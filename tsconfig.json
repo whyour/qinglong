@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
+    "target": "es2017",
+    "module": "commonjs",
     "moduleResolution": "node",
     "importHelpers": true,
     "jsx": "react-jsx",
@@ -13,11 +13,22 @@
       "@/*": ["src/*"],
       "@@/*": ["src/.umi/*"]
     },
+    "lib": ["dom", "es2017", "esnext.asynciterable"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "./back/types",
+      "./node_modules/celebrate/lib/index.d.ts"
+    ],
     "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "forceConsistentCasingInFileNames": true,
+    "pretty": true,
+    "allowJs": true,
+    "noEmit": false
   },
   "include": [
-    "mock/**/*",
+    "back/**/*",
     "src/**/*",
     "config/**/*",
     ".umirc.ts",

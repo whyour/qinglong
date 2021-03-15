@@ -19,3 +19,4 @@
 /src/.umi-test
 /.env.local
 /config
+.env

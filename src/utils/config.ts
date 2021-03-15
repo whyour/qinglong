@@ -1,7 +1,7 @@
 export default {
   siteName: '京东羊毛脚本控制面板',
   apiPrefix: '/api/',
-  authKey: 'whyour',
+  authKey: 'token',
 
   /* Layout configuration, specify which layout to use for route. */
   layouts: [

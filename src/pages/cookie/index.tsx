@@ -25,9 +25,7 @@ const columns = [
     title: '状态',
     key: 'status',
     dataIndex: 'status',
-    render: (text: string, record: any) => (
-      <Tag color="success">success</Tag>
-    ),
+    render: (text: string, record: any) => <Tag color="success">success</Tag>,
   },
   {
     title: '操作',
@@ -74,9 +72,12 @@ const Config = () => {
 
   const getConfig = () => {
     setLoading(true);
-    request.get(`${config.apiPrefix}config/config`).then((data) => {
-      setValue(data);
-    }).finally(() => setLoading(false));
+    request
+      .get(`${config.apiPrefix}config/config`)
+      .then((data) => {
+        setValue(data.content);
+      })
+      .finally(() => setLoading(false));
   };
 
   const updateConfig = () => {
@@ -182,7 +183,11 @@ const Config = () => {
         height: '100vh',
       }}
     >
-      <Table columns={columns} pagination={{hideOnSinglePage: true}} dataSource={data} />
+      <Table
+        columns={columns}
+        pagination={{ hideOnSinglePage: true }}
+        dataSource={data}
+      />
     </PageContainer>
   );
 };

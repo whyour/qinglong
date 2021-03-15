@@ -16,15 +16,18 @@ const Crontab = () => {
 
   const getConfig = () => {
     request.get(`${config.apiPrefix}config/config`).then((data) => {
-      setValue(data);
+      setValue(data.content);
     });
   };
 
   const getSample = () => {
     setLoading(true);
-    request.get(`${config.apiPrefix}config/sample`).then((data) => {
-      setSample(data);
-    }).finally(() => setLoading(false));
+    request
+      .get(`${config.apiPrefix}config/sample`)
+      .then((data) => {
+        setSample(data.content);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -63,16 +66,19 @@ const Crontab = () => {
       }}
     >
       <ReactDiffViewer
-        styles={{ diffRemoved: {
-          overflowX: 'auto',
-          maxWidth: 300,
-      },
-      diffAdded: {
-          overflowX: 'auto',
-          maxWidth: 300,
-      },line: {
-        wordBreak: 'break-word',
-    }, }}
+        styles={{
+          diffRemoved: {
+            overflowX: 'auto',
+            maxWidth: 300,
+          },
+          diffAdded: {
+            overflowX: 'auto',
+            maxWidth: 300,
+          },
+          line: {
+            wordBreak: 'break-word',
+          },
+        }}
         oldValue={value}
         newValue={sample}
         splitView={true}

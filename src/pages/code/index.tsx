@@ -14,9 +14,12 @@ const Crontab = () => {
 
   const getConfig = () => {
     setLoading(true);
-    request.get(`${config.apiPrefix}config/shareCode`).then((data) => {
-      setValue(data);
-    }).finally(() => setLoading(false));
+    request
+      .get(`${config.apiPrefix}config/shareCode`)
+      .then((data) => {
+        setValue(data.content);
+      })
+      .finally(() => setLoading(false));
   };
 
   const updateConfig = () => {

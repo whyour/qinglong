@@ -18,7 +18,7 @@ const Login = () => {
       })
       .then((data) => {
         if (data.err == 0) {
-          localStorage.setItem(config.authKey, 'true');
+          localStorage.setItem(config.authKey, data.token);
           history.push('/cookie');
         } else {
           notification.open({
@@ -36,7 +36,7 @@ const Login = () => {
     if (isAuth) {
       history.push('/cookie');
     }
-  }, [])
+  }, []);
 
   return (
     <Fragment>
@@ -50,7 +50,7 @@ const Login = () => {
             rules={[{ required: true, message: '请输入用户名' }]}
             hasFeedback
           >
-            <Input placeholder="用户名" autoFocus/>
+            <Input placeholder="用户名" autoFocus />
           </FormItem>
           <FormItem
             name="password"
