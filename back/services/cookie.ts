@@ -3,7 +3,8 @@ import winston from 'winston';
 import fetch from 'node-fetch';
 import { getFileContentByName } from '../config/util';
 import config from '../config';
-import FormData from 'form-data';
+import * as fs from 'fs';
+import got from 'got';
 
 enum Status {
   '正常',
@@ -22,8 +23,10 @@ export default class CookieService {
   private token: string = '';
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  public async getYiYan(): Promise<any> {
-    return { yiYan: 'test' };
+  public async getQrUrl(): Promise<{ qrurl: string }> {
+    await this.step1();
+    const qrurl = await this.step2();
+    return { qrurl };
   }
 
   private async step1() {
@@ -49,17 +52,18 @@ export default class CookieService {
           Host: 'plogin.m.jd.com',
         },
       });
-      this.praseSetCookies(text);
+      await this.praseSetCookies(text);
     } catch (error) {
-      this.logger.error(error.response.body);
+      this.logger.error(error);
     }
   }
 
   private async step2() {
     try {
       if (this.cookies == '') {
-        return 0;
+        return '';
       }
+      console.log(this.cookies);
       let timeStamp = new Date().getTime();
       let url =
         'https://plogin.m.jd.com/cgi-bin/m/tmauthreflogurl?s_token=' +
@@ -67,7 +71,7 @@ export default class CookieService {
         '&v=' +
         timeStamp +
         '&remember=true';
-      const response = await fetch(url, {
+      const response: any = await fetch(url, {
         method: 'post',
         body: JSON.stringify({
           lang: 'chs',
@@ -91,37 +95,28 @@ export default class CookieService {
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
           Host: 'plogin.m.jd.com',
         },
-      }).then((res) => res.json);
-      // this.token = response.body.token
-      // this.okl_token = response.headers['set-cookie'][0]
-      // this.okl_token = this.okl_token.substring(this.okl_token.indexOf("=") + 1, this.okl_token.indexOf(";"))
+      });
+      const body = await response.json();
+      this.token = body.token;
+      const setCookies = response.headers.get('set-cookie');
+      this.okl_token = setCookies.match(/okl_token=(.+?);/)[1];
       var qrUrl =
         'https://plogin.m.jd.com/cgi-bin/m/tmauth?appid=300&client_type=m&token=' +
         this.token;
       return qrUrl;
     } catch (error) {
       console.log(error.response.body);
-      return 0;
+      return '';
     }
   }
 
-  private praseSetCookies(response: any) {
-    this.s_token = response.body.s_token;
-    this.guid = response.headers['set-cookie'][0];
-    this.guid = this.guid.substring(
-      this.guid.indexOf('=') + 1,
-      this.guid.indexOf(';'),
-    );
-    this.lsid = response.headers['set-cookie'][2];
-    this.lsid = this.lsid.substring(
-      this.lsid.indexOf('=') + 1,
-      this.lsid.indexOf(';'),
-    );
-    this.lstoken = response.headers['set-cookie'][3];
-    this.lstoken = this.lstoken.substring(
-      this.lstoken.indexOf('=') + 1,
-      this.lstoken.indexOf(';'),
-    );
+  private async praseSetCookies(response: any) {
+    const body = await response.json();
+    this.s_token = body.s_token;
+    const setCookies = response.headers.get('set-cookie');
+    this.guid = setCookies.match(/guid=(.+?);/)[1];
+    this.lsid = setCookies.match(/lsid=(.+?);/)[1];
+    this.lstoken = setCookies.match(/lstoken=(.+?);/)[1];
     this.cookies =
       'guid=' +
       this.guid +
@@ -133,26 +128,14 @@ export default class CookieService {
   }
 
   private getCookie(response: any) {
-    var TrackerID = response.headers['set-cookie'][0];
-    TrackerID = TrackerID.substring(
-      TrackerID.indexOf('=') + 1,
-      TrackerID.indexOf(';'),
-    );
-    var pt_key = response.headers['set-cookie'][1];
-    pt_key = pt_key.substring(pt_key.indexOf('=') + 1, pt_key.indexOf(';'));
-    var pt_pin = response.headers['set-cookie'][2];
-    pt_pin = pt_pin.substring(pt_pin.indexOf('=') + 1, pt_pin.indexOf(';'));
-    var pt_token = response.headers['set-cookie'][3];
-    pt_token = pt_token.substring(
-      pt_token.indexOf('=') + 1,
-      pt_token.indexOf(';'),
-    );
-    var pwdt_id = response.headers['set-cookie'][4];
-    pwdt_id = pwdt_id.substring(pwdt_id.indexOf('=') + 1, pwdt_id.indexOf(';'));
-    var s_key = response.headers['set-cookie'][5];
-    s_key = s_key.substring(s_key.indexOf('=') + 1, s_key.indexOf(';'));
-    var s_pin = response.headers['set-cookie'][6];
-    s_pin = s_pin.substring(s_pin.indexOf('=') + 1, s_pin.indexOf(';'));
+    const setCookies = response.headers['set-cookie'];
+    var TrackerID = setCookies[0].match(/TrackerID=(.+?);/)[1];
+    var pt_key = setCookies[1].match(/pt_key=(.+?);/)[1];
+    var pt_pin = setCookies[2].match(/pt_pin=(.+?);/)[1];
+    var pt_token = setCookies[3].match(/pt_token=(.+?);/)[1];
+    var pwdt_id = setCookies[4].match(/pwdt_id=(.+?);/)[1];
+    var s_key = setCookies[5].match(/s_key=(.+?);/)[1];
+    var s_pin = setCookies[6].match(/s_pin=(.+?);/)[1];
     this.cookies =
       'TrackerID=' +
       TrackerID +
@@ -177,19 +160,29 @@ export default class CookieService {
   }
 
   public async addCookie() {
-    const cookie: any = await this.checkLogin();
-    if (cookie.body.errcode == 0) {
-      let ucookie = this.getCookie(cookie);
-      return ucookie;
+    const res: any = await this.checkLogin();
+    if (res.body.errcode === 0) {
+      let ucookie = this.getCookie(res);
+      let content = getFileContentByName(config.confFile);
+      const regx = /.*Cookie[0-9]{1}\=\"(.+?)\"/g;
+      const lastCookie = (content.match(regx) as any[]).pop();
+      const cookieRegx = /Cookie([0-9]+)\=.+?/.exec(lastCookie);
+      if (cookieRegx) {
+        const num = parseInt(cookieRegx[1]) + 1;
+        const newCookie = `${lastCookie}\nCookie${num}="${ucookie}"`;
+        const result = content.replace(lastCookie, newCookie);
+        fs.writeFileSync(config.confFile, result);
+      }
+      return { cookie: ucookie };
     } else {
-      return '';
+      return res.body;
     }
   }
 
   private async checkLogin() {
     try {
       if (this.cookies == '') {
-        return 0;
+        return '';
       }
       let timeStamp = new Date().getTime();
       let url =
@@ -197,20 +190,15 @@ export default class CookieService {
         this.token +
         '&ou_state=0&okl_token=' +
         this.okl_token;
-      let payload = {
-        lang: 'chs',
-        appid: 300,
-        returnurl:
-          'https://wqlogin2.jd.com/passport/LoginRedirect?state=1100399130787&returnurl=//home.m.jd.com/myJd/newhome.action?sceneval=2&ufc=&/myJd/home.action',
-        source: 'wq_passport',
-      };
-      let form = new FormData();
-      for (const key in payload) {
-        form.append(key, (payload as any)[key] as any);
-      }
-      const response = await fetch(url, {
-        method: 'post',
-        body: form,
+      return got.post(url, {
+        responseType: 'json',
+        form: {
+          lang: 'chs',
+          appid: 300,
+          returnurl:
+            'https://wqlogin2.jd.com/passport/LoginRedirect?state=1100399130787&returnurl=//home.m.jd.com/myJd/newhome.action?sceneval=2&ufc=&/myJd/home.action',
+          source: 'wq_passport',
+        },
         headers: {
           Referer:
             'https://plogin.m.jd.com/login/login?appid=300&returnurl=https://wqlogin2.jd.com/passport/LoginRedirect?state=' +
@@ -224,10 +212,8 @@ export default class CookieService {
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
         },
       });
-
-      return response;
     } catch (error) {
-      console.log(error.response.body);
+      console.log(error);
       let res: any = {};
       res.body = { check_ip: 0, errcode: 222, message: '出错' };
       res.headers = {};
@@ -278,10 +264,7 @@ export default class CookieService {
         },
       },
     )
-      .then((x) => {
-        console.log(x);
-        return x.json();
-      })
+      .then((x) => x.json())
       .then((x) => {
         console.log(x.data.userInfo);
         if (x.retcode === '0' && x.data && x.data.userInfo) {

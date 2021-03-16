@@ -21,7 +21,7 @@ const columns = [
     title: '用户名',
     dataIndex: 'pin',
     key: 'pin',
-    align: 'center',
+    align: 'center' as const,
     render: (text: string, record: any) => {
       return <span>{decodeURIComponent(text)}</span>;
     },
@@ -30,13 +30,13 @@ const columns = [
     title: '昵称',
     dataIndex: 'nickname',
     key: 'nickname',
-    align: 'center',
+    align: 'center' as const,
   },
   {
     title: '值',
     dataIndex: 'cookie',
     key: 'cookie',
-    align: 'center',
+    align: 'center' as const,
     render: (text: string, record: any) => {
       return (
         <span
@@ -55,7 +55,7 @@ const columns = [
     title: '状态',
     key: 'status',
     dataIndex: 'status',
-    align: 'center',
+    align: 'center' as const,
     render: (text: string, record: any) => {
       return (
         <Space size="middle">
@@ -111,45 +111,55 @@ const Config = () => {
 
   const showQrCode = () => {
     request.get(`${config.apiPrefix}qrcode`).then(async (data) => {
-      const modal = Modal.info({
-        title: '二维码',
-        content: (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              marginLeft: -38,
-            }}
-          >
-            <QRCode
+      if (data.qrcode) {
+        const modal = Modal.info({
+          title: '二维码',
+          content: (
+            <div
               style={{
-                width: 200,
-                height: 200,
-                marginBottom: 10,
-                marginTop: 20,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                marginLeft: -38,
               }}
-              value={data.qrcode}
-            />
-          </div>
-        ),
-      });
-      getCookie(modal);
+            >
+              <QRCode
+                style={{
+                  width: 200,
+                  height: 200,
+                  marginBottom: 10,
+                  marginTop: 20,
+                }}
+                value={data.qrcode}
+              />
+            </div>
+          ),
+        });
+        getCookie(modal);
+      } else {
+        notification.error({ message: '获取二维码失败' });
+      }
     });
   };
 
   const getCookie = async (modal: { destroy: () => void }) => {
     for (let i = 0; i < 50; i++) {
-      const result = await request.get(`${config.apiPrefix}cookie`);
-      if (result && result.cookie) {
+      const {
+        data: { cookie, errcode, message },
+      } = await request.get(`${config.apiPrefix}cookie`);
+      if (cookie) {
         notification.success({
           message: 'Cookie获取成功',
         });
         modal.destroy();
         Modal.success({
           title: '获取Cookie成功',
-          content: <div>{result.cookie}</div>,
+          content: <div>{cookie}</div>,
         });
+        break;
+      }
+      if (errcode !== 176) {
+        notification.error({ message });
         break;
       }
       await sleep(2000);
@@ -199,7 +209,7 @@ const Config = () => {
         columns={columns}
         pagination={{ hideOnSinglePage: true }}
         dataSource={value}
-        rowKey="value"
+        rowKey="pin"
         size="middle"
         bordered
       />

@@ -16,10 +16,10 @@ export default (app: Router) => {
       try {
         if (req) {
           const cookieService = Container.get(CookieService);
-          const { shici } = await cookieService.getYiYan();
-          return res.status(200).json({ code: 200, data: shici });
+          const { qrurl } = await cookieService.getQrUrl();
+          return res.send({ code: 200, qrcode: qrurl });
         } else {
-          return res.status(200).json({ err: 1, msg: 'loginFaild' });
+          return res.send({ code: 1, msg: 'loginFaild' });
         }
       } catch (e) {
         logger.error('🔥 error: %o', e);

@@ -70,17 +70,22 @@ const Config = () => {
 
   const getCookie = async (modal: { destroy: () => void }) => {
     for (let i = 0; i < 50; i++) {
-      const result = await request.get(`${config.apiPrefix}cookie`);
-      console.log(i, result);
-      if (result && result.cookie) {
+      const {
+        data: { cookie, errcode, message },
+      } = await request.get(`${config.apiPrefix}cookie`);
+      if (cookie) {
         notification.success({
           message: 'Cookie获取成功',
         });
         modal.destroy();
         Modal.success({
           title: '获取Cookie成功',
-          content: <div>{result.cookie}</div>,
+          content: <div>{cookie}</div>,
         });
+        break;
+      }
+      if (errcode !== 176) {
+        notification.error({ message });
         break;
       }
       await sleep(2000);
@@ -108,9 +113,6 @@ const Config = () => {
       extra={[
         <Button key="1" type="primary" onClick={updateConfig}>
           保存
-        </Button>,
-        <Button key="2" type="primary" onClick={showQrCode}>
-          扫码获取Cookie
         </Button>,
       ]}
       header={{
