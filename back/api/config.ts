@@ -1,7 +1,7 @@
+import { getFileContentByName, getLastModifyFilePath } from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
-import * as fs from 'fs';
 import config from '../config';
 const route = Router();
 
@@ -41,30 +41,3 @@ export default (app: Router) => {
     },
   );
 };
-
-function getFileContentByName(fileName) {
-  if (fs.existsSync(fileName)) {
-    return fs.readFileSync(fileName, 'utf8');
-  }
-  return '';
-}
-function getLastModifyFilePath(dir) {
-  var filePath = '';
-
-  if (fs.existsSync(dir)) {
-    var lastmtime = 0;
-
-    var arr = fs.readdirSync(dir);
-
-    arr.forEach(function (item) {
-      var fullpath = path.join(dir, item);
-      var stats = fs.statSync(fullpath);
-      if (stats.isFile()) {
-        if (stats.mtimeMs >= lastmtime) {
-          filePath = fullpath;
-        }
-      }
-    });
-  }
-  return filePath;
-}

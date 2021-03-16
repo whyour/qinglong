@@ -5,27 +5,64 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import QRCode from 'qrcode.react';
 
+enum Status {
+  '正常',
+  '失效',
+  '状态异常',
+}
+enum StatusColor {
+  'success',
+  'error',
+  'warning',
+}
+
 const columns = [
   {
     title: '用户名',
     dataIndex: 'pin',
     key: 'pin',
+    align: 'center',
+    render: (text: string, record: any) => {
+      return <span>{decodeURIComponent(text)}</span>;
+    },
   },
   {
     title: '昵称',
     dataIndex: 'nickname',
     key: 'nickname',
+    align: 'center',
   },
   {
     title: '值',
     dataIndex: 'cookie',
     key: 'cookie',
+    align: 'center',
+    render: (text: string, record: any) => {
+      return (
+        <span
+          style={{
+            textAlign: 'left',
+            display: 'inline-block',
+            wordBreak: 'break-all',
+          }}
+        >
+          {text}
+        </span>
+      );
+    },
   },
   {
     title: '状态',
     key: 'status',
     dataIndex: 'status',
-    render: (text: string, record: any) => <Tag color="success">success</Tag>,
+    align: 'center',
+    render: (text: string, record: any) => {
+      return (
+        <Space size="middle">
+          <Tag color={StatusColor[record.status]}>{Status[record.status]}</Tag>
+        </Space>
+      );
+    },
   },
   {
     title: '操作',
@@ -39,43 +76,19 @@ const columns = [
   },
 ];
 
-const data = [
-  {
-    key: '1',
-    name: 'John Brown',
-    age: 32,
-    address: 'New York No. 1 Lake Park',
-    tags: ['nice', 'developer'],
-  },
-  {
-    key: '2',
-    name: 'Jim Green',
-    age: 42,
-    address: 'London No. 1 Lake Park',
-    tags: ['loser'],
-  },
-  {
-    key: '3',
-    name: 'Joe Black',
-    age: 32,
-    address: 'Sidney No. 1 Lake Park',
-    tags: ['cool', 'teacher'],
-  },
-];
-
 const Config = () => {
   const [width, setWdith] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState();
   const [loading, setLoading] = useState(true);
 
   const getConfig = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}config/config`)
+      .get(`${config.apiPrefix}cookies`)
       .then((data) => {
-        setValue(data.content);
+        setValue(data.data);
       })
       .finally(() => setLoading(false));
   };
@@ -128,7 +141,6 @@ const Config = () => {
   const getCookie = async (modal: { destroy: () => void }) => {
     for (let i = 0; i < 50; i++) {
       const result = await request.get(`${config.apiPrefix}cookie`);
-      console.log(i, result);
       if (result && result.cookie) {
         notification.success({
           message: 'Cookie获取成功',
@@ -164,7 +176,7 @@ const Config = () => {
       loading={loading}
       extra={[
         <Button key="2" type="primary" onClick={showQrCode}>
-          扫码获取Cookie
+          添加Cookie
         </Button>,
       ]}
       header={{
@@ -186,7 +198,10 @@ const Config = () => {
       <Table
         columns={columns}
         pagination={{ hideOnSinglePage: true }}
-        dataSource={data}
+        dataSource={value}
+        rowKey="value"
+        size="middle"
+        bordered
       />
     </PageContainer>
   );

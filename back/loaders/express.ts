@@ -10,6 +10,7 @@ export default ({ app }: { app: Application }) => {
   app.use(cors());
 
   app.use(bodyParser.json());
+  app.use(bodyParser.urlencoded({ extended: true }));
   app.use(
     jwt({ secret: config.secret as string, algorithms: ['HS384'] }).unless({
       path: ['/api/auth'],
