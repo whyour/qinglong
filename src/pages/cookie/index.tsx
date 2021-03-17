@@ -16,67 +16,75 @@ enum StatusColor {
   'warning',
 }
 
-const columns = [
-  {
-    title: '用户名',
-    dataIndex: 'pin',
-    key: 'pin',
-    align: 'center' as const,
-    render: (text: string, record: any) => {
-      return <span>{decodeURIComponent(text)}</span>;
-    },
-  },
-  {
-    title: '昵称',
-    dataIndex: 'nickname',
-    key: 'nickname',
-    align: 'center' as const,
-  },
-  {
-    title: '值',
-    dataIndex: 'cookie',
-    key: 'cookie',
-    align: 'center' as const,
-    render: (text: string, record: any) => {
-      return (
-        <span
-          style={{
-            textAlign: 'left',
-            display: 'inline-block',
-            wordBreak: 'break-all',
-          }}
-        >
-          {text}
-        </span>
-      );
-    },
-  },
-  {
-    title: '状态',
-    key: 'status',
-    dataIndex: 'status',
-    align: 'center' as const,
-    render: (text: string, record: any) => {
-      return (
-        <Space size="middle">
-          <Tag color={StatusColor[record.status]}>{Status[record.status]}</Tag>
-        </Space>
-      );
-    },
-  },
-  {
-    title: '操作',
-    key: 'action',
-    render: (text: string, record: any) => (
-      <Space size="middle">
-        <a>Invite {record.name}</a>
-        <a>Delete</a>
-      </Space>
-    ),
-  },
-];
-
 const Config = () => {
+  const columns = [
+    {
+      title: '用户名',
+      dataIndex: 'pin',
+      key: 'pin',
+      align: 'center' as const,
+      render: (text: string, record: any) => {
+        return <span>{decodeURIComponent(text)}</span>;
+      },
+    },
+    {
+      title: '昵称',
+      dataIndex: 'nickname',
+      key: 'nickname',
+      align: 'center' as const,
+    },
+    {
+      title: '值',
+      dataIndex: 'cookie',
+      key: 'cookie',
+      align: 'center' as const,
+      width: '50%',
+      render: (text: string, record: any) => {
+        return (
+          <span
+            style={{
+              textAlign: 'left',
+              display: 'inline-block',
+              wordBreak: 'break-all',
+            }}
+          >
+            {text}
+          </span>
+        );
+      },
+    },
+    {
+      title: '状态',
+      key: 'status',
+      dataIndex: 'status',
+      align: 'center' as const,
+      render: (text: string, record: any) => {
+        return (
+          <Space size="middle">
+            <Tag color={StatusColor[record.status]}>
+              {Status[record.status]}
+            </Tag>
+          </Space>
+        );
+      },
+    },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center' as const,
+      render: (text: string, record: any, index: number) => (
+        <Space size="middle">
+          {record.status === 0 && <span>-</span>}
+          {record.status === 1 && (
+            <a onClick={() => reacquire(record)}>重新获取</a>
+          )}
+          {record.status === 2 && (
+            <a onClick={() => refreshStatus(record, index)}>刷新状态</a>
+          )}
+        </Space>
+      ),
+    },
+  ];
   const [width, setWdith] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
@@ -109,7 +117,7 @@ const Config = () => {
     return new Promise((resolve) => setTimeout(resolve, time));
   }
 
-  const showQrCode = () => {
+  const showQrCode = (oldCookie?: string) => {
     request.get(`${config.apiPrefix}qrcode`).then(async (data) => {
       if (data.qrcode) {
         const modal = Modal.info({
@@ -135,18 +143,21 @@ const Config = () => {
             </div>
           ),
         });
-        getCookie(modal);
+        getCookie(modal, oldCookie);
       } else {
         notification.error({ message: '获取二维码失败' });
       }
     });
   };
 
-  const getCookie = async (modal: { destroy: () => void }) => {
+  const getCookie = async (
+    modal: { destroy: () => void },
+    oldCookie: string = '',
+  ) => {
     for (let i = 0; i < 50; i++) {
       const {
         data: { cookie, errcode, message },
-      } = await request.get(`${config.apiPrefix}cookie`);
+      } = await request.get(`${config.apiPrefix}cookie?cookie=${oldCookie}`);
       if (cookie) {
         notification.success({
           message: 'Cookie获取成功',
@@ -164,6 +175,26 @@ const Config = () => {
       }
       await sleep(2000);
     }
+  };
+
+  const reacquire = async (record: any) => {
+    await showQrCode(record.cookie);
+  };
+
+  const refreshStatus = (record: any, index: number) => {
+    request
+      .post(`${config.apiPrefix}cookie/refresh`, {
+        data: { cookie: record.cookie },
+      })
+      .then(async (data: any) => {
+        if (data.data && data.data.cookie) {
+          (value as any).splice(index, 1, data.data);
+          setValue([...(value as any)] as any);
+          notification.success({ message: '更新状态成功' });
+        } else {
+          notification.error({ message: '更新状态失败' });
+        }
+      });
   };
 
   useEffect(() => {
@@ -185,7 +216,7 @@ const Config = () => {
       title="Cookie管理"
       loading={loading}
       extra={[
-        <Button key="2" type="primary" onClick={showQrCode}>
+        <Button key="2" type="primary" onClick={() => showQrCode()}>
           添加Cookie
         </Button>,
       ]}
@@ -212,6 +243,7 @@ const Config = () => {
         rowKey="pin"
         size="middle"
         bordered
+        scroll={{ x: '100%' }}
       />
     </PageContainer>
   );

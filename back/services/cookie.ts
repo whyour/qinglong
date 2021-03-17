@@ -159,13 +159,13 @@ export default class CookieService {
     return userCookie;
   }
 
-  public async addCookie() {
+  public async addCookie(oldCookie: string) {
     const res: any = await this.checkLogin();
     if (res.body.errcode === 0) {
       let ucookie = this.getCookie(res);
       let content = getFileContentByName(config.confFile);
       const regx = /.*Cookie[0-9]{1}\=\"(.+?)\"/g;
-      const lastCookie = (content.match(regx) as any[]).pop();
+      const lastCookie = oldCookie || (content.match(regx) as any[]).pop();
       const cookieRegx = /Cookie([0-9]+)\=.+?/.exec(lastCookie);
       if (cookieRegx) {
         const num = parseInt(cookieRegx[1]) + 1;
@@ -246,6 +246,17 @@ export default class CookieService {
     return result;
   }
 
+  public async refreshCookie(body: any) {
+    const { cookie } = body;
+    const { nickname, status } = await this.getJdInfo(cookie);
+    return {
+      pin: cookie.match(/pt_pin=(.+?);/)[1],
+      cookie,
+      status,
+      nickname: nickname,
+    };
+  }
+
   private getJdInfo(cookie: string) {
     return fetch(
       `https://me-api.jd.com/user_new/info/GetJDUserInfoUnion?orgFlag=JD_PinGou_New&callSource=mainorder&channel=4&isHomewhite=0&sceneval=2&_=${Date.now()}&sceneval=2&g_login_type=1&g_ty=ls`,
@@ -266,7 +277,6 @@ export default class CookieService {
     )
       .then((x) => x.json())
       .then((x) => {
-        console.log(x.data.userInfo);
         if (x.retcode === '0' && x.data && x.data.userInfo) {
           return { nickname: x.data.userInfo.baseInfo.nickname, status: 0 };
         } else if (x.retcode === 13) {

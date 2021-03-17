@@ -41,4 +41,9 @@ export default {
   crontabFile,
   sampleFile,
   confFile,
+  fileMap: {
+    'config.sh': confFile,
+    'crontab.list': crontabFile,
+    'diy.sh': diyFile,
+  },
 };

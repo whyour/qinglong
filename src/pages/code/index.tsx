@@ -22,18 +22,6 @@ const Crontab = () => {
       .finally(() => setLoading(false));
   };
 
-  const updateConfig = () => {
-    request
-      .post(`${config.apiPrefix}save`, {
-        data: { content: value, name: 'diy.sh' },
-      })
-      .then((data) => {
-        notification.success({
-          message: data.msg,
-        });
-      });
-  };
-
   useEffect(() => {
     if (document.body.clientWidth < 768) {
       setWdith('auto');
@@ -52,11 +40,6 @@ const Crontab = () => {
       className="code-mirror-wrapper"
       title="互助码"
       loading={loading}
-      extra={[
-        <Button key="1" type="primary" onClick={updateConfig}>
-          保存
-        </Button>,
-      ]}
       header={{
         style: {
           padding: '4px 16px 4px 15px',

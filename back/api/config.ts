@@ -3,6 +3,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
+import * as fs from 'fs';
+import { celebrate, Joi } from 'celebrate';
 const route = Router();
 
 export default (app: Router) => {
@@ -34,6 +36,28 @@ export default (app: Router) => {
             break;
         }
         res.send({ code: 200, content });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/save',
+    celebrate({
+      body: Joi.object({
+        name: Joi.string().required(),
+        content: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const { name, content } = req.body;
+        const path = (config.fileMap as any)[name];
+        fs.writeFileSync(path, content);
+        res.send({ code: 200, msg: '保存成功' });
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);
