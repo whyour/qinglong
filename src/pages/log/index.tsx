@@ -21,20 +21,32 @@ const Log = () => {
   };
 
   const formatData = (tree: any[]) => {
-    return tree.map(x => {
-      x.title = x.dirName;
-      x.value = x.dirName;
-      x.disabled = true;
-      x.children = x.files.map((y: string) => ({ title: y, key: y, value: y, parent: x.dirName }));
+    return tree.map((x) => {
+      x.title = x.name;
+      x.value = x.name;
+      x.disabled = x.isDir;
+      x.children = x.files.map((y: string) => ({
+        title: y,
+        key: y,
+        value: y,
+        parent: x.name,
+      }));
       return x;
-    })
-  }
+    });
+  };
 
   const getLog = (node: any) => {
     setLoading(true);
-    request.get(`${config.apiPrefix}logs/${node.parent}/${node.value}`).then((data) => {
-      setValue(data);
-    }).finally(() => setLoading(false));
+    let url = `${node.parent}/${node.value}`;
+    if (!node.isDir) {
+      url = node.value;
+    }
+    request
+      .get(`${config.apiPrefix}logs/${url}`)
+      .then((data) => {
+        setValue(data.data);
+      })
+      .finally(() => setLoading(false));
   };
 
   const onSelect = (value: any, node: any) => {
@@ -60,7 +72,6 @@ const Log = () => {
     <PageContainer
       className="code-mirror-wrapper"
       title={title}
-      loading={loading}
       extra={[
         <TreeSelect
           style={{ width: 280 }}
@@ -71,7 +82,7 @@ const Log = () => {
           showSearch
           key="title"
           onSelect={onSelect}
-        />
+        />,
       ]}
       header={{
         style: {

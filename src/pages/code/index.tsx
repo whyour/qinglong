@@ -39,7 +39,6 @@ const Crontab = () => {
     <PageContainer
       className="code-mirror-wrapper"
       title="互助码"
-      loading={loading}
       header={{
         style: {
           padding: '4px 16px 4px 15px',

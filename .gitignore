@@ -20,4 +20,5 @@
 /src/.umi-test
 /.env.local
 /config
+/log
 .env

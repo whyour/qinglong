@@ -35,63 +35,6 @@ const Config = () => {
       });
   };
 
-  function sleep(time: number) {
-    return new Promise((resolve) => setTimeout(resolve, time));
-  }
-
-  const showQrCode = () => {
-    request.get(`${config.apiPrefix}qrcode`).then(async (data) => {
-      const modal = Modal.info({
-        title: '二维码',
-        content: (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              marginLeft: -38,
-            }}
-          >
-            <QRCode
-              style={{
-                width: 200,
-                height: 200,
-                marginBottom: 10,
-                marginTop: 20,
-              }}
-              value={data.qrcode}
-            />
-          </div>
-        ),
-      });
-      getCookie(modal);
-    });
-  };
-
-  const getCookie = async (modal: { destroy: () => void }) => {
-    for (let i = 0; i < 50; i++) {
-      const {
-        data: { cookie, errcode, message },
-      } = await request.get(`${config.apiPrefix}cookie`);
-      if (cookie) {
-        notification.success({
-          message: 'Cookie获取成功',
-        });
-        modal.destroy();
-        Modal.success({
-          title: '获取Cookie成功',
-          content: <div>{cookie}</div>,
-        });
-        break;
-      }
-      if (errcode !== 176) {
-        notification.error({ message });
-        break;
-      }
-      await sleep(2000);
-    }
-  };
-
   useEffect(() => {
     if (document.body.clientWidth < 768) {
       setWdith('auto');
@@ -109,7 +52,6 @@ const Config = () => {
     <PageContainer
       className="code-mirror-wrapper"
       title="config.sh"
-      loading={loading}
       extra={[
         <Button key="1" type="primary" onClick={updateConfig}>
           保存

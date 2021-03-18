@@ -51,7 +51,6 @@ const Crontab = () => {
     <PageContainer
       className="code-mirror-wrapper"
       title="diy.sh"
-      loading={loading}
       extra={[
         <Button key="1" type="primary" onClick={updateConfig}>
           保存
