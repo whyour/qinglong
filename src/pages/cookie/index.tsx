@@ -91,7 +91,7 @@ const Config = () => {
   const [value, setValue] = useState();
   const [loading, setLoading] = useState(true);
 
-  const getConfig = () => {
+  const getCookies = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}cookies`)
@@ -167,6 +167,7 @@ const Config = () => {
           title: '获取Cookie成功',
           content: <div>{cookie}</div>,
         });
+        getCookies();
         break;
       }
       if (errcode !== 176) {
@@ -207,7 +208,7 @@ const Config = () => {
       setMarginLeft(0);
       setMarginTop(-72);
     }
-    getConfig();
+    getCookies();
   }, []);
 
   return (

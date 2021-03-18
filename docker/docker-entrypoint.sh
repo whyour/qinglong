@@ -27,11 +27,7 @@ if [ ! -s ${JD_DIR}/config/auth.json ]; then
   echo
 fi
 
-if [ ! -s /etc/nginx/conf.d/front.conf ]
-then
-  echo -e "检测到nginx配置不存在...\n"
-  cp -fv ${JD_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
-fi
+cp -fv ${JD_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
 
 echo -e "======================2. 启动nginx========================\n"
 nginx -c /etc/nginx/nginx.conf
