@@ -9,7 +9,7 @@ import ProLayout, {
 import defaultProps from './defaultProps';
 import { Link, history } from 'umi';
 import config from '@/utils/config';
-import 'codemirror/mode/shell/shell.js'
+import 'codemirror/mode/shell/shell.js';
 import './index.less';
 
 export default function (props: any) {
@@ -21,7 +21,7 @@ export default function (props: any) {
   }, []);
   useEffect(() => {
     if (props.location.pathname === '/') {
-      history.push('/config');
+      history.push('/cookie');
     }
   }, [props.location.pathname]);
   if (props.location.pathname === '/login') {
@@ -41,11 +41,11 @@ export default function (props: any) {
         }
         return <Link to={menuItemProps.path}>{defaultDom}</Link>;
       }}
-    //   rightContentRender={() => (
-    //       <div>
-    //           <Avatar shape="square" size="small" icon={<UserOutlined />} />
-    //       </div>
-    //   )}
+      //   rightContentRender={() => (
+      //       <div>
+      //           <Avatar shape="square" size="small" icon={<UserOutlined />} />
+      //       </div>
+      //   )}
       {...defaultProps}
     >
       {props.children}
