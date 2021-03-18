@@ -1,5 +1,5 @@
 export default {
-  siteName: '京东羊毛脚本控制面板',
+  siteName: '脚本控制面板',
   apiPrefix: '/api/',
   authKey: 'token',
 

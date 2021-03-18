@@ -1,4 +1,24 @@
-.form {
+@import '~antd/es/style/themes/default.less';
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: auto;
+  background: @layout-body-background;
+}
+
+.lang {
+  width: 100%;
+  height: 40px;
+  line-height: 44px;
+  text-align: right;
+  :global(.ant-dropdown-trigger) {
+    margin-right: 24px;
+  }
+}
+
+.content {
   position: absolute;
   top: 45%;
   left: 50%;
@@ -6,53 +26,97 @@
   width: 320px;
   height: 320px;
   padding: 36px;
-  box-shadow: 0 0 100px rgba(0, 0, 0, 0.08);
+  // box-shadow: 0 0 100px rgba(0, 0, 0, 0.08);
+}
 
-  button {
-    width: 100%;
+@media (min-width: @screen-md-min) {
+  .container {
+    background-image: url('https://gw.alipayobjects.com/zos/rmsportal/TVYTbAXWheQpRcWDaDMu.svg');
+    background-repeat: no-repeat;
+    background-position: center 110px;
+    background-size: 100%;
   }
 
-  p {
-    color: rgb(204, 204, 204);
-    text-align: center;
-    margin-top: 16px;
-    font-size: 12px;
+  .content {
+    padding: 32px 0 24px;
+  }
+}
+
+.top {
+  text-align: center;
+}
+
+.header {
+  height: 44px;
+  line-height: 44px;
+  a {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: center;
   }
 }
 
 .logo {
-  text-align: center;
-  cursor: pointer;
-  margin-bottom: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  img {
-    width: 40px;
-    margin-right: 8px;
-  }
-
-  span {
-    vertical-align: text-bottom;
-    font-size: 16px;
-    text-transform: uppercase;
-    display: inline-block;
-    font-weight: 700;
-    // color: @primary-color;
-    // .text-gradient();
-  }
+  height: 44px;
+  margin-right: 16px;
+  vertical-align: top;
 }
 
-.ant-spin-container,
-.ant-spin-nested-loading {
-  height: 100%;
+.title {
+  position: relative;
+  top: 2px;
+  color: @heading-color;
+  font-weight: 600;
+  font-size: 33px;
+  font-family: Avenir, 'Helvetica Neue', Arial, Helvetica, sans-serif;
 }
 
-.footer {
-  position: absolute;
-  width: 100%;
-  bottom: 0;
+.desc {
+  margin-top: 12px;
+  margin-bottom: 40px;
+  color: @text-color-secondary;
+  font-size: @font-size-base;
+}
+
+.main {
+  width: 320px;
+  margin: 25px auto 0;
+  @media screen and (max-width: @screen-sm) {
+    width: 95%;
+    max-width: 320px;
+  }
+
+  :global {
+    .@{ant-prefix}-tabs-nav-list {
+      margin: auto;
+      font-size: 16px;
+    }
+  }
+
+  .icon {
+    margin-left: 16px;
+    color: rgba(0, 0, 0, 0.2);
+    font-size: 24px;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: color 0.3s;
+
+    &:hover {
+      color: @primary-color;
+    }
+  }
+
+  .other {
+    margin-top: 24px;
+    line-height: 22px;
+    text-align: left;
+    .register {
+      float: right;
+    }
+  }
+
+  .prefixIcon {
+    color: @primary-color;
+    font-size: @font-size-base;
+  }
 }

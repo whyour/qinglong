@@ -5,6 +5,7 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs';
 import { celebrate, Joi } from 'celebrate';
+import { execSync } from 'child_process';
 const route = Router();
 
 export default (app: Router) => {
@@ -57,6 +58,9 @@ export default (app: Router) => {
         const { name, content } = req.body;
         const path = (config.fileMap as any)[name];
         fs.writeFileSync(path, content);
+        if (name === 'crontab.list') {
+          execSync(`crontab ${path}`);
+        }
         res.send({ code: 200, msg: '保存成功' });
       } catch (e) {
         logger.error('🔥 error: %o', e);

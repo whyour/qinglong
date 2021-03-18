@@ -165,12 +165,18 @@ export default class CookieService {
       let ucookie = this.getCookie(res);
       let content = getFileContentByName(config.confFile);
       const regx = /.*Cookie[0-9]{1}\=\"(.+?)\"/g;
-      const lastCookie = oldCookie || (content.match(regx) as any[]).pop();
-      const cookieRegx = /Cookie([0-9]+)\=.+?/.exec(lastCookie);
-      if (cookieRegx) {
-        const num = parseInt(cookieRegx[1]) + 1;
-        const newCookie = `${lastCookie}\nCookie${num}="${ucookie}"`;
-        const result = content.replace(lastCookie, newCookie);
+      if (content.match(regx)) {
+        const lastCookie = oldCookie || (content.match(regx) as any[]).pop();
+        const cookieRegx = /Cookie([0-9]+)\=.+?/.exec(lastCookie);
+        if (cookieRegx) {
+          const num = parseInt(cookieRegx[1]) + 1;
+          const newCookie = `${lastCookie}\nCookie${num}="${ucookie}"`;
+          const result = content.replace(lastCookie, newCookie);
+          fs.writeFileSync(config.confFile, result);
+        }
+      } else {
+        const newCookie = `Cookie1="${ucookie}"`;
+        const result = content.replace(`Cookie1=""`, newCookie);
         fs.writeFileSync(config.confFile, result);
       }
       return { cookie: ucookie };
