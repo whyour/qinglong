@@ -33,7 +33,11 @@ then
   cp -fv ${JD_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
 fi
 
-echo -e "======================2. 更新源代码========================\n"
+echo -e "======================2. 启动nginx========================\n"
+nginx -c /etc/nginx/nginx.conf
+echo
+
+echo -e "======================3. 更新源代码========================\n"
 bash ${JD_DIR}/git_pull.sh
 echo
 
