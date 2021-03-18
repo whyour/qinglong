@@ -7,9 +7,6 @@ import {
 } from '@ant-design/icons';
 
 export default defineConfig({
-  antd: {
-    compact: true,
-  },
   hash: true,
   layout: false,
   locale: {},

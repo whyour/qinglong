@@ -61,7 +61,6 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cookieService = Container.get(CookieService);
-        console.log(req);
         const data = await cookieService.refreshCookie(req.body);
         return res.send({ code: 200, data });
       } catch (e) {

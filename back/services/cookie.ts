@@ -63,7 +63,6 @@ export default class CookieService {
       if (this.cookies == '') {
         return '';
       }
-      console.log(this.cookies);
       let timeStamp = new Date().getTime();
       let url =
         'https://plogin.m.jd.com/cgi-bin/m/tmauthreflogurl?s_token=' +
@@ -153,9 +152,6 @@ export default class CookieService {
       s_pin +
       '; wq_skey=';
     var userCookie = 'pt_key=' + pt_key + ';pt_pin=' + pt_pin + ';';
-    console.log('\n############  登录成功，获取到 Cookie  #############\n\n');
-    console.log('Cookie1="' + userCookie + '"\n');
-    console.log('\n####################################################\n\n');
     return userCookie;
   }
 
