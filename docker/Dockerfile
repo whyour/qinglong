@@ -23,6 +23,10 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
                              perl \
                              openssl \
                              nginx \
+                             python \
+                             make \
+                             g++ \
+                             yarn \
     && rm -rf /var/cache/apk/* \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
@@ -31,7 +35,6 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && git clone -b ${JD_BASE_BRANCH} ${JD_BASE_URL} ${JD_DIR} \
     && cd ${JD_DIR} \
     && cp -f .env.example .env \
-    && curl -o- -L https://yarnpkg.com/install.sh | bash \
     && yarn install \
     && yarn build \
     && yarn build-back \
