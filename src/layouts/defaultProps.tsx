@@ -73,8 +73,6 @@ export default {
     pathname: '/',
   },
   fixSiderbar: true,
-  navTheme: 'light',
-  primaryColor: '#1890ff',
   contentWidth: 'Fixed',
   splitMenus: false,
   logo: logo,

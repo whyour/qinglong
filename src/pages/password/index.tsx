@@ -66,11 +66,24 @@ const Password = () => {
         height: '100vh',
       }}
     >
-      <Form onFinish={handleOk} style={{ padding: 20, background: '#fff', height: 'calc(100vh - 96px)' }}>
-        <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]} hasFeedback style={{width:300}}>
-          <Input placeholder="用户名" autoFocus/>
+      <Form
+        onFinish={handleOk}
+        style={{ padding: 20, height: 'calc(100vh - 96px)' }}
+      >
+        <Form.Item
+          name="username"
+          rules={[{ required: true, message: '请输入用户名' }]}
+          hasFeedback
+          style={{ width: 300 }}
+        >
+          <Input placeholder="用户名" autoFocus />
         </Form.Item>
-        <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]} hasFeedback style={{width:300}}>
+        <Form.Item
+          name="password"
+          rules={[{ required: true, message: '请输入密码' }]}
+          hasFeedback
+          style={{ width: 300 }}
+        >
           <Input type="password" placeholder="密码" />
         </Form.Item>
         <Button type="primary" htmlType="submit">
