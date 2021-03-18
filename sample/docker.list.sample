@@ -1,0 +1,64 @@
+# 更新lxk0301大佬的js脚本，添加随机cron，日志为log/git_pull.log,每天只更新两次
+55 2,13 * * * bash git_pull >> ${JD_DIR}/log/git_pull.log 2>&1
+
+# 删除 RmLogDaysAgo 指定天数以前的旧日志，本行为不记录日志
+57 13 * * * bash rm_log >/dev/null 2>&1
+
+# 导出所有互助码清单，日志在log/export_sharecodes下
+48 5 * * * bash export_sharecodes
+
+# 重启挂机脚本，挂机脚本可以随容器启动而启动，建议需要重启挂机程序时直接重启容器，如实在不想通过重启容器而重启挂机程序，可以解除下一行注释
+# 33 13 * * * bash jd hangup
+
+# 另外的js脚本，若需使用，请去掉注释（包括52破解，bilibili，爱奇艺，联通）
+#10 13 * * * bash jd 52pojie
+#*/30 7-22 * * * bash jd iqiyi
+#*/30 7-22 * * * bash jd bilibili
+#*/30 7-22 * * * bash jd unicom
+
+# 此处为py脚本(包括喜马拉雅极速版)
+#*/30 * * * * bash jd xmly_speed py
+
+# 运行lxk0301大佬的js脚本，仅列出长期任务作初始化用，AutoAddCron=true时，将自动添加短期任务。
+# 请保留任务名称中的前缀"jd_"，去掉后缀".js"，如果有些任务你不想运行，注释掉就好了，不要删除。
+# 非lxk0301/jd_scripts仓库中的脚本不能以“jd_”、“jr_”、“jx_”开头。请在最后保留一个空行。
+5 9 * * * bash jd jd_bean_change
+28 5 * * * bash jd jd_bean_home
+4 0,9 * * * bash jd jd_bean_sign
+0,30 0 * * * bash jd jd_blueCoin
+12 8,12,18 * * * bash jd jd_bookshop
+37 7 * * * bash jd jd_car
+13 8,22 * * * bash jd jd_cash
+0 0 * * * bash jd jd_car_exchange
+2 0 * * * bash jd jd_club_lottery
+43 13 * * * bash jd jd_crazy_joy
+54 2-23/3 * * * bash jd jd_daily_egg
+20 * * * * bash jd jd_dreamFactory
+29 7,12,18 * * * bash jd jd_fruit
+49 6 * * * bash jd jd_get_share_code
+36 * * * * bash jd jd_jdfactory
+14 11 * * * bash jd jd_jdzz
+6 0,8,9,13,18,22 * * * bash jd jd_joy
+*/20 0-22 * * * bash jd jd_joy_feedPets
+0 0,8,12,16 * * * bash jd jd_joy_reward
+12 9-20/2 * * * bash jd jd_joy_run
+0 0,6 * * * bash jd jd_joy_steal
+0 9,12,18 * * * bash jd jd_jxnc
+32 7 * * * bash jd jd_kd
+13-33/5 13 * * * bash jd jd_live
+15 1 * * * bash jd jd_lotteryMachine
+40 */4 * * * bash jd jd_moneyTree
+20 0,20 * * * bash jd jd_necklace
+10 7,12,18 * * * bash jd jd_pet
+25 * * * * bash jd jd_pigPet
+35 7-22 * * * bash jd jd_plantBean
+11 0 * * * bash jd jd_rankingList
+1 1 * * * bash jd jd_redPacket
+0 0 * * * bash jd jd_shop
+16 0 * * * bash jd jd_small_home
+35 */3 * * * bash jd jd_speed
+9 1-23/5 * * * bash jd jd_superMarket
+25 9 * * * bash jd jd_syj
+44 5 * * 5 bash jd jd_unbind
+45 23 * * * bash jd jd_unsubscribe
+19 11 * * * bash jd jx_sign

@@ -1,7 +1,13 @@
 import { defineConfig } from 'umi';
-import { SmileOutlined, CrownOutlined, TabletOutlined, AntDesignOutlined } from '@ant-design/icons';
+import {
+  SmileOutlined,
+  CrownOutlined,
+  TabletOutlined,
+  AntDesignOutlined,
+} from '@ant-design/icons';
 
 export default defineConfig({
+  hash: true,
   layout: false,
   locale: {},
   nodeModulesTransform: {
@@ -11,8 +17,8 @@ export default defineConfig({
   favicon: 'http://demo.sc.chinaz.com/Files/pic/iconsico/8002/g5.ico',
   proxy: {
     '/api': {
-      'target': 'http://127.0.0.1:5678/',
-      'changeOrigin': true,
+      target: 'http://127.0.0.1:5678/',
+      changeOrigin: true,
     },
   },
 });

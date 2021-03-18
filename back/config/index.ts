@@ -22,7 +22,7 @@ if (envFound.error) {
 }
 
 export default {
-  port: parseInt(process.env.PORT, 10),
+  port: parseInt(process.env.PORT as string, 10),
   secret: process.env.SECRET,
   logs: {
     level: process.env.LOG_LEVEL || 'silly',
