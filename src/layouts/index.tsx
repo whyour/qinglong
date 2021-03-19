@@ -28,8 +28,12 @@ export default function (props: any) {
   useEffect(() => {
     const colorScheme =
       window.matchMedia('(prefers-color-scheme: dark)').matches && 'dark';
-    const theme =
-      localStorage.getItem('qinglong_dark_theme') || colorScheme || 'light';
+    console.log(colorScheme);
+    let localTheme = localStorage.getItem('qinglong_dark_theme');
+    if (localTheme === 'auto') {
+      localTheme = null;
+    }
+    const theme = localTheme || colorScheme || 'light';
     setFetchMethod(window.fetch);
     if (theme === 'dark') {
       enableDarkMode({ darkSchemeTextColor: '#fff' });
@@ -45,7 +49,7 @@ export default function (props: any) {
     <ProLayout
       selectedKeys={[props.location.pathname]}
       title="控制面板"
-      menuItemRender={(menuItemProps: any, defaultDom) => {
+      menuItemRender={(menuItemProps: any, defaultDom: any) => {
         if (
           menuItemProps.isUrl ||
           !menuItemProps.path ||
