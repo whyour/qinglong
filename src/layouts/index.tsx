@@ -28,7 +28,6 @@ export default function (props: any) {
   useEffect(() => {
     const colorScheme =
       window.matchMedia('(prefers-color-scheme: dark)').matches && 'dark';
-    console.log(colorScheme);
     let localTheme = localStorage.getItem('qinglong_dark_theme');
     if (localTheme === 'auto') {
       localTheme = null;
