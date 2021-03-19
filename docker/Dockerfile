@@ -35,6 +35,12 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && git clone -b ${JD_BASE_BRANCH} ${JD_BASE_URL} ${JD_DIR} \
     && cd ${JD_DIR} \
     && cp -f .env.example .env \
+    && ln -sf ${JD_DIR}/shell/jd.sh /usr/local/bin/jd \
+    && ln -sf ${JD_DIR}/shell/git_pull.sh /usr/local/bin/git_pull \
+    && ln -sf ${JD_DIR}/shell/rm_log.sh /usr/local/bin/rm_log \
+    && ln -sf ${JD_DIR}/shell/export_sharecodes.sh /usr/local/bin/export_sharecodes \
+    && ln -sf ${JD_DIR}/shell/git_diy.sh /usr/local/bin/diy \
+    && ln -sf ${JD_DIR}/shell/notify.sh /usr/local/bin/notify \
     && yarn install \
     && yarn build \
     && yarn build-back \

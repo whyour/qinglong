@@ -272,7 +272,7 @@ ForOtherJoy6=""
 ## 具体填法及要求详见本文件最下方“互助码填法示例”
 ## 京喜农场助力码为 JSON 格式因此使用单引号，json 格式如下
 ## {"smp":"22bdadsfaadsfadse8a","active":"jdnc_1_btorange210113_2","joinnum":"1"}
-## 助力码获取可以通过 bash jd.sh jd_get_share_code now 命令获取
+## 助力码获取可以通过 bash jd jd_get_share_code now 命令获取
 ## 注意：京喜农场 种植种子发生变化的时候，互助码也会变！！
 MyJxnc1=''
 MyJxnc2=''

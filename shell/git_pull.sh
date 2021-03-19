@@ -2,18 +2,16 @@
 
 ## 文件路径、脚本网址、文件版本以及各种环境的判断
 ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
-[[ ${JD_DIR} ]] && ShellJd=jd || ShellJd=${ShellDir}/jd.sh
+[[ ${JD_DIR} ]] && ShellJd=jd || ShellJd=${ShellDir}/shell/jd.sh
 LogDir=${ShellDir}/log
 [ ! -d ${LogDir} ] && mkdir -p ${LogDir}
 ScriptsDir=${ShellDir}/scripts
-Scripts2Dir=${ShellDir}/scripts2
 ConfigDir=${ShellDir}/config
 FileConf=${ConfigDir}/config.sh
 FileDiy=${ConfigDir}/diy.sh
 FileConfSample=${ShellDir}/sample/config.sh.sample
 ListCron=${ConfigDir}/crontab.list
 ListCronLxk=${ScriptsDir}/docker/crontab_list.sh
-ListCronShylocks=${Scripts2Dir}/docker/crontab_list.sh
 ListTask=${LogDir}/task.list
 ListJs=${LogDir}/js.list
 ListJsAdd=${LogDir}/js-add.list
@@ -23,8 +21,8 @@ ContentNewTask=${ShellDir}/new_task
 ContentDropTask=${ShellDir}/drop_task
 SendCount=${ShellDir}/send_count
 isTermux=${ANDROID_RUNTIME_ROOT}${ANDROID_ROOT}
-ShellURL=${JD_SHELL_URL:-git@gitee.com:evine/jd_shell.git}
-ScriptsURL=${JD_SCRIPTS_URL:-git@gitee.com:lxk0301/jd_scripts.git}
+ShellURL=https://github.com.cnpmjs.org/whyour/qinglong
+ScriptsURL=https://github.com.cnpmjs.org/RikudouPatrickstar/jd_scripts
 
 ## 导入配置文件
 function Import_Conf {
@@ -53,31 +51,16 @@ function Update_Cron {
     crontab ${ListCron}
   fi
 }
-
-## 重置仓库remote url
-function Reset_RepoUrl {
-  if [[ ${JD_DIR} ]] && [[ ${ENABLE_RESET_REPO_URL} == true ]]; then
-    if [ -d ${ShellDir}/.git ]; then
-      cd ${ShellDir}
-      git remote set-url origin ${ShellURL}
-      git reset --hard
-    fi
-    if [ -d ${ScriptsDir}/.git ]; then
-      cd ${ScriptsDir}
-      git remote set-url origin ${ScriptsURL}
-      git reset --hard
-    fi
-  fi
-}
-
-## 更新shell
 function Git_PullShell {
   echo -e "更新shell...\n"
   cd ${ShellDir}
   git fetch --all
+  git stash
+  git pull
   ExitStatusShell=$?
-  git reset --hard origin/master
   echo
+  git stash pop
+  git reset --mixed
 }
 
 ## 更新shell成功后的操作
@@ -95,7 +78,6 @@ function Git_PullShellNext {
 
 ## 克隆scripts
 function Git_CloneScripts {
-  echo -e "克隆scripts...\n"
   git clone -b master ${ScriptsURL} ${ScriptsDir}
   ExitStatusScripts=$?
   echo
@@ -106,9 +88,16 @@ function Git_PullScripts {
   echo -e "更新scripts...\n"
   cd ${ScriptsDir}
   git fetch --all
+  git rm -f i-chenzhe*
+  git rm -f  moposmall*
+  git rm -f qq34347476*
+  git rm -f whyour*
+  git stash
+  git pull
   ExitStatusScripts=$?
-  git reset --hard origin/master
   echo
+  git stash pop
+  git reset --mixed
 }
 
 ## 更新docker-entrypoint
@@ -274,8 +263,7 @@ function Del_Cron {
     crontab -l
     echo -e "\n--------------------------------------------------------------\n"
     if [ -d ${ScriptsDir}/node_modules ]; then
-      echo -e "删除失效的定时任务：\n\n${JsDrop}" > ${ContentDropTask}
-      Notify_DropTask
+      notify "删除 lxk0301 失效脚本" "${JsDrop}"
     fi
   fi
 }
@@ -308,14 +296,12 @@ function Add_Cron {
       crontab -l
       echo -e "\n--------------------------------------------------------------\n"
       if [ -d ${ScriptsDir}/node_modules ]; then
-        echo -e "成功添加新的定时任务：\n\n${JsAdd}" > ${ContentNewTask}
-        Notify_NewTask
+        notify "新增 lxk0301 自定义脚本" "${JsAdd}"
       fi
     else
       echo -e "添加新的定时任务出错，请手动添加...\n"
       if [ -d ${ScriptsDir}/node_modules ]; then
-        echo -e "尝试自动添加以下新的定时任务出错，请手动添加：\n\n${JsAdd}" > ${ContentNewTask}
-        Notify_NewTask
+        notify "尝试自动添加 lxk0301 以下新的定时任务出错，请手动添加：" "${JsAdd}"
       fi
     fi
   fi
@@ -336,7 +322,6 @@ echo -e "--------------------------------------------------------------\n"
 ## 导入配置，更新cron，设置url，更新shell，复制sample，复制entrypoint，发送新配置通知
 Import_Conf "git_pull"
 Update_Cron
-Reset_RepoUrl
 [ -f ${ShellDir}/panel/package.json ] && PanelDependOld=$(cat ${ShellDir}/panel/package.json)
 Git_PullShell
 [ -f ${ShellDir}/panel/package.json ] && PanelDependNew=$(cat ${ShellDir}/panel/package.json)
