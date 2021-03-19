@@ -44,10 +44,8 @@ const Login = () => {
       <div className={styles.content}>
         <div className={styles.top}>
           <div className={styles.header}>
-            <Link to="/">
-              <img alt="logo" className={styles.logo} src={logo} />
-              <span className={styles.title}>{config.siteName}</span>
-            </Link>
+            <img alt="logo" className={styles.logo} src={logo} />
+            <span className={styles.title}>{config.siteName}</span>
           </div>
         </div>
         <div className={styles.main}>

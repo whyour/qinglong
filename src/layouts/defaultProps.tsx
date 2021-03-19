@@ -5,8 +5,8 @@ import {
   SettingOutlined,
   CodeOutlined,
   FolderOutlined,
-  LockOutlined,
   RadiusSettingOutlined,
+  ControlOutlined,
 } from '@ant-design/icons';
 import logo from '@/assets/logo.png';
 
@@ -28,7 +28,7 @@ export default {
       {
         path: '/config',
         name: '配置文件',
-        icon: <SettingOutlined />,
+        icon: <ControlOutlined />,
         component: '@/pages/config/index',
       },
       {
@@ -62,9 +62,9 @@ export default {
         component: '@/pages/log/index',
       },
       {
-        path: '/password',
-        name: '修改密码',
-        icon: <LockOutlined />,
+        path: '/setting',
+        name: '系统设置',
+        icon: <SettingOutlined />,
         component: '@/pages/password/index',
       },
     ],
@@ -72,8 +72,8 @@ export default {
   location: {
     pathname: '/',
   },
-  fixSiderbar: true,
   navTheme: 'light',
+  fixSiderbar: true,
   contentWidth: 'Fixed',
   splitMenus: false,
   logo: logo,

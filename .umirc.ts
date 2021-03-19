@@ -1,10 +1,4 @@
 import { defineConfig } from 'umi';
-import {
-  SmileOutlined,
-  CrownOutlined,
-  TabletOutlined,
-  AntDesignOutlined,
-} from '@ant-design/icons';
 
 export default defineConfig({
   hash: true,
