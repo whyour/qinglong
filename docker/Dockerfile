@@ -38,9 +38,10 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && yarn install \
     && yarn build \
     && yarn build-back \
+    && yarn install --production \
     && git clone -b ${JD_SCRIPTS_BRANCH} ${JD_SCRIPTS_URL} ${JD_DIR}/scripts \
     && cd ${JD_DIR}/scripts \
-    && npm install \
+    && npm install --production\
     && npm install -g pm2 \
     && rm -rf /root/.npm
 WORKDIR ${JD_DIR}
