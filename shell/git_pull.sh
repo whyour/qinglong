@@ -263,7 +263,7 @@ function Del_Cron {
     crontab -l
     echo -e "\n--------------------------------------------------------------\n"
     if [ -d ${ScriptsDir}/node_modules ]; then
-      notify "删除 lxk0301 失效脚本" "${JsDrop}"
+      bash notify "删除 lxk0301 失效脚本" "${JsDrop}"
     fi
   fi
 }
@@ -296,12 +296,12 @@ function Add_Cron {
       crontab -l
       echo -e "\n--------------------------------------------------------------\n"
       if [ -d ${ScriptsDir}/node_modules ]; then
-        notify "新增 lxk0301 自定义脚本" "${JsAdd}"
+        bash notify "新增 lxk0301 自定义脚本" "${JsAdd}"
       fi
     else
       echo -e "添加新的定时任务出错，请手动添加...\n"
       if [ -d ${ScriptsDir}/node_modules ]; then
-        notify "尝试自动添加 lxk0301 以下新的定时任务出错，请手动添加：" "${JsAdd}"
+        bash notify "尝试自动添加 lxk0301 以下新的定时任务出错，请手动添加：" "${JsAdd}"
       fi
     fi
   fi

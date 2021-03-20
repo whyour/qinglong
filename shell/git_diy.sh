@@ -60,7 +60,7 @@ function addnewcron {
         [ -n "${change}" ] && \cp $js /jd/scripts/${author}_$js && echo -e "${author}_$js 脚本更新了."
       fi
   done
-  [ "$addname" != "" ] notify "新增 ${author} 自定义脚本" "${addname}"
+  [ "$addname" != "" ] && bash notify "新增 ${author} 自定义脚本" "${addname}"
 
 }
 
@@ -74,7 +74,7 @@ function delcron {
 	delname="${delname}\n${author}_${filename}"
       fi
   done
-  [ "$delname" != "" ] && notify  "删除 ${author} 失效脚本" "${delname}" 
+  [ "$delname" != "" ] && bash notify  "删除 ${author} 失效脚本" "${delname}" 
 }
 
 if [[ ${gitpullstatus} -eq 0 ]]
@@ -83,7 +83,7 @@ then
   delcron
 else
   echo -e "$author 仓库更新失败了."
-  notify "自定义仓库更新失败" "$author"
+  bash notify "自定义仓库更新失败" "$author"
 fi
 
 exit 0

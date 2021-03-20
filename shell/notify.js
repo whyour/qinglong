@@ -1,4 +1,4 @@
-const notify = require('../scripts/sendNotify');
+const notify = require('/jd/scripts/sendNotify');
 const title = process.argv[2];
 const content = process.argv[3];
 

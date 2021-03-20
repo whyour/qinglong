@@ -5,7 +5,7 @@
  * @Last Modified time: 2020-12-20 13:51:02
  */
 const $ = new Env('通知');
-const notify = require('./scripts/sendNotify');
+const notify = require('/jd/scripts/sendNotify');
 const fs = require('fs');
 !(async () => {
   await update();
