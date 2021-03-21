@@ -6,6 +6,7 @@ import { request } from '@/utils/http';
 import {
   enable as enableDarkMode,
   disable as disableDarkMode,
+  auto as followSystemColorScheme,
   setFetchMethod,
 } from 'darkreader';
 
@@ -21,10 +22,7 @@ const Password = () => {
   const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(true);
-  const colorScheme =
-    window.matchMedia('(prefers-color-scheme: dark)').matches && 'dark';
-  const defaultDarken =
-    localStorage.getItem('qinglong_dark_theme') || colorScheme;
+  const defaultDarken = localStorage.getItem('qinglong_dark_theme') || 'auto';
   const [theme, setTheme] = useState(defaultDarken);
 
   const handleOk = (values: any) => {
@@ -69,7 +67,7 @@ const Password = () => {
     } else if (theme === 'light') {
       disableDarkMode();
     } else {
-      enableDarkMode({ darkSchemeTextColor: '#fff' });
+      followSystemColorScheme({ darkSchemeTextColor: '#fff' });
     }
   }, [theme]);
 

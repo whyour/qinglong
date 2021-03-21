@@ -3,6 +3,7 @@ import ProLayout from '@ant-design/pro-layout';
 import {
   enable as enableDarkMode,
   disable as disableDarkMode,
+  auto as followSystemColorScheme,
   setFetchMethod,
 } from 'darkreader';
 import defaultProps from './defaultProps';
@@ -26,18 +27,14 @@ export default function (props: any) {
   }, [props.location.pathname]);
 
   useEffect(() => {
-    const colorScheme =
-      window.matchMedia('(prefers-color-scheme: dark)').matches && 'dark';
-    let localTheme = localStorage.getItem('qinglong_dark_theme');
-    if (localTheme === 'auto') {
-      localTheme = null;
-    }
-    const theme = localTheme || colorScheme || 'light';
+    const theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
     setFetchMethod(window.fetch);
     if (theme === 'dark') {
       enableDarkMode({ darkSchemeTextColor: '#fff' });
     } else if (theme === 'light') {
       disableDarkMode();
+    } else {
+      followSystemColorScheme({ darkSchemeTextColor: '#fff' });
     }
   }, []);
 
