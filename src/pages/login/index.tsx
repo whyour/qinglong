@@ -18,7 +18,7 @@ const Login = () => {
         },
       })
       .then((data) => {
-        if (data.err == 0) {
+        if (data.code == 200) {
           localStorage.setItem(config.authKey, data.token);
           history.push('/cookie');
         } else {

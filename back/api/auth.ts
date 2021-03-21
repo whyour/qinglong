@@ -25,13 +25,29 @@ export default (app: Router) => {
                 config.secret as any,
                 { expiresIn: 60 * 60 * 24 * 7, algorithm: 'HS384' },
               );
-              res.send({ err: 0, token });
+              res.send({ code: 200, token });
             } else {
-              res.send({ err: 1, msg: config.authError });
+              res.send({ code: 400, msg: config.authError });
             }
           } else {
-            res.send({ err: 1, msg: '请输入用户名密码!' });
+            res.send({ err: 400, msg: '请输入用户名密码!' });
           }
+        });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/user',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        fs.writeFile(config.authConfigFile, JSON.stringify(req.body), (err) => {
+          if (err) console.log(err);
+          res.send({ code: 200, msg: '更新成功' });
         });
       } catch (e) {
         logger.error('🔥 error: %o', e);

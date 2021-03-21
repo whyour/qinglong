@@ -88,10 +88,10 @@ function Git_PullScripts {
   echo -e "更新scripts...\n"
   cd ${ScriptsDir}
   git fetch --all
-  git rm -f i-chenzhe*
-  git rm -f  moposmall*
-  git rm -f qq34347476*
-  git rm -f whyour*
+  git rm -f --ignore-unmatch i-chenzhe*
+  git rm -f --ignore-unmatch  moposmall*
+  git rm -f --ignore-unmatch qq34347476*
+  git rm -f --ignore-unmatch whyour*
   git stash
   git pull
   ExitStatusScripts=$?

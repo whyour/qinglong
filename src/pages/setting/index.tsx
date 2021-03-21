@@ -29,22 +29,18 @@ const Password = () => {
 
   const handleOk = (values: any) => {
     request
-      .post(`${config.apiPrefix}auth?t=${Date.now()}`, {
+      .post(`${config.apiPrefix}user?t=${Date.now()}`, {
         data: {
           username: values.username,
           password: values.password,
         },
       })
-      .then((data) => {
-        if (data.err == 0) {
-          localStorage.setItem(config.authKey, 'true');
-        } else {
-          notification.open({
-            message: data.msg,
-          });
-        }
+      .then((data: any) => {
+        notification.success({
+          message: data.msg,
+        });
       })
-      .catch(function (error) {
+      .catch((error: any) => {
         console.log(error);
       });
   };
