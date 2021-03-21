@@ -17,9 +17,12 @@ export default (app: Router) => {
         let password = req.body.password;
         fs.readFile(config.authConfigFile, 'utf8', function (err, data) {
           if (err) console.log(err);
-          var con = JSON.parse(data);
+          const authInfo = JSON.parse(data);
           if (username && password) {
-            if (username == con.user && password == con.password) {
+            if (
+              username == authInfo.username &&
+              password == authInfo.password
+            ) {
               let token = jwt.sign(
                 { username, password },
                 config.secret as any,

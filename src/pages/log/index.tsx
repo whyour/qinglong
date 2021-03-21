@@ -38,7 +38,7 @@ const Log = () => {
   const getLog = (node: any) => {
     setLoading(true);
     let url = `${node.parent}/${node.value}`;
-    if (!node.isDir) {
+    if (!node.parent) {
       url = node.value;
     }
     request
