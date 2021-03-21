@@ -42,7 +42,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && ln -sf ${JD_DIR}/shell/git_diy.sh /usr/local/bin/diy \
     && ln -sf ${JD_DIR}/shell/notify.sh /usr/local/bin/notify \
     && ln -sf ${JD_DIR}/shell/rebuild.sh /usr/local/bin/rebuild \
-    && yarn install \
+    && yarn install --network-timeout 100000 \
     && yarn build \
     && yarn build-back \
     && git clone -b ${JD_SCRIPTS_BRANCH} ${JD_SCRIPTS_URL} ${JD_DIR}/scripts \

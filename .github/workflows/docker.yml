@@ -1,0 +1,47 @@
+name: Publish Docker Image
+on: [push]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout base
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      # https://github.com/docker/setup-qemu-action
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      # https://github.com/docker/setup-buildx-action
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Docker login
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
+      
+      - name: Docker buildx image and push on master branch
+        if: github.ref == 'refs/heads/master'
+        run: |
+          docker buildx build --output "type=image,push=true" --platform=linux/amd64,linux/arm/v7,linux/arm64 --tag whyour/qinglong:latest docker/
+
+      - name: Replace tag without `v`
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/github-script@v1
+        id: version
+        with:
+          script: |
+            return context.payload.ref.replace(/\/?refs\/tags\/v/, '')
+          result-encoding: string
+
+      - name: Docker buildx image and push on release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          docker buildx build --output "type=image,push=true" --platform=linux/amd64,linux/arm/v7,linux/arm64 --tag whyour/qinglong:${{steps.version.outputs.result}} docker/
+          docker buildx build --output "type=image,push=true" --platform=linux/amd64,linux/arm/v7,linux/arm64 --tag whyour/qinglong:latest docker/
