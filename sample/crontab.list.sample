@@ -1,6 +1,8 @@
 # 更新你需要的仓库的代码
 55 2,13 * * * bash git_pull >> ${JD_DIR}/log/git_pull.log 2>&1
 30 * * * * bash diy i-chenzhe qx >> ${JD_DIR}/log/diy_pull.log 2>&1
+# 重新build面板
+# 30 7 */7 * * bash rebuild >> ${JD_DIR}/log/rebuild.log 2>&1
 
 # 删除 RmLogDaysAgo 指定天数以前的旧日志，本行为不记录日志
 57 13 * * * bash rm_log >/dev/null 2>&1

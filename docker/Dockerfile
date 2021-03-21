@@ -41,13 +41,13 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && ln -sf ${JD_DIR}/shell/export_sharecodes.sh /usr/local/bin/export_sharecodes \
     && ln -sf ${JD_DIR}/shell/git_diy.sh /usr/local/bin/diy \
     && ln -sf ${JD_DIR}/shell/notify.sh /usr/local/bin/notify \
+    && ln -sf ${JD_DIR}/shell/rebuild.sh /usr/local/bin/rebuild \
     && yarn install \
     && yarn build \
     && yarn build-back \
-    && yarn install --production \
     && git clone -b ${JD_SCRIPTS_BRANCH} ${JD_SCRIPTS_URL} ${JD_DIR}/scripts \
     && cd ${JD_DIR}/scripts \
-    && npm install --production\
+    && npm install \
     && npm install -g pm2 \
     && rm -rf /root/.npm
 WORKDIR ${JD_DIR}
