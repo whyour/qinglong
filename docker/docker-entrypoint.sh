@@ -47,7 +47,7 @@ else
 fi
 
 echo -e "======================5. 启动控制面板========================\n"
-  pm2 start ${JD_DIR}/build/app.js
+  pm2 start ${JD_DIR}/build/app.js -n panel
   echo -e "控制面板启动成功...\n"
 
 echo -e "\n容器启动成功...\n"
