@@ -21,7 +21,7 @@ function Import_Conf {
   then
     . ${CookieConf}
     . ${FileConf}
-    if [ ! -s ${CookieConf} ]; then
+    if [[ ! -s ${CookieConf} ]]; then
       echo -e "请先在Cookie管理中添加一条Cookie...\n"
       exit 1
     fi
@@ -40,10 +40,11 @@ function Detect_Cron {
 
 ## 用户数量UserSum
 function Count_UserSum {
-  for ((i=1; i<=1000; i++)); do
-    Tmp=Cookie$i
-    CookieTmp=${!Tmp}
-    [[ ${CookieTmp} ]] && UserSum=$i || break
+  UserSum=0
+  for line in `cat $CookieConf`
+  do
+    ((UserSum++))
+    eval Cookie${UserSum}="\"${line}\""
   done
 }
 
