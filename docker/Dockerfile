@@ -20,7 +20,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && git clone -b ${JD_BASE_BRANCH} ${JD_BASE_URL} ${JD_DIR} \
     && cd ${JD_DIR} \
     && cp -f .env.example .env \
-    && yarn --network-timeout 100000
+    && yarn install --network-timeout 100000
 FROM node:lts-alpine
 LABEL maintainer="whyour"
 ARG JD_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
