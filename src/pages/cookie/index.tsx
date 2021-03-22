@@ -1,9 +1,11 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
 import { Button, notification, Modal, Table, Tag, Space } from 'antd';
+import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import QRCode from 'qrcode.react';
+import CookieModal from './modal';
 
 enum Status {
   '正常',
@@ -74,13 +76,8 @@ const Config = () => {
       align: 'center' as const,
       render: (text: string, record: any, index: number) => (
         <Space size="middle">
-          {record.status === 0 && <span>-</span>}
-          {record.status === 1 && (
-            <a onClick={() => reacquire(record)}>重新获取</a>
-          )}
-          {record.status === 2 && (
-            <a onClick={() => refreshStatus(record, index)}>刷新状态</a>
-          )}
+          <EditOutlined onClick={() => editCookie(record, index)} />
+          <DeleteOutlined onClick={() => deleteCookie(record, index)} />
         </Space>
       ),
     },
@@ -90,27 +87,17 @@ const Config = () => {
   const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState();
   const [loading, setLoading] = useState(true);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editedCookie, setEditedCookie] = useState();
 
   const getCookies = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}cookies`)
-      .then((data) => {
+      .then((data: any) => {
         setValue(data.data);
       })
       .finally(() => setLoading(false));
-  };
-
-  const updateConfig = () => {
-    request
-      .post(`${config.apiPrefix}save`, {
-        data: { content: value, name: 'config.sh' },
-      })
-      .then((data) => {
-        notification.success({
-          message: data.msg,
-        });
-      });
   };
 
   function sleep(time: number) {
@@ -198,6 +185,50 @@ const Config = () => {
       });
   };
 
+  const addCookie = () => {
+    setIsModalVisible(true);
+  };
+
+  const editCookie = (record: any, index: number) => {
+    setEditedCookie(record.cookie);
+    setIsModalVisible(true);
+  };
+
+  const deleteCookie = (record: any, index: number) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确认删除Cookie ${record.cookie} 吗`,
+      onOk() {
+        request
+          .delete(`${config.apiPrefix}cookie`, {
+            data: { cookie: record.cookie },
+          })
+          .then((data: any) => {
+            if (data.code === 200) {
+              notification.success({
+                message: '删除成功',
+              });
+              getCookies();
+            } else {
+              notification.error({
+                message: data,
+              });
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const handleCancel = (needUpdate?: boolean) => {
+    setIsModalVisible(false);
+    if (needUpdate) {
+      getCookies();
+    }
+  };
+
   useEffect(() => {
     if (document.body.clientWidth < 768) {
       setWdith('auto');
@@ -217,7 +248,7 @@ const Config = () => {
       title="Cookie管理"
       loading={loading}
       extra={[
-        <Button key="2" type="primary" onClick={() => showQrCode()}>
+        <Button key="2" type="primary" onClick={() => addCookie()}>
           添加Cookie
         </Button>,
       ]}
@@ -245,6 +276,11 @@ const Config = () => {
         size="middle"
         bordered
         scroll={{ x: '100%' }}
+      />
+      <CookieModal
+        visible={isModalVisible}
+        handleCancel={handleCancel}
+        cookie={editedCookie}
       />
     </PageContainer>
   );

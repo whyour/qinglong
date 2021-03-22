@@ -5,6 +5,7 @@ ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
 LogDir=${ShellDir}/log
 
 ## 导入配置文件
+. ${ShellDir}/config/cookie.sh
 . ${ShellDir}/config/config.sh
 
 ## 删除运行js脚本的旧日志

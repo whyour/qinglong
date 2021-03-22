@@ -5,6 +5,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
 const envFound = dotenv.config();
 const rootPath = path.resolve(__dirname, '../../');
+const cookieFile = path.join(rootPath, 'config/cookie.sh');
 const confFile = path.join(rootPath, 'config/config.sh');
 const sampleFile = path.join(rootPath, 'sample/config.sh.sample');
 const crontabFile = path.join(rootPath, 'config/crontab.list');
@@ -41,6 +42,7 @@ export default {
   crontabFile,
   sampleFile,
   confFile,
+  cookieFile,
   fileMap: {
     'config.sh': confFile,
     'crontab.list': crontabFile,

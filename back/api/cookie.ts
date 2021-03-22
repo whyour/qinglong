@@ -46,8 +46,69 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cookieService = Container.get(CookieService);
-        const data = await cookieService.addCookie(req.query.cookie as string);
+        const data = await cookieService.addQrCookie(
+          req.query.cookie as string,
+        );
         return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/cookie',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cookieService = Container.get(CookieService);
+        const data = await cookieService.addCookie(req.body.cookies);
+        if (data) {
+          return res.send({ code: 500, data });
+        } else {
+          return res.send({ code: 200, data: '新建成功' });
+        }
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/cookie',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cookieService = Container.get(CookieService);
+        const data = await cookieService.updateCookie(req.body);
+        if (data) {
+          return res.send({ code: 500, data });
+        } else {
+          return res.send({ code: 200, data: '新建成功' });
+        }
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/cookie',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cookieService = Container.get(CookieService);
+        const data = await cookieService.deleteCookie(
+          req.body.cookie as string,
+        );
+        if (data) {
+          return res.send({ code: 500, data });
+        } else {
+          return res.send({ code: 200, data: '新建成功' });
+        }
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);

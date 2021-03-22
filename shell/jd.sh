@@ -7,6 +7,7 @@ ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
 ScriptsDir=${ShellDir}/scripts
 ConfigDir=${ShellDir}/config
 FileConf=${ConfigDir}/config.sh
+CookieConf=${ConfigDir}/cookie.sh
 FileConfSample=${ShellDir}/sample/config.sh.sample
 LogDir=${ShellDir}/log
 ListScripts=($(cd ${ScriptsDir}; ls *.js | grep -E "j[drx]_"))
@@ -18,9 +19,10 @@ ListJs=${LogDir}/js.list
 function Import_Conf {
   if [ -f ${FileConf} ]
   then
+    . ${CookieConf}
     . ${FileConf}
-    if [ -z "${Cookie1}" ]; then
-      echo -e "请先在config.sh中配置好Cookie...\n"
+    if [ ! -s ${CookieConf} ]; then
+      echo -e "请先在Cookie管理中添加一条Cookie...\n"
       exit 1
     fi
   else

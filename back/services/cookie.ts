@@ -155,14 +155,14 @@ export default class CookieService {
     return userCookie;
   }
 
-  public async addCookie(oldCookie: string) {
+  public async addQrCookie(cookie: string) {
     const res: any = await this.checkLogin();
     if (res.body.errcode === 0) {
       let ucookie = this.getCookie(res);
       let content = getFileContentByName(config.confFile);
       const regx = /.*Cookie[0-9]{1}\=\"(.+?)\"/g;
       if (content.match(regx)) {
-        const lastCookie = oldCookie || (content.match(regx) as any[]).pop();
+        const lastCookie = cookie || (content.match(regx) as any[]).pop();
         const cookieRegx = /Cookie([0-9]+)\=.+?/.exec(lastCookie);
         if (cookieRegx) {
           const num = parseInt(cookieRegx[1]) + 1;
@@ -178,6 +178,40 @@ export default class CookieService {
       return { cookie: ucookie };
     } else {
       return res.body;
+    }
+  }
+
+  public async addCookie(cookies: string[]) {
+    let content = getFileContentByName(config.cookieFile);
+    const originCookies = content.split('\n').filter((x) => !!x);
+    const result = originCookies.concat(cookies);
+    fs.writeFileSync(config.cookieFile, result.join('\n'));
+    return '';
+  }
+
+  public async updateCookie({ cookie, oldCookie }) {
+    let content = getFileContentByName(config.cookieFile);
+    const cookies = content.split('\n');
+    const index = cookies.findIndex((x) => x === oldCookie);
+    if (index !== -1) {
+      cookies[index] = cookie;
+      fs.writeFileSync(config.cookieFile, cookies.join('\n'));
+      return '';
+    } else {
+      return '未找到要原有Cookie';
+    }
+  }
+
+  public async deleteCookie(cookie: string) {
+    let content = getFileContentByName(config.cookieFile);
+    const cookies = content.split('\n');
+    const index = cookies.findIndex((x) => x === cookie);
+    if (index !== -1) {
+      cookies.splice(index, 1);
+      fs.writeFileSync(config.cookieFile, cookies.join('\n'));
+      return '';
+    } else {
+      return '未找到要删除的Cookie';
     }
   }
 
@@ -224,14 +258,8 @@ export default class CookieService {
   }
 
   public async getCookies() {
-    const content = getFileContentByName(config.confFile);
-    const regx = /Cookie[0-9]{1}\=\"(.+?)\"/g;
-    let m,
-      data = [];
-    while ((m = regx.exec(content)) !== null) {
-      data.push(m[1]);
-    }
-    return this.formatCookie(data);
+    const content = getFileContentByName(config.cookieFile);
+    return this.formatCookie(content.split('\n').filter((x) => !!x));
   }
 
   private async formatCookie(data: any[]) {

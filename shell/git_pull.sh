@@ -8,6 +8,7 @@ LogDir=${ShellDir}/log
 ScriptsDir=${ShellDir}/scripts
 ConfigDir=${ShellDir}/config
 FileConf=${ConfigDir}/config.sh
+CookieConf=${ConfigDir}/cookie.sh
 FileDiy=${ConfigDir}/diy.sh
 FileConfSample=${ShellDir}/sample/config.sh.sample
 ListCron=${ConfigDir}/crontab.list
@@ -27,6 +28,7 @@ ScriptsURL=https://github.com.cnpmjs.org/RikudouPatrickstar/jd_scripts
 ## 导入配置文件
 function Import_Conf {
   if [ -f ${FileConf} ]; then
+    . ${CookieConf}
     . ${FileConf}
   fi
 }
@@ -106,17 +108,6 @@ function Update_Entrypoint {
     cp -f ${ShellDir}/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
     chmod 777 /usr/local/bin/docker-entrypoint.sh
   fi
-}
-
-## 用户数量UserSum
-function Count_UserSum {
-  i=1
-  while [ $i -le 1000 ]; do
-    Tmp=Cookie$i
-    CookieTmp=${!Tmp}
-    [[ ${CookieTmp} ]] && UserSum=$i || break
-    let i++
-  done
 }
 
 ## 检测文件：LXK9301/jd_scripts 仓库中的 docker/crontab_list.sh
