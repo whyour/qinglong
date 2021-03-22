@@ -5,6 +5,7 @@ ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
 LogDir=${ShellDir}/log
 ConfigDir=${ShellDir}/config
 FileConf=${ConfigDir}/config.sh
+CookieConf=${ConfigDir}/cookie.sh
 [[ ${ANDROID_RUNTIME_ROOT}${ANDROID_ROOT} ]] && Opt="P" || Opt="E"
 Tips="从日志中未找到任何互助码"
 
@@ -34,11 +35,7 @@ function Import_Conf {
 
 ## 用户数量 UserSum
 function Count_UserSum {
-  for ((i=1; i<=1000; i++)); do
-    Tmp=Cookie$i
-    CookieTmp=${!Tmp}
-    [[ ${CookieTmp} ]] && UserSum=$i || break
-  done
+  UserSum=$(awk '{print NR}' ${CookieConf} | tail -n1)
 }
 
 
