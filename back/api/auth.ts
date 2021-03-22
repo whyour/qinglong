@@ -4,6 +4,7 @@ import { Logger } from 'winston';
 import * as fs from 'fs';
 import config from '../config';
 import jwt from 'jsonwebtoken';
+import { createPassword } from '../config/util';
 const route = Router();
 
 export default (app: Router) => {
@@ -19,6 +20,23 @@ export default (app: Router) => {
           if (err) console.log(err);
           const authInfo = JSON.parse(data);
           if (username && password) {
+            if (
+              authInfo.username === 'admin' &&
+              authInfo.password === 'adminadmin'
+            ) {
+              const newPassword = createPassword(16, 22);
+              fs.writeFileSync(
+                config.authConfigFile,
+                JSON.stringify({
+                  username: authInfo.username,
+                  password: newPassword,
+                }),
+              );
+              return res.send({
+                code: 100,
+                msg: '已初始化密码，请前往auth.json查看并重新登录',
+              });
+            }
             if (
               username == authInfo.username &&
               password == authInfo.password

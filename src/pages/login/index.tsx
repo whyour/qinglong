@@ -18,11 +18,15 @@ const Login = () => {
         },
       })
       .then((data) => {
-        if (data.code == 200) {
+        if (data.code === 200) {
           localStorage.setItem(config.authKey, data.token);
           history.push('/cookie');
+        } else if (data.code === 100) {
+          notification.warn({
+            message: data.msg,
+          });
         } else {
-          notification.open({
+          notification.error({
             message: data.msg,
           });
         }

@@ -65,7 +65,7 @@ export default (app: Router) => {
         const cookieService = Container.get(CookieService);
         const data = await cookieService.addCookie(req.body.cookies);
         if (data) {
-          return res.send({ code: 500, data });
+          return res.send({ code: 400, data });
         } else {
           return res.send({ code: 200, data: '新建成功' });
         }
@@ -84,7 +84,7 @@ export default (app: Router) => {
         const cookieService = Container.get(CookieService);
         const data = await cookieService.updateCookie(req.body);
         if (data) {
-          return res.send({ code: 500, data });
+          return res.send({ code: 400, data });
         } else {
           return res.send({ code: 200, data: '新建成功' });
         }
@@ -105,7 +105,7 @@ export default (app: Router) => {
           req.body.cookie as string,
         );
         if (data) {
-          return res.send({ code: 500, data });
+          return res.send({ code: 400, data });
         } else {
           return res.send({ code: 200, data: '新建成功' });
         }
