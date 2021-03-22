@@ -1,3 +1,26 @@
+FROM node:lts-alpine as build
+LABEL maintainer="whyour"
+ARG JD_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
+ARG JD_BASE_BRANCH=master
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    LANG=zh_CN.UTF-8 \
+    SHELL=/bin/bash \
+    PS1="\u@\h:\w \$ " \
+    JD_DIR=/jd
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk update -f \
+    && apk upgrade \
+    && apk --no-cache add -f coreutils \
+                             moreutils \
+                             git \
+                             python \
+                             make \
+                             g++ \
+                             yarn \
+    && git clone -b ${JD_BASE_BRANCH} ${JD_BASE_URL} ${JD_DIR} \
+    && cd ${JD_DIR} \
+    && cp -f .env.example .env \
+    && yarn --network-timeout 100000
 FROM node:lts-alpine
 LABEL maintainer="whyour"
 ARG JD_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
@@ -41,8 +64,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && ln -sf ${JD_DIR}/shell/export_sharecodes.sh /usr/local/bin/export_sharecodes \
     && ln -sf ${JD_DIR}/shell/git_diy.sh /usr/local/bin/diy \
     && ln -sf ${JD_DIR}/shell/notify.sh /usr/local/bin/notify \
-    && ln -sf ${JD_DIR}/shell/rebuild.sh /usr/local/bin/rebuild \
-    && yarn install --network-timeout 100000 \
+    && ln -sf ${JD_DIR}/shell/rebuild.sh /usr/local/bin/rebuild
+COPY --from=build /jd/node_modules /jd/node_modules/
+RUN cd ${JD_DIR} \
     && yarn build \
     && yarn build-back \
     && git clone -b ${JD_SCRIPTS_BRANCH} ${JD_SCRIPTS_URL} ${JD_DIR}/scripts \
