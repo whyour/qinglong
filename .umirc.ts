@@ -3,7 +3,6 @@ import { defineConfig } from 'umi';
 export default defineConfig({
   hash: true,
   layout: false,
-  locale: {},
   nodeModulesTransform: {
     type: 'none',
   },
