@@ -67,6 +67,10 @@ const Crontab = () => {
     >
       <ReactDiffViewer
         styles={{
+          diffContainer: {
+            overflowX: 'auto',
+            minWidth: 768,
+          },
           diffRemoved: {
             overflowX: 'auto',
             maxWidth: 300,

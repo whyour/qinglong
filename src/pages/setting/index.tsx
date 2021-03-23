@@ -94,7 +94,7 @@ const Password = () => {
       <Tabs
         defaultActiveKey="person"
         tabPosition="left"
-        style={{ padding: '16px 0', height: 'calc(100vh - 96px)' }}
+        style={{ padding: '16px 16px 16px 0', height: 'calc(100vh - 96px)' }}
       >
         <Tabs.TabPane tab="个人设置" key="person">
           <Form onFinish={handleOk} layout="vertical">
@@ -103,7 +103,7 @@ const Password = () => {
               name="username"
               rules={[{ required: true }]}
               hasFeedback
-              style={{ width: 300 }}
+              style={{ maxWidth: 300 }}
             >
               <Input placeholder="用户名" autoFocus />
             </Form.Item>
@@ -112,7 +112,7 @@ const Password = () => {
               name="password"
               rules={[{ required: true }]}
               hasFeedback
-              style={{ width: 300 }}
+              style={{ maxWidth: 300 }}
             >
               <Input type="password" placeholder="密码" />
             </Form.Item>
