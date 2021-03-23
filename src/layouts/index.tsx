@@ -16,6 +16,7 @@ import './index.less';
 export default function (props: any) {
   const logout = () => {
     localStorage.removeItem(config.authKey);
+    history.push('/login');
   };
 
   useEffect(() => {

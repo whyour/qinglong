@@ -81,7 +81,7 @@ const Config = () => {
           styleActiveLine: true,
           matchBrackets: true,
           mode: 'shell',
-          theme: 'dracula',
+          theme: 'icecoder',
         }}
         onBeforeChange={(editor, data, value) => {
           setValue(value);

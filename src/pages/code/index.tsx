@@ -63,7 +63,7 @@ const Crontab = () => {
           styleActiveLine: true,
           matchBrackets: true,
           mode: 'shell',
-          theme: 'dracula',
+          theme: 'icecoder',
           readOnly: 'nocursor',
         }}
         onBeforeChange={(editor, data, value) => {
