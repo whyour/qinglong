@@ -275,7 +275,7 @@ const Config = () => {
         rowKey="pin"
         size="middle"
         bordered
-        scroll={{ x: '100%' }}
+        scroll={{ x: 768 }}
       />
       <CookieModal
         visible={isModalVisible}
