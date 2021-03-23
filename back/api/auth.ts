@@ -10,7 +10,7 @@ const route = Router();
 export default (app: Router) => {
   app.use('/', route);
   route.post(
-    '/auth',
+    '/login',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {

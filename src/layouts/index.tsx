@@ -8,11 +8,16 @@ import {
 } from 'darkreader';
 import defaultProps from './defaultProps';
 import { Link, history } from 'umi';
+import { LogoutOutlined } from '@ant-design/icons';
 import config from '@/utils/config';
 import 'codemirror/mode/shell/shell.js';
 import './index.less';
 
 export default function (props: any) {
+  const logout = () => {
+    localStorage.removeItem(config.authKey);
+  };
+
   useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
     if (!isAuth) {
@@ -54,6 +59,16 @@ export default function (props: any) {
           return defaultDom;
         }
         return <Link to={menuItemProps.path}>{defaultDom}</Link>;
+      }}
+      postMenuData={(menuData) => {
+        return [
+          ...(menuData || []),
+          {
+            icon: <LogoutOutlined />,
+            name: '退出登录',
+            onTitleClick: () => logout(),
+          },
+        ];
       }}
       {...defaultProps}
     >

@@ -11,7 +11,7 @@ const FormItem = Form.Item;
 const Login = () => {
   const handleOk = (values: any) => {
     request
-      .post(`${config.apiPrefix}auth`, {
+      .post(`${config.apiPrefix}login`, {
         data: {
           username: values.username,
           password: values.password,

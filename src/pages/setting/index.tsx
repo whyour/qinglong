@@ -9,6 +9,7 @@ import {
   auto as followSystemColorScheme,
   setFetchMethod,
 } from 'darkreader';
+import { history } from 'umi';
 
 const optionsWithDisabled = [
   { label: '亮色', value: 'light' },
@@ -34,9 +35,8 @@ const Password = () => {
         },
       })
       .then((data: any) => {
-        notification.success({
-          message: data.msg,
-        });
+        localStorage.removeItem(config.authKey);
+        history.push('/login');
       })
       .catch((error: any) => {
         console.log(error);

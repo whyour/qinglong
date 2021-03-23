@@ -13,7 +13,7 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(
     jwt({ secret: config.secret as string, algorithms: ['HS384'] }).unless({
-      path: ['/api/auth'],
+      path: ['/api/login'],
     }),
   );
   app.use(config.api.prefix, routes());
