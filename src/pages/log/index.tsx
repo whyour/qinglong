@@ -109,7 +109,7 @@ const Log = () => {
           matchBrackets: true,
           mode: 'shell',
           theme: 'icecoder',
-          readOnly: 'nocursor',
+          readOnly: true,
         }}
         onBeforeChange={(editor, data, value) => {
           setValue(value);
