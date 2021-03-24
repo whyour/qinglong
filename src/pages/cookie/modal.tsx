@@ -59,7 +59,13 @@ const CookieModal = ({
       <Form form={form} layout="vertical" name="form_in_modal">
         <Form.Item
           name="cookie"
-          rules={[{ required: true, message: '请输入Cookie' }]}
+          rules={[
+            { required: true, message: '请输入Cookie' },
+            {
+              pattern: /[pt_pin=|pt_key=](.+?);[pt_pin=|pt_key=](.+?);/,
+              message: 'Cookie格式错误，注意分号(pt_key=***;pt_pin=***;)',
+            },
+          ]}
         >
           <Input.TextArea
             rows={4}
