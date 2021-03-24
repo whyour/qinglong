@@ -12,7 +12,7 @@ git reset --mixed
 echo -e "更新shell完成...\n"
 
 echo -e "重新build...\n"
-yarn install
+yarn install --registry=https://registry.npm.taobao.org
 yarn build
 yarn build-back
 echo -e "重新build完成...\n"

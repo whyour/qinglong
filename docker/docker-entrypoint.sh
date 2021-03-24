@@ -33,6 +33,12 @@ if [ ! -s ${JD_DIR}/config/auth.json ]; then
   echo
 fi
 
+if [ -s /etc/nginx/conf.d/default.conf ]; then
+  echo -e "检测到默认nginx配置文件，删除...\n"
+  rm -f /etc/nginx/conf.d/default.conf
+  echo
+fi
+
 cp -fv ${JD_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
 
 echo -e "======================2. 启动nginx========================\n"

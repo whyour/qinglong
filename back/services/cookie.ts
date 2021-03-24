@@ -266,12 +266,21 @@ export default class CookieService {
     const result = [];
     for (const x of data) {
       const { nickname, status } = await this.getJdInfo(x);
-      result.push({
-        pin: x.match(/pt_pin=(.+?);/)[1],
-        cookie: x,
-        status,
-        nickname: nickname,
-      });
+      if (/pt_pin=(.+?);/.test(x)) {
+        result.push({
+          pin: x.match(/pt_pin=(.+?);/)[1],
+          cookie: x,
+          status,
+          nickname: nickname,
+        });
+      } else {
+        result.push({
+          pin: 'pin未匹配到',
+          cookie: x,
+          status,
+          nickname: nickname,
+        });
+      }
     }
     return result;
   }
