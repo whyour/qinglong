@@ -108,7 +108,6 @@ const Log = () => {
           styleActiveLine: true,
           matchBrackets: true,
           mode: 'shell',
-          theme: 'icecoder',
           readOnly: true,
         }}
         onBeforeChange={(editor, data, value) => {

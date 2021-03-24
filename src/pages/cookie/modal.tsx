@@ -15,10 +15,24 @@ const CookieModal = ({
   const [form] = Form.useForm();
 
   const handleOk = async (values: any) => {
+    const cookies = values.cookie
+      .split('\n')
+      .map((x: any) => x.trim().replace(/\s/g, ''));
+    let flag = false;
+    for (const coo of cookies) {
+      if (!/pt_key=\S*;\s*pt_pin=\S*;\s*/.test(coo)) {
+        notification.error({ message: `${coo}格式有误` });
+        flag = true;
+        break;
+      }
+    }
+    if (flag) {
+      return;
+    }
     const method = cookie ? 'put' : 'post';
     const payload = cookie
-      ? { cookie: values.cookie, oldCookie: cookie }
-      : { cookies: values.cookie.split('\n') };
+      ? { cookie: cookies[0], oldCookie: cookie }
+      : { cookies };
     const { code, data } = await request[method](`${config.apiPrefix}cookie`, {
       data: payload,
     });
@@ -62,13 +76,14 @@ const CookieModal = ({
           rules={[
             { required: true, message: '请输入Cookie' },
             {
-              pattern: /[pt_pin=|pt_key=](.+?);[pt_pin=|pt_key=](.+?);/,
+              pattern: /pt_key=\S*;\s*pt_pin=\S*;\s*/,
               message: 'Cookie格式错误，注意分号(pt_key=***;pt_pin=***;)',
             },
           ]}
         >
           <Input.TextArea
             rows={4}
+            autoSize={true}
             placeholder="请输入cookie，多个cookie换行输入"
           />
         </Form.Item>

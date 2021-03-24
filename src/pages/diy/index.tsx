@@ -80,7 +80,6 @@ const Crontab = () => {
           styleActiveLine: true,
           matchBrackets: true,
           mode: 'shell',
-          theme: 'icecoder',
         }}
         onBeforeChange={(editor, data, value) => {
           setValue(value);

@@ -67,6 +67,7 @@ export default function (props: any) {
           {
             icon: <LogoutOutlined />,
             name: '退出登录',
+            path: 'logout',
             onTitleClick: () => logout(),
           },
         ];
