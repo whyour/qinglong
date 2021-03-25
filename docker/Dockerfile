@@ -25,7 +25,7 @@ FROM node:lts-alpine
 LABEL maintainer="whyour"
 ARG QL_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
 ARG QL_BASE_BRANCH=master
-ARG QL_SCRIPTS_URL=https://github.com.cnpmjs.org/RikudouPatrickstar/QL_scripts
+ARG QL_SCRIPTS_URL=https://github.com.cnpmjs.org/RikudouPatrickstar/jd_scripts
 ARG QL_SCRIPTS_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
@@ -65,10 +65,10 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && ln -sf ${QL_DIR}/shell/export_sharecodes.sh /usr/local/bin/export_sharecodes \
     && ln -sf ${QL_DIR}/shell/git_diy.sh /usr/local/bin/diy \
     && ln -sf ${QL_DIR}/shell/notify.sh /usr/local/bin/notify \
-    && ln -sf ${QL_DIR}/shell/rebuild.sh /usr/local/bin/rebuild
-    && cp -f $QL_DIR/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh \
-    && chmod 777 /usr/local/bin/docker-entrypoint.sh \
-    && chmod 777 $QL_DIR/shell/*.sh \
+    && ln -sf ${QL_DIR}/shell/rebuild.sh /usr/local/bin/rebuild \
+    && ln -sf ${QL_DIR}/docker/docker-entrypoint.sh /usr/local/bin/entrypoint \
+    && chmod 777 ${QL_DIR}/shell/*.sh \
+    && chmod 777 ${QL_DIR}/docker/*.sh
 COPY --from=build /ql/node_modules /ql/node_modules/
 RUN cd ${QL_DIR} \
     && yarn build \
@@ -78,4 +78,4 @@ RUN cd ${QL_DIR} \
     && npm install \
     && npm install -g pm2 \
     && rm -rf /root/.npm
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["entrypoint"]
