@@ -3,7 +3,6 @@
 ## Update Content: 京小兑控制变量，宠汪汪自己内部账户互助变量,环球挑战赛互助变量。
 
 ## 上面版本号中，如果第2位数字有变化，那么代表增加了新的参数，如果只有第3位数字有变化，仅代表更新了注释，没有增加新的参数，可更新可不更新
-## 如需更新，请参考WIKI（https://github.com/EvineDeng/jd-base/wiki）中"如何更新配置文件"部分的操作说明，进行智能比对后修改。
 
 ################################## 说明 ##################################
 ## 以下配置中，带有 export 申明的，均由LXK9301大佬定义，详见：https://gitee.com/lxk0301/jd_scripts/blob/master/githubAction.md
@@ -258,7 +257,7 @@ ForOtherJoy6=""
 ## 具体填法及要求详见本文件最下方“互助码填法示例”
 ## 京喜农场助力码为 JSON 格式因此使用单引号，json 格式如下
 ## {"smp":"22bdadsfaadsfadse8a","active":"jdnc_1_btorange210113_2","joinnum":"1"}
-## 助力码获取可以通过 bash jd jd_get_share_code now 命令获取
+## 助力码获取可以通过 js jd_get_share_code now 命令获取
 ## 注意：京喜农场 种植种子发生变化的时候，互助码也会变！！
 MyJxnc1=''
 MyJxnc2=''
@@ -598,17 +597,3 @@ EnableExtraShell=""
 # ForOtherFruit4="${MyFruit1}@${MyFruit2}@${MyFruit3}@${MyFruitC}@${MyFruit6}@${MyFruitA}"  # 解释同上，东东农场实际上只能助力3次
 # ForOtherFruit5="${MyFruit1}@${MyFruit2}@${MyFruit3}@${MyFruitB}@${MyFruit4}@${MyFruit6}@${MyFruitC}@${MyFruitA}"
 # ForOtherFruit6="${MyFruit1}@${MyFruit2}@${MyFruit3}@${MyFruitA}@${MyFruit4}@${MyFruit5}@${MyFruitC}"
-
-
-################################## 额外的环境变量（选填） ##################################
-## 请在以下补充你需要用到的额外的环境变量，形式：export 变量名="变量值"
-
-################################## 喜玛拉亚极速版 #########################################
-## 所需要的环境变量请去作者地址查看，因为是京东脚本为主，所以在京东缺失cookie的情况下此脚本也不会运行。仓库地址：https://github.com/Zero-S1/xmly_speed
-export XMLY_SPEED_COOKIE=""
-
-###############################联通，爱奇艺，bilibili，52pojie#############################
-##请至config文件夹中相应的.json文件进行查看。参考仓库地址：https://github.com/kangwenhang/jd_docker2/tree/AutoSignMachine（非原仓库地址）
-##注意：.json文件配置完成后请删除内容注释那一行。
-##联通脚本更新，请于config文件中创建.env文件并且填写参数（注意：联通的json文件不用配置，但不可以删除，必须保留并且删除第一行注释）
-##env文件参考：https://github.com/dockere/jd-base/blob/py/sample/.env.sample

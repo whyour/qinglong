@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 ## 文件路径、脚本网址、文件版本以及各种环境的判断
-ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
-[[ ${JD_DIR} ]] && ShellJd=jd || ShellJd=${ShellDir}/shell/jd.sh
+ShellDir=${QL_DIR:-$(cd $(dirname $0); pwd)}
+[[ ${QL_DIR} ]] && ShellJs=js
 LogDir=${ShellDir}/log
 [ ! -d ${LogDir} ] && mkdir -p ${LogDir}
 ScriptsDir=${ShellDir}/scripts
@@ -49,7 +49,7 @@ function Update_Cron {
     for ((i=1; i<${#RanHourArray[*]}; i++)); do
       RanHour="${RanHour},${RanHourArray[i]}"
     done
-    perl -i -pe "s|.+(bash.+git_pull.+log.*)|${RanMin} ${RanHour} \* \* \* sleep ${RanSleep} && \1|" ${ListCron}
+    perl -i -pe "s|.+(git_pull.+log.*)|${RanMin} ${RanHour} \* \* \* sleep ${RanSleep} && \1|" ${ListCron}
     crontab ${ListCron}
   fi
 }
@@ -104,7 +104,7 @@ function Git_PullScripts {
 
 ## 更新docker-entrypoint
 function Update_Entrypoint {
-  if [[ ${JD_DIR} ]] && [[ $(cat ${ShellDir}/docker/docker-entrypoint.sh) != $(cat /usr/local/bin/docker-entrypoint.sh) ]]; then
+  if [[ ${QL_DIR} ]] && [[ $(cat ${ShellDir}/docker/docker-entrypoint.sh) != $(cat /usr/local/bin/docker-entrypoint.sh) ]]; then
     cp -f ${ShellDir}/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
     chmod 777 /usr/local/bin/docker-entrypoint.sh
   fi
@@ -118,7 +118,7 @@ function Update_Entrypoint {
 ## js-drop.list 如果上述检测文件删除了定时任务，这个文件内容将不为空
 function Diff_Cron {
   if [ -f ${ListCron} ]; then
-    if [ -n "${JD_DIR}" ]
+    if [ -n "${QL_DIR}" ]
     then
       grep -E " j[drx]_\w+" ${ListCron} | perl -pe "s|.+ (j[drx]_\w+).*|\1|" | sort -u > ${ListTask}
     else
@@ -149,7 +149,7 @@ function Notify_Version {
   if [ -f ${FileConf} ] && [[ "${VerConf}" != "${VerConfSample}" ]] && [[ ${UpdateDate} == $(date "+%Y-%m-%d") ]]
   then
     if [ ! -f ${SendCount} ]; then
-      bash notify "检测到配置文件config.sh.sample有更新" "更新日期: ${UpdateDate}\n当前版本: ${VerConf}\n新的版本: ${VerConfSample}\n更新内容: ${UpdateContent}\n更新说明: 如需使用新功能请对照config.sh.sample，将相关新参数手动增加到你自己的config.sh中，否则请无视本消息。本消息只在该新版本配置文件更新当天发送一次。"
+      notify "检测到配置文件config.sh.sample有更新" "更新日期: ${UpdateDate}\n当前版本: ${VerConf}\n新的版本: ${VerConfSample}\n更新内容: ${UpdateContent}\n更新说明: 如需使用新功能请对照config.sh.sample，将相关新参数手动增加到你自己的config.sh中，否则请无视本消息。本消息只在该新版本配置文件更新当天发送一次。"
     fi
   else
     [ -f ${ContentVersion} ] && rm -f ${ContentVersion}
@@ -234,7 +234,7 @@ function Del_Cron {
     crontab -l
     echo -e "\n--------------------------------------------------------------\n"
     if [ -d ${ScriptsDir}/node_modules ]; then
-      bash notify "删除 lxk0301 失效脚本" "${JsDrop}"
+      notify "删除 lxk0301 失效脚本" "${JsDrop}"
     fi
   fi
 }
@@ -254,9 +254,9 @@ function Add_Cron {
     do
       if [[ ${Cron} == jd_bean_sign ]]
       then
-        echo "4 0,9 * * * bash ${ShellJd} ${Cron}" >> ${ListCron}
+        echo "4 0,9 * * * ${ShellJs} ${Cron}" >> ${ListCron}
       else
-        cat ${ListCronLxk} | grep -E "\/${Cron}\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1bash ${ShellJd} \2|" >> ${ListCron}
+        cat ${ListCronLxk} | grep -E "\/${Cron}\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\${ShellJs} \2|" >> ${ListCron}
       fi
     done
 
@@ -267,12 +267,12 @@ function Add_Cron {
       crontab -l
       echo -e "\n--------------------------------------------------------------\n"
       if [ -d ${ScriptsDir}/node_modules ]; then
-        bash notify "新增 lxk0301 自定义脚本" "${JsAdd}"
+        notify "新增 lxk0301 自定义脚本" "${JsAdd}"
       fi
     else
       echo -e "添加新的定时任务出错，请手动添加...\n"
       if [ -d ${ScriptsDir}/node_modules ]; then
-        bash notify "尝试自动添加 lxk0301 以下新的定时任务出错，请手动添加：" "${JsAdd}"
+        notify "尝试自动添加 lxk0301 以下新的定时任务出错，请手动添加：" "${JsAdd}"
       fi
     fi
   fi

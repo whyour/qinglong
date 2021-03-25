@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
+ShellDir=${QL_DIR:-$(cd $(dirname $0); pwd)}
 
 echo -e "更新shell...\n"
 cd ${ShellDir}

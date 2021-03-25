@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
 ## 路径
-ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
-[[ ${JD_DIR} ]] && HelpJd=jd || HelpJd=jd.sh
-[[ ${JD_DIR} ]] && ShellJd=jd || ShellJd=${ShellDir}/shell/jd.sh
+ShellDir=${QL_DIR:-$(cd $(dirname $0); pwd)}
+[[ ${QL_DIR} ]] && ShellJS=js
 ScriptsDir=${ShellDir}/scripts
 ConfigDir=${ShellDir}/config
 FileConf=${ConfigDir}/config.sh
@@ -142,11 +141,11 @@ function Random_Delay {
 ## 使用说明
 function Help {
   echo -e "本脚本的用法为："
-  echo -e "1. bash ${HelpJd} xxx      # 如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
-  echo -e "2. bash ${HelpJd} xxx now  # 无论是否设置了随机延迟，均立即运行"
-  echo -e "3. bash ${HelpJd} runall   # 运行所有非挂机脚本，非常耗时"
-  echo -e "4. bash ${HelpJd} hangup   # 重启挂机程序"
-  echo -e "5. bash ${HelpJd} resetpwd # 重置控制面板用户名和密码"
+  echo -e "1. ${ShellJS} xxx      # 如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
+  echo -e "2. ${ShellJS} xxx now  # 无论是否设置了随机延迟，均立即运行"
+  echo -e "3. ${ShellJS} runall   # 运行所有非挂机脚本，非常耗时"
+  echo -e "4. ${ShellJS} hangup   # 重启挂机程序"
+  echo -e "5. ${ShellJS} resetpwd # 重置控制面板用户名和密码"
   echo -e "\n针对用法1、用法2中的\"xxx\"，可以不输入后缀\".js\"，另外，如果前缀是\"jd_\"的话前缀也可以省略。"
   echo -e "当前有以下脚本可以运行（仅列出以jd_、jr_、jx_开头的脚本）："
   cd ${ScriptsDir}
@@ -203,7 +202,7 @@ function Run_All {
   done
   for file in $(cat ${ListJs}); do
     echo -e "==================== 运行 $file.js 脚本 ====================\n"
-    bash ${ShellJd} $file now
+    ${ShellJS} $file now
   done
 }
 

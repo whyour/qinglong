@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ## 判断环境
-ShellDir=${JD_DIR:-$(cd $(dirname $0); pwd)}
+ShellDir=${QL_DIR:-$(cd $(dirname $0); pwd)}
 LogDir=${ShellDir}/log
 
 ## 导入配置文件

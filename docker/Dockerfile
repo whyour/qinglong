@@ -1,12 +1,12 @@
 FROM node:lts-alpine as build
 LABEL maintainer="whyour"
-ARG JD_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
-ARG JD_BASE_BRANCH=master
+ARG QL_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
+ARG QL_BASE_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
     SHELL=/bin/bash \
     PS1="\u@\h:\w \$ " \
-    JD_DIR=/jd
+    QL_DIR=/ql
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
     && apk update -f \
     && apk upgrade \
@@ -17,21 +17,22 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
                              make \
                              g++ \
                              yarn \
-    && git clone -b ${JD_BASE_BRANCH} ${JD_BASE_URL} ${JD_DIR} \
-    && cd ${JD_DIR} \
+    && git clone -b ${QL_BASE_BRANCH} ${QL_BASE_URL} ${QL_DIR} \
+    && cd ${QL_DIR} \
     && cp -f .env.example .env \
     && yarn --network-timeout 100000
 FROM node:lts-alpine
 LABEL maintainer="whyour"
-ARG JD_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
-ARG JD_BASE_BRANCH=master
-ARG JD_SCRIPTS_URL=https://github.com.cnpmjs.org/RikudouPatrickstar/jd_scripts
-ARG JD_SCRIPTS_BRANCH=master
+ARG QL_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
+ARG QL_BASE_BRANCH=master
+ARG QL_SCRIPTS_URL=https://github.com.cnpmjs.org/RikudouPatrickstar/QL_scripts
+ARG QL_SCRIPTS_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
     SHELL=/bin/bash \
     PS1="\u@\h:\w \$ " \
-    JD_DIR=/jd
+    QL_DIR=/ql
+WORKDIR ${QL_DIR}
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
     && apk update -f \
     && apk upgrade \
@@ -55,24 +56,26 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && echo "Asia/Shanghai" > /etc/timezone \
     && touch ~/.bashrc \
     && mkdir /run/nginx \
-    && git clone -b ${JD_BASE_BRANCH} ${JD_BASE_URL} ${JD_DIR} \
-    && cd ${JD_DIR} \
+    && git clone -b ${QL_BASE_BRANCH} ${QL_BASE_URL} ${QL_DIR} \
+    && cd ${QL_DIR} \
     && cp -f .env.example .env \
-    && ln -sf ${JD_DIR}/shell/jd.sh /usr/local/bin/jd \
-    && ln -sf ${JD_DIR}/shell/git_pull.sh /usr/local/bin/git_pull \
-    && ln -sf ${JD_DIR}/shell/rm_log.sh /usr/local/bin/rm_log \
-    && ln -sf ${JD_DIR}/shell/export_sharecodes.sh /usr/local/bin/export_sharecodes \
-    && ln -sf ${JD_DIR}/shell/git_diy.sh /usr/local/bin/diy \
-    && ln -sf ${JD_DIR}/shell/notify.sh /usr/local/bin/notify \
-    && ln -sf ${JD_DIR}/shell/rebuild.sh /usr/local/bin/rebuild
-COPY --from=build /jd/node_modules /jd/node_modules/
-RUN cd ${JD_DIR} \
+    && ln -sf ${QL_DIR}/shell/js.sh /usr/local/bin/js \
+    && ln -sf ${QL_DIR}/shell/git_pull.sh /usr/local/bin/git_pull \
+    && ln -sf ${QL_DIR}/shell/rm_log.sh /usr/local/bin/rm_log \
+    && ln -sf ${QL_DIR}/shell/export_sharecodes.sh /usr/local/bin/export_sharecodes \
+    && ln -sf ${QL_DIR}/shell/git_diy.sh /usr/local/bin/diy \
+    && ln -sf ${QL_DIR}/shell/notify.sh /usr/local/bin/notify \
+    && ln -sf ${QL_DIR}/shell/rebuild.sh /usr/local/bin/rebuild
+    && cp -f $QL_DIR/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh \
+    && chmod 777 /usr/local/bin/docker-entrypoint.sh \
+    && chmod 777 $QL_DIR/shell/*.sh \
+COPY --from=build /ql/node_modules /ql/node_modules/
+RUN cd ${QL_DIR} \
     && yarn build \
     && yarn build-back \
-    && git clone -b ${JD_SCRIPTS_BRANCH} ${JD_SCRIPTS_URL} ${JD_DIR}/scripts \
-    && cd ${JD_DIR}/scripts \
+    && git clone -b ${QL_SCRIPTS_BRANCH} ${QL_SCRIPTS_URL} ${QL_DIR}/scripts \
+    && cd ${QL_DIR}/scripts \
     && npm install \
     && npm install -g pm2 \
     && rm -rf /root/.npm
-WORKDIR ${JD_DIR}
-ENTRYPOINT bash ${JD_DIR}/docker/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]

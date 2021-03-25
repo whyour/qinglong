@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 #author:spark thanks to: https://github.com/sparkssssssss/scripts
-#需要docker环境,下载本文件到容器内任意位置,以下示例是放到了/jd/scripts
-#*/30 * * * *  bash diy i-chenzhe qx
 
 declare -A BlackListDict
 author=$1
@@ -18,7 +16,7 @@ if [ $# != 2 ] ; then
   exit 0;
 fi
 
-diyscriptsdir=/jd/diyscripts
+diyscriptsdir=/ql/diyscripts
 mkdir -p ${diyscriptsdir}
 
 if [ ! -d "$diyscriptsdir/${author}_${repo}" ]; then
@@ -52,29 +50,29 @@ function addnewcron {
       script_date=`cat  $js|grep ^[0-9]|awk '{print $1,$2,$3,$4,$5}'|egrep -v "[a-zA-Z]|:|\."|sort |uniq|head -n 1`
       [ -z "${script_date}" ] && script_date=`cat  $js|grep -Eo "([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9][,-].*)"|sort |uniq|head -n 1`
       [ -z "${script_date}" ] && cron_min=$(rand 1 59) && cron_hour=$(rand 7 9) && script_date="${cron_min} ${cron_hour} * * *"
-      [ $(grep -c -w "$croname" /jd/config/crontab.list) -eq 0 ] && sed -i "/hangup/a${script_date} bash jd $croname"  /jd/config/crontab.list && addname="${addname}\n${croname}" && echo -e "添加了新的脚本${croname}." && bash jd ${croname} now >/dev/null &
-      if [ ! -f "/jd/scripts/${author}_$js" ];then
-        \cp $js /jd/scripts/${author}_$js
+      [ $(grep -c -w "$croname" /ql/config/crontab.list) -eq 0 ] && sed -i "/hangup/a${script_date} js $croname"  /ql/config/crontab.list && addname="${addname}\n${croname}" && echo -e "添加了新的脚本${croname}." && js ${croname} now >/dev/null &
+      if [ ! -f "/ql/scripts/${author}_$js" ];then
+        \cp $js /ql/scripts/${author}_$js
       else
-        change=$(diff $js /jd/scripts/${author}_$js)
-        [ -n "${change}" ] && \cp $js /jd/scripts/${author}_$js && echo -e "${author}_$js 脚本更新了."
+        change=$(diff $js /ql/scripts/${author}_$js)
+        [ -n "${change}" ] && \cp $js /ql/scripts/${author}_$js && echo -e "${author}_$js 脚本更新了."
       fi
   done
-  [ "$addname" != "" ] && bash notify "新增 ${author} 自定义脚本" "${addname}"
+  [ "$addname" != "" ] && notify "新增 ${author} 自定义脚本" "${addname}"
 
 }
 
 function delcron {
   delname=""
-  cronfiles=$(grep "$author" /jd/config/crontab.list|grep -v "^#"|awk '{print $8}'|awk -F"${author}_" '{print $2}')
+  cronfiles=$(grep "$author" /ql/config/crontab.list|grep -v "^#"|awk '{print $8}'|awk -F"${author}_" '{print $2}')
   for filename in $cronfiles;
     do
       if [ ! -f "${diyscriptsdir}/${author}_${repo}/${filename}.js" ]; then 
-        sed -i "/\<bash jd ${author}_${filename}\>/d" /jd/config/crontab.list && echo -e "删除失效脚本${filename}."
+        sed -i "/\<js ${author}_${filename}\>/d" /ql/config/crontab.list && echo -e "删除失效脚本${filename}."
 	delname="${delname}\n${author}_${filename}"
       fi
   done
-  [ "$delname" != "" ] && bash notify  "删除 ${author} 失效脚本" "${delname}" 
+  [ "$delname" != "" ] && notify  "删除 ${author} 失效脚本" "${delname}" 
 }
 
 if [[ ${gitpullstatus} -eq 0 ]]
@@ -83,7 +81,7 @@ then
   delcron
 else
   echo -e "$author 仓库更新失败了."
-  bash notify "自定义仓库更新失败" "$author"
+  notify "自定义仓库更新失败" "$author"
 fi
 
 exit 0
