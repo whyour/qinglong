@@ -28,11 +28,6 @@ _request.interceptors.request.use((url, options) => {
 
 _request.interceptors.response.use(async (response) => {
   const res = await response.clone();
-  if (res.status === 401) {
-    setTimeout(() => {
-      history.push('/login');
-    });
-  }
   return response;
 });
 

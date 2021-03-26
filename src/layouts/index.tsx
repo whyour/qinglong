@@ -11,12 +11,15 @@ import { Link, history } from 'umi';
 import { LogoutOutlined } from '@ant-design/icons';
 import config from '@/utils/config';
 import 'codemirror/mode/shell/shell.js';
+import { request } from '@/utils/http';
 import './index.less';
 
 export default function (props: any) {
   const logout = () => {
-    localStorage.removeItem(config.authKey);
-    history.push('/login');
+    request.post(`${config.apiPrefix}logout`).then(() => {
+      localStorage.removeItem(config.authKey);
+      history.push('/login');
+    });
   };
 
   useEffect(() => {
