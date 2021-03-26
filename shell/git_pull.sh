@@ -69,7 +69,6 @@ function Git_PullShell {
 function Git_PullShellNext {
   if [[ ${ExitStatusShell} -eq 0 ]]; then
     echo -e "更新shell成功...\n"
-    Update_Entrypoint
     [[ "${PanelDependOld}" != "${PanelDependNew}" ]] && cd ${ShellDir}/panel && Npm_Install panel
     cp -f ${FileConfSample} ${ConfigDir}/config.sh.sample
     [ -d ${ScriptsDir}/node_modules ] && Notify_Version
@@ -100,14 +99,6 @@ function Git_PullScripts {
   echo
   git stash pop
   git reset --mixed
-}
-
-## 更新docker-entrypoint
-function Update_Entrypoint {
-  if [[ ${QL_DIR} ]] && [[ $(cat ${ShellDir}/docker/docker-entrypoint.sh) != $(cat /usr/local/bin/docker-entrypoint.sh) ]]; then
-    cp -f ${ShellDir}/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-    chmod 777 /usr/local/bin/docker-entrypoint.sh
-  fi
 }
 
 ## 检测文件：LXK9301/jd_scripts 仓库中的 docker/crontab_list.sh
@@ -256,7 +247,7 @@ function Add_Cron {
       then
         echo "4 0,9 * * * ${ShellJs} ${Cron}" >> ${ListCron}
       else
-        cat ${ListCronLxk} | grep -E "\/${Cron}\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\${ShellJs} \2|" >> ${ListCron}
+        cat ${ListCronLxk} | grep -E "\/${Cron}\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1${ShellJs} \2|" >> ${ListCron}
       fi
     done
 
