@@ -29,4 +29,4 @@
 
 ### one more thing
 
-![one-more-thing](https://image.whyour.cn/others/one-more-thing.jpg)
+![one-more-thing](https://image.whyour.cn/others/nice.png)
