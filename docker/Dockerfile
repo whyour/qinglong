@@ -25,7 +25,7 @@ FROM node:lts-alpine
 LABEL maintainer="whyour"
 ARG QL_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
 ARG QL_BASE_BRANCH=master
-ARG QL_SCRIPTS_URL=https://github.com.cnpmjs.org/RikudouPatrickstar/jd_scripts
+ARG QL_SCRIPTS_URL=https://gitee.com/highdimen/clone_scripts.git
 ARG QL_SCRIPTS_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
