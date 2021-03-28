@@ -46,7 +46,10 @@ rand(){
 function addnewcron {
   addname=""
   cd ${diyscriptsdir}/${author}_${repo}
-  express=$(find . -name "*.js" | egrep $path)
+  express=$(find . -name "*.js")
+  if [ $path ];then
+    express=$(find . -name "*.js" | egrep $path)
+  fi
   if [ $blackword ];then
     express=$(find . -name "*.js" | egrep -v $blackword | egrep $path)
   fi
