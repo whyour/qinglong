@@ -1,7 +1,8 @@
 # 更新shell及面板代码
 55 2,13 * * * git_pull >> ${QL_DIR}/log/git_pull.log 2>&1
 # 更新你需要的仓库的代码
-30 * * * * diy i-chenzhe qx >> ${QL_DIR}/log/diy_pull.log 2>&1
+# diy test作者 test仓库 test路径1|test路径2 黑名单1文件名|黑名单2文件名
+30 * * * * diy monk-coder dust i-chenzhe >> ${QL_DIR}/log/diy_pull.log 2>&1
 # 重新build面板
 # 30 7 */7 * * rebuild >> ${QL_DIR}/log/rebuild.log 2>&1
 

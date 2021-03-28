@@ -4,15 +4,17 @@
 declare -A BlackListDict
 author=$1
 repo=$2
-#指定仓库屏蔽关键词,不添加计划任务,多个按照格式二
-BlackListDict['i-chenzhe']="_get"
-BlackListDict['sparkssssssss']="smzdm|tg|xxxxxxxx"
+path=$3
+blackword=$4
 
-blackword=${BlackListDict["${author}"]}
-blackword=${blackword:-"wojiushigejimo"}
+if [[ $# -lt 2 ]] || [[ $# -gt 4 ]] ; then
+  echo 'Desc: 用户拉取指定用户的指定仓储'
+  echo 'Usage: diy <auth> <repo> <path> <blacklist>'
 
-if [ $# != 2 ] ; then
-  echo "USAGE: $0 author repo"
+  echo 'auth  作者名'
+  echo 'repo  仓储名'
+  echo 'path  需要下载脚本的指定目录，多个目录 | 分割  path1 | path2'
+  echo 'blacklist  需要排除的脚本名，多个名称 | 分割  blacklist1 | blacklist2'
   exit 0;
 fi
 
@@ -44,18 +46,23 @@ rand(){
 function addnewcron {
   addname=""
   cd ${diyscriptsdir}/${author}_${repo}
-  for js in `ls *.js|egrep -v $blackword`;
+  express=$(find . -name "*.js" | egrep $path)
+  if [ $blackword ];then
+    express=$(find . -name "*.js" | egrep -v $blackword | egrep $path)
+  fi
+  for js in $express;
     do 
-      croname=`echo "${author}_$js"|awk -F\. '{print $1}'`
+      base=`basename $js`
+      croname=`echo "${author}_$base"|awk -F\. '{print $1}'`
       script_date=`cat  $js|grep ^[0-9]|awk '{print $1,$2,$3,$4,$5}'|egrep -v "[a-zA-Z]|:|\."|sort |uniq|head -n 1`
       [ -z "${script_date}" ] && script_date=`cat  $js|grep -Eo "([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9][,-].*)"|sort |uniq|head -n 1`
       [ -z "${script_date}" ] && cron_min=$(rand 1 59) && cron_hour=$(rand 7 9) && script_date="${cron_min} ${cron_hour} * * *"
       [ $(grep -c -w "$croname" /ql/config/crontab.list) -eq 0 ] && sed -i "/hangup/a${script_date} js $croname"  /ql/config/crontab.list && addname="${addname}\n${croname}" && echo -e "添加了新的脚本${croname}." && js ${croname} now >/dev/null &
-      if [ ! -f "/ql/scripts/${author}_$js" ];then
-        \cp $js /ql/scripts/${author}_$js
+      if [ ! -f "/ql/scripts/${author}_$base" ];then
+        \cp $js /ql/scripts/${author}_$base
       else
-        change=$(diff $js /ql/scripts/${author}_$js)
-        [ -n "${change}" ] && \cp $js /ql/scripts/${author}_$js && echo -e "${author}_$js 脚本更新了."
+        change=$(diff $js /ql/scripts/${author}_$base)
+        [ -n "${change}" ] && \cp $js /ql/scripts/${author}_$base && echo -e "${author}_$base 脚本更新了."
       fi
   done
   [ "$addname" != "" ] && notify "新增 ${author} 自定义脚本" "${addname}"
