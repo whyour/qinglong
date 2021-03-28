@@ -69,8 +69,9 @@ const CookieModal = ({
           });
       }}
       onCancel={() => handleCancel()}
+      destroyOnClose
     >
-      <Form form={form} layout="vertical" name="form_in_modal">
+      <Form form={form} layout="vertical" name="form_in_modal" preserve={false}>
         <Form.Item
           name="cookie"
           rules={[

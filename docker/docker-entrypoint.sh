@@ -16,7 +16,7 @@ crontab ${QL_DIR}/config/crontab.list
 echo -e "成功添加定时任务...\n"
 
 if [ ! -s ${QL_DIR}/config/cookie.sh ]; then
-  echo -e "检测到config配置目录下不存在config.sh，从示例文件复制一份用于初始化...\n"
+  echo -e "检测到config配置目录下不存在cookie.sh，从示例文件复制一份用于初始化...\n"
   touch ${QL_DIR}/config/cookie.sh
   echo
 fi

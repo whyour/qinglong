@@ -12,14 +12,19 @@ git reset --mixed
 echo -e "更新shell完成...\n"
 
 echo -e "重新build...\n"
-yarn install --registry=https://registry.npm.taobao.org
 yarn build
 yarn build-back
 echo -e "重新build完成...\n"
 
 echo -e "重启服务...\n"
 
-pm2 restart panel
+PIDS=`ps -ef|grep "app.js"|grep -v grep`
+if [ "$PIDS" != "" ]; then
+  pm2 restart panel
+else
+  pm2 start ${QL_DIR}/build/app.js -n panel
+fi
+
 nginx -s reload
 
 echo -e "重启服务完成...\n"
