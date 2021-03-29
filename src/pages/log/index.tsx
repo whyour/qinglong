@@ -27,8 +27,7 @@ const Log = () => {
       x.disabled = x.isDir;
       x.children = x.files.map((y: string) => ({
         title: y,
-        key: y,
-        value: y,
+        value: `${x.name}/${y}`,
         parent: x.name,
       }));
       return x;
@@ -36,13 +35,10 @@ const Log = () => {
   };
 
   const getLog = (node: any) => {
+    console.log(node);
     setLoading(true);
-    let url = `${node.parent}/${node.value}`;
-    if (!node.parent) {
-      url = node.value;
-    }
     request
-      .get(`${config.apiPrefix}logs/${url}`)
+      .get(`${config.apiPrefix}logs/${node.value}`)
       .then((data) => {
         setValue(data.data);
       })
@@ -80,7 +76,7 @@ const Log = () => {
           treeData={data}
           placeholder="请选择日志文件"
           showSearch
-          key="title"
+          key="value"
           onSelect={onSelect}
         />,
       ]}
