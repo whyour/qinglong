@@ -25,8 +25,6 @@ FROM node:lts-alpine
 LABEL maintainer="whyour"
 ARG QL_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
 ARG QL_BASE_BRANCH=master
-ARG QL_SCRIPTS_URL=https://gitee.com/highdimen/clone_scripts.git
-ARG QL_SCRIPTS_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
     SHELL=/bin/bash \
@@ -68,14 +66,11 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && ln -sf ${QL_DIR}/shell/rebuild.sh /usr/local/bin/rebuild \
     && ln -sf ${QL_DIR}/docker/docker-entrypoint.sh /usr/local/bin/entrypoint \
     && chmod 777 ${QL_DIR}/shell/*.sh \
-    && chmod 777 ${QL_DIR}/docker/*.sh
+    && chmod 777 ${QL_DIR}/docker/*.sh \
+    && npm install -g pm2 \
+    && rm -rf /root/.npm
 COPY --from=build /ql/node_modules /ql/node_modules/
 RUN cd ${QL_DIR} \
     && yarn build \
-    && yarn build-back \
-    && git clone -b ${QL_SCRIPTS_BRANCH} ${QL_SCRIPTS_URL} ${QL_DIR}/scripts \
-    && cd ${QL_DIR}/scripts \
-    && npm install --no-save \
-    && npm install -g pm2 \
-    && rm -rf /root/.npm
+    && yarn build-back
 ENTRYPOINT ["entrypoint"]

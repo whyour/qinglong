@@ -23,7 +23,7 @@ ContentDropTask=${ShellDir}/drop_task
 SendCount=${ShellDir}/send_count
 isTermux=${ANDROID_RUNTIME_ROOT}${ANDROID_ROOT}
 ShellURL=https://github.com.cnpmjs.org/whyour/qinglong
-ScriptsURL=https://github.com.cnpmjs.org/RikudouPatrickstar/jd_scripts
+ScriptsURL=https://gitee.com/highdimen/clone_scripts
 
 ## 导入配置文件
 function Import_Conf {
