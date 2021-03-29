@@ -75,7 +75,7 @@ RUN cd ${QL_DIR} \
     && yarn build-back \
     && git clone -b ${QL_SCRIPTS_BRANCH} ${QL_SCRIPTS_URL} ${QL_DIR}/scripts \
     && cd ${QL_DIR}/scripts \
-    && npm install \
+    && npm install --no-save \
     && npm install -g pm2 \
     && rm -rf /root/.npm
 ENTRYPOINT ["entrypoint"]

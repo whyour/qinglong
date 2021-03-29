@@ -56,6 +56,8 @@ function Update_Cron {
 function Git_PullShell {
   echo -e "更新shell...\n"
   cd ${ShellDir}
+  git config --global user.email "noreplay@githb.com"
+  git config --global user.name "noreplay"
   git fetch --all
   git stash
   git pull
@@ -89,6 +91,8 @@ function Git_PullScripts {
   echo -e "更新scripts...\n"
   cd ${ScriptsDir}
   git fetch --all
+  git config --global user.email "noreplay@githb.com"
+  git config --global user.name "noreplay"
   git rm -f --ignore-unmatch i-chenzhe*
   git rm -f --ignore-unmatch  moposmall*
   git rm -f --ignore-unmatch qq34347476*
@@ -152,10 +156,10 @@ function Notify_Version {
 function Npm_InstallSub {
   if [ -n "${isTermux}" ]
   then
-    npm install --no-bin-links || npm install --no-bin-links --registry=https://registry.npm.taobao.org
+    npm install --no-bin-links --no-save || npm install --no-save --no-bin-links --registry=https://registry.npm.taobao.org
   elif ! type yarn >/dev/null 2>&1
   then
-    npm install || npm install --registry=https://registry.npm.taobao.org
+    npm install --no-save || npm install --no-save --registry=https://registry.npm.taobao.org
   else
     echo -e "检测到本机安装了 yarn，使用 yarn 替代 npm...\n"
     yarn install || yarn install --registry=https://registry.npm.taobao.org
