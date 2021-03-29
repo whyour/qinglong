@@ -61,10 +61,10 @@ function Git_PullShell {
   git fetch --all
   git stash
   git pull
-  ExitStatusShell=$?
-  echo
   git stash pop
   git reset --mixed
+  ExitStatusShell=$?
+  echo
 }
 
 ## 更新shell成功后的操作
@@ -89,20 +89,20 @@ function Git_CloneScripts {
 ## 更新scripts
 function Git_PullScripts {
   echo -e "更新scripts...\n"
-  cd ${ScriptsDir}
-  git fetch --all
+  cd ${ScriptsDir}                 
   git config --global user.email "noreplay@githb.com"
-  git config --global user.name "noreplay"
-  git rm -f --ignore-unmatch i-chenzhe*
-  git rm -f --ignore-unmatch  moposmall*
+  git config --global user.name "noreplay"     
+  git fetch --all                    
+  git rm -f --ignore-unmatch i-chenzhe*               
+  git rm -f --ignore-unmatch  moposmall*                              
   git rm -f --ignore-unmatch qq34347476*
   git rm -f --ignore-unmatch whyour*
-  git stash
-  git pull
+  git stash           
+  git pull                   
+  git stash pop    
+  git reset --mixed
   ExitStatusScripts=$?
   echo
-  git stash pop
-  git reset --mixed
 }
 
 ## 检测文件：LXK9301/jd_scripts 仓库中的 docker/crontab_list.sh
