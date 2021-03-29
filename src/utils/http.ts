@@ -5,10 +5,10 @@ import config from './config';
 const time = Date.now();
 const errorHandler = function (error: any) {
   if (error.response) {
-    const message = error.data
-      ? error.data.errors && error.data.errors.message
-      : error.response.statusText;
-    notification.error({ message });
+    const message = error.data ? error.data.message : error.response.statusText;
+    if (error.response.status !== 401) {
+      notification.error({ message });
+    }
   } else {
     console.log(error.message);
   }
