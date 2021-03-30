@@ -87,7 +87,7 @@ function Git_CloneScripts {
 function Git_PullScripts {
   echo -e "更新scripts...\n"
   cd ${ScriptsDir}          
-  git remote set-url origin $ShellURL
+  git remote set-url origin $ScriptsURL
   git fetch --all              
   ExitStatusScripts=$?      
   git reset --hard origin/master
