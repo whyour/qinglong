@@ -23,7 +23,7 @@ ContentDropTask=${ShellDir}/drop_task
 SendCount=${ShellDir}/send_count
 isTermux=${ANDROID_RUNTIME_ROOT}${ANDROID_ROOT}
 ShellURL=https://github.com.cnpmjs.org/whyour/qinglong
-ScriptsURL=https://gitee.com/highdimen/clone_scripts
+ScriptsURL=https://github.com/gossh520/jd_scripts
 
 ## 导入配置文件
 function Import_Conf {
@@ -56,14 +56,11 @@ function Update_Cron {
 function Git_PullShell {
   echo -e "更新shell...\n"
   cd ${ShellDir}
-  git config --global user.email "noreplay@githb.com"
-  git config --global user.name "noreplay"
+  git remote set-url origin $ShellURL
   git fetch --all
-  git stash
-  git pull
-  git stash pop
-  git reset --mixed
   ExitStatusShell=$?
+  git reset --hard origin/master
+  git pull
   echo
 }
 
@@ -89,19 +86,12 @@ function Git_CloneScripts {
 ## 更新scripts
 function Git_PullScripts {
   echo -e "更新scripts...\n"
-  cd ${ScriptsDir}                 
-  git config --global user.email "noreplay@githb.com"
-  git config --global user.name "noreplay"     
-  git fetch --all                    
-  git rm -f --ignore-unmatch i-chenzhe*               
-  git rm -f --ignore-unmatch  moposmall*                              
-  git rm -f --ignore-unmatch qq34347476*
-  git rm -f --ignore-unmatch whyour*
-  git stash           
+  cd ${ScriptsDir}          
+  git remote set-url origin $ShellURL
+  git fetch --all              
+  ExitStatusScripts=$?      
+  git reset --hard origin/master
   git pull                   
-  git stash pop    
-  git reset --mixed
-  ExitStatusScripts=$?
   echo
 }
 
