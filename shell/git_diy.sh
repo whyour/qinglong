@@ -60,7 +60,7 @@ function addnewcron {
       script_date=`cat  $js|grep ^[0-9]|awk '{print $1,$2,$3,$4,$5}'|egrep -v "[a-zA-Z]|:|\."|sort |uniq|head -n 1`
       [ -z "${script_date}" ] && script_date=`cat  $js|grep -Eo "([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9]+[,-].*) ([0-9]+|\*|[0-9][,-].*)"|sort |uniq|head -n 1`
       [ -z "${script_date}" ] && cron_min=$(rand 1 59) && cron_hour=$(rand 7 9) && script_date="${cron_min} ${cron_hour} * * *"
-      [ $(grep -c -w "$croname" /ql/config/crontab.list) -eq 0 ] && sed -i "/hangup/a${script_date} js $croname"  /ql/config/crontab.list && addname="${addname}\n${croname}" && echo -e "添加了新的脚本${croname}." && js ${croname} now >/dev/null &
+      [ $(grep -c -w "$croname" /ql/config/crontab.list) -eq 0 ] && sed -i "/hangup/a${script_date} js $croname"  /ql/config/crontab.list && addname="${addname}\n${croname}" && echo -e "添加了新的脚本${croname}."
       if [ ! -f "/ql/scripts/${author}_$base" ];then
         \cp $js /ql/scripts/${author}_$base
       else
@@ -79,7 +79,7 @@ function delcron {
     do
       if [ ! -f "${diyscriptsdir}/${author}_${repo}/${filename}.js" ]; then 
         sed -i "/\<js ${author}_${filename}\>/d" /ql/config/crontab.list && echo -e "删除失效脚本${filename}."
-	delname="${delname}\n${author}_${filename}"
+	      delname="${delname}\n${author}_${filename}"
       fi
   done
   [ "$delname" != "" ] && notify  "删除 ${author} 失效脚本" "${delname}" 
