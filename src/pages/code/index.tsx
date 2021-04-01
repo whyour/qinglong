@@ -17,7 +17,7 @@ const Crontab = () => {
     request
       .get(`${config.apiPrefix}config/shareCode`)
       .then((data) => {
-        setValue(data.content);
+        setValue(data.data);
       })
       .finally(() => setLoading(false));
   };

@@ -39,11 +39,19 @@ export default function (props: any) {
     const theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
     setFetchMethod(window.fetch);
     if (theme === 'dark') {
-      enableDarkMode({ darkSchemeTextColor: '#fff' });
+      enableDarkMode({
+        brightness: 100,
+        contrast: 90,
+        sepia: 10,
+      });
     } else if (theme === 'light') {
       disableDarkMode();
     } else {
-      followSystemColorScheme({ darkSchemeTextColor: '#fff' });
+      followSystemColorScheme({
+        brightness: 100,
+        contrast: 90,
+        sepia: 10,
+      });
     }
   }, []);
 

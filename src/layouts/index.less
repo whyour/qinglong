@@ -8,7 +8,7 @@ body {
 
 .code-mirror-wrapper .CodeMirror {
   position: absolute;
-  height: calc(100% - 24px);
+  height: calc(100% - 48px);
   width: 100%;
 }
 
@@ -19,5 +19,14 @@ body {
     overflow: auto;
     height: calc(100vh - 96px);
     background-color: #fff;
+    padding: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ant-pro-grid-content.wide {
+    .ant-pro-page-container-children-content {
+      height: calc(100vh - 144px);
+    }
   }
 }

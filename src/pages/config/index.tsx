@@ -4,7 +4,6 @@ import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { Controlled as CodeMirror } from 'react-codemirror2';
 import { request } from '@/utils/http';
-import QRCode from 'qrcode.react';
 
 const Config = () => {
   const [width, setWdith] = useState('100%');
@@ -18,7 +17,7 @@ const Config = () => {
     request
       .get(`${config.apiPrefix}config/config`)
       .then((data) => {
-        setValue(data.content);
+        setValue(data.data);
       })
       .finally(() => setLoading(false));
   };

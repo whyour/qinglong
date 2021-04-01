@@ -36,7 +36,7 @@ export default (app: Router) => {
           default:
             break;
         }
-        res.send({ code: 200, content });
+        res.send({ code: 200, data: content });
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);

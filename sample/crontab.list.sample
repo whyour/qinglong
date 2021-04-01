@@ -1,5 +1,6 @@
 # 更新shell及面板代码
 55 2,13 * * * git_pull >> ${QL_DIR}/log/git_pull.log 2>&1
+
 # 更新你需要的仓库的代码
 # diy test作者 test仓库 test路径1|test路径2 黑名单1文件名|黑名单2文件名
 33 * * * * diy whyour hundun "quanx/jx|quanx/jd" tokens >> ${QL_DIR}/log/diy_pull.log 2>&1
@@ -14,49 +15,13 @@
 # 导出所有互助码清单，日志在log/export_sharecodes下
 48 5 * * * export_sharecodes
 
-# 重启挂机脚本，挂机脚本可以随容器启动而启动，建议需要重启挂机程序时直接重启容器，如实在不想通过重启容器而重启挂机程序，可以解除下一行注释
-# 33 13 * * * js hangup
+# 重启挂机脚本
+# 33 3 * * * js hangup
 
-# 运行lxk0301大佬的js脚本，仅列出长期任务作初始化用，AutoAddCron=true时，将自动添加短期任务。
-# 请保留任务名称中的前缀"jd_"，去掉后缀".js"，如果有些任务你不想运行，注释掉就好了，不要删除。
-# 非lxk0301/jd_scripts仓库中的脚本不能以“jd_”、“jr_”、“jx_”开头。请在最后保留一个空行。
-5 9 * * * js jd_bean_change
-28 5 * * * js jd_bean_home
-4 0,9 * * * js jd_bean_sign
-0,30 0 * * * js jd_blueCoin
-12 8,12,18 * * * js jd_bookshop
-37 7 * * * js jd_car
-13 8,22 * * * js jd_cash
-0 0 * * * js jd_car_exchange
-2 0 * * * js jd_club_lottery
-43 13 * * * js jd_crazy_joy
-54 2-23/3 * * * js jd_daily_egg
-20 * * * * js jd_dreamFactory
-29 7,12,18 * * * js jd_fruit
-49 6 * * * js jd_get_share_code
-36 * * * * js jd_jdfactory
-14 11 * * * js jd_jdzz
-6 0,8,9,13,18,22 * * * js jd_joy
-*/20 0-22 * * * js jd_joy_feedPets
-0 0,8,12,16 * * * js jd_joy_reward
-12 9-20/2 * * * js jd_joy_run
-0 0,6 * * * js jd_joy_steal
-0 9,12,18 * * * js jd_jxnc
-32 7 * * * js jd_kd
-13-33/5 13 * * * js jd_live
-15 1 * * * js jd_lotteryMachine
-40 */4 * * * js jd_moneyTree
-20 0,20 * * * js jd_necklace
-10 7,12,18 * * * js jd_pet
-25 * * * * js jd_pigPet
-35 7-22 * * * js jd_plantBean
-11 0 * * * js jd_rankingList
-1 1 * * * js jd_redPacket
-0 0 * * * js jd_shop
-16 0 * * * js jd_small_home
-35 */3 * * * js jd_speed
-9 1-23/5 * * * js jd_superMarket
-25 9 * * * js jd_syj
-44 5 * * 5 js jd_unbind
-45 23 * * * js jd_unsubscribe
-19 11 * * * js jx_sign
+# 重置密码
+# 33 6 */7 * * js resetpwd
+
+# 运行所有脚本(慎用)
+# 33 9 */7 * * js runall
+
+# 其他定时任务

@@ -1,11 +1,21 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
-import { Button, notification, Modal, Table, Tag, Space } from 'antd';
+import {
+  Button,
+  notification,
+  Modal,
+  Table,
+  Tag,
+  Space,
+  Typography,
+} from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import QRCode from 'qrcode.react';
 import CookieModal from './modal';
+
+const { Text } = Typography;
 
 enum Status {
   '正常',
@@ -197,7 +207,11 @@ const Config = () => {
   const deleteCookie = (record: any, index: number) => {
     Modal.confirm({
       title: '确认删除',
-      content: `确认删除Cookie ${record.cookie} 吗`,
+      content: (
+        <>
+          确认删除Cookie <Text type="warning">{record.cookie}</Text> 吗
+        </>
+      ),
       onOk() {
         request
           .delete(`${config.apiPrefix}cookie`, {
@@ -270,7 +284,11 @@ const Config = () => {
     >
       <Table
         columns={columns}
-        pagination={{ hideOnSinglePage: true }}
+        pagination={{
+          hideOnSinglePage: true,
+          showSizeChanger: true,
+          defaultPageSize: 20,
+        }}
         dataSource={value}
         rowKey="pin"
         size="middle"

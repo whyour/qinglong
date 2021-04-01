@@ -17,6 +17,9 @@ const logPath = path.join(rootPath, 'log/');
 const authError = '错误的用户名密码，请重试';
 const loginFaild = '请先登录!';
 const configString = 'config sample crontab shareCode diy';
+const dbPath = path.join(rootPath, 'db/');
+const manualLogPath = path.join(rootPath, 'manual_log/');
+const cronDbFile = path.join(rootPath, 'db/crontab.db');
 
 if (envFound.error) {
   throw new Error("⚠️  Couldn't find .env file  ⚠️");
@@ -48,4 +51,7 @@ export default {
     'crontab.list': crontabFile,
     'diy.sh': diyFile,
   },
+  dbPath,
+  cronDbFile,
+  manualLogPath,
 };

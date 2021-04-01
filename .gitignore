@@ -19,6 +19,9 @@
 /src/.umi-production
 /src/.umi-test
 /.env.local
+.env
+
 /config
 /log
-.env
+/db
+/manual_log
