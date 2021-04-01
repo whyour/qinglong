@@ -30,8 +30,8 @@ export default (app: Router) => {
             let shareCodeFile = getLastModifyFilePath(config.shareCodeDir);
             content = getFileContentByName(shareCodeFile);
             break;
-          case 'diy':
-            content = getFileContentByName(config.diyFile);
+          case 'extra':
+            content = getFileContentByName(config.extraFile);
             break;
           default:
             break;

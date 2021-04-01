@@ -25,7 +25,7 @@ const Crontab = () => {
   const updateConfig = () => {
     request
       .post(`${config.apiPrefix}save`, {
-        data: { content: value, name: 'diy.sh' },
+        data: { content: value, name: 'extra.sh' },
       })
       .then((data) => {
         notification.success({
@@ -50,7 +50,7 @@ const Crontab = () => {
   return (
     <PageContainer
       className="code-mirror-wrapper"
-      title="diy.sh"
+      title="extra.sh"
       extra={[
         <Button key="1" type="primary" onClick={updateConfig}>
           保存

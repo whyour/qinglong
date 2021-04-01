@@ -571,8 +571,8 @@ export JOY_RUN_HELP_MYSELF=""
 
 ################################## 是否添加DIY脚本（选填） ##################################
 ## 如果你自己会写shell脚本，并且希望在每次git_pull.sh这个脚本运行时，额外运行你的DIY脚本，请赋值为 "true"
-## 同时，请务必将你的脚本命名为 diy.sh (只能叫这个文件名)，放在 config 目录下
-## 仓库下已经上传diy.sh模板，如果你想使用；可以参考本仓库下 diy.sh 文件；地址：https://raw.githubusercontent.com/dockere/jd-base/master/sample/diy.sh
+## 同时，请务必将你的脚本命名为 extra.sh (只能叫这个文件名)，放在 config 目录下
+## 仓库下已经上传extra.sh模板，如果你想使用；可以参考本仓库下 extra.sh 文件；地址：https://raw.githubusercontent.com/dockere/jd-base/master/sample/diy.sh
 EnableExtraShell=""
 
 

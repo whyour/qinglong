@@ -12,7 +12,7 @@ const crontabFile = path.join(rootPath, 'config/crontab.list');
 const confBakDir = path.join(rootPath, 'config/bak/');
 const authConfigFile = path.join(rootPath, 'config/auth.json');
 const shareCodeDir = path.join(rootPath, 'log/export_sharecodes/');
-const diyFile = path.join(rootPath, 'config/diy.sh');
+const extraFile = path.join(rootPath, 'config/extra.sh');
 const logPath = path.join(rootPath, 'log/');
 const authError = '错误的用户名密码，请重试';
 const loginFaild = '请先登录!';
@@ -38,7 +38,7 @@ export default {
   loginFaild,
   authError,
   logPath,
-  diyFile,
+  extraFile,
   shareCodeDir,
   authConfigFile,
   confBakDir,
@@ -49,7 +49,7 @@ export default {
   fileMap: {
     'config.sh': confFile,
     'crontab.list': crontabFile,
-    'diy.sh': diyFile,
+    'extra.sh': extraFile,
   },
   dbPath,
   cronDbFile,
