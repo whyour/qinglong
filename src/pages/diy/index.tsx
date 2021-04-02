@@ -15,7 +15,7 @@ const Crontab = () => {
   const getConfig = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}config/diy`)
+      .get(`${config.apiPrefix}config/extra`)
       .then((data) => {
         setValue(data.data);
       })
