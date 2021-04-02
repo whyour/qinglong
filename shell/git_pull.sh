@@ -145,6 +145,7 @@ Random_Pull_Cron() {
       [[ $tmp -lt 24 ]] && RanHourArray[i]=$tmp || break
     done
     
+    RanHour=${RanHourArray[0]}
     for ((i = 1; i < ${#RanHourArray[*]}; i++)); do
       RanHour="$RanHour,${RanHourArray[i]}"
     done
