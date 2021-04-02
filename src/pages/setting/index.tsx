@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, notification, Input, Form, Radio, Tabs } from 'antd';
+import { Button, Input, Form, Radio, Tabs } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
@@ -28,7 +28,7 @@ const Password = () => {
 
   const handleOk = (values: any) => {
     request
-      .post(`${config.apiPrefix}user?t=${Date.now()}`, {
+      .post(`${config.apiPrefix}user`, {
         data: {
           username: values.username,
           password: values.password,
@@ -48,6 +48,12 @@ const Password = () => {
     localStorage.setItem('qinglong_dark_theme', e.target.value);
   };
 
+  const importJob = () => {
+    request.get(`${config.apiPrefix}crons/import`).then((data: any) => {
+      console.log(data);
+    });
+  };
+
   useEffect(() => {
     if (document.body.clientWidth < 768) {
       setWdith('auto');
@@ -63,11 +69,19 @@ const Password = () => {
   useEffect(() => {
     setFetchMethod(window.fetch);
     if (theme === 'dark') {
-      enableDarkMode({ darkSchemeTextColor: '#fff' });
+      enableDarkMode({
+        brightness: 100,
+        contrast: 90,
+        sepia: 10,
+      });
     } else if (theme === 'light') {
       disableDarkMode();
     } else {
-      followSystemColorScheme({ darkSchemeTextColor: '#fff' });
+      followSystemColorScheme({
+        brightness: 100,
+        contrast: 90,
+        sepia: 10,
+      });
     }
   }, [theme]);
 
@@ -94,7 +108,7 @@ const Password = () => {
       <Tabs
         defaultActiveKey="person"
         tabPosition="left"
-        style={{ padding: '16px 16px 16px 0', height: 'calc(100vh - 96px)' }}
+        style={{ height: 'calc(100vh - 128px)' }}
       >
         <Tabs.TabPane tab="个人设置" key="person">
           <Form onFinish={handleOk} layout="vertical">
