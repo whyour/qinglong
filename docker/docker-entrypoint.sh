@@ -45,11 +45,15 @@ echo -e "======================2. 启动nginx========================\n"
 nginx -c /etc/nginx/nginx.conf
 echo
 
-echo -e "======================3. 更新源代码========================\n"
+echo -e "======================3. 启动控制面板========================\n"
+pm2 start ${QL_DIR}/build/app.js -n panel
+echo -e "控制面板启动成功...\n"
+
+echo -e "======================4. 更新源代码========================\n"
 git_pull
 echo
 
-echo -e "======================4. 启动挂机程序========================\n"
+echo -e "======================5. 启动挂机程序========================\n"
 CookieConf=${QL_DIR}/config/cookie.sh
 . ${QL_DIR}/config/config.sh
 . ${CookieConf}
@@ -59,10 +63,6 @@ if [ -s ${CookieConf} ]; then
 else
   echo -e "尚未在Cookie管理中添加一条Cookie，可能是首次部署容器，因此不启动挂机程序...\n"
 fi
-
-echo -e "======================5. 启动控制面板========================\n"
-  pm2 start ${QL_DIR}/build/app.js -n panel
-  echo -e "控制面板启动成功...\n"
 
 echo -e "\n容器启动成功...\n"
 

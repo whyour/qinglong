@@ -100,12 +100,12 @@ Npm_Install() {
 ## npm install 子程序，判断是否为安卓，判断是否安装有yarn
 function Npm_InstallSub() {
   if [ -n "$isTermux" ]; then
-    npm install --no-bin-links --no-save || npm install --no-save --no-bin-links --registry=https://registry.npm.taobao.org
+    npm install --no-save --no-bin-links --registry=https://registry.npm.taobao.org || npm install --no-bin-links --no-save
   elif ! type yarn >/dev/null 2>&1; then
-    npm install --no-save || npm install --no-save --registry=https://registry.npm.taobao.org
+    npm install --no-save --registry=https://registry.npm.taobao.org || npm install --no-save
   else
     echo -e "检测到本机安装了 yarn，使用 yarn 替代 npm...\n"
-    yarn install || yarn install --registry=https://registry.npm.taobao.org
+    yarn install --registry=https://registry.npm.taobao.org || yarn install
   fi
 }
 
