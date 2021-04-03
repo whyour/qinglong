@@ -92,7 +92,7 @@ delcron() {
   [ "$delname" != "" ] && notify "删除 ${author} 失效脚本" "${delname}"
 }
 
-. /ql/shell/api.sh
+. $ShellDir/shell/api.sh
 get_token
 
 if [[ ${gitpullstatus} -eq 0 ]]; then

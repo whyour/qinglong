@@ -283,14 +283,14 @@ Import_Conf
 Random_Pull_Cron
 
 # 更新shell
-# [ -f $ShellDir/package.json ] && PanelDependOld=$(cat $ShellDir/package.json)
-# Git_Pull_Shell
-# Git_Pull_Shell_Next
+[ -f $ShellDir/package.json ] && PanelDependOld=$(cat $ShellDir/package.json)
+Git_Pull_Shell
+Git_Pull_Shell_Next
 
 ## 更新scripts
-# [ -f $ScriptsDir/package.json ] && ScriptsDependOld=$(cat $ScriptsDir/package.json)
-# Git_Pull_Scripts
-# Git_Pull_Scripts_Next
+[ -f $ScriptsDir/package.json ] && ScriptsDependOld=$(cat $ScriptsDir/package.json)
+Git_Pull_Scripts
+Git_Pull_Scripts_Next
 
 ## 调用用户自定义的extra.sh
 if [[ $EnableExtraShell == true ]]; then
