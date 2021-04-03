@@ -22,10 +22,10 @@ get_json_value() {
 }
 
 add_cron_api() {
-  local currentTimeStamp=$(date +%s%3)
+  local currentTimeStamp=$(date +%s)
   if [ $# -eq 1 ]; then
-    local schedule=$(echo "$1" | awk -F ": " '{print $1}')
-    local command=$(echo "$1" | awk -F ": " '{print $2}')
+    local schedule=$(echo "$1" | awk -F ":" '{print $1}')
+    local command=$(echo "$1" | awk -F ":" '{print $2}')
     local name=$(echo "$1" | awk -F ": " '{print $3}')
   else
     local schedule=$1
@@ -54,7 +54,7 @@ add_cron_api() {
 
 del_cron_api() {
   local id=$1
-  local currentTimeStamp=$(date +%s%3)
+  local currentTimeStamp=$(date +%s)
   local api=$(curl "http://localhost:5678/api/crons/$id?t=$currentTimeStamp" \
     -X 'DELETE' \
     -H "Accept: application/json" \

@@ -1,39 +1,5 @@
 #!/usr/bin/env bash
 
-## 常量
-ShellDir=${QL_DIR:-$(
-  cd $(dirname $0)
-  pwd
-)}
-[[ $QL_DIR ]] && ShellJs=js
-LogDir=$ShellDir/log
-[ ! -d $LogDir ] && mkdir -p $LogDir
-DbDir=$ShellDir/db
-[ ! -d $DbDir ] && mkdir -p $DbDir
-ManualLogDir=$ShellDir/manual_log
-[ ! -d $ManualLogDir ] && mkdir -p $ManualLogDir
-ScriptsDir=$ShellDir/scripts
-ConfigDir=$ShellDir/config
-FileConf=$ConfigDir/config.sh
-CookieConf=$ConfigDir/cookie.sh
-AuthConf=$ConfigDir/auth.json
-ExtraShell=$ConfigDir/extra.sh
-FileConfSample=$ShellDir/sample/config.sh.sample
-ListCronSample=$ShellDir/sample/crontab.list.sample
-ListCronCurrent=$ConfigDir/crontab.list
-ListCronRemote=$ScriptsDir/docker/crontab_list.sh
-ListCurrentTask=$LogDir/task.list
-ListRemoteTask=$LogDir/js.list
-ListJsAdd=$LogDir/js-add.list
-ListJsDrop=$LogDir/js-drop.list
-ContentVersion=$ShellDir/version
-ContentNewTask=$ShellDir/new_task
-ContentDropTask=$ShellDir/drop_task
-SendVersion=$ShellDir/send_version
-isTermux=$ANDROID_RUNTIME_ROOT$ANDROID_ROOT
-ShellURL=https://github.com.cnpmjs.org/whyour/qinglong
-ScriptsURL=https://github.com.cnpmjs.org/gossh520/jd_scripts
-
 Import_Conf() {
   if [ ! -s $FileConf ]; then
     echo -e "复制一份 $FileConfSample 示例配置文件\n\n"
@@ -45,8 +11,6 @@ Import_Conf() {
   fi
   [ -f $CookieConf ] && . $CookieConf
   [ -f $FileConf ] && . $FileConf
-
-  . $ShellDir/shell/api.sh
 }
 
 # 更新shell
@@ -147,12 +111,12 @@ Random_Pull_Cron() {
       tmp=$(($RANDOM % 3 + ${RanHourArray[j]} + 2))
       [[ $tmp -lt 24 ]] && RanHourArray[i]=$tmp || break
     done
-    
+
     RanHour=${RanHourArray[0]}
     for ((i = 1; i < ${#RanHourArray[*]}; i++)); do
       RanHour="$RanHour,${RanHourArray[i]}"
     done
-    
+
     perl -i -pe "s|.+(git_pull? .+git_pull\.log.*)|$RanMin $RanHour \* \* \* sleep $RanSleep && \1|" $ListCronCurrent
     crontab $ListCronCurrent
   fi
@@ -201,7 +165,7 @@ Git_Pull_Scripts_Next() {
 
 Diff_Cron() {
   cat $ListCronRemote | grep -E "node.+j[drx]_\w+\.js" | perl -pe "s|.+(j[drx]_\w+)\.js.+|\1|" | sort -u >$ListRemoteTask
-  cat $ListCronCurrent | grep -E "$ShellJs j[drx]_\w+" | perl -pe "s|.*ID=(.*)$ShellJs (j[drx]_\w+)\.*|\1|" | sort -u >$ListCurrentTask
+  cat $ListCronCurrent | grep -E "$ShellJs j[drx]_\w+" | perl -pe "s|.*ID=(.*)$ShellJs (j[drx]_\w+)\.*|\1:\2|" | sort -u >$ListCurrentTask
   if [ -s $ListCurrentTask ]; then
     grep -vwf $ListCurrentTask $ListRemoteTask >$ListJsAdd
   else
@@ -221,7 +185,9 @@ Del_Cron() {
     echo
     JsDrop=$(cat $ListJsDrop)
     for Cron in $JsDrop; do
-      del_cron_api "$Cron"
+      local id=$(echo "$1" | awk -F ":" '{print $1}')
+      local name=$(echo "$1" | awk -F ":" '{print $2}')
+      del_cron_api "$id"
     done
     crontab $ListCronCurrent
     echo -e "成功删除失效的脚本与定时任务\n"
@@ -234,10 +200,12 @@ Add_Cron() {
     echo -e "开始尝试自动添加定时任务\n"
     JsAdd=$(cat $ListJsAdd)
     for Cron in $JsAdd; do
-      if [[ $Cron == jd_bean_sign ]]; then
-        echo "4 0,9 * * * $ShellJs $Cron" >> $ListCronCurrent
+      local id=$(echo "$1" | awk -F ":" '{print $1}')
+      local name=$(echo "$1" | awk -F ":" '{print $2}')
+      if [[ $name == jd_bean_sign ]]; then
+        echo "4 0,9 * * * $ShellJs $name" >>$ListCronCurrent
       else
-        param=$(cat $ListCronRemote | grep -E "\/$Cron\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1\: $ShellJs \2: \2|")
+        param=$(cat $ListCronRemote | grep -E "\/$name\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1\:$ShellJs \2:\2|")
         add_cron_api "$param"
       fi
     done
@@ -275,10 +243,12 @@ fi
 echo -e "\nJS脚本目录：$ScriptsDir\n"
 echo -e "--------------------------------------------------------------\n"
 
+. $ShellDir/shell/variables.sh
+. $ShellDir/shell/api.sh
+get_token
+
 Import_Conf
 Random_Pull_Cron
-
-get_token
 
 # 更新shell
 [ -f $ShellDir/package.json ] && PanelDependOld=$(cat $ShellDir/package.json)
