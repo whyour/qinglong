@@ -16,6 +16,7 @@ ScriptsDir=$ShellDir/scripts
 ConfigDir=$ShellDir/config
 FileConf=$ConfigDir/config.sh
 CookieConf=$ConfigDir/cookie.sh
+AuthConf=$ConfigDir/auth.json
 ExtraShell=$ConfigDir/extra.sh
 FileConfSample=$ShellDir/sample/config.sh.sample
 ListCronSample=$ShellDir/sample/crontab.list.sample
@@ -44,6 +45,8 @@ Import_Conf() {
   fi
   [ -f $CookieConf ] && . $CookieConf
   [ -f $FileConf ] && . $FileConf
+
+  . $ShellDir/shell/api.sh
 }
 
 # 更新shell
@@ -198,7 +201,7 @@ Git_Pull_Scripts_Next() {
 
 Diff_Cron() {
   cat $ListCronRemote | grep -E "node.+j[drx]_\w+\.js" | perl -pe "s|.+(j[drx]_\w+)\.js.+|\1|" | sort -u >$ListRemoteTask
-  cat $ListCronCurrent | grep -E "$ShellJs j[drx]_\w+" | perl -pe "s|.*$ShellJs (j[drx]_\w+)\.*|\1|" | sort -u >$ListCurrentTask
+  cat $ListCronCurrent | grep -E "$ShellJs j[drx]_\w+" | perl -pe "s|.*ID=(.*)$ShellJs (j[drx]_\w+)\.*|\1|" | sort -u >$ListCurrentTask
   if [ -s $ListCurrentTask ]; then
     grep -vwf $ListCurrentTask $ListRemoteTask >$ListJsAdd
   else
@@ -218,7 +221,7 @@ Del_Cron() {
     echo
     JsDrop=$(cat $ListJsDrop)
     for Cron in $JsDrop; do
-      perl -i -ne "{print unless / $Cron( |$)/}" $ListCronCurrent
+      del_cron_api "$Cron"
     done
     crontab $ListCronCurrent
     echo -e "成功删除失效的脚本与定时任务\n"
@@ -234,7 +237,8 @@ Add_Cron() {
       if [[ $Cron == jd_bean_sign ]]; then
         echo "4 0,9 * * * $ShellJs $Cron" >> $ListCronCurrent
       else
-        cat $ListCronRemote | grep -E "\/$Cron\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1$ShellJs \2|" >> $ListCronCurrent
+        param=$(cat $ListCronRemote | grep -E "\/$Cron\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1\: $ShellJs \2: \2|")
+        add_cron_api "$param"
       fi
     done
 
@@ -273,6 +277,8 @@ echo -e "--------------------------------------------------------------\n"
 
 Import_Conf
 Random_Pull_Cron
+
+get_token
 
 # 更新shell
 [ -f $ShellDir/package.json ] && PanelDependOld=$(cat $ShellDir/package.json)

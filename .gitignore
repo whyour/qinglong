@@ -20,6 +20,7 @@
 /src/.umi-test
 /.env.local
 .env
+.history
 
 /config
 /log
