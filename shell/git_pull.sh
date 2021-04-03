@@ -233,12 +233,10 @@ Add_Cron() {
     echo -e "开始尝试自动添加定时任务\n"
     JsAdd=$(cat $ListJsAdd)
     for Cron in $JsAdd; do
-      local id=$(echo "$1" | awk -F ":" '{print $1}')
-      local name=$(echo "$1" | awk -F ":" '{print $2}')
-      if [[ $name == jd_bean_sign ]]; then
-        echo "4 0,9 * * * $ShellJs $name" >>$ListCronCurrent
+      if [[ $Cron == jd_bean_sign ]]; then
+        echo "4 0,9 * * * $ShellJs $Cron" >>$ListCronCurrent
       else
-        param=$(cat $ListCronRemote | grep -E "\/$name\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1\:$ShellJs \2:\2|")
+        param=$(cat $ListCronRemote | grep -E "\/$Cron\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1\:$ShellJs \2:\2|")
         add_cron_api "$param"
       fi
     done

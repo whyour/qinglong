@@ -74,7 +74,7 @@ export default class CronService {
       let logFile = `${config.manualLogPath}${res._id}.log`;
       fs.writeFileSync(logFile, `${new Date().toString()}\n\n`);
 
-      const cmd = spawn(res.command, { shell: true });
+      const cmd = spawn(`${res.command} now`, { shell: true });
 
       this.cronDb.update({ _id }, { $set: { status: CrontabStatus.running } });
 
