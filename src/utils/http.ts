@@ -16,7 +16,7 @@ const errorHandler = function (error: any) {
   throw error; // 如果throw. 错误将继续抛出.
 };
 
-const _request = extend({ timeout: 5000, params: { t: time }, errorHandler });
+const _request = extend({ timeout: 60000, params: { t: time }, errorHandler });
 
 _request.interceptors.request.use((url, options) => {
   const token = localStorage.getItem(config.authKey);
