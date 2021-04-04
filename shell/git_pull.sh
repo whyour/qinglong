@@ -198,7 +198,7 @@ Git_Pull_Scripts_Next() {
 
 Diff_Cron() {
   cat $ListCronRemote | grep -E "node.+j[drx]_\w+\.js" | perl -pe "s|.+(j[drx]_\w+)\.js.+|\1|" | sort -u >$ListRemoteTask
-  cat $ListCronCurrent | grep -E "$ShellJs j[drx]_\w+" | perl -pe "s|.*ID=(.*)$ShellJs (j[drx]_\w+)\.*|\1:\2|" | sort -u >$ListCurrentTask
+  cat $ListCronCurrent | grep -E "$ShellJs j[drx]_\w+" | perl -pe "s|.*ID=(.*) $ShellJs (j[drx]_\w+)\.*|\2|" | sort -u >$ListCurrentTask
   if [ -s $ListCurrentTask ]; then
     grep -vwf $ListCurrentTask $ListRemoteTask >$ListJsAdd
   else
@@ -218,8 +218,7 @@ Del_Cron() {
     echo
     JsDrop=$(cat $ListJsDrop)
     for Cron in $JsDrop; do
-      local id=$(echo "$1" | awk -F ":" '{print $1}')
-      local name=$(echo "$1" | awk -F ":" '{print $2}')
+      local id=$(cat $ListCronCurrent | grep -E "js $Cron" | perl -pe "s|.*ID=(.*) js $Cron|\1|")
       del_cron_api "$id"
     done
     crontab $ListCronCurrent

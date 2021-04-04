@@ -261,7 +261,7 @@ const Crontab = () => {
           <Menu.Item key="edit" icon={<EditOutlined />}>
             编辑
           </Menu.Item>
-          {record.isSystem === 0 && (
+          {record.isSystem !== 0 && (
             <>
               <Menu.Item
                 key="enableordisable"

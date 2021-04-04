@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 get_token() {
-  echo $AuthConf
   local authInfo=$(cat $AuthConf)
   token=$(get_json_value "$authInfo" "token")
 }
