@@ -284,11 +284,7 @@ const Config = () => {
     >
       <Table
         columns={columns}
-        pagination={{
-          hideOnSinglePage: true,
-          showSizeChanger: true,
-          defaultPageSize: 20,
-        }}
+        pagination={false}
         dataSource={value}
         rowKey="pin"
         size="middle"
