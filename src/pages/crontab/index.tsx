@@ -53,6 +53,7 @@ const Crontab = () => {
       title: '任务',
       dataIndex: 'command',
       key: 'command',
+      width: '50%',
       align: 'center' as const,
     },
     {
