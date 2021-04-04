@@ -51,6 +51,8 @@ const CookieModal = ({
   useEffect(() => {
     if (cookie) {
       form.setFieldsValue({ cookie });
+    } else {
+      form.resetFields();
     }
   }, [cookie]);
 
@@ -58,6 +60,7 @@ const CookieModal = ({
     <Modal
       title={cookie ? '编辑Cookie' : '新建Cookie'}
       visible={visible}
+      forceRender
       onOk={() => {
         form
           .validateFields()

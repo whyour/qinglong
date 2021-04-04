@@ -39,6 +39,8 @@ const CronModal = ({
   useEffect(() => {
     if (cron) {
       form.setFieldsValue(cron);
+    } else {
+      form.resetFields();
     }
   }, [cron]);
 
@@ -46,6 +48,7 @@ const CronModal = ({
     <Modal
       title={cron ? '编辑定时' : '新建定时'}
       visible={visible}
+      forceRender
       onOk={() => {
         form
           .validateFields()

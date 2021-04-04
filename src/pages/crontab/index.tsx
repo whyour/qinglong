@@ -151,6 +151,7 @@ const Crontab = () => {
   };
 
   const addCron = () => {
+    setEditedCron(null as any);
     setIsModalVisible(true);
   };
 

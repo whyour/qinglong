@@ -196,6 +196,7 @@ const Config = () => {
   };
 
   const addCookie = () => {
+    setEditedCookie(null as any);
     setIsModalVisible(true);
   };
 
