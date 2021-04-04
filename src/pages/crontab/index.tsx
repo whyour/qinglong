@@ -53,8 +53,22 @@ const Crontab = () => {
       title: '任务',
       dataIndex: 'command',
       key: 'command',
-      width: '50%',
+      width: '40%',
       align: 'center' as const,
+      render: (text: string, record: any) => {
+        return (
+          <span
+            style={{
+              textAlign: 'left',
+              width: '100%',
+              display: 'inline-block',
+              wordBreak: 'break-all',
+            }}
+          >
+            {text}
+          </span>
+        );
+      },
     },
     {
       title: '任务定时',
