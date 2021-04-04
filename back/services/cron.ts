@@ -82,7 +82,7 @@ export default class CronService {
   }
 
   public async run(_id: string) {
-    this.cronDb.find({ _id }).exec((err, docs) => {
+    this.cronDb.find({ _id }).exec((err, docs: Crontab[]) => {
       let res = docs[0];
 
       this.logger.silly('Running job');
@@ -92,7 +92,13 @@ export default class CronService {
       let logFile = `${config.manualLogPath}${res._id}.log`;
       fs.writeFileSync(logFile, `${new Date().toString()}\n\n`);
 
-      const cmd = spawn(`${res.command} now`, { shell: true });
+      let cmdStr = res.command;
+      if (res.command.startsWith('js')) {
+        cmdStr = `${res.command} now`;
+      } else if (/&& (.*) >>/.test(res.command)) {
+        cmdStr = res.command.match(/&& (.*) >>/)[1];
+      }
+      const cmd = spawn(cmdStr, { shell: true });
 
       this.cronDb.update({ _id }, { $set: { status: CrontabStatus.running } });
 
@@ -141,7 +147,13 @@ export default class CronService {
     const tabs = await this.crontabs();
     var crontab_string = '';
     tabs.forEach((tab) => {
-      if (tab.status !== CrontabStatus.disabled) {
+      if (tab.status === CrontabStatus.disabled) {
+        crontab_string += '# ';
+        crontab_string += tab.schedule;
+        crontab_string += ' ';
+        crontab_string += this.make_command(tab);
+        crontab_string += '\n';
+      } else {
         crontab_string += tab.schedule;
         crontab_string += ' ';
         crontab_string += this.make_command(tab);

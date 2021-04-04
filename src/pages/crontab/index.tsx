@@ -123,11 +123,12 @@ const Crontab = () => {
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedCron, setEditedCron] = useState();
+  const [searchText, setSearchText] = useState('');
 
-  const getCrons = (text: string = '') => {
+  const getCrons = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}crons?searchValue=${text}`)
+      .get(`${config.apiPrefix}crons?searchValue=${searchText}`)
       .then((data: any) => {
         setValue(data.data.sort((a: any, b: any) => a.status - b.status));
       })
@@ -311,8 +312,12 @@ const Crontab = () => {
   };
 
   const onSearch = (value: string) => {
-    getCrons(value);
+    setSearchText(searchText);
   };
+
+  useEffect(() => {
+    getCrons();
+  }, [searchText]);
 
   useEffect(() => {
     if (document.body.clientWidth < 768) {
