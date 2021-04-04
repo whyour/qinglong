@@ -153,9 +153,7 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}crons`, {
-            data: { _id: record._id },
-          })
+          .delete(`${config.apiPrefix}crons/${record._id}`)
           .then((data: any) => {
             if (data.code === 200) {
               notification.success({
