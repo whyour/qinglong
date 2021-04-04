@@ -15,7 +15,9 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cookieService = Container.get(CronService);
-        const data = await cookieService.crontabs();
+        const data = await cookieService.crontabs(
+          req.query.searchValue as string,
+        );
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);

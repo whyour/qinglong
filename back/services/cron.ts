@@ -48,10 +48,24 @@ export default class CronService {
     await this.set_crontab();
   }
 
-  public async crontabs(): Promise<Crontab[]> {
+  public async crontabs(searchText?: string): Promise<Crontab[]> {
+    let query = {};
+    if (searchText) {
+      const reg = new RegExp(searchText);
+      query = {
+        $or: [
+          {
+            name: reg,
+          },
+          {
+            command: reg,
+          },
+        ],
+      };
+    }
     return new Promise((resolve) => {
       this.cronDb
-        .find({})
+        .find(query)
         .sort({ created: -1 })
         .exec((err, docs) => {
           resolve(docs);

@@ -10,6 +10,7 @@ import {
   Dropdown,
   Menu,
   Typography,
+  Input,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -29,6 +30,7 @@ import { request } from '@/utils/http';
 import CronModal from './modal';
 
 const { Text } = Typography;
+const { Search } = Input;
 
 enum CrontabStatus {
   'running',
@@ -122,10 +124,10 @@ const Crontab = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedCron, setEditedCron] = useState();
 
-  const getCrons = () => {
+  const getCrons = (text: string = '') => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}crons`)
+      .get(`${config.apiPrefix}crons?searchValue=${text}`)
       .then((data: any) => {
         setValue(data.data.sort((a: any, b: any) => a.status - b.status));
       })
@@ -310,6 +312,10 @@ const Crontab = () => {
     }
   };
 
+  const onSearch = (value: string) => {
+    getCrons(value);
+  };
+
   useEffect(() => {
     if (document.body.clientWidth < 768) {
       setWdith('auto');
@@ -329,6 +335,13 @@ const Crontab = () => {
       title="定时任务"
       loading={loading}
       extra={[
+        <Search
+          placeholder="请输入名称或者关键词"
+          style={{ width: 'auto' }}
+          enterButton
+          loading={loading}
+          onSearch={onSearch}
+        />,
         <Button key="2" type="primary" onClick={() => addCron()}>
           添加定时
         </Button>,
