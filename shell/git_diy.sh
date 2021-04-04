@@ -6,6 +6,8 @@ ShellDir=${QL_DIR:-$(
   pwd
 )}
 [[ $QL_DIR ]] && ShellJs=js
+ConfigDir=$ShellDir/config
+AuthConf=$ConfigDir/auth.json
 
 declare -A BlackListDict
 author=$1
