@@ -7,6 +7,7 @@ ShellDir=${QL_DIR:-$(
 )}
 [[ $QL_DIR ]] && ShellJs=js
 ConfigDir=$ShellDir/config
+ListCronCurrent=$ConfigDir/crontab.list
 AuthConf=$ConfigDir/auth.json
 
 declare -A BlackListDict
