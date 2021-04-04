@@ -31,8 +31,8 @@ import CronModal from './modal';
 const { Text } = Typography;
 
 enum CrontabStatus {
-  'idle',
   'running',
+  'idle',
   'disabled',
 }
 

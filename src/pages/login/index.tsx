@@ -20,7 +20,7 @@ const Login = () => {
       .then((data) => {
         if (data.code === 200) {
           localStorage.setItem(config.authKey, data.token);
-          history.push('/cookie');
+          history.push('/crontab');
         } else if (data.code === 100) {
           notification.warn({
             message: data.msg,
@@ -39,7 +39,7 @@ const Login = () => {
   useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
     if (isAuth) {
-      history.push('/cookie');
+      history.push('/crontab');
     }
   }, []);
 

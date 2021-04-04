@@ -20,6 +20,12 @@ export default {
         component: '@/pages/login/index',
       },
       {
+        path: '/crontab',
+        name: '定时任务',
+        icon: <FieldTimeOutlined />,
+        component: '@/pages/crontab/index',
+      },
+      {
         path: '/cookie',
         name: 'Cookie管理',
         icon: <RadiusSettingOutlined />,
@@ -36,12 +42,6 @@ export default {
         name: '自定义脚本',
         icon: <FormOutlined />,
         component: '@/pages/diy/index',
-      },
-      {
-        path: '/crontab',
-        name: '定时任务',
-        icon: <FieldTimeOutlined />,
-        component: '@/pages/crontab/index',
       },
       {
         path: '/diff',

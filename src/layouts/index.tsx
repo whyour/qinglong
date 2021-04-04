@@ -31,7 +31,7 @@ export default function (props: any) {
 
   useEffect(() => {
     if (props.location.pathname === '/') {
-      history.push('/cookie');
+      history.push('/crontab');
     }
   }, [props.location.pathname]);
 
