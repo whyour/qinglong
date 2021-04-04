@@ -66,7 +66,7 @@ export default class CronService {
     return new Promise((resolve) => {
       this.cronDb
         .find(query)
-        .sort({ created: -1 })
+        .sort({ created: 1 })
         .exec((err, docs) => {
           resolve(docs);
         });
