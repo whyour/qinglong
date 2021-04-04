@@ -64,7 +64,7 @@ const initData = [
     status: CrontabStatus.disabled,
   },
   {
-    name: '运行所以脚本(慎用)',
+    name: '运行所有脚本(慎用)',
     command: 'js runall',
     schedule: '33 6 */7 * *',
     status: CrontabStatus.disabled,
