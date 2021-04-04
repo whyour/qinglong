@@ -18,6 +18,10 @@ export default class CronService {
     });
   }
 
+  public getDb(): DataStore {
+    return this.cronDb;
+  }
+
   public async create(payload: Crontab): Promise<void> {
     const tab = new Crontab(payload);
     tab.created = new Date().valueOf();

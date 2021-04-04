@@ -127,7 +127,7 @@ const Crontab = () => {
     request
       .get(`${config.apiPrefix}crons`)
       .then((data: any) => {
-        setValue(data.data);
+        setValue(data.data.sort((a: any, b: any) => a.status - b.status));
       })
       .finally(() => setLoading(false));
   };
@@ -259,21 +259,25 @@ const Crontab = () => {
           <Menu.Item key="edit" icon={<EditOutlined />}>
             编辑
           </Menu.Item>
-          <Menu.Item
-            key="enableordisable"
-            icon={
-              record.status === CrontabStatus.disabled ? (
-                <CheckCircleOutlined />
-              ) : (
-                <StopOutlined />
-              )
-            }
-          >
-            {record.status === CrontabStatus.disabled ? '启用' : '禁用'}
-          </Menu.Item>
-          <Menu.Item key="delete" icon={<DeleteOutlined />}>
-            删除
-          </Menu.Item>
+          {record.isSystem === 0 && (
+            <>
+              <Menu.Item
+                key="enableordisable"
+                icon={
+                  record.status === CrontabStatus.disabled ? (
+                    <CheckCircleOutlined />
+                  ) : (
+                    <StopOutlined />
+                  )
+                }
+              >
+                {record.status === CrontabStatus.disabled ? '启用' : '禁用'}
+              </Menu.Item>
+              <Menu.Item key="delete" icon={<DeleteOutlined />}>
+                删除
+              </Menu.Item>
+            </>
+          )}
         </Menu>
       }
     >

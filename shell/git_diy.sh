@@ -61,7 +61,8 @@ addnewcron() {
     [ -z "${script_date}" ] && cron_min=$(rand 1 59) && cron_hour=$(rand 7 9) && script_date="${cron_min} ${cron_hour} * * *"
     local oldCron=$(grep -c -w "$croname" "$ListCronCurrent")
     if [[ oldCron -eq 0 ]]; then
-      add_cron_api "$script_date" "js $croname" "$croname"
+      local name=$(cat "$js" | grep -E "new Env\(" | perl -pe "s|(^.+)new Env\(\'*\"*(.+?)'*\"*\).+|\2|")
+      add_cron_api "$script_date" "js $croname" "$name"
       addname="${addname}\n${croname}"
       echo -e "添加了新的脚本${croname}."
     fi

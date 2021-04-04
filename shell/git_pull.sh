@@ -236,8 +236,9 @@ Add_Cron() {
       if [[ $Cron == jd_bean_sign ]]; then
         echo "4 0,9 * * * $ShellJs $Cron" >>$ListCronCurrent
       else
-        param=$(cat $ListCronRemote | grep -E "\/$Cron\." | perl -pe "s|(^.+)node */scripts/(j[drx]_\w+)\.js.+|\1\:$ShellJs \2:\2|")
-        add_cron_api "$param"
+        local name=$(cat "$ScriptsDir/$Cron.js" | grep -E "new Env\(" | perl -pe "s|(^.+)new Env\(\'*\"*(.+?)'*\"*\).+|\2|")
+        local param=$(cat $ListCronRemote | grep -E "\/$Cron\." | perl -pe "s|(^.+) node */scripts/(j[drx]_\w+)\.js.+|\1\:$ShellJs \2|")
+        add_cron_api "$param:$name"
       fi
     done
 
@@ -278,7 +279,6 @@ echo -e "--------------------------------------------------------------\n"
 get_token
 
 Import_Conf
-Random_Pull_Cron
 
 # 更新shell
 [ -f $ShellDir/package.json ] && PanelDependOld=$(cat $ShellDir/package.json)

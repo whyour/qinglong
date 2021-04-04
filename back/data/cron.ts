@@ -7,6 +7,7 @@ export class Crontab {
   saved?: boolean;
   _id?: string;
   status?: CrontabStatus;
+  isSystem?: 1 | 0;
 
   constructor(options: Crontab) {
     this.name = options.name;
@@ -17,11 +18,12 @@ export class Crontab {
     this.created = options.created;
     this.status = options.status || CrontabStatus.idle;
     this.timestamp = new Date().toString();
+    this.isSystem = options.isSystem;
   }
 }
 
 export enum CrontabStatus {
-  'idle',
   'running',
+  'idle',
   'disabled',
 }
