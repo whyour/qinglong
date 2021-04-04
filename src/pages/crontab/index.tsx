@@ -329,7 +329,6 @@ const Crontab = () => {
       setMarginLeft(0);
       setMarginTop(-72);
     }
-    getCrons();
   }, []);
 
   return (
