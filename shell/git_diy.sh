@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 #author:spark thanks to: https://github.com/sparkssssssss/scripts
 
+ShellDir=${QL_DIR:-$(
+  cd $(dirname $0)
+  pwd
+)}
+[[ $QL_DIR ]] && ShellJs=js
+
 declare -A BlackListDict
 author=$1
 repo=$2

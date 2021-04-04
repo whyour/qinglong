@@ -233,7 +233,8 @@ Add_Cron() {
     JsAdd=$(cat $ListJsAdd)
     for Cron in $JsAdd; do
       if [[ $Cron == jd_bean_sign ]]; then
-        echo "4 0,9 * * * $ShellJs $Cron" >>$ListCronCurrent
+        local name=$(cat "$ScriptsDir/$Cron.js" | grep -E "new Env\(" | perl -pe "s|(^.+)new Env\(\'*\"*(.+?)'*\"*\).+|\2|")
+        add_cron_api "4 0,9 * * *" "$ShellJs $Cron" "$name"
       else
         local name=$(cat "$ScriptsDir/$Cron.js" | grep -E "new Env\(" | perl -pe "s|(^.+)new Env\(\'*\"*(.+?)'*\"*\).+|\2|")
         local param=$(cat $ListCronRemote | grep -E "\/$Cron\." | perl -pe "s|(^.+) node */scripts/(j[drx]_\w+)\.js.+|\1\:$ShellJs \2|")
