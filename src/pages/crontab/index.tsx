@@ -312,7 +312,7 @@ const Crontab = () => {
   };
 
   const onSearch = (value: string) => {
-    setSearchText(searchText);
+    setSearchText(value);
   };
 
   useEffect(() => {
