@@ -8,7 +8,9 @@
 
 ## 多谢
 
-本仓库部分shell脚本及其配置参考自[nevinee](https://github.com/nevinee)大佬, [https://github.com/nevinee/jd_shell](https://github.com/nevinee/jd_shell), 感谢👍👍👍
+[https://github.com/nevinee/jd_shell](https://github.com/nevinee/jd_shell)
+
+[https://github.com/alseambusher/crontab-ui](https://github.com/alseambusher/crontab-ui)
 
 ## 免责声明
 
