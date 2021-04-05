@@ -110,7 +110,7 @@ const Crontab = () => {
           <Tooltip title="运行">
             <a
               onClick={() => {
-                runCron(record);
+                runCron(record, index);
               }}
             >
               <PlayCircleOutlined />
@@ -125,7 +125,7 @@ const Crontab = () => {
               <FileTextOutlined />
             </a>
           </Tooltip>
-          <MoreBtn key="more" record={record} />
+          <MoreBtn key="more" record={record} index={index} />
         </Space>
       ),
     },
@@ -134,7 +134,7 @@ const Crontab = () => {
   const [width, setWdith] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
-  const [value, setValue] = useState();
+  const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedCron, setEditedCron] = useState();
@@ -155,12 +155,12 @@ const Crontab = () => {
     setIsModalVisible(true);
   };
 
-  const editCron = (record: any) => {
+  const editCron = (record: any, index: number) => {
     setEditedCron(record);
     setIsModalVisible(true);
   };
 
-  const delCron = (record: any) => {
+  const delCron = (record: any, index: number) => {
     Modal.confirm({
       title: '确认删除',
       content: (
@@ -176,7 +176,9 @@ const Crontab = () => {
               notification.success({
                 message: '删除成功',
               });
-              getCrons();
+              const result = [...value];
+              result.splice(index, 1);
+              setValue(result);
             } else {
               notification.error({
                 message: data,
@@ -190,7 +192,7 @@ const Crontab = () => {
     });
   };
 
-  const runCron = (record: any) => {
+  const runCron = (record: any, index: number) => {
     Modal.confirm({
       title: '确认运行',
       content: (
@@ -202,7 +204,19 @@ const Crontab = () => {
         request
           .get(`${config.apiPrefix}crons/${record._id}/run`)
           .then((data: any) => {
-            getCrons();
+            if (data.code === 200) {
+              const result = [...value];
+              result.splice(index, 1, {
+                ...record,
+                status: CrontabStatus.running,
+              });
+              console.log(result);
+              setValue(result);
+            } else {
+              notification.error({
+                message: data,
+              });
+            }
           });
       },
       onCancel() {
@@ -211,12 +225,15 @@ const Crontab = () => {
     });
   };
 
-  const enabledOrDisabledCron = (record: any) => {
+  const enabledOrDisabledCron = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认禁用',
+      title: `确认${
+        record.status === CrontabStatus.disabled ? '启用' : '禁用'
+      }`,
       content: (
         <>
-          确认禁用定时任务 <Text type="warning">{record.name}</Text> 吗
+          确认{record.status === CrontabStatus.disabled ? '启用' : '禁用'}
+          定时任务 <Text type="warning">{record.name}</Text> 吗
         </>
       ),
       onOk() {
@@ -232,9 +249,20 @@ const Crontab = () => {
           .then((data: any) => {
             if (data.code === 200) {
               notification.success({
-                message: '禁用成功',
+                message: `${
+                  record.status === CrontabStatus.disabled ? '启用' : '禁用'
+                }成功`,
               });
-              getCrons();
+              const newStatus =
+                record.status === CrontabStatus.disabled
+                  ? CrontabStatus.idle
+                  : CrontabStatus.disabled;
+              const result = [...value];
+              result.splice(index, 1, {
+                ...record,
+                status: newStatus,
+              });
+              setValue(result);
             } else {
               notification.error({
                 message: data,
@@ -267,12 +295,13 @@ const Crontab = () => {
 
   const MoreBtn: React.FC<{
     record: any;
-  }> = ({ record }) => (
+    index: number;
+  }> = ({ record, index }) => (
     <Dropdown
       arrow
       trigger={['click', 'hover']}
       overlay={
-        <Menu onClick={({ key }) => action(key, record)}>
+        <Menu onClick={({ key }) => action(key, record, index)}>
           <Menu.Item key="edit" icon={<EditOutlined />}>
             编辑
           </Menu.Item>
@@ -304,16 +333,16 @@ const Crontab = () => {
     </Dropdown>
   );
 
-  const action = (key: string | number, record: any) => {
+  const action = (key: string | number, record: any, index: number) => {
     switch (key) {
       case 'edit':
-        editCron(record);
+        editCron(record, index);
         break;
       case 'enableordisable':
-        enabledOrDisabledCron(record);
+        enabledOrDisabledCron(record, index);
         break;
       case 'delete':
-        delCron(record);
+        delCron(record, index);
         break;
       default:
         break;
