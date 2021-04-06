@@ -338,7 +338,7 @@ const Crontab = () => {
   const handleCancel = (needUpdate?: boolean) => {
     setIsModalVisible(false);
     if (needUpdate) {
-      getCrons();
+      getCronDetail(editedCron);
     }
   };
 
@@ -346,15 +346,15 @@ const Crontab = () => {
     setSearchText(value);
   };
 
-  const getCronDetail = () => {
+  const getCronDetail = (cron: any) => {
     request
-      .get(`${config.apiPrefix}crons/${logCron._id}`)
+      .get(`${config.apiPrefix}crons/${cron._id}`)
       .then((data: any) => {
-        const index = value.findIndex((x) => x._id === logCron._id);
+        const index = value.findIndex((x) => x._id === cron._id);
         const result = [...value];
         result.splice(index, 1, {
-          ...logCron,
-          status: data.data.status,
+          ...cron,
+          ...data.data,
         });
         setValue(result);
       })
@@ -423,7 +423,7 @@ const Crontab = () => {
       <CronLogModal
         visible={isLogModalVisible}
         handleCancel={() => {
-          getCronDetail();
+          getCronDetail(logCron);
           setIsLogModalVisible(false);
         }}
         cron={logCron}
