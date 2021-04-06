@@ -185,4 +185,24 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.get(
+    '/crons/:id',
+    celebrate({
+      params: Joi.object({
+        id: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cookieService = Container.get(CronService);
+        const data = await cookieService.get(req.params.id);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
 };

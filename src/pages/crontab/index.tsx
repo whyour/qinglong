@@ -28,6 +28,7 @@ import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import CronModal from './modal';
+import CronLogModal from './logModal';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -119,7 +120,8 @@ const Crontab = () => {
           <Tooltip title="日志">
             <a
               onClick={() => {
-                logCron(record);
+                setLogCron(record);
+                setIsLogModalVisible(true);
               }}
             >
               <FileTextOutlined />
@@ -139,6 +141,8 @@ const Crontab = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedCron, setEditedCron] = useState();
   const [searchText, setSearchText] = useState('');
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const [logCron, setLogCron] = useState<any>();
 
   const getCrons = () => {
     setLoading(true);
@@ -210,7 +214,6 @@ const Crontab = () => {
                 ...record,
                 status: CrontabStatus.running,
               });
-              console.log(result);
               setValue(result);
             } else {
               notification.error({
@@ -274,23 +277,6 @@ const Crontab = () => {
         console.log('Cancel');
       },
     });
-  };
-
-  const logCron = (record: any) => {
-    request
-      .get(`${config.apiPrefix}crons/${record._id}/log`)
-      .then((data: any) => {
-        Modal.info({
-          width: 650,
-          title: `${record.name || record._id}`,
-          content: (
-            <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
-              {data.data || '暂无日志'}
-            </pre>
-          ),
-          onOk() {},
-        });
-      });
   };
 
   const MoreBtn: React.FC<{
@@ -360,6 +346,21 @@ const Crontab = () => {
     setSearchText(value);
   };
 
+  const getCronDetail = () => {
+    request
+      .get(`${config.apiPrefix}crons/${logCron._id}`)
+      .then((data: any) => {
+        const index = value.findIndex((x) => x._id === logCron._id);
+        const result = [...value];
+        result.splice(index, 1, {
+          ...logCron,
+          status: data.data.status,
+        });
+        setValue(result);
+      })
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     getCrons();
   }, [searchText]);
@@ -418,6 +419,14 @@ const Crontab = () => {
         size="middle"
         bordered
         scroll={{ x: 768 }}
+      />
+      <CronLogModal
+        visible={isLogModalVisible}
+        handleCancel={() => {
+          getCronDetail();
+          setIsLogModalVisible(false);
+        }}
+        cron={logCron}
       />
       <CronModal
         visible={isModalVisible}
