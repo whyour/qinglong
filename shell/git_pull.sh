@@ -30,8 +30,8 @@ ContentNewTask=$ShellDir/new_task
 ContentDropTask=$ShellDir/drop_task
 SendVersion=$ShellDir/send_version
 isTermux=$ANDROID_RUNTIME_ROOT$ANDROID_ROOT
-ShellURL=https://github.com.cnpmjs.org/whyour/qinglong
-ScriptsURL=https://github.com.cnpmjs.org/gossh520/jd_scripts
+ShellURL=https://ghproxy.com/https://github.com/whyour/qinglong
+ScriptsURL=https://ghproxy.com/https://github.com/gossh520/jd_scripts
 
 Import_Conf() {
   if [ ! -s $FileConf ]; then
