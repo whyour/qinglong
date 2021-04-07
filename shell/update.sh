@@ -329,8 +329,6 @@ update_all_scripts () {
                 add_cron $list_own_add
             fi
         fi
-    else
-        perl -i -ne "{print unless / $cmd_task /}" $list_crontab_user
     fi
 }
 
