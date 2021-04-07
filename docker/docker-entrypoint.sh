@@ -1,7 +1,11 @@
 #!/bin/bash
 set -e
 
-echo -e "======================1. 检测配置文件========================\n"
+echo -e "======================1. 更新源代码========================\n"
+update
+echo
+
+echo -e "======================2. 检测配置文件========================\n"
 [ ! -d ${QL_DIR}/config ] && mkdir -p ${QL_DIR}/config
 
 if [ ! -s ${QL_DIR}/config/crontab.list ]
@@ -11,7 +15,6 @@ then
   sed -i "s,MY_PATH,${QL_DIR},g" ${QL_DIR}/config/crontab.list
   sed -i "s,ENV_PATH=,PATH=$PATH,g" ${QL_DIR}/config/crontab.list
 fi
-crond
 crontab ${QL_DIR}/config/crontab.list
 echo -e "成功添加定时任务...\n"
 
@@ -41,33 +44,16 @@ fi
 
 cp -fv ${QL_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
 
-echo -e "======================2. 启动nginx========================\n"
+echo -e "======================3. 启动nginx========================\n"
 nginx -c /etc/nginx/nginx.conf
 echo
 
-echo -e "======================3. 启动控制面板========================\n"
+echo -e "======================4. 启动控制面板========================\n"
 pm2 start ${QL_DIR}/build/app.js -n panel
 echo -e "控制面板启动成功...\n"
 
-echo -e "======================4. 更新源代码========================\n"
-git_pull
-echo
-
-echo -e "======================5. 启动挂机程序========================\n"
-CookieConf=${QL_DIR}/config/cookie.sh
-. ${QL_DIR}/config/config.sh
-. ${CookieConf}
-if [ -s ${CookieConf} ]; then
-  js hangup 2>/dev/null
-  echo -e "挂机程序启动成功...\n"
-else
-  echo -e "尚未在Cookie管理中添加一条Cookie，可能是首次部署容器，因此不启动挂机程序...\n"
-fi
-
 echo -e "\n容器启动成功...\n"
 
-if [ "${1#-}" != "${1}" ] || [ -z "$(command -v "${1}")" ]; then
-  set -- node "$@"
-fi
+crond -f
 
 exec "$@"
