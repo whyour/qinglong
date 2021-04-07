@@ -363,7 +363,7 @@ update_specify_scripts_repo () {
             echo -e "$dir_scripts/$tmp_dir 不是一个git仓库...\n"
         fi
     else
-        echo -e "命令输入错误...\n"
+        echo -e "$dir_scripts/$tmp_dir 还不存在，可能是还没有clone？\n"
         usage
     fi
 }
