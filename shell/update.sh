@@ -189,10 +189,9 @@ del_cron () {
         detail=$(cat $list_drop)     
         echo -e "开始尝试自动删除失效的定时任务...\n"
         for cron in $detail; do
-            local tmp=$(echo $cron | perl -pe "s|/|\.|g")
-            perl -i -ne "{print unless / $cmd_task $tmp( |$)/}" $list_crontab_user
+            local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron" | perl -pe "s|.*ID=(.*) $cmd_task $cron|\1|")
+            del_cron_api "$id"
         done
-        crontab $list_crontab_user
         detail2=$(echo $detail | perl -pe "s| |\\\n|g")
         echo -e "成功删除失效的的定时任务...\n"
         notify "删除失效任务通知" "成功删除以下失效的定时任务：\n$detail2"
@@ -201,7 +200,7 @@ del_cron () {
 
 ## 自动增加定时任务，需要：1.AutoAddCron 设置为 true；2.正常更新js脚本，没有报错；3.存在新任务；4.crontab.list存在并且不为空
 ## $1：新任务清单文件路径
-add_cron_step_1 () {
+add_cron () {
     local list_add=$1
     local list_crontab_own_tmp=$dir_list_tmp/crontab_own.list
 
@@ -213,37 +212,33 @@ add_cron_step_1 () {
         for file_full_path in $detail; do
             local file_name=$(echo $file_full_path | awk -F "/" '{print $NF}')
             if [ -f $file_full_path ]; then
-                perl -ne "{
-                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
-                }" $file_full_path | \
-                perl -pe "{
-                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1 $cmd_task $file_full_path|g;
-                    s|  | |g;
-                    s|$dir_scripts||
-                }" | sort -u | head -1 >> $list_crontab_own_tmp
+                cron_line=$(
+                    perl -ne "{
+                        print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
+                    }" $file_full_path | \
+                    perl -pe "{
+                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1:$cmd_task $file_full_path|g;
+                        s|  | |g
+                    }" | sort -u | head -1
+                )
+                cron_name=$(grep "new Env" $file_full_path | awk -F "'|\"" '{print $2}' | head -1)
+                [[ -z $cron_name ]] && cron_name="$file_name"
+                add_cron_api "$cron_line:$cron_name"
             fi
         done
-        cat $list_crontab_own_tmp >> $list_crontab_user
         exit_status=$?
+        local detail2=$(echo $detail | perl -pe "s| |\\\n|g")
+        if [[ $exit_status -eq 0 ]]; then
+            crontab $list_crontab_user
+            echo -e "成功添加新的定时任务...\n"
+            notify "新增任务通知" "成功添加新的定时任务：\n$detail2"
+        else
+            echo -e "添加新的定时任务出错，请手动添加...\n"
+            notify "新任务添加失败通知" "尝试自动添加以下新的定时任务出错，请手动添加：\n$detail2"
+        fi
     fi
 
     [ -f $list_crontab_own_tmp ] && rm -f $list_crontab_own_tmp
-}
-
-## 向系统添加定时任务以及通知，$1：写入crontab.list时的exit状态，$2：新增清单文件路径
-add_cron_step_2 () {
-    local status_code=$1
-    local list_add=$2
-    local tmp=$(echo $(cat $list_add))
-    local detail=$(echo $tmp | perl -pe "s| |\\\n|g")
-    if [[ $status_code -eq 0 ]]; then
-        crontab $list_crontab_user
-        echo -e "成功添加新的定时任务...\n"
-        notify "新增任务通知" "成功添加新的定时任务（$type）：\n$detail"
-    else
-        echo -e "添加新的定时任务出错，请手动添加...\n"
-        notify "新任务添加失败通知" "尝试自动添加以下新的定时任务出错，请手动添加（$type）：\n$detail"
-    fi
 }
 
 ## 更新所有仓库
@@ -331,8 +326,7 @@ update_all_scripts () {
         if [ -s $list_own_add ]; then
             output_list_add_drop $list_own_add "新"
             if [[ ${AutoAddCron} == true ]]; then
-                add_cron_step_1 $list_own_add
-                add_cron_step_2 $exit_status $list_own_add
+                add_cron $list_own_add
             fi
         fi
     else
