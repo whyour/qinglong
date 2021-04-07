@@ -89,12 +89,12 @@ gen_array_scripts () {
 usage () {
     define_cmd
     gen_array_scripts
-    echo -e "\ntask命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或相对路径（定时任务中建议写作去掉 $dir_scripts/ 目录后的相对路径），用法为："
+    echo -e "\ntask命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或去掉 “$dir_scripts/” 目录后的相对路径（定时任务中请写作相对路径），用法为："
     echo -e "1.$cmd_task <js_path>        # 依次执行，如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
     echo -e "2.$cmd_task <js_path> now    # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
     echo -e "3.$cmd_task <js_path> conc   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
     echo -e "\nmytask命令运行未识别出cron的脚本以及你自己添加的脚本，用法同task。mytask和task命令均为同一脚本的不同名字，二者仅用来在crontab.list中区分不同类型的任务，以方便自动增删任务，手动直接运行task即可。"
-    echo -e "\n当前有以下脚本可以运行（已省略路径 $dir_scripts/ ）："
+    echo -e "\n当前有以下脚本可以运行（已省略路径 “$dir_scripts/” ）："
     for ((i=0; i<${#array_scripts[*]}; i++)); do
         echo -e "$(($i + 1)). ${array_scripts_name[i]}：${array_scripts[i]}"
     done
