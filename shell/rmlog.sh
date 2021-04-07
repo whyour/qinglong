@@ -41,7 +41,6 @@ remove_empty_dir () {
 if [[ ${RmLogDaysAgo} ]]; then
     echo -e "查找旧日志文件中...\n"
     remove_js_log
-    remove_jup_log
     remove_empty_dir
     echo -e "删除旧日志执行完毕\n"
 fi

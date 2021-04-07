@@ -7,6 +7,7 @@ send_mark=$dir_shell/send_mark
 
 ## 导入通用变量与函数
 . $dir_shell/share.sh
+. $dir_shell/api.sh
 
 ## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件
 detect_termux
@@ -14,46 +15,7 @@ detect_macos
 link_shell
 define_cmd
 fix_config
-import_config_no_check jup
-
-## 更新crontab，gitee服务器同一时间限制5个链接，因此每个人更新代码必须错开时间，每次执行git_pull随机生成。
-## 每天次数随机，更新时间随机，更新秒数随机，至少4次，至多6次，大部分为5次，符合正态分布。
-random_update_jup_cron () {
-    if [[ $(date "+%-H") -le 4 ]] && [ -f $list_crontab_user ]; then
-        local random_min=$(gen_random_num 60)
-        local random_sleep=$(gen_random_num 56)
-        local random_hour_array[0]=$(gen_random_num 5)
-        local random_hour=${random_hour_array[0]}
-        local i j tmp
-
-        for ((i=1; i<14; i++)); do
-            j=$(($i - 1))
-            tmp=$(($(gen_random_num 3) + ${random_hour_array[j]} + 4))
-            [[ $tmp -lt 24 ]] && random_hour_array[i]=$tmp || break
-        done
-
-        for ((i=1; i<${#random_hour_array[*]}; i++)); do
-            random_hour="$random_hour,${random_hour_array[i]}"
-        done
-
-        perl -i -pe "s|.+( $cmd_update)( .*\|$)|$random_min $random_hour \* \* \* sleep $random_sleep && \1|" $list_crontab_user
-        crontab $list_crontab_user
-    fi
-}
-
-## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
-reset_romote_url () {
-    local dir_current=$(pwd)
-    local dir_work=$1
-    local url=$2
-
-    if [ -d "$dir/.git" ]; then
-        cd $dir_work
-        git remote set-url origin $url
-        git reset --hard
-        cd $dir_current
-    fi
-}
+import_config_no_check "update"
 
 ## 克隆脚本，$1：仓库地址，$2：仓库保存路径，$3：分支（可省略）
 git_clone_scripts () {
@@ -66,69 +28,22 @@ git_clone_scripts () {
     exit_status=$?
 }
 
-## 更新脚本，$1：仓库保存路径
+## 更新脚本，$1：仓库保存路径，$2：分支（可省略）
 git_pull_scripts () {
     local dir_current=$(pwd)
     local dir_work=$1
+    local cmd_branch
+    [[ $2 ]] && cmd_branch="origin/$branch" || cmd_branch=""
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
     git fetch --all
     exit_status=$?
-    git reset --hard
+    git reset --hard $cmd_branch
     git pull
     cd $dir_current
 }
 
-## 统计 own 仓库数量
-count_own_repo_sum () {
-    if [[ -z ${RepoUrl1} ]]; then
-        own_repo_sum=0
-    else
-        for ((i=1; i<=1000; i++)); do
-            local tmp1=RepoUrl$i
-            local tmp2=${!tmp1}
-            [[ $tmp2 ]] && own_repo_sum=$i || break
-        done
-    fi
-}
-
-## 形成 own 仓库的文件夹名清单，依赖于import_config_and_check或import_config_no_check
-## array_own_repo_path：repo存放的绝对路径组成的数组；array_own_scripts_path：所有要使用的脚本所在的绝对路径组成的数组
-gen_own_dir_and_path () {
-    local scripts_path_num="-1"
-    local repo_num tmp1 tmp2 tmp3 tmp4 tmp5 dir
-    
-    if [[ $own_repo_sum -ge 1 ]]; then
-        for ((i=1; i<=$own_repo_sum; i++)); do
-            repo_num=$((i - 1))
-            tmp1=RepoUrl$i
-            array_own_repo_url[$repo_num]=${!tmp1}
-            tmp2=RepoBranch$i
-            array_own_repo_branch[$repo_num]=${!tmp2}
-            array_own_repo_dir[$repo_num]=$(echo ${array_own_repo_url[$repo_num]} | perl -pe "s|.+com(/\|:)([\w-]+)/([\w-]+)(\.git)?|\2_\3|")
-            array_own_repo_path[$repo_num]=$dir_scripts/${array_own_repo_dir[$repo_num]}
-            tmp3=RepoPath$i
-            if [[ ${!tmp3} ]]; then
-                for dir in ${!tmp3}; do
-                    let scripts_path_num++
-                    tmp4="${array_own_repo_dir[repo_num]}/$dir"
-                    tmp5=$(echo $tmp4 | perl -pe "{s|//|/|g; s|/$||}")  # 去掉多余的/
-                    array_own_scripts_path[$scripts_path_num]="$dir_scripts/$tmp5"
-                done
-            else
-                let scripts_path_num++
-                array_own_scripts_path[$scripts_path_num]="${array_own_repo_path[$repo_num]}"
-            fi
-        done
-    fi
-
-    if [[ ${#RawUrl[*]} -ge 1 ]]; then
-        let scripts_path_num++
-        array_own_scripts_path[$scripts_path_num]=$dir_raw  # 只有own脚本所在绝对路径附加了raw文件夹，其他数组均不附加
-    fi
-}
-
-## 生成脚本的相对路径清单
+## 生成脚本的路径清单文件
 gen_list_own () {
     local dir_current=$(pwd)
     rm -f $dir_list_tmp/own*.list >/dev/null 2>&1
@@ -238,6 +153,22 @@ npm_install_2 () {
     cd $dir_current
 }
 
+## 更新依赖
+update_depend () {
+    if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+        cp -f $dir_sample/package.json $dir_scripts/package.json
+        npm_install_2 $dir_scripts
+    fi
+
+    if [ ! -s $dir_scripts/sendNotify.js ] || [[ $(diff $dir_sample/sendNotify.js $dir_scripts/sendNotify.js) ]]; then
+        cp -f $dir_sample/sendNotify.js $dir_scripts/sendNotify.js
+    fi
+
+    if [ ! -s $dir_scripts/jdCookie.js ] || [[ $(diff $dir_sample/jdCookie.js $dir_scripts/jdCookie.js) ]]; then
+        cp -f $dir_sample/jdCookie.js $dir_scripts/jdCookie.js
+    fi
+}
+
 ## 输出是否有新的或失效的定时任务，$1：新的或失效的任务清单文件路径，$2：新/失效
 output_list_add_drop () {
     local list=$1
@@ -256,10 +187,10 @@ del_cron () {
     local detail detail2
     if [ -s $list_drop ] && [ -s $list_crontab_user ]; then
         detail=$(cat $list_drop)     
-        echo -e "开始尝试自动删除$type2的定时任务...\n"
+        echo -e "开始尝试自动删除失效的定时任务...\n"
         for cron in $detail; do
             local tmp=$(echo $cron | perl -pe "s|/|\.|g")
-            perl -i -ne "{print unless / $type $tmp( |$)/}" $list_crontab_user
+            perl -i -ne "{print unless / $cmd_task $tmp( |$)/}" $list_crontab_user
         done
         crontab $list_crontab_user
         detail2=$(echo $detail | perl -pe "s| |\\\n|g")
@@ -268,16 +199,16 @@ del_cron () {
     fi
 }
 
-## 自动增加自己额外的脚本的定时任务，需要：1.AutoAddCron 设置为 true；2.正常更新js脚本，没有报错；3.存在新任务；4.crontab.list存在并且不为空
+## 自动增加定时任务，需要：1.AutoAddCron 设置为 true；2.正常更新js脚本，没有报错；3.存在新任务；4.crontab.list存在并且不为空
 ## $1：新任务清单文件路径
-add_cron () {
+add_cron_step_1 () {
     local list_add=$1
     local list_crontab_own_tmp=$dir_list_tmp/crontab_own.list
 
     [ -f $list_crontab_own_tmp ] && rm -f $list_crontab_own_tmp
 
-    if [[ ${AutoAddCron} == true ]] && [ -s $list_add ] && [ -s $list_crontab_user ]; then
-        echo -e "开始尝试自动添加 own 脚本的定时任务...\n"
+    if [ -s $list_crontab_user ]; then
+        echo -e "开始尝试自动添加定时任务...\n"
         local detail=$(cat $list_add)
         for file_full_path in $detail; do
             local file_name=$(echo $file_full_path | awk -F "/" '{print $NF}')
@@ -299,13 +230,12 @@ add_cron () {
     [ -f $list_crontab_own_tmp ] && rm -f $list_crontab_own_tmp
 }
 
-## 向系统添加定时任务以及通知，$1：写入crontab.list时的exit状态，$2：新增清单文件路径，$3：jd_scripts脚本/own脚本
-add_cron_notify () {
+## 向系统添加定时任务以及通知，$1：写入crontab.list时的exit状态，$2：新增清单文件路径
+add_cron_step_2 () {
     local status_code=$1
     local list_add=$2
     local tmp=$(echo $(cat $list_add))
     local detail=$(echo $tmp | perl -pe "s| |\\\n|g")
-    local type=$3
     if [[ $status_code -eq 0 ]]; then
         crontab $list_crontab_user
         echo -e "成功添加新的定时任务...\n"
@@ -321,7 +251,8 @@ update_own_repo () {
     [[ ${#array_own_repo_url[*]} -gt 0 ]] && echo -e "--------------------------------------------------------------\n"
     for ((i=0; i<${#array_own_repo_url[*]}; i++)); do
         if [ -d ${array_own_repo_path[i]}/.git ]; then
-            git_pull_scripts ${array_own_repo_path[i]}
+            reset_romote_url ${array_own_repo_path[i]} ${array_own_repo_url[i]} &>/dev/null
+            git_pull_scripts ${array_own_repo_path[i]} ${array_own_repo_branch[i]}
         else
             git_clone_scripts ${array_own_repo_url[i]} ${array_own_repo_path[i]} ${array_own_repo_branch[i]}
         fi
@@ -331,7 +262,6 @@ update_own_repo () {
 
 ## 更新所有 raw 文件
 update_own_raw () {
-    local rm_mark
     [[ ${#RawUrl[*]} -gt 0 ]] && echo -e "--------------------------------------------------------------\n"
     for ((i=0; i<${#RawUrl[*]}; i++)); do
         raw_file_name[$i]=$(echo ${RawUrl[i]} | awk -F "/" '{print $NF}')
@@ -345,147 +275,109 @@ update_own_raw () {
             [ -f "$dir_raw/${raw_file_name[$i]}.new" ] && rm -f "$dir_raw/${raw_file_name[$i]}.new"
         fi
     done
-
-    for file in $(ls $dir_raw); do
-        rm_mark="yes"
-        for ((i=0; i<${#raw_file_name[*]}; i++)); do
-            if [[ $file == ${raw_file_name[$i]} ]]; then
-                rm_mark="no"
-                break
-            fi
-        done
-        [[ $rm_mark == yes ]] && rm -f $dir_raw/$file 2>/dev/null
-    done
 }
 
-## 调用用户自定义的diy.sh
-run_diy_shell () {
+## 调用用户自定义的extra.sh
+run_extra_shell () {
     if [[ ${EnableExtraShell} == true ]]; then
-        if [ -f $file_diy_shell ]
+        if [ -f $file_extra_shell ]
         then
             echo -e "--------------------------------------------------------------\n"
-            . $file_diy_shell
+            . $file_extra_shell
         else
-            echo -e "$file_diy_shell文件不存在，跳过执行DIY脚本...\n"
+            echo -e "$file_extra_shell文件不存在，跳过执行...\n"
         fi
     fi
 }
 
-## 在日志中记录时间与路径
-record_time_in_log () {
-    echo "
---------------------------------------------------------------
-
-系统时间：$(date "+%Y-%m-%d %H:%M:%S")
-
-根目录：$dir_root
-
-scripts目录：$dir_scripts
-
---------------------------------------------------------------
-"
+## 脚本用法
+usage () {
+    echo -e "本脚本用法："
+    echo -e "1. $cmd_update           # 更新qinglong、所有你设置的仓库和raw文件，如果启用了EnableExtraShell还将在最后运行你自己编写的extra.sh"
+    echo -e "2. $cmd_update ql        # 只更新qinglong，和输入 $cmd_update qinglong 时功能一样，不会运行extra.sh"
+    echo -e "3. $cmd_update <folder>  # 指定scripts脚本目录下某个文件夹名称，只更新这个文件夹中的脚本，当该文件夹为git仓库才可使用此命令，不会运行extra.sh"
 }
 
-#################################################################################################################################
-
-
-
-## 更新jup任务的cron
-random_update_jup_cron
-
-## 重置仓库romote url
-if [[ $QL_DIR ]] && [[ $ENABLE_RESET_REPO_URL == true ]]; then
-    reset_romote_url $dir_shell $url_shell >/dev/null
-    reset_romote_url $dir_scripts $url_scripts >/dev/null
-fi
-
-## 更新shell
-git_pull_scripts $dir_shell
-if [[ $exit_status -eq 0 ]]; then
-    echo -e "\n更新$dir_shell成功...\n"
-    make_dir $dir_config
-    cp -f $file_config_sample $dir_config/config.sample.sh
-    update_docker_entrypoint
-    update_bot_py
-    detect_config_version
-else
-    echo -e "\n更新$dir_shell失败，请检查原因...\n"
-fi
-
-## 更新scripts
-## 更新前先存储package.json和githubAction.md的内容
-[ -f $dir_scripts/package.json ] && scripts_depend_old=$(cat $dir_scripts/package.json)
-[ -f $dir_scripts/githubAction.md ] && cp -f $dir_scripts/githubAction.md $dir_list_tmp/githubAction.md
-
-## 更新或克隆scripts
-if [ -d $dir_scripts/.git ]; then
-    git_pull_scripts $dir_scripts
-else
-    git_clone_scripts $url_scripts $dir_scripts
-fi
-
-if [[ $exit_status -eq 0 ]]; then
-    echo -e "\n更新$dir_scripts成功...\n"
-
-    ## npm install
-    [ ! -d $dir_scripts/node_modules ] && npm_install_1 $dir_scripts
-    [ -f $dir_scripts/package.json ] && scripts_depend_new=$(cat $dir_scripts/package.json)
-    [[ "$scripts_depend_old" != "$scripts_depend_new" ]] && npm_install_2 $dir_scripts
-    
-    ## diff cron
-    gen_list_task
-    diff_cron $list_task_jd_scripts $list_task_user $list_task_add $list_task_drop
-
-    ## 失效任务通知
-    if [ -s $list_task_drop ]; then
-        output_list_add_drop $list_task_drop "失效"
-        [[ ${AutoDelCron} == true ]] && del_cron $list_task_drop jtask
+## 更新qinglong
+update_qinglong () {
+    git_pull_scripts $dir_root
+    if [[ $exit_status -eq 0 ]]; then
+        echo -e "\n更新$dir_root成功...\n"
+        make_dir $dir_config
+        cp -f $file_config_sample $dir_config/config.sample.sh
+        update_docker_entrypoint
+        update_depend
+        detect_config_version
+    else
+        echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
+}
 
-    ## 新增任务通知
-    if [ -s $list_task_add ]; then
-        output_list_add_drop $list_task_add "新"
-        add_cron_jd_scripts $list_task_add
-        [[ ${AutoAddCron} == true ]] && add_cron_notify $exit_status $list_task_add "jd_scripts脚本"
+## 更新所有脚本
+update_all_scripts () {
+    count_own_repo_sum
+    gen_own_dir_and_path
+    if [[ ${#array_own_scripts_path[*]} -gt 0 ]]; then
+        make_dir $dir_raw
+        update_own_repo
+        update_own_raw
+        gen_list_own
+        diff_cron $list_own_scripts $list_own_user $list_own_add $list_own_drop
+
+        if [ -s $list_own_drop ]; then
+            output_list_add_drop $list_own_drop "失效"
+            [[ ${AutoDelCron} == true ]] && del_cron $list_own_drop
+        fi
+        if [ -s $list_own_add ]; then
+            output_list_add_drop $list_own_add "新"
+            if [[ ${AutoAddCron} == true ]]; then
+                add_cron_step_1 $list_own_add
+                add_cron_step_2 $exit_status $list_own_add
+            fi
+        fi
+    else
+        perl -i -ne "{print unless / $cmd_task /}" $list_crontab_user
     fi
+}
 
-    ## 环境变量变化通知
-    echo -e "检测环境变量清单文件 $dir_scripts/githubAction.md 是否有变化...\n"
-    diff $dir_list_tmp/githubAction.md $dir_scripts/githubAction.md | tee $dir_list_tmp/env.diff
-    if [ ! -s $dir_list_tmp/env.diff ]; then
-        echo -e "$dir_scripts/githubAction.md 没有变化...\n"
-    elif [ -s $dir_list_tmp/env.diff ] && [[ ${EnvChangeNotify} == true ]]; then
-        notify_title="检测到环境变量清单文件有变化"
-        notify_content="减少的内容：\n$(grep -E '^-[^-]' $dir_list_tmp/env.diff)\n\n增加的内容：\n$(grep -E '^\+[^\+]' $dir_list_tmp/env.diff)"
-        notify "$notify_title" "$notify_content"
+## 更新指定仓库
+update_specify_scripts_repo () {
+    local tmp_dir=$1
+    if [ -d $dir_scripts/$tmp_dir ]; then
+        git_pull_scripts $dir_scripts/$tmp_dir
+    else
+        echo -e "$dir_scripts/$tmp_dir 不存在...\n"
+        usage
     fi
-else
-    echo -e "\n更新$dir_scripts失败，请检查原因...\n"
-fi
+}
 
-## 更新own脚本
-count_own_repo_sum
-gen_own_dir_and_path
-if [[ ${#array_own_scripts_path[*]} -gt 0 ]]; then
-    make_dir $dir_raw
-    update_own_repo
-    update_own_raw
-    gen_list_own
-    diff_cron $list_own_scripts $list_own_user $list_own_add $list_own_drop
+main () {
+    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
+    log_path="$dir_log/update/${log_time}.log"
+    make_dir "$dir_log/update"
+    case $# in
+        0)
+            update_qinglong | tee $log_path
+            update_all_scripts | tee -a $log_path
+            run_extra_shell | tee -a $log_path
+            exit 0
+            ;;
+        1)
+            case $1 in
+                ql | qinglong)
+                    update_qinglong | tee $log_path
+                    ;;
+                *)
+                    update_specify_scripts_repo | tee $log_path
+                    ;;
+            esac
+            exit 0
+            ;;
+        *)
+            usage
+            exit 0
+            ;;
+    esac
+}
 
-    if [ -s $list_own_drop ]; then
-        output_list_add_drop $list_own_drop "失效"
-        [[ ${AutoDelCron} == true ]] && del_cron $list_own_drop otask
-    fi
-    if [ -s $list_own_add ]; then
-        output_list_add_drop $list_own_add "新"
-        add_cron $list_own_add
-        [[ ${AutoAddCron} == true ]] && add_cron_notify $exit_status $list_own_add "own脚本"
-    fi
-else
-    perl -i -ne "{print unless / $cmd_task /}" $list_crontab_user
-fi
-
-
-
-exit 0
+main "$@"

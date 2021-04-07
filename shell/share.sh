@@ -12,7 +12,7 @@ file_sharecode=$dir_config/sharecode.sh
 file_config_user=$dir_config/config.sh
 file_auth_sample=$dir_sample/auth.sample.json
 file_auth_user=$dir_config/auth.json
-file_diy_shell=$dir_config/diy.sh
+file_extra_shell=$dir_config/extra.sh
 
 ## 清单文件
 list_crontab_user=$dir_config/crontab.list
@@ -22,7 +22,7 @@ list_own_user=$dir_list_tmp/own_user.list
 list_own_add=$dir_list_tmp/own_add.list
 list_own_drop=$dir_list_tmp/own_drop.list
 
-## 需组合的环境变量列表，env_name需要和var_name一一对应
+## 需组合的环境变量列表，env_name需要和var_name一一对应，需要从api取信息
 env_name=(
     JD_COOKIE
 )
@@ -36,12 +36,14 @@ link_name=(
     mytask
     rmlog
     update
+    rebuild
 )
 original_name=(
     task.sh
     task.sh
     rmlog.sh
     update.sh
+    rebuild.sh
 )
 
 ## 导入配置文件不校验
@@ -65,16 +67,17 @@ notify () {
     local title=$(echo $1 | perl -pe 's|-|_|g')
     local msg="$(echo -e $2)"
     if [ -d $dir_scripts_node_modules ]; then
-        node $dir_root/notify.js "$title" "$msg"
+        node $dir_scripts/notify.js "$title" "$msg"
     fi
 }
 
 ## 统计用户数量
 count_user_sum () {
-    for ((i=1; i<=${SUM:-$((3 * 4))}; i++)); do
-        local tmp1=Cookie$i
-        local tmp2=${!tmp1}
-        [[ $tmp2 ]] && user_sum=$i || break
+    user_sum=0
+    for line in $(cat $file_cookie); do
+        let user_sum++
+        [[ $user_sum -gt $((3 * 5)) ]] && break
+        eval Cookie${user_sum}="\"$line\""
     done
 }
 
@@ -150,8 +153,54 @@ define_cmd () {
         fi
     fi
     for ((i=0; i<${#link_name[*]}; i++)); do
-        export cmd_${link_name[i]}="${cmd_prefix}${link_name[i]}${cmd_suffix}"
+        eval cmd_${link_name[i]}="${cmd_prefix}${link_name[i]}${cmd_suffix}"
     done
+}
+
+## 统计 own 仓库数量
+count_own_repo_sum () {
+    own_repo_sum=0
+    for ((i=1; i<=1000; i++)); do
+        local tmp1=RepoUrl$i
+        local tmp2=${!tmp1}
+        [[ $tmp2 ]] && own_repo_sum=$i || break
+    done
+}
+
+## 形成 own 仓库的文件夹名清单，依赖于import_config_and_check或import_config_no_check
+## array_own_repo_path：repo存放的绝对路径组成的数组；array_own_scripts_path：所有要使用的脚本所在的绝对路径组成的数组
+gen_own_dir_and_path () {
+    local scripts_path_num="-1"
+    local repo_num tmp1 tmp2 tmp3 tmp4 tmp5 dir
+    
+    if [[ $own_repo_sum -ge 1 ]]; then
+        for ((i=1; i<=$own_repo_sum; i++)); do
+            repo_num=$((i - 1))
+            tmp1=RepoUrl$i
+            array_own_repo_url[$repo_num]=${!tmp1}
+            tmp2=RepoBranch$i
+            array_own_repo_branch[$repo_num]=${!tmp2}
+            array_own_repo_dir[$repo_num]=$(echo ${array_own_repo_url[$repo_num]} | perl -pe "s|.+com(/\|:)([\w-]+)/([\w-]+)(\.git)?|\2_\3|")
+            array_own_repo_path[$repo_num]=$dir_scripts/${array_own_repo_dir[$repo_num]}
+            tmp3=RepoPath$i
+            if [[ ${!tmp3} ]]; then
+                for dir in ${!tmp3}; do
+                    let scripts_path_num++
+                    tmp4="${array_own_repo_dir[repo_num]}/$dir"
+                    tmp5=$(echo $tmp4 | perl -pe "{s|//|/|g; s|/$||}")  # 去掉多余的/
+                    array_own_scripts_path[$scripts_path_num]="$dir_scripts/$tmp5"
+                done
+            else
+                let scripts_path_num++
+                array_own_scripts_path[$scripts_path_num]="${array_own_repo_path[$repo_num]}"
+            fi
+        done
+    fi
+
+    if [[ ${#RawUrl[*]} -ge 1 ]]; then
+        let scripts_path_num++
+        array_own_scripts_path[$scripts_path_num]=$dir_raw  # 只有own脚本所在绝对路径附加了raw文件夹，其他数组均不附加
+    fi
 }
 
 ## 修复配置文件
@@ -168,10 +217,10 @@ fix_config () {
         echo
     fi
     perl -i -pe "{
-        s|CMD_UPDATE|$cmd_jup|g;
-        s|ROOT_DIR|$dir_root|g;
-        s|CMD_RMLOG|$cmd_jlog|g;
+        s|CMD_UPDATE|$cmd_update|g;
+        s|CMD_REBUILD|$cmd_rebuild|g;
+        s|CMD_RMLOG|$cmd_rmlog|g;
         s|CMD_TASK|$cmd_task|g;
-        s|CMD_MTASK|$cmd_mtask|g
+        s|CMD_MYTASK|$cmd_mytask|g
     }" $list_crontab_user
 }
