@@ -122,7 +122,8 @@ run_normal () {
         make_dir "$dir_log/$p1"
         $which_program $p1 2>&1 | tee $log_path
     else
-        echo -e "\n $dir_scripts/$p1 脚本不存在，请确认...\n"
+        update_crontab
+        echo -e "\n $p1 脚本不存在，请确认...\n"
         usage
     fi
 }
@@ -148,7 +149,8 @@ run_concurrent () {
             $which_program $p1 &>$log_path &
         done
     else
-        echo -e "\n $dir_scripts/$p1 脚本不存在，请确认...\n"
+        update_crontab
+        echo -e "\n $p1 脚本不存在，请确认...\n"
         usage
     fi
 }
