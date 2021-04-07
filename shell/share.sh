@@ -68,7 +68,7 @@ notify () {
     local title=$(echo $1 | perl -pe 's|-|_|g')
     local msg="$(echo -e $2)"
     if [ -d $dir_scripts_node_modules ]; then
-        node $dir_scripts/notify.js "$title" "$msg"
+        node $dir_shell/notify.js "$title" "$msg"
     fi
 }
 
