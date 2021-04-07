@@ -1,5 +1,5 @@
-# 更新qinglong
-55 2,13 * * * CMD_UPDATE
+# 更新所有脚本
+55 2,13 * * * CMD_UPDATE all
 
 # 重新build面板
 # 30 7 */7 * * CMD_REBUILD >> ${QL_DIR}/log/rebuild.log 2>&1
