@@ -66,14 +66,14 @@ EnableExtraShell=""
 ## OwnRepoPath2="scripts/jd normal"  # 代表第2个仓库https://github.com/nedcd/jxddfsa.git，你想使用的脚本在仓库的 scripts/jd 和 normal文件夹下，必须输入相对路径
 ## OwnRepoPath3="'' cron"            # 代表第3个仓库git@github.com:eject/poex.git，你想使用的脚本在仓库的 根目录 和 cron 文件夹下，必须输入相对路径
 
-OwnRepoUrl1=""
-OwnRepoUrl2=""
+RepoUrl1=""
+RepoUrl2=""
 
-OwnRepoBranch1=""
-OwnRepoBranch2=""
+RepoBranch1=""
+RepoBranch2=""
 
-OwnRepoPath1=""
-OwnRepoPath2=""
+RepoPath1=""
+RepoPath2=""
 
 ## 启用其他开发者的仓库方式二（选填）：只下载想要的文件，针对同一个仓库，方式一和方式二只能选择一种。
 ## 请先确认你能正常下载该raw文件才列在下方，无论是github还是gitee，请只填入 raw 文件链接。
@@ -83,6 +83,6 @@ OwnRepoPath2=""
 ##     https://github.com/lonfeg/loon/raw/main/jd_dudi.js
 ##     https://github.com/sunsem/qx/raw/main/z_dida.js
 ## )
-OwnRawFile=(
+RawFile=(
     
 )
