@@ -1,4 +1,5 @@
 ## 目录
+dir_sample=$dir_root/sample
 dir_config=$dir_root/config
 dir_scripts=$dir_root/scripts
 dir_raw=$dir_scripts/raw

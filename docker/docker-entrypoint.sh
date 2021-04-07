@@ -30,9 +30,9 @@ if [ ! -s ${QL_DIR}/config/config.sh ]; then
   echo
 fi
 
-if [ ! -s ${QL_DIR}/config/auth.json ]; then
+if [ ! -s ${QL_DIR}/config/auth.sample.json ]; then
   echo -e "检测到config配置目录下不存在auth.json，从示例文件复制一份用于初始化...\n"
-  cp -fv ${QL_DIR}/sample/auth.json ${QL_DIR}/config/auth.json
+  cp -fv ${QL_DIR}/sample/auth.sample.json ${QL_DIR}/config/auth.json
   echo
 fi
 
