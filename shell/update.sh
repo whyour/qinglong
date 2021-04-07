@@ -16,6 +16,7 @@ link_shell
 define_cmd
 fix_config
 import_config_no_check "update"
+get_token
 
 ## 克隆脚本，$1：仓库地址，$2：仓库保存路径，$3：分支（可省略）
 git_clone_scripts () {
@@ -28,17 +29,15 @@ git_clone_scripts () {
     exit_status=$?
 }
 
-## 更新脚本，$1：仓库保存路径，$2：分支（可省略）
+## 更新脚本，$1：仓库保存路径
 git_pull_scripts () {
     local dir_current=$(pwd)
     local dir_work=$1
-    local cmd_branch
-    [[ $2 ]] && cmd_branch="origin/$branch" || cmd_branch=""
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
     git fetch --all
     exit_status=$?
-    git reset --hard $cmd_branch
+    git reset --hard
     git pull
     cd $dir_current
 }
@@ -63,7 +62,7 @@ gen_list_own () {
             done
         fi
     done
-    grep -E "$cmd_task " $list_crontab_user | perl -pe "s|.*$cmd_task ([^\s]+)( .+\|$)|\1|" | sort -u > $list_own_user
+    grep -E "$cmd_task " $list_crontab_user | perl -pe "s|.* $cmd_task ([^\s]+)( .+\|$)|\1|" | sort -u > $list_own_user
     cd $dir_current
 }
 
@@ -153,20 +152,24 @@ npm_install_2 () {
     cd $dir_current
 }
 
+## 比对两个文件，$1比$2新时，将$1复制为$2
+diff_and_copy () {
+    local copy_source=$1
+    local copy_to=$2
+    if [ ! -s $copy_to ] || [[ $(diff $copy_source $copy_to) ]]; then
+        cp $copy_source $copy_to
+    fi
+}
+
 ## 更新依赖
 update_depend () {
+    diff_and_copy "$dir_sample/package.json" "$dir_scripts/package.json"
     if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
-        cp -f $dir_sample/package.json $dir_scripts/package.json
         npm_install_2 $dir_scripts
     fi
 
-    if [ ! -s $dir_scripts/sendNotify.js ] || [[ $(diff $dir_sample/sendNotify.js $dir_scripts/sendNotify.js) ]]; then
-        cp -f $dir_sample/sendNotify.js $dir_scripts/sendNotify.js
-    fi
-
-    if [ ! -s $dir_scripts/jdCookie.js ] || [[ $(diff $dir_sample/jdCookie.js $dir_scripts/jdCookie.js) ]]; then
-        cp -f $dir_sample/jdCookie.js $dir_scripts/jdCookie.js
-    fi
+    diff_and_copy "$dir_sample/sendNotify.js" "$dir_scripts/sendNotify.js"
+    diff_and_copy "$dir_sample/jdCookie.js" "$dir_scripts/jdCookie.js"
 }
 
 ## 输出是否有新的或失效的定时任务，$1：新的或失效的任务清单文件路径，$2：新/失效
@@ -209,19 +212,20 @@ add_cron () {
     if [ -s $list_crontab_user ]; then
         echo -e "开始尝试自动添加定时任务...\n"
         local detail=$(cat $list_add)
-        for file_full_path in $detail; do
-            local file_name=$(echo $file_full_path | awk -F "/" '{print $NF}')
-            if [ -f $file_full_path ]; then
+        cd $dir_scripts
+        for file_relative_path in $detail; do
+            local file_name=$(echo $file_relative_path | awk -F "/" '{print $NF}')
+            if [ -f $file_relative_path ]; then
                 cron_line=$(
                     perl -ne "{
                         print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
-                    }" $file_full_path | \
+                    }" $file_relative_path | \
                     perl -pe "{
-                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1:$cmd_task $file_full_path|g;
+                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1:$cmd_task $file_relative_path|g;
                         s|  | |g
                     }" | sort -u | head -1
                 )
-                cron_name=$(grep "new Env" $file_full_path | awk -F "'|\"" '{print $2}' | head -1)
+                cron_name=$(grep "new Env" $file_relative_path | awk -F "'|\"" '{print $2}' | head -1)
                 [[ -z $cron_name ]] && cron_name="$file_name"
                 add_cron_api "$cron_line:$cron_name"
             fi
@@ -251,13 +255,22 @@ update_own_repo () {
         else
             git_clone_scripts ${array_own_repo_url[i]} ${array_own_repo_path[i]} ${array_own_repo_branch[i]}
         fi
-        [[ $exit_status -eq 0 ]] && echo -e "\n更新${array_own_repo_path[i]}成功...\n" || echo -e "\n更新${array_own_repo_path[i]}失败，请检查原因...\n"
+        if [[ $exit_status -eq 0 ]]; then
+            echo -e "\n更新${array_own_repo_path[i]}成功...\n"
+            diff_and_copy "$dir_sample/sendNotify.js" "${array_own_repo_path[i]}/sendNotify.js"
+            diff_and_copy "$dir_sample/jdCookie.js" "${array_own_repo_path[i]}/jdCookie.js"
+        else
+            echo -e "\n更新${array_own_repo_path[i]}失败，请检查原因...\n"
+        fi
     done
 }
 
 ## 更新所有 raw 文件
 update_own_raw () {
-    [[ ${#RawUrl[*]} -gt 0 ]] && echo -e "--------------------------------------------------------------\n"
+    if [[ ${#RawUrl[*]} -gt 0 ]]; then
+        echo -e "--------------------------------------------------------------\n"
+        make_dir $dir_raw
+    fi
     for ((i=0; i<${#RawUrl[*]}; i++)); do
         raw_file_name[$i]=$(echo ${RawUrl[i]} | awk -F "/" '{print $NF}')
         echo -e "开始下载：${RawUrl[i]} \n\n保存路径：$dir_raw/${raw_file_name[$i]}\n"
@@ -288,13 +301,16 @@ run_extra_shell () {
 ## 脚本用法
 usage () {
     echo -e "本脚本用法："
-    echo -e "1. $cmd_update           # 更新qinglong、所有你设置的仓库和raw文件，如果启用了EnableExtraShell还将在最后运行你自己编写的extra.sh"
+    echo -e "1. $cmd_update all       # 更新qinglong、所有你设置的仓库和raw文件，如果启用了EnableExtraShell还将在最后运行你自己编写的extra.sh"
     echo -e "2. $cmd_update ql        # 只更新qinglong，和输入 $cmd_update qinglong 时功能一样，不会运行extra.sh"
-    echo -e "3. $cmd_update <folder>  # 指定scripts脚本目录下某个文件夹名称，只更新这个文件夹中的脚本，当该文件夹为git仓库才可使用此命令，不会运行extra.sh"
+    echo -e "3. $cmd_update raw       # 只更新raw文件，不会运行extra.sh"
+    echo -e "4. $cmd_update repo      # 更新所有设置的REPO，不会运行extra.sh"
+    echo -e "5. $cmd_update <folder>  # 指定scripts脚本目录下某个文件夹名称，只更新这个文件夹中的脚本，当该文件夹已经存在并且是git仓库才可使用此命令，不会运行extra.sh"
 }
 
 ## 更新qinglong
 update_qinglong () {
+    echo -e "--------------------------------------------------------------\n"
     git_pull_scripts $dir_root
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$dir_root成功...\n"
@@ -313,7 +329,6 @@ update_all_scripts () {
     count_own_repo_sum
     gen_own_dir_and_path
     if [[ ${#array_own_scripts_path[*]} -gt 0 ]]; then
-        make_dir $dir_raw
         update_own_repo
         update_own_raw
         gen_list_own
@@ -336,40 +351,52 @@ update_all_scripts () {
 update_specify_scripts_repo () {
     local tmp_dir=$1
     if [ -d $dir_scripts/$tmp_dir ]; then
-        git_pull_scripts $dir_scripts/$tmp_dir
+        if [ -d $dir_scripts/$tmp_dir/.git ]; then
+            git_pull_scripts $dir_scripts/$tmp_dir
+        else
+            echo -e "$dir_scripts/$tmp_dir 不是一个git仓库...\n"
+        fi
     else
-        echo -e "$dir_scripts/$tmp_dir 不存在...\n"
+        echo -e "命令输入错误...\n"
         usage
     fi
 }
 
 main () {
+    local p1=$1
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_path="$dir_log/update/${log_time}.log"
+    log_path="$dir_log/update/${log_time}_$p1.log"
     make_dir "$dir_log/update"
-    case $# in
-        0)
-            update_qinglong | tee $log_path
-            update_all_scripts | tee -a $log_path
-            run_extra_shell | tee -a $log_path
-            exit 0
-            ;;
-        1)
-            case $1 in
-                ql | qinglong)
-                    update_qinglong | tee $log_path
-                    ;;
-                *)
-                    update_specify_scripts_repo | tee $log_path
-                    ;;
-            esac
-            exit 0
-            ;;
-        *)
-            usage
-            exit 0
-            ;;
-    esac
+    if [[ $# -ne 1 ]]; then
+        echo -e "命令输入错误...\n"
+        usage
+    else
+        case $p1 in
+            all)
+                update_qinglong | tee $log_path
+                update_all_scripts | tee -a $log_path
+                run_extra_shell | tee -a $log_path
+                ;;
+            ql | qinglong)
+                update_qinglong | tee $log_path
+                ;;
+            repo)
+                count_own_repo_sum
+                gen_own_dir_and_path
+                update_own_repo | tee $log_path
+                ;;
+            raw)
+                count_own_repo_sum
+                gen_own_dir_and_path
+                update_own_raw | tee $log_path
+                ;;
+            *)
+                update_specify_scripts_repo "$p1" | tee $log_path
+                ;;
+        esac
+    fi
 }
 
 main "$@"
+
+exit 0

@@ -6,20 +6,20 @@
 
 
 ## 临时屏蔽某个Cookie
-## 多个Cookie编号以半角的空格分隔，两侧一对半角双引号，使用此功能后，在运行js脚本时账户编号将发生变化
+## 多个Cookie编号以半角的空格分隔，两侧一对半角双引号，使用此功能后，在运行脚本时账户编号将发生变化
 ## 举例1：TempBlockCookie="2"    临时屏蔽掉Cookie2
 ## 举例2：TempBlockCookie="2 4"  临时屏蔽掉Cookie2和Cookie4
 TempBlockCookie=""
 
-## 如果只是想要屏蔽某个账号不跑某一些脚本，可以参考下面 case 这个命令的例子来控制，case的条件中请输入脚本的绝对路径，也就是在crontab.list中的脚本路径是什么，这里就填入什么
+## 如果只是想要屏蔽某个账号不跑某一些脚本，可以参考下面 case 这个命令的例子来控制，case的条件中请输入脚本从scripts目录出发的相对路径，也就是在crontab.list中的task命令后面的脚本路径是什么，这里就填入什么
 ## case $1 in
-##     /ql/scripts/lxk0301_jd_scripts/jd_fruit.js)
+##     lxk0301_jd_scripts/jd_fruit.js)
 ##         TempBlockCookie="5"      # 账号5不玩lxk0301_jd_scripts下的jd_fruit.js
 ##         ;;
-##     /ql/scripts/lxk0301_jd_scripts/jd_dreamFactory.js | /ql/scripts/whyour_hundun/quanx/didi.js)
+##     lxk0301_jd_scripts/jd_dreamFactory.js | whyour_hundun/quanx/didi.js)
 ##         TempBlockCookie="2"      # 账号2不玩lxk0301_jd_scripts下的jd_dreamFactory.js和whyour_hundun下子文件夹quanx中的didi.js
 ##         ;;
-##     /ql/scripts/lxk0301_jd_scripts/jd_jdzz.js | /ql/scripts/whyour_hundun/quanx/jx_factory.js)
+##     lxk0301_jd_scripts/jd_jdzz.js | whyour_hundun/quanx/jx_factory.js)
 ##         TempBlockCookie="3 6"    # 账号3、账号6不玩lxk0301_jd_scripts下的jd_jdzz.js和whyour_hundun下子文件夹quanx中的jx_factory.js
 ##         ;;
 ## esac
@@ -50,21 +50,21 @@ EnableExtraShell=""
 
 
 ## 启用其他开发者的仓库方式一（选填）：完整更新整个仓库，针对同一个仓库，方式一和方式二只能选择一种
-## OwnRepoUrl：仓库地址清单，必须从1开始依次编号
-## OwnRepoBranch：你想使用的分支清单，不指定分支（即使用默认分支）时可以用一对不包含内容的空引号""，编号必须和 OwnRepoUrl 对应。
-## OwnRepoPath：要使用的脚本在仓库哪个路径下，请输入仓库下的相对路径，默认空值""代表仓库根目录，编号必须和 OwnRepoUrl 对应，同一个仓库下不同文件夹之间使用空格分开。如果既包括根目录又包括子目录，填写请见示例中OwnRepoPath3。
+## RepoUrl：仓库地址清单，必须从1开始依次编号
+## RepoBranch：你想使用的分支清单，不指定分支（即使用默认分支）时可以用一对不包含内容的空引号""，编号必须和 OwnRepoUrl 对应。
+## RepoPath：要使用的脚本在仓库哪个路径下，请输入仓库下的相对路径，默认空值""代表仓库根目录，编号必须和 OwnRepoUrl 对应，同一个仓库下不同文件夹之间使用空格分开。如果既包括根目录又包括子目录，填写请见示例中OwnRepoPath3。
 ## 所有脚本存放在 own 目录下，三个清单必须一一对应，示例如下：
-## OwnRepoUrl1="https://gitee.com/abc/jdtsa.git"
-## OwnRepoUrl2="https://github.com/nedcd/jxddfsa.git"
-## OwnRepoUrl3="git@github.com:eject/poex.git"
+## RepoUrl1="https://gitee.com/abc/jdtsa.git"
+## RepoUrl2="https://github.com/nedcd/jxddfsa.git"
+## RepoUrl3="git@github.com:eject/poex.git"
 ## 
-## OwnRepoBranch1=""         # 代表第1个仓库 https://gitee.com/abc/jdtsa.git 使用 "默认" 分支
-## OwnRepoBranch2="main"     # 代表第2个仓库 https://github.com/nedcd/jxddfsa.git 使用 "main" 分支
-## OwnRepoBranch3="master"   # 代表第3个仓库 git@github.com:eject/poex.git 使用 "master" 分支
+## RepoBranch1=""         # 代表第1个仓库 https://gitee.com/abc/jdtsa.git 使用 "默认" 分支
+## RepoBranch2="main"     # 代表第2个仓库 https://github.com/nedcd/jxddfsa.git 使用 "main" 分支
+## RepoBranch3="master"   # 代表第3个仓库 git@github.com:eject/poex.git 使用 "master" 分支
 ## 
-## OwnRepoPath1=""                   # 代表第1个仓库https://gitee.com/abc/jdtsa.git，你想使用的脚本就在仓库根目录下。
-## OwnRepoPath2="scripts/jd normal"  # 代表第2个仓库https://github.com/nedcd/jxddfsa.git，你想使用的脚本在仓库的 scripts/jd 和 normal文件夹下，必须输入相对路径
-## OwnRepoPath3="'' cron"            # 代表第3个仓库git@github.com:eject/poex.git，你想使用的脚本在仓库的 根目录 和 cron 文件夹下，必须输入相对路径
+## RepoPath1=""                   # 代表第1个仓库https://gitee.com/abc/jdtsa.git，你想使用的脚本就在仓库根目录下。
+## RepoPath2="scripts/jd normal"  # 代表第2个仓库https://github.com/nedcd/jxddfsa.git，你想使用的脚本在仓库的 scripts/jd 和 normal文件夹下，必须输入相对路径
+## RepoPath3="'' cron"            # 代表第3个仓库git@github.com:eject/poex.git，你想使用的脚本在仓库的 根目录 和 cron 文件夹下，必须输入相对路径
 
 RepoUrl1=""
 RepoUrl2=""
@@ -78,11 +78,11 @@ RepoPath2=""
 ## 启用其他开发者的仓库方式二（选填）：只下载想要的文件，针对同一个仓库，方式一和方式二只能选择一种。
 ## 请先确认你能正常下载该raw文件才列在下方，无论是github还是gitee，请只填入 raw 文件链接。
 ## 一行一个文件下载链接，首尾一对半角括号，示例：
-## OwnRawFile=(
+## RawUrl=(
 ##     https://gitee.com/wabdwdd/scipts/raw/master/jd_abc.js
 ##     https://github.com/lonfeg/loon/raw/main/jd_dudi.js
 ##     https://github.com/sunsem/qx/raw/main/z_dida.js
 ## )
-RawFile=(
+RawUrl=(
     
 )

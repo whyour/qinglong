@@ -91,7 +91,7 @@ gen_array_scripts () {
 ## 使用说明
 usage () {
     define_cmd
-    echo -e "\ntask命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或相对路径（定时任务中必须是绝对路径），用法为："
+    echo -e "\ntask命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或相对路径（定时任务中必须是从scripts目录出发的相对路径），用法为："
     echo -e "1.$cmd_task <js_path>        # 依次执行，如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
     echo -e "2.$cmd_task <js_path> now    # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
     echo -e "3.$cmd_task <js_path> conc   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
@@ -111,6 +111,7 @@ run_nohup () {
 ## 正常运行单个脚本，$1：传入参数
 run_normal () {
     local p1=$1
+    cd $dir_scripts
     if [ -f $p1 ]; then
         import_config_and_check "$p1"
         update_crontab
@@ -123,7 +124,7 @@ run_normal () {
         make_dir "$dir_log/$p1"
         $which_program $p1 2>&1 | tee $log_path
     else
-        echo -e "\n $p1 脚本不存在，请确认...\n"
+        echo -e "\n $dir_scripts/$p1 脚本不存在，请确认...\n"
         usage
     fi
 }
@@ -132,6 +133,7 @@ run_normal () {
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
 run_concurrent () {
     local p1=$1
+    cd $dir_scripts
     if [ -f $p1 ]; then
         import_config_and_check "$p1"
         update_crontab
@@ -149,7 +151,7 @@ run_concurrent () {
             $which_program $p1 &>$log_path &
         done
     else
-        echo -e "\n $p 脚本不存在，请确认...\n"
+        echo -e "\n $dir_scripts/$p1 脚本不存在，请确认...\n"
         usage
     fi
 }
