@@ -274,21 +274,22 @@ update_own_raw () {
     if [[ ${#RawUrl[*]} -gt 0 ]]; then
         echo -e "--------------------------------------------------------------\n"
         make_dir $dir_raw
+        diff_and_copy "$dir_sample/sendNotify.js" "$dir_raw/sendNotify.js"
+        diff_and_copy "$dir_sample/jdCookie.js" "$dir_raw/jdCookie.js"
+        for ((i=0; i<${#RawUrl[*]}; i++)); do
+            raw_file_name[$i]=$(echo ${RawUrl[i]} | awk -F "/" '{print $NF}')
+            echo -e "开始下载：${RawUrl[i]} \n\n保存路径：$dir_raw/${raw_file_name[$i]}\n"
+            wget -q --no-check-certificate -O "$dir_raw/${raw_file_name[$i]}.new" ${RawUrl[i]}
+            if [[ $? -eq 0 ]]; then
+                mv "$dir_raw/${raw_file_name[$i]}.new" "$dir_raw/${raw_file_name[$i]}"
+                echo -e "下载 ${raw_file_name[$i]} 成功...\n"
+            else
+                echo -e "下载 ${raw_file_name[$i]} 失败，保留之前正常下载的版本...\n"
+                [ -f "$dir_raw/${raw_file_name[$i]}.new" ] && rm -f "$dir_raw/${raw_file_name[$i]}.new"
+            fi
+        done
     fi
-    for ((i=0; i<${#RawUrl[*]}; i++)); do
-        raw_file_name[$i]=$(echo ${RawUrl[i]} | awk -F "/" '{print $NF}')
-        echo -e "开始下载：${RawUrl[i]} \n\n保存路径：$dir_raw/${raw_file_name[$i]}\n"
-        wget -q --no-check-certificate -O "$dir_raw/${raw_file_name[$i]}.new" ${RawUrl[i]}
-        if [[ $? -eq 0 ]]; then
-            mv "$dir_raw/${raw_file_name[$i]}.new" "$dir_raw/${raw_file_name[$i]}"
-            echo -e "下载 ${raw_file_name[$i]} 成功...\n"
-        else
-            echo -e "下载 ${raw_file_name[$i]} 失败，保留之前正常下载的版本...\n"
-            [ -f "$dir_raw/${raw_file_name[$i]}.new" ] && rm -f "$dir_raw/${raw_file_name[$i]}.new"
-        fi
-    done
-    diff_and_copy "$dir_sample/sendNotify.js" "$dir_raw/sendNotify.js"
-    diff_and_copy "$dir_sample/jdCookie.js" "$dir_raw/jdCookie.js"
+
 }
 
 ## 调用用户自定义的extra.sh
