@@ -153,7 +153,7 @@ define_cmd () {
         fi
     fi
     for ((i=0; i<${#link_name[*]}; i++)); do
-        eval cmd_${link_name[i]}="${cmd_prefix}${link_name[i]}${cmd_suffix}"
+        export cmd_${link_name[i]}="${cmd_prefix}${link_name[i]}${cmd_suffix}"
     done
 }
 
