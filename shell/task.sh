@@ -48,6 +48,7 @@ combine_one () {
 
 ## 选择python3还是node
 define_program () {
+    local p1=$1
     [[ $p1 == *.js ]] && which_program="node"
     [[ $p1 == *.py ]] && which_program="python3"
 }   
@@ -113,7 +114,7 @@ run_normal () {
     if [ -f $p1 ]; then
         import_config_and_check "$p1"
         update_crontab
-        define_program
+        define_program "$p1"
         combine_all
         [[ $# -eq 1 ]] && random_delay
         log_time=$(date "+%Y-%m-%d-%H-%M-%S")
