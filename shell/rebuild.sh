@@ -15,7 +15,7 @@ yarn build-back
 echo -e "重新build完成...\n"
 
 echo -e "重启服务...\n"
-pm2 restart panel || pm2 start $dir_root/build/app.js -n panel 2>/dev/null
+pm2 restart panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
 nginx -s reload
 
 echo -e "重启服务完成...\n"
