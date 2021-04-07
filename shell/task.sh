@@ -46,11 +46,6 @@ combine_one () {
     done
 }
 
-## 申明全部变量，$1：all/Cookie编号
-export_all_env () {
-    [[ $type == all ]] && combine_all || combine_one $type
-}
-
 ## 选择python3还是node
 define_program () {
     [[ $p1 == *.js ]] && which_program="node"
@@ -116,9 +111,8 @@ run_normal () {
     if [ -f $p1 ]; then
         import_config_and_check "$p1"
         update_crontab
-        count_user_sum
         define_program
-        export_all_env all
+        combine_all
         [[ $# -eq 1 ]] && random_delay
         log_time=$(date "+%Y-%m-%d-%H-%M-%S")
         log_path="$dir_log/$p1/$log_time.log"
@@ -138,7 +132,6 @@ run_concurrent () {
     if [ -f $p1 ]; then
         import_config_and_check "$p1"
         update_crontab
-        count_user_sum
         define_program
         make_dir $dir_log/$p1
         log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
@@ -147,7 +140,7 @@ run_concurrent () {
             for num in ${TempBlockCookie}; do
                 [[ $user_num -eq $num ]] && continue 2
             done
-            export_all_env $user_num
+            combine_one $user_num
             log_path="$dir_log/$p1/${log_time}_${user_num}.log"
             $which_program $p1 &>$log_path &
         done

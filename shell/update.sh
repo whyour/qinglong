@@ -263,6 +263,10 @@ update_own_repo () {
             echo -e "\n更新${array_own_repo_path[i]}失败，请检查原因...\n"
         fi
     done
+    for ((i=0; i<${#array_own_scripts_path[*]}; i++)); do
+        diff_and_copy "$dir_sample/sendNotify.js" "${array_own_scripts_path[i]}/sendNotify.js"
+        diff_and_copy "$dir_sample/jdCookie.js" "${array_own_scripts_path[i]}/jdCookie.js"
+    done
 }
 
 ## 更新所有 raw 文件
@@ -283,6 +287,8 @@ update_own_raw () {
             [ -f "$dir_raw/${raw_file_name[$i]}.new" ] && rm -f "$dir_raw/${raw_file_name[$i]}.new"
         fi
     done
+    diff_and_copy "$dir_sample/sendNotify.js" "$dir_raw/sendNotify.js"
+    diff_and_copy "$dir_sample/jdCookie.js" "$dir_raw/jdCookie.js"
 }
 
 ## 调用用户自定义的extra.sh

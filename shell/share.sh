@@ -50,16 +50,22 @@ original_name=(
 ## 导入配置文件不校验
 import_config_no_check () {
     [ -f $file_cookie ] && . $file_cookie
-    [ -f $file_sharecode ] && . $file_sharecode
     [ -f $file_config_user ] && . $file_config_user
 }
 
 ## 导入配置文件并校验，$1：任务名称
 import_config_and_check () {
     import_config_no_check $1
-    if [[ -z ${Cookie1} ]]; then
-        echo -e "请先在配置好Cookie...\n"
+    if [[ ! -s $file_cookie ]]; then
+        echo -e "请先配置好Cookie...\n"
         exit 1
+    else
+        user_sum=0
+        for line in $(cat $file_cookie); do
+            let user_sum++
+            [[ $user_sum -gt $((3 * 5)) ]] && break
+            eval Cookie${user_sum}="\"$line\""
+        done
     fi
 }
 
@@ -70,16 +76,6 @@ notify () {
     if [ -d $dir_scripts_node_modules ]; then
         node $dir_shell/notify.js "$title" "$msg"
     fi
-}
-
-## 统计用户数量
-count_user_sum () {
-    user_sum=0
-    for line in $(cat $file_cookie); do
-        let user_sum++
-        [[ $user_sum -gt $((3 * 5)) ]] && break
-        eval Cookie${user_sum}="\"$line\""
-    done
 }
 
 ## 创建目录，$1：目录的绝对路径
