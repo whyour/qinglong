@@ -18,6 +18,20 @@ fix_config
 import_config_no_check "update"
 get_token
 
+## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
+reset_romote_url () {
+    local dir_current=$(pwd)
+    local dir_work=$1
+    local url=$2
+
+    if [ -d "$dir_work/.git" ]; then
+        cd $dir_work
+        git remote set-url origin $url >/dev/null
+        git reset --hard >/dev/null
+        cd $dir_current
+    fi
+}
+
 ## 克隆脚本，$1：仓库地址，$2：仓库保存路径，$3：分支（可省略）
 git_clone_scripts () {
     local url=$1
@@ -250,8 +264,8 @@ update_own_repo () {
     [[ ${#array_own_repo_url[*]} -gt 0 ]] && echo -e "--------------------------------------------------------------\n"
     for ((i=0; i<${#array_own_repo_url[*]}; i++)); do
         if [ -d ${array_own_repo_path[i]}/.git ]; then
-            reset_romote_url ${array_own_repo_path[i]} ${array_own_repo_url[i]} &>/dev/null
-            git_pull_scripts ${array_own_repo_path[i]} ${array_own_repo_branch[i]}
+            reset_romote_url ${array_own_repo_path[i]} ${array_own_repo_url[i]}
+            git_pull_scripts ${array_own_repo_path[i]}
         else
             git_clone_scripts ${array_own_repo_url[i]} ${array_own_repo_path[i]} ${array_own_repo_branch[i]}
         fi
