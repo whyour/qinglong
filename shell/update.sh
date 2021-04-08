@@ -221,10 +221,6 @@ del_cron () {
 ## $1：新任务清单文件路径
 add_cron () {
     local list_add=$1
-    local list_crontab_own_tmp=$dir_list_tmp/crontab_own.list
-
-    [ -f $list_crontab_own_tmp ] && rm -f $list_crontab_own_tmp
-
     if [ -s $list_crontab_user ]; then
         echo -e "开始尝试自动添加定时任务...\n"
         local detail=$(cat $list_add)
@@ -257,8 +253,6 @@ add_cron () {
             notify "新任务添加失败通知" "尝试自动添加以下新的定时任务出错，请手动添加：\n$detail2"
         fi
     fi
-
-    [ -f $list_crontab_own_tmp ] && rm -f $list_crontab_own_tmp
 }
 
 ## 更新所有仓库
