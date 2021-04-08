@@ -171,16 +171,18 @@ diff_and_copy () {
     local copy_source=$1
     local copy_to=$2
     if [ ! -s $copy_to ] || [[ $(diff $copy_source $copy_to) ]]; then
-        cp $copy_source $copy_to
+        cp -f $copy_source $copy_to
     fi
 }
 
 ## 更新依赖
 update_depend () {
-    diff_and_copy "$dir_sample/package.json" "$dir_scripts/package.json"
     if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+        cp -f $dir_sample/package.json $dir_scripts/package.json
         npm_install_2 $dir_scripts
     fi
+
+    [ ! -d $dir_scripts/node_modules ] && npm_install_2 $dir_scripts
 
     diff_and_copy "$dir_sample/sendNotify.js" "$dir_scripts/sendNotify.js"
     diff_and_copy "$dir_sample/jdCookie.js" "$dir_scripts/jdCookie.js"
