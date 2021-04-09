@@ -20,6 +20,7 @@ const configString = 'config sample crontab shareCode diy';
 const dbPath = path.join(rootPath, 'db/');
 const manualLogPath = path.join(rootPath, 'manual_log/');
 const cronDbFile = path.join(rootPath, 'db/crontab.db');
+const cookieDbFile = path.join(rootPath, 'db/cookie.db');
 
 if (envFound.error) {
   throw new Error("⚠️  Couldn't find .env file  ⚠️");
@@ -53,5 +54,6 @@ export default {
   },
   dbPath,
   cronDbFile,
+  cookieDbFile,
   manualLogPath,
 };

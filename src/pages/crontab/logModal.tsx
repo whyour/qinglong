@@ -3,6 +3,12 @@ import { Modal, notification, Input, Form } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 
+enum CrontabStatus {
+  'running',
+  'idle',
+  'disabled',
+}
+
 const CronLogModal = ({
   cron,
   handleCancel,
@@ -12,14 +18,14 @@ const CronLogModal = ({
   visible: boolean;
   handleCancel: () => void;
 }) => {
-  const [value, setValue] = useState<string>('运行中...');
+  const [value, setValue] = useState<string>('启动中...');
   const [logTimer, setLogTimer] = useState<any>();
 
   const getCronLog = () => {
     request
       .get(`${config.apiPrefix}crons/${cron._id}/log`)
       .then((data: any) => {
-        setValue(data.data);
+        setValue(data.data || '暂无日志');
       });
   };
 

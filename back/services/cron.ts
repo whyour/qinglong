@@ -90,7 +90,7 @@ export default class CronService {
       this.logger.silly('Original command: ' + res.command);
 
       let logFile = `${config.manualLogPath}${res._id}.log`;
-      fs.writeFileSync(logFile, `${new Date().toString()}\n\n`);
+      fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
 
       let cmdStr = res.command;
       if (res.command.startsWith('js')) {
@@ -120,6 +120,18 @@ export default class CronService {
       cmd.on('error', (err) => {
         this.logger.silly(err);
         fs.appendFileSync(logFile, err.stack);
+      });
+
+      cmd.on('exit', (code: number, signal: any) => {
+        this.logger.silly(`cmd exit ${code}`);
+        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+        fs.appendFileSync(logFile, `\n\n执行结束...`);
+      });
+
+      cmd.on('disconnect', () => {
+        this.logger.silly(`cmd disconnect`);
+        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+        fs.appendFileSync(logFile, `\n\n连接断开...`);
       });
     });
   }

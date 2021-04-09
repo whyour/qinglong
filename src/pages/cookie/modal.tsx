@@ -8,14 +8,14 @@ const CookieModal = ({
   handleCancel,
   visible,
 }: {
-  cookie?: string;
+  cookie?: any;
   visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
 }) => {
   const [form] = Form.useForm();
 
   const handleOk = async (values: any) => {
-    const cookies = values.cookie
+    const cookies = values.value
       .split('\n')
       .map((x: any) => x.trim().replace(/\s/g, ''));
     let flag = false;
@@ -30,10 +30,8 @@ const CookieModal = ({
       return;
     }
     const method = cookie ? 'put' : 'post';
-    const payload = cookie
-      ? { cookie: cookies[0], oldCookie: cookie }
-      : { cookies };
-    const { code, data } = await request[method](`${config.apiPrefix}cookie`, {
+    const payload = cookie ? { value: cookies[0], _id: cookie._id } : cookies;
+    const { code, data } = await request[method](`${config.apiPrefix}cookies`, {
       data: payload,
     });
     if (code === 200) {
@@ -49,11 +47,7 @@ const CookieModal = ({
   };
 
   useEffect(() => {
-    if (cookie) {
-      form.setFieldsValue({ cookie });
-    } else {
-      form.resetFields();
-    }
+    form.resetFields();
   }, [cookie]);
 
   return (
@@ -74,9 +68,15 @@ const CookieModal = ({
       onCancel={() => handleCancel()}
       destroyOnClose
     >
-      <Form form={form} layout="vertical" name="form_in_modal" preserve={false}>
+      <Form
+        form={form}
+        layout="vertical"
+        name="form_in_modal"
+        preserve={false}
+        initialValues={cookie}
+      >
         <Form.Item
-          name="cookie"
+          name="value"
           rules={[
             { required: true, message: '请输入Cookie' },
             {

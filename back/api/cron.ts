@@ -14,8 +14,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.crontabs(
+        const cronService = Container.get(CronService);
+        const data = await cronService.crontabs(
           req.query.searchValue as string,
         );
         return res.send({ code: 200, data });
@@ -38,8 +38,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.create(req.body);
+        const cronService = Container.get(CronService);
+        const data = await cronService.create(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -58,8 +58,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.run(req.params.id);
+        const cronService = Container.get(CronService);
+        const data = await cronService.run(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -78,8 +78,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.disabled(req.params.id);
+        const cronService = Container.get(CronService);
+        const data = await cronService.disabled(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -98,8 +98,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.enabled(req.params.id);
+        const cronService = Container.get(CronService);
+        const data = await cronService.enabled(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -118,8 +118,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.log(req.params.id);
+        const cronService = Container.get(CronService);
+        const data = await cronService.log(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -141,8 +141,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.update(req.body);
+        const cronService = Container.get(CronService);
+        const data = await cronService.update(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -161,8 +161,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.remove(req.params.id);
+        const cronService = Container.get(CronService);
+        const data = await cronService.remove(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -176,8 +176,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.import_crontab();
+        const cronService = Container.get(CronService);
+        const data = await cronService.import_crontab();
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -196,8 +196,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CronService);
-        const data = await cookieService.get(req.params.id);
+        const cronService = Container.get(CronService);
+        const data = await cronService.get(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);

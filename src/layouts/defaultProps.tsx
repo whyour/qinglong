@@ -50,12 +50,6 @@ export default {
         component: '@/pages/diff/index',
       },
       {
-        path: '/code',
-        name: '互助码',
-        icon: <CodeOutlined />,
-        component: '@/pages/code/index',
-      },
-      {
         path: '/log',
         name: '日志',
         icon: <FolderOutlined />,

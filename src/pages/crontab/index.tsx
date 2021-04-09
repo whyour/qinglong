@@ -169,7 +169,11 @@ const Crontab = () => {
       title: '确认删除',
       content: (
         <>
-          确认删除定时任务 <Text type="warning">{record.name}</Text> 吗
+          确认删除定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
         </>
       ),
       onOk() {
@@ -201,7 +205,11 @@ const Crontab = () => {
       title: '确认运行',
       content: (
         <>
-          确认运行定时任务 <Text type="warning">{record.name}</Text> 吗
+          确认运行定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
         </>
       ),
       onOk() {
@@ -236,7 +244,11 @@ const Crontab = () => {
       content: (
         <>
           确认{record.status === CrontabStatus.disabled ? '启用' : '禁用'}
-          定时任务 <Text type="warning">{record.name}</Text> 吗
+          定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
         </>
       ),
       onOk() {
@@ -415,7 +427,7 @@ const Crontab = () => {
           defaultPageSize: 20,
         }}
         dataSource={value}
-        rowKey="pin"
+        rowKey="_id"
         size="middle"
         bordered
         scroll={{ x: 768 }}

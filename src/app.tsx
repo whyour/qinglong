@@ -18,7 +18,7 @@ export function render(oldRender: any) {
     })
     .catch((e) => {
       console.log(e);
-      if (e.response.status === 401) {
+      if (e.response && e.response.status === 401) {
         localStorage.removeItem(config.authKey);
         history.push('/login');
         oldRender();
