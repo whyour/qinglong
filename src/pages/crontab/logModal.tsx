@@ -35,7 +35,7 @@ const CronLogModal = ({
           if (logTimer) {
             clearInterval(logTimer);
           }
-        } else {
+        } else if (isFirst) {
           const timer = setInterval(() => {
             getCronLog();
           }, 2000);
