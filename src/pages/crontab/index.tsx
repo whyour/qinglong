@@ -347,15 +347,28 @@ const Crontab = () => {
     }
   };
 
-  const handleCancel = (needUpdate?: boolean) => {
+  const handleCancel = (cron?: any) => {
     setIsModalVisible(false);
-    if (needUpdate) {
-      getCronDetail(editedCron);
+    if (cron) {
+      handleCrons(cron);
     }
   };
 
   const onSearch = (value: string) => {
     setSearchText(value);
+  };
+
+  const handleCrons = (cron: any) => {
+    const index = value.findIndex((x) => x._id === cron._id);
+    const result = [...value];
+    if (index === -1) {
+      result.push(cron);
+    } else {
+      result.splice(index, 1, {
+        ...cron,
+      });
+    }
+    setValue(result);
   };
 
   const getCronDetail = (cron: any) => {

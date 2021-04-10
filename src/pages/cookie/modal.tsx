@@ -43,7 +43,7 @@ const CookieModal = ({
         message: data,
       });
     }
-    handleCancel(true);
+    handleCancel(data);
   };
 
   useEffect(() => {

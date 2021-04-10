@@ -322,26 +322,24 @@ const Config = () => {
     });
   };
 
-  const handleCancel = (needUpdate?: boolean) => {
+  const handleCancel = (cookie: any) => {
     setIsModalVisible(false);
-    if (needUpdate) {
-      getCookieDetail(editedCookie);
+    if (cookie) {
+      handleCookies(cookie);
     }
   };
 
-  const getCookieDetail = (cookie: any) => {
-    request
-      .get(`${config.apiPrefix}cookies/${cookie._id}`)
-      .then((data: any) => {
-        const index = value.findIndex((x) => x._id === cookie._id);
-        const result = [...value];
-        result.splice(index, 1, {
-          ...cookie,
-          ...data.data,
-        });
-        setValue(result);
-      })
-      .finally(() => setLoading(false));
+  const handleCookies = (cookie: any) => {
+    const index = value.findIndex((x) => x._id === cookie._id);
+    const result = [...value];
+    if (index === -1) {
+      result.push(...cookie);
+    } else {
+      result.splice(index, 1, {
+        ...cookie,
+      });
+    }
+    setValue(result);
   };
 
   const components = {
@@ -352,6 +350,9 @@ const Config = () => {
 
   const moveRow = useCallback(
     (dragIndex, hoverIndex) => {
+      if (dragIndex === hoverIndex) {
+        return;
+      }
       const dragRow = value[dragIndex];
       const newData = [...value];
       newData.splice(dragIndex, 1);

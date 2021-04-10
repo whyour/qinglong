@@ -22,21 +22,52 @@ export default class CronService {
     return this.cronDb;
   }
 
-  public async create(payload: Crontab): Promise<void> {
+  public async create(payload: Crontab): Promise<Crontab> {
     const tab = new Crontab(payload);
     tab.created = new Date().valueOf();
     tab.saved = false;
-    this.cronDb.insert(tab);
+    const doc = await this.insert(tab);
     await this.set_crontab();
+    return doc;
   }
 
-  public async update(payload: Crontab): Promise<void> {
+  public async insert(payload: Crontab): Promise<Crontab> {
+    return new Promise((resolve) => {
+      this.cronDb.insert(payload, (err, docs) => {
+        if (err) {
+          this.logger.error(err);
+        } else {
+          resolve(docs);
+        }
+      });
+    });
+  }
+
+  public async update(payload: Crontab): Promise<Crontab> {
     const { _id, ...other } = payload;
     const doc = await this.get(_id);
     const tab = new Crontab({ ...doc, ...other });
     tab.saved = false;
-    this.cronDb.update({ _id }, tab, { returnUpdatedDocs: true });
+    const newDoc = await this.update(tab);
     await this.set_crontab();
+    return newDoc;
+  }
+
+  public async updateDb(payload: Crontab): Promise<Crontab> {
+    return new Promise((resolve) => {
+      this.cronDb.update(
+        { _id: payload._id },
+        payload,
+        { returnUpdatedDocs: true },
+        (err, num, docs: any) => {
+          if (err) {
+            this.logger.error(err);
+          } else {
+            resolve(docs);
+          }
+        },
+      );
+    });
   }
 
   public async status(_id: string, stopped: boolean) {

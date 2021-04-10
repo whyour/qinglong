@@ -120,7 +120,7 @@ export default class CookieService {
       });
   }
 
-  public async create(payload: string[]): Promise<void> {
+  public async create(payload: string[]): Promise<Cookie[]> {
     const cookies = await this.cookies('', { postion: 1 });
     let position = initCookiePosition;
     if (cookies && cookies.length > 0) {
@@ -131,16 +131,47 @@ export default class CookieService {
       position = position / 2;
       return cookie;
     });
-    this.cronDb.insert(tabs);
+    const docs = await this.insert(tabs);
     await this.set_cookies();
+    return docs;
   }
 
-  public async update(payload: Cookie): Promise<void> {
+  public async insert(payload: Cookie[]): Promise<Cookie[]> {
+    return new Promise((resolve) => {
+      this.cronDb.insert(payload, (err, docs) => {
+        if (err) {
+          this.logger.error(err);
+        } else {
+          resolve(docs);
+        }
+      });
+    });
+  }
+
+  public async update(payload: Cookie): Promise<Cookie> {
     const { _id, ...other } = payload;
     const doc = await this.get(_id);
     const tab = new Cookie({ ...doc, ...other });
-    this.cronDb.update({ _id }, tab, { returnUpdatedDocs: true });
+    const newDoc = await this.updateDb(tab);
     await this.set_cookies();
+    return newDoc;
+  }
+
+  public async updateDb(payload: Cookie): Promise<Cookie> {
+    return new Promise((resolve) => {
+      this.cronDb.update(
+        { _id: payload._id },
+        payload,
+        { returnUpdatedDocs: true },
+        (err, docs) => {
+          if (err) {
+            this.logger.error(err);
+          } else {
+            resolve(docs as Cookie);
+          }
+        },
+      );
+    });
   }
 
   public async remove(_id: string) {
@@ -163,8 +194,8 @@ export default class CookieService {
     const cookies = await this.cookies();
     if (toIndex === 0 || toIndex === cookies.length - 1) {
       targetPosition = isUpward
-        ? (cookies[0].position * 2 + 1) / 2
-        : (cookies[toIndex].position * 2 - 1) / 2;
+        ? cookies[0].position * 2
+        : cookies[toIndex].position / 2;
     } else {
       targetPosition = isUpward
         ? (cookies[toIndex].position + cookies[toIndex - 1].position) / 2
