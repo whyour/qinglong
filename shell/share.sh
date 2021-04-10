@@ -177,7 +177,7 @@ gen_own_dir_and_path () {
             array_own_repo_url[$repo_num]=${!tmp1}
             tmp2=RepoBranch$i
             array_own_repo_branch[$repo_num]=${!tmp2}
-            array_own_repo_dir[$repo_num]=$(echo ${array_own_repo_url[$repo_num]} | perl -pe "s|.+com(/\|:)([\w-]+)/([\w-]+)(\.git)?|\2_\3|")
+            array_own_repo_dir[$repo_num]=$(echo ${array_own_repo_url[$repo_num]} | perl -pe "s|\.git||" | awk -F "/|:" '{print $((NF - 1)) "_" $NF}')
             array_own_repo_path[$repo_num]=$dir_scripts/${array_own_repo_dir[$repo_num]}
             tmp3=RepoPath$i
             if [[ ${!tmp3} ]]; then
