@@ -20,12 +20,37 @@ const CronLogModal = ({
 }) => {
   const [value, setValue] = useState<string>('启动中...');
   const [logTimer, setLogTimer] = useState<any>();
+  const [loading, setLoading] = useState<any>(true);
 
-  const getCronLog = () => {
+  const getCronLog = (isFirst?: boolean) => {
+    if (isFirst) {
+      setLoading(true);
+    }
     request
       .get(`${config.apiPrefix}crons/${cron._id}/log`)
       .then((data: any) => {
-        setValue(data.data || '暂无日志');
+        const log = data.data as string;
+        setValue(log || '暂无日志');
+        if (log.includes('执行结束')) {
+          if (logTimer) {
+            clearInterval(logTimer);
+          }
+        } else {
+          const timer = setInterval(() => {
+            getCronLog();
+          }, 2000);
+          setLogTimer(timer);
+        }
+      })
+      .catch(() => {
+        if (logTimer) {
+          clearInterval(logTimer);
+        }
+      })
+      .finally(() => {
+        if (isFirst) {
+          setLoading(false);
+        }
       });
   };
 
@@ -36,10 +61,7 @@ const CronLogModal = ({
 
   useEffect(() => {
     if (cron) {
-      const timer = setInterval(() => {
-        getCronLog();
-      }, 2000);
-      setLogTimer(timer);
+      getCronLog(true);
     }
   }, [cron]);
 
@@ -50,7 +72,6 @@ const CronLogModal = ({
       forceRender
       onOk={() => cancel()}
       onCancel={() => cancel()}
-      destroyOnClose
     >
       <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
         {value}

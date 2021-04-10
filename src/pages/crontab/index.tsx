@@ -120,8 +120,7 @@ const Crontab = () => {
           <Tooltip title="日志">
             <a
               onClick={() => {
-                setLogCron(record);
-                setIsLogModalVisible(true);
+                setLogCron({ ...record, timestamp: Date.now() });
               }}
             >
               <FileTextOutlined />
@@ -385,6 +384,12 @@ const Crontab = () => {
       })
       .finally(() => setLoading(false));
   };
+
+  useEffect(() => {
+    if (logCron) {
+      setIsLogModalVisible(true);
+    }
+  }, [logCron]);
 
   useEffect(() => {
     getCrons();

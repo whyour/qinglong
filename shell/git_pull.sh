@@ -105,7 +105,7 @@ function Npm_InstallSub() {
     npm install --no-save --registry=https://registry.npm.taobao.org || npm install --no-save
   else
     echo -e "检测到本机安装了 yarn，使用 yarn 替代 npm...\n"
-    yarn install --registry=https://registry.npm.taobao.org || yarn install
+    yarn install --registry=https://registry.npm.taobao.org --network-timeout 1000000000 || yarn install
   fi
 }
 
