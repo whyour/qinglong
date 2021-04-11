@@ -32,7 +32,10 @@ mkdir -p ${diyscriptsdir}
 
 if [ ! -d "$diyscriptsdir/${author}_${repo}" ]; then
   echo -e "${author}本地仓库不存在,从gayhub拉取ing..."
-  cd ${diyscriptsdir} && git clone https://ghproxy.com/https://github.com/${author}/${repo} ${author}_${repo}
+  local url="https://ghproxy.com/https://github.com/${author}/${repo}"
+  if [ $author == "monk-coder" ] && [ $repo == "dust" ]; then
+    url="git@github.com:monk-coder/dust.git"
+  cd ${diyscriptsdir} && git clone $url ${author}_${repo}
   gitpullstatus=$?
   [ $gitpullstatus -eq 0 ] && echo -e "${author}本地仓库拉取完毕"
   [ $gitpullstatus -ne 0 ] && echo -e "${author}本地仓库拉取失败,请检查!" && exit 0
