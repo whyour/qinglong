@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 get_token() {
-  local authInfo=$(cat $AuthConf)
-  token=$(get_json_value "$authInfo" "token")
+  token=$(cat $AuthConf | jq -r .token)
 }
 
 get_json_value() {
@@ -42,8 +41,7 @@ add_cron_api() {
     -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
     --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\"}" \
     --compressed)
-  echo $api
-  code=$(get_json_value $api "code")
+  code=$(echo $api | jq -r .code)
   if [[ $code == 200 ]]; then
     echo -e "$name 添加成功"
   else
@@ -63,8 +61,7 @@ del_cron_api() {
     -H "Origin: http://localhost:5700" \
     -H "Referer: http://localhost:5700/crontab" \
     -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7")
-  echo $api
-  code=$(get_json_value $api "code")
+  code=$(echo $api | jq -r .code)
   if [[ $code == 200 ]]; then
     echo -e "$name 删除成功"
   else
