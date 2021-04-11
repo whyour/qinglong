@@ -13,6 +13,7 @@ const CookieModal = ({
   handleCancel: (needUpdate?: boolean) => void;
 }) => {
   const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
   const handleOk = async (values: any) => {
     const cookies = values.value
@@ -29,6 +30,7 @@ const CookieModal = ({
     if (flag) {
       return;
     }
+    setLoading(true);
     const method = cookie ? 'put' : 'post';
     const payload = cookie ? { value: cookies[0], _id: cookie._id } : cookies;
     const { code, data } = await request[method](`${config.apiPrefix}cookies`, {
@@ -43,6 +45,7 @@ const CookieModal = ({
         message: data,
       });
     }
+    setLoading(false);
     handleCancel(data);
   };
 
@@ -66,6 +69,7 @@ const CookieModal = ({
           });
       }}
       onCancel={() => handleCancel()}
+      confirmLoading={loading}
       destroyOnClose
     >
       <Form

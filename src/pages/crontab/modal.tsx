@@ -14,8 +14,10 @@ const CronModal = ({
   handleCancel: (needUpdate?: boolean) => void;
 }) => {
   const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
   const handleOk = async (values: any) => {
+    setLoading(true);
     const method = cron ? 'put' : 'post';
     const payload = { ...values };
     if (cron) {
@@ -33,6 +35,7 @@ const CronModal = ({
         message: data,
       });
     }
+    setLoading(false);
     handleCancel(data);
   };
 
@@ -60,6 +63,7 @@ const CronModal = ({
           });
       }}
       onCancel={() => handleCancel()}
+      confirmLoading={loading}
       destroyOnClose
     >
       <Form form={form} layout="vertical" name="form_in_modal" preserve={false}>

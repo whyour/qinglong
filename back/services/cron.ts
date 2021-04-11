@@ -48,7 +48,7 @@ export default class CronService {
     const doc = await this.get(_id);
     const tab = new Crontab({ ...doc, ...other });
     tab.saved = false;
-    const newDoc = await this.update(tab);
+    const newDoc = await this.updateDb(tab);
     await this.set_crontab();
     return newDoc;
   }
