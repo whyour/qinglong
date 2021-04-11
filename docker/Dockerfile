@@ -73,5 +73,5 @@ COPY --from=build /ql/node_modules /ql/node_modules/
 RUN cd ${QL_DIR} \
     && yarn build \
     && yarn build-back \
-    && rm -rf node_modules
+    && yarn install --production --network-timeout 100000
 ENTRYPOINT ["entrypoint"]
