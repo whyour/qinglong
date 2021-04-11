@@ -19,7 +19,6 @@ const CronLogModal = ({
   handleCancel: () => void;
 }) => {
   const [value, setValue] = useState<string>('启动中...');
-  const [logTimer, setLogTimer] = useState<any>();
   const [loading, setLoading] = useState<any>(true);
 
   const getCronLog = (isFirst?: boolean) => {
@@ -31,20 +30,10 @@ const CronLogModal = ({
       .then((data: any) => {
         const log = data.data as string;
         setValue(log || '暂无日志');
-        if (log.includes('执行结束')) {
-          if (logTimer) {
-            clearInterval(logTimer);
-          }
-        } else if (isFirst) {
-          const timer = setInterval(() => {
+        if (log && log.includes('执行结束')) {
+          setTimeout(() => {
             getCronLog();
           }, 2000);
-          setLogTimer(timer);
-        }
-      })
-      .catch(() => {
-        if (logTimer) {
-          clearInterval(logTimer);
         }
       })
       .finally(() => {
@@ -55,7 +44,6 @@ const CronLogModal = ({
   };
 
   const cancel = () => {
-    clearInterval(logTimer);
     handleCancel();
   };
 
@@ -74,7 +62,7 @@ const CronLogModal = ({
       onCancel={() => cancel()}
     >
       <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
-        {value}
+        {!loading && value}
       </pre>
     </Modal>
   );

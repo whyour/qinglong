@@ -124,7 +124,7 @@ export default class CronService {
       fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
 
       let cmdStr = res.command;
-      if (res.command.startsWith('js')) {
+      if (res.command.startsWith('js') && !res.command.endsWith('now')) {
         cmdStr = `${res.command} now`;
       } else if (/&& (.*) >>/.test(res.command)) {
         cmdStr = res.command.match(/&& (.*) >>/)[1];
