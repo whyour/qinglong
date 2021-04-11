@@ -35,6 +35,7 @@ if [ ! -d "$diyscriptsdir/${author}_${repo}" ]; then
   local url="https://ghproxy.com/https://github.com/${author}/${repo}"
   if [ $author == "monk-coder" ] && [ $repo == "dust" ]; then
     url="git@github.com:monk-coder/dust.git"
+  fi
   cd ${diyscriptsdir} && git clone $url ${author}_${repo}
   gitpullstatus=$?
   [ $gitpullstatus -eq 0 ] && echo -e "${author}本地仓库拉取完毕"
