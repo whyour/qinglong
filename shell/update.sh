@@ -136,10 +136,14 @@ detect_config_version () {
 
 ## npm install 子程序，判断是否为安卓，判断是否安装有yarn
 npm_install_sub () {
-    local cmd_1 cmd_2
-    type yarn >/dev/null 2>&1 && cmd_1=yarn || cmd_1=npm
-    [[ $is_termux -eq 1 ]] && cmd_2="--no-bin-links" || cmd_2=""
-    $cmd_1 install $cmd_2 --registry=https://registry.npm.taobao.org || $cmd_1 install $cmd_2
+    if [ $is_termux -eq 1 ]; then
+        npm install --production --no-save --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links --no-save
+    elif ! type yarn >/dev/null 2>&1; then
+        npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
+    else
+        echo -e "检测到本机安装了 yarn，使用 yarn 替代 npm...\n"
+        yarn install --production --network-timeout 1000000000 --registry=https://registry.npm.taobao.org || yarn install --production --network-timeout 1000000000
+    fi
 }
 
 ## npm install，$1：package.json文件所在路径
