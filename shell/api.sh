@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 get_token() {
-    local auth_info=$(cat $file_auth_user)
-    token=$(get_json_value "$auth_info" "token")
+  token=$(cat $file_auth_user | jq -r .token)
 }
 
 get_json_value() {
@@ -32,42 +31,40 @@ add_cron_api() {
         local name=$3
     fi
 
-    local api=$(curl "http://localhost:5600/api/crons?t=$currentTimeStamp" \
-        -H "Accept: application/json" \
-        -H "Authorization: Bearer $token" \
-        -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
-        -H "Content-Type: application/json;charset=UTF-8" \
-        -H "Origin: http://localhost:5700" \
-        -H "Referer: http://localhost:5700/crontab" \
-        -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
-        --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\"}" \
-        --compressed)
-    echo $api
-    code=$(get_json_value $api "code")
-    if [[ $code == 200 ]]; then
-        echo -e "$name 添加成功"
-    else
-        echo -e "$name 添加失败"
-    fi
+  local api=$(curl "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+    -H "Accept: application/json" \
+    -H "Authorization: Bearer $token" \
+    -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
+    -H "Content-Type: application/json;charset=UTF-8" \
+    -H "Origin: http://localhost:5700" \
+    -H "Referer: http://localhost:5700/crontab" \
+    -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
+    --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\"}" \
+    --compressed)
+  code=$(echo $api | jq -r .code)
+  if [[ $code == 200 ]]; then
+    echo -e "$name 添加成功"
+  else
+    echo -e "$name 添加失败"
+  fi
 }
 
 del_cron_api() {
-    local id=$1
-    local currentTimeStamp=$(date +%s)
-    local api=$(curl "http://localhost:5600/api/crons/$id?t=$currentTimeStamp" \
-        -X 'DELETE' \
-        -H "Accept: application/json" \
-        -H "Authorization: Bearer $token" \
-        -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
-        -H "Content-Type: application/json;charset=UTF-8" \
-        -H "Origin: http://localhost:5700" \
-        -H "Referer: http://localhost:5700/crontab" \
-        -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7")
-    echo $api
-    code=$(get_json_value $api "code")
-    if [[ $code == 200 ]]; then
-        echo -e "$name 删除成功"
-    else
-        echo -e "$name 删除失败"
-    fi
+  local id=$1
+  local currentTimeStamp=$(date +%s)
+  local api=$(curl "http://localhost:5600/api/crons/$id?t=$currentTimeStamp" \
+    -X 'DELETE' \
+    -H "Accept: application/json" \
+    -H "Authorization: Bearer $token" \
+    -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
+    -H "Content-Type: application/json;charset=UTF-8" \
+    -H "Origin: http://localhost:5700" \
+    -H "Referer: http://localhost:5700/crontab" \
+    -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7")
+  code=$(echo $api | jq -r .code)
+  if [[ $code == 200 ]]; then
+    echo -e "$name 删除成功"
+  else
+    echo -e "$name 删除失败"
+  fi
 }

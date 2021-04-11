@@ -33,7 +33,7 @@ const CronModal = ({
         message: data,
       });
     }
-    handleCancel(true);
+    handleCancel(data);
   };
 
   useEffect(() => {

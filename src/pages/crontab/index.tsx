@@ -120,8 +120,7 @@ const Crontab = () => {
           <Tooltip title="日志">
             <a
               onClick={() => {
-                setLogCron(record);
-                setIsLogModalVisible(true);
+                setLogCron({ ...record, timestamp: Date.now() });
               }}
             >
               <FileTextOutlined />
@@ -169,7 +168,11 @@ const Crontab = () => {
       title: '确认删除',
       content: (
         <>
-          确认删除定时任务 <Text type="warning">{record.name}</Text> 吗
+          确认删除定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
         </>
       ),
       onOk() {
@@ -201,7 +204,11 @@ const Crontab = () => {
       title: '确认运行',
       content: (
         <>
-          确认运行定时任务 <Text type="warning">{record.name}</Text> 吗
+          确认运行定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
         </>
       ),
       onOk() {
@@ -236,7 +243,11 @@ const Crontab = () => {
       content: (
         <>
           确认{record.status === CrontabStatus.disabled ? '启用' : '禁用'}
-          定时任务 <Text type="warning">{record.name}</Text> 吗
+          定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
         </>
       ),
       onOk() {
@@ -335,15 +346,28 @@ const Crontab = () => {
     }
   };
 
-  const handleCancel = (needUpdate?: boolean) => {
+  const handleCancel = (cron?: any) => {
     setIsModalVisible(false);
-    if (needUpdate) {
-      getCronDetail(editedCron);
+    if (cron) {
+      handleCrons(cron);
     }
   };
 
   const onSearch = (value: string) => {
     setSearchText(value);
+  };
+
+  const handleCrons = (cron: any) => {
+    const index = value.findIndex((x) => x._id === cron._id);
+    const result = [...value];
+    if (index === -1) {
+      result.push(cron);
+    } else {
+      result.splice(index, 1, {
+        ...cron,
+      });
+    }
+    setValue(result);
   };
 
   const getCronDetail = (cron: any) => {
@@ -360,6 +384,12 @@ const Crontab = () => {
       })
       .finally(() => setLoading(false));
   };
+
+  useEffect(() => {
+    if (logCron) {
+      setIsLogModalVisible(true);
+    }
+  }, [logCron]);
 
   useEffect(() => {
     getCrons();
@@ -415,7 +445,7 @@ const Crontab = () => {
           defaultPageSize: 20,
         }}
         dataSource={value}
-        rowKey="pin"
+        rowKey="_id"
         size="middle"
         bordered
         scroll={{ x: 768 }}

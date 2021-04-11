@@ -10,6 +10,7 @@ git pull
 echo -e "更新更新qinglong完成...\n"
 
 echo -e "重新build...\n"
+yarn install --network-timeout 1000000000 || yarn install --registry=https://registry.npm.taobao.org --network-timeout 1000000000
 yarn build
 yarn build-back
 echo -e "重新build完成...\n"

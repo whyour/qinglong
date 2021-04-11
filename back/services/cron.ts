@@ -22,21 +22,52 @@ export default class CronService {
     return this.cronDb;
   }
 
-  public async create(payload: Crontab): Promise<void> {
+  public async create(payload: Crontab): Promise<Crontab> {
     const tab = new Crontab(payload);
     tab.created = new Date().valueOf();
     tab.saved = false;
-    this.cronDb.insert(tab);
+    const doc = await this.insert(tab);
     await this.set_crontab();
+    return doc;
   }
 
-  public async update(payload: Crontab): Promise<void> {
+  public async insert(payload: Crontab): Promise<Crontab> {
+    return new Promise((resolve) => {
+      this.cronDb.insert(payload, (err, docs) => {
+        if (err) {
+          this.logger.error(err);
+        } else {
+          resolve(docs);
+        }
+      });
+    });
+  }
+
+  public async update(payload: Crontab): Promise<Crontab> {
     const { _id, ...other } = payload;
     const doc = await this.get(_id);
     const tab = new Crontab({ ...doc, ...other });
     tab.saved = false;
-    this.cronDb.update({ _id }, tab, { returnUpdatedDocs: true });
+    const newDoc = await this.update(tab);
     await this.set_crontab();
+    return newDoc;
+  }
+
+  public async updateDb(payload: Crontab): Promise<Crontab> {
+    return new Promise((resolve) => {
+      this.cronDb.update(
+        { _id: payload._id },
+        payload,
+        { returnUpdatedDocs: true },
+        (err, num, docs: any) => {
+          if (err) {
+            this.logger.error(err);
+          } else {
+            resolve(docs);
+          }
+        },
+      );
+    });
   }
 
   public async status(_id: string, stopped: boolean) {
@@ -90,10 +121,10 @@ export default class CronService {
       this.logger.silly('Original command: ' + res.command);
 
       let logFile = `${config.manualLogPath}${res._id}.log`;
-      fs.writeFileSync(logFile, `${new Date().toString()}\n\n`);
+      fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
 
       let cmdStr = res.command;
-      if (res.command.startsWith('js')) {
+      if (res.command.startsWith('js') && !res.command.endsWith('now')) {
         cmdStr = `${res.command} now`;
       } else if (/&& (.*) >>/.test(res.command)) {
         cmdStr = res.command.match(/&& (.*) >>/)[1];
@@ -120,6 +151,18 @@ export default class CronService {
       cmd.on('error', (err) => {
         this.logger.silly(err);
         fs.appendFileSync(logFile, err.stack);
+      });
+
+      cmd.on('exit', (code: number, signal: any) => {
+        this.logger.silly(`cmd exit ${code}`);
+        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+        fs.appendFileSync(logFile, `\n\n执行结束...`);
+      });
+
+      cmd.on('disconnect', () => {
+        this.logger.silly(`cmd disconnect`);
+        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+        fs.appendFileSync(logFile, `\n\n连接断开...`);
       });
     });
   }
