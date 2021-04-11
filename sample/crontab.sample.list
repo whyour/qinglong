@@ -1,0 +1,11 @@
+# 更新所有脚本
+55 2,13 * * * CMD_UPDATE all
+
+# 重构面板
+# 30 7 */7 * * CMD_REBUILD >> ${QL_DIR}/log/rebuild.log 2>&1
+
+# 删除 RmLogDaysAgo 指定天数以前的旧日志，不记录日志
+57 13 * * * CMD_RMLOG >/dev/null 2>&1
+
+# 其他定时任务，由本程序自动添加的任务使用 CMD_TASK 命令，由你自行添加的任务请使用 CMD_MYTASK 命令
+# 如果由本程序自动添加的任务你不想运行，注释即可，不要删除，请在最后保留一个空行
