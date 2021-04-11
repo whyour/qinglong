@@ -72,5 +72,6 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 COPY --from=build /ql/node_modules /ql/node_modules/
 RUN cd ${QL_DIR} \
     && yarn build \
-    && yarn build-back
+    && yarn build-back \
+    && rm -rf node_modules
 ENTRYPOINT ["entrypoint"]
