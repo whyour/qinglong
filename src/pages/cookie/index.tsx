@@ -119,6 +119,12 @@ const Config = () => {
       },
     },
     {
+      title: '昵称',
+      dataIndex: 'nickname',
+      key: 'nickname',
+      align: 'center' as const,
+    },
+    {
       title: '值',
       dataIndex: 'value',
       key: 'value',
@@ -208,8 +214,21 @@ const Config = () => {
       .get(`${config.apiPrefix}cookies`)
       .then((data: any) => {
         setValue(data.data);
+        asyncUpdateStatus(data.data);
       })
       .finally(() => setLoading(false));
+  };
+
+  const asyncUpdateStatus = async (data: any[]) => {
+    for (let i = 0; i < data.length; i++) {
+      const cookie = data[i];
+      await sleep(1000);
+      refreshStatus(cookie, i);
+    }
+  };
+
+  const sleep = (time: number) => {
+    return new Promise((resolve) => setTimeout(resolve, time));
   };
 
   const refreshStatus = (record: any, index: number) => {
@@ -339,6 +358,7 @@ const Config = () => {
         ...cookie,
       });
     }
+    refreshStatus(cookie, index);
     setValue(result);
   };
 

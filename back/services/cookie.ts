@@ -81,10 +81,11 @@ export default class CookieService {
 
   public async refreshCookie(_id: string) {
     const current = await this.get(_id);
-    const { status } = await this.getJdInfo(current.value);
+    const { status, nickname } = await this.getJdInfo(current.value);
     return {
       ...current,
       status,
+      nickname,
     };
   }
 
