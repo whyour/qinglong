@@ -16,23 +16,17 @@ const initData = [
     status: CrontabStatus.idle,
   },
   {
-    name: '自定义仓库',
-    command: `sleep ${randomSchedule(
-      60,
-      1,
-    )} && diy whyour hundun "quanx/jx|quanx/jd" tokens >> $QL_DIR/log/diy_pull.log 2>&1`,
-    schedule: `${randomSchedule(60, 1)} ${randomSchedule(
-      24,
-      6,
-    ).toString()} * * *`,
-    status: CrontabStatus.idle,
+    name: 'build面板',
+    command: 'rebuild >> ${QL_DIR}/log/rebuild.log 2>&1',
+    schedule: '30 7 */7 * *',
+    status: CrontabStatus.disabled,
   },
   {
     name: '自定义仓库',
     command: `sleep ${randomSchedule(
       60,
       1,
-    )} && diy monk-coder dust "i-chenzhe|normal" >> $QL_DIR/log/diy_pull.log 2>&1`,
+    )} && diy whyour hundun "quanx/jx|quanx/jd" tokens >> $QL_DIR/log/diy_pull.log 2>&1`,
     schedule: `${randomSchedule(60, 1)} ${randomSchedule(
       24,
       6,
@@ -46,12 +40,6 @@ const initData = [
     status: CrontabStatus.idle,
   },
   {
-    name: 'build面板',
-    command: 'rebuild >> ${QL_DIR}/log/rebuild.log 2>&1',
-    schedule: '30 7 */7 * *',
-    status: CrontabStatus.disabled,
-  },
-  {
     name: '删除日志',
     command: 'rm_log >/dev/null 2>&1',
     schedule: '30 7 */7 * *',
@@ -60,6 +48,12 @@ const initData = [
   {
     name: '重置密码',
     command: 'js resetpwd',
+    schedule: '33 6 */7 * *',
+    status: CrontabStatus.disabled,
+  },
+  {
+    name: '启动挂机程序',
+    command: 'js hangup',
     schedule: '33 6 */7 * *',
     status: CrontabStatus.disabled,
   },

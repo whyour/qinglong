@@ -11,8 +11,7 @@ ListCronCurrent=$ConfigDir/crontab.list
 AuthConf=$ConfigDir/auth.json
 
 declare -A BlackListDict
-author=$1
-repo=$2
+url=$1
 path=$3
 blackword=$4
 
@@ -31,11 +30,11 @@ diyscriptsdir=/ql/diyscripts
 mkdir -p ${diyscriptsdir}
 
 if [ ! -d "$diyscriptsdir/${author}_${repo}" ]; then
-  echo -e "${author}本地仓库不存在,从gayhub拉取ing..."
-  url="https://ghproxy.com/https://github.com/${author}/${repo}"
-  if [ $author == "monk-coder" ] && [ $repo == "dust" ]; then
-    url="git@github.com:monk-coder/dust.git"
-  fi
+  echo -e "${author}本地仓库不存在,从远程拉取ing..."
+  repoTmp=${url##*/}
+  repo=${repoTmpName%.*}
+  tmp=${url%/*}
+  author=${tmp##*/}
   cd ${diyscriptsdir} && git clone $url ${author}_${repo}
   gitpullstatus=$?
   [ $gitpullstatus -eq 0 ] && echo -e "${author}本地仓库拉取完毕"

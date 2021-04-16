@@ -2,7 +2,6 @@ FROM node:lts-alpine
 LABEL maintainer="whyour"
 ARG QL_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
 ARG QL_BASE_BRANCH=master
-ARG SSH_PRIVATE_KEY
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
     SHELL=/bin/bash \
@@ -23,15 +22,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
                              nginx \
                              python3 \
                              jq \
-                             openssh \
     && rm -rf /var/cache/apk/* \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
-    && mkdir -p /root/.ssh \
-    && chmod 700 /root/.ssh \
-    && echo -e $SSH_PRIVATE_KEY > /root/.ssh/id_rsa \
-    && chmod 600 /root/.ssh/id_rsa \
-    && ssh-keyscan github.com > /root/.ssh/known_hosts \
     && touch ~/.bashrc \
     && mkdir /run/nginx \
     && git clone -b ${QL_BASE_BRANCH} ${QL_BASE_URL} ${QL_DIR} \
