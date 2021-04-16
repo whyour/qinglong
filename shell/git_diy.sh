@@ -32,7 +32,7 @@ mkdir -p ${diyscriptsdir}
 
 if [ ! -d "$diyscriptsdir/${author}_${repo}" ]; then
   echo -e "${author}本地仓库不存在,从gayhub拉取ing..."
-  local url="https://ghproxy.com/https://github.com/${author}/${repo}"
+  url="https://ghproxy.com/https://github.com/${author}/${repo}"
   if [ $author == "monk-coder" ] && [ $repo == "dust" ]; then
     url="git@github.com:monk-coder/dust.git"
   fi

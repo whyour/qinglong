@@ -49,22 +49,23 @@ echo -e "======================3. 启动控制面板========================\n"
 pm2 start ${QL_DIR}/build/app.js -n panel
 echo -e "控制面板启动成功...\n"
 
-echo -e "======================4. 更新源代码========================\n"
-git_pull
-echo
-
-echo -e "======================5. 启动挂机程序========================\n"
+echo -e "======================4. 启动挂机程序========================\n"
 CookieConf=${QL_DIR}/config/cookie.sh
 . ${QL_DIR}/config/config.sh
 . ${CookieConf}
-if [ -s ${CookieConf} ]; then
-  js hangup 2>/dev/null
-  echo -e "挂机程序启动成功...\n"
+if [[ ${ENABLE_HANGUP} == true ]]; then
+  if [ -s ${CookieConf} ]; then
+    js hangup 2>/dev/null
+    echo -e "挂机程序启动成功...\n"
+  else
+    echo -e "尚未在Cookie管理中添加一条Cookie，可能是首次部署容器，因此不启动挂机程序...\n"
+  fi
 else
-  echo -e "尚未在Cookie管理中添加一条Cookie，可能是首次部署容器，因此不启动挂机程序...\n"
+  echo -e "默认不自动启动挂机程序，跳过...\n"
 fi
 
 echo -e "\n容器启动成功...\n"
+echo -e "\n请先访问5700端口，登录面板成功之后手动执行一次git_pull命令...\n"
 
 if [ "${1#-}" != "${1}" ] || [ -z "$(command -v "${1}")" ]; then
   set -- node "$@"
