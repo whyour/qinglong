@@ -123,6 +123,12 @@ const Config = () => {
       dataIndex: 'nickname',
       key: 'nickname',
       align: 'center' as const,
+      width: '15%',
+      render: (text: string, record: any, index: number) => {
+        return (
+          <span style={{ cursor: 'text' }}>{record.nickname || '-'} </span>
+        );
+      },
     },
     {
       title: '值',
