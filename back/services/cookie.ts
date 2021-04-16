@@ -122,14 +122,15 @@ export default class CookieService {
   }
 
   public async create(payload: string[]): Promise<Cookie[]> {
-    const cookies = await this.cookies('', { postion: 1 });
+    const cookies = await this.cookies('');
     let position = initCookiePosition;
     if (cookies && cookies.length > 0) {
-      position = cookies[0].position / 2;
+      position = cookies[cookies.length - 1].position;
     }
     const tabs = payload.map((x) => {
       const cookie = new Cookie({ value: x, position });
       position = position / 2;
+      cookie.position = position;
       return cookie;
     });
     const docs = await this.insert(tabs);

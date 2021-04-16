@@ -114,7 +114,9 @@ const Config = () => {
         const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
         const val = (match && match[1]) || '未匹配用户名';
         return (
-          <span style={{ cursor: 'text' }}>{decodeURIComponent(val)}</span>
+          <span style={{ cursor: 'text' }}>
+            {decodeURIComponent(unescape(val))}
+          </span>
         );
       },
     },
@@ -226,7 +228,7 @@ const Config = () => {
 
   useEffect(() => {
     if (value && loading) {
-      asyncUpdateStatus();
+      // asyncUpdateStatus();
     }
   }, [value]);
 

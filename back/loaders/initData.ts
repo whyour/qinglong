@@ -26,7 +26,7 @@ const initData = [
     command: `sleep ${randomSchedule(
       60,
       1,
-    )} && diy whyour hundun "quanx/jx|quanx/jd" tokens >> $QL_DIR/log/diy_pull.log 2>&1`,
+    )} && diy https://ghproxy.com/https://github.com/whyour/hundun.git "quanx/jx|quanx/jd" tokens >> $QL_DIR/log/diy_pull.log 2>&1`,
     schedule: `${randomSchedule(60, 1)} ${randomSchedule(
       24,
       6,

@@ -32,7 +32,7 @@ mkdir -p ${diyscriptsdir}
 if [ ! -d "$diyscriptsdir/${author}_${repo}" ]; then
   echo -e "${author}本地仓库不存在,从远程拉取ing..."
   repoTmp=${url##*/}
-  repo=${repoTmpName%.*}
+  repo=${repoTmp%.*}
   tmp=${url%/*}
   author=${tmp##*/}
   cd ${diyscriptsdir} && git clone $url ${author}_${repo}

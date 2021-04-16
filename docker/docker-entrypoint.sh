@@ -3,6 +3,9 @@ set -e
 
 echo -e "======================1. 检测配置文件========================\n"
 [ ! -d ${QL_DIR}/config ] && mkdir -p ${QL_DIR}/config
+[ ! -d ${QL_DIR}/log ] && mkdir -p ${QL_DIR}/log
+[ ! -d ${QL_DIR}/db ] && mkdir -p ${QL_DIR}/db
+[ ! -d ${QL_DIR}/manual_log ] && mkdir -p ${QL_DIR}/manual_log
 
 if [ ! -s ${QL_DIR}/config/crontab.list ]
 then

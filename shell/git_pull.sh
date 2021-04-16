@@ -6,11 +6,8 @@ ShellDir=${QL_DIR:-$(
 )}
 [[ $QL_DIR ]] && ShellJs=js
 LogDir=$ShellDir/log
-[ ! -d $LogDir ] && mkdir -p $LogDir
 DbDir=$ShellDir/db
-[ ! -d $DbDir ] && mkdir -p $DbDir
 ManualLogDir=$ShellDir/manual_log
-[ ! -d $ManualLogDir ] && mkdir -p $ManualLogDir
 ScriptsDir=$ShellDir/scripts
 ConfigDir=$ShellDir/config
 FileConf=$ConfigDir/config.sh
@@ -177,7 +174,7 @@ Git_Pull_Scripts() {
 }
 
 Git_Pull_Scripts_Next() {
-  if [[ $ExitStatusShell -eq 0 ]]; then
+  if [[ $ExitStatusScripts -eq 0 ]]; then
     echo -e "更新scripts成功...\n"
     [ ! -d $ScriptsDir/node_modules ] && Npm_Install scripts
     [ -f $ScriptsDir/package.json ] && ScriptsDependNew=$(cat $ScriptsDir/package.json)
