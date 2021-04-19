@@ -52,12 +52,6 @@ const initData = [
     status: CrontabStatus.disabled,
   },
   {
-    name: '启动挂机程序',
-    command: 'js hangup',
-    schedule: '33 6 */7 * *',
-    status: CrontabStatus.disabled,
-  },
-  {
     name: '运行所有脚本(慎用)',
     command: 'js runall',
     schedule: '33 6 */7 * *',
