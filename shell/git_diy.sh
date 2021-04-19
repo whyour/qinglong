@@ -12,15 +12,14 @@ AuthConf=$ConfigDir/auth.json
 
 declare -A BlackListDict
 url=$1
-path=$3
-blackword=$4
+path=$2
+blackword=$3
 
 if [[ $# -lt 2 ]] || [[ $# -gt 4 ]]; then
   echo 'Desc: 用户拉取指定用户的指定仓储'
-  echo 'Usage: diy <auth> <repo> <path> <blacklist>'
+  echo 'Usage: diy <repourl> <path> <blacklist>'
 
-  echo 'auth  作者名'
-  echo 'repo  仓储名'
+  echo 'repourl  仓储地址'
   echo 'path  需要下载脚本的指定目录，多个目录 | 分割  path1 | path2'
   echo 'blacklist  需要排除的脚本名，多个名称 | 分割  blacklist1 | blacklist2'
   exit 0
