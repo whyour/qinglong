@@ -29,12 +29,16 @@ fi
 diyscriptsdir=/ql/diyscripts
 mkdir -p ${diyscriptsdir}
 
+urlTmp=${url%*/}
+repoTmp=${urlTmp##*/}
+repo=${repoTmp%.*}
+tmp=${url%/*}
+authorTmp1=${tmp##*/}
+authorTmp2=${authorTmp1##*:}
+author=${authorTmp2##*.}
+
 if [ ! -d "$diyscriptsdir/${author}_${repo}" ]; then
   echo -e "${author}本地仓库不存在,从远程拉取ing..."
-  repoTmp=${url##*/}
-  repo=${repoTmp%.*}
-  tmp=${url%/*}
-  author=${tmp##*/}
   cd ${diyscriptsdir} && git clone $url ${author}_${repo}
   gitpullstatus=$?
   [ $gitpullstatus -eq 0 ] && echo -e "${author}本地仓库拉取完毕"

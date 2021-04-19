@@ -113,11 +113,7 @@ const Config = () => {
       render: (text: string, record: any) => {
         const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
         const val = (match && match[1]) || '未匹配用户名';
-        return (
-          <span style={{ cursor: 'text' }}>
-            {decodeURIComponent(unescape(val))}
-          </span>
-        );
+        return <span style={{ cursor: 'text' }}>{decodeUrl(val)}</span>;
       },
     },
     {
@@ -226,17 +222,29 @@ const Config = () => {
       .finally(() => setLoading(false));
   };
 
+  const decodeUrl = (val: string) => {
+    try {
+      const newUrl = decodeURIComponent(val);
+      return newUrl;
+    } catch (error) {
+      return val;
+    }
+  };
+
   useEffect(() => {
     if (value && loading) {
-      // asyncUpdateStatus();
+      asyncUpdateStatus();
     }
   }, [value]);
 
   const asyncUpdateStatus = async () => {
     for (let i = 0; i < value.length; i++) {
       const cookie = value[i];
+      if (cookie.status === Status.已禁用) {
+        continue;
+      }
       await sleep(1000);
-      refreshStatus(cookie, i);
+      location.pathname === '/cookie' && refreshStatus(cookie, i);
     }
   };
 
