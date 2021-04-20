@@ -1,5 +1,25 @@
-## 青龙(WIP)
+<h1 align="center">青龙(WIP)</h1>
 
+<div align="center">
+
+[Ant Design](https://ant.design)、[Ant Design Pro](https://pro.ant.design/) 与 [Umijs3.0](https://umijs.org) 暗黑主题实践（Python和JavaScript的定时任务管理Dashboard）
+
+[![donate][donate-image]][donate-url] [![build status][build-status-image]][build-status-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker version][docker-version-image]][docker-version-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url]
+
+[donate-image]: https://img.shields.io/badge/donate-wechat-green?style=for-the-badge
+[donate-url]: https://qinglong.whyour.cn/nice.png
+[build-status-image]: https://img.shields.io/docker/cloud/build/whyour/qinglong?style=for-the-badge
+[build-status-url]: https://img.shields.io/docker/cloud/build/whyour/qinglong
+[docker-pulls-image]: https://img.shields.io/docker/pulls/whyour/qinglong?style=for-the-badge
+[docker-pulls-url]: https://hub.docker.com/r/whyour/qinglong
+[docker-version-image]: https://img.shields.io/docker/v/whyour/qinglong?style=for-the-badge
+[docker-version-url]: https://hub.docker.com/r/whyour/qinglong/tags?page=1&ordering=last_updated
+[docker-stars-image]: https://img.shields.io/docker/stars/whyour/qinglong?style=for-the-badge
+[docker-stars-url]: https://hub.docker.com/r/whyour/qinglong
+[docker-image-size-image]: https://img.shields.io/docker/image-size/whyour/qinglong?style=for-the-badge
+[docker-image-size-url]: https://hub.docker.com/r/whyour/qinglong
+
+</div>
 青龙，又名苍龙，在中国传统文化中是四象之一、[天之四灵](https://zh.wikipedia.org/wiki/%E5%A4%A9%E4%B9%8B%E5%9B%9B%E7%81%B5)之一，根据五行学说，它是代表东方的灵兽，为青色的龙，五行属木，代表的季节是春季，八卦主震。苍龙与应龙一样，都是身具羽翼。《张果星宗》称“又有辅翼，方为真龙”。
 
 《后汉书·律历志下》记载：日周于天，一寒一暑，四时备成，万物毕改，摄提迁次，青龙移辰，谓之岁。
@@ -27,8 +47,3 @@
 6. 如果任何单位或个人认为此仓储脚本可能涉嫌侵犯其权利，应及时通知并提供身份证明，所有权证明，我们将在收到认证文件确认后删除此仓储脚本。
 
 7. 所有直接或间接使用、查看此仓储脚本的人均应该仔细阅读此声明。本人保留随时更改或补充此声明的权利。一旦您使用或复制了此仓储脚本，即视为您已接受此免责声明。
-
-
-### one more thing
-
-![one-more-thing](https://qinglong.whyour.cn/nice.png)
