@@ -31,4 +31,4 @@
 
 ### one more thing
 
-![one-more-thing](https://image.whyour.cn/others/nice.png)
+![one-more-thing](https://qinglong.whyour.cn/others/nice.png)
