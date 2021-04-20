@@ -69,5 +69,5 @@ export default {
   fixSiderbar: true,
   contentWidth: 'Fixed',
   splitMenus: false,
-  logo: 'https://qinglong.whyour.cn/others/qinglong.png',
+  logo: 'https://qinglong.whyour.cn/qinglong.png',
 } as any;

@@ -50,7 +50,7 @@ const Login = () => {
             <img
               alt="logo"
               className={styles.logo}
-              src="https://qinglong.whyour.cn/others/qinglong.png"
+              src="https://qinglong.whyour.cn/qinglong.png"
             />
             <span className={styles.title}>{config.siteName}</span>
           </div>
