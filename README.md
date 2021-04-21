@@ -8,7 +8,7 @@
 
 <div align="center">
 
-[Ant Design](https://ant.design)、[Ant Design Pro](https://pro.ant.design/) 与 [Umijs3.0](https://umijs.org) 暗黑主题实践（Python和JavaScript的定时任务管理Dashboard）
+python和javaScript的定时任务管理面板
 
 [![donate][donate-image]][donate-url] [![build status][build-status-image]][build-status-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker version][docker-version-image]][docker-version-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url]
 
@@ -35,9 +35,15 @@
 
 ## 多谢
 
-[https://github.com/nevinee/jd_shell](https://github.com/nevinee/jd_shell)
+* [https://github.com/nevinee/jd_shell](https://github.com/nevinee/jd_shell)
 
-[https://github.com/alseambusher/crontab-ui](https://github.com/alseambusher/crontab-ui)
+* [https://github.com/alseambusher/crontab-ui](https://github.com/alseambusher/crontab-ui)
+
+* [Ant Design](https://ant.design)、[Ant Design Pro](https://pro.ant.design/)
+
+* [Umijs3.0](https://umijs.org)
+
+* [darkreader](https://github.com/darkreader/darkreader)
 
 ## 免责声明
 
