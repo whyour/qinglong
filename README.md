@@ -39,7 +39,9 @@ python和javaScript的定时任务管理面板
 
 * [https://github.com/alseambusher/crontab-ui](https://github.com/alseambusher/crontab-ui)
 
-* [Ant Design](https://ant.design)、[Ant Design Pro](https://pro.ant.design/)
+* [Ant Design](https://ant.design)
+
+* [Ant Design Pro](https://pro.ant.design/)
 
 * [Umijs3.0](https://umijs.org)
 
