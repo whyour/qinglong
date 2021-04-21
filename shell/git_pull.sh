@@ -215,7 +215,7 @@ Del_Cron() {
     echo
     JsDrop=$(cat $ListJsDrop)
     for Cron in $JsDrop; do
-      local id=$(cat $ListCronCurrent | grep -E "js $Cron" | perl -pe "s|.*ID=(.*) js $Cron|\1|")
+      local id=$(cat $ListCronCurrent | grep -E "js $Cron$" | perl -pe "s|.*ID=(.*) js $Cron$|\1|")
       del_cron_api "$id"
     done
     crontab $ListCronCurrent
