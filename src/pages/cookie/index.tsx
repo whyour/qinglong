@@ -113,8 +113,18 @@ const Config = () => {
       render: (text: string, record: any) => {
         const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
         const val = (match && match[1]) || '未匹配用户名';
+        return <span style={{ cursor: 'text' }}>{decodeUrl(val)}</span>;
+      },
+    },
+    {
+      title: '昵称',
+      dataIndex: 'nickname',
+      key: 'nickname',
+      align: 'center' as const,
+      width: '15%',
+      render: (text: string, record: any, index: number) => {
         return (
-          <span style={{ cursor: 'text' }}>{decodeURIComponent(val)}</span>
+          <span style={{ cursor: 'text' }}>{record.nickname || '-'} </span>
         );
       },
     },
@@ -210,6 +220,36 @@ const Config = () => {
         setValue(data.data);
       })
       .finally(() => setLoading(false));
+  };
+
+  const decodeUrl = (val: string) => {
+    try {
+      const newUrl = decodeURIComponent(val);
+      return newUrl;
+    } catch (error) {
+      return val;
+    }
+  };
+
+  useEffect(() => {
+    if (value && loading) {
+      asyncUpdateStatus();
+    }
+  }, [value]);
+
+  const asyncUpdateStatus = async () => {
+    for (let i = 0; i < value.length; i++) {
+      const cookie = value[i];
+      if (cookie.status === Status.已禁用) {
+        continue;
+      }
+      await sleep(1000);
+      location.pathname === '/cookie' && refreshStatus(cookie, i);
+    }
+  };
+
+  const sleep = (time: number) => {
+    return new Promise((resolve) => setTimeout(resolve, time));
   };
 
   const refreshStatus = (record: any, index: number) => {
@@ -322,24 +362,28 @@ const Config = () => {
     });
   };
 
-  const handleCancel = (cookie: any) => {
+  const handleCancel = (cookies: any[]) => {
     setIsModalVisible(false);
-    if (cookie) {
-      handleCookies(cookie);
+    if (cookies && cookies.length > 0) {
+      handleCookies(cookies);
     }
   };
 
-  const handleCookies = (cookie: any) => {
-    const index = value.findIndex((x) => x._id === cookie._id);
-    const result = [...value];
-    if (index === -1) {
-      result.push(...cookie);
-    } else {
-      result.splice(index, 1, {
-        ...cookie,
-      });
+  const handleCookies = (cookies: any[]) => {
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i];
+      const index = value.findIndex((x) => x._id === cookie._id);
+      const result = [...value];
+      if (index === -1) {
+        result.push(cookie);
+      } else {
+        result.splice(index, 1, {
+          ...cookie,
+        });
+      }
+      setValue(result);
+      refreshStatus(cookie, index);
     }
-    setValue(result);
   };
 
   const components = {
@@ -388,7 +432,7 @@ const Config = () => {
 
   return (
     <PageContainer
-      className="code-mirror-wrapper"
+      className="cookie-wrapper"
       title="Cookie管理"
       loading={loading}
       extra={[

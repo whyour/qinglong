@@ -3,9 +3,6 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 
 export function render(oldRender: any) {
-  if (history.location.pathname === '/login') {
-    oldRender();
-  }
   request
     .get(`${config.apiPrefix}user`)
     .then((data) => {

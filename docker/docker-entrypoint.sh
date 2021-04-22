@@ -7,6 +7,9 @@ echo
 
 echo -e "======================2. 检测配置文件========================\n"
 [ ! -d ${QL_DIR}/config ] && mkdir -p ${QL_DIR}/config
+[ ! -d ${QL_DIR}/log ] && mkdir -p ${QL_DIR}/log
+[ ! -d ${QL_DIR}/db ] && mkdir -p ${QL_DIR}/db
+[ ! -d ${QL_DIR}/manual_log ] && mkdir -p ${QL_DIR}/manual_log
 
 if [ ! -s ${QL_DIR}/config/crontab.list ]
 then
@@ -52,6 +55,9 @@ pm2 start ${QL_DIR}/build/app.js -n panel
 echo -e "控制面板启动成功...\n"
 
 echo -e "\n容器启动成功...\n"
+echo -e "\n请先访问5700端口，登录面板成功之后先手动执行一次git_pull命令...\n"
+echo -e "\n如果需要启动挂机程序手动执行docker exec -it qinglong js hangup...\n"
+echo -e "\n或者去cron管理搜索hangup手动执行挂机任务...\n"
 
 crond -f
 

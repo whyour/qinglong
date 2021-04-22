@@ -8,7 +8,6 @@ import {
   RadiusSettingOutlined,
   ControlOutlined,
 } from '@ant-design/icons';
-import logo from '@/assets/logo.png';
 
 export default {
   route: {
@@ -70,5 +69,5 @@ export default {
   fixSiderbar: true,
   contentWidth: 'Fixed',
   splitMenus: false,
-  logo: logo,
+  logo: 'https://qinglong.whyour.cn/qinglong.png',
 } as any;

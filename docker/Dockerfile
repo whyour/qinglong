@@ -15,9 +15,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
                              coreutils \
                              moreutils \
                              git \
-                             wget \
                              curl \
-                             nano \
                              tzdata \
                              perl \
                              openssl \

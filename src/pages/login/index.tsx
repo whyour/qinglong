@@ -4,7 +4,6 @@ import config from '@/utils/config';
 import { history, Link } from 'umi';
 import styles from './index.less';
 import { request } from '@/utils/http';
-import logo from '@/assets/logo.png';
 
 const FormItem = Form.Item;
 
@@ -48,7 +47,11 @@ const Login = () => {
       <div className={styles.content}>
         <div className={styles.top}>
           <div className={styles.header}>
-            <img alt="logo" className={styles.logo} src={logo} />
+            <img
+              alt="logo"
+              className={styles.logo}
+              src="https://qinglong.whyour.cn/qinglong.png"
+            />
             <span className={styles.title}>{config.siteName}</span>
           </div>
         </div>

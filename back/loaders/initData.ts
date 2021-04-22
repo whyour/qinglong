@@ -16,23 +16,17 @@ const initData = [
     status: CrontabStatus.idle,
   },
   {
-    name: '自定义仓库',
-    command: `sleep ${randomSchedule(
-      60,
-      1,
-    )} && diy whyour hundun "quanx/jx|quanx/jd" tokens >> $QL_DIR/log/diy_pull.log 2>&1`,
-    schedule: `${randomSchedule(60, 1)} ${randomSchedule(
-      24,
-      6,
-    ).toString()} * * *`,
-    status: CrontabStatus.idle,
+    name: 'build面板',
+    command: 'rebuild >> ${QL_DIR}/log/rebuild.log 2>&1',
+    schedule: '30 7 */7 * *',
+    status: CrontabStatus.disabled,
   },
   {
     name: '自定义仓库',
     command: `sleep ${randomSchedule(
       60,
       1,
-    )} && diy monk-coder dust "i-chenzhe|normal" >> $QL_DIR/log/diy_pull.log 2>&1`,
+    )} && diy https://ghproxy.com/https://github.com/whyour/hundun.git "quanx/jx|quanx/jd" tokens >> $QL_DIR/log/diy_pull.log 2>&1`,
     schedule: `${randomSchedule(60, 1)} ${randomSchedule(
       24,
       6,
@@ -44,12 +38,6 @@ const initData = [
     command: 'export_sharecodes',
     schedule: '48 5 * * *',
     status: CrontabStatus.idle,
-  },
-  {
-    name: 'build面板',
-    command: 'rebuild >> ${QL_DIR}/log/rebuild.log 2>&1',
-    schedule: '30 7 */7 * *',
-    status: CrontabStatus.disabled,
   },
   {
     name: '删除日志',
