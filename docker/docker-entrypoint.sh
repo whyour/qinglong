@@ -1,11 +1,16 @@
 #!/bin/bash
 set -e
 
-echo -e "======================1. 更新源代码========================\n"
-update ql
+echo -e "======================1. 初始化命令========================\n"
+. ${QL_DIR}/shell/share.sh
+link_shell
 echo
 
-echo -e "======================2. 检测配置文件========================\n"
+echo -e "======================2. 更新源代码========================\n"
+ql update
+echo
+
+echo -e "======================3. 检测配置文件========================\n"
 [ ! -d ${QL_DIR}/config ] && mkdir -p ${QL_DIR}/config
 [ ! -d ${QL_DIR}/log ] && mkdir -p ${QL_DIR}/log
 [ ! -d ${QL_DIR}/db ] && mkdir -p ${QL_DIR}/db
@@ -37,11 +42,11 @@ fi
 
 cp -fv ${QL_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
 
-echo -e "======================3. 启动nginx========================\n"
+echo -e "======================4. 启动nginx========================\n"
 nginx -c /etc/nginx/nginx.conf
 echo
 
-echo -e "======================4. 启动控制面板========================\n"
+echo -e "======================5. 启动控制面板========================\n"
 pm2 start ${QL_DIR}/build/app.js -n panel
 echo -e "控制面板启动成功...\n"
 

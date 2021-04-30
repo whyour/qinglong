@@ -35,15 +35,11 @@ var_name=(
 ## 软连接及其原始文件对应关系
 link_name=(
     task
-    rmlog
-    update
-    rebuild
+    ql
 )
 original_name=(
     task.sh
-    rmlog.sh
     update.sh
-    rebuild.sh
 )
 
 ## 导入配置文件不校验

@@ -12,6 +12,8 @@ import_config_no_check rmlog
 detect_termux
 detect_macos
 
+days=$1
+
 ## 删除运行js脚本的旧日志
 remove_js_log () {
     local log_full_path_list=$(ls -l $dir_log/*/*.log | awk '{print $9}')
@@ -23,7 +25,7 @@ remove_js_log () {
         else
             diff_time=$(($(date +%s) - $(date +%s -d "$log_date")))
         fi
-        [[ $diff_time -gt $((${RmLogDaysAgo} * 86400)) ]] && rm -vf $log
+        [[ $diff_time -gt $((${days} * 86400)) ]] && rm -vf $log
     done
 }
 
@@ -38,7 +40,7 @@ remove_empty_dir () {
 }
 
 ## 运行
-if [[ ${RmLogDaysAgo} ]]; then
+if [[ ${days} ]]; then
     echo -e "查找旧日志文件中...\n"
     remove_js_log
     remove_empty_dir

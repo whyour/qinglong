@@ -10,15 +10,12 @@ dir_root=$(
 send_mark=$dir_shell/send_mark
 
 # 导入通用变量与函数
-# . $dir_shell/share.sh
-# . $dir_shell/api.sh
-. ./shell/share.sh
-. ./shell/api.sh
+. $dir_shell/share.sh
+. $dir_shell/api.sh
 
 ## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件
 detect_termux
 detect_macos
-link_shell
 define_cmd
 fix_config
 import_config_no_check "update"
@@ -408,6 +405,9 @@ main() {
         ;;
     raw)
         update_raw | tee $log_path
+        ;;
+    rmlog)
+        source $dir_shell/rmlog.sh "$p2" | tee $log_path
         ;;
     *)
         echo -e "命令输入错误...\n"

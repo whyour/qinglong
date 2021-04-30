@@ -30,12 +30,6 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && cd ${QL_DIR} \
     && cp -f .env.example .env \
-    && ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
-    && ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/update \
-    && ln -sf ${QL_DIR}/shell/rmlog.sh /usr/local/bin/rmlog \
-    && ln -sf ${QL_DIR}/shell/notify.sh /usr/local/bin/notify \
-    && ln -sf ${QL_DIR}/shell/rebuild.sh /usr/local/bin/rebuild \
-    && ln -sf ${QL_DIR}/docker/docker-entrypoint.sh /usr/local/bin/entrypoint \
     && chmod 777 ${QL_DIR}/shell/*.sh \
     && chmod 777 ${QL_DIR}/docker/*.sh \
     && npm install -g pm2 \
