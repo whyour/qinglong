@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 
 ## 文件路径、脚本网址
-# dir_shell=$(dirname $(readlink -f "$0"))
-# dir_root=$(
-#     cd $dir_shell
-#     cd ..
-#     pwd
-# )
-dir_shell=$(pwd)
+dir_shell=$(dirname $(readlink -f "$0"))
 dir_root=$(
     cd $dir_shell
+    cd ..
     pwd
 )
 send_mark=$dir_shell/send_mark
@@ -209,22 +204,23 @@ del_cron() {
 ## $1：新任务清单文件路径
 add_cron() {
     local list_add=$1
+    local author=$2
     echo -e "开始尝试自动添加定时任务...\n"
     local detail=$(cat $list_add)
     cd $dir_scripts
-    for file_relative_path in $detail; do
-        local file_name=$(echo $file_relative_path | awk -F "/" '{print $NF}')
-        if [ -f $file_relative_path ]; then
+    for file in $detail; do
+        local file_name=${file/${author}\_/}
+        if [ -f $file ]; then
             cron_line=$(
                 perl -ne "{
                         print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
-                    }" $file_relative_path |
+                    }" $file |
                     perl -pe "{
-                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1:$cmd_task $file_relative_path|g;
+                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1:$cmd_task $file|g;
                         s|  | |g
                     }" | sort -u | head -1
             )
-            cron_name=$(grep "new Env" $file_relative_path | awk -F "'|\"" '{print $2}' | head -1)
+            cron_name=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
             [[ -z $cron_name ]] && cron_name="$file_name"
             add_cron_api "$cron_line:$cron_name"
         fi
@@ -360,7 +356,7 @@ diff_scripts() {
     if [ -s $list_own_add ]; then
         output_list_add_drop $list_own_add "新"
         if [[ ${AutoAddCron} == true ]]; then
-            add_cron $list_own_add
+            add_cron $list_own_add $2
         fi
     fi
 }
@@ -372,8 +368,8 @@ gen_list_repo() {
     local author="$2"
     local path="$3"
     local blackword="$4"
-    # rm -f $dir_list_tmp/own*.list >/dev/null 2>&1
-    
+    rm -f $dir_list_tmp/own*.list >/dev/null 2>&1
+
     cd ${repo_path}
     files=$(find . -name "*.js")
     if [ $path ]; then
@@ -383,17 +379,9 @@ gen_list_repo() {
         files=$(find . -name "*.js" | egrep -v $blackword | egrep $path)
     fi
     for file in ${files}; do
-        if [ -f $file ]; then
-            # base=$(basename $file)
-            # echo  $base | head -1 >>$list_own_scripts
-            perl -ne "{
-                print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*\/?$file/
-            }" $file | \
-            perl -pe "{
-                s|.*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file.*|${repo_path}/$file|g;
-                s|$dir_scripts/||
-            }" | head -1 >> $list_own_scripts
-        fi
+        filename=$(basename $file)
+        cp -f $file $dir_scripts/${author}_${filename}
+        echo ${author}_${filename} >>$list_own_scripts
     done
     grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | sort -u >$list_own_user
     cd $dir_current
