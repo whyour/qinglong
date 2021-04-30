@@ -11,15 +11,6 @@ echo -e "======================2. 检测配置文件========================\n"
 [ ! -d ${QL_DIR}/db ] && mkdir -p ${QL_DIR}/db
 [ ! -d ${QL_DIR}/manual_log ] && mkdir -p ${QL_DIR}/manual_log
 
-if [ ! -s ${QL_DIR}/config/crontab.list ]
-then
-    echo -e "检测到config配置目录下不存在crontab.list或存在但文件为空，从示例文件复制一份用于初始化...\n"
-    cp -fv ${QL_DIR}/sample/crontab.sample.list ${QL_DIR}/config/crontab.list
-    perl -i -pe "{s|CMD_UPDATE|update|g; s|CMD_REBUILD|rebuild|g; s|CMD_RMLOG|rmlog|g; s|CMD_TASK|task|g; s|CMD_MYTASK|mytask|g}" ${QL_DIR}/config/crontab.list
-fi
-crontab ${QL_DIR}/config/crontab.list
-echo -e "成功添加定时任务...\n"
-
 if [ ! -s ${QL_DIR}/config/cookie.sh ]; then
     echo -e "检测到config配置目录下不存在cookie.sh，从示例文件复制一份用于初始化...\n"
     touch ${QL_DIR}/config/cookie.sh

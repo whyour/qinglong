@@ -2,17 +2,10 @@
 
 ## 路径
 dir_shell=$(dirname $(readlink -f "$0"))
-dir_root=$(cd $dir_shell; cd ..; pwd)
+dir_root=$(cd $dir_shell; pwd)
 
 ## 导入通用变量与函数
 . $dir_shell/share.sh
-
-## 更新crontab
-update_crontab () {
-    if [[ $(cat $list_crontab_user) != $(crontab -l) ]]; then
-        crontab $list_crontab_user
-    fi
-}
 
 ## 组合Cookie和互助码子程序，$1：要组合的内容
 combine_sub () {
@@ -68,20 +61,16 @@ random_delay () {
 ## scripts目录下所有可运行脚本数组
 gen_array_scripts () {
     import_config_no_check
-    count_own_repo_sum
-    gen_own_dir_and_path
     local dir_current=$(pwd)
     local i="-1"
-    for ((scripts_path_num=0; scripts_path_num<${#array_own_scripts_path[*]}; scripts_path_num++)); do
-        cd ${array_own_scripts_path[$scripts_path_num]}
-        for file in $(ls); do
-            if [ -f $file ] && [[ $(grep "new Env" $file) ]] && [[ $file == *.js && $file != sendNotify.js && $file != JD_extra_cookie.js ]]; then
-                let i++
-                array_scripts[i]=$(echo "${array_own_scripts_path[$scripts_path_num]}/$file" | perl -pe "s|$dir_scripts/||g")
-                array_scripts_name[i]=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
-                [[ -z ${array_scripts_name[i]} ]] && array_scripts_name[i]="<未识别出活动名称>"
-            fi
-        done
+    cd $dir_scripts
+    for file in $(ls); do
+        if [ -f $file ] && [[ $file == *.js && $file != sendNotify.js && $file != JD_extra_cookie.js ]]; then
+            let i++
+            array_scripts[i]=$(echo "$file" | perl -pe "s|$dir_scripts/||g")
+            array_scripts_name[i]=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
+            [[ -z ${array_scripts_name[i]} ]] && array_scripts_name[i]="<未识别出活动名称>"
+        fi
     done
     cd $dir_current
 }
@@ -113,7 +102,6 @@ run_normal () {
     cd $dir_scripts
     if [ -f $p1 ]; then
         import_config_and_check "$p1"
-        update_crontab
         define_program "$p1"
         combine_all
         [[ $# -eq 1 ]] && random_delay
@@ -122,7 +110,6 @@ run_normal () {
         make_dir "$dir_log/$p1"
         $which_program $p1 2>&1 | tee $log_path
     else
-        update_crontab
         echo -e "\n $p1 脚本不存在，请确认...\n"
         usage
     fi
@@ -135,7 +122,6 @@ run_concurrent () {
     cd $dir_scripts
     if [ -f $p1 ]; then
         import_config_and_check "$p1"
-        update_crontab
         define_program
         make_dir $dir_log/$p1
         log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
@@ -149,7 +135,6 @@ run_concurrent () {
             $which_program $p1 &>$log_path &
         done
     else
-        update_crontab
         echo -e "\n $p1 脚本不存在，请确认...\n"
         usage
     fi

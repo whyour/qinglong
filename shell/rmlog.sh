@@ -2,7 +2,7 @@
 
 ## 判断环境
 dir_shell=$(dirname $(readlink -f "$0"))
-dir_root=$(cd $dir_shell; cd ..; pwd)
+dir_root=$(cd $dir_shell; pwd)
 
 ## 导入通用变量与函数
 . $dir_shell/share.sh

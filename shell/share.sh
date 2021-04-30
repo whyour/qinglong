@@ -2,6 +2,7 @@
 dir_sample=$dir_root/sample
 dir_config=$dir_root/config
 dir_scripts=$dir_root/scripts
+dir_repo=$dir_root/repo
 dir_raw=$dir_scripts/raw
 dir_log=$dir_root/log
 dir_list_tmp=$dir_log/.tmp
@@ -34,13 +35,11 @@ var_name=(
 ## 软连接及其原始文件对应关系
 link_name=(
     task
-    mytask
     rmlog
     update
     rebuild
 )
 original_name=(
-    task.sh
     task.sh
     rmlog.sh
     update.sh
@@ -66,15 +65,6 @@ import_config_and_check () {
             [[ $user_sum -gt $((3 * 5)) ]] && break
             eval Cookie${user_sum}="\"$line\""
         done
-    fi
-}
-
-## 发送通知，依赖于import_config_and_check或import_config_no_check，$1：标题，$2：内容
-notify () {
-    local title=$(echo $1 | perl -pe 's|-|_|g')
-    local msg="$(echo -e $2)"
-    if [ -d $dir_scripts_node_modules ]; then
-        node $dir_shell/notify.js "$title" "$msg"
     fi
 }
 
@@ -154,52 +144,6 @@ define_cmd () {
     done
 }
 
-## 统计 own 仓库数量
-count_own_repo_sum () {
-    own_repo_sum=0
-    for ((i=1; i<=1000; i++)); do
-        local tmp1=RepoUrl$i
-        local tmp2=${!tmp1}
-        [[ $tmp2 ]] && own_repo_sum=$i || break
-    done
-}
-
-## 形成 own 仓库的文件夹名清单，依赖于import_config_and_check或import_config_no_check
-## array_own_repo_path：repo存放的绝对路径组成的数组；array_own_scripts_path：所有要使用的脚本所在的绝对路径组成的数组
-gen_own_dir_and_path () {
-    local scripts_path_num="-1"
-    local repo_num tmp1 tmp2 tmp3 tmp4 tmp5 dir
-    
-    if [[ $own_repo_sum -ge 1 ]]; then
-        for ((i=1; i<=$own_repo_sum; i++)); do
-            repo_num=$((i - 1))
-            tmp1=RepoUrl$i
-            array_own_repo_url[$repo_num]=${!tmp1}
-            tmp2=RepoBranch$i
-            array_own_repo_branch[$repo_num]=${!tmp2}
-            array_own_repo_dir[$repo_num]=$(echo ${array_own_repo_url[$repo_num]} | perl -pe "s|\.git||" | awk -F "/|:" '{print $((NF - 1)) "_" $NF}')
-            array_own_repo_path[$repo_num]=$dir_scripts/${array_own_repo_dir[$repo_num]}
-            tmp3=RepoPath$i
-            if [[ ${!tmp3} ]]; then
-                for dir in ${!tmp3}; do
-                    let scripts_path_num++
-                    tmp4="${array_own_repo_dir[repo_num]}/$dir"
-                    tmp5=$(echo $tmp4 | perl -pe "{s|//|/|g; s|/$||}")  # 去掉多余的/
-                    array_own_scripts_path[$scripts_path_num]="$dir_scripts/$tmp5"
-                done
-            else
-                let scripts_path_num++
-                array_own_scripts_path[$scripts_path_num]="${array_own_repo_path[$repo_num]}"
-            fi
-        done
-    fi
-
-    if [[ ${#RawUrl[*]} -ge 1 ]]; then
-        let scripts_path_num++
-        array_own_scripts_path[$scripts_path_num]=$dir_raw  # 只有own脚本所在绝对路径附加了raw文件夹，其他数组均不附加
-    fi
-}
-
 ## 修复配置文件
 fix_config () {
     make_dir $dir_config
@@ -208,16 +152,9 @@ fix_config () {
         cp -fv $file_config_sample $file_config_user
         echo
     fi
-    if [ ! -s $list_crontab_user ]; then
-        echo -e "复制一份 $list_crontab_sample 为 $list_crontab_user，这是你自己的 crontab.list\n"
-        cp -fv $list_crontab_sample $list_crontab_user
-        echo
-    fi
     perl -i -pe "{
         s|CMD_UPDATE|$cmd_update|g;
-        s|CMD_REBUILD|$cmd_rebuild|g;
         s|CMD_RMLOG|$cmd_rmlog|g;
-        s|CMD_TASK|$cmd_task|g;
-        s|CMD_MYTASK|$cmd_mytask|g
+        s|CMD_TASK|$cmd_task|g
     }" $list_crontab_user
 }

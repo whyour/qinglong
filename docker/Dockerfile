@@ -31,7 +31,6 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && cd ${QL_DIR} \
     && cp -f .env.example .env \
     && ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
-    && ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/mytask \
     && ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/update \
     && ln -sf ${QL_DIR}/shell/rmlog.sh /usr/local/bin/rmlog \
     && ln -sf ${QL_DIR}/shell/notify.sh /usr/local/bin/notify \
