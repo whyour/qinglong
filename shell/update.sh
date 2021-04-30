@@ -388,7 +388,8 @@ gen_list_repo() {
             # echo  $base | head -1 >>$list_own_scripts
             perl -ne "{
                 print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*\/?$file/
-            }" $file | perl -pe "{
+            }" $file | \
+            perl -pe "{
                 s|.*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file.*|${repo_path}/$file|g;
                 s|$dir_scripts/||
             }" | head -1 >> $list_own_scripts
