@@ -68,6 +68,7 @@ import_config_and_check () {
 make_dir () {
     local dir=$1
     [ ! -d $dir ] && mkdir -p $dir
+    echo
 }
 
 ## 检测termux
@@ -154,7 +155,7 @@ fix_config () {
         echo
     fi
 
-    if [ ! -s $file_cookie ]; then
+    if [ ! -f $file_cookie ]; then
         echo -e "检测到config配置目录下不存在cookie.sh，创建一个空文件用于初始化...\n"
         touch $file_cookie
         echo
@@ -244,8 +245,6 @@ update_depend() {
         cd $dir_scripts
         pip3 install -r $dir_scripts/requirements.txt
     fi
-
-    [ ! -d $dir_scripts/node_modules ] && npm_install_2 $dir_scripts
 
     cd $dir_current
 }
