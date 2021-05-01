@@ -13,14 +13,14 @@ echo
 
 echo -e "======================3. 检测配置文件========================\n"
 fix_config
-cp -fv ${QL_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
+cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
 
 echo -e "======================4. 启动nginx========================\n"
 nginx -c /etc/nginx/nginx.conf
 echo
 
 echo -e "======================5. 启动控制面板========================\n"
-pm2 start ${QL_DIR}/build/app.js -n panel
+pm2 start $dir_root/build/app.js -n panel
 echo -e "控制面板启动成功...\n"
 
 echo -e "\n容器启动成功...\n"

@@ -239,8 +239,6 @@ update_depend() {
         npm_install_2 $dir_scripts
     fi
 
-    [ ! -d $dir_scripts/node_modules ] && npm_install_2 $dir_scripts
-
     if [ ! -s $dir_scripts/requirements.txt ] || [[ $(diff $dir_sample/requirements.txt $dir_scripts/requirements.txt) ]]; then
         cp -f $dir_sample/requirements.txt $dir_scripts/requirements.txt
         cd $dir_scripts
