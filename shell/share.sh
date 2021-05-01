@@ -1,13 +1,16 @@
 ## 目录
+dir_root=/ql
+dir_shell=$dir_root/shell
 dir_sample=$dir_root/sample
 dir_config=$dir_root/config
 dir_scripts=$dir_root/scripts
 dir_repo=$dir_root/repo
-dir_raw=$dir_scripts/raw
+dir_raw=$dir_root/raw
 dir_log=$dir_root/log
 dir_db=$dir_root/db
 dir_manual_log=$dir_root/manual_log
 dir_list_tmp=$dir_log/.tmp
+dir_code=$dir_log/code
 
 ## 文件
 file_config_sample=$dir_sample/config.sample.sh
@@ -17,6 +20,10 @@ file_config_user=$dir_config/config.sh
 file_auth_sample=$dir_sample/auth.sample.json
 file_auth_user=$dir_config/auth.json
 file_extra_shell=$dir_config/extra.sh
+file_notify_js_sample=$dir_sample/notify.js
+file_notify_py_sample=$dir_sample/notify.py
+file_notify_py=$dir_scripts/notify.py
+file_notify_js=$dir_scripts/sendNotify.js
 
 ## 清单文件
 list_crontab_user=$dir_config/crontab.list
@@ -25,14 +32,6 @@ list_own_scripts=$dir_list_tmp/own_scripts.list
 list_own_user=$dir_list_tmp/own_user.list
 list_own_add=$dir_list_tmp/own_add.list
 list_own_drop=$dir_list_tmp/own_drop.list
-
-## 需组合的环境变量列表，env_name需要和var_name一一对应，需要从api取信息
-env_name=(
-    JD_COOKIE
-)
-var_name=(
-    Cookie
-)
 
 ## 软连接及其原始文件对应关系
 link_name=(
@@ -50,9 +49,9 @@ import_config_no_check () {
     [ -f $file_config_user ] && . $file_config_user
 }
 
-## 导入配置文件并校验，$1：任务名称
+## 导入配置文件并校验
 import_config_and_check () {
-    import_config_no_check $1
+    import_config_no_check
     if [[ ! -s $file_cookie ]]; then
         echo -e "请先配置好Cookie...\n"
         exit 1
@@ -60,7 +59,6 @@ import_config_and_check () {
         user_sum=0
         for line in $(cat $file_cookie); do
             let user_sum++
-            [[ $user_sum -gt $((3 * 5)) ]] && break
             eval Cookie${user_sum}="\"$line\""
         done
     fi
@@ -148,6 +146,7 @@ fix_config () {
     make_dir $dir_log
     make_dir $dir_db
     make_dir $dir_manual_log
+    make_dir $dir_scripts
     
     if [ ! -s $file_config_user ]; then
         echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
@@ -167,9 +166,95 @@ fix_config () {
         echo
     fi
 
+    if [ ! -s $file_notify_py ]; then
+        echo -e "复制一份 $file_notify_py_sample 为 $file_notify_py\n"
+        cp -fv $file_notify_py_sample $file_notify_py
+        echo
+    fi
+
+    if [ ! -s $file_notify_js ]; then
+        echo -e "复制一份 $file_notify_js_sample 为 $file_notify_js\n"
+        cp -fv $file_notify_js_sample $file_notify_js
+        echo
+    fi
+
     if [ -s /etc/nginx/conf.d/default.conf ]; then
         echo -e "检测到默认nginx配置文件，删除...\n"
         rm -f /etc/nginx/conf.d/default.conf
         echo
     fi
 }
+
+## npm install 子程序，判断是否为安卓，判断是否安装有yarn
+npm_install_sub() {
+    if [ $is_termux -eq 1 ]; then
+        npm install --production --no-save --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links --no-save
+    elif ! type yarn >/dev/null 2>&1; then
+        npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
+    else
+        echo -e "检测到本机安装了 yarn，使用 yarn 替代 npm...\n"
+        yarn install --production --network-timeout 1000000000 --registry=https://registry.npm.taobao.org || yarn install --production --network-timeout 1000000000
+    fi
+}
+
+## npm install，$1：package.json文件所在路径
+npm_install_1() {
+    local dir_current=$(pwd)
+    local dir_work=$1
+
+    cd $dir_work
+    echo -e "运行 npm install...\n"
+    npm_install_sub
+    [[ $? -ne 0 ]] && echo -e "\nnpm install 运行不成功，请进入 $dir_work 目录后手动运行 npm install...\n"
+    cd $dir_current
+}
+
+npm_install_2() {
+    local dir_current=$(pwd)
+    local dir_work=$1
+
+    cd $dir_work
+    echo -e "检测到 $dir_work 的依赖包有变化，运行 npm install...\n"
+    npm_install_sub
+    [[ $? -ne 0 ]] && echo -e "\n安装 $dir_work 的依赖包运行不成功，再次尝试一遍...\n"
+    npm_install_1 $dir_work
+    cd $dir_current
+}
+
+## 比对两个文件，$1比$2新时，将$1复制为$2
+diff_and_copy() {
+    local copy_source=$1
+    local copy_to=$2
+    if [ ! -s $copy_to ] || [[ $(diff $copy_source $copy_to) ]]; then
+        cp -f $copy_source $copy_to
+    fi
+}
+
+## 更新依赖
+update_depend() {
+    local dir_current=$(pwd)
+
+    if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+        cp -f $dir_sample/package.json $dir_scripts/package.json
+        npm_install_2 $dir_scripts
+    fi
+
+    [ ! -d $dir_scripts/node_modules ] && npm_install_2 $dir_scripts
+
+    if [ ! -s $dir_scripts/requirements.txt ] || [[ $(diff $dir_sample/requirements.txt $dir_scripts/requirements.txt) ]]; then
+        cp -f $dir_sample/requirements.txt $dir_scripts/requirements.txt
+        cd $dir_scripts
+        pip3 install -r $dir_scripts/requirements.txt
+    fi
+
+    [ ! -d $dir_scripts/node_modules ] && npm_install_2 $dir_scripts
+
+    cd $dir_current
+}
+
+## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件
+detect_termux
+detect_macos
+define_cmd
+fix_config
+import_config_no_check

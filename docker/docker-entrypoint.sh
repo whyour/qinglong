@@ -2,18 +2,7 @@
 set -e
 
 echo -e "======================1. 初始化命令========================\n"
-dir_shell=/ql/shell/
-dir_root=$(
-    cd $dir_shell
-    cd ..
-    pwd
-)
-
 . $dir_shell/share.sh
-
-detect_termux
-detect_macos
-define_cmd
 link_shell
 echo
 

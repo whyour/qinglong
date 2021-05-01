@@ -1,35 +1,95 @@
 ## Version: v2.0.0
 ## Date: 2021-04-07
-## Update Content: 新一版qinglong。
+## Update Content: 新一版青龙。
 
 ## 上面版本号中，如果第2位数字有变化，那么代表增加了新的参数，如果只有第3位数字有变化，仅代表更新了注释，没有增加新的参数，可更新可不更新
 
+## 需组合的环境变量列表，env_name需要和var_name一一对应
+env_name=(
+  JD_COOKIE
+  FRUITSHARECODES
+  PETSHARECODES
+  PLANT_BEAN_SHARECODES
+  DREAM_FACTORY_SHARE_CODES
+  DDFACTORY_SHARECODES
+  JDZZ_SHARECODES
+  JDJOY_SHARECODES
+  JXNC_SHARECODES
+  BOOKSHOP_SHARECODES
+  JD_CASH_SHARECODES
+  JDSGMH_SHARECODES
+  JDCFD_SHARECODES
+  JDHEALTH_SHARECODES
+)
+var_name=(
+  Cookie
+  ForOtherFruit
+  ForOtherPet
+  ForOtherBean
+  ForOtherDreamFactory
+  ForOtherJdFactory
+  ForOtherJdzz
+  ForOtherJoy
+  ForOtherJxnc
+  ForOtherBookShop
+  ForOtherCash
+  ForOtherSgmh
+  ForOtherCfd
+  ForOtherHealth
+)
 
-## 临时屏蔽某个Cookie
-## 多个Cookie编号以半角的空格分隔，两侧一对半角双引号，使用此功能后，在运行脚本时账户编号将发生变化
-## 举例1：TempBlockCookie="2"    临时屏蔽掉Cookie2
-## 举例2：TempBlockCookie="2 4"  临时屏蔽掉Cookie2和Cookie4
-TempBlockCookie=""
+## 所有有互助码的活动，把脚本名称列在 name_js 中，对应 config.sh 中互助码后缀列在 name_config 中，中文名称列在 name_chinese 中。
+## name_js、name_config 和 name_chinese 中的三个名称必须一一对应。
+name_js=(
+  jd_fruit
+  jd_pet
+  jd_plantBean
+  jd_dreamFactory
+  jd_jdfactory
+  jd_jdzz
+  jd_crazy_joy
+  jd_jxnc
+  jd_bookshop
+  jd_cash
+  jd_sgmh
+  jd_cfd
+  jd_health
+)
+name_config=(
+  Fruit
+  Pet
+  Bean
+  DreamFactory
+  JdFactory
+  Jdzz
+  Joy
+  Jxnc
+  BookShop
+  Cash
+  Sgmh
+  Cfd
+  Health
+)
+name_chinese=(
+  东东农场
+  东东萌宠
+  京东种豆得豆
+  京喜工厂
+  东东工厂
+  京东赚赚
+  crazyJoy任务
+  京喜农场
+  口袋书店
+  签到领现金
+  闪购盲盒
+  京喜财富岛
+  东东健康社区
+)
 
-## 如果只是想要屏蔽某个账号不跑某一些脚本，可以参考下面 case 这个命令的例子来控制，case的条件中请输入脚本从scripts目录出发的相对路径，也就是在crontab.list中的task命令后面的脚本路径是什么，这里就填入什么
-## case $1 in
-##     lxk0301_jd_scripts/jd_fruit.js)
-##         TempBlockCookie="5"      # 账号5不玩lxk0301_jd_scripts下的jd_fruit.js
-##         ;;
-##     lxk0301_jd_scripts/jd_dreamFactory.js | whyour_hundun/quanx/didi.js)
-##         TempBlockCookie="2"      # 账号2不玩lxk0301_jd_scripts下的jd_dreamFactory.js和whyour_hundun下子文件夹quanx中的didi.js
-##         ;;
-##     lxk0301_jd_scripts/jd_jdzz.js | whyour_hundun/quanx/jx_factory.js)
-##         TempBlockCookie="3 6"    # 账号3、账号6不玩lxk0301_jd_scripts下的jd_jdzz.js和whyour_hundun下子文件夹quanx中的jx_factory.js
-##         ;;
-## esac
-
-
-## 在运行 update 命令时，是否自动删除失效的脚本与定时任务
+## 在运行 ql repo 命令时，是否自动删除失效的脚本与定时任务
 AutoDelCron="true"
 
-
-## 在运行 update 命令时，是否自动增加新的本地定时任务
+## 在运行 ql repo 命令时，是否自动增加新的本地定时任务
 AutoAddCron="true"
 
 ## 在运行 task 命令时，随机延迟启动任务的最大延迟时间
@@ -38,7 +98,16 @@ AutoAddCron="true"
 ## 在crontab.list中，除掉每小时上述时间启动的任务外，其他任务在你定义了 RandomDelay 的情况下，一律启用随机延迟，但如果你给某些任务添加了 "now" 或者 "conc"，那么这些任务也将无视随机延迟直接启动
 RandomDelay="300"
 
-
 ## 如果你自己会写shell脚本，并且希望在每次运行 update 命令时，额外运行你的 shell 脚本，请赋值为 "true"
 ## 同时，请务必将你的脚本命名为 extra.sh (只能叫这个文件名)，放在 config 目录下
 EnableExtraShell=""
+
+## 自动按顺序进行账号间互助（选填） 设置为 true 时，将直接导入code最新日志来进行互助
+AutoHelpOther=""
+
+## 定义 jcode 脚本导出的互助码模板样式（选填）
+## 不填 使用“按编号顺序助力模板”，Cookie编号在前的优先助力
+## 填 0 使用“全部一致助力模板”，所有账户要助力的码全部一致
+## 填 1 使用“均等机会助力模板”，所有账户获得助力次数一致
+## 填 2 使用“随机顺序助力模板”，本套脚本内账号间随机顺序助力，每次生成的顺序都不一致。
+HelpType=""

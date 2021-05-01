@@ -5,10 +5,7 @@ import CronService from '../services/cron';
 const initData = [
   {
     name: '更新面板',
-    command: `sleep ${randomSchedule(
-      60,
-      1,
-    )} && git_pull >> $QL_DIR/log/git_pull.log 2>&1`,
+    command: `sleep ${randomSchedule(60, 1)} && ql update`,
     schedule: `${randomSchedule(60, 1)} ${randomSchedule(
       24,
       7,
@@ -17,44 +14,20 @@ const initData = [
   },
   {
     name: 'build面板',
-    command: 'rebuild >> ${QL_DIR}/log/rebuild.log 2>&1',
+    command: 'ql rebuild',
     schedule: '30 7 */7 * *',
     status: CrontabStatus.disabled,
-  },
-  {
-    name: '自定义仓库',
-    command: `sleep ${randomSchedule(
-      60,
-      1,
-    )} && diy https://ghproxy.com/https://github.com/whyour/hundun.git "quanx/jx|quanx/jd" tokens >> $QL_DIR/log/diy_pull.log 2>&1`,
-    schedule: `${randomSchedule(60, 1)} ${randomSchedule(
-      24,
-      6,
-    ).toString()} * * *`,
-    status: CrontabStatus.idle,
-  },
-  {
-    name: '互助码导出',
-    command: 'export_sharecodes',
-    schedule: '48 5 * * *',
-    status: CrontabStatus.idle,
   },
   {
     name: '删除日志',
-    command: 'rm_log >/dev/null 2>&1',
+    command: 'ql rmlog 7',
     schedule: '30 7 */7 * *',
     status: CrontabStatus.disabled,
   },
   {
-    name: '重置密码',
-    command: 'js resetpwd',
-    schedule: '33 6 */7 * *',
-    status: CrontabStatus.disabled,
-  },
-  {
-    name: '运行所有脚本(慎用)',
-    command: 'js runall',
-    schedule: '33 6 */7 * *',
+    name: '互助码',
+    command: 'ql code',
+    schedule: '30 7 */7 * *',
     status: CrontabStatus.disabled,
   },
 ];

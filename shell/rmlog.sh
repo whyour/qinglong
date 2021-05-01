@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 
-## 判断环境
-dir_shell=$(dirname $(readlink -f "$0"))
-dir_root=$(cd $dir_shell; pwd)
-
 ## 导入通用变量与函数
 . $dir_shell/share.sh
 
-## 导入配置文件，检测平台
+## 导入配置文件
 import_config_no_check rmlog
-detect_termux
-detect_macos
 
 days=$1
 

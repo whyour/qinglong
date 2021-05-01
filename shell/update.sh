@@ -1,24 +1,11 @@
 #!/usr/bin/env bash
 
-## 文件路径、脚本网址
-dir_shell=$(dirname $(readlink -f "$0"))
-dir_root=$(
-    cd $dir_shell
-    cd ..
-    pwd
-)
 send_mark=$dir_shell/send_mark
 
 # 导入通用变量与函数
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
-## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件
-detect_termux
-detect_macos
-define_cmd
-fix_config
-import_config_no_check "update"
 get_token
 
 ## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
@@ -78,14 +65,6 @@ diff_cron() {
     fi
 }
 
-## 更新docker-entrypoint，docker专用
-update_docker_entrypoint() {
-    if [[ $QL_DIR ]] && [[ $(diff $dir_root/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh) ]]; then
-        cp -f $dir_root/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-        chmod 777 /usr/local/bin/docker-entrypoint.sh
-    fi
-}
-
 ## 检测配置文件版本
 detect_config_version() {
     ## 识别出两个文件的版本号
@@ -111,61 +90,6 @@ detect_config_version() {
     else
         [ -f $send_mark ] && rm -f $send_mark
     fi
-}
-
-## npm install 子程序，判断是否为安卓，判断是否安装有yarn
-npm_install_sub() {
-    if [ $is_termux -eq 1 ]; then
-        npm install --production --no-save --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links --no-save
-    elif ! type yarn >/dev/null 2>&1; then
-        npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
-    else
-        echo -e "检测到本机安装了 yarn，使用 yarn 替代 npm...\n"
-        yarn install --production --network-timeout 1000000000 --registry=https://registry.npm.taobao.org || yarn install --production --network-timeout 1000000000
-    fi
-}
-
-## npm install，$1：package.json文件所在路径
-npm_install_1() {
-    local dir_current=$(pwd)
-    local dir_work=$1
-
-    cd $dir_work
-    echo -e "运行 npm install...\n"
-    npm_install_sub
-    [[ $? -ne 0 ]] && echo -e "\nnpm install 运行不成功，请进入 $dir_work 目录后手动运行 npm install...\n"
-    cd $dir_current
-}
-
-npm_install_2() {
-    local dir_current=$(pwd)
-    local dir_work=$1
-
-    cd $dir_work
-    echo -e "检测到 $dir_work 的依赖包有变化，运行 npm install...\n"
-    npm_install_sub
-    [[ $? -ne 0 ]] && echo -e "\n安装 $dir_work 的依赖包运行不成功，再次尝试一遍...\n"
-    npm_install_1 $dir_work
-    cd $dir_current
-}
-
-## 比对两个文件，$1比$2新时，将$1复制为$2
-diff_and_copy() {
-    local copy_source=$1
-    local copy_to=$2
-    if [ ! -s $copy_to ] || [[ $(diff $copy_source $copy_to) ]]; then
-        cp -f $copy_source $copy_to
-    fi
-}
-
-## 更新依赖
-update_depend() {
-    if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
-        cp -f $dir_sample/package.json $dir_scripts/package.json
-        npm_install_2 $dir_scripts
-    fi
-
-    [ ! -d $dir_scripts/node_modules ] && npm_install_2 $dir_scripts
 }
 
 ## 输出是否有新的或失效的定时任务，$1：新的或失效的任务清单文件路径，$2：新/失效
@@ -299,11 +223,12 @@ run_extra_shell() {
 ## 脚本用法
 usage() {
     echo -e "本脚本用法："
-    echo -e "2. $cmd_update update    # 只更新qinglong，不会运行extra.sh"
-    echo -e "2. $cmd_update rebuild   # 重新编译qinglong，不会运行extra.sh"
-    echo -e "3. $cmd_update raw       # 只更新raw文件，不会运行extra.sh"
-    echo -e "4. $cmd_update repo      # 更新所有设置的REPO，不会运行extra.sh"
-    echo -e "5. $cmd_update <folder>  # 指定scripts脚本目录下某个文件夹名称，只更新这个文件夹中的脚本，当该文件夹已经存在并且是git仓库才可使用此命令，不会运行extra.sh"
+    echo -e "1. $cmd_update update                              # 更新青龙，并且运行extra.sh"
+    echo -e "2. $cmd_update rebuild                             # 重新编译青龙，不会运行extra.sh"
+    echo -e "3. $cmd_update raw <fileurl>                       # 更新单个文件脚本"
+    echo -e "4. $cmd_update repo <repourl> <path> <blacklist>   # 更新仓库的脚本"
+    echo -e "5. $cmd_update rmlog <days>                        # 删除旧日志"
+    echo -e "6. $cmd_update code                                # 获取互助码"
 }
 
 ## 更新qinglong
@@ -312,11 +237,9 @@ update_qinglong() {
     git_pull_scripts $dir_root
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$dir_root成功...\n"
-        make_dir $dir_config
         cp -f $file_config_sample $dir_config/config.sample.sh
-        update_docker_entrypoint
-        update_depend
         detect_config_version
+        update_depend
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
@@ -408,6 +331,9 @@ main() {
         ;;
     rmlog)
         source $dir_shell/rmlog.sh "$p2" | tee $log_path
+        ;;
+    code)
+        source $dir_shell/code.sh
         ;;
     *)
         echo -e "命令输入错误...\n"
