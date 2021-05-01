@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-send_mark=$dir_shell/send_mark
-
 # 导入通用变量与函数
+dir_shell=/ql/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
+
+send_mark=$dir_shell/send_mark
 
 get_token
 

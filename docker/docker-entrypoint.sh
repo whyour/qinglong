@@ -2,6 +2,7 @@
 set -e
 
 echo -e "======================1. 初始化命令========================\n"
+dir_shell=/ql/shell
 . $dir_shell/share.sh
 link_shell
 echo
