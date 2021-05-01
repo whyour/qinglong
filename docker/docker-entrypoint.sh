@@ -2,7 +2,7 @@
 set -e
 
 echo -e "======================1. 初始化命令========================\n"
-dir_shell=$(dirname $(readlink -f "$0"))
+dir_shell=/ql/shell/
 dir_root=$(
     cd $dir_shell
     cd ..
@@ -22,35 +22,7 @@ ql update
 echo
 
 echo -e "======================3. 检测配置文件========================\n"
-[ ! -d ${QL_DIR}/config ] && mkdir -p ${QL_DIR}/config
-[ ! -d ${QL_DIR}/log ] && mkdir -p ${QL_DIR}/log
-[ ! -d ${QL_DIR}/db ] && mkdir -p ${QL_DIR}/db
-[ ! -d ${QL_DIR}/manual_log ] && mkdir -p ${QL_DIR}/manual_log
-
-if [ ! -s ${QL_DIR}/config/cookie.sh ]; then
-    echo -e "检测到config配置目录下不存在cookie.sh，从示例文件复制一份用于初始化...\n"
-    touch ${QL_DIR}/config/cookie.sh
-    echo
-fi
-
-if [ ! -s ${QL_DIR}/config/config.sh ]; then
-    echo -e "检测到config配置目录下不存在config.sh，从示例文件复制一份用于初始化...\n"
-    cp -fv ${QL_DIR}/sample/config.sample.sh ${QL_DIR}/config/config.sh
-    echo
-fi
-
-if [ ! -s ${QL_DIR}/config/auth.sample.json ]; then
-    echo -e "检测到config配置目录下不存在auth.json，从示例文件复制一份用于初始化...\n"
-    cp -fv ${QL_DIR}/sample/auth.sample.json ${QL_DIR}/config/auth.json
-    echo
-fi
-
-if [ -s /etc/nginx/conf.d/default.conf ]; then
-    echo -e "检测到默认nginx配置文件，删除...\n"
-    rm -f /etc/nginx/conf.d/default.conf
-    echo
-fi
-
+fix_config
 cp -fv ${QL_DIR}/docker/front.conf /etc/nginx/conf.d/front.conf
 
 echo -e "======================4. 启动nginx========================\n"

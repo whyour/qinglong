@@ -5,6 +5,8 @@ dir_scripts=$dir_root/scripts
 dir_repo=$dir_root/repo
 dir_raw=$dir_scripts/raw
 dir_log=$dir_root/log
+dir_db=$dir_root/db
+dir_manual_log=$dir_root/manual_log
 dir_list_tmp=$dir_log/.tmp
 
 ## 文件
@@ -143,9 +145,31 @@ define_cmd () {
 ## 修复配置文件
 fix_config () {
     make_dir $dir_config
+    make_dir $dir_log
+    make_dir $dir_db
+    make_dir $dir_manual_log
+    
     if [ ! -s $file_config_user ]; then
         echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
         cp -fv $file_config_sample $file_config_user
+        echo
+    fi
+
+    if [ ! -s $file_cookie ]; then
+        echo -e "检测到config配置目录下不存在cookie.sh，创建一个空文件用于初始化...\n"
+        touch $file_cookie
+        echo
+    fi
+
+    if [ ! -s $file_auth_user ]; then
+        echo -e "复制一份 $file_auth_sample 为 $file_auth_user\n"
+        cp -fv $file_auth_sample $file_auth_user
+        echo
+    fi
+
+    if [ -s /etc/nginx/conf.d/default.conf ]; then
+        echo -e "检测到默认nginx配置文件，删除...\n"
+        rm -f /etc/nginx/conf.d/default.conf
         echo
     fi
 }
