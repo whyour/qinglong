@@ -148,9 +148,4 @@ fix_config () {
         cp -fv $file_config_sample $file_config_user
         echo
     fi
-    perl -i -pe "{
-        s|CMD_UPDATE|$cmd_update|g;
-        s|CMD_RMLOG|$cmd_rmlog|g;
-        s|CMD_TASK|$cmd_task|g
-    }" $list_crontab_user
 }

@@ -2,7 +2,18 @@
 set -e
 
 echo -e "======================1. 初始化命令========================\n"
-. ${QL_DIR}/shell/share.sh
+dir_shell=$(dirname $(readlink -f "$0"))
+dir_root=$(
+    cd $dir_shell
+    cd ..
+    pwd
+)
+
+. $dir_shell/share.sh
+
+detect_termux
+detect_macos
+define_cmd
 link_shell
 echo
 
