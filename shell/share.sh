@@ -67,8 +67,9 @@ import_config_and_check () {
 ## 创建目录，$1：目录的绝对路径
 make_dir () {
     local dir=$1
-    [ ! -d $dir ] && mkdir -p $dir
-    echo
+    if [[ ! -d $dir ]]; then
+        mkdir -p $dir
+    fi
 }
 
 ## 检测termux
