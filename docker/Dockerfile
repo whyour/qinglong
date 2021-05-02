@@ -1,7 +1,7 @@
 FROM node:lts-alpine
 LABEL maintainer="whyour"
 ARG QL_URL=https://github.com.cnpmjs.org/whyour/qinglong
-ARG QL_BRANCH=dev
+ARG QL_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
     SHELL=/bin/bash \

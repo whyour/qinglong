@@ -1,22 +1,23 @@
 #!/bin/bash
 set -e
 
-echo -e "======================1. 初始化命令========================\n"
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 link_shell
-
-echo -e "======================2. 更新源代码========================\n"
+echo -e "======================1. 更新源代码========================\n"
 ql update
+echo
 
-echo -e "======================3. 检测配置文件========================\n"
+echo -e "======================2. 检测配置文件========================\n"
 fix_config
 cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
+echo
 
-echo -e "======================4. 启动nginx========================\n"
-nginx -c /etc/nginx/nginx.conf
+echo -e "======================3. 启动nginx========================\n"
+nginx -s reload || nginx -c /etc/nginx/nginx.conf
+echo
 
-echo -e "======================5. 启动控制面板========================\n"
+echo -e "======================4. 启动控制面板========================\n"
 pm2 start $dir_root/build/app.js -n panel
 echo -e "控制面板启动成功...\n"
 
