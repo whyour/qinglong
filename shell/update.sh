@@ -49,7 +49,6 @@ git_pull_scripts() {
 
 ## 检测cron的差异，$1：脚本清单文件路径，$2：cron任务清单文件路径，$3：增加任务清单文件路径，$4：删除任务清单文件路径
 diff_cron() {
-    make_dir $dir_list_tmp
     local list_scripts="$1"
     local list_task="$2"
     local list_add="$3"
@@ -104,21 +103,27 @@ output_list_add_drop() {
     fi
 }
 
-## 自动删除失效的脚本与定时任务，需要：1.AutoDelCron/AutoDelCron 设置为 true；2.正常更新js脚本，没有报错；3.存在失效任务；4.crontab.list存在并且不为空
+## 自动删除失效的脚本与定时任务，需要：1.AutoDelCron 设置为 true；2.正常更新js脚本，没有报错；3.存在失效任务
 ## $1：失效任务清单文件路径
 del_cron() {
     local list_drop=$1
+    local author=$2
     local detail detail2
-    if [ -s $list_drop ] && [ -s $list_crontab_user ]; then
-        detail=$(cat $list_drop)
-        echo -e "开始尝试自动删除失效的定时任务...\n"
-        for cron in $detail; do
-            local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron$" | perl -pe "s|.*ID=(.*) $cmd_task $cron$|\1|")
-            del_cron_api "$id"
-        done
-        detail2=$(echo $detail | perl -pe "s| |\\\n|g")
+    detail=$(cat $list_drop)
+    echo -e "开始尝试自动删除失效的定时任务...\n"
+    for cron in $detail; do
+        local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron$" | perl -pe "s|.*ID=(.*) $cmd_task $cron$|\1|")
+        del_cron_api "$id"
+        rm -f "$dir_scripts/${cron}"
+    done
+    exit_status=$?
+    detail2=$(echo $detail | perl -pe "s| |\\\n|g")
+    if [[ $exit_status -eq 0 ]]; then
         echo -e "成功删除失效的的定时任务...\n"
         notify "删除失效任务通知" "成功删除以下失效的定时任务：\n$detail2"
+    else
+        echo -e "删除定时任务出错，请手动删除...\n"
+        notify "删除任务失败通知" "尝试自动删除以下定时任务出错，请手动删除：\n$detail2"
     fi
 }
 
@@ -138,13 +143,14 @@ add_cron() {
                         print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
                     }" $file |
                     perl -pe "{
-                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1:$cmd_task $file|g;
+                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1|g;
                         s|  | |g
                     }" | sort -u | head -1
             )
             cron_name=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
             [[ -z $cron_name ]] && cron_name="$file_name"
-            add_cron_api "$cron_line:$cron_name"
+            [[ -z $cron_line ]] && cron_line="0 6 * * *"
+            add_cron_api "$cron_line:$cmd_task $file:$cron_name"
         fi
     done
     exit_status=$?
@@ -190,21 +196,31 @@ update_repo() {
 
 ## 更新所有 raw 文件
 update_raw() {
-    if [[ ${#RawUrl[*]} -gt 0 ]]; then
-        echo -e "--------------------------------------------------------------\n"
-        make_dir $dir_raw
-        for ((i = 0; i < ${#RawUrl[*]}; i++)); do
-            raw_file_name[$i]=$(echo ${RawUrl[i]} | awk -F "/" '{print $NF}')
-            echo -e "开始下载：${RawUrl[i]} \n\n保存路径：$dir_raw/${raw_file_name[$i]}\n"
-            wget -q --no-check-certificate -O "$dir_raw/${raw_file_name[$i]}.new" ${RawUrl[i]}
-            if [[ $? -eq 0 ]]; then
-                mv "$dir_raw/${raw_file_name[$i]}.new" "$dir_raw/${raw_file_name[$i]}"
-                echo -e "下载 ${raw_file_name[$i]} 成功...\n"
-            else
-                echo -e "下载 ${raw_file_name[$i]} 失败，保留之前正常下载的版本...\n"
-                [ -f "$dir_raw/${raw_file_name[$i]}.new" ] && rm -f "$dir_raw/${raw_file_name[$i]}.new"
-            fi
-        done
+    echo -e "--------------------------------------------------------------\n"
+    local raw_url="$1"
+    raw_file_name=$(echo ${raw_url} | awk -F "/" '{print $NF}')
+    echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
+    wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
+    if [[ $? -eq 0 ]]; then
+        mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
+        echo -e "下载 ${raw_file_name} 成功...\n"
+        cp -f $raw_file_name $dir_scripts/raw_${filename}
+        cron_line=$(
+            perl -ne "{
+                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
+                }" $raw_file_name |
+                perl -pe "{
+                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$raw_file_name.*|\1|g;
+                    s|  | |g
+                }" | sort -u | head -1
+        )
+        cron_name=$(grep "new Env" $raw_file_name | awk -F "'|\"" '{print $2}' | head -1)
+        [[ -z $cron_name ]] && cron_name="$raw_file_name"
+        [[ -z $cron_line ]] && cron_line="0 6 * * *"
+        add_cron_api "$cron_line:$cmd_task raw_$raw_file_name:$cron_name"
+    else
+        echo -e "下载 ${raw_file_name} 失败，保留之前正常下载的版本...\n"
+        [ -f "$dir_raw/${raw_file_name}.new" ] && rm -f "$dir_raw/${raw_file_name}.new"
     fi
 
 }
@@ -272,7 +288,9 @@ diff_scripts() {
 
     if [ -s $list_own_drop ]; then
         output_list_add_drop $list_own_drop "失效"
-        [[ ${AutoDelCron} == true ]] && del_cron $list_own_drop
+        if [[ ${AutoDelCron} == true ]]; then 
+            del_cron $list_own_drop $2
+        fi
     fi
     if [ -s $list_own_add ]; then
         output_list_add_drop $list_own_add "新"
@@ -328,7 +346,7 @@ main() {
         update_repo "$p2" "$p3" "$p4" | tee $log_path
         ;;
     raw)
-        update_raw | tee $log_path
+        update_raw "$p2" | tee $log_path
         ;;
     rmlog)
         source $dir_shell/rmlog.sh "$p2" | tee $log_path

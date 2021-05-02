@@ -37,10 +37,12 @@ list_own_drop=$dir_list_tmp/own_drop.list
 link_name=(
     task
     ql
+    notify
 )
 original_name=(
     task.sh
     update.sh
+    notify.sh
 )
 
 ## 导入配置文件不校验
@@ -149,6 +151,8 @@ fix_config () {
     make_dir $dir_db
     make_dir $dir_manual_log
     make_dir $dir_scripts
+    make_dir $dir_list_tmp
+    make_dir $dir_raw
     
     if [ ! -s $file_config_user ]; then
         echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
