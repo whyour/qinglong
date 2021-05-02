@@ -31,7 +31,7 @@ add_cron_api() {
         local name=$3
     fi
 
-  local api=$(curl "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+  local api=$(curl -s "http://localhost:5600/api/crons?t=$currentTimeStamp" \
     -H "Accept: application/json" \
     -H "Authorization: Bearer $token" \
     -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
@@ -52,7 +52,7 @@ add_cron_api() {
 del_cron_api() {
   local id=$1
   local currentTimeStamp=$(date +%s)
-  local api=$(curl "http://localhost:5600/api/crons/$id?t=$currentTimeStamp" \
+  local api=$(curl -s "http://localhost:5600/api/crons/$id?t=$currentTimeStamp" \
     -X 'DELETE' \
     -H "Accept: application/json" \
     -H "Authorization: Bearer $token" \
