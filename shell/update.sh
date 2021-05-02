@@ -204,7 +204,10 @@ update_raw() {
     if [[ $? -eq 0 ]]; then
         mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
         echo -e "下载 ${raw_file_name} 成功...\n"
-        cp -f $raw_file_name $dir_scripts/raw_${filename}
+        cd $dir_raw
+        local filename="raw_${raw_file_name}"
+        local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task $filename$" | perl -pe "s|.*ID=(.*) $cmd_task $filename$|\1|")
+        cp -f $raw_file_name $dir_scripts/${filename}
         cron_line=$(
             perl -ne "{
                     print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
@@ -217,7 +220,11 @@ update_raw() {
         cron_name=$(grep "new Env" $raw_file_name | awk -F "'|\"" '{print $2}' | head -1)
         [[ -z $cron_name ]] && cron_name="$raw_file_name"
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
-        add_cron_api "$cron_line:$cmd_task raw_$raw_file_name:$cron_name"
+        if [[ -z $cron_id ]]; then
+            add_cron_api "$cron_line:$cmd_task $filename:$cron_name"
+        else
+            # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
+        fi
     else
         echo -e "下载 ${raw_file_name} 失败，保留之前正常下载的版本...\n"
         [ -f "$dir_raw/${raw_file_name}.new" ] && rm -f "$dir_raw/${raw_file_name}.new"
