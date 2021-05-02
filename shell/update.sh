@@ -222,7 +222,6 @@ update_raw() {
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
             add_cron_api "$cron_line:$cmd_task $filename:$cron_name"
-        else
             # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
         fi
     else
