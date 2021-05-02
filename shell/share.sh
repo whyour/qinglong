@@ -218,8 +218,10 @@ npm_install_2() {
     cd $dir_work
     echo -e "检测到 $dir_work 的依赖包有变化，运行 npm install...\n"
     npm_install_sub
-    [[ $? -ne 0 ]] && echo -e "\n安装 $dir_work 的依赖包运行不成功，再次尝试一遍...\n"
-    npm_install_1 $dir_work
+    if [[ $? -ne 0 ]]; then
+        echo -e "\n安装 $dir_work 的依赖包运行不成功，再次尝试一遍...\n"
+        npm_install_1 $dir_work
+    fi
     cd $dir_current
 }
 
