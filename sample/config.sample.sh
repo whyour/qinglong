@@ -98,8 +98,7 @@ AutoAddCron="true"
 ## 在crontab.list中，除掉每小时上述时间启动的任务外，其他任务在你定义了 RandomDelay 的情况下，一律启用随机延迟，但如果你给某些任务添加了 "now" 或者 "conc"，那么这些任务也将无视随机延迟直接启动
 RandomDelay="300"
 
-## 如果你自己会写shell脚本，并且希望在每次运行 update 命令时，额外运行你的 shell 脚本，请赋值为 "true"
-## 同时，请务必将你的脚本命名为 extra.sh (只能叫这个文件名)，放在 config 目录下
+## 如果你自己会写shell脚本，并且希望在每次运行 ql update 命令时，额外运行你的 shell 脚本，请赋值为 "true"
 EnableExtraShell=""
 
 ## 自动按顺序进行账号间互助（选填） 设置为 true 时，将直接导入code最新日志来进行互助
