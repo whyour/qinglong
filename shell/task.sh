@@ -98,6 +98,10 @@ run_normal () {
         import_config_and_check
         define_program "$p1"
         combine_all
+        if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
+            local latest_log=$(ls -r $dir_code | head -1)
+            . $dir_code/$latest_log
+        fi
         [[ $# -eq 1 ]] && random_delay
         log_time=$(date "+%Y-%m-%d-%H-%M-%S")
         log_path="$dir_log/$p1/$log_time.log"

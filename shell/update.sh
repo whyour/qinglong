@@ -281,7 +281,7 @@ rebuild_qinglong() {
         echo -e "重新编译青龙完成...\n"
 
         echo -e "重启青龙...\n"
-        pm2 restart panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
+        pm2 restart panel || pm2 start npm -n panel -- run panel
         nginx -s reload
         echo -e "重启青龙完成...\n"
     fi
