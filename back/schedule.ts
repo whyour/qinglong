@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import Logger from './loaders/logger';
 import { Container } from 'typedi';
 import CronService from './services/cron';
+import { CrontabStatus } from './data/cron';
 
 const run = async () => {
   const cronService = Container.get(CronService);
@@ -21,7 +22,11 @@ const run = async () => {
         for (let i = 0; i < docs.length; i++) {
           const task = docs[i];
           const _schedule = task.schedule && task.schedule.split(' ');
-          if (_schedule && _schedule.length > 5) {
+          if (
+            _schedule &&
+            _schedule.length > 5 &&
+            task.status !== CrontabStatus.disabled
+          ) {
             schedule.scheduleJob(task.schedule, function () {
               exec(task.command);
             });

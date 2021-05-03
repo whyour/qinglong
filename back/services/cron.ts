@@ -191,19 +191,17 @@ export default class CronService {
     var crontab_string = '';
     tabs.forEach((tab) => {
       const _schedule = tab.schedule && tab.schedule.split(' ');
-      if (_schedule && _schedule.length === 5) {
-        if (tab.status === CrontabStatus.disabled) {
-          crontab_string += '# ';
-          crontab_string += tab.schedule;
-          crontab_string += ' ';
-          crontab_string += this.make_command(tab);
-          crontab_string += '\n';
-        } else {
-          crontab_string += tab.schedule;
-          crontab_string += ' ';
-          crontab_string += this.make_command(tab);
-          crontab_string += '\n';
-        }
+      if (tab.status === CrontabStatus.disabled || _schedule.length !== 5) {
+        crontab_string += '# ';
+        crontab_string += tab.schedule;
+        crontab_string += ' ';
+        crontab_string += this.make_command(tab);
+        crontab_string += '\n';
+      } else {
+        crontab_string += tab.schedule;
+        crontab_string += ' ';
+        crontab_string += this.make_command(tab);
+        crontab_string += '\n';
       }
     });
 
