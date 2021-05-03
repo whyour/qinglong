@@ -1,13 +1,15 @@
 import schedule from 'node-schedule';
-import DataStore from 'nedb';
-import config from './config';
 import { exec } from 'child_process';
 import Logger from './loaders/logger';
-
-const db = new DataStore({ filename: config.cronDbFile, autoload: true });
+import { Container } from 'typedi';
+import CronService from './services/cron';
 
 const run = async () => {
-  db.find({})
+  const cronService = Container.get(CronService);
+  const cronDb = cronService.getDb();
+
+  cronDb
+    .find({})
     .sort({ created: 1 })
     .exec((err, docs) => {
       if (err) {

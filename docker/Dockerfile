@@ -36,6 +36,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && rm -rf /root/.npm \
     && yarn install --network-timeout 100000 \
     && yarn build \
+    && yarn build-back \
     && yarn install --production --network-timeout 100000 \
     && yarn cache clean
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]

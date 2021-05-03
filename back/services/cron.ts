@@ -190,17 +190,20 @@ export default class CronService {
     const tabs = await this.crontabs();
     var crontab_string = '';
     tabs.forEach((tab) => {
-      if (tab.status === CrontabStatus.disabled) {
-        crontab_string += '# ';
-        crontab_string += tab.schedule;
-        crontab_string += ' ';
-        crontab_string += this.make_command(tab);
-        crontab_string += '\n';
-      } else {
-        crontab_string += tab.schedule;
-        crontab_string += ' ';
-        crontab_string += this.make_command(tab);
-        crontab_string += '\n';
+      const _schedule = tab.schedule && tab.schedule.split(' ');
+      if (_schedule && _schedule.length === 5) {
+        if (tab.status === CrontabStatus.disabled) {
+          crontab_string += '# ';
+          crontab_string += tab.schedule;
+          crontab_string += ' ';
+          crontab_string += this.make_command(tab);
+          crontab_string += '\n';
+        } else {
+          crontab_string += tab.schedule;
+          crontab_string += ' ';
+          crontab_string += this.make_command(tab);
+          crontab_string += '\n';
+        }
       }
     });
 
@@ -208,7 +211,7 @@ export default class CronService {
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
-    execSync(`pm2 restart schedule`);
+    exec(`pm2 restart schedule`);
     this.cronDb.update({}, { $set: { saved: true } }, { multi: true });
   }
 
