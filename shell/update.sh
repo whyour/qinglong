@@ -247,7 +247,7 @@ run_extra_shell() {
 usage() {
     echo -e "本脚本用法："
     echo -e "1. $cmd_update update                              # 更新青龙，并且运行extra.sh"
-    echo -e "2. $cmd_update rebuild                             # 重新编译青龙，不会运行extra.sh"
+    echo -e "2. $cmd_update restart                             # 重新启动青龙并编译，不会运行extra.sh"
     echo -e "3. $cmd_update raw <fileurl>                       # 更新单个文件脚本"
     echo -e "4. $cmd_update repo <repourl> <path> <blacklist>   # 更新仓库的脚本"
     echo -e "5. $cmd_update rmlog <days>                        # 删除旧日志"
@@ -268,25 +268,6 @@ update_qinglong() {
     fi
 }
 
-## 重新编译qinglong
-rebuild_qinglong() {
-    echo -e "--------------------------------------------------------------\n"
-    update_qinglong
-    if [[ $exit_status -eq 0 ]]; then
-        echo -e "重新编译青龙...\n"
-        yarn install --network-timeout 1000000000 || yarn install --registry=https://registry.npm.taobao.org --network-timeout 1000000000
-        yarn build
-        yarn build-back
-        yarn cache clean
-        echo -e "重新编译青龙完成...\n"
-
-        echo -e "重启青龙...\n"
-        pm2 restart panel || pm2 start npm -n panel -- run panel
-        nginx -s reload
-        echo -e "重启青龙完成...\n"
-    fi
-}
-
 ## 对比脚本
 diff_scripts() {
     gen_list_repo $1 $2 $3 $4
@@ -294,7 +275,7 @@ diff_scripts() {
 
     if [ -s $list_own_drop ]; then
         output_list_add_drop $list_own_drop "失效"
-        if [[ ${AutoDelCron} == true ]]; then 
+        if [[ ${AutoDelCron} == true ]]; then
             del_cron $list_own_drop $2
         fi
     fi
@@ -332,6 +313,28 @@ gen_list_repo() {
     cd $dir_current
 }
 
+## 重新编译qinglong
+restart_qinglong() {
+    echo -e "--------------------------------------------------------------\n"
+    update_qinglong
+    if [[ $exit_status -eq 0 ]]; then
+        echo -e "重新编译青龙...\n"
+        yarn install --network-timeout 1000000000 || yarn install --registry=https://registry.npm.taobao.org --network-timeout 1000000000
+        yarn build
+        yarn cache clean
+        echo -e "重新编译青龙完成...\n"
+
+        echo -e "重启青龙面板...\n"
+        pm2 restart panel 2>/dev/null || pm2 start npm -n panel -- run panel
+        nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
+        echo -e "重启面板完成...\n"
+
+        echo -e "重启定时任务...\n"
+        pm2 restart schedule 2>/dev/null || pm2 start npm -n schedule -- run schedule
+        echo -e "重启定时完成...\n"
+    fi
+}
+
 main() {
     local p1=$1
     local p2=$2
@@ -345,8 +348,8 @@ main() {
         update_qinglong | tee $log_path
         run_extra_shell | tee -a $log_path
         ;;
-    rebuild)
-        rebuild_qinglong | tee $log_path
+    restart)
+        restart_qinglong | tee $log_path
         ;;
     repo)
         update_repo "$p2" "$p3" "$p4" | tee $log_path
