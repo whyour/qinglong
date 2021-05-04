@@ -209,7 +209,7 @@ export default class CronService {
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
-    exec(`pm2 restart schedule`);
+    exec(`pm2 reload schedule`);
     this.cronDb.update({}, { $set: { saved: true } }, { multi: true });
   }
 

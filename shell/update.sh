@@ -326,12 +326,12 @@ restart_qinglong() {
         echo -e "重新编译青龙完成...\n"
 
         echo -e "重启青龙面板...\n"
-        pm2 restart panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
+        pm2 reload panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
         echo -e "重启面板完成...\n"
 
         echo -e "重启定时任务...\n"
-        pm2 restart schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule
+        pm2 reload schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule
         echo -e "重启定时完成...\n"
     fi
 }
