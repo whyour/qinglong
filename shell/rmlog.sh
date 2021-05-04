@@ -4,9 +4,6 @@
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 
-## 导入配置文件
-import_config
-
 days=$1
 
 ## 删除运行js脚本的旧日志

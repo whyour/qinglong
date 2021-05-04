@@ -59,7 +59,6 @@ random_delay () {
 
 ## scripts目录下所有可运行脚本数组
 gen_array_scripts () {
-    import_config
     local dir_current=$(pwd)
     local i="-1"
     cd $dir_scripts
@@ -79,13 +78,17 @@ usage () {
     define_cmd
     gen_array_scripts
     echo -e "\ntask命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或去掉 “$dir_scripts/” 目录后的相对路径（定时任务中请写作相对路径），用法为："
-    echo -e "1.$cmd_task <js_path>        # 依次执行，如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
-    echo -e "2.$cmd_task <js_path> now    # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
-    echo -e "3.$cmd_task <js_path> conc   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
-    echo -e "\n当前有以下脚本可以运行（已省略路径 “$dir_scripts/” ）："
-    for ((i=0; i<${#array_scripts[*]}; i++)); do
-        echo -e "$(($i + 1)). ${array_scripts_name[i]}：${array_scripts[i]}"
-    done
+    echo -e "1.$cmd_task <file_name>        # 依次执行，如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
+    echo -e "2.$cmd_task <file_name> now    # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
+    echo -e "3.$cmd_task <file_name> conc   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
+    if [[ ${#array_scripts[*]} -gt 0 ]]; then
+        echo -e "\n当前有以下脚本可以运行:"
+        for ((i=0; i<${#array_scripts[*]}; i++)); do
+            echo -e "$(($i + 1)). ${array_scripts_name[i]}：${array_scripts[i]}"
+        done
+    else
+        echo -e "\n暂无脚本可以执行"
+    fi
 }
 
 ## run nohup，$1：文件名，不含路径，带后缀
@@ -98,14 +101,17 @@ run_nohup () {
 run_normal () {
     local p1=$1
     cd $dir_scripts
-    import_config
     define_program "$p1"
     combine_all
-    if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
-        local latest_log=$(ls -r $dir_code | head -1)
-        . $dir_code/$latest_log
+    if [[ $p1 == *.js ]]; then
+        if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
+            local latest_log=$(ls -r $dir_code | head -1)
+            . $dir_code/$latest_log
+        fi
+        if [[ $# -eq 1 ]]; then
+            random_delay
+        fi
     fi
-    [[ $# -eq 1 ]] && random_delay
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_path="$dir_log/$p1/$log_time.log"
     make_dir "$dir_log/$p1"
@@ -117,7 +123,6 @@ run_normal () {
 run_concurrent () {
     local p1=$1
     cd $dir_scripts
-    import_config
     define_program "$p1"
     make_dir $dir_log/$p1
     log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")

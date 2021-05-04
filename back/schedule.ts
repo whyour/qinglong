@@ -31,7 +31,11 @@ const run = async () => {
             task.status !== CrontabStatus.disabled
           ) {
             schedule.scheduleJob(task.schedule, function () {
-              exec(task.command);
+              let command = task.command as string;
+              if (!command.startsWith('task ')) {
+                command = `task ${command}`;
+              }
+              exec(command);
             });
           }
         }

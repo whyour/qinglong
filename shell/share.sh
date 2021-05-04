@@ -11,6 +11,7 @@ dir_db=$dir_root/db
 dir_manual_log=$dir_root/manual_log
 dir_list_tmp=$dir_log/.tmp
 dir_code=$dir_log/code
+dir_update_log=$dir_log/update
 
 ## 文件
 file_config_sample=$dir_sample/config.sample.sh
@@ -143,6 +144,7 @@ fix_config () {
     make_dir $dir_scripts
     make_dir $dir_list_tmp
     make_dir $dir_raw
+    make_dir $dir_update_log
     
     if [ ! -s $file_config_user ]; then
         echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"

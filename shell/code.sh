@@ -4,9 +4,6 @@
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 
-## 导入配置文件
-import_config
-
 ## 生成pt_pin清单
 gen_pt_pin_array () {
     local tmp1 tmp2 i pt_pin_temp

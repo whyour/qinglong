@@ -306,7 +306,12 @@ gen_list_repo() {
     fi
     for file in ${files}; do
         filename=$(basename $file)
-        cp -f $file $dir_scripts/${author}_${filename}
+        local non_scripts=$(echo $filename | egrep jd | egrep -v "jd_")
+        if [[ -z $non_scripts ]]; then
+            cp -f $file $dir_scripts/${filename}
+        else
+            cp -f $file $dir_scripts/${author}_${filename}
+        fi
         echo ${author}_${filename} >>$list_own_scripts
     done
     grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | sort -u >$list_own_user
@@ -315,7 +320,6 @@ gen_list_repo() {
 
 ## 重新编译qinglong
 restart_qinglong() {
-    echo -e "--------------------------------------------------------------\n"
     update_qinglong
     if [[ $exit_status -eq 0 ]]; then
         echo -e "重新编译青龙...\n"
@@ -343,7 +347,6 @@ main() {
     local p4=$4
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_path="$dir_log/update/${log_time}_$p1.log"
-    make_dir "$dir_log/update"
     case $p1 in
     update)
         update_qinglong | tee $log_path
@@ -353,16 +356,29 @@ main() {
         restart_qinglong | tee $log_path
         ;;
     repo)
-        update_repo "$p2" "$p3" "$p4" | tee $log_path
+        local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
+        log_path="$dir_log/update/${log_time}_$name.log"
+        if [[ -n $p2 ]]; then
+            update_repo "$p2" "$p3" "$p4" | tee $log_path
+        else
+            echo -e "命令输入错误...\n"
+            usage
         ;;
     raw)
-        update_raw "$p2" | tee $log_path
+        local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
+        log_path="$dir_log/update/${log_time}_$name.log"
+        if [[ -n $p2 ]]; then
+            update_raw "$p2" | tee $log_path
+        else
+            echo -e "命令输入错误...\n"
+            usage
+        ;;
         ;;
     rmlog)
-        source $dir_shell/rmlog.sh "$p2" | tee $log_path
+        . $dir_shell/rmlog.sh "$p2" | tee $log_path
         ;;
     code)
-        source $dir_shell/code.sh
+        . $dir_shell/code.sh
         ;;
     *)
         echo -e "命令输入错误...\n"
