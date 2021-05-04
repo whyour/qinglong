@@ -16,7 +16,6 @@ echo
 echo -e "======================3. 启动nginx========================\n"
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 echo -e "nginx启动成功...\n"
-echo
 
 echo -e "======================4. 启动控制面板========================\n"
 cd $dir_root

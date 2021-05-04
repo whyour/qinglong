@@ -36,8 +36,13 @@ combine_one () {
 ## 选择python3还是node
 define_program () {
     local p1=$1
-    [[ $p1 == *.js ]] && which_program="node"
-    [[ $p1 == *.py ]] && which_program="python3"
+    if [[ $p1 == *.js ]]; then
+        which_program="node"
+    elif [[ $p1 == *.py ]]; then
+        which_program="python3"
+    else
+        which_program="bash"
+    fi
 }   
 
 random_delay () {
@@ -77,7 +82,6 @@ usage () {
     echo -e "1.$cmd_task <js_path>        # 依次执行，如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
     echo -e "2.$cmd_task <js_path> now    # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
     echo -e "3.$cmd_task <js_path> conc   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
-    echo -e "\nmytask命令运行未识别出cron的脚本以及你自己添加的脚本，用法同task。mytask和task命令均为同一脚本的不同名字，二者仅用来在crontab.list中区分不同类型的任务，以方便自动增删任务，手动直接运行task即可。"
     echo -e "\n当前有以下脚本可以运行（已省略路径 “$dir_scripts/” ）："
     for ((i=0; i<${#array_scripts[*]}; i++)); do
         echo -e "$(($i + 1)). ${array_scripts_name[i]}：${array_scripts[i]}"
@@ -94,23 +98,18 @@ run_nohup () {
 run_normal () {
     local p1=$1
     cd $dir_scripts
-    if [ -f $p1 ]; then
-        import_config_and_check
-        define_program "$p1"
-        combine_all
-        if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
-            local latest_log=$(ls -r $dir_code | head -1)
-            . $dir_code/$latest_log
-        fi
-        [[ $# -eq 1 ]] && random_delay
-        log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-        log_path="$dir_log/$p1/$log_time.log"
-        make_dir "$dir_log/$p1"
-        $which_program $p1 2>&1 | tee $log_path
-    else
-        echo -e "\n $p1 脚本不存在，请确认...\n"
-        usage
+    import_config_and_check
+    define_program "$p1"
+    combine_all
+    if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
+        local latest_log=$(ls -r $dir_code | head -1)
+        . $dir_code/$latest_log
     fi
+    [[ $# -eq 1 ]] && random_delay
+    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
+    log_path="$dir_log/$p1/$log_time.log"
+    make_dir "$dir_log/$p1"
+    $which_program $p1 2>&1 | tee $log_path
 }
 
 ## 并发执行，因为是并发，所以日志只能直接记录在日志文件中（日志文件以Cookie编号结尾），前台执行并发跑时不会输出日志
@@ -118,21 +117,16 @@ run_normal () {
 run_concurrent () {
     local p1=$1
     cd $dir_scripts
-    if [ -f $p1 ]; then
-        import_config_and_check
-        define_program
-        make_dir $dir_log/$p1
-        log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
-        echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n"
-        for ((user_num=1; user_num<=$user_sum; user_num++)); do
-            combine_one $user_num
-            log_path="$dir_log/$p1/${log_time}_${user_num}.log"
-            $which_program $p1 &>$log_path &
-        done
-    else
-        echo -e "\n $p1 脚本不存在，请确认...\n"
-        usage
-    fi
+    import_config_and_check
+    define_program
+    make_dir $dir_log/$p1
+    log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
+    echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n"
+    for ((user_num=1; user_num<=$user_sum; user_num++)); do
+        combine_one $user_num
+        log_path="$dir_log/$p1/${log_time}_${user_num}.log"
+        $which_program $p1 &>$log_path &
+    done
 }
 
 ## 命令检测
@@ -160,7 +154,7 @@ main () {
             esac
             ;;
         *)
-            echo -e "\n命令过多...\n"
+            echo -e "\n命令参数过多...\n"
             usage
             ;;
     esac
