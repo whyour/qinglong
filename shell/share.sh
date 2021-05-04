@@ -45,25 +45,15 @@ original_name=(
     notify.sh
 )
 
-## 导入配置文件不校验
-import_config_no_check () {
+## 导入配置文件
+import_config () {
     [ -f $file_cookie ] && . $file_cookie
     [ -f $file_config_user ] && . $file_config_user
-}
-
-## 导入配置文件并校验
-import_config_and_check () {
-    import_config_no_check
-    if [[ ! -s $file_cookie ]]; then
-        echo -e "请先配置好Cookie...\n"
-        exit 1
-    else
-        user_sum=0
-        for line in $(cat $file_cookie); do
-            let user_sum++
-            eval Cookie${user_sum}="\"$line\""
-        done
-    fi
+    user_sum=0
+    for line in $(cat $file_cookie); do
+        let user_sum++
+        eval Cookie${user_sum}="\"$line\""
+    done
 }
 
 ## 创建目录，$1：目录的绝对路径
@@ -261,4 +251,4 @@ detect_termux
 detect_macos
 define_cmd
 fix_config
-import_config_no_check
+import_config

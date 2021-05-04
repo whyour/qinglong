@@ -41,7 +41,7 @@ define_program () {
     elif [[ $p1 == *.py ]]; then
         which_program="python3"
     else
-        which_program="bash"
+        which_program=""
     fi
 }   
 
@@ -59,7 +59,7 @@ random_delay () {
 
 ## scripts目录下所有可运行脚本数组
 gen_array_scripts () {
-    import_config_no_check
+    import_config
     local dir_current=$(pwd)
     local i="-1"
     cd $dir_scripts
@@ -98,7 +98,7 @@ run_nohup () {
 run_normal () {
     local p1=$1
     cd $dir_scripts
-    import_config_and_check
+    import_config
     define_program "$p1"
     combine_all
     if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
@@ -117,8 +117,8 @@ run_normal () {
 run_concurrent () {
     local p1=$1
     cd $dir_scripts
-    import_config_and_check
-    define_program
+    import_config
+    define_program "$p1"
     make_dir $dir_log/$p1
     log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n"

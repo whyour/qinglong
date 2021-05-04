@@ -5,7 +5,7 @@ dir_shell=/ql/shell
 . $dir_shell/share.sh
 
 ## 导入配置文件
-import_config_no_check rmlog
+import_config
 
 days=$1
 
