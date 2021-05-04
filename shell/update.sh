@@ -363,6 +363,7 @@ main() {
         else
             echo -e "命令输入错误...\n"
             usage
+        fi
         ;;
     raw)
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
@@ -372,7 +373,7 @@ main() {
         else
             echo -e "命令输入错误...\n"
             usage
-        ;;
+        fi
         ;;
     rmlog)
         . $dir_shell/rmlog.sh "$p2" | tee $log_path
