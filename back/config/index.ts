@@ -7,11 +7,10 @@ const envFound = dotenv.config();
 const rootPath = path.resolve(__dirname, '../../');
 const cookieFile = path.join(rootPath, 'config/cookie.sh');
 const confFile = path.join(rootPath, 'config/config.sh');
-const sampleFile = path.join(rootPath, 'sample/config.sh.sample');
+const sampleFile = path.join(rootPath, 'sample/config.sample.sh');
 const crontabFile = path.join(rootPath, 'config/crontab.list');
 const confBakDir = path.join(rootPath, 'config/bak/');
 const authConfigFile = path.join(rootPath, 'config/auth.json');
-const shareCodeDir = path.join(rootPath, 'log/export_sharecodes/');
 const extraFile = path.join(rootPath, 'config/extra.sh');
 const logPath = path.join(rootPath, 'log/');
 const authError = '错误的用户名密码，请重试';
@@ -40,7 +39,6 @@ export default {
   authError,
   logPath,
   extraFile,
-  shareCodeDir,
   authConfigFile,
   confBakDir,
   crontabFile,

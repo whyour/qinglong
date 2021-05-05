@@ -124,10 +124,10 @@ export default class CronService {
       fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
 
       let cmdStr = res.command;
-      if (!res.command.startsWith('task')) {
+      if (!cmdStr.startsWith('task') && !cmdStr.startsWith('ql ')) {
         cmdStr = `task ${cmdStr}`;
       }
-      if (res.command.endsWith('.js')) {
+      if (cmdStr.endsWith('.js')) {
         cmdStr = `${cmdStr} now`;
       }
       const cmd = spawn(cmdStr, { shell: true });

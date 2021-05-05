@@ -26,10 +26,6 @@ export default (app: Router) => {
           case 'crontab':
             content = getFileContentByName(config.crontabFile);
             break;
-          case 'shareCode':
-            let shareCodeFile = getLastModifyFilePath(config.shareCodeDir);
-            content = getFileContentByName(shareCodeFile);
-            break;
           case 'extra':
             content = getFileContentByName(config.extraFile);
             break;

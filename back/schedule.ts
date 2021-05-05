@@ -32,7 +32,7 @@ const run = async () => {
           ) {
             schedule.scheduleJob(task.schedule, function () {
               let command = task.command as string;
-              if (!command.startsWith('task ')) {
+              if (!command.startsWith('task ') && !command.startsWith('ql ')) {
                 command = `task ${command}`;
               }
               exec(command);
