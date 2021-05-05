@@ -5,6 +5,7 @@ import Logger from './loaders/logger';
 import { Container } from 'typedi';
 import CronService from './services/cron';
 import { CrontabStatus } from './data/cron';
+import config from './config';
 
 const app = express();
 
@@ -44,11 +45,11 @@ const run = async () => {
 };
 
 app
-  .listen(5800, () => {
+  .listen(config.cronPort, () => {
     run();
     Logger.info(`
       ################################################
-      🛡️  Schedule listening on port: 5800 🛡️
+      🛡️  Schedule listening on port: ${config.cronPort} 🛡️
       ################################################
     `);
   })
