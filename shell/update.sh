@@ -119,10 +119,8 @@ del_cron() {
     exit_status=$?
     detail2=$(echo $detail | perl -pe "s| |\\\n|g")
     if [[ $exit_status -eq 0 ]]; then
-        echo -e "成功删除失效的的定时任务...\n"
         notify "删除失效任务通知" "成功删除以下失效的定时任务：\n$detail2"
     else
-        echo -e "删除定时任务出错，请手动删除...\n"
         notify "删除任务失败通知" "尝试自动删除以下定时任务出错，请手动删除：\n$detail2"
     fi
 }
@@ -156,10 +154,8 @@ add_cron() {
     exit_status=$?
     local detail2=$(echo $detail | perl -pe "s| |\\\n|g")
     if [[ $exit_status -eq 0 ]]; then
-        echo -e "成功添加新的定时任务...\n"
         notify "新增任务通知" "成功添加新的定时任务：\n$detail2"
     else
-        echo -e "添加新的定时任务出错，请手动添加...\n"
         notify "新任务添加失败通知" "尝试自动添加以下新的定时任务出错，请手动添加：\n$detail2"
     fi
 }
@@ -247,12 +243,12 @@ run_extra_shell() {
 ## 脚本用法
 usage() {
     echo -e "本脚本用法："
-    echo -e "1. $cmd_update update                              # 更新青龙，并且运行extra.sh"
-    echo -e "2. $cmd_update restart                             # 重新启动青龙并编译，不会运行extra.sh"
-    echo -e "3. $cmd_update raw <fileurl>                       # 更新单个文件脚本"
-    echo -e "4. $cmd_update repo <repourl> <path> <blacklist>   # 更新仓库的脚本"
-    echo -e "5. $cmd_update rmlog <days>                        # 删除旧日志"
-    echo -e "6. $cmd_update code                                # 获取互助码"
+    echo -e "1. $cmd_update update                                           # 更新青龙，并且运行extra.sh"
+    echo -e "2. $cmd_update restart                                          # 重新启动青龙并编译，不会运行extra.sh"
+    echo -e "3. $cmd_update raw <fileurl>                                    # 更新单个文件脚本"
+    echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence>   # 更新仓库的脚本"
+    echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
+    echo -e "6. $cmd_update code                                             # 获取互助码"
 }
 
 ## 更新qinglong
@@ -357,6 +353,7 @@ main() {
         restart_qinglong | tee $log_path
         ;;
     repo)
+        get_user_info
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
         if [[ -n $p2 ]]; then
@@ -367,6 +364,7 @@ main() {
         fi
         ;;
     raw)
+        get_user_info
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
         if [[ -n $p2 ]]; then

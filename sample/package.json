@@ -2,13 +2,15 @@
   "name": "dependence",
   "author": "",
   "license": "ISC",
-  "crypto-js": "^4.0.0",
-  "download": "^8.0.0",
-  "got": "^11.5.1",
-  "http-server": "^0.12.3",
-  "qrcode-terminal": "^0.12.0",
-  "request": "^2.88.2",
-  "tough-cookie": "^4.0.0",
-  "tunnel": "0.0.6",
-  "ws": "^7.4.3"
+  "dependencies": {
+    "crypto-js": "^4.0.0",
+    "download": "^8.0.0",
+    "got": "^11.5.1",
+    "http-server": "^0.12.3",
+    "qrcode-terminal": "^0.12.0",
+    "request": "^2.88.2",
+    "tough-cookie": "^4.0.0",
+    "tunnel": "0.0.6",
+    "ws": "^7.4.3"
+  }
 }
