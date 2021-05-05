@@ -170,6 +170,7 @@ update_repo() {
     local url="$1"
     local path="$2"
     local blackword="$3"
+    local dependence="$4"
     local urlTmp="${url%*/}"
     local repoTmp="${urlTmp##*/}"
     local repo="${repoTmp%.*}"
@@ -178,7 +179,7 @@ update_repo() {
     local authorTmp2="${authorTmp1##*:}"
     local author="${authorTmp2##*.}"
 
-    local repo_path="${author}_${repo}"
+    local repo_path="${dir_repo}/${author}_${repo}"
     if [ -d ${repo_path}/.git ]; then
         reset_romote_url ${repo_path} ${url}
         git_pull_scripts ${repo_path}
@@ -191,7 +192,7 @@ update_repo() {
         echo -e "\n更新${repo_path}失败，请检查原因...\n"
     fi
 
-    diff_scripts $repo_path $author $path $blackword
+    diff_scripts $repo_path $author $path $blackword $dependence
 }
 
 ## 更新所有 raw 文件
@@ -270,7 +271,7 @@ update_qinglong() {
 
 ## 对比脚本
 diff_scripts() {
-    gen_list_repo $1 $2 $3 $4
+    gen_list_repo $1 $2 $3 $4 $5
     diff_cron $list_own_scripts $list_own_user $list_own_add $list_own_drop
 
     if [ -s $list_own_drop ]; then
@@ -294,24 +295,23 @@ gen_list_repo() {
     local author="$2"
     local path="$3"
     local blackword="$4"
+    local dependence="$4"
     rm -f $dir_list_tmp/own*.list >/dev/null 2>&1
 
     cd ${repo_path}
-    files=$(find . -name "*.js")
-    if [ $path ]; then
-        files=$(find . -name "*.js" | egrep $path)
+    files=$(find . -name "*.js" | sed 's/^..//')
+    if [[ -n $path ]]; then
+        files=$(find . -name "*.js" | sed 's/^..//' | egrep $path)
     fi
-    if [ $blackword ]; then
-        files=$(find . -name "*.js" | egrep -v $blackword | egrep $path)
+    if [[ -n $blackword ]]; then
+        files=$(find . -name "*.js" | sed 's/^..//' | egrep -v $blackword | egrep $path)
+    fi
+    if [[ -n $dependence ]]; then
+        find . -name "*.js" | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
     fi
     for file in ${files}; do
         filename=$(basename $file)
-        local non_scripts=$(echo $filename | egrep jd | egrep -v "jd_")
-        if [[ -z $non_scripts ]]; then
-            cp -f $file $dir_scripts/${filename}
-        else
-            cp -f $file $dir_scripts/${author}_${filename}
-        fi
+        cp -f $file $dir_scripts/${author}_${filename}
         echo ${author}_${filename} >>$list_own_scripts
     done
     grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | sort -u >$list_own_user
@@ -345,6 +345,7 @@ main() {
     local p2=$2
     local p3=$3
     local p4=$4
+    local p4=$5
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_path="$dir_log/update/${log_time}_$p1.log"
     case $p1 in
@@ -359,7 +360,7 @@ main() {
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" | tee $log_path
+            update_repo "$p2" "$p3" "$p4" "$p5" | tee $log_path
         else
             echo -e "命令输入错误...\n"
             usage
