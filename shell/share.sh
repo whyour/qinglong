@@ -48,7 +48,6 @@ original_name=(
 
 ## 导入配置文件
 import_config () {
-    [ -f $file_cookie ] && . $file_cookie
     [ -f $file_config_user ] && . $file_config_user
     user_sum=0
     for line in $(cat $file_cookie); do

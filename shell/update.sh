@@ -291,18 +291,18 @@ gen_list_repo() {
     local author="$2"
     local path="$3"
     local blackword="$4"
-    local dependence="$4"
+    local dependence="$5"
     rm -f $dir_list_tmp/own*.list >/dev/null 2>&1
 
     cd ${repo_path}
     files=$(find . -name "*.js" | sed 's/^..//')
-    if [[ -n $path ]]; then
+    if [[ $path ]]; then
         files=$(find . -name "*.js" | sed 's/^..//' | egrep $path)
     fi
-    if [[ -n $blackword ]]; then
+    if [[ $blackword ]]; then
         files=$(find . -name "*.js" | sed 's/^..//' | egrep -v $blackword | egrep $path)
     fi
-    if [[ -n $dependence ]]; then
+    if [[ $dependence ]]; then
         find . -name "*.js" | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
     fi
     for file in ${files}; do
@@ -341,7 +341,7 @@ main() {
     local p2=$2
     local p3=$3
     local p4=$4
-    local p4=$5
+    local p5=$5
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_path="$dir_log/update/${log_time}_$p1.log"
     case $p1 in
