@@ -229,11 +229,11 @@ export default class CronService {
         var command = line.replace(regex, '').trim();
         var schedule = line.replace(command, '').trim();
 
-        var is_valid = false;
-        try {
-          is_valid = cron_parser.parseString(line).expressions.length > 0;
-        } catch (e) {}
-        if (command && schedule && is_valid) {
+        if (
+          command &&
+          schedule &&
+          cron_parser.parseExpression(schedule).hasNext()
+        ) {
           var name = namePrefix + '_' + index;
 
           this.cronDb.findOne({ command, schedule }, (err, doc) => {

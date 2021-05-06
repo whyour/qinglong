@@ -80,7 +80,7 @@ const CronModal = ({
             { required: true },
             {
               validator: (rule, value) => {
-                if (cronParse.parseString(value).expressions.length > 0) {
+                if (cronParse.parseExpression(value).hasNext()) {
                   return Promise.resolve();
                 } else {
                   return Promise.reject('Cron表达式格式有误');
