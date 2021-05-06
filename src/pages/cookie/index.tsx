@@ -362,7 +362,7 @@ const Config = () => {
     });
   };
 
-  const handleCancel = (cookies: any[]) => {
+  const handleCancel = (cookies?: any[]) => {
     setIsModalVisible(false);
     if (cookies && cookies.length > 0) {
       handleCookies(cookies);

@@ -68,14 +68,14 @@ const CronModal = ({
     >
       <Form form={form} layout="vertical" name="form_in_modal" preserve={false}>
         <Form.Item name="name" label="名称">
-          <Input />
+          <Input placeholder="请输入任务名称" />
         </Form.Item>
-        <Form.Item name="command" label="任务" rules={[{ required: true }]}>
-          <Input />
+        <Form.Item name="command" label="命令" rules={[{ required: true }]}>
+          <Input placeholder="请输入要执行的命令" />
         </Form.Item>
         <Form.Item
           name="schedule"
-          label="时间"
+          label="定时规则"
           rules={[
             { required: true },
             {
@@ -89,7 +89,7 @@ const CronModal = ({
             },
           ]}
         >
-          <Input />
+          <Input placeholder="秒(可选) 分 时 天 月 周" />
         </Form.Item>
       </Form>
     </Modal>
