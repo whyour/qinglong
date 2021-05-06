@@ -138,10 +138,10 @@ add_cron() {
         if [ -f $file ]; then
             cron_line=$(
                 perl -ne "{
-                        print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
+                        print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
                     }" $file |
                     perl -pe "{
-                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1|g;
+                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1|g;
                         s|  | |g
                     }" | sort -u | head -1
             )
@@ -310,7 +310,7 @@ gen_list_repo() {
         cp -f $file $dir_scripts/${author}_${filename}
         echo ${author}_${filename} >>$list_own_scripts
     done
-    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | sort -u >$list_own_user
+    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >$list_own_user
     cd $dir_current
 }
 
