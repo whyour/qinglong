@@ -113,8 +113,9 @@ run_normal () {
         fi
     fi
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_path="$dir_log/$p1/$log_time.log"
-    make_dir "$dir_log/$p1"
+    log_dir="$dir_log/${p1%%.*}"
+    log_path="$log_dir/$log_time.log"
+    make_dir "$log_dir"
     $which_program $p1 2>&1 | tee $log_path
 }
 
@@ -124,12 +125,13 @@ run_concurrent () {
     local p1=$1
     cd $dir_scripts
     define_program "$p1"
-    make_dir $dir_log/$p1
+    log_dir="$dir_log/${p1%%.*}"
+    make_dir $log_dir
     log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n"
     for ((user_num=1; user_num<=$user_sum; user_num++)); do
         combine_one $user_num
-        log_path="$dir_log/$p1/${log_time}_${user_num}.log"
+        log_path="$log_dir/${log_time}_${user_num}.log"
         $which_program $p1 &>$log_path &
     done
 }
