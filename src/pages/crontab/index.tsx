@@ -385,6 +385,7 @@ const Crontab = () => {
 
   useEffect(() => {
     if (logCron) {
+      localStorage.setItem('logCron', logCron._id);
       setIsLogModalVisible(true);
     }
   }, [logCron]);
