@@ -165,11 +165,11 @@ export default class CookieService {
         { _id: payload._id },
         payload,
         { returnUpdatedDocs: true },
-        (err, docs) => {
+        (err, num, doc) => {
           if (err) {
             this.logger.error(err);
           } else {
-            resolve(docs as Cookie);
+            resolve(doc as Cookie);
           }
         },
       );

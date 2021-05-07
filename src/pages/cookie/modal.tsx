@@ -46,7 +46,7 @@ const CookieModal = ({
       });
     }
     setLoading(false);
-    handleCancel(data);
+    handleCancel(cookie ? [data] : data);
   };
 
   useEffect(() => {
