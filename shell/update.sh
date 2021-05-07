@@ -113,6 +113,7 @@ del_cron() {
     for cron in $(cat $list_drop); do
         local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron$" | perl -pe "s|.*ID=(.*) $cmd_task $cron$|\1|")
         result=$(del_cron_api "$id")
+        echo -e "$result"
         rm -f "$dir_scripts/${cron}"
         detail="${detail}\n${result}"
     done
@@ -143,6 +144,7 @@ add_cron() {
             [[ -z $cron_name ]] && cron_name="$file_name"
             [[ -z $cron_line ]] && cron_line="0 6 * * *"
             result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
+            echo -e "$result"
             detail="${detail}\n${result}"
         fi
     done
@@ -208,6 +210,7 @@ update_raw() {
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
             result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
+            echo -e "$result"
             notify "新增任务通知" "\n$result"
             # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
         fi
