@@ -108,21 +108,15 @@ output_list_add_drop() {
 del_cron() {
     local list_drop=$1
     local author=$2
-    local detail detail2
-    detail=$(cat $list_drop)
+    local detail=""
     echo -e "开始尝试自动删除失效的定时任务...\n"
-    for cron in $detail; do
+    for cron in $(cat $list_drop); do
         local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron$" | perl -pe "s|.*ID=(.*) $cmd_task $cron$|\1|")
-        del_cron_api "$id"
+        result=$(del_cron_api "$id")
         rm -f "$dir_scripts/${cron}"
+        detail="${detail}\n${result}"
     done
-    exit_status=$?
-    detail2=$(echo $detail | perl -pe "s| |\\\n|g")
-    if [[ $exit_status -eq 0 ]]; then
-        notify "删除失效任务通知" "成功删除以下失效的定时任务：\n$detail2"
-    else
-        notify "删除任务失败通知" "尝试自动删除以下定时任务出错，请手动删除：\n$detail2"
-    fi
+    notify "删除失效任务通知" "$detail2"
 }
 
 ## 自动增加定时任务，需要：1.AutoAddCron 设置为 true；2.正常更新js脚本，没有报错；3.存在新任务；4.crontab.list存在并且不为空
@@ -131,9 +125,9 @@ add_cron() {
     local list_add=$1
     local author=$2
     echo -e "开始尝试自动添加定时任务...\n"
-    local detail=$(cat $list_add)
+    local detail=""
     cd $dir_scripts
-    for file in $detail; do
+    for file in $(cat $list_add); do
         local file_name=${file/${author}\_/}
         if [ -f $file ]; then
             cron_line=$(
@@ -148,16 +142,11 @@ add_cron() {
             cron_name=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
             [[ -z $cron_name ]] && cron_name="$file_name"
             [[ -z $cron_line ]] && cron_line="0 6 * * *"
-            add_cron_api "$cron_line:$cmd_task $file:$cron_name"
+            result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
+            detail="${detail}\n${result}"
         fi
     done
-    exit_status=$?
-    local detail2=$(echo $detail | perl -pe "s| |\\\n|g")
-    if [[ $exit_status -eq 0 ]]; then
-        notify "新增任务通知" "成功添加新的定时任务：\n$detail2"
-    else
-        notify "新任务添加失败通知" "尝试自动添加以下新的定时任务出错，请手动添加：\n$detail2"
-    fi
+    notify "新增任务通知" "$detail"
 }
 
 ## 更新仓库
@@ -207,10 +196,10 @@ update_raw() {
         cp -f $raw_file_name $dir_scripts/${filename}
         cron_line=$(
             perl -ne "{
-                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
+                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
                 }" $raw_file_name |
                 perl -pe "{
-                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$raw_file_name.*|\1|g;
+                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$raw_file_name.*|\1|g;
                     s|  | |g
                 }" | sort -u | head -1
         )
@@ -249,6 +238,7 @@ usage() {
     echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence>   # 更新仓库的脚本"
     echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
     echo -e "6. $cmd_update code                                             # 获取互助码"
+    echo -e "6. $cmd_update bot                                              # 启动tg-bot"
 }
 
 ## 更新qinglong
@@ -379,6 +369,9 @@ main() {
         ;;
     code)
         . $dir_shell/code.sh
+        ;;
+    bot)
+        . $dir_shell/bot.sh
         ;;
     *)
         echo -e "命令输入错误...\n"

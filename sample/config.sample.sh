@@ -1,5 +1,5 @@
 ## Version: v2.0.0
-## Date: 2021-04-07
+## Date: 2021-05-07
 ## Update Content: 新一版青龙。
 
 ## 上面版本号中，如果第2位数字有变化，那么代表增加了新的参数，如果只有第3位数字有变化，仅代表更新了注释，没有增加新的参数，可更新可不更新
@@ -19,8 +19,8 @@ CommandTimeoutTime="1h"
 ## 在crontab.list中，除掉每小时上述时间启动的任务外，其他任务在你定义了 RandomDelay 的情况下，一律启用随机延迟，但如果你给某些任务添加了 "now" 或者 "conc"，那么这些任务也将无视随机延迟直接启动
 RandomDelay="300"
 
-## 如果你自己会写shell脚本，并且希望在每次运行 ql update 命令时，额外运行你的 shell 脚本，请赋值为 "true"
-EnableExtraShell=""
+## 如果你自己会写shell脚本，并且希望在每次运行 ql update 命令时，额外运行你的 shell 脚本，请赋值为 "true"，默认为true
+EnableExtraShell="true"
 
 ## 自动按顺序进行账号间互助（选填） 设置为 true 时，将直接导入code最新日志来进行互助
 AutoHelpOther=""
@@ -33,7 +33,7 @@ AutoHelpOther=""
 HelpType=""
 
 
-## 需组合的环境变量列表，env_name需要和var_name一一对应
+## 需组合的环境变量列表，env_name需要和var_name一一对应，如何有新活动按照格式添加(不懂勿动)
 env_name=(
   JD_COOKIE
   FRUITSHARECODES

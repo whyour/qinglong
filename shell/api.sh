@@ -4,21 +4,6 @@ get_token() {
     token=$(cat $file_auth_user | jq -r .token)
 }
 
-get_json_value() {
-    local json=$1
-    local key=$2
-
-    if [[ -z "$3" ]]; then
-        local num=1
-    else
-        local num=$3
-    fi
-
-    local value=$(echo "${json}" | awk -F"[,:}]" '{for(i=1;i<=NF;i++){if($i~/'${key}'\042/){print $(i+1)}}}' | tr -d '"' | sed -n ${num}p)
-
-    echo ${value}
-}
-
 add_cron_api() {
     local currentTimeStamp=$(date +%s)
     if [ $# -eq 1 ]; then
@@ -44,10 +29,11 @@ add_cron_api() {
             --compressed
     )
     code=$(echo $api | jq -r .code)
+    message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name 添加成功"
+        return "$name 添加成功"
     else
-        echo -e "$name 添加失败"
+        return "$name 添加失败(${message})"
     fi
 }
 
@@ -79,10 +65,11 @@ update_cron_api() {
             --compressed
     )
     code=$(echo $api | jq -r .code)
+    message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name 添加成功"
+        return "$name 更新成功"
     else
-        echo -e "$name 添加失败"
+        return "$name 更新失败(${message})"
     fi
 }
 
@@ -101,10 +88,11 @@ del_cron_api() {
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
     )
     code=$(echo $api | jq -r .code)
+    message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name 删除成功"
+        return "$name 删除成功"
     else
-        echo -e "$name 删除失败"
+        return "$name 删除失败(${message})"
     fi
 }
 

@@ -5,11 +5,11 @@ dir_shell=/ql/shell
 . $dir_shell/share.sh
 
 ## 组合Cookie和互助码子程序，$1：要组合的内容
-combine_sub () {
+combine_sub() {
     local what_combine=$1
     local combined_all=""
     local tmp1 tmp2
-    for ((i=1; i<=$user_sum; i++)); do
+    for ((i = 1; i <= $user_sum; i++)); do
         local tmp1=$what_combine$i
         local tmp2=${!tmp1}
         combined_all="$combined_all&$tmp2"
@@ -18,23 +18,23 @@ combine_sub () {
 }
 
 ## 正常依次运行时，组合所有账号的Cookie与互助码
-combine_all () {
-    for ((i=0; i<${#env_name[*]}; i++)); do
+combine_all() {
+    for ((i = 0; i < ${#env_name[*]}; i++)); do
         export ${env_name[i]}=$(combine_sub ${var_name[i]})
     done
 }
 
 ## 并发运行时，直接申明每个账号的Cookie与互助码，$1：用户Cookie编号
-combine_one () {
+combine_one() {
     local user_num=$1
-    for ((i=0; i<${#env_name[*]}; i++)); do
+    for ((i = 0; i < ${#env_name[*]}; i++)); do
         local tmp=${var_name[i]}$user_num
         export ${env_name[i]}=${!tmp}
     done
 }
 
 ## 选择python3还是node
-define_program () {
+define_program() {
     local p1=$1
     if [[ $p1 == *.js ]]; then
         which_program="node"
@@ -43,9 +43,9 @@ define_program () {
     else
         which_program=""
     fi
-}   
+}
 
-random_delay () {
+random_delay() {
     local random_delay_max=$RandomDelay
     if [[ $random_delay_max ]] && [[ $random_delay_max -gt 0 ]]; then
         local current_min=$(date "+%-M")
@@ -58,7 +58,7 @@ random_delay () {
 }
 
 ## scripts目录下所有可运行脚本数组
-gen_array_scripts () {
+gen_array_scripts() {
     local dir_current=$(pwd)
     local i="-1"
     cd $dir_scripts
@@ -74,7 +74,7 @@ gen_array_scripts () {
 }
 
 ## 使用说明
-usage () {
+usage() {
     define_cmd
     gen_array_scripts
     echo -e "task命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或去掉 “$dir_scripts/” 目录后的相对路径（定时任务中请写作相对路径），用法为："
@@ -83,7 +83,7 @@ usage () {
     echo -e "3.$cmd_task <file_name> conc   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
     if [[ ${#array_scripts[*]} -gt 0 ]]; then
         echo -e "\n当前有以下脚本可以运行:"
-        for ((i=0; i<${#array_scripts[*]}; i++)); do
+        for ((i = 0; i < ${#array_scripts[*]}; i++)); do
             echo -e "$(($i + 1)). ${array_scripts_name[i]}：${array_scripts[i]}"
         done
     else
@@ -92,13 +92,13 @@ usage () {
 }
 
 ## run nohup，$1：文件名，不含路径，带后缀
-run_nohup () {
+run_nohup() {
     local file_name=$1
     nohup node $file_name &>$log_path &
 }
 
 ## 正常运行单个脚本，$1：传入参数
-run_normal () {
+run_normal() {
     local p1=$1
     cd $dir_scripts
     define_program "$p1"
@@ -121,7 +121,7 @@ run_normal () {
 
 ## 并发执行，因为是并发，所以日志只能直接记录在日志文件中（日志文件以Cookie编号结尾），前台执行并发跑时不会输出日志
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
-run_concurrent () {
+run_concurrent() {
     local p1=$1
     cd $dir_scripts
     define_program "$p1"
@@ -129,41 +129,48 @@ run_concurrent () {
     make_dir $log_dir
     log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n"
-    for ((user_num=1; user_num<=$user_sum; user_num++)); do
+    for ((user_num = 1; user_num <= $user_sum; user_num++)); do
         combine_one $user_num
         log_path="$log_dir/${log_time}_${user_num}.log"
         timeout $CommandTimeoutTime $which_program $p1 &>$log_path &
     done
 }
 
+## 运行其他命令
+run_else() {
+    local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
+    local log_dir="$dir_log/$1"
+    local log_path="$log_dir/$log_time.log"
+    make_dir "$log_dir"
+    timeout $CommandTimeoutTime "$@" 2>&1 | tee $log_path
+}
+
 ## 命令检测
-main () {
+main() {
     case $# in
-        0)
-            echo
-            usage
+    0)
+        echo
+        usage
+        ;;
+    1)
+        run_normal $1
+        ;;
+    2)
+        case $2 in
+        now)
+            run_normal $1 $2
             ;;
-        1)
-            run_normal $1
-            ;;
-        2)
-            case $2 in
-                now)
-                    run_normal $1 $2
-                    ;;
-                conc)
-                    run_concurrent $1 $2
-                    ;;
-                *)
-                    echo -e "\n命令输入错误...\n"
-                    usage
-                    ;;
-            esac
+        conc)
+            run_concurrent $1 $2
             ;;
         *)
-            echo -e "\n命令参数过多...\n"
-            usage
+            run_else "$@"
             ;;
+        esac
+        ;;
+    *)
+        run_else "$@"
+        ;;
     esac
 }
 

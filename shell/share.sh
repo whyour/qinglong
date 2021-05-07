@@ -49,7 +49,7 @@ original_name=(
 )
 
 ## 导入配置文件
-import_config () {
+import_config() {
     [ -f $file_config_user ] && . $file_config_user
     user_sum=0
     for line in $(cat $file_cookie); do
@@ -59,7 +59,7 @@ import_config () {
 }
 
 ## 创建目录，$1：目录的绝对路径
-make_dir () {
+make_dir() {
     local dir=$1
     if [[ ! -d $dir ]]; then
         mkdir -p $dir
@@ -67,7 +67,7 @@ make_dir () {
 }
 
 ## 检测termux
-detect_termux () {
+detect_termux() {
     if [[ ${ANDROID_RUNTIME_ROOT}${ANDROID_ROOT} ]] || [[ $PATH == *com.termux* ]]; then
         is_termux=1
     else
@@ -76,18 +76,18 @@ detect_termux () {
 }
 
 ## 检测macos
-detect_macos () {
+detect_macos() {
     [[ $(uname -s) == Darwin ]] && is_macos=1 || is_macos=0
 }
 
 ## 生成随机数，$1：用来求余的数字
-gen_random_num () {
+gen_random_num() {
     local divi=$1
     echo $((${RANDOM} % $divi))
 }
 
 ## 创建软连接的子函数，$1：软连接文件路径，$2：要连接的对象
-link_shell_sub () {
+link_shell_sub() {
     local link_path="$1"
     local original_path="$2"
     if [ ! -L $link_path ] || [[ $(readlink -f $link_path) != $original_path ]]; then
@@ -97,7 +97,7 @@ link_shell_sub () {
 }
 
 ## 创建软连接
-link_shell () {
+link_shell() {
     if [[ $is_termux -eq 1 ]]; then
         local path="/data/data/com.termux/files/usr/bin/"
     elif [[ $PATH == */usr/local/bin* ]] && [ -d /usr/local/bin ]; then
@@ -107,14 +107,14 @@ link_shell () {
         echo -e "脚本功能受限，请自行添加命令的软连接...\n"
     fi
     if [[ $path ]]; then
-        for ((i=0; i<${#link_name[*]}; i++)); do
+        for ((i = 0; i < ${#link_name[*]}; i++)); do
             link_shell_sub "$path${link_name[i]}" "$dir_shell/${original_name[i]}"
         done
     fi
 }
 
 ## 定义各命令
-define_cmd () {
+define_cmd() {
     local cmd_prefix cmd_suffix
     if type task >/dev/null 2>&1; then
         cmd_suffix=""
@@ -131,13 +131,13 @@ define_cmd () {
             cmd_prefix="bash $dir_shell/"
         fi
     fi
-    for ((i=0; i<${#link_name[*]}; i++)); do
+    for ((i = 0; i < ${#link_name[*]}; i++)); do
         export cmd_${link_name[i]}="${cmd_prefix}${link_name[i]}${cmd_suffix}"
     done
 }
 
 ## 修复配置文件
-fix_config () {
+fix_config() {
     make_dir $dir_config
     make_dir $dir_log
     make_dir $dir_db
@@ -147,7 +147,7 @@ fix_config () {
     make_dir $dir_repo
     make_dir $dir_raw
     make_dir $dir_update_log
-    
+
     if [ ! -s $file_config_user ]; then
         echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
         cp -fv $file_config_sample $file_config_user
