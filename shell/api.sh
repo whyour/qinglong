@@ -31,9 +31,9 @@ add_cron_api() {
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name 添加成功"
+        echo -e "$name -> 添加成功"
     else
-        echo -e "$name 添加失败(${message})"
+        echo -e "$name -> 添加失败(${message})"
     fi
 }
 
@@ -67,9 +67,9 @@ update_cron_api() {
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name 更新成功"
+        echo -e "$name -> 更新成功"
     else
-        echo -e "$name 更新失败(${message})"
+        echo -e "$name -> 更新失败(${message})"
     fi
 }
 
@@ -90,9 +90,9 @@ del_cron_api() {
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name 删除成功"
+        echo -e "$name -> 删除成功"
     else
-        echo -e "$name 删除失败(${message})"
+        echo -e "$name -> 删除失败(${message})"
     fi
 }
 
