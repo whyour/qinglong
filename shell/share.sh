@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 ## 目录
 dir_root=/ql
 dir_shell=$dir_root/shell
@@ -51,7 +53,7 @@ import_config () {
     [ -f $file_config_user ] && . $file_config_user
     user_sum=0
     for line in $(cat $file_cookie); do
-        let user_sum++
+        let user_sum+=1
         eval Cookie${user_sum}="\"$line\""
     done
 }
