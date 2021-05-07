@@ -207,7 +207,8 @@ update_raw() {
         [[ -z $cron_name ]] && cron_name="$raw_file_name"
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
-            add_cron_api "$cron_line:$cmd_task $filename:$cron_name"
+            result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
+            notify "新增任务通知" "\n$result"
             # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
         fi
     else
