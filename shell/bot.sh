@@ -17,7 +17,7 @@ cp -f "$repo_path/config/bot.json" "$dir_root/config"
 
 echo -e "3、启动bot程序...\n"
 cd $dir_root
-kill -9 $(ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}') 2>/dev/null
+ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
 nohup python3 -m jbot &
 
 exit 0
