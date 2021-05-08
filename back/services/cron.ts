@@ -74,8 +74,8 @@ export default class CronService {
     this.cronDb.update({ _id }, { $set: { stopped, saved: false } });
   }
 
-  public async remove(_id: string) {
-    this.cronDb.remove({ _id }, {});
+  public async remove(ids: string[]) {
+    this.cronDb.remove({ _id: { $in: ids } }, { multi: true });
     await this.set_crontab();
   }
 
@@ -112,69 +112,84 @@ export default class CronService {
     });
   }
 
-  public async run(_id: string) {
-    this.cronDb.find({ _id }).exec((err, docs: Crontab[]) => {
-      let res = docs[0];
-
-      this.logger.silly('Running job');
-      this.logger.silly('ID: ' + _id);
-      this.logger.silly('Original command: ' + res.command);
-
-      let logFile = `${config.manualLogPath}${res._id}.log`;
-      fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
-
-      let cmdStr = res.command;
-      if (!cmdStr.startsWith('task') && !cmdStr.startsWith('ql ')) {
-        cmdStr = `task ${cmdStr}`;
+  public async run(ids: string[]) {
+    this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
+      for (let i = 0; i < docs.length; i++) {
+        const doc = docs[i];
+        this.runSingle(doc);
       }
-      if (cmdStr.endsWith('.js')) {
-        cmdStr = `${cmdStr} now`;
-      }
-      const cmd = spawn(cmdStr, { shell: true });
-
-      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.running } });
-
-      cmd.stdout.on('data', (data) => {
-        this.logger.silly(`stdout: ${data}`);
-        fs.appendFileSync(logFile, data);
-      });
-
-      cmd.stderr.on('data', (data) => {
-        this.logger.error(`stderr: ${data}`);
-        fs.appendFileSync(logFile, data);
-      });
-
-      cmd.on('close', (code) => {
-        this.logger.silly(`child process exited with code ${code}`);
-        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
-      });
-
-      cmd.on('error', (err) => {
-        this.logger.silly(err);
-        fs.appendFileSync(logFile, err.stack);
-      });
-
-      cmd.on('exit', (code: number, signal: any) => {
-        this.logger.silly(`cmd exit ${code}`);
-        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
-        fs.appendFileSync(logFile, `\n\n执行结束...`);
-      });
-
-      cmd.on('disconnect', () => {
-        this.logger.silly(`cmd disconnect`);
-        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
-        fs.appendFileSync(logFile, `\n\n连接断开...`);
-      });
     });
   }
 
-  public async disabled(_id: string) {
-    this.cronDb.update({ _id }, { $set: { status: CrontabStatus.disabled } });
+  private async runSingle(cron: Crontab) {
+    let { _id, command } = cron;
+
+    this.logger.silly('Running job');
+    this.logger.silly('ID: ' + _id);
+    this.logger.silly('Original command: ' + command);
+
+    let logFile = `${config.manualLogPath}${_id}.log`;
+    fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
+
+    let cmdStr = command;
+    if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {
+      cmdStr = `task ${cmdStr}`;
+    }
+    if (cmdStr.endsWith('.js')) {
+      cmdStr = `${cmdStr} now`;
+    }
+    const cmd = spawn(cmdStr, { shell: true });
+
+    this.cronDb.update({ _id }, { $set: { status: CrontabStatus.running } });
+
+    cmd.stdout.on('data', (data) => {
+      this.logger.silly(`stdout: ${data}`);
+      fs.appendFileSync(logFile, data);
+    });
+
+    cmd.stderr.on('data', (data) => {
+      this.logger.error(`stderr: ${data}`);
+      fs.appendFileSync(logFile, data);
+    });
+
+    cmd.on('close', (code) => {
+      this.logger.silly(`child process exited with code ${code}`);
+      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+    });
+
+    cmd.on('error', (err) => {
+      this.logger.silly(err);
+      fs.appendFileSync(logFile, err.stack);
+    });
+
+    cmd.on('exit', (code: number, signal: any) => {
+      this.logger.silly(`cmd exit ${code}`);
+      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+      fs.appendFileSync(logFile, `\n\n执行结束...`);
+    });
+
+    cmd.on('disconnect', () => {
+      this.logger.silly(`cmd disconnect`);
+      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+      fs.appendFileSync(logFile, `\n\n连接断开...`);
+    });
+  }
+
+  public async disabled(ids: string[]) {
+    this.cronDb.update(
+      { _id: { $in: ids } },
+      { $set: { status: CrontabStatus.disabled } },
+      { multi: true },
+    );
     await this.set_crontab();
   }
 
-  public async enabled(_id: string) {
-    this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+  public async enabled(ids: string[]) {
+    this.cronDb.update(
+      { _id: { $in: ids } },
+      { $set: { status: CrontabStatus.idle } },
+      { multi: true },
+    );
   }
 
   public async log(_id: string) {

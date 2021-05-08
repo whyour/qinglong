@@ -51,18 +51,16 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/crons/:id/run',
+  route.put(
+    '/crons/run',
     celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
+      body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.run(req.params.id);
+        const data = await cronService.run(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -71,18 +69,16 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/crons/:id/disable',
+  route.put(
+    '/crons/disable',
     celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
+      body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.disabled(req.params.id);
+        const data = await cronService.disabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -91,18 +87,16 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/crons/:id/enable',
+  route.put(
+    '/crons/enable',
     celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
+      body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.enabled(req.params.id);
+        const data = await cronService.enabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -159,17 +153,15 @@ export default (app: Router) => {
   );
 
   route.delete(
-    '/crons/:id',
+    '/crons',
     celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
+      body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.remove(req.params.id);
+        const data = await cronService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);

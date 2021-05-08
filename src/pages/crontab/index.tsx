@@ -39,6 +39,18 @@ enum CrontabStatus {
   'disabled',
 }
 
+enum OperationName {
+  '启用',
+  '禁用',
+  '运行',
+}
+
+enum OperationPath {
+  'enable',
+  'disable',
+  'run',
+}
+
 const Crontab = () => {
   const columns = [
     {
@@ -142,6 +154,7 @@ const Crontab = () => {
   const [searchText, setSearchText] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   const getCrons = () => {
     setLoading(true);
@@ -177,7 +190,7 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}crons/${record._id}`)
+          .delete(`${config.apiPrefix}crons`, { data: [record._id] })
           .then((data: any) => {
             if (data.code === 200) {
               notification.success({
@@ -213,7 +226,7 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .get(`${config.apiPrefix}crons/${record._id}/run`)
+          .put(`${config.apiPrefix}crons/run`, { data: [record._id] })
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
@@ -252,21 +265,16 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .get(
-            `${config.apiPrefix}crons/${record._id}/${
+          .put(
+            `${config.apiPrefix}crons/${
               record.status === CrontabStatus.disabled ? 'enable' : 'disable'
             }`,
             {
-              data: { _id: record._id },
+              data: [record._id],
             },
           )
           .then((data: any) => {
             if (data.code === 200) {
-              notification.success({
-                message: `${
-                  record.status === CrontabStatus.disabled ? '启用' : '禁用'
-                }成功`,
-              });
               const newStatus =
                 record.status === CrontabStatus.disabled
                   ? CrontabStatus.idle
@@ -296,7 +304,7 @@ const Crontab = () => {
   }> = ({ record, index }) => (
     <Dropdown
       arrow
-      trigger={['click', 'hover']}
+      trigger={['click']}
       overlay={
         <Menu onClick={({ key }) => action(key, record, index)}>
           <Menu.Item key="edit" icon={<EditOutlined />}>
@@ -383,6 +391,74 @@ const Crontab = () => {
       .finally(() => setLoading(false));
   };
 
+  const onSelectChange = (selectedIds: any[]) => {
+    setSelectedRowIds(selectedIds);
+  };
+
+  const rowSelection = {
+    selectedRowIds,
+    onChange: onSelectChange,
+    selections: [
+      Table.SELECTION_ALL,
+      Table.SELECTION_INVERT,
+      Table.SELECTION_NONE,
+    ],
+  };
+
+  const delCrons = () => {
+    Modal.confirm({
+      title: '确认删除',
+      content: <>确认删除选中的定时任务吗</>,
+      onOk() {
+        request
+          .delete(`${config.apiPrefix}crons`, { data: selectedRowIds })
+          .then((data: any) => {
+            if (data.code === 200) {
+              notification.success({
+                message: '批量删除成功',
+              });
+              getCrons();
+            } else {
+              notification.error({
+                message: data,
+              });
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const operateCrons = (operationStatus: number) => {
+    Modal.confirm({
+      title: `确认${OperationName[operationStatus]}`,
+      content: <>确认{OperationName[operationStatus]}选中的定时任务吗</>,
+      onOk() {
+        request
+          .put(`${config.apiPrefix}crons/${OperationPath[operationStatus]}`, {
+            data: selectedRowIds,
+          })
+          .then((data: any) => {
+            if (data.code === 200) {
+              notification.success({
+                message: `批量${OperationName[operationStatus]}成功`,
+              });
+              getCrons();
+            } else {
+              notification.error({
+                message: data,
+              });
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
   useEffect(() => {
     if (logCron) {
       localStorage.setItem('logCron', logCron._id);
@@ -410,7 +486,6 @@ const Crontab = () => {
     <PageContainer
       className="code-mirror-wrapper"
       title="定时任务"
-      loading={loading}
       extra={[
         <Search
           placeholder="请输入名称或者关键词"
@@ -439,6 +514,38 @@ const Crontab = () => {
         height: '100vh',
       }}
     >
+      {selectedRowIds.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Button type="primary" onClick={delCrons}>
+            批量删除
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => operateCrons(0)}
+            style={{ marginLeft: 8 }}
+          >
+            批量启用
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => operateCrons(1)}
+            style={{ marginLeft: 8 }}
+          >
+            批量禁用
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => operateCrons(2)}
+            style={{ marginLeft: 8 }}
+          >
+            批量运行
+          </Button>
+          <span style={{ marginLeft: 8 }}>
+            已选择
+            <a>{selectedRowIds?.length}</a>项
+          </span>
+        </div>
+      )}
       <Table
         columns={columns}
         pagination={{
@@ -449,8 +556,9 @@ const Crontab = () => {
         dataSource={value}
         rowKey="_id"
         size="middle"
-        bordered
         scroll={{ x: 768 }}
+        loading={loading}
+        rowSelection={rowSelection}
       />
       <CronLogModal
         visible={isLogModalVisible}

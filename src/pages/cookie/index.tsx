@@ -434,7 +434,6 @@ const Config = () => {
     <PageContainer
       className="cookie-wrapper"
       title="Cookie管理"
-      loading={loading}
       extra={[
         <Button key="2" type="primary" onClick={() => addCookie()}>
           添加Cookie
@@ -463,9 +462,9 @@ const Config = () => {
           dataSource={value}
           rowKey="value"
           size="middle"
-          bordered
           scroll={{ x: 768 }}
           components={components}
+          loading={loading}
           onRow={(record, index) => {
             return {
               index,
