@@ -516,28 +516,24 @@ const Crontab = () => {
     >
       {selectedRowIds.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <Button type="primary" onClick={delCrons}>
+          <Button type="primary" style={{ marginBottom: 5 }} onClick={delCrons}>
             批量删除
           </Button>
           <Button
             type="primary"
             onClick={() => operateCrons(0)}
-            style={{ marginLeft: 8 }}
+            style={{ marginLeft: 8, marginBottom: 5 }}
           >
             批量启用
           </Button>
           <Button
             type="primary"
             onClick={() => operateCrons(1)}
-            style={{ marginLeft: 8 }}
+            style={{ marginLeft: 8, marginRight: 8 }}
           >
             批量禁用
           </Button>
-          <Button
-            type="primary"
-            onClick={() => operateCrons(2)}
-            style={{ marginLeft: 8 }}
-          >
+          <Button type="primary" onClick={() => operateCrons(2)}>
             批量运行
           </Button>
           <span style={{ marginLeft: 8 }}>
