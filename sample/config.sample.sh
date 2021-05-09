@@ -67,6 +67,7 @@ var_name=(
   ForOtherHealth
 )
 
+## name_js为脚本文件名，如果使用ql repo命令拉取，文件名含有作者名
 ## 所有有互助码的活动，把脚本名称列在 name_js 中，对应 config.sh 中互助码后缀列在 name_config 中，中文名称列在 name_chinese 中。
 ## name_js、name_config 和 name_chinese 中的三个名称必须一一对应。
 name_js=(
