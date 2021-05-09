@@ -417,6 +417,7 @@ const Crontab = () => {
               notification.success({
                 message: '批量删除成功',
               });
+              setSelectedRowIds([]);
               getCrons();
             } else {
               notification.error({

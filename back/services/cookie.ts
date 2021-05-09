@@ -121,6 +121,16 @@ export default class CookieService {
       });
   }
 
+  private async formatCookies(cookies: Cookie[]) {
+    const result = [];
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i];
+      const { status, nickname } = await this.getJdInfo(cookie.value);
+      result.push({ ...cookie, status, nickname });
+    }
+    return result;
+  }
+
   public async create(payload: string[]): Promise<Cookie[]> {
     const cookies = await this.cookies('');
     let position = initCookiePosition;
@@ -135,7 +145,7 @@ export default class CookieService {
     });
     const docs = await this.insert(tabs);
     await this.set_cookies();
-    return docs;
+    return await this.formatCookies(docs);
   }
 
   public async insert(payload: Cookie[]): Promise<Cookie[]> {
@@ -156,10 +166,11 @@ export default class CookieService {
     const tab = new Cookie({ ...doc, ...other });
     const newDoc = await this.updateDb(tab);
     await this.set_cookies();
-    return newDoc;
+    const [newCookie] = await this.formatCookies([newDoc]);
+    return newCookie;
   }
 
-  public async updateDb(payload: Cookie): Promise<Cookie> {
+  private async updateDb(payload: Cookie): Promise<Cookie> {
     return new Promise((resolve) => {
       this.cronDb.update(
         { _id: payload._id },
@@ -228,6 +239,11 @@ export default class CookieService {
         ],
       };
     }
+    const newDocs = await this.find(query, sort);
+    return await this.formatCookies(newDocs);
+  }
+
+  private async find(query: any, sort: any): Promise<Cookie[]> {
     return new Promise((resolve) => {
       this.cronDb
         .find(query)

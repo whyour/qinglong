@@ -117,7 +117,7 @@ del_cron() {
         rm -f "$dir_scripts/${cron}"
         detail="${detail}\n${result}"
     done
-    notify "删除失效任务通知" "$detail2"
+    notify "删除失效任务通知" "$detail"
 }
 
 ## 自动增加定时任务，需要：1.AutoAddCron 设置为 true；2.正常更新js脚本，没有报错；3.存在新任务；4.crontab.list存在并且不为空

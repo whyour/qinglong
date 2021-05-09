@@ -56,6 +56,8 @@ import_config() {
         let user_sum+=1
         eval Cookie${user_sum}="\"$line\""
     done
+
+    command_timeout_time=${CommandTimeoutTime:-"1h"}
 }
 
 ## 创建目录，$1：目录的绝对路径

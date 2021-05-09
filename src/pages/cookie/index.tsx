@@ -105,17 +105,17 @@ const Config = () => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },
     },
-    {
-      title: '用户名',
-      dataIndex: 'pin',
-      key: 'pin',
-      align: 'center' as const,
-      render: (text: string, record: any) => {
-        const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
-        const val = (match && match[1]) || '未匹配用户名';
-        return <span style={{ cursor: 'text' }}>{decodeUrl(val)}</span>;
-      },
-    },
+    // {
+    //   title: '用户名',
+    //   dataIndex: 'pin',
+    //   key: 'pin',
+    //   align: 'center' as const,
+    //   render: (text: string, record: any) => {
+    //     const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
+    //     const val = (match && match[1]) || '未匹配用户名';
+    //     return <span style={{ cursor: 'text' }}>{decodeUrl(val)}</span>;
+    //   },
+    // },
     {
       title: '昵称',
       dataIndex: 'nickname',
@@ -231,11 +231,11 @@ const Config = () => {
     }
   };
 
-  useEffect(() => {
-    if (value && loading) {
-      asyncUpdateStatus();
-    }
-  }, [value]);
+  // useEffect(() => {
+  //   if (value && loading) {
+  //     asyncUpdateStatus();
+  //   }
+  // }, [value]);
 
   const asyncUpdateStatus = async () => {
     for (let i = 0; i < value.length; i++) {
@@ -370,10 +370,10 @@ const Config = () => {
   };
 
   const handleCookies = (cookies: any[]) => {
+    const result = [...value];
     for (let i = 0; i < cookies.length; i++) {
       const cookie = cookies[i];
       const index = value.findIndex((x) => x._id === cookie._id);
-      const result = [...value];
       if (index === -1) {
         result.push(cookie);
       } else {
@@ -381,9 +381,8 @@ const Config = () => {
           ...cookie,
         });
       }
-      setValue(result);
-      refreshStatus(cookie, index);
     }
+    setValue(result);
   };
 
   const components = {
@@ -432,8 +431,8 @@ const Config = () => {
 
   return (
     <PageContainer
-      className="cookie-wrapper"
-      title="Cookie管理"
+      className="session-wrapper"
+      title="Session管理"
       extra={[
         <Button key="2" type="primary" onClick={() => addCookie()}>
           添加Cookie

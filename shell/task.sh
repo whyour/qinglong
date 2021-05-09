@@ -116,7 +116,7 @@ run_normal() {
     log_dir="$dir_log/${p1%%.*}"
     log_path="$log_dir/$log_time.log"
     make_dir "$log_dir"
-    timeout $CommandTimeoutTime $which_program $p1 2>&1 | tee $log_path
+    timeout $command_timeout_time $which_program $p1 2>&1 | tee $log_path
 }
 
 ## 并发执行，因为是并发，所以日志只能直接记录在日志文件中（日志文件以Cookie编号结尾），前台执行并发跑时不会输出日志
@@ -132,7 +132,7 @@ run_concurrent() {
     for ((user_num = 1; user_num <= $user_sum; user_num++)); do
         combine_one $user_num
         log_path="$log_dir/${log_time}_${user_num}.log"
-        timeout $CommandTimeoutTime $which_program $p1 &>$log_path &
+        timeout $command_timeout_time $which_program $p1 &>$log_path &
     done
 }
 
@@ -142,7 +142,7 @@ run_else() {
     local log_dir="$dir_log/$1"
     local log_path="$log_dir/$log_time.log"
     make_dir "$log_dir"
-    timeout $CommandTimeoutTime "$@" 2>&1 | tee $log_path
+    timeout $command_timeout_time "$@" 2>&1 | tee $log_path
 }
 
 ## 命令检测
