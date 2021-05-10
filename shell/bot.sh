@@ -12,7 +12,9 @@ echo
 echo -e "2、下载bot所需文件...\n"
 git clone -b master https://ghproxy.com/https://github.com/SuMaiKaDe/jddockerbot.git $repo_path
 cp -rf "$repo_path/jbot" $dir_root
-cp -f "$repo_path/config/bot.json" "$dir_root/config"
+if [[ ! -f "$dir_root/config/bot.json" ]]; then
+  cp -f "$repo_path/config/bot.json" "$dir_root/config"
+fi
 echo
 
 echo -e "3、安装python3依赖...\n"
@@ -24,7 +26,7 @@ echo
 echo -e "4、启动bot程序...\n"
 cd $dir_root
 ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
-nohup python3 -m jbot &
+nohup python3 -m jbot & >/dev/null 2>&1
 echo
 
 exit 0
