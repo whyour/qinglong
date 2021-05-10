@@ -127,7 +127,7 @@ del_cron() {
         rm -f $cron_file
     done
     result=$(del_cron_api "$ids")
-    detail="${result}\n${detail}"
+    detail="${result}\n\n${detail}"
     notify "删除失效任务通知" "$detail"
 }
 
