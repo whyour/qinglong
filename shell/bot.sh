@@ -22,9 +22,7 @@ pip3 install -r requirements.txt
 echo
 
 echo -e "4、启动bot程序...\n"
-cd $dir_root
-ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
-nohup python3 -m jbot &
+pm2 restart jbot 2>/dev/null || pm2 start jbot -n $dir_root/jbot --interpreter=python3 -- -m
 echo
 
 exit 0
