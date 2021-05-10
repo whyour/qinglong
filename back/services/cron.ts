@@ -22,12 +22,20 @@ export default class CronService {
     return this.cronDb;
   }
 
+  private isSixCron(cron: Crontab) {
+    const { schedule } = cron;
+    if (schedule.split(' ').length === 6) {
+      return true;
+    }
+    return false;
+  }
+
   public async create(payload: Crontab): Promise<Crontab> {
     const tab = new Crontab(payload);
     tab.created = new Date().valueOf();
     tab.saved = false;
     const doc = await this.insert(tab);
-    await this.set_crontab();
+    await this.set_crontab(this.isSixCron(doc));
     return doc;
   }
 
@@ -76,7 +84,7 @@ export default class CronService {
 
   public async remove(ids: string[]) {
     this.cronDb.remove({ _id: { $in: ids } }, { multi: true });
-    await this.set_crontab();
+    await this.set_crontab(true);
   }
 
   public async crontabs(searchText?: string): Promise<Crontab[]> {
@@ -126,14 +134,7 @@ export default class CronService {
       for (let i = 0; i < docs.length; i++) {
         const doc = docs[i];
         if (doc.pid) {
-          exec(`kill -9 ${doc.pid}`, (err, stdout, stderr) => {
-            let logFile = `${config.manualLogPath}${doc._id}.log`;
-            this.cronDb.update(
-              { _id: doc._id },
-              { $set: { status: CrontabStatus.idle } },
-            );
-            fs.appendFileSync(logFile, `\n\n${stderr}\n${stdout}...`);
-          });
+          exec(`kill -9 ${doc.pid}`);
         }
       }
     });
@@ -223,7 +224,7 @@ export default class CronService {
     return crontab_job_string;
   }
 
-  private async set_crontab() {
+  private async set_crontab(needReloadSchedule: boolean = false) {
     const tabs = await this.crontabs();
     var crontab_string = '';
     tabs.forEach((tab) => {
@@ -246,7 +247,9 @@ export default class CronService {
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
-    exec(`pm2 reload schedule`);
+    if (needReloadSchedule) {
+      exec(`pm2 reload schedule`);
+    }
     this.cronDb.update({}, { $set: { saved: true } }, { multi: true });
   }
 

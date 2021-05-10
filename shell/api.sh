@@ -74,10 +74,10 @@ update_cron_api() {
 }
 
 del_cron_api() {
-    local id=$1
+    local ids=$1
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s "http://localhost:5600/api/crons/$id?t=$currentTimeStamp" \
+        curl -s "http://localhost:5600/api/crons?t=$currentTimeStamp" \
             -X 'DELETE' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
@@ -85,14 +85,16 @@ del_cron_api() {
             -H "Content-Type: application/json;charset=UTF-8" \
             -H "Origin: http://localhost:5700" \
             -H "Referer: http://localhost:5700/crontab" \
-            -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
+            -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
+            --data-raw "[$ids]" \
+            --compressed
     )
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name -> 删除成功"
+        echo -e "删除成功"
     else
-        echo -e "$name -> 删除失败(${message})"
+        echo -e "删除失败(${message})"
     fi
 }
 
