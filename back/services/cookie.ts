@@ -125,14 +125,18 @@ export default class CookieService {
     const result = [];
     for (let i = 0; i < cookies.length; i++) {
       const cookie = cookies[i];
-      const { status, nickname } = await this.getJdInfo(cookie.value);
-      result.push({ ...cookie, status, nickname });
+      if (cookie.status !== CookieStatus.disabled) {
+        const { status, nickname } = await this.getJdInfo(cookie.value);
+        result.push({ ...cookie, status, nickname });
+      } else {
+        result.push({ ...cookie, nickname: '-' });
+      }
     }
     return result;
   }
 
   public async create(payload: string[]): Promise<Cookie[]> {
-    const cookies = await this.cookies('');
+    const cookies = await this.cookies();
     let position = initCookiePosition;
     if (cookies && cookies.length > 0) {
       position = cookies[cookies.length - 1].position;
@@ -224,6 +228,7 @@ export default class CookieService {
   public async cookies(
     searchText?: string,
     sort: any = { position: -1 },
+    needDetail: boolean = false,
   ): Promise<Cookie[]> {
     let query = {};
     if (searchText) {
@@ -240,7 +245,11 @@ export default class CookieService {
       };
     }
     const newDocs = await this.find(query, sort);
-    return await this.formatCookies(newDocs);
+    if (needDetail) {
+      return await this.formatCookies(newDocs);
+    } else {
+      return newDocs;
+    }
   }
 
   private async find(query: any, sort: any): Promise<Cookie[]> {
