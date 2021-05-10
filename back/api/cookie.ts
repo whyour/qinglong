@@ -13,7 +13,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cookieService = Container.get(CookieService);
-        const data = await cookieService.cookies();
+        const data = await cookieService.cookies('', { position: -1 }, true);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
