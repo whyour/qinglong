@@ -125,7 +125,6 @@ export default class CronService {
     this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
       for (let i = 0; i < docs.length; i++) {
         const doc = docs[i];
-        this.runSingle(doc);
         if (doc.pid) {
           exec(`kill -9 ${doc.pid}`, (err, stdout, stderr) => {
             let logFile = `${config.manualLogPath}${doc._id}.log`;
