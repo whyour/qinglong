@@ -23,30 +23,6 @@ reset_romote_url() {
     fi
 }
 
-## 克隆脚本，$1：仓库地址，$2：仓库保存路径，$3：分支（可省略）
-git_clone_scripts() {
-    local url=$1
-    local dir=$2
-    local branch=$3
-    [[ $branch ]] && local cmd="-b $branch "
-    echo -e "开始克隆仓库 $url 到 $dir\n"
-    git clone $cmd $url $dir
-    exit_status=$?
-}
-
-## 更新脚本，$1：仓库保存路径
-git_pull_scripts() {
-    local dir_current=$(pwd)
-    local dir_work=$1
-    cd $dir_work
-    echo -e "开始更新仓库：$dir_work\n"
-    git fetch --all
-    exit_status=$?
-    git reset --hard
-    git pull
-    cd $dir_current
-}
-
 ## 检测cron的差异，$1：脚本清单文件路径，$2：cron任务清单文件路径，$3：增加任务清单文件路径，$4：删除任务清单文件路径
 diff_cron() {
     local list_scripts="$1"
