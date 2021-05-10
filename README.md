@@ -35,9 +35,9 @@ python和javaScript的定时任务管理面板
 
 ## 多谢
 
-* [https://github.com/nevinee/jd_shell](https://github.com/nevinee/jd_shell)
+* [nevinee](https://gitee.com/evine)
 
-* [https://github.com/alseambusher/crontab-ui](https://github.com/alseambusher/crontab-ui)
+* [crontab-ui](https://github.com/alseambusher/crontab-ui)
 
 * [Ant Design](https://ant.design)
 

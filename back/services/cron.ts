@@ -22,12 +22,20 @@ export default class CronService {
     return this.cronDb;
   }
 
+  private isSixCron(cron: Crontab) {
+    const { schedule } = cron;
+    if (schedule.split(' ').length === 6) {
+      return true;
+    }
+    return false;
+  }
+
   public async create(payload: Crontab): Promise<Crontab> {
     const tab = new Crontab(payload);
     tab.created = new Date().valueOf();
     tab.saved = false;
     const doc = await this.insert(tab);
-    await this.set_crontab();
+    await this.set_crontab(this.isSixCron(doc));
     return doc;
   }
 
@@ -74,9 +82,9 @@ export default class CronService {
     this.cronDb.update({ _id }, { $set: { stopped, saved: false } });
   }
 
-  public async remove(_id: string) {
-    this.cronDb.remove({ _id }, {});
-    await this.set_crontab();
+  public async remove(ids: string[]) {
+    this.cronDb.remove({ _id: { $in: ids } }, { multi: true });
+    await this.set_crontab(true);
   }
 
   public async crontabs(searchText?: string): Promise<Crontab[]> {
@@ -112,68 +120,98 @@ export default class CronService {
     });
   }
 
-  public async run(_id: string) {
-    this.cronDb.find({ _id }).exec((err, docs: Crontab[]) => {
-      let res = docs[0];
-
-      this.logger.silly('Running job');
-      this.logger.silly('ID: ' + _id);
-      this.logger.silly('Original command: ' + res.command);
-
-      let logFile = `${config.manualLogPath}${res._id}.log`;
-      fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
-
-      let cmdStr = res.command;
-      if (res.command.startsWith('js') && !res.command.endsWith('now')) {
-        cmdStr = `${res.command} now`;
-      } else if (/&& (.*) >>/.test(res.command)) {
-        cmdStr = res.command.match(/&& (.*) >>/)[1];
+  public async run(ids: string[]) {
+    this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
+      for (let i = 0; i < docs.length; i++) {
+        const doc = docs[i];
+        this.runSingle(doc);
       }
-      const cmd = spawn(cmdStr, { shell: true });
-
-      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.running } });
-
-      cmd.stdout.on('data', (data) => {
-        this.logger.silly(`stdout: ${data}`);
-        fs.appendFileSync(logFile, data);
-      });
-
-      cmd.stderr.on('data', (data) => {
-        this.logger.error(`stderr: ${data}`);
-        fs.appendFileSync(logFile, data);
-      });
-
-      cmd.on('close', (code) => {
-        this.logger.silly(`child process exited with code ${code}`);
-        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
-      });
-
-      cmd.on('error', (err) => {
-        this.logger.silly(err);
-        fs.appendFileSync(logFile, err.stack);
-      });
-
-      cmd.on('exit', (code: number, signal: any) => {
-        this.logger.silly(`cmd exit ${code}`);
-        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
-        fs.appendFileSync(logFile, `\n\n执行结束...`);
-      });
-
-      cmd.on('disconnect', () => {
-        this.logger.silly(`cmd disconnect`);
-        this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
-        fs.appendFileSync(logFile, `\n\n连接断开...`);
-      });
     });
   }
 
-  public async disabled(_id: string) {
-    this.cronDb.update({ _id }, { $set: { status: CrontabStatus.disabled } });
+  public async stop(ids: string[]) {
+    this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
+      for (let i = 0; i < docs.length; i++) {
+        const doc = docs[i];
+        if (doc.pid) {
+          exec(`kill -9 ${doc.pid}`);
+        }
+      }
+    });
+  }
+
+  private async runSingle(cron: Crontab) {
+    let { _id, command } = cron;
+
+    this.logger.silly('Running job');
+    this.logger.silly('ID: ' + _id);
+    this.logger.silly('Original command: ' + command);
+
+    let logFile = `${config.manualLogPath}${_id}.log`;
+    fs.writeFileSync(logFile, `开始执行...\n\n${new Date().toString()}\n`);
+
+    let cmdStr = command;
+    if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {
+      cmdStr = `task ${cmdStr}`;
+    }
+    if (cmdStr.endsWith('.js')) {
+      cmdStr = `${cmdStr} now`;
+    }
+    const cmd = spawn(cmdStr, { shell: true });
+
+    this.cronDb.update(
+      { _id },
+      { $set: { status: CrontabStatus.running, pid: cmd.pid } },
+    );
+
+    cmd.stdout.on('data', (data) => {
+      this.logger.silly(`stdout: ${data}`);
+      fs.appendFileSync(logFile, data);
+    });
+
+    cmd.stderr.on('data', (data) => {
+      this.logger.error(`stderr: ${data}`);
+      fs.appendFileSync(logFile, data);
+    });
+
+    cmd.on('close', (code) => {
+      this.logger.silly(`child process exited with code ${code}`);
+      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+    });
+
+    cmd.on('error', (err) => {
+      this.logger.silly(err);
+      fs.appendFileSync(logFile, err.stack);
+    });
+
+    cmd.on('exit', (code: number, signal: any) => {
+      this.logger.silly(`cmd exit ${code}`);
+      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+      fs.appendFileSync(logFile, `\n\n执行结束...`);
+    });
+
+    cmd.on('disconnect', () => {
+      this.logger.silly(`cmd disconnect`);
+      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+      fs.appendFileSync(logFile, `\n\n连接断开...`);
+    });
+  }
+
+  public async disabled(ids: string[]) {
+    this.cronDb.update(
+      { _id: { $in: ids } },
+      { $set: { status: CrontabStatus.disabled } },
+      { multi: true },
+    );
     await this.set_crontab();
   }
 
-  public async enabled(_id: string) {
-    this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+  public async enabled(ids: string[]) {
+    this.cronDb.update(
+      { _id: { $in: ids } },
+      { $set: { status: CrontabStatus.idle } },
+      { multi: true },
+    );
   }
 
   public async log(_id: string) {
@@ -186,11 +224,12 @@ export default class CronService {
     return crontab_job_string;
   }
 
-  private async set_crontab() {
+  private async set_crontab(needReloadSchedule: boolean = false) {
     const tabs = await this.crontabs();
     var crontab_string = '';
     tabs.forEach((tab) => {
-      if (tab.status === CrontabStatus.disabled) {
+      const _schedule = tab.schedule && tab.schedule.split(' ');
+      if (tab.status === CrontabStatus.disabled || _schedule.length !== 5) {
         crontab_string += '# ';
         crontab_string += tab.schedule;
         crontab_string += ' ';
@@ -208,6 +247,9 @@ export default class CronService {
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
+    if (needReloadSchedule) {
+      exec(`pm2 reload schedule`);
+    }
     this.cronDb.update({}, { $set: { saved: true } }, { multi: true });
   }
 
@@ -226,11 +268,11 @@ export default class CronService {
         var command = line.replace(regex, '').trim();
         var schedule = line.replace(command, '').trim();
 
-        var is_valid = false;
-        try {
-          is_valid = cron_parser.parseString(line).expressions.length > 0;
-        } catch (e) {}
-        if (command && schedule && is_valid) {
+        if (
+          command &&
+          schedule &&
+          cron_parser.parseExpression(schedule).hasNext()
+        ) {
           var name = namePrefix + '_' + index;
 
           this.cronDb.findOne({ command, schedule }, (err, doc) => {
