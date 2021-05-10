@@ -102,7 +102,6 @@ run_normal() {
     local p1=$1
     cd $dir_scripts
     define_program "$p1"
-    combine_all
     if [[ $p1 == *.js ]]; then
         if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
             local latest_log=$(ls -r $dir_code | head -1)
@@ -112,6 +111,7 @@ run_normal() {
             random_delay
         fi
     fi
+    combine_all
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir="$dir_log/${p1%%.*}"
     log_path="$log_dir/$log_time.log"
