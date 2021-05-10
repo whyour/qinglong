@@ -132,7 +132,7 @@ export default class CronService {
               { _id: doc._id },
               { $set: { status: CrontabStatus.idle } },
             );
-            fs.appendFileSync(logFile, `\n\n${stderr}\n${stdout}\n执行结束...`);
+            fs.appendFileSync(logFile, `\n\n${stderr}\n${stdout}...`);
           });
         }
       }
