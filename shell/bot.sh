@@ -18,11 +18,11 @@ echo
 echo -e "3、安装python3依赖...\n"
 pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 cp -f "$repo_path/jbot/requirements.txt" "$dir_root"
-pip3 install -r requirements.txt
+pip3 --default-timeout=100 install -r requirements.txt --no-cache-dir
 echo
 
 echo -e "4、启动bot程序...\n"
-pm2 restart jbot 2>/dev/null || pm2 start jbot -n $dir_root/jbot --interpreter=python3 -- -m
+pm2 restart jbot 2>/dev/null || pm2 start $dir_root/jbot -n jbot --interpreter=python3 -- -m
 echo
 
 exit 0
