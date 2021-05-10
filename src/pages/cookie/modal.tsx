@@ -10,7 +10,7 @@ const CookieModal = ({
 }: {
   cookie?: any;
   visible: boolean;
-  handleCancel: (needUpdate?: boolean) => void;
+  handleCancel: (cks?: any[]) => void;
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -46,7 +46,7 @@ const CookieModal = ({
       });
     }
     setLoading(false);
-    handleCancel(data);
+    handleCancel(cookie ? [data] : data);
   };
 
   useEffect(() => {
@@ -92,7 +92,7 @@ const CookieModal = ({
           <Input.TextArea
             rows={4}
             autoSize={true}
-            placeholder="请输入cookie，多个cookie换行输入"
+            placeholder="请输入cookie，可直接换行输入多个cookie"
           />
         </Form.Item>
       </Form>

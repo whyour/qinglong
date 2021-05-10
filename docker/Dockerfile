@@ -1,7 +1,7 @@
 FROM node:lts-alpine
 LABEL maintainer="whyour"
-ARG QL_BASE_URL=https://github.com.cnpmjs.org/whyour/qinglong
-ARG QL_BASE_BRANCH=master
+ARG QL_URL=https://ghproxy.com/https://github.com/whyour/qinglong.git
+ARG QL_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
     SHELL=/bin/bash \
@@ -27,17 +27,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && echo "Asia/Shanghai" > /etc/timezone \
     && touch ~/.bashrc \
     && mkdir /run/nginx \
-    && git clone -b ${QL_BASE_BRANCH} ${QL_BASE_URL} ${QL_DIR} \
+    && git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && cd ${QL_DIR} \
     && cp -f .env.example .env \
-    && ln -sf ${QL_DIR}/shell/js.sh /usr/local/bin/js \
-    && ln -sf ${QL_DIR}/shell/git_pull.sh /usr/local/bin/git_pull \
-    && ln -sf ${QL_DIR}/shell/rm_log.sh /usr/local/bin/rm_log \
-    && ln -sf ${QL_DIR}/shell/export_sharecodes.sh /usr/local/bin/export_sharecodes \
-    && ln -sf ${QL_DIR}/shell/git_diy.sh /usr/local/bin/diy \
-    && ln -sf ${QL_DIR}/shell/notify.sh /usr/local/bin/notify \
-    && ln -sf ${QL_DIR}/shell/rebuild.sh /usr/local/bin/rebuild \
-    && ln -sf ${QL_DIR}/docker/docker-entrypoint.sh /usr/local/bin/entrypoint \
     && chmod 777 ${QL_DIR}/shell/*.sh \
     && chmod 777 ${QL_DIR}/docker/*.sh \
     && npm install -g pm2 \
@@ -47,4 +39,4 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && yarn build-back \
     && yarn install --production --network-timeout 100000 \
     && yarn cache clean
-ENTRYPOINT ["entrypoint"]
+ENTRYPOINT ["./docker/docker-entrypoint.sh"]

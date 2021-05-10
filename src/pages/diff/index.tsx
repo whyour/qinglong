@@ -87,7 +87,7 @@ const Crontab = () => {
         newValue={sample}
         splitView={true}
         leftTitle="config.sh"
-        rightTitle="config.sh.sample"
+        rightTitle="config.sample.sh"
         disableWordDiff={true}
       />
       {/* <CodeDiff

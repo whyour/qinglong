@@ -49,7 +49,10 @@ export default ({ app }: { app: Application }) => {
       next: NextFunction,
     ) => {
       if (err.name === 'UnauthorizedError') {
-        return res.status(err.status).send({ message: err.message }).end();
+        return res
+          .status(err.status)
+          .send({ code: 401, message: err.message })
+          .end();
       }
       return next(err);
     },
@@ -64,6 +67,7 @@ export default ({ app }: { app: Application }) => {
     ) => {
       res.status(err.status || 500);
       res.json({
+        code: err.status || 500,
         message: err.message,
       });
     },
