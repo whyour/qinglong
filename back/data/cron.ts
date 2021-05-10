@@ -8,6 +8,7 @@ export class Crontab {
   _id?: string;
   status?: CrontabStatus;
   isSystem?: 1 | 0;
+  pid?: number;
 
   constructor(options: Crontab) {
     this.name = options.name;
@@ -19,6 +20,7 @@ export class Crontab {
     this.status = options.status || CrontabStatus.idle;
     this.timestamp = new Date().toString();
     this.isSystem = options.isSystem || 0;
+    this.pid = options.pid;
   }
 }
 

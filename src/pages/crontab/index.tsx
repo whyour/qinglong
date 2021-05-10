@@ -23,6 +23,7 @@ import {
   EditOutlined,
   StopOutlined,
   DeleteOutlined,
+  PauseCircleOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -43,12 +44,14 @@ enum OperationName {
   '启用',
   '禁用',
   '运行',
+  '停止',
 }
 
 enum OperationPath {
   'enable',
   'disable',
   'run',
+  'stop',
 }
 
 const Crontab = () => {
@@ -120,15 +123,28 @@ const Crontab = () => {
       align: 'center' as const,
       render: (text: string, record: any, index: number) => (
         <Space size="middle">
-          <Tooltip title="运行">
-            <a
-              onClick={() => {
-                runCron(record, index);
-              }}
-            >
-              <PlayCircleOutlined />
-            </a>
-          </Tooltip>
+          {record.status !== CrontabStatus.running && (
+            <Tooltip title="运行">
+              <a
+                onClick={() => {
+                  runCron(record, index);
+                }}
+              >
+                <PlayCircleOutlined />
+              </a>
+            </Tooltip>
+          )}
+          {record.status === CrontabStatus.running && (
+            <Tooltip title="停止">
+              <a
+                onClick={() => {
+                  stopCron(record, index);
+                }}
+              >
+                <PauseCircleOutlined />
+              </a>
+            </Tooltip>
+          )}
           <Tooltip title="日志">
             <a
               onClick={() => {
@@ -233,6 +249,42 @@ const Crontab = () => {
               result.splice(index, 1, {
                 ...record,
                 status: CrontabStatus.running,
+              });
+              setValue(result);
+            } else {
+              notification.error({
+                message: data,
+              });
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const stopCron = (record: any, index: number) => {
+    Modal.confirm({
+      title: '确认停止',
+      content: (
+        <>
+          确认停止定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
+        </>
+      ),
+      onOk() {
+        request
+          .put(`${config.apiPrefix}crons/stop`, { data: [record._id] })
+          .then((data: any) => {
+            if (data.code === 200) {
+              const result = [...value];
+              result.splice(index, 1, {
+                ...record,
+                status: CrontabStatus.idle,
               });
               setValue(result);
             } else {
@@ -534,8 +586,15 @@ const Crontab = () => {
           >
             批量禁用
           </Button>
-          <Button type="primary" onClick={() => operateCrons(2)}>
+          <Button
+            type="primary"
+            style={{ marginRight: 8 }}
+            onClick={() => operateCrons(2)}
+          >
             批量运行
+          </Button>
+          <Button type="primary" onClick={() => operateCrons(3)}>
+            批量停止
           </Button>
           <span style={{ marginLeft: 8 }}>
             已选择

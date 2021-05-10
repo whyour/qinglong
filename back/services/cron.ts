@@ -121,6 +121,25 @@ export default class CronService {
     });
   }
 
+  public async stop(ids: string[]) {
+    this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
+      for (let i = 0; i < docs.length; i++) {
+        const doc = docs[i];
+        this.runSingle(doc);
+        if (doc.pid) {
+          exec(`kill -9 ${doc.pid}`, (err, stdout, stderr) => {
+            let logFile = `${config.manualLogPath}${doc._id}.log`;
+            this.cronDb.update(
+              { _id: doc._id },
+              { $set: { status: CrontabStatus.idle } },
+            );
+            fs.appendFileSync(logFile, `\n\n${stderr}\n${stdout}\n执行结束...`);
+          });
+        }
+      }
+    });
+  }
+
   private async runSingle(cron: Crontab) {
     let { _id, command } = cron;
 
@@ -140,7 +159,10 @@ export default class CronService {
     }
     const cmd = spawn(cmdStr, { shell: true });
 
-    this.cronDb.update({ _id }, { $set: { status: CrontabStatus.running } });
+    this.cronDb.update(
+      { _id },
+      { $set: { status: CrontabStatus.running, pid: cmd.pid } },
+    );
 
     cmd.stdout.on('data', (data) => {
       this.logger.silly(`stdout: ${data}`);
