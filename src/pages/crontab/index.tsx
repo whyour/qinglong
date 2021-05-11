@@ -284,6 +284,7 @@ const Crontab = () => {
               const result = [...value];
               result.splice(index, 1, {
                 ...record,
+                pid: null,
                 status: CrontabStatus.idle,
               });
               setValue(result);
