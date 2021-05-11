@@ -23,6 +23,7 @@ file_config_user=$dir_config/config.sh
 file_auth_sample=$dir_sample/auth.sample.json
 file_auth_user=$dir_config/auth.json
 file_extra_shell=$dir_config/extra.sh
+file_extra_sample=$dir_sample/extra.sample.sh
 file_notify_js_sample=$dir_sample/notify.js
 file_notify_py_sample=$dir_sample/notify.py
 file_notify_py=$dir_scripts/notify.py
@@ -163,8 +164,8 @@ fix_config() {
     fi
 
     if [ ! -f $file_extra_shell ]; then
-        echo -e "检测到config配置目录下不存在extra.sh，创建一个空文件用于初始化...\n"
-        touch $file_extra_shell
+        echo -e "复制一份 $file_extra_sample 为 $file_extra_shell\n"
+        cp -fv $file_extra_sample $file_extra_shell
         echo
     fi
 
