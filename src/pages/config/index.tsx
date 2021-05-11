@@ -49,7 +49,7 @@ const Config = () => {
 
   return (
     <PageContainer
-      className="code-mirror-wrapper"
+      className="ql-container-wrapper"
       title="config.sh"
       extra={[
         <Button key="1" type="primary" onClick={updateConfig}>
@@ -67,9 +67,6 @@ const Config = () => {
           width,
           marginLeft,
         },
-      }}
-      style={{
-        height: '100vh',
       }}
     >
       <CodeMirror

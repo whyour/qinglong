@@ -537,7 +537,7 @@ const Crontab = () => {
 
   return (
     <PageContainer
-      className="code-mirror-wrapper"
+      className="ql-container-wrapper crontab-wrapper"
       title="定时任务"
       extra={[
         <Search
@@ -562,9 +562,6 @@ const Crontab = () => {
           width,
           marginLeft,
         },
-      }}
-      style={{
-        height: '100vh',
       }}
     >
       {selectedRowIds.length > 0 && (

@@ -66,11 +66,11 @@ const Log = () => {
 
   return (
     <PageContainer
-      className="code-mirror-wrapper"
+      className="ql-container-wrapper"
       title={title}
       extra={[
         <TreeSelect
-          style={{ width: 280 }}
+          className="log-select"
           value={select}
           dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
           treeData={data}
@@ -91,9 +91,6 @@ const Log = () => {
           width,
           marginLeft,
         },
-      }}
-      style={{
-        height: '100vh',
       }}
     >
       <CodeMirror

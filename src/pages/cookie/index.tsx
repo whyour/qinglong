@@ -450,9 +450,6 @@ const Config = () => {
           marginLeft,
         },
       }}
-      style={{
-        height: '100vh',
-      }}
     >
       <DndProvider backend={HTML5Backend}>
         <Table

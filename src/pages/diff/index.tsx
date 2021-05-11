@@ -46,7 +46,7 @@ const Crontab = () => {
 
   return (
     <PageContainer
-      className="code-mirror-wrapper"
+      className="ql-container-wrapper"
       title="对比工具"
       loading={loading}
       header={{
@@ -60,9 +60,6 @@ const Crontab = () => {
           width,
           marginLeft,
         },
-      }}
-      style={{
-        height: '100vh',
       }}
     >
       <ReactDiffViewer
