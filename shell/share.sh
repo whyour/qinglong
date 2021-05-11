@@ -287,5 +287,4 @@ git_pull_scripts() {
 detect_termux
 detect_macos
 define_cmd
-fix_config
 import_config
