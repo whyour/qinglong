@@ -8,7 +8,7 @@ const Log = () => {
   const [width, setWdith] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
-  const [title, setTitle] = useState('log');
+  const [title, setTitle] = useState('请选择日志文件');
   const [value, setValue] = useState('请选择日志文件');
   const [select, setSelect] = useState();
   const [data, setData] = useState();
@@ -47,7 +47,7 @@ const Log = () => {
 
   const onSelect = (value: any, node: any) => {
     setSelect(value);
-    setTitle(node.parent);
+    setTitle(node.parent || node.value);
     getLog(node);
   };
 
@@ -66,7 +66,7 @@ const Log = () => {
 
   return (
     <PageContainer
-      className="ql-container-wrapper"
+      className="ql-container-wrapper log-wrapper"
       title={title}
       extra={[
         <TreeSelect

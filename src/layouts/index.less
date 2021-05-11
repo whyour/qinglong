@@ -33,8 +33,13 @@ body {
   }
 }
 
-.log-select {
-  width: 300px;
+.log-wrapper {
+  .log-select {
+    width: 300px;
+  }
+  .ant-page-header-heading-left {
+    min-width: 100px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -45,18 +50,20 @@ body {
     }
   }
   .ql-container-wrapper {
-    &.crontab-wrapper {
+    &.crontab-wrapper,
+    &.log-wrapper {
       .ant-pro-grid-content.wide .ant-pro-page-container-children-content {
         height: calc(100vh - 184px);
         height: calc(100vh - var(--vh-offset, 0px) - 184px);
+      }
+      .CodeMirror {
+        height: calc(100vh - 216px);
+        height: calc(100vh - var(--vh-offset, 0px) - 216px);
       }
     }
     .CodeMirror {
       height: calc(100vh - 176px);
       height: calc(100vh - var(--vh-offset, 0px) - 176px);
     }
-  }
-  .log-select {
-    width: 200px;
   }
 }
