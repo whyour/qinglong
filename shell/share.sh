@@ -14,6 +14,7 @@ dir_manual_log=$dir_root/manual_log
 dir_list_tmp=$dir_log/.tmp
 dir_code=$dir_log/code
 dir_update_log=$dir_log/update
+ql_static_repo=$dir_repo/static
 
 ## 文件
 file_config_sample=$dir_sample/config.sample.sh

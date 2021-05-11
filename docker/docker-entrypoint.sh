@@ -13,18 +13,22 @@ fix_config
 cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
 echo
 
-echo -e "======================3. 启动nginx========================\n"
+echo -e "======================3. 拉取静态资源========================\n"
+git clone https://gitee.com/whyour/qinglong-static.git $ql_static_repo
+echo
+
+echo -e "======================4. 启动nginx========================\n"
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 echo -e "nginx启动成功...\n"
 
-echo -e "======================4. 启动控制面板========================\n"
+echo -e "======================5. 启动控制面板========================\n"
 cd $dir_root
-pm2 reload panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
+pm2 reload panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel --watch $dir_root/build
 echo -e "控制面板启动成功...\n"
 
-echo -e "======================5. 启动定时任务========================\n"
+echo -e "======================6. 启动定时任务========================\n"
 cd $dir_root
-pm2 reload schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule
+pm2 reload schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule --watch $dir_root/build
 echo -e "定时任务启动成功...\n"
 
 echo -e "############################################################\n"

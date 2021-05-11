@@ -13,12 +13,6 @@ const initData = [
     status: CrontabStatus.idle,
   },
   {
-    name: '重启并编译面板',
-    command: 'ql restart',
-    schedule: '30 7 */7 * *',
-    status: CrontabStatus.disabled,
-  },
-  {
     name: '删除日志',
     command: 'ql rmlog 7',
     schedule: '30 7 */7 * *',
