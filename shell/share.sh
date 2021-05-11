@@ -162,6 +162,12 @@ fix_config() {
         echo
     fi
 
+    if [ ! -f $file_extra_shell ]; then
+        echo -e "检测到config配置目录下不存在extra.sh，创建一个空文件用于初始化...\n"
+        touch $file_extra_shell
+        echo
+    fi
+
     if [ ! -s $file_auth_user ]; then
         echo -e "复制一份 $file_auth_sample 为 $file_auth_user\n"
         cp -fv $file_auth_sample $file_auth_user
