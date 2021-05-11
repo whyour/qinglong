@@ -31,6 +31,7 @@ pip3 --default-timeout=100 install -r requirements.txt --no-cache-dir
 echo -e "\npython3依赖安装成功...\n"
 
 echo -e "4、启动bot程序...\n"
+make_dir $dir_log/bot
 cd $dir_root
 ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
 nohup python3 -m jbot >$dir_log/bot/nohup.log 2>&1 &
