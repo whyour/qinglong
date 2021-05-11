@@ -87,7 +87,7 @@ const Password = () => {
 
   return (
     <PageContainer
-      className="code-mirror-wrapper"
+      className="ql-container-wrapper"
       title="系统设置"
       header={{
         style: {
@@ -101,14 +101,11 @@ const Password = () => {
           marginLeft,
         },
       }}
-      style={{
-        height: '100vh',
-      }}
     >
       <Tabs
         defaultActiveKey="person"
         tabPosition="left"
-        style={{ height: 'calc(100vh - 128px)' }}
+        style={{ height: 'calc(100vh - var(--vh-offset, 0px) - 128px)' }}
       >
         <Tabs.TabPane tab="个人设置" key="person">
           <Form onFinish={handleOk} layout="vertical">

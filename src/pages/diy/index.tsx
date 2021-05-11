@@ -49,7 +49,7 @@ const Crontab = () => {
 
   return (
     <PageContainer
-      className="code-mirror-wrapper"
+      className="ql-container-wrapper"
       title="extra.sh"
       extra={[
         <Button key="1" type="primary" onClick={updateConfig}>
@@ -67,9 +67,6 @@ const Crontab = () => {
           width,
           marginLeft,
         },
-      }}
-      style={{
-        height: '100vh',
       }}
     >
       <CodeMirror

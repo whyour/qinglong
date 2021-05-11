@@ -13,6 +13,7 @@ import config from '@/utils/config';
 import 'codemirror/mode/shell/shell.js';
 import { request } from '@/utils/http';
 import './index.less';
+import vhCheck from 'vh-check';
 
 export default function (props: any) {
   const logout = () => {
@@ -27,6 +28,7 @@ export default function (props: any) {
     if (!isAuth) {
       history.push('/login');
     }
+    vhCheck();
   }, []);
 
   useEffect(() => {
