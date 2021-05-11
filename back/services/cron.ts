@@ -186,7 +186,10 @@ export default class CronService {
 
     cmd.on('exit', (code: number, signal: any) => {
       this.logger.silly(`cmd exit ${code}`);
-      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+      this.cronDb.update(
+        { _id },
+        { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+      );
       fs.appendFileSync(logFile, `\n\n执行结束...`);
     });
 
