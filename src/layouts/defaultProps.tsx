@@ -26,7 +26,7 @@ export default {
       },
       {
         path: '/cookie',
-        name: 'Cookie管理',
+        name: 'Session管理',
         icon: <RadiusSettingOutlined />,
         component: '@/pages/cookie/index',
       },
