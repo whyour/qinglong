@@ -244,6 +244,27 @@ update_qinglong() {
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
+
+    local url="https://gitee.com/whyour/qinglong-static.git"
+    if [ -d ${ql_static_repo}/.git ]; then
+        reset_romote_url ${ql_static_repo} ${url}
+        git_pull_scripts ${ql_static_repo}
+    else
+        git_clone_scripts ${url} ${ql_static_repo}
+    fi
+    if [[ $exit_status -eq 0 ]]; then
+        echo -e "\n更新$ql_static_repo成功...\n"
+        cp -rf $ql_static_repo/* $dir_root
+    else
+        echo -e "\n更新$dir_root失败，请检查原因...\n"
+    fi
+
+    if [[ $exit_status -eq 0 ]]; then
+        echo -e "重启青龙面板...\n"
+        sleep 5
+        nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
+        echo -e "重启面板完成...\n"
+    fi
 }
 
 ## 对比脚本
@@ -295,28 +316,6 @@ gen_list_repo() {
     cd $dir_current
 }
 
-## 重新编译qinglong
-restart_qinglong() {
-    update_qinglong
-    if [[ $exit_status -eq 0 ]]; then
-        echo -e "重新编译青龙...\n"
-        yarn install --network-timeout 1000000000 || yarn install --registry=https://registry.npm.taobao.org --network-timeout 1000000000
-        yarn build
-        yarn build-back
-        yarn cache clean
-        echo -e "重新编译青龙完成...\n"
-
-        echo -e "重启定时任务...\n"
-        pm2 reload schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule
-        echo -e "重启定时完成...\n"
-
-        echo -e "重启青龙面板...\n"
-        pm2 reload panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
-        nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-        echo -e "重启面板完成...\n"
-    fi
-}
-
 main() {
     local p1=$1
     local p2=$2
@@ -329,9 +328,6 @@ main() {
     update)
         update_qinglong | tee $log_path
         run_extra_shell | tee -a $log_path
-        ;;
-    restart)
-        restart_qinglong | tee $log_path
         ;;
     repo)
         get_user_info
