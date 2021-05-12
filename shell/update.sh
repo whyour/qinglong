@@ -258,7 +258,7 @@ update_qinglong() {
         echo -e "重启青龙面板(后台重启)...\n"
         cd $dir_root
         nohup pm2 reload all >/dev/null 2>&1 & 
-        nohup pm2 reload all >/dev/null 2>&1 &
+        pm2 reload schedule
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
         echo -e "重启面板完成(请刷新页面)...\n"
     fi
