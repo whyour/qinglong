@@ -46,6 +46,7 @@ const CronLogModal = ({
   };
 
   const cancel = () => {
+    localStorage.removeItem('logCron');
     handleCancel();
   };
 
