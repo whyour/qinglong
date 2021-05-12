@@ -245,12 +245,8 @@ update_qinglong() {
     fi
 
     local url="https://gitee.com/whyour/qinglong-static.git"
-    if [ -d ${ql_static_repo}/.git ]; then
-        reset_romote_url ${ql_static_repo} ${url}
-        git_pull_scripts ${ql_static_repo}
-    else
-        git_clone_scripts ${url} ${ql_static_repo}
-    fi
+    rm -rf ${ql_static_repo}
+    git_clone_scripts ${url} ${ql_static_repo}
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
         cp -rf $ql_static_repo/* $dir_root
