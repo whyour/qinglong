@@ -5,7 +5,7 @@ import CronService from '../services/cron';
 const initData = [
   {
     name: '更新面板',
-    command: `sleep ${randomSchedule(60, 1)} && ql update`,
+    command: `ql update`,
     schedule: `${randomSchedule(60, 1)} ${randomSchedule(
       24,
       7,
@@ -31,20 +31,30 @@ export default async () => {
   const cronDb = cronService.getDb();
 
   cronDb.count({}, async (err, count) => {
-    const data = initData.map((x) => {
-      const tab = new Crontab(x);
-      tab.created = new Date().valueOf();
-      tab.saved = false;
-      if (tab.name === '更新面板') {
-        tab.isSystem = 1;
-      } else {
-        tab.isSystem = 0;
-      }
-      return tab;
-    });
     if (count === 0) {
+      const data = initData.map((x) => {
+        const tab = new Crontab(x);
+        tab.created = new Date().valueOf();
+        tab.saved = false;
+        if (tab.name === '更新面板') {
+          tab.isSystem = 1;
+        } else {
+          tab.isSystem = 0;
+        }
+        return tab;
+      });
       cronDb.insert(data);
       await cronService.autosave_crontab();
+    }
+  });
+
+  cronDb.find({ name: '更新面板' }).exec((err, docs) => {
+    const doc = docs[0];
+    if (doc && doc.status === CrontabStatus.running) {
+      cronDb.update(
+        { name: '更新面板' },
+        { $set: { status: CrontabStatus.idle } },
+      );
     }
   });
 };
