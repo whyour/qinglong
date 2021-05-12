@@ -134,7 +134,12 @@ export default class CronService {
       for (let i = 0; i < docs.length; i++) {
         const doc = docs[i];
         if (doc.pid) {
-          exec(`kill -9 ${doc.pid}`);
+          exec(`kill -9 ${doc.pid}`, (err, stdout, stderr) => {
+            this.cronDb.update(
+              { _id: doc._id },
+              { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+            );
+          });
         }
       }
     });
