@@ -4,13 +4,13 @@ set -e
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 link_shell
-echo -e "======================1. 更新源代码========================\n"
-ql update
-echo
-
-echo -e "======================2. 检测配置文件========================\n"
+echo -e "======================1. 检测配置文件========================\n"
 fix_config
 cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
+echo
+
+echo -e "======================2. 更新源代码========================\n"
+ql update
 echo
 
 echo -e "======================3. 启动nginx========================\n"
