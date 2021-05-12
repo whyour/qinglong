@@ -246,7 +246,6 @@ update_qinglong() {
 
     local url="https://gitee.com/whyour/qinglong-static.git"
     rm -rf ${ql_static_repo}
-    make_dir ${ql_static_repo}
     git_clone_scripts ${url} ${ql_static_repo}
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
