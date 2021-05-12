@@ -255,13 +255,12 @@ update_qinglong() {
     fi
 
     if [[ $exit_status -eq 0 ]]; then
-        echo -e "重启青龙面板...\n"
+        echo -e "重启青龙面板(后台重启)...\n"
         cd $dir_root
-        pm2 reload panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
-
-        pm2 reload schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule
+        nohup pm2 reload panel >/dev/null 2>&1 & 
+        nohup pm2 reload schedule >/dev/null 2>&1 &
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-        echo -e "重启面板完成...\n"
+        echo -e "重启面板完成(请刷新页面)...\n"
     fi
 }
 
