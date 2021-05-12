@@ -57,7 +57,7 @@ export default class CronService {
     const tab = new Crontab({ ...doc, ...other });
     tab.saved = false;
     const newDoc = await this.updateDb(tab);
-    await this.set_crontab();
+    await this.set_crontab(this.isSixCron(newDoc));
     return newDoc;
   }
 
@@ -98,6 +98,9 @@ export default class CronService {
           },
           {
             command: reg,
+          },
+          {
+            schedule: reg,
           },
         ],
       };
@@ -214,7 +217,7 @@ export default class CronService {
       { $set: { status: CrontabStatus.disabled } },
       { multi: true },
     );
-    await this.set_crontab();
+    await this.set_crontab(true);
   }
 
   public async enabled(ids: string[]) {
@@ -223,6 +226,7 @@ export default class CronService {
       { $set: { status: CrontabStatus.idle } },
       { multi: true },
     );
+    await this.set_crontab(true);
   }
 
   public async log(_id: string) {

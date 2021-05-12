@@ -223,7 +223,8 @@ run_extra_shell() {
 ## 脚本用法
 usage() {
     echo -e "本脚本用法："
-    echo -e "1. $cmd_update update                                           # 更新青龙，并且运行extra.sh"
+    echo -e "1. $cmd_update update                                           # 更新并重启青龙"
+    echo -e "1. $cmd_update extra                                            # 运行自定义脚本"
     echo -e "3. $cmd_update raw <fileurl>                                    # 更新单个脚本文件"
     echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence>   # 更新单个仓库的脚本"
     echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
@@ -266,18 +267,20 @@ update_qinglong() {
 ## 对比脚本
 diff_scripts() {
     gen_list_repo $1 $2 $3 $4 $5
-    diff_cron $list_own_scripts $list_own_user $list_own_add $list_own_drop
+    local list_add="$dir_list_tmp/${2}_add.list"
+    local list_drop="$dir_list_tmp/${2}_drop.list"
+    diff_cron "$dir_list_tmp/${2}_scripts.list" "$dir_list_tmp/${2}_user.list" $list_add $list_drop
 
-    if [ -s $list_own_drop ]; then
-        output_list_add_drop $list_own_drop "失效"
+    if [ -s $list_drop ]; then
+        output_list_add_drop $list_drop "失效"
         if [[ ${AutoDelCron} == true ]]; then
-            del_cron $list_own_drop $2
+            del_cron $list_drop $2
         fi
     fi
-    if [ -s $list_own_add ]; then
-        output_list_add_drop $list_own_add "新"
+    if [ -s $list_add ]; then
+        output_list_add_drop $list_add "新"
         if [[ ${AutoAddCron} == true ]]; then
-            add_cron $list_own_add $2
+            add_cron $list_add $2
         fi
     fi
 }
@@ -306,9 +309,9 @@ gen_list_repo() {
     for file in ${files}; do
         filename=$(basename $file)
         cp -f $file $dir_scripts/${author}_${filename}
-        echo ${author}_${filename} >>$list_own_scripts
+        echo ${author}_${filename} >>"$dir_list_tmp/${author}_scripts.list"
     done
-    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >$list_own_user
+    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${author}_user.list"
     cd $dir_current
 }
 
@@ -323,6 +326,8 @@ main() {
     case $p1 in
     update)
         update_qinglong | tee $log_path
+        ;;
+    extra)
         run_extra_shell | tee -a $log_path
         ;;
     repo)
