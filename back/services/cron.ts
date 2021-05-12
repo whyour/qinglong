@@ -170,27 +170,30 @@ export default class CronService {
     );
 
     cmd.stdout.on('data', (data) => {
-      this.logger.silly(`stdout: ${data}`);
+      this.logger.info(`stdout: ${data}`);
       fs.appendFileSync(logFile, data);
     });
 
     cmd.stderr.on('data', (data) => {
-      this.logger.error(`stderr: ${data}`);
+      this.logger.info(`stderr: ${data}`);
       fs.appendFileSync(logFile, data);
     });
 
     cmd.on('close', (code) => {
-      this.logger.silly(`child process exited with code ${code}`);
-      this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
+      this.logger.info(`child process exited with code ${code}`);
+      this.cronDb.update(
+        { _id },
+        { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+      );
     });
 
     cmd.on('error', (err) => {
-      this.logger.silly(err);
+      this.logger.info(err);
       fs.appendFileSync(logFile, err.stack);
     });
 
     cmd.on('exit', (code: number, signal: any) => {
-      this.logger.silly(`cmd exit ${code}`);
+      this.logger.info(`cmd exit ${code}`);
       this.cronDb.update(
         { _id },
         { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
@@ -199,7 +202,7 @@ export default class CronService {
     });
 
     cmd.on('disconnect', () => {
-      this.logger.silly(`cmd disconnect`);
+      this.logger.info(`cmd disconnect`);
       this.cronDb.update({ _id }, { $set: { status: CrontabStatus.idle } });
       fs.appendFileSync(logFile, `\n\n连接断开...`);
     });
