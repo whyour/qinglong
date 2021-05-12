@@ -99,12 +99,12 @@ const Crontab = () => {
       align: 'center' as const,
       render: (text: string, record: any) => (
         <>
-          {record.status !== CrontabStatus.disabled && !record.pid && (
+          {record.status === CrontabStatus.idle && (
             <Tag icon={<ClockCircleOutlined />} color="default">
               空闲中
             </Tag>
           )}
-          {record.status === CrontabStatus.running && record.pid && (
+          {record.status === CrontabStatus.running && (
             <Tag icon={<SyncOutlined spin />} color="processing">
               运行中
             </Tag>
