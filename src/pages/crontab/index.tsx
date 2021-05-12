@@ -496,9 +496,6 @@ const Crontab = () => {
           })
           .then((data: any) => {
             if (data.code === 200) {
-              notification.success({
-                message: `批量${OperationName[operationStatus]}成功`,
-              });
               getCrons();
             } else {
               notification.error({

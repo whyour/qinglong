@@ -293,7 +293,7 @@ gen_list_repo() {
     local path="$3"
     local blackword="$4"
     local dependence="$5"
-    rm -f $dir_list_tmp/own*.list >/dev/null 2>&1
+    rm -f $dir_list_tmp/${author}*.list >/dev/null 2>&1
 
     cd ${repo_path}
     files=$(find . -name "*.js" | sed 's/^..//')
