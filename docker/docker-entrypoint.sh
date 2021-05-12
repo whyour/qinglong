@@ -27,6 +27,13 @@ cd $dir_root
 pm2 reload schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule --watch $dir_root/build
 echo -e "定时任务启动成功...\n"
 
+if [[ $AutoStartBot == true ]]; then
+  echo -e "======================6. 启动bot========================\n"
+  cd $dir_root
+  ql bot
+  echo -e "bot启动成功...\n"
+fi
+
 echo -e "############################################################\n"
 echo -e "容器启动成功..."
 echo -e "\n请先访问5700端口，登录成功面板之后再执行添加定时任务..."
