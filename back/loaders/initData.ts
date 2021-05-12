@@ -1,3 +1,4 @@
+import { exec } from 'child_process';
 import { Container } from 'typedi';
 import { Crontab, CrontabStatus } from '../data/cron';
 import CronService from '../services/cron';
@@ -48,6 +49,7 @@ export default async () => {
     }
   });
 
+  // patch更新面板任务状态
   cronDb.find({ name: '更新面板' }).exec((err, docs) => {
     const doc = docs[0];
     if (doc && doc.status === CrontabStatus.running) {
@@ -57,6 +59,18 @@ export default async () => {
       );
     }
   });
+
+  // 初始化时执行一次所有的ql repo 任务
+  cronDb
+    .find({
+      command: /ql (repo|raw)/,
+    })
+    .exec((err, docs) => {
+      for (let i = 0; i < docs.length; i++) {
+        const doc = docs[i];
+        exec(doc.command);
+      }
+    });
 };
 
 function randomSchedule(from: number, to: number) {
