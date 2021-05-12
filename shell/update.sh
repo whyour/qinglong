@@ -261,6 +261,8 @@ update_qinglong() {
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
         echo -e "重启面板完成(请刷新页面)...\n"
     fi
+    exit 0
+    exit 0
 }
 
 ## 对比脚本
