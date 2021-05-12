@@ -19,12 +19,20 @@ echo -e "nginx启动成功...\n"
 
 echo -e "======================4. 启动控制面板========================\n"
 cd $dir_root
-pm2 reload panel 2>/dev/null || pm2 start $dir_root/build/app.js -n panel
+if [[ $(pm2 info panel) ]]; then
+  pm2 reload panel
+else
+  pm2 start $dir_root/build/app.js -n panel
+fi
 echo -e "控制面板启动成功...\n"
 
 echo -e "======================5. 启动定时任务========================\n"
 cd $dir_root
-pm2 reload schedule 2>/dev/null || pm2 start $dir_root/build/schedule.js -n schedule
+if [[ $(pm2 info schedule) ]]; then
+  pm2 reload schedule
+else
+  pm2 start $dir_root/build/schedule.js -n schedule
+fi
 echo -e "定时任务启动成功...\n"
 
 if [[ $AutoStartBot == true ]]; then
