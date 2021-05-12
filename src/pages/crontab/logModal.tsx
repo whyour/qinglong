@@ -31,7 +31,7 @@ const CronLogModal = ({
         if (localStorage.getItem('logCron') === cron._id) {
           const log = data.data as string;
           setValue(log || '暂无日志');
-          if (log && !log.includes('执行结束') && visible) {
+          if (log && !log.includes('执行结束')) {
             setTimeout(() => {
               getCronLog();
             }, 2000);
