@@ -224,7 +224,6 @@ run_extra_shell() {
 usage() {
     echo -e "本脚本用法："
     echo -e "1. $cmd_update update                                           # 更新青龙，并且运行extra.sh"
-    echo -e "2. $cmd_update restart                                          # 重新启动青龙并编译，不会运行extra.sh"
     echo -e "3. $cmd_update raw <fileurl>                                    # 更新单个脚本文件"
     echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence>   # 更新单个仓库的脚本"
     echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
