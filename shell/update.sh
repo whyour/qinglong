@@ -256,14 +256,18 @@ update_qinglong() {
     fi
 
     local url="https://gitee.com/whyour/qinglong-static.git"
-    rm -rf ${ql_static_repo}
-    git_clone_scripts ${url} ${ql_static_repo}
+    if [ -d ${ql_static_repo}/.git ]; then
+        reset_romote_url ${ql_static_repo} ${url}
+        git_pull_scripts ${ql_static_repo}
+    else
+        git_clone_scripts ${url} ${ql_static_repo}
+    fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
         cp -rf $ql_static_repo/* $dir_root
         echo -e "重启面板中..."
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-        sleep 1 && pm2 reload all >/dev/null 2>&1
+        pm2 reload all >/dev/null 2>&1
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
