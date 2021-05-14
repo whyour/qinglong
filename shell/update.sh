@@ -266,10 +266,9 @@ update_qinglong() {
     fi
 
     if [[ $exit_status -eq 0 ]]; then
-        echo -e "重启青龙面板(后台重启)...\n"
         cd $dir_root
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-        echo -e "重启面板完成(请5s后刷新页面)..."
+        echo -e "重启面板完成"
         pm2 reload all >/dev/null 2>&1
     fi
 }
