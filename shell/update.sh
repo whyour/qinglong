@@ -276,10 +276,19 @@ update_qinglong() {
 
 ## 对比脚本
 diff_scripts() {
-    gen_list_repo $1 $2 $3 $4 $5
-    local list_add="$dir_list_tmp/${1}_add.list"
-    local list_drop="$dir_list_tmp/${1}_drop.list"
-    diff_cron "$dir_list_tmp/${1}_scripts.list" "$dir_list_tmp/${1}_user.list" $list_add $list_drop
+    local dir_current=$(pwd)
+    local repo_path="$1"
+    local author="$2"
+    local path="$3"
+    local blackword="$4"
+    local dependence="$5"
+
+    gen_list_repo $repo_path $author $path $blackword $dependence
+
+    local repo="${repo_path##*/}"
+    local list_add="$dir_list_tmp/${repo}_add.list"
+    local list_drop="$dir_list_tmp/${repo}_drop.list"
+    diff_cron "$dir_list_tmp/${repo}_scripts.list" "$dir_list_tmp/${repo}_user.list" $list_add $list_drop
 
     if [ -s $list_drop ]; then
         output_list_add_drop $list_drop "失效"
@@ -293,6 +302,7 @@ diff_scripts() {
             add_cron $list_add $2
         fi
     fi
+    cd $dir_current
 }
 
 ## 生成脚本的路径清单文件
@@ -303,7 +313,9 @@ gen_list_repo() {
     local path="$3"
     local blackword="$4"
     local dependence="$5"
-    rm -f $dir_list_tmp/${repo_path}*.list >/dev/null 2>&1
+
+    local repo="${repo_path##*/}"
+    rm -f $dir_list_tmp/${repo}*.list >/dev/null 2>&1
 
     cd ${repo_path}
     files=$(find . -name "*.js" | sed 's/^..//')
@@ -319,9 +331,9 @@ gen_list_repo() {
     for file in ${files}; do
         filename=$(basename $file)
         cp -f $file $dir_scripts/${author}_${filename}
-        echo ${author}_${filename} >>"$dir_list_tmp/${repo_path}_scripts.list"
+        echo ${author}_${filename} >>"$dir_list_tmp/${repo}_scripts.list"
     done
-    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${repo_path}_user.list"
+    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${repo}_user.list"
     cd $dir_current
 }
 
