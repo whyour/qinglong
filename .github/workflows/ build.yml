@@ -31,4 +31,4 @@ jobs:
           git config user.email "imwhyour@gmail.com"
           git add .
           git commit -m "copy static at $(date +'%Y-%m-%d %H:%M:%S')"
-          git push --force --quiet "https://whyour:${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" master:master
+          git push --quiet "https://whyour:${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" master:master

@@ -44,8 +44,12 @@ const CronLogModal = ({
               getCronLog();
             }, 2000);
           }
-          if (log && log.includes('重启面板')) {
-            message.warning({ content: '系统将在5秒后刷新', duration: 5 });
+          if (
+            log &&
+            log.includes('重启面板') &&
+            cron.status === CrontabStatus.running
+          ) {
+            message.warning({ content: '系统将在5秒后自动刷新', duration: 5 });
             setTimeout(() => {
               window.location.reload();
             }, 5000);
