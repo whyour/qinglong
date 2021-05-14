@@ -97,14 +97,20 @@ del_cron() {
         cron_file="$dir_scripts/${cron}"
         if [[ -f $cron_file ]]; then
             cron_name=$(grep "new Env" $cron_file | awk -F "'|\"" '{print $2}' | head -1)
+            rm -f $cron_file
         fi
         [[ -z $cron_name ]] && cron_name="$cron"
-        detail="${detail}\n${cron_name}"
-        rm -f $cron_file
+        if [[ $detail ]]; then
+            detail="${detail}\n${cron_name}"
+        else
+            detail="${cron_name}"
+        fi
     done
-    result=$(del_cron_api "$ids")
-    detail="${result}\n\n${detail}"
-    notify "删除失效任务通知" "$detail"
+    if [[ $ids ]]; then
+        result=$(del_cron_api "$ids")
+        detail="${result}\n\n${detail}"
+        notify "删除失效任务通知" "$detail"
+    fi
 }
 
 ## 自动增加定时任务，需要：1.AutoAddCron 设置为 true；2.正常更新js脚本，没有报错；3.存在新任务；4.crontab.list存在并且不为空
@@ -132,7 +138,11 @@ add_cron() {
             [[ -z $cron_line ]] && cron_line="0 6 * * *"
             result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
             echo -e "$result"
-            detail="${detail}\n${result}"
+            if [[ $detail ]]; then
+                detail="${detail}\n${result}"
+            else
+                detail="${result}"
+            fi
         fi
     done
     notify "新增任务通知" "$detail"
@@ -267,9 +277,9 @@ update_qinglong() {
 ## 对比脚本
 diff_scripts() {
     gen_list_repo $1 $2 $3 $4 $5
-    local list_add="$dir_list_tmp/${2}_add.list"
-    local list_drop="$dir_list_tmp/${2}_drop.list"
-    diff_cron "$dir_list_tmp/${2}_scripts.list" "$dir_list_tmp/${2}_user.list" $list_add $list_drop
+    local list_add="$dir_list_tmp/${1}_add.list"
+    local list_drop="$dir_list_tmp/${1}_drop.list"
+    diff_cron "$dir_list_tmp/${1}_scripts.list" "$dir_list_tmp/${1}_user.list" $list_add $list_drop
 
     if [ -s $list_drop ]; then
         output_list_add_drop $list_drop "失效"
@@ -293,7 +303,7 @@ gen_list_repo() {
     local path="$3"
     local blackword="$4"
     local dependence="$5"
-    rm -f $dir_list_tmp/${author}*.list >/dev/null 2>&1
+    rm -f $dir_list_tmp/${repo_path}*.list >/dev/null 2>&1
 
     cd ${repo_path}
     files=$(find . -name "*.js" | sed 's/^..//')
@@ -309,9 +319,9 @@ gen_list_repo() {
     for file in ${files}; do
         filename=$(basename $file)
         cp -f $file $dir_scripts/${author}_${filename}
-        echo ${author}_${filename} >>"$dir_list_tmp/${author}_scripts.list"
+        echo ${author}_${filename} >>"$dir_list_tmp/${repo_path}_scripts.list"
     done
-    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${author}_user.list"
+    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${repo_path}_user.list"
     cd $dir_current
 }
 
