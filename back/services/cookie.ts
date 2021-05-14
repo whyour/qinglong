@@ -292,7 +292,7 @@ export default class CookieService {
     this.cronDb.update({ _id }, { $set: { status: CookieStatus.noacquired } });
   }
 
-  private async set_cookies() {
+  public async set_cookies() {
     const cookies = await this.cookies();
     let cookie_string = '';
     cookies.forEach((tab) => {
