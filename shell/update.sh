@@ -270,7 +270,7 @@ update_qinglong() {
         cd $dir_root
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
         echo -e "重启面板完成(请5s后刷新页面)..."
-        pm2 reload all
+        pm2 reload all >/dev/null 2>&1
     fi
 }
 
