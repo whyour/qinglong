@@ -71,7 +71,7 @@ const CronLogModal = ({
       <>
         {excuting && <Loading3QuartersOutlined spin />}
         {!excuting && <CheckCircleOutlined />}
-        <span style={{ marginRight: 5 }}>日志-{cron && cron.name}</span>{' '}
+        <span style={{ marginLeft: 5 }}>日志-{cron && cron.name}</span>{' '}
       </>
     );
   };
