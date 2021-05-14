@@ -37,7 +37,11 @@ const CronLogModal = ({
           const log = data.data as string;
           setValue(log || '暂无日志');
           setExcuting(log && !log.includes('执行结束'));
-          if (log && !log.includes('执行结束')) {
+          if (
+            log &&
+            !log.includes('执行结束') &&
+            !log.includes('重启面板完成')
+          ) {
             setTimeout(() => {
               getCronLog();
             }, 2000);
@@ -65,9 +69,9 @@ const CronLogModal = ({
   const titleElement = () => {
     return (
       <>
-        <span style={{ marginRight: 5 }}>日志-{cron && cron.name}</span>{' '}
         {excuting && <Loading3QuartersOutlined spin />}
         {!excuting && <CheckCircleOutlined />}
+        <span style={{ marginRight: 5 }}>日志-{cron && cron.name}</span>{' '}
       </>
     );
   };
