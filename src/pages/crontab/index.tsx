@@ -14,7 +14,7 @@ import {
 } from 'antd';
 import {
   ClockCircleOutlined,
-  SyncOutlined,
+  Loading3QuartersOutlined,
   CloseCircleOutlined,
   FileTextOutlined,
   EllipsisOutlined,
@@ -105,7 +105,7 @@ const Crontab = () => {
             </Tag>
           )}
           {record.status === CrontabStatus.running && (
-            <Tag icon={<SyncOutlined spin />} color="processing">
+            <Tag icon={<Loading3QuartersOutlined spin />} color="processing">
               运行中
             </Tag>
           )}

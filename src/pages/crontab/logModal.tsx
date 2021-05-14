@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Modal, notification, Input, Form } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
+import {
+  Loading3QuartersOutlined,
+  CheckCircleOutlined,
+} from '@ant-design/icons';
 
 enum CrontabStatus {
   'running',
@@ -20,6 +24,7 @@ const CronLogModal = ({
 }) => {
   const [value, setValue] = useState<string>('启动中...');
   const [loading, setLoading] = useState<any>(true);
+  const [excuting, setExcuting] = useState<any>(true);
 
   const getCronLog = (isFirst?: boolean) => {
     if (isFirst) {
@@ -31,6 +36,7 @@ const CronLogModal = ({
         if (localStorage.getItem('logCron') === cron._id) {
           const log = data.data as string;
           setValue(log || '暂无日志');
+          setExcuting(log && !log.includes('执行结束'));
           if (log && !log.includes('执行结束')) {
             setTimeout(() => {
               getCronLog();
@@ -50,6 +56,16 @@ const CronLogModal = ({
     handleCancel();
   };
 
+  const titleElement = () => {
+    return (
+      <>
+        <span style={{ marginRight: 5 }}>日志-{cron && cron.name}</span>{' '}
+        {excuting && <Loading3QuartersOutlined spin />}
+        {!excuting && <CheckCircleOutlined />}
+      </>
+    );
+  };
+
   useEffect(() => {
     if (cron) {
       getCronLog(true);
@@ -58,7 +74,7 @@ const CronLogModal = ({
 
   return (
     <Modal
-      title={`日志-${cron && cron.name}`}
+      title={titleElement()}
       visible={visible}
       forceRender
       onOk={() => cancel()}
