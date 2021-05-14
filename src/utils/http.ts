@@ -2,14 +2,20 @@ import { extend } from 'umi-request';
 import { notification } from 'antd';
 import config from './config';
 
+notification.config({
+  duration: 2.5,
+});
+
 const time = Date.now();
 const errorHandler = function (error: any) {
   if (error.response) {
     const message = error.data
       ? error.data.message || error.data
       : error.response.statusText;
-    if (error.response.status !== 401) {
+    if (error.response.status !== 401 && error.response.status !== 502) {
       notification.error({ message });
+    } else {
+      console.log(error.response);
     }
   } else {
     console.log(error.message);

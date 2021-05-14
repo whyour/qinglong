@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, notification, Input, Form } from 'antd';
+import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import {
@@ -41,6 +41,12 @@ const CronLogModal = ({
             setTimeout(() => {
               getCronLog();
             }, 2000);
+          }
+          if (log && log.includes('重启面板完成')) {
+            message.warning({ content: '系统将在5秒后刷新', duration: 5 });
+            setTimeout(() => {
+              window.location.reload();
+            }, 5000);
           }
         }
       })
