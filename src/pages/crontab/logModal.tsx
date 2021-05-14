@@ -37,11 +37,7 @@ const CronLogModal = ({
           const log = data.data as string;
           setValue(log || '暂无日志');
           setExcuting(log && !log.includes('执行结束'));
-          if (
-            log &&
-            !log.includes('执行结束') &&
-            !log.includes('重启面板完成')
-          ) {
+          if (log && !log.includes('执行结束') && !log.includes('重启面板')) {
             setTimeout(() => {
               getCronLog();
             }, 2000);
@@ -89,7 +85,7 @@ const CronLogModal = ({
       centered
       bodyStyle={{
         overflowY: 'auto',
-        height: 'calc(80vh - var(--vh-offset, 0px))',
+        maxHeight: 'calc(80vh - var(--vh-offset, 0px))',
       }}
       forceRender
       onOk={() => cancel()}
