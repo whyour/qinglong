@@ -86,6 +86,11 @@ const CronLogModal = ({
     <Modal
       title={titleElement()}
       visible={visible}
+      centered
+      bodyStyle={{
+        overflowY: 'auto',
+        height: 'calc(80vh - var(--vh-offset, 0px))',
+      }}
       forceRender
       onOk={() => cancel()}
       onCancel={() => cancel()}
