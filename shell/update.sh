@@ -261,9 +261,9 @@ update_qinglong() {
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
         cp -rf $ql_static_repo/* $dir_root
-        nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
         echo -e "重启面板中..."
-        pm2 reload all >/dev/null 2>&1
+        nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
+        sleep 1 && pm2 reload all >/dev/null 2>&1
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
