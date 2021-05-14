@@ -3,7 +3,7 @@ import { notification } from 'antd';
 import config from './config';
 
 notification.config({
-  duration: 2.5,
+  duration: 2,
 });
 
 const time = Date.now();
