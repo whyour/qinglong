@@ -9,8 +9,8 @@ const initData = [
     name: '更新面板',
     command: `ql update`,
     schedule: `${randomSchedule(60, 1)} ${randomSchedule(
-      24,
-      7,
+      6,
+      1,
     ).toString()} * * *`,
     status: CrontabStatus.idle,
   },
