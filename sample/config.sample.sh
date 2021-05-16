@@ -38,7 +38,6 @@ HelpType=""
 ## 是否自动启动bot，默认不启动，设置为true时自动启动
 AutoStartBot=""
 
-
 ## 需组合的环境变量列表，env_name需要和var_name一一对应，如何有新活动按照格式添加(不懂勿动)
 env_name=(
   JD_COOKIE
@@ -121,3 +120,5 @@ name_chinese=(
   京喜财富岛
   东东健康社区
 )
+
+## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
