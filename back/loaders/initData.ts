@@ -74,6 +74,25 @@ export default async () => {
       }
     });
 
+  // patch 禁用状态字段改变
+  cronDb
+    .find({
+      status: CrontabStatus.disabled,
+    })
+    .exec((err, docs) => {
+      if (docs.length > 0) {
+        const ids = docs.map((x) => x._id);
+        cronDb.update(
+          { _id: { $in: ids } },
+          { $set: { status: CrontabStatus.idle, isDisabled: 1 } },
+          { multi: true },
+          (err) => {
+            cronService.autosave_crontab();
+          },
+        );
+      }
+    });
+
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
   await cookieService.set_cookies();

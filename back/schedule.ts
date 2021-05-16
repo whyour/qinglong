@@ -29,7 +29,8 @@ const run = async () => {
           if (
             _schedule &&
             _schedule.length > 5 &&
-            task.status !== CrontabStatus.disabled
+            task.status !== CrontabStatus.disabled &&
+            !task.isDisabled
           ) {
             schedule.scheduleJob(task.schedule, function () {
               let command = task.command as string;

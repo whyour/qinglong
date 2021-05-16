@@ -20,9 +20,14 @@ const dbPath = path.join(rootPath, 'db/');
 const manualLogPath = path.join(rootPath, 'manual_log/');
 const cronDbFile = path.join(rootPath, 'db/crontab.db');
 const cookieDbFile = path.join(rootPath, 'db/cookie.db');
+const configFound = dotenv.config({ path: confFile });
 
 if (envFound.error) {
   throw new Error("⚠️  Couldn't find .env file  ⚠️");
+}
+
+if (configFound.error) {
+  throw new Error("⚠️  Couldn't find config.sh file  ⚠️");
 }
 
 export default {
