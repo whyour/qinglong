@@ -24,7 +24,7 @@ import {
   StopOutlined,
   DeleteOutlined,
   PauseCircleOutlined,
-  SendOutlined,
+  FieldTimeOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -119,7 +119,7 @@ const Crontab = () => {
                 </Tag>
               )}
               {record.status === CrontabStatus.queued && (
-                <Tag icon={<SendOutlined />} color="default">
+                <Tag icon={<FieldTimeOutlined />} color="default">
                   队列中
                 </Tag>
               )}
