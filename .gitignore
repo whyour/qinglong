@@ -6,6 +6,7 @@
 /yarn-error.log
 /yarn.lock
 /package-lock.json
+/pnpm-lock.yaml
 
 # production
 /dist
