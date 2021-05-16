@@ -11,6 +11,7 @@ enum CrontabStatus {
   'running',
   'idle',
   'disabled',
+  'queued',
 }
 
 const CronLogModal = ({

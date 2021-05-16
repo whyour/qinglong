@@ -24,6 +24,7 @@ import {
   StopOutlined,
   DeleteOutlined,
   PauseCircleOutlined,
+  SendOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -38,6 +39,7 @@ enum CrontabStatus {
   'running',
   'idle',
   'disabled',
+  'queued',
 }
 
 enum OperationName {
@@ -99,17 +101,29 @@ const Crontab = () => {
       align: 'center' as const,
       render: (text: string, record: any) => (
         <>
-          {record.status === CrontabStatus.idle && (
-            <Tag icon={<ClockCircleOutlined />} color="default">
-              空闲中
-            </Tag>
+          {!record.isDisabled && (
+            <>
+              {record.status === CrontabStatus.idle && (
+                <Tag icon={<ClockCircleOutlined />} color="default">
+                  空闲中
+                </Tag>
+              )}
+              {record.status === CrontabStatus.running && (
+                <Tag
+                  icon={<Loading3QuartersOutlined spin />}
+                  color="processing"
+                >
+                  运行中
+                </Tag>
+              )}
+              {record.status === CrontabStatus.queued && (
+                <Tag icon={<SendOutlined />} color="default">
+                  队列中
+                </Tag>
+              )}
+            </>
           )}
-          {record.status === CrontabStatus.running && (
-            <Tag icon={<Loading3QuartersOutlined spin />} color="processing">
-              运行中
-            </Tag>
-          )}
-          {record.status === CrontabStatus.disabled && (
+          {record.isDisabled === 1 && (
             <Tag icon={<CloseCircleOutlined />} color="error">
               已禁用
             </Tag>
@@ -123,7 +137,7 @@ const Crontab = () => {
       align: 'center' as const,
       render: (text: string, record: any, index: number) => (
         <Space size="middle">
-          {record.status !== CrontabStatus.running && (
+          {record.status === CrontabStatus.idle && (
             <Tooltip title="运行">
               <a
                 onClick={() => {
@@ -134,7 +148,7 @@ const Crontab = () => {
               </a>
             </Tooltip>
           )}
-          {record.status === CrontabStatus.running && (
+          {record.status !== CrontabStatus.idle && (
             <Tooltip title="停止">
               <a
                 onClick={() => {
@@ -303,12 +317,10 @@ const Crontab = () => {
 
   const enabledOrDisabledCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${
-        record.status === CrontabStatus.disabled ? '启用' : '禁用'
-      }`,
+      title: `确认${record.isDisabled === 1 ? '启用' : '禁用'}`,
       content: (
         <>
-          确认{record.status === CrontabStatus.disabled ? '启用' : '禁用'}
+          确认{record.isDisabled === 1 ? '启用' : '禁用'}
           定时任务{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
@@ -320,7 +332,7 @@ const Crontab = () => {
         request
           .put(
             `${config.apiPrefix}crons/${
-              record.status === CrontabStatus.disabled ? 'enable' : 'disable'
+              record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             {
               data: [record._id],
@@ -328,14 +340,11 @@ const Crontab = () => {
           )
           .then((data: any) => {
             if (data.code === 200) {
-              const newStatus =
-                record.status === CrontabStatus.disabled
-                  ? CrontabStatus.idle
-                  : CrontabStatus.disabled;
+              const newStatus = record.isDisabled === 1 ? 0 : 1;
               const result = [...value];
               result.splice(index, 1, {
                 ...record,
-                status: newStatus,
+                isDisabled: newStatus,
               });
               setValue(result);
             } else {
@@ -366,14 +375,14 @@ const Crontab = () => {
           <Menu.Item
             key="enableordisable"
             icon={
-              record.status === CrontabStatus.disabled ? (
+              record.isDisabled === 1 ? (
                 <CheckCircleOutlined />
               ) : (
                 <StopOutlined />
               )
             }
           >
-            {record.status === CrontabStatus.disabled ? '启用' : '禁用'}
+            {record.isDisabled === 1 ? '启用' : '禁用'}
           </Menu.Item>
           {record.isSystem !== 1 && (
             <Menu.Item key="delete" icon={<DeleteOutlined />}>

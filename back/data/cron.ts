@@ -9,6 +9,7 @@ export class Crontab {
   status?: CrontabStatus;
   isSystem?: 1 | 0;
   pid?: number;
+  isDisabled?: 1 | 0;
 
   constructor(options: Crontab) {
     this.name = options.name;
@@ -21,6 +22,7 @@ export class Crontab {
     this.timestamp = new Date().toString();
     this.isSystem = options.isSystem || 0;
     this.pid = options.pid;
+    this.isDisabled = options.isDisabled || 0;
   }
 }
 
@@ -28,4 +30,5 @@ export enum CrontabStatus {
   'running',
   'idle',
   'disabled',
+  'queued',
 }
