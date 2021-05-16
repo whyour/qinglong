@@ -12,12 +12,14 @@ remove_js_log() {
     local diff_time
     for log in $log_full_path_list; do
         local log_date=$(echo $log | awk -F "/" '{print $NF}' | cut -c1-10) #文件名比文件属性获得的日期要可靠
-        if [[ $is_macos -eq 1 ]]; then
-            diff_time=$(($(date +%s) - $(date -j -f "%Y-%m-%d" "$log_date" +%s)))
-        else
-            diff_time=$(($(date +%s) - $(date +%s -d "$log_date")))
+        if [[ $(date +%s -d $log_date 2>/dev/null) ]]; then
+            if [[ $is_macos -eq 1 ]]; then
+                diff_time=$(($(date +%s) - $(date -j -f "%Y-%m-%d" "$log_date" +%s)))
+            else
+                diff_time=$(($(date +%s) - $(date +%s -d "$log_date")))
+            fi
+            [[ $diff_time -gt $((${days} * 86400)) ]] && rm -vf $log
         fi
-        [[ $diff_time -gt $((${days} * 86400)) ]] && rm -vf $log
     done
 }
 
