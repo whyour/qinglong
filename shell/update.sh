@@ -245,15 +245,17 @@ usage() {
 ## 更新qinglong
 update_qinglong() {
     echo -e "--------------------------------------------------------------\n"
+    [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     git_pull_scripts $dir_root
 
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$dir_root成功...\n"
-        npm_install_2 $dir_root
-
         cp -f $file_config_sample $dir_config/config.sample.sh
         detect_config_version
         update_depend
+        
+        [ -f $dir_root/package.json ] && ql_depend_new=$(cat $dir_root/package.json)
+        [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi

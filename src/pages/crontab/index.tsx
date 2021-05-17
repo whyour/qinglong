@@ -103,7 +103,7 @@ const Crontab = () => {
       align: 'center' as const,
       render: (text: string, record: any) => (
         <>
-          {!record.isDisabled && (
+          {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
             <>
               {record.status === CrontabStatus.idle && (
                 <Tag icon={<ClockCircleOutlined />} color="default">
@@ -125,7 +125,7 @@ const Crontab = () => {
               )}
             </>
           )}
-          {record.isDisabled === 1 && (
+          {record.isDisabled === 1 && record.status === CrontabStatus.idle && (
             <Tag icon={<CloseCircleOutlined />} color="error">
               已禁用
             </Tag>
@@ -194,9 +194,12 @@ const Crontab = () => {
       .get(`${config.apiPrefix}crons?searchValue=${searchText}`)
       .then((data: any) => {
         setValue(
-          data.data.sort(
-            (a: any, b: any) => CrontabSort[a.status] - CrontabSort[b.status],
-          ),
+          data.data.sort((a: any, b: any) => {
+            if (a.status === b.status && a.status === CrontabStatus.idle) {
+              return a.isDisabled - b.isDisable;
+            }
+            return CrontabSort[a.status] - CrontabSort[b.status];
+          }),
         );
         const runningTasks = data.data.filter(
           (x: any) => x.status !== CrontabStatus.idle,
