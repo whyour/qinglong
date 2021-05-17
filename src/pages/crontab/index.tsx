@@ -196,7 +196,7 @@ const Crontab = () => {
         setValue(
           data.data.sort((a: any, b: any) => {
             if (a.status === b.status && a.status === CrontabStatus.idle) {
-              return a.isDisabled - b.isDisable;
+              return a.isDisabled - b.isDisabled;
             }
             return CrontabSort[a.status] - CrontabSort[b.status];
           }),
