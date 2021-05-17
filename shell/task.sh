@@ -78,7 +78,7 @@ usage() {
     define_cmd
     gen_array_scripts
     echo -e "task命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或去掉 “$dir_scripts/” 目录后的相对路径（定时任务中请写作相对路径），用法为："
-    echo -e "1.$cmd_task <file_name>        # 依次执行，如果设置了随机延迟并且当时时间不在0-2、30-31、59分内，将随机延迟一定秒数"
+    echo -e "1.$cmd_task <file_name>        # 依次执行，如果设置了随机延迟，将随机延迟一定秒数"
     echo -e "2.$cmd_task <file_name> now    # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
     echo -e "3.$cmd_task <file_name> conc   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
     if [[ ${#array_scripts[*]} -gt 0 ]]; then
