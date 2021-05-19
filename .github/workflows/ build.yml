@@ -23,9 +23,8 @@ jobs:
         env: 
           GITHUB_REPO: gitee.com/whyour/qinglong-static
         run: |
-          git config --global http.postBuffer 524288000
+          ifconfig eth0 mtu 14000
           git config --global user.email "imwhyour@gmail.com"
-          git config --global core.compression 0
           git config --global user.name "whyour"
           git clone --depth 1 https://gitee.com/whyour/qinglong-static.git static
           cd ./static 
