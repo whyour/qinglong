@@ -25,8 +25,9 @@ jobs:
         run: |
           git config --global http.postBuffer 524288000
           git config --global user.email "imwhyour@gmail.com"
+          git config --global core.compression 0
           git config --global user.name "whyour"
-          git clone https://gitee.com/whyour/qinglong-static.git static
+          git clone --depth 1 https://gitee.com/whyour/qinglong-static.git static
           cd ./static 
           cp -rf ../dist ./ && cp -rf ../build ./
           git add .
