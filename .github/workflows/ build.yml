@@ -23,11 +23,11 @@ jobs:
         env: 
           GITHUB_REPO: gitee.com/whyour/qinglong-static
         run: |
-          ifconfig eth0 mtu 14000
           git config --global user.email "imwhyour@gmail.com"
           git config --global user.name "whyour"
           git clone --depth 1 https://gitee.com/whyour/qinglong-static.git static
           cd ./static 
+          rm -rf dist/* && rm -rf build/*
           cp -rf ../dist ./ && cp -rf ../build ./
           git add .
           git commit --allow-empty -m "copy static at $(date +'%Y-%m-%d %H:%M:%S')"
