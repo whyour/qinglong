@@ -42,7 +42,7 @@ enum CrontabStatus {
   'queued',
 }
 
-const CrontabSort = [0, 3, 1];
+const CrontabSort: any = { 0: 0, 3: 1, 1: 2, 4: 3 };
 
 enum OperationName {
   '启用',
@@ -188,33 +188,20 @@ const Crontab = () => {
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
-  const getCrons = (needLoading: boolean = true) => {
-    needLoading && setLoading(true);
+  const getCrons = () => {
+    setLoading(true);
     request
       .get(`${config.apiPrefix}crons?searchValue=${searchText}`)
       .then((data: any) => {
         setValue(
           data.data.sort((a: any, b: any) => {
-            if (a.status === b.status && a.status === CrontabStatus.idle) {
-              return a.isDisabled - b.isDisabled;
-            }
-            return CrontabSort[a.status] - CrontabSort[b.status];
+            const sortA = a.isDisabled ? 4 : a.status;
+            const sortB = b.isDisabled ? 4 : b.status;
+            return CrontabSort[sortA] - CrontabSort[sortB];
           }),
         );
-        const runningTasks = data.data.filter(
-          (x: any) => x.status !== CrontabStatus.idle,
-        );
-        if (
-          runningTasks.length > 0 &&
-          !logCron &&
-          location.pathname === '/crontab'
-        ) {
-          setTimeout(() => {
-            getCrons(false);
-          }, 5000);
-        }
       })
-      .finally(() => needLoading && setLoading(false));
+      .finally(() => setLoading(false));
   };
 
   const addCron = () => {
