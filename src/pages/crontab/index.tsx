@@ -103,7 +103,7 @@ const Crontab = () => {
       align: 'center' as const,
       render: (text: string, record: any) => (
         <>
-          {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
+          {!record.isDisabled && (
             <>
               {record.status === CrontabStatus.idle && (
                 <Tag icon={<ClockCircleOutlined />} color="default">
@@ -125,7 +125,7 @@ const Crontab = () => {
               )}
             </>
           )}
-          {record.isDisabled === 1 && record.status === CrontabStatus.idle && (
+          {record.isDisabled === 1 && (
             <Tag icon={<CloseCircleOutlined />} color="error">
               已禁用
             </Tag>

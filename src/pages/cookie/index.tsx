@@ -187,7 +187,7 @@ const Config = () => {
             </a>
           </Tooltip>
           <Tooltip title={record.status === Status.已禁用 ? '启用' : '禁用'}>
-            <a onClick={() => enabledOrDisabledCron(record, index)}>
+            <a onClick={() => enabledOrDisabledCookie(record, index)}>
               {record.status === Status.已禁用 ? (
                 <CheckCircleOutlined />
               ) : (
@@ -222,36 +222,6 @@ const Config = () => {
       .finally(() => setLoading(false));
   };
 
-  const decodeUrl = (val: string) => {
-    try {
-      const newUrl = decodeURIComponent(val);
-      return newUrl;
-    } catch (error) {
-      return val;
-    }
-  };
-
-  // useEffect(() => {
-  //   if (value && loading) {
-  //     asyncUpdateStatus();
-  //   }
-  // }, [value]);
-
-  const asyncUpdateStatus = async () => {
-    for (let i = 0; i < value.length; i++) {
-      const cookie = value[i];
-      if (cookie.status === Status.已禁用) {
-        continue;
-      }
-      await sleep(1000);
-      location.pathname === '/cookie' && refreshStatus(cookie, i);
-    }
-  };
-
-  const sleep = (time: number) => {
-    return new Promise((resolve) => setTimeout(resolve, time));
-  };
-
   const refreshStatus = (record: any, index: number) => {
     request
       .get(`${config.apiPrefix}cookies/${record._id}/refresh`)
@@ -265,7 +235,7 @@ const Config = () => {
       });
   };
 
-  const enabledOrDisabledCron = (record: any, index: number) => {
+  const enabledOrDisabledCookie = (record: any, index: number) => {
     Modal.confirm({
       title: `确认${record.status === Status.已禁用 ? '启用' : '禁用'}`,
       content: (
@@ -280,12 +250,12 @@ const Config = () => {
       ),
       onOk() {
         request
-          .get(
-            `${config.apiPrefix}cookies/${record._id}/${
+          .put(
+            `${config.apiPrefix}cookies/${
               record.status === Status.已禁用 ? 'enable' : 'disable'
             }`,
             {
-              data: { _id: record._id },
+              data: [record._id],
             },
           )
           .then((data: any) => {
@@ -340,7 +310,7 @@ const Config = () => {
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}cookies/${record._id}`)
+          .delete(`${config.apiPrefix}cookies`, { data: [record._id] })
           .then((data: any) => {
             if (data.code === 200) {
               notification.success({
