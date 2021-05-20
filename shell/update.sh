@@ -263,7 +263,8 @@ update_qinglong() {
     local url="https://ghproxy.com/https://github.com/whyour/qinglong-static.git"
     if [ -d ${ql_static_repo}/.git ]; then
         reset_romote_url ${ql_static_repo} ${url}
-        git fetch
+        git fetch --all
+        exit_status=$?
         git reset --hard origin/master >/dev/null 2>&1
     else
         git_clone_scripts ${url} ${ql_static_repo}
