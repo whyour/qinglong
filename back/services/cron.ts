@@ -88,8 +88,16 @@ export default class CronService {
   }
 
   public async remove(ids: string[]) {
-    this.cronDb.remove({ _id: { $in: ids } }, { multi: true });
-    await this.set_crontab(true);
+    return new Promise((resolve: any) => {
+      this.cronDb.remove(
+        { _id: { $in: ids } },
+        { multi: true },
+        async (err) => {
+          await this.set_crontab(true);
+          resolve();
+        },
+      );
+    });
   }
 
   public async crontabs(searchText?: string): Promise<Crontab[]> {
@@ -141,17 +149,21 @@ export default class CronService {
   }
 
   public async stop(ids: string[]) {
-    this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
-      this.cronDb.update(
-        { _id: { $in: ids } },
-        { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
-      );
-      const pids = docs
-        .map((x) => x.pid)
-        .filter((x) => !!x)
-        .join('\n');
-      console.log(pids);
-      exec(`echo - e "${pids}" | xargs kill - 9`);
+    return new Promise((resolve: any) => {
+      this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
+        this.cronDb.update(
+          { _id: { $in: ids } },
+          { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+        );
+        const pids = docs
+          .map((x) => x.pid)
+          .filter((x) => !!x)
+          .join('\n');
+        console.log(pids);
+        exec(`echo - e "${pids}" | xargs kill - 9`, (err) => {
+          resolve();
+        });
+      });
     });
   }
 
@@ -222,21 +234,31 @@ export default class CronService {
   }
 
   public async disabled(ids: string[]) {
-    this.cronDb.update(
-      { _id: { $in: ids } },
-      { $set: { isDisabled: 1 } },
-      { multi: true },
-    );
-    await this.set_crontab(true);
+    return new Promise((resolve: any) => {
+      this.cronDb.update(
+        { _id: { $in: ids } },
+        { $set: { isDisabled: 1 } },
+        { multi: true },
+        async (err) => {
+          await this.set_crontab(true);
+          resolve();
+        },
+      );
+    });
   }
 
   public async enabled(ids: string[]) {
-    this.cronDb.update(
-      { _id: { $in: ids } },
-      { $set: { isDisabled: 0 } },
-      { multi: true },
-    );
-    await this.set_crontab(true);
+    return new Promise((resolve: any) => {
+      this.cronDb.update(
+        { _id: { $in: ids } },
+        { $set: { isDisabled: 0 } },
+        { multi: true },
+        async (err) => {
+          await this.set_crontab(true);
+          resolve();
+        },
+      );
+    });
   }
 
   public async log(_id: string) {
@@ -289,7 +311,8 @@ export default class CronService {
 
       lines.reverse().forEach((line, index) => {
         line = line.replace(/\t+/g, ' ');
-        var regex = /^((\@[a-zA-Z]+\s+)|(([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+))/;
+        var regex =
+          /^((\@[a-zA-Z]+\s+)|(([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+))/;
         var command = line.replace(regex, '').trim();
         var schedule = line.replace(command, '').trim();
 
