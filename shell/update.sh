@@ -166,8 +166,7 @@ update_repo() {
     local repo_path="${dir_repo}/${author}_${repo}"
     if [ -d ${repo_path}/.git ]; then
         reset_romote_url ${repo_path} ${url}
-        git fetch
-        git reset --hard origin/master >/dev/null 2>&1
+        git_pull_scripts ${repo_path}
     else
         git_clone_scripts ${url} ${repo_path}
     fi
@@ -264,7 +263,8 @@ update_qinglong() {
     local url="https://ghproxy.com/https://github.com/whyour/qinglong-static.git"
     if [ -d ${ql_static_repo}/.git ]; then
         reset_romote_url ${ql_static_repo} ${url}
-        git_pull_scripts ${ql_static_repo}
+        git fetch
+        git reset --hard origin/master >/dev/null 2>&1
     else
         git_clone_scripts ${url} ${ql_static_repo}
     fi
