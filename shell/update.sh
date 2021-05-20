@@ -261,7 +261,7 @@ update_qinglong() {
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
 
-    local url="https://gitee.com/whyour/qinglong-static.git"
+    local url="https://ghproxy.com/https://github.com/whyour/qinglong-static.git"
     if [ -d ${ql_static_repo}/.git ]; then
         reset_romote_url ${ql_static_repo} ${url}
         git_pull_scripts ${ql_static_repo}
