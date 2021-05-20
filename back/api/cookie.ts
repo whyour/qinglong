@@ -62,17 +62,15 @@ export default (app: Router) => {
   );
 
   route.delete(
-    '/cookies/:id',
+    '/cookies',
     celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
+      body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cookieService = Container.get(CookieService);
-        const data = await cookieService.remove(req.params.id);
+        const data = await cookieService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -125,18 +123,16 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/cookies/:id/disable',
+  route.put(
+    '/cookies/disable',
     celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
+      body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cookieService = Container.get(CookieService);
-        const data = await cookieService.disabled(req.params.id);
+        const data = await cookieService.disabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -145,18 +141,16 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/cookies/:id/enable',
+  route.put(
+    '/cookies/enable',
     celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
+      body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cookieService = Container.get(CookieService);
-        const data = await cookieService.enabled(req.params.id);
+        const data = await cookieService.enabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
