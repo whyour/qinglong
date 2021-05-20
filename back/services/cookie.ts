@@ -193,10 +193,14 @@ export default class CookieService {
 
   public async remove(ids: string[]) {
     return new Promise((resolve: any) => {
-      this.cronDb.remove({ _id: { $in: ids } }, {}, async (err) => {
-        await this.set_cookies();
-        resolve();
-      });
+      this.cronDb.remove(
+        { _id: { $in: ids } },
+        { multi: true },
+        async (err) => {
+          await this.set_cookies();
+          resolve();
+        },
+      );
     });
   }
 
@@ -287,12 +291,12 @@ export default class CookieService {
     });
   }
 
-  public async disabled(ids: string) {
+  public async disabled(ids: string[]) {
     return new Promise((resolve: any) => {
       this.cronDb.update(
         { _id: { $in: ids } },
         { $set: { status: CookieStatus.disabled } },
-        {},
+        { multi: true },
         async (err) => {
           await this.set_cookies();
           resolve();
@@ -301,12 +305,12 @@ export default class CookieService {
     });
   }
 
-  public async enabled(ids: string) {
+  public async enabled(ids: string[]) {
     return new Promise((resolve: any) => {
       this.cronDb.update(
         { _id: { $in: ids } },
         { $set: { status: CookieStatus.noacquired } },
-        {},
+        { multi: true },
         async (err, num) => {
           await this.set_cookies();
           resolve();
