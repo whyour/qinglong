@@ -290,6 +290,7 @@ export default class CookieService {
 
   public async enabled(_id: string) {
     this.cronDb.update({ _id }, { $set: { status: CookieStatus.noacquired } });
+    await this.set_cookies();
   }
 
   public async set_cookies() {
