@@ -166,7 +166,8 @@ update_repo() {
     local repo_path="${dir_repo}/${author}_${repo}"
     if [ -d ${repo_path}/.git ]; then
         reset_romote_url ${repo_path} ${url}
-        git_pull_scripts ${repo_path}
+        git fetch
+        git reset --hard origin/master >/dev/null 2>&1
     else
         git_clone_scripts ${url} ${repo_path}
     fi
@@ -253,7 +254,7 @@ update_qinglong() {
         cp -f $file_config_sample $dir_config/config.sample.sh
         detect_config_version
         update_depend
-        
+
         [ -f $dir_root/package.json ] && ql_depend_new=$(cat $dir_root/package.json)
         [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
     else
