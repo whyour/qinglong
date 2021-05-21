@@ -199,17 +199,17 @@ export default class CronService {
       );
 
       cmd.stdout.on('data', (data) => {
-        this.logger.info(`stdout: ${data}`);
+        this.logger.silly(`stdout: ${data}`);
         fs.appendFileSync(logFile, data);
       });
 
       cmd.stderr.on('data', (data) => {
-        this.logger.info(`stderr: ${data}`);
+        this.logger.silly(`stderr: ${data}`);
         fs.appendFileSync(logFile, data);
       });
 
       cmd.on('close', (code) => {
-        this.logger.info(`child process exited with code ${code}`);
+        this.logger.silly(`child process exited with code ${code}`);
         this.cronDb.update(
           { _id },
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
@@ -222,7 +222,7 @@ export default class CronService {
       });
 
       cmd.on('exit', (code: number, signal: any) => {
-        this.logger.info(`cmd exit ${code}`);
+        this.logger.silly(`cmd exit ${code}`);
         this.cronDb.update(
           { _id },
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
