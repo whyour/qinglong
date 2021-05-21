@@ -168,10 +168,10 @@ export default class CronService {
   }
 
   private async runSingle(id: string): Promise<number> {
-    return new Promise(async (resolve) => {
+    return new Promise(async (resolve: any) => {
       const cron = await this.get(id);
       if (cron.status !== CrontabStatus.queued) {
-        resolve(0);
+        resolve();
         return;
       }
 
@@ -228,7 +228,12 @@ export default class CronService {
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
         );
         fs.appendFileSync(logFile, `\n执行结束...`);
-        resolve(code);
+        resolve();
+      });
+
+      process.on('SIGINT', function () {
+        fs.appendFileSync(logFile, `\n执行结束...`);
+        resolve();
       });
     });
   }
