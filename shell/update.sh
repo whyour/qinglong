@@ -271,6 +271,10 @@ update_qinglong() {
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
+        cd $ql_static_repo
+        commit_id=$(git rev-parse --short HEAD)
+        echo -e "\n当前静态资源版本 $commit_id...\n"
+        cd $dir_root
         rm -rf $dir_root/build && rm -rf $dir_root/dist
         cp -rf $ql_static_repo/* $dir_root
         echo -e "重启面板中..."
