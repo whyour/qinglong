@@ -99,9 +99,9 @@ update_cron_command_api() {
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "$name -> 更新成功"
+        echo -e "$command -> 更新成功"
     else
-        echo -e "$name -> 更新失败(${message})"
+        echo -e "$command -> 更新失败(${message})"
     fi
 }
 

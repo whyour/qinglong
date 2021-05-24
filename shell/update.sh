@@ -345,7 +345,7 @@ gen_list_repo() {
         filename=$(basename $file)
         cp -f $file $dir_scripts/${repo}_${filename}
         echo ${repo}_${filename} >>"$dir_list_tmp/${repo}_scripts.list"
-        cron_id=$(grep -E "$cmd_task ${author}_${filename}" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|")
+        cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${author}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|")
         if [[ $cron_id ]]; then
             result=$(update_cron_command_api "$cmd_task ${repo}_${filename}:$cron_id")
         fi
