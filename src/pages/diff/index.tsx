@@ -1,5 +1,5 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
-import { Button, notification, Modal } from 'antd';
+import { Button, message, Modal } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';

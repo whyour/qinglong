@@ -1,5 +1,5 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
-import { Button, notification, Modal, TreeSelect } from 'antd';
+import { Button, message, Modal, TreeSelect } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { Controlled as CodeMirror } from 'react-codemirror2';

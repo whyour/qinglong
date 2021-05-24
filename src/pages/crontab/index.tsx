@@ -1,7 +1,7 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
 import {
   Button,
-  notification,
+  message,
   Modal,
   Table,
   Tag,
@@ -231,16 +231,12 @@ const Crontab = () => {
           .delete(`${config.apiPrefix}crons`, { data: [record._id] })
           .then((data: any) => {
             if (data.code === 200) {
-              notification.success({
-                message: '删除成功',
-              });
+              message.success('删除成功');
               const result = [...value];
               result.splice(index, 1);
               setValue(result);
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
@@ -274,9 +270,7 @@ const Crontab = () => {
               });
               setValue(result);
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
@@ -311,9 +305,7 @@ const Crontab = () => {
               });
               setValue(result);
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
@@ -356,9 +348,7 @@ const Crontab = () => {
               });
               setValue(result);
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
@@ -484,15 +474,11 @@ const Crontab = () => {
           .delete(`${config.apiPrefix}crons`, { data: selectedRowIds })
           .then((data: any) => {
             if (data.code === 200) {
-              notification.success({
-                message: '批量删除成功',
-              });
+              message.success('批量删除成功');
               setSelectedRowIds([]);
               getCrons();
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
@@ -515,9 +501,7 @@ const Crontab = () => {
             if (data.code === 200) {
               getCrons();
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
