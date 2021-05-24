@@ -12,7 +12,7 @@ const initData = [
       6,
       1,
     ).toString()} * * *`,
-    status: CrontabStatus.idle,
+    status: CrontabStatus.disabled,
   },
   {
     name: '删除日志',

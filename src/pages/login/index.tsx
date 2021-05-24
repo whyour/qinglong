@@ -1,5 +1,5 @@
 import React, { Fragment, useEffect } from 'react';
-import { Button, Row, Input, Form, notification } from 'antd';
+import { Button, Row, Input, Form, message } from 'antd';
 import config from '@/utils/config';
 import { history, Link } from 'umi';
 import styles from './index.less';
@@ -21,13 +21,9 @@ const Login = () => {
           localStorage.setItem(config.authKey, data.token);
           history.push('/crontab');
         } else if (data.code === 100) {
-          notification.warn({
-            message: data.msg,
-          });
+          message.warn(data.msg);
         } else {
-          notification.error({
-            message: data.msg,
-          });
+          message.error(data.msg);
         }
       })
       .catch(function (error) {

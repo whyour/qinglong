@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, notification, Input, Form } from 'antd';
+import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import cronParse from 'cron-parser';
@@ -27,13 +27,9 @@ const CronModal = ({
       data: payload,
     });
     if (code === 200) {
-      notification.success({
-        message: cron ? '更新Cron成功' : '添加Cron成功',
-      });
+      message.success(cron ? '更新Cron成功' : '添加Cron成功');
     } else {
-      notification.error({
-        message: data,
-      });
+      message.error(data);
     }
     setLoading(false);
     handleCancel(data);
