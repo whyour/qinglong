@@ -6,6 +6,7 @@ import {
   Loading3QuartersOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
+import { Controlled as CodeMirror } from 'react-codemirror2';
 
 enum CrontabStatus {
   'running',
@@ -98,9 +99,19 @@ const CronLogModal = ({
       onOk={() => cancel()}
       onCancel={() => cancel()}
     >
-      <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
-        {!loading && value}
-      </pre>
+      {!loading && value && (
+        <CodeMirror
+          value={value}
+          options={{
+            lineWrapping: true,
+            readOnly: true,
+          }}
+          onBeforeChange={(editor, data, value) => {
+            setValue(value);
+          }}
+          onChange={(editor, data, value) => {}}
+        />
+      )}
     </Modal>
   );
 };
