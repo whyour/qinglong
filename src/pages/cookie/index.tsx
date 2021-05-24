@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   Button,
-  notification,
+  message,
   Modal,
   Table,
   Tag,
@@ -230,7 +230,7 @@ const Config = () => {
           (value as any).splice(index, 1, data.data);
           setValue([...(value as any)] as any);
         } else {
-          notification.error({ message: '更新状态失败' });
+          message.error('更新状态失败');
         }
       });
   };
@@ -260,11 +260,9 @@ const Config = () => {
           )
           .then((data: any) => {
             if (data.code === 200) {
-              notification.success({
-                message: `${
-                  record.status === Status.已禁用 ? '启用' : '禁用'
-                }成功`,
-              });
+              message.success(
+                `${record.status === Status.已禁用 ? '启用' : '禁用'}成功`,
+              );
               const newStatus =
                 record.status === Status.已禁用 ? Status.未获取 : Status.已禁用;
               const result = [...value];
@@ -274,9 +272,7 @@ const Config = () => {
               });
               setValue(result);
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
@@ -313,16 +309,12 @@ const Config = () => {
           .delete(`${config.apiPrefix}cookies`, { data: [record._id] })
           .then((data: any) => {
             if (data.code === 200) {
-              notification.success({
-                message: '删除成功',
-              });
+              message.success('删除成功');
               const result = [...value];
               result.splice(index, 1);
               setValue(result);
             } else {
-              notification.error({
-                message: data,
-              });
+              message.error(data);
             }
           });
       },
@@ -377,9 +369,7 @@ const Config = () => {
         })
         .then((data: any) => {
           if (data.code !== 200) {
-            notification.error({
-              message: data,
-            });
+            message.error(data);
           }
         });
     },

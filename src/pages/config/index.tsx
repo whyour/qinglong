@@ -1,5 +1,5 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
-import { Button, notification, Modal } from 'antd';
+import { Button, message, Modal } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { Controlled as CodeMirror } from 'react-codemirror2';
@@ -16,7 +16,7 @@ const Config = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}config/config`)
-      .then((data) => {
+      .then((data: any) => {
         setValue(data.data);
       })
       .finally(() => setLoading(false));
@@ -27,10 +27,8 @@ const Config = () => {
       .post(`${config.apiPrefix}save`, {
         data: { content: value, name: 'config.sh' },
       })
-      .then((data) => {
-        notification.success({
-          message: data.msg,
-        });
+      .then((data: any) => {
+        message.success(data.msg);
       });
   };
 

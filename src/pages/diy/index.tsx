@@ -1,5 +1,5 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
-import { Button, notification, Modal } from 'antd';
+import { Button, message, Modal } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { Controlled as CodeMirror } from 'react-codemirror2';
@@ -28,9 +28,7 @@ const Crontab = () => {
         data: { content: value, name: 'extra.sh' },
       })
       .then((data) => {
-        notification.success({
-          message: data.msg,
-        });
+        message.success(data.msg);
       });
   };
 

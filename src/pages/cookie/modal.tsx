@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, notification, Input, Form } from 'antd';
+import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 
@@ -22,7 +22,7 @@ const CookieModal = ({
     let flag = false;
     for (const coo of cookies) {
       if (!/pt_key=\S*;\s*pt_pin=\S*;\s*/.test(coo)) {
-        notification.error({ message: `${coo}格式有误` });
+        message.error(`${coo}格式有误`);
         flag = true;
         break;
       }
@@ -37,13 +37,9 @@ const CookieModal = ({
       data: payload,
     });
     if (code === 200) {
-      notification.success({
-        message: cookie ? '更新Cookie成功' : '添加Cookie成功',
-      });
+      message.success(cookie ? '更新Cookie成功' : '添加Cookie成功');
     } else {
-      notification.error({
-        message: data,
-      });
+      message.error(data);
     }
     setLoading(false);
     handleCancel(cookie ? [data] : data);
