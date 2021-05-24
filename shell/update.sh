@@ -83,7 +83,7 @@ output_list_add_drop() {
 ## $1：失效任务清单文件路径
 del_cron() {
     local list_drop=$1
-    local author=$2
+    local path=$2
     local detail=""
     local ids=""
     echo -e "开始尝试自动删除失效的定时任务...\n"
@@ -117,12 +117,12 @@ del_cron() {
 ## $1：新任务清单文件路径
 add_cron() {
     local list_add=$1
-    local author=$2
+    local path=$2
     echo -e "开始尝试自动添加定时任务...\n"
     local detail=""
     cd $dir_scripts
     for file in $(cat $list_add); do
-        local file_name=${file/${author}\_/}
+        local file_name=${file/${path}\_/}
         if [ -f $file ]; then
             cron_line=$(
                 perl -ne "{
@@ -308,13 +308,13 @@ diff_scripts() {
     if [ -s $list_drop ]; then
         output_list_add_drop $list_drop "失效"
         if [[ ${AutoDelCron} == true ]]; then
-            del_cron $list_drop $2
+            del_cron $list_drop $repo
         fi
     fi
     if [ -s $list_add ]; then
         output_list_add_drop $list_add "新"
         if [[ ${AutoAddCron} == true ]]; then
-            add_cron $list_add $2
+            add_cron $list_add $repo
         fi
     fi
     cd $dir_current
