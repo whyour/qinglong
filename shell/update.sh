@@ -343,10 +343,14 @@ gen_list_repo() {
     fi
     for file in ${files}; do
         filename=$(basename $file)
-        cp -f $file $dir_scripts/${author}_${filename}
-        echo ${author}_${filename} >>"$dir_list_tmp/${repo}_scripts.list"
+        cp -f $file $dir_scripts/${repo}_${filename}
+        echo ${repo}_${filename} >>"$dir_list_tmp/${repo}_scripts.list"
+        cron_id=$(grep -E "$cmd_task ${author}_${filename}" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|")
+        if [[ $cron_id ]]; then
+            result=$(update_cron_command_api "$cmd_task ${repo}_${filename}:$cron_id")
+        fi
     done
-    grep -E "$cmd_task $author" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($author_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${repo}_user.list"
+    grep -E "$cmd_task $repo" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($repo_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${repo}_user.list"
     cd $dir_current
 }
 

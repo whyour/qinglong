@@ -36,6 +36,9 @@ HelpType=""
 ## 是否自动启动bot，默认不启动，设置为true时自动启动
 AutoStartBot=""
 
+## 安装bot依赖时指定pip源，默认使用清华源，如不需要源，设置此参数为空
+PipMirror="https://pypi.tuna.tsinghua.edu.cn/simple"
+
 ## 需组合的环境变量列表，env_name需要和var_name一一对应，如何有新活动按照格式添加(不懂勿动)
 env_name=(
   JD_COOKIE

@@ -147,8 +147,8 @@ export default (app: Router) => {
     '/crons',
     celebrate({
       body: Joi.object({
-        command: Joi.string().required(),
-        schedule: Joi.string().required(),
+        command: Joi.string().optional(),
+        schedule: Joi.string().optional(),
         name: Joi.string().optional(),
         _id: Joi.string().required(),
       }),
@@ -156,7 +156,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        if (cron_parser.parseExpression(req.body.schedule).hasNext()) {
+        if (
+          !req.body.schedule ||
+          cron_parser.parseExpression(req.body.schedule).hasNext()
+        ) {
           const cronService = Container.get(CronService);
           const data = await cronService.update(req.body);
           return res.send({ code: 200, data });
