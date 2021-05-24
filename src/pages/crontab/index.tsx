@@ -620,6 +620,8 @@ const Crontab = () => {
           hideOnSinglePage: true,
           showSizeChanger: true,
           defaultPageSize: 20,
+          showTotal: (total: number, range: number[]) =>
+            `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
         }}
         dataSource={value}
         rowKey="_id"

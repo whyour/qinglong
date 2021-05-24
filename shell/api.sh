@@ -73,6 +73,38 @@ update_cron_api() {
     fi
 }
 
+update_cron_command_api() {
+    local currentTimeStamp=$(date +%s)
+    if [ $# -eq 1 ]; then
+        local command=$(echo "$1" | awk -F ":" '{print $1}')
+        local id=$(echo "$1" | awk -F ":" '{print $2}')
+    else
+        local command=$1
+        local id=$2
+    fi
+
+    local api=$(
+        curl -s "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+            -X 'PUT' \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $token" \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
+            -H "Content-Type: application/json;charset=UTF-8" \
+            -H "Origin: http://localhost:5700" \
+            -H "Referer: http://localhost:5700/crontab" \
+            -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
+            --data-raw "{\"command\":\"$command\",\"_id\":\"$id\"}" \
+            --compressed
+    )
+    code=$(echo $api | jq -r .code)
+    message=$(echo $api | jq -r .message)
+    if [[ $code == 200 ]]; then
+        echo -e "$name -> 更新成功"
+    else
+        echo -e "$name -> 更新失败(${message})"
+    fi
+}
+
 del_cron_api() {
     local ids=$1
     local currentTimeStamp=$(date +%s)
