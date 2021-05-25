@@ -113,7 +113,8 @@ run_normal() {
     fi
     combine_all
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir="$dir_log/${p1%%.*}"
+    log_dir_tmp="${p1##*/}"
+    log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
     make_dir "$log_dir"
     timeout $command_timeout_time $which_program $p1 2>&1 | tee $log_path
