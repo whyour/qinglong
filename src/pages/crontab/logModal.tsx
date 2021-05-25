@@ -102,6 +102,7 @@ const CronLogModal = ({
       {!loading && value && (
         <CodeMirror
           value={value}
+          className="log-modal-code"
           options={{
             lineWrapping: true,
             readOnly: true,
