@@ -16,6 +16,13 @@ body {
     overflow-y: hidden;
     overflow-x: auto;
   }
+
+  .CodeMirror-sizer {
+    width: 500px;
+    transform: scale(0.95);
+    transform-origin: top left;
+    min-height: auto;
+  }
 }
 
 .ql-container-wrapper {
@@ -76,6 +83,15 @@ body {
     .CodeMirror {
       height: calc(100vh - 176px);
       height: calc(100vh - var(--vh-offset, 0px) - 176px);
+    }
+  }
+
+  .log-modal-code {
+    .CodeMirror-sizer {
+      width: 500px;
+      transform: scale(0.95);
+      transform-origin: top left;
+      min-height: auto;
     }
   }
 }
