@@ -7,7 +7,7 @@
  * @param text 通知头
  * @param desp 通知体
  * @param params 某些推送通知方式点击弹窗可跳转, 例：{ url: 'https://abc.com' }
- * @param author 作者仓库等信息  例：`本脚本免费使用 By：https://github.com/whyour/qinglong`
+ * @param author 作者仓库等信息  例：`本通知 By：https://github.com/whyour/qinglong`
  */
 
 const querystring = require('querystring');
@@ -151,14 +151,14 @@ if (process.env.PUSH_PLUS_USER) {
  * @param text 通知头
  * @param desp 通知体
  * @param params 某些推送通知方式点击弹窗可跳转, 例：{ url: 'https://abc.com' }
- * @param author 作者仓库等信息  例：`本脚本免费使用 By：https://github.com/whyour/qinglong`
+ * @param author 作者仓库等信息  例：`本通知 By：https://github.com/whyour/qinglong`
  * @returns {Promise<unknown>}
  */
 async function sendNotify(
   text,
   desp,
   params = {},
-  author = '\n\n本脚本免费使用 By：https://github.com/whyour/qinglong',
+  author = '\n\n本通知 By：https://github.com/whyour/qinglong',
 ) {
   //提供6种通知
   desp += author; //增加作者信息，防止被贩卖等
