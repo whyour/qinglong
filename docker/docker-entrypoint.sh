@@ -19,7 +19,7 @@ echo -e "nginx启动成功...\n"
 
 echo -e "======================4. 启动控制面板========================\n"
 cd $dir_root
-if [[ $(pm2 info panel) ]]; then
+if [[ $(pm2 info panel 2>/dev/null) ]]; then
   pm2 reload panel
 else
   pm2 start $dir_root/build/app.js -n panel
@@ -47,6 +47,6 @@ echo -e "容器启动成功..."
 echo -e "\n请先访问5700端口，登录成功面板之后再执行添加定时任务..."
 echo -e "############################################################\n"
 
-crond -f
+crond -f >/dev/null 2>&1
 
 exec "$@"
