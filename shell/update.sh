@@ -108,8 +108,7 @@ del_cron() {
     done
     if [[ $ids ]]; then
         result=$(del_cron_api "$ids")
-        detail="${result}\n\n${detail}"
-        notify "删除失效任务通知" "$detail"
+        notify "$path 删除任务${result}" "$detail"
     fi
 }
 
@@ -145,7 +144,7 @@ add_cron() {
             fi
         fi
     done
-    notify "新增任务通知" "$detail"
+    notify "$path 新增任务" "$detail"
 }
 
 ## 更新仓库
