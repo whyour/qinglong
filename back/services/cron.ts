@@ -182,7 +182,10 @@ export default class CronService {
       this.logger.silly('Original command: ' + command);
 
       let logFile = `${config.manualLogPath}${_id}.log`;
-      fs.writeFileSync(logFile, `开始执行...\n${new Date().toString()}\n`);
+      fs.writeFileSync(
+        logFile,
+        `开始执行... ${new Date().toLocaleString()}\n\n`,
+      );
 
       let cmdStr = command;
       if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {

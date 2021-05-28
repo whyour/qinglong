@@ -6,18 +6,6 @@ body {
 
 @import '~codemirror/lib/codemirror.css';
 
-.log-modal-code {
-  .CodeMirror {
-    height: auto;
-  }
-
-  .CodeMirror-scroll {
-    height: auto;
-    overflow-y: hidden;
-    overflow-x: auto;
-  }
-}
-
 .ql-container-wrapper {
   .CodeMirror {
     position: absolute;
@@ -76,15 +64,6 @@ body {
     .CodeMirror {
       height: calc(100vh - 176px);
       height: calc(100vh - var(--vh-offset, 0px) - 176px);
-    }
-  }
-
-  .log-modal-code {
-    .CodeMirror-sizer {
-      width: 380px;
-      transform: scale(0.83);
-      transform-origin: top left;
-      min-height: auto;
     }
   }
 }
