@@ -124,9 +124,9 @@ del_cron_api() {
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "删除成功"
+        echo -e "成功"
     else
-        echo -e "删除失败(${message})"
+        echo -e "失败(${message})"
     fi
 }
 
