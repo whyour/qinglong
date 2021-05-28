@@ -99,7 +99,9 @@ const CronLogModal = ({
       onOk={() => cancel()}
       onCancel={() => cancel()}
     >
-      {!loading && value && <pre>{value}</pre>}
+      {!loading && value && (
+        <pre style={{ whiteSpace: 'break-spaces' }}>{value}</pre>
+      )}
     </Modal>
   );
 };
