@@ -99,20 +99,7 @@ const CronLogModal = ({
       onOk={() => cancel()}
       onCancel={() => cancel()}
     >
-      {!loading && value && (
-        <CodeMirror
-          value={value}
-          className="log-modal-code"
-          options={{
-            lineWrapping: true,
-            readOnly: true,
-          }}
-          onBeforeChange={(editor, data, value) => {
-            setValue(value);
-          }}
-          onChange={(editor, data, value) => {}}
-        />
-      )}
+      {!loading && value && <pre>{value}</pre>}
     </Modal>
   );
 };
