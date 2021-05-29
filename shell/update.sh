@@ -281,11 +281,25 @@ update_qinglong() {
         echo -e "重启面板中..."
         nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
         sleep 1
-        pm2 reload all >/dev/null 2>&1
+        reload_pm2
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
 
+}
+
+reload_pm2() {
+    if [[ $(pm2 info panel 2>/dev/null) ]]; then
+        pm2 reload panel >/dev/null 2>&1
+    else
+        pm2 start $dir_root/build/app.js -n panel >/dev/null 2>&1
+    fi
+
+    if [[ $(pm2 info schedule 2>/dev/null) ]]; then
+        pm2 reload schedule >/dev/null 2>&1
+    else
+        pm2 start $dir_root/build/schedule.js -n schedule >/dev/null 2>&1
+    fi
 }
 
 ## 对比脚本
