@@ -104,7 +104,8 @@ const Password = () => {
     >
       <Tabs
         defaultActiveKey="person"
-        tabPosition="left"
+        size="small"
+        tabPosition="top"
         style={{ height: 'calc(100vh - var(--vh-offset, 0px) - 128px)' }}
       >
         <Tabs.TabPane tab="个人设置" key="person">
@@ -116,7 +117,7 @@ const Password = () => {
               hasFeedback
               style={{ maxWidth: 300 }}
             >
-              <Input placeholder="用户名" autoFocus />
+              <Input placeholder="用户名" />
             </Form.Item>
             <Form.Item
               label="密码"
