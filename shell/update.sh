@@ -171,11 +171,10 @@ update_repo() {
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新${repo_path}成功...\n"
+        diff_scripts $repo_path $author $path $blackword $dependence
     else
         echo -e "\n更新${repo_path}失败，请检查原因...\n"
     fi
-
-    diff_scripts $repo_path $author $path $blackword $dependence
 }
 
 ## 更新所有 raw 文件
