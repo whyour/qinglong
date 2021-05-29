@@ -35,7 +35,6 @@ const Log = () => {
   };
 
   const getLog = (node: any) => {
-    console.log(node);
     setLoading(true);
     request
       .get(`${config.apiPrefix}logs/${node.value}`)

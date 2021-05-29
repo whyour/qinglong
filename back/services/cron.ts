@@ -159,7 +159,6 @@ export default class CronService {
           .map((x) => x.pid)
           .filter((x) => !!x)
           .join('\n');
-        console.log(pids);
         exec(`echo - e "${pids}" | xargs kill - 9`, (err) => {
           resolve();
         });
