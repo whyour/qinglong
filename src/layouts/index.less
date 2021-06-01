@@ -1,3 +1,4 @@
+@import '~@/styles/variable.less';
 body {
   height: 100%;
   overflow-y: hidden;
@@ -11,7 +12,7 @@ body {
     position: absolute;
     height: calc(100vh - 128px);
     height: calc(100vh - var(--vh-offset, 0px) - 128px);
-    width: calc(100% - 32px);
+    width: calc(100% - 32px - @tree-width);
   }
 }
 

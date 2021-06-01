@@ -1,9 +1,40 @@
-import React, { PureComponent, Fragment, useState, useEffect } from 'react';
-import { Button, message, Modal, TreeSelect } from 'antd';
+import { useState, useEffect, useCallback, Key } from 'react';
+import { TreeSelect, Tree, Input } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { Controlled as CodeMirror } from 'react-codemirror2';
 import { request } from '@/utils/http';
+import styles from './index.module.less';
+
+function getFilterData(keyword: string, data: any) {
+  const expandedKeys: string[] = [];
+  if (keyword) {
+    const tree: any = [];
+    data.forEach((item) => {
+      if (item.title.includes(keyword)) {
+        tree.push(item);
+        expandedKeys.push(...item.children.map((x) => x.key));
+      } else {
+        const children: any[] = [];
+        (item.children || []).forEach((subItem: any) => {
+          if (subItem.title.includes(keyword)) {
+            children.push(subItem);
+          }
+        });
+        if (children.length > 0) {
+          tree.push({
+            ...item,
+            children,
+          });
+          expandedKeys.push(...children.map((x) => x.key));
+        }
+      }
+    });
+    return { tree, expandedKeys };
+  }
+  return { tree: data, expandedKeys };
+}
+
 const Log = () => {
   const [width, setWdith] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
@@ -11,12 +42,15 @@ const Log = () => {
   const [title, setTitle] = useState('请选择日志文件');
   const [value, setValue] = useState('请选择日志文件');
   const [select, setSelect] = useState();
-  const [data, setData] = useState();
+  const [data, setData] = useState<any[]>([]);
+  const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const getConfig = () => {
     request.get(`${config.apiPrefix}logs`).then((data) => {
-      setData(formatData(data.dirs) as any);
+      const result = formatData(data.dirs) as any;
+      setData(result);
+      setFilterData(result);
     });
   };
 
@@ -25,10 +59,13 @@ const Log = () => {
       x.title = x.name;
       x.value = x.name;
       x.disabled = x.isDir;
+      x.key = x.name;
       x.children = x.files.map((y: string) => ({
         title: y,
         value: `${x.name}/${y}`,
+        key: `${x.name}/${y}`,
         parent: x.name,
+        isLeaf: true,
       }));
       return x;
     });
@@ -49,6 +86,19 @@ const Log = () => {
     setTitle(node.parent || node.value);
     getLog(node);
   };
+
+  const onTreeSelect = useCallback((keys: Key[], e: any) => {
+    onSelect(keys[0], e.node);
+  }, []);
+
+  const onSearch = useCallback(
+    (e) => {
+      const keyword = e.target.value;
+      const { tree, expandedKeys } = getFilterData(keyword, data);
+      setFilterData(tree);
+    },
+    [data, setFilterData],
+  );
 
   useEffect(() => {
     if (document.body.clientWidth < 768) {
@@ -92,21 +142,36 @@ const Log = () => {
         },
       }}
     >
-      <CodeMirror
-        value={value}
-        options={{
-          lineNumbers: true,
-          lineWrapping: true,
-          styleActiveLine: true,
-          matchBrackets: true,
-          mode: 'shell',
-          readOnly: true,
-        }}
-        onBeforeChange={(editor, data, value) => {
-          setValue(value);
-        }}
-        onChange={(editor, data, value) => {}}
-      />
+      <div className={styles['log-container']}>
+        <div className={styles['left-tree-container']}>
+          <Input.Search
+            className={styles['left-tree-search']}
+            onChange={onSearch}
+          ></Input.Search>
+          <div className={styles['left-tree-scroller']}>
+            <Tree
+              className={styles['left-tree']}
+              treeData={filterData}
+              onSelect={onTreeSelect}
+            ></Tree>
+          </div>
+        </div>
+        <CodeMirror
+          value={value}
+          options={{
+            lineNumbers: true,
+            lineWrapping: true,
+            styleActiveLine: true,
+            matchBrackets: true,
+            mode: 'shell',
+            readOnly: true,
+          }}
+          onBeforeChange={(editor, data, value) => {
+            setValue(value);
+          }}
+          onChange={(editor, data, value) => {}}
+        />
+      </div>
     </PageContainer>
   );
 };
