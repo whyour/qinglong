@@ -165,7 +165,7 @@ update_repo() {
 
     local repo_path="${dir_repo}/${author}_${repo}"
     if [ -d ${repo_path}/.git ]; then
-        reset_romote_url ${repo_path} ${url}
+        reset_romote_url ${repo_path} "${github_proxy_url}${url/https:\/\/ghproxy.com\//}"
         git_pull_scripts ${repo_path}
     else
         git_clone_scripts ${url} ${repo_path}
