@@ -31,6 +31,12 @@ export default {
         component: '@/pages/cookie/index',
       },
       {
+        path: '/terminal',
+        name: '终端管理',
+        icon: <RadiusSettingOutlined />,
+        component: '@/pages/terminal/index',
+      },
+      {
         path: '/config',
         name: '配置文件',
         icon: <ControlOutlined />,
