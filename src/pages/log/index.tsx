@@ -45,6 +45,7 @@ const Log = () => {
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isPhone, setIsPhone] = useState(false);
 
   const getConfig = () => {
     request.get(`${config.apiPrefix}logs`).then((data) => {
@@ -105,10 +106,12 @@ const Log = () => {
       setWdith('auto');
       setMarginLeft(0);
       setMarginTop(0);
+      setIsPhone(true);
     } else {
       setWdith('100%');
       setMarginLeft(0);
       setMarginTop(-72);
+      setIsPhone(false);
     }
     getConfig();
   }, []);
@@ -117,18 +120,20 @@ const Log = () => {
     <PageContainer
       className="ql-container-wrapper log-wrapper"
       title={title}
-      extra={[
-        <TreeSelect
-          className="log-select"
-          value={select}
-          dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-          treeData={data}
-          placeholder="请选择日志文件"
-          showSearch
-          key="value"
-          onSelect={onSelect}
-        />,
-      ]}
+      extra={
+        isPhone && [
+          <TreeSelect
+            className="log-select"
+            value={select}
+            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+            treeData={data}
+            placeholder="请选择日志文件"
+            showSearch
+            key="value"
+            onSelect={onSelect}
+          />,
+        ]
+      }
       header={{
         style: {
           padding: '4px 16px 4px 15px',
@@ -142,20 +147,22 @@ const Log = () => {
         },
       }}
     >
-      <div className={styles['log-container']}>
-        <div className={styles['left-tree-container']}>
-          <Input.Search
-            className={styles['left-tree-search']}
-            onChange={onSearch}
-          ></Input.Search>
-          <div className={styles['left-tree-scroller']}>
-            <Tree
-              className={styles['left-tree']}
-              treeData={filterData}
-              onSelect={onTreeSelect}
-            ></Tree>
+      <div className={`${styles['log-container']}`}>
+        {!isPhone && (
+          <div className={styles['left-tree-container']}>
+            <Input.Search
+              className={styles['left-tree-search']}
+              onChange={onSearch}
+            ></Input.Search>
+            <div className={styles['left-tree-scroller']}>
+              <Tree
+                className={styles['left-tree']}
+                treeData={filterData}
+                onSelect={onTreeSelect}
+              ></Tree>
+            </div>
           </div>
-        </div>
+        )}
         <CodeMirror
           value={value}
           options={{
