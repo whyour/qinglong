@@ -60,6 +60,7 @@ import_config() {
     done
 
     command_timeout_time=${CommandTimeoutTime:-"1h"}
+    github_proxy_url=${GithubProxyUrl:-""}
 }
 
 ## 创建目录，$1：目录的绝对路径

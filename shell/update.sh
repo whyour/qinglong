@@ -96,7 +96,7 @@ del_cron() {
         fi
         cron_file="$dir_scripts/${cron}"
         if [[ -f $cron_file ]]; then
-            cron_name=$(grep "new Env" $cron_file | awk -F "'|\"" '{print $2}' | head -1)
+            cron_name=$(grep "new Env" $cron_file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
             rm -f $cron_file
         fi
         [[ -z $cron_name ]] && cron_name="$cron"
@@ -125,14 +125,15 @@ add_cron() {
         if [ -f $file ]; then
             cron_line=$(
                 perl -ne "{
-                        print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
-                    }" $file |
+                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*/
+                }" $file |
                     perl -pe "{
-                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1|g;
-                        s|  | |g
-                    }" | sort -u | head -1
+                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*|\1|g;
+                    s|\*([\d\*])(.*)|\1\2|g;
+                    s|  | |g;
+                }" | sort -u | head -1
             )
-            cron_name=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
+            cron_name=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
             [[ -z $cron_name ]] && cron_name="$file_name"
             [[ -z $cron_line ]] && cron_line="0 6 * * *"
             result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
@@ -164,7 +165,7 @@ update_repo() {
 
     local repo_path="${dir_repo}/${author}_${repo}"
     if [ -d ${repo_path}/.git ]; then
-        reset_romote_url ${repo_path} ${url}
+        reset_romote_url ${repo_path} "${github_proxy_url}${url/https:\/\/ghproxy.com\//}"
         git_pull_scripts ${repo_path}
     else
         git_clone_scripts ${url} ${repo_path}
@@ -193,14 +194,15 @@ update_raw() {
         cp -f $raw_file_name $dir_scripts/${filename}
         cron_line=$(
             perl -ne "{
-                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
+                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*/
                 }" $raw_file_name |
                 perl -pe "{
-                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$raw_file_name.*|\1|g;
-                    s|  | |g
+                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*|\1|g;
+                    s|\*([\d\*])(.*)|\1\2|g;
+                    s|  | |g;
                 }" | sort -u | head -1
         )
-        cron_name=$(grep "new Env" $raw_file_name | awk -F "'|\"" '{print $2}' | head -1)
+        cron_name=$(grep "new Env" $raw_file_name | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
         [[ -z $cron_name ]] && cron_name="$raw_file_name"
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
@@ -244,6 +246,7 @@ usage() {
 update_qinglong() {
     echo -e "--------------------------------------------------------------\n"
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
+    reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
 
     if [[ $exit_status -eq 0 ]]; then
@@ -258,7 +261,7 @@ update_qinglong() {
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
 
-    local url="https://ghproxy.com/https://github.com/whyour/qinglong-static.git"
+    local url="${github_proxy_url}https://github.com/whyour/qinglong-static.git"
     if [ -d ${ql_static_repo}/.git ]; then
         reset_romote_url ${ql_static_repo} ${url}
         cd ${ql_static_repo}
