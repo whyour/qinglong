@@ -7,7 +7,9 @@ import {
   FolderOutlined,
   RadiusSettingOutlined,
   ControlOutlined,
+  DesktopOutlined,
 } from '@ant-design/icons';
+import React from 'react';
 
 export default {
   route: {
@@ -33,7 +35,7 @@ export default {
       {
         path: '/terminal',
         name: '终端管理',
-        icon: <RadiusSettingOutlined />,
+        icon: <DesktopOutlined />,
         component: '@/pages/terminal/index',
       },
       {
