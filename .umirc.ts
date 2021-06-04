@@ -11,7 +11,8 @@ export default defineConfig({
   favicon: 'https://qinglong.whyour.cn/g5.ico',
   proxy: {
     '/api': {
-      target: 'http://127.0.0.1:5678/',
+      target: 'http://127.0.0.1:5600',
+      ws: true,
       changeOrigin: true,
     },
   },
