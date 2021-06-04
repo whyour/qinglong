@@ -65,27 +65,27 @@ export default ({ app }: { app: Application }) => {
 
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-  // app.use(
-  //   auth(getTokenFromReq).unless({
-  //     path: excludePath,
-  //   }),
-  // );
-  // app.use((req, res, next) => {
-  //   if (req.url && excludePath.includes(req.path)) {
-  //     return next();
-  //   }
-  //   const data = fs.readFileSync(config.authConfigFile, 'utf8');
-  //   const authHeader = getTokenFromReq(req);
-  //   if (data) {
-  //     const { token } = JSON.parse(data);
-  //     if (token && authHeader.includes(token)) {
-  //       return next();
-  //     }
-  //   }
-  //   const err: any = new Error('UnauthorizedError');
-  //   err['status'] = 401;
-  //   next(err);
-  // });
+  app.use(
+    auth(getTokenFromReq).unless({
+      path: excludePath,
+    }),
+  );
+  app.use((req, res, next) => {
+    if (req.url && excludePath.includes(req.path)) {
+      return next();
+    }
+    const data = fs.readFileSync(config.authConfigFile, 'utf8');
+    const authHeader = getTokenFromReq(req);
+    if (data) {
+      const { token } = JSON.parse(data);
+      if (token && authHeader.includes(token)) {
+        return next();
+      }
+    }
+    const err: any = new Error('UnauthorizedError');
+    err['status'] = 401;
+    next(err);
+  });
   app.use(config.api.prefix, routes());
 
   app.use((req, res, next) => {
