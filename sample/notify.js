@@ -689,7 +689,7 @@ function pushPlusNotify(text, desp) {
         topic: `${PUSH_PLUS_USER}`,
       };
       const options = {
-        url: `http://www.pushplus.plus/send`,
+        url: `https://www.pushplus.plus/send`,
         body: JSON.stringify(body),
         headers: {
           'Content-Type': ' application/json',
