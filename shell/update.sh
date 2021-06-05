@@ -173,7 +173,7 @@ update_repo() {
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新${repo_path}成功...\n"
-        diff_scripts $repo_path $author $path $blackword $dependence
+        diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence"
     else
         echo -e "\n更新${repo_path}失败，请检查原因...\n"
     fi
@@ -314,7 +314,7 @@ diff_scripts() {
     local blackword="$4"
     local dependence="$5"
 
-    gen_list_repo $repo_path $author $path $blackword $dependence
+    gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence"
 
     local repo="${repo_path##*/}"
     local list_add="$dir_list_tmp/${repo}_add.list"
@@ -351,10 +351,10 @@ gen_list_repo() {
     cd ${repo_path}
     files=$(find . -name "*.js" | sed 's/^..//')
     if [[ $path ]]; then
-        files=$(find . -name "*.js" | sed 's/^..//' | egrep $path)
+        files=$(echo "$files" | egrep $path)
     fi
     if [[ $blackword ]]; then
-        files=$(find . -name "*.js" | sed 's/^..//' | egrep -v $blackword | egrep $path)
+        files=$(echo "$files" | egrep -v $blackword)
     fi
     if [[ $dependence ]]; then
         find . -name "*.js" | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
