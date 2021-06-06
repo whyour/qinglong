@@ -204,7 +204,7 @@ npm_install_sub() {
         npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
     else
         echo -e "检测到本机安装了 pnpm，使用 pnpm 替代 ...\n"
-        pnpm install --prod --registry=https://registry.npm.taobao.org || pnpm install --prod
+        pnpm install --prod
     fi
 }
 
@@ -247,10 +247,8 @@ diff_and_copy() {
 update_depend() {
     local dir_current=$(pwd)
 
-    if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
-        cp -f $dir_sample/package.json $dir_scripts/package.json
-        npm_install_2 $dir_scripts
-    fi
+    cp -f $dir_sample/package.json $dir_scripts/package.json
+    npm_install_2 $dir_scripts
 
     if [ ! -s $dir_scripts/requirements.txt ] || [[ $(diff $dir_sample/requirements.txt $dir_scripts/requirements.txt) ]]; then
         cp -f $dir_sample/requirements.txt $dir_scripts/requirements.txt
