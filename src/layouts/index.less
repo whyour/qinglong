@@ -1,3 +1,4 @@
+@import '~@/styles/variable.less';
 body {
   height: 100%;
   overflow-y: hidden;
@@ -55,10 +56,13 @@ body {
       .ant-pro-grid-content.wide .ant-pro-page-container-children-content {
         height: calc(100vh - 184px);
         height: calc(100vh - var(--vh-offset, 0px) - 184px);
+        margin-left: 0;
+        margin-right: 0;
       }
       .CodeMirror {
         height: calc(100vh - 216px);
         height: calc(100vh - var(--vh-offset, 0px) - 216px);
+        width: calc(100vw - 32px);
       }
     }
     .CodeMirror {
