@@ -14,6 +14,7 @@ import 'codemirror/mode/shell/shell.js';
 import { request } from '@/utils/http';
 import './index.less';
 import vhCheck from 'vh-check';
+import { version, changeLog } from '../version';
 
 export default function (props: any) {
   const logout = () => {
@@ -63,7 +64,16 @@ export default function (props: any) {
   return (
     <ProLayout
       selectedKeys={[props.location.pathname]}
-      title="控制面板"
+      title={
+        <>
+          控制面板
+          <a href={changeLog} target="_blank" rel="noopener noreferrer">
+            <span style={{ fontSize: 9, color: '#666', marginLeft: 5 }}>
+              {version}
+            </span>
+          </a>
+        </>
+      }
       menuItemRender={(menuItemProps: any, defaultDom: any) => {
         if (
           menuItemProps.isUrl ||
