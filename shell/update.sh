@@ -173,7 +173,7 @@ update_repo() {
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新${repo_path}成功...\n"
-        diff_scripts $repo_path $author $path $blackword $dependence
+        diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence"
     else
         echo -e "\n更新${repo_path}失败，请检查原因...\n"
     fi
@@ -205,6 +205,7 @@ update_raw() {
         )
         cron_name=$(grep "new Env" $raw_file_name | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
         [[ -z $cron_name ]] && cron_name="$raw_file_name"
+        [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | xargs)
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
             result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
@@ -314,7 +315,7 @@ diff_scripts() {
     local blackword="$4"
     local dependence="$5"
 
-    gen_list_repo $repo_path $author $path $blackword $dependence
+    gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence"
 
     local repo="${repo_path##*/}"
     local list_add="$dir_list_tmp/${repo}_add.list"
@@ -351,10 +352,10 @@ gen_list_repo() {
     cd ${repo_path}
     files=$(find . -name "*.js" | sed 's/^..//')
     if [[ $path ]]; then
-        files=$(find . -name "*.js" | sed 's/^..//' | egrep $path)
+        files=$(echo "$files" | egrep $path)
     fi
     if [[ $blackword ]]; then
-        files=$(find . -name "*.js" | sed 's/^..//' | egrep -v $blackword | egrep $path)
+        files=$(echo "$files" | egrep -v $blackword)
     fi
     if [[ $dependence ]]; then
         find . -name "*.js" | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
