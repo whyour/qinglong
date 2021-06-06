@@ -2,6 +2,18 @@ import { history } from 'umi';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 
+const titleMap: any = {
+  '/': '控制面板',
+  '/login': '登录',
+  '/crontab': '定时任务',
+  '/cookie': 'Session管理',
+  '/config': '配置文件',
+  '/diy': '自定义脚本',
+  '/diff': '对比工具',
+  '/log': '日志',
+  '/setting': '系统设置',
+};
+
 export function render(oldRender: any) {
   request
     .get(`${config.apiPrefix}user`)
@@ -21,4 +33,11 @@ export function render(oldRender: any) {
         oldRender();
       }
     });
+}
+
+export function onRouteChange({ matchedRoutes }: any) {
+  if (matchedRoutes.length) {
+    const path: string = matchedRoutes[matchedRoutes.length - 1].route.path;
+    document.title = `${titleMap[path]} - 控制面板`;
+  }
 }
