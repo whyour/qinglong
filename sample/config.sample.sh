@@ -1,6 +1,6 @@
 ## Version: v2.0.0-05302045
 ## Date: 2021-05-30
-## Update Content: 增加ql bot命令所需文件提示
+## Update Content: 增加GithubProxyUrl参数，访问github链接不需要代理时，可移除此参数
 
 ## 上面版本号中，如果第2位数字有变化，那么代表增加了新的参数，如果只有第3位数字有变化，仅代表更新了注释，没有增加新的参数，可更新可不更新
 
@@ -9,6 +9,9 @@ AutoDelCron="true"
 
 ## 在运行 ql repo 命令时，是否自动增加新的本地定时任务
 AutoAddCron="true"
+
+## 由于github仓库拉取较慢，所以会默认添加代理前缀，如不需要请移除
+GithubProxyUrl="https://ghproxy.com/"
 
 ## 设置定时任务执行的超时时间，默认1h，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
 CommandTimeoutTime="1h"

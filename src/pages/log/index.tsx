@@ -10,10 +10,10 @@ function getFilterData(keyword: string, data: any) {
   const expandedKeys: string[] = [];
   if (keyword) {
     const tree: any = [];
-    data.forEach((item) => {
+    data.forEach((item: any) => {
       if (item.title.includes(keyword)) {
         tree.push(item);
-        expandedKeys.push(...item.children.map((x) => x.key));
+        expandedKeys.push(...item.children.map((x: any) => x.key));
       } else {
         const children: any[] = [];
         (item.children || []).forEach((subItem: any) => {
@@ -95,7 +95,7 @@ const Log = () => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
-      const { tree, expandedKeys } = getFilterData(keyword, data);
+      const { tree } = getFilterData(keyword, data);
       setFilterData(tree);
     },
     [data, setFilterData],

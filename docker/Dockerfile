@@ -1,6 +1,6 @@
 FROM node:lts-alpine
 LABEL maintainer="whyour"
-ARG QL_URL=https://ghproxy.com/https://github.com/whyour/qinglong.git
+ARG QL_URL=https://github.com/whyour/qinglong.git
 ARG QL_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
@@ -16,6 +16,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
                              moreutils \
                              git \
                              curl \
+                             wget \
                              tzdata \
                              perl \
                              openssl \
