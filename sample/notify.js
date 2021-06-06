@@ -13,6 +13,15 @@
 const querystring = require('querystring');
 const $ = new Env();
 const timeout = 15000; //超时时间(单位毫秒)
+// =======================================go-cqhttp通知设置区域===========================================
+//gobot_url 填写请求地址http://127.0.0.1/send_private_msg
+//gobot_token 填写在go-cqhttp文件设置的访问密钥
+//gobot_qq 填写推送到个人QQ或者QQ群号
+//go-cqhttp相关API https://docs.go-cqhttp.org/api
+let GOBOT_URL = ''; // 推送到个人QQ: http://127.0.0.1/send_private_msg  群：http://127.0.0.1/send_group_msg 
+let GOBOT_TOKEN = ''; //访问密钥
+let GOBOT_QQ = ''; // 如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群 
+
 // =======================================微信server酱通知设置区域===========================================
 //此处填你申请的SCKEY.
 //(环境变量名 PUSH_KEY)
@@ -73,6 +82,16 @@ let PUSH_PLUS_TOKEN = '';
 let PUSH_PLUS_USER = '';
 
 //==========================云端环境变量的判断与接收=========================
+if (process.env.GOBOT_URL) {
+  GOBOT_URL = process.env.GOBOT_URL;
+}
+if (process.env.GOBOT_TOKEN) {
+  GOBOT_TOKEN = process.env.GOBOT_TOKEN;
+}
+if (process.env.GOBOT_QQ) {
+  GOBOT_QQ = process.env.GOBOT_QQ;
+}
+
 if (process.env.PUSH_KEY) {
   SCKEY = process.env.PUSH_KEY;
 }
@@ -175,7 +194,50 @@ async function sendNotify(
     qywxBotNotify(text, desp), //企业微信机器人
     qywxamNotify(text, desp), //企业微信应用消息推送
     iGotNotify(text, desp, params), //iGot
+    gobotNotify(text, desp),//go-cqhttp
   ]);
+}
+
+function gobotNotify(text, desp) {
+  return new Promise((resolve) => {
+    if (GOBOT_URL) {
+      const options = {
+        url: `${GOBOT_URL}?access_token=${GOBOT_TOKEN}&${GOBOT_QQ}`,
+        body: `message=${text}\n${desp}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout,
+      };
+      setTimeout(() => {
+        $.post(options, (err, resp, data) => {
+          try {
+            if (err) {
+              console.log('发送go-cqhttp通知调用API失败！！\n');
+              console.log(err);
+            } else {
+              data = JSON.parse(data);
+              if (data.retcode === 0) {
+                console.log('go-cqhttp发送通知消息成功🎉\n');
+              } else if (data.retcode === 100) {
+                console.log(`go-cqhttp发送通知消息异常: ${data.errmsg}\n`);
+              } else {
+                console.log(
+                  `go-cqhttp发送通知消息异常\n${JSON.stringify(data)}`,
+                );
+              }
+            }
+          } catch (e) {
+            $.logErr(e, resp);
+          } finally {
+            resolve(data);
+          }
+        });
+      }, time);
+    } else {
+      resolve();
+    }
+  });
 }
 
 function serverNotify(text, desp, time = 2100) {
