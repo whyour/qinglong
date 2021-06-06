@@ -1,11 +1,4 @@
-import {
-  useState,
-  useEffect,
-  useCallback,
-  Key,
-  useRef,
-  CSSProperties,
-} from 'react';
+import { useState, useEffect, useRef } from 'react';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
@@ -19,7 +12,6 @@ const TerminalApp = () => {
   const [width, setWdith] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
-  const [style, setStyle] = useState<CSSProperties | undefined>(undefined);
 
   const ref = useRef<HTMLElement>(null);
 
@@ -76,7 +68,7 @@ const TerminalApp = () => {
         },
       }}
     >
-      <div ref={ref} style={style}></div>
+      <div ref={ref}></div>
     </PageContainer>
   );
 };

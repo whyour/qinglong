@@ -7,7 +7,6 @@ import jwt from 'express-jwt';
 import fs from 'fs';
 import http from 'http';
 import expressWs from 'express-ws';
-import Logger from './logger';
 
 const excludePath = ['/api/login'];
 
@@ -37,28 +36,7 @@ export default ({ app }: { app: Application }) => {
     return server.listen(...args);
   };
 
-  const wsInstance = expressWs(app, server);
-
-  // server.on('upgrade', function upgrade(request, socket, head) {
-  //   const wss = wsInstance.getWss();
-  //   auth((req) => {
-  //     const searchParams = new URLSearchParams(
-  //       req.url.slice(req.url.indexOf('?')),
-  //     );
-  //     return searchParams.get('token');
-  //   })(request, {} as any, (err) => {
-  //     Logger.error(err);
-  //     if (err) {
-  //       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-  //       socket.destroy();
-  //       return;
-  //     }
-
-  //     wss.handleUpgrade(request, socket, head, function done(ws) {
-  //       wss.emit('connection', ws, request);
-  //     });
-  //   });
-  // });
+  expressWs(app, server);
 
   app.enable('trust proxy');
   app.use(cors());
