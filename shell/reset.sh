@@ -13,4 +13,14 @@ cp -f $dir_sample/package.json $dir_scripts/package.json
 npm_install_2 $dir_scripts
 echo -e "脚本依赖安装完成\n"
 
+echo -e "3. 复制通知文件\n"
+echo -e "复制一份 $file_notify_py_sample 为 $file_notify_py\n"
+cp -fv $file_notify_py_sample $file_notify_py
+echo
+
+echo -e "复制一份 $file_notify_js_sample 为 $file_notify_js\n"
+cp -fv $file_notify_js_sample $file_notify_js
+
+echo -e "通知文件复制完成\n"
+
 exit 0
