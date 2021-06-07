@@ -56,7 +56,7 @@ import_config() {
     user_sum=0
     for line in $(cat $file_cookie); do
         let user_sum+=1
-        eval Cookie${user_sum}="\"$line\""
+        eval Cookie${user_sum}="\"${line}\""
     done
 
     command_timeout_time=${CommandTimeoutTime:-"1h"}
@@ -247,8 +247,10 @@ diff_and_copy() {
 update_depend() {
     local dir_current=$(pwd)
 
-    cp -f $dir_sample/package.json $dir_scripts/package.json
-    npm_install_2 $dir_scripts
+    if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+        cp -f $dir_sample/package.json $dir_scripts/package.json
+        npm_install_2 $dir_scripts
+    fi
 
     if [ ! -s $dir_scripts/requirements.txt ] || [[ $(diff $dir_sample/requirements.txt $dir_scripts/requirements.txt) ]]; then
         cp -f $dir_sample/requirements.txt $dir_scripts/requirements.txt

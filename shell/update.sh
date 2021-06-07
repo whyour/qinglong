@@ -242,11 +242,13 @@ usage() {
     echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
     echo -e "6. $cmd_update code                                             # 获取互助码"
     echo -e "6. $cmd_update bot                                              # 启动tg-bot"
+    echo -e "7. $cmd_update reset                                            # 重置青龙基础环境"
 }
 
 ## 更新qinglong
 update_qinglong() {
     echo -e "--------------------------------------------------------------\n"
+    [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
 
@@ -256,7 +258,8 @@ update_qinglong() {
         detect_config_version
         update_depend
 
-        npm_install_2 $dir_root
+        [ -f $dir_root/package.json ] && ql_depend_new=$(cat $dir_root/package.json)
+        [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
@@ -416,6 +419,9 @@ main() {
         ;;
     bot)
         . $dir_shell/bot.sh
+        ;;
+    reset)
+        . $dir_shell/reset.sh
         ;;
     *)
         echo -e "命令输入错误...\n"
