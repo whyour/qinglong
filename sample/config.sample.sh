@@ -114,6 +114,13 @@ export GOBOT_URL = ""
 export GOBOT_TOKEN = ""
 export GOBOT_QQ = ""
 
+## 如果只是想要屏蔽某个ck不执行某个脚本，可以参考下面 case 这个命令的例子来控制，脚本名称包含后缀
+## case $1 in
+##   test.js)
+##     TempBlockCookie="5"
+##     ;;
+## esac
+
 ## 需组合的环境变量列表，env_name需要和var_name一一对应，如何有新活动按照格式添加(不懂勿动)
 env_name=(
   JD_COOKIE
