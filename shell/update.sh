@@ -247,7 +247,6 @@ usage() {
 ## 更新qinglong
 update_qinglong() {
     echo -e "--------------------------------------------------------------\n"
-    [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
 
@@ -257,8 +256,7 @@ update_qinglong() {
         detect_config_version
         update_depend
 
-        [ -f $dir_root/package.json ] && ql_depend_new=$(cat $dir_root/package.json)
-        [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
+        npm_install_2 $dir_root
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
