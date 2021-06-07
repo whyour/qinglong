@@ -10,6 +10,9 @@ combine_sub() {
     local combined_all=""
     local tmp1 tmp2
     for ((i = 1; i <= $user_sum; i++)); do
+        for num in $TempBlockCookie; do
+            [[ $i -eq $num ]] && continue 2
+        done
         local tmp1=$what_combine$i
         local tmp2=${!tmp1}
         combined_all="$combined_all&$tmp2"
