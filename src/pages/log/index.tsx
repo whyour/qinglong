@@ -11,13 +11,13 @@ function getFilterData(keyword: string, data: any) {
   if (keyword) {
     const tree: any = [];
     data.forEach((item: any) => {
-      if (item.title.includes(keyword)) {
+      if (item.title.toLocaleLowerCase().includes(keyword)) {
         tree.push(item);
         expandedKeys.push(...item.children.map((x: any) => x.key));
       } else {
         const children: any[] = [];
         (item.children || []).forEach((subItem: any) => {
-          if (subItem.title.includes(keyword)) {
+          if (subItem.title.toLocaleLowerCase().includes(keyword)) {
             children.push(subItem);
           }
         });
@@ -95,7 +95,7 @@ const Log = () => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
-      const { tree } = getFilterData(keyword, data);
+      const { tree } = getFilterData(keyword.toLocaleLowerCase(), data);
       setFilterData(tree);
     },
     [data, setFilterData],
