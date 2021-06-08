@@ -110,9 +110,9 @@ export PUSH_PLUS_USER=""
 ## gobot_token 填写在go-cqhttp文件设置的访问密钥
 ## gobot_qq 如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群 
 ## go-cqhttp相关API https://docs.go-cqhttp.org/api
-export GOBOT_URL = ""
-export GOBOT_TOKEN = ""
-export GOBOT_QQ = ""
+export GOBOT_URL=""
+export GOBOT_TOKEN=""
+export GOBOT_QQ=""
 
 ## 如果只是想要屏蔽某个ck不执行某个脚本，可以参考下面 case 这个命令的例子来控制，脚本名称包含后缀
 ## case $1 in
