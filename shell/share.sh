@@ -56,7 +56,7 @@ import_config() {
     user_sum=0
     for line in $(cat $file_cookie); do
         let user_sum+=1
-        eval Cookie${user_sum}="\"$line\""
+        eval Cookie${user_sum}="\"${line}\""
     done
 
     command_timeout_time=${CommandTimeoutTime:-"1h"}
@@ -204,7 +204,7 @@ npm_install_sub() {
         npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
     else
         echo -e "检测到本机安装了 pnpm，使用 pnpm 替代 ...\n"
-        pnpm install --prod --registry=https://registry.npm.taobao.org || pnpm install --prod
+        pnpm install --prod
     fi
 }
 

@@ -15,7 +15,7 @@ export default {
   route: {
     routes: [
       {
-        name: 'login',
+        name: '登录',
         path: '/login',
         hideInMenu: true,
         component: '@/pages/login/index',

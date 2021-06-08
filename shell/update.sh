@@ -242,6 +242,7 @@ usage() {
     echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
     echo -e "6. $cmd_update code                                             # 获取互助码"
     echo -e "6. $cmd_update bot                                              # 启动tg-bot"
+    echo -e "7. $cmd_update reset                                            # 重置青龙基础环境"
 }
 
 ## 更新qinglong
@@ -418,6 +419,9 @@ main() {
         ;;
     bot)
         . $dir_shell/bot.sh
+        ;;
+    reset)
+        . $dir_shell/reset.sh
         ;;
     *)
         echo -e "命令输入错误...\n"

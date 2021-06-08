@@ -42,6 +42,16 @@ enum StatusColor {
   'error',
 }
 
+enum OperationName {
+  '启用',
+  '禁用',
+}
+
+enum OperationPath {
+  'enable',
+  'disable',
+}
+
 const type = 'DragableBodyRow';
 
 const DragableBodyRow = ({
@@ -105,17 +115,6 @@ const Config = () => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },
     },
-    // {
-    //   title: '用户名',
-    //   dataIndex: 'pin',
-    //   key: 'pin',
-    //   align: 'center' as const,
-    //   render: (text: string, record: any) => {
-    //     const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
-    //     const val = (match && match[1]) || '未匹配用户名';
-    //     return <span style={{ cursor: 'text' }}>{decodeUrl(val)}</span>;
-    //   },
-    // },
     {
       title: '昵称',
       dataIndex: 'nickname',
@@ -123,8 +122,10 @@ const Config = () => {
       align: 'center' as const,
       width: '15%',
       render: (text: string, record: any, index: number) => {
+        const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
+        const val = (match && match[1]) || '未匹配用户名';
         return (
-          <span style={{ cursor: 'text' }}>{record.nickname || '-'} </span>
+          <span style={{ cursor: 'text' }}>{record.nickname || val} </span>
         );
       },
     },
@@ -204,13 +205,14 @@ const Config = () => {
       ),
     },
   ];
-  const [width, setWdith] = useState('100%');
+  const [width, setWidth] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedCookie, setEditedCookie] = useState();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   const getCookies = () => {
     setLoading(true);
@@ -376,13 +378,68 @@ const Config = () => {
     [value],
   );
 
+  const onSelectChange = (selectedIds: any[]) => {
+    setSelectedRowIds(selectedIds);
+  };
+
+  const rowSelection = {
+    selectedRowIds,
+    onChange: onSelectChange,
+  };
+
+  const delCookies = () => {
+    Modal.confirm({
+      title: '确认删除',
+      content: <>确认删除选中的Cookie吗</>,
+      onOk() {
+        request
+          .delete(`${config.apiPrefix}cookies`, { data: selectedRowIds })
+          .then((data: any) => {
+            if (data.code === 200) {
+              message.success('批量删除成功');
+              setSelectedRowIds([]);
+              getCookies();
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const operateCookies = (operationStatus: number) => {
+    Modal.confirm({
+      title: `确认${OperationName[operationStatus]}`,
+      content: <>确认{OperationName[operationStatus]}选中的Cookie吗</>,
+      onOk() {
+        request
+          .put(`${config.apiPrefix}cookies/${OperationPath[operationStatus]}`, {
+            data: selectedRowIds,
+          })
+          .then((data: any) => {
+            if (data.code === 200) {
+              getCookies();
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
   useEffect(() => {
     if (document.body.clientWidth < 768) {
-      setWdith('auto');
+      setWidth('auto');
       setMarginLeft(0);
       setMarginTop(0);
     } else {
-      setWdith('100%');
+      setWidth('100%');
       setMarginLeft(0);
       setMarginTop(-72);
     }
@@ -411,12 +468,42 @@ const Config = () => {
         },
       }}
     >
+      {selectedRowIds.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            style={{ marginBottom: 5 }}
+            onClick={delCookies}
+          >
+            批量删除
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => operateCookies(0)}
+            style={{ marginLeft: 8, marginBottom: 5 }}
+          >
+            批量启用
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => operateCookies(1)}
+            style={{ marginLeft: 8, marginRight: 8 }}
+          >
+            批量禁用
+          </Button>
+          <span style={{ marginLeft: 8 }}>
+            已选择
+            <a>{selectedRowIds?.length}</a>项
+          </span>
+        </div>
+      )}
       <DndProvider backend={HTML5Backend}>
         <Table
           columns={columns}
+          rowSelection={rowSelection}
           pagination={false}
           dataSource={value}
-          rowKey="value"
+          rowKey="_id"
           size="middle"
           scroll={{ x: 768 }}
           components={components}

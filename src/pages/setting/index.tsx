@@ -18,7 +18,7 @@ const optionsWithDisabled = [
 ];
 
 const Password = () => {
-  const [width, setWdith] = useState('100%');
+  const [width, setWidth] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState('');
@@ -56,11 +56,11 @@ const Password = () => {
 
   useEffect(() => {
     if (document.body.clientWidth < 768) {
-      setWdith('auto');
+      setWidth('auto');
       setMarginLeft(0);
       setMarginTop(0);
     } else {
-      setWdith('100%');
+      setWidth('100%');
       setMarginLeft(0);
       setMarginTop(-72);
     }

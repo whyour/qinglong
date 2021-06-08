@@ -11,13 +11,13 @@ function getFilterData(keyword: string, data: any) {
   if (keyword) {
     const tree: any = [];
     data.forEach((item: any) => {
-      if (item.title.includes(keyword)) {
+      if (item.title.toLocaleLowerCase().includes(keyword)) {
         tree.push(item);
         expandedKeys.push(...item.children.map((x: any) => x.key));
       } else {
         const children: any[] = [];
         (item.children || []).forEach((subItem: any) => {
-          if (subItem.title.includes(keyword)) {
+          if (subItem.title.toLocaleLowerCase().includes(keyword)) {
             children.push(subItem);
           }
         });
@@ -36,7 +36,7 @@ function getFilterData(keyword: string, data: any) {
 }
 
 const Log = () => {
-  const [width, setWdith] = useState('100%');
+  const [width, setWidth] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
   const [title, setTitle] = useState('请选择日志文件');
@@ -95,7 +95,7 @@ const Log = () => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
-      const { tree } = getFilterData(keyword, data);
+      const { tree } = getFilterData(keyword.toLocaleLowerCase(), data);
       setFilterData(tree);
     },
     [data, setFilterData],
@@ -103,12 +103,12 @@ const Log = () => {
 
   useEffect(() => {
     if (document.body.clientWidth < 768) {
-      setWdith('auto');
+      setWidth('auto');
       setMarginLeft(0);
       setMarginTop(0);
       setIsPhone(true);
     } else {
-      setWdith('100%');
+      setWidth('100%');
       setMarginLeft(0);
       setMarginTop(-72);
       setIsPhone(false);

@@ -27,6 +27,7 @@ const CronLogModal = ({
   const [value, setValue] = useState<string>('启动中...');
   const [loading, setLoading] = useState<any>(true);
   const [excuting, setExcuting] = useState<any>(true);
+  const [isPhone, setIsPhone] = useState(false);
 
   const getCronLog = (isFirst?: boolean) => {
     if (isFirst) {
@@ -86,6 +87,10 @@ const CronLogModal = ({
     }
   }, [cron]);
 
+  useEffect(() => {
+    setIsPhone(document.body.clientWidth < 768);
+  }, []);
+
   return (
     <Modal
       title={titleElement()}
@@ -100,7 +105,18 @@ const CronLogModal = ({
       onCancel={() => cancel()}
     >
       {!loading && value && (
-        <pre style={{ whiteSpace: 'break-spaces', lineHeight: '17px' }}>
+        <pre
+          style={
+            !isPhone
+              ? { whiteSpace: 'break-spaces', lineHeight: '17px' }
+              : {
+                  whiteSpace: 'break-spaces',
+                  lineHeight: '17px',
+                  width: 375,
+                  zoom: 0.83,
+                }
+          }
+        >
           {value}
         </pre>
       )}
