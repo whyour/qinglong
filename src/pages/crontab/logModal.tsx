@@ -113,7 +113,7 @@ const CronLogModal = ({
                   whiteSpace: 'break-spaces',
                   lineHeight: '17px',
                   width: 375,
-                  zoom: 0.88,
+                  zoom: 0.83,
                 }
           }
         >

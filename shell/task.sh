@@ -17,7 +17,7 @@ combine_sub() {
         local tmp2=${!tmp1}
         combined_all="$combined_all&$tmp2"
     done
-    echo $combined_all | perl -pe "{s|^&||; s|^@+||; s|&@|&|g; s|@+&|&|g; s|@+|@|g; s|@+$||}"
+    echo $combined_all | xargs perl -pe "{s|^&||; s|^@+||; s|&@|&|g; s|@+&|&|g; s|@+|@|g; s|@+$||}"
 }
 
 ## 正常依次运行时，组合所有账号的Cookie与互助码
