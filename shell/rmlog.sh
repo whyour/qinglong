@@ -8,7 +8,7 @@ days=$1
 
 ## 删除运行js脚本的旧日志
 remove_js_log() {
-    local log_full_path_list=$(ls -l $dir_log/*/*.log | awk '{print $9}')
+    local log_full_path_list=$(find test/ -name "*.log")
     local diff_time
     for log in $log_full_path_list; do
         local log_date=$(echo $log | awk -F "/" '{print $NF}' | cut -c1-10) #文件名比文件属性获得的日期要可靠
