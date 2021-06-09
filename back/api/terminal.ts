@@ -15,8 +15,8 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     const env = Object.assign({}, process.env);
     env['COLORTERM'] = 'truecolor';
-    const cols = parseInt(req.query.cols),
-      rows = parseInt(req.query.rows),
+    const cols = parseInt(req.query.cols as string),
+      rows = parseInt(req.query.rows as string),
       term = pty.spawn(process.platform === 'win32' ? 'cmd.exe' : 'bash', [], {
         name: 'xterm-256color',
         cols: cols || 80,
@@ -39,8 +39,8 @@ export default (app: Router) => {
   route.post('/terminals/:pid/size', (req, res) => {
     const logger: Logger = Container.get('logger');
     const pid = parseInt(req.params.pid),
-      cols = parseInt(req.query.cols),
-      rows = parseInt(req.query.rows),
+      cols = parseInt(req.query.cols as string),
+      rows = parseInt(req.query.rows as string),
       term = terminals[pid];
 
     term.resize(cols, rows);
