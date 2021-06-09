@@ -1,4 +1,11 @@
-import React, { PureComponent, Fragment, useState, useEffect } from 'react';
+import React, {
+  PureComponent,
+  Fragment,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import {
   Button,
   message,
@@ -11,6 +18,7 @@ import {
   Menu,
   Typography,
   Input,
+  Tabs,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -31,9 +39,12 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import CronModal from './modal';
 import CronLogModal from './logModal';
+import AddFilterModal from './addFilterModal';
 
 const { Text } = Typography;
 const { Search } = Input;
+
+type Pane = { title: string; key: string };
 
 enum CrontabStatus {
   'running',
@@ -57,6 +68,8 @@ enum OperationPath {
   'run',
   'stop',
 }
+
+const KEY_ALL = 'all';
 
 const Crontab = () => {
   const columns = [
@@ -187,6 +200,21 @@ const Crontab = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [panes, setPanes] = useState<Pane[]>([
+    {
+      title: '内置命令',
+      key: 'ql',
+    },
+  ]);
+  const [activeKey, setActiveKey] = useState<string>(KEY_ALL);
+  const addFilterModalRef = useRef(null);
+
+  const handleAddFilter = useCallback(
+    (values) => {
+      setPanes([...panes, values]);
+    },
+    [panes, setPanes],
+  );
 
   const getCrons = () => {
     setLoading(true);
@@ -511,6 +539,30 @@ const Crontab = () => {
     });
   };
 
+  const remove = useCallback(
+    (targetKey) => {
+      setPanes(panes.filter((pane) => pane.key !== targetKey));
+    },
+    [panes, setPanes],
+  );
+
+  const add = useCallback(() => {
+    (addFilterModalRef.current as any).showModal();
+  }, []);
+
+  const onEdit = useCallback((targetKey: string, action: string) => {
+    if (action === 'remove') {
+      remove(targetKey);
+    } else {
+      add();
+    }
+  }, []);
+
+  const onTabChange = useCallback((activeKey: string) => {
+    activeKey !== KEY_ALL && onSearch(activeKey);
+    setActiveKey(activeKey);
+  }, []);
+
   useEffect(() => {
     if (logCron) {
       localStorage.setItem('logCron', logCron._id);
@@ -598,6 +650,18 @@ const Crontab = () => {
           </span>
         </div>
       )}
+      <Tabs
+        style={{ marginBottom: 16 }}
+        type="editable-card"
+        onEdit={onEdit}
+        activeKey={activeKey}
+        onChange={onTabChange}
+      >
+        <Tabs.TabPane key={KEY_ALL} tab="全部" closable={false}></Tabs.TabPane>
+        {panes.map((pane) => {
+          return <Tabs.TabPane key={pane.key} tab={pane.title}></Tabs.TabPane>;
+        })}
+      </Tabs>
       <Table
         columns={columns}
         pagination={{
@@ -627,6 +691,7 @@ const Crontab = () => {
         handleCancel={handleCancel}
         cron={editedCron}
       />
+      <AddFilterModal ref={addFilterModalRef} handleOk={handleAddFilter} />
     </PageContainer>
   );
 };
