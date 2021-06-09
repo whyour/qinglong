@@ -275,12 +275,14 @@ git_clone_scripts() {
 ## 更新脚本，$1：仓库保存路径
 git_pull_scripts() {
     local dir_current=$(pwd)
-    local dir_work=$1
+    local dir_work="$1"
+    local branch="$2"
+    [[ $branch ]] && local cmd="origin/${branch}"
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
     git fetch --all
     exit_status=$?
-    git reset --hard
+    git reset --hard $cmd
     git pull
     cd $dir_current
 }
