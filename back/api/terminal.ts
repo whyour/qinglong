@@ -56,6 +56,7 @@ export default (app: Router) => {
     res.end();
   });
 
+  // @ts-ignore
   route.ws('/terminals/:pid', function (ws, req) {
     const logger: Logger = Container.get('logger');
     const term = terminals[parseInt(req.params.pid)];
