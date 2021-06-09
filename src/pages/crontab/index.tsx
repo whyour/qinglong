@@ -40,11 +40,12 @@ import { request } from '@/utils/http';
 import CronModal from './modal';
 import CronLogModal from './logModal';
 import AddFilterModal from './addFilterModal';
+import { store } from './store';
 
 const { Text } = Typography;
 const { Search } = Input;
 
-type Pane = { title: string; key: string };
+export type Pane = { title: string; key: string };
 
 enum CrontabStatus {
   'running',
@@ -200,7 +201,7 @@ const Crontab = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [panes, setPanes] = useState<Pane[]>([
+  const [paneList, setPaneList] = useState<Pane[]>([
     {
       title: '内置命令',
       key: 'ql',
@@ -209,11 +210,19 @@ const Crontab = () => {
   const [activeKey, setActiveKey] = useState<string>(KEY_ALL);
   const addFilterModalRef = useRef(null);
 
+  const setPanesAndStore = useCallback(
+    (panes: Pane[]) => {
+      setPaneList(panes);
+      store.savePanes(panes);
+    },
+    [setPaneList],
+  );
+
   const handleAddFilter = useCallback(
     (values) => {
-      setPanes([...panes, values]);
+      setPanesAndStore([...paneList, values]);
     },
-    [panes, setPanes],
+    [paneList, setPanesAndStore],
   );
 
   const getCrons = () => {
@@ -541,25 +550,28 @@ const Crontab = () => {
 
   const remove = useCallback(
     (targetKey) => {
-      setPanes(panes.filter((pane) => pane.key !== targetKey));
+      setPanesAndStore(paneList.filter((pane) => pane.key !== targetKey));
     },
-    [panes, setPanes],
+    [paneList, setPanesAndStore],
   );
 
   const add = useCallback(() => {
     (addFilterModalRef.current as any).showModal();
   }, []);
 
-  const onEdit = useCallback((targetKey: string, action: string) => {
-    if (action === 'remove') {
-      remove(targetKey);
-    } else {
-      add();
-    }
-  }, []);
+  const onEdit = useCallback(
+    (targetKey: string, action: string) => {
+      if (action === 'remove') {
+        remove(targetKey);
+      } else {
+        add();
+      }
+    },
+    [remove],
+  );
 
   const onTabChange = useCallback((activeKey: string) => {
-    activeKey !== KEY_ALL && onSearch(activeKey);
+    onSearch(activeKey !== KEY_ALL ? activeKey : '');
     setActiveKey(activeKey);
   }, []);
 
@@ -573,6 +585,11 @@ const Crontab = () => {
   useEffect(() => {
     getCrons();
   }, [searchText]);
+
+  useEffect(() => {
+    const panes = store.getPanes();
+    panes && setPaneList(panes);
+  }, []);
 
   useEffect(() => {
     if (document.body.clientWidth < 768) {
@@ -658,7 +675,7 @@ const Crontab = () => {
         onChange={onTabChange}
       >
         <Tabs.TabPane key={KEY_ALL} tab="全部" closable={false}></Tabs.TabPane>
-        {panes.map((pane) => {
+        {paneList.map((pane) => {
           return <Tabs.TabPane key={pane.key} tab={pane.title}></Tabs.TabPane>;
         })}
       </Tabs>
