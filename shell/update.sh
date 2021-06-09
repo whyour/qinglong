@@ -14,11 +14,14 @@ reset_romote_url() {
     local dir_current=$(pwd)
     local dir_work=$1
     local url=$2
+    local branch="$3"
+
+    [[ $branch ]] && local cmd="origin/${branch}"
 
     if [ -d "$dir_work/.git" ]; then
         cd $dir_work
         git remote set-url origin $url >/dev/null
-        git reset --hard >/dev/null
+        git reset --hard $cmd >/dev/null
         cd $dir_current
     fi
 }
@@ -156,6 +159,7 @@ update_repo() {
     local path="$2"
     local blackword="$3"
     local dependence="$4"
+    local branch="$5"
     local urlTmp="${url%*/}"
     local repoTmp="${urlTmp##*/}"
     local repo="${repoTmp%.*}"
@@ -165,11 +169,13 @@ update_repo() {
     local author="${authorTmp2##*.}"
 
     local repo_path="${dir_repo}/${author}_${repo}"
+    [[ $branch ]] && repo_path="${repo_path}_${branch}"
+    
     if [ -d ${repo_path}/.git ]; then
-        reset_romote_url ${repo_path} "${github_proxy_url}${url/https:\/\/ghproxy.com\//}"
-        git_pull_scripts ${repo_path}
+        reset_romote_url ${repo_path} "${github_proxy_url}${url/https:\/\/ghproxy.com\//}" "${branch}"
+        git_pull_scripts ${repo_path} "${branch}"
     else
-        git_clone_scripts ${url} ${repo_path}
+        git_clone_scripts ${url} ${repo_path} "${branch}"
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新${repo_path}成功...\n"
@@ -380,6 +386,7 @@ main() {
     local p3=$3
     local p4=$4
     local p5=$5
+    local p6=$6
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_path="$dir_log/update/${log_time}_$p1.log"
     case $p1 in
@@ -394,7 +401,7 @@ main() {
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" | tee $log_path
+            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" | tee $log_path
         else
             echo -e "命令输入错误...\n"
             usage
