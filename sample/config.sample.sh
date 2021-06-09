@@ -1,4 +1,4 @@
-## Version: v2.2.0
+## Version: v2.2.0-062
 ## Date: 2021-06-07
 ## Update Content: session管理增加批量操作\n增加go-cqhttp通知方式\n修复页面标题
 
