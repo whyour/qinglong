@@ -1,0 +1,7 @@
+qrcode==6.1
+Telethon==1.21.1
+requests==2.25.1
+Pillow==8.1.2
+python-socks==1.2.4
+async_timeout==3.0.1
+prettytable>=2.1.0
