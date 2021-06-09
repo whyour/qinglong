@@ -170,7 +170,7 @@ update_repo() {
 
     local repo_path="${dir_repo}/${author}_${repo}"
     [[ $branch ]] && repo_path="${repo_path}_${branch}"
-    
+
     if [ -d ${repo_path}/.git ]; then
         reset_romote_url ${repo_path} "${github_proxy_url}${url/https:\/\/ghproxy.com\//}" "${branch}"
         git_pull_scripts ${repo_path} "${branch}"
@@ -241,14 +241,14 @@ run_extra_shell() {
 ## 脚本用法
 usage() {
     echo -e "本脚本用法："
-    echo -e "1. $cmd_update update                                           # 更新并重启青龙"
-    echo -e "1. $cmd_update extra                                            # 运行自定义脚本"
-    echo -e "3. $cmd_update raw <fileurl>                                    # 更新单个脚本文件"
-    echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence>   # 更新单个仓库的脚本"
-    echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
-    echo -e "6. $cmd_update code                                             # 获取互助码"
-    echo -e "6. $cmd_update bot                                              # 启动tg-bot"
-    echo -e "7. $cmd_update reset                                            # 重置青龙基础环境"
+    echo -e "1. $cmd_update update                                                    # 更新并重启青龙"
+    echo -e "1. $cmd_update extra                                                     # 运行自定义脚本"
+    echo -e "3. $cmd_update raw <fileurl>                                             # 更新单个脚本文件"
+    echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch>   # 更新单个仓库的脚本"
+    echo -e "5. $cmd_update rmlog <days>                                              # 删除旧日志"
+    echo -e "6. $cmd_update code                                                      # 获取互助码"
+    echo -e "6. $cmd_update bot                                                       # 启动tg-bot"
+    echo -e "7. $cmd_update reset                                                     # 重置青龙基础环境"
 }
 
 ## 更新qinglong
