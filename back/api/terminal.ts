@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import * as pty from 'node-pty';
 import os from 'os';
+import Container from 'typedi';
+import { Logger } from 'winston';
 // Whether to use binary transport.
 const USE_BINARY = os.platform() !== 'win32';
 const route = Router();
@@ -10,6 +12,7 @@ export default (app: Router) => {
   const logs = {};
   app.use('/', route);
   route.post('/terminals', (req, res) => {
+    const logger: Logger = Container.get('logger');
     const env = Object.assign({}, process.env);
     env['COLORTERM'] = 'truecolor';
     const cols = parseInt(req.query.cols),
@@ -23,7 +26,7 @@ export default (app: Router) => {
         encoding: USE_BINARY ? null : 'utf8',
       });
 
-    console.log('Created terminal with PID: ' + term.pid);
+    logger.info('Created terminal with PID: ' + term.pid);
     terminals[term.pid] = term;
     logs[term.pid] = '';
     term.on('data', function (data) {
@@ -34,13 +37,14 @@ export default (app: Router) => {
   });
 
   route.post('/terminals/:pid/size', (req, res) => {
+    const logger: Logger = Container.get('logger');
     const pid = parseInt(req.params.pid),
       cols = parseInt(req.query.cols),
       rows = parseInt(req.query.rows),
       term = terminals[pid];
 
     term.resize(cols, rows);
-    console.log(
+    logger.info(
       'Resized terminal ' +
         pid +
         ' to ' +
@@ -53,8 +57,9 @@ export default (app: Router) => {
   });
 
   route.ws('/terminals/:pid', function (ws, req) {
+    const logger: Logger = Container.get('logger');
     const term = terminals[parseInt(req.params.pid)];
-    console.log('Connected to terminal ' + term.pid);
+    logger.info('Connected to terminal ' + term.pid);
     ws.send(logs[term.pid]);
 
     // string message buffering
@@ -104,7 +109,7 @@ export default (app: Router) => {
     });
     ws.on('close', function () {
       term.kill();
-      console.log('Closed terminal ' + term.pid);
+      logger.info('Closed terminal ' + term.pid);
       // Clean things up
       delete terminals[term.pid];
       delete logs[term.pid];
