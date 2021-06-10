@@ -70,7 +70,9 @@ export default async () => {
     .exec((err, docs) => {
       for (let i = 0; i < docs.length; i++) {
         const doc = docs[i];
-        exec(doc.command);
+        if (doc && doc.isDisabled !== 1) {
+          exec(doc.command);
+        }
       }
     });
 
