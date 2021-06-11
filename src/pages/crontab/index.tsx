@@ -1,4 +1,11 @@
-import React, { PureComponent, Fragment, useState, useEffect } from 'react';
+import React, {
+  PureComponent,
+  Fragment,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import {
   Button,
   message,
@@ -11,6 +18,7 @@ import {
   Menu,
   Typography,
   Input,
+  Tabs,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -31,9 +39,13 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import CronModal from './modal';
 import CronLogModal from './logModal';
+import AddFilterModal from './addFilterModal';
+import { store } from './store';
 
 const { Text } = Typography;
 const { Search } = Input;
+
+export type Pane = { title: string; key: string };
 
 enum CrontabStatus {
   'running',
@@ -57,6 +69,8 @@ enum OperationPath {
   'run',
   'stop',
 }
+
+const KEY_ALL = 'all';
 
 const Crontab = () => {
   const columns = [
@@ -187,6 +201,29 @@ const Crontab = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [paneList, setPaneList] = useState<Pane[]>([
+    {
+      title: '内置命令',
+      key: 'ql',
+    },
+  ]);
+  const [activeKey, setActiveKey] = useState<string>(KEY_ALL);
+  const addFilterModalRef = useRef(null);
+
+  const setPanesAndStore = useCallback(
+    (panes: Pane[]) => {
+      setPaneList(panes);
+      store.savePanes(panes);
+    },
+    [setPaneList],
+  );
+
+  const handleAddFilter = useCallback(
+    (values) => {
+      setPanesAndStore([...paneList, values]);
+    },
+    [paneList, setPanesAndStore],
+  );
 
   const getCrons = () => {
     setLoading(true);
@@ -511,6 +548,33 @@ const Crontab = () => {
     });
   };
 
+  const remove = useCallback(
+    (targetKey) => {
+      setPanesAndStore(paneList.filter((pane) => pane.key !== targetKey));
+    },
+    [paneList, setPanesAndStore],
+  );
+
+  const add = useCallback(() => {
+    (addFilterModalRef.current as any).showModal();
+  }, []);
+
+  const onEdit = useCallback(
+    (targetKey: string, action: string) => {
+      if (action === 'remove') {
+        remove(targetKey);
+      } else {
+        add();
+      }
+    },
+    [remove],
+  );
+
+  const onTabChange = useCallback((activeKey: string) => {
+    onSearch(activeKey !== KEY_ALL ? activeKey : '');
+    setActiveKey(activeKey);
+  }, []);
+
   useEffect(() => {
     if (logCron) {
       localStorage.setItem('logCron', logCron._id);
@@ -521,6 +585,11 @@ const Crontab = () => {
   useEffect(() => {
     getCrons();
   }, [searchText]);
+
+  useEffect(() => {
+    const panes = store.getPanes();
+    panes && setPaneList(panes);
+  }, []);
 
   useEffect(() => {
     if (document.body.clientWidth < 768) {
@@ -598,6 +667,18 @@ const Crontab = () => {
           </span>
         </div>
       )}
+      <Tabs
+        style={{ marginBottom: 16 }}
+        type="editable-card"
+        onEdit={onEdit}
+        activeKey={activeKey}
+        onChange={onTabChange}
+      >
+        <Tabs.TabPane key={KEY_ALL} tab="全部" closable={false}></Tabs.TabPane>
+        {paneList.map((pane) => {
+          return <Tabs.TabPane key={pane.key} tab={pane.title}></Tabs.TabPane>;
+        })}
+      </Tabs>
       <Table
         columns={columns}
         pagination={{
@@ -627,6 +708,7 @@ const Crontab = () => {
         handleCancel={handleCancel}
         cron={editedCron}
       />
+      <AddFilterModal ref={addFilterModalRef} handleOk={handleAddFilter} />
     </PageContainer>
   );
 };
