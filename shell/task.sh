@@ -105,22 +105,10 @@ run_normal() {
     local p1=$1
     cd $dir_scripts
     define_program "$p1"
-    if [[ $p1 == *.js ]]; then
-        if [[ $AutoHelpOther == true ]] && [[ $(ls $dir_code) ]]; then
-            local latest_log=$(ls -r $dir_code | head -1)
-            . $dir_code/$latest_log
-        fi
-        if [[ $# -eq 1 ]]; then
-            random_delay
-        fi
-    fi
+
     combine_all
-    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir_tmp="${p1##*/}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
-    log_path="$log_dir/$log_time.log"
-    make_dir "$log_dir"
-    timeout $command_timeout_time $which_program $p1 2>&1 | tee $log_path
+
+    timeout $command_timeout_time ../run_scripts.sh $which_program $p1 2>&1 
 }
 
 ## 并发执行，因为是并发，所以日志只能直接记录在日志文件中（日志文件以Cookie编号结尾），前台执行并发跑时不会输出日志
