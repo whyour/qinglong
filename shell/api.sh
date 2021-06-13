@@ -173,3 +173,5 @@ update_cron_status() {
         echo -e "失败(${message})"
     fi
 }
+
+get_token
