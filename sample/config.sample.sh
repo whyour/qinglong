@@ -1,6 +1,6 @@
-## Version: v2.2.0-062
-## Date: 2021-06-07
-## Update Content: session管理增加批量操作\n增加go-cqhttp通知方式\n修复页面标题
+## Version: v2.2.0-063
+## Date: 2021-06-13
+## Update Content: \n1. 增加文件后缀配置 RepoFileExtensions\n2. 增加定时任务pageSize缓存\n3. 增加定时任务自动运行时状态展示
 
 ## 上面版本号中，如果第2位数字有变化，那么代表增加了新的参数，如果只有第3位数字有变化，仅代表更新了注释，没有增加新的参数，可更新可不更新
 
