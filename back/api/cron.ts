@@ -238,7 +238,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.status(req.body);
+        const data = await cronService.status({
+          ...req.body,
+          status: parseInt(req.body.status),
+        });
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
