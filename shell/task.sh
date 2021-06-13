@@ -3,6 +3,7 @@
 ## 导入通用变量与函数
 dir_shell=/ql/shell
 . $dir_shell/share.sh
+. $dir_shell/api.sh
 
 ## 组合Cookie和互助码子程序，$1：要组合的内容
 combine_sub() {
@@ -120,11 +121,11 @@ run_normal() {
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
     make_dir "$log_dir"
-    
+
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1$" | perl -pe "s|.*ID=(.*) $cmd_task $p1$|\1|" | xargs | sed 's/ /","/g')
-    local status="0"  ## 0 任务运行中
-    update_cron_status "\"$id\"" $status
+    update_cron_status "\"$id\"" "0"
     timeout $command_timeout_time $which_program $p1 2>&1 | tee $log_path
+    update_cron_status "\"$id\"" "1"
 }
 
 ## 并发执行，因为是并发，所以日志只能直接记录在日志文件中（日志文件以Cookie编号结尾），前台执行并发跑时不会输出日志
