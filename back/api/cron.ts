@@ -225,4 +225,25 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/crons/status',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.string().required()),
+        status: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.status(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
 };
