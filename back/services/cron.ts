@@ -83,8 +83,14 @@ export default class CronService {
     });
   }
 
-  public async status(_id: string, stopped: boolean) {
-    this.cronDb.update({ _id }, { $set: { stopped, saved: false } });
+  public async status({
+    ids,
+    status,
+  }: {
+    ids: string[];
+    status: CrontabStatus;
+  }) {
+    this.cronDb.update({ _id: { $in: ids } }, { $set: { status } });
   }
 
   public async remove(ids: string[]) {

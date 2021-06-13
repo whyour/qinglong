@@ -147,3 +147,29 @@ get_user_info() {
         exit 0
     fi
 }
+
+update_cron_status() {
+    local ids=$1
+    local status=$2
+    local currentTimeStamp=$(date +%s)
+    local api=$(
+        curl -s "http://localhost:5700/api/crons/status?t=$currentTimeStamp" \
+            -X 'PUT' \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $token" \
+            -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
+            -H "Content-Type: application/json;charset=UTF-8" \
+            -H "Origin: http://localhost:5700" \
+            -H "Referer: http://localhost:5700/crontab" \
+            -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
+            --data-raw "{\"ids\":\"[$ids]\",\"status\":\"$status\"}" \
+            --compressed
+    )
+    code=$(echo $api | jq -r .code)
+    message=$(echo $api | jq -r .message)
+    if [[ $code == 200 ]]; then
+        echo -e "成功"
+    else
+        echo -e "失败(${message})"
+    fi
+}

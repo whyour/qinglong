@@ -62,6 +62,7 @@ import_config() {
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     github_proxy_url=${GithubProxyUrl:-""}
     block_cookie=${TempBlockCookie:-""}
+    file_extensions=${RepoFileExtensions:-"js py"}
 }
 
 ## 创建目录，$1：目录的绝对路径
