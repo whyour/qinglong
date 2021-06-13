@@ -357,8 +357,14 @@ gen_list_repo() {
     cd ${repo_path}
     
     local cmd="find ."
+    local index=0
     for extension in $file_extensions; do
-        cmd="${cmd} -o -name \"*.${extension}\""
+        if [[ $index -eq 0 ]]; then
+            cmd="${cmd} -name \"*.${extension}\""
+        else
+            cmd="${cmd} -o -name \"*.${extension}\""
+        fi
+        let index+=1
     done
     files=$($cmd | sed 's/^..//')
     if [[ $path ]]; then
