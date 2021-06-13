@@ -374,7 +374,7 @@ gen_list_repo() {
         files=$(echo "$files" | egrep -v $blackword)
     fi
     if [[ $dependence ]]; then
-        $cmd | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
+        eval $cmd | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
     fi
     for file in ${files}; do
         filename=$(basename $file)
