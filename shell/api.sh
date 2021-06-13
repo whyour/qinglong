@@ -133,7 +133,7 @@ del_cron_api() {
 get_user_info() {
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s "http://localhost:5700/api/user?t=$currentTimeStamp" \
+        curl -s "http://localhost:5600/api/user?t=$currentTimeStamp" \
             -H 'Accept: */*' \
             -H "Authorization: Bearer $token" \
             -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36' \
@@ -153,7 +153,7 @@ update_cron_status() {
     local status=$2
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s "http://localhost:5700/api/crons/status?t=$currentTimeStamp" \
+        curl -s "http://localhost:5600/api/crons/status?t=$currentTimeStamp" \
             -X 'PUT' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
@@ -162,7 +162,7 @@ update_cron_status() {
             -H "Origin: http://localhost:5700" \
             -H "Referer: http://localhost:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
-            --data-raw "{\"ids\":\"[$ids]\",\"status\":\"$status\"}" \
+            --data-raw "{\"ids\":[$ids],\"status\":\"$status\"}" \
             --compressed
     )
     code=$(echo $api | jq -r .code)
