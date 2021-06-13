@@ -356,17 +356,17 @@ gen_list_repo() {
 
     cd ${repo_path}
     
-    local cmd="find . -name *.js"
-    # local index=0
-    # for extension in $file_extensions; do
-    #     if [[ $index -eq 0 ]]; then
-    #         cmd="${cmd} -name \"*.${extension}\""
-    #     else
-    #         cmd="${cmd} -o -name \"*.${extension}\""
-    #     fi
-    #     let index+=1
-    # done
-    files=$($cmd | sed 's/^..//')
+    local cmd="find ."
+    local index=0
+    for extension in $file_extensions; do
+        if [[ $index -eq 0 ]]; then
+            cmd="${cmd} -name \"*.${extension}\""
+        else
+            cmd="${cmd} -o -name \"*.${extension}\""
+        fi
+        let index+=1
+    done
+    files=$(eval $cmd | sed 's/^..//')
     if [[ $path ]]; then
         files=$(echo "$files" | egrep $path)
     fi
