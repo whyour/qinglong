@@ -357,7 +357,12 @@ gen_list_repo() {
     rm -f $dir_list_tmp/${repo}*.list >/dev/null 2>&1
 
     cd ${repo_path}
-    files=$(find . -name "*.js" | sed 's/^..//')
+    
+    local cmd="find ."
+    for extension in $file_extensions; do
+        cmd="${cmd} -o -name \"*.${extension}\""
+    done
+    files=$($cmd | sed 's/^..//')
     if [[ $path ]]; then
         files=$(echo "$files" | egrep $path)
     fi
@@ -365,7 +370,7 @@ gen_list_repo() {
         files=$(echo "$files" | egrep -v $blackword)
     fi
     if [[ $dependence ]]; then
-        find . -name "*.js" | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
+        $cmd | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
     fi
     for file in ${files}; do
         filename=$(basename $file)

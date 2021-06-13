@@ -120,6 +120,10 @@ run_normal() {
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
     make_dir "$log_dir"
+    
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1$" | perl -pe "s|.*ID=(.*) $cmd_task $p1$|\1|" | xargs | sed 's/ /","/g')
+    local status="0"  ## 0 任务运行中
+    update_cron_status "\"$id\"" $status
     timeout $command_timeout_time $which_program $p1 2>&1 | tee $log_path
 }
 
