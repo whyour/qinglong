@@ -7,8 +7,6 @@ dir_shell=/ql/shell
 
 send_mark=$dir_shell/send_mark
 
-get_token
-
 ## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
 reset_romote_url() {
     local dir_current=$(pwd)
