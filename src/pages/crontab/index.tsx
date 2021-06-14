@@ -187,6 +187,8 @@ const Crontab = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const getCrons = () => {
     setLoading(true);
@@ -233,7 +235,7 @@ const Crontab = () => {
             if (data.code === 200) {
               message.success('删除成功');
               const result = [...value];
-              result.splice(index, 1);
+              result.splice(index + pageSize * (currentPage - 1), 1);
               setValue(result);
             } else {
               message.error(data);
@@ -264,7 +266,7 @@ const Crontab = () => {
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              result.splice(index, 1, {
+              result.splice(index + pageSize * (currentPage - 1), 1, {
                 ...record,
                 status: CrontabStatus.running,
               });
@@ -298,7 +300,7 @@ const Crontab = () => {
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              result.splice(index, 1, {
+              result.splice(index + pageSize * (currentPage - 1), 1, {
                 ...record,
                 pid: null,
                 status: CrontabStatus.idle,
@@ -342,7 +344,7 @@ const Crontab = () => {
             if (data.code === 200) {
               const newStatus = record.isDisabled === 1 ? 0 : 1;
               const result = [...value];
-              result.splice(index, 1, {
+              result.splice(index + pageSize * (currentPage - 1), 1, {
                 ...record,
                 isDisabled: newStatus,
               });
@@ -429,7 +431,7 @@ const Crontab = () => {
     if (index === -1) {
       result.push(cron);
     } else {
-      result.splice(index, 1, {
+      result.splice(index + pageSize * (currentPage - 1), 1, {
         ...cron,
       });
     }
@@ -442,7 +444,7 @@ const Crontab = () => {
       .then((data: any) => {
         const index = value.findIndex((x) => x._id === cron._id);
         const result = [...value];
-        result.splice(index, 1, {
+        result.splice(index + pageSize * (currentPage - 1), 1, {
           ...cron,
           ...data.data,
         });
@@ -511,6 +513,12 @@ const Crontab = () => {
     });
   };
 
+  const onPageChange = (page: number, pageSize: number | undefined) => {
+    setCurrentPage(page);
+    setPageSize(pageSize as number);
+    localStorage.setItem('pageSize', pageSize + '');
+  };
+
   useEffect(() => {
     if (logCron) {
       localStorage.setItem('logCron', logCron._id);
@@ -532,6 +540,7 @@ const Crontab = () => {
       setMarginLeft(0);
       setMarginTop(-72);
     }
+    setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
   }, []);
 
   return (
@@ -602,6 +611,9 @@ const Crontab = () => {
         columns={columns}
         pagination={{
           hideOnSinglePage: true,
+          current: currentPage,
+          onChange: onPageChange,
+          pageSize: pageSize,
           showSizeChanger: true,
           defaultPageSize: 20,
           showTotal: (total: number, range: number[]) =>

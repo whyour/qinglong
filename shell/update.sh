@@ -7,8 +7,6 @@ dir_shell=/ql/shell
 
 send_mark=$dir_shell/send_mark
 
-get_token
-
 ## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
 reset_romote_url() {
     local dir_current=$(pwd)
@@ -357,7 +355,18 @@ gen_list_repo() {
     rm -f $dir_list_tmp/${repo}*.list >/dev/null 2>&1
 
     cd ${repo_path}
-    files=$(find . -name "*.js" | sed 's/^..//')
+    
+    local cmd="find ."
+    local index=0
+    for extension in $file_extensions; do
+        if [[ $index -eq 0 ]]; then
+            cmd="${cmd} -name \"*.${extension}\""
+        else
+            cmd="${cmd} -o -name \"*.${extension}\""
+        fi
+        let index+=1
+    done
+    files=$(eval $cmd | sed 's/^..//')
     if [[ $path ]]; then
         files=$(echo "$files" | egrep $path)
     fi
@@ -365,7 +374,7 @@ gen_list_repo() {
         files=$(echo "$files" | egrep -v $blackword)
     fi
     if [[ $dependence ]]; then
-        find . -name "*.js" | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
+        eval $cmd | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
     fi
     for file in ${files}; do
         filename=$(basename $file)
