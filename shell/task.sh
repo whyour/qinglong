@@ -105,10 +105,15 @@ run_normal() {
     local p1=$1
     cd $dir_scripts
     define_program "$p1"
-
+	
     combine_all
-
-    timeout $command_timeout_time ../run_scripts.sh $which_program $p1 2>&1 
+	log_time=$(date "+%Y-%m-%d-%H-%M-%S")
+	log_dir_tmp="${p1##*/}"
+	log_dir="$dir_log/${log_dir_tmp%%.*}"
+	log_path="$log_dir/$log_time.log"
+	make_dir "$log_dir"
+	
+	timeout $command_timeout_time ${dir_shell}/run_scripts.sh $p1 2>&1 | tee $log_path
 }
 
 ## 并发执行，因为是并发，所以日志只能直接记录在日志文件中（日志文件以Cookie编号结尾），前台执行并发跑时不会输出日志
