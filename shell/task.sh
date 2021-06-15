@@ -24,7 +24,10 @@ combine_sub() {
 ## 正常依次运行时，组合所有账号的Cookie与互助码
 combine_all() {
     for ((i = 0; i < ${#env_name[*]}; i++)); do
-        export ${env_name[i]}=$(combine_sub ${var_name[i]})
+        result=$(combine_sub ${var_name[i]})
+        if [[ $result ]]; then
+            export ${env_name[i]}="$result"
+        fi
     done
 }
 
@@ -53,7 +56,7 @@ random_delay() {
     local random_delay_max=$RandomDelay
     if [[ $random_delay_max ]] && [[ $random_delay_max -gt 0 ]]; then
         local current_min=$(date "+%-M")
-        if [[ $current_min -gt 2 && $current_min -lt 30 ]] || [[ $current_min -gt 31 && $current_min -lt 59 ]]; then
+        if [[ $current_min -ne 0 ]] && [[ $current_min -ne 30 ]]; then
             delay_second=$(($(gen_random_num $random_delay_max) + 1))
             echo -e "\n命令未添加 \"now\"，随机延迟 $delay_second 秒后再执行任务，如需立即终止，请按 CTRL+C...\n"
             sleep $delay_second
