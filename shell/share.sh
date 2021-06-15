@@ -289,8 +289,13 @@ git_pull_scripts() {
     cd $dir_current
 }
 
+init_env() {
+    TempBlockCookie=""
+}
+
 ## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件
 detect_termux
 detect_macos
 define_cmd
+init_env
 import_config $1
