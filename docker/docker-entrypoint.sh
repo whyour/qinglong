@@ -26,7 +26,6 @@ fi
 echo -e "控制面板启动成功...\n"
 
 echo -e "======================5. 启动定时任务========================\n"
-cd $dir_root
 if [[ $(pm2 info schedule 2>/dev/null) ]]; then
   pm2 reload schedule
 else
