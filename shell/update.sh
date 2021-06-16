@@ -298,13 +298,15 @@ update_qinglong() {
 }
 
 reload_pm2() {
-    if [[ $(pm2 info panel 2>/dev/null) ]]; then
+    local app_pid=$(ps -ef | grep "app.js" | grep -v grep)
+    if [ "$app_pid" != "" ]; then
         pm2 reload panel >/dev/null 2>&1
     else
         pm2 start $dir_root/build/app.js -n panel >/dev/null 2>&1
     fi
 
-    if [[ $(pm2 info schedule 2>/dev/null) ]]; then
+    local schedule_pid=$(ps -ef | grep "schedule.js" | grep -v grep)
+    if [ "$schedule_pid" != "" ]; then
         pm2 reload schedule >/dev/null 2>&1
     else
         pm2 start $dir_root/build/schedule.js -n schedule >/dev/null 2>&1
@@ -355,7 +357,7 @@ gen_list_repo() {
     rm -f $dir_list_tmp/${repo}*.list >/dev/null 2>&1
 
     cd ${repo_path}
-    
+
     local cmd="find ."
     local index=0
     for extension in $file_extensions; do
