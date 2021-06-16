@@ -68,7 +68,9 @@ export default function (props: any) {
         <>
           控制面板
           <a href={changeLog} target="_blank" rel="noopener noreferrer">
-            <span style={{ fontSize: 9, color: '#666', marginLeft: 5 }}>
+            <span
+              style={{ fontSize: 12, color: '#666', marginLeft: 5, zoom: 0.8 }}
+            >
               {version}
             </span>
           </a>

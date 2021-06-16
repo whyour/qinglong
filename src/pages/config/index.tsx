@@ -71,7 +71,6 @@ const Config = () => {
         value={value}
         options={{
           lineNumbers: true,
-          lineWrapping: true,
           styleActiveLine: true,
           matchBrackets: true,
           mode: 'shell',
