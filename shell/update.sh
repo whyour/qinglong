@@ -251,6 +251,7 @@ usage() {
 
 ## 更新qinglong
 update_qinglong() {
+    local no_restart="$1"
     echo -e "--------------------------------------------------------------\n"
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
@@ -287,10 +288,12 @@ update_qinglong() {
         cd $dir_root
         rm -rf $dir_root/build && rm -rf $dir_root/dist
         cp -rf $ql_static_repo/* $dir_root
-        echo -e "重启面板中..."
-        nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-        sleep 1
-        reload_pm2
+        if [[ $no_restart != "no-restart" ]]; then
+            echo -e "重启面板中..."
+            nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
+            sleep 1
+            reload_pm2
+        fi
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
@@ -402,7 +405,7 @@ main() {
     log_path="$dir_log/update/${log_time}_$p1.log"
     case $p1 in
     update)
-        update_qinglong | tee $log_path
+        update_qinglong "$2" | tee $log_path
         ;;
     extra)
         run_extra_shell | tee -a $log_path
