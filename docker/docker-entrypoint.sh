@@ -9,24 +9,25 @@ fix_config
 cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
 echo
 
-echo -e "======================2. 启动nginx========================\n"
+echo -e "======================2. 更新源代码========================\n"
+ql update "no-restart"
+echo
+
+echo -e "======================3. 启动nginx========================\n"
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 echo -e "nginx启动成功...\n"
 
-echo -e "======================3. 启动控制面板========================\n"
-
-app_pid=$(ps -ef | grep "app.js" | grep -v grep)
-if [ "$app_pid" != "" ]; then
+echo -e "======================4. 启动控制面板========================\n"
+if [[ $(pm2 info panel 2>/dev/null) ]]; then
   pm2 reload panel
 else
   pm2 start $dir_root/build/app.js -n panel
 fi
 echo -e "控制面板启动成功...\n"
 
-echo -e "======================4. 启动定时任务========================\n"
-
-schedule_pid=$(ps -ef | grep "schedule.js" | grep -v grep)
-if [ "$schedule_pid" != "" ]; then
+echo -e "======================5. 启动定时任务========================\n"
+cd $dir_root
+if [[ $(pm2 info schedule 2>/dev/null) ]]; then
   pm2 reload schedule
 else
   pm2 start $dir_root/build/schedule.js -n schedule
@@ -34,7 +35,7 @@ fi
 echo -e "定时任务启动成功...\n"
 
 if [[ $AutoStartBot == true ]]; then
-  echo -e "======================5. 启动bot========================\n"
+  echo -e "======================6. 启动bot========================\n"
   ql bot
 fi
 
