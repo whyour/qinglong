@@ -10,7 +10,7 @@ cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
 echo
 
 echo -e "======================2. 更新源代码========================\n"
-ql update
+ql update "no-restart"
 echo
 
 echo -e "======================3. 启动nginx========================\n"
