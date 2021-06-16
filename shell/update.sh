@@ -301,6 +301,8 @@ update_qinglong() {
 }
 
 reload_pm2() {
+    pm2 l >/dev/null 2>&1
+    
     if [[ $(pm2 info panel 2>/dev/null) ]]; then
         pm2 reload panel >/dev/null 2>&1
     else
