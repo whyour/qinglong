@@ -61,6 +61,11 @@ export default function (props: any) {
   if (props.location.pathname === '/login') {
     return props.children;
   }
+
+  const isFirefox = navigator.userAgent.includes('Firefox');
+  const isSafari =
+    navigator.userAgent.includes('Safari') &&
+    !navigator.userAgent.includes('Chrome');
   return (
     <ProLayout
       selectedKeys={[props.location.pathname]}
@@ -69,7 +74,12 @@ export default function (props: any) {
           控制面板
           <a href={changeLog} target="_blank" rel="noopener noreferrer">
             <span
-              style={{ fontSize: 12, color: '#666', marginLeft: 5, zoom: 0.8 }}
+              style={{
+                fontSize: isFirefox ? 9 : 12,
+                color: '#666',
+                marginLeft: 5,
+                zoom: isSafari ? 0.66 : 0.8,
+              }}
             >
               {version}
             </span>
