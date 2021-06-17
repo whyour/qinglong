@@ -431,7 +431,7 @@ const Crontab = () => {
     if (index === -1) {
       result.push(cron);
     } else {
-      result.splice(index + pageSize * (currentPage - 1), 1, {
+      result.splice(index, 1, {
         ...cron,
       });
     }
@@ -442,9 +442,11 @@ const Crontab = () => {
     request
       .get(`${config.apiPrefix}crons/${cron._id}`)
       .then((data: any) => {
+        console.log(value);
         const index = value.findIndex((x) => x._id === cron._id);
+        console.log(index);
         const result = [...value];
-        result.splice(index + pageSize * (currentPage - 1), 1, {
+        result.splice(index, 1, {
           ...cron,
           ...data.data,
         });
