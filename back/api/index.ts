@@ -4,6 +4,7 @@ import cookie from './cookie';
 import config from './config';
 import log from './log';
 import cron from './cron';
+import terminal from './terminal';
 
 export default () => {
   const app = Router();
@@ -12,6 +13,7 @@ export default () => {
   config(app);
   log(app);
   cron(app);
+  terminal(app);
 
   return app;
 };

@@ -7,6 +7,7 @@ const titleMap: any = {
   '/login': '登录',
   '/crontab': '定时任务',
   '/cookie': 'Session管理',
+  '/terminal': '终端管理',
   '/config': '配置文件',
   '/diy': '自定义脚本',
   '/diff': '对比工具',

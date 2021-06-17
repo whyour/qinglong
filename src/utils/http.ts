@@ -9,11 +9,11 @@ message.config({
 const time = Date.now();
 const errorHandler = function (error: any) {
   if (error.response) {
-    const message = error.data
+    const msg = error.data
       ? error.data.message || error.data
       : error.response.statusText;
     if (error.response.status !== 401 && error.response.status !== 502) {
-      message.error(message);
+      message.error(msg);
     } else {
       console.log(error.response);
     }
