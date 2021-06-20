@@ -53,6 +53,7 @@ original_name=(
 ## 导入配置文件
 import_config() {
     [ -f $file_config_user ] && . $file_config_user
+    [ -f $file_env ] && . $file_env
 
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     github_proxy_url=${GithubProxyUrl:-""}
