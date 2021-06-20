@@ -252,6 +252,13 @@ usage() {
 update_qinglong() {
     local no_restart="$1"
     echo -e "--------------------------------------------------------------\n"
+    if [ -f /ql/db/cookie.db ] && [ ! -f /ql/db/env.db ]; then
+        echo -e "检测到旧的db文件，拷贝为新db...\n"
+        mv /ql/db/cookie.db /ql/db/env.db
+        rm /ql/db/cookie.db
+        echo
+    fi
+
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
