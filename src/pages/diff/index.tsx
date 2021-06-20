@@ -23,7 +23,7 @@ const Crontab = () => {
   const getSample = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}config/config.sample.sh`)
+      .get(`${config.apiPrefix}configs/config.sample.sh`)
       .then((data) => {
         setSample(data.data);
       })
