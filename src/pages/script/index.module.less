@@ -1,0 +1,37 @@
+@import '~@/styles/variable.less';
+
+.left-tree {
+  &-container {
+    overflow: hidden;
+    position: relative;
+    background-color: #fff;
+    height: calc(100vh - 128px);
+    height: calc(100vh - var(--vh-offset, 0px) - 128px);
+    width: @tree-width;
+    display: flex;
+    flex-direction: column;
+  }
+  &-scroller {
+    flex: 1;
+    overflow: auto;
+  }
+  &-search {
+    margin-bottom: 16px;
+  }
+}
+
+.log-container {
+  display: flex;
+}
+
+:global {
+  .log-wrapper {
+    .ant-pro-grid-content.wide .ant-pro-page-container-children-content {
+      background-color: #f8f8f8;
+    }
+
+    .CodeMirror {
+      width: calc(100% - 32px - @tree-width);
+    }
+  }
+}

@@ -19,8 +19,8 @@ import {
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import QRCode from 'qrcode.react';
-import CookieModal from './modal';
+import EnvModal from './modal';
+import EditNameModal from './editNameModal';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
@@ -28,17 +28,12 @@ import './index.less';
 const { Text } = Typography;
 
 enum Status {
-  '未获取',
-  '正常',
+  '已启用',
   '已禁用',
-  '已失效',
-  '状态异常',
 }
 
 enum StatusColor {
-  'default',
   'success',
-  'warning',
   'error',
 }
 
@@ -106,7 +101,7 @@ const DragableBodyRow = ({
   );
 };
 
-const Config = () => {
+const Env = () => {
   const columns = [
     {
       title: '序号',
@@ -116,25 +111,17 @@ const Config = () => {
       },
     },
     {
-      title: '昵称',
-      dataIndex: 'nickname',
-      key: 'nickname',
+      title: '名称',
+      dataIndex: 'name',
+      key: 'name',
       align: 'center' as const,
-      width: '15%',
-      render: (text: string, record: any, index: number) => {
-        const match = record.value.match(/pt_pin=([^; ]+)(?=;?)/);
-        const val = (match && match[1]) || '未匹配用户名';
-        return (
-          <span style={{ cursor: 'text' }}>{record.nickname || val} </span>
-        );
-      },
     },
     {
       title: '值',
       dataIndex: 'value',
       key: 'value',
       align: 'center' as const,
-      width: '50%',
+      width: '45%',
       render: (text: string, record: any) => {
         return (
           <span
@@ -143,6 +130,7 @@ const Config = () => {
               display: 'inline-block',
               wordBreak: 'break-all',
               cursor: 'text',
+              width: '100%',
             }}
           >
             {text}
@@ -151,27 +139,23 @@ const Config = () => {
       },
     },
     {
+      title: '备注',
+      dataIndex: 'remarks',
+      key: 'remarks',
+      align: 'center' as const,
+    },
+    {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
       align: 'center' as const,
-      width: '15%',
+      width: 60,
       render: (text: string, record: any, index: number) => {
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
-            <Tag
-              color={StatusColor[record.status] || StatusColor[3]}
-              style={{ marginRight: 0 }}
-            >
+            <Tag color={StatusColor[record.status]} style={{ marginRight: 0 }}>
               {Status[record.status]}
             </Tag>
-            {record.status !== Status.已禁用 && (
-              <Tooltip title="刷新">
-                <a onClick={() => refreshStatus(record, index)}>
-                  <SyncOutlined />
-                </a>
-              </Tooltip>
-            )}
           </Space>
         );
       },
@@ -183,12 +167,12 @@ const Config = () => {
       render: (text: string, record: any, index: number) => (
         <Space size="middle">
           <Tooltip title="编辑">
-            <a onClick={() => editCookie(record, index)}>
+            <a onClick={() => editEnv(record, index)}>
               <EditOutlined />
             </a>
           </Tooltip>
           <Tooltip title={record.status === Status.已禁用 ? '启用' : '禁用'}>
-            <a onClick={() => enabledOrDisabledCookie(record, index)}>
+            <a onClick={() => enabledOrDisabledEnv(record, index)}>
               {record.status === Status.已禁用 ? (
                 <CheckCircleOutlined />
               ) : (
@@ -197,7 +181,7 @@ const Config = () => {
             </a>
           </Tooltip>
           <Tooltip title="删除">
-            <a onClick={() => deleteCookie(record, index)}>
+            <a onClick={() => deleteEnv(record, index)}>
               <DeleteOutlined />
             </a>
           </Tooltip>
@@ -211,39 +195,27 @@ const Config = () => {
   const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editedCookie, setEditedCookie] = useState();
+  const [isEditNameModalVisible, setIsEditNameModalVisible] = useState(false);
+  const [editedEnv, setEditedEnv] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
-  const getCookies = () => {
+  const getEnvs = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}cookies`)
+      .get(`${config.apiPrefix}envs`)
       .then((data: any) => {
         setValue(data.data);
       })
       .finally(() => setLoading(false));
   };
 
-  const refreshStatus = (record: any, index: number) => {
-    request
-      .get(`${config.apiPrefix}cookies/${record._id}/refresh`)
-      .then(async (data: any) => {
-        if (data.data && data.data.value) {
-          (value as any).splice(index, 1, data.data);
-          setValue([...(value as any)] as any);
-        } else {
-          message.error('更新状态失败');
-        }
-      });
-  };
-
-  const enabledOrDisabledCookie = (record: any, index: number) => {
+  const enabledOrDisabledEnv = (record: any, index: number) => {
     Modal.confirm({
       title: `确认${record.status === Status.已禁用 ? '启用' : '禁用'}`,
       content: (
         <>
           确认{record.status === Status.已禁用 ? '启用' : '禁用'}
-          Cookie{' '}
+          Env{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.value}
           </Text>{' '}
@@ -253,7 +225,7 @@ const Config = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}cookies/${
+            `${config.apiPrefix}envs/${
               record.status === Status.已禁用 ? 'enable' : 'disable'
             }`,
             {
@@ -284,22 +256,22 @@ const Config = () => {
     });
   };
 
-  const addCookie = () => {
-    setEditedCookie(null as any);
+  const addEnv = () => {
+    setEditedEnv(null as any);
     setIsModalVisible(true);
   };
 
-  const editCookie = (record: any, index: number) => {
-    setEditedCookie(record);
+  const editEnv = (record: any, index: number) => {
+    setEditedEnv(record);
     setIsModalVisible(true);
   };
 
-  const deleteCookie = (record: any, index: number) => {
+  const deleteEnv = (record: any, index: number) => {
     Modal.confirm({
       title: '确认删除',
       content: (
         <>
-          确认删除Cookie{' '}
+          确认删除Env{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.value}
           </Text>{' '}
@@ -308,7 +280,7 @@ const Config = () => {
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}cookies`, { data: [record._id] })
+          .delete(`${config.apiPrefix}envs`, { data: [record._id] })
           .then((data: any) => {
             if (data.code === 200) {
               message.success('删除成功');
@@ -326,25 +298,25 @@ const Config = () => {
     });
   };
 
-  const handleCancel = (cookies?: any[]) => {
+  const handleCancel = (env?: any[]) => {
     setIsModalVisible(false);
-    if (cookies && cookies.length > 0) {
-      handleCookies(cookies);
-    }
+    handleEnv(env);
   };
 
-  const handleCookies = (cookies: any[]) => {
+  const handleEditNameCancel = (env?: any[]) => {
+    setIsEditNameModalVisible(false);
+    getEnvs();
+  };
+
+  const handleEnv = (env: any) => {
     const result = [...value];
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i];
-      const index = value.findIndex((x) => x._id === cookie._id);
-      if (index === -1) {
-        result.push(cookie);
-      } else {
-        result.splice(index, 1, {
-          ...cookie,
-        });
-      }
+    const index = value.findIndex((x) => x._id === env._id);
+    if (index === -1) {
+      result.push(env);
+    } else {
+      result.splice(index, 1, {
+        ...env,
+      });
     }
     setValue(result);
   };
@@ -366,7 +338,7 @@ const Config = () => {
       newData.splice(hoverIndex, 0, dragRow);
       setValue([...newData]);
       request
-        .put(`${config.apiPrefix}cookies/${dragRow._id}/move`, {
+        .put(`${config.apiPrefix}envs/${dragRow._id}/move`, {
           data: { fromIndex: dragIndex, toIndex: hoverIndex },
         })
         .then((data: any) => {
@@ -387,18 +359,18 @@ const Config = () => {
     onChange: onSelectChange,
   };
 
-  const delCookies = () => {
+  const delEnvs = () => {
     Modal.confirm({
       title: '确认删除',
-      content: <>确认删除选中的Cookie吗</>,
+      content: <>确认删除选中的Env吗</>,
       onOk() {
         request
-          .delete(`${config.apiPrefix}cookies`, { data: selectedRowIds })
+          .delete(`${config.apiPrefix}envs`, { data: selectedRowIds })
           .then((data: any) => {
             if (data.code === 200) {
               message.success('批量删除成功');
               setSelectedRowIds([]);
-              getCookies();
+              getEnvs();
             } else {
               message.error(data);
             }
@@ -410,18 +382,18 @@ const Config = () => {
     });
   };
 
-  const operateCookies = (operationStatus: number) => {
+  const operateEnvs = (operationStatus: number) => {
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
-      content: <>确认{OperationName[operationStatus]}选中的Cookie吗</>,
+      content: <>确认{OperationName[operationStatus]}选中的Env吗</>,
       onOk() {
         request
-          .put(`${config.apiPrefix}cookies/${OperationPath[operationStatus]}`, {
+          .put(`${config.apiPrefix}envs/${OperationPath[operationStatus]}`, {
             data: selectedRowIds,
           })
           .then((data: any) => {
             if (data.code === 200) {
-              getCookies();
+              getEnvs();
             } else {
               message.error(data);
             }
@@ -431,6 +403,10 @@ const Config = () => {
         console.log('Cancel');
       },
     });
+  };
+
+  const modifyName = () => {
+    setIsEditNameModalVisible(true);
   };
 
   useEffect(() => {
@@ -443,16 +419,16 @@ const Config = () => {
       setMarginLeft(0);
       setMarginTop(-72);
     }
-    getCookies();
+    getEnvs();
   }, []);
 
   return (
     <PageContainer
-      className="session-wrapper"
-      title="Session管理"
+      className="env-wrapper"
+      title="环境变量"
       extra={[
-        <Button key="2" type="primary" onClick={() => addCookie()}>
-          添加Cookie
+        <Button key="2" type="primary" onClick={() => addEnv()}>
+          添加Env
         </Button>,
       ]}
       header={{
@@ -473,20 +449,27 @@ const Config = () => {
           <Button
             type="primary"
             style={{ marginBottom: 5 }}
-            onClick={delCookies}
+            onClick={modifyName}
+          >
+            批量修改变量名称
+          </Button>
+          <Button
+            type="primary"
+            style={{ marginBottom: 5, marginLeft: 8 }}
+            onClick={delEnvs}
           >
             批量删除
           </Button>
           <Button
             type="primary"
-            onClick={() => operateCookies(0)}
+            onClick={() => operateEnvs(0)}
             style={{ marginLeft: 8, marginBottom: 5 }}
           >
             批量启用
           </Button>
           <Button
             type="primary"
-            onClick={() => operateCookies(1)}
+            onClick={() => operateEnvs(1)}
             style={{ marginLeft: 8, marginRight: 8 }}
           >
             批量禁用
@@ -516,13 +499,18 @@ const Config = () => {
           }}
         />
       </DndProvider>
-      <CookieModal
+      <EnvModal
         visible={isModalVisible}
         handleCancel={handleCancel}
-        cookie={editedCookie}
+        env={editedEnv}
+      />
+      <EditNameModal
+        visible={isEditNameModalVisible}
+        handleCancel={handleEditNameCancel}
+        ids={selectedRowIds}
       />
     </PageContainer>
   );
 };
 
-export default Config;
+export default Env;

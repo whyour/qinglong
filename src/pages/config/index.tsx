@@ -1,5 +1,5 @@
 import React, { PureComponent, Fragment, useState, useEffect } from 'react';
-import { Button, message, Modal } from 'antd';
+import { Button, message, Modal, TreeSelect } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { Controlled as CodeMirror } from 'react-codemirror2';
@@ -11,25 +11,40 @@ const Config = () => {
   const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState('config.sh');
+  const [select, setSelect] = useState('config.sh');
+  const [data, setData] = useState<any[]>([]);
 
-  const getConfig = () => {
+  const getConfig = (name: string) => {
+    request.get(`${config.apiPrefix}configs/${name}`).then((data: any) => {
+      setValue(data.data);
+    });
+  };
+
+  const getFiles = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}config/config`)
+      .get(`${config.apiPrefix}configs/files`)
       .then((data: any) => {
-        setValue(data.data);
+        setData(data.data);
       })
       .finally(() => setLoading(false));
   };
 
   const updateConfig = () => {
     request
-      .post(`${config.apiPrefix}save`, {
-        data: { content: value, name: 'config.sh' },
+      .post(`${config.apiPrefix}configs/save`, {
+        data: { content: value, name: select },
       })
       .then((data: any) => {
         message.success(data.msg);
       });
+  };
+
+  const onSelect = (value: any, node: any) => {
+    setSelect(value);
+    setTitle(node.value);
+    getConfig(node.value);
   };
 
   useEffect(() => {
@@ -42,14 +57,24 @@ const Config = () => {
       setMarginLeft(0);
       setMarginTop(-72);
     }
-    getConfig();
+    getFiles();
+    getConfig('config.sh');
   }, []);
 
   return (
     <PageContainer
-      className="ql-container-wrapper"
-      title="config.sh"
+      className="ql-container-wrapper config-wrapper"
+      title={title}
       extra={[
+        <TreeSelect
+          className="config-select"
+          value={select}
+          dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+          treeData={data}
+          key="value"
+          defaultValue="config.sh"
+          onSelect={onSelect}
+        />,
         <Button key="1" type="primary" onClick={updateConfig}>
           保存
         </Button>,
