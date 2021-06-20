@@ -214,7 +214,6 @@ export default class EnvService {
       { status: { $ne: EnvStatus.disabled }, name: { $exists: true } },
     );
     const groups = _.groupBy(envs, 'name');
-    console.log(groups);
     let env_string = '';
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {

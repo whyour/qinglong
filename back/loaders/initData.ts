@@ -18,13 +18,7 @@ const initData = [
     name: '删除日志',
     command: 'ql rmlog 7',
     schedule: '30 7 */7 * *',
-    status: CrontabStatus.idle,
-  },
-  {
-    name: '互助码',
-    command: 'ql code',
-    schedule: '30 7 * * *',
-    status: CrontabStatus.idle,
+    status: CrontabStatus.disabled,
   },
 ];
 
