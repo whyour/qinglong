@@ -7,32 +7,16 @@ import { request } from '@/utils/http';
 import styles from './index.module.less';
 
 function getFilterData(keyword: string, data: any) {
-  const expandedKeys: string[] = [];
   if (keyword) {
     const tree: any = [];
     data.forEach((item: any) => {
       if (item.title.toLocaleLowerCase().includes(keyword)) {
         tree.push(item);
-        expandedKeys.push(...item.children.map((x: any) => x.key));
-      } else {
-        const children: any[] = [];
-        (item.children || []).forEach((subItem: any) => {
-          if (subItem.title.toLocaleLowerCase().includes(keyword)) {
-            children.push(subItem);
-          }
-        });
-        if (children.length > 0) {
-          tree.push({
-            ...item,
-            children,
-          });
-          expandedKeys.push(...children.map((x) => x.key));
-        }
       }
     });
-    return { tree, expandedKeys };
+    return { tree };
   }
-  return { tree: data, expandedKeys };
+  return { tree: data };
 }
 
 const Script = () => {
@@ -65,8 +49,6 @@ const Script = () => {
   };
 
   const onSelect = (value: any, node: any) => {
-    console.log(value);
-    console.log(node);
     setSelect(value);
     setTitle(node.parent || node.value);
     getDetail(node);
