@@ -16,8 +16,6 @@ const EditNameModal = ({
   const [loading, setLoading] = useState(false);
 
   const handleOk = async (values: any) => {
-    console.log(values);
-    console.log(ids);
     setLoading(true);
     const { code, data } = await request.put(`${config.apiPrefix}envs/name`, {
       data: {

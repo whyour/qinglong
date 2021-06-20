@@ -34,7 +34,6 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        console.log(req.params.file);
         const content = getFileContentByName(
           `${config.scriptPath}${req.params.file}`,
         );

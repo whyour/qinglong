@@ -244,7 +244,6 @@ usage() {
     echo -e "3. $cmd_update raw <fileurl>                                             # 更新单个脚本文件"
     echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch>   # 更新单个仓库的脚本"
     echo -e "5. $cmd_update rmlog <days>                                              # 删除旧日志"
-    echo -e "6. $cmd_update code                                                      # 获取互助码"
     echo -e "6. $cmd_update bot                                                       # 启动tg-bot"
     echo -e "7. $cmd_update reset                                                     # 重置青龙基础环境"
 }
