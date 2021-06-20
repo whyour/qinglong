@@ -24,6 +24,9 @@ file_config_user=$dir_config/config.sh
 file_auth_sample=$dir_sample/auth.sample.json
 file_auth_user=$dir_config/auth.json
 file_extra_shell=$dir_config/extra.sh
+file_task_before=$dir_config/task_before.sh
+file_task_after=$dir_config/task_after.sh
+file_task_sample=$dir_sample/task.sample.sh
 file_extra_sample=$dir_sample/extra.sample.sh
 file_notify_js_sample=$dir_sample/notify.js
 file_notify_py_sample=$dir_sample/notify.py
@@ -159,6 +162,18 @@ fix_config() {
     if [ ! -f $file_env ]; then
         echo -e "检测到config配置目录下不存在env.sh，创建一个空文件用于初始化...\n"
         touch $file_env
+        echo
+    fi
+
+    if [ ! -f $file_task_before ]; then
+        echo -e "复制一份 $file_task_sample 为 $file_task_before\n"
+        cp -fv $file_task_sample $file_task_before
+        echo
+    fi
+
+    if [ ! -f $file_task_after ]; then
+        echo -e "复制一份 $file_task_sample 为 $file_task_after\n"
+        cp -fv $file_task_sample $file_task_after
         echo
     fi
 
