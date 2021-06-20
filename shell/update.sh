@@ -259,6 +259,8 @@ update_qinglong() {
         echo
     fi
 
+    fix_config
+
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
