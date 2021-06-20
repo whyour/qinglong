@@ -252,7 +252,7 @@ usage() {
 update_qinglong() {
     local no_restart="$1"
     echo -e "--------------------------------------------------------------\n"
-    if [ -f /ql/db/cookie.db ] && [ ! -f /ql/db/env.db ]; then
+    if [ -f /ql/db/cookie.db ]; then
         echo -e "检测到旧的db文件，拷贝为新db...\n"
         mv /ql/db/cookie.db /ql/db/env.db
         rm /ql/db/cookie.db
