@@ -1,22 +1,25 @@
-export class Cookie {
+export class Env {
   value?: string;
   timestamp?: string;
   created?: number;
   _id?: string;
-  status?: CookieStatus;
+  status?: EnvStatus;
   position?: number;
+  name?: number;
+  remarks?: number;
 
-  constructor(options: Cookie) {
+  constructor(options: Env) {
     this.value = options.value;
     this._id = options._id;
     this.created = options.created || new Date().valueOf();
-    this.status = options.status || CookieStatus.noacquired;
+    this.status = options.status || EnvStatus.noacquired;
     this.timestamp = new Date().toString();
-    this.position = options.position;
+    this.name = options.name;
+    this.remarks = options.remarks;
   }
 }
 
-export enum CookieStatus {
+export enum EnvStatus {
   'noacquired',
   'normal',
   'disabled',
@@ -24,4 +27,4 @@ export enum CookieStatus {
   'abnormal',
 }
 
-export const initCookiePosition = 9999999999;
+export const initEnvPosition = 9999999999;

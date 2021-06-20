@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
-import CookieService from '../services/cookie';
+import EnvService from '../services/env';
 import { Logger } from 'winston';
 import { celebrate, Joi } from 'celebrate';
 const route = Router();
@@ -8,12 +8,12 @@ const route = Router();
 export default (app: Router) => {
   app.use('/', route);
   route.get(
-    '/cookies',
+    '/envs',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.cookies('', { position: -1 }, true);
+        const envService = Container.get(EnvService);
+        const data = await envService.envs('', { position: -1 });
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -23,15 +23,19 @@ export default (app: Router) => {
   );
 
   route.post(
-    '/cookies',
+    '/envs',
     celebrate({
-      body: Joi.array().items(Joi.string().required()).min(1),
+      body: Joi.object({
+        value: Joi.string().required(),
+        name: Joi.string().required(),
+        remarks: Joi.string().optional(),
+      }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.create(req.body);
+        const envService = Container.get(EnvService);
+        const data = await envService.create(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -41,18 +45,20 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/cookies',
+    '/envs',
     celebrate({
       body: Joi.object({
         value: Joi.string().required(),
+        name: Joi.string().required(),
+        remarks: Joi.string().optional(),
         _id: Joi.string().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.update(req.body);
+        const envService = Container.get(EnvService);
+        const data = await envService.update(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -62,15 +68,15 @@ export default (app: Router) => {
   );
 
   route.delete(
-    '/cookies',
+    '/envs',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.remove(req.body);
+        const envService = Container.get(EnvService);
+        const data = await envService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -80,7 +86,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/cookies/:id/move',
+    '/envs/:id/move',
     celebrate({
       params: Joi.object({
         id: Joi.string().required(),
@@ -93,28 +99,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.move(req.params.id, req.body);
-        return res.send({ code: 200, data });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
-
-  route.get(
-    '/cookies/:id/refresh',
-    celebrate({
-      params: Joi.object({
-        id: Joi.string().required(),
-      }),
-    }),
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.refreshCookie(req.params.id);
+        const envService = Container.get(EnvService);
+        const data = await envService.move(req.params.id, req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -124,15 +110,15 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/cookies/disable',
+    '/envs/disable',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.disabled(req.body);
+        const envService = Container.get(EnvService);
+        const data = await envService.disabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -142,15 +128,36 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/cookies/enable',
+    '/envs/enable',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.enabled(req.body);
+        const envService = Container.get(EnvService);
+        const data = await envService.enabled(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/envs/name',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.string().required()),
+        name: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.updateNames(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -160,7 +167,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/cookies/:id',
+    '/envs/:id',
     celebrate({
       params: Joi.object({
         id: Joi.string().required(),
@@ -169,8 +176,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const cookieService = Container.get(CookieService);
-        const data = await cookieService.get(req.params.id);
+        const envService = Container.get(EnvService);
+        const data = await envService.get(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);

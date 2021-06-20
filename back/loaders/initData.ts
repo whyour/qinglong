@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { Container } from 'typedi';
 import { Crontab, CrontabStatus } from '../data/cron';
 import CronService from '../services/cron';
-import CookieService from '../services/cookie';
+import EnvService from '../services/env';
 
 const initData = [
   {
@@ -30,7 +30,7 @@ const initData = [
 
 export default async () => {
   const cronService = Container.get(CronService);
-  const cookieService = Container.get(CookieService);
+  const envService = Container.get(EnvService);
   const cronDb = cronService.getDb();
 
   cronDb.count({}, async (err, count) => {
@@ -97,7 +97,7 @@ export default async () => {
 
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
-  await cookieService.set_cookies();
+  await envService.set_envs();
 };
 
 function randomSchedule(from: number, to: number) {
