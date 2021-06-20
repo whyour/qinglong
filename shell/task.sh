@@ -5,41 +5,6 @@ dir_shell=/ql/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
-## 组合Cookie和互助码子程序，$1：要组合的内容
-combine_sub() {
-    local what_combine=$1
-    local combined_all=""
-    local tmp1 tmp2
-    for ((i = 1; i <= $user_sum; i++)); do
-        for num in $block_cookie; do
-            [[ $i -eq $num ]] && continue 2
-        done
-        local tmp1=$what_combine$i
-        local tmp2=${!tmp1}
-        combined_all="$combined_all&$tmp2"
-    done
-    echo $combined_all | perl -pe "{s|^&||; s|^@+||; s|&@|&|g; s|@+&|&|g; s|@+|@|g; s|@+$||}"
-}
-
-## 正常依次运行时，组合所有账号的Cookie与互助码
-combine_all() {
-    for ((i = 0; i < ${#env_name[*]}; i++)); do
-        result=$(combine_sub ${var_name[i]})
-        if [[ $result ]]; then
-            export ${env_name[i]}="$result"
-        fi
-    done
-}
-
-## 并发运行时，直接申明每个账号的Cookie与互助码，$1：用户Cookie编号
-combine_one() {
-    local user_num=$1
-    for ((i = 0; i < ${#env_name[*]}; i++)); do
-        local tmp=${var_name[i]}$user_num
-        export ${env_name[i]}=${!tmp}
-    done
-}
-
 ## 选择python3还是node
 define_program() {
     local p1=$1
@@ -118,7 +83,6 @@ run_normal() {
             random_delay
         fi
     fi
-    combine_all
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${p1##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
@@ -131,18 +95,20 @@ run_normal() {
     update_cron_status "\"$id\"" "1"
 }
 
-## 并发执行，因为是并发，所以日志只能直接记录在日志文件中（日志文件以Cookie编号结尾），前台执行并发跑时不会输出日志
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
 run_concurrent() {
     local p1=$1
+    local p3=$3
+    local envs=$(eval echo "\$${p3}")
+    local array=(${envs//&/})
     cd $dir_scripts
     define_program "$p1"
     log_dir="$dir_log/${p1%%.*}"
     make_dir $log_dir
     log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n"
-    for ((user_num = 1; user_num <= $user_sum; user_num++)); do
-        combine_one $user_num
+    for i in "${!array[@]}"; do
+        export ${p3}=${array[i]}
         log_path="$log_dir/${log_time}_${user_num}.log"
         timeout $command_timeout_time $which_program $p1 &>$log_path &
     done
@@ -173,7 +139,7 @@ main() {
             run_normal $1 $2
             ;;
         conc)
-            run_concurrent $1 $2
+            run_concurrent $1 $2 $3
             ;;
         *)
             run_else "$@"

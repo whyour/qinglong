@@ -25,10 +25,10 @@ export default {
         component: '@/pages/crontab/index',
       },
       {
-        path: '/cookie',
-        name: 'Session管理',
+        path: '/env',
+        name: '环境变量',
         icon: <RadiusSettingOutlined />,
-        component: '@/pages/cookie/index',
+        component: '@/pages/env/index',
       },
       {
         path: '/config',
@@ -37,10 +37,10 @@ export default {
         component: '@/pages/config/index',
       },
       {
-        path: '/diy',
-        name: '自定义脚本',
+        path: '/script',
+        name: '查看脚本',
         icon: <FormOutlined />,
-        component: '@/pages/diy/index',
+        component: '@/pages/script/index',
       },
       {
         path: '/diff',

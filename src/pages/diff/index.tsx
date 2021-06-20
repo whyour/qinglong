@@ -15,7 +15,7 @@ const Crontab = () => {
   const [loading, setLoading] = useState(true);
 
   const getConfig = () => {
-    request.get(`${config.apiPrefix}config/config`).then((data) => {
+    request.get(`${config.apiPrefix}configs/config.sh`).then((data) => {
       setValue(data.data);
     });
   };
@@ -23,7 +23,7 @@ const Crontab = () => {
   const getSample = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}config/sample`)
+      .get(`${config.apiPrefix}config/config.sample.sh`)
       .then((data) => {
         setSample(data.data);
       })

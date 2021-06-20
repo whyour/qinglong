@@ -3,12 +3,12 @@ import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 
-const CookieModal = ({
-  cookie,
+const EnvModal = ({
+  env,
   handleCancel,
   visible,
 }: {
-  cookie?: any;
+  env?: any;
   visible: boolean;
   handleCancel: (cks?: any[]) => void;
 }) => {
@@ -16,42 +16,28 @@ const CookieModal = ({
   const [loading, setLoading] = useState(false);
 
   const handleOk = async (values: any) => {
-    const cookies = values.value
-      .split('\n')
-      .map((x: any) => x.trim().replace(/\s/g, ''));
-    let flag = false;
-    for (const coo of cookies) {
-      if (!/pt_key=\S*;\s*pt_pin=\S*;\s*/.test(coo)) {
-        message.error(`${coo}格式有误`);
-        flag = true;
-        break;
-      }
-    }
-    if (flag) {
-      return;
-    }
     setLoading(true);
-    const method = cookie ? 'put' : 'post';
-    const payload = cookie ? { value: cookies[0], _id: cookie._id } : cookies;
-    const { code, data } = await request[method](`${config.apiPrefix}cookies`, {
+    const method = env ? 'put' : 'post';
+    const payload = env ? { ...values, _id: env._id } : values;
+    const { code, data } = await request[method](`${config.apiPrefix}envs`, {
       data: payload,
     });
     if (code === 200) {
-      message.success(cookie ? '更新Cookie成功' : '添加Cookie成功');
+      message.success(env ? '更新Env成功' : '添加Env成功');
     } else {
       message.error(data);
     }
     setLoading(false);
-    handleCancel(cookie ? [data] : data);
+    handleCancel(data);
   };
 
   useEffect(() => {
     form.resetFields();
-  }, [cookie]);
+  }, [env]);
 
   return (
     <Modal
-      title={cookie ? '编辑Cookie' : '新建Cookie'}
+      title={env ? '编辑Env' : '新建Env'}
       visible={visible}
       forceRender
       onOk={() => {
@@ -71,29 +57,34 @@ const CookieModal = ({
       <Form
         form={form}
         layout="vertical"
-        name="form_in_modal"
+        name="env_modal"
         preserve={false}
-        initialValues={cookie}
+        initialValues={env}
       >
         <Form.Item
+          name="name"
+          label="名称"
+          rules={[{ required: true, message: '请输入环境变量名称' }]}
+        >
+          <Input placeholder="请输入环境变量名称" />
+        </Form.Item>
+        <Form.Item
           name="value"
-          rules={[
-            { required: true, message: '请输入Cookie' },
-            {
-              pattern: /pt_key=\S*;\s*pt_pin=\S*;\s*/,
-              message: 'Cookie格式错误，注意分号(pt_key=***;pt_pin=***;)',
-            },
-          ]}
+          label="值"
+          rules={[{ required: true, message: '请输入环境变量值' }]}
         >
           <Input.TextArea
             rows={4}
             autoSize={true}
-            placeholder="请输入cookie，可直接换行输入多个cookie"
+            placeholder="请输入环境变量值"
           />
+        </Form.Item>
+        <Form.Item name="remarks" label="备注">
+          <Input />
         </Form.Item>
       </Form>
     </Modal>
   );
 };
 
-export default CookieModal;
+export default EnvModal;

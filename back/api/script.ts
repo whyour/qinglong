@@ -11,18 +11,16 @@ export default (app: Router) => {
   app.use('/', route);
 
   route.get(
-    '/configs/files',
+    '/scripts/files',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const fileList = fs.readdirSync(config.configPath, 'utf-8');
+        const fileList = fs.readdirSync(config.scriptPath, 'utf-8');
         res.send({
           code: 200,
-          data: fileList
-            .filter((x) => !config.blackFileList.includes(x))
-            .map((x) => {
-              return { title: x, value: x };
-            }),
+          data: fileList.map((x) => {
+            return { title: x, value: x, key: x };
+          }),
         });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -32,36 +30,15 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/configs/:file',
+    '/scripts/:file',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
+        console.log(req.params.file);
         const content = getFileContentByName(
-          `${config.configPath}${req.params.file}`,
+          `${config.scriptPath}${req.params.file}`,
         );
         res.send({ code: 200, data: content });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
-
-  route.post(
-    '/configs/save',
-    celebrate({
-      body: Joi.object({
-        name: Joi.string().required(),
-        content: Joi.string().required(),
-      }),
-    }),
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const { name, content } = req.body;
-        const path = `${config.configPath}${name}`;
-        fs.writeFileSync(path, content);
-        res.send({ code: 200, msg: '保存成功' });
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);
