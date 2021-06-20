@@ -14,6 +14,7 @@ export class Env {
     this.created = options.created || new Date().valueOf();
     this.status = options.status || EnvStatus.noacquired;
     this.timestamp = new Date().toString();
+    this.position = options.position;
     this.name = options.name;
     this.remarks = options.remarks;
   }
