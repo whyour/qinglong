@@ -38,6 +38,7 @@
     "p-queue": "6.6.2",
     "reflect-metadata": "^0.1.13",
     "typedi": "^0.8.0",
+    "lodash": "^4.17.21",
     "winston": "^3.3.3"
   },
   "devDependencies": {
@@ -60,7 +61,6 @@
     "compression-webpack-plugin": "6.1.1",
     "darkreader": "^4.9.27",
     "lint-staged": "^10.0.7",
-    "lodash": "^4.17.21",
     "nodemon": "^2.0.4",
     "prettier": "^2.2.0",
     "qrcode.react": "^1.0.1",
