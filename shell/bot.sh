@@ -12,6 +12,7 @@ echo -e "\nbot依赖安装成功...\n"
 
 echo -e "2、下载bot所需文件...\n"
 if [ -d ${repo_path}/.git ]; then
+    reset_romote_url ${repo_path} "${url}"
     git_pull_scripts ${repo_path}
 else
   rm -rf ${repo_path}

@@ -7,23 +7,6 @@ dir_shell=/ql/shell
 
 send_mark=$dir_shell/send_mark
 
-## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
-reset_romote_url() {
-    local dir_current=$(pwd)
-    local dir_work=$1
-    local url=$2
-    local branch="$3"
-
-    [[ $branch ]] && local cmd="origin/${branch}"
-
-    if [ -d "$dir_work/.git" ]; then
-        cd $dir_work
-        git remote set-url origin $url >/dev/null
-        git reset --hard $cmd >/dev/null
-        cd $dir_current
-    fi
-}
-
 ## 检测cron的差异，$1：脚本清单文件路径，$2：cron任务清单文件路径，$3：增加任务清单文件路径，$4：删除任务清单文件路径
 diff_cron() {
     local list_scripts="$1"
