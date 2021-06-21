@@ -299,6 +299,23 @@ git_pull_scripts() {
     cd $dir_current
 }
 
+## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
+reset_romote_url() {
+    local dir_current=$(pwd)
+    local dir_work=$1
+    local url=$2
+    local branch="$3"
+
+    [[ $branch ]] && local cmd="origin/${branch}"
+
+    if [ -d "$dir_work/.git" ]; then
+        cd $dir_work
+        git remote set-url origin $url >/dev/null
+        git reset --hard $cmd >/dev/null
+        cd $dir_current
+    fi
+}
+
 ## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件
 detect_termux
 detect_macos
