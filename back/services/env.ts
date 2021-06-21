@@ -183,7 +183,7 @@ export default class EnvService {
     return new Promise((resolve: any) => {
       this.cronDb.update(
         { _id: { $in: ids } },
-        { $set: { status: EnvStatus.noacquired } },
+        { $set: { status: EnvStatus.normal } },
         { multi: true },
         async (err, num) => {
           await this.set_envs();

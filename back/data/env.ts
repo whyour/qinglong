@@ -12,7 +12,7 @@ export class Env {
     this.value = options.value;
     this._id = options._id;
     this.created = options.created || new Date().valueOf();
-    this.status = options.status || EnvStatus.noacquired;
+    this.status = options.status || EnvStatus.normal;
     this.timestamp = new Date().toString();
     this.position = options.position;
     this.name = options.name;
@@ -21,11 +21,8 @@ export class Env {
 }
 
 export enum EnvStatus {
-  'noacquired',
   'normal',
   'disabled',
-  'invalid',
-  'abnormal',
 }
 
 export const initEnvPosition = 9999999999;

@@ -241,7 +241,7 @@ const Env = () => {
                 `${record.status === Status.已禁用 ? '启用' : '禁用'}成功`,
               );
               const newStatus =
-                record.status === Status.已禁用 ? Status.未获取 : Status.已禁用;
+                record.status === Status.已禁用 ? Status.已启用 : Status.已禁用;
               const result = [...value];
               result.splice(index, 1, {
                 ...record,
