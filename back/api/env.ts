@@ -13,7 +13,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.envs('', { position: -1 });
+        const data = await envService.envs(req.query.searchValue as string);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);

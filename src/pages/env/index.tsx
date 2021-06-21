@@ -8,6 +8,7 @@ import {
   Space,
   Typography,
   Tooltip,
+  Input,
 } from 'antd';
 import {
   EditOutlined,
@@ -26,6 +27,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
 
 const { Text } = Typography;
+const { Search } = Input;
 
 enum Status {
   '已启用',
@@ -198,11 +200,12 @@ const Env = () => {
   const [isEditNameModalVisible, setIsEditNameModalVisible] = useState(false);
   const [editedEnv, setEditedEnv] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [searchText, setSearchText] = useState('');
 
   const getEnvs = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}envs`)
+      .get(`${config.apiPrefix}envs?searchValue=${searchText}`)
       .then((data: any) => {
         setValue(data.data);
       })
@@ -409,6 +412,14 @@ const Env = () => {
     setIsEditNameModalVisible(true);
   };
 
+  const onSearch = (value: string) => {
+    setSearchText(value);
+  };
+
+  useEffect(() => {
+    getEnvs();
+  }, [searchText]);
+
   useEffect(() => {
     if (document.body.clientWidth < 768) {
       setWidth('auto');
@@ -419,7 +430,6 @@ const Env = () => {
       setMarginLeft(0);
       setMarginTop(-72);
     }
-    getEnvs();
   }, []);
 
   return (
@@ -427,6 +437,13 @@ const Env = () => {
       className="env-wrapper"
       title="环境变量"
       extra={[
+        <Search
+          placeholder="请输入名称/值/备注"
+          style={{ width: 'auto' }}
+          enterButton
+          loading={loading}
+          onSearch={onSearch}
+        />,
         <Button key="2" type="primary" onClick={() => addEnv()}>
           添加Env
         </Button>,
