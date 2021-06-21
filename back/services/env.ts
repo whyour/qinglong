@@ -109,7 +109,7 @@ export default class EnvService {
   }
 
   public async envs(
-    searchText?: string,
+    searchText: string = '',
     sort: any = { position: -1 },
     query: any = {},
   ): Promise<Env[]> {
