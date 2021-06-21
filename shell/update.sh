@@ -262,7 +262,7 @@ update_qinglong() {
     fix_config
 
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
-    reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
+    reset_romote_url ${dir_root} "${github_proxy_url}"https://github.com/strawferry/qinglong-static.git
     git_pull_scripts $dir_root
 
     if [[ $exit_status -eq 0 ]]; then
@@ -277,7 +277,7 @@ update_qinglong() {
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
 
-    local url="${github_proxy_url}https://github.com/whyour/qinglong-static.git"
+    local url="${github_proxy_url}"https://github.com/strawferry/qinglong-static.git
     if [ -d ${ql_static_repo}/.git ]; then
         reset_romote_url ${ql_static_repo} ${url}
         cd ${ql_static_repo}
