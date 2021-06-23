@@ -426,9 +426,6 @@ main() {
     rmlog)
         . $dir_shell/rmlog.sh "$p2" | tee $log_path
         ;;
-    code)
-        . $dir_shell/code.sh
-        ;;
     bot)
         . $dir_shell/bot.sh
         ;;
