@@ -12,6 +12,8 @@ define_program() {
         which_program="node"
     elif [[ $p1 == *.py ]]; then
         which_program="python3"
+    elif [[ $p1 == *.sh ]]; then
+        which_program="bash"
     else
         which_program=""
     fi
