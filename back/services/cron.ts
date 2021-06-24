@@ -8,6 +8,7 @@ import fs from 'fs';
 import cron_parser from 'cron-parser';
 import { getFileContentByName } from '../config/util';
 import PQueue from 'p-queue';
+import { promises, existsSync } from 'fs';
 
 @Service()
 export default class CronService {
@@ -275,8 +276,22 @@ export default class CronService {
   }
 
   public async log(_id: string) {
-    let logFile = `${config.manualLogPath}${_id}.log`;
-    return getFileContentByName(logFile);
+    const doc = await this.get(_id);
+    const commandStr = doc.command.split(' ')[1];
+    const start =
+      commandStr.lastIndexOf('/') !== -1 ? commandStr.lastIndexOf('/') + 1 : 0;
+    const end =
+      commandStr.lastIndexOf('.') !== -1
+        ? commandStr.lastIndexOf('.')
+        : commandStr.length;
+    const logPath = commandStr.substring(start, end);
+    let logDir = `${config.logPath}${logPath}`;
+    if (existsSync(logDir)) {
+      const files = await promises.readdir(logDir);
+      return getFileContentByName(`${logDir}/${files[files.length - 1]}`);
+    } else {
+      return '';
+    }
   }
 
   private make_command(tab: Crontab) {
