@@ -108,7 +108,8 @@ run_concurrent() {
     local array=($(echo $envs | sed 's/&/ /g'))
     cd $dir_scripts
     define_program "$p1"
-    log_dir="$dir_log/${p1%%.*}"
+    log_dir_tmp="${p1##*/}"
+    log_dir="$dir_log/${log_dir_tmp%%.*}"
     make_dir $log_dir
     log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n"
