@@ -187,12 +187,6 @@ export default class CronService {
       this.logger.silly('ID: ' + _id);
       this.logger.silly('Original command: ' + command);
 
-      let logFile = `${config.manualLogPath}${_id}.log`;
-      fs.writeFileSync(
-        logFile,
-        `开始执行... ${new Date().toLocaleString()}\n\n`,
-      );
-
       let cmdStr = command;
       if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {
         cmdStr = `task ${cmdStr}`;
@@ -200,50 +194,17 @@ export default class CronService {
       if (cmdStr.endsWith('.js')) {
         cmdStr = `${cmdStr} now`;
       }
-      const cmd = spawn(cmdStr, { shell: true });
-
+      const cp = exec(cmdStr, (err, stdout, stderr) => {
+        this.cronDb.update(
+          { _id },
+          { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+        );
+        resolve();
+      });
       this.cronDb.update(
         { _id },
-        { $set: { status: CrontabStatus.running, pid: cmd.pid } },
+        { $set: { status: CrontabStatus.running, pid: cp.pid } },
       );
-
-      cmd.stdout.on('data', (data) => {
-        this.logger.silly(`stdout: ${data}`);
-        fs.appendFileSync(logFile, data);
-      });
-
-      cmd.stderr.on('data', (data) => {
-        this.logger.silly(`stderr: ${data}`);
-        fs.appendFileSync(logFile, data);
-      });
-
-      cmd.on('close', (code) => {
-        this.logger.silly(`child process exited with code ${code}`);
-        this.cronDb.update(
-          { _id },
-          { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
-        );
-      });
-
-      cmd.on('error', (err) => {
-        this.logger.info(err);
-        fs.appendFileSync(logFile, err.stack);
-      });
-
-      cmd.on('exit', (code: number, signal: any) => {
-        this.logger.silly(`cmd exit ${code}`);
-        this.cronDb.update(
-          { _id },
-          { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
-        );
-        fs.appendFileSync(logFile, `\n执行结束...`);
-        resolve();
-      });
-
-      process.on('SIGINT', function () {
-        fs.appendFileSync(logFile, `\n执行结束...`);
-        resolve();
-      });
     });
   }
 
