@@ -18,7 +18,9 @@ export class Crontab {
     this.saved = options.saved;
     this._id = options._id;
     this.created = options.created;
-    this.status = options.status || CrontabStatus.idle;
+    this.status = CrontabStatus[options.status]
+      ? options.status
+      : CrontabStatus.idle;
     this.timestamp = new Date().toString();
     this.isSystem = options.isSystem || 0;
     this.pid = options.pid;
