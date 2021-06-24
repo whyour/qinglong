@@ -10,7 +10,6 @@ dir_repo=$dir_root/repo
 dir_raw=$dir_root/raw
 dir_log=$dir_root/log
 dir_db=$dir_root/db
-dir_manual_log=$dir_root/manual_log
 dir_list_tmp=$dir_log/.tmp
 dir_code=$dir_log/code
 dir_update_log=$dir_log/update
@@ -146,7 +145,6 @@ fix_config() {
     make_dir $dir_config
     make_dir $dir_log
     make_dir $dir_db
-    make_dir $dir_manual_log
     make_dir $dir_scripts
     make_dir $dir_list_tmp
     make_dir $dir_repo

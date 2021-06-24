@@ -89,10 +89,15 @@ run_normal() {
     make_dir "$log_dir"
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1$" | perl -pe "s|.*ID=(.*) $cmd_task $p1$|\1|" | xargs | sed 's/ /","/g')
+    local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "开始执行... $begin_time\n" >> $log_path
     update_cron_status "\"$id\"" "0"
-    timeout $command_timeout_time $which_program $p1 2>&1 | tee $log_path
+    timeout $command_timeout_time $which_program $p1 2>&1 | tee -a $log_path
     . $file_task_after
     update_cron_status "\"$id\"" "1"
+    local end_time=$(date '+%Y-%m-%d %H:%M:%S')
+    local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
+    echo -e "\n执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
