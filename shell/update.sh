@@ -397,18 +397,18 @@ main() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     case $p1 in
     update)
-        echo -e "开始执行... $begin_time\n" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         update_qinglong "$2" | tee -a $log_path
         ;;
     extra)
-        echo -e "开始执行... $begin_time\n" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         run_extra_shell | tee -a $log_path
         ;;
     repo)
         get_user_info
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
-        echo -e "开始执行... $begin_time\n" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
             update_repo "$p2" "$p3" "$p4" "$p5" "$p6" | tee -a $log_path
         else
@@ -420,7 +420,7 @@ main() {
         get_user_info
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
-        echo -e "开始执行... $begin_time\n" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
             update_raw "$p2" | tee -a $log_path
         else
@@ -429,15 +429,15 @@ main() {
         fi
         ;;
     rmlog)
-        echo -e "开始执行... $begin_time\n" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         . $dir_shell/rmlog.sh "$p2" | tee -a $log_path
         ;;
     bot)
-        echo -e "开始执行... $begin_time\n" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         . $dir_shell/bot.sh | tee -a $log_path
         ;;
     reset)
-        echo -e "开始执行... $begin_time\n" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         . $dir_shell/reset.sh | tee -a $log_path
         ;;
     *)
@@ -447,7 +447,7 @@ main() {
     esac
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
+    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
 }
 
 main "$@"
