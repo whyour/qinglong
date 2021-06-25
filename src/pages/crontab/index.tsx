@@ -492,6 +492,31 @@ const Crontab = () => {
     });
   };
 
+  const removeDuplicate = () => {
+    Modal.confirm({
+      title: '确认去重',
+      content: <>确认删除选中的重复定时任务吗</>,
+      onOk() {
+        request
+          .delete(`${config.apiPrefix}crons/remove-duplicate`, {
+            data: selectedRowIds,
+          })
+          .then((data: any) => {
+            if (data.code === 200) {
+              message.success('批量删除成功');
+              setSelectedRowIds([]);
+              getCrons();
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
   const operateCrons = (operationStatus: number) => {
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
@@ -578,6 +603,13 @@ const Crontab = () => {
         <div style={{ marginBottom: 16 }}>
           <Button type="primary" style={{ marginBottom: 5 }} onClick={delCrons}>
             批量删除
+          </Button>
+          <Button
+            type="primary"
+            style={{ marginLeft: 8, marginBottom: 5 }}
+            onClick={removeDuplicate}
+          >
+            批量去重
           </Button>
           <Button
             type="primary"

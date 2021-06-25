@@ -107,6 +107,26 @@ export default class CronService {
     });
   }
 
+  public async removeDuplicate(ids: string[]) {
+    return new Promise((resolve: any) => {
+      {
+        this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
+          const nameSet = new Set<string>();
+          const removeIdsSet = new Set<string>();
+          docs.forEach((item) => {
+            if (nameSet.has(item.name)) {
+              removeIdsSet.add(item._id);
+            } else {
+              nameSet.add(item.name);
+            }
+          });
+          const removeIds: string[] = Array.from(removeIdsSet);
+          this.remove(removeIds).then(resolve);
+        });
+      }
+    });
+  }
+
   public async crontabs(searchText?: string): Promise<Crontab[]> {
     let query = {};
     if (searchText) {

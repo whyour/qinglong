@@ -191,6 +191,24 @@ export default (app: Router) => {
     },
   );
 
+  route.delete(
+    '/crons/remove-duplicate',
+    celebrate({
+      body: Joi.array().items(Joi.string().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.removeDuplicate(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
   route.get(
     '/crons/import',
     async (req: Request, res: Response, next: NextFunction) => {
