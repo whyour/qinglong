@@ -238,21 +238,33 @@ export default class CronService {
 
   public async log(_id: string) {
     const doc = await this.get(_id);
-    const commandStr = doc.command.split(' ')[1];
-    const start =
-      commandStr.lastIndexOf('/') !== -1 ? commandStr.lastIndexOf('/') + 1 : 0;
-    const end =
-      commandStr.lastIndexOf('.') !== -1
-        ? commandStr.lastIndexOf('.')
-        : commandStr.length;
-    const logPath = commandStr.substring(start, end);
+    const [, commandStr, url] = doc.command.split(' ');
+    let logPath = this.getKey(commandStr);
+    const isQlCommand = doc.command.startsWith('ql ');
+    const key = this.getKey(url) || logPath;
+    if (isQlCommand) {
+      logPath = 'update';
+    }
     let logDir = `${config.logPath}${logPath}`;
     if (existsSync(logDir)) {
-      const files = await promises.readdir(logDir);
+      let files = await promises.readdir(logDir);
+      if (isQlCommand) {
+        files = files.filter((x) => x.includes(key));
+      }
       return getFileContentByName(`${logDir}/${files[files.length - 1]}`);
     } else {
       return '';
     }
+  }
+
+  private getKey(command: string) {
+    const start =
+      command.lastIndexOf('/') !== -1 ? command.lastIndexOf('/') + 1 : 0;
+    const end =
+      command.lastIndexOf('.') !== -1
+        ? command.lastIndexOf('.')
+        : command.length;
+    return command.substring(start, end);
   }
 
   private make_command(tab: Crontab) {
