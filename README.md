@@ -8,24 +8,26 @@
 
 <div align="center">
 
-python和javaScript的定时任务管理面板
+Python 和 JavaScript 定时任务管理面板
 
-[![donate][donate-image]][donate-url] [![build status][build-status-image]][build-status-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker version][docker-version-image]][docker-version-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url]
+[![docker version][docker-version-image]][docker-version-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url] [![donate][donate-image]][donate-url]
 
-[donate-image]: https://img.shields.io/badge/donate-wechat-green?style=for-the-badge
+[donate-image]: https://img.shields.io/badge/donate-wechat-green?style=flat
 [donate-url]: https://qinglong.whyour.cn/nice.png
-[build-status-image]: https://img.shields.io/docker/cloud/build/whyour/qinglong?style=for-the-badge
-[build-status-url]: https://img.shields.io/docker/cloud/build/whyour/qinglong
-[docker-pulls-image]: https://img.shields.io/docker/pulls/whyour/qinglong?style=for-the-badge
+[docker-pulls-image]: https://img.shields.io/docker/pulls/whyour/qinglong?style=flat
 [docker-pulls-url]: https://hub.docker.com/r/whyour/qinglong
-[docker-version-image]: https://img.shields.io/docker/v/whyour/qinglong?style=for-the-badge
+[docker-version-image]: https://img.shields.io/docker/v/whyour/qinglong?style=flat
 [docker-version-url]: https://hub.docker.com/r/whyour/qinglong/tags?page=1&ordering=last_updated
-[docker-stars-image]: https://img.shields.io/docker/stars/whyour/qinglong?style=for-the-badge
+[docker-stars-image]: https://img.shields.io/docker/stars/whyour/qinglong?style=flat
 [docker-stars-url]: https://hub.docker.com/r/whyour/qinglong
-[docker-image-size-image]: https://img.shields.io/docker/image-size/whyour/qinglong?style=for-the-badge
+[docker-image-size-image]: https://img.shields.io/docker/image-size/whyour/qinglong?style=flat
 [docker-image-size-url]: https://hub.docker.com/r/whyour/qinglong
-
 </div>
+
+<p align="center">
+  <img width="40%" src="https://image.whyour.cn/others/20210626154835.png">
+  <img width="40%" src="https://image.whyour.cn/others/20210626154753.png">
+</p>
 
 青龙，又名苍龙，在中国传统文化中是四象之一、[天之四灵](https://zh.wikipedia.org/wiki/%E5%A4%A9%E4%B9%8B%E5%9B%9B%E7%81%B5)之一，根据五行学说，它是代表东方的灵兽，为青色的龙，五行属木，代表的季节是春季，八卦主震。苍龙与应龙一样，都是身具羽翼。《张果星宗》称“又有辅翼，方为真龙”。
 
@@ -46,19 +48,3 @@ python和javaScript的定时任务管理面板
 * [Umijs3.0](https://umijs.org)
 
 * [darkreader](https://github.com/darkreader/darkreader)
-
-## 免责声明
-
-1. 此仓储脚本仅用于学习研究，不保证其合法性、准确性、有效性，请根据情况自行判断，本人对此不承担任何保证责任。
-
-2. 由于此仓储脚本仅用于学习研究，您必须在下载后 24 小时内将所有内容从您的计算机或手机或任何存储设备中完全删除，若违反规定引起任何事件本人对此均不负责。
-
-3. 请勿将此仓储脚本用于任何商业或非法目的，若违反规定请自行对此负责。
-
-4. 此仓储脚本涉及应用与本人无关，本人对因此引起的任何隐私泄漏或其他后果不承担任何责任。
-
-5. 本人对任何脚本引发的问题概不负责，包括但不限于由脚本错误引起的任何损失和损害。
-
-6. 如果任何单位或个人认为此仓储脚本可能涉嫌侵犯其权利，应及时通知并提供身份证明，所有权证明，我们将在收到认证文件确认后删除此仓储脚本。
-
-7. 所有直接或间接使用、查看此仓储脚本的人均应该仔细阅读此声明。本人保留随时更改或补充此声明的权利。一旦您使用或复制了此仓储脚本，即视为您已接受此免责声明。
