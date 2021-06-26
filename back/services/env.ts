@@ -218,7 +218,9 @@ export default class EnvService {
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
-        env_string += `export ${key}="${_.map(group, 'value').join('&')}"\n`;
+        env_string += `export ${key}="${_.map(group, 'value')
+          .join('&')
+          .replaceAll(' ', '')}"\n`;
       }
     }
     fs.writeFileSync(config.envFile, env_string);
