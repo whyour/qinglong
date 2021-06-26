@@ -23,7 +23,7 @@ const EnvModal = ({
       data: payload,
     });
     if (code === 200) {
-      message.success(env ? '更新Env成功' : '添加Env成功');
+      message.success(env ? '更新变量成功' : '添加变量成功');
     } else {
       message.error(data);
     }
@@ -37,7 +37,7 @@ const EnvModal = ({
 
   return (
     <Modal
-      title={env ? '编辑Env' : '新建Env'}
+      title={env ? '编辑变量' : '新建变量'}
       visible={visible}
       forceRender
       onOk={() => {
