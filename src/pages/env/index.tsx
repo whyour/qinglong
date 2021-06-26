@@ -274,7 +274,7 @@ const Env = () => {
       title: '确认删除',
       content: (
         <>
-          确认删除Env{' '}
+          确认删除变量{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.value}
           </Text>{' '}
@@ -365,7 +365,7 @@ const Env = () => {
   const delEnvs = () => {
     Modal.confirm({
       title: '确认删除',
-      content: <>确认删除选中的Env吗</>,
+      content: <>确认删除选中的变量吗</>,
       onOk() {
         request
           .delete(`${config.apiPrefix}envs`, { data: selectedRowIds })
@@ -388,7 +388,7 @@ const Env = () => {
   const operateEnvs = (operationStatus: number) => {
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
-      content: <>确认{OperationName[operationStatus]}选中的Env吗</>,
+      content: <>确认{OperationName[operationStatus]}选中的变量吗</>,
       onOk() {
         request
           .put(`${config.apiPrefix}envs/${OperationPath[operationStatus]}`, {
