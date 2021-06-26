@@ -303,7 +303,7 @@ const Env = () => {
 
   const handleCancel = (env?: any[]) => {
     setIsModalVisible(false);
-    handleEnv(env);
+    env && handleEnv(env);
   };
 
   const handleEditNameCancel = (env?: any[]) => {
@@ -445,7 +445,7 @@ const Env = () => {
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addEnv()}>
-          添加Env
+          添加变量
         </Button>,
       ]}
       header={{
