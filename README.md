@@ -25,8 +25,8 @@ Python 和 JavaScript 定时任务管理面板
 </div>
 
 <p align="center">
-  <img width="49%" src="https://image.whyour.cn/others/20210626154835.png">
-  <img width="49%" src="https://image.whyour.cn/others/20210626154753.png">
+  <img width="49%" src="https://qinglong.whyour.cn/login.png">
+  <img width="49%" src="https://qinglong.whyour.cn/home.png">
 </p>
 
 青龙，又名苍龙，在中国传统文化中是四象之一、[天之四灵](https://zh.wikipedia.org/wiki/%E5%A4%A9%E4%B9%8B%E5%9B%9B%E7%81%B5)之一，根据五行学说，它是代表东方的灵兽，为青色的龙，五行属木，代表的季节是春季，八卦主震。苍龙与应龙一样，都是身具羽翼。《张果星宗》称“又有辅翼，方为真龙”。
