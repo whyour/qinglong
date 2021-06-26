@@ -33,7 +33,7 @@ const EnvModal = ({
 
   useEffect(() => {
     form.resetFields();
-  }, [env]);
+  }, [env, visible]);
 
   return (
     <Modal
@@ -52,15 +52,8 @@ const EnvModal = ({
       }}
       onCancel={() => handleCancel()}
       confirmLoading={loading}
-      destroyOnClose
     >
-      <Form
-        form={form}
-        layout="vertical"
-        name="env_modal"
-        preserve={false}
-        initialValues={env}
-      >
+      <Form form={form} layout="vertical" name="env_modal" initialValues={env}>
         <Form.Item
           name="name"
           label="名称"

@@ -34,7 +34,7 @@ const EditNameModal = ({
 
   useEffect(() => {
     form.resetFields();
-  }, [ids]);
+  }, [ids, visible]);
 
   return (
     <Modal
@@ -53,14 +53,8 @@ const EditNameModal = ({
       }}
       onCancel={() => handleCancel()}
       confirmLoading={loading}
-      destroyOnClose
     >
-      <Form
-        form={form}
-        layout="vertical"
-        name="edit_name_modal"
-        preserve={false}
-      >
+      <Form form={form} layout="vertical" name="edit_name_modal">
         <Form.Item
           name="name"
           rules={[{ required: true, message: '请输入新的环境变量名称' }]}
