@@ -36,12 +36,8 @@ const CronModal = ({
   };
 
   useEffect(() => {
-    if (cron) {
-      form.setFieldsValue(cron);
-    } else {
-      form.resetFields();
-    }
-  }, [cron]);
+    form.resetFields();
+  }, [cron, visible]);
 
   return (
     <Modal
@@ -60,9 +56,13 @@ const CronModal = ({
       }}
       onCancel={() => handleCancel()}
       confirmLoading={loading}
-      destroyOnClose
     >
-      <Form form={form} layout="vertical" name="form_in_modal" preserve={false}>
+      <Form
+        form={form}
+        layout="vertical"
+        name="form_in_modal"
+        initialValues={cron}
+      >
         <Form.Item name="name" label="名称">
           <Input placeholder="请输入任务名称" />
         </Form.Item>
