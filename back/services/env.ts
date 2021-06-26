@@ -220,7 +220,7 @@ export default class EnvService {
         const group = groups[key];
         env_string += `export ${key}="${_.map(group, 'value')
           .join('&')
-          .replaceAll(' ', '')}"\n`;
+          .replace(/ /g, '')}"\n`;
       }
     }
     fs.writeFileSync(config.envFile, env_string);
