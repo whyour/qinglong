@@ -241,7 +241,9 @@ export default class CronService {
     const [, commandStr, url] = doc.command.split(' ');
     let logPath = this.getKey(commandStr);
     const isQlCommand = doc.command.startsWith('ql ');
-    const key = (url && this.getKey(url)) || logPath;
+    const key =
+      (url && ['repo', 'raw'].includes(commandStr) && this.getKey(url)) ||
+      logPath;
     if (isQlCommand) {
       logPath = 'update';
     }
