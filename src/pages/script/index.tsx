@@ -19,6 +19,12 @@ function getFilterData(keyword: string, data: any) {
   return { tree: data };
 }
 
+const LangMap: any = {
+  '.py': 'python',
+  '.js': 'javascript',
+  '.sh': 'shell',
+};
+
 const Script = () => {
   const [width, setWidth] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
@@ -30,25 +36,28 @@ const Script = () => {
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
+  const [mode, setMode] = useState('');
 
   const getScripts = () => {
-    request.get(`${config.apiPrefix}scripts/files`).then((data) => {
-      setData(data.data);
-      setFilterData(data.data);
-    });
-  };
-
-  const getDetail = (node: any) => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}scripts/${node.value}`)
+      .get(`${config.apiPrefix}scripts/files`)
       .then((data) => {
-        setValue(data.data);
+        setData(data.data);
+        setFilterData(data.data);
       })
       .finally(() => setLoading(false));
   };
 
+  const getDetail = (node: any) => {
+    request.get(`${config.apiPrefix}scripts/${node.value}`).then((data) => {
+      setValue(data.data);
+    });
+  };
+
   const onSelect = (value: any, node: any) => {
+    const newMode = LangMap[value.slice(-3)] || '';
+    setMode(newMode);
     setSelect(value);
     setTitle(node.parent || node.value);
     getDetail(node);
@@ -86,6 +95,7 @@ const Script = () => {
     <PageContainer
       className="ql-container-wrapper log-wrapper"
       title={title}
+      loading={loading}
       extra={
         isPhone && [
           <TreeSelect
@@ -136,7 +146,7 @@ const Script = () => {
             lineWrapping: true,
             styleActiveLine: true,
             matchBrackets: true,
-            mode: 'shell',
+            mode,
             readOnly: true,
           }}
           onBeforeChange={(editor, data, value) => {

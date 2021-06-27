@@ -65,6 +65,7 @@ const Config = () => {
     <PageContainer
       className="ql-container-wrapper config-wrapper"
       title={title}
+      loading={loading}
       extra={[
         <TreeSelect
           className="config-select"
