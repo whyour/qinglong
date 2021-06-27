@@ -170,7 +170,6 @@ const Log = () => {
             lineWrapping: true,
             styleActiveLine: true,
             matchBrackets: true,
-            mode: 'shell',
             readOnly: true,
           }}
           onBeforeChange={(editor, data, value) => {

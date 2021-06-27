@@ -10,7 +10,6 @@ import defaultProps from './defaultProps';
 import { Link, history } from 'umi';
 import { LogoutOutlined } from '@ant-design/icons';
 import config from '@/utils/config';
-import 'codemirror/mode/shell/shell.js';
 import { request } from '@/utils/http';
 import './index.less';
 import vhCheck from 'vh-check';
