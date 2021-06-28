@@ -242,8 +242,6 @@ update_qinglong() {
         echo
     fi
 
-    fix_config
-
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
@@ -295,15 +293,15 @@ reload_pm2() {
     pm2 l >/dev/null 2>&1
     
     if [[ $(pm2 info panel 2>/dev/null) ]]; then
-        pm2 reload panel >/dev/null 2>&1
+        pm2 reload panel --source-map-support --time >/dev/null 2>&1
     else
-        pm2 start $dir_root/build/app.js -n panel >/dev/null 2>&1
+        pm2 start $dir_root/build/app.js -n panel --source-map-support --time >/dev/null 2>&1
     fi
 
     if [[ $(pm2 info schedule 2>/dev/null) ]]; then
-        pm2 reload schedule >/dev/null 2>&1
+        pm2 reload schedule --source-map-support --time >/dev/null 2>&1
     else
-        pm2 start $dir_root/build/schedule.js -n schedule >/dev/null 2>&1
+        pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time >/dev/null 2>&1
     fi
 }
 
@@ -436,9 +434,9 @@ main() {
         echo -e "## 开始执行... $begin_time\n" >> $log_path
         . $dir_shell/bot.sh | tee -a $log_path
         ;;
-    reset)
+    check)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        . $dir_shell/reset.sh | tee -a $log_path
+        . $dir_shell/check.sh | tee -a $log_path
         ;;
     *)
         echo -e "命令输入错误...\n"
