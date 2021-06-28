@@ -213,7 +213,6 @@ npm_install_sub() {
     elif ! type pnpm >/dev/null 2>&1; then
         npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
     else
-        echo -e "检测到本机安装了 pnpm，使用 pnpm 替代 ...\n"
         pnpm install --prod
     fi
 }
