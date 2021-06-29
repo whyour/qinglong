@@ -5,8 +5,6 @@ dir_shell=/ql/shell
 . $dir_shell/api.sh
 get_token
 
-panelLogPath="/root/.pm2/logs/panel-error.log"
-
 reset_env() {
   echo -e "---> 1. 开始检测配置文件\n"
   fix_config
@@ -50,8 +48,8 @@ pm2_log() {
   echo -e "---> pm2日志"
   local panelOut="/root/.pm2/logs/panel-out.log"
   local panelError="/root/.pm2/logs/panel-error.log"
-  tail -n 10 "$panelOut"
-  tail -n 10 "$panelError"
+  tail -n 20 "$panelOut"
+  tail -n 20 "$panelError"
 }
 
 check_nginx() {
@@ -98,8 +96,20 @@ check_pm2() {
   fi
 }
 
+init_git() {
+  local dir_current=$(pwd)
+
+  cd $dir_root
+  git config --global user.email "qinglong@@users.noreply.github.com"
+  git config --global user.name "qinglong"
+  git config --global pull.rebase true
+
+  cd $dir_current
+}
+
 main() {
   echo -e "=====> 开始检测"
+  init_git
   check_ql
   check_pm2
   echo -e "\n=====> 检测结束\n"
