@@ -91,8 +91,8 @@ check_pm2() {
   if [[ $api =~ "{\"code\"" ]]; then
     echo -e "=====> 后台服务启动正常\n"
   else
-    echo -e "=====> 后台服务异常，重启后台\n"
-    reload_pm2
+    echo -e "=====> 后台服务异常，重置基础环境并重启后台\n"
+    reset_env
   fi
 }
 
@@ -112,6 +112,7 @@ main() {
   init_git
   check_ql
   check_pm2
+  reload_pm2
   echo -e "\n=====> 检测结束\n"
 }
 
