@@ -18,7 +18,7 @@ export default ({ app }: { app: Application }) => {
     }),
   );
   app.use((req, res, next) => {
-    if (req.url && req.url.includes('/api/login')) {
+    if (req.url && req.path.includes('/api/login')) {
       return next();
     }
     const data = fs.readFileSync(config.authConfigFile, 'utf8');

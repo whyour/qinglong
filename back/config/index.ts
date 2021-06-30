@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { createRandomString } from './util';
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -34,7 +35,7 @@ if (configFound.error) {
 export default {
   port: parseInt(process.env.PORT as string, 10),
   cronPort: parseInt(process.env.CRON_PORT as string, 10),
-  secret: process.env.SECRET,
+  secret: process.env.SECRET || createRandomString(16, 32),
   logs: {
     level: process.env.LOG_LEVEL || 'silly',
   },
