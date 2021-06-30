@@ -37,13 +37,13 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && cp -f .env.example .env \
     && chmod 777 ${QL_DIR}/shell/*.sh \
     && chmod 777 ${QL_DIR}/docker/*.sh \
+    && npm install -g pm2 \
+    && npm install -g pnpm \
+    && rm -rf /root/.npm \
     && pnpm install \
     && pnpm build \
     && pnpm build-back \
     && rm -rf node_modules \
-    && npm install -g pm2 \
-    && npm install -g pnpm \
-    && rm -rf /root/.npm \
     && pnpm install --prod \
     && rm -rf /root/.pnpm-store
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
