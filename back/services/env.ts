@@ -19,7 +19,7 @@ export default class EnvService {
   public async create(payload: Env): Promise<Env> {
     const envs = await this.envs();
     let position = initEnvPosition;
-    if (envs && envs.length > 0) {
+    if (envs && envs.length > 0 && envs[envs.length - 1].position) {
       position = envs[envs.length - 1].position;
     }
     const tab = new Env({ ...payload, position: position / 2 });
