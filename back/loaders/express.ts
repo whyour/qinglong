@@ -5,6 +5,7 @@ import routes from '../api';
 import config from '../config';
 import jwt from 'express-jwt';
 import fs from 'fs';
+import { getToken } from '../config/util';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -22,10 +23,10 @@ export default ({ app }: { app: Application }) => {
       return next();
     }
     const data = fs.readFileSync(config.authConfigFile, 'utf8');
-    const authHeader = req.headers.authorization;
+    const headerToken = getToken(req);
     if (data) {
       const { token } = JSON.parse(data);
-      if (token && authHeader.includes(token)) {
+      if (token && headerToken === token) {
         return next();
       }
     }
