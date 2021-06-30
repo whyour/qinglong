@@ -19,9 +19,6 @@ export default ({ app }: { app: Application }) => {
     }),
   );
   app.use((req, res, next) => {
-    if (req.url && req.path.includes('/api/login')) {
-      return next();
-    }
     const data = fs.readFileSync(config.authConfigFile, 'utf8');
     const headerToken = getToken(req);
     if (data) {
@@ -29,6 +26,9 @@ export default ({ app }: { app: Application }) => {
       if (token && headerToken === token) {
         return next();
       }
+    }
+    if (!headerToken && req.url && req.path === '/api/login') {
+      return next();
     }
     const err: any = new Error('UnauthorizedError');
     err['status'] = 401;
