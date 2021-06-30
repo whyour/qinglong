@@ -54,7 +54,7 @@ pm2_log() {
 
 check_nginx() {
   local nginxPid=$(ps -ef | grep nginx | grep -v grep)
-  echo -e "---> nginx服务\n$nginxPid"
+  echo -e "=====> 检测nginx服务\n$nginxPid"
   if [[ $nginxPid ]]; then
     echo -e "\n=====> nginx服务正常\n"
   else
@@ -68,7 +68,6 @@ check_ql() {
   echo -e "\n=====> 检测面板\n\n$api\n"
   if [[ $api =~ "<div id=\"root\"></div>" ]]; then
     echo -e "=====> 面板服务启动正常\n"
-    check_nginx
   else
     echo -e "=====> 面板服务异常，重置基础环境\n"
     reset_env
@@ -111,6 +110,7 @@ main() {
   echo -e "=====> 开始检测"
   init_git
   check_ql
+  check_nginx
   check_pm2
   reload_pm2
   echo -e "\n=====> 检测结束\n"
