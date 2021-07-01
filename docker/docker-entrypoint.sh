@@ -10,11 +10,15 @@ cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
 pm2 l >/dev/null 2>&1
 echo
 
-echo -e "======================2. 启动nginx========================\n"
+echo -e "======================2. 安装依赖========================\n"
+update_depend
+echo
+
+echo -e "======================3. 启动nginx========================\n"
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 echo -e "nginx启动成功...\n"
 
-echo -e "======================3. 启动控制面板========================\n"
+echo -e "======================4. 启动控制面板========================\n"
 if [[ $(pm2 info panel 2>/dev/null) ]]; then
   pm2 reload panel --source-map-support --time
 else
@@ -22,7 +26,7 @@ else
 fi
 echo -e "控制面板启动成功...\n"
 
-echo -e "======================4. 启动定时任务========================\n"
+echo -e "======================5. 启动定时任务========================\n"
 if [[ $(pm2 info schedule 2>/dev/null) ]]; then
   pm2 reload schedule --source-map-support --time
 else
@@ -31,12 +35,12 @@ fi
 echo -e "定时任务启动成功...\n"
 
 if [[ $AutoStartBot == true ]]; then
-  echo -e "======================5. 启动bot========================\n"
+  echo -e "======================6. 启动bot========================\n"
   ql bot
 fi
 
 if [[ $EnableExtraShell == true ]]; then
-  echo -e "======================6. 执行自定义脚本========================\n"
+  echo -e "======================7. 执行自定义脚本========================\n"
   ql extra
 fi
 
