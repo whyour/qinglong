@@ -17,7 +17,7 @@ add_cron_api() {
     fi
 
     local api=$(
-        curl -s "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
             -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
@@ -52,7 +52,7 @@ update_cron_api() {
     fi
 
     local api=$(
-        curl -s "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
             -X 'PUT' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
@@ -84,7 +84,7 @@ update_cron_command_api() {
     fi
 
     local api=$(
-        curl -s "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
             -X 'PUT' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
@@ -109,7 +109,7 @@ del_cron_api() {
     local ids=$1
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
             -X 'DELETE' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
@@ -133,7 +133,7 @@ del_cron_api() {
 get_user_info() {
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s "http://localhost:5600/api/user?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://localhost:5600/api/user?t=$currentTimeStamp" \
             -H 'Accept: */*' \
             -H "Authorization: Bearer $token" \
             -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36' \
@@ -153,7 +153,7 @@ update_cron_status() {
     local status=$2
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s "http://localhost:5600/api/crons/status?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://localhost:5600/api/crons/status?t=$currentTimeStamp" \
             -X 'PUT' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
