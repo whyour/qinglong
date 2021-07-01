@@ -27,7 +27,7 @@ export default ({ app }: { app: Application }) => {
         return next();
       }
     }
-    if (!headerToken && req.url && req.path === '/api/login') {
+    if (!headerToken && req.path && req.path === '/api/login') {
       return next();
     }
     const err: any = new Error('UnauthorizedError');
