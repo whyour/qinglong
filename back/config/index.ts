@@ -15,6 +15,7 @@ const authConfigFile = path.join(rootPath, 'config/auth.json');
 const extraFile = path.join(rootPath, 'config/extra.sh');
 const configPath = path.join(rootPath, 'config/');
 const scriptPath = path.join(rootPath, 'scripts/');
+const samplePath = path.join(rootPath, 'sample/');
 const logPath = path.join(rootPath, 'log/');
 const authError = '错误的用户名密码，请重试';
 const loginFaild = '请先登录!';
@@ -58,5 +59,6 @@ export default {
   envDbFile,
   configPath,
   scriptPath,
+  samplePath,
   blackFileList: ['auth.json', 'config.sh.sample', 'cookie.sh', 'crontab.list'],
 };
