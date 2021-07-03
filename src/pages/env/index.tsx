@@ -124,19 +124,14 @@ const Env = () => {
       key: 'value',
       align: 'center' as const,
       width: '45%',
+      ellipsis: {
+        showTitle: false,
+      },
       render: (text: string, record: any) => {
         return (
-          <span
-            style={{
-              textAlign: 'left',
-              display: 'inline-block',
-              wordBreak: 'break-all',
-              cursor: 'text',
-              width: '100%',
-            }}
-          >
-            {text}
-          </span>
+          <Tooltip placement="topLeft" title={text}>
+            <span>{text}</span>
+          </Tooltip>
         );
       },
     },
@@ -166,29 +161,36 @@ const Env = () => {
       title: '操作',
       key: 'action',
       align: 'center' as const,
-      render: (text: string, record: any, index: number) => (
-        <Space size="middle">
-          <Tooltip title="编辑">
-            <a onClick={() => editEnv(record, index)}>
-              <EditOutlined />
-            </a>
-          </Tooltip>
-          <Tooltip title={record.status === Status.已禁用 ? '启用' : '禁用'}>
-            <a onClick={() => enabledOrDisabledEnv(record, index)}>
-              {record.status === Status.已禁用 ? (
-                <CheckCircleOutlined />
-              ) : (
-                <StopOutlined />
-              )}
-            </a>
-          </Tooltip>
-          <Tooltip title="删除">
-            <a onClick={() => deleteEnv(record, index)}>
-              <DeleteOutlined />
-            </a>
-          </Tooltip>
-        </Space>
-      ),
+      render: (text: string, record: any, index: number) => {
+        const isPc = width === '100%';
+        return (
+          <Space size="middle">
+            <Tooltip title={isPc ? '编辑' : ''}>
+              <a onClick={() => editEnv(record, index)}>
+                <EditOutlined />
+              </a>
+            </Tooltip>
+            <Tooltip
+              title={
+                isPc ? (record.status === Status.已禁用 ? '启用' : '禁用') : ''
+              }
+            >
+              <a onClick={() => enabledOrDisabledEnv(record, index)}>
+                {record.status === Status.已禁用 ? (
+                  <CheckCircleOutlined />
+                ) : (
+                  <StopOutlined />
+                )}
+              </a>
+            </Tooltip>
+            <Tooltip title={isPc ? '删除' : ''}>
+              <a onClick={() => deleteEnv(record, index)}>
+                <DeleteOutlined />
+              </a>
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
   const [width, setWidth] = useState('100%');
