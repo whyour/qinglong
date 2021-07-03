@@ -36,9 +36,16 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const content = getFileContentByName(
-          `${config.configPath}${req.params.file}`,
-        );
+        let content = '';
+        if (req.params.file.includes('sample')) {
+          content = getFileContentByName(
+            `${config.samplePath}${req.params.file}`,
+          );
+        } else {
+          content = getFileContentByName(
+            `${config.configPath}${req.params.file}`,
+          );
+        }
         res.send({ code: 200, data: content });
       } catch (e) {
         logger.error('🔥 error: %o', e);
