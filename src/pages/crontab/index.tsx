@@ -137,42 +137,45 @@ const Crontab = () => {
       title: '操作',
       key: 'action',
       align: 'center' as const,
-      render: (text: string, record: any, index: number) => (
-        <Space size="middle">
-          {record.status === CrontabStatus.idle && (
-            <Tooltip title="运行">
+      render: (text: string, record: any, index: number) => {
+        const isPc = width === '100%';
+        return (
+          <Space size="middle">
+            {record.status === CrontabStatus.idle && (
+              <Tooltip title={isPc ? '运行' : ''}>
+                <a
+                  onClick={() => {
+                    runCron(record, index);
+                  }}
+                >
+                  <PlayCircleOutlined />
+                </a>
+              </Tooltip>
+            )}
+            {record.status !== CrontabStatus.idle && (
+              <Tooltip title={isPc ? '停止' : ''}>
+                <a
+                  onClick={() => {
+                    stopCron(record, index);
+                  }}
+                >
+                  <PauseCircleOutlined />
+                </a>
+              </Tooltip>
+            )}
+            <Tooltip title={isPc ? '日志' : ''}>
               <a
                 onClick={() => {
-                  runCron(record, index);
+                  setLogCron({ ...record, timestamp: Date.now() });
                 }}
               >
-                <PlayCircleOutlined />
+                <FileTextOutlined />
               </a>
             </Tooltip>
-          )}
-          {record.status !== CrontabStatus.idle && (
-            <Tooltip title="停止">
-              <a
-                onClick={() => {
-                  stopCron(record, index);
-                }}
-              >
-                <PauseCircleOutlined />
-              </a>
-            </Tooltip>
-          )}
-          <Tooltip title="日志">
-            <a
-              onClick={() => {
-                setLogCron({ ...record, timestamp: Date.now() });
-              }}
-            >
-              <FileTextOutlined />
-            </a>
-          </Tooltip>
-          <MoreBtn key="more" record={record} index={index} />
-        </Space>
-      ),
+            <MoreBtn key="more" record={record} index={index} />
+          </Space>
+        );
+      },
     },
   ];
 

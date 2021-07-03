@@ -12,13 +12,13 @@ const initData = [
       6,
       1,
     ).toString()} * * *`,
-    status: CrontabStatus.disabled,
+    isDisabled: 1,
   },
   {
     name: '删除日志',
     command: 'ql rmlog 7',
     schedule: '30 7 */7 * *',
-    status: CrontabStatus.disabled,
+    isDisabled: 1,
   },
 ];
 
@@ -29,7 +29,7 @@ export default async () => {
 
   cronDb.count({}, async (err, count) => {
     if (count === 0) {
-      const data = initData.map((x) => {
+      const data = initData.map((x: any) => {
         const tab = new Crontab(x);
         tab.created = new Date().valueOf();
         tab.saved = false;
