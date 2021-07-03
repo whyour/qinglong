@@ -123,7 +123,7 @@ const Env = () => {
       dataIndex: 'value',
       key: 'value',
       align: 'center' as const,
-      width: '45%',
+      width: '40%',
       ellipsis: {
         showTitle: false,
       },
@@ -164,7 +164,7 @@ const Env = () => {
       render: (text: string, record: any, index: number) => {
         const isPc = width === '100%';
         return (
-          <Space size="middle">
+          <Space size="middle" style={{ paddingLeft: 8 }}>
             <Tooltip title={isPc ? '编辑' : ''}>
               <a onClick={() => editEnv(record, index)}>
                 <EditOutlined />
