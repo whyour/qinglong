@@ -445,9 +445,7 @@ const Crontab = () => {
     request
       .get(`${config.apiPrefix}crons/${cron._id}`)
       .then((data: any) => {
-        console.log(value);
         const index = value.findIndex((x) => x._id === cron._id);
-        console.log(index);
         const result = [...value];
         result.splice(index, 1, {
           ...cron,
