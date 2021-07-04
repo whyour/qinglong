@@ -87,7 +87,7 @@ run_normal() {
     log_path="$log_dir/$log_time.log"
     make_dir "$log_dir"
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1$" | perl -pe "s|.*ID=(.*) $cmd_task $p1$|\1|" | head -1 | awk -F " " '{print $1}')
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" | tee -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
@@ -121,7 +121,7 @@ run_concurrent() {
     log_path="$log_dir/$log_time.log"
     make_dir $log_dir
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1$" | perl -pe "s|.*ID=(.*) $cmd_task $p1$|\1|" | head -1 | awk -F " " '{print $1}')
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" | tee -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
@@ -150,7 +150,7 @@ run_else() {
     log_path="$log_dir/$log_time.log"
     make_dir "$log_dir"
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1$" | perl -pe "s|.*ID=(.*) $cmd_task $p1$|\1|" | head -1 | awk -F " " '{print $1}')
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" | tee -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
