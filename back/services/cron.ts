@@ -87,11 +87,18 @@ export default class CronService {
   public async status({
     ids,
     status,
+    pid,
+    log_path,
   }: {
     ids: string[];
     status: CrontabStatus;
+    pid: number;
+    log_path: string;
   }) {
-    this.cronDb.update({ _id: { $in: ids } }, { $set: { status } });
+    this.cronDb.update(
+      { _id: { $in: ids } },
+      { $set: { status, pid, log_path } },
+    );
   }
 
   public async remove(ids: string[]) {
@@ -158,17 +165,26 @@ export default class CronService {
   public async stop(ids: string[]) {
     return new Promise((resolve: any) => {
       this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
+        for (const doc of docs) {
+          if (doc.pid) {
+            try {
+              process.kill(-doc.pid);
+            } catch (error) {
+              this.logger.silly(error);
+            }
+          }
+          if (doc.log_path) {
+            fs.appendFileSync(
+              `${config.logPath}${doc.log_path}`,
+              `\n## 执行结束...  ${new Date().toLocaleString()} `,
+            );
+          }
+        }
         this.cronDb.update(
           { _id: { $in: ids } },
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
         );
-        const pids = docs
-          .map((x) => x.pid)
-          .filter((x) => !!x)
-          .join('\n');
-        exec(`echo - e "${pids}" | xargs kill - 9`, (err) => {
-          resolve();
-        });
+        resolve();
       });
     });
   }
@@ -194,17 +210,19 @@ export default class CronService {
       if (cmdStr.endsWith('.js')) {
         cmdStr = `${cmdStr} now`;
       }
-      const cp = exec(cmdStr, (err, stdout, stderr) => {
+
+      const cp = spawn(cmdStr, { shell: true, detached: true });
+      this.cronDb.update(
+        { _id },
+        { $set: { status: CrontabStatus.running, pid: cp.pid } },
+      );
+      cp.on('close', (code) => {
         this.cronDb.update(
           { _id },
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
         );
         resolve();
       });
-      this.cronDb.update(
-        { _id },
-        { $set: { status: CrontabStatus.running, pid: cp.pid } },
-      );
     });
   }
 
@@ -238,6 +256,9 @@ export default class CronService {
 
   public async log(_id: string) {
     const doc = await this.get(_id);
+    if (doc.log_path) {
+      return getFileContentByName(`${config.logPath}/${doc.log_path}`);
+    }
     const [, commandStr, url] = doc.command.split(' ');
     let logPath = this.getKey(commandStr);
     const isQlCommand = doc.command.startsWith('ql ');

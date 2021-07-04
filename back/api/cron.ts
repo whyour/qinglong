@@ -232,6 +232,8 @@ export default (app: Router) => {
       body: Joi.object({
         ids: Joi.array().items(Joi.string().required()),
         status: Joi.string().required(),
+        pid: Joi.string().optional(),
+        log_path: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -241,6 +243,7 @@ export default (app: Router) => {
         const data = await cronService.status({
           ...req.body,
           status: parseInt(req.body.status),
+          pid: parseInt(req.body.pid) || '',
         });
         return res.send({ code: 200, data });
       } catch (e) {
