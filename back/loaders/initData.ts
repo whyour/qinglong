@@ -45,16 +45,11 @@ export default async () => {
     }
   });
 
-  // patch更新面板任务状态
-  cronDb.find({ name: '更新面板' }).exec((err, docs) => {
-    const doc = docs[0];
-    if (doc && doc.status === CrontabStatus.running) {
-      cronDb.update(
-        { name: '更新面板' },
-        { $set: { status: CrontabStatus.idle } },
-      );
-    }
-  });
+  // 初始化更新所有任务状态为空闲
+  cronDb.update(
+    { status: CrontabStatus.running },
+    { $set: { status: CrontabStatus.idle } },
+  );
 
   // 初始化时执行一次所有的ql repo 任务
   cronDb
