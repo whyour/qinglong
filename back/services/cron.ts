@@ -257,7 +257,7 @@ export default class CronService {
   public async log(_id: string) {
     const doc = await this.get(_id);
     if (doc.log_path) {
-      return getFileContentByName(`${config.logPath}/${doc.log_path}`);
+      return getFileContentByName(`${doc.log_path}`);
     }
     const [, commandStr, url] = doc.command.split(' ');
     let logPath = this.getKey(commandStr);
