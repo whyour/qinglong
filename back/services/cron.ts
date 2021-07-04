@@ -175,7 +175,7 @@ export default class CronService {
           }
           if (doc.log_path) {
             fs.appendFileSync(
-              `${config.logPath}${doc.log_path}`,
+              `${doc.log_path}`,
               `\n## 执行结束...  ${new Date().toLocaleString()} `,
             );
           }
