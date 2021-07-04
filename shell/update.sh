@@ -72,7 +72,7 @@ del_cron() {
     local ids=""
     echo -e "开始尝试自动删除失效的定时任务...\n"
     for cron in $(cat $list_drop); do
-        local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron" | perl -pe "s|.*ID=(.*) $cmd_task $cron|\1|" | xargs | sed 's/ /","/g' | head -1)
+        local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron" | perl -pe "s|.*ID=(.*) $cmd_task $cron\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
         if [[ $ids ]]; then
             ids="$ids,\"$id\""
         else
@@ -179,7 +179,7 @@ update_raw() {
         echo -e "下载 ${raw_file_name} 成功...\n"
         cd $dir_raw
         local filename="raw_${raw_file_name}"
-        local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task $filename" | perl -pe "s|.*ID=(.*) $cmd_task $filename\.*|\1|" | head -1)
+        local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task $filename" | perl -pe "s|.*ID=(.*) $cmd_task $filename\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
         cp -f $raw_file_name $dir_scripts/${filename}
         cron_line=$(
             perl -ne "{
@@ -376,7 +376,7 @@ gen_list_repo() {
         filename=$(basename $file)
         cp -f $file $dir_scripts/${repo}_${filename}
         echo ${repo}_${filename} >>"$dir_list_tmp/${repo}_scripts.list"
-        cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${author}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|" | head -1)
+        cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${author}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
         if [[ $cron_id ]]; then
             result=$(update_cron_command_api "$cmd_task ${repo}_${filename}:$cron_id")
         fi

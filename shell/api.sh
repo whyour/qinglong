@@ -148,9 +148,11 @@ get_user_info() {
     fi
 }
 
-update_cron_status() {
-    local ids=$1
-    local status=$2
+update_cron() {
+    local ids="$1"
+    local status="$2"
+    local pid="${3:-''}"
+    local logPath="$4"
     local currentTimeStamp=$(date +%s)
     local api=$(
         curl -s --noproxy "*" "http://localhost:5600/api/crons/status?t=$currentTimeStamp" \
@@ -162,15 +164,15 @@ update_cron_status() {
             -H "Origin: http://localhost:5700" \
             -H "Referer: http://localhost:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
-            --data-raw "{\"ids\":[$ids],\"status\":\"$status\"}" \
+            --data-raw "{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\"}" \
             --compressed
     )
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "更新任务状态成功"
+        echo -e "更新任务状态成功"  | tee -a $log_path
     else
-        echo -e "更新任务状态失败(${message})"
+        echo -e "更新任务状态失败(${message})"  | tee -a $log_path
     fi
 }
 

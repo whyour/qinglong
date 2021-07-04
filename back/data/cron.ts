@@ -10,6 +10,7 @@ export class Crontab {
   isSystem?: 1 | 0;
   pid?: number;
   isDisabled?: 1 | 0;
+  log_path?: string;
 
   constructor(options: Crontab) {
     this.name = options.name;
@@ -25,6 +26,7 @@ export class Crontab {
     this.isSystem = options.isSystem || 0;
     this.pid = options.pid;
     this.isDisabled = options.isDisabled || 0;
+    this.log_path = options.log_path || '';
   }
 }
 
