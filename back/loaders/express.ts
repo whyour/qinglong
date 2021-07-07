@@ -30,6 +30,13 @@ export default ({ app }: { app: Application }) => {
     if (!headerToken && req.path && req.path === '/api/login') {
       return next();
     }
+    const remoteAddress = req.socket.remoteAddress;
+    if (
+      remoteAddress === '::ffff:127.0.0.1' &&
+      req.path === '/api/crons/status'
+    ) {
+      return next();
+    }
     const err: any = new Error('UnauthorizedError');
     err['status'] = 401;
     next(err);
