@@ -211,18 +211,17 @@ export default class CronService {
         cmdStr = `${cmdStr} now`;
       }
 
-      const cp = spawn(cmdStr, { shell: true, detached: true });
-      this.cronDb.update(
-        { _id },
-        { $set: { status: CrontabStatus.running, pid: cp.pid } },
-      );
-      cp.on('close', (code) => {
+      const cp = exec(cmdStr, (err, stdout, stderr) => {
         this.cronDb.update(
           { _id },
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
         );
         resolve();
       });
+      this.cronDb.update(
+        { _id },
+        { $set: { status: CrontabStatus.running, pid: cp.pid } },
+      );
     });
   }
 
