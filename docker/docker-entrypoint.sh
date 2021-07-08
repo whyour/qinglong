@@ -36,12 +36,14 @@ echo -e "定时任务启动成功...\n"
 
 if [[ $AutoStartBot == true ]]; then
   echo -e "======================6. 启动bot========================\n"
-  ql bot
+  nohup ql bot >>$dir_log/start.log 2>&1 &
+  echo -e "bot后台启动中...\n"
 fi
 
 if [[ $EnableExtraShell == true ]]; then
   echo -e "======================7. 执行自定义脚本========================\n"
-  ql extra
+  nohup ql extra >>$dir_log/start.log 2>&1 &
+  echo -e "自定义脚本后台执行中...\n"
 fi
 
 echo -e "############################################################\n"
