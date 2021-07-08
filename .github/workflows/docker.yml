@@ -1,6 +1,12 @@
-name: Publish Docker Image
+name: PublishDockerImage
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - BuildStatic
+    branches:
+      - master
+    types:
+      - completed
 
 jobs:
   build:
