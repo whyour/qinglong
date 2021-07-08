@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# 导入通用变量与函数
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
