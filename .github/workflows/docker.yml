@@ -28,12 +28,10 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          echo ${{ github.event.head_commit.message }}
           echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
 
       - name: Docker buildx image and push on master branch
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        if: "contains(github.event.head_commit.message, 'docker')"
         run: |
           docker buildx build --build-arg SSH_PRIVATE_KEY="${SSH_PRIVATE_KEY}" --output "type=image,push=true" --platform=linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/s390x --tag whyour/qinglong:latest docker/
