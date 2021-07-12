@@ -15,7 +15,7 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
   app.use(
     jwt({ secret: config.secret as string, algorithms: ['HS384'] }).unless({
-      path: ['/api/login'],
+      path: ['/api/login', '/api/crons/status'],
     }),
   );
   app.use((req, res, next) => {

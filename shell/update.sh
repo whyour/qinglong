@@ -234,15 +234,9 @@ usage() {
 
 ## 更新qinglong
 update_qinglong() {
-    local no_restart="$1"
-    echo -e "--------------------------------------------------------------\n"
-    if [ -f /ql/db/cookie.db ]; then
-        echo -e "检测到旧的db文件，拷贝为新db...\n"
-        mv /ql/db/cookie.db /ql/db/env.db
-        rm /ql/db/cookie.db
-        echo
-    fi
+    patch_version
 
+    local no_restart="$1"
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
@@ -272,9 +266,8 @@ update_qinglong() {
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
-        cd $ql_static_repo
-        commit_id=$(git rev-parse --short HEAD)
-        echo -e "\n当前静态资源版本 $commit_id...\n"
+        local static_version=$(cat /ql/src/version.ts | perl -pe "s|.*\'(.*)\';\.*|\1|" | head -1)
+        echo -e "\n当前版本 $static_version...\n"
         cd $dir_root
         rm -rf $dir_root/build && rm -rf $dir_root/dist
         cp -rf $ql_static_repo/* $dir_root
@@ -288,6 +281,20 @@ update_qinglong() {
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
 
+}
+
+patch_version() {
+    if [ -f /ql/db/cookie.db ]; then
+        echo -e "检测到旧的db文件，拷贝为新db...\n"
+        mv /ql/db/cookie.db /ql/db/env.db
+        rm /ql/db/cookie.db
+        echo
+    fi
+
+    if ! type ts-node >/dev/null 2>&1; then
+        pnpm i -g ts-node
+        pnpm i -g typescript
+    fi
 }
 
 reload_pm2() {
