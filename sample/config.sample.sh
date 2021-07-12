@@ -46,6 +46,8 @@ export PUSH_KEY=""
 export BARK_PUSH=""
 ## 下方填写推送声音设置，例如choo，具体值请在bark-推送铃声-查看所有铃声
 export BARK_SOUND=""
+## 下方填写推送消息分组，默认为"QingLong"
+export BARK_GROUP="QingLong"
 
 ## 3. Telegram 
 ## 下方填写自己申请@BotFather的Token，如10xxx4:AAFcqxxxxgER5uw
