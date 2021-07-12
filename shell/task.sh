@@ -93,19 +93,11 @@ run_normal() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" | tee -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    if [[ $(. $file_task_before) ]]; then
-        . $file_task_before
-    else
-        echo -e "## task_before执行失败，自行检查\n" | tee -a $log_path
-    fi
+    . $file_task_before
 
     timeout $command_timeout_time $which_program $p1 2>&1 | tee -a $log_path
 
-    if [[ $(. $file_task_after) ]]; then
-        . $file_task_after
-    else
-        echo -e "## task_after执行失败，自行检查\n" | tee -a $log_path
-    fi
+    . $file_task_after
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -135,11 +127,8 @@ run_concurrent() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" | tee -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    if [[ $(. $file_task_before) ]]; then
-        . $file_task_before
-    else
-        echo -e "## task_before执行失败，自行检查\n" | tee -a $log_path
-    fi
+    . $file_task_before
+
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n" | tee -a $log_path
 
     single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
@@ -149,11 +138,7 @@ run_concurrent() {
         timeout $command_timeout_time $which_program $p1 &>$single_log_path &
     done
 
-    if [[ $(. $file_task_after) ]]; then
-        . $file_task_after
-    else
-        echo -e "## task_after执行失败，自行检查\n" | tee -a $log_path
-    fi
+    . $file_task_after
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -172,19 +157,11 @@ run_else() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" | tee -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    if [[ $(. $file_task_before) ]]; then
-        . $file_task_before
-    else
-        echo -e "## task_before执行失败，自行检查\n" | tee -a $log_path
-    fi
+    . $file_task_before
 
     timeout $command_timeout_time "$@" 2>&1 | tee -a $log_path
 
-    if [[ $(. $file_task_after) ]]; then
-        . $file_task_after
-    else
-        echo -e "## task_after执行失败，自行检查\n" | tee -a $log_path
-    fi
+    . $file_task_after
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
