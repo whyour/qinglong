@@ -32,6 +32,8 @@ let SCKEY = '';
 let BARK_PUSH = '';
 //BARK app推送铃声,铃声列表去APP查看复制填写
 let BARK_SOUND = '';
+//BARK app推送消息的分组, 默认为"QingLong"
+let BARK_GROUP = 'QingLong';
 
 // =======================================telegram机器人通知设置区域===========================================
 //此处填你telegram bot 的Token，telegram机器人通知推送必填项.例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw
@@ -116,6 +118,9 @@ if (process.env.BARK_PUSH) {
   }
   if (process.env.BARK_SOUND) {
     BARK_SOUND = process.env.BARK_SOUND;
+  }
+  if (process.env.BARK_GROUP) {
+    BARK_GROUP = process.env.BARK_GROUP;
   }
 } else {
   if (
@@ -371,7 +376,7 @@ function BarkNotify(text, desp, params = {}) {
       const options = {
         url: `${BARK_PUSH}/${encodeURIComponent(text)}/${encodeURIComponent(
           desp,
-        )}?sound=${BARK_SOUND}&${querystring.stringify(params)}`,
+        )}?sound=${BARK_SOUND}&group=${BARK_GROUP}&${querystring.stringify(params)}`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
