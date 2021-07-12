@@ -4,7 +4,8 @@ import { Logger } from 'winston';
 import * as fs from 'fs';
 import config from '../config';
 import jwt from 'jsonwebtoken';
-import { createPassword } from '../config/util';
+import { createRandomString } from '../config/util';
+import crypto from 'crypto';
 const route = Router();
 
 export default (app: Router) => {
@@ -24,7 +25,7 @@ export default (app: Router) => {
               authInfo.username === 'admin' &&
               authInfo.password === 'adminadmin'
             ) {
-              const newPassword = createPassword(16, 22);
+              const newPassword = createRandomString(16, 22);
               fs.writeFileSync(
                 config.authConfigFile,
                 JSON.stringify({
@@ -41,11 +42,11 @@ export default (app: Router) => {
               username == authInfo.username &&
               password == authInfo.password
             ) {
-              let token = jwt.sign(
-                { username, password },
-                config.secret as any,
-                { expiresIn: 60 * 60 * 24 * 7, algorithm: 'HS384' },
-              );
+              const data = createRandomString(50, 100);
+              let token = jwt.sign({ data }, config.secret as any, {
+                expiresIn: 60 * 60 * 24 * 3,
+                algorithm: 'HS384',
+              });
               fs.writeFileSync(
                 config.authConfigFile,
                 JSON.stringify({

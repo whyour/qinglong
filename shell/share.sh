@@ -10,7 +10,6 @@ dir_repo=$dir_root/repo
 dir_raw=$dir_root/raw
 dir_log=$dir_root/log
 dir_db=$dir_root/db
-dir_manual_log=$dir_root/manual_log
 dir_list_tmp=$dir_log/.tmp
 dir_code=$dir_log/code
 dir_update_log=$dir_log/update
@@ -18,12 +17,15 @@ ql_static_repo=$dir_repo/static
 
 ## 文件
 file_config_sample=$dir_sample/config.sample.sh
-file_cookie=$dir_config/cookie.sh
+file_env=$dir_config/env.sh
 file_sharecode=$dir_config/sharecode.sh
 file_config_user=$dir_config/config.sh
 file_auth_sample=$dir_sample/auth.sample.json
 file_auth_user=$dir_config/auth.json
 file_extra_shell=$dir_config/extra.sh
+file_task_before=$dir_config/task_before.sh
+file_task_after=$dir_config/task_after.sh
+file_task_sample=$dir_sample/task.sample.sh
 file_extra_sample=$dir_sample/extra.sample.sh
 file_notify_js_sample=$dir_sample/notify.js
 file_notify_py_sample=$dir_sample/notify.py
@@ -53,14 +55,11 @@ original_name=(
 ## 导入配置文件
 import_config() {
     [ -f $file_config_user ] && . $file_config_user
-    user_sum=0
-    for line in $(cat $file_cookie); do
-        let user_sum+=1
-        eval Cookie${user_sum}="\"${line}\""
-    done
+    [ -f $file_env ] && . $file_env
 
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     github_proxy_url=${GithubProxyUrl:-""}
+    file_extensions=${RepoFileExtensions:-"js py"}
 }
 
 ## 创建目录，$1：目录的绝对路径
@@ -146,7 +145,6 @@ fix_config() {
     make_dir $dir_config
     make_dir $dir_log
     make_dir $dir_db
-    make_dir $dir_manual_log
     make_dir $dir_scripts
     make_dir $dir_list_tmp
     make_dir $dir_repo
@@ -159,9 +157,21 @@ fix_config() {
         echo
     fi
 
-    if [ ! -f $file_cookie ]; then
-        echo -e "检测到config配置目录下不存在cookie.sh，创建一个空文件用于初始化...\n"
-        touch $file_cookie
+    if [ ! -f $file_env ]; then
+        echo -e "检测到config配置目录下不存在env.sh，创建一个空文件用于初始化...\n"
+        touch $file_env
+        echo
+    fi
+
+    if [ ! -f $file_task_before ]; then
+        echo -e "复制一份 $file_task_sample 为 $file_task_before\n"
+        cp -fv $file_task_sample $file_task_before
+        echo
+    fi
+
+    if [ ! -f $file_task_after ]; then
+        echo -e "复制一份 $file_task_sample 为 $file_task_after\n"
+        cp -fv $file_task_sample $file_task_after
         echo
     fi
 
@@ -203,7 +213,6 @@ npm_install_sub() {
     elif ! type pnpm >/dev/null 2>&1; then
         npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
     else
-        echo -e "检测到本机安装了 pnpm，使用 pnpm 替代 ...\n"
         pnpm install --prod
     fi
 }
@@ -275,14 +284,33 @@ git_clone_scripts() {
 ## 更新脚本，$1：仓库保存路径
 git_pull_scripts() {
     local dir_current=$(pwd)
-    local dir_work=$1
+    local dir_work="$1"
+    local branch="$2"
+    [[ $branch ]] && local cmd="origin/${branch}"
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
     git fetch --all
     exit_status=$?
-    git reset --hard
+    git reset --hard $cmd
     git pull
     cd $dir_current
+}
+
+## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
+reset_romote_url() {
+    local dir_current=$(pwd)
+    local dir_work=$1
+    local url=$2
+    local branch="$3"
+
+    [[ $branch ]] && local cmd="origin/${branch}"
+
+    if [ -d "$dir_work/.git" ]; then
+        cd $dir_work
+        git remote set-url origin $url >/dev/null
+        git reset --hard $cmd >/dev/null
+        cd $dir_current
+    fi
 }
 
 ## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件

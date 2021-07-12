@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { Container } from 'typedi';
 import { Crontab, CrontabStatus } from '../data/cron';
 import CronService from '../services/cron';
-import CookieService from '../services/cookie';
+import EnvService from '../services/env';
 
 const initData = [
   {
@@ -12,30 +12,24 @@ const initData = [
       6,
       1,
     ).toString()} * * *`,
-    status: CrontabStatus.disabled,
+    isDisabled: 1,
   },
   {
     name: '删除日志',
     command: 'ql rmlog 7',
     schedule: '30 7 */7 * *',
-    status: CrontabStatus.idle,
-  },
-  {
-    name: '互助码',
-    command: 'ql code',
-    schedule: '30 7 * * *',
-    status: CrontabStatus.idle,
+    isDisabled: 1,
   },
 ];
 
 export default async () => {
   const cronService = Container.get(CronService);
-  const cookieService = Container.get(CookieService);
+  const envService = Container.get(EnvService);
   const cronDb = cronService.getDb();
 
   cronDb.count({}, async (err, count) => {
     if (count === 0) {
-      const data = initData.map((x) => {
+      const data = initData.map((x: any) => {
         const tab = new Crontab(x);
         tab.created = new Date().valueOf();
         tab.saved = false;
@@ -51,16 +45,11 @@ export default async () => {
     }
   });
 
-  // patch更新面板任务状态
-  cronDb.find({ name: '更新面板' }).exec((err, docs) => {
-    const doc = docs[0];
-    if (doc && doc.status === CrontabStatus.running) {
-      cronDb.update(
-        { name: '更新面板' },
-        { $set: { status: CrontabStatus.idle } },
-      );
-    }
-  });
+  // 初始化更新所有任务状态为空闲
+  cronDb.update(
+    { status: CrontabStatus.running },
+    { $set: { status: CrontabStatus.idle } },
+  );
 
   // 初始化时执行一次所有的ql repo 任务
   cronDb
@@ -70,7 +59,9 @@ export default async () => {
     .exec((err, docs) => {
       for (let i = 0; i < docs.length; i++) {
         const doc = docs[i];
-        exec(doc.command);
+        if (doc && doc.isDisabled !== 1) {
+          exec(doc.command);
+        }
       }
     });
 
@@ -95,7 +86,7 @@ export default async () => {
 
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
-  await cookieService.set_cookies();
+  await envService.set_envs();
 };
 
 function randomSchedule(from: number, to: number) {

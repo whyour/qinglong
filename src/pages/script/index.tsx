@@ -7,85 +7,60 @@ import { request } from '@/utils/http';
 import styles from './index.module.less';
 
 function getFilterData(keyword: string, data: any) {
-  const expandedKeys: string[] = [];
   if (keyword) {
     const tree: any = [];
     data.forEach((item: any) => {
       if (item.title.toLocaleLowerCase().includes(keyword)) {
         tree.push(item);
-        expandedKeys.push(...item.children.map((x: any) => x.key));
-      } else {
-        const children: any[] = [];
-        (item.children || []).forEach((subItem: any) => {
-          if (subItem.title.toLocaleLowerCase().includes(keyword)) {
-            children.push(subItem);
-          }
-        });
-        if (children.length > 0) {
-          tree.push({
-            ...item,
-            children,
-          });
-          expandedKeys.push(...children.map((x) => x.key));
-        }
       }
     });
-    return { tree, expandedKeys };
+    return { tree };
   }
-  return { tree: data, expandedKeys };
+  return { tree: data };
 }
 
-const Log = () => {
+const LangMap: any = {
+  '.py': 'python',
+  '.js': 'javascript',
+  '.sh': 'shell',
+};
+
+const Script = () => {
   const [width, setWidth] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
-  const [title, setTitle] = useState('请选择日志文件');
-  const [value, setValue] = useState('请选择日志文件');
+  const [title, setTitle] = useState('请选择脚本文件');
+  const [value, setValue] = useState('请选择脚本文件');
   const [select, setSelect] = useState();
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
+  const [mode, setMode] = useState('');
 
-  const getConfig = () => {
-    request.get(`${config.apiPrefix}logs`).then((data) => {
-      const result = formatData(data.dirs) as any;
-      setData(result);
-      setFilterData(result);
-    });
-  };
-
-  const formatData = (tree: any[]) => {
-    return tree.map((x) => {
-      x.title = x.name;
-      x.value = x.name;
-      x.disabled = x.isDir;
-      x.key = x.name;
-      x.children = x.files.map((y: string) => ({
-        title: y,
-        value: `${x.name}/${y}`,
-        key: `${x.name}/${y}`,
-        parent: x.name,
-        isLeaf: true,
-      }));
-      return x;
-    });
-  };
-
-  const getLog = (node: any) => {
+  const getScripts = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}logs/${node.value}`)
+      .get(`${config.apiPrefix}scripts/files`)
       .then((data) => {
-        setValue(data.data);
+        setData(data.data);
+        setFilterData(data.data);
       })
       .finally(() => setLoading(false));
   };
 
+  const getDetail = (node: any) => {
+    request.get(`${config.apiPrefix}scripts/${node.value}`).then((data) => {
+      setValue(data.data);
+    });
+  };
+
   const onSelect = (value: any, node: any) => {
+    const newMode = LangMap[value.slice(-3)] || '';
+    setMode(newMode);
     setSelect(value);
     setTitle(node.parent || node.value);
-    getLog(node);
+    getDetail(node);
   };
 
   const onTreeSelect = useCallback((keys: Key[], e: any) => {
@@ -113,13 +88,14 @@ const Log = () => {
       setMarginTop(-72);
       setIsPhone(false);
     }
-    getConfig();
+    getScripts();
   }, []);
 
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
       title={title}
+      loading={loading}
       extra={
         isPhone && [
           <TreeSelect
@@ -127,7 +103,7 @@ const Log = () => {
             value={select}
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
             treeData={data}
-            placeholder="请选择日志文件"
+            placeholder="请选择脚本文件"
             showSearch
             key="value"
             onSelect={onSelect}
@@ -170,6 +146,7 @@ const Log = () => {
             lineWrapping: true,
             styleActiveLine: true,
             matchBrackets: true,
+            mode,
             readOnly: true,
           }}
           onBeforeChange={(editor, data, value) => {
@@ -182,4 +159,4 @@ const Log = () => {
   );
 };
 
-export default Log;
+export default Script;

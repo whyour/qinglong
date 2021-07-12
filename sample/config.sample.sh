@@ -1,6 +1,6 @@
-## Version: v2.2.0
-## Date: 2021-06-07
-## Update Content: session管理增加批量操作\n增加go-cqhttp通知方式\n修复页面标题
+## Version: v2.8.0
+## Date: 2021-06-20
+## Update Content: 可持续发展纲要\n1. session管理破坏性修改\n2. 配置管理可编辑config下文件\n3. 自定义脚本改为查看脚本\n4. 移除互助相关
 
 ## 上面版本号中，如果第2位数字有变化，那么代表增加了新的参数，如果只有第3位数字有变化，仅代表更新了注释，没有增加新的参数，可更新可不更新
 
@@ -9,6 +9,9 @@ AutoDelCron="true"
 
 ## 在运行 ql repo 命令时，是否自动增加新的本地定时任务
 AutoAddCron="true"
+
+## ql repo命令拉取脚本时需要拉取的文件后缀，直接写文件后缀名即可
+RepoFileExtensions="js py"
 
 ## 由于github仓库拉取较慢，所以会默认添加代理前缀，如不需要请移除
 GithubProxyUrl="https://ghproxy.com/"
@@ -25,16 +28,6 @@ RandomDelay="300"
 
 ## 如果你自己会写shell脚本，并且希望在每次运行 ql update 命令时，额外运行你的 shell 脚本，请赋值为 "true"，默认为true
 EnableExtraShell="true"
-
-## 自动按顺序进行账号间互助（选填） 设置为 true 时，将直接导入code最新日志来进行互助
-AutoHelpOther=""
-
-## 定义 jcode 脚本导出的互助码模板样式（选填）
-## 不填 使用“按编号顺序助力模板”，Cookie编号在前的优先助力
-## 填 0 使用“全部一致助力模板”，所有账户要助力的码全部一致
-## 填 1 使用“均等机会助力模板”，所有账户获得助力次数一致
-## 填 2 使用“随机顺序助力模板”，本套脚本内账号间随机顺序助力，每次生成的顺序都不一致。
-HelpType=""
 
 ## 是否自动启动bot，默认不启动，设置为true时自动启动，目前需要自行克隆bot仓库所需代码，存到ql/repo目录下，文件夹命名为dockerbot
 AutoStartBot=""
@@ -113,95 +106,5 @@ export PUSH_PLUS_USER=""
 export GOBOT_URL=""
 export GOBOT_TOKEN=""
 export GOBOT_QQ=""
-
-## 如果只是想要屏蔽某个ck不执行某个脚本，可以参考下面 case 这个命令的例子来控制，脚本名称包含后缀
-## case $1 in
-##   test.js)
-##     TempBlockCookie="5"
-##     ;;
-## esac
-
-## 需组合的环境变量列表，env_name需要和var_name一一对应，如何有新活动按照格式添加(不懂勿动)
-env_name=(
-  JD_COOKIE
-  FRUITSHARECODES
-  PETSHARECODES
-  PLANT_BEAN_SHARECODES
-  DREAM_FACTORY_SHARE_CODES
-  DDFACTORY_SHARECODES
-  JDZZ_SHARECODES
-  JDJOY_SHARECODES
-  JXNC_SHARECODES
-  BOOKSHOP_SHARECODES
-  JD_CASH_SHARECODES
-  JDSGMH_SHARECODES
-  JDCFD_SHARECODES
-  JDHEALTH_SHARECODES
-)
-var_name=(
-  Cookie
-  ForOtherFruit
-  ForOtherPet
-  ForOtherBean
-  ForOtherDreamFactory
-  ForOtherJdFactory
-  ForOtherJdzz
-  ForOtherJoy
-  ForOtherJxnc
-  ForOtherBookShop
-  ForOtherCash
-  ForOtherSgmh
-  ForOtherCfd
-  ForOtherHealth
-)
-
-## name_js为脚本文件名，如果使用ql repo命令拉取，文件名含有作者名
-## 所有有互助码的活动，把脚本名称列在 name_js 中，对应 config.sh 中互助码后缀列在 name_config 中，中文名称列在 name_chinese 中。
-## name_js、name_config 和 name_chinese 中的三个名称必须一一对应。
-name_js=(
-  jd_fruit
-  jd_pet
-  jd_plantBean
-  jd_dreamFactory
-  jd_jdfactory
-  jd_jdzz
-  jd_crazy_joy
-  jd_jxnc
-  jd_bookshop
-  jd_cash
-  jd_sgmh
-  jd_cfd
-  jd_health
-)
-name_config=(
-  Fruit
-  Pet
-  Bean
-  DreamFactory
-  JdFactory
-  Jdzz
-  Joy
-  Jxnc
-  BookShop
-  Cash
-  Sgmh
-  Cfd
-  Health
-)
-name_chinese=(
-  东东农场
-  东东萌宠
-  京东种豆得豆
-  京喜工厂
-  东东工厂
-  京东赚赚
-  crazyJoy任务
-  京喜农场
-  口袋书店
-  签到领现金
-  闪购盲盒
-  京喜财富岛
-  东东健康社区
-)
 
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

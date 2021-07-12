@@ -1,13 +1,10 @@
 @import '~@/styles/variable.less';
 
 @font-face {
-  font-family: 'monospace';
-  src: url('../assets/fonts/monospace.eot?') format('eot'),
-    url('../assets/fonts/monospace.woff') format('woff'),
-    url('../assets/fonts/monospace.ttf') format('truetype'),
-    url('../assets/fonts/monospace.svg#monospace') format('svg');
-  font-weight: normal;
-  font-style: normal;
+  font-family: 'Source Code Pro';
+  src: url('../assets/fonts/SourceCodePro-Regular.ttf.woff2') format('woff2'),
+    url('../assets/fonts/SourceCodePro-Regular.otf.woff') format('woff'),
+    url('../assets/fonts/SourceCodePro-Regular.ttf') format('truetype');
 }
 
 body {
@@ -39,7 +36,18 @@ body {
   }
 }
 
-.session-wrapper {
+.ant-table-cell-ellipsis {
+  text-align: left !important;
+}
+
+.ant-tooltip {
+  max-width: 500px !important;
+  .ant-tooltip-inner {
+    word-break: break-all !important;
+  }
+}
+
+.env-wrapper {
   th {
     white-space: nowrap;
   }
@@ -54,6 +62,25 @@ body {
   }
 }
 
+.config-wrapper {
+  .config-select {
+    width: 250px;
+  }
+  .ant-page-header-heading-left {
+    min-width: 100px;
+  }
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  transition-delay: 99999s;
+  transition: color 99999s ease-out, background-color 99999s ease-out;
+  -webkit-transition-delay: 99999s;
+  -webkit-transition: color 99999s ease-out, background-color 99999s ease-out;
+}
+
 @media (max-width: 768px) {
   .ant-pro-grid-content.wide {
     .ant-pro-page-container-children-content {
@@ -61,6 +88,7 @@ body {
       height: calc(100vh - var(--vh-offset, 0px) - 144px);
     }
   }
+
   .ql-container-wrapper {
     &.crontab-wrapper,
     &.log-wrapper {
@@ -80,5 +108,9 @@ body {
       height: calc(100vh - 176px);
       height: calc(100vh - var(--vh-offset, 0px) - 176px);
     }
+  }
+
+  .ant-tooltip {
+    max-width: 250px !important;
   }
 }

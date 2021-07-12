@@ -5,32 +5,46 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs';
 import { celebrate, Joi } from 'celebrate';
-import { execSync } from 'child_process';
 const route = Router();
 
 export default (app: Router) => {
   app.use('/', route);
+
   route.get(
-    '/config/:key',
+    '/configs/files',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let content = '未找到文件';
-        switch (req.params.key) {
-          case 'config':
-            content = getFileContentByName(config.confFile);
-            break;
-          case 'sample':
-            content = getFileContentByName(config.sampleFile);
-            break;
-          case 'crontab':
-            content = getFileContentByName(config.crontabFile);
-            break;
-          case 'extra':
-            content = getFileContentByName(config.extraFile);
-            break;
-          default:
-            break;
+        const fileList = fs.readdirSync(config.configPath, 'utf-8');
+        res.send({
+          code: 200,
+          data: fileList
+            .filter((x) => !config.blackFileList.includes(x))
+            .map((x) => {
+              return { title: x, value: x };
+            }),
+        });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/configs/:file',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        let content = '';
+        if (req.params.file.includes('sample')) {
+          content = getFileContentByName(
+            `${config.samplePath}${req.params.file}`,
+          );
+        } else {
+          content = getFileContentByName(
+            `${config.configPath}${req.params.file}`,
+          );
         }
         res.send({ code: 200, data: content });
       } catch (e) {
@@ -41,7 +55,7 @@ export default (app: Router) => {
   );
 
   route.post(
-    '/save',
+    '/configs/save',
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
@@ -52,11 +66,8 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const { name, content } = req.body;
-        const path = (config.fileMap as any)[name];
+        const path = `${config.configPath}${name}`;
         fs.writeFileSync(path, content);
-        if (name === 'crontab.list') {
-          execSync(`crontab ${path}`);
-        }
         res.send({ code: 200, msg: '保存成功' });
       } catch (e) {
         logger.error('🔥 error: %o', e);

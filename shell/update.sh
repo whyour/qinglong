@@ -1,27 +1,10 @@
 #!/usr/bin/env bash
 
-# 导入通用变量与函数
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
 send_mark=$dir_shell/send_mark
-
-get_token
-
-## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
-reset_romote_url() {
-    local dir_current=$(pwd)
-    local dir_work=$1
-    local url=$2
-
-    if [ -d "$dir_work/.git" ]; then
-        cd $dir_work
-        git remote set-url origin $url >/dev/null
-        git reset --hard >/dev/null
-        cd $dir_current
-    fi
-}
 
 ## 检测cron的差异，$1：脚本清单文件路径，$2：cron任务清单文件路径，$3：增加任务清单文件路径，$4：删除任务清单文件路径
 diff_cron() {
@@ -88,7 +71,7 @@ del_cron() {
     local ids=""
     echo -e "开始尝试自动删除失效的定时任务...\n"
     for cron in $(cat $list_drop); do
-        local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron$" | perl -pe "s|.*ID=(.*) $cmd_task $cron$|\1|" | xargs | sed 's/ /","/g')
+        local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron" | perl -pe "s|.*ID=(.*) $cmd_task $cron\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
         if [[ $ids ]]; then
             ids="$ids,\"$id\""
         else
@@ -136,6 +119,7 @@ add_cron() {
             cron_name=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
             [[ -z $cron_name ]] && cron_name="$file_name"
             [[ -z $cron_line ]] && cron_line=$(grep "cron:" $file | awk -F ":" '{print $2}' | xargs)
+            [[ -z $cron_line ]] && cron_line=$(grep "cron " $file | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | xargs) 
             [[ -z $cron_line ]] && cron_line="0 6 * * *"
             result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
             echo -e "$result"
@@ -156,6 +140,7 @@ update_repo() {
     local path="$2"
     local blackword="$3"
     local dependence="$4"
+    local branch="$5"
     local urlTmp="${url%*/}"
     local repoTmp="${urlTmp##*/}"
     local repo="${repoTmp%.*}"
@@ -165,11 +150,13 @@ update_repo() {
     local author="${authorTmp2##*.}"
 
     local repo_path="${dir_repo}/${author}_${repo}"
+    [[ $branch ]] && repo_path="${repo_path}_${branch}"
+
     if [ -d ${repo_path}/.git ]; then
-        reset_romote_url ${repo_path} "${github_proxy_url}${url/https:\/\/ghproxy.com\//}"
-        git_pull_scripts ${repo_path}
+        reset_romote_url ${repo_path} "${github_proxy_url}${url/https:\/\/ghproxy.com\//}" "${branch}"
+        git_pull_scripts ${repo_path} "${branch}"
     else
-        git_clone_scripts ${url} ${repo_path}
+        git_clone_scripts ${url} ${repo_path} "${branch}"
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新${repo_path}成功...\n"
@@ -191,7 +178,7 @@ update_raw() {
         echo -e "下载 ${raw_file_name} 成功...\n"
         cd $dir_raw
         local filename="raw_${raw_file_name}"
-        local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task $filename$" | perl -pe "s|.*ID=(.*) $cmd_task $filename$|\1|")
+        local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task $filename" | perl -pe "s|.*ID=(.*) $cmd_task $filename\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
         cp -f $raw_file_name $dir_scripts/${filename}
         cron_line=$(
             perl -ne "{
@@ -206,6 +193,7 @@ update_raw() {
         cron_name=$(grep "new Env" $raw_file_name | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
         [[ -z $cron_name ]] && cron_name="$raw_file_name"
         [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | xargs)
+        [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | xargs) 
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
             result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
@@ -235,19 +223,26 @@ run_extra_shell() {
 ## 脚本用法
 usage() {
     echo -e "本脚本用法："
-    echo -e "1. $cmd_update update                                           # 更新并重启青龙"
-    echo -e "1. $cmd_update extra                                            # 运行自定义脚本"
-    echo -e "3. $cmd_update raw <fileurl>                                    # 更新单个脚本文件"
-    echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence>   # 更新单个仓库的脚本"
-    echo -e "5. $cmd_update rmlog <days>                                     # 删除旧日志"
-    echo -e "6. $cmd_update code                                             # 获取互助码"
-    echo -e "6. $cmd_update bot                                              # 启动tg-bot"
-    echo -e "7. $cmd_update reset                                            # 重置青龙基础环境"
+    echo -e "1. $cmd_update update                                                    # 更新并重启青龙"
+    echo -e "1. $cmd_update extra                                                     # 运行自定义脚本"
+    echo -e "3. $cmd_update raw <fileurl>                                             # 更新单个脚本文件"
+    echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch>   # 更新单个仓库的脚本"
+    echo -e "5. $cmd_update rmlog <days>                                              # 删除旧日志"
+    echo -e "6. $cmd_update bot                                                       # 启动tg-bot"
+    echo -e "7. $cmd_update reset                                                     # 重置青龙基础环境"
 }
 
 ## 更新qinglong
 update_qinglong() {
+    local no_restart="$1"
     echo -e "--------------------------------------------------------------\n"
+    if [ -f /ql/db/cookie.db ]; then
+        echo -e "检测到旧的db文件，拷贝为新db...\n"
+        mv /ql/db/cookie.db /ql/db/env.db
+        rm /ql/db/cookie.db
+        echo
+    fi
+
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
     git_pull_scripts $dir_root
@@ -283,10 +278,12 @@ update_qinglong() {
         cd $dir_root
         rm -rf $dir_root/build && rm -rf $dir_root/dist
         cp -rf $ql_static_repo/* $dir_root
-        echo -e "重启面板中..."
-        nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-        sleep 1
-        reload_pm2
+        if [[ $no_restart != "no-restart" ]]; then
+            echo -e "重启面板中..."
+            nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
+            sleep 1
+            reload_pm2
+        fi
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
@@ -294,16 +291,18 @@ update_qinglong() {
 }
 
 reload_pm2() {
+    pm2 l >/dev/null 2>&1
+    
     if [[ $(pm2 info panel 2>/dev/null) ]]; then
-        pm2 reload panel >/dev/null 2>&1
+        pm2 reload panel --source-map-support --time >/dev/null 2>&1
     else
-        pm2 start $dir_root/build/app.js -n panel >/dev/null 2>&1
+        pm2 start $dir_root/build/app.js -n panel --source-map-support --time >/dev/null 2>&1
     fi
 
     if [[ $(pm2 info schedule 2>/dev/null) ]]; then
-        pm2 reload schedule >/dev/null 2>&1
+        pm2 reload schedule --source-map-support --time >/dev/null 2>&1
     else
-        pm2 start $dir_root/build/schedule.js -n schedule >/dev/null 2>&1
+        pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time >/dev/null 2>&1
     fi
 }
 
@@ -351,7 +350,18 @@ gen_list_repo() {
     rm -f $dir_list_tmp/${repo}*.list >/dev/null 2>&1
 
     cd ${repo_path}
-    files=$(find . -name "*.js" | sed 's/^..//')
+
+    local cmd="find ."
+    local index=0
+    for extension in $file_extensions; do
+        if [[ $index -eq 0 ]]; then
+            cmd="${cmd} -name \"*.${extension}\""
+        else
+            cmd="${cmd} -o -name \"*.${extension}\""
+        fi
+        let index+=1
+    done
+    files=$(eval $cmd | sed 's/^..//')
     if [[ $path ]]; then
         files=$(echo "$files" | egrep $path)
     fi
@@ -359,13 +369,13 @@ gen_list_repo() {
         files=$(echo "$files" | egrep -v $blackword)
     fi
     if [[ $dependence ]]; then
-        find . -name "*.js" | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
+        eval $cmd | sed 's/^..//' | egrep $dependence | xargs -i cp {} $dir_scripts
     fi
     for file in ${files}; do
         filename=$(basename $file)
         cp -f $file $dir_scripts/${repo}_${filename}
         echo ${repo}_${filename} >>"$dir_list_tmp/${repo}_scripts.list"
-        cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${author}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|")
+        cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${author}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
         if [[ $cron_id ]]; then
             result=$(update_cron_command_api "$cmd_task ${repo}_${filename}:$cron_id")
         fi
@@ -380,21 +390,26 @@ main() {
     local p3=$3
     local p4=$4
     local p5=$5
-    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_path="$dir_log/update/${log_time}_$p1.log"
+    local p6=$6
+    local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
+    local log_path="$dir_log/update/${log_time}_$p1.log"
+    local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     case $p1 in
     update)
-        update_qinglong | tee $log_path
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
+        update_qinglong "$2" | tee -a $log_path
         ;;
     extra)
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         run_extra_shell | tee -a $log_path
         ;;
     repo)
         get_user_info
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" | tee $log_path
+            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" | tee -a $log_path
         else
             echo -e "命令输入错误...\n"
             usage
@@ -404,30 +419,34 @@ main() {
         get_user_info
         local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
         log_path="$dir_log/update/${log_time}_$name.log"
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
-            update_raw "$p2" | tee $log_path
+            update_raw "$p2" | tee -a $log_path
         else
             echo -e "命令输入错误...\n"
             usage
         fi
         ;;
     rmlog)
-        . $dir_shell/rmlog.sh "$p2" | tee $log_path
-        ;;
-    code)
-        . $dir_shell/code.sh
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
+        . $dir_shell/rmlog.sh "$p2" | tee -a $log_path
         ;;
     bot)
-        . $dir_shell/bot.sh
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
+        . $dir_shell/bot.sh | tee -a $log_path
         ;;
-    reset)
-        . $dir_shell/reset.sh
+    check)
+        echo -e "## 开始执行... $begin_time\n" >> $log_path
+        . $dir_shell/check.sh | tee -a $log_path
         ;;
     *)
         echo -e "命令输入错误...\n"
         usage
         ;;
     esac
+    local end_time=$(date '+%Y-%m-%d %H:%M:%S')
+    local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
+    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
 }
 
 main "$@"

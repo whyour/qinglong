@@ -137,42 +137,45 @@ const Crontab = () => {
       title: '操作',
       key: 'action',
       align: 'center' as const,
-      render: (text: string, record: any, index: number) => (
-        <Space size="middle">
-          {record.status === CrontabStatus.idle && (
-            <Tooltip title="运行">
+      render: (text: string, record: any, index: number) => {
+        const isPc = width === '100%';
+        return (
+          <Space size="middle">
+            {record.status === CrontabStatus.idle && (
+              <Tooltip title={isPc ? '运行' : ''}>
+                <a
+                  onClick={() => {
+                    runCron(record, index);
+                  }}
+                >
+                  <PlayCircleOutlined />
+                </a>
+              </Tooltip>
+            )}
+            {record.status !== CrontabStatus.idle && (
+              <Tooltip title={isPc ? '停止' : ''}>
+                <a
+                  onClick={() => {
+                    stopCron(record, index);
+                  }}
+                >
+                  <PauseCircleOutlined />
+                </a>
+              </Tooltip>
+            )}
+            <Tooltip title={isPc ? '日志' : ''}>
               <a
                 onClick={() => {
-                  runCron(record, index);
+                  setLogCron({ ...record, timestamp: Date.now() });
                 }}
               >
-                <PlayCircleOutlined />
+                <FileTextOutlined />
               </a>
             </Tooltip>
-          )}
-          {record.status !== CrontabStatus.idle && (
-            <Tooltip title="停止">
-              <a
-                onClick={() => {
-                  stopCron(record, index);
-                }}
-              >
-                <PauseCircleOutlined />
-              </a>
-            </Tooltip>
-          )}
-          <Tooltip title="日志">
-            <a
-              onClick={() => {
-                setLogCron({ ...record, timestamp: Date.now() });
-              }}
-            >
-              <FileTextOutlined />
-            </a>
-          </Tooltip>
-          <MoreBtn key="more" record={record} index={index} />
-        </Space>
-      ),
+            <MoreBtn key="more" record={record} index={index} />
+          </Space>
+        );
+      },
     },
   ];
 
@@ -187,6 +190,8 @@ const Crontab = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const getCrons = () => {
     setLoading(true);
@@ -233,7 +238,7 @@ const Crontab = () => {
             if (data.code === 200) {
               message.success('删除成功');
               const result = [...value];
-              result.splice(index, 1);
+              result.splice(index + pageSize * (currentPage - 1), 1);
               setValue(result);
             } else {
               message.error(data);
@@ -264,7 +269,7 @@ const Crontab = () => {
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              result.splice(index, 1, {
+              result.splice(index + pageSize * (currentPage - 1), 1, {
                 ...record,
                 status: CrontabStatus.running,
               });
@@ -298,7 +303,7 @@ const Crontab = () => {
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              result.splice(index, 1, {
+              result.splice(index + pageSize * (currentPage - 1), 1, {
                 ...record,
                 pid: null,
                 status: CrontabStatus.idle,
@@ -342,7 +347,7 @@ const Crontab = () => {
             if (data.code === 200) {
               const newStatus = record.isDisabled === 1 ? 0 : 1;
               const result = [...value];
-              result.splice(index, 1, {
+              result.splice(index + pageSize * (currentPage - 1), 1, {
                 ...record,
                 isDisabled: newStatus,
               });
@@ -511,6 +516,12 @@ const Crontab = () => {
     });
   };
 
+  const onPageChange = (page: number, pageSize: number | undefined) => {
+    setCurrentPage(page);
+    setPageSize(pageSize as number);
+    localStorage.setItem('pageSize', pageSize + '');
+  };
+
   useEffect(() => {
     if (logCron) {
       localStorage.setItem('logCron', logCron._id);
@@ -532,6 +543,7 @@ const Crontab = () => {
       setMarginLeft(0);
       setMarginTop(-72);
     }
+    setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
   }, []);
 
   return (
@@ -547,7 +559,7 @@ const Crontab = () => {
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
-          添加定时
+          添加任务
         </Button>,
       ]}
       header={{
@@ -602,6 +614,9 @@ const Crontab = () => {
         columns={columns}
         pagination={{
           hideOnSinglePage: true,
+          current: currentPage,
+          onChange: onPageChange,
+          pageSize: pageSize,
           showSizeChanger: true,
           defaultPageSize: 20,
           showTotal: (total: number, range: number[]) =>
