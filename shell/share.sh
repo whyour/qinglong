@@ -52,7 +52,10 @@ original_name=(
     notify.sh
 )
 
-## 导入配置文件
+init_env() {
+    export NODE_PATH=/usr/local/bin:/usr/local/pnpm-global/5/node_modules:/usr/local/lib/node_modules
+}
+
 import_config() {
     [ -f $file_config_user ] && . $file_config_user
     [ -f $file_env ] && . $file_env
@@ -62,7 +65,6 @@ import_config() {
     file_extensions=${RepoFileExtensions:-"js py"}
 }
 
-## 创建目录，$1：目录的绝对路径
 make_dir() {
     local dir=$1
     if [[ ! -d $dir ]]; then
@@ -70,7 +72,6 @@ make_dir() {
     fi
 }
 
-## 检测termux
 detect_termux() {
     if [[ ${ANDROID_RUNTIME_ROOT}${ANDROID_ROOT} ]] || [[ $PATH == *com.termux* ]]; then
         is_termux=1
@@ -79,18 +80,15 @@ detect_termux() {
     fi
 }
 
-## 检测macos
 detect_macos() {
     [[ $(uname -s) == Darwin ]] && is_macos=1 || is_macos=0
 }
 
-## 生成随机数，$1：用来求余的数字
 gen_random_num() {
     local divi=$1
     echo $((${RANDOM} % $divi))
 }
 
-## 创建软连接的子函数，$1：软连接文件路径，$2：要连接的对象
 link_shell_sub() {
     local link_path="$1"
     local original_path="$2"
@@ -100,7 +98,6 @@ link_shell_sub() {
     fi
 }
 
-## 创建软连接
 link_shell() {
     if [[ $is_termux -eq 1 ]]; then
         local path="/data/data/com.termux/files/usr/bin/"
@@ -117,7 +114,6 @@ link_shell() {
     fi
 }
 
-## 定义各命令
 define_cmd() {
     local cmd_prefix cmd_suffix
     if type task >/dev/null 2>&1; then
@@ -140,7 +136,6 @@ define_cmd() {
     done
 }
 
-## 修复配置文件
 fix_config() {
     make_dir $dir_config
     make_dir $dir_log
@@ -206,7 +201,6 @@ fix_config() {
     fi
 }
 
-## npm install 子程序，判断是否为安卓，判断是否安装有pnpm
 npm_install_sub() {
     if [ $is_termux -eq 1 ]; then
         npm install --production --no-save --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links --no-save
@@ -217,7 +211,6 @@ npm_install_sub() {
     fi
 }
 
-## npm install，$1：package.json文件所在路径
 npm_install_1() {
     local dir_current=$(pwd)
     local dir_work=$1
@@ -243,7 +236,6 @@ npm_install_2() {
     cd $dir_current
 }
 
-## 比对两个文件，$1比$2新时，将$1复制为$2
 diff_and_copy() {
     local copy_source=$1
     local copy_to=$2
@@ -252,7 +244,6 @@ diff_and_copy() {
     fi
 }
 
-## 更新依赖
 update_depend() {
     local dir_current=$(pwd)
 
@@ -270,7 +261,6 @@ update_depend() {
     cd $dir_current
 }
 
-## 克隆脚本，$1：仓库地址，$2：仓库保存路径，$3：分支（可省略）
 git_clone_scripts() {
     local url=$1
     local dir=$2
@@ -281,7 +271,6 @@ git_clone_scripts() {
     exit_status=$?
 }
 
-## 更新脚本，$1：仓库保存路径
 git_pull_scripts() {
     local dir_current=$(pwd)
     local dir_work="$1"
@@ -296,7 +285,6 @@ git_pull_scripts() {
     cd $dir_current
 }
 
-## 重置仓库remote url，docker专用，$1：要重置的目录，$2：要重置为的网址
 reset_romote_url() {
     local dir_current=$(pwd)
     local dir_work=$1
@@ -313,7 +301,7 @@ reset_romote_url() {
     fi
 }
 
-## 导入配置文件，检测平台，创建软连接，识别命令，修复配置文件
+init_env
 detect_termux
 detect_macos
 define_cmd
