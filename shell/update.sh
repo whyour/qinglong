@@ -292,8 +292,7 @@ patch_version() {
     fi
 
     if ! type ts-node >/dev/null 2>&1; then
-        pnpm i -g ts-node
-        pnpm i -g typescript
+        pnpm i -g ts-node typescript tslib
     fi
 }
 
