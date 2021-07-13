@@ -99,7 +99,7 @@ run_normal() {
         echo -e "## task_before执行失败，自行检查\n" | tee -a $log_path
     fi
 
-    timeout $command_timeout_time $which_program $p1 2>&1 | tee -a $log_path
+    timeout $command_timeout_time $which_program $p1 $TempBlockCookie 2>&1 | tee -a $log_path
 
     if [[ ! $(. $file_task_after) ]]; then
         . $file_task_after
@@ -146,7 +146,7 @@ run_concurrent() {
     for i in "${!array[@]}"; do
         export ${p3}=${array[i]}
         single_log_path="$log_dir/${single_log_time}_$((i+1)).log"
-        timeout $command_timeout_time $which_program $p1 &>$single_log_path &
+        timeout $command_timeout_time $which_program $p1 $TempBlockCookie &>$single_log_path &
     done
 
     if [[ ! $(. $file_task_after) ]]; then
