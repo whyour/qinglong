@@ -403,11 +403,11 @@ main() {
     case $p1 in
     update)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        update_qinglong "$2" | tee -a $log_path
+        update_qinglong "$2" | tee --output-error=warn  -a $log_path
         ;;
     extra)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        run_extra_shell | tee -a $log_path
+        run_extra_shell | tee --output-error=warn  -a $log_path
         ;;
     repo)
         get_user_info
@@ -415,7 +415,7 @@ main() {
         log_path="$dir_log/update/${log_time}_$name.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" | tee -a $log_path
+            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" | tee --output-error=warn  -a $log_path
         else
             echo -e "命令输入错误...\n"
             usage
@@ -427,7 +427,7 @@ main() {
         log_path="$dir_log/update/${log_time}_$name.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
-            update_raw "$p2" | tee -a $log_path
+            update_raw "$p2" | tee --output-error=warn  -a $log_path
         else
             echo -e "命令输入错误...\n"
             usage
@@ -435,15 +435,15 @@ main() {
         ;;
     rmlog)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        . $dir_shell/rmlog.sh "$p2" | tee -a $log_path
+        . $dir_shell/rmlog.sh "$p2" | tee --output-error=warn  -a $log_path
         ;;
     bot)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        . $dir_shell/bot.sh | tee -a $log_path
+        . $dir_shell/bot.sh | tee --output-error=warn  -a $log_path
         ;;
     check)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        . $dir_shell/check.sh | tee -a $log_path
+        . $dir_shell/check.sh | tee --output-error=warn  -a $log_path
         ;;
     *)
         echo -e "命令输入错误...\n"
