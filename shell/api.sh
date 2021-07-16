@@ -170,9 +170,9 @@ update_cron() {
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "## 更新任务状态成功"  | tee --output-error=warn  -a $log_path
+        echo -e "## 更新任务状态成功"  | tee -p -a $log_path
     else
-        echo -e "## 更新任务状态失败(${message})"  | tee --output-error=warn  -a $log_path
+        echo -e "## 更新任务状态失败(${message})"  | tee -p -a $log_path
     fi
 }
 
