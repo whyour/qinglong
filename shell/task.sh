@@ -91,25 +91,25 @@ run_normal() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "## 开始执行... $begin_time\n" | tee --output-error=warn  -a $log_path
+    echo -e "## 开始执行... $begin_time\n" | tee -p -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    if [[ ! $(. $file_task_before) ]]; then
+    if [[ ! $(. $file_task_before 1>/dev/null) ]]; then
         . $file_task_before
     else
-        echo -e "## task_before执行失败，自行检查\n" | tee --output-error=warn  -a $log_path
+        echo -e "## task_before执行失败，自行检查\n" | tee -p -a $log_path
     fi
 
-    timeout $command_timeout_time $which_program $p1 2>&1 | tee --output-error=warn  -a $log_path
+    timeout $command_timeout_time $which_program $p1 2>&1 | tee -p -a $log_path
 
-    if [[ ! $(. $file_task_after) ]]; then
+    if [[ ! $(. $file_task_after 1>/dev/null) ]]; then
         . $file_task_after
     else
-        echo -e "## task_after执行失败，自行检查\n" | tee --output-error=warn  -a $log_path
+        echo -e "## task_after执行失败，自行检查\n" | tee -p -a $log_path
     fi
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" | tee --output-error=warn  -a $log_path
+    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" | tee -p -a $log_path
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
@@ -133,14 +133,14 @@ run_concurrent() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "## 开始执行... $begin_time\n" | tee --output-error=warn  -a $log_path
+    echo -e "## 开始执行... $begin_time\n" | tee -p -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    if [[ ! $(. $file_task_before) ]]; then
+    if [[ ! $(. $file_task_before 1>/dev/null) ]]; then
         . $file_task_before
     else
-        echo -e "## task_before执行失败，自行检查\n" | tee --output-error=warn  -a $log_path
+        echo -e "## task_before执行失败，自行检查\n" | tee -p -a $log_path
     fi
-    echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n" | tee --output-error=warn  -a $log_path
+    echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n" | tee -p -a $log_path
 
     single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     for i in "${!array[@]}"; do
@@ -149,15 +149,15 @@ run_concurrent() {
         timeout $command_timeout_time $which_program $p1 &>$single_log_path &
     done
 
-    if [[ ! $(. $file_task_after) ]]; then
+    if [[ ! $(. $file_task_after 1>/dev/null) ]]; then
         . $file_task_after
     else
-        echo -e "## task_after执行失败，自行检查\n" | tee --output-error=warn  -a $log_path
+        echo -e "## task_after执行失败，自行检查\n" | tee -p -a $log_path
     fi
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" | tee --output-error=warn  -a $log_path
+    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" | tee -p -a $log_path
 }
 
 ## 运行其他命令
@@ -170,25 +170,25 @@ run_else() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "## 开始执行... $begin_time\n" | tee --output-error=warn  -a $log_path
+    echo -e "## 开始执行... $begin_time\n" | tee -p -a $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    if [[ ! $(. $file_task_before) ]]; then
+    if [[ ! $(. $file_task_before 1>/dev/null) ]]; then
         . $file_task_before
     else
-        echo -e "## task_before执行失败，自行检查\n" | tee --output-error=warn  -a $log_path
+        echo -e "## task_before执行失败，自行检查\n" | tee -p -a $log_path
     fi
 
-    timeout $command_timeout_time "$@" 2>&1 | tee --output-error=warn  -a $log_path
+    timeout $command_timeout_time "$@" 2>&1 | tee -p -a $log_path
 
-    if [[ ! $(. $file_task_after) ]]; then
+    if [[ ! $(. $file_task_after 1>/dev/null) ]]; then
         . $file_task_after
     else
-        echo -e "## task_after执行失败，自行检查\n" | tee --output-error=warn  -a $log_path
+        echo -e "## task_after执行失败，自行检查\n" | tee -p -a $log_path
     fi
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" | tee --output-error=warn  -a $log_path
+    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" | tee -p -a $log_path
 }
 
 ## 命令检测
