@@ -47,19 +47,21 @@ export default async () => {
 
   // 初始化更新所有任务状态为空闲
   cronDb.update(
-    { status: CrontabStatus.running },
+    { status: { $in: [CrontabStatus.running, CrontabStatus.queued] } },
     { $set: { status: CrontabStatus.idle } },
+    { multi: true },
   );
 
   // 初始化时执行一次所有的ql repo 任务
   cronDb
     .find({
       command: /ql (repo|raw)/,
+      isDisabled: { $ne: 1 },
     })
     .exec((err, docs) => {
       for (let i = 0; i < docs.length; i++) {
         const doc = docs[i];
-        if (doc && doc.isDisabled !== 1) {
+        if (doc) {
           exec(doc.command);
         }
       }
