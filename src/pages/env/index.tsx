@@ -108,6 +108,7 @@ const Env = () => {
     {
       title: '序号',
       align: 'center' as const,
+      width: 50,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },
@@ -123,7 +124,7 @@ const Env = () => {
       dataIndex: 'value',
       key: 'value',
       align: 'center' as const,
-      width: '40%',
+      width: '44%',
       ellipsis: {
         showTitle: false,
       },
@@ -436,7 +437,7 @@ const Env = () => {
 
   return (
     <PageContainer
-      className="env-wrapper"
+      className="ql-container-wrapper env-wrapper"
       title="环境变量"
       extra={[
         <Search

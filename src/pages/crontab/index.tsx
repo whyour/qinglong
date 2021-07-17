@@ -101,6 +101,7 @@ const Crontab = () => {
       key: 'status',
       dataIndex: 'status',
       align: 'center' as const,
+      width: 60,
       render: (text: string, record: any) => (
         <>
           {(!record.isDisabled || record.status !== CrontabStatus.idle) && (

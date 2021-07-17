@@ -71,6 +71,34 @@ body {
   }
 }
 
+.ant-tree {
+  .ant-tree-treenode {
+    width: 100%;
+    padding-right: 8px !important;
+  }
+
+  .ant-tree-node-content-wrapper {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+}
+
+.ant-select-tree {
+  .ant-select-tree-treenode {
+    width: 100%;
+    padding-right: 8px !important;
+  }
+
+  .ant-select-tree-node-content-wrapper {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+}
+
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -91,17 +119,17 @@ input:-webkit-autofill:active {
 
   .ql-container-wrapper {
     &.crontab-wrapper,
-    &.log-wrapper {
+    &.log-wrapper,
+    &.env-wrapper,
+    &.config-wrapper {
       .ant-pro-grid-content.wide .ant-pro-page-container-children-content {
         height: calc(100vh - 184px);
         height: calc(100vh - var(--vh-offset, 0px) - 184px);
-        margin-left: 0;
-        margin-right: 0;
       }
       .CodeMirror {
         height: calc(100vh - 216px);
         height: calc(100vh - var(--vh-offset, 0px) - 216px);
-        width: calc(100vw - 32px);
+        width: calc(100vw - 80px);
       }
     }
     .CodeMirror {
@@ -112,5 +140,12 @@ input:-webkit-autofill:active {
 
   .ant-tooltip {
     max-width: 250px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .ant-layout-content.ant-pro-basicLayout-content.ant-pro-basicLayout-has-header {
+    min-height: calc(100vh - 72px);
+    min-height: calc(100vh - var(--vh-offset, 0px) - 72px);
   }
 }

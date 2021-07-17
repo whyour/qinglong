@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Key } from 'react';
+import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import { TreeSelect, Tree, Input } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -46,13 +46,19 @@ const Log = () => {
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
+  const [height, setHeight] = useState<number>();
+  const treeDom = useRef<any>();
 
-  const getConfig = () => {
-    request.get(`${config.apiPrefix}logs`).then((data) => {
-      const result = formatData(data.dirs) as any;
-      setData(result);
-      setFilterData(result);
-    });
+  const getLogs = () => {
+    setLoading(true);
+    request
+      .get(`${config.apiPrefix}logs`)
+      .then((data) => {
+        const result = formatData(data.dirs) as any;
+        setData(result);
+        setFilterData(result);
+      })
+      .finally(() => setLoading(false));
   };
 
   const formatData = (tree: any[]) => {
@@ -73,13 +79,9 @@ const Log = () => {
   };
 
   const getLog = (node: any) => {
-    setLoading(true);
-    request
-      .get(`${config.apiPrefix}logs/${node.value}`)
-      .then((data) => {
-        setValue(data.data);
-      })
-      .finally(() => setLoading(false));
+    request.get(`${config.apiPrefix}logs/${node.value}`).then((data) => {
+      setValue(data.data);
+    });
   };
 
   const onSelect = (value: any, node: any) => {
@@ -113,13 +115,15 @@ const Log = () => {
       setMarginTop(-72);
       setIsPhone(false);
     }
-    getConfig();
+    getLogs();
+    setHeight(treeDom.current.clientHeight);
   }, []);
 
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
       title={title}
+      loading={loading}
       extra={
         isPhone && [
           <TreeSelect
@@ -154,10 +158,13 @@ const Log = () => {
               className={styles['left-tree-search']}
               onChange={onSearch}
             ></Input.Search>
-            <div className={styles['left-tree-scroller']}>
+            <div className={styles['left-tree-scroller']} ref={treeDom}>
               <Tree
                 className={styles['left-tree']}
                 treeData={filterData}
+                showIcon={true}
+                height={height}
+                showLine={{ showLeafIcon: true }}
                 onSelect={onTreeSelect}
               ></Tree>
             </div>
