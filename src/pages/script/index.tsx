@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Key } from 'react';
+import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import { TreeSelect, Tree, Input } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -37,6 +37,8 @@ const Script = () => {
   const [loading, setLoading] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
   const [mode, setMode] = useState('');
+  const [height, setHeight] = useState<number>();
+  const treeDom = useRef<any>();
 
   const getScripts = () => {
     setLoading(true);
@@ -89,6 +91,7 @@ const Script = () => {
       setIsPhone(false);
     }
     getScripts();
+    setHeight(treeDom.current.clientHeight);
   }, []);
 
   return (
@@ -130,10 +133,13 @@ const Script = () => {
               className={styles['left-tree-search']}
               onChange={onSearch}
             ></Input.Search>
-            <div className={styles['left-tree-scroller']}>
+            <div className={styles['left-tree-scroller']} ref={treeDom}>
               <Tree
                 className={styles['left-tree']}
                 treeData={filterData}
+                showIcon={true}
+                height={height}
+                showLine={{ showLeafIcon: true }}
                 onSelect={onTreeSelect}
               ></Tree>
             </div>

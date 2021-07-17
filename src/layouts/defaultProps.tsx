@@ -38,7 +38,7 @@ export default {
       },
       {
         path: '/script',
-        name: '查看脚本',
+        name: '脚本管理',
         icon: <FormOutlined />,
         component: '@/pages/script/index',
       },
@@ -50,7 +50,7 @@ export default {
       },
       {
         path: '/log',
-        name: '日志',
+        name: '任务日志',
         icon: <FolderOutlined />,
         component: '@/pages/log/index',
       },
