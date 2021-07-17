@@ -60,5 +60,11 @@ export default {
   configPath,
   scriptPath,
   samplePath,
-  blackFileList: ['auth.json', 'config.sh.sample', 'cookie.sh', 'crontab.list'],
+  blackFileList: [
+    'auth.json',
+    'config.sh.sample',
+    'cookie.sh',
+    'crontab.list',
+    'env.sh',
+  ],
 };
