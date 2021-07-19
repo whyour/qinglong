@@ -99,7 +99,7 @@ run_normal() {
         echo -e "## task_before执行失败，自行检查\n" | tee -p -a $log_path
     fi
 
-    timeout $command_timeout_time $which_program $p1 2>&1 | tee -p -a $log_path
+    timeout -k 10s $command_timeout_time $which_program $p1 2>&1 | tee -p -a $log_path
 
     if [[ ! $(. $file_task_after 1>/dev/null) ]]; then
         . $file_task_after
@@ -145,8 +145,8 @@ run_concurrent() {
     single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     for i in "${!array[@]}"; do
         export ${p3}=${array[i]}
-        single_log_path="$log_dir/${single_log_time}_$((i+1)).log"
-        timeout $command_timeout_time $which_program $p1 &>$single_log_path &
+        single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
+        timeout -k 10s $command_timeout_time $which_program $p1 &>$single_log_path &
     done
 
     if [[ ! $(. $file_task_after 1>/dev/null) ]]; then
@@ -178,7 +178,7 @@ run_else() {
         echo -e "## task_before执行失败，自行检查\n" | tee -p -a $log_path
     fi
 
-    timeout $command_timeout_time "$@" 2>&1 | tee -p -a $log_path
+    timeout -k 10s $command_timeout_time bash -c "$@" 2>&1 | tee -p -a $log_path
 
     if [[ ! $(. $file_task_after 1>/dev/null) ]]; then
         . $file_task_after
@@ -193,31 +193,35 @@ run_else() {
 
 ## 命令检测
 main() {
-    case $# in
-    0)
-        echo
-        usage
-        ;;
-    1)
-        run_normal $1
-        ;;
-    2|3)
-        case $2 in
-        now)
-            run_normal $1 $2
+    if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
+        case $# in
+        0)
+            echo
+            usage
             ;;
-        conc)
-            run_concurrent $1 $2 $3
+        1)
+            run_normal $1
+            ;;
+        2 | 3)
+            case $2 in
+            now)
+                run_normal $1 $2
+                ;;
+            conc)
+                run_concurrent $1 $2 $3
+                ;;
+            *)
+                run_else "$@"
+                ;;
+            esac
             ;;
         *)
             run_else "$@"
             ;;
         esac
-        ;;
-    *)
+    else
         run_else "$@"
-        ;;
-    esac
+    fi
 }
 
 main "$@"
