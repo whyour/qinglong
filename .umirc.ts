@@ -39,5 +39,8 @@ export default defineConfig({
     'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/mode/shell/shell.js',
     'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/mode/python/python.js',
     'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/mode/javascript/javascript.js',
+    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/addon/dialog/dialog.js',
+    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/addon/search/search.js',
+    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/addon/search/searchcursor.js',
   ],
 });
