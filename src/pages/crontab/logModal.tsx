@@ -6,7 +6,6 @@ import {
   Loading3QuartersOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
-import Editor from "@monaco-editor/react";
 
 enum CrontabStatus {
   'running',
@@ -92,50 +91,40 @@ const CronLogModal = ({
     setIsPhone(document.body.clientWidth < 768);
   }, []);
 
-  useEffect(()=>{
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark?'vs-dark':'vs');
-    media.addEventListener('change',(e)=>{
-      if(storageTheme === 'auto' || !storageTheme){
-        if(e.matches){
-          setTheme('vs-dark')
-        }else{
-          setTheme('vs');
-        }
-      }
-    })
-  },[])
-
   return (
     <Modal
       title={titleElement()}
       visible={visible}
       centered
-      // bodyStyle={{
-      //   overflowY: 'auto',
-      //   maxHeight: 'calc(80vh - var(--vh-offset, 0px))',
-      // }}
+      bodyStyle={{
+        overflowY: 'auto',
+        maxHeight: 'calc(80vh - var(--vh-offset, 0px))',
+      }}
       forceRender
-      wrapClassName="log-modal"
       onOk={() => cancel()}
       onCancel={() => cancel()}
     >
       {!loading && value && (
-        <Editor
-          defaultLanguage="shell"
-          value={value}
-          theme={theme}
-          options={{
-            fontSize: 12,
-            minimap: {enabled: false},
-            lineNumbersMinChars: 3,
-            folding: false,
-            fontFamily: 'Source Code Pro',
-            glyphMargin: false
-          }}
-        />
+        <pre
+          style={
+            !isPhone
+              ? {
+                  whiteSpace: 'break-spaces',
+                  lineHeight: '17px',
+                  marginBottom: 0,
+                }
+              : {
+                  whiteSpace: 'break-spaces',
+                  lineHeight: '17px',
+                  marginBottom: 0,
+                  fontFamily: 'Source Code Pro',
+                  width: 375,
+                  zoom: 0.83,
+                }
+          }
+        >
+          {value}
+        </pre>
       )}
     </Modal>
   );

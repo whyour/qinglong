@@ -172,7 +172,8 @@ const Script = () => {
             minimap: {enabled: width==='100%'},
             lineNumbersMinChars: 3,
             folding: false,
-            glyphMargin: false
+            glyphMargin: false,
+            wordWrap: 'on'
           }}
           onChange={(val) => {setValue(val as string)}}
         />
