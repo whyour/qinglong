@@ -2,8 +2,8 @@ import React, { PureComponent, Fragment, useState, useEffect } from 'react';
 import { Button, message, Modal, TreeSelect } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
-import { Controlled as CodeMirror } from 'react-codemirror2';
 import { request } from '@/utils/http';
+import Editor from "@monaco-editor/react";
 
 const Config = () => {
   const [width, setWidth] = useState('100%');
@@ -14,6 +14,7 @@ const Config = () => {
   const [title, setTitle] = useState('config.sh');
   const [select, setSelect] = useState('config.sh');
   const [data, setData] = useState<any[]>([]);
+  const [theme, setTheme] = useState<string>('');
 
   const getConfig = (name: string) => {
     request.get(`${config.apiPrefix}configs/${name}`).then((data: any) => {
@@ -61,6 +62,22 @@ const Config = () => {
     getConfig('config.sh');
   }, []);
 
+  useEffect(()=>{
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const storageTheme = localStorage.getItem('qinglong_dark_theme');
+    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark?'vs-dark':'vs');
+    media.addEventListener('change',(e)=>{
+      if(storageTheme === 'auto' || !storageTheme){
+        if(e.matches){
+          setTheme('vs-dark')
+        }else{
+          setTheme('vs');
+        }
+      }
+    })
+  },[])
+
   return (
     <PageContainer
       className="ql-container-wrapper config-wrapper"
@@ -93,18 +110,18 @@ const Config = () => {
         },
       }}
     >
-      <CodeMirror
+      <Editor
+        defaultLanguage="shell"
         value={value}
+        theme={theme}
         options={{
-          lineNumbers: true,
-          styleActiveLine: true,
-          matchBrackets: true,
-          mode: 'shell',
+          fontSize: 12,
+          minimap: {enabled: width==='100%'},
+          lineNumbersMinChars: 3,
+          folding: false,
+          glyphMargin: false
         }}
-        onBeforeChange={(editor, data, value) => {
-          setValue(value);
-        }}
-        onChange={(editor, data, value) => {}}
+        onChange={(val) => {setValue(val as string)}}
       />
     </PageContainer>
   );

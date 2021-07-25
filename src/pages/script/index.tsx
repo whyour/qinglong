@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import { TreeSelect, Tree, Input } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
-import { Controlled as CodeMirror } from 'react-codemirror2';
+import Editor from "@monaco-editor/react";
 import { request } from '@/utils/http';
 import styles from './index.module.less';
 
@@ -39,6 +39,7 @@ const Script = () => {
   const [mode, setMode] = useState('');
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
+  const [theme, setTheme] = useState<string>('');
 
   const getScripts = () => {
     setLoading(true);
@@ -94,6 +95,22 @@ const Script = () => {
     setHeight(treeDom.current.clientHeight);
   }, []);
 
+  useEffect(()=>{
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const storageTheme = localStorage.getItem('qinglong_dark_theme');
+    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark?'vs-dark':'vs');
+    media.addEventListener('change',(e)=>{
+      if(storageTheme === 'auto' || !storageTheme){
+        if(e.matches){
+          setTheme('vs-dark')
+        }else{
+          setTheme('vs');
+        }
+      }
+    })
+  },[])
+
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
@@ -145,20 +162,19 @@ const Script = () => {
             </div>
           </div>
         )}
-        <CodeMirror
+        <Editor
+          language={mode}
           value={value}
+          theme={theme}
           options={{
-            lineNumbers: true,
-            lineWrapping: true,
-            styleActiveLine: true,
-            matchBrackets: true,
-            mode,
             readOnly: true,
+            fontSize: 12,
+            minimap: {enabled: width==='100%'},
+            lineNumbersMinChars: 3,
+            folding: false,
+            glyphMargin: false
           }}
-          onBeforeChange={(editor, data, value) => {
-            setValue(value);
-          }}
-          onChange={(editor, data, value) => {}}
+          onChange={(val) => {setValue(val as string)}}
         />
       </div>
     </PageContainer>

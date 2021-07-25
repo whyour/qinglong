@@ -28,19 +28,11 @@ export default defineConfig({
   externals: {
     react: 'window.React',
     'react-dom': 'window.ReactDOM',
-    codemirror: 'window.CodeMirror',
     darkreader: 'window.DarkReader',
   },
   scripts: [
     'https://gw.alipayobjects.com/os/lib/react/16.13.1/umd/react.production.min.js',
     'https://gw.alipayobjects.com/os/lib/react-dom/16.13.1/umd/react-dom.production.min.js',
-    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/lib/codemirror.min.js',
-    'https://cdn.jsdelivr.net/npm/darkreader@4.9.27/darkreader.min.js',
-    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/mode/shell/shell.js',
-    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/mode/python/python.js',
-    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/mode/javascript/javascript.js',
-    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/addon/dialog/dialog.js',
-    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/addon/search/search.js',
-    'https://cdn.jsdelivr.net/npm/codemirror@5.62.0/addon/search/searchcursor.js',
+    'https://cdn.jsdelivr.net/npm/darkreader@4.9.34/darkreader.min.js',
   ],
 });

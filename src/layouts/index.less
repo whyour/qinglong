@@ -13,15 +13,32 @@ body {
   background-color: rgb(248, 248, 248);
 }
 
-@import '~codemirror/lib/codemirror.css';
-@import '~codemirror/addon/dialog/dialog.css';
+.ant-modal {
+  padding-bottom: 0 !important;
+  width: 580px !important;
+}
 
-.ql-container-wrapper {
-  .CodeMirror {
-    position: absolute;
-    height: calc(100vh - 128px);
-    height: calc(100vh - var(--vh-offset, 0px) - 128px);
-    width: calc(100% - 32px);
+.monaco-editor:not(.rename-box) {
+  height: calc(100vh - 128px) !important;
+  height: calc(100vh - var(--vh-offset, 0px) - 128px) !important;
+  .view-overlays .current-line{
+    border-width: 0;
+  }
+}
+
+.log-modal {
+  .monaco-editor:not(.rename-box) {
+    height: calc(100vh - 176px) !important;
+    height: calc(100vh - var(--vh-offset, 0px) - 176px) !important;
+    background-color: transparent !important;
+  }
+}
+
+.rename-box  {
+  height: 0;
+  .rename-input{
+    height: 0;
+    padding: 0 !important;
   }
 }
 
@@ -29,7 +46,7 @@ body {
   max-width: unset !important;
   overflow: auto;
   .ant-pro-page-container-children-content {
-    overflow: auto;
+    overflow: visible;
     height: calc(100vh - 96px);
     height: calc(100vh - var(--vh-offset, 0px) - 96px);
     background-color: #fff;
@@ -127,15 +144,14 @@ input:-webkit-autofill:active {
         height: calc(100vh - 184px);
         height: calc(100vh - var(--vh-offset, 0px) - 184px);
       }
-      .CodeMirror {
-        height: calc(100vh - 216px);
-        height: calc(100vh - var(--vh-offset, 0px) - 216px);
-        width: calc(100vw - 80px);
+      .monaco-editor:not(.rename-box) {
+        height: calc(100vh - 216px) !important;
+        height: calc(100vh - var(--vh-offset, 0px) - 216px) !important;
       }
     }
-    .CodeMirror {
-      height: calc(100vh - 176px);
-      height: calc(100vh - var(--vh-offset, 0px) - 176px);
+    .monaco-editor:not(.rename-box) {
+      height: calc(100vh - 176px) !important;
+      height: calc(100vh - var(--vh-offset, 0px) - 176px) !important;
     }
   }
 

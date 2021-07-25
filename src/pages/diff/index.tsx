@@ -5,6 +5,7 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import ReactDiffViewer from 'react-diff-viewer';
 import './index.less';
+import { DiffEditor } from "@monaco-editor/react";
 
 const Crontab = () => {
   const [width, setWidth] = useState('100%');
@@ -13,6 +14,7 @@ const Crontab = () => {
   const [value, setValue] = useState('');
   const [sample, setSample] = useState('');
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<string>('');
 
   const getConfig = () => {
     request.get(`${config.apiPrefix}configs/config.sh`).then((data) => {
@@ -44,6 +46,22 @@ const Crontab = () => {
     getSample();
   }, []);
 
+  useEffect(()=>{
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const storageTheme = localStorage.getItem('qinglong_dark_theme');
+    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark?'vs-dark':'vs');
+    media.addEventListener('change',(e)=>{
+      if(storageTheme === 'auto' || !storageTheme){
+        if(e.matches){
+          setTheme('vs-dark')
+        }else{
+          setTheme('vs');
+        }
+      }
+    })
+  },[])
+
   return (
     <PageContainer
       className="ql-container-wrapper"
@@ -62,37 +80,21 @@ const Crontab = () => {
         },
       }}
     >
-      <ReactDiffViewer
-        styles={{
-          diffContainer: {
-            overflowX: 'auto',
-            minWidth: 768,
-          },
-          diffRemoved: {
-            overflowX: 'auto',
-            maxWidth: 300,
-          },
-          diffAdded: {
-            overflowX: 'auto',
-            maxWidth: 300,
-          },
-          line: {
-            wordBreak: 'break-word',
-          },
+      <DiffEditor
+        language={"shell"}
+        original={sample}
+        modified={value}
+        options={{
+          readOnly: true,
+          fontSize: 12,
+          minimap: {enabled: width==='100%'},
+          lineNumbersMinChars: 3,
+          folding: false,
+          glyphMargin: false,
+          renderSideBySide: width==='100%'
         }}
-        oldValue={value}
-        newValue={sample}
-        splitView={true}
-        leftTitle="config.sh"
-        rightTitle="config.sample.sh"
-        disableWordDiff={true}
+        theme={theme}
       />
-      {/* <CodeDiff
-        style={{ height: 'calc(100vh - 72px)', overflowY: 'auto' }}
-        outputFormat="side-by-side"
-        oldStr={value}
-        newStr={sample}
-      /> */}
     </PageContainer>
   );
 };
