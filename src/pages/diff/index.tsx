@@ -91,7 +91,8 @@ const Crontab = () => {
           lineNumbersMinChars: 3,
           folding: false,
           glyphMargin: false,
-          renderSideBySide: width==='100%'
+          renderSideBySide: width==='100%',
+          wordWrap: 'on'
         }}
         theme={theme}
       />

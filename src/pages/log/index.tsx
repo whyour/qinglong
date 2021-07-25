@@ -196,8 +196,10 @@ const Log = () => {
             fontSize: 12,
             minimap: {enabled: width==='100%'},
             lineNumbersMinChars: 3,
+            fontFamily: 'Source Code Pro',
             folding: false,
-            glyphMargin: false
+            glyphMargin: false,
+            wordWrap: 'on'
           }}
           onChange={(val, ev) => {setValue(val as string)}}
         />
