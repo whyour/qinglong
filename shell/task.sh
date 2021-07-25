@@ -171,10 +171,6 @@ run_else() {
 main() {
     if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
         case $# in
-        0)
-            echo
-            usage
-            ;;
         1)
             run_normal $1
             ;;
@@ -195,6 +191,9 @@ main() {
             run_else "$@"
             ;;
         esac
+    elif [[ $# -eq 0]]; then
+        echo
+        usage
     else
         run_else "$@"
     fi
