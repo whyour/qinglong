@@ -175,7 +175,6 @@ const Script = () => {
             lineNumbersMinChars: 3,
             folding: false,
             glyphMargin: false,
-            default
           }}
           onChange={(val) => {
             setValue((val as string).replace(/\r\n/g, '\n'));
