@@ -3,7 +3,7 @@ import { Button, message, Modal, TreeSelect } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import Editor from "@monaco-editor/react";
+import Editor from '@monaco-editor/react';
 
 const Config = () => {
   const [width, setWidth] = useState('100%');
@@ -62,21 +62,22 @@ const Config = () => {
     getConfig('config.sh');
   }, []);
 
-  useEffect(()=>{
+  useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark?'vs-dark':'vs');
-    media.addEventListener('change',(e)=>{
-      if(storageTheme === 'auto' || !storageTheme){
-        if(e.matches){
-          setTheme('vs-dark')
-        }else{
+    const isDark =
+      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark ? 'vs-dark' : 'vs');
+    media.addEventListener('change', (e) => {
+      if (storageTheme === 'auto' || !storageTheme) {
+        if (e.matches) {
+          setTheme('vs-dark');
+        } else {
           setTheme('vs');
         }
       }
-    })
-  },[])
+    });
+  }, []);
 
   return (
     <PageContainer
@@ -116,12 +117,14 @@ const Config = () => {
         theme={theme}
         options={{
           fontSize: 12,
-          minimap: {enabled: width==='100%'},
+          minimap: { enabled: width === '100%' },
           lineNumbersMinChars: 3,
           folding: false,
-          glyphMargin: false
+          glyphMargin: false,
         }}
-        onChange={(val) => {setValue(val as string)}}
+        onChange={(val) => {
+          setValue((val as string).replace(/\r\n/g, '\n'));
+        }}
       />
     </PageContainer>
   );

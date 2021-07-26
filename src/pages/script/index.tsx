@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import { TreeSelect, Tree, Input } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
-import Editor from "@monaco-editor/react";
+import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
 import styles from './index.module.less';
 
@@ -23,6 +23,7 @@ const LangMap: any = {
   '.py': 'python',
   '.js': 'javascript',
   '.sh': 'shell',
+  '.ts': 'typescript',
 };
 
 const Script = () => {
@@ -95,21 +96,22 @@ const Script = () => {
     setHeight(treeDom.current.clientHeight);
   }, []);
 
-  useEffect(()=>{
+  useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark?'vs-dark':'vs');
-    media.addEventListener('change',(e)=>{
-      if(storageTheme === 'auto' || !storageTheme){
-        if(e.matches){
-          setTheme('vs-dark')
-        }else{
+    const isDark =
+      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark ? 'vs-dark' : 'vs');
+    media.addEventListener('change', (e) => {
+      if (storageTheme === 'auto' || !storageTheme) {
+        if (e.matches) {
+          setTheme('vs-dark');
+        } else {
           setTheme('vs');
         }
       }
-    })
-  },[])
+    });
+  }, []);
 
   return (
     <PageContainer
@@ -169,12 +171,15 @@ const Script = () => {
           options={{
             readOnly: true,
             fontSize: 12,
-            minimap: {enabled: width==='100%'},
+            minimap: { enabled: width === '100%' },
             lineNumbersMinChars: 3,
             folding: false,
             glyphMargin: false,
+            default
           }}
-          onChange={(val) => {setValue(val as string)}}
+          onChange={(val) => {
+            setValue((val as string).replace(/\r\n/g, '\n'));
+          }}
         />
       </div>
     </PageContainer>
