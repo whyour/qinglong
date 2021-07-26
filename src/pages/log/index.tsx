@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import { TreeSelect, Tree, Input } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
-import Editor from "@monaco-editor/react";
+import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
 import styles from './index.module.less';
 
@@ -120,21 +120,22 @@ const Log = () => {
     setHeight(treeDom.current.clientHeight);
   }, []);
 
-  useEffect(()=>{
+  useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark?'vs-dark':'vs');
-    media.addEventListener('change',(e)=>{
-      if(storageTheme === 'auto' || !storageTheme){
-        if(e.matches){
-          setTheme('vs-dark')
-        }else{
+    const isDark =
+      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark ? 'vs-dark' : 'vs');
+    media.addEventListener('change', (e) => {
+      if (storageTheme === 'auto' || !storageTheme) {
+        if (e.matches) {
+          setTheme('vs-dark');
+        } else {
           setTheme('vs');
         }
       }
-    })
-  },[])
+    });
+  }, []);
 
   return (
     <PageContainer
@@ -194,14 +195,16 @@ const Log = () => {
           options={{
             readOnly: true,
             fontSize: 12,
-            minimap: {enabled: width==='100%'},
+            minimap: { enabled: width === '100%' },
             lineNumbersMinChars: 3,
             fontFamily: 'Source Code Pro',
             folding: false,
             glyphMargin: false,
-            wordWrap: 'on'
+            wordWrap: 'on',
           }}
-          onChange={(val, ev) => {setValue(val as string)}}
+          onChange={(val, ev) => {
+            setValue((val as string).replace(/\r\n/g, '\n'));
+          }}
         />
       </div>
     </PageContainer>
