@@ -191,7 +191,7 @@ main() {
             run_else "$@"
             ;;
         esac
-    elif [[ $# -eq 0]]; then
+    elif [[ $# -eq 0 ]]; then
         echo
         usage
     else
