@@ -65,6 +65,8 @@ export default function (props: any) {
   const isSafari =
     navigator.userAgent.includes('Safari') &&
     !navigator.userAgent.includes('Chrome');
+  const isQQBrowser = navigator.userAgent.includes('QQBrowser');
+
   return (
     <ProLayout
       selectedKeys={[props.location.pathname]}
@@ -76,8 +78,9 @@ export default function (props: any) {
               style={{
                 fontSize: isFirefox ? 9 : 12,
                 color: '#666',
-                marginLeft: 5,
+                marginLeft: 2,
                 zoom: isSafari ? 0.66 : 0.8,
+                letterSpacing: isQQBrowser ? -2 : 0,
               }}
             >
               {version}

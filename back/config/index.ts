@@ -67,4 +67,10 @@ export default {
     'crontab.list',
     'env.sh',
   ],
+  writePathList: [
+    '/ql/scripts/',
+    '/ql/config/',
+    '/ql/jbot/',
+    '/ql/bak/',
+  ],
 };

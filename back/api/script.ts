@@ -48,4 +48,44 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.post(
+    '/scripts',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        path: Joi.string().required(),
+        content: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        let { filename, path, content } = req.body as {
+          filename: string;
+          path: string;
+          content: string;
+        };
+        if (!path.endsWith('/')) {
+          path += '/';
+        }
+        if (config.writePathList.every((x) => !path.startsWith(x))) {
+          return res.send({ code: 400, data: '文件路径错误，可保存目录/ql/scripts、/ql/config、/ql/jbot、/ql/bak' });
+        }
+        const filePath = `${path}${filename.replace(/\//g, '')}`;
+        const bakPath = '/ql/bak';
+        if (fs.existsSync(filePath)) {
+          if (!fs.existsSync(bakPath)) {
+            fs.mkdirSync(bakPath);
+          }
+          fs.copyFileSync(filePath, bakPath);
+        }
+        fs.writeFileSync(filePath, content);
+        return res.send({ code: 200 });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
 };

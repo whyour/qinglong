@@ -21,9 +21,9 @@ const Login = () => {
           localStorage.setItem(config.authKey, data.token);
           history.push('/crontab');
         } else if (data.code === 100) {
-          message.warn(data.msg);
+          message.warn(data.message);
         } else {
-          message.error(data.msg);
+          message.error(data.message);
         }
       })
       .catch(function (error) {
