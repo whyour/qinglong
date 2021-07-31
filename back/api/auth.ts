@@ -35,7 +35,7 @@ export default (app: Router) => {
               );
               return res.send({
                 code: 100,
-                msg: '已初始化密码，请前往auth.json查看并重新登录',
+                message: '已初始化密码，请前往auth.json查看并重新登录',
               });
             }
             if (
@@ -57,10 +57,10 @@ export default (app: Router) => {
               );
               res.send({ code: 200, token });
             } else {
-              res.send({ code: 400, msg: config.authError });
+              res.send({ code: 400, message: config.authError });
             }
           } else {
-            res.send({ err: 400, msg: '请输入用户名密码!' });
+            res.send({ err: 400, message: '请输入用户名密码!' });
           }
         });
       } catch (e) {
@@ -101,7 +101,7 @@ export default (app: Router) => {
       try {
         fs.writeFile(config.authConfigFile, JSON.stringify(req.body), (err) => {
           if (err) console.log(err);
-          res.send({ code: 200, msg: '更新成功' });
+          res.send({ code: 200, message: '更新成功' });
         });
       } catch (e) {
         logger.error('🔥 error: %o', e);

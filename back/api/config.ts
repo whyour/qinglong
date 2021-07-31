@@ -68,7 +68,7 @@ export default (app: Router) => {
         const { name, content } = req.body;
         const path = `${config.configPath}${name}`;
         fs.writeFileSync(path, content);
-        res.send({ code: 200, msg: '保存成功' });
+        res.send({ code: 200, message: '保存成功' });
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);

@@ -96,6 +96,7 @@ const CronLogModal = ({
       title={titleElement()}
       visible={visible}
       centered
+      className="log-modal"
       bodyStyle={{
         overflowY: 'auto',
         maxHeight: 'calc(80vh - var(--vh-offset, 0px))',

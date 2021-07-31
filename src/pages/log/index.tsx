@@ -5,6 +5,7 @@ import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
 import styles from './index.module.less';
+import { Controlled as CodeMirror } from 'react-codemirror2';
 
 function getFilterData(keyword: string, data: any) {
   const expandedKeys: string[] = [];
@@ -188,24 +189,41 @@ const Log = () => {
             </div>
           </div>
         )}
-        <Editor
-          language="shell"
-          theme={theme}
-          value={value}
-          options={{
-            readOnly: true,
-            fontSize: 12,
-            minimap: { enabled: width === '100%' },
-            lineNumbersMinChars: 3,
-            fontFamily: 'Source Code Pro',
-            folding: false,
-            glyphMargin: false,
-            wordWrap: 'on',
-          }}
-          onChange={(val, ev) => {
-            setValue((val as string).replace(/\r\n/g, '\n'));
-          }}
-        />
+        {isPhone ? (
+          <CodeMirror
+            value={value}
+            options={{
+              lineNumbers: true,
+              lineWrapping: true,
+              styleActiveLine: true,
+              matchBrackets: true,
+              readOnly: true,
+            }}
+            onBeforeChange={(editor, data, value) => {
+              setValue(value);
+            }}
+            onChange={(editor, data, value) => {}}
+          />
+        ) : (
+          <Editor
+            language="shell"
+            theme={theme}
+            value={value}
+            options={{
+              readOnly: true,
+              fontSize: 12,
+              minimap: { enabled: width === '100%' },
+              lineNumbersMinChars: 3,
+              fontFamily: 'Source Code Pro',
+              folding: false,
+              glyphMargin: false,
+              wordWrap: 'on',
+            }}
+            onChange={(val, ev) => {
+              setValue((val as string).replace(/\r\n/g, '\n'));
+            }}
+          />
+        )}
       </div>
     </PageContainer>
   );

@@ -3,9 +3,9 @@ import { Button, message, Modal } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import ReactDiffViewer from 'react-diff-viewer';
 import './index.less';
-import { DiffEditor } from "@monaco-editor/react";
+import { DiffEditor } from '@monaco-editor/react';
+import ReactDiffViewer from 'react-diff-viewer';
 
 const Crontab = () => {
   const [width, setWidth] = useState('100%');
@@ -15,6 +15,7 @@ const Crontab = () => {
   const [sample, setSample] = useState('');
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<string>('');
+  const [isPhone, setIsPhone] = useState(false);
 
   const getConfig = () => {
     request.get(`${config.apiPrefix}configs/config.sh`).then((data) => {
@@ -37,30 +38,33 @@ const Crontab = () => {
       setWidth('auto');
       setMarginLeft(0);
       setMarginTop(0);
+      setIsPhone(true);
     } else {
       setWidth('100%');
       setMarginLeft(0);
       setMarginTop(-72);
+      setIsPhone(false);
     }
     getConfig();
     getSample();
   }, []);
 
-  useEffect(()=>{
+  useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark = (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark?'vs-dark':'vs');
-    media.addEventListener('change',(e)=>{
-      if(storageTheme === 'auto' || !storageTheme){
-        if(e.matches){
-          setTheme('vs-dark')
-        }else{
+    const isDark =
+      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark ? 'vs-dark' : 'vs');
+    media.addEventListener('change', (e) => {
+      if (storageTheme === 'auto' || !storageTheme) {
+        if (e.matches) {
+          setTheme('vs-dark');
+        } else {
           setTheme('vs');
         }
       }
-    })
-  },[])
+    });
+  }, []);
 
   return (
     <PageContainer
@@ -80,22 +84,50 @@ const Crontab = () => {
         },
       }}
     >
-      <DiffEditor
-        language={"shell"}
-        original={sample}
-        modified={value}
-        options={{
-          readOnly: true,
-          fontSize: 12,
-          minimap: {enabled: width==='100%'},
-          lineNumbersMinChars: 3,
-          folding: false,
-          glyphMargin: false,
-          renderSideBySide: width==='100%',
-          wordWrap: 'on'
-        }}
-        theme={theme}
-      />
+      {isPhone ? (
+        <ReactDiffViewer
+          styles={{
+            diffContainer: {
+              overflowX: 'auto',
+              minWidth: 768,
+            },
+            diffRemoved: {
+              overflowX: 'auto',
+              maxWidth: 300,
+            },
+            diffAdded: {
+              overflowX: 'auto',
+              maxWidth: 300,
+            },
+            line: {
+              wordBreak: 'break-word',
+            },
+          }}
+          oldValue={value}
+          newValue={sample}
+          splitView={true}
+          leftTitle="config.sh"
+          rightTitle="config.sample.sh"
+          disableWordDiff={true}
+        />
+      ) : (
+        <DiffEditor
+          language={'shell'}
+          original={sample}
+          modified={value}
+          options={{
+            readOnly: true,
+            fontSize: 12,
+            minimap: { enabled: width === '100%' },
+            lineNumbersMinChars: 3,
+            folding: false,
+            glyphMargin: false,
+            renderSideBySide: width === '100%',
+            wordWrap: 'on',
+          }}
+          theme={theme}
+        />
+      )}
     </PageContainer>
   );
 };

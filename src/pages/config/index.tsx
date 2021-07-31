@@ -4,6 +4,7 @@ import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import Editor from '@monaco-editor/react';
+import { Controlled as CodeMirror } from 'react-codemirror2';
 
 const Config = () => {
   const [width, setWidth] = useState('100%');
@@ -15,6 +16,7 @@ const Config = () => {
   const [select, setSelect] = useState('config.sh');
   const [data, setData] = useState<any[]>([]);
   const [theme, setTheme] = useState<string>('');
+  const [isPhone, setIsPhone] = useState(false);
 
   const getConfig = (name: string) => {
     request.get(`${config.apiPrefix}configs/${name}`).then((data: any) => {
@@ -38,7 +40,7 @@ const Config = () => {
         data: { content: value, name: select },
       })
       .then((data: any) => {
-        message.success(data.msg);
+        message.success(data.message);
       });
   };
 
@@ -53,10 +55,12 @@ const Config = () => {
       setWidth('auto');
       setMarginLeft(0);
       setMarginTop(0);
+      setIsPhone(true);
     } else {
       setWidth('100%');
       setMarginLeft(0);
       setMarginTop(-72);
+      setIsPhone(false);
     }
     getFiles();
     getConfig('config.sh');
@@ -111,21 +115,37 @@ const Config = () => {
         },
       }}
     >
-      <Editor
-        defaultLanguage="shell"
-        value={value}
-        theme={theme}
-        options={{
-          fontSize: 12,
-          minimap: { enabled: width === '100%' },
-          lineNumbersMinChars: 3,
-          folding: false,
-          glyphMargin: false,
-        }}
-        onChange={(val) => {
-          setValue((val as string).replace(/\r\n/g, '\n'));
-        }}
-      />
+      {isPhone ? (
+        <CodeMirror
+          value={value}
+          options={{
+            lineNumbers: true,
+            styleActiveLine: true,
+            matchBrackets: true,
+            mode: 'shell',
+          }}
+          onBeforeChange={(editor, data, value) => {
+            setValue(value);
+          }}
+          onChange={(editor, data, value) => {}}
+        />
+      ) : (
+        <Editor
+          defaultLanguage="shell"
+          value={value}
+          theme={theme}
+          options={{
+            fontSize: 12,
+            minimap: { enabled: width === '100%' },
+            lineNumbersMinChars: 3,
+            folding: false,
+            glyphMargin: false,
+          }}
+          onChange={(val) => {
+            setValue((val as string).replace(/\r\n/g, '\n'));
+          }}
+        />
+      )}
     </PageContainer>
   );
 };

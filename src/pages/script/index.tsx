@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, Key, useRef } from 'react';
-import { TreeSelect, Tree, Input } from 'antd';
+import { TreeSelect, Tree, Input, Button } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
 import styles from './index.module.less';
+import EditModal from './editModal';
+import { Controlled as CodeMirror } from 'react-codemirror2';
 
 function getFilterData(keyword: string, data: any) {
   if (keyword) {
@@ -41,6 +43,7 @@ const Script = () => {
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
   const [theme, setTheme] = useState<string>('');
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
 
   const getScripts = () => {
     setLoading(true);
@@ -119,18 +122,29 @@ const Script = () => {
       title={title}
       loading={loading}
       extra={
-        isPhone && [
-          <TreeSelect
-            className="log-select"
-            value={select}
-            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-            treeData={data}
-            placeholder="请选择脚本文件"
-            showSearch
-            key="value"
-            onSelect={onSelect}
-          />,
-        ]
+        isPhone
+          ? [
+              <TreeSelect
+                className="log-select"
+                value={select}
+                dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+                treeData={data}
+                placeholder="请选择脚本文件"
+                showSearch
+                key="value"
+                onSelect={onSelect}
+              />,
+            ]
+          : [
+              <Button
+                type="primary"
+                onClick={() => {
+                  setIsLogModalVisible(true);
+                }}
+              >
+                调试
+              </Button>,
+            ]
       }
       header={{
         style: {
@@ -164,20 +178,47 @@ const Script = () => {
             </div>
           </div>
         )}
-        <Editor
-          language={mode}
-          value={value}
-          theme={theme}
-          options={{
-            readOnly: true,
-            fontSize: 12,
-            minimap: { enabled: width === '100%' },
-            lineNumbersMinChars: 3,
-            folding: false,
-            glyphMargin: false,
-          }}
-          onChange={(val) => {
-            setValue((val as string).replace(/\r\n/g, '\n'));
+        {isPhone ? (
+          <CodeMirror
+            value={value}
+            options={{
+              lineNumbers: true,
+              lineWrapping: true,
+              styleActiveLine: true,
+              matchBrackets: true,
+              mode,
+              readOnly: true,
+            }}
+            onBeforeChange={(editor, data, value) => {
+              setValue(value);
+            }}
+            onChange={(editor, data, value) => {}}
+          />
+        ) : (
+          <Editor
+            language={mode}
+            value={value}
+            theme={theme}
+            options={{
+              readOnly: true,
+              fontSize: 12,
+              minimap: { enabled: width === '100%' },
+              lineNumbersMinChars: 3,
+              folding: false,
+              glyphMargin: false,
+            }}
+            onChange={(val) => {
+              setValue((val as string).replace(/\r\n/g, '\n'));
+            }}
+          />
+        )}
+        <EditModal
+          visible={isLogModalVisible}
+          treeData={data}
+          currentFile={select}
+          content={value}
+          handleCancel={() => {
+            setIsLogModalVisible(false);
           }}
         />
       </div>
