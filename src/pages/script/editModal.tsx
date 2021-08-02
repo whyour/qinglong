@@ -6,6 +6,7 @@ import SplitPane from 'react-split-pane';
 import Editor from '@monaco-editor/react';
 import SaveModal from './saveModal';
 import SettingModal from './setting';
+import { useTheme } from '@/utils/hooks';
 
 const { Option } = Select;
 const LangMap: any = {
@@ -35,7 +36,6 @@ const EditModal = ({
   handleCancel: () => void;
 }) => {
   const [value, setValue] = useState('');
-  const [theme, setTheme] = useState<string>('');
   const [language, setLanguage] = useState<string>('javascript');
   const [fileName, setFileName] = useState<string>('');
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
@@ -43,6 +43,7 @@ const EditModal = ({
     useState<boolean>(false);
   const [isNewFile, setIsNewFile] = useState<boolean>(false);
   const [log, setLog] = useState<string>('');
+  const { theme } = useTheme();
 
   const cancel = () => {
     handleCancel();
@@ -78,23 +79,6 @@ const EditModal = ({
       setValue(content as string);
     }
     setIsNewFile(!currentFile);
-  }, []);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark =
-      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark ? 'vs-dark' : 'vs');
-    media.addEventListener('change', (e) => {
-      if (storageTheme === 'auto' || !storageTheme) {
-        if (e.matches) {
-          setTheme('vs-dark');
-        } else {
-          setTheme('vs');
-        }
-      }
-    });
   }, []);
 
   return (
