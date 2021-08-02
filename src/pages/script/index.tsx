@@ -7,6 +7,7 @@ import { request } from '@/utils/http';
 import styles from './index.module.less';
 import EditModal from './editModal';
 import { Controlled as CodeMirror } from 'react-codemirror2';
+import { useCtx, useTheme } from '@/utils/hooks';
 
 function getFilterData(keyword: string, data: any) {
   if (keyword) {
@@ -29,21 +30,18 @@ const LangMap: any = {
 };
 
 const Script = () => {
-  const [width, setWidth] = useState('100%');
-  const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-72);
   const [title, setTitle] = useState('请选择脚本文件');
   const [value, setValue] = useState('请选择脚本文件');
   const [select, setSelect] = useState();
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isPhone, setIsPhone] = useState(false);
   const [mode, setMode] = useState('');
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
-  const [theme, setTheme] = useState<string>('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const { headerStyle, isPhone } = useCtx();
+  const { theme } = useTheme();
 
   const getScripts = () => {
     setLoading(true);
@@ -64,7 +62,7 @@ const Script = () => {
 
   const onSelect = (value: any, node: any) => {
     const newMode = LangMap[value.slice(-3)] || '';
-    setMode(newMode);
+    setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setSelect(value);
     setTitle(node.parent || node.value);
     getDetail(node);
@@ -84,36 +82,8 @@ const Script = () => {
   );
 
   useEffect(() => {
-    if (document.body.clientWidth < 768) {
-      setWidth('auto');
-      setMarginLeft(0);
-      setMarginTop(0);
-      setIsPhone(true);
-    } else {
-      setWidth('100%');
-      setMarginLeft(0);
-      setMarginTop(-72);
-      setIsPhone(false);
-    }
     getScripts();
     setHeight(treeDom.current.clientHeight);
-  }, []);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark =
-      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark ? 'vs-dark' : 'vs');
-    media.addEventListener('change', (e) => {
-      if (storageTheme === 'auto' || !storageTheme) {
-        if (e.matches) {
-          setTheme('vs-dark');
-        } else {
-          setTheme('vs');
-        }
-      }
-    });
   }, []);
 
   return (
@@ -147,16 +117,7 @@ const Script = () => {
             ]
       }
       header={{
-        style: {
-          padding: '4px 16px 4px 15px',
-          position: 'sticky',
-          top: 0,
-          left: 0,
-          zIndex: 20,
-          marginTop,
-          width,
-          marginLeft,
-        },
+        style: headerStyle,
       }}
     >
       <div className={`${styles['log-container']}`}>
@@ -202,7 +163,6 @@ const Script = () => {
             options={{
               readOnly: true,
               fontSize: 12,
-              minimap: { enabled: width === '100%' },
               lineNumbersMinChars: 3,
               folding: false,
               glyphMargin: false,

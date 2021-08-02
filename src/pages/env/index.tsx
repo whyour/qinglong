@@ -25,6 +25,7 @@ import EditNameModal from './editNameModal';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
+import { useCtx } from '@/utils/hooks';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -194,9 +195,6 @@ const Env = () => {
       },
     },
   ];
-  const [width, setWidth] = useState('100%');
-  const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -204,6 +202,7 @@ const Env = () => {
   const [editedEnv, setEditedEnv] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
+  const { headerStyle, isPhone } = useCtx();
 
   const getEnvs = () => {
     setLoading(true);
@@ -423,18 +422,6 @@ const Env = () => {
     getEnvs();
   }, [searchText]);
 
-  useEffect(() => {
-    if (document.body.clientWidth < 768) {
-      setWidth('auto');
-      setMarginLeft(0);
-      setMarginTop(0);
-    } else {
-      setWidth('100%');
-      setMarginLeft(0);
-      setMarginTop(-72);
-    }
-  }, []);
-
   return (
     <PageContainer
       className="ql-container-wrapper env-wrapper"
@@ -452,16 +439,7 @@ const Env = () => {
         </Button>,
       ]}
       header={{
-        style: {
-          padding: '4px 16px 4px 15px',
-          position: 'sticky',
-          top: 0,
-          left: 0,
-          zIndex: 20,
-          marginTop,
-          width,
-          marginLeft,
-        },
+        style: headerStyle,
       }}
     >
       {selectedRowIds.length > 0 && (
@@ -511,7 +489,7 @@ const Env = () => {
           scroll={{ x: 768 }}
           components={components}
           loading={loading}
-          onRow={(record, index) => {
+          onRow={(record: any, index: number) => {
             return {
               index,
               moveRow,
