@@ -164,7 +164,7 @@ const Env = () => {
       key: 'action',
       align: 'center' as const,
       render: (text: string, record: any, index: number) => {
-        const isPc = width === '100%';
+        const isPc = !isPhone;
         return (
           <Space size="middle" style={{ paddingLeft: 8 }}>
             <Tooltip title={isPc ? '编辑' : ''}>
