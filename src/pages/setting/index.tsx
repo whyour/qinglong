@@ -10,6 +10,7 @@ import {
   setFetchMethod,
 } from 'darkreader';
 import { history } from 'umi';
+import { useCtx } from '@/utils/hooks';
 
 const optionsWithDisabled = [
   { label: '亮色', value: 'light' },
@@ -18,13 +19,11 @@ const optionsWithDisabled = [
 ];
 
 const Password = () => {
-  const [width, setWidth] = useState('100%');
-  const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(true);
   const defaultDarken = localStorage.getItem('qinglong_dark_theme') || 'auto';
   const [theme, setTheme] = useState(defaultDarken);
+  const { headerStyle, isPhone } = useCtx();
 
   const handleOk = (values: any) => {
     request
@@ -55,18 +54,6 @@ const Password = () => {
   };
 
   useEffect(() => {
-    if (document.body.clientWidth < 768) {
-      setWidth('auto');
-      setMarginLeft(0);
-      setMarginTop(0);
-    } else {
-      setWidth('100%');
-      setMarginLeft(0);
-      setMarginTop(-72);
-    }
-  }, []);
-
-  useEffect(() => {
     setFetchMethod(window.fetch);
     if (theme === 'dark') {
       enableDarkMode({
@@ -90,16 +77,7 @@ const Password = () => {
       className="ql-container-wrapper"
       title="系统设置"
       header={{
-        style: {
-          padding: '4px 16px 4px 15px',
-          position: 'sticky',
-          top: 0,
-          left: 0,
-          zIndex: 20,
-          marginTop,
-          width,
-          marginLeft,
-        },
+        style: headerStyle,
       }}
     >
       <Tabs

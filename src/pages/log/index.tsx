@@ -6,6 +6,7 @@ import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
 import styles from './index.module.less';
 import { Controlled as CodeMirror } from 'react-codemirror2';
+import { useCtx, useTheme } from '@/utils/hooks';
 
 function getFilterData(keyword: string, data: any) {
   const expandedKeys: string[] = [];
@@ -37,19 +38,16 @@ function getFilterData(keyword: string, data: any) {
 }
 
 const Log = () => {
-  const [width, setWidth] = useState('100%');
-  const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-72);
   const [title, setTitle] = useState('请选择日志文件');
   const [value, setValue] = useState('请选择日志文件');
   const [select, setSelect] = useState();
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isPhone, setIsPhone] = useState(false);
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
-  const [theme, setTheme] = useState<string>('');
+  const { headerStyle, isPhone } = useCtx();
+  const { theme } = useTheme();
 
   const getLogs = () => {
     setLoading(true);
@@ -106,36 +104,8 @@ const Log = () => {
   );
 
   useEffect(() => {
-    if (document.body.clientWidth < 768) {
-      setWidth('auto');
-      setMarginLeft(0);
-      setMarginTop(0);
-      setIsPhone(true);
-    } else {
-      setWidth('100%');
-      setMarginLeft(0);
-      setMarginTop(-72);
-      setIsPhone(false);
-    }
     getLogs();
     setHeight(treeDom.current.clientHeight);
-  }, []);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark =
-      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark ? 'vs-dark' : 'vs');
-    media.addEventListener('change', (e) => {
-      if (storageTheme === 'auto' || !storageTheme) {
-        if (e.matches) {
-          setTheme('vs-dark');
-        } else {
-          setTheme('vs');
-        }
-      }
-    });
   }, []);
 
   return (
@@ -158,16 +128,7 @@ const Log = () => {
         ]
       }
       header={{
-        style: {
-          padding: '4px 16px 4px 15px',
-          position: 'sticky',
-          top: 0,
-          left: 0,
-          zIndex: 20,
-          marginTop,
-          width,
-          marginLeft,
-        },
+        style: headerStyle,
       }}
     >
       <div className={`${styles['log-container']}`}>
@@ -212,7 +173,6 @@ const Log = () => {
             options={{
               readOnly: true,
               fontSize: 12,
-              minimap: { enabled: width === '100%' },
               lineNumbersMinChars: 3,
               fontFamily: 'Source Code Pro',
               folding: false,

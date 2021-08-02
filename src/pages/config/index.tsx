@@ -5,18 +5,16 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import Editor from '@monaco-editor/react';
 import { Controlled as CodeMirror } from 'react-codemirror2';
+import { useCtx, useTheme } from '@/utils/hooks';
 
 const Config = () => {
-  const [width, setWidth] = useState('100%');
-  const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('config.sh');
   const [select, setSelect] = useState('config.sh');
   const [data, setData] = useState<any[]>([]);
-  const [theme, setTheme] = useState<string>('');
-  const [isPhone, setIsPhone] = useState(false);
+  const { headerStyle, isPhone } = useCtx();
+  const { theme } = useTheme();
 
   const getConfig = (name: string) => {
     request.get(`${config.apiPrefix}configs/${name}`).then((data: any) => {
@@ -51,36 +49,8 @@ const Config = () => {
   };
 
   useEffect(() => {
-    if (document.body.clientWidth < 768) {
-      setWidth('auto');
-      setMarginLeft(0);
-      setMarginTop(0);
-      setIsPhone(true);
-    } else {
-      setWidth('100%');
-      setMarginLeft(0);
-      setMarginTop(-72);
-      setIsPhone(false);
-    }
     getFiles();
     getConfig('config.sh');
-  }, []);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark =
-      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    setTheme(isDark ? 'vs-dark' : 'vs');
-    media.addEventListener('change', (e) => {
-      if (storageTheme === 'auto' || !storageTheme) {
-        if (e.matches) {
-          setTheme('vs-dark');
-        } else {
-          setTheme('vs');
-        }
-      }
-    });
   }, []);
 
   return (
@@ -103,16 +73,7 @@ const Config = () => {
         </Button>,
       ]}
       header={{
-        style: {
-          padding: '4px 16px 4px 15px',
-          position: 'sticky',
-          top: 0,
-          left: 0,
-          zIndex: 20,
-          marginTop,
-          width,
-          marginLeft,
-        },
+        style: headerStyle,
       }}
     >
       {isPhone ? (
@@ -136,7 +97,6 @@ const Config = () => {
           theme={theme}
           options={{
             fontSize: 12,
-            minimap: { enabled: width === '100%' },
             lineNumbersMinChars: 3,
             folding: false,
             glyphMargin: false,

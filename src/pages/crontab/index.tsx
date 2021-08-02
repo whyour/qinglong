@@ -31,6 +31,7 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import CronModal from './modal';
 import CronLogModal from './logModal';
+import { useCtx, useTheme } from '@/utils/hooks';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -139,7 +140,7 @@ const Crontab = () => {
       key: 'action',
       align: 'center' as const,
       render: (text: string, record: any, index: number) => {
-        const isPc = width === '100%';
+        const isPc = !isPhone;
         return (
           <Space size="middle">
             {record.status === CrontabStatus.idle && (
@@ -180,9 +181,6 @@ const Crontab = () => {
     },
   ];
 
-  const [width, setWidth] = useState('100%');
-  const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-72);
   const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -193,6 +191,7 @@ const Crontab = () => {
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const { headerStyle, isPhone } = useCtx();
 
   const getCrons = () => {
     setLoading(true);
@@ -535,15 +534,6 @@ const Crontab = () => {
   }, [searchText]);
 
   useEffect(() => {
-    if (document.body.clientWidth < 768) {
-      setWidth('auto');
-      setMarginLeft(0);
-      setMarginTop(0);
-    } else {
-      setWidth('100%');
-      setMarginLeft(0);
-      setMarginTop(-72);
-    }
     setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
   }, []);
 
@@ -564,16 +554,7 @@ const Crontab = () => {
         </Button>,
       ]}
       header={{
-        style: {
-          padding: '4px 16px 4px 15px',
-          position: 'sticky',
-          top: 0,
-          left: 0,
-          zIndex: 20,
-          marginTop,
-          width,
-          marginLeft,
-        },
+        style: headerStyle,
       }}
     >
       {selectedRowIds.length > 0 && (
