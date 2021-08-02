@@ -195,8 +195,8 @@ fix_config() {
     fi
 
     if [ -s /etc/nginx/conf.d/default.conf ]; then
-        echo -e "检测到默认nginx配置文件，删除...\n"
-        rm -f /etc/nginx/conf.d/default.conf
+        echo -e "检测到默认nginx配置文件，清空...\n"
+        echo '' > /etc/nginx/conf.d/default.conf
         echo
     fi
 }
