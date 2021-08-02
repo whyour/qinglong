@@ -47,7 +47,8 @@ export const useTheme = () => {
     const isDark =
       (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
     setTheme(isDark ? 'vs-dark' : 'vs');
-    media.addEventListener('change', (e) => {
+
+    const cb = (e: any) => {
       if (storageTheme === 'auto' || !storageTheme) {
         if (e.matches) {
           setTheme('vs-dark');
@@ -55,7 +56,12 @@ export const useTheme = () => {
           setTheme('vs');
         }
       }
-    });
+    };
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', cb);
+    } else if (typeof media.addListener === 'function') {
+      media.addListener(cb);
+    }
   }, []);
 
   return { theme };
