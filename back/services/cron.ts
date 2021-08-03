@@ -183,6 +183,7 @@ export default class CronService {
         this.cronDb.update(
           { _id: { $in: ids } },
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+          { multi: true },
         );
         resolve();
       });
