@@ -211,14 +211,16 @@ export default class EnvService {
     const envs = await this.envs(
       '',
       { position: -1 },
-      { status: { $ne: EnvStatus.disabled }, name: { $exists: true } },
+      { name: { $exists: true } },
     );
     const groups = _.groupBy(envs, 'name');
     let env_string = '';
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
-        env_string += `export ${key}="${_.map(group, 'value')
+        env_string += `export ${key}="${_(group)
+          .filter((x) => x.status !== EnvStatus.disabled)
+          .map('value')
           .join('&')
           .replace(/ /g, '')}"\n`;
       }
