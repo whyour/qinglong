@@ -1,4 +1,4 @@
-import React, { PureComponent, Fragment, useState, useEffect } from 'react';
+import React, { PureComponent, Fragment, useState, useEffect, useRef } from 'react';
 import { Button, message, Modal, TreeSelect } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -15,6 +15,7 @@ const Config = () => {
   const [data, setData] = useState<any[]>([]);
   const { headerStyle, isPhone } = useCtx();
   const { theme } = useTheme();
+  const editorRef = useRef<any>(null);
 
   const getConfig = (name: string) => {
     request.get(`${config.apiPrefix}configs/${name}`).then((data: any) => {
@@ -33,9 +34,11 @@ const Config = () => {
   };
 
   const updateConfig = () => {
+    const content = editorRef.current.getValue(1);
+
     request
       .post(`${config.apiPrefix}configs/save`, {
-        data: { content: value, name: select },
+        data: { content, name: select },
       })
       .then((data: any) => {
         message.success(data.message);
@@ -101,8 +104,8 @@ const Config = () => {
             folding: false,
             glyphMargin: false,
           }}
-          onChange={(val) => {
-            setValue((val as string).replace(/\r\n/g, '\n'));
+          onMount={(editor) => {
+            editorRef.current = editor;
           }}
         />
       )}
