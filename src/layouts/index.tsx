@@ -112,6 +112,7 @@ export default function (props: any) {
           },
         ];
       }}
+      pageTitleRender={() => '控制面板'}
       {...defaultProps}
     >
       {props.children}
