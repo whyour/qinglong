@@ -167,9 +167,6 @@ const Script = () => {
               folding: false,
               glyphMargin: false,
             }}
-            onChange={(val) => {
-              setValue((val as string).replace(/\r\n/g, '\n'));
-            }}
           />
         )}
         <EditModal

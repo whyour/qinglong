@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Drawer, Button, Tabs, Badge, Select, TreeSelect } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
@@ -44,6 +44,7 @@ const EditModal = ({
   const [isNewFile, setIsNewFile] = useState<boolean>(false);
   const [log, setLog] = useState<string>('');
   const { theme } = useTheme();
+  const editorRef = useRef<any>(null);
 
   const cancel = () => {
     handleCancel();
@@ -164,8 +165,8 @@ const EditModal = ({
             lineNumbersMinChars: 3,
             glyphMargin: false,
           }}
-          onChange={(val) => {
-            setValue((val as string).replace(/\r\n/g, '\n'));
+          onMount={(editor) => {
+            editorRef.current = editor;
           }}
         />
         <div>
@@ -178,7 +179,7 @@ const EditModal = ({
           setSaveModalVisible(false);
         }}
         isNewFile={isNewFile}
-        file={{ content: value, filename: fileName }}
+        file={{ content: editorRef.current.getValue(1), filename: fileName }}
       />
       <SettingModal
         visible={settingModalVisible}
