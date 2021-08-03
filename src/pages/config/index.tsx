@@ -1,4 +1,10 @@
-import React, { PureComponent, Fragment, useState, useEffect, useRef } from 'react';
+import React, {
+  PureComponent,
+  Fragment,
+  useState,
+  useEffect,
+  useRef,
+} from 'react';
 import { Button, message, Modal, TreeSelect } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -34,7 +40,9 @@ const Config = () => {
   };
 
   const updateConfig = () => {
-    const content = editorRef.current.getValue().replace(/\r\n/g, '\n');
+    const content = editorRef.current
+      ? editorRef.current.getValue().replace(/\r\n/g, '\n')
+      : value;
 
     request
       .post(`${config.apiPrefix}configs/save`, {
