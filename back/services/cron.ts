@@ -9,6 +9,7 @@ import cron_parser from 'cron-parser';
 import { getFileContentByName } from '../config/util';
 import PQueue from 'p-queue';
 import { promises, existsSync } from 'fs';
+import { promisify } from 'util';
 
 @Service()
 export default class CronService {
@@ -164,30 +165,56 @@ export default class CronService {
 
   public async stop(ids: string[]) {
     return new Promise((resolve: any) => {
-      this.cronDb.find({ _id: { $in: ids } }).exec((err, docs: Crontab[]) => {
-        for (const doc of docs) {
-          if (doc.pid) {
-            try {
-              process.kill(-doc.pid);
-            } catch (error) {
-              this.logger.silly(error);
+      this.cronDb
+        .find({ _id: { $in: ids } })
+        .exec(async (err, docs: Crontab[]) => {
+          for (const doc of docs) {
+            if (doc.pid) {
+              try {
+                process.kill(-doc.pid);
+              } catch (error) {
+                this.logger.silly(error);
+              }
+            }
+            const err = await this.killTask(doc.command);
+            if (doc.log_path) {
+              const str = err ? `\n${err}` : '';
+              fs.appendFileSync(
+                `${doc.log_path}`,
+                `${str}\n## 执行结束...  ${new Date().toLocaleString()} `,
+              );
             }
           }
-          if (doc.log_path) {
-            fs.appendFileSync(
-              `${doc.log_path}`,
-              `\n## 执行结束...  ${new Date().toLocaleString()} `,
-            );
-          }
-        }
-        this.cronDb.update(
-          { _id: { $in: ids } },
-          { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
-          { multi: true },
-        );
-        resolve();
-      });
+          this.cronDb.update(
+            { _id: { $in: ids } },
+            { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+            { multi: true },
+          );
+          this.queue.clear();
+          resolve();
+        });
     });
+  }
+
+  private async killTask(name: string) {
+    let taskCommond = `ps -ef | grep "${name}" | grep -v grep | awk '{print $1}'`;
+    const execAsync = promisify(exec);
+    try {
+      let pid = (await execAsync(taskCommond)).stdout;
+      if (pid) {
+        pid = (await execAsync(`pstree -p ${pid}`)).stdout;
+      } else {
+        return;
+      }
+      const pids = pid.match(/\d+/g);
+      for (const id of pids) {
+        const c = `kill -9 ${id}`;
+        const { stdout, stderr } = await execAsync(c);
+        return stderr;
+      }
+    } catch (e) {
+      return JSON.stringify(e);
+    }
   }
 
   private async runSingle(id: string): Promise<number> {
