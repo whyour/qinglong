@@ -179,7 +179,7 @@ const EditModal = ({
           setSaveModalVisible(false);
         }}
         isNewFile={isNewFile}
-        file={{ content: editorRef.current && editorRef.current.getValue(1), filename: fileName }}
+        file={{ content: editorRef.current && editorRef.current.getValue().replace(/\r\n/g, '\n'), filename: fileName }}
       />
       <SettingModal
         visible={settingModalVisible}

@@ -34,7 +34,7 @@ const Config = () => {
   };
 
   const updateConfig = () => {
-    const content = editorRef.current.getValue(1);
+    const content = editorRef.current.getValue().replace(/\r\n/g, '\n');
 
     request
       .post(`${config.apiPrefix}configs/save`, {
