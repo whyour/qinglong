@@ -119,7 +119,7 @@ add_cron() {
             cron_name=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
             [[ -z $cron_name ]] && cron_name="$file_name"
             [[ -z $cron_line ]] && cron_line=$(grep "cron:" $file | awk -F ":" '{print $2}' | xargs)
-            [[ -z $cron_line ]] && cron_line=$(grep "cron " $file | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | xargs) 
+            [[ -z $cron_line ]] && cron_line=$(grep "cron " $file | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | xargs)
             [[ -z $cron_line ]] && cron_line="0 6 * * *"
             result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
             echo -e "$result"
@@ -193,7 +193,7 @@ update_raw() {
         cron_name=$(grep "new Env" $raw_file_name | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
         [[ -z $cron_name ]] && cron_name="$raw_file_name"
         [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | xargs)
-        [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | xargs) 
+        [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | xargs)
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
             result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
@@ -238,8 +238,8 @@ update_qinglong() {
 
     local no_restart="$1"
     [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
-    reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git"
-    git_pull_scripts $dir_root
+    reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git" "master"
+    git_pull_scripts $dir_root "master"
 
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$dir_root成功...\n"
@@ -255,12 +255,8 @@ update_qinglong() {
 
     local url="${github_proxy_url}https://github.com/whyour/qinglong-static.git"
     if [ -d ${ql_static_repo}/.git ]; then
-        reset_romote_url ${ql_static_repo} ${url}
-        cd ${ql_static_repo}
-        git fetch --all
-        exit_status=$?
-        git reset --hard origin/master
-        cd $dir_root
+        reset_romote_url ${ql_static_repo} ${url} "master"
+        git_pull_scripts ${ql_static_repo} "master"
     else
         git_clone_scripts ${url} ${ql_static_repo}
     fi
@@ -298,7 +294,7 @@ patch_version() {
 
 reload_pm2() {
     pm2 l >/dev/null 2>&1
-    
+
     if [[ $(pm2 info panel 2>/dev/null) ]]; then
         pm2 reload panel --source-map-support --time >/dev/null 2>&1
     else
