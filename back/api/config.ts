@@ -59,7 +59,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
-        content: Joi.string().required(),
+        content: Joi.string().allow('').optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {

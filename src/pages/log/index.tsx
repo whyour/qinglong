@@ -179,9 +179,6 @@ const Log = () => {
               glyphMargin: false,
               wordWrap: 'on',
             }}
-            onChange={(val, ev) => {
-              setValue((val as string).replace(/\r\n/g, '\n'));
-            }}
           />
         )}
       </div>
