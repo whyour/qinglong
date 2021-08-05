@@ -93,11 +93,11 @@ run_normal() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" >> $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before
+    . $file_task_before >> $log_path 2>&1
 
-    timeout -k 10s $command_timeout_time $which_program $p1 2>&1 >> $log_path
+    timeout -k 10s $command_timeout_time $which_program $p1 >> $log_path 2>&1
 
-    . $file_task_after
+    . $file_task_after >> $log_path 2>&1
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -127,17 +127,17 @@ run_concurrent() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" >> $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before
+    . $file_task_before >> $log_path 2>&1
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n" >> $log_path
 
     single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     for i in "${!array[@]}"; do
         export ${p3}=${array[i]}
         single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
-        timeout -k 10s $command_timeout_time $which_program $p1 &>$single_log_path &
+        timeout -k 10s $command_timeout_time $which_program $p1 &>$single_log_path 2>&1 &
     done
 
-    . $file_task_after
+    . $file_task_after >> $log_path 2>&1
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -156,11 +156,11 @@ run_else() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     echo -e "## 开始执行... $begin_time\n" >> $log_path
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before
+    . $file_task_before >> $log_path 2>&1
 
-    timeout -k 10s $command_timeout_time "$@" 2>&1 >> $log_path
+    timeout -k 10s $command_timeout_time "$@" >> $log_path 2>&1
 
-    . $file_task_after
+    . $file_task_after >> $log_path 2>&1
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
