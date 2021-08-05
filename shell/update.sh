@@ -278,10 +278,10 @@ update_qinglong() {
 }
 
 patch_version() {
-    if [ -f /ql/db/cookie.db ]; then
+    if [[ -f "/ql/db/cookie.db" ]]; then
         echo -e "检测到旧的db文件，拷贝为新db...\n"
         mv /ql/db/cookie.db /ql/db/env.db
-        rm /ql/db/cookie.db
+        rm -rf /ql/db/cookie.db
         echo
     fi
 
