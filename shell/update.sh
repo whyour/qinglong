@@ -168,7 +168,7 @@ update_raw() {
     echo -e "--------------------------------------------------------------\n"
     local raw_url="${github_proxy_url}${1/https:\/\/ghproxy.com\//}"
     local suffix="${raw_url##*.}"
-    local raw_file_name="${uniq_path}${suffix}"
+    local raw_file_name="${uniq_path}.${suffix}"
     echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
     wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
     if [[ $? -eq 0 ]]; then
