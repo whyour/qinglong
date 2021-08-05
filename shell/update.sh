@@ -141,16 +141,12 @@ update_repo() {
     local blackword="$3"
     local dependence="$4"
     local branch="$5"
-    local urlTmp="${url%*/}"
-    local repoTmp="${urlTmp##*/}"
-    local repo="${repoTmp%.*}"
     local tmp="${url%/*}"
     local authorTmp1="${tmp##*/}"
     local authorTmp2="${authorTmp1##*:}"
     local author="${authorTmp2##*.}"
 
-    local repo_path="${dir_repo}/${author}_${repo}"
-    [[ $branch ]] && repo_path="${repo_path}_${branch}"
+    local repo_path="${dir_repo}/${uniq_path}"
 
     local formatUrl="${github_proxy_url}${url/https:\/\/ghproxy.com\//}"
     if [ -d ${repo_path}/.git ]; then
@@ -392,6 +388,21 @@ gen_list_repo() {
     cd $dir_current
 }
 
+get_uniq_path() {
+  local url="$1"
+  local branch="$2"
+  local urlTmp="${url%*/}"
+  local repoTmp="${urlTmp##*/}"
+  local repo="${repoTmp%.*}"
+  local tmp="${url%/*}"
+  local authorTmp1="${tmp##*/}"
+  local authorTmp2="${authorTmp1##*:}"
+  local author="${authorTmp2##*.}"
+
+  uniq_path="${author}_${repo}"
+  [[ $branch ]] && uniq_path="${uniq_path}_${branch}"
+}
+
 main() {
     local p1=$1
     local p2=$2
@@ -413,8 +424,8 @@ main() {
         ;;
     repo)
         get_user_info
-        local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
-        log_path="$dir_log/update/${log_time}_$name.log"
+        get_uniq_path "$p2" "$p6"
+        log_path="$dir_log/update/${log_time}_${uniq_path}.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
             update_repo "$p2" "$p3" "$p4" "$p5" "$p6" | tee -p -a $log_path
@@ -425,8 +436,8 @@ main() {
         ;;
     raw)
         get_user_info
-        local name=$(echo "${p2##*/}" | awk -F "." '{print $1}')
-        log_path="$dir_log/update/${log_time}_$name.log"
+        get_uniq_path "$p2"
+        log_path="$dir_log/update/${log_time}_${uniq_path}.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
         if [[ -n $p2 ]]; then
             update_raw "$p2" | tee -p -a $log_path
