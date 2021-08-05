@@ -124,9 +124,9 @@ add_cron() {
             result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
             echo -e "$result"
             if [[ $detail ]]; then
-                detail="${detail}\n${result}"
+                detail="${detail}${result}\n"
             else
-                detail="${result}"
+                detail="${result}\n"
             fi
         fi
     done
@@ -166,8 +166,9 @@ update_repo() {
 ## 更新所有 raw 文件
 update_raw() {
     echo -e "--------------------------------------------------------------\n"
-    local raw_url="$1"
-    raw_file_name=$(echo ${raw_url} | awk -F "/" '{print $NF}')
+    local raw_url="${github_proxy_url}${1/https:\/\/ghproxy.com\//}"
+    local suffix="${raw_url##*.}"
+    local raw_file_name="${uniq_path}${suffix}"
     echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
     wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
     if [[ $? -eq 0 ]]; then
@@ -194,7 +195,7 @@ update_raw() {
         [[ -z $cron_line ]] && cron_line="0 6 * * *"
         if [[ -z $cron_id ]]; then
             result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
-            echo -e "$result"
+            echo -e "$result\n"
             notify "新增任务通知" "\n$result"
             # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
         fi
