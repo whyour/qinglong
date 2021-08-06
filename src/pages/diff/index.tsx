@@ -1,4 +1,4 @@
-import React, { PureComponent, Fragment, useState, useEffect } from 'react';
+import React, { PureComponent, useRef, useState, useEffect } from 'react';
 import { Button, message, Modal } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -14,6 +14,7 @@ const Crontab = () => {
   const [loading, setLoading] = useState(true);
   const { headerStyle, isPhone } = useCtx();
   const { theme } = useTheme();
+  const editorRef = useRef<any>(null);
 
   const getConfig = () => {
     request.get(`${config.apiPrefix}configs/config.sh`).then((data) => {
@@ -31,6 +32,20 @@ const Crontab = () => {
       .finally(() => setLoading(false));
   };
 
+  const updateConfig = () => {
+    const content = editorRef.current
+      ? editorRef.current.getModel().modified.getValue().replace(/\r\n/g, '\n')
+      : value;
+
+    request
+      .post(`${config.apiPrefix}configs/save`, {
+        data: { content, name: 'config.sh' },
+      })
+      .then((data: any) => {
+        message.success(data.message);
+      });
+  };
+
   useEffect(() => {
     getConfig();
     getSample();
@@ -44,6 +59,13 @@ const Crontab = () => {
       header={{
         style: headerStyle,
       }}
+      extra={
+        !isPhone && [
+          <Button key="1" type="primary" onClick={updateConfig}>
+            保存
+          </Button>,
+        ]
+      }
     >
       {isPhone ? (
         <ReactDiffViewer
@@ -77,7 +99,6 @@ const Crontab = () => {
           original={sample}
           modified={value}
           options={{
-            readOnly: true,
             fontSize: 12,
             lineNumbersMinChars: 3,
             folding: false,
@@ -85,6 +106,9 @@ const Crontab = () => {
             wordWrap: 'on',
           }}
           theme={theme}
+          onMount={(editor) => {
+            editorRef.current = editor;
+          }}
         />
       )}
     </PageContainer>
