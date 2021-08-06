@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center">青龙(WIP)</h1>
+<h1 align="center">青龙</h1>
 
 <div align="center">
 
