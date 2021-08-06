@@ -14,9 +14,18 @@ body {
   background-color: rgb(248, 248, 248);
 }
 
-.log-modal .ant-modal {
-  padding-bottom: 0 !important;
-  width: 580px !important;
+.log-modal {
+  .ant-modal {
+    padding-bottom: 0 !important;
+    width: 580px !important;
+  }
+
+  pre {
+    white-space: break-spaces;
+    line-height: 17px;
+    margin-bottom: 0;
+    overflow: hidden;
+  }
 }
 
 .monaco-editor:not(.rename-box) {
