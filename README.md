@@ -8,7 +8,7 @@
 
 <div align="center">
 
-Python、JavaScript、Shell、Typescript 定时任务管理
+Python/JavaScript/Shell/Typescript 定时任务管理
 
 [![docker version][docker-version-image]][docker-version-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url] [![donate][donate-image]][donate-url]
 
