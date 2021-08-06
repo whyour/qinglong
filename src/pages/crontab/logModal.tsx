@@ -108,20 +108,13 @@ const CronLogModal = ({
       {!loading && value && (
         <pre
           style={
-            !isPhone
+            isPhone
               ? {
-                  whiteSpace: 'break-spaces',
-                  lineHeight: '17px',
-                  marginBottom: 0,
-                }
-              : {
-                  whiteSpace: 'break-spaces',
-                  lineHeight: '17px',
-                  marginBottom: 0,
                   fontFamily: 'Source Code Pro',
                   width: 375,
                   zoom: 0.83,
                 }
+              : {}
           }
         >
           {value}
