@@ -148,7 +148,12 @@ update_repo() {
 
     local repo_path="${dir_repo}/${uniq_path}"
 
-    local formatUrl="${github_proxy_url}${url/https:\/\/ghproxy.com\//}"
+    local formatUrl="$url"
+    if [[ $github_proxy_url ]]; then
+        if [[ $url =~ "github.com" ]] || [[ $url =~ "githubusercontent.com" ]]; then
+            [[ ! $url =~ "https://ghproxy.com" ]] && formatUrl="${github_proxy_url}${url}"
+        fi
+    fi
     if [ -d ${repo_path}/.git ]; then
         reset_romote_url ${repo_path} "${formatUrl}" "${branch}"
         git_pull_scripts ${repo_path} "${branch}"
@@ -166,7 +171,13 @@ update_repo() {
 ## 更新所有 raw 文件
 update_raw() {
     echo -e "--------------------------------------------------------------\n"
-    local raw_url="${github_proxy_url}${1/https:\/\/ghproxy.com\//}"
+    local url="$1"
+    local raw_url="$url"
+    if [[ $github_proxy_url ]]; then
+        if [[ $url =~ "github.com" ]] || [[ $url =~ "githubusercontent.com" ]]; then
+            [[ ! $url =~ "https://ghproxy.com" ]] && raw_url="${github_proxy_url}${url}"
+        fi
+    fi
     local suffix="${raw_url##*.}"
     local raw_file_name="${uniq_path}.${suffix}"
     echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
@@ -227,7 +238,7 @@ usage() {
     echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch>   # 更新单个仓库的脚本"
     echo -e "5. $cmd_update rmlog <days>                                              # 删除旧日志"
     echo -e "6. $cmd_update bot                                                       # 启动tg-bot"
-    echo -e "7. $cmd_update reset                                                     # 重置青龙基础环境"
+    echo -e "7. $cmd_update check                                                     # 检测青龙环境并修复"
 }
 
 ## 更新qinglong
