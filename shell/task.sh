@@ -113,8 +113,6 @@ run_concurrent() {
         exit 1
     fi
 
-    local envs=$(eval echo "\$${p3}")
-    local array=($(echo $envs | sed 's/&/ /g'))
     cd $dir_scripts
     define_program "$p1"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
@@ -130,6 +128,8 @@ run_concurrent() {
     . $file_task_before >> $log_path 2>&1
     echo -e "\n各账号间已经在后台开始并发执行，前台不输入日志，日志直接写入文件中。\n" >> $log_path
 
+    local envs=$(eval echo "\$${p3}")
+    local array=($(echo $envs | sed 's/&/ /g'))
     single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     for i in "${!array[@]}"; do
         export ${p3}=${array[i]}
