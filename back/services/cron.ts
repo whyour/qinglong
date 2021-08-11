@@ -218,7 +218,7 @@ export default class CronService {
           killLogs.push(stdout);
         }
       }
-      return killLogs.length > 0 ? killLogs : '';
+      return killLogs.length > 0 ? JSON.stringify(killLogs) : '';
     } catch (e) {
       return JSON.stringify(e);
     }
