@@ -208,7 +208,6 @@ export default class CronService {
       }
       const pids = pid.match(/\d+/g);
       const killLogs = [];
-      this.logger.info(`需要杀死的进程：${JSON.stringify(pids.toString())}`);
       for (const id of pids) {
         const c = `kill -9 ${id}`;
         const { stdout, stderr } = await execAsync(c);
@@ -219,8 +218,7 @@ export default class CronService {
           killLogs.push(stdout);
         }
       }
-      this.logger.info(`杀死的进程结果：${JSON.stringify(killLogs)}`);
-      return JSON.stringify(killLogs);
+      return killLogs.length > 0 ? killLogs : '';
     } catch (e) {
       return JSON.stringify(e);
     }
