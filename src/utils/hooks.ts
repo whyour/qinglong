@@ -10,7 +10,7 @@ export const useCtx = () => {
   useEffect(() => {
     const { platform } = browserType();
 
-    if (platform === 'mobile') {
+    if (platform === 'mobile' || document.body.offsetWidth < 768) {
       setWidth('auto');
       setMarginLeft(0);
       setMarginTop(0);

@@ -131,7 +131,7 @@ const Log = () => {
         style: headerStyle,
       }}
     >
-      <div className={`${styles['log-container']}`}>
+      <div className={`${styles['log-container']} log-container`}>
         {!isPhone && (
           <div className={styles['left-tree-container']}>
             <Input.Search

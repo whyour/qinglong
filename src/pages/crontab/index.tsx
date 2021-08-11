@@ -432,7 +432,7 @@ const Crontab = () => {
     const index = value.findIndex((x) => x._id === cron._id);
     const result = [...value];
     if (index === -1) {
-      result.push(cron);
+      result.unshift(cron);
     } else {
       result.splice(index, 1, {
         ...cron,
