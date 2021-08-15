@@ -135,12 +135,13 @@ input:-webkit-autofill:active {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 48px);
+  height: calc(100vh - var(--vh-offset, 0px) - 48px);
   .ant-pro-grid-content.wide {
     flex: 1;
     .ant-pro-grid-content-children {
       height: calc(100% - 48px);
+      height: calc(100% - var(--vh-offset, 0px) - 48px);
       > div,
-      .ant-pro-page-container-children-content,
       .log-container,
       .react-codemirror2,
       .CodeMirror {
@@ -176,6 +177,10 @@ input:-webkit-autofill:active {
   .ant-tooltip {
     max-width: 250px !important;
   }
+}
+
+.ant-layout-content.ant-pro-basicLayout-content.ant-pro-basicLayout-has-header {
+  margin-bottom: 0 !important;
 }
 
 @media (min-width: 768px) {

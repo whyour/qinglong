@@ -80,12 +80,7 @@ const Password = () => {
         style: headerStyle,
       }}
     >
-      <Tabs
-        defaultActiveKey="person"
-        size="small"
-        tabPosition="top"
-        style={{ height: 'calc(100vh - var(--vh-offset, 0px) - 128px)' }}
-      >
+      <Tabs defaultActiveKey="person" size="small" tabPosition="top">
         <Tabs.TabPane tab="个人设置" key="person">
           <Form onFinish={handleOk} layout="vertical">
             <Form.Item
