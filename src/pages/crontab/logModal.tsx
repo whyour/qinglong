@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form } from 'antd';
+import { Modal, message, Input, Form, Statistic } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import {
@@ -13,6 +13,7 @@ enum CrontabStatus {
   'disabled',
   'queued',
 }
+const { Countdown } = Statistic;
 
 const CronLogModal = ({
   cron,
@@ -52,10 +53,19 @@ const CronLogModal = ({
             log.includes('重启面板') &&
             cron.status === CrontabStatus.running
           ) {
-            message.warning({ content: '系统将在5秒后自动刷新', duration: 5 });
+            message.warning({
+              content: (
+                <span>
+                  系统将在
+                  <Countdown format="ss" value={Date.now() + 1000 * 10} />
+                  秒后自动刷新
+                </span>
+              ),
+              duration: 10,
+            });
             setTimeout(() => {
               window.location.reload();
-            }, 5000);
+            }, 10000);
           }
         }
       })
