@@ -40,5 +40,3 @@ cd $dir_root
 ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
 nohup python3 -m jbot >$dir_log/bot/nohup.log 2>&1 &
 echo -e "bot启动成功...\n"
-
-exit 0
