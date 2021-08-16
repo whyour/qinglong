@@ -117,5 +117,3 @@ main() {
 }
 
 main
-
-exit
