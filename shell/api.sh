@@ -17,13 +17,13 @@ add_cron_api() {
     fi
 
     local api=$(
-        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://0.0.0.0:5600/api/crons?t=$currentTimeStamp" \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
             -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
             -H "Content-Type: application/json;charset=UTF-8" \
-            -H "Origin: http://localhost:5700" \
-            -H "Referer: http://localhost:5700/crontab" \
+            -H "Origin: http://0.0.0.0:5700" \
+            -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
             --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\"}" \
             --compressed
@@ -52,14 +52,14 @@ update_cron_api() {
     fi
 
     local api=$(
-        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://0.0.0.0:5600/api/crons?t=$currentTimeStamp" \
             -X 'PUT' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
             -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
             -H "Content-Type: application/json;charset=UTF-8" \
-            -H "Origin: http://localhost:5700" \
-            -H "Referer: http://localhost:5700/crontab" \
+            -H "Origin: http://0.0.0.0:5700" \
+            -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
             --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\",\"_id\":\"$id\"}" \
             --compressed
@@ -84,14 +84,14 @@ update_cron_command_api() {
     fi
 
     local api=$(
-        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://0.0.0.0:5600/api/crons?t=$currentTimeStamp" \
             -X 'PUT' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
             -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
             -H "Content-Type: application/json;charset=UTF-8" \
-            -H "Origin: http://localhost:5700" \
-            -H "Referer: http://localhost:5700/crontab" \
+            -H "Origin: http://0.0.0.0:5700" \
+            -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
             --data-raw "{\"command\":\"$command\",\"_id\":\"$id\"}" \
             --compressed
@@ -109,14 +109,14 @@ del_cron_api() {
     local ids=$1
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s --noproxy "*" "http://localhost:5600/api/crons?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://0.0.0.0:5600/api/crons?t=$currentTimeStamp" \
             -X 'DELETE' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
             -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
             -H "Content-Type: application/json;charset=UTF-8" \
-            -H "Origin: http://localhost:5700" \
-            -H "Referer: http://localhost:5700/crontab" \
+            -H "Origin: http://0.0.0.0:5700" \
+            -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
             --data-raw "[$ids]" \
             --compressed
@@ -133,11 +133,11 @@ del_cron_api() {
 get_user_info() {
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s --noproxy "*" "http://localhost:5600/api/user?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://0.0.0.0:5600/api/user?t=$currentTimeStamp" \
             -H 'Accept: */*' \
             -H "Authorization: Bearer $token" \
             -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36' \
-            -H 'Referer: http://localhost:5700/crontab' \
+            -H 'Referer: http://0.0.0.0:5700/crontab' \
             -H 'Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7' \
             --compressed
     )
@@ -155,14 +155,14 @@ update_cron() {
     local logPath="$4"
     local currentTimeStamp=$(date +%s)
     local api=$(
-        curl -s --noproxy "*" "http://localhost:5600/api/crons/status?t=$currentTimeStamp" \
+        curl -s --noproxy "*" "http://0.0.0.0:5600/api/crons/status?t=$currentTimeStamp" \
             -X 'PUT' \
             -H "Accept: application/json" \
             -H "Authorization: Bearer $token" \
             -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
             -H "Content-Type: application/json;charset=UTF-8" \
-            -H "Origin: http://localhost:5700" \
-            -H "Referer: http://localhost:5700/crontab" \
+            -H "Origin: http://0.0.0.0:5700" \
+            -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
             --data-raw "{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\"}" \
             --compressed

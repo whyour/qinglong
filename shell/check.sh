@@ -64,7 +64,7 @@ check_nginx() {
 }
 
 check_ql() {
-  local api=$(curl -s --noproxy "*" "http://localhost:5700")
+  local api=$(curl -s --noproxy "*" "http://0.0.0.0:5700")
   echo -e "\n=====> 检测面板\n\n$api\n"
   if [[ $api =~ "<div id=\"root\"></div>" ]]; then
     echo -e "=====> 面板服务启动正常\n"
@@ -78,11 +78,11 @@ check_pm2() {
   pm2_log
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://localhost:5600/api/user?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5600/api/user?t=$currentTimeStamp" \
       -H 'Accept: */*' \
       -H "Authorization: Bearer $token" \
       -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36' \
-      -H 'Referer: http://localhost:5700/crontab' \
+      -H 'Referer: http://0.0.0.0:5700/crontab' \
       -H 'Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7' \
       --compressed
   )
