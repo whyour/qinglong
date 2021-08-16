@@ -31,6 +31,7 @@ file_notify_js_sample=$dir_sample/notify.js
 file_notify_py_sample=$dir_sample/notify.py
 file_notify_py=$dir_scripts/notify.py
 file_notify_js=$dir_scripts/sendNotify.js
+task_error_log_path=$dir_log/task_error.log
 
 ## 清单文件
 list_crontab_user=$dir_config/crontab.list
@@ -305,4 +306,6 @@ init_env
 detect_termux
 detect_macos
 define_cmd
-import_config $1
+
+rm $task_error_log_path
+import_config $1 >> $task_error_log_path 2>&1

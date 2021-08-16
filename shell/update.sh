@@ -285,10 +285,10 @@ update_qinglong() {
         rm -rf $dir_root/build && rm -rf $dir_root/dist
         cp -rf $ql_static_repo/* $dir_root
         if [[ $no_restart != "no-restart" ]]; then
-            echo -e "重启面板中..."
-            nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-            sleep 1
             reload_pm2
+            nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
+            sleep 3
+            echo -e "重启面板中..."
         fi
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
@@ -436,19 +436,22 @@ main() {
     case $p1 in
     update)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        update_qinglong "$2" | tee -p -a $log_path
+        cat $task_error_log_path >> $log_path
+        update_qinglong "$2" >> $log_path
         ;;
     extra)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        run_extra_shell | tee -p -a $log_path
+        cat $task_error_log_path >> $log_path
+        run_extra_shell >> $log_path
         ;;
     repo)
         get_user_info
         get_uniq_path "$p2" "$p6"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
+        cat $task_error_log_path >> $log_path
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" | tee -p -a $log_path
+            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" >> $log_path
         else
             echo -e "命令输入错误...\n"
             usage
@@ -459,8 +462,9 @@ main() {
         get_uniq_path "$p2"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
+        cat $task_error_log_path >> $log_path
         if [[ -n $p2 ]]; then
-            update_raw "$p2" | tee -p -a $log_path
+            update_raw "$p2" >> $log_path
         else
             echo -e "命令输入错误...\n"
             usage
@@ -468,15 +472,18 @@ main() {
         ;;
     rmlog)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        . $dir_shell/rmlog.sh "$p2" | tee -p -a $log_path
+        cat $task_error_log_path >> $log_path
+        . $dir_shell/rmlog.sh "$p2" >> $log_path
         ;;
     bot)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        . $dir_shell/bot.sh | tee -p -a $log_path
+        cat $task_error_log_path >> $log_path
+        . $dir_shell/bot.sh >> $log_path
         ;;
     check)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        . $dir_shell/check.sh | tee -p -a $log_path
+        cat $task_error_log_path >> $log_path
+        . $dir_shell/check.sh >> $log_path
         ;;
     *)
         echo -e "命令输入错误...\n"
