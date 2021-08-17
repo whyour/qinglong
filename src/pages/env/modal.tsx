@@ -19,16 +19,22 @@ const EnvModal = ({
     setLoading(true);
     const { value, split, name, remarks } = values;
     const method = env ? 'put' : 'post';
-    let payload = env ? { ...values, _id: env._id } : values;
-    if (!env && split === '1') {
-      const symbol = value.includes('&') ? '&' : '\n';
-      payload = value.split(symbol).map((x: any) => {
-        return {
-          name: name,
-          value: x,
-          remarks: remarks,
-        };
-      });
+    let payload;
+    if (!env) {
+      if (split === '1') {
+        const symbol = value.includes('&') ? '&' : '\n';
+        payload = value.split(symbol).map((x: any) => {
+          return {
+            name: name,
+            value: x,
+            remarks: remarks,
+          };
+        });
+      } else {
+        payload = [values];
+      }
+    } else {
+      payload = { ...values, _id: env._id };
     }
     const { code, data } = await request[method](`${config.apiPrefix}envs`, {
       data: payload,
