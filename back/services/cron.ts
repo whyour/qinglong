@@ -246,7 +246,7 @@ export default class CronService {
         cmdStr = `${cmdStr} now`;
       }
 
-      const cp = spawn(cmdStr, { shell: '/bin/bash', detached: true });
+      const cp = spawn(cmdStr, { shell: '/bin/bash' });
       this.cronDb.update(
         { _id },
         { $set: { status: CrontabStatus.running, pid: cp.pid } },
