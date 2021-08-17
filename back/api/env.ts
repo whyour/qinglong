@@ -25,11 +25,13 @@ export default (app: Router) => {
   route.post(
     '/envs',
     celebrate({
-      body: Joi.object({
-        value: Joi.string().required(),
-        name: Joi.string().required(),
-        remarks: Joi.string().optional(),
-      }),
+      body: Joi.array().items(
+        Joi.object({
+          value: Joi.string().required(),
+          name: Joi.string().required(),
+          remarks: Joi.string().optional().allow(''),
+        }),
+      ),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');

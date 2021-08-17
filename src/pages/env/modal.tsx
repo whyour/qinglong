@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form } from 'antd';
+import { Modal, message, Input, Form, Radio } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 
@@ -17,8 +17,19 @@ const EnvModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
+    const { value, split, name, remarks } = values;
     const method = env ? 'put' : 'post';
-    const payload = env ? { ...values, _id: env._id } : values;
+    let payload = env ? { ...values, _id: env._id } : values;
+    if (!env && split === '1') {
+      const symbol = value.includes('&') ? '&' : '\n';
+      payload = value.split(symbol).map((x: any) => {
+        return {
+          name: name,
+          value: x,
+          remarks: remarks,
+        };
+      });
+    }
     const { code, data } = await request[method](`${config.apiPrefix}envs`, {
       data: payload,
     });
@@ -61,6 +72,14 @@ const EnvModal = ({
         >
           <Input placeholder="请输入环境变量名称" />
         </Form.Item>
+        {!env && (
+          <Form.Item name="split" label="自动拆分" initialValue="0">
+            <Radio.Group>
+              <Radio value="1">是</Radio>
+              <Radio value="0">否</Radio>
+            </Radio.Group>
+          </Form.Item>
+        )}
         <Form.Item
           name="value"
           label="值"

@@ -16,25 +16,29 @@ export default class EnvService {
     });
   }
 
-  public async create(payload: Env): Promise<Env> {
+  public async create(payloads: Env[]): Promise<Env[]> {
     const envs = await this.envs();
     let position = initEnvPosition;
     if (envs && envs.length > 0 && envs[envs.length - 1].position) {
       position = envs[envs.length - 1].position;
     }
-    const tab = new Env({ ...payload, position: position / 2 });
-    const doc = await this.insert(tab);
+    const tabs = payloads.map((x) => {
+      position = position / 2;
+      const tab = new Env({ ...x, position });
+      return tab;
+    });
+    const docs = await this.insert(tabs);
     await this.set_envs();
-    return doc;
+    return docs;
   }
 
-  public async insert(payload: Env): Promise<Env> {
+  public async insert(payloads: Env[]): Promise<Env[]> {
     return new Promise((resolve) => {
-      this.cronDb.insert(payload, (err, doc) => {
+      this.cronDb.insert(payloads, (err, docs) => {
         if (err) {
           this.logger.error(err);
         } else {
-          resolve(doc);
+          resolve(docs);
         }
       });
     });

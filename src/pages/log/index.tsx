@@ -7,6 +7,7 @@ import { request } from '@/utils/http';
 import styles from './index.module.less';
 import { Controlled as CodeMirror } from 'react-codemirror2';
 import { useCtx, useTheme } from '@/utils/hooks';
+import SplitPane from 'react-split-pane';
 
 function getFilterData(keyword: string, data: any) {
   const expandedKeys: string[] = [];
@@ -133,24 +134,40 @@ const Log = () => {
     >
       <div className={`${styles['log-container']} log-container`}>
         {!isPhone && (
-          <div className={styles['left-tree-container']}>
-            <Input.Search
-              className={styles['left-tree-search']}
-              onChange={onSearch}
-            ></Input.Search>
-            <div className={styles['left-tree-scroller']} ref={treeDom}>
-              <Tree
-                className={styles['left-tree']}
-                treeData={filterData}
-                showIcon={true}
-                height={height}
-                showLine={{ showLeafIcon: true }}
-                onSelect={onTreeSelect}
-              ></Tree>
+          <SplitPane split="vertical" size={200} maxSize={-100}>
+            <div className={styles['left-tree-container']}>
+              <Input.Search
+                className={styles['left-tree-search']}
+                onChange={onSearch}
+              ></Input.Search>
+              <div className={styles['left-tree-scroller']} ref={treeDom}>
+                <Tree
+                  className={styles['left-tree']}
+                  treeData={filterData}
+                  showIcon={true}
+                  height={height}
+                  showLine={{ showLeafIcon: true }}
+                  onSelect={onTreeSelect}
+                ></Tree>
+              </div>
             </div>
-          </div>
+            <Editor
+              language="shell"
+              theme={theme}
+              value={value}
+              options={{
+                readOnly: true,
+                fontSize: 12,
+                lineNumbersMinChars: 3,
+                fontFamily: 'Source Code Pro',
+                folding: false,
+                glyphMargin: false,
+                wordWrap: 'on',
+              }}
+            />
+          </SplitPane>
         )}
-        {isPhone ? (
+        {isPhone && (
           <CodeMirror
             value={value}
             options={{
@@ -164,21 +181,6 @@ const Log = () => {
               setValue(value);
             }}
             onChange={(editor, data, value) => {}}
-          />
-        ) : (
-          <Editor
-            language="shell"
-            theme={theme}
-            value={value}
-            options={{
-              readOnly: true,
-              fontSize: 12,
-              lineNumbersMinChars: 3,
-              fontFamily: 'Source Code Pro',
-              folding: false,
-              glyphMargin: false,
-              wordWrap: 'on',
-            }}
           />
         )}
       </div>
