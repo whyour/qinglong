@@ -317,7 +317,8 @@ const Env = () => {
     const result = [...value];
     const index = value.findIndex((x) => x._id === env._id);
     if (index === -1) {
-      result.push(env);
+      env = Array.isArray(env) ? env : [env];
+      result.push(...env);
     } else {
       result.splice(index, 1, {
         ...env,

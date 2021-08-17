@@ -8,6 +8,7 @@ import styles from './index.module.less';
 import EditModal from './editModal';
 import { Controlled as CodeMirror } from 'react-codemirror2';
 import { useCtx, useTheme } from '@/utils/hooks';
+import SplitPane from 'react-split-pane';
 
 function getFilterData(keyword: string, data: any) {
   if (keyword) {
@@ -122,24 +123,38 @@ const Script = () => {
     >
       <div className={`${styles['log-container']} log-container`}>
         {!isPhone && (
-          <div className={styles['left-tree-container']}>
-            <Input.Search
-              className={styles['left-tree-search']}
-              onChange={onSearch}
-            ></Input.Search>
-            <div className={styles['left-tree-scroller']} ref={treeDom}>
-              <Tree
-                className={styles['left-tree']}
-                treeData={filterData}
-                showIcon={true}
-                height={height}
-                showLine={{ showLeafIcon: true }}
-                onSelect={onTreeSelect}
-              ></Tree>
+          <SplitPane split="vertical" size={200} maxSize={-100}>
+            <div className={styles['left-tree-container']}>
+              <Input.Search
+                className={styles['left-tree-search']}
+                onChange={onSearch}
+              ></Input.Search>
+              <div className={styles['left-tree-scroller']} ref={treeDom}>
+                <Tree
+                  className={styles['left-tree']}
+                  treeData={filterData}
+                  showIcon={true}
+                  height={height}
+                  showLine={{ showLeafIcon: true }}
+                  onSelect={onTreeSelect}
+                ></Tree>
+              </div>
             </div>
-          </div>
+            <Editor
+              language={mode}
+              value={value}
+              theme={theme}
+              options={{
+                readOnly: true,
+                fontSize: 12,
+                lineNumbersMinChars: 3,
+                folding: false,
+                glyphMargin: false,
+              }}
+            />
+          </SplitPane>
         )}
-        {isPhone ? (
+        {isPhone && (
           <CodeMirror
             value={value}
             options={{
@@ -154,19 +169,6 @@ const Script = () => {
               setValue(value);
             }}
             onChange={(editor, data, value) => {}}
-          />
-        ) : (
-          <Editor
-            language={mode}
-            value={value}
-            theme={theme}
-            options={{
-              readOnly: true,
-              fontSize: 12,
-              lineNumbersMinChars: 3,
-              folding: false,
-              glyphMargin: false,
-            }}
           />
         )}
         <EditModal
