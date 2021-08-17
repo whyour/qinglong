@@ -31,7 +31,7 @@ const EnvModal = ({
           };
         });
       } else {
-        payload = [values];
+        payload = [{ value, name, remarks }];
       }
     } else {
       payload = { ...values, _id: env._id };
