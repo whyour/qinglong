@@ -119,6 +119,7 @@ const Env = () => {
       dataIndex: 'name',
       key: 'name',
       align: 'center' as const,
+      sorter: (a: any, b: any) => a.name.localeCompare(b.name),
     },
     {
       title: '值',
