@@ -70,7 +70,10 @@ export default (app: Router) => {
           path += '/';
         }
         if (config.writePathList.every((x) => !path.startsWith(x))) {
-          return res.send({ code: 400, data: '文件路径错误，可保存目录/ql/scripts、/ql/config、/ql/jbot、/ql/bak' });
+          return res.send({
+            code: 400,
+            data: '文件路径错误，可保存目录/ql/scripts、/ql/config、/ql/jbot、/ql/bak',
+          });
         }
         const filePath = `${path}${filename.replace(/\//g, '')}`;
         const bakPath = '/ql/bak';
@@ -82,6 +85,54 @@ export default (app: Router) => {
         }
         fs.writeFileSync(filePath, content);
         return res.send({ code: 200 });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/scripts',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        content: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        let { filename, content } = req.body as {
+          filename: string;
+          content: string;
+        };
+        const filePath = `${config.scriptPath}${filename}`;
+        fs.writeFileSync(filePath, content);
+        return res.send({ code: 200 });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/scripts',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        let { filename } = req.body as {
+          filename: string;
+        };
+        const filePath = `${config.scriptPath}${filename}`;
+        fs.unlinkSync(filePath);
+        res.send({ code: 200 });
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);
