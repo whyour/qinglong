@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, Key, useRef } from 'react';
-import { TreeSelect, Tree, Input, Button } from 'antd';
+import {
+  TreeSelect,
+  Tree,
+  Input,
+  Button,
+  Modal,
+  message,
+  Typography,
+} from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
@@ -9,6 +17,8 @@ import EditModal from './editModal';
 import { Controlled as CodeMirror } from 'react-codemirror2';
 import { useCtx, useTheme } from '@/utils/hooks';
 import SplitPane from 'react-split-pane';
+
+const { Text } = Typography;
 
 function getFilterData(keyword: string, data: any) {
   if (keyword) {
@@ -33,7 +43,7 @@ const LangMap: any = {
 const Script = () => {
   const [title, setTitle] = useState('请选择脚本文件');
   const [value, setValue] = useState('请选择脚本文件');
-  const [select, setSelect] = useState();
+  const [select, setSelect] = useState<string>();
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,6 +53,9 @@ const Script = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const { headerStyle, isPhone } = useCtx();
   const { theme } = useTheme();
+  const [searchValue, setSearchValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const editorRef = useRef<any>(null);
 
   const getScripts = () => {
     setLoading(true);
@@ -76,11 +89,101 @@ const Script = () => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
+      setSearchValue(keyword);
       const { tree } = getFilterData(keyword.toLocaleLowerCase(), data);
       setFilterData(tree);
     },
     [data, setFilterData],
   );
+
+  const editFile = () => {
+    setIsEditing(true);
+  };
+
+  const saveFile = () => {
+    Modal.confirm({
+      title: `确认保存`,
+      content: (
+        <>
+          确认保存文件
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {select}
+          </Text>{' '}
+          ，保存后不可恢复
+        </>
+      ),
+      onOk() {
+        const content = editorRef.current
+          ? editorRef.current.getValue().replace(/\r\n/g, '\n')
+          : value;
+        request
+          .put(`${config.apiPrefix}scripts`, {
+            data: {
+              filename: select,
+              content,
+            },
+          })
+          .then((_data: any) => {
+            if (_data.code === 200) {
+              message.success(`保存成功`);
+            } else {
+              message.error(_data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const deleteFile = () => {
+    Modal.confirm({
+      title: `确认删除`,
+      content: (
+        <>
+          确认删除文件
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {select}
+          </Text>{' '}
+          ，删除后不可恢复
+        </>
+      ),
+      onOk() {
+        request
+          .delete(`${config.apiPrefix}scripts`, {
+            data: {
+              filename: select,
+            },
+          })
+          .then((_data: any) => {
+            if (_data.code === 200) {
+              message.success(`删除成功`);
+              let newData = [...data];
+              const index = newData.findIndex((x) => x.value === select);
+              newData.splice(index, 1);
+              setData(newData);
+            } else {
+              message.error(_data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  useEffect(() => {
+    const word = searchValue || '';
+    const { tree } = getFilterData(word.toLocaleLowerCase(), data);
+    console.log(word);
+    console.log(tree);
+    setFilterData(tree);
+    setSelect('');
+    setTitle('请选择脚本文件');
+    setValue('请选择脚本文件');
+  }, [data]);
 
   useEffect(() => {
     getScripts();
@@ -105,8 +208,23 @@ const Script = () => {
                 key="value"
                 onSelect={onSelect}
               />,
+              <Button type="primary" onClick={deleteFile}>
+                删除
+              </Button>,
+            ]
+          : isEditing
+          ? [
+              <Button type="primary" onClick={saveFile}>
+                保存
+              </Button>,
             ]
           : [
+              <Button type="primary" onClick={editFile}>
+                编辑
+              </Button>,
+              <Button type="primary" onClick={deleteFile}>
+                删除
+              </Button>,
               <Button
                 type="primary"
                 onClick={() => {
@@ -145,11 +263,14 @@ const Script = () => {
               value={value}
               theme={theme}
               options={{
-                readOnly: true,
+                readOnly: !isEditing,
                 fontSize: 12,
                 lineNumbersMinChars: 3,
                 folding: false,
                 glyphMargin: false,
+              }}
+              onMount={(editor) => {
+                editorRef.current = editor;
               }}
             />
           </SplitPane>
