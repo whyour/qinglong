@@ -6,14 +6,11 @@ import { request } from '@/utils/http';
 import './index.less';
 import { DiffEditor } from '@monaco-editor/react';
 import ReactDiffViewer from 'react-diff-viewer';
-import { useCtx, useTheme } from '@/utils/hooks';
 
-const Crontab = () => {
+const Diff = ({ headerStyle, isPhone, theme }: any) => {
   const [value, setValue] = useState('');
   const [sample, setSample] = useState('');
   const [loading, setLoading] = useState(true);
-  const { headerStyle, isPhone } = useCtx();
-  const { theme } = useTheme();
   const editorRef = useRef<any>(null);
 
   const getConfig = () => {
@@ -115,4 +112,4 @@ const Crontab = () => {
   );
 };
 
-export default Crontab;
+export default Diff;

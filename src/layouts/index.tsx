@@ -14,8 +14,12 @@ import { request } from '@/utils/http';
 import './index.less';
 import vhCheck from 'vh-check';
 import { version, changeLog } from '../version';
+import { useCtx, useTheme } from '@/utils/hooks';
 
 export default function (props: any) {
+  const ctx = useCtx();
+  const theme = useTheme();
+
   const logout = () => {
     request.post(`${config.apiPrefix}logout`).then(() => {
       localStorage.removeItem(config.authKey);
@@ -107,7 +111,9 @@ export default function (props: any) {
       pageTitleRender={() => '控制面板'}
       {...defaultProps}
     >
-      {props.children}
+      {React.Children.map(props.children, (child) => {
+        return React.cloneElement(child, { ...ctx, ...theme });
+      })}
     </ProLayout>
   );
 }

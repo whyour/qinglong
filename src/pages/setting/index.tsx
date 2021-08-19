@@ -18,12 +18,11 @@ const optionsWithDisabled = [
   { label: '跟随系统', value: 'auto' },
 ];
 
-const Password = () => {
+const Password = ({ headerStyle, isPhone }: any) => {
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(true);
   const defaultDarken = localStorage.getItem('qinglong_dark_theme') || 'auto';
   const [theme, setTheme] = useState(defaultDarken);
-  const { headerStyle, isPhone } = useCtx();
 
   const handleOk = (values: any) => {
     request

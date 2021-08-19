@@ -104,7 +104,7 @@ const DragableBodyRow = ({
   );
 };
 
-const Env = () => {
+const Env = ({ headerStyle, isPhone, theme }: any) => {
   const columns = [
     {
       title: '序号',
@@ -203,7 +203,6 @@ const Env = () => {
   const [editedEnv, setEditedEnv] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
-  const { headerStyle, isPhone } = useCtx();
 
   const getEnvs = () => {
     setLoading(true);

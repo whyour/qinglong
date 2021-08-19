@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/whyour/qinglong">
-    <img width="150" src="https://qinglong.whyour.cn/qinglong.png">
+    <img width="150" src="/images/qinglong.png">
   </a>
 </p>
 

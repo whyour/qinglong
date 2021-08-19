@@ -38,7 +38,7 @@ function getFilterData(keyword: string, data: any) {
   return { tree: data, expandedKeys };
 }
 
-const Log = () => {
+const Log = ({ headerStyle, isPhone, theme }: any) => {
   const [title, setTitle] = useState('请选择日志文件');
   const [value, setValue] = useState('请选择日志文件');
   const [select, setSelect] = useState();
@@ -47,8 +47,6 @@ const Log = () => {
   const [loading, setLoading] = useState(false);
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
-  const { headerStyle, isPhone } = useCtx();
-  const { theme } = useTheme();
 
   const getLogs = () => {
     setLoading(true);
@@ -86,6 +84,7 @@ const Log = () => {
   };
 
   const onSelect = (value: any, node: any) => {
+    setValue('加载中...');
     setSelect(value);
     setTitle(node.parent || node.value);
     getLog(node);

@@ -18,7 +18,6 @@ const SaveModal = ({
   const [loading, setLoading] = useState(false);
 
   const handleOk = async (values: any) => {
-    console.log(file.filename);
     setLoading(true);
     const payload = { ...file, ...values };
     request

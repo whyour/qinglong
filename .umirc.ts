@@ -8,7 +8,7 @@ export default defineConfig({
     type: 'none',
   },
   fastRefresh: {},
-  favicon: 'https://qinglong.whyour.cn/g5.ico',
+  favicon: '/images/g5.ico',
   proxy: {
     '/api': {
       target: 'http://127.0.0.1:5678/',

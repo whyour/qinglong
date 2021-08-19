@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import browserType from './browser';
 
 export const useCtx = () => {
@@ -6,10 +6,9 @@ export const useCtx = () => {
   const [marginLeft, setMarginLeft] = useState(0);
   const [marginTop, setMarginTop] = useState(-72);
   const [isPhone, setIsPhone] = useState(false);
+  const { platform } = useMemo(() => browserType(), []);
 
   useEffect(() => {
-    const { platform } = browserType();
-
     if (platform === 'mobile' || document.body.offsetWidth < 768) {
       setWidth('auto');
       setMarginLeft(0);
