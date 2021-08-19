@@ -69,6 +69,10 @@ const Crontab = () => {
       render: (text: string, record: any) => (
         <span>{record.name || record._id}</span>
       ),
+      sorter: {
+        compare: (a: any, b: any) => a.name.localeCompare(b.name),
+        multiple: 2,
+      },
     },
     {
       title: '任务',
@@ -90,12 +94,20 @@ const Crontab = () => {
           </span>
         );
       },
+      sorter: {
+        compare: (a: any, b: any) => a.command.localeCompare(b.command),
+        multiple: 3,
+      },
     },
     {
       title: '任务定时',
       dataIndex: 'schedule',
       key: 'schedule',
       align: 'center' as const,
+      sorter: {
+        compare: (a: any, b: any) => a.schedule.localeCompare(b.schedule),
+        multiple: 1,
+      },
     },
     {
       title: '状态',
