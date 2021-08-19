@@ -1,2 +1,2 @@
-export const version = 'v2.8.2';
-export const changeLog = 'https://t.me/jiaolongwang/129';
+export const version = 'v2.8.3';
+export const changeLog = 'https://t.me/jiaolongwang/130';
