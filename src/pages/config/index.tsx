@@ -11,16 +11,13 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import Editor from '@monaco-editor/react';
 import { Controlled as CodeMirror } from 'react-codemirror2';
-import { useCtx, useTheme } from '@/utils/hooks';
 
-const Config = () => {
+const Config = ({ headerStyle, isPhone, theme }: any) => {
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('config.sh');
   const [select, setSelect] = useState('config.sh');
   const [data, setData] = useState<any[]>([]);
-  const { headerStyle, isPhone } = useCtx();
-  const { theme } = useTheme();
   const editorRef = useRef<any>(null);
 
   const getConfig = (name: string) => {

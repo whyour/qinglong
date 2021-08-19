@@ -31,7 +31,6 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import CronModal from './modal';
 import CronLogModal from './logModal';
-import { useCtx, useTheme } from '@/utils/hooks';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -59,7 +58,7 @@ enum OperationPath {
   'stop',
 }
 
-const Crontab = () => {
+const Crontab = ({ headerStyle, isPhone }: any) => {
   const columns = [
     {
       title: '任务名',
@@ -203,7 +202,6 @@ const Crontab = () => {
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const { headerStyle, isPhone } = useCtx();
 
   const getCrons = () => {
     setLoading(true);

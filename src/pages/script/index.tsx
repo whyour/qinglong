@@ -40,7 +40,7 @@ const LangMap: any = {
   '.ts': 'typescript',
 };
 
-const Script = () => {
+const Script = ({ headerStyle, isPhone, theme }: any) => {
   const [title, setTitle] = useState('请选择脚本文件');
   const [value, setValue] = useState('请选择脚本文件');
   const [select, setSelect] = useState<string>();
@@ -51,8 +51,6 @@ const Script = () => {
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
-  const { headerStyle, isPhone } = useCtx();
-  const { theme } = useTheme();
   const [searchValue, setSearchValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const editorRef = useRef<any>(null);
@@ -64,6 +62,7 @@ const Script = () => {
       .then((data) => {
         setData(data.data);
         setFilterData(data.data);
+        onSelect(data.data[0].value, data.data[0]);
       })
       .finally(() => setLoading(false));
   };
@@ -75,6 +74,7 @@ const Script = () => {
   };
 
   const onSelect = (value: any, node: any) => {
+    setValue('加载中...');
     const newMode = LangMap[value.slice(-3)] || '';
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setSelect(value);
@@ -98,6 +98,12 @@ const Script = () => {
 
   const editFile = () => {
     setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setValue('加载中...');
+    getDetail({ value: select });
   };
 
   const saveFile = () => {
@@ -126,6 +132,7 @@ const Script = () => {
           .then((_data: any) => {
             if (_data.code === 200) {
               message.success(`保存成功`);
+              setIsEditing(false);
             } else {
               message.error(_data);
             }
@@ -177,8 +184,6 @@ const Script = () => {
   useEffect(() => {
     const word = searchValue || '';
     const { tree } = getFilterData(word.toLocaleLowerCase(), data);
-    console.log(word);
-    console.log(tree);
     setFilterData(tree);
     setSelect('');
     setTitle('请选择脚本文件');
@@ -216,6 +221,9 @@ const Script = () => {
           ? [
               <Button type="primary" onClick={saveFile}>
                 保存
+              </Button>,
+              <Button type="primary" onClick={cancelEdit}>
+                退出编辑
               </Button>,
             ]
           : [
@@ -255,6 +263,7 @@ const Script = () => {
                   height={height}
                   showLine={{ showLeafIcon: true }}
                   onSelect={onTreeSelect}
+                  defaultSelectedKeys={[data[0] && data[0].key]}
                 ></Tree>
               </div>
             </div>

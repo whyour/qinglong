@@ -155,6 +155,18 @@ export default function browserType() {
         },
   );
 
-  console.log(result);
+  console.log(
+    "%c\n .d88b.  d888888b d8b   db  d888b  db       .d88b.  d8b   db  d888b  \n.8P  Y8.   `88'   888o  88 88' Y8b 88      .8P  Y8. 888o  88 88' Y8b \n88    88    88    88V8o 88 88      88      88    88 88V8o 88 88      \n88    88    88    88 V8o88 88  ooo 88      88    88 88 V8o88 88  ooo \n`8P  d8'   .88.   88  V888 88. ~8~ 88booo. `8b  d8' 88  V888 88. ~8~ \n `Y88'Y8 Y888888P VP   V8P  Y888P  Y88888P  `Y88P'  VP   V8P  Y888P  \n                                                                     \n                                                                     \n",
+    'color: blue;font-size: 14px;',
+  );
+  console.log(
+    '%c忘形雨笠烟蓑，知心牧唱樵歌。明月清风共我，闲人三个，从他今古消磨。\n',
+    'color: yellow;font-size: 18px;',
+  );
+  console.log(
+    `%c青龙运行环境:\n\n系统：${result.system}/${result.systemVs}\n浏览器：${result.supporter}/${result.supporterVs}\n内核：${result.engine}/${result.engineVs}`,
+    'color: green;font-size: 14px;font-weight: bold;',
+  );
+
   return result;
 }

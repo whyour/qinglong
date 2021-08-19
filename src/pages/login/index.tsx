@@ -46,7 +46,7 @@ const Login = () => {
             <img
               alt="logo"
               className={styles.logo}
-              src="https://qinglong.whyour.cn/qinglong.png"
+              src="/images/qinglong.png"
             />
             <span className={styles.title}>{config.siteName}</span>
           </div>
