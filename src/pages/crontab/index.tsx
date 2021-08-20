@@ -114,6 +114,31 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       dataIndex: 'status',
       align: 'center' as const,
       width: 60,
+      filters: [
+        {
+          text: '运行中',
+          value: 0,
+        },
+        {
+          text: '空闲中',
+          value: 1,
+        },
+        {
+          text: '已禁用',
+          value: 2,
+        },
+        {
+          text: '队列中',
+          value: 3,
+        },
+      ],
+      onFilter: (value: number, record: any) => {
+        if (record.isDisabled && record.status !== 0) {
+          return value === 2;
+        } else {
+          return record.status === value;
+        }
+      },
       render: (text: string, record: any) => (
         <>
           {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
