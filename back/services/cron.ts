@@ -232,7 +232,7 @@ export default class CronService {
         return;
       }
 
-      let { _id, command } = cron;
+      let { _id, command, log_path } = cron;
 
       this.logger.silly('Running job');
       this.logger.silly('ID: ' + _id);
@@ -251,7 +251,20 @@ export default class CronService {
         { _id },
         { $set: { status: CrontabStatus.running, pid: cp.pid } },
       );
+      cp.stderr.on('data', (data) => {
+        this.logger.info(`stderr: ${data}`);
+        if (log_path) {
+          fs.appendFileSync(`${log_path}`, `${data}`);
+        }
+      });
+      cp.on('error', (err) => {
+        this.logger.info(`err: ${err}`);
+        if (log_path) {
+          fs.appendFileSync(`${log_path}`, `${JSON.stringify(err)}`);
+        }
+      });
       cp.on('close', (code) => {
+        this.logger.info(`${command} pid: ${cp.pid} closed ${code}`);
         this.cronDb.update(
           { _id },
           { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
