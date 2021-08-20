@@ -252,13 +252,11 @@ export default class CronService {
         { $set: { status: CrontabStatus.running, pid: cp.pid } },
       );
       cp.stderr.on('data', (data) => {
-        this.logger.info(`stderr: ${data}`);
         if (log_path) {
           fs.appendFileSync(`${log_path}`, `${data}`);
         }
       });
       cp.on('error', (err) => {
-        this.logger.info(`err: ${err}`);
         if (log_path) {
           fs.appendFileSync(`${log_path}`, `${JSON.stringify(err)}`);
         }
