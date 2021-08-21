@@ -52,7 +52,7 @@ export default (app: Router) => {
       body: Joi.object({
         value: Joi.string().required(),
         name: Joi.string().required(),
-        remarks: Joi.string().optional(),
+        remarks: Joi.string().optional().allow(''),
         _id: Joi.string().required(),
       }),
     }),
