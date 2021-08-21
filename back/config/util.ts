@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import got from 'got';
 
 export function getFileContentByName(fileName: string) {
   if (fs.existsSync(fileName)) {
@@ -118,4 +119,53 @@ export function getToken(req: any) {
     return authorization.split(' ')[1];
   }
   return '';
+}
+
+export async function getNetIp(req: any) {
+  const ipArray = [
+    ...new Set([
+      ...(req.headers['x-real-ip'] || '').split(','),
+      ...(req.headers['x-forwarded-for'] || '').split(','),
+      req.ip,
+      ...req.ips,
+      req.socket.remoteAddress,
+    ]),
+  ];
+  let ip = ipArray[0];
+  console.log(ipArray);
+  if (ipArray.length > 1) {
+    for (let i = 0; i < ipArray.length; i++) {
+      const ipNumArray = ipArray[i].split('.');
+      const tmp = ipNumArray[0] + '.' + ipNumArray[1];
+      if (
+        tmp === '192.168' ||
+        (ipNumArray[0] === '172' &&
+          ipNumArray[1] >= 16 &&
+          ipNumArray[1] <= 32) ||
+        tmp === '10.7' ||
+        tmp === '127.0'
+      ) {
+        continue;
+      }
+      ip = ipArray[i];
+    }
+  }
+  ip = ip.substr(ip.lastIndexOf(':') + 1, ip.length);
+  if (ip.includes('127.0') || ip.includes('192.168') || ip.includes('10.7')) {
+    ip = '';
+  }
+
+  try {
+    const { data } = await got
+      .get(
+        `https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=${ip}&co=&resource_id=6006&t=1555898284898&ie=utf8&oe=utf8&format=json&tn=baidu`,
+      )
+      .json();
+    return { address: data[0].location, ip };
+  } catch (error) {
+    const { country, regionName, city } = await got
+      .get(`http://ip-api.com/json/${ip}?lang=zh-CN`)
+      .json();
+    return { address: `${country} ${regionName} ${city}`, ip };
+  }
 }

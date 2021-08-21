@@ -18,14 +18,20 @@ reset_env() {
   cp -f $dir_sample/package.json $dir_scripts/package.json
   npm_install_2 $dir_scripts
   echo -e "---> 脚本依赖安装完成\n"
+}
 
-  echo -e "---> 4. 复制通知文件\n"
+copy_dep() {
+  echo -e "---> 1. 复制通知文件\n"
   echo -e "---> 复制一份 $file_notify_py_sample 为 $file_notify_py\n"
   cp -fv $file_notify_py_sample $file_notify_py
   echo
   echo -e "---> 复制一份 $file_notify_js_sample 为 $file_notify_js\n"
   cp -fv $file_notify_js_sample $file_notify_js
   echo -e "---> 通知文件复制完成\n"
+
+  echo -e "---> 2. 复制nginx配置文件\n"
+  cp -fv $nginx_conf /etc/nginx/conf.d/front.conf
+  echo -e "---> 配置文件复制完成\n"
 }
 
 reload_pm2() {
@@ -57,6 +63,7 @@ check_nginx() {
   echo -e "=====> 检测nginx服务\n$nginxPid"
   if [[ $nginxPid ]]; then
     echo -e "\n=====> nginx服务正常\n"
+    nginx -s reload
   else
     echo -e "\n=====> nginx服务异常，重新启动nginx\n"
     nginx -c /etc/nginx/nginx.conf
@@ -109,6 +116,7 @@ init_git() {
 main() {
   echo -e "=====> 开始检测"
   init_git
+  copy_dep
   check_ql
   check_nginx
   check_pm2

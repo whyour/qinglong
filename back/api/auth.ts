@@ -3,66 +3,28 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import * as fs from 'fs';
 import config from '../config';
-import jwt from 'jsonwebtoken';
-import { createRandomString } from '../config/util';
-import crypto from 'crypto';
+import { getNetIp } from '../config/util';
+import AuthService from '../services/auth';
+import { celebrate, Joi } from 'celebrate';
 const route = Router();
 
 export default (app: Router) => {
   app.use('/', route);
   route.post(
     '/login',
+    celebrate({
+      body: Joi.object({
+        username: Joi.string().required(),
+        password: Joi.string().required(),
+      }),
+    }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let username = req.body.username;
-        let password = req.body.password;
-        fs.readFile(config.authConfigFile, 'utf8', function (err, data) {
-          if (err) console.log(err);
-          const authInfo = JSON.parse(data);
-          if (username && password) {
-            if (
-              authInfo.username === 'admin' &&
-              authInfo.password === 'adminadmin'
-            ) {
-              const newPassword = createRandomString(16, 22);
-              fs.writeFileSync(
-                config.authConfigFile,
-                JSON.stringify({
-                  username: authInfo.username,
-                  password: newPassword,
-                }),
-              );
-              return res.send({
-                code: 100,
-                message: '已初始化密码，请前往auth.json查看并重新登录',
-              });
-            }
-            if (
-              username == authInfo.username &&
-              password == authInfo.password
-            ) {
-              const data = createRandomString(50, 100);
-              let token = jwt.sign({ data }, config.secret as any, {
-                expiresIn: 60 * 60 * 24 * 3,
-                algorithm: 'HS384',
-              });
-              fs.writeFileSync(
-                config.authConfigFile,
-                JSON.stringify({
-                  username: authInfo.username,
-                  password: authInfo.password,
-                  token,
-                }),
-              );
-              res.send({ code: 200, token });
-            } else {
-              res.send({ code: 400, message: config.authError });
-            }
-          } else {
-            res.send({ err: 400, message: '请输入用户名密码!' });
-          }
-        });
+        const authService = Container.get(AuthService);
+        const ipInfo = await getNetIp(req);
+        const data = await authService.login({ ...req.body, ...ipInfo });
+        return res.send(data);
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);
@@ -81,8 +43,8 @@ export default (app: Router) => {
           fs.writeFileSync(
             config.authConfigFile,
             JSON.stringify({
-              username: authInfo.username,
-              password: authInfo.password,
+              ...authInfo,
+              token: '',
             }),
           );
           res.send({ code: 200 });
@@ -99,10 +61,15 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        fs.writeFile(config.authConfigFile, JSON.stringify(req.body), (err) => {
-          if (err) console.log(err);
-          res.send({ code: 200, message: '更新成功' });
-        });
+        const content = fs.readFileSync(config.authConfigFile, 'utf8');
+        fs.writeFile(
+          config.authConfigFile,
+          JSON.stringify({ ...JSON.parse(content || '{}'), ...req.body }),
+          (err) => {
+            if (err) console.log(err);
+            res.send({ code: 200, message: '更新成功' });
+          },
+        );
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);

@@ -1,5 +1,5 @@
 import React, { Fragment, useEffect } from 'react';
-import { Button, Row, Input, Form, message } from 'antd';
+import { Button, Row, Input, Form, message, notification } from 'antd';
 import config from '@/utils/config';
 import { history, Link } from 'umi';
 import styles from './index.less';
@@ -18,7 +18,21 @@ const Login = () => {
       })
       .then((data) => {
         if (data.code === 200) {
-          localStorage.setItem(config.authKey, data.token);
+          const { token, lastip, lastaddr, lastlogon } = data.data;
+          localStorage.setItem(config.authKey, token);
+          notification.success({
+            message: '登录成功！',
+            description: (
+              <div>
+                <div>
+                  最后登录时间：{new Date(lastlogon).toLocaleString() || '-'}
+                </div>
+                <div>最后登录地点：{lastaddr || '-'}</div>
+                <div>最后登录IP：{lastip || '-'}</div>
+              </div>
+            ),
+            duration: 5,
+          });
           history.push('/crontab');
         } else if (data.code === 100) {
           message.warn(data.message);

@@ -32,6 +32,7 @@ file_notify_py_sample=$dir_sample/notify.py
 file_notify_py=$dir_scripts/notify.py
 file_notify_js=$dir_scripts/sendNotify.js
 task_error_log_path=$dir_log/task_error.log
+nginx_conf=$dir_root/docker/front.conf
 
 ## 清单文件
 list_crontab_user=$dir_config/crontab.list
