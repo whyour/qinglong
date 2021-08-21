@@ -120,7 +120,7 @@ add_cron() {
             [[ -z $cron_name ]] && cron_name="$file_name"
             [[ -z $cron_line ]] && cron_line=$(grep "cron:" $file | awk -F ":" '{print $2}' | head -1 | xargs)
             [[ -z $cron_line ]] && cron_line=$(grep "cron " $file | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
-            [[ -z $cron_line ]] && cron_line="0 6 * * *"
+            [[ -z $cron_line ]] && cron_line="$default_cron"
             result=$(add_cron_api "$cron_line:$cmd_task $file:$cron_name")
             echo -e "$result"
             if [[ $detail ]]; then
@@ -210,7 +210,7 @@ update_raw() {
         [[ -z $cron_name ]] && cron_name="$raw_file_name"
         [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | head -1 | xargs)
         [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
-        [[ -z $cron_line ]] && cron_line="0 6 * * *"
+        [[ -z $cron_line ]] && cron_line="$default_cron"
         if [[ -z $cron_id ]]; then
             result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
             echo -e "$result\n"

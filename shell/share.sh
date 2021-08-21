@@ -64,6 +64,7 @@ import_config() {
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     github_proxy_url=${GithubProxyUrl:-""}
     file_extensions=${RepoFileExtensions:-"js py"}
+    default_cron="$(random_range 0 59) $(random_range 0 23) * * *"
 }
 
 make_dir() {
@@ -300,6 +301,12 @@ reset_romote_url() {
         git reset --hard $cmd >/dev/null
         cd $dir_current
     fi
+}
+
+random_range() {
+    local beg=$1
+    local end=$2
+    echo $((RANDOM % ($end - $beg) + $beg))
 }
 
 init_env
