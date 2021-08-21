@@ -87,23 +87,25 @@ run_normal() {
     log_dir_tmp="${p1##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
+    cmd=">> $log_path"
+    [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "## 开始执行... $begin_time\n" >> $log_path
-    cat $task_error_log_path >> $log_path
+    eval echo -e "## 开始执行... $begin_time\n" $cmd
+    eval cat $task_error_log_path $cmd
 
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before >> $log_path 2>&1
+    . $file_task_before $cmd 2>&1
 
-    timeout -k 10s $command_timeout_time $which_program $p1 >> $log_path 2>&1
+    eval timeout -k 10s $command_timeout_time $which_program $p1 $cmd 2>&1
 
-    . $file_task_after >> $log_path 2>&1
+    eval . $file_task_after $cmd 2>&1
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
+    eval echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
@@ -121,14 +123,16 @@ run_concurrent() {
     log_dir_tmp="${p1##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
+    cmd=">> $log_path"
+    [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "## 开始执行... $begin_time\n" >> $log_path
-    cat $task_error_log_path >> $log_path
+    eval echo -e "## 开始执行... $begin_time\n" $cmd
+    eval cat $task_error_log_path $cmd
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before >> $log_path 2>&1
+    eval . $file_task_before $cmd 2>&1
 
     local envs=$(eval echo "\$${p3}")
     local array=($(echo $envs | sed 's/&/ /g'))
@@ -142,15 +146,15 @@ run_concurrent() {
     wait
     for i in "${!array[@]}"; do
         single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
-        cat $single_log_path >> $log_path
+        eval cat $single_log_path $cmd
         [ -f $single_log_path ] && rm -f $single_log_path
     done
 
-    . $file_task_after >> $log_path 2>&1
+    eval . $file_task_after $cmd 2>&1
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
+    eval echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
 ## 运行其他命令
@@ -159,27 +163,40 @@ run_else() {
     local log_dir_tmp="${1##*/}"
     local log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
+    cmd=">> $log_path"
+    [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $p1" | perl -pe "s|.*ID=(.*) $cmd_task $p1\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "## 开始执行... $begin_time\n" >> $log_path
-    cat $task_error_log_path >> $log_path
+    eval echo -e "## 开始执行... $begin_time\n" $cmd
+    eval cat $task_error_log_path $cmd
 
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before >> $log_path 2>&1
+    eval . $file_task_before $cmd 2>&1
 
-    timeout -k 10s $command_timeout_time "$@" >> $log_path 2>&1
+    eval timeout -k 10s $command_timeout_time "$@" $cmd 2>&1
 
-    . $file_task_after >> $log_path 2>&1
+    eval . $file_task_after $cmd 2>&1
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
+    eval echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
 ## 命令检测
 main() {
+    show_log="false"
+    while getopts ":l" opt
+    do
+        case $opt in
+            l)
+                show_log="true"
+                ;;
+        esac
+    done
+    shift $(($OPTIND - 1))
+
     if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
         case $# in
         1)
