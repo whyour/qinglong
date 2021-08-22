@@ -87,7 +87,7 @@ run_normal() {
     log_dir_tmp="${first_param##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd=">> $log_path"
+    cmd=">> $log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
@@ -97,11 +97,11 @@ run_normal() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before $cmd 2>&1
+    . $file_task_before $cmd
 
-    eval timeout -k 10s $command_timeout_time $which_program $first_param $cmd 2>&1
+    eval timeout -k 10s $command_timeout_time $which_program $first_param $cmd
 
-    eval . $file_task_after $cmd 2>&1
+    eval . $file_task_after $cmd
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -123,7 +123,7 @@ run_concurrent() {
     log_dir_tmp="${first_param##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd=">> $log_path"
+    cmd=">> $log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
@@ -133,7 +133,7 @@ run_concurrent() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    eval . $file_task_before $cmd 2>&1
+    eval . $file_task_before $cmd
 
     local envs=$(eval echo "\$${third_param}")
     local array=($(echo $envs | sed 's/&/ /g'))
@@ -141,7 +141,7 @@ run_concurrent() {
     for i in "${!array[@]}"; do
         export ${third_param}=${array[i]}
         single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
-        timeout -k 10s $command_timeout_time $which_program $first_param &>$single_log_path 2>&1 &
+        timeout -k 10s $command_timeout_time $which_program $first_param &>$single_log_path &
     done
 
     wait
@@ -151,7 +151,7 @@ run_concurrent() {
         [ -f $single_log_path ] && rm -f $single_log_path
     done
 
-    eval . $file_task_after $cmd 2>&1
+    eval . $file_task_after $cmd
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -164,7 +164,7 @@ run_else() {
     local log_dir_tmp="${1##*/}"
     local log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd=">> $log_path"
+    cmd=">> $log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
@@ -174,11 +174,11 @@ run_else() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    eval . $file_task_before $cmd 2>&1
+    eval . $file_task_before $cmd
 
-    eval timeout -k 10s $command_timeout_time "$@" $cmd 2>&1
+    eval timeout -k 10s $command_timeout_time "$@" $cmd
 
-    eval . $file_task_after $cmd 2>&1
+    eval . $file_task_after $cmd
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))

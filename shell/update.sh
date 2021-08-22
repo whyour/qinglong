@@ -423,6 +423,17 @@ get_uniq_path() {
 }
 
 main() {
+    show_log="false"
+    while getopts ":l" opt
+    do
+        case $opt in
+            l)
+                show_log="true"
+                ;;
+        esac
+    done
+    [[ "$show_log" == "true" ]] && shift $(($OPTIND - 1))
+    
     local p1=$1
     local p2=$2
     local p3=$3
@@ -431,26 +442,32 @@ main() {
     local p6=$6
     local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     local log_path="$dir_log/update/${log_time}_$p1.log"
+    
+    local cmd=">> $log_path"
+    [[ "$show_log" == "true" ]] && cmd=""
+
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     case $p1 in
     update)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
-        update_qinglong "$2" >> $log_path
+        eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+        eval cat $task_error_log_path $cmd
+        eval update_qinglong "$2" $cmd
         ;;
     extra)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
-        run_extra_shell >> $log_path
+        eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+        eval cat $task_error_log_path $cmd
+        eval run_extra_shell $cmd
         ;;
     repo)
         get_user_info
         get_uniq_path "$p2" "$p6"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ "$show_log" == "false" ]] && cmd=">> $log_path"
+
+        eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+        cat $task_error_log_path $cmd
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" >> $log_path
+            eval update_repo "$p2" "$p3" "$p4" "$p5" "$p6" $cmd
         else
             echo -e "命令输入错误...\n"
             usage
@@ -460,29 +477,31 @@ main() {
         get_user_info
         get_uniq_path "$p2"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ "$show_log" == "false" ]] && cmd=">> $log_path"
+
+        eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+        eval cat $task_error_log_path $cmd
         if [[ -n $p2 ]]; then
-            update_raw "$p2" >> $log_path
+            eval update_raw "$p2" $cmd
         else
             echo -e "命令输入错误...\n"
             usage
         fi
         ;;
     rmlog)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
-        . $dir_shell/rmlog.sh "$p2" >> $log_path
+        eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+        eval cat $task_error_log_path $cmd
+        eval . $dir_shell/rmlog.sh "$p2" $cmd
         ;;
     bot)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
-        . $dir_shell/bot.sh >> $log_path
+        eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+        eval cat $task_error_log_path $cmd
+        eval . $dir_shell/bot.sh $cmd
         ;;
     check)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
-        . $dir_shell/check.sh >> $log_path
+        eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+        eval cat $task_error_log_path $cmd
+        eval . $dir_shell/check.sh $cmd
         ;;
     *)
         echo -e "命令输入错误...\n"
@@ -491,7 +510,7 @@ main() {
     esac
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
+    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
     cat $log_path
 }
 
