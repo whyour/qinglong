@@ -39,11 +39,11 @@ const Login = () => {
             description: (
               <>
                 <div>
-                  最后登录时间：
+                  上次登录时间：
                   {lastlogon ? new Date(lastlogon).toLocaleString() : '-'}
                 </div>
-                <div>最后登录地点：{lastaddr || '-'}</div>
-                <div>最后登录IP：{lastip || '-'}</div>
+                <div>上次登录地点：{lastaddr || '-'}</div>
+                <div>上次登录IP：{lastip || '-'}</div>
               </>
             ),
             duration: 5,
