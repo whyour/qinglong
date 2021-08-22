@@ -450,12 +450,12 @@ main() {
     case $p1 in
     update)
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-        eval cat $task_error_log_path $cmd
+        [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
         eval update_qinglong "$2" $cmd
         ;;
     extra)
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-        eval cat $task_error_log_path $cmd
+        [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
         eval run_extra_shell $cmd
         ;;
     repo)
@@ -465,7 +465,7 @@ main() {
         [[ "$show_log" == "false" ]] && cmd=">> $log_path"
 
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-        cat $task_error_log_path $cmd
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path $cmd
         if [[ -n $p2 ]]; then
             eval update_repo "$p2" "$p3" "$p4" "$p5" "$p6" $cmd
         else
@@ -480,7 +480,7 @@ main() {
         [[ "$show_log" == "false" ]] && cmd=">> $log_path"
 
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-        eval cat $task_error_log_path $cmd
+        [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
         if [[ -n $p2 ]]; then
             eval update_raw "$p2" $cmd
         else
@@ -490,17 +490,17 @@ main() {
         ;;
     rmlog)
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-        eval cat $task_error_log_path $cmd
+        [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
         eval . $dir_shell/rmlog.sh "$p2" $cmd
         ;;
     bot)
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-        eval cat $task_error_log_path $cmd
+        [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
         eval . $dir_shell/bot.sh $cmd
         ;;
     check)
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-        eval cat $task_error_log_path $cmd
+        [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
         eval . $dir_shell/check.sh $cmd
         ;;
     *)
@@ -511,7 +511,7 @@ main() {
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
-    cat $log_path
+    [[ -f $log_path ]] && cat $log_path
 }
 
 main "$@"
