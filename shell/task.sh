@@ -195,7 +195,7 @@ main() {
                 ;;
         esac
     done
-    shift $(($OPTIND - 1))
+    [[ "$show_log" == "true" ]] && shift $(($OPTIND - 1))
 
     if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
         case $# in
