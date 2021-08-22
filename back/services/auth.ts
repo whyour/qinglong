@@ -39,6 +39,17 @@ export default class AuthService {
       ) {
         return this.initAuthInfo();
       }
+      if (retries > 2 && Date.now() - lastlogon < Math.pow(3, retries) * 1000) {
+        return {
+          code: 410,
+          message: `失败次数过多，请${Math.round(
+            (Math.pow(3, retries) * 1000 - Date.now() + lastlogon) / 1000,
+          )}秒后重试`,
+          data: Math.round(
+            (Math.pow(3, retries) * 1000 - Date.now() + lastlogon) / 1000,
+          ),
+        };
+      }
       if (username === cUsername && password === cPassword) {
         const data = createRandomString(50, 100);
         let token = jwt.sign({ data }, config.secret as any, {
@@ -68,20 +79,6 @@ export default class AuthService {
             lastaddr: address,
           }),
         );
-        if (
-          retries > 2 &&
-          Date.now() - lastlogon < Math.pow(3, retries) * 1000
-        ) {
-          return {
-            code: 410,
-            message: `失败次数过多，请${Math.round(
-              (Math.pow(3, retries) * 1000 - Date.now() + lastlogon) / 1000,
-            )}秒后重试`,
-            data: Math.round(
-              (Math.pow(3, retries) * 1000 - Date.now() + lastlogon) / 1000,
-            ),
-          };
-        }
         return { code: 400, message: config.authError };
       }
     } else {
