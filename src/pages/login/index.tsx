@@ -1,14 +1,28 @@
-import React, { Fragment, useEffect } from 'react';
-import { Button, Row, Input, Form, message, notification } from 'antd';
+import React, { Fragment, useEffect, useState } from 'react';
+import {
+  Button,
+  Row,
+  Input,
+  Form,
+  message,
+  notification,
+  Statistic,
+} from 'antd';
 import config from '@/utils/config';
 import { history, Link } from 'umi';
 import styles from './index.less';
 import { request } from '@/utils/http';
 
 const FormItem = Form.Item;
+const { Countdown } = Statistic;
 
 const Login = () => {
+  const [loading, setLoading] = useState(false);
+  const [waitTime, setWaitTime] = useState<any>();
+
   const handleOk = (values: any) => {
+    setLoading(true);
+    setWaitTime(null);
     request
       .post(`${config.apiPrefix}login`, {
         data: {
@@ -36,12 +50,17 @@ const Login = () => {
           history.push('/crontab');
         } else if (data.code === 100) {
           message.warn(data.message);
+        } else if (data.code === 410) {
+          message.error(data.message);
+          setWaitTime(data.data);
         } else {
           message.error(data.message);
         }
+        setLoading(false);
       })
       .catch(function (error) {
         console.log(error);
+        setLoading(false);
       });
   };
 
@@ -82,13 +101,27 @@ const Login = () => {
               <Input type="password" placeholder="密码" />
             </FormItem>
             <Row>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{ width: '100%' }}
-              >
-                登录
-              </Button>
+              {waitTime ? (
+                <Button type="primary" style={{ width: '100%' }} disabled>
+                  请
+                  <Countdown
+                    valueStyle={{ color: 'rgba(232, 230, 227, 0.25)' }}
+                    className="inline-countdown"
+                    format="ss"
+                    value={Date.now() + 1000 * waitTime}
+                  />
+                  秒后重试
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  style={{ width: '100%' }}
+                  loading={loading}
+                >
+                  登录
+                </Button>
+              )}
             </Row>
           </Form>
         </div>

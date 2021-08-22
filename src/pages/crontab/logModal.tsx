@@ -57,7 +57,11 @@ const CronLogModal = ({
               content: (
                 <span>
                   系统将在
-                  <Countdown format="ss" value={Date.now() + 1000 * 10} />
+                  <Countdown
+                    className="inline-countdown"
+                    format="ss"
+                    value={Date.now() + 1000 * 10}
+                  />
                   秒后自动刷新
                 </span>
               ),
