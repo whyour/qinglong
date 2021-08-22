@@ -91,11 +91,11 @@ run_normal() {
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     eval cat $task_error_log_path $cmd
 
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
     . $file_task_before $cmd 2>&1
 
@@ -127,10 +127,11 @@ run_concurrent() {
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     eval cat $task_error_log_path $cmd
+
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
     eval . $file_task_before $cmd 2>&1
 
@@ -167,11 +168,11 @@ run_else() {
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     eval cat $task_error_log_path $cmd
 
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
     eval . $file_task_before $cmd 2>&1
 
