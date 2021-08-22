@@ -97,7 +97,7 @@ run_normal() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    . $file_task_before $cmd
+    eval . $file_task_before $cmd
 
     eval timeout -k 10s $command_timeout_time $which_program $first_param $cmd
 
