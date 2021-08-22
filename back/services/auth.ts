@@ -75,7 +75,7 @@ export default class AuthService {
             ...JSON.parse(content),
             retries: retries + 1,
             lastlogon: timestamp,
-            ip,
+            lastip: ip,
             lastaddr: address,
           }),
         );
