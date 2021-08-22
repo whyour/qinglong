@@ -107,6 +107,7 @@ const Login = () => {
                   <Countdown
                     valueStyle={{ color: 'rgba(232, 230, 227, 0.25)' }}
                     className="inline-countdown"
+                    onFinish={() => setWaitTime(null)}
                     format="ss"
                     value={Date.now() + 1000 * waitTime}
                   />
