@@ -37,13 +37,14 @@ const Login = () => {
           notification.success({
             message: '登录成功！',
             description: (
-              <div>
+              <>
                 <div>
-                  最后登录时间：{new Date(lastlogon).toLocaleString() || '-'}
+                  最后登录时间：
+                  {lastlogon ? new Date(lastlogon).toLocaleString() : '-'}
                 </div>
                 <div>最后登录地点：{lastaddr || '-'}</div>
                 <div>最后登录IP：{lastip || '-'}</div>
-              </div>
+              </>
             ),
             duration: 5,
           });
