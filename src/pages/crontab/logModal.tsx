@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form, Statistic } from 'antd';
+import { Modal, message, Input, Form, Statistic, Button } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import {
@@ -118,6 +118,11 @@ const CronLogModal = ({
       forceRender
       onOk={() => cancel()}
       onCancel={() => cancel()}
+      footer={[
+        <Button type="primary" onClick={() => cancel()}>
+          知道了
+        </Button>,
+      ]}
     >
       {!loading && value && (
         <pre

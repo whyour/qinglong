@@ -93,7 +93,7 @@ run_normal() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    eval echo -e "## 开始执行... $begin_time\n" $cmd
+    eval echo -e "\#\# 开始执行... $begin_time\n" $cmd
     eval cat $task_error_log_path $cmd
 
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
@@ -105,7 +105,7 @@ run_normal() {
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    eval echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
@@ -129,7 +129,7 @@ run_concurrent() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    eval echo -e "## 开始执行... $begin_time\n" $cmd
+    eval echo -e "\#\# 开始执行... $begin_time\n" $cmd
     eval cat $task_error_log_path $cmd
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
     eval . $file_task_before $cmd 2>&1
@@ -154,7 +154,7 @@ run_concurrent() {
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    eval echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
 ## 运行其他命令
@@ -169,7 +169,7 @@ run_else() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    eval echo -e "## 开始执行... $begin_time\n" $cmd
+    eval echo -e "\#\# 开始执行... $begin_time\n" $cmd
     eval cat $task_error_log_path $cmd
 
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
@@ -181,7 +181,7 @@ run_else() {
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    eval echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
 ## 命令检测
