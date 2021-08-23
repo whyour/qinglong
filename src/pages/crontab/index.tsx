@@ -240,6 +240,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
             return CrontabSort[sortA] - CrontabSort[sortB];
           }),
         );
+        setCurrentPage(1);
       })
       .finally(() => setLoading(false));
   };
