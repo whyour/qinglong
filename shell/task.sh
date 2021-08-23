@@ -97,11 +97,11 @@ run_normal() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    eval . $file_task_before $cmd
+    eval . $file_task_before "$@" $cmd
 
     eval timeout -k 10s $command_timeout_time $which_program $first_param $cmd
 
-    eval . $file_task_after $cmd
+    eval . $file_task_after "$@" $cmd
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -133,7 +133,7 @@ run_concurrent() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    eval . $file_task_before $cmd
+    eval . $file_task_before "$@" $cmd
 
     local envs=$(eval echo "\$${third_param}")
     local array=($(echo $envs | sed 's/&/ /g'))
@@ -151,7 +151,7 @@ run_concurrent() {
         [ -f $single_log_path ] && rm -f $single_log_path
     done
 
-    eval . $file_task_after $cmd
+    eval . $file_task_after "$@" $cmd
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
@@ -174,11 +174,11 @@ run_else() {
 
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path"
-    eval . $file_task_before $cmd
+    eval . $file_task_before "$@" $cmd
 
     eval timeout -k 10s $command_timeout_time "$@" $cmd
 
-    eval . $file_task_after $cmd
+    eval . $file_task_after "$@" $cmd
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path"
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
