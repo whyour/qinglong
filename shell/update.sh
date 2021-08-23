@@ -435,12 +435,12 @@ main() {
     case $p1 in
     update)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
         update_qinglong "$2" >> $log_path
         ;;
     extra)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
         run_extra_shell >> $log_path
         ;;
     repo)
@@ -448,7 +448,7 @@ main() {
         get_uniq_path "$p2" "$p6"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
         if [[ -n $p2 ]]; then
             update_repo "$p2" "$p3" "$p4" "$p5" "$p6" >> $log_path
         else
@@ -461,7 +461,7 @@ main() {
         get_uniq_path "$p2"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
         if [[ -n $p2 ]]; then
             update_raw "$p2" >> $log_path
         else
@@ -471,17 +471,17 @@ main() {
         ;;
     rmlog)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
         . $dir_shell/rmlog.sh "$p2" >> $log_path
         ;;
     bot)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
         . $dir_shell/bot.sh >> $log_path
         ;;
     check)
         echo -e "## 开始执行... $begin_time\n" >> $log_path
-        cat $task_error_log_path >> $log_path
+        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
         . $dir_shell/check.sh >> $log_path
         ;;
     *)
