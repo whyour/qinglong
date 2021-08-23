@@ -467,7 +467,7 @@ main() {
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
         [[ -f $task_error_log_path ]] && cat $task_error_log_path $cmd
         if [[ -n $p2 ]]; then
-            eval update_repo "$p2" "$p3" "$p4" "$p5" "$p6" $cmd
+            eval update_repo '$p2' '$p3' '$p4' '$p5' '$p6' $cmd
         else
             echo -e "命令输入错误...\n"
             usage
@@ -477,7 +477,7 @@ main() {
         get_user_info
         get_uniq_path "$p2"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
-        [[ "$show_log" == "false" ]] && cmd=">> $log_path"
+        [[ "$show_log" == "false" ]] && cmd=" >> $log_path"
 
         eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
         [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
