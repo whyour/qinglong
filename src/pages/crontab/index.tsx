@@ -274,7 +274,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
             if (data.code === 200) {
               message.success('删除成功');
               const result = [...value];
-              result.splice(index + pageSize * (currentPage - 1), 1);
+              const i = result.findIndex((x) => x._id === record._id);
+              result.splice(i, 1);
               setValue(result);
             } else {
               message.error(data);
@@ -305,7 +306,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              result.splice(index + pageSize * (currentPage - 1), 1, {
+              const i = result.findIndex((x) => x._id === record._id);
+              result.splice(i, 1, {
                 ...record,
                 status: CrontabStatus.running,
               });
@@ -339,7 +341,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              result.splice(index + pageSize * (currentPage - 1), 1, {
+              const i = result.findIndex((x) => x._id === record._id);
+              result.splice(i, 1, {
                 ...record,
                 pid: null,
                 status: CrontabStatus.idle,
@@ -383,7 +386,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
             if (data.code === 200) {
               const newStatus = record.isDisabled === 1 ? 0 : 1;
               const result = [...value];
-              result.splice(index + pageSize * (currentPage - 1), 1, {
+              const i = result.findIndex((x) => x._id === record._id);
+              result.splice(i, 1, {
                 ...record,
                 isDisabled: newStatus,
               });

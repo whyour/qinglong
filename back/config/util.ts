@@ -165,9 +165,13 @@ export async function getNetIp(req: any) {
       .json();
     return { address: data[0].location, ip };
   } catch (error) {
-    const { country, regionName, city } = await got
-      .get(`http://ip-api.com/json/${ip}?lang=zh-CN`)
-      .json();
-    return { address: `${country} ${regionName} ${city}`, ip };
+    try {
+      const { country, regionName, city } = await got
+        .get(`http://ip-api.com/json/${ip}?lang=zh-CN`)
+        .json();
+      return { address: `${country} ${regionName} ${city}`, ip };
+    } catch (err) {
+      return { address: `获取失败`, ip };
+    }
   }
 }
