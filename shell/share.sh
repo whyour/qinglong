@@ -65,7 +65,12 @@ import_config() {
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     github_proxy_url=${GithubProxyUrl:-""}
     file_extensions=${RepoFileExtensions:-"js py"}
-    default_cron="$(random_range 0 59) $(random_range 0 23) * * *"
+
+    if [[ -n "${DefaultCronRule}" ]]; then
+        default_cron="${DefaultCronRule}"
+    else
+        default_cron="$(random_range 0 59) $(random_range 0 23) * * *"
+    fi
 }
 
 make_dir() {
