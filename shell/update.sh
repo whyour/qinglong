@@ -408,18 +408,18 @@ gen_list_repo() {
 }
 
 get_uniq_path() {
-  local url="$1"
-  local branch="$2"
-  local urlTmp="${url%*/}"
-  local repoTmp="${urlTmp##*/}"
-  local repo="${repoTmp%.*}"
-  local tmp="${url%/*}"
-  local authorTmp1="${tmp##*/}"
-  local authorTmp2="${authorTmp1##*:}"
-  local author="${authorTmp2##*.}"
+    local url="$1"
+    local branch="$2"
+    local urlTmp="${url%*/}"
+    local repoTmp="${urlTmp##*/}"
+    local repo="${repoTmp%.*}"
+    local tmp="${url%/*}"
+    local authorTmp1="${tmp##*/}"
+    local authorTmp2="${authorTmp1##*:}"
+    local author="${authorTmp2##*.}"
 
-  uniq_path="${author}_${repo}"
-  [[ $branch ]] && uniq_path="${uniq_path}_${branch}"
+    uniq_path="${author}_${repo}"
+    [[ $branch ]] && uniq_path="${uniq_path}_${branch}"
 }
 
 main() {
@@ -434,23 +434,23 @@ main() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     case $p1 in
     update)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
-        update_qinglong "$2" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
+        update_qinglong "$2" >>$log_path
         ;;
     extra)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
-        run_extra_shell >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
+        run_extra_shell >>$log_path
         ;;
     repo)
         get_user_info
         get_uniq_path "$p2" "$p6"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" >> $log_path
+            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" >>$log_path
         else
             echo -e "命令输入错误...\n"
             usage
@@ -460,29 +460,35 @@ main() {
         get_user_info
         get_uniq_path "$p2"
         log_path="$dir_log/update/${log_time}_${uniq_path}.log"
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
         if [[ -n $p2 ]]; then
-            update_raw "$p2" >> $log_path
+            update_raw "$p2" >>$log_path
         else
             echo -e "命令输入错误...\n"
             usage
         fi
         ;;
     rmlog)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
-        . $dir_shell/rmlog.sh "$p2" >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
+        . $dir_shell/rmlog.sh "$p2" >>$log_path
         ;;
     bot)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
-        . $dir_shell/bot.sh >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
+        . $dir_shell/bot.sh >>$log_path
         ;;
     check)
-        echo -e "## 开始执行... $begin_time\n" >> $log_path
-        [[ -f $task_error_log_path ]] &&  cat $task_error_log_path >> $log_path
-        . $dir_shell/check.sh >> $log_path
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
+        . $dir_shell/check.sh >>$log_path
+        ;;
+    resetlet)
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        auth_value=$(cat $file_auth_user | jq '.retries =0' -c)
+        echo -e "重置成功 \n $auth_value" >>$log_path
+        echo "$auth_value" >$file_auth_user
         ;;
     *)
         echo -e "命令输入错误...\n"
@@ -491,7 +497,7 @@ main() {
     esac
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >> $log_path
+    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >>$log_path
     cat $log_path
 }
 
