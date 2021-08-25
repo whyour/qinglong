@@ -12,6 +12,7 @@ import config from '@/utils/config';
 import { history, Link } from 'umi';
 import styles from './index.less';
 import { request } from '@/utils/http';
+import { useTheme } from '@/utils/hooks';
 
 const FormItem = Form.Item;
 const { Countdown } = Statistic;
@@ -19,6 +20,7 @@ const { Countdown } = Statistic;
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [waitTime, setWaitTime] = useState<any>();
+  const { theme } = useTheme();
 
   const handleOk = (values: any) => {
     setLoading(true);
@@ -106,7 +108,12 @@ const Login = () => {
                 <Button type="primary" style={{ width: '100%' }} disabled>
                   请
                   <Countdown
-                    valueStyle={{ color: 'rgba(232, 230, 227, 0.25)' }}
+                    valueStyle={{
+                      color:
+                        theme === 'vs'
+                          ? 'rgba(0,0,0,.25)'
+                          : 'rgba(232, 230, 227, 0.25)',
+                    }}
                     className="inline-countdown"
                     onFinish={() => setWaitTime(null)}
                     format="ss"
