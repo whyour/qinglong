@@ -25,7 +25,7 @@ const run = async () => {
       if (docs && docs.length > 0) {
         for (let i = 0; i < docs.length; i++) {
           const task = docs[i];
-          const _schedule = task.schedule && task.schedule.split(' ');
+          const _schedule = task.schedule && task.schedule.split(/ +/);
           if (
             _schedule &&
             _schedule.length > 5 &&

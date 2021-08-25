@@ -132,7 +132,6 @@ export async function getNetIp(req: any) {
     ]),
   ];
   let ip = ipArray[0];
-  console.log(`访问的ip ${ipArray.toString()}`);
 
   if (ipArray.length > 1) {
     for (let i = 0; i < ipArray.length; i++) {
@@ -156,22 +155,22 @@ export async function getNetIp(req: any) {
   if (ip.includes('127.0') || ip.includes('192.168') || ip.includes('10.7')) {
     ip = '';
   }
-
   try {
-    const { data } = await got
-      .get(
-        `https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=${ip}&co=&resource_id=6006&t=1555898284898&ie=utf8&oe=utf8&format=json&tn=baidu`,
-      )
-      .json();
-    return { address: data[0].location, ip };
-  } catch (error) {
-    try {
-      const { country, regionName, city } = await got
-        .get(`http://ip-api.com/json/${ip}?lang=zh-CN`)
-        .json();
+    const baiduApi = got.get(
+      `https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=${ip}&co=&resource_id=6006&t=1555898284898&ie=utf8&oe=utf8&format=json&tn=baidu`,
+    );
+    const ipApi = got.get(`http://ip-api.com/json/${ip}?lang=zh-CN`);
+    const [{ data }, { country, regionName, city }] = await (
+      await Promise.all<any>([baiduApi, ipApi])
+    ).map((x) => JSON.parse(x.body));
+    if (data[0] && data[0].location) {
+      return { address: data[0].location, ip };
+    } else if (country && regionName) {
       return { address: `${country} ${regionName} ${city}`, ip };
-    } catch (err) {
+    } else {
       return { address: `获取失败`, ip };
     }
+  } catch (error) {
+    return { address: `获取失败`, ip };
   }
 }

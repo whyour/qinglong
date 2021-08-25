@@ -305,7 +305,7 @@ export default class CronService {
     if (doc.log_path) {
       return getFileContentByName(`${doc.log_path}`);
     }
-    const [, commandStr, url] = doc.command.split(' ');
+    const [, commandStr, url] = doc.command.split(/ +/);
     let logPath = this.getKey(commandStr);
     const isQlCommand = doc.command.startsWith('ql ');
     const key =
@@ -345,7 +345,7 @@ export default class CronService {
     const tabs = await this.crontabs();
     var crontab_string = '';
     tabs.forEach((tab) => {
-      const _schedule = tab.schedule && tab.schedule.split(' ');
+      const _schedule = tab.schedule && tab.schedule.split(/ +/);
       if (tab.isDisabled === 1 || _schedule.length !== 5) {
         crontab_string += '# ';
         crontab_string += tab.schedule;

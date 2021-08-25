@@ -3,7 +3,6 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import * as fs from 'fs';
 import config from '../config';
-import { getNetIp } from '../config/util';
 import AuthService from '../services/auth';
 import { celebrate, Joi } from 'celebrate';
 const route = Router();
@@ -22,8 +21,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const authService = Container.get(AuthService);
-        const ipInfo = await getNetIp(req);
-        const data = await authService.login({ ...req.body, ...ipInfo });
+        const data = await authService.login({ ...req.body }, req);
         return res.send(data);
       } catch (e) {
         logger.error('🔥 error: %o', e);
