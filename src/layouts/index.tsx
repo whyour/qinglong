@@ -45,11 +45,11 @@ export default function (props: any) {
   }, [props.location.pathname]);
 
   useEffect(() => {
-    const theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
+    const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
     setFetchMethod(window.fetch);
-    if (theme === 'dark') {
+    if (_theme === 'dark') {
       enableDarkMode({});
-    } else if (theme === 'light') {
+    } else if (_theme === 'light') {
       disableDarkMode();
     } else {
       followSystemColorScheme({});
