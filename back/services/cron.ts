@@ -31,7 +31,7 @@ export default class CronService {
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
-    if (schedule.split(' ').length === 6) {
+    if (schedule.split(/ +/).length === 6) {
       return true;
     }
     return false;
