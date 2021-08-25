@@ -30,7 +30,8 @@ copy_dep() {
   echo -e "---> 通知文件复制完成\n"
 
   echo -e "---> 2. 复制nginx配置文件\n"
-  cp -fv $nginx_conf /etc/nginx/conf.d/front.conf
+  cp -fv $nginx_conf /etc/nginx/nginx.conf
+  cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
   echo -e "---> 配置文件复制完成\n"
 }
 

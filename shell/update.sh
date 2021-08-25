@@ -246,6 +246,7 @@ usage() {
     echo -e "5. $cmd_update rmlog <days>                                              # 删除旧日志"
     echo -e "6. $cmd_update bot                                                       # 启动tg-bot"
     echo -e "7. $cmd_update check                                                     # 检测青龙环境并修复"
+    echo -e "8. $cmd_update resetlet                                                  # 重置登录错误次数"
 }
 
 ## 更新qinglong
