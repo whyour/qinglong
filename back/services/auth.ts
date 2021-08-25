@@ -1,6 +1,6 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { createRandomString, getFileContentByName } from '../config/util';
+import { createRandomString, getNetIp } from '../config/util';
 import config from '../config';
 import * as fs from 'fs';
 import _ from 'lodash';
@@ -10,17 +10,18 @@ import jwt from 'jsonwebtoken';
 export default class AuthService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  public async login(payloads: {
-    username: string;
-    password: string;
-    ip: string;
-    address: string;
-  }): Promise<any> {
+  public async login(
+    payloads: {
+      username: string;
+      password: string;
+    },
+    req: any,
+  ): Promise<any> {
     if (!fs.existsSync(config.authConfigFile)) {
       return this.initAuthInfo();
     }
 
-    let { username, password, ip, address } = payloads;
+    let { username, password } = payloads;
     const content = fs.readFileSync(config.authConfigFile, 'utf8');
     const timestamp = Date.now();
     if (content) {
@@ -32,6 +33,7 @@ export default class AuthService {
         lastip,
         lastaddr,
       } = JSON.parse(content);
+
       if (
         (cUsername === 'admin' && cPassword === 'adminadmin') ||
         !cUsername ||
@@ -39,6 +41,7 @@ export default class AuthService {
       ) {
         return this.initAuthInfo();
       }
+
       if (retries > 2 && Date.now() - lastlogon < Math.pow(3, retries) * 1000) {
         return {
           code: 410,
@@ -50,6 +53,8 @@ export default class AuthService {
           ),
         };
       }
+
+      const { ip, address } = await getNetIp(req);
       if (username === cUsername && password === cPassword) {
         const data = createRandomString(50, 100);
         let token = jwt.sign({ data }, config.secret as any, {
