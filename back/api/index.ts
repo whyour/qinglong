@@ -5,6 +5,7 @@ import config from './config';
 import log from './log';
 import cron from './cron';
 import script from './script';
+import open from './open';
 
 export default () => {
   const app = Router();
@@ -14,6 +15,7 @@ export default () => {
   log(app);
   cron(app);
   script(app);
+  open(app);
 
   return app;
 };

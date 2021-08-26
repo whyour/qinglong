@@ -6,6 +6,9 @@ import config from '../config';
 import jwt from 'express-jwt';
 import fs from 'fs';
 import { getToken } from '../config/util';
+import Container from 'typedi';
+import OpenService from '../services/open';
+import rewrite from 'express-urlrewrite';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -15,19 +18,42 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
   app.use(
     jwt({ secret: config.secret as string, algorithms: ['HS384'] }).unless({
-      path: ['/api/login', '/api/crons/status'],
+      path: ['/api/login', '/api/crons/status', /^\/open\//],
     }),
   );
-  app.use((req, res, next) => {
-    const data = fs.readFileSync(config.authConfigFile, 'utf8');
+
+  app.use(async (req, res, next) => {
     const headerToken = getToken(req);
+    if (req.path.startsWith('/open/')) {
+      const openService = Container.get(OpenService);
+      const doc = await openService.findTokenByValue(headerToken);
+      if (doc && doc.tokens.length > 0) {
+        const currentToken = doc.tokens.find((x) => x.value === headerToken);
+        const key =
+          req.path.match(/\/open\/([a-z]+)\/*/) &&
+          req.path.match(/\/open\/([a-z]+)\/*/)[1];
+        if (
+          doc.scopes.includes(key as any) &&
+          currentToken &&
+          currentToken.expiration >= Math.round(Date.now() / 1000)
+        ) {
+          return next();
+        }
+      }
+    }
+
+    const data = fs.readFileSync(config.authConfigFile, 'utf8');
     if (data) {
       const { token } = JSON.parse(data);
       if (token && headerToken === token) {
         return next();
       }
     }
-    if (!headerToken && req.path && req.path === '/api/login') {
+    if (
+      !headerToken &&
+      req.path &&
+      (req.path === '/api/login' || req.path === '/open/auth/token')
+    ) {
       return next();
     }
     const remoteAddress = req.socket.remoteAddress;
@@ -37,10 +63,13 @@ export default ({ app }: { app: Application }) => {
     ) {
       return next();
     }
+
     const err: any = new Error('UnauthorizedError');
-    err['status'] = 401;
+    err.status = 401;
     next(err);
   });
+
+  app.use(rewrite('/open/*', '/api/$1'));
   app.use(config.api.prefix, routes());
 
   app.use((req, res, next) => {

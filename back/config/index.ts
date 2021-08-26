@@ -23,6 +23,8 @@ const configString = 'config sample crontab shareCode diy';
 const dbPath = path.join(rootPath, 'db/');
 const cronDbFile = path.join(rootPath, 'db/crontab.db');
 const envDbFile = path.join(rootPath, 'db/env.db');
+const appDbFile = path.join(rootPath, 'db/app.db');
+
 const configFound = dotenv.config({ path: confFile });
 
 if (envFound.error) {
@@ -57,6 +59,7 @@ export default {
   dbPath,
   cronDbFile,
   envDbFile,
+  appDbFile,
   configPath,
   scriptPath,
   samplePath,
@@ -67,10 +70,5 @@ export default {
     'crontab.list',
     'env.sh',
   ],
-  writePathList: [
-    '/ql/scripts/',
-    '/ql/config/',
-    '/ql/jbot/',
-    '/ql/bak/',
-  ],
+  writePathList: ['/ql/scripts/', '/ql/config/', '/ql/jbot/', '/ql/bak/'],
 };
