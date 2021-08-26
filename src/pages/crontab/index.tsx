@@ -635,7 +635,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       <Table
         columns={columns}
         pagination={{
-          hideOnSinglePage: true,
           current: currentPage,
           onChange: onPageChange,
           pageSize: pageSize,
