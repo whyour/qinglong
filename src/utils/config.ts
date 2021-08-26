@@ -34,4 +34,33 @@ export default {
     ],
     defaultLanguage: 'en',
   },
+  scopes: [
+    {
+      name: '定时任务',
+      value: 'crons',
+    },
+    {
+      name: '环境变量',
+      value: 'envs',
+    },
+    {
+      name: '配置文件',
+      value: 'configs',
+    },
+    {
+      name: '脚本管理',
+      value: 'scripts',
+    },
+    {
+      name: '任务日志',
+      value: 'logs',
+    },
+  ],
+  scopesMap: {
+    crons: '定时任务',
+    envs: '环境变量',
+    configs: '配置文件',
+    scripts: '脚本管理',
+    logs: '任务日志',
+  },
 };

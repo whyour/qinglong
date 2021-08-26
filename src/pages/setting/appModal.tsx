@@ -1,0 +1,80 @@
+import React, { useEffect, useState } from 'react';
+import { Modal, message, Input, Form, Select } from 'antd';
+import { request } from '@/utils/http';
+import config from '@/utils/config';
+
+const AppModal = ({
+  app,
+  handleCancel,
+  visible,
+}: {
+  app?: any;
+  visible: boolean;
+  handleCancel: (needUpdate?: boolean) => void;
+}) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const handleOk = async (values: any) => {
+    setLoading(true);
+    const method = app ? 'put' : 'post';
+    const payload = { ...values };
+    if (app) {
+      payload._id = app._id;
+    }
+    const { code, data } = await request[method](`${config.apiPrefix}apps`, {
+      data: payload,
+    });
+    if (code === 200) {
+      message.success(app ? '更新应用成功' : '添加应用成功');
+    } else {
+      message.error(data);
+    }
+    setLoading(false);
+    handleCancel(data);
+  };
+
+  useEffect(() => {
+    form.resetFields();
+  }, [app, visible]);
+
+  return (
+    <Modal
+      title={app ? '编辑应用' : '新建应用'}
+      visible={visible}
+      forceRender
+      onOk={() => {
+        form
+          .validateFields()
+          .then((values) => {
+            handleOk(values);
+          })
+          .catch((info) => {
+            console.log('Validate Failed:', info);
+          });
+      }}
+      onCancel={() => handleCancel()}
+      confirmLoading={loading}
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        name="form_app_modal"
+        initialValues={app}
+      >
+        <Form.Item name="name" label="名称">
+          <Input placeholder="请输入应用名称" />
+        </Form.Item>
+        <Form.Item name="scopes" label="权限" rules={[{ required: true }]}>
+          <Select mode="multiple" allowClear style={{ width: '100%' }}>
+            {config.scopes.map((x) => {
+              return <Select.Option value={x.value}>{x.name}</Select.Option>;
+            })}
+          </Select>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+};
+
+export default AppModal;

@@ -86,7 +86,7 @@ export function createRandomString(min: number, max: number): string {
     'Y',
     'Z',
   ];
-  const special = ['-', '_', '#'];
+  const special = ['-', '_'];
   const config = num.concat(english).concat(ENGLISH).concat(special);
 
   const arr = [];

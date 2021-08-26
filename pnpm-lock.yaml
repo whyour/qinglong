@@ -17,7 +17,6 @@ specifiers:
   '@types/react-dom': ^17.0.0
   '@umijs/plugin-antd': ^0.9.1
   '@umijs/test': ^3.3.9
-  axios: ^0.21.1
   body-parser: ^1.19.0
   celebrate: ^13.0.3
   codemirror: ^5.62.2
@@ -28,6 +27,7 @@ specifiers:
   dotenv: ^8.2.0
   express: ^4.17.1
   express-jwt: ^6.0.0
+  express-urlrewrite: ^1.4.0
   got: ^11.8.2
   jsonwebtoken: ^8.5.1
   lint-staged: ^10.0.7
@@ -52,13 +52,13 @@ specifiers:
   typescript: ^4.1.2
   umi: ^3.3.9
   umi-request: ^1.3.5
+  uuid: ^8.3.2
   vh-check: ^2.0.5
   webpack: ^5.28.0
   winston: ^3.3.3
   yorkie: ^2.0.0
 
 dependencies:
-  axios: 0.21.1
   body-parser: 1.19.0
   celebrate: 13.0.4
   cors: 2.8.5
@@ -66,6 +66,7 @@ dependencies:
   dotenv: 8.6.0
   express: 4.17.1
   express-jwt: 6.0.0
+  express-urlrewrite: 1.4.0
   got: 11.8.2
   jsonwebtoken: 8.5.1
   lodash: 4.17.21
@@ -75,6 +76,7 @@ dependencies:
   p-queue: 6.6.2
   reflect-metadata: 0.1.13
   typedi: 0.8.0
+  uuid: 8.3.2
   winston: 3.3.3
 
 devDependencies:
@@ -2008,14 +2010,6 @@ packages:
     resolution: {integrity: sha512-xh1Rl34h6Fi1DC2WWKfxUTVqRsNnr6LsKz2+hfwDxQJWmrx8+c7ylaqBMcHfl1U1r2dsifOvKX3LQuLNZ+XSvA==}
     dev: true
 
-  /axios/0.21.1:
-    resolution: {integrity: sha512-dKQiRHxGD9PPRIUNIWvZhPTPpl1rf/OxTYKsqKUDjBwYylTvV7SjSHJb9ratfyzM6wCdLCOYLzs73qpg5c4iGA==}
-    dependencies:
-      follow-redirects: 1.14.2
-    transitivePeerDependencies:
-      - debug
-    dev: false
-
   /babel-core/7.0.0-bridge.0_@babel+core@7.12.10:
     resolution: {integrity: sha512-poPX9mZH/5CSanm50Q+1toVci6pv5KSRv/5TWCwtzQS5XEwn40BcCrgIeMFWP9CKKIniKXNxoIOnOq4VVlGXhg==}
     peerDependencies:
@@ -3122,6 +3116,18 @@ packages:
       ms: 2.1.2
     dev: true
 
+  /debug/4.3.2:
+    resolution: {integrity: sha512-mOp8wKcvj7XxC78zLgw/ZA+6TSgkoE2C/ienthhRD298T7UNwAg9diBpLRxC0mOezLl4B0xV7M0cCO6P/O0Xhw==}
+    engines: {node: '>=6.0'}
+    peerDependencies:
+      supports-color: '*'
+    peerDependenciesMeta:
+      supports-color:
+        optional: true
+    dependencies:
+      ms: 2.1.2
+    dev: false
+
   /decamelize/1.2.0:
     resolution: {integrity: sha1-9lNNFRSCabIDUue+4m9QH5oZEpA=}
     engines: {node: '>=0.10.0'}
@@ -3643,6 +3649,15 @@ packages:
     resolution: {integrity: sha1-JVfBRudb65A+LSR/m1ugFFJpbiA=}
     dev: false
 
+  /express-urlrewrite/1.4.0:
+    resolution: {integrity: sha512-PI5h8JuzoweS26vFizwQl6UTF25CAHSggNv0J25Dn/IKZscJHWZzPrI5z2Y2jgOzIaw2qh8l6+/jUcig23Z2SA==}
+    dependencies:
+      debug: 4.3.2
+      path-to-regexp: 1.8.0
+    transitivePeerDependencies:
+      - supports-color
+    dev: false
+
   /express/4.17.1:
     resolution: {integrity: sha512-mHJ9O79RqluphRrcw2X/GTh3k9tVv8YcoyY4Kkh4WDMUYKRZUq0h1o0w2rrrxBqM7VoeUVqgb27xlEMXTnYt4g==}
     engines: {node: '>= 0.10.0'}
@@ -3836,16 +3851,6 @@ packages:
 
   /fn.name/1.1.0:
     resolution: {integrity: sha512-GRnmB5gPyJpAhTQdSZTSp9uaPSvl09KoYcMQtsB9rQoOmzs9dH6ffeccH+Z+cv6P68Hu5bC6JjRh4Ah/mHSNRw==}
-    dev: false
-
-  /follow-redirects/1.14.2:
-    resolution: {integrity: sha512-yLR6WaE2lbF0x4K2qE2p9PEXKLDjUjnR/xmjS3wHAYxtlsI9MLLBJUZirAHKzUZDGLxje7w/cXR49WOUo4rbsA==}
-    engines: {node: '>=4.0'}
-    peerDependencies:
-      debug: '*'
-    peerDependenciesMeta:
-      debug:
-        optional: true
     dev: false
 
   /for-each/0.3.3:
@@ -4687,7 +4692,6 @@ packages:
 
   /isarray/0.0.1:
     resolution: {integrity: sha1-ihis/Kmo9Bd+Cav8YDiTmwXR7t8=}
-    dev: true
 
   /isarray/1.0.0:
     resolution: {integrity: sha1-u5NdSFgsuhaMBoNJV6VKPgcSTxE=}
@@ -6003,7 +6007,6 @@ packages:
 
   /ms/2.1.2:
     resolution: {integrity: sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==}
-    dev: true
 
   /ms/2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -6518,7 +6521,6 @@ packages:
     resolution: {integrity: sha512-n43JRhlUKUAlibEJhPeir1ncUID16QnEjNpwzNdO3Lm4ywrBpBZ5oLD0I6br9evr1Y9JTqwRtAh7JLoOzAQdVA==}
     dependencies:
       isarray: 0.0.1
-    dev: true
 
   /path-to-regexp/2.4.0:
     resolution: {integrity: sha512-G6zHoVqC6GGTQkZwF4lkuEyMbVOjoBKAEybQUypI1WTkqinCOrq2x6U2+phkJ1XsEMTy4LjtwPI7HW+NVrRR2w==}
@@ -9506,8 +9508,6 @@ packages:
   /uuid/8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
     hasBin: true
-    dev: true
-    optional: true
 
   /v8-compile-cache/2.3.0:
     resolution: {integrity: sha512-l8lCEmLcLYZh4nbunNZvQCJc5pv7+RCwa8q/LdUx8u7lsWvPDKmpodJAJNwkAhJC//dFY48KuIEmjtd4RViDrA==}
