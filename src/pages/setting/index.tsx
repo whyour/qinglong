@@ -50,12 +50,18 @@ const Setting = ({ headerStyle, isPhone }: any) => {
       dataIndex: 'client_id',
       key: 'client_id',
       align: 'center' as const,
+      render: (text: string, record: any) => {
+        return <Text copyable>{record.client_id}</Text>;
+      },
     },
     {
       title: 'Client Secret',
       dataIndex: 'client_secret',
       key: 'client_secret',
       align: 'center' as const,
+      render: (text: string, record: any) => {
+        return <Text copyable={{ text: record.client_secret }}>*******</Text>;
+      },
     },
     {
       title: '权限',
