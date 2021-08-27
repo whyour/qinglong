@@ -159,14 +159,16 @@ export async function getNetIp(req: any) {
     const baiduApi = got.get(
       `https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=${ip}&co=&resource_id=6006&t=1555898284898&ie=utf8&oe=utf8&format=json&tn=baidu`,
     );
-    const ipApi = got.get(`http://ip-api.com/json/${ip}?lang=zh-CN`);
-    const [{ data }, { country, regionName, city }] = await (
+    const ipApi = got.get(
+      `https://whois.pconline.com.cn/ipJson.jsp?ip=${ip}&json=true`,
+    );
+    const [{ data }, { addr, region, city }] = await (
       await Promise.all<any>([baiduApi, ipApi])
     ).map((x) => JSON.parse(x.body));
     if (data[0] && data[0].location) {
       return { address: data[0].location, ip };
-    } else if (country && regionName) {
-      return { address: `${country} ${regionName} ${city}`, ip };
+    } else if (city && region) {
+      return { address: `${addr}`, ip };
     } else {
       return { address: `获取失败`, ip };
     }
