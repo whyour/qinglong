@@ -66,7 +66,12 @@ const AppModal = ({
           <Input placeholder="请输入应用名称" />
         </Form.Item>
         <Form.Item name="scopes" label="权限" rules={[{ required: true }]}>
-          <Select mode="multiple" allowClear style={{ width: '100%' }}>
+          <Select
+            mode="multiple"
+            placeholder="请选择模块权限"
+            allowClear
+            style={{ width: '100%' }}
+          >
             {config.scopes.map((x) => {
               return <Select.Option value={x.value}>{x.name}</Select.Option>;
             })}
