@@ -465,7 +465,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   };
 
   const onSearch = (value: string) => {
-    setSearchText(value);
+    setSearchText(value.trim());
   };
 
   const handleCrons = (cron: any) => {

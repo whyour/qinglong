@@ -427,7 +427,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
   };
 
   const onSearch = (value: string) => {
-    setSearchText(value);
+    setSearchText(value.trim());
   };
 
   useEffect(() => {
