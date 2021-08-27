@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import got from 'got';
+import iconv from 'iconv-lite';
 
 export function getFileContentByName(fileName: string) {
   if (fs.existsSync(fileName)) {
@@ -156,18 +157,24 @@ export async function getNetIp(req: any) {
     ip = '';
   }
   try {
-    const baiduApi = got.get(
-      `https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?query=${ip}&co=&resource_id=6006&t=1555898284898&ie=utf8&oe=utf8&format=json&tn=baidu`,
-    );
-    const ipApi = got.get(
-      `https://whois.pconline.com.cn/ipJson.jsp?ip=${ip}&json=true`,
-    );
-    const [{ data }, { addr, region, city }] = await (
-      await Promise.all<any>([baiduApi, ipApi])
-    ).map((x) => JSON.parse(x.body));
-    if (data[0] && data[0].location) {
-      return { address: data[0].location, ip };
-    } else if (city && region) {
+    const baiduApi = got
+      .get(`https://www.cip.cc/${ip}`, { timeout: 100000 })
+      .text();
+    const ipApi = got
+      .get(`https://whois.pconline.com.cn/ipJson.jsp?ip=${ip}&json=true`, {
+        timeout: 100000,
+      })
+      .buffer();
+    const [data, ipApiBody] = await await Promise.all<any>([baiduApi, ipApi]);
+
+    const ipRegx = /.*IP	:(.*)\n/;
+    const addrRegx = /.*数据二	:(.*)\n/;
+    if (data && ipRegx.test(data) && addrRegx.test(data)) {
+      const ip = data.match(ipRegx)[1];
+      const addr = data.match(addrRegx)[1];
+      return { address: addr, ip };
+    } else if (ipApiBody) {
+      const { addr, ip } = JSON.parse(iconv.decode(ipApiBody, 'GBK'));
       return { address: `${addr}`, ip };
     } else {
       return { address: `获取失败`, ip };

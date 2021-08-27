@@ -29,6 +29,7 @@ specifiers:
   express-jwt: ^6.0.0
   express-urlrewrite: ^1.4.0
   got: ^11.8.2
+  iconv-lite: ^0.6.3
   jsonwebtoken: ^8.5.1
   lint-staged: ^10.0.7
   lodash: ^4.17.21
@@ -68,6 +69,7 @@ dependencies:
   express-jwt: 6.0.0
   express-urlrewrite: 1.4.0
   got: 11.8.2
+  iconv-lite: 0.6.3
   jsonwebtoken: 8.5.1
   lodash: 4.17.21
   nedb: 1.8.0
@@ -4282,7 +4284,6 @@ packages:
     engines: {node: '>=0.10.0'}
     dependencies:
       safer-buffer: 2.1.2
-    dev: true
 
   /identity-obj-proxy/3.0.0:
     resolution: {integrity: sha1-lNK9qWCERT7zb7xarsN+D3nx/BQ=}
