@@ -105,7 +105,9 @@ const Log = ({ headerStyle, isPhone, theme }: any) => {
 
   useEffect(() => {
     getLogs();
-    setHeight(treeDom.current.clientHeight);
+    if (treeDom && treeDom.current) {
+      setHeight(treeDom.current.clientHeight);
+    }
   }, []);
 
   return (

@@ -9,7 +9,7 @@ export const useCtx = () => {
   const { platform } = useMemo(() => browserType(), []);
 
   useEffect(() => {
-    if (platform === 'mobile' || document.body.offsetWidth < 768) {
+    if (platform === 'mobile' && document.body.offsetWidth < 768) {
       setWidth('auto');
       setMarginLeft(0);
       setMarginTop(0);

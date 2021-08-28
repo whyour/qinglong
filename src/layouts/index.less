@@ -51,8 +51,7 @@ body {
   overflow: auto;
   .ant-pro-page-container-children-content {
     overflow: auto;
-    height: calc(100vh - 96px);
-    height: calc(100vh - var(--vh-offset, 0px) - 96px);
+    height: 100%;
     background-color: #fff;
     padding: 16px;
   }
@@ -77,7 +76,7 @@ body {
 
 .log-wrapper {
   .log-select {
-    width: 300px;
+    width: 250px;
   }
   .ant-page-header-heading-left {
     min-width: 100px;
@@ -140,7 +139,6 @@ input:-webkit-autofill:active {
     flex: 1;
     .ant-pro-grid-content-children {
       height: calc(100% - 48px);
-      height: calc(100% - var(--vh-offset, 0px) - 48px);
       > div,
       .log-container,
       .react-codemirror2,
@@ -152,22 +150,11 @@ input:-webkit-autofill:active {
 }
 
 @media (max-width: 768px) {
-  .ant-pro-grid-content.wide {
-    .ant-pro-page-container-children-content {
-      height: calc(100vh - 144px);
-      height: calc(100vh - var(--vh-offset, 0px) - 144px);
-    }
-  }
-
   .ql-container-wrapper {
     &.crontab-wrapper,
     &.log-wrapper,
     &.env-wrapper,
     &.config-wrapper {
-      .ant-pro-grid-content.wide .ant-pro-page-container-children-content {
-        height: calc(100vh - 184px);
-        height: calc(100vh - var(--vh-offset, 0px) - 184px);
-      }
       .CodeMirror {
         width: calc(100vw - 80px);
       }

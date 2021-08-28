@@ -192,7 +192,9 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
 
   useEffect(() => {
     getScripts();
-    setHeight(treeDom.current.clientHeight);
+    if (treeDom && treeDom.current) {
+      setHeight(treeDom.current.clientHeight);
+    }
   }, []);
 
   return (
