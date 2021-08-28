@@ -9,11 +9,12 @@ import _ from 'lodash';
 
 @Service()
 export default class EnvService {
-  private cronDb = new DataStore({ filename: config.envDbFile });
+  private envDb = new DataStore({ filename: config.envDbFile });
   constructor(@Inject('logger') private logger: winston.Logger) {
-    this.cronDb.loadDatabase((err) => {
+    this.envDb.loadDatabase((err) => {
       if (err) throw err;
     });
+    this.envDb.persistence.setAutocompactionInterval(30000);
   }
 
   public async create(payloads: Env[]): Promise<Env[]> {
@@ -34,7 +35,7 @@ export default class EnvService {
 
   public async insert(payloads: Env[]): Promise<Env[]> {
     return new Promise((resolve) => {
-      this.cronDb.insert(payloads, (err, docs) => {
+      this.envDb.insert(payloads, (err, docs) => {
         if (err) {
           this.logger.error(err);
         } else {
@@ -55,7 +56,7 @@ export default class EnvService {
 
   private async updateDb(payload: Env): Promise<Env> {
     return new Promise((resolve) => {
-      this.cronDb.update(
+      this.envDb.update(
         { _id: payload._id },
         payload,
         { returnUpdatedDocs: true },
@@ -72,14 +73,10 @@ export default class EnvService {
 
   public async remove(ids: string[]) {
     return new Promise((resolve: any) => {
-      this.cronDb.remove(
-        { _id: { $in: ids } },
-        { multi: true },
-        async (err) => {
-          await this.set_envs();
-          resolve();
-        },
-      );
+      this.envDb.remove({ _id: { $in: ids } }, { multi: true }, async (err) => {
+        await this.set_envs();
+        resolve();
+      });
     });
   }
 
@@ -140,7 +137,7 @@ export default class EnvService {
 
   private async find(query: any, sort: any): Promise<Env[]> {
     return new Promise((resolve) => {
-      this.cronDb
+      this.envDb
         .find(query)
         .sort({ ...sort })
         .exec((err, docs) => {
@@ -151,7 +148,7 @@ export default class EnvService {
 
   public async get(_id: string): Promise<Env> {
     return new Promise((resolve) => {
-      this.cronDb.find({ _id }).exec((err, docs) => {
+      this.envDb.find({ _id }).exec((err, docs) => {
         resolve(docs[0]);
       });
     });
@@ -159,7 +156,7 @@ export default class EnvService {
 
   public async getBySort(sort: any): Promise<Env> {
     return new Promise((resolve) => {
-      this.cronDb
+      this.envDb
         .find({})
         .sort({ ...sort })
         .limit(1)
@@ -171,7 +168,7 @@ export default class EnvService {
 
   public async disabled(ids: string[]) {
     return new Promise((resolve: any) => {
-      this.cronDb.update(
+      this.envDb.update(
         { _id: { $in: ids } },
         { $set: { status: EnvStatus.disabled } },
         { multi: true },
@@ -185,7 +182,7 @@ export default class EnvService {
 
   public async enabled(ids: string[]) {
     return new Promise((resolve: any) => {
-      this.cronDb.update(
+      this.envDb.update(
         { _id: { $in: ids } },
         { $set: { status: EnvStatus.normal } },
         { multi: true },
@@ -199,7 +196,7 @@ export default class EnvService {
 
   public async updateNames({ ids, name }: { ids: string[]; name: string }) {
     return new Promise((resolve: any) => {
-      this.cronDb.update(
+      this.envDb.update(
         { _id: { $in: ids } },
         { $set: { name } },
         { multi: true },
