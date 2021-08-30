@@ -5,6 +5,7 @@ import config from '../config';
 import * as fs from 'fs';
 import _ from 'lodash';
 import jwt from 'jsonwebtoken';
+import { authenticator } from '@otplib/preset-default';
 
 @Service()
 export default class AuthService {
@@ -32,6 +33,8 @@ export default class AuthService {
         lastlogon,
         lastip,
         lastaddr,
+        twoFactorActived,
+        twoFactorChecked,
       } = JSON.parse(content);
 
       if (
@@ -42,7 +45,21 @@ export default class AuthService {
         return this.initAuthInfo();
       }
 
+      if (twoFactorActived && !twoFactorChecked) {
+        return {
+          code: 420,
+          message: '请输入两步验证token',
+        };
+      }
+
       if (retries > 2 && Date.now() - lastlogon < Math.pow(3, retries) * 1000) {
+        fs.writeFileSync(
+          config.authConfigFile,
+          JSON.stringify({
+            ...JSON.parse(content),
+            twoFactorChecked: false,
+          }),
+        );
         return {
           code: 410,
           message: `失败次数过多，请${Math.round(
@@ -57,8 +74,9 @@ export default class AuthService {
       const { ip, address } = await getNetIp(req);
       if (username === cUsername && password === cPassword) {
         const data = createRandomString(50, 100);
+        const expiration = twoFactorActived ? 30 : 3;
         let token = jwt.sign({ data }, config.secret as any, {
-          expiresIn: 60 * 60 * 24 * 3,
+          expiresIn: 60 * 60 * 24 * expiration,
           algorithm: 'HS384',
         });
         fs.writeFileSync(
@@ -70,6 +88,7 @@ export default class AuthService {
             retries: 0,
             lastip: ip,
             lastaddr: address,
+            twoFactorChecked: false,
           }),
         );
         return { code: 200, data: { token, lastip, lastaddr, lastlogon } };
@@ -82,6 +101,7 @@ export default class AuthService {
             lastlogon: timestamp,
             lastip: ip,
             lastaddr: address,
+            twoFactorChecked: false,
           }),
         );
         return { code: 400, message: config.authError };
@@ -104,5 +124,69 @@ export default class AuthService {
       code: 100,
       message: '已初始化密码，请前往auth.json查看并重新登录',
     };
+  }
+
+  public getUserInfo(): Promise<any> {
+    return new Promise((resolve) => {
+      fs.readFile(config.authConfigFile, 'utf8', (err, data) => {
+        if (err) console.log(err);
+        resolve(JSON.parse(data));
+      });
+    });
+  }
+
+  public initTwoFactor() {
+    const secret = authenticator.generateSecret();
+    const authInfo = this.getAuthInfo();
+    const otpauth = authenticator.keyuri(authInfo.username, 'qinglong', secret);
+    this.updateAuthInfo(authInfo, { twoFactorSecret: secret });
+    return { secret, url: otpauth };
+  }
+
+  public activeTwoFactor(code: string) {
+    const authInfo = this.getAuthInfo();
+    const isValid = authenticator.verify({
+      token: code,
+      secret: authInfo.twoFactorSecret,
+    });
+    if (isValid) {
+      this.updateAuthInfo(authInfo, { twoFactorActived: true });
+    }
+    return isValid;
+  }
+
+  public twoFactorLogin({ username, password, code }, req) {
+    const authInfo = this.getAuthInfo();
+    const isValid = authenticator.verify({
+      token: code,
+      secret: authInfo.twoFactorSecret,
+    });
+    if (isValid) {
+      this.updateAuthInfo(authInfo, { twoFactorChecked: true });
+      return this.login({ username, password }, req);
+    } else {
+      return { code: 430, message: '验证失败' };
+    }
+  }
+
+  public deactiveTwoFactor() {
+    const authInfo = this.getAuthInfo();
+    this.updateAuthInfo(authInfo, {
+      twoFactorActived: false,
+      twoFactorSecret: '',
+    });
+    return true;
+  }
+
+  private getAuthInfo() {
+    const content = fs.readFileSync(config.authConfigFile, 'utf8');
+    return JSON.parse(content || '{}');
+  }
+
+  private updateAuthInfo(authInfo: any, info: any) {
+    fs.writeFileSync(
+      config.authConfigFile,
+      JSON.stringify({ ...authInfo, ...info }),
+    );
   }
 }

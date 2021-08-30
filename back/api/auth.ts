@@ -80,11 +80,87 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        fs.readFile(config.authConfigFile, 'utf8', (err, data) => {
-          if (err) console.log(err);
-          const authInfo = JSON.parse(data);
-          res.send({ code: 200, data: { username: authInfo.username } });
+        const authService = Container.get(AuthService);
+        const authInfo = await authService.getUserInfo();
+        res.send({
+          code: 200,
+          data: {
+            username: authInfo.username,
+            twoFactorActived: authInfo.twoFactorActived,
+          },
         });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/user/two-factor/init',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const authService = Container.get(AuthService);
+        const data = await authService.initTwoFactor();
+        res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/user/two-factor/active',
+    celebrate({
+      body: Joi.object({
+        code: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const authService = Container.get(AuthService);
+        const data = await authService.activeTwoFactor(req.body.code);
+        res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/user/two-factor/deactive',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const authService = Container.get(AuthService);
+        const data = await authService.deactiveTwoFactor();
+        res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/user/two-factor/login',
+    celebrate({
+      body: Joi.object({
+        code: Joi.string().required(),
+        username: Joi.string().required(),
+        password: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const authService = Container.get(AuthService);
+        const data = await authService.twoFactorLogin(req.body, req);
+        res.send(data);
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);

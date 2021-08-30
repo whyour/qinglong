@@ -22,13 +22,13 @@ import {
   auto as followSystemColorScheme,
   setFetchMethod,
 } from 'darkreader';
-import { history } from 'umi';
 import AppModal from './appModal';
 import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
+import SecuritySettings from './security';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -37,7 +37,7 @@ const optionsWithDisabled = [
   { label: '跟随系统', value: 'auto' },
 ];
 
-const Setting = ({ headerStyle, isPhone }: any) => {
+const Setting = ({ headerStyle, isPhone, user }: any) => {
   const columns = [
     {
       title: '名称',
@@ -109,24 +109,7 @@ const Setting = ({ headerStyle, isPhone }: any) => {
   const [dataSource, setDataSource] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedApp, setEditedApp] = useState();
-  const [tabActiveKey, setTabActiveKey] = useState('person');
-
-  const handleOk = (values: any) => {
-    request
-      .post(`${config.apiPrefix}user`, {
-        data: {
-          username: values.username,
-          password: values.password,
-        },
-      })
-      .then((data: any) => {
-        localStorage.removeItem(config.authKey);
-        history.push('/login');
-      })
-      .catch((error: any) => {
-        console.log(error);
-      });
-  };
+  const [tabActiveKey, setTabActiveKey] = useState('security');
 
   const themeChange = (e: any) => {
     setTheme(e.target.value);
@@ -272,35 +255,13 @@ const Setting = ({ headerStyle, isPhone }: any) => {
       }
     >
       <Tabs
-        defaultActiveKey="person"
+        defaultActiveKey="security"
         size="small"
         tabPosition="top"
         onChange={tabChange}
       >
-        <Tabs.TabPane tab="个人设置" key="person">
-          <Form onFinish={handleOk} layout="vertical">
-            <Form.Item
-              label="用户名"
-              name="username"
-              rules={[{ required: true }]}
-              hasFeedback
-              style={{ maxWidth: 300 }}
-            >
-              <Input placeholder="用户名" />
-            </Form.Item>
-            <Form.Item
-              label="密码"
-              name="password"
-              rules={[{ required: true }]}
-              hasFeedback
-              style={{ maxWidth: 300 }}
-            >
-              <Input type="password" placeholder="密码" />
-            </Form.Item>
-            <Button type="primary" htmlType="submit">
-              保存
-            </Button>
-          </Form>
+        <Tabs.TabPane tab="安全设置" key="security">
+          <SecuritySettings user={user} />
         </Tabs.TabPane>
         <Tabs.TabPane tab="应用设置" key="app">
           <Table

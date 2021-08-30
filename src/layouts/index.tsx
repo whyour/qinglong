@@ -19,6 +19,7 @@ import { useCtx, useTheme } from '@/utils/hooks';
 export default function (props: any) {
   const ctx = useCtx();
   const theme = useTheme();
+  const [user, setUser] = useState<any>();
 
   const logout = () => {
     request.post(`${config.apiPrefix}logout`).then(() => {
@@ -27,12 +28,29 @@ export default function (props: any) {
     });
   };
 
+  const getUser = () => {
+    request
+      .get(`${config.apiPrefix}user`)
+      .then((data) => {
+        if (data.data.username) {
+          setUser(data.data);
+        }
+      })
+      .catch((e) => {
+        if (e.response && e.response.status === 401) {
+          localStorage.removeItem(config.authKey);
+          history.push('/login');
+        }
+      });
+  };
+
   useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
     if (!isAuth) {
       history.push('/login');
     }
     vhCheck();
+    getUser();
 
     // patch custome layout title as react node [object, object]
     document.title = '控制面板';
@@ -112,7 +130,7 @@ export default function (props: any) {
       {...defaultProps}
     >
       {React.Children.map(props.children, (child) => {
-        return React.cloneElement(child, { ...ctx, ...theme });
+        return React.cloneElement(child, { ...ctx, ...theme, user });
       })}
     </ProLayout>
   );

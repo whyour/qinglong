@@ -4,6 +4,7 @@ specifiers:
   '@ant-design/icons': ^4.6.2
   '@ant-design/pro-layout': ^6.5.0
   '@monaco-editor/react': ^4.2.1
+  '@otplib/preset-default': ^12.0.1
   '@types/cors': ^2.8.10
   '@types/express': ^4.17.8
   '@types/express-jwt': ^6.0.1
@@ -60,6 +61,7 @@ specifiers:
   yorkie: ^2.0.0
 
 dependencies:
+  '@otplib/preset-default': 12.0.1
   body-parser: 1.19.0
   celebrate: 13.0.4
   cors: 2.8.5
@@ -907,6 +909,31 @@ packages:
       mkdirp: 1.0.4
       rimraf: 3.0.2
     dev: true
+
+  /@otplib/core/12.0.1:
+    resolution: {integrity: sha512-4sGntwbA/AC+SbPhbsziRiD+jNDdIzsZ3JUyfZwjtKyc/wufl1pnSIaG4Uqx8ymPagujub0o92kgBnB89cuAMA==}
+    dev: false
+
+  /@otplib/plugin-crypto/12.0.1:
+    resolution: {integrity: sha512-qPuhN3QrT7ZZLcLCyKOSNhuijUi9G5guMRVrxq63r9YNOxxQjPm59gVxLM+7xGnHnM6cimY57tuKsjK7y9LM1g==}
+    dependencies:
+      '@otplib/core': 12.0.1
+    dev: false
+
+  /@otplib/plugin-thirty-two/12.0.1:
+    resolution: {integrity: sha512-MtT+uqRso909UkbrrYpJ6XFjj9D+x2Py7KjTO9JDPhL0bJUYVu5kFP4TFZW4NFAywrAtFRxOVY261u0qwb93gA==}
+    dependencies:
+      '@otplib/core': 12.0.1
+      thirty-two: 1.0.2
+    dev: false
+
+  /@otplib/preset-default/12.0.1:
+    resolution: {integrity: sha512-xf1v9oOJRyXfluBhMdpOkr+bsE+Irt+0D5uHtvg6x1eosfmHCsCC6ej/m7FXiWqdo0+ZUI6xSKDhJwc8yfiOPQ==}
+    dependencies:
+      '@otplib/core': 12.0.1
+      '@otplib/plugin-crypto': 12.0.1
+      '@otplib/plugin-thirty-two': 12.0.1
+    dev: false
 
   /@qixian.cs/path-to-regexp/6.1.0:
     resolution: {integrity: sha512-2jIiLiVZB1jnY7IIRQKtoV8Gnr7XIhk4mC88ONGunZE3hYt5IHUG4BE/6+JiTBjjEWQLBeWnZB8hGpppkufiVw==}
@@ -9082,6 +9109,11 @@ packages:
 
   /text-hex/1.0.0:
     resolution: {integrity: sha512-uuVGNWzgJ4yhRaNSiubPY7OjISw4sw4E5Uv0wbjp+OzcbmVU/rsT8ujgcXJhn9ypzsgr5vlzpPqP+MBBKcGvbg==}
+    dev: false
+
+  /thirty-two/1.0.2:
+    resolution: {integrity: sha1-TKL//AKlEpDSdEueP1V2k8prYno=}
+    engines: {node: '>=0.2.6'}
     dev: false
 
   /throat/5.0.0:
