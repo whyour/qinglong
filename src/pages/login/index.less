@@ -21,13 +21,11 @@
 
 .content {
   position: absolute;
-  top: 45%;
+  top: 86px;
   left: 50%;
-  margin: -160px 0 0 -160px;
-  width: 320px;
-  height: 320px;
-  padding: 36px;
-  box-shadow: 0 0 100px rgba(0, 0, 0, 0.08);
+  margin-left: -170px;
+  width: 340px;
+  padding: 0 16px;
 }
 
 @media (min-width: @screen-md-min) {
@@ -44,16 +42,20 @@
 }
 
 .header {
-  height: 44px;
-  line-height: 44px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  flex-direction: column;
 }
 
 .logo {
-  width: 30px;
-  margin-right: 8px;
+  width: 48px;
+  display: block;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 20px;
+  margin-bottom: 16px;
 }
 
 .desc {
@@ -64,7 +66,11 @@
 }
 
 .main {
-  margin: 35px auto 0;
+  padding: 20px;
+  border-radius: 6px;
+  background-color: #f6f8fa;
+  border: 1px solid #ebedef;
+
   @media screen and (max-width: @screen-sm) {
     width: 95%;
     max-width: 320px;
@@ -103,4 +109,8 @@
     color: @primary-color;
     font-size: @font-size-base;
   }
+}
+
+.extra {
+  margin-top: 20px;
 }

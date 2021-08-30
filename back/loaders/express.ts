@@ -18,7 +18,12 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
   app.use(
     jwt({ secret: config.secret as string, algorithms: ['HS384'] }).unless({
-      path: ['/api/login', '/api/crons/status', /^\/open\//],
+      path: [
+        '/api/login',
+        '/api/crons/status',
+        /^\/open\//,
+        '/api/user/two-factor/login',
+      ],
     }),
   );
 
@@ -52,7 +57,9 @@ export default ({ app }: { app: Application }) => {
     if (
       !headerToken &&
       req.path &&
-      (req.path === '/api/login' || req.path === '/open/auth/token')
+      (req.path === '/api/login' ||
+        req.path === '/open/auth/token' ||
+        req.path === '/api/user/two-factor/login')
     ) {
       return next();
     }

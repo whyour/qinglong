@@ -14,26 +14,6 @@ const titleMap: any = {
   '/setting': '系统设置',
 };
 
-export function render(oldRender: any) {
-  request
-    .get(`${config.apiPrefix}user`)
-    .then((data) => {
-      if (data.data && data.data.username) {
-        return oldRender();
-      }
-      localStorage.removeItem(config.authKey);
-      history.push('/login');
-      oldRender();
-    })
-    .catch((e) => {
-      if (e.response && e.response.status === 401) {
-        localStorage.removeItem(config.authKey);
-        history.push('/login');
-        oldRender();
-      }
-    });
-}
-
 export function onRouteChange({ matchedRoutes }: any) {
   if (matchedRoutes.length) {
     const path: string = matchedRoutes[matchedRoutes.length - 1].route.path;

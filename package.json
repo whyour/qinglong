@@ -24,6 +24,7 @@
     ]
   },
   "dependencies": {
+    "@otplib/preset-default": "^12.0.1",
     "body-parser": "^1.19.0",
     "celebrate": "^13.0.3",
     "cors": "^2.8.5",
