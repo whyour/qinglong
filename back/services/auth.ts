@@ -155,7 +155,7 @@ export default class AuthService {
     return isValid;
   }
 
-  public twoFactorLogin({ username, password, code }, req) {
+  public async twoFactorLogin({ username, password, code }, req) {
     const authInfo = this.getAuthInfo();
     const isValid = authenticator.verify({
       token: code,
@@ -165,6 +165,11 @@ export default class AuthService {
       this.updateAuthInfo(authInfo, { twoFactorChecked: true });
       return this.login({ username, password }, req);
     } else {
+      const { ip, address } = await getNetIp(req);
+      this.updateAuthInfo(authInfo, {
+        lastip: ip,
+        lastaddr: address,
+      });
       return { code: 430, message: '验证失败' };
     }
   }
