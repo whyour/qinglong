@@ -247,6 +247,7 @@ usage() {
     echo -e "6. $cmd_update bot                                                       # 启动tg-bot"
     echo -e "7. $cmd_update check                                                     # 检测青龙环境并修复"
     echo -e "8. $cmd_update resetlet                                                  # 重置登录错误次数"
+    echo -e "9. $cmd_update resettfa                                                  # 禁用两步登录"
 }
 
 ## 更新qinglong
@@ -488,7 +489,13 @@ main() {
     resetlet)
         echo -e "## 开始执行... $begin_time\n" >>$log_path
         auth_value=$(cat $file_auth_user | jq '.retries =0' -c)
-        echo -e "重置成功 \n $auth_value" >>$log_path
+        echo -e "重置登录错误次数成功 \n $auth_value" >>$log_path
+        echo "$auth_value" >$file_auth_user
+        ;;
+    resettfa)
+        echo -e "## 开始执行... $begin_time\n" >>$log_path
+        auth_value=$(cat $file_auth_user | jq '.twoFactorActived =false' -c)
+        echo -e "禁用两步验证成功 \n $auth_value" >>$log_path
         echo "$auth_value" >$file_auth_user
         ;;
     *)
