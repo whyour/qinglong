@@ -1,0 +1,16 @@
+version: '2'
+services:
+  web:
+    image: whyour/qinglong:latest
+    volumes:
+      - ./data/config:/ql/config
+      - ./data/log:/ql/log
+      - ./data/db:/ql/db
+      - ./data/scripts:/ql/scripts
+      - ./data/repo:/ql/repo
+    ports:
+      - "0.0.0.0:5700:5700"
+    environment:
+      - ENABLE_HANGUP=true
+      - ENABLE_WEB_PANEL=true
+    restart: always
