@@ -34,6 +34,9 @@ export default function (props: any) {
       .then((data) => {
         if (data.data.username) {
           setUser(data.data);
+          if (props.location.pathname === '/') {
+            history.push('/crontab');
+          }
         }
       })
       .catch((e) => {
@@ -55,12 +58,6 @@ export default function (props: any) {
     // patch custome layout title as react node [object, object]
     document.title = '控制面板';
   }, []);
-
-  useEffect(() => {
-    if (props.location.pathname === '/') {
-      history.push('/crontab');
-    }
-  }, [props.location.pathname]);
 
   useEffect(() => {
     const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
