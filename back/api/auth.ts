@@ -131,7 +131,7 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
+  route.put(
     '/user/two-factor/deactive',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
