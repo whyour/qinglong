@@ -91,7 +91,10 @@ export default class AuthService {
             twoFactorChecked: false,
           }),
         );
-        return { code: 200, data: { token, lastip, lastaddr, lastlogon } };
+        return {
+          code: 200,
+          data: { token, lastip, lastaddr, lastlogon, retries },
+        };
       } else {
         fs.writeFileSync(
           config.authConfigFile,
