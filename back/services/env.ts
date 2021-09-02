@@ -89,7 +89,7 @@ export default class EnvService {
       fromIndex: number;
       toIndex: number;
     },
-  ) {
+  ): Promise<Env> {
     let targetPosition: number;
     const isUpward = fromIndex > toIndex;
     const envs = await this.envs();
@@ -102,11 +102,11 @@ export default class EnvService {
         ? (envs[toIndex].position + envs[toIndex - 1].position) / 2
         : (envs[toIndex].position + envs[toIndex + 1].position) / 2;
     }
-    this.update({
+    const newDoc = await this.update({
       _id,
       position: targetPosition,
     });
-    await this.set_envs();
+    return newDoc;
   }
 
   public async envs(
