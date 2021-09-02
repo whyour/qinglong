@@ -25,7 +25,6 @@ import EditNameModal from './editNameModal';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
-import { useCtx } from '@/utils/hooks';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -60,36 +59,30 @@ const DragableBodyRow = ({
   ...restProps
 }: any) => {
   const ref = useRef();
-  const [{ isOver, dropClassName }, drop] = useDrop(
-    () => ({
-      accept: type,
-      collect: (monitor) => {
-        const { index: dragIndex } = monitor.getItem() || ({} as any);
-        if (dragIndex === index) {
-          return {};
-        }
-        return {
-          isOver: monitor.isOver(),
-          dropClassName:
-            dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
-        };
-      },
-      drop: (item: any) => {
-        moveRow(item.index, index);
-      },
+  const [{ isOver, dropClassName }, drop] = useDrop({
+    accept: type,
+    collect: (monitor) => {
+      const { index: dragIndex } = (monitor.getItem() as any) || {};
+      if (dragIndex === index) {
+        return {};
+      }
+      return {
+        isOver: monitor.isOver(),
+        dropClassName:
+          dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
+      };
+    },
+    drop: (item: any) => {
+      moveRow(item.index, index);
+    },
+  });
+  const [, drag] = useDrag({
+    type,
+    item: { index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
     }),
-    [index],
-  );
-  const [, drag, preview] = useDrag(
-    () => ({
-      type,
-      item: { index },
-      collect: (monitor) => ({
-        isDragging: monitor.isDragging(),
-      }),
-    }),
-    [index],
-  );
+  });
   drop(drag(ref));
 
   return (
@@ -98,9 +91,7 @@ const DragableBodyRow = ({
       className={`${className}${isOver ? dropClassName : ''}`}
       style={{ cursor: 'move', ...style }}
       {...restProps}
-    >
-      {restProps.children}
-    </tr>
+    />
   );
 };
 
@@ -350,16 +341,17 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
         return;
       }
       const dragRow = value[dragIndex];
-      const newData = [...value];
-      newData.splice(dragIndex, 1);
-      newData.splice(hoverIndex, 0, dragRow);
-      setValue([...newData]);
       request
         .put(`${config.apiPrefix}envs/${dragRow._id}/move`, {
           data: { fromIndex: dragIndex, toIndex: hoverIndex },
         })
         .then((data: any) => {
-          if (data.code !== 200) {
+          if (data.code === 200) {
+            const newData = [...value];
+            newData.splice(dragIndex, 1);
+            newData.splice(hoverIndex, 0, { ...dragRow, ...data.data });
+            setValue([...newData]);
+          } else {
             message.error(data);
           }
         });
