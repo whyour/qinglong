@@ -11,11 +11,13 @@ reset_env() {
   echo -e "---> 配置文件检测完成\n"
 
   echo -e "---> 2. 开始安装青龙依赖\n"
+  rm $dir_root/node_modules
   npm_install_2 $dir_root
   echo -e "---> 青龙依赖安装完成\n"
 
   echo -e "---> 3. 开始安装脚本依赖\n"
   cp -f $dir_sample/package.json $dir_scripts/package.json
+  rm -rf $dir_scripts/node_modules
   npm_install_2 $dir_scripts
   echo -e "---> 脚本依赖安装完成\n"
 }
