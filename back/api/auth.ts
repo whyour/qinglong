@@ -151,13 +151,15 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         code: Joi.string().required(),
+        username: Joi.string().required(),
+        password: Joi.string().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const authService = Container.get(AuthService);
-        const data = await authService.twoFactorLogin(req.body);
+        const data = await authService.twoFactorLogin(req.body, req);
         res.send(data);
       } catch (e) {
         logger.error('🔥 error: %o', e);

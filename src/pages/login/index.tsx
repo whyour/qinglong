@@ -24,6 +24,7 @@ const Login = () => {
   const { theme } = useTheme();
   const [twoFactor, setTwoFactor] = useState(false);
   const [verifing, setVerifing] = useState(false);
+  const [loginInfo, setLoginInfo] = useState<any>();
 
   const handleOk = (values: any) => {
     setLoading(true);
@@ -38,6 +39,10 @@ const Login = () => {
       })
       .then((data) => {
         if (data.code === 420) {
+          setLoginInfo({
+            username: values.username,
+            password: values.password,
+          });
           setTwoFactor(true);
         } else {
           checkResponse(data);
@@ -54,7 +59,7 @@ const Login = () => {
     setVerifing(true);
     request
       .put(`${config.apiPrefix}user/two-factor/login`, {
-        data: { code: values.code },
+        data: { ...loginInfo, code: values.code },
       })
       .then((data: any) => {
         if (data.code === 430) {

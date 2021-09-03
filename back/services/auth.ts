@@ -34,6 +34,7 @@ export default class AuthService {
         lastip,
         lastaddr,
         twoFactorActived,
+        isTwoFactorChecking,
       } = content;
 
       if (
@@ -58,30 +59,35 @@ export default class AuthService {
 
       const { ip, address } = await getNetIp(req);
       if (username === cUsername && password === cPassword) {
+        if (twoFactorActived && !isTwoFactorChecking) {
+          this.updateAuthInfo(content, {
+            isTwoFactorChecking: true,
+          });
+          return {
+            code: 420,
+            message: '请输入两步验证token',
+          };
+        }
+
         const data = createRandomString(50, 100);
         const expiration = twoFactorActived ? 30 : 3;
         let token = jwt.sign({ data }, config.secret as any, {
           expiresIn: 60 * 60 * 24 * expiration,
           algorithm: 'HS384',
         });
+
         this.updateAuthInfo(content, {
           token,
           lastlogon: timestamp,
-          retries: twoFactorActived ? retries : 0,
+          retries: 0,
           lastip: ip,
           lastaddr: address,
+          isTwoFactorChecking: false,
         });
-        if (twoFactorActived) {
-          return {
-            code: 420,
-            message: '请输入两步验证token',
-          };
-        } else {
-          return {
-            code: 200,
-            data: { token, lastip, lastaddr, lastlogon, retries },
-          };
-        }
+        return {
+          code: 200,
+          data: { token, lastip, lastaddr, lastlogon, retries },
+        };
       } else {
         this.updateAuthInfo(content, {
           retries: retries + 1,
@@ -140,22 +146,24 @@ export default class AuthService {
     return isValid;
   }
 
-  public async twoFactorLogin({ code }) {
+  public async twoFactorLogin({ username, password, code }, req) {
     const authInfo = this.getAuthInfo();
-    const { token, lastip, lastaddr, lastlogon, retries, twoFactorSecret } =
-      authInfo;
+    const { isTwoFactorChecking, retries, twoFactorSecret } = authInfo;
+    if (!isTwoFactorChecking) {
+      return { code: 450, message: '未知错误' };
+    }
     const isValid = authenticator.verify({
       token: code,
       secret: twoFactorSecret,
     });
     if (isValid) {
-      this.updateAuthInfo(authInfo, { retries: 0 });
-      return {
-        code: 200,
-        data: { token, lastip, lastaddr, lastlogon, retries },
-      };
+      return this.login({ username, password }, req);
     } else {
-      this.updateAuthInfo(authInfo, { retries: retries + 1 });
+      const { ip, address } = await getNetIp(req);
+      this.updateAuthInfo(authInfo, {
+        lastip: ip,
+        lastaddr: address,
+      });
       return { code: 430, message: '验证失败' };
     }
   }
