@@ -37,6 +37,9 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         let content = '';
+        if (config.blackFileList.includes(req.params.file)) {
+          res.send({ code: 403, message: '文件无法访问' });
+        }
         if (req.params.file.includes('sample')) {
           content = getFileContentByName(
             `${config.samplePath}${req.params.file}`,
@@ -66,6 +69,9 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const { name, content } = req.body;
+        if (config.blackFileList.includes(name)) {
+          res.send({ code: 403, message: '文件无法访问' });
+        }
         const path = `${config.configPath}${name}`;
         fs.writeFileSync(path, content);
         res.send({ code: 200, message: '保存成功' });
