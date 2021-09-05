@@ -140,7 +140,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
       key: 'status',
       dataIndex: 'status',
       align: 'center' as const,
-      width: 60,
+      width: 70,
       filters: [
         {
           text: '已启用',

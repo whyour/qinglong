@@ -67,7 +67,11 @@ const CronModal = ({
           <Input placeholder="请输入任务名称" />
         </Form.Item>
         <Form.Item name="command" label="命令" rules={[{ required: true }]}>
-          <Input placeholder="请输入要执行的命令" />
+          <Input.TextArea
+            rows={4}
+            autoSize={true}
+            placeholder="请输入要执行的命令"
+          />
         </Form.Item>
         <Form.Item
           name="schedule"
