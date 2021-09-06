@@ -29,6 +29,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import SecuritySettings from './security';
+import LoginLog from './loginLog';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -37,7 +38,7 @@ const optionsWithDisabled = [
   { label: '跟随系统', value: 'auto' },
 ];
 
-const Setting = ({ headerStyle, isPhone, user }: any) => {
+const Setting = ({ headerStyle, isPhone, user, reloadUser }: any) => {
   const columns = [
     {
       title: '名称',
@@ -110,6 +111,7 @@ const Setting = ({ headerStyle, isPhone, user }: any) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedApp, setEditedApp] = useState();
   const [tabActiveKey, setTabActiveKey] = useState('security');
+  const [loginLogData, setLoginLogData] = useState<any[]>([]);
 
   const themeChange = (e: any) => {
     setTheme(e.target.value);
@@ -219,10 +221,23 @@ const Setting = ({ headerStyle, isPhone, user }: any) => {
     setDataSource(result);
   };
 
+  const getLoginLog = () => {
+    request
+      .get(`${config.apiPrefix}user/login-log`)
+      .then((data: any) => {
+        setLoginLogData(data.data);
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
+  };
+
   const tabChange = (activeKey: string) => {
     setTabActiveKey(activeKey);
     if (activeKey === 'app') {
       getApps();
+    } else if (activeKey === 'login') {
+      getLoginLog();
     }
   };
 
@@ -261,7 +276,7 @@ const Setting = ({ headerStyle, isPhone, user }: any) => {
         onChange={tabChange}
       >
         <Tabs.TabPane tab="安全设置" key="security">
-          <SecuritySettings user={user} />
+          <SecuritySettings user={user} userChange={reloadUser} />
         </Tabs.TabPane>
         <Tabs.TabPane tab="应用设置" key="app">
           <Table
@@ -273,6 +288,9 @@ const Setting = ({ headerStyle, isPhone, user }: any) => {
             scroll={{ x: 768 }}
             loading={loading}
           />
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="登陆日志" key="login">
+          <LoginLog data={loginLogData} />
         </Tabs.TabPane>
         <Tabs.TabPane tab="其他设置" key="theme">
           <Form layout="vertical">

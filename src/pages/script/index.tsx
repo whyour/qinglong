@@ -15,7 +15,6 @@ import { request } from '@/utils/http';
 import styles from './index.module.less';
 import EditModal from './editModal';
 import { Controlled as CodeMirror } from 'react-codemirror2';
-import { useCtx, useTheme } from '@/utils/hooks';
 import SplitPane from 'react-split-pane';
 
 const { Text } = Typography;
@@ -82,9 +81,29 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     getDetail(node);
   };
 
-  const onTreeSelect = useCallback((keys: Key[], e: any) => {
-    onSelect(keys[0], e.node);
-  }, []);
+  const onTreeSelect = useCallback(
+    (keys: Key[], e: any) => {
+      const content = editorRef.current
+        ? editorRef.current.getValue().replace(/\r\n/g, '\n')
+        : value;
+      if (content !== value) {
+        Modal.confirm({
+          title: `确认离开`,
+          content: <>当前修改未保存，确定离开吗</>,
+          onOk() {
+            onSelect(keys[0], e.node);
+            setIsEditing(false);
+          },
+          onCancel() {
+            console.log('Cancel');
+          },
+        });
+      } else {
+        onSelect(keys[0], e.node);
+      }
+    },
+    [value],
+  );
 
   const onSearch = useCallback(
     (e) => {
@@ -132,6 +151,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
           .then((_data: any) => {
             if (_data.code === 200) {
               message.success(`保存成功`);
+              setValue(content);
               setIsEditing(false);
             } else {
               message.error(_data);

@@ -6,10 +6,20 @@ import * as fs from 'fs';
 import _ from 'lodash';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
+import { exec } from 'child_process';
+import DataStore from 'nedb';
+import { AuthInfo, LoginStatus } from '../data/auth';
 
 @Service()
 export default class AuthService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  private authDb = new DataStore({ filename: config.authDbFile });
+
+  constructor(@Inject('logger') private logger: winston.Logger) {
+    this.authDb.loadDatabase((err) => {
+      if (err) throw err;
+    });
+    this.authDb.persistence.setAutocompactionInterval(30000);
+  }
 
   public async login(
     payloads: {
@@ -84,6 +94,16 @@ export default class AuthService {
           lastaddr: address,
           isTwoFactorChecking: false,
         });
+        exec(
+          `notify 登陆通知 你于${new Date(
+            timestamp,
+          ).toLocaleString()}在${address}登陆成功，ip地址${ip}`,
+        );
+        await this.getLoginLog();
+        await this.insertDb({
+          type: 'loginLog',
+          info: { timestamp, address, ip, status: LoginStatus.success },
+        });
         return {
           code: 200,
           data: { token, lastip, lastaddr, lastlogon, retries },
@@ -95,11 +115,51 @@ export default class AuthService {
           lastip: ip,
           lastaddr: address,
         });
+        exec(
+          `notify 登陆通知 你于${new Date(
+            timestamp,
+          ).toLocaleString()}在${address}登陆失败，ip地址${ip}`,
+        );
+        await this.getLoginLog();
+        await this.insertDb({
+          type: 'loginLog',
+          info: { timestamp, address, ip, status: LoginStatus.fail },
+        });
         return { code: 400, message: config.authError };
       }
     } else {
       return this.initAuthInfo();
     }
+  }
+
+  public async getLoginLog(): Promise<AuthInfo[]> {
+    return new Promise((resolve) => {
+      this.authDb.find({ type: 'loginLog' }).exec((err, docs) => {
+        if (err || docs.length === 0) {
+          resolve(docs);
+        } else {
+          const result = docs.sort(
+            (a, b) => b.info.timestamp - a.info.timestamp,
+          );
+          if (result.length > 100) {
+            this.authDb.remove({ _id: result[result.length - 1]._id });
+          }
+          resolve(result.map((x) => x.info));
+        }
+      });
+    });
+  }
+
+  private async insertDb(payload: AuthInfo): Promise<AuthInfo> {
+    return new Promise((resolve) => {
+      this.authDb.insert(payload, (err, doc) => {
+        if (err) {
+          this.logger.error(err);
+        } else {
+          resolve(doc);
+        }
+      });
+    });
   }
 
   private initAuthInfo() {

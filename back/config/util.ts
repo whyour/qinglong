@@ -158,11 +158,12 @@ export async function getNetIp(req: any) {
   }
   try {
     const baiduApi = got
-      .get(`https://www.cip.cc/${ip}`, { timeout: 100000 })
+      .get(`https://www.cip.cc/${ip}`, { timeout: 10000, retry: 0 })
       .text();
     const ipApi = got
       .get(`https://whois.pconline.com.cn/ipJson.jsp?ip=${ip}&json=true`, {
-        timeout: 100000,
+        timeout: 10000,
+        retry: 0,
       })
       .buffer();
     const [data, ipApiBody] = await await Promise.all<any>([baiduApi, ipApi]);

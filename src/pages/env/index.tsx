@@ -280,7 +280,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
         <>
           确认删除变量{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
-            {record.value}
+            {record.name}: {record.value}
           </Text>{' '}
           吗
         </>
