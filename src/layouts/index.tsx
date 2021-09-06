@@ -127,7 +127,12 @@ export default function (props: any) {
       {...defaultProps}
     >
       {React.Children.map(props.children, (child) => {
-        return React.cloneElement(child, { ...ctx, ...theme, user });
+        return React.cloneElement(child, {
+          ...ctx,
+          ...theme,
+          user,
+          reloadUser: getUser,
+        });
       })}
     </ProLayout>
   );

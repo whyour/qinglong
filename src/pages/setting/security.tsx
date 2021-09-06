@@ -7,7 +7,7 @@ import QRCode from 'qrcode.react';
 
 const { Title, Link } = Typography;
 
-const SecuritySettings = ({ user }: any) => {
+const SecuritySettings = ({ user, userChange }: any) => {
   const [loading, setLoading] = useState(false);
   const [twoFactorActived, setTwoFactorActived] = useState<boolean>();
   const [twoFactoring, setTwoFactoring] = useState(false);
@@ -46,6 +46,7 @@ const SecuritySettings = ({ user }: any) => {
       .then((data: any) => {
         if (data.data) {
           setTwoFactorActived(false);
+          userChange();
         }
       })
       .catch((error: any) => {
@@ -61,6 +62,7 @@ const SecuritySettings = ({ user }: any) => {
           message.success('激活成功');
           setTwoFactoring(false);
           setTwoFactorActived(true);
+          userChange();
         }
       })
       .catch((error: any) => {

@@ -167,4 +167,19 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.get(
+    '/user/login-log',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const authService = Container.get(AuthService);
+        const data = await authService.getLoginLog();
+        res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
 };

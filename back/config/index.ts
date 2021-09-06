@@ -24,6 +24,7 @@ const dbPath = path.join(rootPath, 'db/');
 const cronDbFile = path.join(rootPath, 'db/crontab.db');
 const envDbFile = path.join(rootPath, 'db/env.db');
 const appDbFile = path.join(rootPath, 'db/app.db');
+const authDbFile = path.join(rootPath, 'db/auth.db');
 
 const configFound = dotenv.config({ path: confFile });
 
@@ -60,6 +61,7 @@ export default {
   cronDbFile,
   envDbFile,
   appDbFile,
+  authDbFile,
   configPath,
   scriptPath,
   samplePath,
