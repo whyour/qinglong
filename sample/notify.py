@@ -214,11 +214,12 @@ def pushplus_bot(title, content):
 
 def qywxapp_bot(title, content):
     print("\n")
-    if not QYWX_APP:
+    if not push_config.get('QYWX_APP'):
         print("企业微信应用的QYWX_APP未设置!!\n取消推送")
         return
-    print("企业微信应用启动")
-    qywx_app_params = QYWX_APP.split(',')
+    print("企业微信 应用启动")
+
+    qywx_app_params = push_config.get('QYWX_APP').split(',')
     url='https://qyapi.weixin.qq.com/cgi-bin/gettoken'
     headers= {
         'Content-Type': 'application/json',
@@ -290,7 +291,7 @@ def qywxapp_bot(title, content):
         print('推送失败！')
 
 def change_user_id(desp):
-    qywx_app_params = QYWX_APP.split(',')
+    qywx_app_params = push_config.get('QYWX_APP').split(',')
     if qywx_app_params[2]:
         userIdTmp = qywx_app_params[2].split("|")
         userId = ""
