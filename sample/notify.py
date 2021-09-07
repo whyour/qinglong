@@ -48,8 +48,6 @@ push_config = {
     'GOBOT_QQ': '',                    # go-cqhttp的推送群或者用户
                                        # GOBOT_URL设置 /send_private_msg 填入 user_id=个人QQ
                                        #              /send_group_msg   填入 group_id=QQ群
-
-
 }
 notify_function = []
 
