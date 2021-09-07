@@ -25,7 +25,7 @@ const columns = [
     },
   },
   {
-    title: '时间',
+    title: '登陆时间',
     dataIndex: 'timestamp',
     key: 'timestamp',
     align: 'center' as const,
@@ -34,13 +34,13 @@ const columns = [
     },
   },
   {
-    title: '地址',
+    title: '登陆地址',
     dataIndex: 'address',
     key: 'address',
     align: 'center' as const,
   },
   {
-    title: 'IP',
+    title: '登陆IP',
     dataIndex: 'ip',
     key: 'ip',
     align: 'center' as const,
