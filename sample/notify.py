@@ -326,8 +326,8 @@ if push_config.get('QQ_SKEY') and push_config.get('QQ_MODE'):
     notify_function.append(coolpush_bot)
 if push_config.get('PUSH_PLUS_TOKEN'):
     notify_function.append(pushplus_bot)
-if push_config.get('QYWX_AM'):
-    notify_function.append(wecom_app)
+if push_config.get('QYWX_APP'):
+    notify_function.append(qywxapp_bot)
 
 
 def send(title, content):
