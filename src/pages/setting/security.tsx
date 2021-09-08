@@ -55,6 +55,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
   };
 
   const completeTowFactor = () => {
+    setLoading(true);
     request
       .put(`${config.apiPrefix}user/two-factor/active`, { data: { code } })
       .then((data: any) => {
@@ -63,11 +64,14 @@ const SecuritySettings = ({ user, userChange }: any) => {
           setTwoFactoring(false);
           setTwoFactorActived(true);
           userChange();
+        } else {
+          message.success('验证失败');
         }
       })
       .catch((error: any) => {
         console.log(error);
-      });
+      })
+      .finally(() => setLoading(false));
   };
 
   const getTwoFactorInfo = () => {
@@ -132,7 +136,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
             onChange={(e) => setCode(e.target.value)}
             placeholder="123456"
           />
-          <Button type="primary" onClick={completeTowFactor}>
+          <Button type="primary" loading={loading} onClick={completeTowFactor}>
             完成设置
           </Button>
         </div>
