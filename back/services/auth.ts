@@ -27,6 +27,7 @@ export default class AuthService {
       password: string;
     },
     req: any,
+    needTwoFactor = true,
   ): Promise<any> {
     if (!fs.existsSync(config.authConfigFile)) {
       return this.initAuthInfo();
@@ -44,7 +45,6 @@ export default class AuthService {
         lastip,
         lastaddr,
         twoFactorActived,
-        isTwoFactorChecking,
       } = content;
 
       if (
@@ -69,7 +69,7 @@ export default class AuthService {
 
       const { ip, address } = await getNetIp(req);
       if (username === cUsername && password === cPassword) {
-        if (twoFactorActived && !isTwoFactorChecking) {
+        if (twoFactorActived && needTwoFactor) {
           this.updateAuthInfo(content, {
             isTwoFactorChecking: true,
           });
@@ -95,9 +95,9 @@ export default class AuthService {
           isTwoFactorChecking: false,
         });
         exec(
-          `notify 登陆通知 你于${new Date(
+          `notify "登陆通知" "你于${new Date(
             timestamp,
-          ).toLocaleString()}在${address}登陆成功，ip地址${ip}`,
+          ).toLocaleString()}在${address}登陆成功，ip地址${ip}"`,
         );
         await this.getLoginLog();
         await this.insertDb({
@@ -116,9 +116,9 @@ export default class AuthService {
           lastaddr: address,
         });
         exec(
-          `notify 登陆通知 你于${new Date(
+          `notify "登陆通知" "你于${new Date(
             timestamp,
-          ).toLocaleString()}在${address}登陆失败，ip地址${ip}`,
+          ).toLocaleString()}在${address}登陆失败，ip地址${ip}"`,
         );
         await this.getLoginLog();
         await this.insertDb({
@@ -208,7 +208,7 @@ export default class AuthService {
 
   public async twoFactorLogin({ username, password, code }, req) {
     const authInfo = this.getAuthInfo();
-    const { isTwoFactorChecking, retries, twoFactorSecret } = authInfo;
+    const { isTwoFactorChecking, twoFactorSecret } = authInfo;
     if (!isTwoFactorChecking) {
       return { code: 450, message: '未知错误' };
     }
@@ -217,7 +217,7 @@ export default class AuthService {
       secret: twoFactorSecret,
     });
     if (isValid) {
-      return this.login({ username, password }, req);
+      return this.login({ username, password }, req, false);
     } else {
       const { ip, address } = await getNetIp(req);
       this.updateAuthInfo(authInfo, {
