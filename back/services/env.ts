@@ -14,7 +14,6 @@ export default class EnvService {
     this.envDb.loadDatabase((err) => {
       if (err) throw err;
     });
-    this.envDb.persistence.setAutocompactionInterval(30000);
   }
 
   public async create(payloads: Env[]): Promise<Env[]> {

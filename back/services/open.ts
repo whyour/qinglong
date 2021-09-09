@@ -13,7 +13,6 @@ export default class OpenService {
     this.appDb.loadDatabase((err) => {
       if (err) throw err;
     });
-    this.appDb.persistence.setAutocompactionInterval(30000);
   }
 
   public getDb(): DataStore {
