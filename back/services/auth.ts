@@ -18,7 +18,6 @@ export default class AuthService {
     this.authDb.loadDatabase((err) => {
       if (err) throw err;
     });
-    this.authDb.persistence.setAutocompactionInterval(30000);
   }
 
   public async login(

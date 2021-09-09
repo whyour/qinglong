@@ -23,7 +23,6 @@ export default class CronService {
     this.cronDb.loadDatabase((err) => {
       if (err) throw err;
     });
-    this.cronDb.persistence.setAutocompactionInterval(30000);
   }
 
   public getDb(): DataStore {
