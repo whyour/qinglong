@@ -124,7 +124,12 @@ const SecuritySettings = ({ user, userChange }: any) => {
           </Title>
           使用手机应用扫描二维码，或者输入秘钥 {twoFactorInfo?.secret}
           <div style={{ marginTop: 10 }}>
-            <QRCode value={twoFactorInfo?.url} />
+            <QRCode
+              style={{ border: '1px solid #21262d', borderRadius: 6 }}
+              includeMargin={true}
+              size={187}
+              value={twoFactorInfo?.url}
+            />
           </div>
           <Title style={{ marginTop: 5 }} level={5}>
             第三步
