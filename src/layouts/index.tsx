@@ -48,12 +48,17 @@ export default function (props: any) {
   };
 
   useEffect(() => {
+    if (!user) {
+      getUser();
+    }
+  }, [props.location.pathname]);
+
+  useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
     if (!isAuth) {
       history.push('/login');
     }
     vhCheck();
-    getUser();
 
     // patch custome layout title as react node [object, object]
     document.title = '控制面板';
