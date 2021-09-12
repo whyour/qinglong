@@ -15,11 +15,13 @@ import './index.less';
 import vhCheck from 'vh-check';
 import { version, changeLog } from '../version';
 import { useCtx, useTheme } from '@/utils/hooks';
+import { message } from 'antd';
 
 export default function (props: any) {
   const ctx = useCtx();
   const theme = useTheme();
   const [user, setUser] = useState<any>();
+  const [loading, setLoading] = useState<boolean>(true);
 
   const logout = () => {
     request.post(`${config.apiPrefix}logout`).then(() => {
@@ -28,30 +30,25 @@ export default function (props: any) {
     });
   };
 
-  const getUser = () => {
-    request
-      .get(`${config.apiPrefix}user`)
-      .then((data) => {
-        if (data.data.username) {
-          setUser(data.data);
-          if (props.location.pathname === '/') {
-            history.push('/crontab');
-          }
+  const getUser = (needLoading = true) => {
+    needLoading && setLoading(true);
+    request.get(`${config.apiPrefix}user`).then(({ code, data }) => {
+      if (code === 200 && data.username) {
+        setUser(data);
+        localStorage.setItem('isLogin', 'true');
+        if (props.location.pathname === '/') {
+          history.push('/crontab');
         }
-      })
-      .catch((e) => {
-        if (e.response && e.response.status === 401) {
-          localStorage.removeItem(config.authKey);
-          history.push('/login');
-        }
-      });
+      } else {
+        message.error(data);
+      }
+      needLoading && setLoading(false);
+    });
   };
 
-  useEffect(() => {
-    if (!user) {
-      getUser();
-    }
-  }, [props.location.pathname]);
+  const reloadUser = () => {
+    getUser(false);
+  };
 
   useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
@@ -63,6 +60,12 @@ export default function (props: any) {
     // patch custome layout title as react node [object, object]
     document.title = '控制面板';
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      getUser();
+    }
+  }, [props.location.pathname]);
 
   useEffect(() => {
     const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
@@ -89,6 +92,7 @@ export default function (props: any) {
   return (
     <ProLayout
       selectedKeys={[props.location.pathname]}
+      loading={loading}
       title={
         <>
           控制面板
@@ -136,7 +140,7 @@ export default function (props: any) {
           ...ctx,
           ...theme,
           user,
-          reloadUser: getUser,
+          reloadUser,
         });
       })}
     </ProLayout>
