@@ -1,6 +1,7 @@
 import { extend } from 'umi-request';
 import { message } from 'antd';
 import config from './config';
+import { history } from 'umi';
 
 message.config({
   duration: 1.5,
@@ -12,10 +13,17 @@ const errorHandler = function (error: any) {
     const msg = error.data
       ? error.data.message || error.data
       : error.response.statusText;
-    if (error.response.status !== 401 && error.response.status !== 502) {
-      message.error(msg);
+    const responseStatus = error.response.status;
+    if (responseStatus === 502) {
+      message.error('服务异常，请手动执行ql check检查服务状态');
+    } else if (responseStatus === 401) {
+      if (history.location.pathname !== '/login') {
+        message.error('登录已过期，请重新登录');
+        localStorage.removeItem(config.authKey);
+        history.push('/login');
+      }
     } else {
-      console.log(error.response);
+      message.error(msg);
     }
   } else {
     console.log(error.message);
