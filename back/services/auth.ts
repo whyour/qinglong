@@ -14,12 +14,11 @@ import NotificationService from './notify';
 
 @Service()
 export default class AuthService {
+  @Inject((type) => NotificationService)
+  private notificationService!: NotificationService;
   private authDb = new DataStore({ filename: config.authDbFile });
 
-  constructor(
-    @Inject('logger') private logger: winston.Logger,
-    private notificationService: NotificationService,
-  ) {
+  constructor(@Inject('logger') private logger: winston.Logger) {
     this.authDb.loadDatabase((err) => {
       if (err) throw err;
     });
