@@ -1,9 +1,10 @@
+import { NotificationInfo } from '../data/notify';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import AuthService from './auth';
 
 @Service()
-export default class NotifyService {
+export default class NotificationService {
   private modeMap = new Map([
     ['goCqHttpBot', this.goCqHttpBot],
     ['serverChan', this.serverChan],
@@ -17,14 +18,21 @@ export default class NotifyService {
     ['email', this.email],
   ]);
 
+  private title = '';
+  private content = '';
+  private params!: Omit<NotificationInfo, 'type'>;
+
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private authService: AuthService,
   ) {}
 
-  private async notify() {
-    const { type } = await this.authService.getNotificationMode();
+  public async notify(title: string, content: string) {
+    const { type, ...rest } = await this.authService.getNotificationMode();
     if (type) {
+      this.title = title;
+      this.content = content;
+      this.params = rest;
       const notificationModeAction = this.modeMap.get(type);
       notificationModeAction?.call(this);
     }

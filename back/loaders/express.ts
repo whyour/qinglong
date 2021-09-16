@@ -47,13 +47,6 @@ export default ({ app }: { app: Application }) => {
       }
     }
 
-    const data = fs.readFileSync(config.authConfigFile, 'utf8');
-    if (data) {
-      const { token } = JSON.parse(data);
-      if (token && headerToken === token) {
-        return next();
-      }
-    }
     if (
       !headerToken &&
       req.path &&
@@ -69,6 +62,14 @@ export default ({ app }: { app: Application }) => {
       req.path === '/api/crons/status'
     ) {
       return next();
+    }
+
+    const data = fs.readFileSync(config.authConfigFile, 'utf8');
+    if (data) {
+      const { token } = JSON.parse(data);
+      if (token && headerToken === token) {
+        return next();
+      }
     }
 
     const err: any = new Error('UnauthorizedError');
