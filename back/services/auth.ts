@@ -10,12 +10,16 @@ import { exec } from 'child_process';
 import DataStore from 'nedb';
 import { AuthDataType, AuthInfo, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
+import NotificationService from './notify';
 
 @Service()
 export default class AuthService {
   private authDb = new DataStore({ filename: config.authDbFile });
 
-  constructor(@Inject('logger') private logger: winston.Logger) {
+  constructor(
+    @Inject('logger') private logger: winston.Logger,
+    private notificationService: NotificationService,
+  ) {
     this.authDb.loadDatabase((err) => {
       if (err) throw err;
     });
@@ -48,7 +52,7 @@ export default class AuthService {
       } = content;
 
       if (
-        (cUsername === 'admin' && cPassword === 'adminadmin') ||
+        (cUsername === 'admin' && cPassword === 'admin') ||
         !cUsername ||
         !cPassword
       ) {
@@ -94,10 +98,11 @@ export default class AuthService {
           lastaddr: address,
           isTwoFactorChecking: false,
         });
-        exec(
-          `notify "登陆通知" "你于${new Date(
+        await this.notificationService.notify(
+          '登陆通知',
+          `你于${new Date(
             timestamp,
-          ).toLocaleString()}在${address}登陆成功，ip地址${ip}"`,
+          ).toLocaleString()}在 ${address} 登陆成功，ip地址 ${ip}"`,
         );
         await this.getLoginLog();
         await this.insertDb({
@@ -115,10 +120,11 @@ export default class AuthService {
           lastip: ip,
           lastaddr: address,
         });
-        exec(
-          `notify "登陆通知" "你于${new Date(
+        await this.notificationService.notify(
+          '登陆通知',
+          `你于${new Date(
             timestamp,
-          ).toLocaleString()}在${address}登陆失败，ip地址${ip}"`,
+          ).toLocaleString()}在 ${address} 登陆失败，ip地址 ${ip}"`,
         );
         await this.getLoginLog();
         await this.insertDb({

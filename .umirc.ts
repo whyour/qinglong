@@ -11,7 +11,7 @@ export default defineConfig({
   favicon: '/images/g5.ico',
   proxy: {
     '/api': {
-      target: 'http://127.0.0.1:5678/',
+      target: 'http://127.0.0.1:5600/',
       changeOrigin: true,
     },
   },
