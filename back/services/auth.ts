@@ -8,7 +8,8 @@ import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
 import { exec } from 'child_process';
 import DataStore from 'nedb';
-import { AuthInfo, LoginStatus } from '../data/auth';
+import { AuthDataType, AuthInfo, LoginStatus } from '../data/auth';
+import { NotificationInfo } from '../data/notify';
 
 @Service()
 export default class AuthService {
@@ -100,7 +101,7 @@ export default class AuthService {
         );
         await this.getLoginLog();
         await this.insertDb({
-          type: 'loginLog',
+          type: AuthDataType.loginLog,
           info: { timestamp, address, ip, status: LoginStatus.success },
         });
         return {
@@ -121,7 +122,7 @@ export default class AuthService {
         );
         await this.getLoginLog();
         await this.insertDb({
-          type: 'loginLog',
+          type: AuthDataType.loginLog,
           info: { timestamp, address, ip, status: LoginStatus.fail },
         });
         return { code: 400, message: config.authError };
@@ -133,9 +134,9 @@ export default class AuthService {
 
   public async getLoginLog(): Promise<AuthInfo[]> {
     return new Promise((resolve) => {
-      this.authDb.find({ type: 'loginLog' }).exec((err, docs) => {
+      this.authDb.find({ type: AuthDataType.loginLog }).exec((err, docs) => {
         if (err || docs.length === 0) {
-          resolve(docs);
+          resolve([]);
         } else {
           const result = docs.sort(
             (a, b) => b.info.timestamp - a.info.timestamp,
@@ -246,5 +247,26 @@ export default class AuthService {
       config.authConfigFile,
       JSON.stringify({ ...authInfo, ...info }),
     );
+  }
+
+  public async getNotificationMode(): Promise<NotificationInfo> {
+    return new Promise((resolve) => {
+      this.authDb
+        .find({ type: AuthDataType.notification })
+        .exec((err, docs) => {
+          if (err || docs.length === 0) {
+            resolve({} as NotificationInfo);
+          } else {
+            resolve(docs[0].info);
+          }
+        });
+    });
+  }
+
+  public async updateNotificationMode(notificationInfo: NotificationInfo) {
+    return await this.insertDb({
+      type: AuthDataType.notification,
+      info: { notificationInfo },
+    });
   }
 }

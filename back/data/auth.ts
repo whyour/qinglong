@@ -1,6 +1,6 @@
 export class AuthInfo {
   ip?: string;
-  type: AuthInfoType;
+  type: AuthDataType;
   info?: any;
   _id?: string;
 
@@ -17,4 +17,8 @@ export enum LoginStatus {
   'fail',
 }
 
-export type AuthInfoType = 'loginLog' | 'authToken';
+export enum AuthDataType {
+  'loginLog' = 'loginLog',
+  'authToken' = 'authToken',
+  'notification' = 'notification',
+}
