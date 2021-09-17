@@ -60,6 +60,7 @@ export default class NotificationService {
       const notificationModeAction = this.modeMap.get(type);
       return await notificationModeAction?.call(this);
     }
+    return true;
   }
 
   private async goCqHttpBot() {

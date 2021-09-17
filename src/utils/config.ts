@@ -74,7 +74,7 @@ export default {
     { value: 'iGot', label: 'IGot' },
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'email', label: '邮箱' },
-    { value: '', label: '已关闭' },
+    { value: 'closed', label: '已关闭' },
   ],
   notificationModeMap: {
     goCqHttpBot: [
