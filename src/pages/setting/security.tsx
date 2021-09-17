@@ -9,7 +9,7 @@ const { Title, Link } = Typography;
 
 const SecuritySettings = ({ user, userChange }: any) => {
   const [loading, setLoading] = useState(false);
-  const [twoFactorActived, setTwoFactorActived] = useState<boolean>();
+  const [twoFactorActivated, setTwoFactorActivated] = useState<boolean>();
   const [twoFactoring, setTwoFactoring] = useState(false);
   const [twoFactorInfo, setTwoFactorInfo] = useState<any>();
   const [code, setCode] = useState<string>();
@@ -32,7 +32,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
   };
 
   const activeOrDeactiveTwoFactor = () => {
-    if (twoFactorActived) {
+    if (twoFactorActivated) {
       deactiveTowFactor();
     } else {
       getTwoFactorInfo();
@@ -45,7 +45,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
       .put(`${config.apiPrefix}user/two-factor/deactive`)
       .then((data: any) => {
         if (data.data) {
-          setTwoFactorActived(false);
+          setTwoFactorActivated(false);
           userChange();
         }
       })
@@ -62,7 +62,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
         if (data.data) {
           message.success('激活成功');
           setTwoFactoring(false);
-          setTwoFactorActived(true);
+          setTwoFactorActivated(true);
           userChange();
         } else {
           message.success('验证失败');
@@ -86,7 +86,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
   };
 
   useEffect(() => {
-    setTwoFactorActived(user && user.twoFactorActived);
+    setTwoFactorActivated(user && user.twoFactorActivated);
   }, [user]);
 
   return twoFactoring ? (
@@ -198,10 +198,10 @@ const SecuritySettings = ({ user, userChange }: any) => {
       </div>
       <Button
         type="primary"
-        danger={twoFactorActived}
+        danger={twoFactorActivated}
         onClick={activeOrDeactiveTwoFactor}
       >
-        {twoFactorActived ? '禁用' : '启用'}
+        {twoFactorActivated ? '禁用' : '启用'}
       </Button>
     </>
   );

@@ -47,7 +47,7 @@ export default class AuthService {
         lastlogon,
         lastip,
         lastaddr,
-        twoFactorActived,
+        twoFactorActivated,
       } = content;
 
       if (
@@ -72,7 +72,7 @@ export default class AuthService {
 
       const { ip, address } = await getNetIp(req);
       if (username === cUsername && password === cPassword) {
-        if (twoFactorActived && needTwoFactor) {
+        if (twoFactorActivated && needTwoFactor) {
           this.updateAuthInfo(content, {
             isTwoFactorChecking: true,
           });
@@ -83,7 +83,7 @@ export default class AuthService {
         }
 
         const data = createRandomString(50, 100);
-        const expiration = twoFactorActived ? 30 : 3;
+        const expiration = twoFactorActivated ? 30 : 3;
         let token = jwt.sign({ data }, config.secret as any, {
           expiresIn: 60 * 60 * 24 * expiration,
           algorithm: 'HS384',
@@ -206,7 +206,7 @@ export default class AuthService {
       secret: authInfo.twoFactorSecret,
     });
     if (isValid) {
-      this.updateAuthInfo(authInfo, { twoFactorActived: true });
+      this.updateAuthInfo(authInfo, { twoFactorActivated: true });
     }
     return isValid;
   }
@@ -236,7 +236,7 @@ export default class AuthService {
   public deactiveTwoFactor() {
     const authInfo = this.getAuthInfo();
     this.updateAuthInfo(authInfo, {
-      twoFactorActived: false,
+      twoFactorActivated: false,
       twoFactorSecret: '',
     });
     return true;

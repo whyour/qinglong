@@ -86,7 +86,7 @@ export default (app: Router) => {
           code: 200,
           data: {
             username: authInfo.username,
-            twoFactorActived: authInfo.twoFactorActived,
+            twoFactorActivated: authInfo.twoFactorActivated,
           },
         });
       } catch (e) {
@@ -175,6 +175,36 @@ export default (app: Router) => {
       try {
         const authService = Container.get(AuthService);
         const data = await authService.getLoginLog();
+        res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/user/notification',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const authService = Container.get(AuthService);
+        const data = await authService.getNotificationMode();
+        res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/user/notification',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const authService = Container.get(AuthService);
+        const data = await authService.updateNotificationMode(req.body);
         res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
