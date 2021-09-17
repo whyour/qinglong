@@ -39,7 +39,26 @@ export default class NotificationService {
       this.content = content;
       this.params = rest;
       const notificationModeAction = this.modeMap.get(type);
-      notificationModeAction?.call(this);
+      try {
+        return await notificationModeAction?.call(this);
+      } catch (error: any) {
+        return error.message;
+      }
+    }
+  }
+
+  public async testNotify(
+    info: NotificationInfo,
+    title: string,
+    content: string,
+  ) {
+    const { type, ...rest } = info;
+    if (type) {
+      this.title = title;
+      this.content = content;
+      this.params = rest;
+      const notificationModeAction = this.modeMap.get(type);
+      return await notificationModeAction?.call(this);
     }
   }
 

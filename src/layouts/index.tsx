@@ -93,6 +93,7 @@ export default function (props: any) {
     <ProLayout
       selectedKeys={[props.location.pathname]}
       loading={loading}
+      className={theme.theme === 'vs-dark' ? 'dark' : 'white'}
       title={
         <>
           控制面板

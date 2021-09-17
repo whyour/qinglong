@@ -30,6 +30,7 @@ import {
 } from '@ant-design/icons';
 import SecuritySettings from './security';
 import LoginLog from './loginLog';
+import NotificationSetting from './notification';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -112,6 +113,7 @@ const Setting = ({ headerStyle, isPhone, user, reloadUser }: any) => {
   const [editedApp, setEditedApp] = useState();
   const [tabActiveKey, setTabActiveKey] = useState('security');
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
+  const [notificationInfo, setNotificationInfo] = useState<any>();
 
   const themeChange = (e: any) => {
     setTheme(e.target.value);
@@ -238,7 +240,20 @@ const Setting = ({ headerStyle, isPhone, user, reloadUser }: any) => {
       getApps();
     } else if (activeKey === 'login') {
       getLoginLog();
+    } else if (activeKey === 'notification') {
+      getNotification();
     }
+  };
+
+  const getNotification = () => {
+    request
+      .get(`${config.apiPrefix}user/notification`)
+      .then((data: any) => {
+        setNotificationInfo(data.data);
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
   };
 
   useEffect(() => {
@@ -288,6 +303,9 @@ const Setting = ({ headerStyle, isPhone, user, reloadUser }: any) => {
             scroll={{ x: 768 }}
             loading={loading}
           />
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="通知设置" key="notification">
+          <NotificationSetting data={notificationInfo} />
         </Tabs.TabPane>
         <Tabs.TabPane tab="登陆日志" key="login">
           <LoginLog data={loginLogData} />

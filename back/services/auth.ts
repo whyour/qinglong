@@ -268,10 +268,38 @@ export default class AuthService {
     });
   }
 
-  public async updateNotificationMode(notificationInfo: NotificationInfo) {
-    return await this.insertDb({
-      type: AuthDataType.notification,
-      info: { notificationInfo },
+  private async updateNotificationDb(payload: AuthInfo): Promise<any> {
+    return new Promise((resolve) => {
+      this.authDb.update(
+        { type: AuthDataType.notification },
+        payload,
+        { upsert: true, returnUpdatedDocs: true },
+        (err, num, doc: any) => {
+          if (err) {
+            resolve({} as NotificationInfo);
+          } else {
+            resolve(doc.info);
+          }
+        },
+      );
     });
+  }
+
+  public async updateNotificationMode(notificationInfo: NotificationInfo) {
+    const code = Math.random().toString().slice(-6);
+    const isSuccess = await this.notificationService.testNotify(
+      notificationInfo,
+      '青龙',
+      `【蛟龙】您本次的验证码：${code}`,
+    );
+    if (isSuccess) {
+      const result = await this.updateNotificationDb({
+        type: AuthDataType.notification,
+        info: { ...notificationInfo },
+      });
+      return { code: 200, data: { ...result, code } };
+    } else {
+      return { code: 400, data: '通知发送失败，请检查参数' };
+    }
   }
 }
