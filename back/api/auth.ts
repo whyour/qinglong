@@ -204,8 +204,8 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const authService = Container.get(AuthService);
-        const data = await authService.updateNotificationMode(req.body);
-        res.send({ code: 200, data });
+        const result = await authService.updateNotificationMode(req.body);
+        res.send(result);
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);

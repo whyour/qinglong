@@ -272,7 +272,7 @@ export default class AuthService {
     return new Promise((resolve) => {
       this.authDb.update(
         { type: AuthDataType.notification },
-        payload,
+        { ...payload },
         { upsert: true, returnUpdatedDocs: true },
         (err, num, doc: any) => {
           if (err) {

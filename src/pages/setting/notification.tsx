@@ -7,22 +7,25 @@ const { Option } = Select;
 
 const NotificationSetting = ({ data }: any) => {
   const [loading, setLoading] = useState(false);
-  const [notificationMode, setNotificationMode] = useState<string>('');
+  const [notificationMode, setNotificationMode] = useState<string>('closed');
   const [fields, setFields] = useState<any[]>([]);
   const [form] = Form.useForm();
 
   const handleOk = (values: any) => {
+    if (values.type == 'closed') {
+      values.type = '';
+    }
     request
       .put(`${config.apiPrefix}user/notification`, {
         data: {
           ...values,
         },
       })
-      .then((data: any) => {
-        if (data && data.code === 200) {
-          message.success('通知发送成功');
+      .then((_data: any) => {
+        if (_data && _data.code === 200) {
+          message.success(values.type ? '通知发送成功' : '通知关闭成功');
         } else {
-          message.error(data.data);
+          message.error(_data.data);
         }
       })
       .catch((error: any) => {
@@ -33,7 +36,7 @@ const NotificationSetting = ({ data }: any) => {
   const notificationModeChange = (value: string) => {
     setNotificationMode(value);
     const _fields = (config.notificationModeMap as any)[value];
-    setFields(_fields);
+    setFields(_fields || []);
   };
 
   useEffect(() => {
@@ -70,11 +73,9 @@ const NotificationSetting = ({ data }: any) => {
             <Input.TextArea autoSize={true} placeholder={`请输入${x.label}`} />
           </Form.Item>
         ))}
-        {notificationMode !== '' && (
-          <Button type="primary" htmlType="submit">
-            保存
-          </Button>
-        )}
+        <Button type="primary" htmlType="submit">
+          保存
+        </Button>
       </Form>
     </div>
   );
