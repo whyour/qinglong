@@ -19,6 +19,7 @@ const Config = ({ headerStyle, isPhone, theme }: any) => {
   const [select, setSelect] = useState('config.sh');
   const [data, setData] = useState<any[]>([]);
   const editorRef = useRef<any>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const getConfig = (name: string) => {
     request.get(`${config.apiPrefix}configs/${name}`).then((data: any) => {
@@ -37,6 +38,7 @@ const Config = ({ headerStyle, isPhone, theme }: any) => {
   };
 
   const updateConfig = () => {
+    setConfirmLoading(true);
     const content = editorRef.current
       ? editorRef.current.getValue().replace(/\r\n/g, '\n')
       : value;
@@ -47,6 +49,7 @@ const Config = ({ headerStyle, isPhone, theme }: any) => {
       })
       .then((data: any) => {
         message.success(data.message);
+        setConfirmLoading(false);
       });
   };
 
@@ -76,7 +79,12 @@ const Config = ({ headerStyle, isPhone, theme }: any) => {
           defaultValue="config.sh"
           onSelect={onSelect}
         />,
-        <Button key="1" type="primary" onClick={updateConfig}>
+        <Button
+          key="1"
+          loading={confirmLoading}
+          type="primary"
+          onClick={updateConfig}
+        >
           保存
         </Button>,
       ]}
