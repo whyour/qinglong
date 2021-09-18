@@ -62,9 +62,6 @@ export default {
       },
     ],
   },
-  location: {
-    pathname: '/',
-  },
   navTheme: 'light',
   fixSiderbar: true,
   contentWidth: 'Fixed',

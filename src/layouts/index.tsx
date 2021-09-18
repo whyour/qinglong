@@ -56,9 +56,6 @@ export default function (props: any) {
       history.push('/login');
     }
     vhCheck();
-
-    // patch custome layout title as react node [object, object]
-    document.title = '控制面板';
   }, []);
 
   useEffect(() => {
@@ -135,7 +132,12 @@ export default function (props: any) {
           },
         ];
       }}
-      pageTitleRender={() => '控制面板'}
+      pageTitleRender={(props, pageName, info) => {
+        if (info) {
+          return `${info.pageName} - 控制面板`;
+        }
+        return '控制面板';
+      }}
       {...defaultProps}
     >
       {React.Children.map(props.children, (child) => {
