@@ -6,6 +6,7 @@ import {
   Loading3QuartersOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
+import { PageLoading } from '@ant-design/pro-layout';
 
 enum CrontabStatus {
   'running',
@@ -88,7 +89,7 @@ const CronLogModal = ({
   const titleElement = () => {
     return (
       <>
-        {excuting && <Loading3QuartersOutlined spin />}
+        {(excuting || loading) && <Loading3QuartersOutlined spin />}
         {!excuting && <CheckCircleOutlined />}
         <span style={{ marginLeft: 5 }}>日志-{cron && cron.name}</span>{' '}
       </>
@@ -114,6 +115,7 @@ const CronLogModal = ({
       bodyStyle={{
         overflowY: 'auto',
         maxHeight: 'calc(80vh - var(--vh-offset, 0px))',
+        minHeight: '300px',
       }}
       forceRender
       onOk={() => cancel()}
@@ -124,7 +126,9 @@ const CronLogModal = ({
         </Button>,
       ]}
     >
-      {!loading && value && (
+      {loading ? (
+        <PageLoading />
+      ) : (
         <pre
           style={
             isPhone
