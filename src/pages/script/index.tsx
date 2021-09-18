@@ -42,7 +42,7 @@ const LangMap: any = {
 const Script = ({ headerStyle, isPhone, theme }: any) => {
   const [title, setTitle] = useState('请选择脚本文件');
   const [value, setValue] = useState('请选择脚本文件');
-  const [select, setSelect] = useState<string>();
+  const [select, setSelect] = useState<any>();
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,8 +73,11 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   };
 
   const onSelect = (value: any, node: any) => {
+    if (node.key === select || !value) {
+      return;
+    }
     setValue('加载中...');
-    const newMode = LangMap[value.slice(-3)] || '';
+    const newMode = value ? LangMap[value.slice(-3)] : '';
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setSelect(value);
     setTitle(node.parent || node.value);
@@ -286,9 +289,9 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                   treeData={filterData}
                   showIcon={true}
                   height={height}
+                  selectedKeys={[select]}
                   showLine={{ showLeafIcon: true }}
                   onSelect={onTreeSelect}
-                  defaultSelectedKeys={[data[0] && data[0].key]}
                 ></Tree>
               </div>
             </div>
