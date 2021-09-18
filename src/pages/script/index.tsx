@@ -141,22 +141,25 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
         const content = editorRef.current
           ? editorRef.current.getValue().replace(/\r\n/g, '\n')
           : value;
-        request
-          .put(`${config.apiPrefix}scripts`, {
-            data: {
-              filename: select,
-              content,
-            },
-          })
-          .then((_data: any) => {
-            if (_data.code === 200) {
-              message.success(`保存成功`);
-              setValue(content);
-              setIsEditing(false);
-            } else {
-              message.error(_data);
-            }
-          });
+        return new Promise((resolve) => {
+          request
+            .put(`${config.apiPrefix}scripts`, {
+              data: {
+                filename: select,
+                content,
+              },
+            })
+            .then((_data: any) => {
+              if (_data.code === 200) {
+                message.success(`保存成功`);
+                setValue(content);
+                setIsEditing(false);
+              } else {
+                message.error(_data);
+              }
+              resolve(null);
+            });
+        });
       },
       onCancel() {
         console.log('Cancel');

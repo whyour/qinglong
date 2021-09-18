@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import ProLayout from '@ant-design/pro-layout';
+import ProLayout, { PageLoading } from '@ant-design/pro-layout';
 import {
   enable as enableDarkMode,
   disable as disableDarkMode,
@@ -89,7 +89,9 @@ export default function (props: any) {
     !navigator.userAgent.includes('Chrome');
   const isQQBrowser = navigator.userAgent.includes('QQBrowser');
 
-  return (
+  return loading ? (
+    <PageLoading />
+  ) : (
     <ProLayout
       selectedKeys={[props.location.pathname]}
       loading={loading}

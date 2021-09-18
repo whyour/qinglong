@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Input, Form, Button, Spin, message } from 'antd';
+import { Typography, Input, Form, Button, message } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { history } from 'umi';
 import QRCode from 'qrcode.react';
+import { PageLoading } from '@ant-design/pro-layout';
 
 const { Title, Link } = Typography;
 
@@ -146,7 +147,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
           </Button>
         </div>
       ) : (
-        <Spin />
+        <PageLoading />
       )}
     </>
   ) : (
