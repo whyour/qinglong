@@ -115,6 +115,32 @@ export default class CronService {
     });
   }
 
+  public async pin(ids: string[]) {
+    return new Promise((resolve: any) => {
+      this.cronDb.update(
+        { _id: { $in: ids } },
+        { $set: { isPinned: 1 } },
+        { multi: true },
+        async (err) => {
+          resolve();
+        },
+      );
+    });
+  }
+
+  public async unPin(ids: string[]) {
+    return new Promise((resolve: any) => {
+      this.cronDb.update(
+        { _id: { $in: ids } },
+        { $set: { isPinned: 0 } },
+        { multi: true },
+        async (err) => {
+          resolve();
+        },
+      );
+    });
+  }
+
   public async crontabs(searchText?: string): Promise<Crontab[]> {
     let query = {};
     if (searchText) {
