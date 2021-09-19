@@ -290,7 +290,7 @@ export default class AuthService {
     const isSuccess = await this.notificationService.testNotify(
       notificationInfo,
       '青龙',
-      `【蛟龙】您本次的验证码：${code}`,
+      `【蛟龙】测试通知 https://t.me/jiao_long`,
     );
     if (isSuccess) {
       const result = await this.updateNotificationDb({
