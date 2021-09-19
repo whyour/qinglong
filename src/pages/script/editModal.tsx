@@ -41,7 +41,6 @@ const EditModal = ({
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
   const [settingModalVisible, setSettingModalVisible] =
     useState<boolean>(false);
-  const [isNewFile, setIsNewFile] = useState<boolean>(false);
   const [log, setLog] = useState<string>('');
   const { theme } = useTheme();
   const editorRef = useRef<any>(null);
@@ -54,7 +53,6 @@ const EditModal = ({
     const newMode = LangMap[value.slice(-3)] || '';
     setFileName(value);
     setLanguage(newMode);
-    setIsNewFile(false);
     getDetail(node);
   };
 
@@ -64,23 +62,14 @@ const EditModal = ({
     });
   };
 
-  const createFile = () => {
-    setFileName(`未命名${prefixMap[language]}`);
-    setIsNewFile(true);
-    setValue('');
-  };
-
   const run = () => {};
 
   useEffect(() => {
-    if (!currentFile) {
-      createFile();
-    } else {
+    if (currentFile) {
       setFileName(currentFile);
       setValue(content as string);
     }
-    setIsNewFile(!currentFile);
-  }, []);
+  }, [currentFile, content]);
 
   return (
     <Drawer
@@ -134,13 +123,6 @@ const EditModal = ({
           <Button
             type="primary"
             style={{ marginRight: 8 }}
-            onClick={createFile}
-          >
-            新建文件
-          </Button>
-          <Button
-            type="primary"
-            style={{ marginRight: 8 }}
             onClick={() => {
               setSaveModalVisible(true);
             }}
@@ -178,8 +160,12 @@ const EditModal = ({
         handleCancel={() => {
           setSaveModalVisible(false);
         }}
-        isNewFile={isNewFile}
-        file={{ content: editorRef.current && editorRef.current.getValue().replace(/\r\n/g, '\n'), filename: fileName }}
+        file={{
+          content:
+            editorRef.current &&
+            editorRef.current.getValue().replace(/\r\n/g, '\n'),
+          filename: fileName,
+        }}
       />
       <SettingModal
         visible={settingModalVisible}
