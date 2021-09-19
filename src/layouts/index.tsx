@@ -65,6 +65,16 @@ export default function (props: any) {
   }, [props.location.pathname]);
 
   useEffect(() => {
+    if (theme && theme.theme) {
+      if (theme.theme === 'vs-dark') {
+        document.body.classList.add('dark');
+      } else {
+        document.body.classList.add('white');
+      }
+    }
+  }, [theme]);
+
+  useEffect(() => {
     const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
     setFetchMethod(window.fetch);
     if (_theme === 'dark') {
@@ -92,7 +102,6 @@ export default function (props: any) {
     <ProLayout
       selectedKeys={[props.location.pathname]}
       loading={loading}
-      className={theme.theme === 'vs-dark' ? 'dark' : 'white'}
       title={
         <>
           控制面板
