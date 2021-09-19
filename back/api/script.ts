@@ -81,7 +81,9 @@ export default (app: Router) => {
             data: '文件路径禁止访问',
           });
         }
-
+        if (!originFilename) {
+          originFilename = filename;
+        }
         const originFilePath = `${path}${originFilename.replace(/\//g, '')}`;
         const filePath = `${path}${filename.replace(/\//g, '')}`;
         if (fs.existsSync(originFilePath)) {
