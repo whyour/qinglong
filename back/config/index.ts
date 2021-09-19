@@ -5,7 +5,7 @@ import { createRandomString } from './util';
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
 const envFound = dotenv.config();
-const rootPath = path.resolve(__dirname, '../../');
+const rootPath = process.cwd();
 const envFile = path.join(rootPath, 'config/env.sh');
 const confFile = path.join(rootPath, 'config/config.sh');
 const sampleFile = path.join(rootPath, 'sample/config.sample.sh');
@@ -15,6 +15,7 @@ const authConfigFile = path.join(rootPath, 'config/auth.json');
 const extraFile = path.join(rootPath, 'config/extra.sh');
 const configPath = path.join(rootPath, 'config/');
 const scriptPath = path.join(rootPath, 'scripts/');
+const bakPath = path.join(rootPath, 'bak/');
 const samplePath = path.join(rootPath, 'sample/');
 const logPath = path.join(rootPath, 'log/');
 const authError = '错误的用户名密码，请重试';
@@ -46,6 +47,7 @@ export default {
   api: {
     prefix: '/api',
   },
+  rootPath,
   configString,
   loginFaild,
   authError,
@@ -72,5 +74,6 @@ export default {
     'crontab.list',
     'env.sh',
   ],
-  writePathList: ['/ql/scripts/', '/ql/config/', '/ql/jbot/', '/ql/bak/'],
+  writePathList: [configPath, scriptPath],
+  bakPath,
 };
