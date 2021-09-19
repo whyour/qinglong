@@ -80,21 +80,25 @@ export default class NotificationService {
 
   private async serverChan() {
     const { serverChanKey } = this.params;
-    const url = serverChanKey.includes('SCT')
-      ? `https://sctapi.ftqq.com/${SCKEY}.send`
-      : `https://sc.ftqq.com/${SCKEY}.send`;
+    const url = serverChanKey.startsWith('SCT')
+      ? `https://sctapi.ftqq.com/${serverChanKey}.send`
+      : `https://sc.ftqq.com/${serverChanKey}.send`;
     const res: any = await got
       .post(url, {
         timeout: this.timeout,
         retry: 0,
-        body: `text=${this.title}&desp=${this.content}`,
+        body: `title=${this.title}&desp=${this.content}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       .json();
     return res.errno === 0 || res.data.errno === 0;
   }
 
   private async bark() {
-    const { barkPush, barkSound, barkGroup } = this.params;
+    let { barkPush, barkSound, barkGroup } = this.params;
+    if (!barkPush.startsWith('http') && !barkPush.startsWith('https')) {
+      barkPush = `https://api.day.app/${barkPush}`;
+    }
     const url = `${barkPush}/${encodeURIComponent(
       this.title,
     )}/${encodeURIComponent(
@@ -119,26 +123,32 @@ export default class NotificationService {
       telegramBotToken,
       telegramBotUserId,
     } = this.params;
-    const url = `https://${telegramBotApiHost}/bot${telegramBotToken}/sendMessage`;
-    const options = {
-      keepAlive: true,
-      keepAliveMsecs: 1000,
-      maxSockets: 256,
-      maxFreeSockets: 256,
-      proxy: `http://${telegramBotProxyHost}:${telegramBotProxyPort}`,
-    };
-    const httpAgent = new HttpProxyAgent(options);
-    const httpsAgent = new HttpsProxyAgent(options);
+    const url = `https://${
+      telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
+    }/bot${telegramBotToken}/sendMessage`;
+    let agent;
+    if (telegramBotProxyHost && telegramBotProxyPort) {
+      const options: any = {
+        keepAlive: true,
+        keepAliveMsecs: 1000,
+        maxSockets: 256,
+        maxFreeSockets: 256,
+        proxy: `http://${telegramBotProxyHost}:${telegramBotProxyPort}`,
+      };
+      const httpAgent = new HttpProxyAgent(options);
+      const httpsAgent = new HttpsProxyAgent(options);
+      agent = {
+        http: httpAgent,
+        https: httpsAgent,
+      };
+    }
     const res: any = await got
       .post(url, {
         timeout: this.timeout,
         retry: 0,
         body: `chat_id=${telegramBotUserId}&text=${this.title}\n\n${this.content}&disable_web_page_preview=true`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        agent: {
-          http: httpAgent,
-          https: httpsAgent,
-        },
+        agent,
       })
       .json();
     return !!res.ok;
