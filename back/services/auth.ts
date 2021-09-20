@@ -40,7 +40,7 @@ export default class AuthService {
     const content = this.getAuthInfo();
     const timestamp = Date.now();
     if (content) {
-      const {
+      let {
         username: cUsername,
         password: cPassword,
         retries = 0,
@@ -48,7 +48,10 @@ export default class AuthService {
         lastip,
         lastaddr,
         twoFactorActivated,
+        twoFactorActived,
       } = content;
+      // patch old field
+      twoFactorActivated = twoFactorActivated || twoFactorActived;
 
       if (
         (cUsername === 'admin' && cPassword === 'admin') ||
@@ -237,6 +240,7 @@ export default class AuthService {
     const authInfo = this.getAuthInfo();
     this.updateAuthInfo(authInfo, {
       twoFactorActivated: false,
+      twoFactorActived: false,
       twoFactorSecret: '',
     });
     return true;
