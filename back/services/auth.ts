@@ -104,7 +104,7 @@ export default class AuthService {
           '登陆通知',
           `你于${new Date(
             timestamp,
-          ).toLocaleString()}在 ${address} 登陆成功，ip地址 ${ip}"`,
+          ).toLocaleString()}在 ${address} 登陆成功，ip地址 ${ip}`,
         );
         await this.getLoginLog();
         await this.insertDb({
@@ -126,7 +126,7 @@ export default class AuthService {
           '登陆通知',
           `你于${new Date(
             timestamp,
-          ).toLocaleString()}在 ${address} 登陆失败，ip地址 ${ip}"`,
+          ).toLocaleString()}在 ${address} 登陆失败，ip地址 ${ip}`,
         );
         await this.getLoginLog();
         await this.insertDb({
