@@ -32,6 +32,7 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import CronModal from './modal';
 import CronLogModal from './logModal';
+import cron_parser from 'cron-parser';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -122,6 +123,31 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         multiple: 1,
       },
     },
+    {
+      title: '下次运行时间',
+      align: 'center' as const,
+      sorter: {
+        compare: (a: any, b: any) => {
+          return a.nextRunTime - b.nextRunTime;
+        },
+      },
+      render: (text: string, record: any) => {
+        const language = navigator.language || navigator.languages[0];
+        return (
+          <span
+            style={{
+              textAlign: 'left',
+              display: 'block',
+            }}
+          >
+            {record.nextRunTime.toLocaleString(language, {
+              hour12: false,
+            })}
+          </span>
+        );
+      },
+    },
+
     {
       title: '状态',
       key: 'status',
@@ -248,16 +274,26 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       .get(`${config.apiPrefix}crons?searchValue=${searchText}`)
       .then((data: any) => {
         setValue(
-          data.data.sort((a: any, b: any) => {
-            const sortA = a.isDisabled ? 4 : a.status;
-            const sortB = b.isDisabled ? 4 : b.status;
-            a.isPinned = a.isPinned ? a.isPinned : 0;
-            b.isPinned = b.isPinned ? b.isPinned : 0;
-            if (a.isPinned === b.isPinned) {
-              return CrontabSort[sortA] - CrontabSort[sortB];
-            }
-            return b.isPinned - a.isPinned;
-          }),
+          data.data
+            .sort((a: any, b: any) => {
+              const sortA = a.isDisabled ? 4 : a.status;
+              const sortB = b.isDisabled ? 4 : b.status;
+              a.isPinned = a.isPinned ? a.isPinned : 0;
+              b.isPinned = b.isPinned ? b.isPinned : 0;
+              if (a.isPinned === b.isPinned) {
+                return CrontabSort[sortA] - CrontabSort[sortB];
+              }
+              return b.isPinned - a.isPinned;
+            })
+            .map((x) => {
+              return {
+                ...x,
+                nextRunTime: cron_parser
+                  .parseExpression(x.schedule)
+                  .next()
+                  .toDate(),
+              };
+            }),
         );
         setCurrentPage(1);
       })
