@@ -7,6 +7,9 @@ export default defineConfig({
   nodeModulesTransform: {
     type: 'none',
   },
+  // antd: {
+  //   dark: true
+  // },
   fastRefresh: {},
   favicon: '/images/g5.ico',
   proxy: {

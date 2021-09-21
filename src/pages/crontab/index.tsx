@@ -672,6 +672,10 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
     localStorage.setItem('pageSize', pageSize + '');
   };
 
+  const getRowClassName = (record: any, index: number) => {
+    return record.isPinned ? 'pinned-cron' : '';
+  };
+
   useEffect(() => {
     if (logCron) {
       localStorage.setItem('logCron', logCron._id);
@@ -773,6 +777,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         scroll={{ x: 768 }}
         loading={loading}
         rowSelection={rowSelection}
+        rowClassName={getRowClassName}
       />
       <CronLogModal
         visible={isLogModalVisible}

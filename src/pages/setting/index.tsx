@@ -39,7 +39,13 @@ const optionsWithDisabled = [
   { label: '跟随系统', value: 'auto' },
 ];
 
-const Setting = ({ headerStyle, isPhone, user, reloadUser }: any) => {
+const Setting = ({
+  headerStyle,
+  isPhone,
+  user,
+  reloadUser,
+  reloadTheme,
+}: any) => {
   const columns = [
     {
       title: '名称',
@@ -265,6 +271,7 @@ const Setting = ({ headerStyle, isPhone, user, reloadUser }: any) => {
     } else {
       followSystemColorScheme({});
     }
+    reloadTheme(theme);
   }, [theme]);
 
   return (
