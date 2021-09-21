@@ -141,7 +141,13 @@ export default class OpenService {
     });
   }
 
-  public async authToken({ client_id, client_secret }): Promise<any> {
+  public async authToken({
+    client_id,
+    client_secret,
+  }: {
+    client_id: string;
+    client_secret: string;
+  }): Promise<any> {
     const token = uuidV4();
     const expiration = Math.round(Date.now() / 1000) + 2592000; // 2592000 30天
     return new Promise((resolve) => {

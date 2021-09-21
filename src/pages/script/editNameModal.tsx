@@ -8,7 +8,7 @@ const EditScriptNameModal = ({
   visible,
 }: {
   visible: boolean;
-  handleCancel: (file: { filename: string }) => void;
+  handleCancel: (file?: { filename: string }) => void;
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
