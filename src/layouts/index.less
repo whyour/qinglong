@@ -1,3 +1,4 @@
+@import '~antd/lib/style/themes/default.less';
 @import '~@/styles/variable.less';
 @import '~codemirror/lib/codemirror.css';
 
@@ -8,12 +9,12 @@
     url('../assets/fonts/SourceCodePro-Regular.ttf') format('truetype');
 }
 
-body {
-  height: 100%;
-  overflow-y: hidden;
-  background-color: rgb(248, 248, 248);
-  width: 100% !important;
-}
+// body {
+//   height: 100%;
+//   overflow-y: hidden;
+//   // background-color: rgb(248, 248, 248);
+//   width: 100% !important;
+// }
 
 .log-modal {
   .ant-modal {
@@ -118,16 +119,6 @@ body {
     text-overflow: ellipsis;
     flex: 1;
   }
-}
-
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active {
-  transition-delay: 99999s;
-  transition: color 99999s ease-out, background-color 99999s ease-out;
-  -webkit-transition-delay: 99999s;
-  -webkit-transition: color 99999s ease-out, background-color 99999s ease-out;
 }
 
 .ant-pro-page-container.ql-container-wrapper {
@@ -236,7 +227,23 @@ input:-webkit-autofill:active {
   font-size: 13px;
 }
 
-.dark {
+[data-dark='true'] {
+  /* Change autocomplete styles in WebKit */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus {
+    border: 1px solid @border-color-base;
+    box-shadow: none;
+    transition: background-color 5000s ease-in-out 0s;
+    -webkit-text-fill-color: @text-color;
+  }
+
   ::placeholder {
     opacity: 0.5 !important;
   }

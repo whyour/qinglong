@@ -50,6 +50,18 @@ export default function (props: any) {
     getUser(false);
   };
 
+  const setTheme = () => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const storageTheme = localStorage.getItem('qinglong_dark_theme');
+    const isDark =
+      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    if (isDark) {
+      document.body.setAttribute('data-dark', 'true');
+    } else {
+      document.body.setAttribute('data-dark', 'false');
+    }
+  };
+
   useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
     if (!isAuth) {
@@ -65,14 +77,8 @@ export default function (props: any) {
   }, [props.location.pathname]);
 
   useEffect(() => {
-    if (theme && theme.theme) {
-      if (theme.theme === 'vs-dark') {
-        document.body.classList.add('dark');
-      } else {
-        document.body.classList.add('white');
-      }
-    }
-  }, [theme]);
+    setTheme();
+  }, [theme.theme]);
 
   useEffect(() => {
     const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
@@ -155,6 +161,7 @@ export default function (props: any) {
           ...theme,
           user,
           reloadUser,
+          reloadTheme: setTheme,
         });
       })}
     </ProLayout>
