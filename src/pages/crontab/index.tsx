@@ -71,6 +71,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '任务名',
       dataIndex: 'name',
       key: 'name',
+      fixed: 'left',
+      width: 150,
       align: 'center' as const,
       render: (text: string, record: any) => (
         <span>
@@ -93,7 +95,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '任务',
       dataIndex: 'command',
       key: 'command',
-      width: '40%',
+      fixed: 'left',
+      width: 250,
       align: 'center' as const,
       render: (text: string, record: any) => {
         return (
@@ -118,6 +121,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '任务定时',
       dataIndex: 'schedule',
       key: 'schedule',
+      width: 110,
       align: 'center' as const,
       sorter: {
         compare: (a: any, b: any) => a.schedule.localeCompare(b.schedule),
@@ -127,6 +131,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
     {
       title: '最后运行时间',
       align: 'center' as const,
+      width: 150,
       sorter: {
         compare: (a: any, b: any) => {
           return a.last_execution_time - b.last_execution_time;
@@ -137,7 +142,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         return (
           <span
             style={{
-              textAlign: 'left',
               display: 'block',
             }}
           >
@@ -156,6 +160,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
     {
       title: '最后运行时长',
       align: 'center' as const,
+      width: 120,
       sorter: {
         compare: (a: any, b: any) => {
           return a.last_running_time - b.last_running_time;
@@ -166,7 +171,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         return (
           <span
             style={{
-              textAlign: 'left',
               display: 'block',
             }}
           >
@@ -180,6 +184,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
     {
       title: '下次运行时间',
       align: 'center' as const,
+      width: 150,
       sorter: {
         compare: (a: any, b: any) => {
           return a.nextRunTime - b.nextRunTime;
@@ -190,7 +195,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         return (
           <span
             style={{
-              textAlign: 'left',
               display: 'block',
             }}
           >
@@ -207,7 +211,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       key: 'status',
       dataIndex: 'status',
       align: 'center' as const,
-      width: 70,
+      width: 85,
       filters: [
         {
           text: '运行中',
@@ -269,6 +273,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '操作',
       key: 'action',
       align: 'center' as const,
+      width: 80,
+      fixed: 'right',
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
