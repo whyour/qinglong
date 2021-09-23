@@ -90,16 +90,34 @@ export default class CronService {
     status,
     pid,
     log_path,
+    last_running_time,
+    last_execution_time,
   }: {
     ids: string[];
     status: CrontabStatus;
     pid: number;
     log_path: string;
+    last_running_time: string;
+    last_execution_time: string;
   }) {
-    this.cronDb.update(
-      { _id: { $in: ids } },
-      { $set: { status, pid, log_path } },
-    );
+    return new Promise((resolve) => {
+      this.cronDb.update(
+        { _id: { $in: ids } },
+        {
+          $set: {
+            status,
+            pid,
+            log_path,
+            last_running_time,
+            last_execution_time,
+          },
+        },
+        { multi: true, returnUpdatedDocs: true },
+        (err) => {
+          resolve(null);
+        },
+      );
+    });
   }
 
   public async remove(ids: string[]) {
