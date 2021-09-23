@@ -186,14 +186,19 @@ run_designated() {
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     local begin_timestamp=$(date "+%s" -d "$begin_time")
 
+    local envs=$(eval echo "\$${env_param}")
+    local array=($(echo $envs | sed 's/&/ /g'))
     local tempArr=$(echo $num_param | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
     local runArr=($(eval echo $tempArr))
     runArr=($(awk -v RS=' ' '!a[$1]++' <<< ${runArr[@]}))
+
     local n=0
-    for i in $runArr; do
+    for i in ${runArr[@]}; do
+        echo "$i"
         array_run[n]=${array[$i - 1]}
         let n++
     done
+    
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
@@ -203,8 +208,6 @@ run_designated() {
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
-    local envs=$(eval echo "\$${env_param}")
-    local array=($(echo $envs | sed 's/&/ /g'))
     [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     eval timeout -k 10s $command_timeout_time $which_program $file_param $cmd
