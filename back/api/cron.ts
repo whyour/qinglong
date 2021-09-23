@@ -270,6 +270,8 @@ export default (app: Router) => {
         status: Joi.string().required(),
         pid: Joi.string().optional(),
         log_path: Joi.string().optional(),
+        last_running_time: Joi.string().optional(),
+        last_execution_time: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {

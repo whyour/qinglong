@@ -33,6 +33,7 @@ import { request } from '@/utils/http';
 import CronModal from './modal';
 import CronLogModal from './logModal';
 import cron_parser from 'cron-parser';
+import { diffTime } from '@/utils/date';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -121,6 +122,59 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       sorter: {
         compare: (a: any, b: any) => a.schedule.localeCompare(b.schedule),
         multiple: 1,
+      },
+    },
+    {
+      title: '最后运行时间',
+      align: 'center' as const,
+      sorter: {
+        compare: (a: any, b: any) => {
+          return a.last_execution_time - b.last_execution_time;
+        },
+      },
+      render: (text: string, record: any) => {
+        const language = navigator.language || navigator.languages[0];
+        return (
+          <span
+            style={{
+              textAlign: 'left',
+              display: 'block',
+            }}
+          >
+            {record.last_execution_time
+              ? new Date(record.last_execution_time * 1000).toLocaleString(
+                  language,
+                  {
+                    hour12: false,
+                  },
+                )
+              : '-'}
+          </span>
+        );
+      },
+    },
+    {
+      title: '最后运行时长',
+      align: 'center' as const,
+      sorter: {
+        compare: (a: any, b: any) => {
+          return a.last_running_time - b.last_running_time;
+        },
+      },
+      render: (text: string, record: any) => {
+        const language = navigator.language || navigator.languages[0];
+        return (
+          <span
+            style={{
+              textAlign: 'left',
+              display: 'block',
+            }}
+          >
+            {record.last_running_time
+              ? diffTime(record.last_running_time)
+              : '-'}
+          </span>
+        );
       },
     },
     {
