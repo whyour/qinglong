@@ -641,6 +641,10 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   const handleCrons = (cron: any) => {
     const index = value.findIndex((x) => x._id === cron._id);
     const result = [...value];
+    cron.nextRunTime = cron_parser
+      .parseExpression(cron.schedule)
+      .next()
+      .toDate();
     if (index === -1) {
       result.unshift(cron);
     } else {
@@ -657,6 +661,10 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       .then((data: any) => {
         const index = value.findIndex((x) => x._id === cron._id);
         const result = [...value];
+        data.data.nextRunTime = cron_parser
+          .parseExpression(data.data.schedule)
+          .next()
+          .toDate();
         result.splice(index, 1, {
           ...cron,
           ...data.data,
