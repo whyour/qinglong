@@ -274,7 +274,7 @@ main() {
                 run_concurrent "$1" "$3"
                 ;;
             desi)
-                run_single "$1" "$3" "$4"
+                run_designated "$1" "$3" "$4"
                 ;;
             *)
                 run_else "$@"
