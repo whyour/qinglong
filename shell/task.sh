@@ -167,7 +167,7 @@ run_concurrent() {
 run_designated() {
     local file_param="$1"
     local env_param="$2"
-    local num_param="$3"
+    local num_param=$(echo "$3" | perl -pe "s|.*$2 (.*)|\1|")
     if [[ ! $env_param ]] || [[ ! $num_param ]]; then
         echo -e "\n 缺少单独运行的参数 task xxx.js single Test 1"
         exit 1
@@ -268,7 +268,7 @@ main() {
         1)
             run_normal "$1"
             ;;
-        2 | 3 | 4)
+        *)
             case $2 in
             now)
                 run_normal "$1" "$2"
@@ -277,15 +277,12 @@ main() {
                 run_concurrent "$1" "$3"
                 ;;
             desi)
-                run_designated "$1" "$3" "$4"
+                run_designated "$1" "$3" "$*"
                 ;;
             *)
                 run_else "$@"
                 ;;
             esac
-            ;;
-        *)
-            run_else "$@"
             ;;
         esac
         [[ -f $log_path ]] && cat $log_path
