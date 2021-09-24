@@ -6,11 +6,11 @@ import * as fs from 'fs';
 import _ from 'lodash';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
-import { exec } from 'child_process';
 import DataStore from 'nedb';
 import { AuthDataType, AuthInfo, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
+import { Request } from 'express';
 
 @Service()
 export default class AuthService {

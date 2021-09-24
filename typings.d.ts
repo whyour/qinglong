@@ -8,9 +8,3 @@ declare module '*.svg' {
   const url: string;
   export default url;
 }
-
-declare namespace Express {
-  export interface Request {
-    platform: 'desktop' | 'mobile';
-  }
-}
