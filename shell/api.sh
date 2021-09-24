@@ -153,8 +153,8 @@ update_cron() {
     local status="$2"
     local pid="${3:-''}"
     local logPath="$4"
-    local lastExecutingTime="${5:-''}"
-    local runningTime="${6:-''}"
+    local lastExecutingTime="${5:-0}"
+    local runningTime="${6:-0}"
     local currentTimeStamp=$(date +%s)
     local api=$(
         curl -s --noproxy "*" "http://0.0.0.0:5600/api/crons/status?t=$currentTimeStamp" \
@@ -166,7 +166,7 @@ update_cron() {
             -H "Origin: http://0.0.0.0:5700" \
             -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
-            --data-raw "{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":\"$lastExecutingTime\",\"last_running_time\":\"$runningTime\"}" \
+            --data-raw "{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime}" \
             --compressed
     )
     code=$(echo $api | jq -r .code)

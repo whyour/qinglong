@@ -113,8 +113,8 @@ run_normal() {
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
 run_concurrent() {
-    local first_param=$1
-    local third_param=$3
+    local first_param="$1"
+    local third_param="$2"
     if [[ ! $third_param ]]; then
         echo -e "\n 缺少并发运行的环境变量参数"
         exit 1
