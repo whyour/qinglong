@@ -71,7 +71,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '任务名',
       dataIndex: 'name',
       key: 'name',
-      fixed: 'left',
       width: 150,
       align: 'center' as const,
       render: (text: string, record: any) => (
@@ -95,7 +94,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '任务',
       dataIndex: 'command',
       key: 'command',
-      fixed: 'left',
       width: 250,
       align: 'center' as const,
       render: (text: string, record: any) => {
@@ -274,7 +272,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       key: 'action',
       align: 'center' as const,
       width: 90,
-      fixed: 'right',
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
