@@ -495,6 +495,7 @@ main() {
     resettfa)
         echo -e "## 开始执行... $begin_time\n" >>$log_path
         auth_value=$(cat $file_auth_user | jq '.twoFactorActivated =false' -c)
+        auth_value=$(cat $auth_value | jq '.twoFactorActived =false' -c)
         echo -e "禁用两步验证成功 \n $auth_value" >>$log_path
         echo "$auth_value" >$file_auth_user
         ;;
