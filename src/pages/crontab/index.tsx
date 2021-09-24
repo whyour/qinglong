@@ -273,7 +273,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '操作',
       key: 'action',
       align: 'center' as const,
-      width: 80,
+      width: 90,
       fixed: 'right',
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
