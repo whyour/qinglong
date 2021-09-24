@@ -46,6 +46,12 @@ const columns = [
     align: 'center' as const,
   },
   {
+    title: '登陆设备',
+    dataIndex: 'platform',
+    key: 'platform',
+    align: 'center' as const,
+  },
+  {
     title: '登陆状态',
     dataIndex: 'status',
     key: 'status',

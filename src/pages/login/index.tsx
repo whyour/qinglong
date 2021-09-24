@@ -77,7 +77,14 @@ const Login = () => {
 
   const checkResponse = (data: any) => {
     if (data.code === 200) {
-      const { token, lastip, lastaddr, lastlogon, retries = 0 } = data.data;
+      const {
+        token,
+        lastip,
+        lastaddr,
+        lastlogon,
+        retries = 0,
+        platform,
+      } = data.data;
       localStorage.setItem(config.authKey, token);
       notification.success({
         message: '登录成功！',
@@ -89,6 +96,7 @@ const Login = () => {
             </div>
             <div>上次登录地点：{lastaddr || '-'}</div>
             <div>上次登录IP：{lastip || '-'}</div>
+            <div>上次登录设备：{platform || '-'}</div>
             <div>上次登录状态：{retries > 0 ? `失败${retries}次` : '成功'}</div>
           </>
         ),

@@ -50,6 +50,7 @@ export default class AuthService {
         twoFactorActivated,
         twoFactorActived,
         tokens = {},
+        platform,
       } = content;
       // patch old field
       twoFactorActivated = twoFactorActivated || twoFactorActived;
@@ -103,22 +104,29 @@ export default class AuthService {
           retries: 0,
           lastip: ip,
           lastaddr: address,
+          platform: req.platform,
           isTwoFactorChecking: false,
         });
         await this.notificationService.notify(
           '登陆通知',
-          `你于${new Date(
-            timestamp,
-          ).toLocaleString()}在 ${address} 登陆成功，ip地址 ${ip}`,
+          `你于${new Date(timestamp).toLocaleString()}在 ${address} ${
+            req.platform
+          }端 登陆成功，ip地址 ${ip}`,
         );
         await this.getLoginLog();
         await this.insertDb({
           type: AuthDataType.loginLog,
-          info: { timestamp, address, ip, status: LoginStatus.success },
+          info: {
+            timestamp,
+            address,
+            ip,
+            platform: req.platform,
+            status: LoginStatus.success,
+          },
         });
         return {
           code: 200,
-          data: { token, lastip, lastaddr, lastlogon, retries },
+          data: { token, lastip, lastaddr, lastlogon, retries, platform },
         };
       } else {
         this.updateAuthInfo(content, {
@@ -126,17 +134,24 @@ export default class AuthService {
           lastlogon: timestamp,
           lastip: ip,
           lastaddr: address,
+          platform: req.platform,
         });
         await this.notificationService.notify(
           '登陆通知',
-          `你于${new Date(
-            timestamp,
-          ).toLocaleString()}在 ${address} 登陆失败，ip地址 ${ip}`,
+          `你于${new Date(timestamp).toLocaleString()}在 ${address} ${
+            req.platform
+          }端 登陆失败，ip地址 ${ip}`,
         );
         await this.getLoginLog();
         await this.insertDb({
           type: AuthDataType.loginLog,
-          info: { timestamp, address, ip, status: LoginStatus.fail },
+          info: {
+            timestamp,
+            address,
+            ip,
+            platform: req.platform,
+            status: LoginStatus.fail,
+          },
         });
         return { code: 400, message: config.authError };
       }
@@ -243,6 +258,7 @@ export default class AuthService {
       this.updateAuthInfo(authInfo, {
         lastip: ip,
         lastaddr: address,
+        platform: req.platform,
       });
       return { code: 430, message: '验证失败' };
     }
