@@ -90,15 +90,15 @@ export default class CronService {
     status,
     pid,
     log_path,
-    last_running_time,
-    last_execution_time,
+    last_running_time = 0,
+    last_execution_time = 0,
   }: {
     ids: string[];
     status: CrontabStatus;
     pid: number;
     log_path: string;
-    last_running_time: string;
-    last_execution_time: string;
+    last_running_time: number;
+    last_execution_time: number;
   }) {
     return new Promise((resolve) => {
       this.cronDb.update(
