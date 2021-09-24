@@ -117,7 +117,9 @@ export function createRandomString(min: number, max: number): string {
 export function getToken(req: any) {
   const { authorization } = req.headers;
   if (authorization && authorization.split(' ')[0] === 'Bearer') {
-    return authorization.split(' ')[1];
+    return (authorization.split(' ')[1] as string)
+      .replace('mobile-', '')
+      .replace('desktop-', '');
   }
   return '';
 }
@@ -183,4 +185,37 @@ export async function getNetIp(req: any) {
   } catch (error) {
     return { address: `获取失败`, ip };
   }
+}
+
+export function getPlatform(userAgent: string): 'mobile' | 'desktop' {
+  const ua = userAgent.toLowerCase();
+  const testUa = (regexp: RegExp) => regexp.test(ua);
+  const testVs = (regexp: RegExp) =>
+    (ua.match(regexp) || [])
+      .toString()
+      .replace(/[^0-9|_.]/g, '')
+      .replace(/_/g, '.');
+
+  // 系统
+  let system = 'unknow';
+  if (testUa(/windows|win32|win64|wow32|wow64/g)) {
+    system = 'windows'; // windows系统
+  } else if (testUa(/macintosh|macintel/g)) {
+    system = 'macos'; // macos系统
+  } else if (testUa(/x11/g)) {
+    system = 'linux'; // linux系统
+  } else if (testUa(/android|adr/g)) {
+    system = 'android'; // android系统
+  } else if (testUa(/ios|iphone|ipad|ipod|iwatch/g)) {
+    system = 'ios'; // ios系统
+  }
+
+  let platform = 'desktop';
+  if (system === 'windows' || system === 'macos' || system === 'linux') {
+    platform = 'desktop';
+  } else if (system === 'android' || system === 'ios' || testUa(/mobile/g)) {
+    platform = 'mobile';
+  }
+
+  return platform as 'mobile' | 'desktop';
 }

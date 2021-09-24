@@ -5,7 +5,7 @@ import routes from '../api';
 import config from '../config';
 import jwt from 'express-jwt';
 import fs from 'fs';
-import { getToken } from '../config/util';
+import { getPlatform, getToken } from '../config/util';
 import Container from 'typedi';
 import OpenService from '../services/open';
 import rewrite from 'express-urlrewrite';
@@ -17,7 +17,10 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
   app.use(
-    jwt({ secret: config.secret as string, algorithms: ['HS384'] }).unless({
+    jwt({
+      secret: config.secret as string,
+      algorithms: ['HS384'],
+    }).unless({
       path: [
         '/api/login',
         '/api/crons/status',
@@ -26,6 +29,16 @@ export default ({ app }: { app: Application }) => {
       ],
     }),
   );
+
+  app.use((req: Request, res, next) => {
+    if (!req.headers) {
+      req.platform = 'desktop';
+    } else {
+      const platform = getPlatform(req.headers['user-agent'] || '');
+      req.platform = platform;
+    }
+    return next();
+  });
 
   app.use(async (req, res, next) => {
     const headerToken = getToken(req);
@@ -66,8 +79,12 @@ export default ({ app }: { app: Application }) => {
 
     const data = fs.readFileSync(config.authConfigFile, 'utf8');
     if (data) {
-      const { token } = JSON.parse(data);
-      if (token && headerToken === token) {
+      const { token = '', tokens = {} } = JSON.parse(data);
+      console.log(tokens);
+      console.log(req.platform);
+      console.log(tokens[req.platform]);
+      if (headerToken === token || tokens[req.platform] === headerToken) {
+        console.log('yes');
         return next();
       }
     }
