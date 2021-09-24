@@ -153,8 +153,8 @@ update_cron() {
     local status="$2"
     local pid="${3:-''}"
     local logPath="$4"
-    local lastExecutingTime="$5"
-    local runningTime="$6"
+    local lastExecutingTime="${5:-''}"
+    local runningTime="${6:-''}"
     local currentTimeStamp=$(date +%s)
     local api=$(
         curl -s --noproxy "*" "http://0.0.0.0:5600/api/crons/status?t=$currentTimeStamp" \
