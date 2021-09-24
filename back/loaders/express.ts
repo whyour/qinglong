@@ -80,11 +80,7 @@ export default ({ app }: { app: Application }) => {
     const data = fs.readFileSync(config.authConfigFile, 'utf8');
     if (data) {
       const { token = '', tokens = {} } = JSON.parse(data);
-      console.log(tokens);
-      console.log(req.platform);
-      console.log(tokens[req.platform]);
       if (headerToken === token || tokens[req.platform] === headerToken) {
-        console.log('yes');
         return next();
       }
     }
