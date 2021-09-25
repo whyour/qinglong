@@ -839,7 +839,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         dataSource={value}
         rowKey="_id"
         size="middle"
-        scroll={{ x: 768 }}
+        scroll={{ x: 1000 }}
         loading={loading}
         rowSelection={rowSelection}
         rowClassName={getRowClassName}
