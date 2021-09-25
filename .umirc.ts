@@ -7,9 +7,9 @@ export default defineConfig({
   nodeModulesTransform: {
     type: 'none',
   },
-  // antd: {
-  //   dark: true
-  // },
+  dynamicImport: {
+    loading: '@/components/pageLoading',
+  },
   fastRefresh: {},
   favicon: '/images/g5.ico',
   proxy: {
