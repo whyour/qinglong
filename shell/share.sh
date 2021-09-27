@@ -205,7 +205,7 @@ fix_config() {
 
     if [ -s /etc/nginx/conf.d/default.conf ]; then
         echo -e "检测到默认nginx配置文件，清空...\n"
-        echo '' > /etc/nginx/conf.d/default.conf
+        cat /dev/null > /etc/nginx/conf.d/default.conf
         echo
     fi
 }
@@ -322,5 +322,4 @@ detect_macos
 define_cmd
 fix_config
 
-echo '' > $task_error_log_path
-import_config $1 >> $task_error_log_path 2>&1
+import_config $1 > $task_error_log_path 2>&1
