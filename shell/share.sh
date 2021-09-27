@@ -320,6 +320,7 @@ init_env
 detect_termux
 detect_macos
 define_cmd
+fix_config
 
 echo '' > $task_error_log_path
 import_config $1 >> $task_error_log_path 2>&1

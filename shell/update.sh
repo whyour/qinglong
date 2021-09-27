@@ -434,6 +434,7 @@ main() {
     local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     local log_path="$dir_log/update/${log_time}_$p1.log"
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
+
     case $p1 in
     update)
         echo -e "## 开始执行... $begin_time\n" >>$log_path
