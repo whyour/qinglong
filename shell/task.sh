@@ -169,7 +169,7 @@ run_designated() {
     local env_param="$2"
     local num_param=$(echo "$3" | perl -pe "s|.*$2 (.*)|\1|")
     if [[ ! $env_param ]] || [[ ! $num_param ]]; then
-        echo -e "\n 缺少单独运行的参数 task xxx.js single Test 1"
+        echo -e "\n 缺少单独运行的参数 task xxx.js desi Test 1 3"
         exit 1
     fi
 

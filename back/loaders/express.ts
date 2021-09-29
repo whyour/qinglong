@@ -45,11 +45,10 @@ export default ({ app }: { app: Application }) => {
     if (req.path.startsWith('/open/')) {
       const openService = Container.get(OpenService);
       const doc = await openService.findTokenByValue(headerToken);
-      if (doc && doc.tokens.length > 0) {
+      if (doc && doc.tokens && doc.tokens.length > 0) {
         const currentToken = doc.tokens.find((x) => x.value === headerToken);
-        const key =
-          req.path.match(/\/open\/([a-z]+)\/*/) &&
-          req.path.match(/\/open\/([a-z]+)\/*/)[1];
+        const keyMatch = req.path.match(/\/open\/([a-z]+)\/*/);
+        const key = keyMatch && keyMatch[1];
         if (
           doc.scopes.includes(key as any) &&
           currentToken &&
