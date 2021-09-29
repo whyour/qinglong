@@ -1,5 +1,5 @@
 import React, { PureComponent, useRef, useState, useEffect } from 'react';
-import { Button, message, Modal } from 'antd';
+import { Button, message, Select, Form, Row, Col } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
@@ -7,46 +7,72 @@ import './index.less';
 import { DiffEditor } from '@monaco-editor/react';
 import ReactDiffViewer from 'react-diff-viewer';
 
+const { Option } = Select;
+
 const Diff = ({ headerStyle, isPhone, theme }: any) => {
-  const [value, setValue] = useState('');
-  const [sample, setSample] = useState('');
+  const [origin, setOrigin] = useState('config.sample.sh');
+  const [current, setCurrent] = useState('config.sh');
+  const [originValue, setOriginValue] = useState('');
+  const [currentValue, setCurrentValue] = useState('');
   const [loading, setLoading] = useState(true);
+  const [files, setFiles] = useState<any[]>([]);
   const editorRef = useRef<any>(null);
 
   const getConfig = () => {
-    request.get(`${config.apiPrefix}configs/config.sh`).then((data) => {
-      setValue(data.data);
+    request.get(`${config.apiPrefix}configs/${current}`).then((data) => {
+      setCurrentValue(data.data);
     });
   };
 
   const getSample = () => {
-    setLoading(true);
-    request
-      .get(`${config.apiPrefix}configs/config.sample.sh`)
-      .then((data) => {
-        setSample(data.data);
-      })
-      .finally(() => setLoading(false));
+    request.get(`${config.apiPrefix}configs/${origin}`).then((data) => {
+      setOriginValue(data.data);
+    });
   };
 
   const updateConfig = () => {
     const content = editorRef.current
       ? editorRef.current.getModel().modified.getValue().replace(/\r\n/g, '\n')
-      : value;
+      : currentValue;
 
     request
       .post(`${config.apiPrefix}configs/save`, {
-        data: { content, name: 'config.sh' },
+        data: { content, name: current },
       })
       .then((data: any) => {
         message.success(data.message);
       });
   };
 
+  const getFiles = () => {
+    setLoading(true);
+    request
+      .get(`${config.apiPrefix}configs/files`)
+      .then((data: any) => {
+        setFiles(data.data);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const originFileChange = (value: string) => {
+    setOrigin(value);
+  };
+
+  const currentFileChange = (value: string) => {
+    setCurrent(value);
+  };
+
+  useEffect(() => {
+    getFiles();
+  }, []);
+
+  useEffect(() => {
+    getSample();
+  }, [origin]);
+
   useEffect(() => {
     getConfig();
-    getSample();
-  }, []);
+  }, [current]);
 
   return (
     <PageContainer
@@ -64,6 +90,26 @@ const Diff = ({ headerStyle, isPhone, theme }: any) => {
         ]
       }
     >
+      <Row gutter={24} className="diff-switch-file">
+        <Col span={12}>
+          <Form.Item label="源文件">
+            <Select value={origin} onChange={originFileChange}>
+              {files.map((x) => (
+                <Option value={x.value}>{x.title}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item label="当前文件">
+            <Select value={current} onChange={currentFileChange}>
+              {files.map((x) => (
+                <Option value={x.value}>{x.title}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Col>
+      </Row>
       {isPhone ? (
         <ReactDiffViewer
           styles={{
@@ -83,8 +129,8 @@ const Diff = ({ headerStyle, isPhone, theme }: any) => {
               wordBreak: 'break-word',
             },
           }}
-          oldValue={value}
-          newValue={sample}
+          oldValue={originValue}
+          newValue={currentValue}
           splitView={true}
           leftTitle="config.sh"
           rightTitle="config.sample.sh"
@@ -93,8 +139,8 @@ const Diff = ({ headerStyle, isPhone, theme }: any) => {
       ) : (
         <DiffEditor
           language={'shell'}
-          original={sample}
-          modified={value}
+          original={originValue}
+          modified={currentValue}
           options={{
             fontSize: 12,
             lineNumbersMinChars: 3,
