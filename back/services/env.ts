@@ -16,11 +16,15 @@ export default class EnvService {
     });
   }
 
+  public getDb(): DataStore {
+    return this.envDb;
+  }
+
   public async create(payloads: Env[]): Promise<Env[]> {
     const envs = await this.envs();
     let position = initEnvPosition;
     if (envs && envs.length > 0 && envs[envs.length - 1].position) {
-      position = envs[envs.length - 1].position;
+      position = envs[envs.length - 1].position as number;
     }
     const tabs = payloads.map((x) => {
       position = position / 2;
