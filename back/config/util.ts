@@ -115,9 +115,10 @@ export function createRandomString(min: number, max: number): string {
 }
 
 export function getToken(req: any) {
-  const { authorization } = req.headers;
+  const { authorization = '' } = req.headers;
   if (authorization && authorization.split(' ')[0] === 'Bearer') {
-    return (authorization.split(' ')[1] as string)
+    return (authorization as string)
+      .replace('Bearer ', '')
       .replace('mobile-', '')
       .replace('desktop-', '');
   }
