@@ -308,6 +308,8 @@ patch_version() {
     if ! type ts-node >/dev/null 2>&1; then
         pnpm i -g ts-node typescript tslib
     fi
+
+    git config --global pull.rebase false
 }
 
 reload_pm2() {
