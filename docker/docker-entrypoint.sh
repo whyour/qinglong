@@ -6,7 +6,8 @@ dir_shell=/ql/shell
 link_shell
 echo -e "======================1. 检测配置文件========================\n"
 fix_config
-cp -fv $dir_root/docker/front.conf /etc/nginx/conf.d/front.conf
+cp -fv $nginx_conf /etc/nginx/nginx.conf
+cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
 pm2 l >/dev/null 2>&1
 echo
 
