@@ -105,20 +105,8 @@ check_pm2() {
   fi
 }
 
-init_git() {
-  local dir_current=$(pwd)
-
-  cd $dir_root
-  git config --global user.email "qinglong@@users.noreply.github.com"
-  git config --global user.name "qinglong"
-  git config --global pull.rebase true
-
-  cd $dir_current
-}
-
 main() {
   echo -e "=====> 开始检测"
-  init_git
   copy_dep
   check_ql
   check_nginx
