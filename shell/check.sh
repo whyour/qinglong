@@ -3,7 +3,6 @@
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
-get_token
 
 reset_env() {
   echo -e "---> 1. 开始检测配置文件\n"
