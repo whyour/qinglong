@@ -17,7 +17,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
 
   const handleOk = (values: any) => {
     request
-      .post(`${config.apiPrefix}user`, {
+      .put(`${config.apiPrefix}user`, {
         data: {
           username: values.username,
           password: values.password,

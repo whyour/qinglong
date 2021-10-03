@@ -34,6 +34,7 @@
   width: 48px;
   display: block;
   margin-bottom: 24px;
+  margin-top: 20px;
 }
 
 .title {
@@ -53,45 +54,16 @@
   border-radius: 6px;
   background-color: #f6f8fa;
   border: 1px solid #ebedef;
-  width: 340px;
-
-  @media screen and (max-width: @screen-sm) {
-    width: 95%;
-    max-width: 320px;
+  display: flex;
+  width: 500px;
+  height: 500px;
+  .ant-steps {
+    width: 150px;
   }
-
-  :global {
-    .@{ant-prefix}-tabs-nav-list {
-      margin: auto;
-      font-size: 16px;
-    }
-  }
-
-  .icon {
-    margin-left: 16px;
-    color: rgba(0, 0, 0, 0.2);
-    font-size: 24px;
-    vertical-align: middle;
-    cursor: pointer;
-    transition: color 0.3s;
-
-    &:hover {
-      color: @primary-color;
-    }
-  }
-
-  .other {
-    margin-top: 24px;
-    line-height: 22px;
-    text-align: left;
-    .register {
-      float: right;
-    }
-  }
-
-  .prefixIcon {
-    color: @primary-color;
-    font-size: @font-size-base;
+  .steps-container {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 20px;
   }
 }
 

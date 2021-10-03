@@ -13,7 +13,7 @@ import NotificationService from './notify';
 import { Request } from 'express';
 
 @Service()
-export default class AuthService {
+export default class UserService {
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
   private authDb = new DataStore({ filename: config.authDbFile });
@@ -160,6 +160,14 @@ export default class AuthService {
     }
   }
 
+  public async logout(platform: string): Promise<any> {
+    const authInfo = this.getAuthInfo();
+    this.updateAuthInfo(authInfo, {
+      token: '',
+      tokens: { ...authInfo.tokens, [platform]: '' },
+    });
+  }
+
   public async getLoginLog(): Promise<AuthInfo[]> {
     return new Promise((resolve) => {
       this.authDb.find({ type: AuthDataType.loginLog }).exec((err, docs) => {
@@ -203,6 +211,18 @@ export default class AuthService {
       code: 100,
       message: '已初始化密码，请前往auth.json查看并重新登录',
     };
+  }
+
+  public async updateUsernameAndPassword({
+    username,
+    password,
+  }: {
+    username: string;
+    password: string;
+  }) {
+    const authInfo = this.getAuthInfo();
+    this.updateAuthInfo(authInfo, { username, password });
+    return { code: 200, message: '更新成功' };
   }
 
   public getUserInfo(): Promise<any> {

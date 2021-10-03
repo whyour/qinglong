@@ -174,4 +174,15 @@ export default {
       { label: 'emailPass', tip: '邮箱SMTP授权码', required: true },
     ],
   },
+  documentTitleMap: {
+    '/login': '登录',
+    '/initialization': '初始化',
+    '/cron': '定时任务',
+    '/env': '环境变量',
+    '/config': '配置文件',
+    '/script': '脚本管理',
+    '/diff': '对比工具',
+    '/log': '任务日志',
+    '/setting': '系统设置',
+  },
 };

@@ -9,6 +9,7 @@ import { getPlatform, getToken } from '../config/util';
 import Container from 'typedi';
 import OpenService from '../services/open';
 import rewrite from 'express-urlrewrite';
+import UserService from '../services/user';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -21,12 +22,7 @@ export default ({ app }: { app: Application }) => {
       secret: config.secret as string,
       algorithms: ['HS384'],
     }).unless({
-      path: [
-        '/api/login',
-        '/api/crons/status',
-        /^\/open\//,
-        '/api/user/two-factor/login',
-      ],
+      path: [...config.apiWhiteList, /^\/open\//],
     }),
   );
 
@@ -62,9 +58,8 @@ export default ({ app }: { app: Application }) => {
     if (
       !headerToken &&
       req.path &&
-      (req.path === '/api/login' ||
-        req.path === '/open/auth/token' ||
-        req.path === '/api/user/two-factor/login')
+      config.apiWhiteList.includes(req.path) &&
+      req.path !== '/api/crons/status'
     ) {
       return next();
     }
@@ -87,6 +82,29 @@ export default ({ app }: { app: Application }) => {
     const err: any = new Error('UnauthorizedError');
     err.status = 401;
     next(err);
+  });
+
+  app.use(async (req, res, next) => {
+    if (!['/api/init/user', '/api/init/notification'].includes(req.path)) {
+      return next();
+    }
+    const userService = Container.get(UserService);
+    const authInfo = await userService.getUserInfo();
+    let isInitialized = true;
+    if (
+      !authInfo ||
+      (Object.keys(authInfo).length === 2 &&
+        authInfo.username === 'admin' &&
+        authInfo.password === 'admin')
+    ) {
+      isInitialized = false;
+    }
+
+    if (isInitialized) {
+      return res.send({ code: 450, message: '未知错误' });
+    } else {
+      return next();
+    }
   });
 
   app.use(rewrite('/open/*', '/api/$1'));

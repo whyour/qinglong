@@ -76,4 +76,12 @@ export default {
   ],
   writePathList: [configPath, scriptPath],
   bakPath,
+  apiWhiteList: [
+    '/api/login',
+    '/open/auth/token',
+    '/api/user/two-factor/login',
+    '/api/system',
+    '/api/init/user',
+    '/api/init/notification',
+  ],
 };
