@@ -5,18 +5,19 @@ import {
   Input,
   Form,
   message,
-  notification,
+  Typography,
   Steps,
   Select,
 } from 'antd';
 import config from '@/utils/config';
-import { history, Link } from 'umi';
+import { history } from 'umi';
 import styles from './index.less';
 import { request } from '@/utils/http';
 
 const FormItem = Form.Item;
 const { Step } = Steps;
 const { Option } = Select;
+const { Link } = Typography;
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -192,8 +193,14 @@ const Login = () => {
         <div className={styles.top} style={{ marginTop: 120 }}>
           <div className={styles.header}>
             <span className={styles.title}>恭喜安装完成！</span>
+            <Link href="https://github.com/whyour/qinglong" target="_blank">
+              Github
+            </Link>
+            <Link href="https://t.me/jiao_long" target="_blank">
+              Telegram频道
+            </Link>
           </div>
-          <div className={styles.action}>
+          <div style={{ marginTop: 16 }}>
             <Button
               type="primary"
               onClick={() => {

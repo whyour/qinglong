@@ -5,7 +5,7 @@ import routes from '../api';
 import config from '../config';
 import jwt from 'express-jwt';
 import fs from 'fs';
-import { getPlatform, getToken } from '../config/util';
+import { getFileContentByName, getPlatform, getToken } from '../config/util';
 import Container from 'typedi';
 import OpenService from '../services/open';
 import rewrite from 'express-urlrewrite';
@@ -90,12 +90,14 @@ export default ({ app }: { app: Application }) => {
     }
     const userService = Container.get(UserService);
     const authInfo = await userService.getUserInfo();
+    const envDbContent = getFileContentByName(config.envDbFile);
+
     let isInitialized = true;
     if (
-      !authInfo ||
-      (Object.keys(authInfo).length === 2 &&
-        authInfo.username === 'admin' &&
-        authInfo.password === 'admin')
+      Object.keys(authInfo).length === 2 &&
+      authInfo.username === 'admin' &&
+      authInfo.password === 'admin' &&
+      envDbContent.length === 0
     ) {
       isInitialized = false;
     }
