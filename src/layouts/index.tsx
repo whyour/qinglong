@@ -22,11 +22,28 @@ export default function (props: any) {
   const theme = useTheme();
   const [user, setUser] = useState<any>();
   const [loading, setLoading] = useState<boolean>(true);
+  const [systemInfo, setSystemInfo] = useState<{ isInitialized: boolean }>();
 
   const logout = () => {
     request.post(`${config.apiPrefix}logout`).then(() => {
       localStorage.removeItem(config.authKey);
       history.push('/login');
+    });
+  };
+
+  const getSystemInfo = () => {
+    request.get(`${config.apiPrefix}system`).then(({ code, data }) => {
+      if (code === 200) {
+        setSystemInfo(data);
+        if (!data.isInitialized) {
+          history.push('/initialization');
+          setLoading(false);
+        } else {
+          getUser();
+        }
+      } else {
+        message.error(data);
+      }
     });
   };
 
@@ -63,18 +80,20 @@ export default function (props: any) {
   };
 
   useEffect(() => {
-    const isAuth = localStorage.getItem(config.authKey);
-    if (!isAuth) {
-      history.push('/login');
-    }
     vhCheck();
   }, []);
 
   useEffect(() => {
-    if (!user) {
+    if (systemInfo && systemInfo.isInitialized && !user) {
       getUser();
     }
   }, [props.location.pathname]);
+
+  useEffect(() => {
+    if (!systemInfo) {
+      getSystemInfo();
+    }
+  }, [systemInfo]);
 
   useEffect(() => {
     setTheme();
@@ -92,8 +111,13 @@ export default function (props: any) {
     }
   }, []);
 
-  if (props.location.pathname === '/login') {
-    return props.children;
+  if (['/login', '/initialization'].includes(props.location.pathname)) {
+    document.title = `${
+      (config.documentTitleMap as any)[props.location.pathname]
+    } - 控制面板`;
+    if (systemInfo) {
+      return props.children;
+    }
   }
 
   const isFirefox = navigator.userAgent.includes('Firefox');
@@ -148,7 +172,7 @@ export default function (props: any) {
         ];
       }}
       pageTitleRender={(props, pageName, info) => {
-        if (info) {
+        if (info && typeof info.pageName === 'string') {
           return `${info.pageName} - 控制面板`;
         }
         return '控制面板';

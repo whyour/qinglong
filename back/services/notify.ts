@@ -1,7 +1,7 @@
 import { NotificationInfo } from '../data/notify';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import AuthService from './auth';
+import UserService from './user';
 import got from 'got';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
@@ -9,8 +9,8 @@ import { HttpProxyAgent, HttpsProxyAgent } from 'hpagent';
 
 @Service()
 export default class NotificationService {
-  @Inject((type) => AuthService)
-  private authService!: AuthService;
+  @Inject((type) => UserService)
+  private userService!: UserService;
 
   private modeMap = new Map([
     ['goCqHttpBot', this.goCqHttpBot],
@@ -32,8 +32,11 @@ export default class NotificationService {
 
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  public async notify(title: string, content: string) {
-    const { type, ...rest } = await this.authService.getNotificationMode();
+  public async notify(
+    title: string,
+    content: string,
+  ): Promise<boolean | undefined> {
+    const { type, ...rest } = await this.userService.getNotificationMode();
     if (type) {
       this.title = title;
       this.content = content;
@@ -42,9 +45,10 @@ export default class NotificationService {
       try {
         return await notificationModeAction?.call(this);
       } catch (error: any) {
-        return error.message;
+        return false;
       }
     }
+    return false;
   }
 
   public async testNotify(

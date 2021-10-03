@@ -1,0 +1,237 @@
+import React, { Fragment, useEffect, useState } from 'react';
+import {
+  Button,
+  Row,
+  Input,
+  Form,
+  message,
+  notification,
+  Steps,
+  Select,
+} from 'antd';
+import config from '@/utils/config';
+import { history, Link } from 'umi';
+import styles from './index.less';
+import { request } from '@/utils/http';
+
+const FormItem = Form.Item;
+const { Step } = Steps;
+const { Option } = Select;
+
+const Login = () => {
+  const [loading, setLoading] = useState(false);
+  const [current, setCurrent] = React.useState(0);
+  const [fields, setFields] = useState<any[]>([]);
+
+  const next = () => {
+    setCurrent(current + 1);
+  };
+
+  const prev = () => {
+    setCurrent(current - 1);
+  };
+
+  const submitAccountSetting = (values: any) => {
+    setLoading(true);
+    request
+      .put(`${config.apiPrefix}init/user`, {
+        data: {
+          username: values.username,
+          password: values.password,
+        },
+      })
+      .then((data) => {
+        if (data.code === 200) {
+          next();
+        } else {
+          message.error(data.message);
+        }
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const submitNotification = (values: any) => {
+    request
+      .put(`${config.apiPrefix}init/notification`, {
+        data: {
+          ...values,
+        },
+      })
+      .then((_data: any) => {
+        if (_data && _data.code === 200) {
+          next();
+        } else {
+          message.error(_data.data);
+        }
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const notificationModeChange = (value: string) => {
+    const _fields = (config.notificationModeMap as any)[value];
+    setFields(_fields || []);
+  };
+
+  const steps = [
+    {
+      title: '欢迎使用',
+      content: (
+        <div className={styles.top} style={{ marginTop: 120 }}>
+          <div className={styles.header}>
+            <span className={styles.title}>欢迎使用青龙控制面板</span>
+          </div>
+          <div className={styles.action}>
+            <Button
+              type="primary"
+              onClick={() => {
+                next();
+              }}
+            >
+              开始安装
+            </Button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: '账户设置',
+      content: (
+        <Form onFinish={submitAccountSetting} layout="vertical">
+          <Form.Item
+            label="用户名"
+            name="username"
+            rules={[{ required: true }]}
+            style={{ maxWidth: 350 }}
+          >
+            <Input placeholder="用户名" />
+          </Form.Item>
+          <Form.Item
+            label="密码"
+            name="password"
+            rules={[{ required: true }]}
+            hasFeedback
+            style={{ maxWidth: 350 }}
+          >
+            <Input type="password" placeholder="密码" />
+          </Form.Item>
+          <Form.Item
+            name="confirm"
+            label="确认密码"
+            dependencies={['password']}
+            hasFeedback
+            style={{ maxWidth: 350 }}
+            rules={[
+              {
+                required: true,
+              },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('您输入的两个密码不匹配！'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="确认密码" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={loading}>
+            提交
+          </Button>
+        </Form>
+      ),
+    },
+    {
+      title: '通知设置',
+      content: (
+        <Form onFinish={submitNotification} layout="vertical">
+          <Form.Item
+            label="通知方式"
+            name="type"
+            rules={[{ required: true, message: '请选择通知方式' }]}
+            style={{ maxWidth: 350 }}
+          >
+            <Select
+              onChange={notificationModeChange}
+              placeholder="请选择通知方式"
+            >
+              {config.notificationModes
+                .filter((x) => x.value !== 'closed')
+                .map((x) => (
+                  <Option value={x.value}>{x.label}</Option>
+                ))}
+            </Select>
+          </Form.Item>
+          {fields.map((x) => (
+            <Form.Item
+              label={x.label}
+              name={x.label}
+              extra={x.tip}
+              rules={[{ required: x.required }]}
+              style={{ maxWidth: 400 }}
+            >
+              <Input.TextArea
+                autoSize={true}
+                placeholder={`请输入${x.label}`}
+              />
+            </Form.Item>
+          ))}
+          <Button type="primary" htmlType="submit" loading={loading}>
+            保存
+          </Button>
+          <Button type="link" htmlType="button" onClick={() => next()}>
+            跳过
+          </Button>
+        </Form>
+      ),
+    },
+    {
+      title: '完成安装',
+      content: (
+        <div className={styles.top} style={{ marginTop: 120 }}>
+          <div className={styles.header}>
+            <span className={styles.title}>恭喜安装完成！</span>
+          </div>
+          <div className={styles.action}>
+            <Button
+              type="primary"
+              onClick={() => {
+                history.push('/login');
+              }}
+            >
+              去登录
+            </Button>
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.top}>
+        <div className={styles.header}>
+          <img alt="logo" className={styles.logo} src="/images/qinglong.png" />
+          <span className={styles.title}>初始化配置</span>
+        </div>
+      </div>
+      <div className={styles.main}>
+        <Steps
+          current={current}
+          direction="vertical"
+          className={styles['ant-steps']}
+        >
+          {steps.map((item) => (
+            <Step key={item.title} title={item.title} />
+          ))}
+        </Steps>
+        <div className={styles['steps-container']}>
+          {steps[current].content}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;

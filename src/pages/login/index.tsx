@@ -122,97 +122,89 @@ const Login = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.content}>
-        <div className={styles.top}>
-          <div className={styles.header}>
-            <img
-              alt="logo"
-              className={styles.logo}
-              src="/images/qinglong.png"
-            />
-            <span className={styles.title}>
-              {twoFactor ? '两步验证' : config.siteName}
-            </span>
+      <div className={styles.top}>
+        <div className={styles.header}>
+          <img alt="logo" className={styles.logo} src="/images/qinglong.png" />
+          <span className={styles.title}>
+            {twoFactor ? '两步验证' : config.siteName}
+          </span>
+        </div>
+      </div>
+      <div className={styles.main}>
+        {twoFactor ? (
+          <Form layout="vertical" onFinish={completeTowFactor}>
+            <FormItem
+              name="code"
+              label="验证码"
+              rules={[
+                {
+                  pattern: /^[0-9]{6}$/,
+                  message: '验证码为6位数字',
+                  validateTrigger: 'onBlur',
+                },
+              ]}
+              hasFeedback
+            >
+              <Input placeholder="6位数字" autoComplete="off" />
+            </FormItem>
+            <Button
+              type="primary"
+              htmlType="submit"
+              style={{ width: '100%' }}
+              loading={verifing}
+            >
+              验证
+            </Button>
+          </Form>
+        ) : (
+          <Form layout="vertical" onFinish={handleOk}>
+            <FormItem name="username" label="用户名" hasFeedback>
+              <Input placeholder="用户名" autoFocus />
+            </FormItem>
+            <FormItem name="password" label="密码" hasFeedback>
+              <Input type="password" placeholder="密码" />
+            </FormItem>
+            <Row>
+              {waitTime ? (
+                <Button type="primary" style={{ width: '100%' }} disabled>
+                  请
+                  <Countdown
+                    valueStyle={{
+                      color:
+                        theme === 'vs'
+                          ? 'rgba(0,0,0,.25)'
+                          : 'rgba(232, 230, 227, 0.25)',
+                    }}
+                    className="inline-countdown"
+                    onFinish={() => setWaitTime(null)}
+                    format="ss"
+                    value={Date.now() + 1000 * waitTime}
+                  />
+                  秒后重试
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  style={{ width: '100%' }}
+                  loading={loading}
+                >
+                  登录
+                </Button>
+              )}
+            </Row>
+          </Form>
+        )}
+      </div>
+      <div className={styles.extra}>
+        {twoFactor ? (
+          <div style={{ paddingLeft: 20, position: 'relative' }}>
+            <MobileOutlined style={{ position: 'absolute', left: 0, top: 4 }} />
+            在您的设备上打开两步验证应用程序以查看您的身份验证代码并验证您的身份。
           </div>
-        </div>
-        <div className={styles.main}>
-          {twoFactor ? (
-            <Form layout="vertical" onFinish={completeTowFactor}>
-              <FormItem
-                name="code"
-                label="验证码"
-                rules={[
-                  {
-                    pattern: /^[0-9]{6}$/,
-                    message: '验证码为6位数字',
-                    validateTrigger: 'onBlur',
-                  },
-                ]}
-                hasFeedback
-              >
-                <Input placeholder="6位数字" autoComplete="off" />
-              </FormItem>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{ width: '100%' }}
-                loading={verifing}
-              >
-                验证
-              </Button>
-            </Form>
-          ) : (
-            <Form layout="vertical" onFinish={handleOk}>
-              <FormItem name="username" label="用户名" hasFeedback>
-                <Input placeholder="用户名" autoFocus />
-              </FormItem>
-              <FormItem name="password" label="密码" hasFeedback>
-                <Input type="password" placeholder="密码" />
-              </FormItem>
-              <Row>
-                {waitTime ? (
-                  <Button type="primary" style={{ width: '100%' }} disabled>
-                    请
-                    <Countdown
-                      valueStyle={{
-                        color:
-                          theme === 'vs'
-                            ? 'rgba(0,0,0,.25)'
-                            : 'rgba(232, 230, 227, 0.25)',
-                      }}
-                      className="inline-countdown"
-                      onFinish={() => setWaitTime(null)}
-                      format="ss"
-                      value={Date.now() + 1000 * waitTime}
-                    />
-                    秒后重试
-                  </Button>
-                ) : (
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    style={{ width: '100%' }}
-                    loading={loading}
-                  >
-                    登录
-                  </Button>
-                )}
-              </Row>
-            </Form>
-          )}
-        </div>
-        <div className={styles.extra}>
-          {twoFactor ? (
-            <div style={{ paddingLeft: 20, position: 'relative' }}>
-              <MobileOutlined
-                style={{ position: 'absolute', left: 0, top: 4 }}
-              />
-              在您的设备上打开两步验证应用程序以查看您的身份验证代码并验证您的身份。
-            </div>
-          ) : (
-            ''
-          )}
-        </div>
+        ) : (
+          ''
+        )}
       </div>
     </div>
   );

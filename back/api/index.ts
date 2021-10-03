@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import auth from './auth';
+import user from './user';
 import env from './env';
 import config from './config';
 import log from './log';
@@ -9,7 +9,7 @@ import open from './open';
 
 export default () => {
   const app = Router();
-  auth(app);
+  user(app);
   env(app);
   config(app);
   log(app);

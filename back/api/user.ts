@@ -3,7 +3,7 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import * as fs from 'fs';
 import config from '../config';
-import AuthService from '../services/auth';
+import UserService from '../services/user';
 import { celebrate, Joi } from 'celebrate';
 const route = Router();
 
@@ -20,8 +20,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const data = await authService.login({ ...req.body }, req);
+        const userService = Container.get(UserService);
+        const data = await userService.login({ ...req.body }, req);
         return res.send(data);
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -35,18 +35,9 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        fs.readFile(config.authConfigFile, 'utf8', function (err, data) {
-          if (err) console.log(err);
-          const authInfo = JSON.parse(data);
-          fs.writeFileSync(
-            config.authConfigFile,
-            JSON.stringify({
-              ...authInfo,
-              token: '',
-            }),
-          );
-          res.send({ code: 200 });
-        });
+        const userService = Container.get(UserService);
+        await userService.logout(req.platform);
+        res.send({ code: 200 });
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);
@@ -54,20 +45,20 @@ export default (app: Router) => {
     },
   );
 
-  route.post(
+  route.put(
     '/user',
+    celebrate({
+      body: Joi.object({
+        username: Joi.string().required(),
+        password: Joi.string().required(),
+      }),
+    }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const content = fs.readFileSync(config.authConfigFile, 'utf8');
-        fs.writeFile(
-          config.authConfigFile,
-          JSON.stringify({ ...JSON.parse(content || '{}'), ...req.body }),
-          (err) => {
-            if (err) console.log(err);
-            res.send({ code: 200, message: '更新成功' });
-          },
-        );
+        const userService = Container.get(UserService);
+        await userService.updateUsernameAndPassword(req.body);
+        res.send({ code: 200, message: '更新成功' });
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);
@@ -80,8 +71,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const authInfo = await authService.getUserInfo();
+        const userService = Container.get(UserService);
+        const authInfo = await userService.getUserInfo();
         res.send({
           code: 200,
           data: {
@@ -101,8 +92,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const data = await authService.initTwoFactor();
+        const userService = Container.get(UserService);
+        const data = await userService.initTwoFactor();
         res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -121,8 +112,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const data = await authService.activeTwoFactor(req.body.code);
+        const userService = Container.get(UserService);
+        const data = await userService.activeTwoFactor(req.body.code);
         res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -136,8 +127,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const data = await authService.deactiveTwoFactor();
+        const userService = Container.get(UserService);
+        const data = await userService.deactiveTwoFactor();
         res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -158,8 +149,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const data = await authService.twoFactorLogin(req.body, req);
+        const userService = Container.get(UserService);
+        const data = await userService.twoFactorLogin(req.body, req);
         res.send(data);
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -173,8 +164,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const data = await authService.getLoginLog();
+        const userService = Container.get(UserService);
+        const data = await userService.getLoginLog();
         res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -188,8 +179,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const data = await authService.getNotificationMode();
+        const userService = Container.get(UserService);
+        const data = await userService.getNotificationMode();
         res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -203,8 +194,74 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const authService = Container.get(AuthService);
-        const result = await authService.updateNotificationMode(req.body);
+        const userService = Container.get(UserService);
+        const result = await userService.updateNotificationMode(req.body);
+        res.send(result);
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/system',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        const authInfo = await userService.getUserInfo();
+        let isInitialized = true;
+        if (
+          !authInfo ||
+          (Object.keys(authInfo).length === 2 &&
+            authInfo.username === 'admin' &&
+            authInfo.password === 'admin')
+        ) {
+          isInitialized = false;
+        }
+        res.send({
+          code: 200,
+          data: {
+            isInitialized,
+          },
+        });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  // 初始化api
+  route.put(
+    '/init/user',
+    celebrate({
+      body: Joi.object({
+        username: Joi.string().required(),
+        password: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        await userService.updateUsernameAndPassword(req.body);
+        res.send({ code: 200, message: '更新成功' });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/init/notification',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        const result = await userService.updateNotificationMode(req.body);
         res.send(result);
       } catch (e) {
         logger.error('🔥 error: %o', e);

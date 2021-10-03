@@ -19,6 +19,12 @@ export default {
         component: '@/pages/login/index',
       },
       {
+        name: '初始化',
+        path: '/initialization',
+        hideInMenu: true,
+        component: '@/pages/initialization/index',
+      },
+      {
         path: '/crontab',
         name: '定时任务',
         icon: <FieldTimeOutlined />,
