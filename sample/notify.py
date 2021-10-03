@@ -28,6 +28,7 @@ TG_PROXY_PORT = ''                                                        # tg�
 DD_BOT_TOKEN = ''                                                         # 钉钉机器人的DD_BOT_TOKEN; secrets可填
 DD_BOT_SECRET = ''                                                        # 钉钉机器人的DD_BOT_SECRET; secrets可填
 QYWX_AM = ''                                                              # 企业微信应用的QYWX_AM; secrets可填 参考http://note.youdao.com/s/HMiudGkb
+QYWX_KEY = ''                                                             # 企业微信机器人的QYWX_KEY; secrets可填
 
 notify_mode = []
 
@@ -44,6 +45,9 @@ if "DD_BOT_TOKEN" in os.environ and os.environ["DD_BOT_TOKEN"] and "DD_BOT_SECRE
     DD_BOT_SECRET = os.environ["DD_BOT_SECRET"]
 if "QYWX_AM" in os.environ and os.environ["QYWX_AM"]:
     QYWX_AM = os.environ["QYWX_AM"]
+if "QYWX_KEY" in os.environ and os.environ["QYWX_KEY"]:
+    QYWX_KEY = os.environ["QYWX_KEY"]    
+    
 
 if BARK:
     notify_mode.append('bark')
@@ -60,6 +64,9 @@ if DD_BOT_TOKEN and DD_BOT_SECRET:
 if QYWX_AM:
     notify_mode.append('qywxapp_bot')
     print("企业微信应用 推送打开")
+if QYWX_KEY:
+    notify_mode.append('qyw_bot')
+    print("企业微信机器人 推送打开")    
 
 def bark(title, content):
     print("\n")
@@ -212,6 +219,22 @@ def qywxapp_bot(title, content):
     else:
         print('推送失败！')
 
+
+def qyw_bot(title, content):
+    print('开始使用 企业微信机器人 推送消息...', end='')
+    url = f'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={QYWX_KEY}'
+    headers = {'Content-Type': 'application/json;charset=utf-8'}
+    data = {
+        'msgtype': 'text',
+        'text': {'content': f'{title}\n\n{content}'}
+    }
+    response = requests.post(url=url, data=json.dumps(data), headers=headers, timeout=15).json()
+    if response['errcode'] == 0:
+        print('推送成功！')
+    else:
+        print('推送失败！')
+
+
 def change_user_id(desp):
     qywx_app_params = QYWX_AM.split(',')
     if qywx_app_params[2]:
@@ -266,6 +289,12 @@ def send(title, content):
             else:
                 print('未启用 企业微信应用推送')
             continue
+        elif i == 'qyw_bot':
+            if QYWX_KEY:
+                qyw_bot(title=title, content=content)
+            else:
+                print('未启用 企业微信机器人')
+            continue    
         else:
             print('此类推送方式不存在')
 
