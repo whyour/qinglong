@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import config from '../config';
 import UserService from '../services/user';
 import { celebrate, Joi } from 'celebrate';
+import { getFileContentByName } from '../config/util';
 const route = Router();
 
 export default (app: Router) => {
@@ -211,12 +212,14 @@ export default (app: Router) => {
       try {
         const userService = Container.get(UserService);
         const authInfo = await userService.getUserInfo();
+        const envDbContent = getFileContentByName(config.envDbFile);
+
         let isInitialized = true;
         if (
-          !authInfo ||
-          (Object.keys(authInfo).length === 2 &&
-            authInfo.username === 'admin' &&
-            authInfo.password === 'admin')
+          Object.keys(authInfo).length === 2 &&
+          authInfo.username === 'admin' &&
+          authInfo.password === 'admin' &&
+          envDbContent.length === 0
         ) {
           isInitialized = false;
         }
