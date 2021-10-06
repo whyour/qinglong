@@ -66,7 +66,11 @@ const CronModal = ({
         <Form.Item name="name" label="名称">
           <Input placeholder="请输入任务名称" />
         </Form.Item>
-        <Form.Item name="command" label="命令" rules={[{ required: true }]}>
+        <Form.Item
+          name="command"
+          label="命令"
+          rules={[{ required: true, whitespace: true }]}
+        >
           <Input.TextArea
             rows={4}
             autoSize={true}

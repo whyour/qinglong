@@ -74,7 +74,13 @@ const EnvModal = ({
         <Form.Item
           name="name"
           label="名称"
-          rules={[{ required: true, message: '请输入环境变量名称' }]}
+          rules={[
+            { required: true, message: '请输入环境变量名称', whitespace: true },
+            {
+              pattern: /^[a-zA-Z_][0-9a-zA-Z_]+$/,
+              message: '只能输入字母数字下划线，且不能以数字开头',
+            },
+          ]}
         >
           <Input placeholder="请输入环境变量名称" />
         </Form.Item>
@@ -89,7 +95,9 @@ const EnvModal = ({
         <Form.Item
           name="value"
           label="值"
-          rules={[{ required: true, message: '请输入环境变量值' }]}
+          rules={[
+            { required: true, message: '请输入环境变量值', whitespace: true },
+          ]}
         >
           <Input.TextArea
             rows={4}
