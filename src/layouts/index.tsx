@@ -15,7 +15,7 @@ import './index.less';
 import vhCheck from 'vh-check';
 import { version, changeLog } from '../version';
 import { useCtx, useTheme } from '@/utils/hooks';
-import { message } from 'antd';
+import { message, Badge, Typography } from 'antd';
 
 export default function (props: any) {
   const ctx = useCtx();
@@ -32,35 +32,44 @@ export default function (props: any) {
   };
 
   const getSystemInfo = () => {
-    request.get(`${config.apiPrefix}system`).then(({ code, data }) => {
-      if (code === 200) {
-        setSystemInfo(data);
-        if (!data.isInitialized) {
-          history.push('/initialization');
-          setLoading(false);
+    request
+      .get(`${config.apiPrefix}system`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setSystemInfo(data);
+          if (!data.isInitialized) {
+            history.push('/initialization');
+            setLoading(false);
+          } else {
+            getUser();
+          }
         } else {
-          getUser();
+          message.error(data);
         }
-      } else {
-        message.error(data);
-      }
-    });
+      })
+      .catch((error) => {
+        console.log(error);
+      });
   };
 
   const getUser = (needLoading = true) => {
     needLoading && setLoading(true);
-    request.get(`${config.apiPrefix}user`).then(({ code, data }) => {
-      if (code === 200 && data.username) {
-        setUser(data);
-        localStorage.setItem('isLogin', 'true');
-        if (props.location.pathname === '/') {
-          history.push('/crontab');
+    request
+      .get(`${config.apiPrefix}user`)
+      .then(({ code, data }) => {
+        if (code === 200 && data.username) {
+          setUser(data);
+          if (props.location.pathname === '/') {
+            history.push('/crontab');
+          }
+        } else {
+          message.error(data);
         }
-      } else {
-        message.error(data);
-      }
-      needLoading && setLoading(false);
-    });
+        needLoading && setLoading(false);
+      })
+      .catch((error) => {
+        console.log(error);
+      });
   };
 
   const reloadUser = () => {
@@ -135,19 +144,43 @@ export default function (props: any) {
       title={
         <>
           控制面板
-          <a href={changeLog} target="_blank" rel="noopener noreferrer">
-            <span
+          <span
+            onClick={() => {
+              alert('yes');
+            }}
+          >
+            <Badge
+              count={'new'}
+              size="small"
+              offset={[15, 0]}
               style={{
                 fontSize: isFirefox ? 9 : 12,
-                color: '#666',
-                marginLeft: 2,
                 zoom: isSafari ? 0.66 : 0.8,
-                letterSpacing: isQQBrowser ? -2 : 0,
+                padding: '0 5px',
               }}
             >
-              {version}
-            </span>
-          </a>
+              <a
+                href={changeLog}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: isFirefox ? 9 : 12,
+                    color: '#666',
+                    marginLeft: 2,
+                    zoom: isSafari ? 0.66 : 0.8,
+                    letterSpacing: isQQBrowser ? -2 : 0,
+                  }}
+                >
+                  {version}
+                </span>
+              </a>
+            </Badge>
+          </span>
         </>
       }
       menuItemRender={(menuItemProps: any, defaultDom: any) => {
