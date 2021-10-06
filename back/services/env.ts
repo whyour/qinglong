@@ -222,11 +222,15 @@ export default class EnvService {
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
-        env_string += `export ${key}="${_(group)
-          .filter((x) => x.status !== EnvStatus.disabled)
-          .map('value')
-          .join('&')
-          .replace(/ /g, '')}"\n`;
+
+        // 忽略不符合bash要求的环境变量名称
+        if (/^[a-zA-Z_][0-9a-zA-Z_]+$/.test(key)) {
+          env_string += `export ${key}="${_(group)
+            .filter((x) => x.status !== EnvStatus.disabled)
+            .map('value')
+            .join('&')
+            .replace(/ /g, '')}"\n`;
+        }
       }
     }
     fs.writeFileSync(config.envFile, env_string);
