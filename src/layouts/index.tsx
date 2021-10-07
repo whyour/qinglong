@@ -13,9 +13,9 @@ import config from '@/utils/config';
 import { request } from '@/utils/http';
 import './index.less';
 import vhCheck from 'vh-check';
-import { version, changeLog } from '../version';
+import { version, changeLogLink, changeLog } from '../version';
 import { useCtx, useTheme } from '@/utils/hooks';
-import { message, Badge, Typography } from 'antd';
+import { message, Badge, Modal } from 'antd';
 
 export default function (props: any) {
   const ctx = useCtx();
@@ -88,6 +88,38 @@ export default function (props: any) {
     }
   };
 
+  const showNewVersionModal = () => {
+    Modal.confirm({
+      width: 500,
+      title: (
+        <>
+          <div>更新可用</div>
+          <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
+            新版本5.8.0 (1780)可用。你使用的版本为{version}。
+          </div>
+        </>
+      ),
+      content: (
+        <pre
+          style={{
+            wordBreak: 'break-all',
+            whiteSpace: 'pre-wrap',
+            paddingTop: 15,
+            fontSize: 12,
+            fontWeight: 400,
+          }}
+        >
+          {changeLog}
+        </pre>
+      ),
+      okText: '更新',
+      cancelText: '以后再说',
+      onOk() {
+        console.log('ok');
+      },
+    });
+  };
+
   useEffect(() => {
     vhCheck();
   }, []);
@@ -144,13 +176,9 @@ export default function (props: any) {
       title={
         <>
           控制面板
-          <span
-            onClick={() => {
-              alert('yes');
-            }}
-          >
+          <span onClick={showNewVersionModal}>
             <Badge
-              count={'new'}
+              count={'New'}
               size="small"
               offset={[15, 0]}
               style={{
@@ -160,7 +188,7 @@ export default function (props: any) {
               }}
             >
               <a
-                href={changeLog}
+                href={changeLogLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => {
@@ -176,7 +204,7 @@ export default function (props: any) {
                     letterSpacing: isQQBrowser ? -2 : 0,
                   }}
                 >
-                  {version}
+                  v{version}
                 </span>
               </a>
             </Badge>
