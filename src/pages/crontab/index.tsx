@@ -34,6 +34,8 @@ import CronModal from './modal';
 import CronLogModal from './logModal';
 import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
+import { getTableScroll } from '@/utils/index';
+import './index.less';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -66,7 +68,7 @@ enum OperationPath {
 }
 
 const Crontab = ({ headerStyle, isPhone }: any) => {
-  const columns = [
+  const columns: any = [
     {
       title: '任务名',
       dataIndex: 'name',
@@ -324,6 +326,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [tableScrollHeight, setTableScrollHeight] = useState<number>();
 
   const getCrons = () => {
     setLoading(true);
@@ -673,6 +676,12 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
 
   const onSelectChange = (selectedIds: any[]) => {
     setSelectedRowIds(selectedIds);
+
+    setTimeout(() => {
+      if (selectedRowIds.length === 0 || selectedIds.length === 0) {
+        setTableScrollHeight(getTableScroll());
+      }
+    });
   };
 
   const rowSelection = {
@@ -754,6 +763,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
 
   useEffect(() => {
     setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
+    setTableScrollHeight(getTableScroll());
   }, []);
 
   return (
@@ -839,7 +849,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         dataSource={value}
         rowKey="_id"
         size="middle"
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1000, y: tableScrollHeight }}
         loading={loading}
         rowSelection={rowSelection}
         rowClassName={getRowClassName}
