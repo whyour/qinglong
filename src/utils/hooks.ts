@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import browserType from './browser';
+import browserType from './index';
 
 export const useCtx = () => {
   const [width, setWidth] = useState('100%');

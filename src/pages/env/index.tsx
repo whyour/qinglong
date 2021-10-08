@@ -25,6 +25,7 @@ import EditNameModal from './editNameModal';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
+import { getTableScroll } from '@/utils/index';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -96,7 +97,7 @@ const DragableBodyRow = ({
 };
 
 const Env = ({ headerStyle, isPhone, theme }: any) => {
-  const columns = [
+  const columns: any = [
     {
       title: '序号',
       align: 'center' as const,
@@ -205,6 +206,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
   const [editedEnv, setEditedEnv] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [tableScrollHeight, setTableScrollHeight] = useState<number>();
 
   const getEnvs = () => {
     setLoading(true);
@@ -361,6 +363,12 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
 
   const onSelectChange = (selectedIds: any[]) => {
     setSelectedRowIds(selectedIds);
+
+    setTimeout(() => {
+      if (selectedRowIds.length === 0 || selectedIds.length === 0) {
+        setTableScrollHeight(getTableScroll({ extraHeight: 40 }));
+      }
+    });
   };
 
   const rowSelection = {
@@ -426,6 +434,10 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
     getEnvs();
   }, [searchText]);
 
+  useEffect(() => {
+    setTableScrollHeight(getTableScroll({ extraHeight: 40 }));
+  }, []);
+
   return (
     <PageContainer
       className="ql-container-wrapper env-wrapper"
@@ -490,7 +502,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
           dataSource={value}
           rowKey="_id"
           size="middle"
-          scroll={{ x: 768 }}
+          scroll={{ x: 768, y: tableScrollHeight }}
           components={components}
           loading={loading}
           onRow={(record: any, index: number) => {
