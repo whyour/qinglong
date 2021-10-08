@@ -328,6 +328,12 @@ const Setting = ({
                 buttonStyle="solid"
               />
             </Form.Item>
+            <Form.Item label="日志删除频率" name="frequency" initialValue={0}>
+              <Input addonBefore="每" addonAfter="天" style={{ width: 300 }} />
+            </Form.Item>
+            <Form.Item label="检查更新" name="theme" initialValue={theme}>
+              <Button type="primary">检查更新</Button>
+            </Form.Item>
           </Form>
         </Tabs.TabPane>
       </Tabs>
