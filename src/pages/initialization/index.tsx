@@ -19,7 +19,7 @@ const { Step } = Steps;
 const { Option } = Select;
 const { Link } = Typography;
 
-const Login = () => {
+const Initialization = () => {
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = React.useState(0);
   const [fields, setFields] = useState<any[]>([]);
@@ -241,4 +241,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Initialization;

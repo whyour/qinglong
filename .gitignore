@@ -21,6 +21,7 @@
 /.env.local
 .env
 .history
+.version.ts
 
 /config
 /log

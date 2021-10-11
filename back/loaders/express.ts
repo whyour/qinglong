@@ -17,6 +17,7 @@ export default ({ app }: { app: Application }) => {
 
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+
   app.use(
     jwt({
       secret: config.secret as string,
