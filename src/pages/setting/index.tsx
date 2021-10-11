@@ -31,6 +31,7 @@ import {
 import SecuritySettings from './security';
 import LoginLog from './loginLog';
 import NotificationSetting from './notification';
+import CheckUpdate from './checkUpdate';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -45,6 +46,7 @@ const Setting = ({
   user,
   reloadUser,
   reloadTheme,
+  ws,
 }: any) => {
   const columns = [
     {
@@ -328,11 +330,16 @@ const Setting = ({
                 buttonStyle="solid"
               />
             </Form.Item>
-            <Form.Item label="日志删除频率" name="frequency" initialValue={0}>
-              <Input addonBefore="每" addonAfter="天" style={{ width: 300 }} />
+            <Form.Item
+              label="日志删除频率"
+              name="frequency"
+              initialValue={0}
+              tooltip="每x天自动删除x天以前的日志"
+            >
+              <Input addonBefore="每" addonAfter="天" style={{ width: 150 }} />
             </Form.Item>
-            <Form.Item label="检查更新" name="theme" initialValue={theme}>
-              <Button type="primary">检查更新</Button>
+            <Form.Item label="检查更新" name="update">
+              <CheckUpdate ws={ws} />
             </Form.Item>
           </Form>
         </Tabs.TabPane>

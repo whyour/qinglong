@@ -11,6 +11,10 @@ import { AuthDataType, AuthInfo, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import { Request } from 'express';
+import ScheduleService from './schedule';
+import { spawn } from 'child_process';
+import SockService from './sock';
+import got from 'got';
 
 @Service()
 export default class UserService {
@@ -18,7 +22,11 @@ export default class UserService {
   private notificationService!: NotificationService;
   private authDb = new DataStore({ filename: config.authDbFile });
 
-  constructor(@Inject('logger') private logger: winston.Logger) {
+  constructor(
+    @Inject('logger') private logger: winston.Logger,
+    private scheduleService: ScheduleService,
+    private sockService: SockService,
+  ) {
     this.authDb.loadDatabase((err) => {
       if (err) throw err;
     });
@@ -330,7 +338,7 @@ export default class UserService {
           if (err) {
             resolve({} as NotificationInfo);
           } else {
-            resolve(doc.info);
+            resolve({ ...doc.info, _id: doc._id });
           }
         },
       );
@@ -353,5 +361,63 @@ export default class UserService {
     } else {
       return { code: 400, data: '通知发送失败，请检查参数' };
     }
+  }
+
+  public async updateLogRemoveFrequency(frequency: number) {
+    const result = await this.updateNotificationDb({
+      type: AuthDataType.removeLogFrequency,
+      info: { frequency },
+    });
+    const cron = {
+      _id: result._id,
+      name: '删除日志',
+      command: `ql rmlog ${frequency}`,
+      schedule: `5 23 */${frequency} * *`,
+    };
+    await this.scheduleService.generateSchedule(cron);
+    return { code: 200, data: { ...cron } };
+  }
+
+  public async checkUpdate() {
+    try {
+      const { version } = await import(config.versionFile);
+      const lastVersionFileContent = await got.get(config.lastVersionFile);
+      const filePath = `${config.rootPath}/.version.ts`;
+      fs.writeFileSync(filePath, lastVersionFileContent.body, {
+        encoding: 'utf-8',
+      });
+      const result = await import(config.versionFile);
+
+      return {
+        code: 200,
+        data: {
+          hasNewVersion: version !== result.version,
+          ...result,
+        },
+      };
+    } catch (error) {
+      return {
+        code: 400,
+        data: '获取版本文件失败',
+      };
+    }
+  }
+
+  public async updateSystem() {
+    const cp = spawn('ql update', { shell: '/bin/bash' });
+
+    cp.stdout.on('data', (data) => {
+      this.sockService.sendMessage(data.toString());
+    });
+
+    cp.stderr.on('data', (data) => {
+      this.sockService.sendMessage(data.toString());
+    });
+
+    cp.on('error', (err) => {
+      this.sockService.sendMessage(JSON.stringify(err));
+    });
+
+    return { code: 200 };
   }
 }

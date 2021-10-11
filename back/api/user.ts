@@ -272,4 +272,56 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/system/log/remove',
+    celebrate({
+      body: Joi.object({
+        frequency: Joi.number().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        const result = await userService.updateLogRemoveFrequency(
+          req.body.frequency,
+        );
+        res.send(result);
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/system/update-check',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        const result = await userService.checkUpdate();
+        res.send(result);
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/system/update',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        const result = await userService.updateSystem();
+        res.send(result);
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
 };

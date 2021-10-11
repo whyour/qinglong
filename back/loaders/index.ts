@@ -2,8 +2,9 @@ import expressLoader from './express';
 import dependencyInjectorLoader from './dependencyInjector';
 import Logger from './logger';
 import initData from './initData';
+import { Application } from 'express';
 
-export default async ({ expressApp }: { expressApp: any }) => {
+export default async ({ expressApp }: { expressApp: Application }) => {
   Logger.info('✌️ DB loaded and connected!');
 
   await dependencyInjectorLoader({

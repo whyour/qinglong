@@ -13,10 +13,12 @@ specifiers:
   '@types/nedb': ^1.8.11
   '@types/node': ^14.11.2
   '@types/node-fetch': ^2.5.8
+  '@types/node-schedule': ^1.3.2
   '@types/nodemailer': ^6.4.4
   '@types/qrcode.react': ^1.0.1
   '@types/react': ^17.0.0
   '@types/react-dom': ^17.0.0
+  '@types/sockjs': ^0.3.33
   '@umijs/plugin-antd': ^0.9.1
   '@umijs/test': ^3.3.9
   body-parser: ^1.19.0
@@ -51,7 +53,9 @@ specifiers:
   react-dnd-html5-backend: ^14.0.0
   react-dom: 17.x
   react-split-pane: ^0.1.92
+  react-use-websocket: ^2.8.0
   reflect-metadata: ^0.1.13
+  sockjs: ^0.3.21
   ts-node: ^9.0.0
   typedi: ^0.8.0
   typescript: ^4.1.2
@@ -84,6 +88,7 @@ dependencies:
   nodemailer: 6.6.3
   p-queue: 6.6.2
   reflect-metadata: 0.1.13
+  sockjs: 0.3.21
   typedi: 0.8.0
   uuid: 8.3.2
   winston: 3.3.3
@@ -100,10 +105,12 @@ devDependencies:
   '@types/nedb': 1.8.11
   '@types/node': 14.14.45
   '@types/node-fetch': 2.5.10
+  '@types/node-schedule': 1.3.2
   '@types/nodemailer': 6.4.4
   '@types/qrcode.react': 1.0.1
   '@types/react': 17.0.5
   '@types/react-dom': 17.0.5
+  '@types/sockjs': 0.3.33
   '@umijs/plugin-antd': 0.9.1_5ccfec03b6e15849b3687a64fe975f75
   '@umijs/test': 3.4.20_ts-node@9.1.1
   codemirror: 5.62.2
@@ -120,6 +127,7 @@ devDependencies:
   react-dnd-html5-backend: 14.0.0
   react-dom: 17.0.2_react@17.0.2
   react-split-pane: 0.1.92_react-dom@17.0.2+react@17.0.2
+  react-use-websocket: 2.8.0_react-dom@17.0.2+react@17.0.2
   ts-node: 9.1.1_typescript@4.2.4
   typescript: 4.2.4
   umi: 3.4.20
@@ -1214,6 +1222,12 @@ packages:
       form-data: 3.0.1
     dev: true
 
+  /@types/node-schedule/1.3.2:
+    resolution: {integrity: sha512-Y0CqdAr+lCpArT8CJJjJq4U2v8Bb5e7ru2nV/NhDdaptCMCRdOL3Y7tAhen39HluQMaIKWvPbDuiFBUQpg7Srw==}
+    dependencies:
+      '@types/node': 14.17.21
+    dev: true
+
   /@types/node/14.14.45:
     resolution: {integrity: sha512-DssMqTV9UnnoxDWu959sDLZzfvqCF0qDNRjaWeYSui9xkFe61kKo4l1TWNTQONpuXEm+gLMRvdlzvNHBamzmEw==}
     dev: true
@@ -1224,6 +1238,10 @@ packages:
 
   /@types/node/14.17.16:
     resolution: {integrity: sha512-WiFf2izl01P1CpeY8WqFAeKWwByMueBEkND38EcN8N68qb0aDG3oIS1P5MhAX5kUdr469qRyqsY/MjanLjsFbQ==}
+    dev: true
+
+  /@types/node/14.17.21:
+    resolution: {integrity: sha512-zv8ukKci1mrILYiQOwGSV4FpkZhyxQtuFWGya2GujWg+zVAeRQ4qbaMmWp9vb9889CFA8JECH7lkwCL6Ygg8kA==}
     dev: true
 
   /@types/nodemailer/6.4.4:
@@ -1335,6 +1353,12 @@ packages:
     dependencies:
       '@types/mime': 1.3.2
       '@types/node': 14.14.45
+    dev: true
+
+  /@types/sockjs/0.3.33:
+    resolution: {integrity: sha512-f0KEEe05NvUnat+boPTZ0dgaLZ4SfSouXUgv5noUiefG2ajgKjmETo9ZJyuqsl7dfl2aHlLJUiki6B4ZYldiiw==}
+    dependencies:
+      '@types/node': 14.17.21
     dev: true
 
   /@types/stack-utils/1.0.1:
@@ -3818,6 +3842,13 @@ packages:
     resolution: {integrity: sha512-Utm6CdzT+6xsDk2m8S6uL8VHxNwI6Jub+e9NYTcAms28T84pTa25GJQV9j0CY0N1rM8hK4x6grpF2BQf+2qwVA==}
     dev: false
 
+  /faye-websocket/0.11.4:
+    resolution: {integrity: sha512-CzbClwlXAuiRQAlUyfqPgvPoNKTckTPGfwZV4ZdAhVcP2lh9KUxJg2b5GkE7XbjKQ3YJnQ9z6D9ntLAlB+tP8g==}
+    engines: {node: '>=0.8.0'}
+    dependencies:
+      websocket-driver: 0.7.4
+    dev: false
+
   /fb-watchman/2.0.1:
     resolution: {integrity: sha512-DkPJKQeY6kKwmuMretBhr7G6Vodr7bFwDYTXIkfG1gjvNpaxBTQV3PbXg6bR1c1UP4jPOX0jHUbbHANL9vRjVg==}
     dependencies:
@@ -4317,6 +4348,10 @@ packages:
       setprototypeof: 1.1.1
       statuses: 1.5.0
       toidentifier: 1.0.0
+    dev: false
+
+  /http-parser-js/0.5.3:
+    resolution: {integrity: sha512-t7hjvef/5HEK7RWTdUzVUhl8zkEu+LlaE0IYzdMuvbSDipxBRpOn4Uhw8ZyECEa808iVT8XCjzo6xmYt4CiLZg==}
     dev: false
 
   /http-signature/1.2.0:
@@ -8045,6 +8080,16 @@ packages:
       tween-functions: 1.2.0
     dev: true
 
+  /react-use-websocket/2.8.0_react-dom@17.0.2+react@17.0.2:
+    resolution: {integrity: sha512-0J1gsX7NFTsZYBBfAQo9vKjIyGE/uxBfb0p8yq6Iza+rZF3mQocj3kkIJujFiXCYQIBt00pWJzNj+YI5srfxZg==}
+    peerDependencies:
+      react: '>= 16.8.0'
+      react-dom: '>= 16.8.0'
+    dependencies:
+      react: 17.0.2
+      react-dom: 17.0.2_react@17.0.2
+    dev: true
+
   /react/16.14.0:
     resolution: {integrity: sha512-0X2CImDkJGApiAlcf0ODKIneSwBPhqJawOa5wCtKbu7ZECrmS26NvtSILynQ66cgkT/RJ4LidJOc3bUESwmU8g==}
     engines: {node: '>=0.10.0'}
@@ -8773,6 +8818,14 @@ packages:
       source-map-resolve: 0.5.3
       use: 3.1.1
     dev: true
+
+  /sockjs/0.3.21:
+    resolution: {integrity: sha512-DhbPFGpxjc6Z3I+uX07Id5ZO2XwYsWOrYjaSeieES78cq+JaJvVe5q/m1uvjIQhXinhIeCFRH6JgXe+mvVMyXw==}
+    dependencies:
+      faye-websocket: 0.11.4
+      uuid: 3.4.0
+      websocket-driver: 0.7.4
+    dev: false
 
   /sort-keys/1.1.2:
     resolution: {integrity: sha1-RBttTTRnmPG05J6JIK37oOVD+a0=}
@@ -9618,8 +9671,8 @@ packages:
 
   /uuid/3.4.0:
     resolution: {integrity: sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==}
+    deprecated: Please upgrade  to version 7 or higher.  Older versions may use Math.random() in certain circumstances, which is known to be problematic.  See https://v8.dev/blog/math-random for details.
     hasBin: true
-    dev: true
 
   /uuid/8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
@@ -9789,6 +9842,20 @@ packages:
       watchpack: 2.1.1
       webpack-sources: 2.2.0
     dev: true
+
+  /websocket-driver/0.7.4:
+    resolution: {integrity: sha512-b17KeDIQVjvb0ssuSDF2cYXSg2iztliJ4B9WdsuB6J952qCPKmnVq4DyW5motImXHDC1cBT/1UezrJVsKw5zjg==}
+    engines: {node: '>=0.8.0'}
+    dependencies:
+      http-parser-js: 0.5.3
+      safe-buffer: 5.2.1
+      websocket-extensions: 0.1.4
+    dev: false
+
+  /websocket-extensions/0.1.4:
+    resolution: {integrity: sha512-OqedPIGOfsDlo31UNwYbCFMSaO9m9G/0faIHj5/dZFDMFqPTcx6UwqyOy3COEaEOg/9VsGIpdqn62W5KhoKSpg==}
+    engines: {node: '>=0.8.0'}
+    dev: false
 
   /whatwg-encoding/1.0.5:
     resolution: {integrity: sha512-b5lim54JOPN9HtzvK9HFXvBma/rnfFeqsic0hSpjtDbVxR3dJKLc+KB4V6GgiGOvl7CY/KNh8rxSo9DKQrnUEw==}

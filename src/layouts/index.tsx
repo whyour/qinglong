@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import ProLayout, { PageLoading } from '@ant-design/pro-layout';
 import {
   enable as enableDarkMode,
@@ -16,6 +16,8 @@ import vhCheck from 'vh-check';
 import { version, changeLogLink, changeLog } from '../version';
 import { useCtx, useTheme } from '@/utils/hooks';
 import { message, Badge, Modal } from 'antd';
+// @ts-ignore
+import SockJS from 'sockjs-client';
 
 export default function (props: any) {
   const ctx = useCtx();
@@ -23,6 +25,7 @@ export default function (props: any) {
   const [user, setUser] = useState<any>();
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<{ isInitialized: boolean }>();
+  const ws = useRef<any>(null);
 
   const logout = () => {
     request.post(`${config.apiPrefix}logout`).then(() => {
@@ -152,12 +155,44 @@ export default function (props: any) {
     }
   }, []);
 
+  useEffect(() => {
+    ws.current = new SockJS(
+      `http://127.0.0.1:5600/ws?token=${localStorage.getItem(config.authKey)}`,
+    );
+    ws.current.onopen = () => {
+      console.log('ws opened');
+    };
+
+    ws.current.onclose = () => console.log('ws closed');
+    const wsCurrent = ws.current;
+
+    return () => {
+      wsCurrent.close();
+    };
+  }, []);
+
   if (['/login', '/initialization'].includes(props.location.pathname)) {
     document.title = `${
       (config.documentTitleMap as any)[props.location.pathname]
     } - 控制面板`;
+    if (
+      systemInfo?.isInitialized &&
+      props.location.pathname === '/initialization'
+    ) {
+      history.push('/crontab');
+    }
+
     if (systemInfo) {
-      return props.children;
+      return React.Children.map(props.children, (child) => {
+        return React.cloneElement(child, {
+          ...ctx,
+          ...theme,
+          user,
+          reloadUser,
+          reloadTheme: setTheme,
+          ws: ws.current,
+        });
+      });
     }
   }
 
@@ -247,6 +282,7 @@ export default function (props: any) {
           user,
           reloadUser,
           reloadTheme: setTheme,
+          ws: ws.current,
         });
       })}
     </ProLayout>

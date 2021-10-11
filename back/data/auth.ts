@@ -21,4 +21,5 @@ export enum AuthDataType {
   'loginLog' = 'loginLog',
   'authToken' = 'authToken',
   'notification' = 'notification',
+  'removeLogFrequency' = 'removeLogFrequency',
 }
