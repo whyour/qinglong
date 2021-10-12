@@ -395,10 +395,10 @@ export default class UserService {
           ...result,
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         code: 400,
-        data: '获取版本文件失败',
+        data: error.message,
       };
     }
   }

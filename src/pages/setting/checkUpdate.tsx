@@ -20,10 +20,14 @@ const CheckUpdate = ({ ws }: any) => {
       .then((_data: any) => {
         message.destroy();
         const { code, data } = _data;
-        if (code === 200 && data.hasNewVersion) {
-          showConfirmUpdateModal(data);
+        if (code === 200) {
+          if (data.hasNewVersion) {
+            showConfirmUpdateModal(data);
+          } else {
+            message.success('已经是最新版了！');
+          }
         } else {
-          message.success('已经是最新版了！');
+          message.error(data);
         }
       })
       .catch((error: any) => {
