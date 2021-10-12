@@ -54,10 +54,10 @@ usage() {
     define_cmd
     gen_array_scripts
     echo -e "task命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或去掉 “$dir_scripts/” 目录后的相对路径（定时任务中请写作相对路径），用法为："
-    echo -e "1.$cmd_task <file_name>                                     # 依次执行，如果设置了随机延迟，将随机延迟一定秒数"
-    echo -e "2.$cmd_task <file_name> now                                 # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
-    echo -e "3.$cmd_task <file_name> conc <环境变量名称>                   # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中"
-    echo -e "4.$cmd_task <file_name> desi <环境变量名称> <账号编号，空格分隔> # 指定账号执行，无论是否设置了随机延迟，均立即运行"
+    echo -e "1.$cmd_task <file_name>                                             # 依次执行，如果设置了随机延迟，将随机延迟一定秒数"
+    echo -e "2.$cmd_task <file_name> now                                         # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
+    echo -e "3.$cmd_task <file_name> conc <环境变量名称> <账号编号，空格分隔>(可选的)  # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中，且可指定账号执行"
+    echo -e "4.$cmd_task <file_name> desi <环境变量名称> <账号编号，空格分隔>         # 指定账号执行，无论是否设置了随机延迟，均立即运行"
     if [[ ${#array_scripts[*]} -gt 0 ]]; then
         echo -e "\n当前有以下脚本可以运行:"
         for ((i = 0; i < ${#array_scripts[*]}; i++)); do
@@ -114,11 +114,27 @@ run_normal() {
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
 run_concurrent() {
     local first_param="$1"
-    local third_param="$2"
-    if [[ ! $third_param ]]; then
+    local env_param="$2"
+    local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|")
+    if [[ ! $env_param ]]; then
         echo -e "\n 缺少并发运行的环境变量参数"
         exit 1
     fi
+
+    local envs=$(eval echo "\$${env_param}")
+    local array=($(echo $envs | sed 's/&/ /g'))
+    local tempArr=$(echo $num_param | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+    local runArr=($(eval echo $tempArr))
+    runArr=($(awk -v RS=' ' '!a[$1]++' <<< ${runArr[@]}))
+
+    local n=0
+    for i in ${runArr[@]}; do
+        echo "$i"
+        array_run[n]=${array[$i - 1]}
+        let n++
+    done
+    
+    local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
 
     cd $dir_scripts
     define_program "$first_param"
@@ -140,11 +156,13 @@ run_concurrent() {
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
-    local envs=$(eval echo "\$${third_param}")
+    [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
+
+    local envs=$(eval echo "\$${env_param}")
     local array=($(echo $envs | sed 's/&/ /g'))
     single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
     for i in "${!array[@]}"; do
-        export ${third_param}=${array[i]}
+        export ${env_param}=${array[i]}
         single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
         timeout -k 10s $command_timeout_time $which_program $first_param &>$single_log_path &
     done
@@ -167,7 +185,7 @@ run_concurrent() {
 run_designated() {
     local file_param="$1"
     local env_param="$2"
-    local num_param=$(echo "$3" | perl -pe "s|.*$2 (.*)|\1|")
+    local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|")
     if [[ ! $env_param ]] || [[ ! $num_param ]]; then
         echo -e "\n 缺少单独运行的参数 task xxx.js desi Test 1 3"
         exit 1
@@ -274,7 +292,7 @@ main() {
                 run_normal "$1" "$2"
                 ;;
             conc)
-                run_concurrent "$1" "$3"
+                run_concurrent "$1" "$3" "$*"
                 ;;
             desi)
                 run_designated "$1" "$3" "$*"
