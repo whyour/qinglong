@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Typography, Modal, Tag, Button, Spin, message } from 'antd';
+import { Statistic, Modal, Tag, Button, Spin, message } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { version } from '../../version';
 
-const { Text, Link } = Typography;
+const { Countdown } = Statistic;
 
 const CheckUpdate = ({ ws }: any) => {
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -18,19 +18,20 @@ const CheckUpdate = ({ ws }: any) => {
     request
       .put(`${config.apiPrefix}system/update-check`)
       .then((_data: any) => {
+        message.destroy();
         const { code, data } = _data;
-        if (code === 200 && !data.hasNewVersion) {
+        if (code === 200 && data.hasNewVersion) {
           showConfirmUpdateModal(data);
         } else {
           message.success('已经是最新版了！');
         }
       })
       .catch((error: any) => {
+        message.destroy();
         console.log(error);
       })
       .finally(() => {
         setUpdateLoading(false);
-        hide();
       });
   };
 
@@ -79,29 +80,10 @@ const CheckUpdate = ({ ws }: any) => {
       maskClosable: false,
       closable: false,
       okButtonProps: { disabled: true },
-      title: <span></span>,
+      title: '更新日志',
       centered: true,
       content: (
-        <pre
-          style={{
-            wordBreak: 'break-all',
-            whiteSpace: 'pre-wrap',
-            paddingTop: 15,
-            fontSize: 12,
-            fontWeight: 400,
-            minHeight: '60vh',
-          }}
-        >
-          {value}
-        </pre>
-      ),
-    });
-  };
-
-  useEffect(() => {
-    ws.onmessage = (e) => {
-      modalRef.current.update({
-        content: (
+        <div style={{ height: '60vh', overflowY: 'auto' }}>
           <pre
             style={{
               wordBreak: 'break-all',
@@ -109,14 +91,55 @@ const CheckUpdate = ({ ws }: any) => {
               paddingTop: 15,
               fontSize: 12,
               fontWeight: 400,
-              minHeight: '60vh',
             }}
           >
-            {e.data + value}
+            {value}
           </pre>
-        ),
-      });
-      setValue(e.data);
+        </div>
+      ),
+    });
+  };
+
+  useEffect(() => {
+    ws.onmessage = (e) => {
+      if (e.data.includes('重启面板')) {
+        message.warning({
+          content: (
+            <span>
+              系统将在
+              <Countdown
+                className="inline-countdown"
+                format="ss"
+                value={Date.now() + 1000 * 10}
+              />
+              秒后自动刷新
+            </span>
+          ),
+          duration: 10,
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 10000);
+      } else {
+        modalRef.current.update({
+          content: (
+            <div style={{ height: '60vh', overflowY: 'auto' }}>
+              <pre
+                style={{
+                  wordBreak: 'break-all',
+                  whiteSpace: 'pre-wrap',
+                  paddingTop: 15,
+                  fontSize: 12,
+                  fontWeight: 400,
+                }}
+              >
+                {value + e.data}
+              </pre>
+            </div>
+          ),
+        });
+        setValue(e.data);
+      }
     };
   }, []);
 
