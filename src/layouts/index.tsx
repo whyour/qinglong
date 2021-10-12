@@ -91,38 +91,6 @@ export default function (props: any) {
     }
   };
 
-  const showNewVersionModal = () => {
-    Modal.confirm({
-      width: 500,
-      title: (
-        <>
-          <div>更新可用</div>
-          <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            新版本5.8.0 (1780)可用。你使用的版本为{version}。
-          </div>
-        </>
-      ),
-      content: (
-        <pre
-          style={{
-            wordBreak: 'break-all',
-            whiteSpace: 'pre-wrap',
-            paddingTop: 15,
-            fontSize: 12,
-            fontWeight: 400,
-          }}
-        >
-          {changeLog}
-        </pre>
-      ),
-      okText: '更新',
-      cancelText: '以后再说',
-      onOk() {
-        console.log('ok');
-      },
-    });
-  };
-
   useEffect(() => {
     vhCheck();
   }, []);
@@ -211,39 +179,26 @@ export default function (props: any) {
       title={
         <>
           控制面板
-          <span onClick={showNewVersionModal}>
-            <Badge
-              count={'New'}
-              size="small"
-              offset={[15, 0]}
+          <a
+            href={changeLogLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <span
               style={{
                 fontSize: isFirefox ? 9 : 12,
+                color: '#666',
+                marginLeft: 2,
                 zoom: isSafari ? 0.66 : 0.8,
-                padding: '0 5px',
+                letterSpacing: isQQBrowser ? -2 : 0,
               }}
             >
-              <a
-                href={changeLogLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: isFirefox ? 9 : 12,
-                    color: '#666',
-                    marginLeft: 2,
-                    zoom: isSafari ? 0.66 : 0.8,
-                    letterSpacing: isQQBrowser ? -2 : 0,
-                  }}
-                >
-                  v{version}
-                </span>
-              </a>
-            </Badge>
-          </span>
+              v{version}
+            </span>
+          </a>
         </>
       }
       menuItemRender={(menuItemProps: any, defaultDom: any) => {
