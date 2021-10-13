@@ -127,12 +127,12 @@ export default function (props: any) {
     ws.current = new SockJS(
       `${location.origin}/api/ws?token=${localStorage.getItem(config.authKey)}`,
     );
-    ws.current.onopen = (e) => {
-      console.log('ws opened', e);
+    ws.current.onopen = (e: any) => {
+      console.log('websocket连接成功', e);
     };
 
-    ws.current.onclose = (e) => {
-      console.log('ws closed', e);
+    ws.current.onclose = (e: any) => {
+      console.log('websocket已关闭', e);
     };
     const wsCurrent = ws.current;
 

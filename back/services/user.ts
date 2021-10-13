@@ -411,7 +411,7 @@ export default class UserService {
   }
 
   public async updateSystem() {
-    const cp = spawn('ql update', { shell: '/bin/bash' });
+    const cp = spawn('ql -l update', { shell: '/bin/bash' });
 
     cp.stdout.on('data', (data) => {
       this.sockService.sendMessage(data.toString());
