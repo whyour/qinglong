@@ -106,6 +106,24 @@ const CheckUpdate = ({ ws }: any) => {
 
   useEffect(() => {
     ws.onmessage = (e) => {
+      setValue(value + e.data);
+      modalRef.current.update({
+        content: (
+          <div style={{ height: '60vh', overflowY: 'auto' }}>
+            <pre
+              style={{
+                wordBreak: 'break-all',
+                whiteSpace: 'pre-wrap',
+                paddingTop: 15,
+                fontSize: 12,
+                fontWeight: 400,
+              }}
+            >
+              {value + e.data}
+            </pre>
+          </div>
+        ),
+      });
       if (e.data.includes('重启面板')) {
         message.warning({
           content: (
@@ -124,25 +142,6 @@ const CheckUpdate = ({ ws }: any) => {
         setTimeout(() => {
           window.location.reload();
         }, 10000);
-      } else {
-        modalRef.current.update({
-          content: (
-            <div style={{ height: '60vh', overflowY: 'auto' }}>
-              <pre
-                style={{
-                  wordBreak: 'break-all',
-                  whiteSpace: 'pre-wrap',
-                  paddingTop: 15,
-                  fontSize: 12,
-                  fontWeight: 400,
-                }}
-              >
-                {value + e.data}
-              </pre>
-            </div>
-          ),
-        });
-        setValue(e.data);
       }
     };
   }, []);
