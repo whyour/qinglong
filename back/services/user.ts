@@ -380,8 +380,8 @@ export default class UserService {
 
   public async checkUpdate() {
     try {
-      const versionRegx = /.*export const version = \'(.*)\'\n/;
-      const logRegx = /.*export const changeLog = \`(.*)\`/;
+      const versionRegx = /.*export const version = \'(.*)\'\;/;
+      const logRegx = /.*export const changeLog = \`(.*)\`\;/;
 
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const currentVersion = currentVersionFile.match(versionRegx)![1];
@@ -390,7 +390,9 @@ export default class UserService {
         await got.get(config.lastVersionFile)
       ).body;
       const lastVersion = lastVersionFileContent.match(versionRegx)![1];
-      const lastLog = lastVersionFileContent.match(logRegx)![1];
+      const lastLog = lastVersionFileContent.match(logRegx)
+        ? lastVersionFileContent.match(logRegx)![1]
+        : '';
 
       return {
         code: 200,
