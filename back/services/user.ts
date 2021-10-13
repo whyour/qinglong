@@ -380,19 +380,30 @@ export default class UserService {
 
   public async checkUpdate() {
     try {
-      const { version } = await import(config.versionFile);
+      const versionRegx = /.*export const version = (.*)\n/;
+      const logRegx = /.*export const changeLog = (.*)\n/;
+      const linkRegx = /.*export const changeLogLink = (.*)\n/;
+
+      const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
+      const currentVersion = currentVersionFile.match(versionRegx)![1];
+
       const lastVersionFileContent = await got.get(config.lastVersionFile);
       const filePath = `${config.rootPath}/.version.ts`;
       fs.writeFileSync(filePath, lastVersionFileContent.body, {
         encoding: 'utf-8',
       });
-      const result = await import(config.versionFile);
+      const lastVersionFile = fs.readFileSync(config.lastVersionFile, 'utf8');
+      const lastVersion = lastVersionFile.match(versionRegx)![1];
+      const lastLog = lastVersionFile.match(logRegx)![1];
+      const lastLink = lastVersionFile.match(linkRegx)![1];
 
       return {
         code: 200,
         data: {
-          hasNewVersion: version !== result.version,
-          ...result,
+          hasNewVersion: currentVersion !== lastVersion,
+          lastVersion,
+          lastLog,
+          lastLink,
         },
       };
     } catch (error: any) {
