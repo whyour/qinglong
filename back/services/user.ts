@@ -392,7 +392,6 @@ export default class UserService {
       ).body;
       const lastVersion = lastVersionFileContent.match(versionRegx)![1];
       const lastLog = lastVersionFileContent.match(logRegx)![1];
-      const lastLink = lastVersionFileContent.match(linkRegx)![1];
 
       return {
         code: 200,
@@ -400,7 +399,6 @@ export default class UserService {
           hasNewVersion: currentVersion !== lastVersion,
           lastVersion,
           lastLog,
-          lastLink,
         },
       };
     } catch (error: any) {
