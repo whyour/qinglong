@@ -40,14 +40,14 @@ const CheckUpdate = ({ ws }: any) => {
   };
 
   const showConfirmUpdateModal = (data: any) => {
-    const { version: newVersion, changeLog } = data;
+    const { lastVersion, lastLog } = data;
     Modal.confirm({
       width: 500,
       title: (
         <>
           <div>更新可用</div>
           <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            新版本{newVersion}可用。你使用的版本为{version}。
+            新版本{lastVersion}可用。你使用的版本为{version}。
           </div>
         </>
       ),
@@ -61,7 +61,7 @@ const CheckUpdate = ({ ws }: any) => {
             fontWeight: 400,
           }}
         >
-          {changeLog}
+          {lastLog}
         </pre>
       ),
       okText: '更新',
