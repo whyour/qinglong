@@ -8,7 +8,7 @@ import fs from 'fs';
 import { getPlatform } from '../config/util';
 
 export default async ({ server }: { server: Server }) => {
-  const echo = sockjs.createServer({ prefix: '/ws' });
+  const echo = sockjs.createServer({ prefix: '/api/ws' });
   const sockService = Container.get(SockService);
 
   echo.on('connection', (conn) => {

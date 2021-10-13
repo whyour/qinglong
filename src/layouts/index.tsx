@@ -125,13 +125,15 @@ export default function (props: any) {
 
   useEffect(() => {
     ws.current = new SockJS(
-      `http://127.0.0.1:5600/ws?token=${localStorage.getItem(config.authKey)}`,
+      `${location.origin}/api/ws?token=${localStorage.getItem(config.authKey)}`,
     );
-    ws.current.onopen = () => {
-      console.log('ws opened');
+    ws.current.onopen = (e) => {
+      console.log('ws opened', e);
     };
 
-    ws.current.onclose = () => console.log('ws closed');
+    ws.current.onclose = (e) => {
+      console.log('ws closed', e);
+    };
     const wsCurrent = ws.current;
 
     return () => {
