@@ -387,15 +387,12 @@ export default class UserService {
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const currentVersion = currentVersionFile.match(versionRegx)![1];
 
-      const lastVersionFileContent = await got.get(config.lastVersionFile);
-      const filePath = `${config.rootPath}/.version.ts`;
-      fs.writeFileSync(filePath, lastVersionFileContent.body, {
-        encoding: 'utf-8',
-      });
-      const lastVersionFile = fs.readFileSync(config.lastVersionFile, 'utf8');
-      const lastVersion = lastVersionFile.match(versionRegx)![1];
-      const lastLog = lastVersionFile.match(logRegx)![1];
-      const lastLink = lastVersionFile.match(linkRegx)![1];
+      const lastVersionFileContent = await (
+        await got.get(config.lastVersionFile)
+      ).body;
+      const lastVersion = lastVersionFileContent.match(versionRegx)![1];
+      const lastLog = lastVersionFileContent.match(logRegx)![1];
+      const lastLink = lastVersionFileContent.match(linkRegx)![1];
 
       return {
         code: 200,
