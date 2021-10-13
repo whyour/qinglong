@@ -1,11 +1,11 @@
 #!/bin/bash
-set -e
 
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 link_shell
+
+set -e
 echo -e "======================1. 检测配置文件========================\n"
-fix_config
 cp -fv $nginx_conf /etc/nginx/nginx.conf
 cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
 pm2 l >/dev/null 2>&1
