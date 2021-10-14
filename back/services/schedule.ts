@@ -54,8 +54,8 @@ export default class ScheduleService {
     );
   }
 
-  async cancelSchedule(id: string, jobName: string) {
-    this.logger.info('[取消定时任务]，任务名：%s', jobName);
-    this.scheduleStacks.has(id) && this.scheduleStacks.get(id)?.cancel();
+  async cancelSchedule({ _id = '', name }: Crontab) {
+    this.logger.info('[取消定时任务]，任务名：%s', name);
+    this.scheduleStacks.has(_id) && this.scheduleStacks.get(_id)?.cancel();
   }
 }
