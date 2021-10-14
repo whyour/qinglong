@@ -374,6 +374,7 @@ export default class UserService {
       command: `ql rmlog ${frequency}`,
       schedule: `5 23 */${frequency} * *`,
     };
+    await this.scheduleService.cancelSchedule(cron);
     await this.scheduleService.generateSchedule(cron);
     return { code: 200, data: { ...cron } };
   }

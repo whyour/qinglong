@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Button,
-  Input,
+  InputNumber,
   Form,
   Radio,
   Tabs,
@@ -32,6 +32,7 @@ import SecuritySettings from './security';
 import LoginLog from './loginLog';
 import NotificationSetting from './notification';
 import CheckUpdate from './checkUpdate';
+import debounce from 'lodash/debounce';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -264,6 +265,18 @@ const Setting = ({
       });
   };
 
+  const updateRemoveLogFrequency = (value: number | string | null) => {
+    const frequency = parseInt((value || '0') as string, 10);
+    request
+      .put(`${config.apiPrefix}system/log/remove`, { data: { frequency } })
+      .then((data: any) => {
+        message.success('更新成功');
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
+  };
+
   useEffect(() => {
     setFetchMethod(window.fetch);
     if (theme === 'dark') {
@@ -336,7 +349,13 @@ const Setting = ({
               initialValue={0}
               tooltip="每x天自动删除x天以前的日志"
             >
-              <Input addonBefore="每" addonAfter="天" style={{ width: 150 }} />
+              <InputNumber
+                defaultValue={0}
+                addonBefore="每"
+                addonAfter="天"
+                style={{ width: 150 }}
+                onChange={debounce(updateRemoveLogFrequency, 500)}
+              />
             </Form.Item>
             <Form.Item label="检查更新" name="update">
               <CheckUpdate ws={ws} />
