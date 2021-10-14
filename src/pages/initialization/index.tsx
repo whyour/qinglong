@@ -62,7 +62,7 @@ const Initialization = () => {
         if (_data && _data.code === 200) {
           next();
         } else {
-          message.error(_data.data);
+          message.error(_data.message);
         }
       })
       .finally(() => setLoading(false));
@@ -77,7 +77,7 @@ const Initialization = () => {
     {
       title: '欢迎使用',
       content: (
-        <div className={styles.top} style={{ marginTop: 120 }}>
+        <div className={styles.top} style={{ marginTop: 100 }}>
           <div className={styles.header}>
             <span className={styles.title}>欢迎使用青龙控制面板</span>
           </div>
@@ -92,6 +92,50 @@ const Initialization = () => {
             </Button>
           </div>
         </div>
+      ),
+    },
+    {
+      title: '通知设置',
+      content: (
+        <Form onFinish={submitNotification} layout="vertical">
+          <Form.Item
+            label="通知方式"
+            name="type"
+            rules={[{ required: true, message: '请选择通知方式' }]}
+            style={{ maxWidth: 350 }}
+          >
+            <Select
+              onChange={notificationModeChange}
+              placeholder="请选择通知方式"
+            >
+              {config.notificationModes
+                .filter((x) => x.value !== 'closed')
+                .map((x) => (
+                  <Option value={x.value}>{x.label}</Option>
+                ))}
+            </Select>
+          </Form.Item>
+          {fields.map((x) => (
+            <Form.Item
+              label={x.label}
+              name={x.label}
+              extra={x.tip}
+              rules={[{ required: x.required }]}
+              style={{ maxWidth: 400 }}
+            >
+              <Input.TextArea
+                autoSize={true}
+                placeholder={`请输入${x.label}`}
+              />
+            </Form.Item>
+          ))}
+          <Button type="primary" htmlType="submit" loading={loading}>
+            保存
+          </Button>
+          <Button type="link" htmlType="button" onClick={() => next()}>
+            跳过
+          </Button>
+        </Form>
       ),
     },
     {
@@ -144,53 +188,9 @@ const Initialization = () => {
       ),
     },
     {
-      title: '通知设置',
-      content: (
-        <Form onFinish={submitNotification} layout="vertical">
-          <Form.Item
-            label="通知方式"
-            name="type"
-            rules={[{ required: true, message: '请选择通知方式' }]}
-            style={{ maxWidth: 350 }}
-          >
-            <Select
-              onChange={notificationModeChange}
-              placeholder="请选择通知方式"
-            >
-              {config.notificationModes
-                .filter((x) => x.value !== 'closed')
-                .map((x) => (
-                  <Option value={x.value}>{x.label}</Option>
-                ))}
-            </Select>
-          </Form.Item>
-          {fields.map((x) => (
-            <Form.Item
-              label={x.label}
-              name={x.label}
-              extra={x.tip}
-              rules={[{ required: x.required }]}
-              style={{ maxWidth: 400 }}
-            >
-              <Input.TextArea
-                autoSize={true}
-                placeholder={`请输入${x.label}`}
-              />
-            </Form.Item>
-          ))}
-          <Button type="primary" htmlType="submit" loading={loading}>
-            保存
-          </Button>
-          <Button type="link" htmlType="button" onClick={() => next()}>
-            跳过
-          </Button>
-        </Form>
-      ),
-    },
-    {
       title: '完成安装',
       content: (
-        <div className={styles.top} style={{ marginTop: 120 }}>
+        <div className={styles.top} style={{ marginTop: 100 }}>
           <div className={styles.header}>
             <span className={styles.title}>恭喜安装完成！</span>
             <Link href="https://github.com/whyour/qinglong" target="_blank">
@@ -227,6 +227,7 @@ const Initialization = () => {
         <Steps
           current={current}
           direction="vertical"
+          size="small"
           className={styles['ant-steps']}
         >
           {steps.map((item) => (
