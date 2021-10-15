@@ -12,10 +12,11 @@ export default class ScheduleService {
 
   async generateSchedule({ _id = '', command, name, schedule }: Crontab) {
     this.logger.info(
-      '[创建定时任务]，任务ID: %s，cron: %s，任务名: %s，任务方法: %s',
+      '[创建定时任务]，任务ID: %s，cron: %s，任务名: %s，执行命令: %s',
       _id,
       schedule,
       name,
+      command,
     );
 
     this.scheduleStacks.set(
