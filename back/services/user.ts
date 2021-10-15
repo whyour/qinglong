@@ -398,7 +398,7 @@ export default class UserService {
   public async checkUpdate() {
     try {
       const versionRegx = /.*export const version = \'(.*)\'\;/;
-      const logRegx = /.*export const changeLog = \`(.*)\`\;/;
+      const logRegx = /.*export const changeLog = \`((.*\n.*)+)\`;/;
 
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const currentVersion = currentVersionFile.match(versionRegx)![1];
