@@ -273,6 +273,21 @@ export default (app: Router) => {
     },
   );
 
+  route.get(
+    '/system/log/remove',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        const data = await userService.getLogRemoveFrequency();
+        res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
   route.put(
     '/system/log/remove',
     celebrate({
