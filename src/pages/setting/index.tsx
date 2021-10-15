@@ -32,7 +32,7 @@ import SecuritySettings from './security';
 import LoginLog from './loginLog';
 import NotificationSetting from './notification';
 import CheckUpdate from './checkUpdate';
-import debounce from 'lodash/debounce';
+import { useForm } from 'antd/lib/form/Form';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -123,6 +123,8 @@ const Setting = ({
   const [tabActiveKey, setTabActiveKey] = useState('security');
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
   const [notificationInfo, setNotificationInfo] = useState<any>();
+  const [logRemoveFrequency, setLogRemoveFrequency] = useState<number>();
+  const [form] = useForm();
 
   const themeChange = (e: any) => {
     setTheme(e.target.value);
@@ -251,6 +253,8 @@ const Setting = ({
       getLoginLog();
     } else if (activeKey === 'notification') {
       getNotification();
+    } else if (activeKey === 'other') {
+      getLogRemoveFrequency();
     }
   };
 
@@ -265,16 +269,32 @@ const Setting = ({
       });
   };
 
-  const updateRemoveLogFrequency = (value: number | string | null) => {
-    const frequency = parseInt((value || '0') as string, 10);
+  const getLogRemoveFrequency = () => {
     request
-      .put(`${config.apiPrefix}system/log/remove`, { data: { frequency } })
+      .get(`${config.apiPrefix}system/log/remove`)
       .then((data: any) => {
-        message.success('更新成功');
+        console.log(data.data.frequency);
+        setLogRemoveFrequency(data.data.frequency);
+        form.setFieldsValue({ frequency: data.data.frequency });
       })
       .catch((error: any) => {
         console.log(error);
       });
+  };
+
+  const updateRemoveLogFrequency = () => {
+    setTimeout(() => {
+      request
+        .put(`${config.apiPrefix}system/log/remove`, {
+          data: { frequency: logRemoveFrequency },
+        })
+        .then((data: any) => {
+          message.success('更新成功');
+        })
+        .catch((error: any) => {
+          console.log(error);
+        });
+    });
   };
 
   useEffect(() => {
@@ -332,8 +352,8 @@ const Setting = ({
         <Tabs.TabPane tab="登陆日志" key="login">
           <LoginLog data={loginLogData} />
         </Tabs.TabPane>
-        <Tabs.TabPane tab="其他设置" key="theme">
-          <Form layout="vertical">
+        <Tabs.TabPane tab="其他设置" key="other">
+          <Form layout="vertical" form={form}>
             <Form.Item label="主题设置" name="theme" initialValue={theme}>
               <Radio.Group
                 options={optionsWithDisabled}
@@ -346,15 +366,15 @@ const Setting = ({
             <Form.Item
               label="日志删除频率"
               name="frequency"
-              initialValue={0}
               tooltip="每x天自动删除x天以前的日志"
             >
               <InputNumber
-                defaultValue={0}
                 addonBefore="每"
                 addonAfter="天"
                 style={{ width: 150 }}
-                onChange={debounce(updateRemoveLogFrequency, 500)}
+                min={0}
+                onBlur={updateRemoveLogFrequency}
+                onChange={(value) => setLogRemoveFrequency(value)}
               />
             </Form.Item>
             <Form.Item label="检查更新" name="update">

@@ -328,10 +328,24 @@ export default class UserService {
     });
   }
 
-  private async updateNotificationDb(payload: AuthInfo): Promise<any> {
+  public async getLogRemoveFrequency() {
+    return new Promise((resolve) => {
+      this.authDb
+        .find({ type: AuthDataType.removeLogFrequency })
+        .exec((err, docs) => {
+          if (err || docs.length === 0) {
+            resolve({});
+          } else {
+            resolve(docs[0].info);
+          }
+        });
+    });
+  }
+
+  private async updateAuthDb(payload: AuthInfo): Promise<any> {
     return new Promise((resolve) => {
       this.authDb.update(
-        { type: AuthDataType.notification },
+        { type: payload.type },
         { ...payload },
         { upsert: true, returnUpdatedDocs: true },
         (err, num, doc: any) => {
@@ -353,7 +367,7 @@ export default class UserService {
       `【蛟龙】测试通知 https://t.me/jiao_long`,
     );
     if (isSuccess) {
-      const result = await this.updateNotificationDb({
+      const result = await this.updateAuthDb({
         type: AuthDataType.notification,
         info: { ...notificationInfo },
       });
@@ -364,7 +378,7 @@ export default class UserService {
   }
 
   public async updateLogRemoveFrequency(frequency: number) {
-    const result = await this.updateNotificationDb({
+    const result = await this.updateAuthDb({
       type: AuthDataType.removeLogFrequency,
       info: { frequency },
     });
@@ -375,7 +389,9 @@ export default class UserService {
       schedule: `5 23 */${frequency} * *`,
     };
     await this.scheduleService.cancelSchedule(cron);
-    await this.scheduleService.generateSchedule(cron);
+    if (frequency > 0) {
+      await this.scheduleService.generateSchedule(cron);
+    }
     return { code: 200, data: { ...cron } };
   }
 
