@@ -274,9 +274,9 @@ git_clone_scripts() {
     local url=$1
     local dir=$2
     local branch=$3
-    [[ $branch ]] && local cmd="-b $branch "
+    [[ $branch ]] && local part_cmd="-b $branch "
     echo -e "开始克隆仓库 $url 到 $dir\n"
-    git clone $cmd $url $dir
+    git clone $part_cmd $url $dir
     exit_status=$?
 }
 
@@ -284,12 +284,12 @@ git_pull_scripts() {
     local dir_current=$(pwd)
     local dir_work="$1"
     local branch="$2"
-    [[ $branch ]] && local cmd="origin/${branch}"
+    [[ $branch ]] && local part_cmd="origin/${branch}"
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
     git fetch --all
     exit_status=$?
-    git reset --hard $cmd
+    git reset --hard $part_cmd
     git pull
     cd $dir_current
 }
@@ -300,12 +300,12 @@ reset_romote_url() {
     local url=$2
     local branch="$3"
 
-    [[ $branch ]] && local cmd="origin/${branch}"
+    [[ $branch ]] && local part_cmd="origin/${branch}"
 
     if [ -d "$dir_work/.git" ]; then
         cd $dir_work
         git remote set-url origin $url >/dev/null
-        git reset --hard $cmd >/dev/null
+        git reset --hard $part_cmd >/dev/null
         cd $dir_current
     fi
 }
