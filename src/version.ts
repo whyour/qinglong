@@ -1,6 +1,8 @@
-export const version = '2.9.8-001';
-export const changeLogLink = 'https://t.me/jiao_long/187';
-export const changeLog = `2.9.8-001版本说明
-1. 修复nginx配置文件
-2. 修复设置删除日志频率
+export const version = '2.9.9';
+export const changeLogLink = 'https://t.me/jiao_long/188';
+export const changeLog = `2.9.9版本说明
+1. 脚本管理移动端支持添加脚本、编辑脚本
+2. 修复移动端表格样式
+3. 修复检查更新中无法展示更新日志
+4. 移除ql update任务删除限制
 `;
