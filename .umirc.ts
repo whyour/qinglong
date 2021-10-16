@@ -10,6 +10,7 @@ export default defineConfig({
   dynamicImport: {
     loading: '@/components/pageLoading',
   },
+  mfsu: {},
   fastRefresh: {},
   favicon: '/images/g5.ico',
   proxy: {

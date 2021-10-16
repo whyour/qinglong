@@ -273,7 +273,6 @@ const Setting = ({
     request
       .get(`${config.apiPrefix}system/log/remove`)
       .then((data: any) => {
-        console.log(data.data.frequency);
         setLogRemoveFrequency(data.data.frequency);
         form.setFieldsValue({ frequency: data.data.frequency });
       })
