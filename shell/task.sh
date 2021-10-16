@@ -129,7 +129,6 @@ run_concurrent() {
 
     local n=0
     for i in ${runArr[@]}; do
-        echo "$i"
         array_run[n]=${array[$i - 1]}
         let n++
     done
@@ -212,7 +211,6 @@ run_designated() {
 
     local n=0
     for i in ${runArr[@]}; do
-        echo "$i"
         array_run[n]=${array[$i - 1]}
         let n++
     done
