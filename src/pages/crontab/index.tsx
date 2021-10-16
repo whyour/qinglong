@@ -273,7 +273,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       title: '操作',
       key: 'action',
       align: 'center' as const,
-      width: 90,
+      width: 100,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
@@ -518,7 +518,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
     });
   };
 
-  const pinOrunPinCron = (record: any, index: number) => {
+  const pinOrUnPinCron = (record: any, index: number) => {
     Modal.confirm({
       title: `确认${record.isPinned === 1 ? '取消置顶' : '置顶'}`,
       content: (
@@ -575,7 +575,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
             编辑
           </Menu.Item>
           <Menu.Item
-            key="enableordisable"
+            key="enableOrDisable"
             icon={
               record.isDisabled === 1 ? (
                 <CheckCircleOutlined />
@@ -590,7 +590,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
             删除
           </Menu.Item>
           <Menu.Item
-            key="pinOrunPin"
+            key="pinOrUnPin"
             icon={
               record.isPinned === 1 ? <StopOutlined /> : <PushpinOutlined />
             }
@@ -611,14 +611,14 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       case 'edit':
         editCron(record, index);
         break;
-      case 'enableordisable':
+      case 'enableOrDisable':
         enabledOrDisabledCron(record, index);
         break;
       case 'delete':
         delCron(record, index);
         break;
-      case 'pinOrunPin':
-        pinOrunPinCron(record, index);
+      case 'pinOrUnPin':
+        pinOrUnPinCron(record, index);
         break;
       default:
         break;

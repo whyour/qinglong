@@ -8,6 +8,8 @@ import {
   message,
   Typography,
   Tooltip,
+  Dropdown,
+  Menu,
 } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -21,10 +23,12 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
+  EllipsisOutlined,
   FormOutlined,
   PlusOutlined,
   PlusSquareOutlined,
   SearchOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import EditScriptNameModal from './editNameModal';
 
@@ -65,6 +69,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   const [isEditing, setIsEditing] = useState(false);
   const editorRef = useRef<any>(null);
   const [isAddFileModalVisible, setIsAddFileModalVisible] = useState(false);
+  const [dropdownIsVisible, setDropdownIsVisible] = useState(false);
 
   const getScripts = () => {
     setLoading(true);
@@ -133,7 +138,9 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   );
 
   const editFile = () => {
-    setIsEditing(true);
+    setTimeout(() => {
+      setIsEditing(true);
+    }, 300);
   };
 
   const cancelEdit = () => {
@@ -234,6 +241,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
       newData.unshift(_file);
       setData(newData);
       onSelect(_file.value, _file);
+      setIsEditing(true);
     }
     setIsAddFileModalVisible(false);
   };
@@ -273,6 +281,29 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     }
   }, []);
 
+  const menu = isEditing ? (
+    <Menu>
+      <Menu.Item key="save" icon={<PlusOutlined />} onClick={saveFile}>
+        保存
+      </Menu.Item>
+      <Menu.Item key="exit" icon={<EditOutlined />} onClick={cancelEdit}>
+        退出编辑
+      </Menu.Item>
+    </Menu>
+  ) : (
+    <Menu>
+      <Menu.Item key="add" icon={<PlusOutlined />} onClick={addFile}>
+        添加
+      </Menu.Item>
+      <Menu.Item key="edit" icon={<EditOutlined />} onClick={editFile}>
+        编辑
+      </Menu.Item>
+      <Menu.Item key="delete" icon={<DeleteOutlined />} onClick={deleteFile}>
+        删除
+      </Menu.Item>
+    </Menu>
+  );
+
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
@@ -291,9 +322,13 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                 key="value"
                 onSelect={onSelect}
               />,
-              <Button type="primary" onClick={deleteFile}>
-                删除
-              </Button>,
+              <Dropdown
+                overlay={menu}
+                trigger={['click']}
+                onVisibleChange={(visible) => setDropdownIsVisible(visible)}
+              >
+                <Button type="primary" icon={<EllipsisOutlined />} />
+              </Dropdown>,
             ]
           : isEditing
           ? [
@@ -326,9 +361,6 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                   icon={<DeleteOutlined />}
                 />
               </Tooltip>,
-              // <Tooltip title="下载">
-              //   <Button type="primary" onClick={downloadFile} icon={<DownloadOutlined />} />
-              // </Tooltip>,
               <Button
                 type="primary"
                 onClick={() => {
@@ -389,7 +421,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
               styleActiveLine: true,
               matchBrackets: true,
               mode,
-              readOnly: true,
+              readOnly: !isEditing,
             }}
             onBeforeChange={(editor, data, value) => {
               setValue(value);
