@@ -127,6 +127,7 @@ export default class NotificationService {
       telegramBotToken,
       telegramBotUserId,
     } = this.params;
+    const authStr = telegramBotProxyAuth ? `${telegramBotProxyAuth}@` : '';
     const url = `https://${
       telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
     }/bot${telegramBotToken}/sendMessage`;
@@ -137,7 +138,7 @@ export default class NotificationService {
         keepAliveMsecs: 1000,
         maxSockets: 256,
         maxFreeSockets: 256,
-        proxy: `http://${telegramBotProxyHost}:${telegramBotProxyPort}`,
+        proxy: `http://${authStr}${telegramBotProxyHost}:${telegramBotProxyPort}`,
       };
       const httpAgent = new HttpProxyAgent(options);
       const httpsAgent = new HttpsProxyAgent(options);
