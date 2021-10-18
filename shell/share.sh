@@ -304,6 +304,7 @@ reset_romote_url() {
 
     if [ -d "$dir_work/.git" ]; then
         cd $dir_work
+        [[ -f ".git/index.lock" ]] && rm -f .git/index.lock >/dev/null
         git remote set-url origin $url >/dev/null
         git reset --hard $part_cmd >/dev/null
         cd $dir_current

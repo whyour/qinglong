@@ -33,10 +33,18 @@ const errorHandler = function (error: any) {
 };
 
 const _request = extend({ timeout: 60000, params: { t: time }, errorHandler });
+const apiWhiteList = [
+  '/api/login',
+  '/open/auth/token',
+  '/api/user/two-factor/login',
+  '/api/system',
+  '/api/init/user',
+  '/api/init/notification',
+];
 
 _request.interceptors.request.use((url, options) => {
   const token = localStorage.getItem(config.authKey);
-  if (token) {
+  if (token && !apiWhiteList.includes(url)) {
     const headers = {
       Authorization: `Bearer ${token}`,
     };
