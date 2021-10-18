@@ -8,7 +8,6 @@ const { Countdown } = Statistic;
 
 const CheckUpdate = ({ ws }: any) => {
   const [updateLoading, setUpdateLoading] = useState(false);
-  const [value, setValue] = useState('');
   const modalRef = useRef<any>();
 
   const checkUpgrade = () => {
@@ -92,12 +91,11 @@ const CheckUpdate = ({ ws }: any) => {
             style={{
               wordBreak: 'break-all',
               whiteSpace: 'pre-wrap',
-              paddingTop: 15,
               fontSize: 12,
               fontWeight: 400,
             }}
           >
-            {value}
+            更新中...
           </pre>
         </div>
       ),
@@ -105,8 +103,12 @@ const CheckUpdate = ({ ws }: any) => {
   };
 
   useEffect(() => {
-    ws.onmessage = (e) => {
-      setValue(value + e.data);
+    let _message = '';
+    ws.onmessage = (e: any) => {
+      if (!modalRef.current) {
+        return;
+      }
+      _message = `${_message}\n${e.data}`;
       modalRef.current.update({
         content: (
           <div style={{ height: '60vh', overflowY: 'auto' }}>
@@ -114,16 +116,21 @@ const CheckUpdate = ({ ws }: any) => {
               style={{
                 wordBreak: 'break-all',
                 whiteSpace: 'pre-wrap',
-                paddingTop: 15,
                 fontSize: 12,
                 fontWeight: 400,
               }}
             >
-              {value + e.data}
+              {_message}
             </pre>
+            <div id="log-identifier" style={{ paddingBottom: 5 }}></div>
           </div>
         ),
       });
+      document.getElementById('log-identifier') &&
+        document
+          .getElementById('log-identifier')!
+          .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
       if (e.data.includes('重启面板')) {
         message.warning({
           content: (
@@ -148,7 +155,6 @@ const CheckUpdate = ({ ws }: any) => {
 
   return (
     <>
-      {value}
       <Button type="primary" onClick={checkUpgrade}>
         检查更新
       </Button>
