@@ -153,7 +153,13 @@ const Initialization = () => {
           <Form.Item
             label="密码"
             name="password"
-            rules={[{ required: true }]}
+            rules={[
+              { required: true },
+              {
+                pattern: /^(?!admin$).*$/,
+                message: '密码不能为admin',
+              },
+            ]}
             hasFeedback
             style={{ maxWidth: 350 }}
           >
@@ -190,7 +196,7 @@ const Initialization = () => {
     {
       title: '完成安装',
       content: (
-        <div className={styles.top} style={{ marginTop: 100 }}>
+        <div className={styles.top} style={{ marginTop: 80 }}>
           <div className={styles.header}>
             <span className={styles.title}>恭喜安装完成！</span>
             <Link href="https://github.com/whyour/qinglong" target="_blank">

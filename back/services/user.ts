@@ -228,6 +228,9 @@ export default class UserService {
     username: string;
     password: string;
   }) {
+    if (password === 'admin') {
+      return { code: 400, message: '密码不能设置为admin' };
+    }
     const authInfo = this.getAuthInfo();
     this.updateAuthInfo(authInfo, { username, password });
     return { code: 200, message: '更新成功' };

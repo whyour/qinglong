@@ -175,7 +175,13 @@ const SecuritySettings = ({ user, userChange }: any) => {
         <Form.Item
           label="密码"
           name="password"
-          rules={[{ required: true }]}
+          rules={[
+            { required: true },
+            {
+              pattern: /^(?!admin$).*$/,
+              message: '密码不能为admin',
+            },
+          ]}
           hasFeedback
           style={{ maxWidth: 300 }}
         >
