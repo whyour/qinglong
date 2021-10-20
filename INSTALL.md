@@ -50,7 +50,7 @@ docker-compose up -d
 会生成`auth.json`
 
 在ssh输入 
-1.docker exec it qinglong bash
+1.docker exec -it qinglong bash
 2.cat /ql/config/auth.json
 
 cat查看之后返回的结果类似如下字段
