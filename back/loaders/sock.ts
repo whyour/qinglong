@@ -1,4 +1,4 @@
-import sockjs from 'sockjs';
+import sockJs from 'sockjs';
 import { Server } from 'http';
 import Logger from './logger';
 import { Container } from 'typedi';
@@ -8,7 +8,7 @@ import fs from 'fs';
 import { getPlatform } from '../config/util';
 
 export default async ({ server }: { server: Server }) => {
-  const echo = sockjs.createServer({ prefix: '/api/ws' });
+  const echo = sockJs.createServer({ prefix: '/api/ws', log: () => {} });
   const sockService = Container.get(SockService);
 
   echo.on('connection', (conn) => {
@@ -18,7 +18,7 @@ export default async ({ server }: { server: Server }) => {
     if (data) {
       const { token = '', tokens = {} } = JSON.parse(data);
       if (headerToken === token || tokens[platform] === headerToken) {
-        Logger.info('✌️ Sockjs connection success');
+        conn.write('hanhh');
         sockService.addClient(conn);
 
         conn.on('data', (message) => {
