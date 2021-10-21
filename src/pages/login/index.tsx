@@ -23,7 +23,7 @@ const Login = () => {
   const [waitTime, setWaitTime] = useState<any>();
   const { theme } = useTheme();
   const [twoFactor, setTwoFactor] = useState(false);
-  const [verifing, setVerifing] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [loginInfo, setLoginInfo] = useState<any>();
 
   const handleOk = (values: any) => {
@@ -56,7 +56,7 @@ const Login = () => {
   };
 
   const completeTowFactor = (values: any) => {
-    setVerifing(true);
+    setVerifying(true);
     request
       .put(`${config.apiPrefix}user/two-factor/login`, {
         data: { ...loginInfo, code: values.code },
@@ -67,11 +67,11 @@ const Login = () => {
         } else {
           checkResponse(data);
         }
-        setVerifing(false);
+        setVerifying(false);
       })
       .catch((error: any) => {
         console.log(error);
-        setVerifing(false);
+        setVerifying(false);
       });
   };
 
@@ -145,13 +145,13 @@ const Login = () => {
               ]}
               hasFeedback
             >
-              <Input placeholder="6位数字" autoComplete="off" />
+              <Input placeholder="6位数字" autoFocus autoComplete="off" />
             </FormItem>
             <Button
               type="primary"
               htmlType="submit"
               style={{ width: '100%' }}
-              loading={verifing}
+              loading={verifying}
             >
               验证
             </Button>
