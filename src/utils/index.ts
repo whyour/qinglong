@@ -181,8 +181,8 @@ export function getTableScroll({
   id,
 }: { extraHeight?: number; id?: string } = {}) {
   if (typeof extraHeight == 'undefined') {
-    //  默认底部分页64 + 边距10
-    extraHeight = 167;
+    //  47 + 40 + 10 + 24
+    extraHeight = 127;
   }
   let tHeader = null;
   if (id) {
@@ -192,7 +192,7 @@ export function getTableScroll({
           .getElementsByClassName('ant-table-thead')[0]
       : null;
   } else {
-    tHeader = document.querySelector('.ant-pro-grid-content');
+    tHeader = document.querySelector('.ant-table-wrapper');
   }
 
   //表格内容距离顶部的距离
