@@ -127,13 +127,15 @@ export default function (props: any) {
     ws.current = new SockJS(
       `${location.origin}/api/ws?token=${localStorage.getItem(config.authKey)}`,
     );
-    ws.current.onopen = (e: any) => {
-      console.log('websocket连接成功', e);
+
+    ws.current.onmessage = (e: any) => {
+      if (e.data === 'hanhh') {
+        console.log('websocket连接成功', e);
+      } else {
+        console.log('websocket连接失败', e);
+      }
     };
 
-    ws.current.onclose = (e: any) => {
-      console.log('websocket已关闭', e);
-    };
     const wsCurrent = ws.current;
 
     return () => {

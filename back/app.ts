@@ -9,7 +9,7 @@ import Logger from './loaders/logger';
 async function startServer() {
   const app = express();
 
-  await require('./loaders').default({ expressApp: app });
+  await require('./loaders/app').default({ expressApp: app });
 
   const server = app
     .listen(config.port, () => {
@@ -24,7 +24,7 @@ async function startServer() {
       process.exit(1);
     });
 
-  await require('./loaders/sock').default({ server });
+  await require('./loaders/server').default({ server });
 }
 
 startServer();

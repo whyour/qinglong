@@ -5,8 +5,6 @@ import initData from './initData';
 import { Application } from 'express';
 
 export default async ({ expressApp }: { expressApp: Application }) => {
-  Logger.info('✌️ DB loaded and connected!');
-
   await dependencyInjectorLoader({
     models: [],
   });
