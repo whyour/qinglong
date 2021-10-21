@@ -1,8 +1,8 @@
-export const version = '2.9.9';
-export const changeLogLink = 'https://t.me/jiao_long/188';
-export const changeLog = `2.9.9版本说明
-1. 脚本管理移动端支持添加脚本、编辑脚本
-2. 修复移动端表格样式
-3. 修复检查更新中无法展示更新日志
-4. 移除ql update任务删除限制
+export const version = '2.9.10';
+export const changeLogLink = 'https://t.me/jiao_long/190';
+export const changeLog = `2.9.10版本说明
+1. 修复系统通知telegram代理认证参数
+2. 修复ql update错误
+3. 修复table滚动高度
+4. 更新安装说明
 `;
