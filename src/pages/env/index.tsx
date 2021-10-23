@@ -438,7 +438,9 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
 
   useEffect(() => {
     const offset = isPhone ? 40 : 0;
-    setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+    setTimeout(() => {
+      setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+    });
   }, []);
 
   return (

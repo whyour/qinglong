@@ -299,7 +299,9 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
 
   useEffect(() => {
     const offset = isPhone ? 40 : 0;
-    setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+    setTimeout(() => {
+      setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+    });
   }, []);
 
   useEffect(() => {
