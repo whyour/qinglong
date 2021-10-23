@@ -49,6 +49,12 @@ export default {
         component: '@/pages/script/index',
       },
       {
+        path: '/dependence',
+        name: '依赖管理',
+        icon: <FormOutlined />,
+        component: '@/pages/dependence/index',
+      },
+      {
         path: '/diff',
         name: '对比工具',
         icon: <DiffOutlined />,

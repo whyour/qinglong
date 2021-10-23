@@ -6,6 +6,7 @@ import log from './log';
 import cron from './cron';
 import script from './script';
 import open from './open';
+import dependence from './dependence';
 
 export default () => {
   const app = Router();
@@ -16,6 +17,7 @@ export default () => {
   cron(app);
   script(app);
   open(app);
+  dependence(app);
 
   return app;
 };

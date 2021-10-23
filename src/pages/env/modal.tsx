@@ -85,7 +85,12 @@ const EnvModal = ({
           <Input placeholder="请输入环境变量名称" />
         </Form.Item>
         {!env && (
-          <Form.Item name="split" label="自动拆分" initialValue="0">
+          <Form.Item
+            name="split"
+            label="自动拆分"
+            initialValue="0"
+            tooltip="多个依赖是否换行分割"
+          >
             <Radio.Group>
               <Radio value="1">是</Radio>
               <Radio value="0">否</Radio>
@@ -106,7 +111,7 @@ const EnvModal = ({
           />
         </Form.Item>
         <Form.Item name="remarks" label="备注">
-          <Input />
+          <Input placeholder="请输入备注" />
         </Form.Item>
       </Form>
     </Modal>

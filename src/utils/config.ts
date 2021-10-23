@@ -188,4 +188,5 @@ export default {
     '/log': '任务日志',
     '/setting': '系统设置',
   },
+  dependenceTypes: ['nodejs', 'python3', 'linux'],
 };
