@@ -1,4 +1,4 @@
-import DependenceService from 'back/services/dependence';
+import DependenceService from '../services/dependence';
 import { exec } from 'child_process';
 import { Container } from 'typedi';
 import { Crontab, CrontabStatus } from '../data/cron';
