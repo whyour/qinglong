@@ -49,7 +49,7 @@ const DependenceLogModal = ({
         if (localStorage.getItem('logDependence') === dependence._id) {
           const log = (data.data.log || []).join('\n') as string;
           setValue(log);
-          setExecuting(!log.includes('安装结束'));
+          setExecuting(!log.includes('依赖安装结束'));
         }
       })
       .finally(() => {
@@ -64,7 +64,7 @@ const DependenceLogModal = ({
         const { type, message, references } = JSON.parse(e.data);
         if (
           type === 'installDependence' &&
-          message === '安装结束' &&
+          message === '依赖安装结束' &&
           references.length > 0
         ) {
           setExecuting(false);

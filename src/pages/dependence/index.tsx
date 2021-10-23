@@ -314,7 +314,7 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
       const { type, message, references } = JSON.parse(e.data);
       if (
         type === 'installDependence' &&
-        message === '安装结束' &&
+        message === '依赖安装结束' &&
         references.length > 0
       ) {
         const result = [...value];

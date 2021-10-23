@@ -227,10 +227,10 @@ export default class DependenceService {
     cp.on('close', (code) => {
       this.sockService.sendMessage({
         type: 'installDependence',
-        message: '安装结束',
+        message: '依赖安装结束',
         references: depIds,
       });
-      isInstall && this.updateLog(depIds, '安装结束');
+      isInstall && this.updateLog(depIds, '依赖安装结束');
       isInstall &&
         this.dependenceDb.update(
           { _id: { $in: depIds } },
