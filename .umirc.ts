@@ -7,9 +7,6 @@ export default defineConfig({
   nodeModulesTransform: {
     type: 'none',
   },
-  dynamicImport: {
-    loading: '@/components/pageLoading',
-  },
   mfsu: {},
   fastRefresh: {},
   favicon: '/images/g5.ico',
