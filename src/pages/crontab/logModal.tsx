@@ -27,7 +27,7 @@ const CronLogModal = ({
 }) => {
   const [value, setValue] = useState<string>('启动中...');
   const [loading, setLoading] = useState<any>(true);
-  const [excuting, setExcuting] = useState<any>(true);
+  const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
   const [theme, setTheme] = useState<string>('');
 
@@ -41,7 +41,7 @@ const CronLogModal = ({
         if (localStorage.getItem('logCron') === cron._id) {
           const log = data.data as string;
           setValue(log || '暂无日志');
-          setExcuting(
+          setExecuting(
             log && !log.includes('执行结束') && !log.includes('重启面板'),
           );
           if (log && !log.includes('执行结束') && !log.includes('重启面板')) {
@@ -89,8 +89,8 @@ const CronLogModal = ({
   const titleElement = () => {
     return (
       <>
-        {(excuting || loading) && <Loading3QuartersOutlined spin />}
-        {!excuting && <CheckCircleOutlined />}
+        {(executing || loading) && <Loading3QuartersOutlined spin />}
+        {!executing && <CheckCircleOutlined />}
         <span style={{ marginLeft: 5 }}>日志-{cron && cron.name}</span>{' '}
       </>
     );

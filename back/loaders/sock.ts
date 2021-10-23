@@ -18,7 +18,7 @@ export default async ({ server }: { server: Server }) => {
     if (data) {
       const { token = '', tokens = {} } = JSON.parse(data);
       if (headerToken === token || tokens[platform] === headerToken) {
-        conn.write('hanhh');
+        conn.write(JSON.stringify({ type: 'ping', message: 'hanhh' }));
         sockService.addClient(conn);
 
         conn.on('data', (message) => {

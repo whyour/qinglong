@@ -129,9 +129,14 @@ export default function (props: any) {
     );
 
     ws.current.onmessage = (e: any) => {
-      if (e.data === 'hanhh') {
-        console.log('websocket连接成功', e);
-      } else {
+      try {
+        const data = JSON.parse(e.data);
+        if (data && data.message === 'hanhh') {
+          console.log('websocket连接成功', e);
+        } else {
+          console.log('websocket连接失败', e);
+        }
+      } catch (error) {
         console.log('websocket连接失败', e);
       }
     };

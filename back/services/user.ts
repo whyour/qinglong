@@ -433,16 +433,29 @@ export default class UserService {
   public async updateSystem() {
     const cp = spawn('ql -l update', { shell: '/bin/bash' });
 
+    this.sockService.sendMessage({
+      type: 'updateSystemVersion',
+      message: `开始更新系统`,
+    });
     cp.stdout.on('data', (data) => {
-      this.sockService.sendMessage(data.toString());
+      this.sockService.sendMessage({
+        type: 'updateSystemVersion',
+        message: data.toString(),
+      });
     });
 
     cp.stderr.on('data', (data) => {
-      this.sockService.sendMessage(data.toString());
+      this.sockService.sendMessage({
+        type: 'updateSystemVersion',
+        message: data.toString(),
+      });
     });
 
     cp.on('error', (err) => {
-      this.sockService.sendMessage(JSON.stringify(err));
+      this.sockService.sendMessage({
+        type: 'updateSystemVersion',
+        message: JSON.stringify(err),
+      });
     });
 
     return { code: 200 };

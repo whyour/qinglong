@@ -1,6 +1,7 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { Connection } from 'sockjs';
+import { SockMessage } from '../data/sock';
 
 @Service()
 export default class SockService {
@@ -25,9 +26,9 @@ export default class SockService {
     }
   }
 
-  public sendMessage(msg: string) {
+  public sendMessage(msg: SockMessage) {
     this.clients.forEach((x) => {
-      x.write(msg);
+      x.write(JSON.stringify(msg));
     });
   }
 }
