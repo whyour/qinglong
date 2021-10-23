@@ -763,7 +763,9 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   useEffect(() => {
     setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
     const offset = isPhone ? 40 : 0;
-    setTableScrollHeight(getTableScroll() - offset);
+    setTimeout(() => {
+      setTableScrollHeight(getTableScroll() - offset);
+    });
   }, []);
 
   return (
