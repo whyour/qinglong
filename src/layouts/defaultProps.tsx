@@ -7,6 +7,7 @@ import {
   FolderOutlined,
   RadiusSettingOutlined,
   ControlOutlined,
+  ContainerOutlined,
 } from '@ant-design/icons';
 
 export default {
@@ -51,7 +52,7 @@ export default {
       {
         path: '/dependence',
         name: '依赖管理',
-        icon: <FormOutlined />,
+        icon: <ContainerOutlined />,
         component: '@/pages/dependence/index',
       },
       {

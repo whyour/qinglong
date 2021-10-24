@@ -26,6 +26,7 @@ export default function (props: any) {
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<{ isInitialized: boolean }>();
   const ws = useRef<any>(null);
+  const [socketMessage, setSocketMessage] = useState<any>();
 
   const logout = () => {
     request.post(`${config.apiPrefix}logout`).then(() => {
@@ -124,6 +125,7 @@ export default function (props: any) {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
     ws.current = new SockJS(
       `${location.origin}/api/ws?token=${localStorage.getItem(config.authKey)}`,
     );
@@ -131,11 +133,14 @@ export default function (props: any) {
     ws.current.onmessage = (e: any) => {
       try {
         const data = JSON.parse(e.data);
-        if (data && data.message === 'hanhh') {
-          console.log('websocket连接成功', e);
-        } else {
-          console.log('websocket连接失败', e);
+        if (data.type === 'ping') {
+          if (data && data.message === 'hanhh') {
+            console.log('websocket连接成功', e);
+          } else {
+            console.log('websocket连接失败', e);
+          }
         }
+        setSocketMessage(data);
       } catch (error) {
         console.log('websocket连接失败', e);
       }
@@ -146,7 +151,7 @@ export default function (props: any) {
     return () => {
       wsCurrent.close();
     };
-  }, []);
+  }, [user]);
 
   if (['/login', '/initialization'].includes(props.location.pathname)) {
     document.title = `${
@@ -246,7 +251,7 @@ export default function (props: any) {
           user,
           reloadUser,
           reloadTheme: setTheme,
-          ws: ws.current,
+          socketMessage,
         });
       })}
     </ProLayout>

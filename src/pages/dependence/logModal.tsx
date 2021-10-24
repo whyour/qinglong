@@ -12,21 +12,23 @@ const DependenceLogModal = ({
   dependence,
   handleCancel,
   visible,
-  ws,
+  socketMessage,
 }: {
   dependence?: any;
   visible: boolean;
-  handleCancel: () => void;
-  ws: any;
+  handleCancel: (needRemove?: boolean) => void;
+  socketMessage: any;
 }) => {
   const [value, setValue] = useState<string>('');
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
-  const [loading, setLoading] = useState<any>(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isRemoveFailed, setIsRemoveFailed] = useState(false);
+  const [removeLoading, setRemoveLoading] = useState<boolean>(false);
 
-  const cancel = () => {
+  const cancel = (needRemove: boolean = false) => {
     localStorage.removeItem('logDependence');
-    handleCancel();
+    handleCancel(needRemove);
   };
 
   const titleElement = () => {
@@ -49,7 +51,8 @@ const DependenceLogModal = ({
         if (localStorage.getItem('logDependence') === dependence._id) {
           const log = (data.data.log || []).join('\n') as string;
           setValue(log);
-          setExecuting(!log.includes('依赖安装结束'));
+          setExecuting(!log.includes('结束时间'));
+          setIsRemoveFailed(log.includes('删除失败'));
         }
       })
       .finally(() => {
@@ -57,22 +60,47 @@ const DependenceLogModal = ({
       });
   };
 
+  const forceRemoveDependence = () => {
+    setRemoveLoading(true);
+    request
+      .delete(`${config.apiPrefix}dependencies/force`, {
+        data: [dependence._id],
+      })
+      .then((data: any) => {
+        cancel(true);
+      })
+      .finally(() => {
+        setRemoveLoading(false);
+      });
+  };
+
+  const footerClick = () => {
+    if (isRemoveFailed) {
+      forceRemoveDependence();
+    } else {
+      cancel();
+    }
+  };
+
   useEffect(() => {
     if (dependence) {
       getDependenceLog();
-      ws.onmessage = (e: any) => {
-        const { type, message, references } = JSON.parse(e.data);
-        if (
-          type === 'installDependence' &&
-          message === '依赖安装结束' &&
-          references.length > 0
-        ) {
-          setExecuting(false);
-        }
-        setValue(`${value} \n ${message}`);
-      };
     }
   }, [dependence]);
+
+  useEffect(() => {
+    if (!socketMessage) return;
+    const { type, message, references } = socketMessage;
+    if (
+      type === 'installDependence' &&
+      message.includes('结束时间') &&
+      references.length > 0
+    ) {
+      setExecuting(false);
+      setIsRemoveFailed(message.includes('删除失败'));
+    }
+    setValue(`${value} \n ${message}`);
+  }, [socketMessage]);
 
   useEffect(() => {
     setIsPhone(document.body.clientWidth < 768);
@@ -93,8 +121,8 @@ const DependenceLogModal = ({
       onOk={() => cancel()}
       onCancel={() => cancel()}
       footer={[
-        <Button type="primary" onClick={() => cancel()}>
-          知道了
+        <Button type="primary" onClick={footerClick} loading={removeLoading}>
+          {isRemoveFailed ? '强制删除' : '知道了'}
         </Button>,
       ]}
     >

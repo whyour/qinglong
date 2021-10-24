@@ -87,6 +87,24 @@ export default (app: Router) => {
     },
   );
 
+  route.delete(
+    '/dependencies/force',
+    celebrate({
+      body: Joi.array().items(Joi.string().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const dependenceService = Container.get(DependenceService);
+        const data = await dependenceService.removeDb(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
   route.get(
     '/dependencies/:id',
     celebrate({

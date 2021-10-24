@@ -24,6 +24,9 @@ export enum DependenceStatus {
   'installing',
   'installed',
   'installFailed',
+  'removing',
+  'removed',
+  'removeFailed',
 }
 
 export enum DependenceTypes {
@@ -33,13 +36,13 @@ export enum DependenceTypes {
 }
 
 export enum InstallDependenceCommandTypes {
-  'pnpm install -g',
+  'npm i -g',
   'pip3 install',
   'apk add --no-cache',
 }
 
 export enum unInstallDependenceCommandTypes {
-  'pnpm uninstall -g',
+  'npm uninstall -g',
   'pip3 uninstall',
   'apk del',
 }

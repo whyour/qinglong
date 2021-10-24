@@ -51,9 +51,7 @@ const DependenceModal = ({
           data: payload,
         },
       );
-      if (code === 200) {
-        message.success(dependence ? '更新依赖成功' : '添加依赖成功');
-      } else {
+      if (code !== 200) {
         message.error(data);
       }
       setLoading(false);

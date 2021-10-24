@@ -47,7 +47,7 @@ const Setting = ({
   user,
   reloadUser,
   reloadTheme,
-  ws,
+  socketMessage,
 }: any) => {
   const columns = [
     {
@@ -377,7 +377,7 @@ const Setting = ({
               />
             </Form.Item>
             <Form.Item label="检查更新" name="update">
-              <CheckUpdate ws={ws} />
+              <CheckUpdate socketMessage={socketMessage} />
             </Form.Item>
           </Form>
         </Tabs.TabPane>

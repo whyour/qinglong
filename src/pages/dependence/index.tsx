@@ -37,6 +37,9 @@ enum Status {
   '安装中',
   '已安装',
   '安装失败',
+  '删除中',
+  '已删除',
+  '删除失败',
 }
 
 enum StatusColor {
@@ -45,7 +48,7 @@ enum StatusColor {
   'error',
 }
 
-const Dependence = ({ headerStyle, isPhone, ws }: any) => {
+const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
   const columns: any = [
     {
       title: '序号',
@@ -69,7 +72,10 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
       render: (text: string, record: any, index: number) => {
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
-            <Tag color={StatusColor[record.status]} style={{ marginRight: 0 }}>
+            <Tag
+              color={StatusColor[record.status % 3]}
+              style={{ marginRight: 0 }}
+            >
               {Status[record.status]}
             </Tag>
           </Space>
@@ -93,20 +99,21 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
-            {record.status !== Status.安装中 && (
-              <>
-                <Tooltip title={isPc ? '重新安装' : ''}>
-                  <a onClick={() => reInstallDependence(record, index)}>
-                    <BugOutlined />
-                  </a>
-                </Tooltip>
-                <Tooltip title={isPc ? '删除' : ''}>
-                  <a onClick={() => deleteDependence(record, index)}>
-                    <DeleteOutlined />
-                  </a>
-                </Tooltip>
-              </>
-            )}
+            {record.status !== Status.安装中 &&
+              record.status !== Status.删除中 && (
+                <>
+                  <Tooltip title={isPc ? '重新安装' : ''}>
+                    <a onClick={() => reInstallDependence(record, index)}>
+                      <BugOutlined />
+                    </a>
+                  </Tooltip>
+                  <Tooltip title={isPc ? '删除' : ''}>
+                    <a onClick={() => deleteDependence(record, index)}>
+                      <DeleteOutlined />
+                    </a>
+                  </Tooltip>
+                </>
+              )}
             <Tooltip title={isPc ? '日志' : ''}>
               <a
                 onClick={() => {
@@ -171,10 +178,7 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
           .delete(`${config.apiPrefix}dependencies`, { data: [record._id] })
           .then((data: any) => {
             if (data.code === 200) {
-              message.success('删除成功');
-              const result = [...value];
-              result.splice(index, 1);
-              setValue(result);
+              handleDependence(data.data[0]);
             } else {
               message.error(data);
             }
@@ -254,13 +258,12 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
   const delDependencies = () => {
     Modal.confirm({
       title: '确认删除',
-      content: <>确认删除选中的变量吗</>,
+      content: <>确认删除选中的依赖吗</>,
       onOk() {
         request
           .delete(`${config.apiPrefix}dependencies`, { data: selectedRowIds })
           .then((data: any) => {
             if (data.code === 200) {
-              message.success('批量删除成功');
               setSelectedRowIds([]);
               getDependencies();
             } else {
@@ -312,25 +315,41 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
   }, [logDependence]);
 
   useEffect(() => {
-    ws.onmessage = (e: any) => {
-      const { type, message, references } = JSON.parse(e.data);
-      if (
-        type === 'installDependence' &&
-        message === '依赖安装结束' &&
-        references.length > 0
-      ) {
-        const result = [...value];
-        for (let i = 0; i < references.length; i++) {
-          const index = value.findIndex((x) => x._id === references[i]);
-          result.splice(index, 1, {
-            ...result[index],
-            status: Status.已安装,
-          });
-        }
-        setValue(result);
+    if (!socketMessage) return;
+    const { type, message, references } = socketMessage;
+    if (
+      type === 'installDependence' &&
+      message.includes('结束时间') &&
+      references.length > 0
+    ) {
+      let status;
+      if (message.includes('安装')) {
+        status = message.includes('成功') ? Status.已安装 : Status.安装失败;
+      } else {
+        status = message.includes('成功') ? Status.已删除 : Status.删除失败;
       }
-    };
-  }, [value]);
+      const result = [...value];
+      for (let i = 0; i < references.length; i++) {
+        const index = value.findIndex((x) => x._id === references[i]);
+        result.splice(index, 1, {
+          ...result[index],
+          status,
+        });
+      }
+      setValue(result);
+
+      if (status === Status.已删除) {
+        setTimeout(() => {
+          const _result = [...value];
+          for (let i = 0; i < references.length; i++) {
+            const index = value.findIndex((x) => x._id === references[i]);
+            _result.splice(index, 1);
+          }
+          setValue(_result);
+        }, 5000);
+      }
+    }
+  }, [socketMessage]);
 
   const panelContent = () => (
     <>
@@ -394,13 +413,13 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
         tabPosition="top"
         onChange={onTabChange}
       >
-        <Tabs.TabPane tab="nodejs" key="nodejs">
+        <Tabs.TabPane tab="NodeJs" key="nodejs">
           {panelContent()}
         </Tabs.TabPane>
-        <Tabs.TabPane tab="python3" key="python3">
+        <Tabs.TabPane tab="Python3" key="python3">
           {panelContent()}
         </Tabs.TabPane>
-        <Tabs.TabPane tab="linux" key="linux">
+        <Tabs.TabPane tab="Linux" key="linux">
           {panelContent()}
         </Tabs.TabPane>
       </Tabs>
@@ -412,11 +431,18 @@ const Dependence = ({ headerStyle, isPhone, ws }: any) => {
       />
       <DependenceLogModal
         visible={isLogModalVisible}
-        handleCancel={() => {
+        handleCancel={(needRemove?: boolean) => {
           setIsLogModalVisible(false);
-          getDependenceDetail(logDependence);
+          if (needRemove) {
+            const index = value.findIndex((x) => x._id === logDependence._id);
+            const result = [...value];
+            result.splice(index, 1);
+            setValue(result);
+          } else if ([...value].map((x) => x._id).includes(logDependence._id)) {
+            getDependenceDetail(logDependence);
+          }
         }}
-        ws={ws}
+        socketMessage={socketMessage}
         dependence={logDependence}
       />
     </PageContainer>
