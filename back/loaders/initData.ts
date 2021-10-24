@@ -32,7 +32,7 @@ export default async () => {
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
-        dependenceService.installOrUninstallDependencies(group);
+        dependenceService.reInstall(group.map((x) => x._id));
       }
     }
   });

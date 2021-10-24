@@ -191,12 +191,20 @@ export default class DependenceService {
     )[dependencies[0].type as any];
     const depIds = dependencies.map((x) => x._id) as string[];
     const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
+    const startTime = Date.now();
     this.sockService.sendMessage({
       type: 'installDependence',
-      message: `开始安装依赖 ${depNames}`,
+      message: `开始安装依赖 ${depNames}，开始时间 ${new Date(
+        startTime,
+      ).toLocaleString()}`,
       references: depIds,
     });
-    this.updateLog(depIds, `开始安装依赖 ${depNames}\n`);
+    this.updateLog(
+      depIds,
+      `开始安装依赖 ${depNames}，开始时间 ${new Date(
+        startTime,
+      ).toLocaleString()}\n`,
+    );
     cp.stdout.on('data', (data) => {
       this.sockService.sendMessage({
         type: 'installDependence',
@@ -225,12 +233,21 @@ export default class DependenceService {
     });
 
     cp.on('close', (code) => {
+      const endTime = Date.now();
       this.sockService.sendMessage({
         type: 'installDependence',
-        message: '依赖安装结束',
+        message: `依赖安装结束，结束时间 ${new Date(
+          endTime,
+        ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
         references: depIds,
       });
-      isInstall && this.updateLog(depIds, '依赖安装结束');
+      isInstall &&
+        this.updateLog(
+          depIds,
+          `依赖安装结束，结束时间 ${new Date(endTime).toLocaleString()}，耗时 ${
+            (endTime - startTime) / 1000
+          } 秒`,
+        );
       isInstall &&
         this.dependenceDb.update(
           { _id: { $in: depIds } },
