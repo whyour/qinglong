@@ -26,8 +26,8 @@ export default async () => {
     { multi: true },
   );
 
-  // 初始化时安装所有依赖
-  dependenceDb.find({}).exec((err, docs) => {
+  // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
+  dependenceDb.find({ status: { $in: [0, 1, 2] } }).exec((err, docs) => {
     const groups = _.groupBy(docs, 'type');
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
