@@ -43,6 +43,6 @@ export enum InstallDependenceCommandTypes {
 
 export enum unInstallDependenceCommandTypes {
   'npm uninstall -g',
-  'pip3 uninstall',
+  'pip3 uninstall -y',
   'apk del',
 }
