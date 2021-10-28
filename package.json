@@ -45,6 +45,7 @@
     "p-queue": "6.6.2",
     "reflect-metadata": "^0.1.13",
     "sockjs": "^0.3.21",
+    "serve-handler": "^6.1.3",
     "typedi": "^0.8.0",
     "uuid": "^8.3.2",
     "winston": "^3.3.3"
@@ -69,6 +70,7 @@
     "@types/sockjs": "^0.3.33",
     "@types/sockjs-client": "^1.5.1",
     "@umijs/plugin-antd": "^0.11.0",
+    "@types/serve-handler": "^6.1.1",
     "@umijs/test": "^3.3.9",
     "antd": "^4.17.0-alpha.6",
     "codemirror": "^5.62.2",
