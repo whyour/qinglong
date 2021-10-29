@@ -25,7 +25,7 @@ const columns = [
     },
   },
   {
-    title: '登陆时间',
+    title: '登录时间',
     dataIndex: 'timestamp',
     key: 'timestamp',
     align: 'center' as const,
@@ -34,25 +34,25 @@ const columns = [
     },
   },
   {
-    title: '登陆地址',
+    title: '登录地址',
     dataIndex: 'address',
     key: 'address',
     align: 'center' as const,
   },
   {
-    title: '登陆IP',
+    title: '登录IP',
     dataIndex: 'ip',
     key: 'ip',
     align: 'center' as const,
   },
   {
-    title: '登陆设备',
+    title: '登录设备',
     dataIndex: 'platform',
     key: 'platform',
     align: 'center' as const,
   },
   {
-    title: '登陆状态',
+    title: '登录状态',
     dataIndex: 'status',
     key: 'status',
     align: 'center' as const,

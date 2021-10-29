@@ -59,7 +59,7 @@ cat查看之后返回的结果类似如下字段
 # admin即为登录名;Xb-ZYP526wmg4_h6q1WqIO为登录密码
 ```
 
-输入此处记录的`username`及`password`，即可成功登陆qinglong面板，登陆后即可正常使用
+输入此处记录的`username`及`password`，即可成功登录qinglong面板，登录后即可正常使用
 
 ## 拉取脚本
 ```bash
