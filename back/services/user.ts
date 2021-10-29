@@ -116,10 +116,10 @@ export default class UserService {
           isTwoFactorChecking: false,
         });
         await this.notificationService.notify(
-          '登陆通知',
+          '登录通知',
           `你于${new Date(timestamp).toLocaleString()}在 ${address} ${
             req.platform
-          }端 登陆成功，ip地址 ${ip}`,
+          }端 登录成功，ip地址 ${ip}`,
         );
         await this.getLoginLog();
         await this.insertDb({
@@ -145,10 +145,10 @@ export default class UserService {
           platform: req.platform,
         });
         await this.notificationService.notify(
-          '登陆通知',
+          '登录通知',
           `你于${new Date(timestamp).toLocaleString()}在 ${address} ${
             req.platform
-          }端 登陆失败，ip地址 ${ip}`,
+          }端 登录失败，ip地址 ${ip}`,
         );
         await this.getLoginLog();
         await this.insertDb({
