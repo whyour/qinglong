@@ -348,7 +348,7 @@ const Setting = ({
         <Tabs.TabPane tab="通知设置" key="notification">
           <NotificationSetting data={notificationInfo} />
         </Tabs.TabPane>
-        <Tabs.TabPane tab="登陆日志" key="login">
+        <Tabs.TabPane tab="登录日志" key="login">
           <LoginLog data={loginLogData} />
         </Tabs.TabPane>
         <Tabs.TabPane tab="其他设置" key="other">
