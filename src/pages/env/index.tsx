@@ -367,8 +367,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
 
     setTimeout(() => {
       if (selectedRowIds.length === 0 || selectedIds.length === 0) {
-        const offset = isPhone ? 40 : 0;
-        setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+        setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
       }
     });
   };
@@ -437,9 +436,8 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
   }, [searchText]);
 
   useEffect(() => {
-    const offset = isPhone ? 40 : 0;
     setTimeout(() => {
-      setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+      setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
     });
   }, []);
 

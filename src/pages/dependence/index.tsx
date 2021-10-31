@@ -244,8 +244,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
 
     setTimeout(() => {
       if (selectedRowIds.length === 0 || selectedIds.length === 0) {
-        const offset = isPhone ? 40 : 0;
-        setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+        setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
       }
     });
   };
@@ -301,9 +300,8 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
   }, [searchText, type]);
 
   useEffect(() => {
-    const offset = isPhone ? 40 : 0;
     setTimeout(() => {
-      setTableScrollHeight(getTableScroll({ extraHeight: 87 }) - offset);
+      setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
     });
   }, []);
 
