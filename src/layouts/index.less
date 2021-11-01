@@ -9,13 +9,6 @@
     url('../assets/fonts/SourceCodePro-Regular.ttf') format('truetype');
 }
 
-// body {
-//   height: 100%;
-//   overflow-y: hidden;
-//   // background-color: rgb(248, 248, 248);
-//   width: 100% !important;
-// }
-
 .log-modal {
   .ant-modal {
     padding-bottom: 0 !important;
@@ -129,7 +122,7 @@
   .ant-pro-grid-content.wide {
     flex: 1;
     .ant-pro-grid-content-children {
-      height: calc(100% - 48px);
+      height: calc(100% - 36px);
       > div,
       .log-container,
       .react-codemirror2,
@@ -159,8 +152,8 @@
 
 .ant-layout-content.ant-pro-basicLayout-content.ant-pro-basicLayout-has-header {
   margin-bottom: 0 !important;
-  min-height: calc(100vh - 72px);
-  min-height: calc(100vh - var(--vh-offset, 0px) - 72px);
+  min-height: calc(100vh - 66px);
+  min-height: calc(100vh - var(--vh-offset, 0px) - 66px);
 }
 
 .Resizer {
@@ -250,5 +243,42 @@
 
   .ant-select-selection-placeholder {
     opacity: 0.5 !important;
+  }
+}
+
+.ant-pro-page-container-children-content {
+  margin: 18px 18px 18px;
+}
+
+.ant-pro-basicLayout-content {
+  margin: 18px;
+  .ant-pro-page-container {
+    margin: -18px -18px -18px;
+  }
+}
+
+.ant-menu-item.ant-pro-sider-collapsed-button {
+  margin: 0;
+}
+
+.side-menu-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: rgba(0, 0, 0, 0.85);
+
+  .side-menu-collapse-button:hover {
+    color: #1890ff;
+  }
+
+  .side-menu-user-wrapper {
+    display: flex;
+    align-items: center;
+  }
+}
+
+.side-menu-user-drop-menu {
+  .ant-dropdown-menu-item:hover {
+    color: #1890ff;
   }
 }

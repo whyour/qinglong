@@ -80,4 +80,5 @@ export default {
   contentWidth: 'Fixed',
   splitMenus: false,
   logo: '/images/qinglong.png',
+  siderWidth: 180,
 } as any;
