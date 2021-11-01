@@ -60,8 +60,8 @@ init_env() {
 }
 
 import_config() {
-    [ -f $file_config_user ] && . $file_config_user
-    [ -f $file_env ] && . $file_env
+    [[ -f $file_config_user ]] && . $file_config_user
+    [[ -f $file_env ]] && . $file_env
 
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     github_proxy_url=${GithubProxyUrl:-""}
@@ -101,7 +101,7 @@ gen_random_num() {
 link_shell_sub() {
     local link_path="$1"
     local original_path="$2"
-    if [ ! -L $link_path ] || [[ $(readlink -f $link_path) != $original_path ]]; then
+    if [[ ! -L $link_path ]] || [[ $(readlink -f $link_path) != $original_path ]]; then
         rm -f $link_path 2>/dev/null
         ln -sf $original_path $link_path
     fi
@@ -110,7 +110,7 @@ link_shell_sub() {
 link_shell() {
     if [[ $is_termux -eq 1 ]]; then
         local path="/data/data/com.termux/files/usr/bin/"
-    elif [[ $PATH == */usr/local/bin* ]] && [ -d /usr/local/bin ]; then
+    elif [[ $PATH == */usr/local/bin* ]] && [[ -d /usr/local/bin ]]; then
         local path="/usr/local/bin/"
     else
         local path=""
@@ -127,14 +127,14 @@ define_cmd() {
     local cmd_prefix cmd_suffix
     if type task >/dev/null 2>&1; then
         cmd_suffix=""
-        if [ -x "$dir_shell/task.sh" ]; then
+        if [[ -x "$dir_shell/task.sh" ]]; then
             cmd_prefix=""
         else
             cmd_prefix="bash "
         fi
     else
         cmd_suffix=".sh"
-        if [ -x "$dir_shell/task.sh" ]; then
+        if [[ -x "$dir_shell/task.sh" ]]; then
             cmd_prefix="$dir_shell/"
         else
             cmd_prefix="bash $dir_shell/"
@@ -155,55 +155,55 @@ fix_config() {
     make_dir $dir_raw
     make_dir $dir_update_log
 
-    if [ ! -s $file_config_user ]; then
+    if [[ ! -s $file_config_user ]]; then
         echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
         cp -fv $file_config_sample $file_config_user
         echo
     fi
 
-    if [ ! -f $file_env ]; then
+    if [[ ! -f $file_env ]]; then
         echo -e "检测到config配置目录下不存在env.sh，创建一个空文件用于初始化...\n"
         touch $file_env
         echo
     fi
 
-    if [ ! -f $file_task_before ]; then
+    if [[ ! -f $file_task_before ]]; then
         echo -e "复制一份 $file_task_sample 为 $file_task_before\n"
         cp -fv $file_task_sample $file_task_before
         echo
     fi
 
-    if [ ! -f $file_task_after ]; then
+    if [[ ! -f $file_task_after ]]; then
         echo -e "复制一份 $file_task_sample 为 $file_task_after\n"
         cp -fv $file_task_sample $file_task_after
         echo
     fi
 
-    if [ ! -f $file_extra_shell ]; then
+    if [[ ! -f $file_extra_shell ]]; then
         echo -e "复制一份 $file_extra_sample 为 $file_extra_shell\n"
         cp -fv $file_extra_sample $file_extra_shell
         echo
     fi
 
-    if [ ! -s $file_auth_user ]; then
+    if [[ ! -s $file_auth_user ]]; then
         echo -e "复制一份 $file_auth_sample 为 $file_auth_user\n"
         cp -fv $file_auth_sample $file_auth_user
         echo
     fi
 
-    if [ ! -s $file_notify_py ]; then
+    if [[ ! -s $file_notify_py ]]; then
         echo -e "复制一份 $file_notify_py_sample 为 $file_notify_py\n"
         cp -fv $file_notify_py_sample $file_notify_py
         echo
     fi
 
-    if [ ! -s $file_notify_js ]; then
+    if [[ ! -s $file_notify_js ]]; then
         echo -e "复制一份 $file_notify_js_sample 为 $file_notify_js\n"
         cp -fv $file_notify_js_sample $file_notify_js
         echo
     fi
 
-    if [ -s /etc/nginx/conf.d/default.conf ]; then
+    if [[ -s /etc/nginx/conf.d/default.conf ]]; then
         echo -e "检测到默认nginx配置文件，清空...\n"
         cat /dev/null > /etc/nginx/conf.d/default.conf
         echo
@@ -211,7 +211,7 @@ fix_config() {
 }
 
 npm_install_sub() {
-    if [ $is_termux -eq 1 ]; then
+    if [[ $is_termux -eq 1 ]]; then
         npm install --production --no-save --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links --no-save
     elif ! type pnpm >/dev/null 2>&1; then
         npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
@@ -248,7 +248,7 @@ npm_install_2() {
 diff_and_copy() {
     local copy_source=$1
     local copy_to=$2
-    if [ ! -s $copy_to ] || [[ $(diff $copy_source $copy_to) ]]; then
+    if [[ ! -s $copy_to ]] || [[ $(diff $copy_source $copy_to) ]]; then
         cp -f $copy_source $copy_to
     fi
 }
@@ -256,12 +256,12 @@ diff_and_copy() {
 update_depend() {
     local dir_current=$(pwd)
 
-    if [ ! -s $dir_scripts/package.json ] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+    if [[ ! -s $dir_scripts/package.json ]] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
         cp -f $dir_sample/package.json $dir_scripts/package.json
         npm_install_2 $dir_scripts
     fi
 
-    if [ ! -s $dir_scripts/requirements.txt ] || [[ $(diff $dir_sample/requirements.txt $dir_scripts/requirements.txt) ]]; then
+    if [[ ! -s $dir_scripts/requirements.txt ]] || [[ $(diff $dir_sample/requirements.txt $dir_scripts/requirements.txt) ]]; then
         cp -f $dir_sample/requirements.txt $dir_scripts/requirements.txt
         cd $dir_scripts
         pip3 install -r $dir_scripts/requirements.txt
@@ -302,7 +302,7 @@ reset_romote_url() {
 
     [[ $branch ]] && local part_cmd="origin/${branch}"
 
-    if [ -d "$dir_work/.git" ]; then
+    if [[ -d "$dir_work/.git" ]]; then
         cd $dir_work
         [[ -f ".git/index.lock" ]] && rm -f .git/index.lock >/dev/null
         git remote set-url origin $url >/dev/null
