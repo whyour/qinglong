@@ -27,7 +27,7 @@ remove_js_log() {
 remove_empty_dir() {
     cd $dir_log
     for dir in $(ls); do
-        if [ -d $dir ] && [[ -z $(ls $dir) ]]; then
+        if [[ -d $dir ]] && [[ -z $(ls $dir) ]]; then
             rm -rf $dir
         fi
     done
