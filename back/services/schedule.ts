@@ -26,8 +26,8 @@ export default class ScheduleService {
           exec(command, async (error, stdout, stderr) => {
             if (error) {
               await this.logger.info(
-                '执行任务`%s`失败，时间：%s, 错误信息：%j',
-                name,
+                '执行任务%s失败，时间：%s, 错误信息：%j',
+                command,
                 new Date().toLocaleString(),
                 error,
               );
@@ -35,8 +35,8 @@ export default class ScheduleService {
 
             if (stderr) {
               await this.logger.info(
-                '执行任务`%s`失败，时间：%s, 错误信息：%j',
-                name,
+                '执行任务%s失败，时间：%s, 错误信息：%j',
+                command,
                 new Date().toLocaleString(),
                 stderr,
               );
@@ -44,8 +44,8 @@ export default class ScheduleService {
           });
         } catch (error) {
           await this.logger.info(
-            '执行任务`%s`失败，时间：%s, 错误信息：%j',
-            name,
+            '执行任务%s失败，时间：%s, 错误信息：%j',
+            command,
             new Date().toLocaleString(),
             error,
           );
