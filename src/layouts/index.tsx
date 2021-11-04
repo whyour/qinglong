@@ -291,7 +291,7 @@ export default function (props: any) {
             e.stopPropagation();
           }}
         >
-          {!collapsed && (
+          {!collapsed && !ctx.isPhone && (
             <Dropdown overlay={menu} trigger={['hover']}>
               <span className="side-menu-user-wrapper">
                 <Avatar shape="square" size="small" icon={<UserOutlined />} />
