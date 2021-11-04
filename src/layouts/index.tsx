@@ -23,6 +23,15 @@ import { useCtx, useTheme } from '@/utils/hooks';
 import { message, Badge, Modal, Avatar, Dropdown, Menu, Popover } from 'antd';
 // @ts-ignore
 import SockJS from 'sockjs-client';
+import * as Sentry from '@sentry/react';
+import { Integrations } from '@sentry/tracing';
+
+Sentry.init({
+  dsn: 'https://ea2fede373244db99c536210b910d9da@o1051273.ingest.sentry.io/6047851',
+  integrations: [new Integrations.BrowserTracing()],
+  release: version,
+  tracesSampleRate: 1.0,
+});
 
 export default function (props: any) {
   const ctx = useCtx();
@@ -159,6 +168,25 @@ export default function (props: any) {
     };
   }, [user]);
 
+  useEffect(() => {
+    window.onload = () => {
+      const timing = performance.timing;
+      console.log(`白屏时间: ${timing.responseStart - timing.navigationStart}`);
+      console.log(
+        `请求完毕至DOM加载: ${timing.domInteractive - timing.responseEnd}`,
+      );
+      console.log(
+        `解释dom树耗时: ${timing.domComplete - timing.domInteractive}`,
+      );
+      console.log(
+        `从开始至load总耗时: ${timing.loadEventEnd - timing.navigationStart}`,
+      );
+      Sentry.captureMessage(
+        `白屏时间 ${timing.responseStart - timing.navigationStart}`,
+      );
+    };
+  }, []);
+
   if (['/login', '/initialization'].includes(props.location.pathname)) {
     document.title = `${
       (config.documentTitleMap as any)[props.location.pathname]
@@ -197,13 +225,13 @@ export default function (props: any) {
       </Menu.Item>
     </Menu>
   );
-
   return loading ? (
     <PageLoading />
   ) : (
     <ProLayout
       selectedKeys={[props.location.pathname]}
       loading={loading}
+      ErrorBoundary={Sentry.ErrorBoundary}
       title={
         <>
           <span style={{ fontSize: 16 }}>控制面板</span>

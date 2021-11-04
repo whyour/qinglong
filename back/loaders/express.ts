@@ -11,6 +11,7 @@ import OpenService from '../services/open';
 import rewrite from 'express-urlrewrite';
 import UserService from '../services/user';
 import handler from 'serve-handler';
+import * as Sentry from '@sentry/node';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -130,6 +131,8 @@ export default ({ app }: { app: Application }) => {
     next(err);
   });
 
+  app.use(Sentry.Handlers.errorHandler());
+
   app.use(
     (
       err: Error & { status: number },
@@ -154,6 +157,8 @@ export default ({ app }: { app: Application }) => {
       res: Response,
       next: NextFunction,
     ) => {
+      Sentry.captureException(err);
+
       res.status(err.status || 500);
       res.json({
         code: err.status || 500,
