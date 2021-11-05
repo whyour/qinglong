@@ -225,7 +225,9 @@ export default class CronService {
               const str = err ? `\n${err}` : '';
               fs.appendFileSync(
                 `${doc.log_path}`,
-                `${str}\n## 执行结束...  ${new Date().toLocaleString()} `,
+                `${str}\n## 执行结束...  ${new Date()
+                  .toLocaleString('zh', { hour12: false })
+                  .replace(' 24:', ' 00:')} `,
               );
             }
           }
@@ -304,6 +306,17 @@ export default class CronService {
         if (log_path) {
           fs.appendFileSync(`${log_path}`, `${JSON.stringify(err)}`);
         }
+      });
+
+      cp.on('exit', (code, signal) => {
+        this.logger.info(
+          `${command} pid: ${cp.pid} exit ${code} signal ${signal}`,
+        );
+        this.cronDb.update(
+          { _id },
+          { $set: { status: CrontabStatus.idle }, $unset: { pid: true } },
+        );
+        resolve();
       });
       cp.on('close', (code) => {
         this.logger.info(`${command} pid: ${cp.pid} closed ${code}`);
