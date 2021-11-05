@@ -8,7 +8,7 @@ set -e
 echo -e "======================1. 检测配置文件========================\n"
 cp -fv $nginx_conf /etc/nginx/nginx.conf
 cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
-pm2 l >/dev/null 2>&1
+pm2 l &>/dev/null
 echo
 
 echo -e "======================2. 安装依赖========================\n"
@@ -20,7 +20,7 @@ nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 echo -e "nginx启动成功...\n"
 
 echo -e "======================4. 启动控制面板========================\n"
-if [[ $(pm2 info panel 2>/dev/null) ]]; then
+if test -z "$(pm2 info panel 1>/dev/null)"; then
   pm2 reload panel --source-map-support --time
 else
   pm2 start $dir_root/build/app.js -n panel --source-map-support --time
@@ -28,7 +28,7 @@ fi
 echo -e "控制面板启动成功...\n"
 
 echo -e "======================5. 启动定时任务========================\n"
-if [[ $(pm2 info schedule 2>/dev/null) ]]; then
+if test -z "$(pm2 info schedule 1>/dev/null)"; then
   pm2 reload schedule --source-map-support --time
 else
   pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time
