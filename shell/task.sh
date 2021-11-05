@@ -88,7 +88,7 @@ run_normal() {
     log_dir_tmp="${first_param##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd=">> $log_path 2>&1"
+    cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
@@ -141,7 +141,7 @@ run_concurrent() {
     log_dir_tmp="${first_param##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd=">> $log_path 2>&1"
+    cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
@@ -196,7 +196,7 @@ run_designated() {
     log_dir_tmp="${file_param##*/}"
     log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd=">> $log_path 2>&1"
+    cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
@@ -242,7 +242,7 @@ run_else() {
     local log_dir_tmp="${1##*/}"
     local log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd=">> $log_path 2>&1"
+    cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 

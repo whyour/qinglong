@@ -305,7 +305,7 @@ patch_version() {
         echo
     fi
 
-    if ! type ts-node >/dev/null 2>&1; then
+    if ! type ts-node &>/dev/null; then
         pnpm i -g ts-node typescript tslib
     fi
 
@@ -313,18 +313,18 @@ patch_version() {
 }
 
 reload_pm2() {
-    pm2 l >/dev/null 2>&1
+    pm2 l &>/dev/null
 
     if [[ $(pm2 info panel 2>/dev/null) ]]; then
-        pm2 reload panel --source-map-support --time >/dev/null 2>&1
+        pm2 reload panel --source-map-support --time &>/dev/null
     else
-        pm2 start $dir_root/build/app.js -n panel --source-map-support --time >/dev/null 2>&1
+        pm2 start $dir_root/build/app.js -n panel --source-map-support --time &>/dev/null
     fi
 
     if [[ $(pm2 info schedule 2>/dev/null) ]]; then
-        pm2 reload schedule --source-map-support --time >/dev/null 2>&1
+        pm2 reload schedule --source-map-support --time &>/dev/null
     else
-        pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time >/dev/null 2>&1
+        pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time &>/dev/null
     fi
 }
 
@@ -369,7 +369,7 @@ gen_list_repo() {
     local dependence="$5"
 
     local repo="${repo_path##*/}"
-    rm -f $dir_list_tmp/${repo}*.list >/dev/null 2>&1
+    rm -f $dir_list_tmp/${repo}*.list &>/dev/null
 
     cd ${repo_path}
 
