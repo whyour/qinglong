@@ -11,7 +11,7 @@ apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
 echo -e "\nbot依赖安装成功...\n"
 
 echo -e "2、下载bot所需文件...\n"
-if [ ! -d ${repo_path}/.git ]; then
+if [[ ! -d ${repo_path}/.git ]]; then
   rm -rf ${repo_path}
   git_clone_scripts ${url} ${repo_path} "main"
 fi
