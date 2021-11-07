@@ -6,7 +6,7 @@ get_token() {
 
 add_cron_api() {
     local currentTimeStamp=$(date +%s)
-    if [[ $# -eq 1 ]]; then
+    if [ $# -eq 1 ]; then
         local schedule=$(echo "$1" | awk -F ":" '{print $1}')
         local command=$(echo "$1" | awk -F ":" '{print $2}')
         local name=$(echo "$1" | awk -F ":" '{print $3}')
@@ -39,7 +39,7 @@ add_cron_api() {
 
 update_cron_api() {
     local currentTimeStamp=$(date +%s)
-    if [[ $# -eq 1 ]]; then
+    if [ $# -eq 1 ]; then
         local schedule=$(echo "$1" | awk -F ":" '{print $1}')
         local command=$(echo "$1" | awk -F ":" '{print $2}')
         local name=$(echo "$1" | awk -F ":" '{print $3}')
@@ -75,7 +75,7 @@ update_cron_api() {
 
 update_cron_command_api() {
     local currentTimeStamp=$(date +%s)
-    if [[ $# -eq 1 ]]; then
+    if [ $# -eq 1 ]; then
         local command=$(echo "$1" | awk -F ":" '{print $1}')
         local id=$(echo "$1" | awk -F ":" '{print $2}')
     else
