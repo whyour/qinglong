@@ -12,12 +12,12 @@ diff_cron() {
     local list_task="$2"
     local list_add="$3"
     local list_drop="$4"
-    if [[ -s $list_task ]]; then
+    if [ -s $list_task ]; then
         grep -vwf $list_task $list_scripts >$list_add
-    elif [[ ! -s $list_task ]] && [[ -s $list_scripts ]]; then
+    elif [ ! -s $list_task ] && [ -s $list_scripts ]; then
         cp -f $list_scripts $list_add
     fi
-    if [[ -s $list_scripts ]]; then
+    if [ -s $list_scripts ]; then
         grep -vwf $list_scripts $list_task >$list_drop
     else
         cp -f $list_task $list_drop
@@ -28,18 +28,18 @@ diff_cron() {
 detect_config_version() {
     ## 识别出两个文件的版本号
     ver_config_sample=$(grep " Version: " $file_config_sample | perl -pe "s|.+v((\d+\.?){3})|\1|")
-    [[ -f $file_config_user ]] && ver_config_user=$(grep " Version: " $file_config_user | perl -pe "s|.+v((\d+\.?){3})|\1|")
+    [ -f $file_config_user ] && ver_config_user=$(grep " Version: " $file_config_user | perl -pe "s|.+v((\d+\.?){3})|\1|")
 
     ## 删除旧的发送记录文件
-    [[ -f $send_mark ]] && [[ $(cat $send_mark) != $ver_config_sample ]] && rm -f $send_mark
+    [ -f $send_mark ] && [[ $(cat $send_mark) != $ver_config_sample ]] && rm -f $send_mark
 
     ## 识别出更新日期和更新内容
     update_date=$(grep " Date: " $file_config_sample | awk -F ": " '{print $2}')
     update_content=$(grep " Update Content: " $file_config_sample | awk -F ": " '{print $2}')
 
     ## 如果是今天，并且版本号不一致，则发送通知
-    if [[ -f $file_config_user ]] && [[ $ver_config_user != $ver_config_sample ]] && [[ $update_date == $(date "+%Y-%m-%d") ]]; then
-        if [[ ! -f $send_mark ]]; then
+    if [ -f $file_config_user ] && [[ $ver_config_user != $ver_config_sample ]] && [[ $update_date == $(date "+%Y-%m-%d") ]]; then
+        if [ ! -f $send_mark ]; then
             local notify_title="配置文件更新通知"
             local notify_content="更新日期: $update_date\n用户版本: $ver_config_user\n新的版本: $ver_config_sample\n更新内容: $update_content\n更新说明: 如需使用新功能请对照config.sample.sh，将相关新参数手动增加到你自己的config.sh中，否则请无视本消息。本消息只在该新版本配置文件更新当天发送一次。\n"
             echo -e $notify_content
@@ -47,7 +47,7 @@ detect_config_version() {
             [[ $? -eq 0 ]] && echo $ver_config_sample >$send_mark
         fi
     else
-        [[ -f $send_mark ]] && rm -f $send_mark
+        [ -f $send_mark ] && rm -f $send_mark
     fi
 }
 
@@ -55,7 +55,7 @@ detect_config_version() {
 output_list_add_drop() {
     local list=$1
     local type=$2
-    if [[ -s $list ]]; then
+    if [ -s $list ]; then
         echo -e "检测到有$type的定时任务：\n"
         cat $list
         echo
@@ -105,7 +105,7 @@ add_cron() {
     cd $dir_scripts
     for file in $(cat $list_add); do
         local file_name=${file/${path}\_/}
-        if [[ -f $file ]]; then
+        if [ -f $file ]; then
             cron_line=$(
                 perl -ne "{
                         print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
@@ -153,7 +153,7 @@ update_repo() {
             [[ ! $url =~ "https://ghproxy.com" ]] && formatUrl="${github_proxy_url}${url}"
         fi
     fi
-    if [[ -d ${repo_path}/.git ]]; then
+    if [ -d ${repo_path}/.git ]; then
         reset_romote_url ${repo_path} "${formatUrl}" "${branch}"
         git_pull_scripts ${repo_path} "${branch}"
     else
@@ -219,7 +219,7 @@ update_raw() {
         fi
     else
         echo -e "下载 ${raw_file_name} 失败，保留之前正常下载的版本...\n"
-        [[ -f "$dir_raw/${raw_file_name}.new" ]] && rm -f "$dir_raw/${raw_file_name}.new"
+        [ -f "$dir_raw/${raw_file_name}.new" ] && rm -f "$dir_raw/${raw_file_name}.new"
     fi
 
 }
@@ -227,7 +227,7 @@ update_raw() {
 ## 调用用户自定义的extra.sh
 run_extra_shell() {
     if [[ ${EnableExtraShell} == true ]]; then
-        if [[ -f $file_extra_shell ]]; then
+        if [ -f $file_extra_shell ]; then
             echo -e "--------------------------------------------------------------\n"
             . $file_extra_shell
         else
@@ -255,7 +255,7 @@ update_qinglong() {
     patch_version
 
     local no_restart="$1"
-    [[ -f $dir_root/package.json ]] && ql_depend_old=$(cat $dir_root/package.json)
+    [ -f $dir_root/package.json ] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git" "master"
     git_pull_scripts $dir_root "master"
 
@@ -265,14 +265,14 @@ update_qinglong() {
         detect_config_version
         update_depend
 
-        [[ -f $dir_root/package.json ]] && ql_depend_new=$(cat $dir_root/package.json)
+        [ -f $dir_root/package.json ] && ql_depend_new=$(cat $dir_root/package.json)
         [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
     else
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
 
     local url="${github_proxy_url}https://github.com/whyour/qinglong-static.git"
-    if [[ -d ${ql_static_repo}/.git ]]; then
+    if [ -d ${ql_static_repo}/.git ]; then
         reset_romote_url ${ql_static_repo} ${url} "master"
         git_pull_scripts ${ql_static_repo} "master"
     else
@@ -344,13 +344,13 @@ diff_scripts() {
     local list_drop="$dir_list_tmp/${repo}_drop.list"
     diff_cron "$dir_list_tmp/${repo}_scripts.list" "$dir_list_tmp/${repo}_user.list" $list_add $list_drop
 
-    if [[ -s $list_drop ]]; then
+    if [ -s $list_drop ]; then
         output_list_add_drop $list_drop "失效"
         if [[ ${AutoDelCron} == true ]]; then
             del_cron $list_drop $repo
         fi
     fi
-    if [[ -s $list_add ]]; then
+    if [ -s $list_add ]; then
         output_list_add_drop $list_add "新"
         if [[ ${AutoAddCron} == true ]]; then
             add_cron $list_add $repo
