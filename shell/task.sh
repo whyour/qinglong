@@ -39,7 +39,7 @@ gen_array_scripts() {
     local i="-1"
     cd $dir_scripts
     for file in $(ls); do
-        if [ -f $file ] && [[ $file == *.js && $file != sendNotify.js ]]; then
+        if [[ -f $file ]] && [[ $file == *.js && $file != sendNotify.js ]]; then
             let i++
             array_scripts[i]=$(echo "$file" | perl -pe "s|$dir_scripts/||g")
             array_scripts_name[i]=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
@@ -170,7 +170,7 @@ run_concurrent() {
     for i in "${!array[@]}"; do
         single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
         eval cat $single_log_path $cmd
-        [ -f $single_log_path ] && rm -f $single_log_path
+        [[ -f $single_log_path ]] && rm -f $single_log_path
     done
 
     eval . $file_task_after "$@" $cmd
