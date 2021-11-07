@@ -212,11 +212,11 @@ fix_config() {
 
 npm_install_sub() {
     if [[ $is_termux -eq 1 ]]; then
-        npm install --production --no-save --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links --no-save
+        npm install --production --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links
     elif ! type pnpm &>/dev/null; then
-        npm install --production --no-save --registry=https://registry.npm.taobao.org || npm install --production --no-save
+        npm install --production --registry=https://registry.npm.taobao.org || npm install --production
     else
-        pnpm install --prod
+        pnpm install --production --registry=https://registry.npm.taobao.org || pnpm install --production
     fi
 }
 
