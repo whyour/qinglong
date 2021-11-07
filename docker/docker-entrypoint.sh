@@ -7,6 +7,7 @@ link_shell
 set -e
 echo -e "======================1. 检测配置文件========================\n"
 cp -fv $nginx_conf /etc/nginx/nginx.conf
+mkdir /etc/nginx/conf.d
 cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
 pm2 l &>/dev/null
 echo
