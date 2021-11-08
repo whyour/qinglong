@@ -6,19 +6,13 @@ import * as fs from 'fs';
 import DataStore from 'nedb';
 import { Env, EnvStatus, initEnvPosition } from '../data/env';
 import _ from 'lodash';
+import { dbs } from '../loaders/db';
 
 @Service()
 export default class EnvService {
-  private envDb = new DataStore({ filename: config.envDbFile });
-  constructor(@Inject('logger') private logger: winston.Logger) {
-    this.envDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-  }
+  private envDb = dbs.envDb;
 
-  public getDb(): DataStore {
-    return this.envDb;
-  }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async create(payloads: Env[]): Promise<Env[]> {
     const envs = await this.envs();

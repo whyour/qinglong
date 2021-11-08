@@ -11,6 +11,8 @@ async function startServer() {
 
   await require('./loaders/sentry').default({ expressApp: app });
 
+  await require('./loaders/db').default();
+
   await require('./loaders/app').default({ expressApp: app });
 
   const server = app

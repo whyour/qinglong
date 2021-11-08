@@ -5,19 +5,14 @@ import { Crontab, CrontabStatus } from '../data/cron';
 import CronService from '../services/cron';
 import EnvService from '../services/env';
 import _ from 'lodash';
+import { dbs } from '../loaders/db';
 
 export default async () => {
   const cronService = Container.get(CronService);
   const envService = Container.get(EnvService);
   const dependenceService = Container.get(DependenceService);
-  const cronDb = cronService.getDb();
-  const envDb = envService.getDb();
-  const dependenceDb = dependenceService.getDb();
-
-  // compaction data file
-  cronDb.persistence.compactDatafile();
-  envDb.persistence.compactDatafile();
-  dependenceDb.persistence.compactDatafile();
+  const cronDb = dbs.cronDb;
+  const dependenceDb = dbs.dependenceDb;
 
   // 初始化更新所有任务状态为空闲
   cronDb.update(

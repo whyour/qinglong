@@ -10,24 +10,17 @@ import { getFileContentByName } from '../config/util';
 import PQueue from 'p-queue';
 import { promises, existsSync } from 'fs';
 import { promisify } from 'util';
+import { dbs } from '../loaders/db';
 
 @Service()
 export default class CronService {
-  private cronDb = new DataStore({ filename: config.cronDbFile });
+  private cronDb = dbs.cronDb;
 
   private queue = new PQueue({
     concurrency: parseInt(process.env.MaxConcurrentNum as string) || 5,
   });
 
-  constructor(@Inject('logger') private logger: winston.Logger) {
-    this.cronDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-  }
-
-  public getDb(): DataStore {
-    return this.cronDb;
-  }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -425,10 +418,6 @@ export default class CronService {
       exec(`pm2 reload schedule`);
     }
     this.cronDb.update({}, { $set: { saved: true } }, { multi: true });
-  }
-
-  private reload_db() {
-    this.cronDb.loadDatabase();
   }
 
   public import_crontab() {
