@@ -15,22 +15,19 @@ import ScheduleService from './schedule';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import got from 'got';
+import { dbs } from '../loaders/db';
 
 @Service()
 export default class UserService {
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
-  private authDb = new DataStore({ filename: config.authDbFile });
+  private authDb = dbs.authDb;
 
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) {
-    this.authDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-  }
+  ) {}
 
   public async login(
     payloads: {

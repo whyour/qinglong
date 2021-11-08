@@ -5,19 +5,13 @@ import config from '../config';
 import DataStore from 'nedb';
 import { App } from '../data/open';
 import { v4 as uuidV4 } from 'uuid';
+import { dbs } from '../loaders/db';
 
 @Service()
 export default class OpenService {
-  private appDb = new DataStore({ filename: config.appDbFile });
-  constructor(@Inject('logger') private logger: winston.Logger) {
-    this.appDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-  }
+  private appDb = dbs.appDb;
 
-  public getDb(): DataStore {
-    return this.appDb;
-  }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async findTokenByValue(token: string): Promise<App> {
     return new Promise((resolve) => {

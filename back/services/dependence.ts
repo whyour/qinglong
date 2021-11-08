@@ -12,22 +12,16 @@ import {
 import _ from 'lodash';
 import { spawn } from 'child_process';
 import SockService from './sock';
+import { dbs } from '../loaders/db';
 
 @Service()
 export default class DependenceService {
-  private dependenceDb = new DataStore({ filename: config.dependenceDbFile });
+  private dependenceDb = dbs.dependenceDb;
+
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) {
-    this.dependenceDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-  }
-
-  public getDb(): DataStore {
-    return this.dependenceDb;
-  }
+  ) {}
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {

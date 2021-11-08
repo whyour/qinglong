@@ -2,16 +2,14 @@ import schedule from 'node-schedule';
 import express from 'express';
 import { exec } from 'child_process';
 import Logger from './loaders/logger';
-import { Container } from 'typedi';
-import CronService from './services/cron';
 import { CrontabStatus } from './data/cron';
 import config from './config';
+import { dbs } from './loaders/db';
 
 const app = express();
 
 const run = async () => {
-  const cronService = Container.get(CronService);
-  const cronDb = cronService.getDb();
+  const cronDb = dbs.cronDb;
 
   cronDb
     .find({})
