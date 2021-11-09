@@ -407,7 +407,7 @@ gen_list_repo() {
             result=$(update_cron_command_api "$cmd_task ${uniq_path}/${filename}:$cron_id")
         fi
     done
-    grep -E "$cmd_task $uniq_path" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($uniq_path.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${uniq_path}_user.list"
+    grep -E "${cmd_task} ${uniq_path}" ${list_crontab_user} | perl -pe "s|.*ID=(.*) ${cmd_task} (${uniq_path}.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${uniq_path}_user.list"
     cd $dir_current
 }
 
