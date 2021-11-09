@@ -78,8 +78,6 @@ run_nohup() {
 run_normal() {
     local first_param=$1
     cd $dir_scripts
-    local relative_path="${first_param%/*}"
-    [[ ! -z ${relative_path} ]] && cd ${relative_path}
     define_program "$first_param"
     if [[ $first_param == *.js ]]; then
         if [[ $# -eq 1 ]]; then
@@ -139,8 +137,6 @@ run_concurrent() {
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
 
     cd $dir_scripts
-    local relative_path="${first_param%/*}"
-    [[ ! -z ${relative_path} ]] && cd ${relative_path}
     define_program "$first_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${first_param##*/}"
@@ -196,8 +192,6 @@ run_designated() {
     fi
 
     cd $dir_scripts
-    local relative_path="${first_param%/*}"
-    [[ ! -z ${relative_path} ]] && cd ${relative_path}
     define_program "$file_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${file_param##*/}"
