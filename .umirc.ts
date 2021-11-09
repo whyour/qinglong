@@ -8,6 +8,9 @@ export default defineConfig({
     type: 'none',
   },
   fastRefresh: {},
+  dynamicImport: {
+    loading: '@/components/pageLoading',
+  },
   favicon: '/images/g5.ico',
   proxy: {
     '/api': {
