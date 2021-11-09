@@ -147,6 +147,8 @@ update_repo() {
 
     local repo_path="${dir_repo}/${uniq_path}"
 
+    make_dir "${dir_scripts}/${uniq_path}"
+
     local formatUrl="$url"
     if [[ $github_proxy_url ]]; then
         if [[ $url =~ "github.com" ]] || [[ $url =~ "githubusercontent.com" ]]; then
@@ -339,21 +341,20 @@ diff_scripts() {
 
     gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence"
 
-    local repo="${repo_path##*/}"
-    local list_add="$dir_list_tmp/${repo}_add.list"
-    local list_drop="$dir_list_tmp/${repo}_drop.list"
-    diff_cron "$dir_list_tmp/${repo}_scripts.list" "$dir_list_tmp/${repo}_user.list" $list_add $list_drop
+    local list_add="$dir_list_tmp/${uniq_path}_add.list"
+    local list_drop="$dir_list_tmp/${uniq_path}_drop.list"
+    diff_cron "$dir_list_tmp/${uniq_path}_scripts.list" "$dir_list_tmp/${uniq_path}_user.list" $list_add $list_drop
 
     if [[ -s $list_drop ]]; then
         output_list_add_drop $list_drop "失效"
         if [[ ${AutoDelCron} == true ]]; then
-            del_cron $list_drop $repo
+            del_cron $list_drop $uniq_path
         fi
     fi
     if [[ -s $list_add ]]; then
         output_list_add_drop $list_add "新"
         if [[ ${AutoAddCron} == true ]]; then
-            add_cron $list_add $repo
+            add_cron $list_add $uniq_path
         fi
     fi
     cd $dir_current
@@ -368,8 +369,7 @@ gen_list_repo() {
     local blackword="$4"
     local dependence="$5"
 
-    local repo="${repo_path##*/}"
-    rm -f $dir_list_tmp/${repo}*.list &>/dev/null
+    rm -f $dir_list_tmp/${uniq_path}*.list &>/dev/null
 
     cd ${repo_path}
 
@@ -395,19 +395,19 @@ gen_list_repo() {
         for _file in ${results}; do
             file_path=$(dirname $_file)
             make_dir "${dir_scripts}/${file_path}"
-            cp -f $_file "${dir_scripts}/${file_path}"
+            cp -f $_file "${dir_scripts}/${uniq_path}/${file_path}"
         done
     fi
     for file in ${files}; do
         filename=$(basename $file)
-        cp -f $file $dir_scripts/${repo}_${filename}
-        echo ${repo}_${filename} >>"$dir_list_tmp/${repo}_scripts.list"
-        cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${author}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${author}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
+        cp -f $file "$dir_scripts/${uniq_path}/${filename}"
+        echo "${uniq_path}/${filename}" >>"$dir_list_tmp/${uniq_path}_scripts.list"
+        cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${uniq_path}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${uniq_path}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
         if [[ $cron_id ]]; then
-            result=$(update_cron_command_api "$cmd_task ${repo}_${filename}:$cron_id")
+            result=$(update_cron_command_api "$cmd_task ${uniq_path}/${filename}:$cron_id")
         fi
     done
-    grep -E "$cmd_task $repo" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($repo_.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${repo}_user.list"
+    grep -E "$cmd_task $uniq_path" $list_crontab_user | perl -pe "s|.*ID=(.*) $cmd_task ($uniq_path.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${repo}_user.list"
     cd $dir_current
 }
 
