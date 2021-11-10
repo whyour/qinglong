@@ -302,7 +302,7 @@ export default class NotificationService {
           token: `${pushPlusToken}`,
           title: `${this.title}`,
           content: `${this.content.replace(/[\n\r]/g, '<br>')}`,
-          topic: `${pushPlusUser}`,
+          topic: `${pushPlusUser || ''}`,
         },
       })
       .json();
