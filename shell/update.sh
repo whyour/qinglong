@@ -394,7 +394,7 @@ gen_list_repo() {
         results=$(eval $cmd | sed 's/^..//' | egrep $dependence)
         for _file in ${results}; do
             file_path=$(dirname $_file)
-            make_dir "${dir_scripts}/${file_path}"
+            make_dir "${dir_scripts}/${uniq_path}/${file_path}"
             cp -f $_file "${dir_scripts}/${uniq_path}/${file_path}"
         done
     fi
