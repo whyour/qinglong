@@ -69,7 +69,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   const [isEditing, setIsEditing] = useState(false);
   const editorRef = useRef<any>(null);
   const [isAddFileModalVisible, setIsAddFileModalVisible] = useState(false);
-  const [dropdownIsVisible, setDropdownIsVisible] = useState(false);
+  const [currentNode, setCurrentNode] = useState<any>();
 
   const getScripts = () => {
     setLoading(true);
@@ -85,9 +85,11 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   };
 
   const getDetail = (node: any) => {
-    request.get(`${config.apiPrefix}scripts/${node.value}`).then((data) => {
-      setValue(data.data);
-    });
+    request
+      .get(`${config.apiPrefix}scripts/${node.value}?path=${node.parent || ''}`)
+      .then((data) => {
+        setValue(data.data);
+      });
   };
 
   const onSelect = (value: any, node: any) => {
@@ -99,6 +101,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setSelect(value);
     setTitle(node.parent || node.value);
+    setCurrentNode(node);
     getDetail(node);
   };
 
@@ -165,11 +168,12 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
         const content = editorRef.current
           ? editorRef.current.getValue().replace(/\r\n/g, '\n')
           : value;
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           request
             .put(`${config.apiPrefix}scripts`, {
               data: {
                 filename: select,
+                path: currentNode.parent || '',
                 content,
               },
             })
@@ -182,7 +186,8 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                 message.error(_data);
               }
               resolve(null);
-            });
+            })
+            .catch((e) => reject(e));
         });
       },
       onCancel() {
@@ -270,6 +275,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     const { tree } = getFilterData(word.toLocaleLowerCase(), data);
     setFilterData(tree);
     setSelect('');
+    setCurrentNode(null);
     setTitle('请选择脚本文件');
     setValue('请选择脚本文件');
   }, [data]);
@@ -322,11 +328,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                 key="value"
                 onSelect={onSelect}
               />,
-              <Dropdown
-                overlay={menu}
-                trigger={['click']}
-                onVisibleChange={(visible) => setDropdownIsVisible(visible)}
-              >
+              <Dropdown overlay={menu} trigger={['click']}>
                 <Button type="primary" icon={<EllipsisOutlined />} />
               </Dropdown>,
             ]

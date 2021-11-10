@@ -18,14 +18,33 @@ export default (app: Router) => {
         const fileList = fs.readdirSync(config.scriptPath, 'utf-8');
         res.send({
           code: 200,
-          data: fileList
-            .filter((x) => {
-              return !fs.lstatSync(config.scriptPath + x).isDirectory();
-            })
-            .map((x) => {
+          data: fileList.map((x) => {
+            if (fs.lstatSync(config.scriptPath + x).isDirectory()) {
+              const childFileList = fs.readdirSync(
+                config.scriptPath + x,
+                'utf-8',
+              );
+              return {
+                title: x,
+                value: x,
+                key: x,
+                disabled: true,
+                children: childFileList.map((y) => {
+                  const statObj = fs.statSync(`${config.scriptPath}${x}/${y}`);
+                  return {
+                    title: y,
+                    value: y,
+                    key: y,
+                    mtime: statObj.mtimeMs,
+                    parent: x,
+                  };
+                }),
+              };
+            } else {
               const statObj = fs.statSync(config.scriptPath + x);
               return { title: x, value: x, key: x, mtime: statObj.mtimeMs };
-            }),
+            }
+          }),
         });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -39,8 +58,9 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
+        const path = req.query.path ? `${req.query.path}/` : '';
         const content = getFileContentByName(
-          `${config.scriptPath}${req.params.file}`,
+          `${config.scriptPath}${path}${req.params.file}`,
         );
         res.send({ code: 200, data: content });
       } catch (e) {
@@ -112,17 +132,19 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
+        path: Joi.string().allow(''),
         content: Joi.string().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let { filename, content } = req.body as {
+        let { filename, content, path } = req.body as {
           filename: string;
           content: string;
+          path: string;
         };
-        const filePath = `${config.scriptPath}${filename}`;
+        const filePath = `${config.scriptPath}${path}/${filename}`;
         fs.writeFileSync(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
