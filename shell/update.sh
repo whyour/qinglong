@@ -391,6 +391,16 @@ gen_list_repo() {
         files=$(echo "$files" | egrep -v $blackword)
     fi
     if [[ $dependence ]]; then
+        cd ${dir_scripts}
+        depInScripts=$(eval $cmd | sed 's/^..//' | egrep -v $uniq_path | egrep $dependence)
+        for dep in ${depInScripts}; do
+            file_path=$(dirname $dep)
+            [[ ! $file_path =~ "/" ]] && file_path=""
+            make_dir "${dir_scripts}/${uniq_path}/${file_path#*/}"
+            cp -f $dep "${dir_scripts}/${uniq_path}/${file_path#*/}"
+        done
+
+        cd ${repo_path}
         results=$(eval $cmd | sed 's/^..//' | egrep $dependence)
         for _file in ${results}; do
             file_path=$(dirname $_file)
