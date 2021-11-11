@@ -352,6 +352,10 @@ export default class CronService {
 
   public async log(_id: string) {
     const doc = await this.get(_id);
+    if (!doc) {
+      return '';
+    }
+
     if (doc.log_path) {
       return getFileContentByName(`${doc.log_path}`);
     }
