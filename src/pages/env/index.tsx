@@ -137,6 +137,29 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
       align: 'center' as const,
     },
     {
+      title: '更新时间',
+      dataIndex: 'timestamp',
+      key: 'timestamp',
+      align: 'center' as const,
+      width: 164,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (text: string, record: any) => {
+        const language = navigator.language || navigator.languages[0];
+        const date = new Date(text)
+                  .toLocaleString(language, {
+                    hour12: false,
+                  })
+                  .replace(' 24:', ' 00:')
+        return (
+          <Tooltip placement="topLeft" title={date}>
+            <span>{date}</span>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
