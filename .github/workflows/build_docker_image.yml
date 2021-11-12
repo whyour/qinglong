@@ -1,0 +1,113 @@
+name: Build And Push Docker Image
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'develop'
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  schedule:
+    # 参考 https://jasonet.co/posts/scheduled-actions/
+    # note: 这里是GMT时间，北京时间减去八小时即可。如北京时间 22:30 => GMT 14:30
+    # minute hour day month dayOfWeek
+    - cron: '00 14 * * *' # GMT 14:00 => 北京时间 22:00
+    #- cron: '30 16 * * *' # GMT 16:30（前一天） => 北京时间 00:30
+  workflow_dispatch:
+
+jobs:
+  build-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '14'
+
+      - name: build front and back
+        run: |
+          yarn install
+          yarn build
+          yarn build-back
+
+      - name: copy to static repo
+        env:
+          GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
+          GITHUB_BRANCH: ${{ github.ref_name }}
+        run: |
+          mkdir -p static
+          cd ./static
+          cp -rf ../dist ./ && cp -rf ../build ./
+          git init -b ${GITHUB_BRANCH} && git add .
+          git config --local user.name 'github-actions[bot]'
+          git config --local user.email 'github-actions[bot]@users.noreply.github.com'
+          git commit --allow-empty -m "copy static at $(date +'%Y-%m-%d %H:%M:%S')"
+          git push --force --quiet "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" ${GITHUB_BRANCH}:${GITHUB_BRANCH}
+
+  build:
+    needs: build-static
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set time zone
+        uses: szenius/set-timezone@v1.0
+        with:
+          timezoneLinux: "Asia/Shanghai"
+          timezoneMacos: "Asia/Shanghai"
+          timezoneWindows: "China Standard Time"
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: |
+            ${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          # generate Docker tags based on the following events/attributes
+          #   nightly, master, pr-2, 1.2.3, 1.2, 1
+          tags: |
+            type=schedule,pattern=nightly
+            type=edge
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          build-args: MAINTAINER=${{ github.repository_owner }}, QL_BRANCH=${{ github.ref_name }}
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/s390x
+          context: docker/
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
