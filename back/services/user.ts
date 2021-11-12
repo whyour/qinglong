@@ -414,7 +414,7 @@ export default class UserService {
       return {
         code: 200,
         data: {
-          hasNewVersion: currentVersion !== lastVersion,
+          hasNewVersion: this.checkHasNewVersion(currentVersion, lastVersion),
           lastVersion,
           lastLog,
         },
@@ -425,6 +425,25 @@ export default class UserService {
         data: error.message,
       };
     }
+  }
+
+  private checkHasNewVersion(curVersion: string, lastVersion: string) {
+    const curArr = curVersion.split('.').map((x) => parseInt(x, 10));
+    const lastArr = lastVersion.split('.').map((x) => parseInt(x, 10));
+    if (curArr[0] < lastArr[0]) {
+      return true;
+    }
+    if (curArr[0] === lastArr[0] && curArr[1] < lastArr[1]) {
+      return true;
+    }
+    if (
+      curArr[0] === lastArr[0] &&
+      curArr[1] === lastArr[1] &&
+      curArr[2] < lastArr[2]
+    ) {
+      return true;
+    }
+    return false;
   }
 
   public async updateSystem() {
