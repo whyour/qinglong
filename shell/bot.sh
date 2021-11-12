@@ -29,12 +29,7 @@ fi
 cp -f "$repo_path/jbot/requirements.txt" "$dir_root"
 
 cd $dir_root
-cat requirements.txt | while read LREAD
-do
-if test ! -z "$(pip3 show "${LREAD%%=*}" 1>/dev/null)"; then
-  pip3 --default-timeout=100 install ${LREAD}
-fi
-done
+pip3 install -r requirements.txt
 
 echo -e "\npython3依赖安装成功...\n"
 
