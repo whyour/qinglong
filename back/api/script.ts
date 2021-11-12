@@ -18,33 +18,47 @@ export default (app: Router) => {
         const fileList = fs.readdirSync(config.scriptPath, 'utf-8');
         res.send({
           code: 200,
-          data: fileList.map((x) => {
-            if (fs.lstatSync(config.scriptPath + x).isDirectory()) {
-              const childFileList = fs.readdirSync(
-                config.scriptPath + x,
-                'utf-8',
-              );
-              return {
-                title: x,
-                value: x,
-                key: x,
-                disabled: true,
-                children: childFileList.map((y) => {
-                  const statObj = fs.statSync(`${config.scriptPath}${x}/${y}`);
-                  return {
-                    title: y,
-                    value: y,
-                    key: y,
-                    mtime: statObj.mtimeMs,
-                    parent: x,
-                  };
-                }),
-              };
-            } else {
-              const statObj = fs.statSync(config.scriptPath + x);
-              return { title: x, value: x, key: x, mtime: statObj.mtimeMs };
-            }
-          }),
+          data: fileList
+            .map((x) => {
+              if (fs.lstatSync(config.scriptPath + x).isDirectory()) {
+                const childFileList = fs.readdirSync(
+                  config.scriptPath + x,
+                  'utf-8',
+                );
+                const dirStat = fs.statSync(`${config.scriptPath}${x}`);
+                return {
+                  title: x,
+                  value: x,
+                  key: x,
+                  mtime: dirStat.mtimeMs,
+                  disabled: true,
+                  children: childFileList
+                    .filter(
+                      (y) =>
+                        !fs
+                          .lstatSync(`${config.scriptPath}${x}/${y}`)
+                          .isDirectory(),
+                    )
+                    .map((y) => {
+                      const statObj = fs.statSync(
+                        `${config.scriptPath}${x}/${y}`,
+                      );
+                      return {
+                        title: y,
+                        value: y,
+                        key: y,
+                        mtime: statObj.mtimeMs,
+                        parent: x,
+                      };
+                    })
+                    .sort((a, b) => b.mtime - a.mtime),
+                };
+              } else {
+                const statObj = fs.statSync(config.scriptPath + x);
+                return { title: x, value: x, key: x, mtime: statObj.mtimeMs };
+              }
+            })
+            .sort((a, b) => b.mtime - a.mtime),
         });
       } catch (e) {
         logger.error('🔥 error: %o', e);
