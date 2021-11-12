@@ -14,7 +14,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
   const checkUpgrade = () => {
     if (updateLoading) return;
     setUpdateLoading(true);
-    const hide = message.loading('检查更新中...', 0);
+    message.loading('检查更新中...', 0);
     request
       .put(`${config.apiPrefix}system/update-check`)
       .then((_data: any) => {
@@ -107,13 +107,13 @@ const CheckUpdate = ({ socketMessage }: any) => {
     if (!modalRef.current || !socketMessage) {
       return;
     }
-    const { type, message, references } = socketMessage;
+    const { type, message: _message, references } = socketMessage;
 
     if (type !== 'updateSystemVersion') {
       return;
     }
 
-    const newMessage = `${value} \n ${message}`;
+    const newMessage = `${value}\n${_message}`;
     modalRef.current.update({
       content: (
         <div style={{ height: '60vh', overflowY: 'auto' }}>
@@ -138,7 +138,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
         .getElementById('log-identifier')!
         .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    if (newMessage.includes('重启面板')) {
+    if (_message.includes('重启面板')) {
       message.warning({
         content: (
           <span>
