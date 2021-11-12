@@ -4,7 +4,6 @@ dir_shell=/ql/shell
 . $dir_shell/share.sh
 link_shell
 
-set -e
 echo -e "======================1. 检测配置文件========================\n"
 make_dir /etc/nginx/conf.d
 cp -fv $nginx_conf /etc/nginx/nginx.conf
@@ -21,19 +20,13 @@ nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 echo -e "nginx启动成功...\n"
 
 echo -e "======================4. 启动控制面板========================\n"
-if test -z "$(pm2 info panel 1>/dev/null)"; then
-  pm2 reload panel --source-map-support --time
-else
-  pm2 start $dir_root/build/app.js -n panel --source-map-support --time
-fi
+pm2 delete panel &>/dev/null
+pm2 start $dir_root/build/app.js -n panel --source-map-support --time
 echo -e "控制面板启动成功...\n"
 
 echo -e "======================5. 启动定时任务========================\n"
-if test -z "$(pm2 info schedule 1>/dev/null)"; then
-  pm2 reload schedule --source-map-support --time
-else
-  pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time
-fi
+pm2 delete schedule &>/dev/null
+pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time
 echo -e "定时任务启动成功...\n"
 
 if [[ $AutoStartBot == true ]]; then
