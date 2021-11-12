@@ -13,8 +13,19 @@ interface Dbs {
 
 const db: Dbs = {} as any;
 
-async function truncateDb() {
+async function fileExist(file: any) {
   return new Promise((resolve) => {
+    try {
+      fs.accessSync(file);
+      resolve(true);
+    } catch (error) {
+      resolve(false);
+    }
+  });
+}
+
+async function truncateDb() {
+  return new Promise(async (resolve) => {
     const files = [
       config.cronDbFile,
       config.dependenceDbFile,
@@ -24,7 +35,8 @@ async function truncateDb() {
     ];
 
     for (const file of files) {
-      if (fs.statSync(file).size >= 1024 * 1024 * 500) {
+      const _fileExist = await fileExist(file);
+      if (_fileExist && fs.statSync(file).size >= 1024 * 1024 * 500) {
         fs.truncateSync(file, 1024 * 1024 * 500);
       }
     }
@@ -35,11 +47,14 @@ export default async () => {
   try {
     await truncateDb();
 
-    db.cronDb = new DataStore({ filename: config.cronDbFile });
-    db.dependenceDb = new DataStore({ filename: config.dependenceDbFile });
-    db.envDb = new DataStore({ filename: config.envDbFile });
-    db.appDb = new DataStore({ filename: config.appDbFile });
-    db.authDb = new DataStore({ filename: config.authDbFile });
+    db.cronDb = new DataStore({ filename: config.cronDbFile, autoload: true });
+    db.dependenceDb = new DataStore({
+      filename: config.dependenceDbFile,
+      autoload: true,
+    });
+    db.envDb = new DataStore({ filename: config.envDbFile, autoload: true });
+    db.appDb = new DataStore({ filename: config.appDbFile, autoload: true });
+    db.authDb = new DataStore({ filename: config.authDbFile, autoload: true });
 
     // compaction data file
     db.cronDb.persistence.compactDatafile();
@@ -47,22 +62,6 @@ export default async () => {
     db.dependenceDb.persistence.compactDatafile();
     db.appDb.persistence.compactDatafile();
     db.authDb.persistence.compactDatafile();
-
-    db.cronDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-    db.envDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-    db.dependenceDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-    db.appDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
-    db.authDb.loadDatabase((err) => {
-      if (err) throw err;
-    });
 
     Logger.info('✌️ DB loaded');
   } catch (error) {
