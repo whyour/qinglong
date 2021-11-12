@@ -76,10 +76,8 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     request
       .get(`${config.apiPrefix}scripts/files`)
       .then((data) => {
-        const sortData = data.data.sort((a: any, b: any) => b.mtime - a.mtime);
-        setData(sortData);
-        setFilterData(sortData);
-        onSelect(sortData[0].value, sortData[0]);
+        setData(data.data);
+        setFilterData(data.data);
       })
       .finally(() => setLoading(false));
   };
