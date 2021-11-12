@@ -2,6 +2,7 @@ import DataStore from 'nedb';
 import config from '../config';
 import Logger from './logger';
 import fs from 'fs';
+import { fileExist } from '../config/util';
 
 interface Dbs {
   cronDb: DataStore;
@@ -12,17 +13,6 @@ interface Dbs {
 }
 
 const db: Dbs = {} as any;
-
-async function fileExist(file: any) {
-  return new Promise((resolve) => {
-    try {
-      fs.accessSync(file);
-      resolve(true);
-    } catch (error) {
-      resolve(false);
-    }
-  });
-}
 
 async function truncateDb() {
   return new Promise(async (resolve) => {

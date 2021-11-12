@@ -1,10 +1,15 @@
-import { getFileContentByName, getLastModifyFilePath } from '../config/util';
+import {
+  fileExist,
+  getFileContentByName,
+  getLastModifyFilePath,
+} from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs';
 import { celebrate, Joi } from 'celebrate';
+import path from 'path';
 const route = Router();
 
 export default (app: Router) => {
@@ -16,49 +21,55 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const fileList = fs.readdirSync(config.scriptPath, 'utf-8');
+
+        let result = [];
+        for (let i = 0; i < fileList.length; i++) {
+          const fileOrDir = fileList[i];
+          const fPath = path.join(config.scriptPath, fileOrDir);
+          const dirStat = fs.statSync(fPath);
+          if (['node_modules'].includes(fileOrDir)) {
+            continue;
+          }
+
+          if (dirStat.isDirectory()) {
+            const childFileList = fs.readdirSync(fPath, 'utf-8');
+            let children = [];
+            for (let j = 0; j < childFileList.length; j++) {
+              const childFile = childFileList[j];
+              const sPath = path.join(config.scriptPath, fileOrDir, childFile);
+              const _fileExist = await fileExist(sPath);
+              if (_fileExist && fs.statSync(sPath).isFile()) {
+                const statObj = fs.statSync(sPath);
+                children.push({
+                  title: childFile,
+                  value: childFile,
+                  key: childFile,
+                  mtime: statObj.mtimeMs,
+                  parent: fileOrDir,
+                });
+              }
+            }
+            result.push({
+              title: fileOrDir,
+              value: fileOrDir,
+              key: fileOrDir,
+              mtime: dirStat.mtimeMs,
+              disabled: true,
+              children: children.sort((a, b) => b.mtime - a.mtime),
+            });
+          } else {
+            result.push({
+              title: fileOrDir,
+              value: fileOrDir,
+              key: fileOrDir,
+              mtime: dirStat.mtimeMs,
+            });
+          }
+        }
+
         res.send({
           code: 200,
-          data: fileList
-            .map((x) => {
-              if (fs.lstatSync(config.scriptPath + x).isDirectory()) {
-                const childFileList = fs.readdirSync(
-                  config.scriptPath + x,
-                  'utf-8',
-                );
-                const dirStat = fs.statSync(`${config.scriptPath}${x}`);
-                return {
-                  title: x,
-                  value: x,
-                  key: x,
-                  mtime: dirStat.mtimeMs,
-                  disabled: true,
-                  children: childFileList
-                    .filter(
-                      (y) =>
-                        !fs
-                          .lstatSync(`${config.scriptPath}${x}/${y}`)
-                          .isDirectory(),
-                    )
-                    .map((y) => {
-                      const statObj = fs.statSync(
-                        `${config.scriptPath}${x}/${y}`,
-                      );
-                      return {
-                        title: y,
-                        value: y,
-                        key: y,
-                        mtime: statObj.mtimeMs,
-                        parent: x,
-                      };
-                    })
-                    .sort((a, b) => b.mtime - a.mtime),
-                };
-              } else {
-                const statObj = fs.statSync(config.scriptPath + x);
-                return { title: x, value: x, key: x, mtime: statObj.mtimeMs };
-              }
-            })
-            .sort((a, b) => b.mtime - a.mtime),
+          data: result,
         });
       } catch (e) {
         logger.error('🔥 error: %o', e);

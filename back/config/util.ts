@@ -220,3 +220,14 @@ export function getPlatform(userAgent: string): 'mobile' | 'desktop' {
 
   return platform as 'mobile' | 'desktop';
 }
+
+export async function fileExist(file: any) {
+  return new Promise((resolve) => {
+    try {
+      fs.accessSync(file);
+      resolve(true);
+    } catch (error) {
+      resolve(false);
+    }
+  });
+}

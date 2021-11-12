@@ -104,7 +104,8 @@ add_cron() {
     local detail=""
     cd $dir_scripts
     for file in $(cat $list_add); do
-        local file_name=${file/${path}\_/}
+        local file_name=${file/${path}\//}
+        file_name=${file/${path}\_/}
         if [[ -f $file ]]; then
             cron_line=$(
                 perl -ne "{
