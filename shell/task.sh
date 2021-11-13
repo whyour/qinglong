@@ -106,7 +106,7 @@ run_normal() {
 
     cd $dir_scripts
     local relative_path="${first_param%/*}"
-    if [[ ! -z ${relative_path} ]]; then
+    if [[ ! -z ${relative_path} ]] && [[ ${first_param} =~ "/" ]]; then
         cd ${relative_path}
         first_param=${first_param/$relative_path\//}
     fi
@@ -174,7 +174,7 @@ run_concurrent() {
 
     cd $dir_scripts
     local relative_path="${first_param%/*}"
-    if [[ ! -z ${relative_path} ]]; then
+    if [[ ! -z ${relative_path} ]] && [[ ${first_param} =~ "/" ]]; then
         cd ${relative_path}
         first_param=${first_param/$relative_path\//}
     fi
@@ -248,7 +248,7 @@ run_designated() {
 
     cd $dir_scripts
     local relative_path="${file_param%/*}"
-    if [[ ! -z ${relative_path} ]]; then
+    if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
         cd ${relative_path}
         file_param=${file_param/$relative_path\//}
     fi
