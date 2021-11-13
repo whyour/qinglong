@@ -16,7 +16,6 @@ function getFilterData(keyword: string, data: any) {
     data.forEach((item: any) => {
       if (item.title.toLocaleLowerCase().includes(keyword)) {
         tree.push(item);
-        expandedKeys.push(...item.children.map((x: any) => x.key));
       } else {
         const children: any[] = [];
         (item.children || []).forEach((subItem: any) => {
@@ -29,7 +28,7 @@ function getFilterData(keyword: string, data: any) {
             ...item,
             children,
           });
-          expandedKeys.push(...children.map((x) => x.key));
+          expandedKeys.push(item.key);
         }
       }
     });
@@ -47,6 +46,7 @@ const Log = ({ headerStyle, isPhone, theme }: any) => {
   const [loading, setLoading] = useState(false);
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
+  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
   const getLogs = () => {
     setLoading(true);
@@ -100,8 +100,12 @@ const Log = ({ headerStyle, isPhone, theme }: any) => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
-      const { tree } = getFilterData(keyword.toLocaleLowerCase(), data);
+      const { tree, expandedKeys } = getFilterData(
+        keyword.toLocaleLowerCase(),
+        data,
+      );
       setFilterData(tree);
+      setExpandedKeys(expandedKeys);
     },
     [data, setFilterData],
   );
@@ -127,7 +131,6 @@ const Log = ({ headerStyle, isPhone, theme }: any) => {
             treeData={data}
             placeholder="请选择日志文件"
             showSearch
-            key="value"
             onSelect={onSelect}
           />,
         ]
