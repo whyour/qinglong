@@ -10,9 +10,9 @@ dir_repo=$dir_root/repo
 dir_raw=$dir_root/raw
 dir_log=$dir_root/log
 dir_db=$dir_root/db
+dir_dep=$dir_root/deps
 dir_list_tmp=$dir_log/.tmp
 dir_code=$dir_log/code
-dir_dep=$dir_log/deps
 dir_update_log=$dir_log/update
 ql_static_repo=$dir_repo/static
 
