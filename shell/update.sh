@@ -391,18 +391,11 @@ gen_list_repo() {
     if [[ $blackword ]]; then
         files=$(echo "$files" | egrep -v $blackword)
     fi
-    if [[ $dependence ]]; then
-        # cd ${dir_scripts}
-        # depInScripts=$(eval $cmd | sed 's/^..//' | egrep -v $uniq_path | egrep $dependence)
-        # for dep in ${depInScripts}; do
-        #     file_path=$(dirname $dep)
-        #     [[ ! $file_path =~ "/" ]] && file_path=""
-        #     make_dir "${dir_scripts}/${uniq_path}/${file_path#*/}"
-        #     cp -f $dep "${dir_scripts}/${uniq_path}/${file_path#*/}"
-        # done
-        cp -f $file_notify_js "${dir_scripts}/${uniq_path}"
-        cp -f $file_notify_py "${dir_scripts}/${uniq_path}"
 
+    cp -f $file_notify_js "${dir_scripts}/${uniq_path}"
+    cp -f $file_notify_py "${dir_scripts}/${uniq_path}"
+
+    if [[ $dependence ]]; then
         cd ${repo_path}
         results=$(eval $cmd | sed 's/^..//' | egrep $dependence)
         for _file in ${results}; do
@@ -411,6 +404,11 @@ gen_list_repo() {
             cp -f $_file "${dir_scripts}/${uniq_path}/${file_path}"
         done
     fi
+    
+    if [[ -d $dir_dep ]]; then
+        cp * "${dir_scripts}/${uniq_path}" &>/dev/null
+    fi
+
     for file in ${files}; do
         filename=$(basename $file)
         cp -f $file "$dir_scripts/${uniq_path}/${filename}"

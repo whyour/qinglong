@@ -12,6 +12,7 @@ dir_log=$dir_root/log
 dir_db=$dir_root/db
 dir_list_tmp=$dir_log/.tmp
 dir_code=$dir_log/code
+dir_dep=$dir_log/deps
 dir_update_log=$dir_log/update
 ql_static_repo=$dir_repo/static
 
@@ -154,6 +155,7 @@ fix_config() {
     make_dir $dir_repo
     make_dir $dir_raw
     make_dir $dir_update_log
+    make_dir $dir_dep
 
     if [[ ! -s $file_config_user ]]; then
         echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
