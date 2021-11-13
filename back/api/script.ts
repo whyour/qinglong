@@ -43,7 +43,7 @@ export default (app: Router) => {
                 children.push({
                   title: childFile,
                   value: childFile,
-                  key: childFile,
+                  key: `${fileOrDir}-${childFile}`,
                   mtime: statObj.mtimeMs,
                   parent: fileOrDir,
                 });
