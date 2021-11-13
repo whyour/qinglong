@@ -44,8 +44,11 @@ const run = async () => {
 };
 
 app
-  .listen(config.cronPort, () => {
-    run();
+  .listen(config.cronPort, async () => {
+    await require('./loaders/sentry').default({ expressApp: app });
+    await require('./loaders/db').default();
+
+    await run();
     Logger.info(`
       ################################################
       🛡️  Schedule listening on port: ${config.cronPort} 🛡️
