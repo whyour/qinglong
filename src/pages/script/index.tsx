@@ -35,16 +35,31 @@ import EditScriptNameModal from './editNameModal';
 const { Text } = Typography;
 
 function getFilterData(keyword: string, data: any) {
+  const expandedKeys: string[] = [];
   if (keyword) {
     const tree: any = [];
     data.forEach((item: any) => {
       if (item.title.toLocaleLowerCase().includes(keyword)) {
         tree.push(item);
+      } else {
+        const children: any[] = [];
+        (item.children || []).forEach((subItem: any) => {
+          if (subItem.title.toLocaleLowerCase().includes(keyword)) {
+            children.push(subItem);
+          }
+        });
+        if (children.length > 0) {
+          tree.push({
+            ...item,
+            children,
+          });
+          expandedKeys.push(item.key);
+        }
       }
     });
-    return { tree };
+    return { tree, expandedKeys };
   }
-  return { tree: data };
+  return { tree: data, expandedKeys };
 }
 
 const LangMap: any = {
@@ -70,6 +85,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   const editorRef = useRef<any>(null);
   const [isAddFileModalVisible, setIsAddFileModalVisible] = useState(false);
   const [currentNode, setCurrentNode] = useState<any>();
+  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
   const getScripts = () => {
     setLoading(true);
@@ -132,7 +148,11 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     (e) => {
       const keyword = e.target.value;
       setSearchValue(keyword);
-      const { tree } = getFilterData(keyword.toLocaleLowerCase(), data);
+      const { tree, expandedKeys } = getFilterData(
+        keyword.toLocaleLowerCase(),
+        data,
+      );
+      setExpandedKeys(expandedKeys);
       setFilterData(tree);
     },
     [data, setFilterData],
@@ -323,7 +343,6 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                 treeData={data}
                 placeholder="请选择脚本文件"
                 showSearch
-                key="value"
                 onSelect={onSelect}
               />,
               <Dropdown overlay={menu} trigger={['click']}>
