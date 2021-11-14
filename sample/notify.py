@@ -51,6 +51,10 @@ push_config = {
                                         #               /send_group_msg   时填入 group_id=QQ群
     'GOBOT_TOKEN': '',                  # go-cqhttp 的 access_token
 
+    'GOTIFY_URL': '',                   # gotify地址,如https://push.example.de:8080
+    'GOTIFY_TOKEN': '',                 # gotify的消息应用token
+    'GOTIFY_PRIORITY': 0,               # 推送消息优先级,默认为0
+
     'IGOT_PUSH_KEY': '',                # iGot 聚合推送的 IGOT_PUSH_KEY
 
     'PUSH_KEY': '',                     # server 酱的 PUSH_KEY，兼容旧版与 Turbo 版
@@ -192,6 +196,25 @@ def go_cqhttp(title: str, content: str) -> None:
         print("go-cqhttp 推送成功！")
     else:
         print("go-cqhttp 推送失败！")
+
+
+def gotify(title:str,content:str)  -> None:
+    """
+    使用 gotify 推送消息。
+    """
+    if not push_config.get("GOTIFY_URL") or not push_config.get("GOTIFY_TOKEN"):
+        print("gotify 服务的 GOTIFY_URL 或 GOTIFY_TOKEN 未设置!!\n取消推送")
+        return
+    print("gotify 服务启动")
+
+    url = f'{push_config.get("GOTIFY_URL")}/message?token={push_config.get("GOTIFY_TOKEN")}'
+    data = {"title": title,"message": content,"priority": push_config.get("GOTIFY_PRIORITY")}
+    response = requests.post(url,data=data).json()
+
+    if response.get("id"):
+        print("gotify 推送成功！")
+    else:
+        print("gotify 推送失败！")
 
 
 def iGot(title: str, content: str) -> None:
@@ -473,6 +496,8 @@ if push_config.get("FSKEY"):
     notify_function.append(feishu_bot)
 if push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ"):
     notify_function.append(go_cqhttp)
+if push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN"):
+    notify_function.append(gotify)
 if push_config.get("IGOT_PUSH_KEY"):
     notify_function.append(iGot)
 if push_config.get("PUSH_KEY"):
