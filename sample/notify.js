@@ -92,13 +92,13 @@ let PUSH_PLUS_USER = '';
 
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
-  GOBOT_URL = process.env.GOTIFY_URL;
+  GOTIFY_URL = process.env.GOTIFY_URL;
 }
 if (process.env.GOTIFY_TOKEN) {
-  GOBOT_TOKEN = process.env.GOTIFY_TOKEN;
+  GOTIFY_TOKEN = process.env.GOTIFY_TOKEN;
 }
 if (process.env.GOTIFY_PRIORITY) {
-  GOBOT_QQ = process.env.GOTIFY_PRIORITY;
+  GOTIFY_PRIORITY = process.env.GOTIFY_PRIORITY;
 }
 
 if (process.env.GOBOT_URL) {
