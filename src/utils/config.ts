@@ -64,6 +64,7 @@ export default {
     logs: '任务日志',
   },
   notificationModes: [
+    { value: 'gotify', label: 'Gotify' },
     { value: 'goCqHttpBot', label: 'GoCqHttpBot' },
     { value: 'serverChan', label: 'Server酱' },
     { value: 'bark', label: 'Bark' },
@@ -77,6 +78,15 @@ export default {
     { value: 'closed', label: '已关闭' },
   ],
   notificationModeMap: {
+    gotify: [
+      {
+        label: 'gotifyUrl',
+        tip: 'gotify的url地址,例如 https://push.example.de:8080',
+        required: true,
+      },
+      { label: 'gotifyToken', tip: 'gotify的消息应用token码', required: true },
+      { label: 'gotifyPriority', tip: '推送消息的优先级' },
+    ],
     goCqHttpBot: [
       {
         label: 'goCqHttpBotUrl',
