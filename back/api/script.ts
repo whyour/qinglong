@@ -120,6 +120,9 @@ export default (app: Router) => {
         if (!path.endsWith('/')) {
           path += '/';
         }
+        if (!path.startsWith('/')) {
+          path = `${config.scriptPath}${path}`;
+        }
         if (config.writePathList.every((x) => !path.startsWith(x))) {
           return res.send({
             code: 430,
@@ -184,15 +187,17 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
+        path: Joi.string().allow(''),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let { filename } = req.body as {
+        let { filename, path } = req.body as {
           filename: string;
+          path: string;
         };
-        const filePath = `${config.scriptPath}${filename}`;
+        const filePath = `${config.scriptPath}${path}/${filename}`;
         fs.unlinkSync(filePath);
         res.send({ code: 200 });
       } catch (e) {

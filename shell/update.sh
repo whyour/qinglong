@@ -318,17 +318,11 @@ patch_version() {
 reload_pm2() {
     pm2 l &>/dev/null
 
-    if [[ $(pm2 info panel 2>/dev/null) ]]; then
-        pm2 reload panel --source-map-support --time &>/dev/null
-    else
-        pm2 start $dir_root/build/app.js -n panel --source-map-support --time &>/dev/null
-    fi
+    pm2 delete panel --source-map-support --time &>/dev/null
+    pm2 start $dir_root/build/app.js -n panel --source-map-support --time &>/dev/null
 
-    if [[ $(pm2 info schedule 2>/dev/null) ]]; then
-        pm2 reload schedule --source-map-support --time &>/dev/null
-    else
-        pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time &>/dev/null
-    fi
+    pm2 delete schedule --source-map-support --time &>/dev/null
+    pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time &>/dev/null
 }
 
 ## 对比脚本
