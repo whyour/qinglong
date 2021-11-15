@@ -13,6 +13,13 @@
 const querystring = require('querystring');
 const $ = new Env();
 const timeout = 15000; //超时时间(单位毫秒)
+// =======================================gotify通知设置区域==============================================
+//gotify_url 填写gotify地址,如https://push.example.de:8080
+//gotify_token 填写gotify的消息应用token
+//gotify_priority 填写推送消息优先级,默认为0
+let GOTIFY_URL = '';
+let GOTIFY_TOKEN = '';
+let GOTIFY_PRIORITY = 0;
 // =======================================go-cqhttp通知设置区域===========================================
 //gobot_url 填写请求地址http://127.0.0.1/send_private_msg
 //gobot_token 填写在go-cqhttp文件设置的访问密钥
@@ -84,6 +91,16 @@ let PUSH_PLUS_TOKEN = '';
 let PUSH_PLUS_USER = '';
 
 //==========================云端环境变量的判断与接收=========================
+if (process.env.GOTIFY_URL) {
+  GOTIFY_URL = process.env.GOTIFY_URL;
+}
+if (process.env.GOTIFY_TOKEN) {
+  GOTIFY_TOKEN = process.env.GOTIFY_TOKEN;
+}
+if (process.env.GOTIFY_PRIORITY) {
+  GOTIFY_PRIORITY = process.env.GOTIFY_PRIORITY;
+}
+
 if (process.env.GOBOT_URL) {
   GOBOT_URL = process.env.GOBOT_URL;
 }
@@ -200,7 +217,43 @@ async function sendNotify(
     qywxamNotify(text, desp), //企业微信应用消息推送
     iGotNotify(text, desp, params), //iGot
     gobotNotify(text, desp),//go-cqhttp
+    gotifyNotify(text, desp),//gotify
   ]);
+}
+
+function gotifyNotify(text, desp) {
+  return new Promise((resolve) => {
+    if (GOTIFY_URL && GOTIFY_TOKEN) {
+      const options = {
+        url: `${GOTIFY_URL}/message?token=${GOTIFY_TOKEN}`,
+        body: `title=${encodeURIComponent(text)}&message=${encodeURIComponent(desp)}&priority=${GOTIFY_PRIORITY}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }
+      };
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('gotify发送通知调用API失败！！\n');
+            console.log(err);
+          } else {
+            data = JSON.parse(data);
+            if (data.id) {
+              console.log('gotify发送通知消息成功🎉\n');
+            } else {
+              console.log(`${data.message}\n`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve();
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
 }
 
 function gobotNotify(text, desp, time = 2100) {
@@ -673,8 +726,8 @@ function qywxamNotify(text, desp) {
             if (err) {
               console.log(
                 '成员ID:' +
-                  ChangeUserId(desp) +
-                  '企业微信应用消息发送通知消息失败！！\n',
+                ChangeUserId(desp) +
+                '企业微信应用消息发送通知消息失败！！\n',
               );
               console.log(err);
             } else {
@@ -682,8 +735,8 @@ function qywxamNotify(text, desp) {
               if (data.errcode === 0) {
                 console.log(
                   '成员ID:' +
-                    ChangeUserId(desp) +
-                    '企业微信应用消息发送通知消息成功🎉。\n',
+                  ChangeUserId(desp) +
+                  '企业微信应用消息发送通知消息成功🎉。\n',
                 );
               } else {
                 console.log(`${data.errmsg}\n`);
