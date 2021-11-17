@@ -2,7 +2,7 @@ FROM node:lts-alpine
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
 ARG QL_URL=http://localhost:5600
-ARG QL_GITHUB_URL=https://github.com/${QL_MAINTAINER}/qinglong.git
+ARG QL_REPOSITORY_URL=https://github.com/${QL_MAINTAINER}/qinglong.git
 ARG QL_BRANCH=master
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=zh_CN.UTF-8 \
@@ -11,7 +11,7 @@ ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     QL_DIR=/ql \
     QL_URL=${QL_URL} \
     QL_MAINTAINER=${QL_MAINTAINER} \
-    QL_GITHUB_URL=${QL_GITHUB_URL} \
+    QL_REPOSITORY_URL=${QL_REPOSITORY_URL} \
     QL_BRANCH=${QL_BRANCH}
 WORKDIR ${QL_DIR}
 RUN set -x \
@@ -36,7 +36,7 @@ RUN set -x \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && touch ~/.bashrc \
-    && git clone -b ${QL_BRANCH} ${QL_GITHUB_URL} ${QL_DIR} \
+    && git clone -b ${QL_BRANCH} ${QL_REPOSITORY_URL} ${QL_DIR} \
     && git config --global user.email "qinglong@@users.noreply.github.com" \
     && git config --global user.name "qinglong" \
     && cd ${QL_DIR} \
