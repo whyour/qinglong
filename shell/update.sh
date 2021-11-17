@@ -400,7 +400,7 @@ gen_list_repo() {
     fi
     
     if [[ -d $dir_dep ]]; then
-        cp $dir_dep/* "${dir_scripts}/${uniq_path}" &>/dev/null
+        cp -f $dir_dep/* "${dir_scripts}/${uniq_path}" &>/dev/null
     fi
 
     for file in ${files}; do
