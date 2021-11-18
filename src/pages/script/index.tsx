@@ -96,8 +96,10 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
         setData(data.data);
         setFilterData(data.data);
       })
-      .finally(() => setLoading(false));
-    initGetScript();
+      .finally(() => {
+        setLoading(false);
+        initGetScript();
+      });
   };
 
   const getDetail = (node: any) => {
