@@ -23,9 +23,98 @@ A timed task management panel that supports typescript, javaScript, python3, and
 </div>
 
 <p align="center">
-  <img width="49%" src="/public/images/login.png">
-  <img width="49%" src="/public/images/home.png">
+  <img width="49%" src="/public/images/1.jpg">
+  <img width="49%" src="/public/images/2.jpg">
 </p>
+
+[简体中文](./README.md) | [English](./README-en.md)
+
+## 功能
+
+- 支持python3、javaScript、shell、typescript脚本语言
+- 支持在线编辑、新增、删除脚本
+- 支持在线编辑、新增、删除环境变量
+- 支持在线查看任务日志
+- 支持秒级任务设置
+- 支持暗黑模式
+- 支持手机端操作
+
+## 部署
+
+### 本机部署
+
+```bash
+# 待补充
+```
+
+### docker 部署
+
+1. docker安装
+
+```bash
+sudo curl -sSL get.docker.com | sh
+```
+
+2. 启动容器
+
+```bash
+docker run -dit \
+  -v $PWD/ql/config:/ql/config \
+  -v $PWD/ql/log:/ql/log \
+  -v $PWD/ql/db:/ql/db \
+  -v $PWD/ql/repo:/ql/repo \
+  -v $PWD/ql/raw:/ql/raw \
+  -v $PWD/ql/scripts:/ql/scripts \
+  -p 5700:5700 \
+  --name qinglong \
+  --hostname qinglong \
+  --restart unless-stopped \
+  whyour/qinglong:latest
+```
+
+### docker-compose 部署
+
+1. docker-compose 安装
+
+```bash
+sudo curl -L https://github.com/docker/compose/releases/download/1.16.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+```
+
+2. 启动容器
+
+```bash
+mkdir qinglong
+wget https://raw.githubusercontent.com/whyour/qinglong/develop/docker-compose.yml
+
+# 启动
+docker-compose up -d
+# 停止
+docker-compose down
+```
+
+## 链接
+
+- [nevinee](https://gitee.com/evine)
+- [crontab-ui](https://github.com/alseambusher/crontab-ui)
+- [Ant Design](https://ant.design)
+- [Ant Design Pro](https://pro.ant.design/)
+- [Umijs3.0](https://umijs.org)
+- [darkreader](https://github.com/darkreader/darkreader)
+
+## 开发
+
+```bash
+$ git clone git@github.com:whyour/qinglong.git
+$ cd qinglong
+$ cp .env.example .env
+$ yarn install
+$ yarn start-back
+$ yarn start
+```
+
+打开你的浏览器，访问 http://127.0.0.1:5600
+
+## 名称来源
 
 青龙，又名苍龙，在中国传统文化中是四象之一、[天之四灵](https://zh.wikipedia.org/wiki/%E5%A4%A9%E4%B9%8B%E5%9B%9B%E7%81%B5)之一，根据五行学说，它是代表东方的灵兽，为青色的龙，五行属木，代表的季节是春季，八卦主震。苍龙与应龙一样，都是身具羽翼。《张果星宗》称“又有辅翼，方为真龙”。
 
@@ -36,17 +125,3 @@ A timed task management panel that supports typescript, javaScript, python3, and
 ## 如何安装
 
 请查看[INSTALL.md](INSTALL.md)
-
-## 多谢
-
-* [nevinee](https://gitee.com/evine)
-
-* [crontab-ui](https://github.com/alseambusher/crontab-ui)
-
-* [Ant Design](https://ant.design)
-
-* [Ant Design Pro](https://pro.ant.design/)
-
-* [Umijs3.0](https://umijs.org)
-
-* [darkreader](https://github.com/darkreader/darkreader)
