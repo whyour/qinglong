@@ -31,6 +31,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import EditScriptNameModal from './editNameModal';
+import { history } from 'umi';
 
 const { Text } = Typography;
 
@@ -96,6 +97,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
         setFilterData(data.data);
       })
       .finally(() => setLoading(false));
+    initGetScript();
   };
 
   const getDetail = (node: any) => {
@@ -104,6 +106,21 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
       .then((data) => {
         setValue(data.data);
       });
+  };
+
+  const initGetScript = () => {
+    const { p, s } = history.location.query as any;
+    if (s) {
+      const obj = {
+        node: {
+          title: s,
+          value: s,
+          key: `${p}-${s}`,
+          parent: p,
+        },
+      };
+      onTreeSelect([`${p}-${s}`], obj);
+    }
   };
 
   const onSelect = (value: any, node: any) => {
