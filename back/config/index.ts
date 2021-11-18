@@ -32,14 +32,8 @@ const authDbFile = path.join(rootPath, 'db/auth.db');
 const dependenceDbFile = path.join(rootPath, 'db/dependence.db');
 const versionFile = path.join(rootPath, 'src/version.ts');
 
-const configFound = dotenv.config({ path: confFile });
-
 if (envFound.error) {
   throw new Error("⚠️  Couldn't find .env file  ⚠️");
-}
-
-if (configFound.error) {
-  throw new Error("⚠️  Couldn't find config.sh file  ⚠️");
 }
 
 export default {
