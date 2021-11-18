@@ -1,10 +1,9 @@
-export const version = '2.10.7';
-export const changeLogLink = 'https://t.me/jiao_long/226';
-export const changeLog = `2.10.7 版本说明
-1. repo命令默认给仓库添加sendNotify依赖
-2. 增加 /ql/deps 目录，此目录下的依赖文件会覆盖系统默认和仓库内的依赖文件
-3. 修复脚本管理列表及搜索
-4. 修复环境变量手机端列表样式
-5. 修复秒级定时任务服务
-6. 修复bot启动命令
+export const version = '2.10.8';
+export const changeLogLink = 'https://t.me/jiao_long/227';
+export const changeLog = `2.10.8 版本说明
+1. 脚本管理新建文件增加选择父目录
+2. 修复脚本管理更新文件
+3. 增加gotify推送，感谢 https://github.com/kilo5hz PR
+4. 修复不能复制deps目录文件
+5. 修复可能的玩客云问题
 `;
