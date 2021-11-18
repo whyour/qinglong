@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/whyour/qinglong">
-    <img width="150" src="/public/images/qinglong.png">
+    <img width="150" src="https://z3.ax1x.com/2021/11/18/I7MpAe.png">
   </a>
 </p>
 
@@ -22,10 +22,7 @@
 [docker-image-size-url]: https://hub.docker.com/r/whyour/qinglong
 </div>
 
-<p align="center">
-  <img width="49%" src="/public/images/1.jpg">
-  <img width="49%" src="/public/images/2.jpg">
-</p>
+[![](https://z3.ax1x.com/2021/11/18/I7KrTg.jpg)](https://whyour.cn)
 
 简体中文 | [English](./README-en.md)
 

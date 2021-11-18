@@ -79,6 +79,6 @@ export default {
   fixSiderbar: true,
   contentWidth: 'Fixed',
   splitMenus: false,
-  logo: '/images/qinglong.png',
+  logo: 'https://z3.ax1x.com/2021/11/18/I7MpAe.png',
   siderWidth: 180,
 } as any;
