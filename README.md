@@ -8,7 +8,7 @@
 
 <div align="center">
 
-A timed task management panel that supports typescript, javaScript, python3, and shell.（支持python3、javaScript、shell、typescript 的定时任务管理面板）
+支持python3、javaScript、shell、typescript 的定时任务管理面板（A timed task management panel that supports typescript, javaScript, python3, and shell.）
 
 [![docker version][docker-version-image]][docker-version-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url]
 
@@ -27,7 +27,7 @@ A timed task management panel that supports typescript, javaScript, python3, and
   <img width="49%" src="/public/images/2.jpg">
 </p>
 
-[简体中文](./README.md) | [English](./README-en.md)
+简体中文 | [English](./README-en.md)
 
 ## 功能
 
@@ -49,7 +49,7 @@ A timed task management panel that supports typescript, javaScript, python3, and
 
 ### docker 部署
 
-1. docker安装
+1. docker 安装
 
 ```bash
 sudo curl -sSL get.docker.com | sh
@@ -100,6 +100,7 @@ docker-compose down
 - [Ant Design Pro](https://pro.ant.design/)
 - [Umijs3.0](https://umijs.org)
 - [darkreader](https://github.com/darkreader/darkreader)
+- [admin-server](https://github.com/sunpu007/admin-server)
 
 ## 开发
 
@@ -112,7 +113,7 @@ $ yarn start-back
 $ yarn start
 ```
 
-打开你的浏览器，访问 http://127.0.0.1:5600
+打开你的浏览器，访问 http://127.0.0.1:5601
 
 ## 名称来源
 
@@ -121,7 +122,3 @@ $ yarn start
 《后汉书·律历志下》记载：日周于天，一寒一暑，四时备成，万物毕改，摄提迁次，青龙移辰，谓之岁。
 
 在中国[二十八宿](https://zh.wikipedia.org/wiki/%E4%BA%8C%E5%8D%81%E5%85%AB%E5%AE%BF)中，青龙是东方七宿（角、亢、氐、房、心、尾、箕）的总称。 在早期星宿信仰中，祂是最尊贵的天神。 但被道教信仰吸纳入其神系后，神格大跌，道教将其称为“孟章”，在不同的道经中有“帝君”、“圣将”、“神将”和“捕鬼将”等称呼，与白虎监兵神君一起，是道教的护卫天神。
-
-## 如何安装
-
-请查看[INSTALL.md](INSTALL.md)
