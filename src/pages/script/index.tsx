@@ -115,10 +115,11 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
         node: {
           title: s,
           value: s,
-          key: `${p}-${s}`,
+          key: p ? `${p}-${s}` : s,
           parent: p,
         },
       };
+      setExpandedKeys([p]);
       onTreeSelect([`${p}-${s}`], obj);
     }
   };
@@ -134,6 +135,10 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     setTitle(node.parent || node.value);
     setCurrentNode(node);
     getDetail(node);
+  };
+
+  const onExpand = (expKeys: any) => {
+    setExpandedKeys(expKeys);
   };
 
   const onTreeSelect = useCallback(
@@ -468,6 +473,8 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                   showIcon={true}
                   height={height}
                   selectedKeys={[select]}
+                  expandedKeys={expandedKeys}
+                  onExpand={onExpand}
                   showLine={{ showLeafIcon: true }}
                   onSelect={onTreeSelect}
                 ></Tree>
