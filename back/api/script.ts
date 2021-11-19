@@ -10,6 +10,7 @@ import config from '../config';
 import * as fs from 'fs';
 import { celebrate, Joi } from 'celebrate';
 import path from 'path';
+import ScriptService from '../services/script';
 const route = Router();
 
 export default (app: Router) => {
@@ -231,6 +232,32 @@ export default (app: Router) => {
         return res.download(filePath, filename, (err) => {
           return next(err);
         });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/scripts/run',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        path: Joi.string().optional().allow(''),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        let { filename, path } = req.body as {
+          filename: string;
+          path: string;
+        };
+        const filePath = `${path}/${filename}`;
+        const scriptService = Container.get(ScriptService);
+        const result = await scriptService.runScript(filePath);
+        res.send(result);
       } catch (e) {
         logger.error('🔥 error: %o', e);
         return next(e);
