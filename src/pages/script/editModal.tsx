@@ -28,16 +28,19 @@ const EditModal = ({
   content,
   handleCancel,
   visible,
+  socketMessage,
 }: {
   treeData?: any;
   currentFile?: string;
   content?: string;
   visible: boolean;
+  socketMessage: any;
   handleCancel: () => void;
 }) => {
   const [value, setValue] = useState('');
   const [language, setLanguage] = useState<string>('javascript');
   const [fileName, setFileName] = useState<string>('');
+  const [selectedKey, setSelectedKey] = useState<string>('');
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
   const [settingModalVisible, setSettingModalVisible] =
     useState<boolean>(false);
@@ -50,10 +53,14 @@ const EditModal = ({
   };
 
   const onSelect = (value: any, node: any) => {
+    if (node.value === fileName || !value) {
+      return;
+    }
     const newMode = LangMap[value.slice(-3)] || '';
     setFileName(value);
     setLanguage(newMode);
     getDetail(node);
+    setSelectedKey(node.key);
   };
 
   const getDetail = (node: any) => {
@@ -62,12 +69,39 @@ const EditModal = ({
     });
   };
 
-  const run = () => {};
+  const run = () => {
+    request
+      .put(`${config.apiPrefix}scripts/run`, {
+        data: {
+          filename: fileName,
+          path: '',
+        },
+      })
+      .then((data) => {});
+  };
+
+  useEffect(() => {
+    if (!socketMessage) {
+      return;
+    }
+
+    let { type, message: _message, references } = socketMessage;
+
+    if (type !== 'manuallyRunScript') {
+      return;
+    }
+
+    if (log) {
+      _message = `\n${_message}`;
+    }
+    setLog(`${log}${_message}`);
+  }, [socketMessage]);
 
   useEffect(() => {
     if (currentFile) {
       setFileName(currentFile);
       setValue(content as string);
+      setSelectedKey(currentFile);
     }
   }, [currentFile, content]);
 
@@ -79,12 +113,11 @@ const EditModal = ({
           <span style={{ marginRight: 8 }}>{fileName}</span>
           <TreeSelect
             style={{ marginRight: 8, width: 120 }}
-            value={currentFile}
+            value={selectedKey}
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
             treeData={treeData}
             placeholder="请选择脚本文件"
             showSearch
-            key="value"
             onSelect={onSelect}
           />
           <Select

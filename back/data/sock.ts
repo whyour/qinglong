@@ -13,4 +13,5 @@ export class SockMessage {
 export type SockMessageType =
   | 'ping'
   | 'installDependence'
-  | 'updateSystemVersion';
+  | 'updateSystemVersion'
+  | 'manuallyRunScript';

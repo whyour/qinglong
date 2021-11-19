@@ -71,7 +71,7 @@ const LangMap: any = {
   '.ts': 'typescript',
 };
 
-const Script = ({ headerStyle, isPhone, theme }: any) => {
+const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
   const [title, setTitle] = useState('请选择脚本文件');
   const [value, setValue] = useState('请选择脚本文件');
   const [select, setSelect] = useState<any>();
@@ -96,11 +96,9 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
       .then((data) => {
         setData(data.data);
         setFilterData(data.data);
-      })
-      .finally(() => {
-        setLoading(false);
         initGetScript();
-      });
+      })
+      .finally(() => setLoading(false));
   };
 
   const getDetail = (node: any) => {
@@ -529,6 +527,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
           treeData={data}
           currentFile={select}
           content={value}
+          socketMessage={socketMessage}
           handleCancel={() => {
             setIsLogModalVisible(false);
           }}
