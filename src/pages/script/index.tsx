@@ -179,7 +179,6 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
 
   const debounceSearch = useCallback(
     debounce((keyword) => {
-      console.log(keyword);
       setSearchValue(keyword);
       const { tree, expandedKeys } = getFilterData(
         keyword.toLocaleLowerCase(),
