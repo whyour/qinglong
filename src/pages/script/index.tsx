@@ -31,6 +31,8 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import EditScriptNameModal from './editNameModal';
+import debounce from 'lodash/debounce';
+import { history } from 'umi';
 
 const { Text } = Typography;
 
@@ -95,7 +97,10 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
         setData(data.data);
         setFilterData(data.data);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        initGetScript();
+      });
   };
 
   const getDetail = (node: any) => {
@@ -104,6 +109,22 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
       .then((data) => {
         setValue(data.data);
       });
+  };
+
+  const initGetScript = () => {
+    const { p, s } = history.location.query as any;
+    if (s) {
+      const obj = {
+        node: {
+          title: s,
+          value: s,
+          key: p ? `${p}-${s}` : s,
+          parent: p,
+        },
+      };
+      setExpandedKeys([p]);
+      onTreeSelect([`${p}-${s}`], obj);
+    }
   };
 
   const onSelect = (value: any, node: any) => {
@@ -117,6 +138,10 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
     setTitle(node.parent || node.value);
     setCurrentNode(node);
     getDetail(node);
+  };
+
+  const onExpand = (expKeys: any) => {
+    setExpandedKeys(expKeys);
   };
 
   const onTreeSelect = useCallback(
@@ -147,6 +172,13 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
+      debounceSearch(keyword);
+    },
+    [data, setFilterData],
+  );
+
+  const debounceSearch = useCallback(
+    debounce((keyword) => {
       setSearchValue(keyword);
       const { tree, expandedKeys } = getFilterData(
         keyword.toLocaleLowerCase(),
@@ -154,7 +186,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
       );
       setExpandedKeys(expandedKeys);
       setFilterData(tree);
-    },
+    }, 300),
     [data, setFilterData],
   );
 
@@ -451,6 +483,8 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
                   showIcon={true}
                   height={height}
                   selectedKeys={[select]}
+                  expandedKeys={expandedKeys}
+                  onExpand={onExpand}
                   showLine={{ showLeafIcon: true }}
                   onSelect={onTreeSelect}
                 ></Tree>
