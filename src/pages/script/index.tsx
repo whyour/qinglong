@@ -31,6 +31,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import EditScriptNameModal from './editNameModal';
+import debounce from 'lodash/debounce';
 import { history } from 'umi';
 
 const { Text } = Typography;
@@ -171,6 +172,14 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
+      debounceSearch(keyword);
+    },
+    [data, setFilterData],
+  );
+
+  const debounceSearch = useCallback(
+    debounce((keyword) => {
+      console.log(keyword);
       setSearchValue(keyword);
       const { tree, expandedKeys } = getFilterData(
         keyword.toLocaleLowerCase(),
@@ -178,7 +187,7 @@ const Script = ({ headerStyle, isPhone, theme }: any) => {
       );
       setExpandedKeys(expandedKeys);
       setFilterData(tree);
-    },
+    }, 300),
     [data, setFilterData],
   );
 
