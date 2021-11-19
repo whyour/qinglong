@@ -35,6 +35,7 @@ import CronLogModal from './logModal';
 import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
 import { getTableScroll } from '@/utils/index';
+import { history } from 'umi';
 import './index.less';
 
 const { Text } = Typography;
@@ -76,7 +77,11 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       width: 150,
       align: 'center' as const,
       render: (text: string, record: any) => (
-        <span>
+        <span
+          onClick={() => {
+            goToScriptManager(record);
+          }}
+        >
           {record.name || record._id}{' '}
           {record.isPinned ? (
             <span>
@@ -328,6 +333,20 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
+
+  const goToScriptManager = (record: any) => {
+    const cmd = record.command.split(' ');
+    if (cmd[0] === 'task') {
+      let [p, s] = cmd[1].split('/');
+      if (!s) {
+        s = p;
+        p = '';
+      }
+      history.push(`/script?p=${p}&s=${s}`);
+    } else if (cmd[1] === 'repo') {
+      location.href = cmd[2];
+    }
+  };
 
   const getCrons = () => {
     setLoading(true);
