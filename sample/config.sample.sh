@@ -112,4 +112,12 @@ export GOBOT_URL=""
 export GOBOT_TOKEN=""
 export GOBOT_QQ=""
 
+## 10. gotify
+## gotify_url 填写gotify地址,如https://push.example.de:8080
+## gotify_token 填写gotify的消息应用token
+## gotify_priority 填写推送消息优先级,默认为0
+export GOTIFY_URL="";
+export GOTIFY_TOKEN="";
+export GOTIFY_PRIORITY=0;
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
