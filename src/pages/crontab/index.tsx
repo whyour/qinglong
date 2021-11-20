@@ -866,6 +866,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           defaultPageSize: 20,
           showTotal: (total: number, range: number[]) =>
             `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+          pageSizeOptions: [10, 20, 50, 100, 200, 500, 1000],
         }}
         dataSource={value}
         rowKey="_id"
