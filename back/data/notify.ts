@@ -1,4 +1,5 @@
 export enum NotificationMode {
+  'gotify' = 'gotify',
   'goCqHttpBot' = 'goCqHttpBot',
   'serverChan' = 'serverChan',
   'bark' = 'bark',
@@ -13,6 +14,12 @@ export enum NotificationMode {
 
 abstract class NotificationBaseInfo {
   public type!: NotificationMode;
+}
+
+export class GotifyNotification extends NotificationBaseInfo {
+  public gotifyUrl = '';
+  public gotifyToken = '';
+  public gotifyPriority = 0;
 }
 
 export class GoCqHttpBotNotification extends NotificationBaseInfo {
@@ -70,6 +77,7 @@ export class EmailNotification extends NotificationBaseInfo {
 
 export interface NotificationInfo
   extends GoCqHttpBotNotification,
+    GotifyNotification,
     ServerChanNotification,
     BarkNotification,
     TelegramBotNotification,

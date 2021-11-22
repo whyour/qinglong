@@ -13,6 +13,7 @@ export default class NotificationService {
   private userService!: UserService;
 
   private modeMap = new Map([
+    ['gotify', this.gotify],
     ['goCqHttpBot', this.goCqHttpBot],
     ['serverChan', this.serverChan],
     ['bark', this.bark],
@@ -65,6 +66,25 @@ export default class NotificationService {
       return await notificationModeAction?.call(this);
     }
     return true;
+  }
+
+  private async gotify() {
+    const { gotifyUrl, gotifyToken, gotifyPriority } = this.params;
+    const res: any = await got
+      .post(`${gotifyUrl}/message?token=${gotifyToken}`, {
+        timeout: this.timeout,
+        retry: 0,
+        body: `title=${encodeURIComponent(
+          this.title,
+        )}&message=${encodeURIComponent(
+          this.content,
+        )}&priority=${gotifyPriority}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      })
+      .json();
+    return typeof res.id === 'number';
   }
 
   private async goCqHttpBot() {
