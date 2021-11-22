@@ -1,4 +1,4 @@
-FROM node:lts-alpine
+FROM node:lts-alpine3.12
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
 ARG QL_URL=https://github.com/${QL_MAINTAINER}/qinglong.git
