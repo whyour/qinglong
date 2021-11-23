@@ -9,7 +9,7 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs';
 import { celebrate, Joi } from 'celebrate';
-import path from 'path';
+import path, { join } from 'path';
 import ScriptService from '../services/script';
 const route = Router();
 
@@ -44,7 +44,7 @@ export default (app: Router) => {
                 children.push({
                   title: childFile,
                   value: childFile,
-                  key: `${fileOrDir}-${childFile}`,
+                  key: `${fileOrDir}/${childFile}`,
                   mtime: statObj.mtimeMs,
                   parent: fileOrDir,
                 });
@@ -84,10 +84,12 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const path = req.query.path ? `${req.query.path}/` : '';
-        const content = getFileContentByName(
-          `${config.scriptPath}${path}${req.params.file}`,
+        const filePath = join(
+          config.scriptPath,
+          req.query.path as string,
+          req.params.file,
         );
+        const content = getFileContentByName(filePath);
         res.send({ code: 200, data: content });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -101,7 +103,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
-        path: Joi.string().allow(''),
+        path: Joi.string().optional().allow(''),
         content: Joi.string().allow(''),
         originFilename: Joi.string().allow(''),
       }),
@@ -161,7 +163,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
-        path: Joi.string().allow(''),
+        path: Joi.string().optional().allow(''),
         content: Joi.string().required(),
       }),
     }),
@@ -173,7 +175,7 @@ export default (app: Router) => {
           content: string;
           path: string;
         };
-        const filePath = `${config.scriptPath}${path}/${filename}`;
+        const filePath = join(config.scriptPath, path, filename);
         fs.writeFileSync(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
@@ -198,7 +200,7 @@ export default (app: Router) => {
           filename: string;
           path: string;
         };
-        const filePath = `${config.scriptPath}${path}/${filename}`;
+        const filePath = join(config.scriptPath, path, filename);
         fs.unlinkSync(filePath);
         res.send({ code: 200 });
       } catch (e) {
@@ -254,7 +256,7 @@ export default (app: Router) => {
           filename: string;
           path: string;
         };
-        const filePath = `${path}/${filename}`;
+        const filePath = join(path, filename);
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.runScript(filePath);
         res.send(result);

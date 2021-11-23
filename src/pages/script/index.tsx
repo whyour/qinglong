@@ -116,12 +116,12 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
         node: {
           title: s,
           value: s,
-          key: p ? `${p}-${s}` : s,
+          key: p ? `${p}/${s}` : s,
           parent: p,
         },
       };
       setExpandedKeys([p]);
-      onTreeSelect([`${p}-${s}`], obj);
+      onTreeSelect([`${p}/${s}`], obj);
     }
   };
 
@@ -525,7 +525,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
         <EditModal
           visible={isLogModalVisible}
           treeData={data}
-          currentFile={select}
+          currentNode={currentNode}
           content={value}
           socketMessage={socketMessage}
           handleCancel={() => {
