@@ -47,5 +47,6 @@ RUN set -x \
     && rm -rf /root/.pnpm-store \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
     && cp -rf /static/* ${QL_DIR} \
-    && rm -rf /static
+    && rm -rf /static \
+    && mkdir -p /run/nginx
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
