@@ -24,22 +24,22 @@ const prefixMap: any = {
 
 const EditModal = ({
   treeData,
-  currentFile,
+  currentNode,
   content,
   handleCancel,
   visible,
   socketMessage,
 }: {
   treeData?: any;
-  currentFile?: string;
   content?: string;
   visible: boolean;
   socketMessage: any;
+  currentNode: any;
   handleCancel: () => void;
 }) => {
   const [value, setValue] = useState('');
   const [language, setLanguage] = useState<string>('javascript');
-  const [fileName, setFileName] = useState<string>('');
+  const [cNode, setCNode] = useState<any>();
   const [selectedKey, setSelectedKey] = useState<string>('');
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
   const [settingModalVisible, setSettingModalVisible] =
@@ -53,28 +53,31 @@ const EditModal = ({
   };
 
   const onSelect = (value: any, node: any) => {
-    if (node.value === fileName || !value) {
+    if (node.key === selectedKey || !value) {
       return;
     }
     const newMode = LangMap[value.slice(-3)] || '';
-    setFileName(value);
+    setCNode(node);
     setLanguage(newMode);
     getDetail(node);
     setSelectedKey(node.key);
   };
 
   const getDetail = (node: any) => {
-    request.get(`${config.apiPrefix}scripts/${node.value}`).then((data) => {
-      setValue(data.data);
-    });
+    request
+      .get(`${config.apiPrefix}scripts/${node.value}?path=${node.parent || ''}`)
+      .then((data) => {
+        setValue(data.data);
+      });
   };
 
   const run = () => {
+    setLog('');
     request
       .put(`${config.apiPrefix}scripts/run`, {
         data: {
-          filename: fileName,
-          path: '',
+          filename: cNode.value,
+          path: cNode.parent || '',
         },
       })
       .then((data) => {});
@@ -98,21 +101,21 @@ const EditModal = ({
   }, [socketMessage]);
 
   useEffect(() => {
-    if (currentFile) {
-      setFileName(currentFile);
+    if (currentNode) {
+      setCNode(currentNode);
       setValue(content as string);
-      setSelectedKey(currentFile);
+      setSelectedKey(currentNode.key);
     }
-  }, [currentFile, content]);
+  }, [content, currentNode]);
 
   return (
     <Drawer
       className="edit-modal"
+      closable={false}
       title={
         <>
-          <span style={{ marginRight: 8 }}>{fileName}</span>
           <TreeSelect
-            style={{ marginRight: 8, width: 120 }}
+            style={{ marginRight: 8, width: 150 }}
             value={selectedKey}
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
             treeData={treeData}
@@ -122,7 +125,7 @@ const EditModal = ({
           />
           <Select
             value={language}
-            style={{ width: 120, marginRight: 8 }}
+            style={{ width: 110, marginRight: 8 }}
             onChange={(e) => {
               setLanguage(e);
             }}
@@ -162,6 +165,15 @@ const EditModal = ({
           >
             保存
           </Button>
+          <Button
+            type="primary"
+            style={{ marginRight: 8 }}
+            onClick={() => {
+              handleCancel();
+            }}
+          >
+            退出
+          </Button>
         </>
       }
       width={'100%'}
@@ -197,7 +209,7 @@ const EditModal = ({
           content:
             editorRef.current &&
             editorRef.current.getValue().replace(/\r\n/g, '\n'),
-          filename: fileName,
+          filename: cNode?.value,
         }}
       />
       <SettingModal

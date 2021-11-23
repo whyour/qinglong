@@ -275,14 +275,16 @@ export default function (props: any) {
       }}
       onCollapse={setCollapsed}
       collapsed={collapsed}
-      rightContentRender={() => (
-        <Dropdown overlay={menu} trigger={['click']}>
-          <span className="side-menu-user-wrapper">
-            <Avatar shape="square" size="small" icon={<UserOutlined />} />
-            <span style={{ marginLeft: 5 }}>admin</span>
-          </span>
-        </Dropdown>
-      )}
+      rightContentRender={() =>
+        ctx.isPhone && (
+          <Dropdown overlay={menu} trigger={['click']}>
+            <span className="side-menu-user-wrapper">
+              <Avatar shape="square" size="small" icon={<UserOutlined />} />
+              <span style={{ marginLeft: 5 }}>admin</span>
+            </span>
+          </Dropdown>
+        )
+      }
       collapsedButtonRender={(collapsed) => (
         <span
           className="side-menu-container"
