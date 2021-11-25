@@ -86,7 +86,7 @@ export default (app: Router) => {
       try {
         const filePath = join(
           config.scriptPath,
-          req.query.path as string,
+          req.query.path as string | undefined || '',
           req.params.file,
         );
         const content = getFileContentByName(filePath);
