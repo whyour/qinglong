@@ -256,7 +256,7 @@ export default (app: Router) => {
           filename: string;
           path: string;
         };
-        const filePath = join(path, filename);
+        const filePath = join(config.scriptPath, path, filename);
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.runScript(filePath);
         res.send(result);
