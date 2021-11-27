@@ -285,6 +285,7 @@ def pushplus_bot(title: str, content: str) -> None:
     else:
 
         url_old = "http://pushplus.hxtrip.com/send"
+        headers["Accept"] = "application/json"
         response = requests.post(url=url_old, data=body, headers=headers).json()
 
         if response["code"] == 200:
