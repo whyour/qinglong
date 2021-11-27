@@ -1,10 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 import chokidar from 'chokidar';
+import config from '../config/index';
 
 function linkToNodeModule(src: string, dst?: string) {
-  const target = path.join(__dirname, 'node_modules', dst || src);
-  const source = path.join(__dirname, src);
+  const target = path.join(config.rootPath, 'node_modules', dst || src);
+  const source = path.join(config.rootPath, src);
 
   fs.lstat(target, (err, stat) => {
     if (!stat) {
@@ -18,7 +19,7 @@ function linkToNodeModule(src: string, dst?: string) {
 export default async (src: string = 'deps') => {
   linkToNodeModule(src);
 
-  const source = path.join(__dirname, src);
+  const source = path.join(config.rootPath, src);
   const watcher = chokidar.watch(source, {
     ignored: /(^|[\/\\])\../, // ignore dotfiles
     persistent: true,
