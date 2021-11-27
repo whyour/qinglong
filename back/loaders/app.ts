@@ -3,6 +3,7 @@ import dependencyInjectorLoader from './dependencyInjector';
 import Logger from './logger';
 import initData from './initData';
 import { Application } from 'express';
+import linkDeps from './deps';
 
 export default async ({ expressApp }: { expressApp: Application }) => {
   await dependencyInjectorLoader({
@@ -15,4 +16,7 @@ export default async ({ expressApp }: { expressApp: Application }) => {
 
   await initData();
   Logger.info('✌️ init data loaded');
+
+  await linkDeps();
+  Logger.info('✌️ link deps');
 };
