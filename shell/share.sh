@@ -35,6 +35,8 @@ file_notify_js=$dir_scripts/sendNotify.js
 task_error_log_path=$dir_log/task_error.log
 nginx_app_conf=$dir_root/docker/front.conf
 nginx_conf=$dir_root/docker/nginx.conf
+dep_notify_py=$dir_dep/notify.py
+dep_notify_js=$dir_dep/sendNotify.js
 
 ## 清单文件
 list_crontab_user=$dir_config/crontab.list
@@ -210,6 +212,19 @@ fix_config() {
         cat /dev/null > /etc/nginx/conf.d/default.conf
         echo
     fi
+
+    if [[ ! -s $dep_notify_js ]]; then
+        echo -e "复制一份 $file_notify_js_sample 为 $dep_notify_js\n"
+        cp -fv $file_notify_js_sample $dep_notify_js
+        echo
+    fi
+
+    if [[ ! -s $dep_notify_py ]]; then
+        echo -e "复制一份 $file_notify_py_sample 为 $dep_notify_py\n"
+        cp -fv $file_notify_py_sample $dep_notify_py
+        echo
+    fi
+    
 }
 
 npm_install_sub() {
