@@ -22,14 +22,14 @@ export default async () => {
   );
 
   // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
-  dependenceDb.find({ status: { $in: [0, 1, 2] } }).exec((err, docs) => {
+  dependenceDb.find({ status: { $in: [0, 1, 2] } }).exec(async (err, docs) => {
     const groups = _.groupBy(docs, 'type');
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
         const depIds = group.map((x) => x._id);
         for (const dep of depIds) {
-          dependenceService.reInstall([dep]);
+          await dependenceService.reInstall([dep]);
         }
       }
     }

@@ -131,7 +131,7 @@ export default class DependenceService {
         { $set: { status: DependenceStatus.installing, log: [] } },
         { multi: true, returnUpdatedDocs: true },
         async (err, num, docs: Dependence[]) => {
-          this.installOrUninstallDependencies(docs);
+          await this.installOrUninstallDependencies(docs);
           resolve(docs);
         },
       );
@@ -178,103 +178,109 @@ export default class DependenceService {
     dependencies: Dependence[],
     isInstall: boolean = true,
   ) {
-    if (dependencies.length === 0) {
-      return;
-    }
-    const depNames = dependencies.map((x) => x.name).join(' ');
-    const depRunCommand = (
-      isInstall
-        ? InstallDependenceCommandTypes
-        : unInstallDependenceCommandTypes
-    )[dependencies[0].type as any];
-    const actionText = isInstall ? '安装' : '删除';
-    const depIds = dependencies.map((x) => x._id) as string[];
-    const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
-    const startTime = Date.now();
-    this.sockService.sendMessage({
-      type: 'installDependence',
-      message: `开始${actionText}依赖 ${depNames}，开始时间 ${new Date(
-        startTime,
-      ).toLocaleString()}`,
-      references: depIds,
-    });
-    this.updateLog(
-      depIds,
-      `开始${actionText}依赖 ${depNames}，开始时间 ${new Date(
-        startTime,
-      ).toLocaleString()}\n`,
-    );
-    cp.stdout.on('data', (data) => {
+    return new Promise((resolve) => {
+      if (dependencies.length === 0) {
+        resolve(null);
+        return;
+      }
+      const depNames = dependencies.map((x) => x.name).join(' ');
+      const depRunCommand = (
+        isInstall
+          ? InstallDependenceCommandTypes
+          : unInstallDependenceCommandTypes
+      )[dependencies[0].type as any];
+      const actionText = isInstall ? '安装' : '删除';
+      const depIds = dependencies.map((x) => x._id) as string[];
+      const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
+      const startTime = Date.now();
       this.sockService.sendMessage({
         type: 'installDependence',
-        message: data.toString(),
-        references: depIds,
-      });
-      this.updateLog(depIds, data.toString());
-    });
-
-    cp.stderr.on('data', (data) => {
-      this.sockService.sendMessage({
-        type: 'installDependence',
-        message: data.toString(),
-        references: depIds,
-      });
-      this.updateLog(depIds, data.toString());
-    });
-
-    cp.on('error', (err) => {
-      this.sockService.sendMessage({
-        type: 'installDependence',
-        message: JSON.stringify(err),
-        references: depIds,
-      });
-      this.updateLog(depIds, JSON.stringify(err));
-    });
-
-    cp.on('close', (code) => {
-      const endTime = Date.now();
-      const isSucceed = code === 0;
-      const resultText = isSucceed ? '成功' : '失败';
-
-      this.sockService.sendMessage({
-        type: 'installDependence',
-        message: `依赖${actionText}${resultText}，结束时间 ${new Date(
-          endTime,
-        ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
+        message: `开始${actionText}依赖 ${depNames}，开始时间 ${new Date(
+          startTime,
+        ).toLocaleString()}`,
         references: depIds,
       });
       this.updateLog(
         depIds,
-        `依赖${actionText}${resultText}，结束时间 ${new Date(
-          endTime,
-        ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
+        `开始${actionText}依赖 ${depNames}，开始时间 ${new Date(
+          startTime,
+        ).toLocaleString()}\n`,
       );
+      cp.stdout.on('data', (data) => {
+        this.sockService.sendMessage({
+          type: 'installDependence',
+          message: data.toString(),
+          references: depIds,
+        });
+        this.updateLog(depIds, data.toString());
+      });
 
-      let status = null;
-      if (isSucceed) {
-        status = isInstall
-          ? DependenceStatus.installed
-          : DependenceStatus.removed;
-      } else {
-        status = isInstall
-          ? DependenceStatus.installFailed
-          : DependenceStatus.removeFailed;
-      }
-      this.dependenceDb.update(
-        { _id: { $in: depIds } },
-        {
-          $set: { status },
-          $unset: { pid: true },
-        },
-        { multi: true },
-      );
+      cp.stderr.on('data', (data) => {
+        this.sockService.sendMessage({
+          type: 'installDependence',
+          message: data.toString(),
+          references: depIds,
+        });
+        this.updateLog(depIds, data.toString());
+      });
 
-      // 如果删除依赖成功，3秒后删除数据库记录
-      if (isSucceed && !isInstall) {
-        setTimeout(() => {
-          this.removeDb(depIds);
-        }, 5000);
-      }
+      cp.on('error', (err) => {
+        this.sockService.sendMessage({
+          type: 'installDependence',
+          message: JSON.stringify(err),
+          references: depIds,
+        });
+        this.updateLog(depIds, JSON.stringify(err));
+        resolve(null);
+      });
+
+      cp.on('close', (code) => {
+        const endTime = Date.now();
+        const isSucceed = code === 0;
+        const resultText = isSucceed ? '成功' : '失败';
+
+        this.sockService.sendMessage({
+          type: 'installDependence',
+          message: `依赖${actionText}${resultText}，结束时间 ${new Date(
+            endTime,
+          ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
+          references: depIds,
+        });
+        this.updateLog(
+          depIds,
+          `依赖${actionText}${resultText}，结束时间 ${new Date(
+            endTime,
+          ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
+        );
+
+        let status = null;
+        if (isSucceed) {
+          status = isInstall
+            ? DependenceStatus.installed
+            : DependenceStatus.removed;
+        } else {
+          status = isInstall
+            ? DependenceStatus.installFailed
+            : DependenceStatus.removeFailed;
+        }
+        this.dependenceDb.update(
+          { _id: { $in: depIds } },
+          {
+            $set: { status },
+            $unset: { pid: true },
+          },
+          { multi: true },
+        );
+
+        // 如果删除依赖成功，3秒后删除数据库记录
+        if (isSucceed && !isInstall) {
+          setTimeout(() => {
+            this.removeDb(depIds);
+          }, 5000);
+        }
+
+        resolve(null);
+      });
     });
   }
 }
