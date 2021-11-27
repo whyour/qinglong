@@ -403,13 +403,22 @@ export default class UserService {
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const currentVersion = currentVersionFile.match(versionRegx)![1];
 
-      const lastVersionFileContent = await (
-        await got.get(config.lastVersionFile)
-      ).body;
-      const lastVersion = lastVersionFileContent.match(versionRegx)![1];
-      const lastLog = lastVersionFileContent.match(logRegx)
-        ? lastVersionFileContent.match(logRegx)![1]
-        : '';
+      let lastVersion = '';
+      let lastLog = '';
+      try {
+        const result = await Promise.race([
+          got.get(config.lastVersionFile, { timeout: 1000, retry: 0 }),
+          got.get(`https://ghproxy.com/${config.lastVersionFile}`, {
+            timeout: 5000,
+            retry: 0,
+          }),
+        ]);
+        const lastVersionFileContent = result.body;
+        lastVersion = lastVersionFileContent.match(versionRegx)![1];
+        lastLog = lastVersionFileContent.match(logRegx)
+          ? lastVersionFileContent.match(logRegx)![1]
+          : '';
+      } catch (error) {}
 
       return {
         code: 200,
