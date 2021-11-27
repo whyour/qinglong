@@ -24,7 +24,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
           if (data.hasNewVersion) {
             showConfirmUpdateModal(data);
           } else {
-            message.success('已经是最新版了！');
+            showForceUpdateModal();
           }
         } else {
           message.error(data);
@@ -37,6 +37,32 @@ const CheckUpdate = ({ socketMessage }: any) => {
       .finally(() => {
         setUpdateLoading(false);
       });
+  };
+
+  const showForceUpdateModal = () => {
+    Modal.confirm({
+      width: 500,
+      title: '更新',
+      content: (
+        <>
+          <div>已经是最新版了！</div>
+          <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
+            青龙 {version} 是目前检测到的最新可用版本了。
+          </div>
+        </>
+      ),
+      okText: '确认',
+      cancelText: '强制更新',
+      onCancel() {
+        showUpdatingModal();
+        request
+          .put(`${config.apiPrefix}system/update`)
+          .then((_data: any) => {})
+          .catch((error: any) => {
+            console.log(error);
+          });
+      },
+    });
   };
 
   const showConfirmUpdateModal = (data: any) => {
