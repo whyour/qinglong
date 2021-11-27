@@ -1,10 +1,10 @@
-export const version = '2.10.9';
-export const changeLogLink = 'https://t.me/jiao_long/228';
-export const changeLog = `2.10.9 版本说明
-1. 任务管理支持任务名跳转脚本管理页，感谢 https://github.com/kilo5hz PR
-2. 系统通知支持gotify，感谢 https://github.com/kilo5hz PR
-3. 定时任务列表pageSize增加200/500/1000，感谢 https://github.com/fzls PR
-4. 修复deps目录依赖文件拷贝
-5. 修改alpine基础镜像版本，解决arm32位系统无法启动容器，感谢 https://github.com/lx200916
-6. 修复调试功能
+export const version = '2.10.10';
+export const changeLogLink = 'https://t.me/jiao_long/229';
+export const changeLog = `2.10.10 版本说明
+1. 检测更新增加强制更新操作
+2. deps目录文件增加软链，支持脚本直接调用。比如 const notify = require('deps/sendNotify')
+3. 修复alpine3.12和3.14关于nginx的兼容性问题
+4. 修复调试脚本运行路径
+5. 修复deps目录依赖文件拷贝
+6. 修复使用旧pushplus推送后结果解析失败的问题，感谢 https://github.com/xuzhonglin
 `;
