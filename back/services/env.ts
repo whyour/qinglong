@@ -219,11 +219,19 @@ export default class EnvService {
 
         // 忽略不符合bash要求的环境变量名称
         if (/^[a-zA-Z_][0-9a-zA-Z_]+$/.test(key)) {
-          env_string += `export ${key}="${_(group)
-            .filter((x) => x.status !== EnvStatus.disabled)
-            .map('value')
-            .join('&')
-            .replace(/ /g, '')}"\n`;
+          if (/"/.test(_(group).map('value').join('&'))) {
+            env_string += `export ${key}='${_(group)
+              .filter((x) => x.status !== EnvStatus.disabled)
+              .map('value')
+              .join('&')
+              .replace(/ /g, '')}'\n`;
+          } else {
+            env_string += `export ${key}="${_(group)
+              .filter((x) => x.status !== EnvStatus.disabled)
+              .map('value')
+              .join('&')
+              .replace(/ /g, '')}"\n`;
+          }
         }
       }
     }
