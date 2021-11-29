@@ -20,7 +20,7 @@ import './index.less';
 import vhCheck from 'vh-check';
 import { version, changeLogLink, changeLog } from '../version';
 import { useCtx, useTheme } from '@/utils/hooks';
-import { message, Badge, Modal, Avatar, Dropdown, Menu, Popover } from 'antd';
+import { message, Badge, Modal, Avatar, Dropdown, Menu, Image } from 'antd';
 // @ts-ignore
 import SockJS from 'sockjs-client';
 import * as Sentry from '@sentry/react';
@@ -232,6 +232,12 @@ export default function (props: any) {
       selectedKeys={[props.location.pathname]}
       loading={loading}
       ErrorBoundary={Sentry.ErrorBoundary}
+      logo={
+        <Image
+          preview={false}
+          src="https://z3.ax1x.com/2021/11/18/I7MpAe.png"
+        />
+      }
       title={
         <>
           <span style={{ fontSize: 16 }}>控制面板</span>
