@@ -1,10 +1,8 @@
-export const version = '2.10.10';
-export const changeLogLink = 'https://t.me/jiao_long/229';
-export const changeLog = `2.10.10 版本说明
-1. 检测更新增加强制更新操作
-2. deps目录文件增加软链，支持脚本直接调用。比如 const notify = require('deps/sendNotify')
-3. 修复alpine3.12和3.14关于nginx的兼容性问题
-4. 修复调试脚本运行路径
-5. 修复deps目录依赖文件拷贝
-6. 修复使用旧pushplus推送后结果解析失败的问题，感谢 https://github.com/xuzhonglin
+export const version = '2.10.11';
+export const changeLogLink = 'https://t.me/jiao_long/230';
+export const changeLog = `2.10.11 版本说明
+1. 修复环境变量中包含双引号变量异常，感谢 https://github.com/mengshouer
+2. 修复最后运行时长覆盖逻辑
+3. 修复内容区高度和logo样式
+4. 修复搜索urlencode的文本时，结果异常
 `;
