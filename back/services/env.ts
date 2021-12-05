@@ -113,7 +113,9 @@ export default class EnvService {
   ): Promise<Env[]> {
     let condition = { ...query };
     if (searchText) {
-      const reg = new RegExp(searchText);
+      const encodeText = encodeURIComponent(searchText);
+      const reg = new RegExp(`${searchText}|${encodeText}`, 'i');
+
       condition = {
         $or: [
           {
