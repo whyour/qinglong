@@ -51,7 +51,8 @@
     "sockjs": "^0.3.21",
     "typedi": "^0.8.0",
     "uuid": "^8.3.2",
-    "winston": "^3.3.3"
+    "winston": "^3.3.3",
+    "yargs": "^17.2.1"
   },
   "devDependencies": {
     "@ant-design/icons": "^4.6.2",

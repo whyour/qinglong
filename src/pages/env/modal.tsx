@@ -77,7 +77,7 @@ const EnvModal = ({
           rules={[
             { required: true, message: '请输入环境变量名称', whitespace: true },
             {
-              pattern: /^[a-zA-Z_][0-9a-zA-Z_]+$/,
+              pattern: /^[a-zA-Z_][0-9a-zA-Z_]*$/,
               message: '只能输入字母数字下划线，且不能以数字开头',
             },
           ]}

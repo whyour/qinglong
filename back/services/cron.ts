@@ -159,7 +159,9 @@ export default class CronService {
   public async crontabs(searchText?: string): Promise<Crontab[]> {
     let query = {};
     if (searchText) {
-      const reg = new RegExp(searchText, 'i');
+      const encodeText = encodeURIComponent(searchText);
+      const reg = new RegExp(`${searchText}|${encodeText}`, 'i');
+
       query = {
         $or: [
           {
