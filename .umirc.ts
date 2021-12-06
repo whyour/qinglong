@@ -2,6 +2,7 @@ import { defineConfig } from 'umi';
 const CompressionPlugin = require('compression-webpack-plugin');
 
 export default defineConfig({
+  publicPath: './',
   hash: true,
   layout: false,
   nodeModulesTransform: {
