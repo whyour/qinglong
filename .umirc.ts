@@ -3,6 +3,7 @@ const CompressionPlugin = require('compression-webpack-plugin');
 
 export default defineConfig({
   publicPath: './',
+  base: './',
   hash: true,
   layout: false,
   nodeModulesTransform: {

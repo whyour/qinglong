@@ -1,6 +1,9 @@
+let pathname = location.pathname.split('/');
+pathname.pop();
+pathname.push('/api/');
 export default {
   siteName: '青龙控制面板',
-  apiPrefix: '/api/',
+  apiPrefix: pathname.join('/'),
   authKey: 'token',
 
   /* Layout configuration, specify which layout to use for route. */
