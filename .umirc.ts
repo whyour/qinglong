@@ -39,7 +39,7 @@ export default defineConfig({
   scripts: [
     'https://gw.alipayobjects.com/os/lib/react/16.13.1/umd/react.production.min.js',
     'https://gw.alipayobjects.com/os/lib/react-dom/16.13.1/umd/react-dom.production.min.js',
-    'https://cdn.jsdelivr.net/npm/darkreader@4/darkreader.min.js',
+    'https://cdn.jsdelivr.net/npm/darkreader@4.9.40/darkreader.min.js',
     'https://cdn.jsdelivr.net/npm/codemirror@5/lib/codemirror.min.js',
     'https://cdn.jsdelivr.net/npm/codemirror@5/mode/shell/shell.js',
     'https://cdn.jsdelivr.net/npm/codemirror@5/mode/python/python.js',
