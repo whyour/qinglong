@@ -264,13 +264,18 @@ run_designated() {
 
 ## 运行其他命令
 run_else() {
-    local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    local log_dir_tmp="${1##*/}"
-    local log_dir="$dir_log/${log_dir_tmp%%.*}"
+    local file_param="$1"
+    define_program "$file_param"
+    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
+    log_dir_tmp="${file_param##*/}"
+    log_dir_tmp_path="${file_param%%/*}"
+    log_dir_tmp_path="${log_dir_tmp_path##*/}"
+    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
+    log_dir="$dir_log/${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
     cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
-    make_dir "$log_dir"
+    make_dir $log_dir
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     local begin_timestamp=$(date "+%s" -d "$begin_time")
@@ -278,13 +283,21 @@ run_else() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $@" | perl -pe "s|.*ID=(.*) $cmd_task $@\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
-    eval timeout -k 10s $command_timeout_time "$@" $cmd
+    cd $dir_scripts
+    local relative_path="${file_param%/*}"
+    if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
+        cd ${relative_path}
+        file_param=${file_param/$relative_path\//}
+    fi
 
-    eval . $file_task_after "$@" $cmd
+    shift
+    eval timeout -k 10s $command_timeout_time $which_program "$file_param" "$@" $cmd
+
+    eval . $file_task_after "$file_param" "$@" $cmd
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local end_timestamp=$(date "+%s" -d "$end_time")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))

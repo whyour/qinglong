@@ -335,8 +335,12 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
 
   const goToScriptManager = (record: any) => {
-    const cmd = record.command.split(' ');
+    const cmd = record.command.split(' ') as string[];
     if (cmd[0] === 'task') {
+      if (cmd[1].startsWith('/ql/scripts')) {
+        cmd[1] = cmd[1].replace('/ql/scripts/', '');
+      }
+
       let [p, s] = cmd[1].split('/');
       if (!s) {
         s = p;
