@@ -52,6 +52,7 @@ const Initialization = () => {
   };
 
   const submitNotification = (values: any) => {
+    setLoading(true);
     request
       .put(`${config.apiPrefix}user/notification/init`, {
         data: {
