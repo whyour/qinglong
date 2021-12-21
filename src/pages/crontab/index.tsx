@@ -77,7 +77,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       width: 150,
       align: 'center' as const,
       render: (text: string, record: any) => (
-        <span
+        <a
           onClick={() => {
             goToScriptManager(record);
           }}
@@ -90,7 +90,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           ) : (
             ''
           )}
-        </span>
+        </a>
       ),
       sorter: {
         compare: (a: any, b: any) => a.name.localeCompare(b.name),
