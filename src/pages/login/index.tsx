@@ -31,7 +31,7 @@ const Login = () => {
     setTwoFactor(false);
     setWaitTime(null);
     request
-      .post(`${config.apiPrefix}login`, {
+      .post(`${config.apiPrefix}user/login`, {
         data: {
           username: values.username,
           password: values.password,
