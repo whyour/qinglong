@@ -35,7 +35,7 @@ const Initialization = () => {
   const submitAccountSetting = (values: any) => {
     setLoading(true);
     request
-      .put(`${config.apiPrefix}init/user`, {
+      .put(`${config.apiPrefix}user/init`, {
         data: {
           username: values.username,
           password: values.password,
@@ -53,7 +53,7 @@ const Initialization = () => {
 
   const submitNotification = (values: any) => {
     request
-      .put(`${config.apiPrefix}init/notification`, {
+      .put(`${config.apiPrefix}user/notification/init`, {
         data: {
           ...values,
         },

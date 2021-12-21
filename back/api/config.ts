@@ -8,10 +8,10 @@ import { celebrate, Joi } from 'celebrate';
 const route = Router();
 
 export default (app: Router) => {
-  app.use('/', route);
+  app.use('/configs', route);
 
   route.get(
-    '/configs/files',
+    '/files',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -32,7 +32,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/configs/:file',
+    '/:file',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -58,7 +58,7 @@ export default (app: Router) => {
   );
 
   route.post(
-    '/configs/save',
+    '/save',
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),

@@ -9,7 +9,8 @@ import { getFileContentByName } from '../config/util';
 const route = Router();
 
 export default (app: Router) => {
-  app.use('/', route);
+  app.use('/user', route);
+
   route.post(
     '/login',
     celebrate({
@@ -47,7 +48,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/user',
+    '/',
     celebrate({
       body: Joi.object({
         username: Joi.string().required(),
@@ -67,29 +68,26 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/user',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const userService = Container.get(UserService);
-        const authInfo = await userService.getUserInfo();
-        res.send({
-          code: 200,
-          data: {
-            username: authInfo.username,
-            twoFactorActivated: authInfo.twoFactorActivated,
-          },
-        });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
+  route.get('/', async (req: Request, res: Response, next: NextFunction) => {
+    const logger: Logger = Container.get('logger');
+    try {
+      const userService = Container.get(UserService);
+      const authInfo = await userService.getUserInfo();
+      res.send({
+        code: 200,
+        data: {
+          username: authInfo.username,
+          twoFactorActivated: authInfo.twoFactorActivated,
+        },
+      });
+    } catch (e) {
+      logger.error('🔥 error: %o', e);
+      return next(e);
+    }
+  });
 
   route.get(
-    '/user/two-factor/init',
+    '/two-factor/init',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -104,7 +102,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/user/two-factor/active',
+    '/two-factor/active',
     celebrate({
       body: Joi.object({
         code: Joi.string().required(),
@@ -124,7 +122,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/user/two-factor/deactive',
+    '/two-factor/deactive',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -139,7 +137,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/user/two-factor/login',
+    '/two-factor/login',
     celebrate({
       body: Joi.object({
         code: Joi.string().required(),
@@ -161,7 +159,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/user/login-log',
+    '/login-log',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -176,7 +174,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/user/notification',
+    '/notification',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -191,7 +189,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/user/notification',
+    '/notification',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -205,42 +203,8 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/system',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const userService = Container.get(UserService);
-        const authInfo = await userService.getUserInfo();
-        const envDbContent = getFileContentByName(config.envDbFile);
-        const { version } = await import(config.versionFile);
-
-        let isInitialized = true;
-        if (
-          Object.keys(authInfo).length === 2 &&
-          authInfo.username === 'admin' &&
-          authInfo.password === 'admin' &&
-          envDbContent.length === 0
-        ) {
-          isInitialized = false;
-        }
-        res.send({
-          code: 200,
-          data: {
-            isInitialized,
-            version,
-          },
-        });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
-
-  // 初始化api
   route.put(
-    '/init/user',
+    '/init',
     celebrate({
       body: Joi.object({
         username: Joi.string().required(),
@@ -261,79 +225,12 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/init/notification',
+    '/notification/init',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
         const result = await userService.updateNotificationMode(req.body);
-        res.send(result);
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
-
-  route.get(
-    '/system/log/remove',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const userService = Container.get(UserService);
-        const data = await userService.getLogRemoveFrequency();
-        res.send({ code: 200, data });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
-
-  route.put(
-    '/system/log/remove',
-    celebrate({
-      body: Joi.object({
-        frequency: Joi.number().required(),
-      }),
-    }),
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const userService = Container.get(UserService);
-        const result = await userService.updateLogRemoveFrequency(
-          req.body.frequency,
-        );
-        res.send(result);
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
-
-  route.put(
-    '/system/update-check',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const userService = Container.get(UserService);
-        const result = await userService.checkUpdate();
-        res.send(result);
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
-
-  route.put(
-    '/system/update',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const userService = Container.get(UserService);
-        const result = await userService.updateSystem();
         res.send(result);
       } catch (e) {
         logger.error('🔥 error: %o', e);

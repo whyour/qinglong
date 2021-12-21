@@ -38,8 +38,8 @@ const apiWhiteList = [
   '/open/auth/token',
   '/api/user/two-factor/login',
   '/api/system',
-  '/api/init/user',
-  '/api/init/notification',
+  '/api/user/init',
+  '/api/user/notification/init',
 ];
 
 _request.interceptors.request.use((url, options) => {
