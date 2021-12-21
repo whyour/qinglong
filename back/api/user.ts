@@ -213,6 +213,7 @@ export default (app: Router) => {
         const userService = Container.get(UserService);
         const authInfo = await userService.getUserInfo();
         const envDbContent = getFileContentByName(config.envDbFile);
+        const { version } = await import(config.versionFile);
 
         let isInitialized = true;
         if (
@@ -227,6 +228,7 @@ export default (app: Router) => {
           code: 200,
           data: {
             isInitialized,
+            version,
           },
         });
       } catch (e) {
