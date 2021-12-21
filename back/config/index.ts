@@ -77,7 +77,7 @@ export default {
   writePathList: [configPath, scriptPath],
   bakPath,
   apiWhiteList: [
-    '/api/login',
+    '/api/user/login',
     '/open/auth/token',
     '/api/user/two-factor/login',
     '/api/system',

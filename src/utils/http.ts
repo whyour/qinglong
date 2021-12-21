@@ -34,7 +34,7 @@ const errorHandler = function (error: any) {
 
 const _request = extend({ timeout: 60000, params: { t: time }, errorHandler });
 const apiWhiteList = [
-  '/api/login',
+  '/api/user/login',
   '/open/auth/token',
   '/api/user/two-factor/login',
   '/api/system',

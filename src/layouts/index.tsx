@@ -44,7 +44,7 @@ export default function (props: any) {
   const [collapsed, setCollapsed] = useState(false);
 
   const logout = () => {
-    request.post(`${config.apiPrefix}logout`).then(() => {
+    request.post(`${config.apiPrefix}user/logout`).then(() => {
       localStorage.removeItem(config.authKey);
       history.push('/login');
     });

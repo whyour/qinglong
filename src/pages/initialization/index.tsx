@@ -73,6 +73,10 @@ const Initialization = () => {
     setFields(_fields || []);
   };
 
+  useEffect(() => {
+    localStorage.removeItem(config.authKey);
+  }, []);
+
   const steps = [
     {
       title: '欢迎使用',
