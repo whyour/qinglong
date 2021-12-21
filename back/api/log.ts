@@ -7,44 +7,42 @@ import { getFileContentByName } from '../config/util';
 const route = Router();
 
 export default (app: Router) => {
-  app.use('/', route);
-  route.get(
-    '/logs',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const fileList = fs.readdirSync(config.logPath, 'utf-8');
-        const dirs = [];
-        for (let i = 0; i < fileList.length; i++) {
-          const stat = fs.lstatSync(config.logPath + fileList[i]);
-          if (stat.isDirectory()) {
-            const fileListTmp = fs.readdirSync(
-              `${config.logPath}/${fileList[i]}`,
-              'utf-8',
-            );
-            dirs.push({
-              name: fileList[i],
-              isDir: true,
-              files: fileListTmp.reverse(),
-            });
-          } else {
-            dirs.push({
-              name: fileList[i],
-              isDir: false,
-              files: [],
-            });
-          }
+  app.use('/logs', route);
+
+  route.get('/', async (req: Request, res: Response, next: NextFunction) => {
+    const logger: Logger = Container.get('logger');
+    try {
+      const fileList = fs.readdirSync(config.logPath, 'utf-8');
+      const dirs = [];
+      for (let i = 0; i < fileList.length; i++) {
+        const stat = fs.lstatSync(config.logPath + fileList[i]);
+        if (stat.isDirectory()) {
+          const fileListTmp = fs.readdirSync(
+            `${config.logPath}/${fileList[i]}`,
+            'utf-8',
+          );
+          dirs.push({
+            name: fileList[i],
+            isDir: true,
+            files: fileListTmp.reverse(),
+          });
+        } else {
+          dirs.push({
+            name: fileList[i],
+            isDir: false,
+            files: [],
+          });
         }
-        res.send({ code: 200, dirs });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
       }
-    },
-  );
+      res.send({ code: 200, dirs });
+    } catch (e) {
+      logger.error('🔥 error: %o', e);
+      return next(e);
+    }
+  });
 
   route.get(
-    '/logs/:dir/:file',
+    '/:dir/:file',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -61,7 +59,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/logs/:file',
+    '/:file',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {

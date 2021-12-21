@@ -14,10 +14,10 @@ import ScriptService from '../services/script';
 const route = Router();
 
 export default (app: Router) => {
-  app.use('/', route);
+  app.use('/scripts', route);
 
   route.get(
-    '/scripts/files',
+    '/files',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -80,7 +80,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/scripts/:file',
+    '/:file',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -99,7 +99,7 @@ export default (app: Router) => {
   );
 
   route.post(
-    '/scripts',
+    '/',
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
@@ -159,7 +159,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/scripts',
+    '/',
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
@@ -186,7 +186,7 @@ export default (app: Router) => {
   );
 
   route.delete(
-    '/scripts',
+    '/',
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
@@ -211,7 +211,7 @@ export default (app: Router) => {
   );
 
   route.post(
-    '/scripts/download',
+    '/download',
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
@@ -242,7 +242,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/scripts/run',
+    '/run',
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),

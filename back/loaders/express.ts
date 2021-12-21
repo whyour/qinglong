@@ -98,7 +98,7 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req, res, next) => {
-    if (!['/api/init/user', '/api/init/notification'].includes(req.path)) {
+    if (!['/api/user/init', '/api/user/notification/init'].includes(req.path)) {
       return next();
     }
     const userService = Container.get(UserService);

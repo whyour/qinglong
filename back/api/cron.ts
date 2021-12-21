@@ -7,26 +7,22 @@ import cron_parser from 'cron-parser';
 const route = Router();
 
 export default (app: Router) => {
-  app.use('/', route);
-  route.get(
-    '/crons',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const cronService = Container.get(CronService);
-        const data = await cronService.crontabs(
-          req.query.searchValue as string,
-        );
-        return res.send({ code: 200, data });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
+  app.use('/crons', route);
+
+  route.get('/', async (req: Request, res: Response, next: NextFunction) => {
+    const logger: Logger = Container.get('logger');
+    try {
+      const cronService = Container.get(CronService);
+      const data = await cronService.crontabs(req.query.searchValue as string);
+      return res.send({ code: 200, data });
+    } catch (e) {
+      logger.error('🔥 error: %o', e);
+      return next(e);
+    }
+  });
 
   route.post(
-    '/crons',
+    '/',
     celebrate({
       body: Joi.object({
         command: Joi.string().required(),
@@ -52,7 +48,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons/run',
+    '/run',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -70,7 +66,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons/stop',
+    '/stop',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -88,7 +84,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons/disable',
+    '/disable',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -106,7 +102,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons/enable',
+    '/enable',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -124,7 +120,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/crons/:id/log',
+    '/:id/log',
     celebrate({
       params: Joi.object({
         id: Joi.string().required(),
@@ -144,7 +140,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons',
+    '',
     celebrate({
       body: Joi.object({
         command: Joi.string().optional(),
@@ -174,7 +170,7 @@ export default (app: Router) => {
   );
 
   route.delete(
-    '/crons',
+    '/',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -192,7 +188,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons/pin',
+    '/pin',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -210,7 +206,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons/unpin',
+    '/unpin',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -228,7 +224,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/crons/import',
+    '/import',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -243,7 +239,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/crons/:id',
+    '/:id',
     celebrate({
       params: Joi.object({
         id: Joi.string().required(),
@@ -263,7 +259,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/crons/status',
+    '/status',
     celebrate({
       body: Joi.object({
         ids: Joi.array().items(Joi.string().required()),

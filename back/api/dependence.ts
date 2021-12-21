@@ -6,24 +6,22 @@ import { celebrate, Joi } from 'celebrate';
 const route = Router();
 
 export default (app: Router) => {
-  app.use('/', route);
-  route.get(
-    '/dependencies',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.dependencies(req.query as any);
-        return res.send({ code: 200, data });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
+  app.use('/dependencies', route);
+
+  route.get('/', async (req: Request, res: Response, next: NextFunction) => {
+    const logger: Logger = Container.get('logger');
+    try {
+      const dependenceService = Container.get(DependenceService);
+      const data = await dependenceService.dependencies(req.query as any);
+      return res.send({ code: 200, data });
+    } catch (e) {
+      logger.error('🔥 error: %o', e);
+      return next(e);
+    }
+  });
 
   route.post(
-    '/dependencies',
+    '/',
     celebrate({
       body: Joi.array().items(
         Joi.object({
@@ -47,7 +45,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/dependencies',
+    '/',
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
@@ -70,7 +68,7 @@ export default (app: Router) => {
   );
 
   route.delete(
-    '/dependencies',
+    '/',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -88,7 +86,7 @@ export default (app: Router) => {
   );
 
   route.delete(
-    '/dependencies/force',
+    '/force',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
@@ -106,7 +104,7 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/dependencies/:id',
+    '/:id',
     celebrate({
       params: Joi.object({
         id: Joi.string().required(),
@@ -126,7 +124,7 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/dependencies/reinstall',
+    '/reinstall',
     celebrate({
       body: Joi.array().items(Joi.string().required()),
     }),
