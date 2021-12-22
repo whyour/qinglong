@@ -122,6 +122,7 @@ export default class SystemService {
           hasNewVersion: this.checkHasNewVersion(currentVersion, lastVersion),
           lastVersion,
           lastLog,
+          currentVersion
         },
       };
     } catch (error: any) {
