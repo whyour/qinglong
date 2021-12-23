@@ -241,7 +241,7 @@ export default class CronService {
     });
   }
 
-  private async killTask(name: string) {
+  public async killTask(name: string) {
     let taskCommand = `ps -ef | grep "${name}" | grep -v grep | awk '{print $1}'`;
     const execAsync = promisify(exec);
     try {
