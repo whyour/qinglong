@@ -27,7 +27,7 @@ const CronModal = ({
       data: payload,
     });
     if (code === 200) {
-      message.success(cron ? '更新Cron成功' : '添加Cron成功');
+      message.success(cron ? '更新Cron成功' : '新建Cron成功');
     } else {
       message.error(data);
     }

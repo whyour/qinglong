@@ -40,7 +40,7 @@ const EnvModal = ({
       data: payload,
     });
     if (code === 200) {
-      message.success(env ? '更新变量成功' : '添加变量成功');
+      message.success(env ? '更新变量成功' : '新建变量成功');
     } else {
       message.error(data);
     }

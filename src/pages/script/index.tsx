@@ -377,7 +377,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
   ) : (
     <Menu>
       <Menu.Item key="add" icon={<PlusOutlined />} onClick={addFile}>
-        添加
+        新建
       </Menu.Item>
       <Menu.Item
         key="edit"
