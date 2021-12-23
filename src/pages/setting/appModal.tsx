@@ -26,7 +26,7 @@ const AppModal = ({
       data: payload,
     });
     if (code === 200) {
-      message.success(app ? '更新应用成功' : '添加应用成功');
+      message.success(app ? '更新应用成功' : '新建应用成功');
     } else {
       message.error(data);
     }

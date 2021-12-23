@@ -319,7 +319,7 @@ const Setting = ({
         tabActiveKey === 'app'
           ? [
               <Button key="2" type="primary" onClick={() => addApp()}>
-                添加应用
+                新建应用
               </Button>,
             ]
           : []

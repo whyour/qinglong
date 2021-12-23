@@ -803,7 +803,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
-          添加任务
+          新建任务
         </Button>,
       ]}
       header={{

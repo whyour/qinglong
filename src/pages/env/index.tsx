@@ -485,7 +485,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addEnv()}>
-          添加变量
+          新建变量
         </Button>,
       ]}
       header={{

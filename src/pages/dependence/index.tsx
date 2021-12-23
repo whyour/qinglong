@@ -398,7 +398,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addDependence()}>
-          添加依赖
+          新建依赖
         </Button>,
       ]}
       header={{
