@@ -12,6 +12,7 @@ export class Crontab {
   isDisabled?: 1 | 0;
   log_path?: string;
   isPinned?: 1 | 0;
+  labels: Array<string>;
 
   constructor(options: Crontab) {
     this.name = options.name;
@@ -29,6 +30,7 @@ export class Crontab {
     this.isDisabled = options.isDisabled || 0;
     this.log_path = options.log_path || '';
     this.isPinned = options.isPinned || 0;
+    this.labels = options.labels || [];
   }
 }
 

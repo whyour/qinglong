@@ -156,25 +156,69 @@ export default class CronService {
     });
   }
 
+  public async addLabels(ids: string[],labels: string[]){
+    return new Promise((resolve: any) => {
+      this.cronDb.update(
+        { _id: { $in: ids } },
+        { $addToSet: { labels: { $each: labels} } },
+        { multi: true },
+        async (err) => {
+          resolve();
+        },
+      );
+    });
+  }
+
+  public async removeLabels(ids: string[],labels: string[]){
+    return new Promise((resolve: any) => {
+      this.cronDb.update(
+        { _id: { $in: ids } },
+        { $pull: { labels: { $in: labels} } },
+        { multi: true },
+        async (err) => {
+          resolve();
+        },
+      );
+    });
+  }
+
   public async crontabs(searchText?: string): Promise<Crontab[]> {
     let query = {};
     if (searchText) {
-      const encodeText = encodeURIComponent(searchText);
-      const reg = new RegExp(`${searchText}|${encodeText}`, 'i');
-
-      query = {
-        $or: [
-          {
-            name: reg,
-          },
-          {
-            command: reg,
-          },
-          {
-            schedule: reg,
-          },
-        ],
-      };
+      const textArray = searchText.split(":");
+      switch (textArray[0]) {
+        case "name":
+          query = {name:createRegexp(textArray[1])};
+          break;
+        case "command":
+          query = {command:createRegexp(textArray[1])};
+          break;
+        case "schedule":
+          query = {schedule:createRegexp(textArray[1])};
+          break;
+       case "label":
+          query = {labels:createRegexp(textArray[1])};
+          break;
+        default:
+          const reg = createRegexp(searchText);
+          query = {
+            $or: [
+              {
+                name: reg,
+              },
+              {
+                command: reg,
+              },
+              {
+                schedule: reg,
+              },
+              {
+                labels: reg,
+              },
+            ],
+          };
+          break;
+      }
     }
     return new Promise((resolve) => {
       this.cronDb
@@ -184,6 +228,11 @@ export default class CronService {
           resolve(docs);
         });
     });
+    function createRegexp(text:string) :RegExp {
+      const encodeText = encodeURIComponent(text);
+      const reg = new RegExp(`${text}|${encodeText}`, 'i');
+      return reg;
+    }
   }
 
   public async get(_id: string): Promise<Crontab> {

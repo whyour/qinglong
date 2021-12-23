@@ -30,7 +30,7 @@ import {
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import CronModal from './modal';
+import CronModal,{CronLabelModal} from './modal';
 import CronLogModal from './logModal';
 import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
@@ -276,6 +276,26 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       ),
     },
     {
+      title: '标签',
+      key: 'labels',
+      dataIndex: 'labels',
+      align: 'center' as const,
+      width: 100,
+      render: (text: string, record: any) => (
+        <>
+          {record.labels?.map((label: string) => (
+            <Tag style={{
+              width: label.replace(/[^\x00-\xff]/g,"01").length < 5 ? 40:90,
+              overflow:'hidden',
+              textOverflow:'ellipsis',
+            }} 
+            color="blue" 
+            onClick={() => { onSearch(`label:${label}`) }}>{label}</Tag>
+          ))}
+        </>
+      ),
+    },
+    {
       title: '操作',
       key: 'action',
       align: 'center' as const,
@@ -325,6 +345,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isLabelModalVisible, setisLabelModalVisible] = useState(false);
   const [editedCron, setEditedCron] = useState();
   const [searchText, setSearchText] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
@@ -853,6 +874,13 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           >
             批量取消置顶
           </Button>
+          <Button
+            type="primary"
+            onClick={() => setisLabelModalVisible(true)}
+            style={{ marginLeft: 8, marginRight: 8 }}
+          >
+            批量修改标签
+          </Button>
           <span style={{ marginLeft: 8 }}>
             已选择
             <a>{selectedRowIds?.length}</a>项
@@ -892,6 +920,16 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         visible={isModalVisible}
         handleCancel={handleCancel}
         cron={editedCron}
+      />
+      <CronLabelModal
+        visible={isLabelModalVisible}
+        handleCancel={(needUpdate?: boolean) => {
+          setisLabelModalVisible(false);
+          if (needUpdate) {
+            getCrons();
+          }
+        }}
+        ids={selectedRowIds}
       />
     </PageContainer>
   );
