@@ -266,4 +266,30 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/stop',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        path: Joi.string().optional().allow(''),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        let { filename, path } = req.body as {
+          filename: string;
+          path: string;
+        };
+        const filePath = join(path, filename);
+        const scriptService = Container.get(ScriptService);
+        const result = await scriptService.stopScript(filePath);
+        res.send(result);
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
 };
