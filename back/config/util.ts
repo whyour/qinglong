@@ -231,3 +231,40 @@ export async function fileExist(file: any) {
     }
   });
 }
+
+export async function concurrentRun(
+  fnList: Array<() => Promise<any>> = [],
+  max = 5,
+) {
+  if (!fnList.length) return;
+
+  const replyList: any[] = []; // 收集任务执行结果
+  const startTime = new Date().getTime(); // 记录任务执行开始时间
+
+  // 任务执行程序
+  const schedule = async (index: number) => {
+    return new Promise(async (resolve) => {
+      const fn = fnList[index];
+      if (!fn) return resolve(null);
+
+      // 执行当前异步任务
+      const reply = await fn();
+      replyList[index] = reply;
+
+      // 执行完当前任务后，继续执行任务池的剩余任务
+      await schedule(index + max);
+      resolve(null);
+    });
+  };
+
+  // 任务池执行程序
+  const scheduleList = new Array(max)
+    .fill(0)
+    .map((_, index) => schedule(index));
+
+  // 使用 Promise.all 批量执行
+  const r = await Promise.all(scheduleList);
+  const cost = (new Date().getTime() - startTime) / 1000;
+
+  return replyList;
+}
