@@ -6,7 +6,7 @@ import { Crontab, CrontabStatus } from '../data/cron';
 import { exec, execSync, spawn } from 'child_process';
 import fs from 'fs';
 import cron_parser from 'cron-parser';
-import { getFileContentByName } from '../config/util';
+import { getFileContentByName, concurrentRun } from '../config/util';
 import PQueue from 'p-queue';
 import { promises, existsSync } from 'fs';
 import { promisify } from 'util';
@@ -200,10 +200,10 @@ export default class CronService {
       { $set: { status: CrontabStatus.queued } },
       { multi: true },
     );
-    for (let i = 0; i < ids.length; i++) {
-      const id = ids[i];
-      this.queue.add(() => this.runSingle(id));
-    }
+    concurrentRun(
+      ids.map((id) => () => this.runSingle(id)),
+      10,
+    );
   }
 
   public async stop(ids: string[]) {
