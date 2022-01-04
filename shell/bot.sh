@@ -3,8 +3,14 @@
 ## 导入通用变量与函数
 dir_shell=/ql/shell
 . $dir_shell/share.sh
-url="${github_proxy_url}https://github.com/SuMaiKaDe/bot.git"
-repo_path="${dir_repo}/dockerbot"
+
+if [[ -z ${BotRepoUrl} ]]; then
+  url="${github_proxy_url}https://github.com/SuMaiKaDe/bot.git"
+  repo_path="${dir_repo}/dockerbot"
+else
+  url=${BotRepoUrl}
+  repo_path="${dir_repo}/diybot"
+fi
 
 echo -e "\n1、安装bot依赖...\n"
 apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
