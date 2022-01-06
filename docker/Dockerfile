@@ -43,7 +43,7 @@ RUN set -x \
     && pnpm install -g pm2 \
     && pnpm install -g ts-node typescript tslib \
     && rm -rf /root/.npm \
-    && pnpm install --prod \
+    && yarn install --prod \
     && rm -rf /root/.pnpm-store \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
     && cp -rf /static/* ${QL_DIR} \
