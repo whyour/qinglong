@@ -11,6 +11,7 @@ import {
   Menu,
   Typography,
   Input,
+  Popover,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -30,7 +31,7 @@ import {
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import CronModal,{CronLabelModal} from './modal';
+import CronModal,{ CronLabelModal } from './modal';
 import CronLogModal from './logModal';
 import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
@@ -77,20 +78,39 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       width: 150,
       align: 'center' as const,
       render: (text: string, record: any) => (
-        <a
-          onClick={() => {
-            goToScriptManager(record);
-          }}
-        >
-          {record.name || record._id}{' '}
-          {record.isPinned ? (
-            <span>
-              <PushpinOutlined />
-            </span>
-          ) : (
-            ''
-          )}
-        </a>
+        <>
+          <a
+            onClick={() => {
+              goToScriptManager(record);
+            }}
+          >
+            {record.name || record._id}{' '}
+            {record.isPinned ? (
+              <span>
+                <PushpinOutlined />
+              </span>
+            ) : (
+              ''
+            )}
+          </a>
+          <span>
+            {record.labels?.length > 0 && record.labels[0] !== '' ? 
+              <Popover placement='right' trigger={isPhone ? 'click' : 'hover'}
+                content={
+                  <div>
+                    {record.labels?.map((label: string, i: number) => (
+                      <Tag color="blue" 
+                        onClick={() => { onSearch(`label:${label}`) }}>
+                        {label}
+                      </Tag>
+                    ))}
+                  </div>
+                }>
+                <Tag color="blue">{record.labels[0]}</Tag>
+              </Popover>
+              : ''}
+          </span>
+        </>
       ),
       sorter: {
         compare: (a: any, b: any) => a.name.localeCompare(b.name),
@@ -272,26 +292,6 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
               已禁用
             </Tag>
           )}
-        </>
-      ),
-    },
-    {
-      title: '标签',
-      key: 'labels',
-      dataIndex: 'labels',
-      align: 'center' as const,
-      width: 100,
-      render: (text: string, record: any) => (
-        <>
-          {record.labels?.map((label: string) => (
-            <Tag style={{
-              width: label.replace(/[^\x00-\xff]/g,"01").length < 5 ? 40:90,
-              overflow:'hidden',
-              textOverflow:'ellipsis',
-            }} 
-            color="blue" 
-            onClick={() => { onSearch(`label:${label}`) }}>{label}</Tag>
-          ))}
         </>
       ),
     },
