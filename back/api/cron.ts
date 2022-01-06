@@ -126,7 +126,7 @@ export default (app: Router) => {
         id: Joi.number().required(),
       }),
     }),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
@@ -242,10 +242,10 @@ export default (app: Router) => {
     '/:id',
     celebrate({
       params: Joi.object({
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);

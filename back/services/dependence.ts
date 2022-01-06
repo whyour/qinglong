@@ -60,7 +60,7 @@ export default class DependenceService {
     return docs[0];
   }
 
-  public async remove(ids: string[]) {
+  public async remove(ids: number[]) {
     const [, docs] = await DependenceModel.update(
       { status: DependenceStatus.removing, log: [] },
       { where: { id: ids } },
@@ -100,7 +100,7 @@ export default class DependenceService {
     }
   }
 
-  public async reInstall(ids: string[]): Promise<Dependence[]> {
+  public async reInstall(ids: number[]): Promise<Dependence[]> {
     const [, docs] = await DependenceModel.update(
       { status: DependenceStatus.installing, log: [] },
       { where: { id: ids } },
@@ -114,7 +114,7 @@ export default class DependenceService {
     return docs;
   }
 
-  public async get(id: string): Promise<Dependence> {
+  public async get(id: number): Promise<Dependence> {
     const docs = await DependenceModel.findAll({ where: { id } });
     return docs[0];
   }

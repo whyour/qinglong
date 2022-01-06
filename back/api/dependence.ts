@@ -110,7 +110,7 @@ export default (app: Router) => {
         id: Joi.string().required(),
       }),
     }),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
