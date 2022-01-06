@@ -20,7 +20,7 @@ const AppModal = ({
     const method = app ? 'put' : 'post';
     const payload = { ...values };
     if (app) {
-      payload._id = app._id;
+      payload.id = app.id;
     }
     const { code, data } = await request[method](`${config.apiPrefix}apps`, {
       data: payload,

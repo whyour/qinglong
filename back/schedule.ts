@@ -2,24 +2,14 @@ import schedule from 'node-schedule';
 import express from 'express';
 import { exec } from 'child_process';
 import Logger from './loaders/logger';
-import { CrontabStatus } from './data/cron';
+import { CrontabModel, CrontabStatus } from './data/cron';
 import config from './config';
-import { dbs } from './loaders/db';
 
 const app = express();
 
 const run = async () => {
-  const cronDb = dbs.cronDb;
-
-  cronDb
-    .find({})
-    .sort({ created: 1 })
-    .exec((err, docs) => {
-      if (err) {
-        Logger.error(err);
-        process.exit(1);
-      }
-
+  CrontabModel.findAll({ where: {} })
+    .then((docs) => {
       if (docs && docs.length > 0) {
         for (let i = 0; i < docs.length; i++) {
           const task = docs[i];
@@ -40,6 +30,10 @@ const run = async () => {
           }
         }
       }
+    })
+    .catch((err) => {
+      Logger.error(err);
+      process.exit(1);
     });
 };
 

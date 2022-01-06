@@ -36,9 +36,9 @@ const CronLogModal = ({
       setLoading(true);
     }
     request
-      .get(`${config.apiPrefix}crons/${cron._id}/log`)
+      .get(`${config.apiPrefix}crons/${cron.id}/log`)
       .then((data: any) => {
-        if (localStorage.getItem('logCron') === cron._id) {
+        if (localStorage.getItem('logCron') === cron.id) {
           const log = data.data as string;
           setValue(log || '暂无日志');
           setExecuting(

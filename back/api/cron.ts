@@ -50,7 +50,7 @@ export default (app: Router) => {
   route.put(
     '/run',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -68,7 +68,7 @@ export default (app: Router) => {
   route.put(
     '/stop',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -86,7 +86,7 @@ export default (app: Router) => {
   route.put(
     '/disable',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -104,7 +104,7 @@ export default (app: Router) => {
   route.put(
     '/enable',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -123,7 +123,7 @@ export default (app: Router) => {
     '/:id/log',
     celebrate({
       params: Joi.object({
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -140,13 +140,13 @@ export default (app: Router) => {
   );
 
   route.put(
-    '',
+    '/',
     celebrate({
       body: Joi.object({
         command: Joi.string().optional(),
         schedule: Joi.string().optional(),
         name: Joi.string().optional(),
-        _id: Joi.string().required(),
+        id: Joi.string().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -172,7 +172,7 @@ export default (app: Router) => {
   route.delete(
     '/',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -190,7 +190,7 @@ export default (app: Router) => {
   route.put(
     '/pin',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -208,7 +208,7 @@ export default (app: Router) => {
   route.put(
     '/unpin',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -262,7 +262,7 @@ export default (app: Router) => {
     '/status',
     celebrate({
       body: Joi.object({
-        ids: Joi.array().items(Joi.string().required()),
+        ids: Joi.array().items(Joi.number().required()),
         status: Joi.string().required(),
         pid: Joi.string().optional(),
         log_path: Joi.string().optional(),

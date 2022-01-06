@@ -42,7 +42,7 @@ const DependenceModal = ({
         payload = [{ name, type }];
       }
     } else {
-      payload = { ...values, _id: dependence._id };
+      payload = { ...values, id: dependence.id };
     }
     try {
       const { code, data } = await request[method](

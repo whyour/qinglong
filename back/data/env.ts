@@ -1,17 +1,18 @@
+import { sequelize } from '.';
+import { DataTypes, Model, ModelDefined } from 'sequelize';
+
 export class Env {
   value?: string;
   timestamp?: string;
-  created?: number;
-  _id?: string;
+  id?: number;
   status?: EnvStatus;
   position?: number;
-  name?: number;
-  remarks?: number;
+  name?: string;
+  remarks?: string;
 
   constructor(options: Env) {
     this.value = options.value;
-    this._id = options._id;
-    this.created = options.created || new Date().valueOf();
+    this.id = options.id;
     this.status = options.status || EnvStatus.normal;
     this.timestamp = new Date().toString();
     this.position = options.position;
@@ -26,3 +27,13 @@ export enum EnvStatus {
 }
 
 export const initEnvPosition = 9999999999;
+
+interface EnvInstance extends Model<Env, Env>, Env {}
+export const EnvModel = sequelize.define<EnvInstance>('Env', {
+  value: DataTypes.STRING,
+  timestamp: DataTypes.STRING,
+  status: DataTypes.NUMBER,
+  position: DataTypes.NUMBER,
+  name: DataTypes.STRING,
+  remarks: DataTypes.STRING,
+});

@@ -21,7 +21,7 @@ const CronModal = ({
     const method = cron ? 'put' : 'post';
     const payload = { ...values };
     if (cron) {
-      payload._id = cron._id;
+      payload.id = cron.id;
     }
     const { code, data } = await request[method](`${config.apiPrefix}crons`, {
       data: payload,

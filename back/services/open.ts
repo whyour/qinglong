@@ -3,29 +3,23 @@ import winston from 'winston';
 import { createRandomString } from '../config/util';
 import config from '../config';
 import DataStore from 'nedb';
-import { App } from '../data/open';
+import { App, AppModel } from '../data/open';
 import { v4 as uuidV4 } from 'uuid';
-import { dbs } from '../loaders/db';
+import sequelize, { Op } from 'sequelize';
 
 @Service()
 export default class OpenService {
-  private appDb = dbs.appDb;
-
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  public async findTokenByValue(token: string): Promise<App> {
-    return new Promise((resolve) => {
-      this.appDb.find(
-        { tokens: { $elemMatch: { value: token } } },
-        (err, docs) => {
-          if (err) {
-            this.logger.error(err);
-          } else {
-            resolve(docs[0]);
-          }
-        },
-      );
+  public async findTokenByValue(token: string): Promise<App | null> {
+    const doc = await AppModel.findOne({
+      where: sequelize.fn(
+        'JSON_CONTAINS',
+        sequelize.col('tokens'),
+        JSON.stringify({ value: token }),
+      ),
     });
+    return doc;
   }
 
   public async create(payload: App): Promise<App> {
@@ -37,52 +31,32 @@ export default class OpenService {
   }
 
   public async insert(payloads: App[]): Promise<App[]> {
-    return new Promise((resolve) => {
-      this.appDb.insert(payloads, (err, docs) => {
-        if (err) {
-          this.logger.error(err);
-        } else {
-          resolve(docs);
-        }
-      });
-    });
+    const docs = await AppModel.bulkCreate(payloads);
+    return docs;
   }
 
   public async update(payload: App): Promise<App> {
-    const { _id, client_id, client_secret, tokens, ...other } = payload;
-    const doc = await this.get(_id);
+    const { id, client_id, client_secret, tokens, ...other } = payload;
+    const doc = await this.get(id);
     const tab = new App({ ...doc, ...other });
     const newDoc = await this.updateDb(tab);
     return { ...newDoc, tokens: [] };
   }
 
   private async updateDb(payload: App): Promise<App> {
-    return new Promise((resolve) => {
-      this.appDb.update(
-        { _id: payload._id },
-        payload,
-        { returnUpdatedDocs: true },
-        (err, num, doc, up) => {
-          if (err) {
-            this.logger.error(err);
-          } else {
-            resolve(doc);
-          }
-        },
-      );
-    });
+    const [, docs] = await AppModel.update(
+      { ...payload },
+      { where: { id: payload.id } },
+    );
+    return docs[0];
   }
 
-  public async remove(ids: string[]) {
-    return new Promise((resolve: any) => {
-      this.appDb.remove({ _id: { $in: ids } }, { multi: true }, async (err) => {
-        resolve();
-      });
-    });
+  public async remove(ids: number[]) {
+    await AppModel.destroy({ where: { id: ids } });
   }
 
-  public async resetSecret(_id: string): Promise<App> {
-    const doc = await this.get(_id);
+  public async resetSecret(id: number): Promise<App> {
+    const doc = await this.get(id);
     const tab = new App({ ...doc });
     tab.client_secret = createRandomString(24, 24);
     tab.tokens = [];
@@ -98,43 +72,44 @@ export default class OpenService {
     let condition = { ...query };
     if (searchText) {
       const encodeText = encodeURIComponent(searchText);
-      const reg = new RegExp(`${searchText}|${encodeText}`, 'i');
+      const reg = {
+        [Op.or]: [
+          { [Op.like]: `%${searchText}&` },
+          { [Op.like]: `%${encodeText}%` },
+        ],
+      };
 
       condition = {
-        $or: [
-          {
-            value: reg,
-          },
+        ...condition,
+        [Op.or]: [
           {
             name: reg,
           },
           {
-            remarks: reg,
+            command: reg,
+          },
+          {
+            schedule: reg,
           },
         ],
       };
     }
-    const newDocs = await this.find(condition, sort);
-    return newDocs.map((x) => ({ ...x, tokens: [] }));
+    try {
+      const result = await this.find(condition);
+      return result.map((x) => ({ ...x, tokens: [] }));
+    } catch (error) {
+      throw error;
+    }
   }
 
-  private async find(query: any, sort: any): Promise<App[]> {
-    return new Promise((resolve) => {
-      this.appDb
-        .find(query)
-        .sort({ ...sort })
-        .exec((err, docs) => {
-          resolve(docs);
-        });
-    });
+  private async find(query: any, sort?: any): Promise<App[]> {
+    const docs = await AppModel.findAll({ where: { ...query } });
+    return docs;
   }
 
-  public async get(_id: string): Promise<App> {
-    return new Promise((resolve) => {
-      this.appDb.find({ _id }).exec((err, docs) => {
-        resolve(docs[0]);
-      });
-    });
+  public async get(id: number): Promise<App> {
+    const docs = await AppModel.findAll({ where: { id } });
+    return docs[0];
   }
 
   public async authToken({
@@ -146,28 +121,22 @@ export default class OpenService {
   }): Promise<any> {
     const token = uuidV4();
     const expiration = Math.round(Date.now() / 1000) + 2592000; // 2592000 30天
-    return new Promise((resolve) => {
-      this.appDb.find({ client_id, client_secret }).exec((err, docs) => {
-        if (docs && docs[0]) {
-          this.appDb.update(
-            { client_id, client_secret },
-            { $push: { tokens: { value: token, expiration } } },
-            {},
-            (err, num, doc) => {
-              resolve({
-                code: 200,
-                data: {
-                  token,
-                  token_type: 'Bearer',
-                  expiration,
-                },
-              });
-            },
-          );
-        } else {
-          resolve({ code: 400, message: 'client_id或client_seret有误' });
-        }
-      });
-    });
+    const doc = await AppModel.findOne({ where: { client_id, client_secret } });
+    if (doc) {
+      const [, docs] = await AppModel.update(
+        { tokens: [...(doc.tokens || []), { value: token, expiration }] },
+        { where: { client_id, client_secret } },
+      );
+      return {
+        code: 200,
+        data: {
+          token,
+          token_type: 'Bearer',
+          expiration,
+        },
+      };
+    } else {
+      return { code: 400, message: 'client_id或client_seret有误' };
+    }
   }
 }
