@@ -101,7 +101,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
     {
       title: '序号',
       align: 'center' as const,
-      width: 50,
+      width: 60,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },
@@ -197,7 +197,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 120,
       align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
@@ -270,7 +270,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
               record.status === Status.已禁用 ? 'enable' : 'disable'
             }`,
             {
-              data: [record._id],
+              data: [record.id],
             },
           )
           .then((data: any) => {
@@ -321,7 +321,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}envs`, { data: [record._id] })
+          .delete(`${config.apiPrefix}envs`, { data: [record.id] })
           .then((data: any) => {
             if (data.code === 200) {
               message.success('删除成功');
@@ -351,7 +351,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
 
   const handleEnv = (env: any) => {
     const result = [...value];
-    const index = value.findIndex((x) => x._id === env._id);
+    const index = value.findIndex((x) => x.id === env.id);
     if (index === -1) {
       env = Array.isArray(env) ? env : [env];
       result.push(...env);
@@ -376,7 +376,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
       }
       const dragRow = value[dragIndex];
       request
-        .put(`${config.apiPrefix}envs/${dragRow._id}/move`, {
+        .put(`${config.apiPrefix}envs/${dragRow.id}/move`, {
           data: { fromIndex: dragIndex, toIndex: hoverIndex },
         })
         .then((data: any) => {
@@ -534,7 +534,7 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
           rowSelection={rowSelection}
           pagination={false}
           dataSource={value}
-          rowKey="_id"
+          rowKey="id"
           size="middle"
           scroll={{ x: 1000, y: tableScrollHeight }}
           components={components}

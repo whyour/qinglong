@@ -3,7 +3,7 @@ import winston from 'winston';
 import config from '../config';
 import * as fs from 'fs';
 import _ from 'lodash';
-import { AuthDataType, AuthInfo, LoginStatus } from '../data/auth';
+import { AuthDataType, AuthInfo, AuthModel, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import ScheduleService from './schedule';
@@ -16,7 +16,6 @@ import { dbs } from '../loaders/db';
 export default class SystemService {
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
-  private authDb = dbs.authDb;
 
   constructor(
     @Inject('logger') private logger: winston.Logger,
@@ -25,34 +24,16 @@ export default class SystemService {
   ) {}
 
   public async getLogRemoveFrequency() {
-    return new Promise((resolve) => {
-      this.authDb
-        .find({ type: AuthDataType.removeLogFrequency })
-        .exec((err, docs) => {
-          if (err || docs.length === 0) {
-            resolve({});
-          } else {
-            resolve(docs[0].info);
-          }
-        });
+    const doc = await AuthModel.findOne({
+      where: { type: AuthDataType.removeLogFrequency },
     });
+    return (doc && doc.info) || {};
   }
 
   private async updateAuthDb(payload: AuthInfo): Promise<any> {
-    return new Promise((resolve) => {
-      this.authDb.update(
-        { type: payload.type },
-        { ...payload },
-        { upsert: true, returnUpdatedDocs: true },
-        (err, num, doc: any) => {
-          if (err) {
-            resolve({} as NotificationInfo);
-          } else {
-            resolve({ ...doc.info, _id: doc._id });
-          }
-        },
-      );
-    });
+    await AuthModel.upsert({ ...payload });
+    const doc = await AuthModel.findOne({ where: { type: payload.type } });
+    return doc;
   }
 
   public async updateNotificationMode(notificationInfo: NotificationInfo) {
@@ -79,7 +60,7 @@ export default class SystemService {
       info: { frequency },
     });
     const cron = {
-      _id: result._id,
+      id: result.id,
       name: '删除日志',
       command: `ql rmlog ${frequency}`,
       schedule: `5 23 */${frequency} * *`,

@@ -46,9 +46,9 @@ const DependenceLogModal = ({
   const getDependenceLog = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}dependencies/${dependence._id}`)
+      .get(`${config.apiPrefix}dependencies/${dependence.id}`)
       .then((data: any) => {
-        if (localStorage.getItem('logDependence') === dependence._id) {
+        if (localStorage.getItem('logDependence') === dependence.id) {
           const log = (data.data.log || []).join('\n') as string;
           setValue(log);
           setExecuting(!log.includes('结束时间'));
@@ -64,7 +64,7 @@ const DependenceLogModal = ({
     setRemoveLoading(true);
     request
       .delete(`${config.apiPrefix}dependencies/force`, {
-        data: [dependence._id],
+        data: [dependence.id],
       })
       .then((data: any) => {
         cancel(true);

@@ -8,16 +8,15 @@ import {
   DependenceStatus,
   DependenceTypes,
   unInstallDependenceCommandTypes,
+  DependenceModel,
 } from '../data/dependence';
 import _ from 'lodash';
 import { spawn } from 'child_process';
 import SockService from './sock';
-import { dbs } from '../loaders/db';
+import { Op } from 'sequelize';
 
 @Service()
 export default class DependenceService {
-  private dependenceDb = dbs.dependenceDb;
-
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
@@ -34,22 +33,15 @@ export default class DependenceService {
   }
 
   public async insert(payloads: Dependence[]): Promise<Dependence[]> {
-    return new Promise((resolve) => {
-      this.dependenceDb.insert(payloads, (err, docs) => {
-        if (err) {
-          this.logger.error(err);
-        } else {
-          resolve(docs);
-        }
-      });
-    });
+    const docs = await DependenceModel.bulkCreate(payloads);
+    return docs;
   }
 
   public async update(
-    payload: Dependence & { _id: string },
+    payload: Dependence & { id: string },
   ): Promise<Dependence> {
-    const { _id, ...other } = payload;
-    const doc = await this.get(_id);
+    const { id, ...other } = payload;
+    const doc = await this.get(id);
     const tab = new Dependence({
       ...doc,
       ...other,
@@ -61,46 +53,23 @@ export default class DependenceService {
   }
 
   private async updateDb(payload: Dependence): Promise<Dependence> {
-    return new Promise((resolve) => {
-      this.dependenceDb.update(
-        { _id: payload._id },
-        payload,
-        { returnUpdatedDocs: true },
-        (err, num, doc) => {
-          if (err) {
-            this.logger.error(err);
-          } else {
-            resolve(doc as Dependence);
-          }
-        },
-      );
-    });
+    const [, docs] = await DependenceModel.update(
+      { ...payload },
+      { where: { id: payload.id } },
+    );
+    return docs[0];
   }
 
   public async remove(ids: string[]) {
-    return new Promise((resolve: any) => {
-      this.dependenceDb.update(
-        { _id: { $in: ids } },
-        { $set: { status: DependenceStatus.removing, log: [] } },
-        { multi: true, returnUpdatedDocs: true },
-        async (err, num, docs: Dependence[]) => {
-          this.installOrUninstallDependencies(docs, false);
-          resolve(docs);
-        },
-      );
-    });
+    const [, docs] = await DependenceModel.update(
+      { status: DependenceStatus.removing, log: [] },
+      { where: { id: ids } },
+    );
+    this.installOrUninstallDependencies(docs, false);
   }
 
-  public async removeDb(ids: string[]) {
-    return new Promise((resolve: any) => {
-      this.dependenceDb.remove(
-        { _id: { $in: ids } },
-        { multi: true },
-        async (err) => {
-          resolve();
-        },
-      );
-    });
+  public async removeDb(ids: number[]) {
+    await DependenceModel.destroy({ where: { id: ids } });
   }
 
   public async dependencies(
@@ -110,68 +79,53 @@ export default class DependenceService {
   ): Promise<Dependence[]> {
     let condition = { ...query, type: DependenceTypes[type as any] };
     if (searchValue) {
-      const reg = new RegExp(searchValue);
-      condition = {
-        ...condition,
-        $or: [
-          {
-            name: reg,
-          },
+      const encodeText = encodeURIComponent(searchValue);
+      const reg = {
+        [Op.or]: [
+          { [Op.like]: `%${encodeText}&` },
+          { [Op.like]: `%${encodeText}%` },
         ],
       };
+
+      condition = {
+        ...condition,
+        name: reg,
+      };
     }
-    const newDocs = await this.find(condition, sort);
-    return newDocs;
+    try {
+      const result = await this.find(condition);
+      return result as any;
+    } catch (error) {
+      throw error;
+    }
   }
 
   public async reInstall(ids: string[]): Promise<Dependence[]> {
-    return new Promise((resolve: any) => {
-      this.dependenceDb.update(
-        { _id: { $in: ids } },
-        { $set: { status: DependenceStatus.installing, log: [] } },
-        { multi: true, returnUpdatedDocs: true },
-        async (err, num, docs: Dependence[]) => {
-          await this.installOrUninstallDependencies(docs);
-          resolve(docs);
-        },
-      );
-    });
+    const [, docs] = await DependenceModel.update(
+      { status: DependenceStatus.installing, log: [] },
+      { where: { id: ids } },
+    );
+    await this.installOrUninstallDependencies(docs);
+    return docs;
   }
 
-  private async find(query: any, sort: any): Promise<Dependence[]> {
-    return new Promise((resolve) => {
-      this.dependenceDb
-        .find(query)
-        .sort({ ...sort })
-        .exec((err, docs) => {
-          resolve(docs);
-        });
-    });
+  private async find(query: any, sort?: any): Promise<Dependence[]> {
+    const docs = await DependenceModel.findAll({ where: { ...query } });
+    return docs;
   }
 
-  public async get(_id: string): Promise<Dependence> {
-    return new Promise((resolve) => {
-      this.dependenceDb.find({ _id }).exec((err, docs) => {
-        resolve(docs[0]);
-      });
-    });
+  public async get(id: string): Promise<Dependence> {
+    const docs = await DependenceModel.findAll({ where: { id } });
+    return docs[0];
   }
 
-  private async updateLog(ids: string[], log: string): Promise<void> {
-    return new Promise((resolve) => {
-      this.dependenceDb.update(
-        { _id: { $in: ids } },
-        { $push: { log } },
-        { multi: true },
-        (err, num, doc) => {
-          if (err) {
-            this.logger.error(err);
-          } else {
-            resolve();
-          }
-        },
-      );
-    });
+  private async updateLog(ids: number[], log: string): Promise<void> {
+    const doc = await DependenceModel.findOne({ where: { id: ids } });
+    const newLog = doc?.log ? [...doc.log, log] : [log];
+    const [, docs] = await DependenceModel.update(
+      { status: DependenceStatus.installing, log: newLog },
+      { where: { id: ids } },
+    );
   }
 
   public installOrUninstallDependencies(
@@ -190,7 +144,7 @@ export default class DependenceService {
           : unInstallDependenceCommandTypes
       )[dependencies[0].type as any];
       const actionText = isInstall ? '安装' : '删除';
-      const depIds = dependencies.map((x) => x._id) as string[];
+      const depIds = dependencies.map((x) => x.id) as number[];
       const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
       const startTime = Date.now();
       this.sockService.sendMessage({
@@ -263,14 +217,8 @@ export default class DependenceService {
             ? DependenceStatus.installFailed
             : DependenceStatus.removeFailed;
         }
-        this.dependenceDb.update(
-          { _id: { $in: depIds } },
-          {
-            $set: { status },
-            $unset: { pid: true },
-          },
-          { multi: true },
-        );
+
+        DependenceModel.update({ status }, { where: { id: depIds } });
 
         // 如果删除依赖成功，3秒后删除数据库记录
         if (isSucceed && !isInstall) {

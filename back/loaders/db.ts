@@ -3,6 +3,12 @@ import config from '../config';
 import Logger from './logger';
 import fs from 'fs';
 import { fileExist } from '../config/util';
+import { EnvModel } from '../data/env';
+import { CrontabModel } from '../data/cron';
+import { DependenceModel } from '../data/dependence';
+import { AppModel } from '../data/open';
+import { AuthModel } from '../data/auth';
+import { sequelize } from '../data';
 
 interface Dbs {
   cronDb: DataStore;
@@ -52,6 +58,43 @@ export default async () => {
     db.dependenceDb.persistence.compactDatafile();
     db.appDb.persistence.compactDatafile();
     db.authDb.persistence.compactDatafile();
+
+    try {
+      await sequelize.sync();
+    } catch (error) {
+      console.log(error);
+    }
+
+    // migrate db to sqlite
+    setTimeout(async () => {
+      try {
+        const count = await CrontabModel.count();
+        if (count !== 0) {
+          return;
+        }
+        db.cronDb.find({}).exec(async (err, docs) => {
+          await CrontabModel.bulkCreate(docs);
+        });
+
+        db.dependenceDb.find({}).exec(async (err, docs) => {
+          await DependenceModel.bulkCreate(docs);
+        });
+
+        db.envDb.find({}).exec(async (err, docs) => {
+          await EnvModel.bulkCreate(docs);
+        });
+
+        db.appDb.find({}).exec(async (err, docs) => {
+          await AppModel.bulkCreate(docs);
+        });
+
+        db.authDb.find({}).exec(async (err, docs) => {
+          await AuthModel.bulkCreate(docs);
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    }, 5000);
 
     Logger.info('✌️ DB loaded');
   } catch (error) {

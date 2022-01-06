@@ -4,14 +4,12 @@ import { getFileContentByName } from '../config/util';
 import config from '../config';
 import * as fs from 'fs';
 import DataStore from 'nedb';
-import { Env, EnvStatus, initEnvPosition } from '../data/env';
+import { Env, EnvModel, EnvStatus, initEnvPosition } from '../data/env';
 import _ from 'lodash';
-import { dbs } from '../loaders/db';
+import { Op } from 'sequelize';
 
 @Service()
 export default class EnvService {
-  private envDb = dbs.envDb;
-
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async create(payloads: Env[]): Promise<Env[]> {
@@ -31,20 +29,13 @@ export default class EnvService {
   }
 
   public async insert(payloads: Env[]): Promise<Env[]> {
-    return new Promise((resolve) => {
-      this.envDb.insert(payloads, (err, docs) => {
-        if (err) {
-          this.logger.error(err);
-        } else {
-          resolve(docs);
-        }
-      });
-    });
+    const docs = await EnvModel.bulkCreate(payloads);
+    return docs;
   }
 
   public async update(payload: Env): Promise<Env> {
-    const { _id, ...other } = payload;
-    const doc = await this.get(_id);
+    const { id, ...other } = payload;
+    const doc = await this.get(id as number);
     const tab = new Env({ ...doc, ...other });
     const newDoc = await this.updateDb(tab);
     await this.set_envs();
@@ -52,33 +43,19 @@ export default class EnvService {
   }
 
   private async updateDb(payload: Env): Promise<Env> {
-    return new Promise((resolve) => {
-      this.envDb.update(
-        { _id: payload._id },
-        payload,
-        { returnUpdatedDocs: true },
-        (err, num, doc) => {
-          if (err) {
-            this.logger.error(err);
-          } else {
-            resolve(doc as Env);
-          }
-        },
-      );
-    });
+    const [, docs] = await EnvModel.update(
+      { ...payload },
+      { where: { id: payload.id } },
+    );
+    return docs[0];
   }
 
   public async remove(ids: string[]) {
-    return new Promise((resolve: any) => {
-      this.envDb.remove({ _id: { $in: ids } }, { multi: true }, async (err) => {
-        await this.set_envs();
-        resolve();
-      });
-    });
+    await EnvModel.destroy({ where: { id: ids } });
   }
 
   public async move(
-    _id: string,
+    id: number,
     {
       fromIndex,
       toIndex,
@@ -100,7 +77,7 @@ export default class EnvService {
         : (envs[toIndex].position + envs[toIndex + 1].position) / 2;
     }
     const newDoc = await this.update({
-      _id,
+      id,
       position: targetPosition,
     });
     return newDoc;
@@ -114,104 +91,72 @@ export default class EnvService {
     let condition = { ...query };
     if (searchText) {
       const encodeText = encodeURIComponent(searchText);
-      const reg = new RegExp(`${searchText}|${encodeText}`, 'i');
+      const reg = {
+        [Op.or]: [
+          { [Op.like]: `%${searchText}&` },
+          { [Op.like]: `%${encodeText}%` },
+        ],
+      };
 
       condition = {
-        $or: [
-          {
-            value: reg,
-          },
+        ...condition,
+        [Op.or]: [
           {
             name: reg,
           },
           {
-            remarks: reg,
+            command: reg,
+          },
+          {
+            schedule: reg,
           },
         ],
       };
     }
-    const newDocs = await this.find(condition, sort);
-    return newDocs;
+    try {
+      const result = await this.find(condition);
+      return result as any;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  private async find(query: any, sort: any): Promise<Env[]> {
-    return new Promise((resolve) => {
-      this.envDb
-        .find(query)
-        .sort({ ...sort })
-        .exec((err, docs) => {
-          resolve(docs);
-        });
-    });
+  private async find(query: any, sort?: any): Promise<Env[]> {
+    const docs = await EnvModel.findAll({ where: { ...query } });
+    return docs;
   }
 
-  public async get(_id: string): Promise<Env> {
-    return new Promise((resolve) => {
-      this.envDb.find({ _id }).exec((err, docs) => {
-        resolve(docs[0]);
-      });
-    });
-  }
-
-  public async getBySort(sort: any): Promise<Env> {
-    return new Promise((resolve) => {
-      this.envDb
-        .find({})
-        .sort({ ...sort })
-        .limit(1)
-        .exec((err, docs) => {
-          resolve(docs[0]);
-        });
-    });
+  public async get(id: number): Promise<Env> {
+    const docs = await EnvModel.findAll({ where: { id } });
+    return docs[0];
   }
 
   public async disabled(ids: string[]) {
-    return new Promise((resolve: any) => {
-      this.envDb.update(
-        { _id: { $in: ids } },
-        { $set: { status: EnvStatus.disabled } },
-        { multi: true },
-        async (err) => {
-          await this.set_envs();
-          resolve();
-        },
-      );
-    });
+    const [, docs] = await EnvModel.update(
+      { status: EnvStatus.disabled },
+      { where: { id: ids } },
+    );
+    await this.set_envs();
   }
 
   public async enabled(ids: string[]) {
-    return new Promise((resolve: any) => {
-      this.envDb.update(
-        { _id: { $in: ids } },
-        { $set: { status: EnvStatus.normal } },
-        { multi: true },
-        async (err, num) => {
-          await this.set_envs();
-          resolve();
-        },
-      );
-    });
+    const [, docs] = await EnvModel.update(
+      { status: EnvStatus.normal },
+      { where: { id: ids } },
+    );
+    await this.set_envs();
   }
 
   public async updateNames({ ids, name }: { ids: string[]; name: string }) {
-    return new Promise((resolve: any) => {
-      this.envDb.update(
-        { _id: { $in: ids } },
-        { $set: { name } },
-        { multi: true },
-        async (err, num) => {
-          await this.set_envs();
-          resolve();
-        },
-      );
-    });
+    const [, docs] = await EnvModel.update({ name }, { where: { id: ids } });
+    await this.set_envs();
   }
 
   public async set_envs() {
     const envs = await this.envs(
       '',
       { position: -1 },
-      { name: { $exists: true } },
+      { name: { [Op.not]: null } },
     );
     const groups = _.groupBy(envs, 'name');
     let env_string = '';

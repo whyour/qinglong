@@ -73,7 +73,7 @@ const LoginLog = ({ data }: any) => {
         columns={columns}
         pagination={false}
         dataSource={data}
-        rowKey="_id"
+        rowKey="id"
         size="middle"
         scroll={{ x: 768 }}
       />
