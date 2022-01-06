@@ -10,7 +10,7 @@ define_program() {
     local first_param=$1
     if [[ $first_param == *.js ]]; then
         which_program="node"
-    elif [[ $first_param == *.py ]]; then
+    elif [[ $first_param == *.py ]] || [[ $first_param == *.pyc ]]; then
         which_program="python3"
     elif [[ $first_param == *.sh ]]; then
         which_program="bash"
@@ -83,7 +83,7 @@ run_normal() {
             random_delay
         fi
     fi
-    
+
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${first_param##*/}"
     log_dir_tmp_path="${first_param%%/*}"
@@ -141,7 +141,7 @@ run_concurrent() {
         array_run[n]=${array[$i - 1]}
         let n++
     done
-    
+
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
 
     define_program "$first_param"
@@ -234,7 +234,7 @@ run_designated() {
         array_run[n]=${array[$i - 1]}
         let n++
     done
-    
+
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
