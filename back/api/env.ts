@@ -177,7 +177,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.get(req.params.id);
+        const data = await envService.getDb(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
