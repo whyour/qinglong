@@ -49,7 +49,7 @@ export default (app: Router) => {
       body: Joi.object({
         name: Joi.string().optional().allow(''),
         scopes: Joi.array().items(Joi.string()),
-        _id: Joi.string().required(),
+        id: Joi.string().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -68,7 +68,7 @@ export default (app: Router) => {
   route.delete(
     '/apps',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -90,7 +90,7 @@ export default (app: Router) => {
         id: Joi.string().required(),
       }),
     }),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const openService = Container.get(OpenService);

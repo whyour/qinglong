@@ -1,7 +1,9 @@
+import { sequelize } from '.';
+import { DataTypes, Model, ModelDefined } from 'sequelize';
+
 export class Dependence {
   timestamp?: string;
-  created?: number;
-  _id?: string;
+  id?: number;
   status?: DependenceStatus;
   type?: DependenceTypes;
   name?: number;
@@ -9,8 +11,7 @@ export class Dependence {
   remark?: string;
 
   constructor(options: Dependence) {
-    this._id = options._id;
-    this.created = options.created || new Date().valueOf();
+    this.id = options.id;
     this.status = options.status || DependenceStatus.installing;
     this.type = options.type || DependenceTypes.nodejs;
     this.timestamp = new Date().toString();
@@ -46,3 +47,18 @@ export enum unInstallDependenceCommandTypes {
   'pip3 uninstall -y',
   'apk del -f',
 }
+
+interface DependenceInstance
+  extends Model<Dependence, Dependence>,
+    Dependence {}
+export const DependenceModel = sequelize.define<DependenceInstance>(
+  'Dependence',
+  {
+    name: DataTypes.STRING,
+    type: DataTypes.STRING,
+    timestamp: DataTypes.STRING,
+    status: DataTypes.STRING,
+    log: DataTypes.JSON,
+    remark: DataTypes.STRING,
+  },
+);

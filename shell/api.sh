@@ -61,7 +61,7 @@ update_cron_api() {
             -H "Origin: http://0.0.0.0:5700" \
             -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
-            --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\",\"_id\":\"$id\"}" \
+            --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\",\"id\":\"$id\"}" \
             --compressed
     )
     code=$(echo $api | jq -r .code)
@@ -93,7 +93,7 @@ update_cron_command_api() {
             -H "Origin: http://0.0.0.0:5700" \
             -H "Referer: http://0.0.0.0:5700/crontab" \
             -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
-            --data-raw "{\"command\":\"$command\",\"_id\":\"$id\"}" \
+            --data-raw "{\"command\":\"$command\",\"id\":\"$id\"}" \
             --compressed
     )
     code=$(echo $api | jq -r .code)

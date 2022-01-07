@@ -113,6 +113,14 @@ const Login = () => {
     }
   };
 
+  const codeInputChange = (e: React.ChangeEvent) => {
+    const { value } = e.target as any;
+    const regx = /^[0-9]{6}$/;
+    if (regx.test(value)) {
+      completeTowFactor({ code: value });
+    }
+  };
+
   useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
     if (isAuth) {
@@ -144,12 +152,15 @@ const Login = () => {
                 {
                   pattern: /^[0-9]{6}$/,
                   message: '验证码为6位数字',
-                  validateTrigger: 'onBlur',
                 },
               ]}
-              hasFeedback
             >
-              <Input placeholder="6位数字" autoFocus autoComplete="off" />
+              <Input
+                placeholder="6位数字"
+                onChange={codeInputChange}
+                autoFocus
+                autoComplete="off"
+              />
             </FormItem>
             <Button
               type="primary"

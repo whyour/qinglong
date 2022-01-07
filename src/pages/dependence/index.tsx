@@ -83,6 +83,12 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
       },
     },
     {
+      title: '备注',
+      dataIndex: 'remark',
+      key: 'remark',
+      align: 'center' as const,
+    },
+    {
       title: '创建时间',
       key: 'created',
       dataIndex: 'created',
@@ -175,7 +181,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}dependencies`, { data: [record._id] })
+          .delete(`${config.apiPrefix}dependencies`, { data: [record.id] })
           .then((data: any) => {
             if (data.code === 200) {
               handleDependence(data.data[0]);
@@ -205,7 +211,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
       onOk() {
         request
           .put(`${config.apiPrefix}dependencies/reinstall`, {
-            data: [record._id],
+            data: [record.id],
           })
           .then((data: any) => {
             if (data.code === 200) {
@@ -231,7 +237,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
     if (Array.isArray(dependence)) {
       result.push(...dependence);
     } else {
-      const index = value.findIndex((x) => x._id === dependence._id);
+      const index = value.findIndex((x) => x.id === dependence.id);
       result.splice(index, 1, {
         ...dependence,
       });
@@ -278,9 +284,9 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
 
   const getDependenceDetail = (dependence: any) => {
     request
-      .get(`${config.apiPrefix}dependencies/${dependence._id}`)
+      .get(`${config.apiPrefix}dependencies/${dependence.id}`)
       .then((data: any) => {
-        const index = value.findIndex((x) => x._id === dependence._id);
+        const index = value.findIndex((x) => x.id === dependence.id);
         const result = [...value];
         result.splice(index, 1, {
           ...dependence,
@@ -307,7 +313,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
 
   useEffect(() => {
     if (logDependence) {
-      localStorage.setItem('logDependence', logDependence._id);
+      localStorage.setItem('logDependence', logDependence.id);
       setIsLogModalVisible(true);
     }
   }, [logDependence]);
@@ -328,7 +334,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
       }
       const result = [...value];
       for (let i = 0; i < references.length; i++) {
-        const index = value.findIndex((x) => x._id === references[i]);
+        const index = value.findIndex((x) => x.id === references[i]);
         result.splice(index, 1, {
           ...result[index],
           status,
@@ -340,7 +346,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
         setTimeout(() => {
           const _result = [...value];
           for (let i = 0; i < references.length; i++) {
-            const index = value.findIndex((x) => x._id === references[i]);
+            const index = value.findIndex((x) => x.id === references[i]);
             _result.splice(index, 1);
           }
           setValue(_result);
@@ -372,7 +378,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
           rowSelection={rowSelection}
           pagination={false}
           dataSource={value}
-          rowKey="_id"
+          rowKey="id"
           size="middle"
           scroll={{ x: 768, y: tableScrollHeight }}
           loading={loading}
@@ -432,11 +438,11 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
         handleCancel={(needRemove?: boolean) => {
           setIsLogModalVisible(false);
           if (needRemove) {
-            const index = value.findIndex((x) => x._id === logDependence._id);
+            const index = value.findIndex((x) => x.id === logDependence.id);
             const result = [...value];
             result.splice(index, 1);
             setValue(result);
-          } else if ([...value].map((x) => x._id).includes(logDependence._id)) {
+          } else if ([...value].map((x) => x.id).includes(logDependence.id)) {
             getDependenceDetail(logDependence);
           }
         }}

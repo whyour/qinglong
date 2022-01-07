@@ -429,12 +429,12 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}crons`, { data: [record._id] })
+          .delete(`${config.apiPrefix}crons`, { data: [record.id] })
           .then((data: any) => {
             if (data.code === 200) {
               message.success('删除成功');
               const result = [...value];
-              const i = result.findIndex((x) => x._id === record._id);
+              const i = result.findIndex((x) => x.id === record.id);
               result.splice(i, 1);
               setValue(result);
             } else {
@@ -462,11 +462,11 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/run`, { data: [record._id] })
+          .put(`${config.apiPrefix}crons/run`, { data: [record.id] })
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              const i = result.findIndex((x) => x._id === record._id);
+              const i = result.findIndex((x) => x.id === record.id);
               result.splice(i, 1, {
                 ...record,
                 status: CrontabStatus.running,
@@ -497,11 +497,11 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/stop`, { data: [record._id] })
+          .put(`${config.apiPrefix}crons/stop`, { data: [record.id] })
           .then((data: any) => {
             if (data.code === 200) {
               const result = [...value];
-              const i = result.findIndex((x) => x._id === record._id);
+              const i = result.findIndex((x) => x.id === record.id);
               result.splice(i, 1, {
                 ...record,
                 pid: null,
@@ -539,14 +539,14 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
               record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             {
-              data: [record._id],
+              data: [record.id],
             },
           )
           .then((data: any) => {
             if (data.code === 200) {
               const newStatus = record.isDisabled === 1 ? 0 : 1;
               const result = [...value];
-              const i = result.findIndex((x) => x._id === record._id);
+              const i = result.findIndex((x) => x.id === record.id);
               result.splice(i, 1, {
                 ...record,
                 isDisabled: newStatus,
@@ -583,14 +583,14 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
               record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             {
-              data: [record._id],
+              data: [record.id],
             },
           )
           .then((data: any) => {
             if (data.code === 200) {
               const newStatus = record.isPinned === 1 ? 0 : 1;
               const result = [...value];
-              const i = result.findIndex((x) => x._id === record._id);
+              const i = result.findIndex((x) => x.id === record.id);
               result.splice(i, 1, {
                 ...record,
                 isPinned: newStatus,
@@ -682,7 +682,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   };
 
   const handleCrons = (cron: any) => {
-    const index = value.findIndex((x) => x._id === cron._id);
+    const index = value.findIndex((x) => x.id === cron.id);
     const result = [...value];
     cron.nextRunTime = cron_parser
       .parseExpression(cron.schedule)
@@ -700,9 +700,9 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
 
   const getCronDetail = (cron: any) => {
     request
-      .get(`${config.apiPrefix}crons/${cron._id}`)
+      .get(`${config.apiPrefix}crons/${cron.id}`)
       .then((data: any) => {
-        const index = value.findIndex((x) => x._id === cron._id);
+        const index = value.findIndex((x) => x.id === cron.id);
         const result = [...value];
         data.data.nextRunTime = cron_parser
           .parseExpression(data.data.schedule)
@@ -795,7 +795,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
 
   useEffect(() => {
     if (logCron) {
-      localStorage.setItem('logCron', logCron._id);
+      localStorage.setItem('logCron', logCron.id);
       setIsLogModalVisible(true);
     }
   }, [logCron]);
@@ -901,7 +901,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           pageSizeOptions: [10, 20, 50, 100, 200, 500, 1000],
         }}
         dataSource={value}
-        rowKey="_id"
+        rowKey="id"
         size="middle"
         scroll={{ x: 1000, y: tableScrollHeight }}
         loading={loading}

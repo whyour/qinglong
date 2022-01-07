@@ -1,14 +1,17 @@
+import { sequelize } from '.';
+import { DataTypes, Model, ModelDefined } from 'sequelize';
+
 export class AuthInfo {
   ip?: string;
   type: AuthDataType;
   info?: any;
-  _id?: string;
+  id?: number;
 
   constructor(options: AuthInfo) {
     this.ip = options.ip;
     this.info = options.info;
     this.type = options.type;
-    this._id = options._id;
+    this.id = options.id;
   }
 }
 
@@ -23,3 +26,13 @@ export enum AuthDataType {
   'notification' = 'notification',
   'removeLogFrequency' = 'removeLogFrequency',
 }
+
+interface AuthInstance extends Model<AuthInfo, AuthInfo>, AuthInfo {}
+export const AuthModel = sequelize.define<AuthInstance>('Auth', {
+  ip: DataTypes.STRING,
+  type: DataTypes.STRING,
+  info: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+});

@@ -27,7 +27,7 @@ import * as Sentry from '@sentry/react';
 import { Integrations } from '@sentry/tracing';
 
 Sentry.init({
-  dsn: 'https://ea2fede373244db99c536210b910d9da@o1051273.ingest.sentry.io/6047851',
+  dsn: 'https://3406424fb1dc4813a62d39e844a9d0ac@o1098464.ingest.sentry.io/6122818',
   integrations: [new Integrations.BrowserTracing()],
   release: version,
   tracesSampleRate: 1.0,

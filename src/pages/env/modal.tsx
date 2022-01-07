@@ -34,7 +34,7 @@ const EnvModal = ({
         payload = [{ value, name, remarks }];
       }
     } else {
-      payload = { ...values, _id: env._id };
+      payload = { ...values, id: env.id };
     }
     const { code, data } = await request[method](`${config.apiPrefix}envs`, {
       data: payload,

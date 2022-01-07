@@ -5,7 +5,7 @@ import Logger from './logger';
 
 export default ({ expressApp }: { expressApp: Application }) => {
   Sentry.init({
-    dsn: 'https://e14681bce55f4849b11024a7d424b711@o1051273.ingest.sentry.io/6047906',
+    dsn: 'https://f4b5b55fb3c645b29a5dc2d70a1a4ef4@o1098464.ingest.sentry.io/6122819',
     integrations: [
       new Sentry.Integrations.Http({ tracing: true }),
       new Tracing.Integrations.Express({ app: expressApp }),

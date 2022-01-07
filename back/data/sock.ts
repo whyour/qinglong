@@ -1,7 +1,7 @@
 export class SockMessage {
   message?: string;
   type?: SockMessageType;
-  references?: string[];
+  references?: number[];
 
   constructor(options: SockMessage) {
     this.type = options.type;

@@ -49,7 +49,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
-        _id: Joi.string().required(),
+        id: Joi.string().required(),
         type: Joi.number().required(),
         remark: Joi.number().optional().allow(''),
       }),
@@ -70,7 +70,7 @@ export default (app: Router) => {
   route.delete(
     '/',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -88,7 +88,7 @@ export default (app: Router) => {
   route.delete(
     '/force',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -110,7 +110,7 @@ export default (app: Router) => {
         id: Joi.string().required(),
       }),
     }),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
@@ -126,7 +126,7 @@ export default (app: Router) => {
   route.put(
     '/reinstall',
     celebrate({
-      body: Joi.array().items(Joi.string().required()),
+      body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');

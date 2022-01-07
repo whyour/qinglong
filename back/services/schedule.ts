@@ -6,22 +6,22 @@ import { exec } from 'child_process';
 
 @Service()
 export default class ScheduleService {
-  private scheduleStacks = new Map<string, nodeSchedule.Job>();
+  private scheduleStacks = new Map<number, nodeSchedule.Job>();
 
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  async generateSchedule({ _id = '', command, name, schedule }: Crontab) {
+  async generateSchedule({ id = 0, command, name, schedule }: Crontab) {
     this.logger.info(
       '[创建定时任务]，任务ID: %s，cron: %s，任务名: %s，执行命令: %s',
-      _id,
+      id,
       schedule,
       name,
       command,
     );
 
     this.scheduleStacks.set(
-      _id,
-      nodeSchedule.scheduleJob(_id, schedule, async () => {
+      id,
+      nodeSchedule.scheduleJob(id + '', schedule, async () => {
         try {
           exec(command, async (error, stdout, stderr) => {
             if (error) {
@@ -55,8 +55,8 @@ export default class ScheduleService {
     );
   }
 
-  async cancelSchedule({ _id = '', name }: Crontab) {
+  async cancelSchedule({ id = 0, name }: Crontab) {
     this.logger.info('[取消定时任务]，任务名：%s', name);
-    this.scheduleStacks.has(_id) && this.scheduleStacks.get(_id)?.cancel();
+    this.scheduleStacks.has(id) && this.scheduleStacks.get(id)?.cancel();
   }
 }

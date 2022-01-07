@@ -164,7 +164,7 @@ const Setting = ({
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}apps`, { data: [record._id] })
+          .delete(`${config.apiPrefix}apps`, { data: [record.id] })
           .then((data: any) => {
             if (data.code === 200) {
               message.success('删除成功');
@@ -198,7 +198,7 @@ const Setting = ({
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}apps/${record._id}/reset-secret`)
+          .put(`${config.apiPrefix}apps/${record.id}/reset-secret`)
           .then((data: any) => {
             if (data.code === 200) {
               message.success('重置成功');
@@ -222,7 +222,7 @@ const Setting = ({
   };
 
   const handleApp = (app: any) => {
-    const index = dataSource.findIndex((x) => x._id === app._id);
+    const index = dataSource.findIndex((x) => x.id === app.id);
     const result = [...dataSource];
     if (index === -1) {
       result.push(app);
@@ -339,7 +339,7 @@ const Setting = ({
             columns={columns}
             pagination={false}
             dataSource={dataSource}
-            rowKey="_id"
+            rowKey="id"
             size="middle"
             scroll={{ x: 768 }}
             loading={loading}

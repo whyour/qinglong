@@ -6,8 +6,7 @@ import * as fs from 'fs';
 import _ from 'lodash';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
-import DataStore from 'nedb';
-import { AuthDataType, AuthInfo, LoginStatus } from '../data/auth';
+import { AuthDataType, AuthInfo, AuthModel, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import { Request } from 'express';
@@ -15,13 +14,11 @@ import ScheduleService from './schedule';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import got from 'got';
-import { dbs } from '../loaders/db';
 
 @Service()
 export default class UserService {
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
-  private authDb = dbs.authDb;
 
   constructor(
     @Inject('logger') private logger: winston.Logger,
@@ -174,33 +171,24 @@ export default class UserService {
   }
 
   public async getLoginLog(): Promise<AuthInfo[]> {
-    return new Promise((resolve) => {
-      this.authDb.find({ type: AuthDataType.loginLog }).exec((err, docs) => {
-        if (err || docs.length === 0) {
-          resolve([]);
-        } else {
-          const result = docs.sort(
-            (a, b) => b.info.timestamp - a.info.timestamp,
-          );
-          if (result.length > 100) {
-            this.authDb.remove({ _id: result[result.length - 1]._id });
-          }
-          resolve(result.map((x) => x.info));
-        }
-      });
+    const docs = await AuthModel.findAll({
+      where: { type: AuthDataType.loginLog },
     });
+    if (docs && docs.length > 0) {
+      const result = docs.sort((a, b) => b.info.timestamp - a.info.timestamp);
+      if (result.length > 100) {
+        await AuthModel.destroy({
+          where: { id: result[result.length - 1].id },
+        });
+      }
+      return result.map((x) => x.info);
+    }
+    return [];
   }
 
   private async insertDb(payload: AuthInfo): Promise<AuthInfo> {
-    return new Promise((resolve) => {
-      this.authDb.insert(payload, (err, doc) => {
-        if (err) {
-          this.logger.error(err);
-        } else {
-          resolve(doc);
-        }
-      });
-    });
+    const doc = await AuthModel.create({ ...payload }, { returning: true });
+    return doc;
   }
 
   private initAuthInfo() {
@@ -315,48 +303,23 @@ export default class UserService {
   }
 
   public async getNotificationMode(): Promise<NotificationInfo> {
-    return new Promise((resolve) => {
-      this.authDb
-        .find({ type: AuthDataType.notification })
-        .exec((err, docs) => {
-          if (err || docs.length === 0) {
-            resolve({} as NotificationInfo);
-          } else {
-            resolve(docs[0].info);
-          }
-        });
+    const doc = await AuthModel.findOne({
+      where: { type: AuthDataType.notification },
     });
+    return (doc && doc.info) || {};
   }
 
   public async getLogRemoveFrequency() {
-    return new Promise((resolve) => {
-      this.authDb
-        .find({ type: AuthDataType.removeLogFrequency })
-        .exec((err, docs) => {
-          if (err || docs.length === 0) {
-            resolve({});
-          } else {
-            resolve(docs[0].info);
-          }
-        });
+    const doc = await AuthModel.findOne({
+      where: { type: AuthDataType.removeLogFrequency },
     });
+    return (doc && doc.info) || {};
   }
 
   private async updateAuthDb(payload: AuthInfo): Promise<any> {
-    return new Promise((resolve) => {
-      this.authDb.update(
-        { type: payload.type },
-        { ...payload },
-        { upsert: true, returnUpdatedDocs: true },
-        (err, num, doc: any) => {
-          if (err) {
-            resolve({} as NotificationInfo);
-          } else {
-            resolve({ ...doc.info, _id: doc._id });
-          }
-        },
-      );
-    });
+    await AuthModel.upsert({ ...payload });
+    const doc = await AuthModel.findOne({ where: { type: payload.type } });
+    return doc;
   }
 
   public async updateNotificationMode(notificationInfo: NotificationInfo) {
@@ -383,7 +346,7 @@ export default class UserService {
       info: { frequency },
     });
     const cron = {
-      _id: result._id,
+      id: result.id,
       name: '删除日志',
       command: `ql rmlog ${frequency}`,
       schedule: `5 23 */${frequency} * *`,

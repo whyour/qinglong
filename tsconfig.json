@@ -27,13 +27,7 @@
     "allowJs": true,
     "noEmit": false
   },
-  "include": [
-    "src/**/*",
-    "config/**/*",
-    ".umirc.ts",
-    "typings.d.ts",
-    "back/**/*"
-  ],
+  "include": ["src/**/*", ".umirc.ts", "typings.d.ts", "back/**/*"],
   "exclude": [
     "node_modules",
     "lib",
