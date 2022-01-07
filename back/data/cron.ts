@@ -14,6 +14,7 @@ export class Crontab {
   isDisabled?: 1 | 0;
   log_path?: string;
   isPinned?: 1 | 0;
+  labels: Array<string>;
   last_running_time?: number;
   last_execution_time?: number;
 
@@ -33,6 +34,7 @@ export class Crontab {
     this.isDisabled = options.isDisabled || 0;
     this.log_path = options.log_path || '';
     this.isPinned = options.isPinned || 0;
+    this.labels = options.labels || [''];
     this.last_running_time = options.last_running_time || 0;
     this.last_execution_time = options.last_execution_time || 0;
   }
@@ -58,6 +60,18 @@ export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   isDisabled: DataTypes.NUMBER,
   isPinned: DataTypes.NUMBER,
   log_path: DataTypes.STRING,
+  labels: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    get() {
+      if (this.getDataValue('labels')) {
+        return this.getDataValue('labels').split(',')
+      }
+    },
+    set(value) {
+      this.setDataValue('labels', value.join(','));
+    },
+  },
   last_running_time: DataTypes.NUMBER,
   last_execution_time: DataTypes.NUMBER,
 });

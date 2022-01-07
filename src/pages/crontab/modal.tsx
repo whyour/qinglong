@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form } from 'antd';
+import { Modal, message, Input, Form, Button } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import cronParse from 'cron-parser';
@@ -48,6 +48,9 @@ const CronModal = ({
         form
           .validateFields()
           .then((values) => {
+            if (typeof values.labels === "string") {
+              values.labels = values.labels.split(/,|，/);
+            }
             handleOk(values);
           })
           .catch((info) => {
@@ -65,6 +68,9 @@ const CronModal = ({
       >
         <Form.Item name="name" label="名称">
           <Input placeholder="请输入任务名称" />
+        </Form.Item>
+        <Form.Item name="labels" label="标签">
+          <Input placeholder="请输入任务标签" />
         </Form.Item>
         <Form.Item
           name="command"
@@ -100,4 +106,79 @@ const CronModal = ({
   );
 };
 
-export default CronModal;
+const CronLabelModal = ({
+  ids,
+  handleCancel,
+  visible,
+}: {
+  ids: Array<string>;
+  visible: boolean;
+  handleCancel: (needUpdate?: boolean) => void;
+}) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const update = async (action: string) => {
+    form
+      .validateFields()
+      .then(async (values) => {
+        if (typeof values.labels === "string") {
+          values.labels = values.labels.split(/,|，/);
+        }
+        setLoading(true);
+        const payload = { ids, labels: values.labels };
+        const { code, data } = await request.put(`${config.apiPrefix}crons/${action}`, {
+          data: payload,
+        });
+        if (code === 200) {
+          message.success(action === 'addLabels' ? '添加Labels成功' : '删除Labels成功');
+        } else {
+          message.error(data);
+        }
+        setLoading(false);
+        handleCancel(true);
+      })
+      .catch((info) => {
+        console.log('Validate Failed:', info);
+      });
+  }
+
+  useEffect(() => {
+    form.resetFields();
+  }, [ids, visible]);
+
+  const buttons = [
+    <Button onClick={() => handleCancel(false)} key="test">
+      取消
+    </Button>,
+    <Button type="primary" danger onClick={() => update('removeLabels')}>
+      删除
+    </Button>,
+    <Button type="primary" onClick={() => update('addLabels')}>
+      添加
+    </Button>
+  ];
+
+  return (
+    <Modal
+      title='批量修改标签'
+      visible={visible}
+      footer={buttons}
+      forceRender
+      onCancel={() => handleCancel(false)}
+      confirmLoading={loading}
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        name="form_in_label_modal"
+      >
+        <Form.Item name="labels" label="标签">
+          <Input placeholder="请输入任务标签" />
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+};
+
+export { CronModal as default, CronLabelModal }

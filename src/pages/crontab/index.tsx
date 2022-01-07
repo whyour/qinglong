@@ -11,6 +11,7 @@ import {
   Menu,
   Typography,
   Input,
+  Popover,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -30,7 +31,7 @@ import {
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import CronModal from './modal';
+import CronModal,{ CronLabelModal } from './modal';
 import CronLogModal from './logModal';
 import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
@@ -77,20 +78,39 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
       width: 150,
       align: 'center' as const,
       render: (text: string, record: any) => (
-        <a
-          onClick={() => {
-            goToScriptManager(record);
-          }}
-        >
-          {record.name || record.id}{' '}
-          {record.isPinned ? (
-            <span>
-              <PushpinOutlined />
-            </span>
-          ) : (
-            ''
-          )}
-        </a>
+        <>
+          <a
+            onClick={() => {
+              goToScriptManager(record);
+            }}
+          >
+            {record.name || record._id}{' '}
+            {record.isPinned ? (
+              <span>
+                <PushpinOutlined />
+              </span>
+            ) : (
+              ''
+            )}
+          </a>
+          <span>
+            {record.labels?.length > 0 && record.labels[0] !== '' ? 
+              <Popover placement='right' trigger={isPhone ? 'click' : 'hover'}
+                content={
+                  <div>
+                    {record.labels?.map((label: string, i: number) => (
+                      <Tag color="blue" 
+                        onClick={() => { onSearch(`label:${label}`) }}>
+                        {label}
+                      </Tag>
+                    ))}
+                  </div>
+                }>
+                <Tag color="blue">{record.labels[0]}</Tag>
+              </Popover>
+              : ''}
+          </span>
+        </>
       ),
       sorter: {
         compare: (a: any, b: any) => a.name.localeCompare(b.name),
@@ -325,6 +345,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isLabelModalVisible, setisLabelModalVisible] = useState(false);
   const [editedCron, setEditedCron] = useState();
   const [searchText, setSearchText] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
@@ -853,6 +874,13 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           >
             批量取消置顶
           </Button>
+          <Button
+            type="primary"
+            onClick={() => setisLabelModalVisible(true)}
+            style={{ marginLeft: 8, marginRight: 8 }}
+          >
+            批量修改标签
+          </Button>
           <span style={{ marginLeft: 8 }}>
             已选择
             <a>{selectedRowIds?.length}</a>项
@@ -892,6 +920,16 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         visible={isModalVisible}
         handleCancel={handleCancel}
         cron={editedCron}
+      />
+      <CronLabelModal
+        visible={isLabelModalVisible}
+        handleCancel={(needUpdate?: boolean) => {
+          setisLabelModalVisible(false);
+          if (needUpdate) {
+            getCrons();
+          }
+        }}
+        ids={selectedRowIds}
       />
     </PageContainer>
   );

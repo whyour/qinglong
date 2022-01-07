@@ -113,17 +113,19 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
   const initGetScript = () => {
     const { p, s } = history.location.query as any;
     if (s) {
+      const vkey = `${p}/${s}`;
       const obj = {
         node: {
           title: s,
           value: s,
-          key: p ? `${p}/${s}` : s,
+          key: p ? vkey : s,
           parent: p,
         },
       };
       setExpandedKeys([p]);
-      onTreeSelect([`${p}/${s}`], obj);
+      onTreeSelect([vkey], obj);
     }
+    history.push('/script');
   };
 
   const onSelect = (value: any, node: any) => {
