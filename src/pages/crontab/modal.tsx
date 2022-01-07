@@ -20,19 +20,26 @@ const CronModal = ({
     setLoading(true);
     const method = cron ? 'put' : 'post';
     const payload = { ...values };
+    if (typeof payload.labels === 'string') {
+      payload.labels = values.labels.split(/,|，/);
+    }
     if (cron) {
       payload.id = cron.id;
     }
-    const { code, data } = await request[method](`${config.apiPrefix}crons`, {
-      data: payload,
-    });
-    if (code === 200) {
-      message.success(cron ? '更新Cron成功' : '新建Cron成功');
-    } else {
-      message.error(data);
+    try {
+      const { code, data } = await request[method](`${config.apiPrefix}crons`, {
+        data: payload,
+      });
+      if (code === 200) {
+        message.success(cron ? '更新Cron成功' : '新建Cron成功');
+      } else {
+        message.error(data);
+      }
+      setLoading(false);
+      handleCancel(data);
+    } catch (error: any) {
+      setLoading(false);
     }
-    setLoading(false);
-    handleCancel(data);
   };
 
   useEffect(() => {
@@ -41,16 +48,13 @@ const CronModal = ({
 
   return (
     <Modal
-      title={cron ? '编辑定时' : '新建定时'}
+      title={cron ? '编辑任务' : '新建任务'}
       visible={visible}
       forceRender
       onOk={() => {
         form
           .validateFields()
           .then((values) => {
-            if (typeof values.labels === "string") {
-              values.labels = values.labels.split(/,|，/);
-            }
             handleOk(values);
           })
           .catch((info) => {
@@ -68,9 +72,6 @@ const CronModal = ({
       >
         <Form.Item name="name" label="名称">
           <Input placeholder="请输入任务名称" />
-        </Form.Item>
-        <Form.Item name="labels" label="标签">
-          <Input placeholder="请输入任务标签" />
         </Form.Item>
         <Form.Item
           name="command"
@@ -101,6 +102,9 @@ const CronModal = ({
         >
           <Input placeholder="秒(可选) 分 时 天 月 周" />
         </Form.Item>
+        <Form.Item name="labels" label="标签">
+          <Input placeholder="请输入任务标签" />
+        </Form.Item>
       </Form>
     </Modal>
   );
@@ -118,20 +122,25 @@ const CronLabelModal = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
-  const update = async (action: string) => {
+  const update = async (action: 'delete' | 'post') => {
     form
       .validateFields()
       .then(async (values) => {
-        if (typeof values.labels === "string") {
+        if (typeof values.labels === 'string') {
           values.labels = values.labels.split(/,|，/);
         }
         setLoading(true);
         const payload = { ids, labels: values.labels };
-        const { code, data } = await request.put(`${config.apiPrefix}crons/${action}`, {
-          data: payload,
-        });
+        const { code, data } = await request[action](
+          `${config.apiPrefix}crons/labels`,
+          {
+            data: payload,
+          },
+        );
         if (code === 200) {
-          message.success(action === 'addLabels' ? '添加Labels成功' : '删除Labels成功');
+          message.success(
+            action === 'post' ? '添加Labels成功' : '删除Labels成功',
+          );
         } else {
           message.error(data);
         }
@@ -141,38 +150,32 @@ const CronLabelModal = ({
       .catch((info) => {
         console.log('Validate Failed:', info);
       });
-  }
+  };
 
   useEffect(() => {
     form.resetFields();
   }, [ids, visible]);
 
   const buttons = [
-    <Button onClick={() => handleCancel(false)} key="test">
-      取消
-    </Button>,
-    <Button type="primary" danger onClick={() => update('removeLabels')}>
+    <Button onClick={() => handleCancel(false)}>取消</Button>,
+    <Button type="primary" danger onClick={() => update('delete')}>
       删除
     </Button>,
-    <Button type="primary" onClick={() => update('addLabels')}>
+    <Button type="primary" onClick={() => update('post')}>
       添加
-    </Button>
+    </Button>,
   ];
 
   return (
     <Modal
-      title='批量修改标签'
+      title="批量修改标签"
       visible={visible}
       footer={buttons}
       forceRender
       onCancel={() => handleCancel(false)}
       confirmLoading={loading}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        name="form_in_label_modal"
-      >
+      <Form form={form} layout="vertical" name="form_in_label_modal">
         <Form.Item name="labels" label="标签">
           <Input placeholder="请输入任务标签" />
         </Form.Item>
@@ -181,4 +184,4 @@ const CronLabelModal = ({
   );
 };
 
-export { CronModal as default, CronLabelModal }
+export { CronModal as default, CronLabelModal };

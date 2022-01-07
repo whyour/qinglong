@@ -90,11 +90,11 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
     },
     {
       title: '创建时间',
-      key: 'created',
-      dataIndex: 'created',
+      key: 'timestamp',
+      dataIndex: 'timestamp',
       align: 'center' as const,
       render: (text: string, record: any) => {
-        return <span>{new Date(record.created).toLocaleString()}</span>;
+        return <span>{new Date(record.timestamp).toLocaleString()}</span>;
       },
     },
     {

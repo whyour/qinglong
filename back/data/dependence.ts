@@ -55,9 +55,9 @@ export const DependenceModel = sequelize.define<DependenceInstance>(
   'Dependence',
   {
     name: DataTypes.STRING,
-    type: DataTypes.STRING,
+    type: DataTypes.NUMBER,
     timestamp: DataTypes.STRING,
-    status: DataTypes.STRING,
+    status: DataTypes.NUMBER,
     log: DataTypes.JSON,
     remark: DataTypes.STRING,
   },

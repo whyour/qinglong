@@ -84,19 +84,22 @@ export default (app: Router) => {
     },
   );
 
-  route.put(
-    '/removelabels',
+  route.delete(
+    '/labels',
     celebrate({
       body: Joi.object({
-        ids:Joi.array().items(Joi.number().required()),
-        labels:Joi.array().items(Joi.string().required()),
-      })
+        ids: Joi.array().items(Joi.number().required()),
+        labels: Joi.array().items(Joi.string().required()),
+      }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.removeLabels(req.body.ids,req.body.labels);
+        const data = await cronService.removeLabels(
+          req.body.ids,
+          req.body.labels,
+        );
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -105,19 +108,19 @@ export default (app: Router) => {
     },
   );
 
-  route.put(
-    '/addlabels',
+  route.post(
+    '/labels',
     celebrate({
       body: Joi.object({
-        ids:Joi.array().items(Joi.number().required()),
-        labels:Joi.array().items(Joi.string().required()),
-      })
+        ids: Joi.array().items(Joi.number().required()),
+        labels: Joi.array().items(Joi.string().required()),
+      }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.addLabels(req.body.ids,req.body.labels);
+        const data = await cronService.addLabels(req.body.ids, req.body.labels);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -293,7 +296,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.get(req.params.id);
+        const data = await cronService.getDb({ id: req.params.id });
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);

@@ -60,7 +60,7 @@ export default async () => {
     db.authDb.persistence.compactDatafile();
 
     try {
-      await sequelize.sync();
+      await sequelize.sync({ alter: true });
     } catch (error) {
       console.log(error);
     }

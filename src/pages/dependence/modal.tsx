@@ -26,7 +26,7 @@ const DependenceModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const { name, split, type } = values;
+    const { name, split, type, remark } = values;
     const method = dependence ? 'put' : 'post';
     let payload;
     if (!dependence) {
@@ -36,10 +36,11 @@ const DependenceModal = ({
           return {
             name: x,
             type,
+            remark,
           };
         });
       } else {
-        payload = [{ name, type }];
+        payload = [{ name, type, remark }];
       }
     } else {
       payload = { ...values, id: dependence.id };

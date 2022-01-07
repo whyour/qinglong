@@ -24,16 +24,19 @@ export default class SystemService {
   ) {}
 
   public async getLogRemoveFrequency() {
-    const doc = await AuthModel.findOne({
-      where: { type: AuthDataType.removeLogFrequency },
-    });
+    const doc = await this.getDb({ type: AuthDataType.removeLogFrequency });
     return (doc && doc.info) || {};
   }
 
   private async updateAuthDb(payload: AuthInfo): Promise<any> {
     await AuthModel.upsert({ ...payload });
-    const doc = await AuthModel.findOne({ where: { type: payload.type } });
+    const doc = await this.getDb({ type: payload.type });
     return doc;
+  }
+
+  public async getDb(query: any): Promise<any> {
+    const doc: any = await AuthModel.findOne({ where: { ...query } });
+    return doc && (doc.get({ plain: true }) as any);
   }
 
   public async updateNotificationMode(notificationInfo: NotificationInfo) {

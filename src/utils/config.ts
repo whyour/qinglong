@@ -70,6 +70,8 @@ export default {
     configs: '配置文件',
     scripts: '脚本管理',
     logs: '任务日志',
+    dependencies: '依赖管理',
+    system: '系统信息',
   },
   notificationModes: [
     { value: 'gotify', label: 'Gotify' },
