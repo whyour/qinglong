@@ -34,20 +34,14 @@ export default class EnvService {
   }
 
   public async update(payload: Env): Promise<Env> {
-    const { id, ...other } = payload;
-    const doc = await this.get(id as number);
-    const tab = new Env({ ...doc, ...other });
-    const newDoc = await this.updateDb(tab);
+    const newDoc = await this.updateDb(payload);
     await this.set_envs();
     return newDoc;
   }
 
   private async updateDb(payload: Env): Promise<Env> {
-    const [, docs] = await EnvModel.update(
-      { ...payload },
-      { where: { id: payload.id } },
-    );
-    return docs[0];
+    await EnvModel.update({ ...payload }, { where: { id: payload.id } });
+    return await this.getDb({ id: payload.id });
   }
 
   public async remove(ids: string[]) {
@@ -126,13 +120,13 @@ export default class EnvService {
     return docs;
   }
 
-  public async get(id: number): Promise<Env> {
-    const docs = await EnvModel.findAll({ where: { id } });
-    return docs[0];
+  public async getDb(query: any): Promise<Env> {
+    const doc: any = await EnvModel.findOne({ where: { ...query } });
+    return doc && (doc.get({ plain: true }) as Env);
   }
 
   public async disabled(ids: string[]) {
-    const [, docs] = await EnvModel.update(
+    await EnvModel.update(
       { status: EnvStatus.disabled },
       { where: { id: ids } },
     );
@@ -140,15 +134,12 @@ export default class EnvService {
   }
 
   public async enabled(ids: string[]) {
-    const [, docs] = await EnvModel.update(
-      { status: EnvStatus.normal },
-      { where: { id: ids } },
-    );
+    await EnvModel.update({ status: EnvStatus.normal }, { where: { id: ids } });
     await this.set_envs();
   }
 
   public async updateNames({ ids, name }: { ids: string[]; name: string }) {
-    const [, docs] = await EnvModel.update({ name }, { where: { id: ids } });
+    await EnvModel.update({ name }, { where: { id: ids } });
     await this.set_envs();
   }
 

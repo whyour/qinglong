@@ -139,7 +139,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
       return;
     }
 
-    const newMessage = `${value}\n${_message}`;
+    const newMessage = `${value}${_message}`;
     modalRef.current.update({
       content: (
         <div style={{ height: '60vh', overflowY: 'auto' }}>

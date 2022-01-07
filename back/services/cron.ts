@@ -31,25 +31,19 @@ export default class CronService {
   }
 
   public async insert(payload: Crontab): Promise<Crontab> {
-    return await CrontabModel.create(payload);
+    return await CrontabModel.create(payload, { returning: true });
   }
 
   public async update(payload: Crontab): Promise<Crontab> {
-    const { id, ...other } = payload;
-    const doc = await this.get(id as number);
-    const tab = new Crontab({ ...doc, ...other });
-    tab.saved = false;
-    const newDoc = await this.updateDb(tab);
+    payload.saved = false;
+    const newDoc = await this.updateDb(payload);
     await this.set_crontab(this.isSixCron(newDoc));
     return newDoc;
   }
 
   public async updateDb(payload: Crontab): Promise<Crontab> {
-    const result = await CrontabModel.update(
-      { ...payload },
-      { where: { id: payload.id } },
-    );
-    return result[1][0];
+    await CrontabModel.update(payload, { where: { id: payload.id } });
+    return await this.getDb({ id: payload.id });
   }
 
   public async status({
@@ -93,43 +87,56 @@ export default class CronService {
     await CrontabModel.update({ isPinned: 0 }, { where: { id: ids } });
   }
 
-  public async addLabels(ids: string[],labels: string[]){
-    const docs = await CrontabModel.findAll({ where: { id:ids }});
+  public async addLabels(ids: string[], labels: string[]) {
+    const docs = await CrontabModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
-      await CrontabModel.update({
-        labels: Array.from(new Set(doc.labels.concat(labels)))
-      },{ where: {id:doc.id}});
+      await CrontabModel.update(
+        {
+          labels: Array.from(new Set((doc.labels || []).concat(labels))),
+        },
+        { where: { id: doc.id } },
+      );
     }
   }
 
-  public async removeLabels(ids: string[],labels: string[]){
-    const docs = await CrontabModel.findAll({ where: { id:ids }});
+  public async removeLabels(ids: string[], labels: string[]) {
+    const docs = await CrontabModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
-      await CrontabModel.update({
-        labels: doc.labels.filter( label => !labels.includes(label) )
-      },{ where: {id:doc.id}});
+      await CrontabModel.update(
+        {
+          labels: (doc.labels || []).filter((label) => !labels.includes(label)),
+        },
+        { where: { id: doc.id } },
+      );
     }
   }
 
   public async crontabs(searchText?: string): Promise<Crontab[]> {
     let query = {};
     if (searchText) {
-      const textArray = searchText.split(":");
+      const textArray = searchText.split(':');
       switch (textArray[0]) {
-        case "name":
-          query = {name:{[Op.or]:createRegexp(textArray[1])}};
-          break;
-        case "command":
-          query = {command:{[Op.or]:createRegexp(textArray[1])}};
-          break;
-        case "schedule":
-          query = {schedule:{[Op.or]:createRegexp(textArray[1])}};
-          break;
-       case "label":
-          query = {labels:{[Op.or]:createRegexp(textArray[1])}};
+        case 'name':
+        case 'command':
+        case 'schedule':
+        case 'label':
+          const column = textArray[0] === 'label' ? 'labels' : textArray[0];
+          query = {
+            [column]: {
+              [Op.or]: [
+                { [Op.like]: `%${textArray[1]}%` },
+                { [Op.like]: `%${encodeURIComponent(textArray[1])}%` },
+              ],
+            },
+          };
           break;
         default:
-          const reg = createRegexp(searchText);
+          const reg = {
+            [Op.or]: [
+              { [Op.like]: `%${searchText}%` },
+              { [Op.like]: `%${encodeURIComponent(searchText)}%` },
+            ],
+          };
           query = {
             [Op.or]: [
               {
@@ -155,19 +162,11 @@ export default class CronService {
     } catch (error) {
       throw error;
     }
-      function createRegexp(text:string) {
-        return {
-          [Op.or]: [
-            { [Op.like]: `%${text}%` },
-            { [Op.like]: `%${encodeURIComponent(text)}%` },
-          ],
-        };
-    }
   }
 
-  public async get(id: number): Promise<Crontab> {
-    const result = await CrontabModel.findAll({ where: { id } });
-    return result[0] as any;
+  public async getDb(query: any): Promise<Crontab> {
+    const doc: any = await CrontabModel.findOne({ where: { ...query } });
+    return doc && (doc.get({ plain: true }) as Crontab);
   }
 
   public async run(ids: number[]) {
@@ -243,7 +242,7 @@ export default class CronService {
 
   private async runSingle(cronId: number): Promise<number> {
     return new Promise(async (resolve: any) => {
-      const cron = await this.get(cronId);
+      const cron = await this.getDb({ id: cronId });
       if (cron.status !== CrontabStatus.queued) {
         resolve();
         return;
@@ -312,7 +311,7 @@ export default class CronService {
   }
 
   public async log(id: number) {
-    const doc = await this.get(id);
+    const doc = await this.getDb({ id });
     if (!doc) {
       return '';
     }

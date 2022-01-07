@@ -49,7 +49,7 @@ export default (app: Router) => {
       body: Joi.object({
         name: Joi.string().optional().allow(''),
         scopes: Joi.array().items(Joi.string()),
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -87,7 +87,7 @@ export default (app: Router) => {
     '/apps/:id/reset-secret',
     celebrate({
       params: Joi.object({
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {

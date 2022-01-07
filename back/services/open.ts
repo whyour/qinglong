@@ -12,7 +12,7 @@ export default class OpenService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async findTokenByValue(token: string): Promise<App | null> {
-    const doc = await AppModel.findOne({
+    const doc = await this.getDb({
       where: sequelize.fn(
         'JSON_CONTAINS',
         sequelize.col('tokens'),
@@ -23,32 +23,35 @@ export default class OpenService {
   }
 
   public async create(payload: App): Promise<App> {
-    const tab = new App({ ...payload });
+    const tab = { ...payload };
     tab.client_id = createRandomString(12, 12);
     tab.client_secret = createRandomString(24, 24);
-    const docs = await this.insert([tab]);
-    return { ...docs[0], tokens: [] };
+    const doc = await this.insert(tab);
+    return { ...doc, tokens: [] };
   }
 
-  public async insert(payloads: App[]): Promise<App[]> {
-    const docs = await AppModel.bulkCreate(payloads);
-    return docs;
+  public async insert(payloads: App): Promise<App> {
+    const doc = await AppModel.create(payloads, { returning: true });
+    return doc.get({ plain: true }) as App;
   }
 
   public async update(payload: App): Promise<App> {
-    const { id, client_id, client_secret, tokens, ...other } = payload;
-    const doc = await this.get(id);
-    const tab = new App({ ...doc, ...other });
-    const newDoc = await this.updateDb(tab);
+    const newDoc = await this.updateDb({
+      name: payload.name,
+      scopes: payload.scopes,
+      id: payload.id,
+    } as any);
     return { ...newDoc, tokens: [] };
   }
 
   private async updateDb(payload: App): Promise<App> {
-    const [, docs] = await AppModel.update(
-      { ...payload },
-      { where: { id: payload.id } },
-    );
-    return docs[0];
+    await AppModel.update(payload, { where: { id: payload.id } });
+    return await this.getDb({ id: payload.id });
+  }
+
+  public async getDb(query: any): Promise<App> {
+    const doc: any = await AppModel.findOne({ where: { ...query } });
+    return doc && (doc.get({ plain: true }) as App);
   }
 
   public async remove(ids: number[]) {
@@ -56,10 +59,7 @@ export default class OpenService {
   }
 
   public async resetSecret(id: number): Promise<App> {
-    const doc = await this.get(id);
-    const tab = new App({ ...doc });
-    tab.client_secret = createRandomString(24, 24);
-    tab.tokens = [];
+    const tab: any = { client_secret: createRandomString(24, 24), tokens: [] };
     const newDoc = await this.updateDb(tab);
     return newDoc;
   }
@@ -104,12 +104,7 @@ export default class OpenService {
 
   private async find(query: any, sort?: any): Promise<App[]> {
     const docs = await AppModel.findAll({ where: { ...query } });
-    return docs;
-  }
-
-  public async get(id: number): Promise<App> {
-    const docs = await AppModel.findAll({ where: { id } });
-    return docs[0];
+    return docs.map((x) => x.get({ plain: true }));
   }
 
   public async authToken({
@@ -123,7 +118,7 @@ export default class OpenService {
     const expiration = Math.round(Date.now() / 1000) + 2592000; // 2592000 30天
     const doc = await AppModel.findOne({ where: { client_id, client_secret } });
     if (doc) {
-      const [, docs] = await AppModel.update(
+      await AppModel.update(
         { tokens: [...(doc.tokens || []), { value: token, expiration }] },
         { where: { client_id, client_secret } },
       );

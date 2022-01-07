@@ -41,7 +41,7 @@ export default class DependenceService {
     payload: Dependence & { id: string },
   ): Promise<Dependence> {
     const { id, ...other } = payload;
-    const doc = await this.get(id);
+    const doc = await this.getDb({ id });
     const tab = new Dependence({
       ...doc,
       ...other,
@@ -53,18 +53,16 @@ export default class DependenceService {
   }
 
   private async updateDb(payload: Dependence): Promise<Dependence> {
-    const [, docs] = await DependenceModel.update(
-      { ...payload },
-      { where: { id: payload.id } },
-    );
-    return docs[0];
+    await DependenceModel.update(payload, { where: { id: payload.id } });
+    return await this.getDb({ id: payload.id });
   }
 
   public async remove(ids: number[]) {
-    const [, docs] = await DependenceModel.update(
+    await DependenceModel.update(
       { status: DependenceStatus.removing, log: [] },
       { where: { id: ids } },
     );
+    const docs = await DependenceModel.findAll({ where: { id: ids } });
     this.installOrUninstallDependencies(docs, false);
   }
 
@@ -82,7 +80,7 @@ export default class DependenceService {
       const encodeText = encodeURIComponent(searchValue);
       const reg = {
         [Op.or]: [
-          { [Op.like]: `%${encodeText}&` },
+          { [Op.like]: `%${searchValue}&` },
           { [Op.like]: `%${encodeText}%` },
         ],
       };
@@ -101,10 +99,12 @@ export default class DependenceService {
   }
 
   public async reInstall(ids: number[]): Promise<Dependence[]> {
-    const [, docs] = await DependenceModel.update(
+    await DependenceModel.update(
       { status: DependenceStatus.installing, log: [] },
       { where: { id: ids } },
     );
+
+    const docs = await DependenceModel.findAll({ where: { id: ids } });
     await this.installOrUninstallDependencies(docs);
     return docs;
   }
@@ -114,25 +114,22 @@ export default class DependenceService {
     return docs;
   }
 
-  public async get(id: number): Promise<Dependence> {
-    const docs = await DependenceModel.findAll({ where: { id } });
-    return docs[0];
+  public async getDb(query: any): Promise<Dependence> {
+    const doc: any = await DependenceModel.findOne({ where: { ...query } });
+    return doc && (doc.get({ plain: true }) as Dependence);
   }
 
   private async updateLog(ids: number[], log: string): Promise<void> {
     const doc = await DependenceModel.findOne({ where: { id: ids } });
     const newLog = doc?.log ? [...doc.log, log] : [log];
-    const [, docs] = await DependenceModel.update(
-      { status: DependenceStatus.installing, log: newLog },
-      { where: { id: ids } },
-    );
+    await DependenceModel.update({ log: newLog }, { where: { id: ids } });
   }
 
   public installOrUninstallDependencies(
     dependencies: Dependence[],
     isInstall: boolean = true,
   ) {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       if (dependencies.length === 0) {
         resolve(null);
         return;
@@ -154,41 +151,41 @@ export default class DependenceService {
         ).toLocaleString()}`,
         references: depIds,
       });
-      this.updateLog(
+      await this.updateLog(
         depIds,
         `开始${actionText}依赖 ${depNames}，开始时间 ${new Date(
           startTime,
         ).toLocaleString()}\n`,
       );
-      cp.stdout.on('data', (data) => {
+      cp.stdout.on('data', async (data) => {
         this.sockService.sendMessage({
           type: 'installDependence',
           message: data.toString(),
           references: depIds,
         });
-        this.updateLog(depIds, data.toString());
+        await this.updateLog(depIds, data.toString());
       });
 
-      cp.stderr.on('data', (data) => {
+      cp.stderr.on('data', async (data) => {
         this.sockService.sendMessage({
           type: 'installDependence',
           message: data.toString(),
           references: depIds,
         });
-        this.updateLog(depIds, data.toString());
+        await this.updateLog(depIds, data.toString());
       });
 
-      cp.on('error', (err) => {
+      cp.on('error', async (err) => {
         this.sockService.sendMessage({
           type: 'installDependence',
           message: JSON.stringify(err),
           references: depIds,
         });
-        this.updateLog(depIds, JSON.stringify(err));
+        await this.updateLog(depIds, JSON.stringify(err));
         resolve(null);
       });
 
-      cp.on('close', (code) => {
+      cp.on('close', async (code) => {
         const endTime = Date.now();
         const isSucceed = code === 0;
         const resultText = isSucceed ? '成功' : '失败';
@@ -200,7 +197,7 @@ export default class DependenceService {
           ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
           references: depIds,
         });
-        this.updateLog(
+        await this.updateLog(
           depIds,
           `依赖${actionText}${resultText}，结束时间 ${new Date(
             endTime,
@@ -217,8 +214,7 @@ export default class DependenceService {
             ? DependenceStatus.installFailed
             : DependenceStatus.removeFailed;
         }
-
-        DependenceModel.update({ status }, { where: { id: depIds } });
+        await DependenceModel.update({ status }, { where: { id: depIds } });
 
         // 如果删除依赖成功，3秒后删除数据库记录
         if (isSucceed && !isInstall) {

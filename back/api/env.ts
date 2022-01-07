@@ -51,7 +51,7 @@ export default (app: Router) => {
         value: Joi.string().required(),
         name: Joi.string().required(),
         remarks: Joi.string().optional().allow(''),
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -89,7 +89,7 @@ export default (app: Router) => {
     '/:id/move',
     celebrate({
       params: Joi.object({
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
       body: Joi.object({
         fromIndex: Joi.number().required(),
@@ -170,7 +170,7 @@ export default (app: Router) => {
     '/:id',
     celebrate({
       params: Joi.object({
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {

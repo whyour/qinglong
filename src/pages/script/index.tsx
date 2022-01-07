@@ -125,7 +125,6 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
       setExpandedKeys([p]);
       onTreeSelect([vkey], obj);
     }
-    history.push('/script');
   };
 
   const onSelect = (value: any, node: any) => {
