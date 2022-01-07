@@ -158,7 +158,7 @@ export default class CronService {
       function createRegexp(text:string) {
         return {
           [Op.or]: [
-            { [Op.like]: `%${searchText}&` },
+            { [Op.like]: `%${text}%` },
             { [Op.like]: `%${encodeURIComponent(text)}%` },
           ],
         };
