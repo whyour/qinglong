@@ -94,29 +94,21 @@ export default class CronService {
   }
 
   public async addLabels(ids: string[],labels: string[]){
-    return new Promise((resolve: any) => {
-      this.cronDb.update(
-        { _id: { $in: ids } },
-        { $addToSet: { labels: { $each: labels} } },
-        { multi: true },
-        async (err) => {
-          resolve();
-        },
-      );
-    });
+    const docs = await CrontabModel.findAll({ where: { id:ids }});
+    for (const doc of docs) {
+      await CrontabModel.update({
+        labels: Array.from(new Set(doc.labels.concat(labels)))
+      },{ where: {id:doc.id}});
+    }
   }
 
   public async removeLabels(ids: string[],labels: string[]){
-    return new Promise((resolve: any) => {
-      this.cronDb.update(
-        { _id: { $in: ids } },
-        { $pull: { labels: { $in: labels} } },
-        { multi: true },
-        async (err) => {
-          resolve();
-        },
-      );
-    });
+    const docs = await CrontabModel.findAll({ where: { id:ids }});
+    for (const doc of docs) {
+      await CrontabModel.update({
+        labels: doc.labels.filter( label => !labels.includes(label) )
+      },{ where: {id:doc.id}});
+    }
   }
 
   public async crontabs(searchText?: string): Promise<Crontab[]> {

@@ -88,7 +88,7 @@ export default (app: Router) => {
     '/removelabels',
     celebrate({
       body: Joi.object({
-        ids:Joi.array().items(Joi.string().required()),
+        ids:Joi.array().items(Joi.number().required()),
         labels:Joi.array().items(Joi.string().required()),
       })
     }),
@@ -109,7 +109,7 @@ export default (app: Router) => {
     '/addlabels',
     celebrate({
       body: Joi.object({
-        ids:Joi.array().items(Joi.string().required()),
+        ids:Joi.array().items(Joi.number().required()),
         labels:Joi.array().items(Joi.string().required()),
       })
     }),
@@ -190,7 +190,7 @@ export default (app: Router) => {
         command: Joi.string().optional(),
         schedule: Joi.string().optional(),
         name: Joi.string().optional(),
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {

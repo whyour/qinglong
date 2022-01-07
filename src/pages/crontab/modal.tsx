@@ -151,10 +151,10 @@ const CronLabelModal = ({
     <Button onClick={() => handleCancel(false)} key="test">
       取消
     </Button>,
-    <Button type="primary" danger onClick={() => update('removelabels')}>
+    <Button type="primary" danger onClick={() => update('removeLabels')}>
       删除
     </Button>,
-    <Button type="primary" onClick={() => update('addlabels')}>
+    <Button type="primary" onClick={() => update('addLabels')}>
       添加
     </Button>
   ];
