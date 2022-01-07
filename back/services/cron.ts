@@ -93,36 +93,75 @@ export default class CronService {
     await CrontabModel.update({ isPinned: 0 }, { where: { id: ids } });
   }
 
+  public async addLabels(ids: string[],labels: string[]){
+    const docs = await CrontabModel.findAll({ where: { id:ids }});
+    for (const doc of docs) {
+      await CrontabModel.update({
+        labels: Array.from(new Set(doc.labels.concat(labels)))
+      },{ where: {id:doc.id}});
+    }
+  }
+
+  public async removeLabels(ids: string[],labels: string[]){
+    const docs = await CrontabModel.findAll({ where: { id:ids }});
+    for (const doc of docs) {
+      await CrontabModel.update({
+        labels: doc.labels.filter( label => !labels.includes(label) )
+      },{ where: {id:doc.id}});
+    }
+  }
+
   public async crontabs(searchText?: string): Promise<Crontab[]> {
     let query = {};
     if (searchText) {
-      const encodeText = encodeURIComponent(searchText);
-      const reg = {
-        [Op.or]: [
-          { [Op.like]: `%${searchText}&` },
-          { [Op.like]: `%${encodeText}%` },
-        ],
-      };
-
-      query = {
-        [Op.or]: [
-          {
-            name: reg,
-          },
-          {
-            command: reg,
-          },
-          {
-            schedule: reg,
-          },
-        ],
-      };
+      const textArray = searchText.split(":");
+      switch (textArray[0]) {
+        case "name":
+          query = {name:{[Op.or]:createRegexp(textArray[1])}};
+          break;
+        case "command":
+          query = {command:{[Op.or]:createRegexp(textArray[1])}};
+          break;
+        case "schedule":
+          query = {schedule:{[Op.or]:createRegexp(textArray[1])}};
+          break;
+       case "label":
+          query = {labels:{[Op.or]:createRegexp(textArray[1])}};
+          break;
+        default:
+          const reg = createRegexp(searchText);
+          query = {
+            [Op.or]: [
+              {
+                name: reg,
+              },
+              {
+                command: reg,
+              },
+              {
+                schedule: reg,
+              },
+              {
+                labels: reg,
+              },
+            ],
+          };
+          break;
+      }
     }
     try {
       const result = await CrontabModel.findAll({ where: query });
       return result as any;
     } catch (error) {
       throw error;
+    }
+      function createRegexp(text:string) {
+        return {
+          [Op.or]: [
+            { [Op.like]: `%${text}%` },
+            { [Op.like]: `%${encodeURIComponent(text)}%` },
+          ],
+        };
     }
   }
 

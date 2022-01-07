@@ -28,6 +28,7 @@ export default (app: Router) => {
         command: Joi.string().required(),
         schedule: Joi.string().required(),
         name: Joi.string().optional(),
+        labels: Joi.array().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -75,6 +76,48 @@ export default (app: Router) => {
       try {
         const cronService = Container.get(CronService);
         const data = await cronService.stop(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/removelabels',
+    celebrate({
+      body: Joi.object({
+        ids:Joi.array().items(Joi.number().required()),
+        labels:Joi.array().items(Joi.string().required()),
+      })
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.removeLabels(req.body.ids,req.body.labels);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/addlabels',
+    celebrate({
+      body: Joi.object({
+        ids:Joi.array().items(Joi.number().required()),
+        labels:Joi.array().items(Joi.string().required()),
+      })
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.addLabels(req.body.ids,req.body.labels);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -143,10 +186,11 @@ export default (app: Router) => {
     '/',
     celebrate({
       body: Joi.object({
+        labels: Joi.array().optional(),
         command: Joi.string().optional(),
         schedule: Joi.string().optional(),
         name: Joi.string().optional(),
-        id: Joi.string().required(),
+        id: Joi.number().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
