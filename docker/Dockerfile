@@ -28,6 +28,7 @@ RUN set -x \
                              jq \
                              openssh \
                              py3-pip \
+                             sqlite \
     && rm -rf /var/cache/apk/* \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
@@ -40,8 +41,6 @@ RUN set -x \
     && chmod 777 ${QL_DIR}/shell/*.sh \
     && chmod 777 ${QL_DIR}/docker/*.sh \
     && npm install -g pnpm \
-    && npm install -g node-gyp \
-    && npm install -g @mapbox/node-pre-gyp \
     && pnpm install -g pm2 \
     && pnpm install -g ts-node typescript tslib \
     && rm -rf /root/.npm \
