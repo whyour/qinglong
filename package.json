@@ -86,6 +86,7 @@
     "compression-webpack-plugin": "6.1.1",
     "darkreader": "^4.9.27",
     "lint-staged": "^10.0.7",
+    "node-pre-gyp": "^0.17.0",
     "nodemon": "^2.0.4",
     "prettier": "^2.2.0",
     "qrcode.react": "^1.0.1",
