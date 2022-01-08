@@ -108,7 +108,7 @@ jobs:
           build-args: |
             MAINTAINER=${{ github.repository_owner }}
             QL_BRANCH=${{ github.ref_name }}
-          platforms: linux/amd64,linux/arm/v6,linux/arm64,linux/s390x
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/s390x
           context: docker/
           push: true
           tags: ${{ steps.meta.outputs.tags }}
