@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '16'
+          node-version: '14'
 
       - name: build front and back
         run: |
@@ -56,6 +56,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '14'
 
       - name: Set time zone
         uses: szenius/set-timezone@v1.0

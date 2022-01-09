@@ -31,7 +31,6 @@ RUN set -x \
                              python2 \
                              g++ \
                              make \
-                             sqlite \
     && rm -rf /var/cache/apk/* \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
