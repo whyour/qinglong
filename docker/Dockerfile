@@ -33,6 +33,9 @@ RUN set -x \
                              make \
                              sqlite \
                              sqlite-dev \
+    && git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
+    && git config --global user.email "qinglong@@users.noreply.github.com" \
+    && git config --global user.name "qinglong" \
     && wget https://github.com/mapbox/node-sqlite3/archive/v5.0.2.zip -O /ql/sqlite3.zip \
     && mkdir -p /ql/sqlite3 \
     && mkdir -p /ql/node_modules/sqlite3 \
@@ -47,9 +50,6 @@ RUN set -x \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && touch ~/.bashrc \
-    && git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
-    && git config --global user.email "qinglong@@users.noreply.github.com" \
-    && git config --global user.name "qinglong" \
     && cd ${QL_DIR} \
     && cp -f .env.example .env \
     && chmod 777 ${QL_DIR}/shell/*.sh \
