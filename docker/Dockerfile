@@ -41,7 +41,7 @@ RUN set -x \
     && npm install \
     && ./node_modules/.bin/node-pre-gyp install --fallback-to-build --build-from-source --sqlite=/usr/bin --python=$(which python) \
     && mv /ql/sqlite3/node-sqlite3-5.0.2 /ql/node_modules/sqlite3 \
-    && apk del g++ make python \
+    && apk del g++ make python2 \
     && rm -Rf /ql/sqlite3 /ql/sqlite3.zip \
     && rm -rf /var/cache/apk/* \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
