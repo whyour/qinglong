@@ -87,6 +87,9 @@ const EditModal = ({
   };
 
   const stop = () => {
+    if (!cNode || !cNode.value) {
+      return;
+    }
     request
       .put(`${config.apiPrefix}scripts/stop`, {
         data: {
