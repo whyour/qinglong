@@ -96,7 +96,7 @@ run_normal() {
     make_dir "$log_dir"
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local begin_timestamp=$(date "+%s" -d "$begin_time")
+    local begin_timestamp=$(date "+%s")
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
@@ -114,7 +114,7 @@ run_normal() {
 
     eval . $file_task_after "$@" $cmd
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local end_timestamp=$(date "+%s" -d "$end_time")
+    local end_timestamp=$(date "+%s")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
@@ -157,7 +157,7 @@ run_concurrent() {
     make_dir $log_dir
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local begin_timestamp=$(date "+%s" -d "$begin_time")
+    local begin_timestamp=$(date "+%s")
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
@@ -193,7 +193,7 @@ run_concurrent() {
 
     eval . $file_task_after "$@" $cmd
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local end_timestamp=$(date "+%s" -d "$end_time")
+    local end_timestamp=$(date "+%s")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
@@ -221,7 +221,7 @@ run_designated() {
     make_dir $log_dir
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local begin_timestamp=$(date "+%s" -d "$begin_time")
+    local begin_timestamp=$(date "+%s")
 
     local envs=$(eval echo "\$${env_param}")
     local array=($(echo $envs | sed 's/&/ /g'))
@@ -256,7 +256,7 @@ run_designated() {
 
     eval . $file_task_after "$@" $cmd
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local end_timestamp=$(date "+%s" -d "$end_time")
+    local end_timestamp=$(date "+%s")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
@@ -278,7 +278,7 @@ run_else() {
     make_dir $log_dir
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local begin_timestamp=$(date "+%s" -d "$begin_time")
+    local begin_timestamp=$(date "+%s")
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
@@ -299,7 +299,7 @@ run_else() {
 
     eval . $file_task_after "$file_param" "$@" $cmd
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local end_timestamp=$(date "+%s" -d "$end_time")
+    local end_timestamp=$(date "+%s")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))
     [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
