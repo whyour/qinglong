@@ -1,9 +1,8 @@
-export const version = '2.10.13';
-export const changeLogLink = 'https://t.me/jiao_long/233';
-export const changeLog = `2.10.13 版本说明
-1. task 命令执行脚本支持任意参数，比如 task xxx.js a b c d
-2. 应用权限增加依赖管理、系统信息
-3. 调试脚本增加停止操作，优化交互
-4. 定时任务任务名修改展示效果，感谢https://github.com/tinet-jutt
+export const version = '2.11.0';
+export const changeLogLink = 'https://t.me/jiao_long/254';
+export const changeLog = `2.11.0 版本说明
+1. 使用sqlite替换nedb，增加数据库稳定性
+2. 任务添加标签功能，感谢https://github.com/kilo5hz
+3. 支持自定义bot仓库，感谢https://github.com/chiupam
 5. 其他bug修复
 `;
