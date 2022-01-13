@@ -87,7 +87,7 @@ export default class EnvService {
       const encodeText = encodeURIComponent(searchText);
       const reg = {
         [Op.or]: [
-          { [Op.like]: `%${searchText}&` },
+          { [Op.like]: `%${searchText}%` },
           { [Op.like]: `%${encodeText}%` },
         ],
       };

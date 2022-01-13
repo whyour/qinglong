@@ -69,7 +69,7 @@ export default class OpenService {
       const encodeText = encodeURIComponent(searchText);
       const reg = {
         [Op.or]: [
-          { [Op.like]: `%${searchText}&` },
+          { [Op.like]: `%${searchText}%` },
           { [Op.like]: `%${encodeText}%` },
         ],
       };

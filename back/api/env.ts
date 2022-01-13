@@ -50,7 +50,7 @@ export default (app: Router) => {
       body: Joi.object({
         value: Joi.string().required(),
         name: Joi.string().required(),
-        remarks: Joi.string().optional().allow(''),
+        remarks: Joi.string().optional().allow('').allow(null),
         id: Joi.number().required(),
       }),
     }),

@@ -189,7 +189,7 @@ export default (app: Router) => {
     '/',
     celebrate({
       body: Joi.object({
-        labels: Joi.array().optional(),
+        labels: Joi.array().optional().allow(null),
         command: Joi.string().optional(),
         schedule: Joi.string().optional(),
         name: Joi.string().optional(),
