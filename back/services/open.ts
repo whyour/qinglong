@@ -76,17 +76,7 @@ export default class OpenService {
 
       condition = {
         ...condition,
-        [Op.or]: [
-          {
-            name: reg,
-          },
-          {
-            command: reg,
-          },
-          {
-            schedule: reg,
-          },
-        ],
+        name: reg,
       };
     }
     try {
