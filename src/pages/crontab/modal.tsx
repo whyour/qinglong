@@ -22,6 +22,8 @@ const CronModal = ({
     const payload = { ...values };
     if (typeof payload.labels === 'string') {
       payload.labels = values.labels.split(/,|，/);
+    } else if (!payload.labels) {
+      payload.labels = [];
     }
     if (cron) {
       payload.id = cron.id;
