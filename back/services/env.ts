@@ -99,10 +99,10 @@ export default class EnvService {
             name: reg,
           },
           {
-            command: reg,
+            value: reg,
           },
           {
-            schedule: reg,
+            remarks: reg,
           },
         ],
       };
