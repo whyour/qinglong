@@ -31,6 +31,12 @@ export default class CronService {
   }
 
   public async insert(payload: Crontab): Promise<Crontab> {
+    const cron = await CrontabModel.findOne({
+      where: { command: payload.command },
+    });
+    if (cron) {
+      return cron;
+    }
     return await CrontabModel.create(payload, { returning: true });
   }
 

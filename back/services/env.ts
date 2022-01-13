@@ -108,15 +108,18 @@ export default class EnvService {
       };
     }
     try {
-      const result = await this.find(condition);
+      const result = await this.find(condition, [['position', 'DESC']]);
       return result as any;
     } catch (error) {
       throw error;
     }
   }
 
-  private async find(query: any, sort?: any): Promise<Env[]> {
-    const docs = await EnvModel.findAll({ where: { ...query } });
+  private async find(query: any, sort: any = []): Promise<Env[]> {
+    const docs = await EnvModel.findAll({
+      where: { ...query },
+      order: [...sort],
+    });
     return docs;
   }
 

@@ -12,14 +12,15 @@ export default class OpenService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async findTokenByValue(token: string): Promise<App | null> {
-    const doc = await this.getDb({
-      where: sequelize.fn(
+    const doc = await this.getDb(
+      sequelize.fn(
         'JSON_CONTAINS',
         sequelize.col('tokens'),
         JSON.stringify({ value: token }),
       ),
-    });
+    );
     return doc;
+    AppModel.upsert;
   }
 
   public async create(payload: App): Promise<App> {
@@ -50,7 +51,7 @@ export default class OpenService {
   }
 
   public async getDb(query: any): Promise<App> {
-    const doc: any = await AppModel.findOne({ where: { ...query } });
+    const doc: any = await AppModel.findOne({ where: query });
     return doc && (doc.get({ plain: true }) as App);
   }
 
