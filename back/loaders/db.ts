@@ -66,35 +66,33 @@ export default async () => {
     }
 
     // migrate db to sqlite
-    setTimeout(async () => {
-      try {
-        const count = await CrontabModel.count();
-        if (count !== 0) {
-          return;
-        }
-        db.cronDb.find({}).exec(async (err, docs) => {
-          await CrontabModel.bulkCreate(docs);
-        });
-
-        db.dependenceDb.find({}).exec(async (err, docs) => {
-          await DependenceModel.bulkCreate(docs);
-        });
-
-        db.envDb.find({}).exec(async (err, docs) => {
-          await EnvModel.bulkCreate(docs);
-        });
-
-        db.appDb.find({}).exec(async (err, docs) => {
-          await AppModel.bulkCreate(docs);
-        });
-
-        db.authDb.find({}).exec(async (err, docs) => {
-          await AuthModel.bulkCreate(docs);
-        });
-      } catch (error) {
-        console.log(error);
+    try {
+      const count = await CrontabModel.count();
+      if (count !== 0) {
+        return;
       }
-    }, 5000);
+      db.cronDb.find({}).exec(async (err, docs) => {
+        await CrontabModel.bulkCreate(docs, { ignoreDuplicates: true });
+      });
+
+      db.dependenceDb.find({}).exec(async (err, docs) => {
+        await DependenceModel.bulkCreate(docs, { ignoreDuplicates: true });
+      });
+
+      db.envDb.find({}).exec(async (err, docs) => {
+        await EnvModel.bulkCreate(docs, { ignoreDuplicates: true });
+      });
+
+      db.appDb.find({}).exec(async (err, docs) => {
+        await AppModel.bulkCreate(docs, { ignoreDuplicates: true });
+      });
+
+      db.authDb.find({}).exec(async (err, docs) => {
+        await AuthModel.bulkCreate(docs, { ignoreDuplicates: true });
+      });
+    } catch (error) {
+      console.log(error);
+    }
 
     Logger.info('✌️ DB loaded');
   } catch (error) {
