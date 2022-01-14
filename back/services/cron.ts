@@ -209,7 +209,7 @@ export default class CronService {
     }
 
     await CrontabModel.update(
-      { status: CrontabStatus.queued, pid: undefined },
+      { status: CrontabStatus.idle, pid: undefined },
       { where: { id: ids } },
     );
   }
