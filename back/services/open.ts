@@ -54,7 +54,17 @@ export default class OpenService {
   }
 
   public async resetSecret(id: number): Promise<App> {
-    const tab: any = { client_secret: createRandomString(24, 24), tokens: [] };
+    const tab: any = {
+      client_secret: createRandomString(24, 24),
+      tokens: [],
+      id,
+    };
+    // const doc = await this.get(id);
+    // const tab = new App({ ...doc });
+    // tab.client_secret = createRandomString(24, 24);
+    // tab.tokens = [];
+    // const newDoc = await this.updateDb(tab);
+    // return newDoc;
     const newDoc = await this.updateDb(tab);
     return newDoc;
   }
