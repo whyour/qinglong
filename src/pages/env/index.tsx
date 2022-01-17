@@ -151,7 +151,8 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
       },
       render: (text: string, record: any) => {
         const language = navigator.language || navigator.languages[0];
-        const date = new Date(text)
+        const time = record.updatedAt || record.timestamp;
+        const date = new Date(time)
           .toLocaleString(language, {
             hour12: false,
           })
