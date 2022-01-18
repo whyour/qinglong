@@ -1,7 +1,6 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
-import DataStore from 'nedb';
 import {
   Dependence,
   InstallDependenceCommandTypes,
