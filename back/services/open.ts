@@ -2,7 +2,6 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { createRandomString } from '../config/util';
 import config from '../config';
-import DataStore from 'nedb';
 import { App, AppModel } from '../data/open';
 import { v4 as uuidV4 } from 'uuid';
 import sequelize, { Op } from 'sequelize';

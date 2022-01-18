@@ -10,7 +10,6 @@ import ScheduleService from './schedule';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import got from 'got';
-import { dbs } from '../loaders/db';
 
 @Service()
 export default class SystemService {
