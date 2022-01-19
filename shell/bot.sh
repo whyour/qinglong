@@ -5,7 +5,7 @@ dir_shell=/ql/shell
 . $dir_shell/share.sh
 
 if [[ -z ${BotRepoUrl} ]]; then
-  url="${github_proxy_url}https://github.com/SuMaiKaDe/bot.git"
+  url="https://github.com/SuMaiKaDe/bot.git"
   repo_path="${dir_repo}/dockerbot"
 else
   url=${BotRepoUrl}
