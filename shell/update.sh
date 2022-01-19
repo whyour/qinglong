@@ -151,11 +151,6 @@ update_repo() {
     make_dir "${dir_scripts}/${uniq_path}"
 
     local formatUrl="$url"
-    if [[ $github_proxy_url ]]; then
-        if [[ $url =~ "github.com" ]] || [[ $url =~ "githubusercontent.com" ]]; then
-            [[ ! $url =~ "https://ghproxy.com" ]] && formatUrl="${github_proxy_url}${url}"
-        fi
-    fi
     if [[ -d ${repo_path}/.git ]]; then
         reset_romote_url ${repo_path} "${formatUrl}" "${branch}"
         git_pull_scripts ${repo_path} "${branch}"
@@ -183,15 +178,14 @@ update_raw() {
     echo -e "--------------------------------------------------------------\n"
     local url="$1"
     local raw_url="$url"
-    if [[ $github_proxy_url ]]; then
-        if [[ $url =~ "github.com" ]] || [[ $url =~ "githubusercontent.com" ]]; then
-            [[ ! $url =~ "https://ghproxy.com" ]] && raw_url="${github_proxy_url}${url}"
-        fi
-    fi
     local suffix="${raw_url##*.}"
     local raw_file_name="${uniq_path}.${suffix}"
     echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
+
+    set_proxy
     wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
+    unset_proxy
+
     if [[ $? -eq 0 ]]; then
         mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
         echo -e "下载 ${raw_file_name} 成功...\n"
@@ -259,7 +253,7 @@ update_qinglong() {
 
     local no_restart="$1"
     [[ -f $dir_root/package.json ]] && ql_depend_old=$(cat $dir_root/package.json)
-    reset_romote_url ${dir_root} "${github_proxy_url}https://github.com/whyour/qinglong.git" "master"
+    reset_romote_url ${dir_root} "https://github.com/whyour/qinglong.git" "master"
     git_pull_scripts $dir_root "master"
 
     if [[ $exit_status -eq 0 ]]; then
@@ -274,7 +268,7 @@ update_qinglong() {
         echo -e "\n更新$dir_root失败，请检查原因...\n"
     fi
 
-    local url="${github_proxy_url}https://github.com/whyour/qinglong-static.git"
+    local url="https://github.com/whyour/qinglong-static.git"
     if [[ -d ${ql_static_repo}/.git ]]; then
         reset_romote_url ${ql_static_repo} ${url} "master"
         git_pull_scripts ${ql_static_repo} "master"

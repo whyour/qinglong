@@ -16,8 +16,8 @@ DefaultCronRule=""
 ## ql repo命令拉取脚本时需要拉取的文件后缀，直接写文件后缀名即可
 RepoFileExtensions="js py"
 
-## 由于github仓库拉取较慢，所以会默认添加代理前缀，如不需要请移除
-GithubProxyUrl="https://ghproxy.com/"
+## 代理地址，支持http/https/socks，例如 http://127.0.0.1:7890
+ProxyUrl=""
 
 ## 设置定时任务执行的超时时间，默认1h，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
 CommandTimeoutTime="1h"
