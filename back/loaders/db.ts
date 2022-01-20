@@ -11,6 +11,8 @@ import { sequelize } from '../data';
 
 export default async () => {
   try {
+    await sequelize.sync({ alter: true });
+
     const crondbExist = await fileExist(config.cronDbFile);
     const dependenceDbExist = await fileExist(config.dependenceDbFile);
     const envDbExist = await fileExist(config.envDbFile);
@@ -75,12 +77,6 @@ export default async () => {
       authDb.find({}).exec(async (err, docs) => {
         await AuthModel.bulkCreate(docs, { ignoreDuplicates: true });
       });
-    }
-
-    try {
-      await sequelize.sync({ alter: true });
-    } catch (error) {
-      console.log(error);
     }
 
     Logger.info('✌️ DB loaded');
