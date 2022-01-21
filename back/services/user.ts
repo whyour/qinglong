@@ -313,8 +313,16 @@ export default class UserService {
   }
 
   private async updateAuthDb(payload: AuthInfo): Promise<any> {
-    await AuthModel.upsert({ ...payload });
-    const doc = await this.getDb({ type: payload.type });
+    let doc = await AuthModel.findOne({ type: payload.type });
+    if (doc) {
+      const updateResult = await AuthModel.update(payload, {
+        where: { id: doc.id },
+        returning: true,
+      });
+      doc = updateResult[1][0];
+    } else {
+      doc = await AuthModel.create(payload, { returning: true });
+    }
     return doc;
   }
 
