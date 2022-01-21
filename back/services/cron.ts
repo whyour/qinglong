@@ -165,7 +165,7 @@ export default class CronService {
     try {
       const result = await CrontabModel.findAll({
         where: query,
-        order: [['updatedAt', 'DESC']],
+        order: [['createdAt', 'DESC']],
       });
       return result as any;
     } catch (error) {
