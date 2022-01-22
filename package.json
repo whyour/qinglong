@@ -84,7 +84,7 @@
     "antd": "^4.17.0-alpha.6",
     "codemirror": "^5.62.2",
     "compression-webpack-plugin": "6.1.1",
-    "darkreader": "^4.9.43",
+    "darkreader": "4.9.40",
     "lint-staged": "^10.0.7",
     "@mapbox/node-pre-gyp": "1.0.8",
     "nodemon": "^2.0.4",

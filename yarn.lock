@@ -3559,10 +3559,10 @@ csstype@^3.0.2:
   resolved "https://registry.npmjs.org/csstype/-/csstype-3.0.8.tgz"
   integrity sha512-jXKhWqXPmlUeoQnF/EhTtTl4C9SnrxSH/jZUih3jmO6lBKr99rP3/+FmrMj4EFpOXzMtXHAZkd3x0E6h6Fgflw==
 
-darkreader@^4.9.43:
-  version "4.9.43"
-  resolved "https://registry.yarnpkg.com/darkreader/-/darkreader-4.9.43.tgz#c88da02b4e533d18700b36281c053b19e23e1fb4"
-  integrity sha512-L6TryKvQiwLcR6YDggkITcPRh9OZeobYkUXHowJOzrV17gT6e0weldbaIJTwdPCoI9tdehTuyyXC8b76/wXhPQ==
+darkreader@4.9.40:
+  version "4.9.40"
+  resolved "https://registry.yarnpkg.com/darkreader/-/darkreader-4.9.40.tgz#9217a2ae83d8aca0b4dc129bba78a0617aca5bce"
+  integrity sha512-Dm8S5jkXSIxvq9WitcvuH4KexV9ZuzGqDMsFOm2VwXzRkMo9VIg8udjq2Mm7cM6SaQSp/zzH4VIWioX93iWayQ==
 
 dashdash@^1.12.0:
   version "1.14.1"
