@@ -69,6 +69,7 @@ import_config() {
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     proxy_url=${ProxyUrl:-""}
     file_extensions=${RepoFileExtensions:-"js py"}
+    current_branch=${QL_BRANCH}
 
     if [[ -n "${DefaultCronRule}" ]]; then
         default_cron="${DefaultCronRule}"
