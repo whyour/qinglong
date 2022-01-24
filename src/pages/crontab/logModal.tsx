@@ -90,7 +90,7 @@ const CronLogModal = ({
     return (
       <>
         {(executing || loading) && <Loading3QuartersOutlined spin />}
-        {!executing && <CheckCircleOutlined />}
+        {!executing && !loading && <CheckCircleOutlined />}
         <span style={{ marginLeft: 5 }}>日志-{cron && cron.name}</span>{' '}
       </>
     );
