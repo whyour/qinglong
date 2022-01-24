@@ -86,9 +86,9 @@ export default class SystemService {
       let lastLog = '';
       try {
         const result = await Promise.race([
-          got.get(config.lastVersionFile, { timeout: 1000, retry: 0 }),
+          got.get(config.lastVersionFile, { timeout: 6000, retry: 0 }),
           got.get(`https://ghproxy.com/${config.lastVersionFile}`, {
-            timeout: 5000,
+            timeout: 6000,
             retry: 0,
           }),
         ]);
