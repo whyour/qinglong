@@ -12,6 +12,7 @@ import { sequelize } from '../data';
 export default async () => {
   try {
     await sequelize.sync({ alter: true });
+    await new Promise((resolve) => setTimeout(() => resolve(null), 5000));
 
     const crondbExist = await fileExist(config.cronDbFile);
     const dependenceDbExist = await fileExist(config.dependenceDbFile);

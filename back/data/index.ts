@@ -6,7 +6,7 @@ export const sequelize = new Sequelize({
   storage: `${config.dbPath}database.sqlite`,
   logging: false,
   pool: {
-    max: 5,
+    max: 6,
     min: 0,
     idle: 30000,
   },
