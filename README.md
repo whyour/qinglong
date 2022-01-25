@@ -153,11 +153,10 @@ $ git clone git@github.com:whyour/qinglong.git
 $ cd qinglong
 $ cp .env.example .env
 $ yarn install
-$ yarn start-back
 $ yarn start
 ```
 
-打开你的浏览器，访问 http://127.0.0.1:5601
+打开你的浏览器，访问 http://127.0.0.1:5700
 
 ## 交流
 

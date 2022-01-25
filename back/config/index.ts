@@ -37,7 +37,7 @@ if (envFound.error) {
 }
 
 export default {
-  port: parseInt(process.env.PORT as string, 10),
+  port: parseInt(process.env.BACK_PORT as string, 10),
   cronPort: parseInt(process.env.CRON_PORT as string, 10),
   secret: process.env.SECRET || createRandomString(16, 32),
   logs: {
