@@ -35,7 +35,7 @@ export enum CrontabStatus {
 
 interface AppInstance extends Model<App, App>, App {}
 export const AppModel = sequelize.define<AppInstance>('App', {
-  name: DataTypes.STRING,
+  name: { type: DataTypes.STRING, unique: 'name' },
   scopes: DataTypes.JSON,
   client_id: DataTypes.STRING,
   client_secret: DataTypes.STRING,

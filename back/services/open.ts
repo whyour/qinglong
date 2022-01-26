@@ -24,8 +24,8 @@ export default class OpenService {
     return { ...doc, tokens: [] };
   }
 
-  public async insert(payloads: App): Promise<App> {
-    const doc = await AppModel.create(payloads, { returning: true });
+  public async insert(payload: App): Promise<App> {
+    const doc = await AppModel.create(payload, { returning: true });
     return doc.get({ plain: true }) as App;
   }
 
