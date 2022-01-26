@@ -30,10 +30,10 @@ export const initEnvPosition = 9999999999;
 
 interface EnvInstance extends Model<Env, Env>, Env {}
 export const EnvModel = sequelize.define<EnvInstance>('Env', {
-  value: DataTypes.STRING,
+  value: { type: DataTypes.STRING, unique: 'compositeIndex' },
   timestamp: DataTypes.STRING,
   status: DataTypes.NUMBER,
   position: DataTypes.NUMBER,
-  name: DataTypes.STRING,
+  name: { type: DataTypes.STRING, unique: 'compositeIndex' },
   remarks: DataTypes.STRING,
 });

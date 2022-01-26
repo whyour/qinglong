@@ -11,8 +11,17 @@ import { sequelize } from '../data';
 
 export default async () => {
   try {
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     await new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+
+    // try {
+    //   const queryInterface = sequelize.getQueryInterface();
+    //   await queryInterface.addIndex('Crontabs', ['command'], { unique: true });
+    //   await queryInterface.addIndex('Envs', ['name', 'value'], { unique: true });
+    //   await queryInterface.addIndex('Apps', ['name'], { unique: true });
+    // } catch (error) {
+
+    // }
 
     const crondbExist = await fileExist(config.cronDbFile);
     const dependenceDbExist = await fileExist(config.dependenceDbFile);

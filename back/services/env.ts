@@ -28,8 +28,12 @@ export default class EnvService {
   }
 
   public async insert(payloads: Env[]): Promise<Env[]> {
-    const docs = await EnvModel.bulkCreate(payloads);
-    return docs;
+    const result = [];
+    for (const env of payloads) {
+      const doc = await EnvModel.create(env, { returning: true });
+      result.push(doc);
+    }
+    return result;
   }
 
   public async update(payload: Env): Promise<Env> {
