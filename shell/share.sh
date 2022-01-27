@@ -304,9 +304,8 @@ git_clone_scripts() {
     
     set_proxy
     git clone $part_cmd $url $dir
-    unset_proxy
-
     exit_status=$?
+    unset_proxy
 }
 
 git_pull_scripts() {
