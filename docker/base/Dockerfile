@@ -37,7 +37,7 @@ RUN set -x \
     && git config --global user.name "qinglong" \
     && npm install -g pnpm \
     && pnpm install -g pm2 \
-    && pnpm install -g ts-node typescript tslib \
+    && pnpm install -g ts-node typescript tslib sqlite3 \
     && rm -rf /root/.npm \
 
 CMD [ "node" ]
