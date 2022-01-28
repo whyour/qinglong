@@ -87,6 +87,7 @@
     "compression-webpack-plugin": "6.1.1",
     "concurrently": "^7.0.0",
     "darkreader": "4.9.40",
+    "esbuild": "^0.14.14",
     "lint-staged": "^10.0.7",
     "nodemon": "^2.0.4",
     "prettier": "^2.2.0",
