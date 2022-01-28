@@ -8,7 +8,6 @@
     "build:back": "tsc -p tsconfig.back.json",
     "panel": "npm run build:back && node build/app.js",
     "schedule": "npm run build:back && node build/schedule.js",
-    "prepare": "umi generate tmp",
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
     "test": "umi-test",
     "test:coverage": "umi-test --coverage"
