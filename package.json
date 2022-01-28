@@ -34,6 +34,7 @@
     "cors": "^2.8.5",
     "cron-parser": "^3.5.0",
     "dotenv": "^8.2.0",
+    "esbuild": "^0.14.14",
     "express": "^4.17.1",
     "express-jwt": "^6.0.0",
     "express-urlrewrite": "^1.4.0",
@@ -55,13 +56,13 @@
     "typedi": "^0.8.0",
     "uuid": "^8.3.2",
     "winston": "^3.3.3",
-    "yargs": "^17.2.1",
-    "esbuild": "^0.14.14"
+    "yargs": "^17.2.1"
   },
   "devDependencies": {
     "@ant-design/icons": "^4.6.2",
     "@ant-design/pro-layout": "^6.26.0",
     "@monaco-editor/react": "^4.3.1",
+    "@sentry/cli": "^1.72.1",
     "@sentry/react": "^6.17.2",
     "@sentry/webpack-plugin": "^1.18.4",
     "@types/cors": "^2.8.10",
