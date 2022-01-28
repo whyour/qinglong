@@ -9,6 +9,7 @@
     "panel": "npm run build:back && node build/app.js",
     "schedule": "npm run build:back && node build/schedule.js",
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
+    "prepare": "umi generate tmp",
     "test": "umi-test",
     "test:coverage": "umi-test --coverage"
   },
