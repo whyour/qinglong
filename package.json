@@ -26,8 +26,8 @@
   },
   "dependencies": {
     "@otplib/preset-default": "^12.0.1",
-    "@sentry/node": "^6.16.1",
-    "@sentry/tracing": "^6.16.1",
+    "@sentry/node": "^6.17.2",
+    "@sentry/tracing": "^6.17.2",
     "body-parser": "^1.19.0",
     "celebrate": "^13.0.3",
     "chokidar": "^3.5.2",
@@ -55,14 +55,15 @@
     "typedi": "^0.8.0",
     "uuid": "^8.3.2",
     "winston": "^3.3.3",
-    "yargs": "^17.2.1"
+    "yargs": "^17.2.1",
+    "esbuild": "^0.14.14"
   },
   "devDependencies": {
     "@ant-design/icons": "^4.6.2",
     "@ant-design/pro-layout": "^6.26.0",
     "@monaco-editor/react": "^4.3.1",
-    "@sentry/react": "^6.16.1",
-    "@sentry/webpack-plugin": "^1.18.3",
+    "@sentry/react": "^6.17.2",
+    "@sentry/webpack-plugin": "^1.18.4",
     "@types/cors": "^2.8.10",
     "@types/express": "^4.17.8",
     "@types/express-jwt": "^6.0.1",
@@ -87,7 +88,6 @@
     "compression-webpack-plugin": "6.1.1",
     "concurrently": "^7.0.0",
     "darkreader": "4.9.40",
-    "esbuild": "^0.14.14",
     "lint-staged": "^10.0.7",
     "nodemon": "^2.0.4",
     "prettier": "^2.2.0",
