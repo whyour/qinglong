@@ -23,6 +23,7 @@ RUN git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && cp -rf /usr/local/pnpm-global/5/node_modules/sqlite3 ./node_modules/ \
     && cp -rf /usr/local/pnpm-global/5/node_modules/.pnpm/sqlite* ./node_modules/.pnpm/ \
     && git checkout . \
+    && pnpm install --prod \
     && rm -rf /root/.pnpm-store \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
     && cp -rf /static/* ${QL_DIR} \
