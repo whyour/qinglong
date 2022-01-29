@@ -18,8 +18,7 @@ RUN git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && cp -f .env.example .env \
     && chmod 777 ${QL_DIR}/shell/*.sh \
     && chmod 777 ${QL_DIR}/docker/*.sh \
-    && pnpm uninstall sqlite3 2>&1 > /dev/null || echo "卸载sqlite3失败" \
-    && rm -rf node_modules \
+    && sed -i '/sqlite3/d' package.json \
     && pnpm install --prod \
     && cp -rf /usr/local/pnpm-global/5/node_modules/sqlite3 ./node_modules/ \
     && cp -rf /usr/local/pnpm-global/5/node_modules/.pnpm/sqlite* ./node_modules/.pnpm/ \
