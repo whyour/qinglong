@@ -5,7 +5,7 @@ import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import { exec, execSync, spawn } from 'child_process';
 import fs from 'fs';
 import cron_parser from 'cron-parser';
-import { getFileContentByName, concurrentRun } from '../config/util';
+import { getFileContentByName, concurrentRun, fileExist } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { promisify } from 'util';
 import { Op } from 'sequelize';
@@ -194,7 +194,8 @@ export default class CronService {
         }
       }
       const err = await this.killTask(doc.command);
-      if (doc.log_path) {
+      const logFileExist = await fileExist(doc.log_path);
+      if (doc.log_path && logFileExist) {
         const str = err ? `\n${err}` : '';
         fs.appendFileSync(
           `${doc.log_path}`,
