@@ -19,6 +19,7 @@ RUN git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && chmod 777 ${QL_DIR}/shell/*.sh \
     && chmod 777 ${QL_DIR}/docker/*.sh \
     && cp -rf /node_modules ./ \
+    && rm -rf /node_modules \
     && pnpm install --prod \
     && rm -rf /root/.pnpm-store \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
