@@ -31,7 +31,7 @@ import {
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import CronModal,{ CronLabelModal } from './modal';
+import CronModal, { CronLabelModal } from './modal';
 import CronLogModal from './logModal';
 import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
@@ -49,7 +49,7 @@ enum CrontabStatus {
   'queued',
 }
 
-const CrontabSort: any = { 0: 0, 3: 1, 1: 2, 4: 3 };
+const CrontabSort: any = { 0: 0, 5: 1, 3: 2, 1: 3, 4: 4 };
 
 enum OperationName {
   '启用',
@@ -94,21 +94,30 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
             )}
           </a>
           <span>
-            {record.labels?.length > 0 && record.labels[0] !== '' ? 
-              <Popover placement='right' trigger={isPhone ? 'click' : 'hover'}
+            {record.labels?.length > 0 && record.labels[0] !== '' ? (
+              <Popover
+                placement="right"
+                trigger={isPhone ? 'click' : 'hover'}
                 content={
                   <div>
                     {record.labels?.map((label: string, i: number) => (
-                      <Tag color="blue" 
-                        onClick={() => { onSearch(`label:${label}`) }}>
+                      <Tag
+                        color="blue"
+                        onClick={() => {
+                          onSearch(`label:${label}`);
+                        }}
+                      >
                         {label}
                       </Tag>
                     ))}
                   </div>
-                }>
+                }
+              >
                 <Tag color="blue">{record.labels[0]}</Tag>
               </Popover>
-              : ''}
+            ) : (
+              ''
+            )}
           </span>
         </>
       ),
@@ -381,14 +390,19 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
         setValue(
           data.data
             .sort((a: any, b: any) => {
-              const sortA = a.isDisabled ? 4 : a.status;
-              const sortB = b.isDisabled ? 4 : b.status;
-              a.isPinned = a.isPinned ? a.isPinned : 0;
-              b.isPinned = b.isPinned ? b.isPinned : 0;
-              if (a.isPinned === b.isPinned) {
-                return CrontabSort[sortA] - CrontabSort[sortB];
-              }
-              return b.isPinned - a.isPinned;
+              const sortA =
+                a.isDisabled && a.status !== 0
+                  ? 4
+                  : a.isPinned && a.status !== 0
+                  ? 5
+                  : a.status;
+              const sortB =
+                b.isDisabled && b.status !== 0
+                  ? 4
+                  : b.isPinned && b.status !== 0
+                  ? 5
+                  : b.status;
+              return CrontabSort[sortA] - CrontabSort[sortB];
             })
             .map((x) => {
               return {
