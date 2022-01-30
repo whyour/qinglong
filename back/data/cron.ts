@@ -49,12 +49,18 @@ export enum CrontabStatus {
 
 interface CronInstance extends Model<Crontab, Crontab>, Crontab {}
 export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
-  name: DataTypes.STRING,
-  command: {
-    unique: 'command',
+  name: {
+    unique: 'compositeIndex',
     type: DataTypes.STRING,
   },
-  schedule: DataTypes.STRING,
+  command: {
+    unique: 'compositeIndex',
+    type: DataTypes.STRING,
+  },
+  schedule: {
+    unique: 'compositeIndex',
+    type: DataTypes.STRING,
+  },
   timestamp: DataTypes.STRING,
   saved: DataTypes.BOOLEAN,
   status: DataTypes.NUMBER,
