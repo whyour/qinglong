@@ -7,6 +7,7 @@ ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     SHELL=/bin/bash \
     PS1="\u@\h:\w \$ "
 
+COPY package.json /
 
 RUN set -x \
     && sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories \
@@ -37,7 +38,8 @@ RUN set -x \
     && git config --global user.name "qinglong" \
     && npm install -g pnpm \
     && pnpm install -g pm2 \
-    && pnpm install -g ts-node typescript tslib sqlite3 \
-    && rm -rf /root/.npm \
+    && pnpm install -g ts-node typescript tslib \
+    && cd / && pnpm install --prod \
+    && rm -rf /root/.npm
 
 CMD [ "node" ]
