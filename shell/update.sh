@@ -307,6 +307,8 @@ patch_version() {
     fi
 
     git config --global pull.rebase false
+
+    cp -f /ql/.env.example /ql/.env
 }
 
 reload_pm2() {
