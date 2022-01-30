@@ -40,6 +40,10 @@ RUN set -x \
     && pnpm install -g pm2 \
     && pnpm install -g ts-node typescript tslib \
     && cd / && pnpm install --prod \
-    && rm -rf /root/.npm
+    && apk --purge del python2 g++ make \
+    && rm -rf /root/.npm \
+    && rm -rf /root/.pnpm-store \
+    && rm -rf /root/.cache \
+    && rm -f /package.json
 
 CMD [ "node" ]

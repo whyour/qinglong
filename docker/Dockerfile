@@ -22,6 +22,7 @@ RUN git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && rm -rf /node_modules \
     && pnpm install --prod \
     && rm -rf /root/.pnpm-store \
+    && rm -rf /root/.cache \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
     && cp -rf /static/* ${QL_DIR} \
     && rm -rf /static
