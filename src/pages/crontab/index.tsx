@@ -391,16 +391,16 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           data.data
             .sort((a: any, b: any) => {
               const sortA =
-                a.isDisabled && a.status !== 0
-                  ? 4
-                  : a.isPinned && a.status !== 0
+                a.isPinned && a.status !== 0
                   ? 5
+                  : a.isDisabled && a.status !== 0
+                  ? 4
                   : a.status;
               const sortB =
-                b.isDisabled && b.status !== 0
-                  ? 4
-                  : b.isPinned && b.status !== 0
+                b.isPinned && b.status !== 0
                   ? 5
+                  : b.isDisabled && b.status !== 0
+                  ? 4
                   : b.status;
               return CrontabSort[sortA] - CrontabSort[sortB];
             })
