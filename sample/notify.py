@@ -35,6 +35,7 @@ push_config = {
     'BARK_ARCHIVE': '',                 # bark 推送是否存档
     'BARK_GROUP': '',                   # bark 推送分组
     'BARK_SOUND': '',                   # bark 推送声音
+    'BARK_ICON': '',                    # bark 推送图标
 
     'CONSOLE': True,                    # 控制台输出
 
@@ -104,6 +105,7 @@ def bark(title: str, content: str) -> None:
         "BARK_ARCHIVE": "isArchive",
         "BARK_GROUP": "group",
         "BARK_SOUND": "sound",
+        "BARK_ICON": "icon",
     }
     params = ""
     for pair in filter(
