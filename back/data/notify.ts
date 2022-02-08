@@ -34,6 +34,7 @@ export class ServerChanNotification extends NotificationBaseInfo {
 
 export class BarkNotification extends NotificationBaseInfo {
   public barkPush = '';
+  public barkIcon = 'https://lf9-survey.bytetos.com/obj/web.business.image/202201205d0d7b5e576ee603497ab6f3';
   public barkSound = '';
   public barkGroup = 'qinglong';
 }
