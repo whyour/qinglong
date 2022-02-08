@@ -91,11 +91,12 @@ export default class NotificationService {
     const { goCqHttpBotQq, goCqHttpBotToken, goCqHttpBotUrl } = this.params;
     const res: any = await got
       .post(
-        `${goCqHttpBotUrl}?access_token=${goCqHttpBotToken}&${goCqHttpBotQq}`,
+        `${goCqHttpBotUrl}?${goCqHttpBotQq}`,
         {
           timeout: this.timeout,
           retry: 0,
           json: { message: `${this.title}\n${this.content}` },
+          headers: { 'Authorization': 'Bearer '+goCqHttpBotToken },
         },
       )
       .json();
