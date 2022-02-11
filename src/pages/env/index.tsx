@@ -149,6 +149,13 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
       ellipsis: {
         showTitle: false,
       },
+      sorter: {
+        compare: (a: any, b: any) => {
+          const updatedAtA = new Date(a.updatedAt || a.timestamp).getTime();
+          const updatedAtB = new Date(b.updatedAt || b.timestamp).getTime();
+          return updatedAtA - updatedAtB;
+        },
+      },
       render: (text: string, record: any) => {
         const language = navigator.language || navigator.languages[0];
         const time = record.updatedAt || record.timestamp;
