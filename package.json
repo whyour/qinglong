@@ -34,7 +34,6 @@
     "cors": "^2.8.5",
     "cron-parser": "^3.5.0",
     "dotenv": "^8.2.0",
-    "esbuild": "^0.14.14",
     "express": "^4.17.1",
     "express-jwt": "^6.0.0",
     "express-urlrewrite": "^1.4.0",
