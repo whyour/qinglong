@@ -235,7 +235,7 @@ export default function (props: any) {
       logo={
         <Image
           preview={false}
-          src="https://lf9-survey.bytetos.com/obj/web.business.image/202201205d0d7b5e576ee603497ab6f3"
+          src="https://img.gejiba.com/images/a3f551e09ac19add4c49ec16228729c5.png"
         />
       }
       title={
