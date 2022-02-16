@@ -10,7 +10,7 @@ const About = () => {
       <img
         alt="logo"
         style={{ width: 140, marginRight: 20 }}
-        src="https://lf9-survey.bytetos.com/obj/web.business.image/202201205d0d7b5e576ee603497ab6f3"
+        src="https://img.gejiba.com/images/a3f551e09ac19add4c49ec16228729c5.png"
       />
       <div className={styles.right}>
         <span className={styles.title}>青龙</span>

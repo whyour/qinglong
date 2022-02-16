@@ -39,7 +39,7 @@ let SCKEY = '';
 let BARK_PUSH = '';
 //BARK app推送图标,自定义推送图标(需iOS15或以上)
 let BARK_ICON =
-  'https://lf9-survey.bytetos.com/obj/web.business.image/202201205d0d7b5e576ee603497ab6f3';
+  'https://img.gejiba.com/images/a3f551e09ac19add4c49ec16228729c5.png';
 //BARK app推送铃声,铃声列表去APP查看复制填写
 let BARK_SOUND = '';
 //BARK app推送消息的分组, 默认为"QingLong"
