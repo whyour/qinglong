@@ -242,6 +242,7 @@ fix_config() {
 }
 
 npm_install_sub() {
+    set_proxy
     if [ $is_termux -eq 1 ]; then
         npm install --production --no-bin-links --registry=https://registry.npm.taobao.org || npm install --production --no-bin-links
     elif ! type pnpm &>/dev/null; then
@@ -249,6 +250,7 @@ npm_install_sub() {
     else
         pnpm install --production --registry=https://registry.npm.taobao.org || pnpm install --production
     fi
+    unset_proxy
 }
 
 npm_install_1() {

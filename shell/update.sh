@@ -161,15 +161,7 @@ update_repo() {
         echo -e "\n更新${repo_path}成功...\n"
         diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence"
     else
-        echo -e "\n更新${repo_path}失败，重新下载全新仓库...\n"
-        rm -rf ${repo_path}
-        git_clone_scripts "${formatUrl}" ${repo_path} "${branch}"
-        if [[ $exit_status -eq 0 ]]; then
-            echo -e "\n更新${repo_path}成功...\n"
-            diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence"
-        else
-            echo -e "\n更新${repo_path}失败，请检查网络...\n"
-        fi
+        echo -e "\n更新${repo_path}失败，请检查网络...\n"
     fi
 }
 
