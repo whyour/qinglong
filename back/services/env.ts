@@ -49,6 +49,7 @@ export default class EnvService {
 
   public async remove(ids: string[]) {
     await EnvModel.destroy({ where: { id: ids } });
+    await this.set_envs();
   }
 
   public async move(
