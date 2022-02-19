@@ -76,7 +76,7 @@ sudo curl -L https://github.com/docker/compose/releases/download/1.16.1/docker-c
 
 ```bash
 mkdir qinglong
-wget https://raw.githubusercontent.com/whyour/qinglong/master/docker-compose.yml
+wget https://raw.githubusercontent.com/whyour/qinglong/master/docker/docker-compose.yml
 
 # 启动
 docker-compose up -d
