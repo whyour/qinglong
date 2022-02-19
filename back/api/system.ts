@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import config from '../config';
 import SystemService from '../services/system';
 import { celebrate, Joi } from 'celebrate';
-import { getFileContentByName } from '../config/util';
 import UserService from '../services/user';
+import { EnvModel } from '../data/env';
 const route = Router();
 
 export default (app: Router) => {
@@ -17,7 +17,7 @@ export default (app: Router) => {
     try {
       const userService = Container.get(UserService);
       const authInfo = await userService.getUserInfo();
-      const envDbContent = getFileContentByName(config.envDbFile);
+      const envCount = await EnvModel.count();
       const versionRegx = /.*export const version = \'(.*)\'\;/;
 
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
@@ -28,7 +28,7 @@ export default (app: Router) => {
         Object.keys(authInfo).length === 2 &&
         authInfo.username === 'admin' &&
         authInfo.password === 'admin' &&
-        envDbContent.length === 0
+        envCount === 0
       ) {
         isInitialized = false;
       }

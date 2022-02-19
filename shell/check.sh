@@ -38,10 +38,10 @@ reload_pm2() {
   pm2 l &>/dev/null
 
   pm2 delete panel --source-map-support --time &>/dev/null
-  pm2 start $dir_root/build/app.js -n panel --source-map-support --time &>/dev/null
+  pm2 start $dir_static/build/app.js -n panel --source-map-support --time &>/dev/null
 
   pm2 delete schedule --source-map-support --time &>/dev/null
-  pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time &>/dev/null
+  pm2 start $dir_static/build/schedule.js -n schedule --source-map-support --time &>/dev/null
 }
 
 pm2_log() {

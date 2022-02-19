@@ -2,15 +2,17 @@
 
 ## 目录
 dir_root=/ql
+dir_data=$dir_root/data
 dir_shell=$dir_root/shell
 dir_sample=$dir_root/sample
-dir_config=$dir_root/config
-dir_scripts=$dir_root/scripts
-dir_repo=$dir_root/repo
-dir_raw=$dir_root/raw
-dir_log=$dir_root/log
-dir_db=$dir_root/db
-dir_dep=$dir_root/deps
+dir_static=$dir_root/static
+dir_config=$dir_data/config
+dir_scripts=$dir_data/scripts
+dir_repo=$dir_data/repo
+dir_raw=$dir_data/raw
+dir_log=$dir_data/log
+dir_db=$dir_data/db
+dir_dep=$dir_data/deps
 dir_list_tmp=$dir_log/.tmp
 dir_code=$dir_log/code
 dir_update_log=$dir_log/update

@@ -271,9 +271,9 @@ update_qinglong() {
         echo -e "\n更新$ql_static_repo成功...\n"
         local static_version=$(cat /ql/src/version.ts | perl -pe "s|.*\'(.*)\';\.*|\1|" | head -1)
         echo -e "\n当前版本 $static_version...\n"
-        cd $dir_root
-        rm -rf $dir_root/build && rm -rf $dir_root/dist
-        cp -rf $ql_static_repo/* $dir_root
+        
+        rm -rf $dir_static
+        cp -rf $ql_static_repo/* $dir_static
         if [[ $no_restart != "no-restart" ]]; then
             nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
             echo -e "重启面板中..."
@@ -307,10 +307,10 @@ reload_pm2() {
     pm2 l &>/dev/null
 
     pm2 delete panel --source-map-support --time &>/dev/null
-    pm2 start $dir_root/build/app.js -n panel --source-map-support --time &>/dev/null
+    pm2 start $dir_static/build/app.js -n panel --source-map-support --time &>/dev/null
 
     pm2 delete schedule --source-map-support --time &>/dev/null
-    pm2 start $dir_root/build/schedule.js -n schedule --source-map-support --time &>/dev/null
+    pm2 start $dir_static/build/schedule.js -n schedule --source-map-support --time &>/dev/null
 }
 
 ## 对比脚本
