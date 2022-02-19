@@ -12,6 +12,7 @@ import {
   Modal,
   message,
   Typography,
+  Input,
 } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -273,8 +274,10 @@ const Setting = ({
     request
       .get(`${config.apiPrefix}system/log/remove`)
       .then((data: any) => {
-        setLogRemoveFrequency(data.data.frequency);
-        form.setFieldsValue({ frequency: data.data.frequency });
+        if (data.data.info) {
+          const { frequency } = data.data.info;
+          setLogRemoveFrequency(frequency);
+        }
       })
       .catch((error: any) => {
         console.log(error);
@@ -367,14 +370,19 @@ const Setting = ({
               name="frequency"
               tooltip="每x天自动删除x天以前的日志"
             >
-              <InputNumber
-                addonBefore="每"
-                addonAfter="天"
-                style={{ width: 150 }}
-                min={0}
-                onBlur={updateRemoveLogFrequency}
-                onChange={(value) => setLogRemoveFrequency(value)}
-              />
+              <Input.Group compact>
+                <InputNumber
+                  addonBefore="每"
+                  addonAfter="天"
+                  style={{ width: 150 }}
+                  min={0}
+                  value={logRemoveFrequency}
+                  onChange={(value) => setLogRemoveFrequency(value)}
+                />
+                <Button type="primary" onClick={updateRemoveLogFrequency}>
+                  确认
+                </Button>
+              </Input.Group>
             </Form.Item>
             <Form.Item label="检查更新" name="update">
               <CheckUpdate socketMessage={socketMessage} />

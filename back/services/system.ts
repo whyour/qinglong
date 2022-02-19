@@ -24,7 +24,7 @@ export default class SystemService {
 
   public async getLogRemoveFrequency() {
     const doc = await this.getDb({ type: AuthDataType.removeLogFrequency });
-    return (doc && doc.info) || {};
+    return doc || {};
   }
 
   private async updateAuthDb(payload: AuthInfo): Promise<any> {
@@ -65,11 +65,13 @@ export default class SystemService {
       id: result.id,
       name: '删除日志',
       command: `ql rmlog ${frequency}`,
-      schedule: `5 23 */${frequency} * *`,
     };
-    await this.scheduleService.cancelSchedule(cron);
+    await this.scheduleService.cancelIntervalTask(cron);
     if (frequency > 0) {
-      await this.scheduleService.generateSchedule(cron);
+      await this.scheduleService.createIntervalTask(cron, {
+        days: frequency,
+        runImmediately: true,
+      });
     }
     return { code: 200, data: { ...cron } };
   }
