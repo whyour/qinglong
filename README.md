@@ -56,12 +56,7 @@ sudo curl -sSL get.docker.com | sh
 
 ```bash
 docker run -dit \
-  -v $PWD/ql/config:/ql/config \
-  -v $PWD/ql/log:/ql/log \
-  -v $PWD/ql/db:/ql/db \
-  -v $PWD/ql/repo:/ql/repo \
-  -v $PWD/ql/raw:/ql/raw \
-  -v $PWD/ql/scripts:/ql/scripts \
+  -v $PWD/ql:/ql/data \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \

@@ -5,13 +5,14 @@ import routes from '../api';
 import config from '../config';
 import jwt from 'express-jwt';
 import fs from 'fs';
-import { getFileContentByName, getPlatform, getToken } from '../config/util';
+import { getPlatform, getToken } from '../config/util';
 import Container from 'typedi';
 import OpenService from '../services/open';
 import rewrite from 'express-urlrewrite';
 import UserService from '../services/user';
 import handler from 'serve-handler';
 import * as Sentry from '@sentry/node';
+import { EnvModel } from '../data/env';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -22,7 +23,7 @@ export default ({ app }: { app: Application }) => {
       next();
     } else {
       return handler(req, res, {
-        public: 'dist',
+        public: 'static/dist',
         rewrites: [{ source: '**', destination: '/index.html' }],
       });
     }
@@ -104,14 +105,14 @@ export default ({ app }: { app: Application }) => {
     }
     const userService = Container.get(UserService);
     const authInfo = await userService.getUserInfo();
-    const envDbContent = getFileContentByName(config.envDbFile);
+    const envCount = await EnvModel.count();
 
     let isInitialized = true;
     if (
       Object.keys(authInfo).length === 2 &&
       authInfo.username === 'admin' &&
       authInfo.password === 'admin' &&
-      envDbContent.length === 0
+      envCount === 0
     ) {
       isInitialized = false;
     }

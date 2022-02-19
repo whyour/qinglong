@@ -9,27 +9,26 @@ const lastVersionFile =
 
 const envFound = dotenv.config();
 const rootPath = process.cwd();
-const envFile = path.join(rootPath, 'config/env.sh');
-const confFile = path.join(rootPath, 'config/config.sh');
-const sampleFile = path.join(rootPath, 'sample/config.sample.sh');
-const crontabFile = path.join(rootPath, 'config/crontab.list');
-const confBakDir = path.join(rootPath, 'config/bak/');
-const authConfigFile = path.join(rootPath, 'config/auth.json');
-const extraFile = path.join(rootPath, 'config/extra.sh');
-const configPath = path.join(rootPath, 'config/');
-const scriptPath = path.join(rootPath, 'scripts/');
-const bakPath = path.join(rootPath, 'bak/');
+const dataPath = path.join(rootPath, 'data/');
 const samplePath = path.join(rootPath, 'sample/');
-const logPath = path.join(rootPath, 'log/');
+const configPath = path.join(dataPath, 'config/');
+const scriptPath = path.join(dataPath, 'scripts/');
+const bakPath = path.join(dataPath, 'bak/');
+const logPath = path.join(dataPath, 'log/');
+const dbPath = path.join(dataPath, 'db/');
+
+const envFile = path.join(configPath, 'env.sh');
+const confFile = path.join(configPath, 'config.sh');
+const crontabFile = path.join(configPath, 'crontab.list');
+const authConfigFile = path.join(configPath, 'auth.json');
+const extraFile = path.join(configPath, 'extra.sh');
+const confBakDir = path.join(dataPath, 'config/bak/');
+const sampleFile = path.join(samplePath, 'config.sample.sh');
+const sqliteFile = path.join(samplePath, 'database.sqlite');
+
 const authError = '错误的用户名密码，请重试';
 const loginFaild = '请先登录!';
 const configString = 'config sample crontab shareCode diy';
-const dbPath = path.join(rootPath, 'db/');
-const cronDbFile = path.join(rootPath, 'db/crontab.db');
-const envDbFile = path.join(rootPath, 'db/env.db');
-const appDbFile = path.join(rootPath, 'db/app.db');
-const authDbFile = path.join(rootPath, 'db/auth.db');
-const dependenceDbFile = path.join(rootPath, 'db/dependence.db');
 const versionFile = path.join(rootPath, 'src/version.ts');
 
 if (envFound.error) {
@@ -59,11 +58,6 @@ export default {
   confFile,
   envFile,
   dbPath,
-  cronDbFile,
-  envDbFile,
-  appDbFile,
-  authDbFile,
-  dependenceDbFile,
   configPath,
   scriptPath,
   samplePath,
@@ -86,4 +80,5 @@ export default {
   ],
   versionFile,
   lastVersionFile,
+  sqliteFile,
 };

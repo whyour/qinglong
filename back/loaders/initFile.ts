@@ -5,13 +5,15 @@ import Logger from './logger';
 import { fileExist } from '../config/util';
 
 const rootPath = process.cwd();
-const confFile = path.join(rootPath, 'config/config.sh');
-const sampleConfigFile = path.join(rootPath, 'sample/config.sample.sh');
-const sampleAuthFile = path.join(rootPath, 'sample/auth.sample.json');
-const authConfigFile = path.join(rootPath, 'config/auth.json');
-const configPath = path.join(rootPath, 'config/');
-const scriptPath = path.join(rootPath, 'scripts/');
-const logPath = path.join(rootPath, 'log/');
+const dataPath = path.join(rootPath, 'data/');
+const configPath = path.join(dataPath, 'config/');
+const scriptPath = path.join(dataPath, 'scripts/');
+const logPath = path.join(dataPath, 'log/');
+const samplePath = path.join(rootPath, 'sample/');
+const confFile = path.join(configPath, 'config.sh');
+const authConfigFile = path.join(configPath, 'auth.json');
+const sampleConfigFile = path.join(samplePath, 'config.sample.sh');
+const sampleAuthFile = path.join(samplePath, 'auth.sample.json');
 
 export default async () => {
   const authFileExist = await fileExist(authConfigFile);

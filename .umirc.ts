@@ -4,6 +4,7 @@ const CompressionPlugin = require('compression-webpack-plugin');
 export default defineConfig({
   hash: true,
   layout: false,
+  outputPath: 'static/dist',
   nodeModulesTransform: {
     type: 'none',
   },

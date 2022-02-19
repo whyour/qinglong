@@ -367,8 +367,8 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
     if (cmd[0] === 'task') {
-      if (cmd[1].startsWith('/ql/scripts')) {
-        cmd[1] = cmd[1].replace('/ql/scripts/', '');
+      if (cmd[1].startsWith('/ql/data/scripts')) {
+        cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
       }
 
       let [p, s] = cmd[1].split('/');
