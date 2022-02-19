@@ -87,13 +87,10 @@ export default class SystemService {
       let lastVersion = '';
       let lastLog = '';
       try {
-        const result = await Promise.race([
-          got.get(config.lastVersionFile, { timeout: 6000, retry: 0 }),
-          got.get(`https://ghproxy.com/${config.lastVersionFile}`, {
-            timeout: 6000,
-            retry: 0,
-          }),
-        ]);
+        const result = await got.get(config.lastVersionFile, {
+          timeout: 6000,
+          retry: 0,
+        });
         const lastVersionFileContent = result.body;
         lastVersion = lastVersionFileContent.match(versionRegx)![1];
         lastLog = lastVersionFileContent.match(logRegx)

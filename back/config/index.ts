@@ -4,8 +4,7 @@ import { createRandomString } from './util';
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-const lastVersionFile =
-  'https://raw.githubusercontent.com/whyour/qinglong/master/src/version.ts';
+const lastVersionFile = 'https://qn.whyour.cn/version.ts';
 
 const envFound = dotenv.config();
 const rootPath = process.cwd();
