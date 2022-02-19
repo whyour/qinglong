@@ -4,7 +4,7 @@ import { DataTypes, Model, ModelDefined } from 'sequelize';
 export class Crontab {
   name?: string;
   command: string;
-  schedule: string;
+  schedule?: string;
   timestamp?: string;
   saved?: boolean;
   id?: number;
