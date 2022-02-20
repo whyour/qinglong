@@ -32,7 +32,7 @@ echo -e "定时任务启动成功...\n"
 
 if [[ $AutoStartBot == true ]]; then
   echo -e "======================6. 启动bot========================\n"
-  nohup ql bot >>$dir_log/start.log 2>&1 &
+  pm2 start $dir_root/jbot/ecosystem.config.js
   echo -e "bot后台启动中...\n"
 fi
 
