@@ -80,7 +80,7 @@ export default class DependenceService {
       const encodeText = encodeURIComponent(searchValue);
       const reg = {
         [Op.or]: [
-          { [Op.like]: `%${searchValue}&` },
+          { [Op.like]: `%${searchValue}%` },
           { [Op.like]: `%${encodeText}%` },
         ],
       };

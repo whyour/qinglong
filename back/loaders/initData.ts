@@ -42,7 +42,7 @@ export default async () => {
     where: {
       isDisabled: { [Op.ne]: 1 },
       command: {
-        [Op.or]: [{ [Op.like]: `%ql repo%` }, { [Op.like]: `%$ql raw%` }],
+        [Op.or]: [{ [Op.like]: `%ql repo%` }, { [Op.like]: `%ql raw%` }],
       },
     },
   }).then((docs) => {
