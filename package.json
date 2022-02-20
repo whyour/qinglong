@@ -79,6 +79,7 @@
     "@types/sockjs-client": "^1.5.1",
     "@types/uuid": "^8.3.3",
     "@umijs/plugin-antd": "^0.11.0",
+    "@umijs/plugin-esbuild": "^1.4.1",
     "@umijs/test": "^3.3.9",
     "antd": "^4.17.0-alpha.6",
     "codemirror": "^5.62.2",
