@@ -24,14 +24,7 @@ import { message, Badge, Modal, Avatar, Dropdown, Menu, Image } from 'antd';
 // @ts-ignore
 import SockJS from 'sockjs-client';
 import * as Sentry from '@sentry/react';
-import { Integrations } from '@sentry/tracing';
-
-Sentry.init({
-  dsn: 'https://3406424fb1dc4813a62d39e844a9d0ac@o1098464.ingest.sentry.io/6122818',
-  integrations: [new Integrations.BrowserTracing()],
-  release: version,
-  tracesSampleRate: 1.0,
-});
+import { init } from '../utils/init';
 
 export default function (props: any) {
   const ctx = useCtx();
@@ -108,10 +101,6 @@ export default function (props: any) {
   };
 
   useEffect(() => {
-    vhCheck();
-  }, []);
-
-  useEffect(() => {
     if (systemInfo && systemInfo.isInitialized && !user) {
       getUser();
     }
@@ -128,6 +117,9 @@ export default function (props: any) {
   }, [theme.theme]);
 
   useEffect(() => {
+    vhCheck();
+    init();
+
     const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
     setFetchMethod(window.fetch);
     if (_theme === 'dark') {

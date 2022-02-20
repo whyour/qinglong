@@ -9,6 +9,7 @@ export default defineConfig({
     type: 'none',
   },
   fastRefresh: {},
+  esbuild: {},
   dynamicImport: {
     loading: '@/components/pageLoading',
   },
