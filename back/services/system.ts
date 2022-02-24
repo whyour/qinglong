@@ -163,4 +163,13 @@ export default class SystemService {
 
     return { code: 200 };
   }
+
+  public async notify({ title, content }: { title: string; content: string }) {
+    const isSuccess = await this.notificationService.notify(title, content);
+    if (isSuccess) {
+      return { code: 200, data: '通知发送成功' };
+    } else {
+      return { code: 400, data: '通知发送失败，请检查参数' };
+    }
+  }
 }
