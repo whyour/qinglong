@@ -324,7 +324,7 @@ git_pull_scripts() {
     git fetch --all
     exit_status=$?
     git reset --hard &>/dev/null
-    git pull &>/dev/null
+    git pull --allow-unrelated-histories &>/dev/null
     unset_proxy
     
     cd $dir_current

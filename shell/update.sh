@@ -243,6 +243,8 @@ usage() {
 update_qinglong() {
     patch_version
 
+    pnpm install -g pm2 &>/dev/null
+    
     local no_restart="$1"
     [[ -f $dir_root/package.json ]] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "https://github.com/whyour/qinglong.git" ${current_branch}
