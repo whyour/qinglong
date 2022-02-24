@@ -316,15 +316,15 @@ git_pull_scripts() {
     local dir_current=$(pwd)
     local dir_work="$1"
     local branch="$2"
-    [[ $branch ]] && local part_cmd="origin/${branch}"
+    [[ $branch ]] && git checkout ${branch}
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
 
     set_proxy
     git fetch --all
     exit_status=$?
-    git reset --hard $part_cmd
-    git pull
+    git reset --hard &>/dev/null
+    git pull &>/dev/null
     unset_proxy
     
     cd $dir_current
@@ -341,8 +341,8 @@ reset_romote_url() {
     if [[ -d "$dir_work/.git" ]]; then
         cd $dir_work
         [[ -f ".git/index.lock" ]] && rm -f .git/index.lock >/dev/null
-        git remote set-url origin $url >/dev/null
-        git reset --hard $part_cmd >/dev/null
+        git remote set-url origin $url &>/dev/null
+        git reset --hard $part_cmd &>/dev/null
         cd $dir_current
     fi
 }
