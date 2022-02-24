@@ -111,4 +111,25 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/notify',
+    celebrate({
+      body: Joi.object({
+        title: Joi.string().required(),
+        content: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.notify(req.body);
+        res.send(result);
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
 };
