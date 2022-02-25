@@ -26,6 +26,12 @@ export default {
         component: '@/pages/initialization/index',
       },
       {
+        name: '错误',
+        path: '/error',
+        hideInMenu: true,
+        component: '@/pages/error/index',
+      },
+      {
         path: '/crontab',
         name: '定时任务',
         icon: <FieldTimeOutlined />,

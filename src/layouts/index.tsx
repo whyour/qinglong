@@ -179,7 +179,9 @@ export default function (props: any) {
     };
   }, []);
 
-  if (['/login', '/initialization'].includes(props.location.pathname)) {
+  if (
+    ['/login', '/initialization', '/error'].includes(props.location.pathname)
+  ) {
     document.title = `${
       (config.documentTitleMap as any)[props.location.pathname]
     } - 控制面板`;
@@ -190,7 +192,7 @@ export default function (props: any) {
       history.push('/crontab');
     }
 
-    if (systemInfo) {
+    if (systemInfo || props.location.pathname === '/error') {
       return React.Children.map(props.children, (child) => {
         return React.cloneElement(child, {
           ...ctx,

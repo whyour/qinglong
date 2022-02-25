@@ -9207,6 +9207,11 @@ react-style-proptype@^3.2.2:
   dependencies:
     prop-types "^15.5.4"
 
+react-terminal-ui@^0.1.14:
+  version "0.1.14"
+  resolved "https://registry.yarnpkg.com/react-terminal-ui/-/react-terminal-ui-0.1.14.tgz#c024853da862d83f1a5720f92ffb7e91c508a4cf"
+  integrity sha512-VTk4/kjSV1ElyiBP2mWlXwU+UscIb7edolYlZcL+MqZBrx5hbI/O6zaG+7nCMih5Nk4fjbKEysxCcOvf8k5J8A==
+
 react-tween-state@^0.1.5:
   version "0.1.5"
   resolved "https://registry.npmjs.org/react-tween-state/-/react-tween-state-0.1.5.tgz"
