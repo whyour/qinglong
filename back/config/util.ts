@@ -107,7 +107,7 @@ export function createRandomString(min: number, max: number): string {
     newArr.push(arr.splice(Math.random() * arr.length, 1)[0]);
   }
 
-  function getOne(arr) {
+  function getOne(arr: any[]) {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
