@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
-import Terminal, { ColorMode, LineType } from 'react-terminal-ui';
+import Terminal, { ColorMode, LineType } from '../../components/terminal';
 import { PageLoading } from '@ant-design/pro-layout';
 import { history } from 'umi';
+import Ansi from 'ansi-to-react';
 import './index.less';
 
-const Error = ({ user }: any) => {
+const Error = ({ user, theme }: any) => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState('暂无日志');
 
@@ -37,10 +38,13 @@ const Error = ({ user }: any) => {
       ) : (
         <Terminal
           name="服务错误"
-          colorMode={ColorMode.Light}
+          colorMode={theme === 'vs-dark' ? ColorMode.Dark : ColorMode.Light}
           lineData={[
             { type: LineType.Input, value: 'pm2 logs panel' },
-            { type: LineType.Output, value: data },
+            {
+              type: LineType.Output,
+              value: <Ansi>{data}</Ansi>,
+            },
           ]}
         />
       )}
