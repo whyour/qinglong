@@ -43,7 +43,11 @@ const Error = ({ user, theme }: any) => {
             { type: LineType.Input, value: 'pm2 logs panel' },
             {
               type: LineType.Output,
-              value: <Ansi>{data}</Ansi>,
+              value: (
+                <pre>
+                  <Ansi>{data}</Ansi>
+                </pre>
+              ),
             },
           ]}
         />
