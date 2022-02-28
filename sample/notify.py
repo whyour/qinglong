@@ -60,6 +60,8 @@ push_config = {
 
     'PUSH_KEY': '',                     # server 酱的 PUSH_KEY，兼容旧版与 Turbo 版
 
+    'DEER_KEY': '',                     # PushDeer 的 PUSHDEER_KEY
+    
     'PUSH_PLUS_TOKEN': '',              # push+ 微信推送的用户令牌
     'PUSH_PLUS_USER': '',               # push+ 微信推送的群组编码
 
@@ -260,6 +262,24 @@ def serverJ(title: str, content: str) -> None:
     else:
         print(f'serverJ 推送失败！错误码：{response["message"]}')
 
+
+def pushdeer(title: str, content: str) -> None:
+    """
+    通过PushDeer 推送消息
+    """
+    if not push_config.get("DEER_KEY"):
+        print("PushDeer 服务的 DEER_KEY 未设置!!\n取消推送")
+        return
+    print("PushDeer 服务启动")
+    data = {"text": title, "desp": urllib.parse.urlencode({"text": content})}
+    url = 'https://api2.pushdeer.com/message/push'
+    response = requests.post(url, data=data).json()
+    
+    if len(response.get("content").get("result")) > 0:
+        print("PushDeer 推送成功！")
+    else:
+        print("PushDeer 推送失败！错误信息：", response)
+    
 
 def pushplus_bot(title: str, content: str) -> None:
     """
@@ -505,6 +525,8 @@ if push_config.get("IGOT_PUSH_KEY"):
     notify_function.append(iGot)
 if push_config.get("PUSH_KEY"):
     notify_function.append(serverJ)
+if push_config.get("DEER_KEY"):
+    notify_function.append(pushdeer)
 if push_config.get("PUSH_PLUS_TOKEN"):
     notify_function.append(pushplus_bot)
 if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"):

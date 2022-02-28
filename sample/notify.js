@@ -34,6 +34,11 @@ let GOBOT_QQ = ''; // 如果GOBOT_URL设置 /send_private_msg 则需要填入 us
 //(环境变量名 PUSH_KEY)
 let SCKEY = '';
 
+// =======================================PushDeer通知设置区域===========================================
+//此处填你申请的PushDeer KEY.
+//(环境变量名 DEER_KEY)
+let PUSHDEER_KEY = '';
+
 // =======================================Bark App通知设置区域===========================================
 //此处填你BarkAPP的信息(IP/设备码，例如：https://api.day.app/XXXXXXXX)
 let BARK_PUSH = '';
@@ -116,6 +121,10 @@ if (process.env.GOBOT_QQ) {
 
 if (process.env.PUSH_KEY) {
   SCKEY = process.env.PUSH_KEY;
+}
+
+if (process.env.DEER_KEY) {
+  PUSHDEER_KEY = process.env.DEER_KEY;
 }
 
 if (process.env.QQ_SKEY) {
@@ -338,6 +347,52 @@ function serverNotify(text, desp, time = 2100) {
               } else {
                 console.log(
                   `server酱发送通知消息异常\n${JSON.stringify(data)}`,
+                );
+              }
+            }
+          } catch (e) {
+            $.logErr(e, resp);
+          } finally {
+            resolve(data);
+          }
+        });
+      }, time);
+    } else {
+      resolve();
+    }
+  });
+}
+
+function PushDeerNotify(text, desp, time = 2100) {
+  return new Promise((resolve) => {
+    if (PUSHDEER_KEY) {
+      // PushDeer 建议对消息内容进行 urlencode
+      desp = encodeURI(desp);
+      const options = {
+        url: `https://api2.pushdeer.com/message/push`,
+        body: `pushkey=${PUSHDEER_KEY}&text=${text}&desp=${desp}&type=markdown`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout,
+      };
+      setTimeout(() => {
+        $.post(options, (err, resp, data) => {
+          try {
+            if (err) {
+              console.log('发送通知调用API失败！！\n');
+              console.log(err);
+            } else {
+              data = JSON.parse(data);
+              // 通过反悔的result的长度来判断是否成功
+              if (
+                data.content.result.length !== undefined &&
+                data.content.result.length > 0
+              ) {
+                console.log('PushDeer发送通知消息成功🎉\n');
+              } else {
+                console.log(
+                  `PushDeer发送通知消息异常\n${JSON.stringify(data)}`,
                 );
               }
             }
