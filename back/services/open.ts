@@ -108,12 +108,26 @@ export default class OpenService {
     client_id: string;
     client_secret: string;
   }): Promise<any> {
-    const token = uuidV4();
+    let token = uuidV4();
     const expiration = Math.round(Date.now() / 1000) + 2592000; // 2592000 30天
     const doc = await AppModel.findOne({ where: { client_id, client_secret } });
     if (doc) {
+      const timestamp = Math.round(Date.now() / 1000);
+      const invalidTokens = (doc.tokens || []).filter(
+        (x) => x.expiration >= timestamp,
+      );
+      let tokens = invalidTokens;
+      if (invalidTokens.length > 5) {
+        tokens = [
+          ...invalidTokens.slice(0, 4),
+          { ...invalidTokens[4], expiration },
+        ];
+        token = invalidTokens[4].value;
+      } else {
+        tokens = [...invalidTokens, { value: token, expiration }];
+      }
       await AppModel.update(
-        { tokens: [...(doc.tokens || []), { value: token, expiration }] },
+        { tokens },
         { where: { client_id, client_secret } },
       );
       return {
