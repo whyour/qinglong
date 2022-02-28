@@ -129,7 +129,7 @@ export default class NotificationService {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       .json();
-    return res.result.success === 'ok';
+    return res.content.result.length > 0;
   }
 
   private async bark() {
