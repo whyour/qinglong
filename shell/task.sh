@@ -143,6 +143,7 @@ run_concurrent() {
     done
 
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
+    [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     define_program "$first_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
@@ -165,8 +166,6 @@ run_concurrent() {
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
-
-    [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     local envs=$(eval echo "\$${env_param}")
     local array=($(echo $envs | sed 's/&/ /g'))
@@ -236,6 +235,7 @@ run_designated() {
     done
 
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
+    [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
@@ -243,8 +243,6 @@ run_designated() {
     local id=$(cat $list_crontab_user | grep -E "$cmd_task $file_param" | perl -pe "s|.*ID=(.*) $cmd_task $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
-
-    [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     cd $dir_scripts
     local relative_path="${file_param%/*}"
