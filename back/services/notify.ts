@@ -16,7 +16,7 @@ export default class NotificationService {
     ['gotify', this.gotify],
     ['goCqHttpBot', this.goCqHttpBot],
     ['serverChan', this.serverChan],
-    ['PushDeer', this.PushDeer],
+    ['pushDeer', this.pushDeer],
     ['bark', this.bark],
     ['telegramBot', this.telegramBot],
     ['dingtalkBot', this.dingtalkBot],
@@ -117,15 +117,17 @@ export default class NotificationService {
     return res.errno === 0 || res.data.errno === 0;
   }
 
-  private async PushDeer() {
-    const { PushDeerKey } = this.params;
+  private async pushDeer() {
+    const { pushDeerKey } = this.params;
     // https://api2.pushdeer.com/message/push?pushkey=<key>&text=标题&desp=<markdown>&type=markdown
     const url = `https://api2.pushdeer.com/message/push`;
     const res: any = await got
       .post(url, {
         timeout: this.timeout,
         retry: 0,
-        body: `pushkey=${PushDeerKey}&text=${this.title}&desp=${this.content}&type=markdown`,
+        body: `pushkey=${pushDeerKey}&text=${
+          this.title
+        }&desp=${encodeURIComponent(this.content)}&type=markdown`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       .json();

@@ -2,7 +2,7 @@ export enum NotificationMode {
   'gotify' = 'gotify',
   'goCqHttpBot' = 'goCqHttpBot',
   'serverChan' = 'serverChan',
-  'PushDeer' = 'PushDeer',
+  'pushDeer' = 'pushDeer',
   'bark' = 'bark',
   'telegramBot' = 'telegramBot',
   'dingtalkBot' = 'dingtalkBot',
@@ -34,7 +34,7 @@ export class ServerChanNotification extends NotificationBaseInfo {
 }
 
 export class PushDeerNotification extends NotificationBaseInfo {
-  public PushDeerKey = '';
+  public pushDeerKey = '';
 }
 
 export class BarkNotification extends NotificationBaseInfo {
