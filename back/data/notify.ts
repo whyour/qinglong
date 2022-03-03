@@ -39,8 +39,7 @@ export class PushDeerNotification extends NotificationBaseInfo {
 
 export class BarkNotification extends NotificationBaseInfo {
   public barkPush = '';
-  public barkIcon =
-    'https://img.gejiba.com/images/a3f551e09ac19add4c49ec16228729c5.png';
+  public barkIcon = 'https://qn.whyour.cn/logo.png';
   public barkSound = '';
   public barkGroup = 'qinglong';
 }

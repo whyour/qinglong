@@ -226,12 +226,7 @@ export default function (props: any) {
       selectedKeys={[props.location.pathname]}
       loading={loading}
       ErrorBoundary={Sentry.ErrorBoundary}
-      logo={
-        <Image
-          preview={false}
-          src="https://img.gejiba.com/images/a3f551e09ac19add4c49ec16228729c5.png"
-        />
-      }
+      logo={<Image preview={false} src="https://qn.whyour.cn/logo.png" />}
       title={
         <>
           <span style={{ fontSize: 16 }}>控制面板</span>

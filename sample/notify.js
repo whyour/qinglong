@@ -43,8 +43,7 @@ let PUSHDEER_KEY = '';
 //此处填你BarkAPP的信息(IP/设备码，例如：https://api.day.app/XXXXXXXX)
 let BARK_PUSH = '';
 //BARK app推送图标,自定义推送图标(需iOS15或以上)
-let BARK_ICON =
-  'https://img.gejiba.com/images/a3f551e09ac19add4c49ec16228729c5.png';
+let BARK_ICON = 'https://qn.whyour.cn/logo.png';
 //BARK app推送铃声,铃声列表去APP查看复制填写
 let BARK_SOUND = '';
 //BARK app推送消息的分组, 默认为"QingLong"
