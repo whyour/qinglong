@@ -233,7 +233,7 @@ const Initialization = () => {
           <img
             alt="logo"
             className={styles.logo}
-            src="https://img.gejiba.com/images/a3f551e09ac19add4c49ec16228729c5.png"
+            src="https://qn.whyour.cn/logo.png"
           />
           <span className={styles.title}>初始化配置</span>
         </div>
