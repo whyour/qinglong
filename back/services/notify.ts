@@ -16,6 +16,7 @@ export default class NotificationService {
     ['gotify', this.gotify],
     ['goCqHttpBot', this.goCqHttpBot],
     ['serverChan', this.serverChan],
+    ['pushDeer', this.pushDeer],
     ['bark', this.bark],
     ['telegramBot', this.telegramBot],
     ['dingtalkBot', this.dingtalkBot],
@@ -90,15 +91,12 @@ export default class NotificationService {
   private async goCqHttpBot() {
     const { goCqHttpBotQq, goCqHttpBotToken, goCqHttpBotUrl } = this.params;
     const res: any = await got
-      .post(
-        `${goCqHttpBotUrl}?${goCqHttpBotQq}`,
-        {
-          timeout: this.timeout,
-          retry: 0,
-          json: { message: `${this.title}\n${this.content}` },
-          headers: { 'Authorization': 'Bearer '+goCqHttpBotToken },
-        },
-      )
+      .post(`${goCqHttpBotUrl}?${goCqHttpBotQq}`, {
+        timeout: this.timeout,
+        retry: 0,
+        json: { message: `${this.title}\n${this.content}` },
+        headers: { Authorization: 'Bearer ' + goCqHttpBotToken },
+      })
       .json();
     return res.retcode === 0;
   }
@@ -117,6 +115,25 @@ export default class NotificationService {
       })
       .json();
     return res.errno === 0 || res.data.errno === 0;
+  }
+
+  private async pushDeer() {
+    const { pushDeerKey } = this.params;
+    // https://api2.pushdeer.com/message/push?pushkey=<key>&text=标题&desp=<markdown>&type=markdown
+    const url = `https://api2.pushdeer.com/message/push`;
+    const res: any = await got
+      .post(url, {
+        timeout: this.timeout,
+        retry: 0,
+        body: `pushkey=${pushDeerKey}&text=${
+          this.title
+        }&desp=${encodeURIComponent(this.content)}&type=markdown`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      .json();
+    return (
+      res.content.result.length !== undefined && res.content.result.length > 0
+    );
   }
 
   private async bark() {
