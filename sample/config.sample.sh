@@ -125,4 +125,8 @@ export GOTIFY_URL=""
 export GOTIFY_TOKEN=""
 export GOTIFY_PRIORITY=0
 
+## 11. PushDeer
+## deer_key 填写PushDeer的key
+export DEER_KEY=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
