@@ -20,10 +20,12 @@ const CronLogModal = ({
   cron,
   handleCancel,
   visible,
+  data,
 }: {
   cron?: any;
   visible: boolean;
   handleCancel: () => void;
+  data?: string;
 }) => {
   const [value, setValue] = useState<string>('启动中...');
   const [loading, setLoading] = useState<any>(true);
@@ -97,10 +99,16 @@ const CronLogModal = ({
   };
 
   useEffect(() => {
-    if (cron) {
+    if (cron && cron.id) {
       getCronLog(true);
     }
   }, [cron]);
+
+  useEffect(() => {
+    if (data) {
+      setValue(data);
+    }
+  }, [data]);
 
   useEffect(() => {
     setIsPhone(document.body.clientWidth < 768);

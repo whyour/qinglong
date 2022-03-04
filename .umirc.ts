@@ -10,6 +10,7 @@ export default defineConfig({
   },
   fastRefresh: {},
   esbuild: {},
+  webpack5: {},
   dynamicImport: {
     loading: '@/components/pageLoading',
   },
