@@ -347,6 +347,40 @@ export default class CronService {
     }
   }
 
+  public async logs(id: number) {
+    const doc = await this.getDb({ id });
+    if (!doc) {
+      return [];
+    }
+
+    const [, commandStr, url] = doc.command.split(/ +/);
+    let logPath = this.getKey(commandStr);
+    const isQlCommand = doc.command.startsWith('ql ');
+    const key =
+      (url && ['repo', 'raw'].includes(commandStr) && this.getKey(url)) ||
+      logPath;
+    if (isQlCommand) {
+      logPath = 'update';
+    }
+    let logDir = `${config.logPath}${logPath}`;
+    if (existsSync(logDir)) {
+      let files = await promises.readdir(logDir);
+      console.log(files);
+      if (isQlCommand) {
+        files = files.filter((x) => x.includes(key));
+      }
+      return files
+        .map((x) => ({
+          filename: x,
+          directory: logPath,
+          time: fs.statSync(`${logDir}/${x}`).mtime.getTime(),
+        }))
+        .sort((a, b) => b.time - a.time);
+    } else {
+      return [];
+    }
+  }
+
   private getKey(command: string) {
     const start =
       command.lastIndexOf('/') !== -1 ? command.lastIndexOf('/') + 1 : 0;

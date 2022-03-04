@@ -70,7 +70,7 @@ enum OperationPath {
   'unpin',
 }
 
-const Crontab = ({ headerStyle, isPhone }: any) => {
+const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const columns: any = [
     {
       title: '任务名',
@@ -90,14 +90,16 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
               trigger={isPhone ? 'click' : 'hover'}
               content={
                 <div>
-                  {record.labels?.map((label: string, i: number) => (
+                  {record.labels?.map((label: string) => (
                     <Tag
                       color="blue"
-                      onClick={() => {
-                        onSearch(`label:${label}`);
+                      style={{ cursor: 'point' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearchText(`label:${label}`);
                       }}
                     >
-                      {label}
+                      <a>{label}</a>
                     </Tag>
                   ))}
                 </div>
@@ -838,7 +840,9 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           placeholder="请输入名称或者关键词"
           style={{ width: 'auto' }}
           enterButton
+          allowClear
           loading={loading}
+          value={searchText}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
@@ -963,6 +967,7 @@ const Crontab = ({ headerStyle, isPhone }: any) => {
           setIsDetailModalVisible(false);
         }}
         cron={detailCron}
+        theme={theme}
       />
     </PageContainer>
   );

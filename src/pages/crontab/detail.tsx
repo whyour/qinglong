@@ -7,7 +7,7 @@ import {
   Button,
   Card,
   Tag,
-  Popover,
+  List,
   Divider,
 } from 'antd';
 import {
@@ -15,14 +15,14 @@ import {
   CloseCircleOutlined,
   FieldTimeOutlined,
   Loading3QuartersOutlined,
+  FileOutlined,
 } from '@ant-design/icons';
 import { CrontabStatus } from './index';
 import { diffTime } from '@/utils/date';
-
-const contentList: any = {
-  log: <p>log content</p>,
-  script: <p>script content</p>,
-};
+import { request } from '@/utils/http';
+import config from '@/utils/config';
+import CronLogModal from './logModal';
+import Editor from '@monaco-editor/react';
 
 const tabList = [
   {
@@ -35,22 +35,113 @@ const tabList = [
   },
 ];
 
+interface LogItem {
+  directory: string;
+  filename: string;
+}
+
 const language = navigator.language || navigator.languages[0];
 
 const CronDetailModal = ({
   cron = {},
   handleCancel,
   visible,
+  theme,
 }: {
   cron?: any;
   visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
+  theme: string;
 }) => {
   const [activeTabKey, setActiveTabKey] = useState('log');
+  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState<LogItem[]>([]);
+  const [log, setLog] = useState('');
+  const [value, setValue] = useState('');
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+
+  const contentList: any = {
+    log: (
+      <List
+        dataSource={logs}
+        loading={loading}
+        renderItem={(item) => (
+          <List.Item className="log-item" onClick={() => onClickItem(item)}>
+            <FileOutlined style={{ marginRight: 10 }} />
+            {item.directory}/{item.filename}
+          </List.Item>
+        )}
+      />
+    ),
+    script: (
+      <Editor
+        language="shell"
+        theme={theme}
+        value={value}
+        options={{
+          readOnly: true,
+          fontSize: 12,
+          lineNumbersMinChars: 3,
+          fontFamily: 'Source Code Pro',
+          folding: false,
+          glyphMargin: false,
+          wordWrap: 'on',
+        }}
+      />
+    ),
+  };
+
+  const onClickItem = (item: LogItem) => {
+    request
+      .get(`${config.apiPrefix}logs/${item.directory}/${item.filename}`)
+      .then((data) => {
+        setLog(data.data);
+        setIsLogModalVisible(true);
+      });
+  };
 
   const onTabChange = (key: string) => {
     setActiveTabKey(key);
   };
+
+  const getLogs = () => {
+    setLoading(true);
+    request
+      .get(`${config.apiPrefix}crons/${cron.id}/logs`)
+      .then((data: any) => {
+        if (data.code === 200) {
+          setLogs(data.data);
+        }
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const getScript = () => {
+    const cmd = cron.command.split(' ') as string[];
+    if (cmd[0] === 'task') {
+      if (cmd[1].startsWith('/ql/data/scripts')) {
+        cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
+      }
+
+      let [p, s] = cmd[1].split('/');
+      if (!s) {
+        s = p;
+        p = '';
+      }
+      request
+        .get(`${config.apiPrefix}scripts/${s}?path=${p || ''}`)
+        .then((data) => {
+          setValue(data.data);
+        });
+    }
+  };
+
+  useEffect(() => {
+    if (cron && cron.id) {
+      getLogs();
+      getScript();
+    }
+  }, [cron]);
 
   return (
     <Modal
@@ -75,7 +166,7 @@ const CronDetailModal = ({
       width={'80vw'}
       bodyStyle={{ background: '#eee', padding: 12 }}
     >
-      <div style={{ height: '70vh', overflowY: 'auto' }}>
+      <div style={{ height: '80vh', overflowY: 'auto' }}>
         <Card bodyStyle={{ display: 'flex', justifyContent: 'space-between' }}>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">状态</div>
@@ -158,6 +249,14 @@ const CronDetailModal = ({
           {contentList[activeTabKey]}
         </Card>
       </div>
+      <CronLogModal
+        visible={isLogModalVisible}
+        handleCancel={() => {
+          setIsLogModalVisible(false);
+        }}
+        cron={cron}
+        data={log}
+      />
     </Modal>
   );
 };
