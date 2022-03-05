@@ -63,6 +63,7 @@ const CronDetailModal = ({
   const contentList: any = {
     log: (
       <List
+        style={{ height: 'calc(80vh - 236px)', overflowY: 'auto' }}
         dataSource={logs}
         loading={loading}
         renderItem={(item) => (
@@ -166,7 +167,7 @@ const CronDetailModal = ({
       width={'80vw'}
       bodyStyle={{ background: '#eee', padding: 12 }}
     >
-      <div style={{ height: '80vh', overflowY: 'auto' }}>
+      <div style={{ height: '80vh' }}>
         <Card bodyStyle={{ display: 'flex', justifyContent: 'space-between' }}>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">状态</div>
