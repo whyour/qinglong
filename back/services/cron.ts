@@ -365,7 +365,6 @@ export default class CronService {
     let logDir = `${config.logPath}${logPath}`;
     if (existsSync(logDir)) {
       let files = await promises.readdir(logDir);
-      console.log(files);
       if (isQlCommand) {
         files = files.filter((x) => x.includes(key));
       }
