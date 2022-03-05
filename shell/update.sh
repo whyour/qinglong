@@ -304,6 +304,31 @@ patch_version() {
     git config --global pull.rebase false
 
     cp -f /ql/.env.example /ql/.env
+
+    if [[ -d "/ql/db" ]]; then
+        echo -e "检测到旧的db目录，拷贝到data目录...\n"
+        cp -rf /ql/config /ql/data
+        echo
+    fi
+
+    if [[ -d "/ql/scripts" ]]; then
+        echo -e "检测到旧的scripts目录，拷贝到data目录...\n"
+        cp -rf /ql/scripts /ql/data
+        echo
+    fi
+
+    if [[ -d "/ql/log" ]]; then
+        echo -e "检测到旧的log目录，拷贝到data目录...\n"
+        cp -rf /ql/log /ql/data
+        echo
+    fi
+
+    if [[ -d "/ql/config" ]]; then
+        echo -e "检测到旧的config目录，拷贝到data目录...\n"
+        cp -rf /ql/config /ql/data
+        echo
+    fi
+
 }
 
 reload_pm2() {
