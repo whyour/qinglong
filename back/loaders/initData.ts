@@ -57,7 +57,6 @@ export default async () => {
   // 更新2.11.3以前的脚本路径
   CrontabModel.findAll({
     where: {
-      isDisabled: { [Op.ne]: 1 },
       command: {
         [Op.or]: [
           { [Op.like]: `%\/ql\/scripts\/%` },
