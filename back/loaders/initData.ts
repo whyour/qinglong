@@ -54,6 +54,56 @@ export default async () => {
     }
   });
 
+  // 更新2.11.3以前的脚本路径
+  CrontabModel.findAll({
+    where: {
+      isDisabled: { [Op.ne]: 1 },
+      command: {
+        [Op.or]: [
+          { [Op.like]: `%\/ql\/scripts\/%` },
+          { [Op.like]: `%\/ql\/config\/%` },
+          { [Op.like]: `%\/ql\/log\/%` },
+          { [Op.like]: `%\/ql\/db\/%` },
+        ],
+      },
+    },
+  }).then(async (docs) => {
+    for (let i = 0; i < docs.length; i++) {
+      const doc = docs[i];
+      if (doc) {
+        if (doc.command.includes('/ql/scripts/')) {
+          await CrontabModel.update(
+            { command: doc.command.replace('/ql/scripts/', '') },
+            { where: { id: doc.id } },
+          );
+        }
+        if (doc.command.includes('/ql/log/')) {
+          await CrontabModel.update(
+            { command: `/ql/data/log/${doc.command.replace('/ql/log/', '')}` },
+            { where: { id: doc.id } },
+          );
+        }
+        if (doc.command.includes('/ql/config/')) {
+          await CrontabModel.update(
+            {
+              command: `/ql/data/config/${doc.command.replace(
+                '/ql/config/',
+                '',
+              )}`,
+            },
+            { where: { id: doc.id } },
+          );
+        }
+        if (doc.command.includes('/ql/db/')) {
+          await CrontabModel.update(
+            { command: `/ql/data/db/${doc.command.replace('/ql/db/', '')}` },
+            { where: { id: doc.id } },
+          );
+        }
+      }
+    }
+  });
+
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
   await envService.set_envs();
