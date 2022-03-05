@@ -225,7 +225,7 @@ fix_config() {
 
     if [[ -s /etc/nginx/conf.d/default.conf ]]; then
         echo -e "检测到默认nginx配置文件，清空...\n"
-        cat /dev/null > /etc/nginx/conf.d/default.conf
+        cat /dev/null >/etc/nginx/conf.d/default.conf
         echo
     fi
 
@@ -240,7 +240,7 @@ fix_config() {
         cp -fv $file_notify_py_sample $dep_notify_py
         echo
     fi
-    
+
 }
 
 npm_install_sub() {
@@ -305,7 +305,7 @@ git_clone_scripts() {
     local branch=$3
     [[ $branch ]] && local part_cmd="-b $branch "
     echo -e "开始克隆仓库 $url 到 $dir\n"
-    
+
     set_proxy
     git clone $part_cmd $url $dir
     exit_status=$?
@@ -316,17 +316,17 @@ git_pull_scripts() {
     local dir_current=$(pwd)
     local dir_work="$1"
     local branch="$2"
-    [[ $branch ]] && git checkout ${branch}
+    [[ $branch ]] && local part_cmd="origin/${branch}"
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
 
     set_proxy
     git fetch --all
     exit_status=$?
-    git reset --hard &>/dev/null
-    git pull --allow-unrelated-histories &>/dev/null
+    git reset --hard $part_cmd
+    git pull
     unset_proxy
-    
+
     cd $dir_current
 }
 
@@ -359,4 +359,4 @@ detect_macos
 define_cmd
 fix_config
 
-import_config $1 > $task_error_log_path 2>&1
+import_config $1 >$task_error_log_path 2>&1
