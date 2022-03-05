@@ -246,9 +246,10 @@ update_qinglong() {
     pnpm install -g pm2 &>/dev/null
     
     local no_restart="$1"
+    local primary_branch="master"
     [[ -f $dir_root/package.json ]] && ql_depend_old=$(cat $dir_root/package.json)
-    reset_romote_url ${dir_root} "https://github.com/whyour/qinglong.git" ${current_branch}
-    git_pull_scripts $dir_root ${current_branch}
+    reset_romote_url ${dir_root} "https://github.com/whyour/qinglong.git" ${primary_branch}
+    git_pull_scripts $dir_root ${primary_branch}
 
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$dir_root成功...\n"
@@ -264,8 +265,8 @@ update_qinglong() {
 
     local url="https://github.com/whyour/qinglong-static.git"
     if [[ -d ${ql_static_repo}/.git ]]; then
-        reset_romote_url ${ql_static_repo} ${url} ${current_branch}
-        git_pull_scripts ${ql_static_repo} ${current_branch}
+        reset_romote_url ${ql_static_repo} ${url} ${primary_branch}
+        git_pull_scripts ${ql_static_repo} ${primary_branch}
     else
         git_clone_scripts ${url} ${ql_static_repo}
     fi
