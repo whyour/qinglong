@@ -165,6 +165,8 @@ define_cmd() {
 }
 
 fix_config() {
+    make_dir $dir_static
+    make_dir $dir_data
     make_dir $dir_config
     make_dir $dir_log
     make_dir $dir_db
@@ -316,14 +318,12 @@ git_pull_scripts() {
     local dir_current=$(pwd)
     local dir_work="$1"
     local branch="$2"
-    [[ $branch ]] && local part_cmd="origin/${branch}"
     cd $dir_work
     echo -e "开始更新仓库：$dir_work\n"
 
     set_proxy
     git fetch --all
     exit_status=$?
-    git reset --hard $part_cmd
     git pull
     unset_proxy
 
@@ -336,12 +336,16 @@ reset_romote_url() {
     local url=$2
     local branch="$3"
 
-    [[ $branch ]] && local part_cmd="origin/${branch}"
-
     if [[ -d "$dir_work/.git" ]]; then
         cd $dir_work
         [[ -f ".git/index.lock" ]] && rm -f .git/index.lock >/dev/null
         git remote set-url origin $url &>/dev/null
+
+        local part_cmd=""
+        if [[ $branch ]]; then
+            part_cmd="origin/${branch}"
+            git checkout -B "$branch"
+        fi
         git reset --hard $part_cmd &>/dev/null
         cd $dir_current
     fi
