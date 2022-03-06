@@ -246,7 +246,11 @@ update_qinglong() {
     pnpm install -g pm2 &>/dev/null
     
     local no_restart="$1"
+    local all_branch=$(git branch -a)
     local primary_branch="master"
+    if [[ "${all_branch}" =~ "${current_branch}" ]]; then
+        primary_branch="${current_branch}"
+    fi
     [[ -f $dir_root/package.json ]] && ql_depend_old=$(cat $dir_root/package.json)
     reset_romote_url ${dir_root} "https://github.com/whyour/qinglong.git" ${primary_branch}
     git_pull_scripts $dir_root ${primary_branch}
