@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-dir_shell=/ql/shell
+dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
@@ -43,7 +43,7 @@ detect_config_version() {
             local notify_title="配置文件更新通知"
             local notify_content="更新日期: $update_date\n用户版本: $ver_config_user\n新的版本: $ver_config_sample\n更新内容: $update_content\n更新说明: 如需使用新功能请对照config.sample.sh，将相关新参数手动增加到你自己的config.sh中，否则请无视本消息。本消息只在该新版本配置文件更新当天发送一次。\n"
             echo -e $notify_content
-            notify "$notify_title" "$notify_content"
+            notify_api "$notify_title" "$notify_content"
             [[ $? -eq 0 ]] && echo $ver_config_sample >$send_mark
         fi
     else
@@ -91,7 +91,7 @@ del_cron() {
     done
     if [[ $ids ]]; then
         result=$(del_cron_api "$ids")
-        notify "$path 删除任务${result}" "$detail"
+        notify_api "$path 删除任务${result}" "$detail"
     fi
 }
 
@@ -131,7 +131,7 @@ add_cron() {
             fi
         fi
     done
-    notify "$path 新增任务" "$detail"
+    notify_api "$path 新增任务" "$detail"
 }
 
 ## 更新仓库
@@ -203,7 +203,7 @@ update_raw() {
         if [[ -z $cron_id ]]; then
             result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name")
             echo -e "$result\n"
-            notify "新增任务通知" "\n$result"
+            notify_api "新增任务通知" "\n$result"
             # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
         fi
     else
@@ -274,7 +274,7 @@ update_qinglong() {
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
-        local static_version=$(cat /ql/src/version.ts | perl -pe "s|.*\'(.*)\';\.*|\1|" | head -1)
+        local static_version=$(cat $dir_root/src/version.ts | perl -pe "s|.*\'(.*)\';\.*|\1|" | head -1)
         echo -e "\n当前版本 $static_version...\n"
         
         rm -rf $dir_static/*
@@ -292,10 +292,10 @@ update_qinglong() {
 }
 
 patch_version() {
-    if [[ -f "/ql/db/cookie.db" ]]; then
+    if [[ -f "$dir_root/db/cookie.db" ]]; then
         echo -e "检测到旧的db文件，拷贝为新db...\n"
-        mv /ql/db/cookie.db /ql/db/env.db
-        rm -rf /ql/db/cookie.db
+        mv $dir_root/db/cookie.db $dir_root/db/env.db
+        rm -rf $dir_root/db/cookie.db
         echo
     fi
 
@@ -305,29 +305,29 @@ patch_version() {
 
     git config --global pull.rebase false
 
-    cp -f /ql/.env.example /ql/.env
+    cp -f $dir_root/.env.example $dir_root/.env
 
-    if [[ -d "/ql/db" ]]; then
+    if [[ -d "$dir_root/db" ]]; then
         echo -e "检测到旧的db目录，拷贝到data目录...\n"
-        cp -rf /ql/config /ql/data
+        cp -rf $dir_root/config $dir_root/data
         echo
     fi
 
-    if [[ -d "/ql/scripts" ]]; then
+    if [[ -d "$dir_root/scripts" ]]; then
         echo -e "检测到旧的scripts目录，拷贝到data目录...\n"
-        cp -rf /ql/scripts /ql/data
+        cp -rf $dir_root/scripts $dir_root/data
         echo
     fi
 
-    if [[ -d "/ql/log" ]]; then
+    if [[ -d "$dir_root/log" ]]; then
         echo -e "检测到旧的log目录，拷贝到data目录...\n"
-        cp -rf /ql/log /ql/data
+        cp -rf $dir_root/log $dir_root/data
         echo
     fi
 
-    if [[ -d "/ql/config" ]]; then
+    if [[ -d "$dir_root/config" ]]; then
         echo -e "检测到旧的config目录，拷贝到data目录...\n"
-        cp -rf /ql/config /ql/data
+        cp -rf $dir_root/config $dir_root/data
         echo
     fi
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ## 目录
-dir_root=/ql
+dir_root=$QL_DIR
 dir_data=$dir_root/data
 dir_shell=$dir_root/shell
 dir_sample=$dir_root/sample
