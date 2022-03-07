@@ -324,8 +324,9 @@ git_pull_scripts() {
     set_proxy
     git fetch --all
     exit_status=$?
-    git pull --allow-unrelated-histories
+    git pull &>/dev/null
     unset_proxy
+    reset_branch "$branch"
 
     cd $dir_current
 }
@@ -342,14 +343,19 @@ reset_romote_url() {
         git remote set-url origin $url &>/dev/null
 
         local part_cmd=""
-        if [[ $branch ]]; then
-            part_cmd="origin/${branch}"
-            git checkout -B "$branch"
-            git branch --set-upstream-to=$part_cmd $branch
-        fi
-        git reset --hard $part_cmd &>/dev/null
+        reset_branch "$branch"
         cd $dir_current
     fi
+}
+
+reset_branch() {
+    local branch="$1"
+    if [[ $branch ]]; then
+        part_cmd="origin/${branch}"
+        git checkout -B "$branch"
+        git branch --set-upstream-to=$part_cmd $branch
+    fi
+    git reset --hard $part_cmd &>/dev/null
 }
 
 random_range() {
