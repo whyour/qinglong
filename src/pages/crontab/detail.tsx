@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   message,
@@ -9,6 +9,7 @@ import {
   Tag,
   List,
   Divider,
+  Typography,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -23,6 +24,8 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 import CronLogModal from './logModal';
 import Editor from '@monaco-editor/react';
+
+const { Text } = Typography;
 
 const tabList = [
   {
@@ -59,6 +62,8 @@ const CronDetailModal = ({
   const [log, setLog] = useState('');
   const [value, setValue] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const editorRef = useRef<any>(null);
+  const [scriptInfo, setScriptInfo] = useState<any>({});
 
   const contentList: any = {
     log: (
@@ -79,13 +84,15 @@ const CronDetailModal = ({
         theme={theme}
         value={value}
         options={{
-          readOnly: true,
           fontSize: 12,
           lineNumbersMinChars: 3,
           fontFamily: 'Source Code Pro',
           folding: false,
           glyphMargin: false,
           wordWrap: 'on',
+        }}
+        onMount={(editor) => {
+          editorRef.current = editor;
         }}
       />
     ),
@@ -128,12 +135,55 @@ const CronDetailModal = ({
         s = p;
         p = '';
       }
+      setScriptInfo({ parent: p, filename: s });
       request
         .get(`${config.apiPrefix}scripts/${s}?path=${p || ''}`)
         .then((data) => {
           setValue(data.data);
         });
     }
+  };
+
+  const saveFile = () => {
+    Modal.confirm({
+      title: `确认保存`,
+      content: (
+        <>
+          确认保存文件
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {scriptInfo.filename}
+          </Text>{' '}
+          ，保存后不可恢复
+        </>
+      ),
+      onOk() {
+        const content = editorRef.current
+          ? editorRef.current.getValue().replace(/\r\n/g, '\n')
+          : value;
+        return new Promise((resolve, reject) => {
+          request
+            .put(`${config.apiPrefix}scripts`, {
+              data: {
+                filename: scriptInfo.filename,
+                path: scriptInfo.parent || '',
+                content,
+              },
+            })
+            .then((_data: any) => {
+              if (_data.code === 200) {
+                message.success(`保存成功`);
+              } else {
+                message.error(_data);
+              }
+              resolve(null);
+            })
+            .catch((e) => reject(e));
+        });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
   };
 
   useEffect(() => {
@@ -245,6 +295,17 @@ const CronDetailModal = ({
           onTabChange={(key) => {
             onTabChange(key);
           }}
+          tabBarExtraContent={
+            activeTabKey === 'script' && (
+              <Button
+                type="primary"
+                style={{ marginRight: 8 }}
+                onClick={saveFile}
+              >
+                保存
+              </Button>
+            )
+          }
           bodyStyle={{ height: 'calc(80vh - 188px)', overflowY: 'auto' }}
         >
           {contentList[activeTabKey]}
