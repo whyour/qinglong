@@ -270,7 +270,7 @@ update_qinglong() {
         reset_romote_url ${ql_static_repo} ${url} ${primary_branch}
         git_pull_scripts ${ql_static_repo} ${primary_branch}
     else
-        git_clone_scripts ${url} ${ql_static_repo}
+        git_clone_scripts ${url} ${ql_static_repo} ${primary_branch}
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新$ql_static_repo成功...\n"
