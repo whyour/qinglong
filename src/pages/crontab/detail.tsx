@@ -63,7 +63,6 @@ const CronDetailModal = ({
   const contentList: any = {
     log: (
       <List
-        style={{ height: 'calc(80vh - 236px)', overflowY: 'auto' }}
         dataSource={logs}
         loading={loading}
         renderItem={(item) => (
@@ -246,6 +245,7 @@ const CronDetailModal = ({
           onTabChange={(key) => {
             onTabChange(key);
           }}
+          bodyStyle={{ height: 'calc(80vh - 188px)', overflowY: 'auto' }}
         >
           {contentList[activeTabKey]}
         </Card>
