@@ -9,6 +9,7 @@ import { DependenceModel } from '../data/dependence';
 import { Op } from 'sequelize';
 import SystemService from '../services/system';
 import ScheduleService from '../services/schedule';
+import config from '../config';
 
 export default async () => {
   const cronService = Container.get(CronService);
@@ -31,7 +32,9 @@ export default async () => {
         const group = groups[key];
         const depIds = group.map((x) => x.id);
         for (const dep of depIds) {
-          await dependenceService.reInstall([dep]);
+          if (dep) {
+            await dependenceService.reInstall([dep]);
+          }
         }
       }
     }
@@ -59,10 +62,10 @@ export default async () => {
     where: {
       command: {
         [Op.or]: [
-          { [Op.like]: `%\/ql\/scripts\/%` },
-          { [Op.like]: `%\/ql\/config\/%` },
-          { [Op.like]: `%\/ql\/log\/%` },
-          { [Op.like]: `%\/ql\/db\/%` },
+          { [Op.like]: `%\/${config.rootPath}\/scripts\/%` },
+          { [Op.like]: `%\/${config.rootPath}\/config\/%` },
+          { [Op.like]: `%\/${config.rootPath}\/log\/%` },
+          { [Op.like]: `%\/${config.rootPath}\/db\/%` },
         ],
       },
     },
@@ -70,32 +73,42 @@ export default async () => {
     for (let i = 0; i < docs.length; i++) {
       const doc = docs[i];
       if (doc) {
-        if (doc.command.includes('/ql/scripts/')) {
+        if (doc.command.includes(`${config.rootPath}/scripts/`)) {
           await CrontabModel.update(
-            { command: doc.command.replace('/ql/scripts/', '') },
+            { command: doc.command.replace(`${config.rootPath}/scripts/`, '') },
             { where: { id: doc.id } },
           );
         }
-        if (doc.command.includes('/ql/log/')) {
-          await CrontabModel.update(
-            { command: `/ql/data/log/${doc.command.replace('/ql/log/', '')}` },
-            { where: { id: doc.id } },
-          );
-        }
-        if (doc.command.includes('/ql/config/')) {
+        if (doc.command.includes(`${config.rootPath}/log/`)) {
           await CrontabModel.update(
             {
-              command: `/ql/data/config/${doc.command.replace(
-                '/ql/config/',
+              command: `${config.rootPath}/data/log/${doc.command.replace(
+                `${config.rootPath}/log/`,
                 '',
               )}`,
             },
             { where: { id: doc.id } },
           );
         }
-        if (doc.command.includes('/ql/db/')) {
+        if (doc.command.includes(`${config.rootPath}/config/`)) {
           await CrontabModel.update(
-            { command: `/ql/data/db/${doc.command.replace('/ql/db/', '')}` },
+            {
+              command: `${config.rootPath}/data/config/${doc.command.replace(
+                `${config.rootPath}/config/`,
+                '',
+              )}`,
+            },
+            { where: { id: doc.id } },
+          );
+        }
+        if (doc.command.includes(`${config.rootPath}/db/`)) {
+          await CrontabModel.update(
+            {
+              command: `${config.rootPath}/data/db/${doc.command.replace(
+                `${config.rootPath}/db/`,
+                '',
+              )}`,
+            },
             { where: { id: doc.id } },
           );
         }

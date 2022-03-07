@@ -8,6 +8,7 @@ import { AppModel } from '../data/open';
 import { AuthModel } from '../data/auth';
 import { sequelize } from '../data';
 import { fileExist } from '../config/util';
+import config from '../config';
 
 export default async () => {
   try {
@@ -26,11 +27,11 @@ export default async () => {
     // } catch (error) { }
 
     // 2.10-2.11 升级
-    const cronDbFile = path.join('/ql', 'db/crontab.db');
-    const envDbFile = path.join('/ql', 'db/env.db');
-    const appDbFile = path.join('/ql', 'db/app.db');
-    const authDbFile = path.join('/ql', 'db/auth.db');
-    const dependenceDbFile = path.join('/ql', 'db/dependence.db');
+    const cronDbFile = path.join(config.rootPath, 'db/crontab.db');
+    const envDbFile = path.join(config.rootPath, 'db/env.db');
+    const appDbFile = path.join(config.rootPath, 'db/app.db');
+    const authDbFile = path.join(config.rootPath, 'db/auth.db');
+    const dependenceDbFile = path.join(config.rootPath, 'db/dependence.db');
     const crondbExist = await fileExist(cronDbFile);
     const dependenceDbExist = await fileExist(dependenceDbFile);
     const envDbExist = await fileExist(envDbFile);

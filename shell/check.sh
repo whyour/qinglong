@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-dir_shell=/ql/shell
+dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
