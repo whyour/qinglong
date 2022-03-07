@@ -345,6 +345,7 @@ reset_romote_url() {
         if [[ $branch ]]; then
             part_cmd="origin/${branch}"
             git checkout -B "$branch"
+            git branch --set-upstream-to=$part_cmd $branch
         fi
         git reset --hard $part_cmd &>/dev/null
         cd $dir_current
