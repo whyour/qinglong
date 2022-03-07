@@ -243,8 +243,6 @@ usage() {
 update_qinglong() {
     patch_version
 
-    pnpm install -g pm2 &>/dev/null
-    
     local no_restart="$1"
     local all_branch=$(git branch -a)
     local primary_branch="master"
@@ -279,7 +277,7 @@ update_qinglong() {
         local static_version=$(cat /ql/src/version.ts | perl -pe "s|.*\'(.*)\';\.*|\1|" | head -1)
         echo -e "\n当前版本 $static_version...\n"
         
-        rm -rf $dir_static
+        rm -rf $dir_static/*
         cp -rf $ql_static_repo/* $dir_static
         if [[ $no_restart != "no-restart" ]]; then
             nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf

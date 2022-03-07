@@ -98,6 +98,7 @@ check_pm2() {
 
 main() {
   echo -e "=====> 开始检测"
+  pnpm install -g pm2
   copy_dep
   check_ql
   check_nginx
