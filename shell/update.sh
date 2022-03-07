@@ -254,7 +254,7 @@ update_qinglong() {
     git_pull_scripts $dir_root ${primary_branch}
 
     if [[ $exit_status -eq 0 ]]; then
-        echo -e "\n更新$dir_root成功...\n"
+        echo -e "\n更新青龙源文件成功...\n"
         cp -f $file_config_sample $dir_config/config.sample.sh
         detect_config_version
         update_depend
@@ -262,7 +262,7 @@ update_qinglong() {
         [[ -f $dir_root/package.json ]] && ql_depend_new=$(cat $dir_root/package.json)
         [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
     else
-        echo -e "\n更新$dir_root失败，请检查原因...\n"
+        echo -e "\n更新青龙源文件失败，请检查原因...\n"
     fi
 
     local url="https://github.com/whyour/qinglong-static.git"
@@ -273,7 +273,7 @@ update_qinglong() {
         git_clone_scripts ${url} ${ql_static_repo} ${primary_branch}
     fi
     if [[ $exit_status -eq 0 ]]; then
-        echo -e "\n更新$ql_static_repo成功...\n"
+        echo -e "\n更新青龙静态资源成功...\n"
         local static_version=$(cat $dir_root/src/version.ts | perl -pe "s|.*\'(.*)\';\.*|\1|" | head -1)
         echo -e "\n当前版本 $static_version...\n"
         
@@ -286,7 +286,7 @@ update_qinglong() {
             reload_pm2
         fi
     else
-        echo -e "\n更新$dir_root失败，请检查原因...\n"
+        echo -e "\n更新青龙静态资源失败，请检查原因...\n"
     fi
 
 }
