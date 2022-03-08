@@ -24,6 +24,7 @@ RUN git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && rm -rf /root/.pnpm-store \
     && rm -rf /root/.cache \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
+    && mkdir -p ${QL_DIR}/static \
     && cp -rf /static/* ${QL_DIR}/static \
     && rm -rf /static
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
