@@ -552,6 +552,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
           socketMessage={socketMessage}
           handleCancel={() => {
             setIsLogModalVisible(false);
+            getDetail(currentNode);
           }}
         />
         <EditScriptNameModal

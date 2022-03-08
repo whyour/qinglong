@@ -72,18 +72,53 @@ const EditModal = ({
       });
   };
 
+  class AutoSave {
+    private id: any;
+
+    constructor() {
+      this.id = ''
+    }
+    start() {
+      this.id = setInterval(async() => await this.save, 3000)
+    }
+    stop() {
+      clearInterval(this.id)
+    }
+    async save() {
+      const payload = {
+        content: editorRef.current && editorRef.current.getValue().replace(/\r\n/g, '\n'),
+        filename: cNode?.value,
+        originFilename: cNode?.value,
+        path: cNode?.parent
+      }
+      return request.post(`${config.apiPrefix}scripts`, {
+        data: payload,
+      })
+    }
+  }
+
+  const autoSave = new AutoSave();
+
+  if (visible) {
+    autoSave.start()
+  } else {
+    autoSave.stop()
+  }
+
   const run = () => {
     setLog('');
-    request
-      .put(`${config.apiPrefix}scripts/run`, {
-        data: {
-          filename: cNode.value,
-          path: cNode.parent || '',
-        },
-      })
-      .then((data) => {
-        setIsRunning(true);
-      });
+    autoSave.save().then(() => {
+      request
+        .put(`${config.apiPrefix}scripts/run`, {
+          data: {
+            filename: cNode.value,
+            path: cNode.parent || '',
+          },
+        })
+        .then((data) => {
+          setIsRunning(true);
+        });
+    })
   };
 
   const stop = () => {
