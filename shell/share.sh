@@ -165,7 +165,6 @@ define_cmd() {
 }
 
 fix_config() {
-    make_dir $dir_static
     make_dir $dir_data
     make_dir $dir_config
     make_dir $dir_log
