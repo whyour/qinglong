@@ -9,11 +9,15 @@ import {
   Typography,
   Tooltip,
   Input,
+  Form,
+  notification,
 } from 'antd';
 import {
   EditOutlined,
   DeleteOutlined,
   SyncOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
   CheckCircleOutlined,
   StopOutlined,
 } from '@ant-design/icons';
@@ -26,9 +30,10 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
 import { getTableScroll } from '@/utils/index';
+import { doc } from 'prettier';
 
 const { Text } = Typography;
-const { Search } = Input;
+const { Search, TextArea } = Input;
 
 enum Status {
   '已启用',
@@ -462,6 +467,188 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
     });
   };
 
+  const [importForm] = Form.useForm();
+
+  const operateImport = () => {
+    const importList: Array<any> = [
+      // {
+      //   index: 1,
+      //   name: '',
+      //   icon: '',
+      //   color: ''
+      // }
+    ];
+    let importRes: any;
+
+    const insertOneEnv = async (values: any) => {
+      const { value, split, name, remarks } = values;
+      const method = 'post';
+      let payload;
+      if (split === '1') {
+        const symbol = value.includes('&') ? '&' : '\n';
+        payload = value.split(symbol).map((x: any) => {
+          return {
+            name: name,
+            value: x,
+            remarks: remarks,
+          };
+        });
+      } else {
+        payload = [{ value, name, remarks }];
+      }
+      const { code, data } = await request[method](`${config.apiPrefix}envs`, {
+        data: payload,
+      });
+      return { code, data };
+    };
+
+    const submitImport = async (value: string) => {
+      let now_at: any = '';
+      try {
+        setLoading(true);
+        const dataList = JSON.parse(value); // 是一个数组
+
+        for (const [index, item] of dataList.entries()) {
+          importList.push({
+            index: index,
+            name: item.name,
+            icon: <SyncOutlined />,
+            color: 'default',
+            text: '等待中',
+          });
+        }
+
+        for (const [index, item] of dataList.entries()) {
+          Object.assign(importList[index], {
+            icon: <ClockCircleOutlined />,
+            color: 'processing',
+            text: '进行中',
+          });
+          now_at = importList[index];
+          const { code = 0 } = await insertOneEnv(item);
+          if (code === 200) {
+            Object.assign(importList[index], {
+              icon: <CheckCircleOutlined />,
+              color: 'success',
+              text: '成功',
+            });
+          } else {
+            Object.assign(importList[index], {
+              icon: <CloseCircleOutlined />,
+              color: 'error',
+              text: '失败',
+            });
+          }
+        }
+        importRes = importList.map((one) => {
+          return (
+            <div>
+              第${one.index + 1}个变量 - ${one.name}{' '}
+              <Tag icon={one.icon} color={one.color}>
+                更新成功
+              </Tag>
+            </div>
+          );
+        });
+
+        const count_success = importList.filter(
+          (one) => one.color === 'success',
+        ).length;
+        const count_failed = importList.filter(
+          (one) => one.color === 'error',
+        ).length;
+
+        notification.success({
+          message: '导入完成',
+          description: `成功导入${count_success}个，失败${count_failed}个`,
+        });
+        return true;
+      } catch (e) {
+        if (e.message.includes('JSON')) {
+          message.error('数据格式有问题，请检查并更正json格式');
+        } else {
+          message.error(
+            `导入第 ${now_at.index + 1} 个数据 ${
+              now_at.name
+            } 失败，请检查是否存在相同变量`,
+          );
+          console.log(e);
+        }
+      } finally {
+        setLoading(false);
+      }
+      return false;
+    };
+    Modal.confirm({
+      title: `环境变量配置数据-导入-请手动粘贴`,
+      okText: '导入',
+      content: (
+        <div>
+          <Form form={importForm} layout="vertical" name="form_in_modal">
+            <Form.Item name="envs" label="环境变量">
+              <TextArea
+                placeholder="请粘贴导入的环境变量"
+                style={{ height: 120, marginTop: '20px' }}
+                autoFocus
+              ></TextArea>
+            </Form.Item>
+          </Form>
+        </div>
+      ),
+      async onOk() {
+        const values = await importForm.validateFields();
+        const { envs }: { envs: string } = values;
+        const isOk = await submitImport(envs);
+        if (isOk) {
+          setTimeout(() => {
+            location.reload();
+          }, 1000);
+          return Promise.resolve();
+        }
+        return Promise.reject('');
+      },
+      onCancel() {
+        importForm.resetFields();
+      },
+    });
+  };
+
+  const operateExport = () => {
+    const result = [...value];
+    const selectItems = result
+      .filter((one) => selectedRowIds.includes(one.id))
+      .map((one) => {
+        return {
+          name: one.name,
+          value: one.value,
+          split: one.split,
+          remarks: one.remarks,
+        };
+      });
+
+    const resJson = JSON.stringify(selectItems, function (key: any, val: any) {
+      console.log(val);
+      if (val) return val;
+    });
+
+    Modal.confirm({
+      title: `环境变量配置数据-导出-请手动复制`,
+      content: (
+        <TextArea
+          style={{ height: 120, marginTop: '20px' }}
+          value={resJson}
+          autoFocus
+        ></TextArea>
+      ),
+      onOk() {
+        console.log('Ok');
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
   const modifyName = () => {
     setIsEditNameModalVisible(true);
   };
@@ -500,42 +687,58 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
         style: headerStyle,
       }}
     >
-      {selectedRowIds.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5 }}
-            onClick={modifyName}
-          >
-            批量修改变量名称
-          </Button>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5, marginLeft: 8 }}
-            onClick={delEnvs}
-          >
-            批量删除
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateEnvs(0)}
-            style={{ marginLeft: 8, marginBottom: 5 }}
-          >
-            批量启用
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateEnvs(1)}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量禁用
-          </Button>
-          <span style={{ marginLeft: 8 }}>
-            已选择
-            <a>{selectedRowIds?.length}</a>项
-          </span>
-        </div>
-      )}
+      <div style={{ marginBottom: 16, display: 'flex' }}>
+        <Button
+          type="primary"
+          style={{ marginBottom: 5 }}
+          onClick={operateImport}
+        >
+          批量导入
+        </Button>
+        {selectedRowIds.length > 0 && (
+          <div>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={operateExport}
+            >
+              批量导出
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={modifyName}
+            >
+              批量修改变量名称
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={delEnvs}
+            >
+              批量删除
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(0)}
+              style={{ marginLeft: 8, marginBottom: 5 }}
+            >
+              批量启用
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(1)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量禁用
+            </Button>
+            <span style={{ marginLeft: 8 }}>
+              已选择
+              <a>{selectedRowIds?.length}</a>项
+            </span>
+          </div>
+        )}
+      </div>
       <DndProvider backend={HTML5Backend}>
         <Table
           columns={columns}
