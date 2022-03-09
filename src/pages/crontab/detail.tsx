@@ -50,11 +50,13 @@ const CronDetailModal = ({
   handleCancel,
   visible,
   theme,
+  isPhone,
 }: {
   cron?: any;
   visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
   theme: string;
+  isPhone: boolean;
 }) => {
   const [activeTabKey, setActiveTabKey] = useState('log');
   const [loading, setLoading] = useState(true);
@@ -213,11 +215,11 @@ const CronDetailModal = ({
       forceRender
       footer={false}
       onCancel={() => handleCancel()}
-      width={'80vw'}
-      bodyStyle={{ background: '#eee', padding: 12 }}
+      wrapClassName="crontab-detail"
+      width={!isPhone ? '80vw' : ''}
     >
       <div style={{ height: '80vh' }}>
-        <Card bodyStyle={{ display: 'flex', justifyContent: 'space-between' }}>
+        <Card>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">状态</div>
             <div className="cron-detail-info-value">
