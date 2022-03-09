@@ -44,6 +44,27 @@
 # 待完善
 ```
 
+### podman 部署
+
+1. podman 安装
+
+```bash
+https://podman.io/getting-started/installation
+```
+
+2. 启动容器
+
+```bash
+podman run -dit \
+  --network bridge \
+  -v $PWD/ql:/ql/data \
+  -p 5700:5700 \
+  --name qinglong \
+  --hostname qinglong \
+  --restart unless-stopped \
+  docker.io/whyour/qinglong:latest
+```
+
 ### docker 部署
 
 1. docker 安装
