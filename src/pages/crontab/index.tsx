@@ -968,6 +968,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         }}
         cron={detailCron}
         theme={theme}
+        isPhone={isPhone}
       />
     </PageContainer>
   );
