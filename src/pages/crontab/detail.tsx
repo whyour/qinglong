@@ -66,6 +66,7 @@ const CronDetailModal = ({
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const editorRef = useRef<any>(null);
   const [scriptInfo, setScriptInfo] = useState<any>({});
+  const [logUrl, setLogUrl] = useState('');
 
   const contentList: any = {
     log: (
@@ -101,6 +102,8 @@ const CronDetailModal = ({
   };
 
   const onClickItem = (item: LogItem) => {
+    localStorage.setItem('logCron', cron.id);
+    setLogUrl(`${config.apiPrefix}logs/${item.directory}/${item.filename}`);
     request
       .get(`${config.apiPrefix}logs/${item.directory}/${item.filename}`)
       .then((data) => {
@@ -173,6 +176,7 @@ const CronDetailModal = ({
             })
             .then((_data: any) => {
               if (_data.code === 200) {
+                setValue(content);
                 message.success(`保存成功`);
               } else {
                 message.error(_data);
@@ -221,6 +225,12 @@ const CronDetailModal = ({
       <div style={{ height: '80vh' }}>
         <Card>
           <div className="cron-detail-info-item">
+            <div className="cron-detail-info-title">任务</div>
+            <div className="cron-detail-info-value">{cron.command}</div>
+          </div>
+        </Card>
+        <Card style={{ marginTop: 10 }}>
+          <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">状态</div>
             <div className="cron-detail-info-value">
               {(!cron.isDisabled || cron.status !== CrontabStatus.idle) && (
@@ -251,10 +261,6 @@ const CronDetailModal = ({
                 </Tag>
               )}
             </div>
-          </div>
-          <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">任务</div>
-            <div className="cron-detail-info-value">{cron.command}</div>
           </div>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">定时</div>
@@ -291,7 +297,7 @@ const CronDetailModal = ({
           </div>
         </Card>
         <Card
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 10 }}
           tabList={tabList}
           activeTabKey={activeTabKey}
           onTabChange={(key) => {
@@ -308,7 +314,7 @@ const CronDetailModal = ({
               </Button>
             )
           }
-          bodyStyle={{ height: 'calc(80vh - 188px)', overflowY: 'auto' }}
+          bodyStyle={{ height: 'calc(80vh - 238px)', overflowY: 'auto' }}
         >
           {contentList[activeTabKey]}
         </Card>
@@ -320,6 +326,7 @@ const CronDetailModal = ({
         }}
         cron={cron}
         data={log}
+        logUrl={logUrl}
       />
     </Modal>
   );
