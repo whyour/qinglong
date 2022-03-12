@@ -177,7 +177,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
             秒后自动刷新
           </span>
         ),
-        duration: 10,
+        duration: 30,
       });
       setTimeout(() => {
         window.location.reload();
