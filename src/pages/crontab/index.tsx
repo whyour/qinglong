@@ -96,7 +96,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
                       style={{ cursor: 'point' }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSearchText(`label:${label}`);
+                        setSearchValue(`label:${label}`);
                       }}
                     >
                       <a>{label}</a>
@@ -364,6 +364,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
+  const [searchValue, setSearchValue] = useState('');
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -842,7 +843,8 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
           enterButton
           allowClear
           loading={loading}
-          value={searchText}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
