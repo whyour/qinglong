@@ -40,7 +40,7 @@ import { getTableScroll } from '@/utils/index';
 import { history } from 'umi';
 import './index.less';
 
-const { Text } = Typography;
+const { Text, Paragraph } = Typography;
 const { Search } = Input;
 
 export enum CrontabStatus {
@@ -130,16 +130,16 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       align: 'center' as const,
       render: (text: string, record: any) => {
         return (
-          <span
+          <Paragraph
             style={{
-              textAlign: 'left',
-              width: '100%',
-              display: 'inline-block',
               wordBreak: 'break-all',
+              marginBottom: 0,
+              textAlign: 'left',
             }}
+            ellipsis={{ tooltip: text, rows: 2 }}
           >
             {text}
-          </span>
+          </Paragraph>
         );
       },
       sorter: {
@@ -628,7 +628,8 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     index: number;
   }> = ({ record, index }) => (
     <Dropdown
-      arrow
+      arrow={{ pointAtCenter: true }}
+      placement="bottomRight"
       trigger={['click']}
       overlay={
         <Menu

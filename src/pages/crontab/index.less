@@ -14,13 +14,42 @@
     padding: 12px;
   }
 
+  .ant-card-body {
+    padding: 18px;
+  }
+  .ant-card-head {
+    padding: 0 18px;
+  }
+
   .ant-card:first-child {
+    max-height: 66px;
+    overflow: auto;
+
+    .ant-card-body {
+      min-width: 600px;
+    }
+
+    .cron-detail-info-item {
+      display: flex;
+
+      .cron-detail-info-title {
+        width: 50px;
+      }
+
+      .cron-detail-info-value {
+        flex: 1;
+        margin-top: 0;
+      }
+    }
+  }
+
+  .ant-card:nth-child(2) {
     overflow-x: auto;
 
     .ant-card-body {
       display: flex;
       justify-content: space-between;
-      min-width: 700px;
+      min-width: 600px;
     }
   }
 
@@ -32,7 +61,7 @@
     }
 
     .cron-detail-info-value {
-      margin-top: 18px;
+      margin-top: 12px;
     }
   }
 }

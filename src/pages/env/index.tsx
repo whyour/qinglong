@@ -27,7 +27,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
 import { getTableScroll } from '@/utils/index';
 
-const { Text } = Typography;
+const { Text, Paragraph } = Typography;
 const { Search } = Input;
 
 enum Status {
@@ -119,18 +119,18 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
       key: 'value',
       align: 'center' as const,
       width: '35%',
-      ellipsis: {
-        showTitle: false,
-      },
       render: (text: string, record: any) => {
         return (
-          <Tooltip
-            placement="topLeft"
-            title={text}
-            trigger={['hover', 'click']}
+          <Paragraph
+            style={{
+              wordBreak: 'break-all',
+              marginBottom: 0,
+              textAlign: 'left',
+            }}
+            ellipsis={{ tooltip: text, rows: 2 }}
           >
-            <span>{text}</span>
-          </Tooltip>
+            {text}
+          </Paragraph>
         );
       },
     },
