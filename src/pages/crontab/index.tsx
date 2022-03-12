@@ -85,28 +85,32 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
               goToScriptManager(record);
             }}
           >
-            <Popover
-              placement="right"
-              trigger={isPhone ? 'click' : 'hover'}
-              content={
-                <div>
-                  {record.labels?.map((label: string) => (
-                    <Tag
-                      color="blue"
-                      style={{ cursor: 'point' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSearchValue(`label:${label}`);
-                      }}
-                    >
-                      <a>{label}</a>
-                    </Tag>
-                  ))}
-                </div>
-              }
-            >
-              {record.name || '-'}
-            </Popover>
+            {record.labels && record.labels.length > 0 ? (
+              <Popover
+                placement="right"
+                trigger={isPhone ? 'click' : 'hover'}
+                content={
+                  <div>
+                    {record.labels?.map((label: string) => (
+                      <Tag
+                        color="blue"
+                        style={{ cursor: 'point' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSearchValue(`label:${label}`);
+                        }}
+                      >
+                        <a>{label}</a>
+                      </Tag>
+                    ))}
+                  </div>
+                }
+              >
+                {record.name || '-'}
+              </Popover>
+            ) : (
+              record.name || '-'
+            )}
             {record.isPinned ? (
               <span>
                 <PushpinOutlined />
