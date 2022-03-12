@@ -85,7 +85,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
               goToScriptManager(record);
             }}
           >
-            {record.labels && record.labels.length > 0 ? (
+            {record.labels?.length > 0 && record.labels[0] !== '' ? (
               <Popover
                 placement="right"
                 trigger={isPhone ? 'click' : 'hover'}
