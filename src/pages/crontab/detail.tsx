@@ -132,6 +132,7 @@ const CronDetailModal = ({
   const getScript = () => {
     const cmd = cron.command.split(' ') as string[];
     if (cmd[0] === 'task') {
+      setValidTabs(validTabs);
       if (cmd[1].startsWith('/ql/data/scripts')) {
         cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
       }
