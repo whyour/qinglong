@@ -67,6 +67,7 @@ const CronDetailModal = ({
   const editorRef = useRef<any>(null);
   const [scriptInfo, setScriptInfo] = useState<any>({});
   const [logUrl, setLogUrl] = useState('');
+  const [validTabs, setValidTabs] = useState(tabList);
 
   const contentList: any = {
     log: (
@@ -146,6 +147,8 @@ const CronDetailModal = ({
         .then((data) => {
           setValue(data.data);
         });
+    } else {
+      setValidTabs([validTabs[0]]);
     }
   };
 
@@ -204,7 +207,9 @@ const CronDetailModal = ({
       title={
         <>
           <span>{cron.name}</span>
-          <Divider type="vertical"></Divider>
+          {cron.labels?.length > 0 && cron.labels[0] !== '' && (
+            <Divider type="vertical"></Divider>
+          )}
           {cron.labels?.length > 0 &&
             cron.labels[0] !== '' &&
             cron.labels?.map((label: string, i: number) => (
@@ -222,7 +227,7 @@ const CronDetailModal = ({
       wrapClassName="crontab-detail"
       width={!isPhone ? '80vw' : ''}
     >
-      <div style={{ height: '80vh' }}>
+      <div className="card-wrapper">
         <Card>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">任务</div>
@@ -298,7 +303,7 @@ const CronDetailModal = ({
         </Card>
         <Card
           style={{ marginTop: 10 }}
-          tabList={tabList}
+          tabList={validTabs}
           activeTabKey={activeTabKey}
           onTabChange={(key) => {
             onTabChange(key);
@@ -314,7 +319,6 @@ const CronDetailModal = ({
               </Button>
             )
           }
-          bodyStyle={{ height: 'calc(80vh - 238px)', overflowY: 'auto' }}
         >
           {contentList[activeTabKey]}
         </Card>

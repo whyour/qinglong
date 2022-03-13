@@ -9,6 +9,19 @@
 }
 
 .crontab-detail {
+  .card-wrapper {
+    height: 80vh;
+    height: calc(80vh - var(--vh-offset, 0px));
+
+    .ant-card:last-child {
+      .ant-card-body {
+        height: calc(80vh - 238px);
+        height: calc(80vh - var(--vh-offset, 0px) - 238px);
+        overflow-y: auto;
+      }
+    }
+  }
+
   .ant-modal-body {
     background: #eee;
     padding: 12px;
