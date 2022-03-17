@@ -22,9 +22,9 @@ if [[ ! -d ${repo_path}/.git ]]; then
   git_clone_scripts ${url} ${repo_path} "main"
 fi
 
-cp -rf "$repo_path/jbot" $dir_root
-if [[ ! -f "$dir_root/config/bot.json" ]]; then
-  cp -f "$repo_path/config/bot.json" "$dir_root/config"
+cp -rf "$repo_path/jbot" $dir_data
+if [[ ! -f "$dir_config/bot.json" ]]; then
+  cp -f "$repo_path/config/bot.json" "$dir_config"
 fi
 echo -e "\nbot文件下载成功...\n"
 
@@ -32,7 +32,7 @@ echo -e "3、安装python3依赖...\n"
 if [[ $PipMirror ]]; then
   pip3 config set global.index-url $PipMirror
 fi
-cp -f "$repo_path/jbot/requirements.txt" "$dir_root"
+cp -f "$repo_path/jbot/requirements.txt" "$dir_data"
 
 cd $dir_root
 cat requirements.txt | while read LREAD
@@ -46,7 +46,7 @@ echo -e "\npython3依赖安装成功...\n"
 
 echo -e "4、启动bot程序...\n"
 make_dir $dir_log/bot
-cd $dir_root
+cd $dir_data
 ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
 nohup python3 -m jbot >$dir_log/bot/nohup.log 2>&1 &
 echo -e "bot启动成功...\n"
