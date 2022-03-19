@@ -40,7 +40,7 @@ import { getTableScroll } from '@/utils/index';
 import { history } from 'umi';
 import './index.less';
 
-const { Text } = Typography;
+const { Text, Paragraph } = Typography;
 const { Search } = Input;
 
 export enum CrontabStatus {
@@ -85,28 +85,32 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
               goToScriptManager(record);
             }}
           >
-            <Popover
-              placement="right"
-              trigger={isPhone ? 'click' : 'hover'}
-              content={
-                <div>
-                  {record.labels?.map((label: string) => (
-                    <Tag
-                      color="blue"
-                      style={{ cursor: 'point' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSearchText(`label:${label}`);
-                      }}
-                    >
-                      <a>{label}</a>
-                    </Tag>
-                  ))}
-                </div>
-              }
-            >
-              {record.name || '-'}
-            </Popover>
+            {record.labels?.length > 0 && record.labels[0] !== '' ? (
+              <Popover
+                placement="right"
+                trigger={isPhone ? 'click' : 'hover'}
+                content={
+                  <div>
+                    {record.labels?.map((label: string) => (
+                      <Tag
+                        color="blue"
+                        style={{ cursor: 'point' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSearchValue(`label:${label}`);
+                        }}
+                      >
+                        <a>{label}</a>
+                      </Tag>
+                    ))}
+                  </div>
+                }
+              >
+                {record.name || '-'}
+              </Popover>
+            ) : (
+              record.name || '-'
+            )}
             {record.isPinned ? (
               <span>
                 <PushpinOutlined />
@@ -130,16 +134,16 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       align: 'center' as const,
       render: (text: string, record: any) => {
         return (
-          <span
+          <Paragraph
             style={{
-              textAlign: 'left',
-              width: '100%',
-              display: 'inline-block',
               wordBreak: 'break-all',
+              marginBottom: 0,
+              textAlign: 'left',
             }}
+            ellipsis={{ tooltip: text, rows: 2 }}
           >
             {text}
-          </span>
+          </Paragraph>
         );
       },
       sorter: {
@@ -364,6 +368,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
+  const [searchValue, setSearchValue] = useState('');
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -627,7 +632,8 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     index: number;
   }> = ({ record, index }) => (
     <Dropdown
-      arrow
+      arrow={{ pointAtCenter: true }}
+      placement="bottomRight"
       trigger={['click']}
       overlay={
         <Menu
@@ -842,7 +848,8 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
           enterButton
           allowClear
           loading={loading}
-          value={searchText}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
@@ -968,6 +975,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         }}
         cron={detailCron}
         theme={theme}
+        isPhone={isPhone}
       />
     </PageContainer>
   );

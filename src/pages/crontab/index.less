@@ -8,15 +8,74 @@
   }
 }
 
-.cron-detail-info-item {
-  flex: auto;
+.crontab-detail {
+  .card-wrapper {
+    height: 80vh;
+    height: calc(80vh - var(--vh-offset, 0px));
 
-  .cron-detail-info-title {
-    color: #888;
+    .ant-card:last-child {
+      .ant-card-body {
+        height: calc(80vh - 238px);
+        height: calc(80vh - var(--vh-offset, 0px) - 238px);
+        overflow-y: auto;
+      }
+    }
   }
 
-  .cron-detail-info-value {
-    margin-top: 18px;
+  .ant-modal-body {
+    background: #eee;
+    padding: 12px;
+  }
+
+  .ant-card-body {
+    padding: 18px;
+  }
+  .ant-card-head {
+    padding: 0 18px;
+  }
+
+  .ant-card:first-child {
+    max-height: 66px;
+    overflow: auto;
+
+    .ant-card-body {
+      min-width: 600px;
+    }
+
+    .cron-detail-info-item {
+      display: flex;
+
+      .cron-detail-info-title {
+        width: 50px;
+      }
+
+      .cron-detail-info-value {
+        flex: 1;
+        margin-top: 0;
+      }
+    }
+  }
+
+  .ant-card:nth-child(2) {
+    overflow-x: auto;
+
+    .ant-card-body {
+      display: flex;
+      justify-content: space-between;
+      min-width: 600px;
+    }
+  }
+
+  .cron-detail-info-item {
+    flex: auto;
+
+    .cron-detail-info-title {
+      color: #888;
+    }
+
+    .cron-detail-info-value {
+      margin-top: 12px;
+    }
   }
 }
 

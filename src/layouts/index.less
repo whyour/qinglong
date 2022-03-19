@@ -26,6 +26,7 @@
 .monaco-editor:not(.rename-box) {
   height: calc(100vh - 128px) !important;
   height: calc(100vh - var(--vh-offset, 0px) - 128px) !important;
+
   .view-overlays .current-line {
     border-width: 0;
   }
@@ -33,6 +34,7 @@
 
 .rename-box {
   height: 0;
+
   .rename-input {
     height: 0;
     padding: 0 !important;
@@ -43,6 +45,7 @@
 .ant-pro-grid-content.wide {
   max-width: unset !important;
   overflow: auto;
+
   .ant-pro-page-container-children-content {
     overflow: auto;
     height: 100%;
@@ -57,6 +60,7 @@
 
 .ant-tooltip {
   max-width: 500px !important;
+
   .ant-tooltip-inner {
     word-break: break-all !important;
   }
@@ -72,6 +76,7 @@
   .log-select {
     width: 250px;
   }
+
   .ant-page-header-heading-left {
     min-width: 100px;
   }
@@ -81,6 +86,7 @@
   .config-select {
     width: 250px;
   }
+
   .ant-page-header-heading-left {
     min-width: 100px;
   }
@@ -119,10 +125,13 @@
   flex-direction: column;
   height: calc(100vh - 48px);
   height: calc(100vh - var(--vh-offset, 0px) - 48px);
+
   .ant-pro-grid-content.wide {
     flex: 1;
+
     .ant-pro-grid-content-children {
       height: calc(100% - 36px);
+
       > div,
       .log-container,
       .react-codemirror2,
@@ -197,6 +206,7 @@
 .Resizer.disabled {
   cursor: not-allowed;
 }
+
 .Resizer.disabled:hover {
   border-color: transparent;
 }
@@ -209,6 +219,7 @@
 
 .inline-countdown.ant-statistic {
   display: inline-block;
+
   .ant-statistic-content {
     font-size: 14px;
     padding: 0 3px;
@@ -253,6 +264,7 @@
 
 .ant-pro-basicLayout-content {
   margin: 18px;
+
   .ant-pro-page-container {
     margin: -18px -18px -18px;
   }
@@ -280,25 +292,27 @@
 
 .side-menu-user-drop-menu {
   position: relative;
-  margin: 0;
-  padding: 4px 0;
   text-align: left;
-  background-clip: padding-box;
   outline: none;
-  background-color: #fff;
+  padding: 4px 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
-  box-shadow: 0 6px 16px -8px rgb(0 0 0 / 8%), 0 9px 28px 0 rgb(0 0 0 / 5%),
-    0 12px 48px 16px rgb(0 0 0 / 3%);
-  .ant-dropdown-menu-item:hover {
-    color: #1890ff;
-  }
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  overflow: auto;
+  background-color: #fff;
+}
+
+[data-dark='true'] .side-menu-user-drop-menu {
+  background-color: #373739;
 }
 
 .ant-pro-sider-logo {
   padding: 16px 8px !important;
+
   h1 {
     margin-left: 5px !important;
   }
+
   img {
     width: 32px !important;
     border-radius: 52% !important;

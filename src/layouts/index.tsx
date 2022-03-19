@@ -272,7 +272,7 @@ export default function (props: any) {
       collapsed={collapsed}
       rightContentRender={() =>
         ctx.isPhone && (
-          <Dropdown overlay={menu} trigger={['click']}>
+          <Dropdown overlay={menu} placement="bottomRight" trigger={['click']}>
             <span className="side-menu-user-wrapper">
               <Avatar shape="square" size="small" icon={<UserOutlined />} />
               <span style={{ marginLeft: 5 }}>admin</span>
@@ -289,7 +289,7 @@ export default function (props: any) {
           }}
         >
           {!collapsed && !ctx.isPhone && (
-            <Dropdown overlay={menu} trigger={['hover']}>
+            <Dropdown overlay={menu} placement="topLeft" trigger={['hover']}>
               <span className="side-menu-user-wrapper">
                 <Avatar shape="square" size="small" icon={<UserOutlined />} />
                 <span style={{ marginLeft: 5 }}>admin</span>

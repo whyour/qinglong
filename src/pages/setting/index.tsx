@@ -120,7 +120,7 @@ const Setting = ({
   const [theme, setTheme] = useState(defaultDarken);
   const [dataSource, setDataSource] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editedApp, setEditedApp] = useState();
+  const [editedApp, setEditedApp] = useState<any>();
   const [tabActiveKey, setTabActiveKey] = useState('security');
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
   const [notificationInfo, setNotificationInfo] = useState<any>();
@@ -143,6 +143,7 @@ const Setting = ({
   };
 
   const addApp = () => {
+    setEditedApp(null);
     setIsModalVisible(true);
   };
 

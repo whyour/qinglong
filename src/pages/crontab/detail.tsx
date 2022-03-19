@@ -50,11 +50,13 @@ const CronDetailModal = ({
   handleCancel,
   visible,
   theme,
+  isPhone,
 }: {
   cron?: any;
   visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
   theme: string;
+  isPhone: boolean;
 }) => {
   const [activeTabKey, setActiveTabKey] = useState('log');
   const [loading, setLoading] = useState(true);
@@ -64,6 +66,8 @@ const CronDetailModal = ({
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const editorRef = useRef<any>(null);
   const [scriptInfo, setScriptInfo] = useState<any>({});
+  const [logUrl, setLogUrl] = useState('');
+  const [validTabs, setValidTabs] = useState(tabList);
 
   const contentList: any = {
     log: (
@@ -99,6 +103,8 @@ const CronDetailModal = ({
   };
 
   const onClickItem = (item: LogItem) => {
+    localStorage.setItem('logCron', cron.id);
+    setLogUrl(`${config.apiPrefix}logs/${item.directory}/${item.filename}`);
     request
       .get(`${config.apiPrefix}logs/${item.directory}/${item.filename}`)
       .then((data) => {
@@ -126,6 +132,7 @@ const CronDetailModal = ({
   const getScript = () => {
     const cmd = cron.command.split(' ') as string[];
     if (cmd[0] === 'task') {
+      setValidTabs(validTabs);
       if (cmd[1].startsWith('/ql/data/scripts')) {
         cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
       }
@@ -141,6 +148,8 @@ const CronDetailModal = ({
         .then((data) => {
           setValue(data.data);
         });
+    } else {
+      setValidTabs([validTabs[0]]);
     }
   };
 
@@ -171,6 +180,7 @@ const CronDetailModal = ({
             })
             .then((_data: any) => {
               if (_data.code === 200) {
+                setValue(content);
                 message.success(`保存成功`);
               } else {
                 message.error(_data);
@@ -198,7 +208,9 @@ const CronDetailModal = ({
       title={
         <>
           <span>{cron.name}</span>
-          <Divider type="vertical"></Divider>
+          {cron.labels?.length > 0 && cron.labels[0] !== '' && (
+            <Divider type="vertical"></Divider>
+          )}
           {cron.labels?.length > 0 &&
             cron.labels[0] !== '' &&
             cron.labels?.map((label: string, i: number) => (
@@ -213,11 +225,17 @@ const CronDetailModal = ({
       forceRender
       footer={false}
       onCancel={() => handleCancel()}
-      width={'80vw'}
-      bodyStyle={{ background: '#eee', padding: 12 }}
+      wrapClassName="crontab-detail"
+      width={!isPhone ? '80vw' : ''}
     >
-      <div style={{ height: '80vh' }}>
-        <Card bodyStyle={{ display: 'flex', justifyContent: 'space-between' }}>
+      <div className="card-wrapper">
+        <Card>
+          <div className="cron-detail-info-item">
+            <div className="cron-detail-info-title">任务</div>
+            <div className="cron-detail-info-value">{cron.command}</div>
+          </div>
+        </Card>
+        <Card style={{ marginTop: 10 }}>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">状态</div>
             <div className="cron-detail-info-value">
@@ -249,10 +267,6 @@ const CronDetailModal = ({
                 </Tag>
               )}
             </div>
-          </div>
-          <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">任务</div>
-            <div className="cron-detail-info-value">{cron.command}</div>
           </div>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">定时</div>
@@ -289,8 +303,8 @@ const CronDetailModal = ({
           </div>
         </Card>
         <Card
-          style={{ marginTop: 16 }}
-          tabList={tabList}
+          style={{ marginTop: 10 }}
+          tabList={validTabs}
           activeTabKey={activeTabKey}
           onTabChange={(key) => {
             onTabChange(key);
@@ -306,7 +320,6 @@ const CronDetailModal = ({
               </Button>
             )
           }
-          bodyStyle={{ height: 'calc(80vh - 188px)', overflowY: 'auto' }}
         >
           {contentList[activeTabKey]}
         </Card>
@@ -318,6 +331,7 @@ const CronDetailModal = ({
         }}
         cron={cron}
         data={log}
+        logUrl={logUrl}
       />
     </Modal>
   );
