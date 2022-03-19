@@ -34,7 +34,7 @@ if [[ $PipMirror ]]; then
 fi
 cp -f "$repo_path/jbot/requirements.txt" "$dir_data"
 
-cd $dir_root
+cd $dir_data
 cat requirements.txt | while read LREAD
 do
 if [[ ! $(pip3 show "${LREAD%%=*}" 2>/dev/null) ]]; then
