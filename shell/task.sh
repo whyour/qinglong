@@ -68,6 +68,17 @@ usage() {
     fi
 }
 
+get_log_path() {
+    local first_param=$1
+    local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
+    local log_dir_tmp="${first_param##*/}"
+    local log_dir_tmp_path="${first_param%%/*}"
+    log_dir_tmp_path="${log_dir_tmp_path##*/}"
+    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
+    log_dir="$dir_log/${log_dir_tmp%.*}"
+    log_path="$log_dir/$log_time.log"
+}
+
 ## run nohup，$1：文件名，不含路径，带后缀
 run_nohup() {
     local file_name=$1
@@ -84,13 +95,7 @@ run_normal() {
         fi
     fi
 
-    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir_tmp="${first_param##*/}"
-    log_dir_tmp_path="${first_param%%/*}"
-    log_dir_tmp_path="${log_dir_tmp_path##*/}"
-    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
-    log_path="$log_dir/$log_time.log"
+    get_log_path "$first_param"
     cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
@@ -146,13 +151,7 @@ run_concurrent() {
     [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     define_program "$first_param"
-    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir_tmp="${first_param##*/}"
-    log_dir_tmp_path="${first_param%%/*}"
-    log_dir_tmp_path="${log_dir_tmp_path##*/}"
-    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
-    log_path="$log_dir/$log_time.log"
+    get_log_path "$first_param"
     cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
@@ -208,13 +207,7 @@ run_designated() {
     fi
 
     define_program "$file_param"
-    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir_tmp="${file_param##*/}"
-    log_dir_tmp_path="${file_param%%/*}"
-    log_dir_tmp_path="${log_dir_tmp_path##*/}"
-    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
-    log_path="$log_dir/$log_time.log"
+    get_log_path "$file_param"
     cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
@@ -264,13 +257,7 @@ run_designated() {
 run_else() {
     local file_param="$1"
     define_program "$file_param"
-    log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir_tmp="${file_param##*/}"
-    log_dir_tmp_path="${file_param%%/*}"
-    log_dir_tmp_path="${log_dir_tmp_path##*/}"
-    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
-    log_path="$log_dir/$log_time.log"
+    get_log_path "$file_param"
     cmd="&>> $log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
