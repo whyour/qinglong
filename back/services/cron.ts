@@ -353,6 +353,21 @@ export default class CronService {
       return [];
     }
 
+    if (doc.log_path) {
+      const relativeDir = `${doc.log_path.replace(/\/[^\/]\..*/, '')}`;
+      const dir = `${config.logPath}${relativeDir}`;
+      if (existsSync(dir)) {
+        let files = await promises.readdir(dir);
+        return files
+          .map((x) => ({
+            filename: x,
+            directory: relativeDir,
+            time: fs.statSync(`${dir}/${x}`).mtime.getTime(),
+          }))
+          .sort((a, b) => b.time - a.time);
+      }
+    }
+
     const [, commandStr, url] = doc.command.split(/ +/);
     let logPath = this.getKey(commandStr);
     const isQlCommand = doc.command.startsWith('ql ');
