@@ -89,9 +89,9 @@ run_normal() {
     log_dir_tmp_path="${first_param%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $log_path"
+    cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$log_dir"
 
@@ -151,9 +151,9 @@ run_concurrent() {
     log_dir_tmp_path="${first_param%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $log_path"
+    cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
@@ -213,9 +213,9 @@ run_designated() {
     log_dir_tmp_path="${file_param%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $log_path"
+    cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
@@ -269,9 +269,9 @@ run_else() {
     log_dir_tmp_path="${file_param%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="$dir_log/${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $log_path"
+    cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir $log_dir
 
