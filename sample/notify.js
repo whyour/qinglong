@@ -383,7 +383,7 @@ function PushDeerNotify(text, desp, time = 2100) {
               console.log(err);
             } else {
               data = JSON.parse(data);
-              // 通过反悔的result的长度来判断是否成功
+              // 通过返回的result的长度来判断是否成功
               if (
                 data.content.result.length !== undefined &&
                 data.content.result.length > 0
