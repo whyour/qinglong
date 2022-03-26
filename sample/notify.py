@@ -271,7 +271,7 @@ def pushdeer(title: str, content: str) -> None:
         print("PushDeer 服务的 DEER_KEY 未设置!!\n取消推送")
         return
     print("PushDeer 服务启动")
-    data = {"text": title, "desp": urllib.parse.urlencode({"text": content})}
+    data = {"text": title, "desp": content, "type": "markdown", "pushkey": push_config.get("DEER_KEY")}
     url = 'https://api2.pushdeer.com/message/push'
     response = requests.post(url, data=data).json()
     
