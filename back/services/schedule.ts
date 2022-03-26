@@ -16,6 +16,8 @@ export default class ScheduleService {
 
   private intervalSchedule = new ToadScheduler();
 
+  private maxBuffer = 200 * 1024 * 1024;
+
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
   async createCronTask({ id = 0, command, name, schedule = '' }: Crontab) {
@@ -32,25 +34,29 @@ export default class ScheduleService {
       _id,
       nodeSchedule.scheduleJob(id + '', schedule, async () => {
         try {
-          exec(command, async (error, stdout, stderr) => {
-            if (error) {
-              await this.logger.info(
-                '执行任务%s失败，时间：%s, 错误信息：%j',
-                command,
-                new Date().toLocaleString(),
-                error,
-              );
-            }
+          exec(
+            command,
+            { maxBuffer: this.maxBuffer },
+            async (error, stdout, stderr) => {
+              if (error) {
+                await this.logger.info(
+                  '执行任务%s失败，时间：%s, 错误信息：%j',
+                  command,
+                  new Date().toLocaleString(),
+                  error,
+                );
+              }
 
-            if (stderr) {
-              await this.logger.info(
-                '执行任务%s失败，时间：%s, 错误信息：%j',
-                command,
-                new Date().toLocaleString(),
-                stderr,
-              );
-            }
-          });
+              if (stderr) {
+                await this.logger.info(
+                  '执行任务%s失败，时间：%s, 错误信息：%j',
+                  command,
+                  new Date().toLocaleString(),
+                  stderr,
+                );
+              }
+            },
+          );
         } catch (error) {
           await this.logger.info(
             '执行任务%s失败，时间：%s, 错误信息：%j',
@@ -83,25 +89,29 @@ export default class ScheduleService {
     );
     const task = new Task(name, async () => {
       try {
-        exec(command, async (error, stdout, stderr) => {
-          if (error) {
-            await this.logger.info(
-              '执行任务%s失败，时间：%s, 错误信息：%j',
-              command,
-              new Date().toLocaleString(),
-              error,
-            );
-          }
+        exec(
+          command,
+          { maxBuffer: this.maxBuffer },
+          async (error, stdout, stderr) => {
+            if (error) {
+              await this.logger.info(
+                '执行任务%s失败，时间：%s, 错误信息：%j',
+                command,
+                new Date().toLocaleString(),
+                error,
+              );
+            }
 
-          if (stderr) {
-            await this.logger.info(
-              '执行任务%s失败，时间：%s, 错误信息：%j',
-              command,
-              new Date().toLocaleString(),
-              stderr,
-            );
-          }
-        });
+            if (stderr) {
+              await this.logger.info(
+                '执行任务%s失败，时间：%s, 错误信息：%j',
+                command,
+                new Date().toLocaleString(),
+                stderr,
+              );
+            }
+          },
+        );
       } catch (error) {
         await this.logger.info(
           '执行任务%s失败，时间：%s, 错误信息：%j',
