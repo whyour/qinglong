@@ -119,15 +119,14 @@ export default class NotificationService {
 
   private async pushDeer() {
     const { pushDeerKey } = this.params;
-    // https://api2.pushdeer.com/message/push?pushkey=<key>&text=标题&desp=<markdown>&type=markdown
     const url = `https://api2.pushdeer.com/message/push`;
     const res: any = await got
       .post(url, {
         timeout: this.timeout,
         retry: 0,
-        body: `pushkey=${pushDeerKey}&text=${
-          this.title
-        }&desp=${encodeURIComponent(this.content)}&type=markdown`,
+        body: `pushkey=${pushDeerKey}&text=${encodeURIComponent(
+          this.title,
+        )}&desp=${encodeURIComponent(this.content)}&type=markdown`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       .json();
