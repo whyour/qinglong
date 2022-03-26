@@ -77,7 +77,7 @@ export default {
     { value: 'gotify', label: 'Gotify' },
     { value: 'goCqHttpBot', label: 'GoCqHttpBot' },
     { value: 'serverChan', label: 'Server酱' },
-    { value: 'PushDeer', label: 'PushDeer' },
+    { value: 'pushDeer', label: 'PushDeer' },
     { value: 'bark', label: 'Bark' },
     { value: 'telegramBot', label: 'Telegram机器人' },
     { value: 'dingtalkBot', label: '钉钉机器人' },
@@ -114,7 +114,13 @@ export default {
     serverChan: [
       { label: 'serverChanKey', tip: 'Server酱SENDKEY', required: true },
     ],
-    PushDeer: [{ label: 'PushDeerKey', tip: 'PushDeer的Key', required: true }],
+    pushDeer: [
+      {
+        label: 'pushDeerKey',
+        tip: 'PushDeer的Key，https://github.com/easychen/pushdeer',
+        required: true,
+      },
+    ],
     bark: [
       {
         label: 'barkPush',
