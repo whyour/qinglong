@@ -195,10 +195,7 @@ export default class CronService {
         }
       }
       const err = await this.killTask(doc.command);
-      const absolutePath = path.join(
-        config.logPath,
-        `${doc.log_path?.replace(config.logPath, '')}`,
-      );
+      const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
       const logFileExist = await fileExist(absolutePath);
       if (doc.log_path && logFileExist) {
         const str = err ? `\n${err}` : '';
@@ -261,11 +258,8 @@ export default class CronService {
       }
 
       let { id, command, log_path } = cron;
-      const absolutePath = path.join(
-        config.logPath,
-        `${log_path?.replace(config.logPath, '')}`,
-      );
-      const logFileExist = await fileExist(absolutePath);
+      const absolutePath = path.resolve(config.logPath, `${log_path}`);
+      const logFileExist = log_path && (await fileExist(absolutePath));
 
       this.logger.silly('Running job');
       this.logger.silly('ID: ' + id);
@@ -333,10 +327,7 @@ export default class CronService {
       return '';
     }
 
-    const absolutePath = path.join(
-      config.logPath,
-      `${doc.log_path?.replace(config.logPath, '')}`,
-    );
+    const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
     const logFileExist = await fileExist(absolutePath);
     if (logFileExist) {
       return getFileContentByName(`${absolutePath}`);
@@ -369,10 +360,8 @@ export default class CronService {
     }
 
     if (doc.log_path) {
-      const relativeDir = `${doc.log_path
-        .replace(/\/[^\/]\..*/, '')
-        .replace(config.logPath, '')}`;
-      const dir = `${config.logPath}${relativeDir}`;
+      const relativeDir = `${doc.log_path.replace(/\/[^\/]\..*/, '')}`;
+      const dir = path.resolve(config.logPath, relativeDir);
       if (existsSync(dir)) {
         let files = await promises.readdir(dir);
         return files
@@ -432,7 +421,7 @@ export default class CronService {
     var crontab_string = '';
     tabs.forEach((tab) => {
       const _schedule = tab.schedule && tab.schedule.split(/ +/);
-      if (tab.isDisabled === 1 || _schedule.length !== 5) {
+      if (tab.isDisabled === 1 || _schedule!.length !== 5) {
         crontab_string += '# ';
         crontab_string += tab.schedule;
         crontab_string += ' ';
@@ -458,22 +447,22 @@ export default class CronService {
 
   public import_crontab() {
     exec('crontab -l', (error, stdout, stderr) => {
-      var lines = stdout.split('\n');
-      var namePrefix = new Date().getTime();
+      const lines = stdout.split('\n');
+      const namePrefix = new Date().getTime();
 
       lines.reverse().forEach(async (line, index) => {
         line = line.replace(/\t+/g, ' ');
-        var regex =
+        const regex =
           /^((\@[a-zA-Z]+\s+)|(([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+))/;
-        var command = line.replace(regex, '').trim();
-        var schedule = line.replace(command, '').trim();
+        const command = line.replace(regex, '').trim();
+        const schedule = line.replace(command, '').trim();
 
         if (
           command &&
           schedule &&
           cron_parser.parseExpression(schedule).hasNext()
         ) {
-          var name = namePrefix + '_' + index;
+          const name = namePrefix + '_' + index;
 
           const _crontab = await CrontabModel.findOne({
             where: { command, schedule },
