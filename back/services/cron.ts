@@ -9,6 +9,7 @@ import { getFileContentByName, concurrentRun, fileExist } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { promisify } from 'util';
 import { Op } from 'sequelize';
+import path from 'path';
 
 @Service()
 export default class CronService {
@@ -16,7 +17,7 @@ export default class CronService {
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
-    if (schedule.split(/ +/).length === 6) {
+    if (schedule?.split(/ +/).length === 6) {
       return true;
     }
     return false;
@@ -194,11 +195,15 @@ export default class CronService {
         }
       }
       const err = await this.killTask(doc.command);
-      const logFileExist = await fileExist(doc.log_path);
+      const absolutePath = path.join(
+        config.logPath,
+        `${doc.log_path?.replace(config.logPath, '')}`,
+      );
+      const logFileExist = await fileExist(absolutePath);
       if (doc.log_path && logFileExist) {
         const str = err ? `\n${err}` : '';
         fs.appendFileSync(
-          `${doc.log_path}`,
+          `${absolutePath}`,
           `${str}\n## 执行结束...  ${new Date()
             .toLocaleString('zh', { hour12: false })
             .replace(' 24:', ' 00:')} `,
@@ -256,6 +261,11 @@ export default class CronService {
       }
 
       let { id, command, log_path } = cron;
+      const absolutePath = path.join(
+        config.logPath,
+        `${log_path?.replace(config.logPath, '')}`,
+      );
+      const logFileExist = await fileExist(absolutePath);
 
       this.logger.silly('Running job');
       this.logger.silly('ID: ' + id);
@@ -276,13 +286,13 @@ export default class CronService {
         { where: { id } },
       );
       cp.stderr.on('data', (data) => {
-        if (log_path) {
-          fs.appendFileSync(`${log_path}`, `${data}`);
+        if (logFileExist) {
+          fs.appendFileSync(`${absolutePath}`, `${data}`);
         }
       });
       cp.on('error', (err) => {
-        if (log_path) {
-          fs.appendFileSync(`${log_path}`, `${JSON.stringify(err)}`);
+        if (logFileExist) {
+          fs.appendFileSync(`${absolutePath}`, `${JSON.stringify(err)}`);
         }
       });
 
@@ -323,8 +333,13 @@ export default class CronService {
       return '';
     }
 
-    if (doc.log_path) {
-      return getFileContentByName(`${doc.log_path}`);
+    const absolutePath = path.join(
+      config.logPath,
+      `${doc.log_path?.replace(config.logPath, '')}`,
+    );
+    const logFileExist = await fileExist(absolutePath);
+    if (logFileExist) {
+      return getFileContentByName(`${absolutePath}`);
     }
     const [, commandStr, url] = doc.command.split(/ +/);
     let logPath = this.getKey(commandStr);
@@ -354,7 +369,9 @@ export default class CronService {
     }
 
     if (doc.log_path) {
-      const relativeDir = `${doc.log_path.replace(/\/[^\/]\..*/, '')}`;
+      const relativeDir = `${doc.log_path
+        .replace(/\/[^\/]\..*/, '')
+        .replace(config.logPath, '')}`;
       const dir = `${config.logPath}${relativeDir}`;
       if (existsSync(dir)) {
         let files = await promises.readdir(dir);
