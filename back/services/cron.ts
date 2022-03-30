@@ -360,7 +360,7 @@ export default class CronService {
     }
 
     if (doc.log_path) {
-      const relativeDir = `${doc.log_path.replace(/\/[^\/]\..*/, '')}`;
+      const relativeDir = path.dirname(`${doc.log_path}`);
       const dir = path.resolve(config.logPath, relativeDir);
       if (existsSync(dir)) {
         let files = await promises.readdir(dir);
