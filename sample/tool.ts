@@ -5,8 +5,9 @@ const envFound = dotenv.config();
 const accessKey = process.env.QINIU_AK;
 const secretKey = process.env.QINIU_SK;
 const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
+const key = 'version.ts';
 const options = {
-  scope: process.env.QINIU_SCOPE,
+  scope: `${process.env.QINIU_SCOPE}:${key}`,
 };
 const putPolicy = new qiniu.rs.PutPolicy(options);
 const uploadToken = putPolicy.uploadToken(mac);
@@ -19,7 +20,6 @@ const putExtra = new qiniu.form_up.PutExtra(
   '',
   'text/plain; charset=utf-8',
 );
-const key = 'version.ts';
 // 文件上传
 formUploader.putFile(
   uploadToken,
