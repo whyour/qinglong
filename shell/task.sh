@@ -7,14 +7,14 @@ dir_shell=$QL_DIR/shell
 
 ## 选择python3还是node
 define_program() {
-    local first_param=$1
-    if [[ $first_param == *.js ]]; then
+    local file_param=$1
+    if [[ $file_param == *.js ]]; then
         which_program="node"
-    elif [[ $first_param == *.py ]] || [[ $first_param == *.pyc ]]; then
+    elif [[ $file_param == *.py ]] || [[ $file_param == *.pyc ]]; then
         which_program="python3"
-    elif [[ $first_param == *.sh ]]; then
+    elif [[ $file_param == *.sh ]]; then
         which_program="bash"
-    elif [[ $first_param == *.ts ]]; then
+    elif [[ $file_param == *.ts ]]; then
         which_program="ts-node-transpile-only"
     else
         which_program=""
@@ -76,20 +76,25 @@ run_nohup() {
 
 ## 正常运行单个脚本，$1：传入参数
 run_normal() {
-    local first_param=$1
-    define_program "$first_param"
-    if [[ $first_param == *.js ]]; then
+    local file_param=$1
+    define_program "$file_param"
+    if [[ $file_param == *.js ]]; then
         if [[ $# -eq 1 ]]; then
             random_delay
         fi
     fi
 
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir_tmp="${first_param##*/}"
-    log_dir_tmp_path="${first_param%%/*}"
+    log_dir_tmp="${file_param##*/}"
+    if [[ $file_param == /* ]]; then
+        log_dir_tmp_path="${file_param:1}"
+    else
+        log_dir_tmp_path="${file_param}"
+    fi
+    log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
@@ -100,17 +105,17 @@ run_normal() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $file_param" | perl -pe "s|.*ID=(.*) $cmd_task $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
     cd $dir_scripts
-    local relative_path="${first_param%/*}"
-    if [[ ! -z ${relative_path} ]] && [[ ${first_param} =~ "/" ]]; then
+    local relative_path="${file_param%/*}"
+    if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
         cd ${relative_path}
-        first_param=${first_param/$relative_path\//}
+        file_param=${file_param/$relative_path\//}
     fi
-    eval timeout -k 10s $command_timeout_time $which_program $first_param $cmd
+    eval timeout -k 10s $command_timeout_time $which_program $file_param $cmd
 
     eval . $file_task_after "$@" $cmd
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
@@ -122,7 +127,7 @@ run_normal() {
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
 run_concurrent() {
-    local first_param="$1"
+    local file_param="$1"
     local env_param="$2"
     local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|")
     if [[ ! $env_param ]]; then
@@ -145,13 +150,18 @@ run_concurrent() {
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
     [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
-    define_program "$first_param"
+    define_program "$file_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_dir_tmp="${first_param##*/}"
-    log_dir_tmp_path="${first_param%%/*}"
+    log_dir_tmp="${file_param##*/}"
+    if [[ $file_param == /* ]]; then
+        log_dir_tmp_path="${file_param:1}"
+    else
+        log_dir_tmp_path="${file_param}"
+    fi
+    log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
@@ -163,7 +173,7 @@ run_concurrent() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $first_param" | perl -pe "s|.*ID=(.*) $cmd_task $first_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task $file_param" | perl -pe "s|.*ID=(.*) $cmd_task $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
     [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
@@ -172,15 +182,15 @@ run_concurrent() {
     single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
 
     cd $dir_scripts
-    local relative_path="${first_param%/*}"
-    if [[ ! -z ${relative_path} ]] && [[ ${first_param} =~ "/" ]]; then
+    local relative_path="${file_param%/*}"
+    if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
         cd ${relative_path}
-        first_param=${first_param/$relative_path\//}
+        file_param=${file_param/$relative_path\//}
     fi
     for i in "${!array[@]}"; do
         export ${env_param}=${array[i]}
         single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
-        timeout -k 10s $command_timeout_time $which_program $first_param &>$single_log_path &
+        timeout -k 10s $command_timeout_time $which_program $file_param &>$single_log_path &
     done
 
     wait
@@ -210,10 +220,15 @@ run_designated() {
     define_program "$file_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${file_param##*/}"
-    log_dir_tmp_path="${file_param%%/*}"
+    if [[ $file_param == /* ]]; then
+        log_dir_tmp_path="${file_param:1}"
+    else
+        log_dir_tmp_path="${file_param}"
+    fi
+    log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
@@ -266,10 +281,15 @@ run_else() {
     define_program "$file_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${file_param##*/}"
-    log_dir_tmp_path="${file_param%%/*}"
+    if [[ $file_param == /* ]]; then
+        log_dir_tmp_path="${file_param:1}"
+    else
+        log_dir_tmp_path="${file_param}"
+    fi
+    log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%%.*}"
+    log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
