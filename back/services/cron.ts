@@ -196,8 +196,8 @@ export default class CronService {
       }
       const err = await this.killTask(doc.command);
       const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
-      const logFileExist = await fileExist(absolutePath);
-      if (doc.log_path && logFileExist) {
+      const logFileExist = doc.log_path && (await fileExist(absolutePath));
+      if (logFileExist) {
         const str = err ? `\n${err}` : '';
         fs.appendFileSync(
           `${absolutePath}`,
@@ -328,7 +328,7 @@ export default class CronService {
     }
 
     const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
-    const logFileExist = await fileExist(absolutePath);
+    const logFileExist = doc.log_path && (await fileExist(absolutePath));
     if (logFileExist) {
       return getFileContentByName(`${absolutePath}`);
     }
