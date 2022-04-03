@@ -168,8 +168,10 @@ task <file_path> desi <env_name> <account_number>
 $ git clone git@github.com:whyour/qinglong.git
 $ cd qinglong
 $ cp .env.example .env
-$ yarn install
-$ yarn start
+# 推荐使用 pnpm https://pnpm.io/zh/installation
+$ npm install -g pnpm
+$ pnpm install
+$ pnpm start
 ```
 
 打开你的浏览器，访问 http://127.0.0.1:5700

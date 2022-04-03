@@ -27,9 +27,10 @@ jobs:
 
       - name: build front and back
         run: |
-          yarn install
-          yarn build:front
-          yarn build:back
+          npm i -g pnpm
+          pnpm install
+          pnpm build:front
+          pnpm build:back
 
       - name: copy to static repo
         env:
