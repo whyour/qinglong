@@ -86,10 +86,12 @@ run_normal() {
 
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${file_param##*/}"
-    if [[ $file_param == /* ]]; then
-        log_dir_tmp_path="${file_param:1}"
-    else
-        log_dir_tmp_path="${file_param}"
+    if [[ $file_param =~ "/" ]]; then
+        if [[ $file_param == /* ]]; then
+            log_dir_tmp_path="${file_param:1}"
+        else
+            log_dir_tmp_path="${file_param}"
+        fi
     fi
     log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
@@ -153,10 +155,12 @@ run_concurrent() {
     define_program "$file_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${file_param##*/}"
-    if [[ $file_param == /* ]]; then
-        log_dir_tmp_path="${file_param:1}"
-    else
-        log_dir_tmp_path="${file_param}"
+    if [[ $file_param =~ "/" ]]; then
+        if [[ $file_param == /* ]]; then
+            log_dir_tmp_path="${file_param:1}"
+        else
+            log_dir_tmp_path="${file_param}"
+        fi
     fi
     log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
@@ -220,10 +224,12 @@ run_designated() {
     define_program "$file_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${file_param##*/}"
-    if [[ $file_param == /* ]]; then
-        log_dir_tmp_path="${file_param:1}"
-    else
-        log_dir_tmp_path="${file_param}"
+    if [[ $file_param =~ "/" ]]; then
+        if [[ $file_param == /* ]]; then
+            log_dir_tmp_path="${file_param:1}"
+        else
+            log_dir_tmp_path="${file_param}"
+        fi
     fi
     log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
@@ -281,10 +287,12 @@ run_else() {
     define_program "$file_param"
     log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     log_dir_tmp="${file_param##*/}"
-    if [[ $file_param == /* ]]; then
-        log_dir_tmp_path="${file_param:1}"
-    else
-        log_dir_tmp_path="${file_param}"
+    if [[ $file_param =~ "/" ]]; then
+        if [[ $file_param == /* ]]; then
+            log_dir_tmp_path="${file_param:1}"
+        else
+            log_dir_tmp_path="${file_param}"
+        fi
     fi
     log_dir_tmp_path="${log_dir_tmp_path%%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
