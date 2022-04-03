@@ -412,9 +412,6 @@ export default class CronService {
     const tmpStr = command.startsWith('/') ? command.substring(1) : command;
     const index = tmpStr.indexOf('/') !== -1 ? tmpStr.indexOf('/') : 0;
     if (index) {
-      console.log(
-        `${tmpStr.substring(0, index)}_${command.substring(start, end)}`,
-      );
       return `${tmpStr.substring(0, index)}_${command.substring(start, end)}`;
     } else {
       return command.substring(start, end);
