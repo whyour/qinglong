@@ -401,7 +401,7 @@ export default class CronService {
     }
   }
 
-  private getKey(command: string) {
+  private getKey(command: string): string {
     const start =
       command.lastIndexOf('/') !== -1 ? command.lastIndexOf('/') + 1 : 0;
     const end =
@@ -409,10 +409,15 @@ export default class CronService {
         ? command.lastIndexOf('.')
         : command.length;
 
-    const tmpStr = command.startsWith('/') ? command.substring(1) : command;
-    const index = tmpStr.indexOf('/') !== -1 ? tmpStr.indexOf('/') : 0;
+    const tmpStr = command.substring(0, start - 1);
+    let index = 0;
+    if (tmpStr.lastIndexOf('/') !== -1 && tmpStr.startsWith('http')) {
+      index = tmpStr.lastIndexOf('/');
+    } else if (tmpStr.lastIndexOf(':') !== -1 && tmpStr.startsWith('git@')) {
+      index = tmpStr.lastIndexOf(':');
+    }
     if (index) {
-      return `${tmpStr.substring(0, index)}_${command.substring(start, end)}`;
+      return `${tmpStr.substring(index + 1)}_${command.substring(start, end)}`;
     } else {
       return command.substring(start, end);
     }
