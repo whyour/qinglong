@@ -366,7 +366,7 @@ main() {
             esac
             ;;
         esac
-        [[ -f $log_path ]] && cat $log_path
+        [[ -f $log_path ]] && cat "$dir_log/$log_path"
     elif [[ $# -eq 0 ]]; then
         echo
         usage
