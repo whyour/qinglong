@@ -100,7 +100,7 @@ run_normal() {
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
-    make_dir "$log_dir"
+    make_dir "$dir_log/$log_dir"
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     local begin_timestamp=$(date "+%s")
@@ -169,7 +169,7 @@ run_concurrent() {
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
-    make_dir $log_dir
+    make_dir "$dir_log/$log_dir"
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     local begin_timestamp=$(date "+%s")
@@ -238,7 +238,7 @@ run_designated() {
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
-    make_dir $log_dir
+    make_dir "$dir_log/$log_dir"
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     local begin_timestamp=$(date "+%s")
@@ -301,7 +301,7 @@ run_else() {
     log_path="$log_dir/$log_time.log"
     cmd="&>> $dir_log/$log_path"
     [[ "$show_log" == "true" ]] && cmd=""
-    make_dir $log_dir
+    make_dir "$dir_log/$log_dir"
 
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
     local begin_timestamp=$(date "+%s")
