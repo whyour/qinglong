@@ -367,7 +367,7 @@ export default class CronService {
         return files
           .map((x) => ({
             filename: x,
-            directory: relativeDir,
+            directory: relativeDir.replace(config.logPath, ''),
             time: fs.statSync(`${dir}/${x}`).mtime.getTime(),
           }))
           .sort((a, b) => b.time - a.time);
