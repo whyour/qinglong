@@ -13,8 +13,8 @@ git push
 echo -e "更新cdn文件"
 ts-node sample/tool.ts
 
-string = $(cat src/version.ts | grep "version" | egrep "[^\']*" -o | egrep "\d\.*")
-version = "v$string"
+string=$(cat src/version.ts | grep "version" | egrep "[^\']*" -o | egrep "\d\.*")
+version="v$string"
 echo -e "当前版本$version"
 
 echo -e "删除已经存在的本地tag"
