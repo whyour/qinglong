@@ -21,6 +21,7 @@ echo -e "删除已经存在的本地tag"
 git tag -d "$version" &>/dev/null
 
 echo -e "删除已经存在的远程tag"
+git push origin :refs/tags/$version &>/dev/null
 
 echo -e "创建新tag"
 git tag -a "$version" -m "release $version"
