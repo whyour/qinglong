@@ -193,13 +193,13 @@ run_concurrent() {
     fi
     for i in "${!array[@]}"; do
         export ${env_param}=${array[i]}
-        single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
+        single_log_path="$dir_log/$log_dir/${single_log_time}_$((i + 1)).log"
         timeout -k 10s $command_timeout_time $which_program $file_param &>$single_log_path &
     done
 
     wait
     for i in "${!array[@]}"; do
-        single_log_path="$log_dir/${single_log_time}_$((i + 1)).log"
+        single_log_path="$dir_log/$log_dir/${single_log_time}_$((i + 1)).log"
         eval cat $single_log_path $cmd
         [[ -f $single_log_path ]] && rm -f $single_log_path
     done
