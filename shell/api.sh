@@ -178,7 +178,7 @@ update_cron() {
 
 notify_api() {
     local title=$1
-    local content=$1
+    local content=$2
     local currentTimeStamp=$(date +%s)
     local api=$(
         curl -s --noproxy "*" "http://0.0.0.0:5600/api/system/notify?t=$currentTimeStamp" \
@@ -196,9 +196,9 @@ notify_api() {
     code=$(echo $api | jq -r .code)
     message=$(echo $api | jq -r .message)
     if [[ $code == 200 ]]; then
-        echo -e "成功"
+        echo -e "通知发送成功"
     else
-        echo -e "失败(${message})"
+        echo -e "通知失败(${message})"
     fi
 }
 
