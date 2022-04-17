@@ -170,7 +170,15 @@ export default class EnvService {
             .join('&')
             .replace(/ /g, '');
           if (/"/.test(value)) {
-            value = `'${value}'`;
+            if (/'/.test(value)) {
+              if (value.indexOf("'") < value.indexOf('"')) {
+                value = `"${value}"`;
+              } else {
+                value = `'${value}'`;
+              }
+            } else {
+              value = `'${value}'`;
+            }
           } else {
             value = `"${value}"`;
           }
