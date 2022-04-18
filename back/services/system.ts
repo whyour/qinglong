@@ -57,7 +57,9 @@ export default class SystemService {
   }
 
   public async updateLogRemoveFrequency(frequency: number) {
+    const oDoc = await this.getLogRemoveFrequency();
     const result = await this.updateAuthDb({
+      ...oDoc,
       type: AuthDataType.removeLogFrequency,
       info: { frequency },
     });

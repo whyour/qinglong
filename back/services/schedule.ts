@@ -5,8 +5,8 @@ import { Crontab } from '../data/cron';
 import { exec } from 'child_process';
 import {
   ToadScheduler,
-  SimpleIntervalJob,
-  Task,
+  LongIntervalJob,
+  AsyncTask,
   SimpleIntervalSchedule,
 } from 'toad-scheduler';
 
@@ -87,43 +87,51 @@ export default class ScheduleService {
       name,
       command,
     );
-    const task = new Task(name, async () => {
-      try {
-        exec(
-          command,
-          { maxBuffer: this.maxBuffer },
-          async (error, stdout, stderr) => {
-            if (error) {
-              await this.logger.info(
-                '执行任务%s失败，时间：%s, 错误信息：%j',
-                command,
-                new Date().toLocaleString(),
-                error,
-              );
-            }
+    const task = new AsyncTask(
+      name,
+      async () => {
+        return new Promise(async (resolve, reject) => {
+          try {
+            exec(
+              command,
+              { maxBuffer: this.maxBuffer },
+              async (error, stdout, stderr) => {
+                if (error) {
+                  await this.logger.info(
+                    '执行任务%s失败，时间：%s, 错误信息：%j',
+                    command,
+                    new Date().toLocaleString(),
+                    error,
+                  );
+                }
 
-            if (stderr) {
-              await this.logger.info(
-                '执行任务%s失败，时间：%s, 错误信息：%j',
-                command,
-                new Date().toLocaleString(),
-                stderr,
-              );
-            }
-          },
-        );
-      } catch (error) {
-        await this.logger.info(
+                if (stderr) {
+                  await this.logger.info(
+                    '执行任务%s失败，时间：%s, 错误信息：%j',
+                    command,
+                    new Date().toLocaleString(),
+                    stderr,
+                  );
+                }
+                resolve();
+              },
+            );
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+      (err) => {
+        this.logger.info(
           '执行任务%s失败，时间：%s, 错误信息：%j',
           command,
           new Date().toLocaleString(),
-          error,
+          err,
         );
-      } finally {
-      }
-    });
+      },
+    );
 
-    const job = new SimpleIntervalJob({ ...schedule }, task, _id);
+    const job = new LongIntervalJob({ ...schedule }, task, _id);
 
     this.intervalSchedule.addIntervalJob(job);
   }
