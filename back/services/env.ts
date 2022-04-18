@@ -168,7 +168,7 @@ export default class EnvService {
             .filter((x) => x.status !== EnvStatus.disabled)
             .map('value')
             .join('&')
-            .replace(/ /g, '');
+            .trim();
           if (/"/.test(value)) {
             if (/'/.test(value)) {
               if (value.indexOf("'") < value.indexOf('"')) {
