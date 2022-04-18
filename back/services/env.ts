@@ -168,21 +168,9 @@ export default class EnvService {
             .filter((x) => x.status !== EnvStatus.disabled)
             .map('value')
             .join('&')
+            .replace(/"/g, '\\"')
             .trim();
-          if (/"/.test(value)) {
-            if (/'/.test(value)) {
-              if (value.indexOf("'") < value.indexOf('"')) {
-                value = `"${value}"`;
-              } else {
-                value = `'${value}'`;
-              }
-            } else {
-              value = `'${value}'`;
-            }
-          } else {
-            value = `"${value}"`;
-          }
-          env_string += `export ${key}=${value}\n`;
+          env_string += `export ${key}="${value}"\n`;
         }
       }
     }
