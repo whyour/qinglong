@@ -94,7 +94,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.removeDb(req.body);
+        const data = await dependenceService.remove(req.body, true);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);

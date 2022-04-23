@@ -37,13 +37,13 @@ export enum DependenceTypes {
 }
 
 export enum InstallDependenceCommandTypes {
-  'npm i -g --force',
+  'npm i -g -f --loglevel warn',
   'pip3 install',
   'apk add --no-cache -f',
 }
 
 export enum unInstallDependenceCommandTypes {
-  'npm uninstall -g --force',
+  'npm uninstall -g -f --loglevel warn',
   'pip3 uninstall -y',
   'apk del -f',
 }
