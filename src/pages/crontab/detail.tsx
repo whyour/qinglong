@@ -10,6 +10,7 @@ import {
   List,
   Divider,
   Typography,
+  Tooltip,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -17,6 +18,8 @@ import {
   FieldTimeOutlined,
   Loading3QuartersOutlined,
   FileOutlined,
+  PlayCircleOutlined,
+  PauseCircleOutlined,
 } from '@ant-design/icons';
 import { CrontabStatus } from './index';
 import { diffTime } from '@/utils/date';
@@ -24,6 +27,7 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 import CronLogModal from './logModal';
 import Editor from '@monaco-editor/react';
+import IconFont from '@/components/iconfont';
 
 const { Text } = Typography;
 
@@ -68,6 +72,7 @@ const CronDetailModal = ({
   const [scriptInfo, setScriptInfo] = useState<any>({});
   const [logUrl, setLogUrl] = useState('');
   const [validTabs, setValidTabs] = useState(tabList);
+  const [currentCron, setCurrentCron] = useState<any>({});
 
   const contentList: any = {
     log: (
@@ -103,7 +108,7 @@ const CronDetailModal = ({
   };
 
   const onClickItem = (item: LogItem) => {
-    localStorage.setItem('logCron', cron.id);
+    localStorage.setItem('logCron', currentCron.id);
     setLogUrl(`${config.apiPrefix}logs/${item.directory}/${item.filename}`);
     request
       .get(`${config.apiPrefix}logs/${item.directory}/${item.filename}`)
@@ -196,8 +201,150 @@ const CronDetailModal = ({
     });
   };
 
+  const runCron = () => {
+    Modal.confirm({
+      title: '确认运行',
+      content: (
+        <>
+          确认运行定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {currentCron.name}
+          </Text>{' '}
+          吗
+        </>
+      ),
+      onOk() {
+        request
+          .put(`${config.apiPrefix}crons/run`, { data: [currentCron.id] })
+          .then((data: any) => {
+            if (data.code === 200) {
+              setCurrentCron({ ...currentCron, status: CrontabStatus.running });
+              setTimeout(() => {
+                getLogs();
+              }, 1000);
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const stopCron = () => {
+    Modal.confirm({
+      title: '确认停止',
+      content: (
+        <>
+          确认停止定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {currentCron.name}
+          </Text>{' '}
+          吗
+        </>
+      ),
+      onOk() {
+        request
+          .put(`${config.apiPrefix}crons/stop`, { data: [currentCron.id] })
+          .then((data: any) => {
+            if (data.code === 200) {
+              setCurrentCron({ ...currentCron, status: CrontabStatus.idle });
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const enabledOrDisabledCron = () => {
+    Modal.confirm({
+      title: `确认${currentCron.isDisabled === 1 ? '启用' : '禁用'}`,
+      content: (
+        <>
+          确认{currentCron.isDisabled === 1 ? '启用' : '禁用'}
+          定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {currentCron.name}
+          </Text>{' '}
+          吗
+        </>
+      ),
+      onOk() {
+        request
+          .put(
+            `${config.apiPrefix}crons/${
+              currentCron.isDisabled === 1 ? 'enable' : 'disable'
+            }`,
+            {
+              data: [currentCron.id],
+            },
+          )
+          .then((data: any) => {
+            if (data.code === 200) {
+              setCurrentCron({
+                ...currentCron,
+                isDisabled: currentCron.isDisabled === 1 ? 0 : 1,
+              });
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const pinOrUnPinCron = () => {
+    Modal.confirm({
+      title: `确认${currentCron.isPinned === 1 ? '取消置顶' : '置顶'}`,
+      content: (
+        <>
+          确认{currentCron.isPinned === 1 ? '取消置顶' : '置顶'}
+          定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {currentCron.name}
+          </Text>{' '}
+          吗
+        </>
+      ),
+      onOk() {
+        request
+          .put(
+            `${config.apiPrefix}crons/${
+              currentCron.isPinned === 1 ? 'unpin' : 'pin'
+            }`,
+            {
+              data: [currentCron.id],
+            },
+          )
+          .then((data: any) => {
+            if (data.code === 200) {
+              setCurrentCron({
+                ...currentCron,
+                isPinned: currentCron.isPinned === 1 ? 0 : 1,
+              });
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
   useEffect(() => {
     if (cron && cron.id) {
+      setCurrentCron(cron);
       getLogs();
       getScript();
     }
@@ -206,19 +353,76 @@ const CronDetailModal = ({
   return (
     <Modal
       title={
-        <>
-          <span>{cron.name}</span>
-          {cron.labels?.length > 0 && cron.labels[0] !== '' && (
-            <Divider type="vertical"></Divider>
-          )}
-          {cron.labels?.length > 0 &&
-            cron.labels[0] !== '' &&
-            cron.labels?.map((label: string, i: number) => (
-              <Tag color="blue" style={{ marginRight: 5 }}>
-                {label}
-              </Tag>
-            ))}
-        </>
+        <div className="crontab-title-wrapper">
+          <div>
+            <span>{currentCron.name}</span>
+            {currentCron.labels?.length > 0 && currentCron.labels[0] !== '' && (
+              <Divider type="vertical"></Divider>
+            )}
+            {currentCron.labels?.length > 0 &&
+              currentCron.labels[0] !== '' &&
+              currentCron.labels?.map((label: string, i: number) => (
+                <Tag color="blue" style={{ marginRight: 5 }}>
+                  {label}
+                </Tag>
+              ))}
+          </div>
+
+          <div className="operations">
+            <Tooltip
+              title={
+                currentCron.status === CrontabStatus.idle ? '运行' : '停止'
+              }
+            >
+              <Button
+                type="link"
+                icon={
+                  currentCron.status === CrontabStatus.idle ? (
+                    <PlayCircleOutlined />
+                  ) : (
+                    <PauseCircleOutlined />
+                  )
+                }
+                size="small"
+                onClick={
+                  currentCron.status === CrontabStatus.idle ? runCron : stopCron
+                }
+              />
+            </Tooltip>
+            <Tooltip title={currentCron.isDisabled === 1 ? '启用' : '禁用'}>
+              <Button
+                type="link"
+                icon={
+                  <IconFont
+                    type={
+                      currentCron.isDisabled === 1
+                        ? 'ql-icon-qiyong'
+                        : 'ql-icon-jinyong'
+                    }
+                  />
+                }
+                size="small"
+                onClick={enabledOrDisabledCron}
+              />
+            </Tooltip>
+            <Tooltip title={currentCron.isPinned === 1 ? '取消置顶' : '置顶'}>
+              <Button
+                type="link"
+                icon={
+                  <IconFont
+                    type={
+                      currentCron.isPinned === 1
+                        ? 'ql-icon-quxiaozhiding'
+                        : 'ql-icon-zhiding'
+                    }
+                  />
+                }
+                size="small"
+                onClick={pinOrUnPinCron}
+              />
+            </Tooltip>
+          </div>
+        </div>
       }
       centered
       visible={visible}
@@ -232,21 +436,22 @@ const CronDetailModal = ({
         <Card>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">任务</div>
-            <div className="cron-detail-info-value">{cron.command}</div>
+            <div className="cron-detail-info-value">{currentCron.command}</div>
           </div>
         </Card>
         <Card style={{ marginTop: 10 }}>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">状态</div>
             <div className="cron-detail-info-value">
-              {(!cron.isDisabled || cron.status !== CrontabStatus.idle) && (
+              {(!currentCron.isDisabled ||
+                currentCron.status !== CrontabStatus.idle) && (
                 <>
-                  {cron.status === CrontabStatus.idle && (
+                  {currentCron.status === CrontabStatus.idle && (
                     <Tag icon={<ClockCircleOutlined />} color="default">
                       空闲中
                     </Tag>
                   )}
-                  {cron.status === CrontabStatus.running && (
+                  {currentCron.status === CrontabStatus.running && (
                     <Tag
                       icon={<Loading3QuartersOutlined spin />}
                       color="processing"
@@ -254,29 +459,30 @@ const CronDetailModal = ({
                       运行中
                     </Tag>
                   )}
-                  {cron.status === CrontabStatus.queued && (
+                  {currentCron.status === CrontabStatus.queued && (
                     <Tag icon={<FieldTimeOutlined />} color="default">
                       队列中
                     </Tag>
                   )}
                 </>
               )}
-              {cron.isDisabled === 1 && cron.status === CrontabStatus.idle && (
-                <Tag icon={<CloseCircleOutlined />} color="error">
-                  已禁用
-                </Tag>
-              )}
+              {currentCron.isDisabled === 1 &&
+                currentCron.status === CrontabStatus.idle && (
+                  <Tag icon={<CloseCircleOutlined />} color="error">
+                    已禁用
+                  </Tag>
+                )}
             </div>
           </div>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">定时</div>
-            <div className="cron-detail-info-value">{cron.schedule}</div>
+            <div className="cron-detail-info-value">{currentCron.schedule}</div>
           </div>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">最后运行时间</div>
             <div className="cron-detail-info-value">
-              {cron.last_execution_time
-                ? new Date(cron.last_execution_time * 1000)
+              {currentCron.last_execution_time
+                ? new Date(currentCron.last_execution_time * 1000)
                     .toLocaleString(language, {
                       hour12: false,
                     })
@@ -287,14 +493,16 @@ const CronDetailModal = ({
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">最后运行时长</div>
             <div className="cron-detail-info-value">
-              {cron.last_running_time ? diffTime(cron.last_running_time) : '-'}
+              {currentCron.last_running_time
+                ? diffTime(currentCron.last_running_time)
+                : '-'}
             </div>
           </div>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">下次运行时间</div>
             <div className="cron-detail-info-value">
-              {cron.nextRunTime &&
-                cron.nextRunTime
+              {currentCron.nextRunTime &&
+                currentCron.nextRunTime
                   .toLocaleString(language, {
                     hour12: false,
                   })
