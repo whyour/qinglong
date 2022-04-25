@@ -168,7 +168,9 @@ export default class EnvService {
             .filter((x) => x.status !== EnvStatus.disabled)
             .map('value')
             .join('&')
-            .replace(/"/g, '\"')
+            .replace(/(\\)[^\n]/g, '\\\\')
+            .replace(/(\\$)/, '\\\\')
+            .replace(/"/g, '\\"')
             .trim();
           env_string += `export ${key}="${value}"\n`;
         }
