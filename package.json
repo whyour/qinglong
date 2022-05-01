@@ -96,6 +96,7 @@
     "prettier": "^2.5.1",
     "qiniu": "^7.4.0",
     "qrcode.react": "^1.0.1",
+    "rc-tween-one": "^3.0.6",
     "react": "17.x",
     "react-codemirror2": "^7.2.1",
     "react-diff-viewer": "^3.1.1",
