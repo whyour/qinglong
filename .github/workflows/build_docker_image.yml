@@ -27,7 +27,7 @@ jobs:
 
       - name: build front and back
         run: |
-          npm i -g pnpm
+          npm i -g pnpm@6
           pnpm install
           pnpm build:front
           pnpm build:back
