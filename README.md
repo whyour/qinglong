@@ -169,7 +169,7 @@ $ git clone git@github.com:whyour/qinglong.git
 $ cd qinglong
 $ cp .env.example .env
 # 推荐使用 pnpm https://pnpm.io/zh/installation
-$ npm install -g pnpm
+$ npm install -g pnpm@6
 $ pnpm install
 $ pnpm start
 ```
