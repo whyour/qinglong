@@ -38,7 +38,7 @@ RUN set -x \
     && touch ~/.bashrc \
     && git config --global user.email "qinglong@@users.noreply.github.com" \
     && git config --global user.name "qinglong" \
-    && npm install -g pnpm@6 \
+    && npm install -g pnpm \
     && pnpm install -g pm2 \
     && pnpm install -g ts-node typescript tslib \
     && git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
