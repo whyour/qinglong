@@ -11,7 +11,7 @@
     "schedule": "npm run build:back && node static/build/schedule.js",
     "public": "npm run build:back && node static/build/public.js",
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
-    "prepare": "umi generate tmp &> /dev/null",
+    "prepare": "umi generate tmp 2>/dev/null || true",
     "test": "umi-test",
     "test:coverage": "umi-test --coverage"
   },
