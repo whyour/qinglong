@@ -27,8 +27,8 @@ jobs:
 
       - name: build front and back
         run: |
-          npm i -g pnpm@6
-          pnpm install
+          npm i -g pnpm
+          pnpm install --loglevel error
           pnpm build:front
           pnpm build:back
 
