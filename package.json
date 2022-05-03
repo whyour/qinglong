@@ -29,7 +29,8 @@
   "pnpm": {
     "peerDependencyRules": {
       "allowedVersions": {
-        "react": "17"
+        "react": "17",
+        "react-dom": "17"
       },
       "ignoreMissing": ["monaco-editor", "react-router"]
     }
