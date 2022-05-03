@@ -252,7 +252,7 @@ npm_install_sub() {
     elif ! type pnpm &>/dev/null; then
         npm install --production --registry=https://registry.npm.taobao.org || npm install --production
     else
-        pnpm install --production --registry=https://registry.npm.taobao.org || pnpm install --production
+        pnpm install --loglevel error --production --registry=https://registry.npm.taobao.org || pnpm install --production --loglevel error
     fi
     unset_proxy
 }
