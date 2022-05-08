@@ -275,7 +275,7 @@ export default function (props: any) {
           <Dropdown overlay={menu} placement="bottomRight" trigger={['click']}>
             <span className="side-menu-user-wrapper">
               <Avatar shape="square" size="small" icon={<UserOutlined />} />
-              <span style={{ marginLeft: 5 }}>admin</span>
+              <span style={{ marginLeft: 5 }}>{user.username}</span>
             </span>
           </Dropdown>
         )
@@ -292,7 +292,7 @@ export default function (props: any) {
             <Dropdown overlay={menu} placement="topLeft" trigger={['hover']}>
               <span className="side-menu-user-wrapper">
                 <Avatar shape="square" size="small" icon={<UserOutlined />} />
-                <span style={{ marginLeft: 5 }}>admin</span>
+                <span style={{ marginLeft: 5 }}>{user.username}</span>
               </span>
             </Dropdown>
           )}
