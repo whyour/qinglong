@@ -22,11 +22,7 @@ app
     await require('./loaders/sentry').default({ expressApp: app });
     await require('./loaders/db').default();
 
-    Logger.info(`
-      ################################################
-      🛡️  Public listening on port: ${config.publicPort} 🛡️
-      ################################################
-    `);
+    Logger.debug(`✌️ Back server launched on port ${config.publicPort}`);
   })
   .on('error', (err) => {
     Logger.error(err);

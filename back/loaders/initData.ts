@@ -7,16 +7,12 @@ import EnvService from '../services/env';
 import _ from 'lodash';
 import { DependenceModel } from '../data/dependence';
 import { Op } from 'sequelize';
-import SystemService from '../services/system';
-import ScheduleService from '../services/schedule';
 import config from '../config';
 
 export default async () => {
   const cronService = Container.get(CronService);
   const envService = Container.get(EnvService);
   const dependenceService = Container.get(DependenceService);
-  const systemService = Container.get(SystemService);
-  const scheduleService = Container.get(ScheduleService);
 
   // 初始化更新所有任务状态为空闲
   await CrontabModel.update(
@@ -119,34 +115,4 @@ export default async () => {
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
   await envService.set_envs();
-
-  // 运行删除日志任务
-  const data = await systemService.getLogRemoveFrequency();
-  if (data && data.info && data.info.frequency) {
-    const cron = {
-      id: data.id,
-      name: '删除日志',
-      command: `ql rmlog ${data.info.frequency}`,
-    };
-    await scheduleService.createIntervalTask(cron, {
-      days: data.info.frequency,
-      runImmediately: true,
-    });
-  }
 };
-
-function randomSchedule(from: number, to: number) {
-  const result: any[] = [];
-  const arr = [...Array(from).keys()];
-  let count = arr.length;
-  for (let i = 0; i < to; i++) {
-    const index = ~~(Math.random() * count) + i;
-    if (result.includes(arr[index])) {
-      continue;
-    }
-    result[i] = arr[index];
-    arr[index] = arr[i];
-    count--;
-  }
-  return result;
-}
