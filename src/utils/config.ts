@@ -44,6 +44,10 @@ export default {
       value: 'envs',
     },
     {
+      name: '订阅管理',
+      value: 'subscriptions',
+    },
+    {
       name: '配置文件',
       value: 'configs',
     },
@@ -67,6 +71,7 @@ export default {
   scopesMap: {
     crons: '定时任务',
     envs: '环境变量',
+    subscriptions: '订阅管理',
     configs: '配置文件',
     scripts: '脚本管理',
     logs: '任务日志',
@@ -214,6 +219,7 @@ export default {
     '/initialization': '初始化',
     '/cron': '定时任务',
     '/env': '环境变量',
+    '/subscription': '订阅管理',
     '/config': '配置文件',
     '/script': '脚本管理',
     '/diff': '对比工具',

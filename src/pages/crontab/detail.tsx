@@ -396,8 +396,8 @@ const CronDetailModal = ({
                   <IconFont
                     type={
                       currentCron.isDisabled === 1
-                        ? 'ql-icon-qiyong'
-                        : 'ql-icon-jinyong'
+                        ? 'ql-icon-enable'
+                        : 'ql-icon-disable'
                     }
                   />
                 }
@@ -412,8 +412,8 @@ const CronDetailModal = ({
                   <IconFont
                     type={
                       currentCron.isPinned === 1
-                        ? 'ql-icon-quxiaozhiding'
-                        : 'ql-icon-zhiding'
+                        ? 'ql-icon-untop'
+                        : 'ql-icon-top'
                     }
                   />
                 }
