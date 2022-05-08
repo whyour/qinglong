@@ -39,7 +39,7 @@ export default class ScheduleService {
             { maxBuffer: this.maxBuffer },
             async (error, stdout, stderr) => {
               if (error) {
-                await this.logger.info(
+                await this.logger.error(
                   '执行任务%s失败，时间：%s, 错误信息：%j',
                   command,
                   new Date().toLocaleString(),
@@ -48,7 +48,7 @@ export default class ScheduleService {
               }
 
               if (stderr) {
-                await this.logger.info(
+                await this.logger.error(
                   '执行任务%s失败，时间：%s, 错误信息：%j',
                   command,
                   new Date().toLocaleString(),
@@ -58,7 +58,7 @@ export default class ScheduleService {
             },
           );
         } catch (error) {
-          await this.logger.info(
+          await this.logger.error(
             '执行任务%s失败，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
@@ -97,7 +97,7 @@ export default class ScheduleService {
               { maxBuffer: this.maxBuffer },
               async (error, stdout, stderr) => {
                 if (error) {
-                  await this.logger.info(
+                  await this.logger.error(
                     '执行任务%s失败，时间：%s, 错误信息：%j',
                     command,
                     new Date().toLocaleString(),
@@ -106,7 +106,7 @@ export default class ScheduleService {
                 }
 
                 if (stderr) {
-                  await this.logger.info(
+                  await this.logger.error(
                     '执行任务%s失败，时间：%s, 错误信息：%j',
                     command,
                     new Date().toLocaleString(),
@@ -122,7 +122,7 @@ export default class ScheduleService {
         });
       },
       (err) => {
-        this.logger.info(
+        this.logger.error(
           '执行任务%s失败，时间：%s, 错误信息：%j',
           command,
           new Date().toLocaleString(),

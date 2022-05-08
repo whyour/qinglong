@@ -4,6 +4,7 @@ import Logger from './logger';
 import initData from './initData';
 import { Application } from 'express';
 import linkDeps from './deps';
+import initTask from './initTask';
 
 export default async ({ expressApp }: { expressApp: Application }) => {
   await depInjectorLoader();
@@ -16,5 +17,8 @@ export default async ({ expressApp }: { expressApp: Application }) => {
   Logger.info('✌️ init data loaded');
 
   await linkDeps();
-  Logger.info('✌️ link deps');
+  Logger.info('✌️ link deps loaded');
+
+  initTask();
+  Logger.info('✌️ init task loaded');
 };
