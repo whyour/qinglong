@@ -1,14 +1,12 @@
 import expressLoader from './express';
-import dependencyInjectorLoader from './dependencyInjector';
+import depInjectorLoader from './depInjector';
 import Logger from './logger';
 import initData from './initData';
 import { Application } from 'express';
 import linkDeps from './deps';
 
 export default async ({ expressApp }: { expressApp: Application }) => {
-  await dependencyInjectorLoader({
-    models: [],
-  });
+  await depInjectorLoader();
   Logger.info('✌️ Dependency Injector loaded');
 
   await expressLoader({ app: expressApp });
