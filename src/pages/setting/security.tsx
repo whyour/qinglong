@@ -98,7 +98,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
 
   useEffect(() => {
     setTwoFactorActivated(user && user.twoFactorActivated);
-    setAvatar(user && user.avatar);
+    setAvatar(user && `/api/static/${user.avatar}`);
   }, [user]);
 
   return twoFactoring ? (
