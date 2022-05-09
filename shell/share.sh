@@ -364,6 +364,22 @@ random_range() {
     echo $((RANDOM % ($end - $beg) + $beg))
 }
 
+reload_pm2() {
+    pm2 l &>/dev/null
+
+    echo -e "启动面板服务\n"
+    pm2 delete panel --source-map-support --time &>/dev/null
+    pm2 start $dir_static/build/app.js -n panel --source-map-support --time &>/dev/null
+
+    echo -e "启动定时任务服务\n"
+    pm2 delete schedule --source-map-support --time &>/dev/null
+    pm2 start $dir_static/build/schedule.js -n schedule --source-map-support --time &>/dev/null
+
+    echo -e "启动公开服务\n"
+    pm2 delete public --source-map-support --time &>/dev/null
+    pm2 start $dir_static/build/public.js -n public --source-map-support --time &>/dev/null
+}
+
 init_env
 detect_termux
 detect_macos

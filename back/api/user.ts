@@ -1,12 +1,25 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
-import * as fs from 'fs';
-import config from '../config';
 import UserService from '../services/user';
 import { celebrate, Joi } from 'celebrate';
-import { getFileContentByName } from '../config/util';
+import multer from 'multer';
+import path from 'path';
+import { v4 as uuidV4 } from 'uuid';
+import config from '../config';
 const route = Router();
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, config.uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.parse(file.originalname).ext;
+    const key = uuidV4();
+    cb(null, key + ext);
+  },
+});
+const upload = multer({ storage: storage });
 
 export default (app: Router) => {
   app.use('/user', route);
@@ -77,6 +90,7 @@ export default (app: Router) => {
         code: 200,
         data: {
           username: authInfo.username,
+          avatar: authInfo.avatar,
           twoFactorActivated: authInfo.twoFactorActivated,
         },
       });
@@ -231,6 +245,22 @@ export default (app: Router) => {
       try {
         const userService = Container.get(UserService);
         const result = await userService.updateNotificationMode(req.body);
+        res.send(result);
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/avatar',
+    upload.single('avatar'),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const userService = Container.get(UserService);
+        const result = await userService.updateAvatar(req.file!.filename);
         res.send(result);
       } catch (e) {
         logger.error('🔥 error: %o', e);

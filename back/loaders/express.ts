@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction, Application } from 'express';
+import express, { Request, Response, NextFunction, Application } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import routes from '../api';
@@ -17,6 +17,7 @@ import { EnvModel } from '../data/env';
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
   app.use(cors());
+  app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
 
   app.use((req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/open')) {

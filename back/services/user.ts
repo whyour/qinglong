@@ -221,6 +221,12 @@ export default class UserService {
     return { code: 200, message: '更新成功' };
   }
 
+  public async updateAvatar(avatar: string) {
+    const authInfo = this.getAuthInfo();
+    this.updateAuthInfo(authInfo, { avatar });
+    return { code: 200, data: avatar, message: '更新成功' };
+  }
+
   public getUserInfo(): Promise<any> {
     return new Promise((resolve) => {
       fs.readFile(config.authConfigFile, 'utf8', (err, data) => {
