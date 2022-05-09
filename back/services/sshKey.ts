@@ -8,7 +8,7 @@ import path from 'path';
 export default class SshKeyService {
   private homedir = os.homedir();
   private sshPath = path.resolve(this.homedir, '.ssh');
-  private sshConfigFilePath = path.resolve(this.homedir, '.ssh/config');
+  private sshConfigFilePath = path.resolve(this.sshPath, 'config');
 
   constructor(@Inject('logger') private logger: winston.Logger) {}
 

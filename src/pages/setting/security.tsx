@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Input, Form, Button, message } from 'antd';
+import { Typography, Input, Form, Button, message, Avatar, Upload } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { history } from 'umi';
 import QRCode from 'qrcode.react';
 import { PageLoading } from '@ant-design/pro-layout';
+import { UploadOutlined, UserOutlined } from '@ant-design/icons';
+import ImgCrop from 'antd-img-crop';
+import 'antd/es/slider/style';
 
 const { Title, Link } = Typography;
 
@@ -14,6 +17,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
   const [twoFactoring, setTwoFactoring] = useState(false);
   const [twoFactorInfo, setTwoFactorInfo] = useState<any>();
   const [code, setCode] = useState<string>();
+  const [avatar, setAvatar] = useState<string>();
 
   const handleOk = (values: any) => {
     request
@@ -84,6 +88,12 @@ const SecuritySettings = ({ user, userChange }: any) => {
       .catch((error: any) => {
         console.log(error);
       });
+  };
+
+  const onChange = (e) => {
+    if (e.file && e.file.response) {
+      setAvatar(`/api/static/${e.file.response.data}`);
+    }
   };
 
   useEffect(() => {
@@ -210,6 +220,36 @@ const SecuritySettings = ({ user, userChange }: any) => {
       >
         {twoFactorActivated ? '禁用' : '启用'}
       </Button>
+
+      <div
+        style={{
+          fontSize: 18,
+          borderBottom: '1px solid #f0f0f0',
+          marginBottom: 8,
+          paddingBottom: 4,
+          marginTop: 16,
+        }}
+      >
+        头像
+      </div>
+      <Avatar size={128} shape="square" icon={<UserOutlined />} src={avatar} />
+      <ImgCrop rotate>
+        <Upload
+          method="put"
+          showUploadList={false}
+          maxCount={1}
+          action="/api/user/avatar"
+          onChange={onChange}
+          name="avatar"
+          headers={{
+            Authorization: `Bearer ${localStorage.getItem(config.authKey)}`,
+          }}
+        >
+          <Button icon={<UploadOutlined />} style={{ marginLeft: 8 }}>
+            更换头像
+          </Button>
+        </Upload>
+      </ImgCrop>
     </>
   );
 };
