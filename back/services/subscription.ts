@@ -100,7 +100,7 @@ export default class SubscriptionService {
           this.logger.silly(error);
         }
       }
-      const err = await this.killTask(doc.command);
+      const err = await this.killTask('');
       const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
       const logFileExist = doc.log_path && (await fileExist(absolutePath));
       if (logFileExist) {
