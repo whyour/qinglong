@@ -19,6 +19,62 @@ import path from 'path';
 export default class SubscriptionService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
+  public async list(searchText?: string): Promise<Subscription[]> {
+    let query = {};
+    if (searchText) {
+      const textArray = searchText.split(':');
+      switch (textArray[0]) {
+        case 'name':
+        case 'command':
+        case 'schedule':
+        case 'label':
+          const column = textArray[0] === 'label' ? 'labels' : textArray[0];
+          query = {
+            [column]: {
+              [Op.or]: [
+                { [Op.like]: `%${textArray[1]}%` },
+                { [Op.like]: `%${encodeURIComponent(textArray[1])}%` },
+              ],
+            },
+          };
+          break;
+        default:
+          const reg = {
+            [Op.or]: [
+              { [Op.like]: `%${searchText}%` },
+              { [Op.like]: `%${encodeURIComponent(searchText)}%` },
+            ],
+          };
+          query = {
+            [Op.or]: [
+              {
+                name: reg,
+              },
+              {
+                command: reg,
+              },
+              {
+                schedule: reg,
+              },
+              {
+                labels: reg,
+              },
+            ],
+          };
+          break;
+      }
+    }
+    try {
+      const result = await SubscriptionModel.findAll({
+        where: query,
+        order: [['createdAt', 'DESC']],
+      });
+      return result as any;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   public async create(payload: Subscription): Promise<Subscription> {
     const tab = new Subscription(payload);
     const doc = await this.insert(tab);
