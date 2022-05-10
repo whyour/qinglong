@@ -49,6 +49,7 @@ const CronModal = ({
       title={cron ? '编辑任务' : '新建任务'}
       visible={visible}
       forceRender
+      centered
       onOk={() => {
         form
           .validateFields()
@@ -166,6 +167,7 @@ const CronLabelModal = ({
       title="批量修改标签"
       visible={visible}
       footer={buttons}
+      centered
       forceRender
       onCancel={() => handleCancel(false)}
       confirmLoading={loading}

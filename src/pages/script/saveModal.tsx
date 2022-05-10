@@ -43,6 +43,7 @@ const SaveModal = ({
       title="保存文件"
       visible={visible}
       forceRender
+      centered
       onOk={() => {
         form
           .validateFields()
