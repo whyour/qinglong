@@ -43,6 +43,7 @@ const SettingModal = ({
       title="运行设置"
       visible={visible}
       forceRender
+      centered
       onCancel={() => handleCancel()}
     >
       <Form

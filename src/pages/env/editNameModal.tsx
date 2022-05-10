@@ -41,6 +41,7 @@ const EditNameModal = ({
       title="修改环境变量名称"
       visible={visible}
       forceRender
+      centered
       onOk={() => {
         form
           .validateFields()

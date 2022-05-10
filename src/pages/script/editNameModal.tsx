@@ -56,6 +56,7 @@ const EditScriptNameModal = ({
       title="新建文件"
       visible={visible}
       forceRender
+      centered
       onOk={() => {
         form
           .validateFields()

@@ -43,6 +43,7 @@ const AppModal = ({
       title={app ? '编辑应用' : '新建应用'}
       visible={visible}
       forceRender
+      centered
       onOk={() => {
         form
           .validateFields()
