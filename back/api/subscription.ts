@@ -28,7 +28,8 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         type: Joi.string().required(),
-        schedule: Joi.string().required(),
+        schedule: Joi.string().optional(),
+        intervalSchedule: Joi.object().optional(),
         name: Joi.string().optional(),
         url: Joi.string().required(),
         whitelist: Joi.string().optional(),
@@ -38,8 +39,8 @@ export default (app: Router) => {
         status: Joi.number().optional(),
         pull_type: Joi.string().optional(),
         pull_option: Joi.object().optional(),
-        schedule_type: Joi.number().optional(),
-        alias: Joi.number().required(),
+        schedule_type: Joi.string().required(),
+        alias: Joi.string().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -156,7 +157,8 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         type: Joi.string().required(),
-        schedule: Joi.string().required(),
+        schedule: Joi.string().optional(),
+        intervalSchedule: Joi.object().optional(),
         name: Joi.string().optional(),
         url: Joi.string().required(),
         whitelist: Joi.string().optional(),
@@ -166,8 +168,8 @@ export default (app: Router) => {
         status: Joi.number().optional(),
         pull_type: Joi.string().optional(),
         pull_option: Joi.object().optional(),
-        schedule_type: Joi.number().optional(),
-        alias: Joi.number().required(),
+        schedule_type: Joi.string().optional(),
+        alias: Joi.string().required(),
         id: Joi.number().required(),
       }),
     }),
@@ -176,6 +178,7 @@ export default (app: Router) => {
       try {
         if (
           !req.body.schedule ||
+          typeof req.body.schedule === 'object' ||
           cron_parser.parseExpression(req.body.schedule).hasNext()
         ) {
           const subscriptionService = Container.get(SubscriptionService);

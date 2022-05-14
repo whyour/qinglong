@@ -14,10 +14,15 @@ import { promises, existsSync } from 'fs';
 import { promisify } from 'util';
 import { Op } from 'sequelize';
 import path from 'path';
+import ScheduleService from './schedule';
+import { SimpleIntervalSchedule } from 'toad-scheduler';
 
 @Service()
 export default class SubscriptionService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(
+    @Inject('logger') private logger: winston.Logger,
+    private scheduleService: ScheduleService,
+  ) {}
 
   public async list(searchText?: string): Promise<Subscription[]> {
     let query = {};
@@ -75,9 +80,38 @@ export default class SubscriptionService {
     }
   }
 
+  private formatCommand(doc: Subscription) {
+    let command = 'ql ';
+    const { type, url, whitelist, blacklist, dependences, branch } = doc;
+    if (type === 'file') {
+      command += `raw ${url}`;
+    } else {
+      command += `repo ${url} ${whitelist || ''} ${blacklist || ''} ${
+        dependences || ''
+      } ${branch || ''}`;
+    }
+    return command;
+  }
+
+  private handleTask(doc: Subscription, needCreate = true) {
+    doc.command = this.formatCommand(doc);
+    if (doc.schedule_type === 'crontab') {
+      this.scheduleService.cancelCronTask(doc as any);
+      needCreate && this.scheduleService.createCronTask(doc as any);
+    } else {
+      this.scheduleService.cancelIntervalTask(doc as any);
+      needCreate &&
+        this.scheduleService.createIntervalTask(
+          doc as any,
+          doc.intervalSchedule as SimpleIntervalSchedule,
+        );
+    }
+  }
+
   public async create(payload: Subscription): Promise<Subscription> {
     const tab = new Subscription(payload);
     const doc = await this.insert(tab);
+    this.handleTask(doc);
     return doc;
   }
 
@@ -87,6 +121,7 @@ export default class SubscriptionService {
 
   public async update(payload: Subscription): Promise<Subscription> {
     const newDoc = await this.updateDb(payload);
+    this.handleTask(newDoc);
     return newDoc;
   }
 
@@ -156,7 +191,9 @@ export default class SubscriptionService {
           this.logger.silly(error);
         }
       }
-      const err = await this.killTask('');
+      this.handleTask(doc, false);
+      const command = this.formatCommand(doc);
+      const err = await this.killTask(command);
       const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
       const logFileExist = doc.log_path && (await fileExist(absolutePath));
       if (logFileExist) {
@@ -219,17 +256,16 @@ export default class SubscriptionService {
         return;
       }
 
-      let { id, log_path } = cron;
+      let { id, log_path, name } = cron;
+      const command = this.formatCommand(cron);
       const absolutePath = path.resolve(config.logPath, `${log_path}`);
       const logFileExist = log_path && (await fileExist(absolutePath));
 
-      this.logger.silly('Running job');
+      this.logger.silly('Running job' + name);
       this.logger.silly('ID: ' + id);
-      this.logger.silly('Original command: ');
+      this.logger.silly('Original command: ' + command);
 
-      let cmdStr = '';
-
-      const cp = spawn(cmdStr, { shell: '/bin/bash' });
+      const cp = spawn(command, { shell: '/bin/bash' });
 
       await SubscriptionModel.update(
         { status: SubscriptionStatus.running, pid: cp.pid },
@@ -266,10 +302,18 @@ export default class SubscriptionService {
   }
 
   public async disabled(ids: number[]) {
+    const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    for (const doc of docs) {
+      this.handleTask(doc, false);
+    }
     await SubscriptionModel.update({ isDisabled: 1 }, { where: { id: ids } });
   }
 
   public async enabled(ids: number[]) {
+    const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    for (const doc of docs) {
+      this.handleTask(doc);
+    }
     await SubscriptionModel.update({ isDisabled: 0 }, { where: { id: ids } });
   }
 

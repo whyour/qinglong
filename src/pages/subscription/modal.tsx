@@ -281,7 +281,7 @@ const SubscriptionModal = ({
           </Radio.Group>
         </Form.Item>
         <Form.Item
-          name="schedule"
+          name={scheduleType === 'crontab' ? 'schedule' : 'intervalSchedule'}
           label="定时规则"
           rules={[
             { required: true },

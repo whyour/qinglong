@@ -7,7 +7,8 @@ export class Subscription {
   name?: string;
   type?: 'public-repo' | 'private-repo' | 'file';
   schedule_type?: 'crontab' | 'interval';
-  schedule?: string | SimpleIntervalSchedule;
+  schedule?: string;
+  intervalSchedule?: SimpleIntervalSchedule;
   url?: string;
   whitelist?: string;
   blacklist?: string;
@@ -22,6 +23,7 @@ export class Subscription {
   isDisabled?: 1 | 0;
   log_path?: string;
   alias: string;
+  command?: string;
 
   constructor(options: Subscription) {
     this.id = options.id;
@@ -41,6 +43,7 @@ export class Subscription {
     this.log_path = options.log_path;
     this.schedule_type = options.schedule_type;
     this.alias = options.alias;
+    this.intervalSchedule = options.intervalSchedule;
   }
 }
 
@@ -69,6 +72,11 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
       unique: 'compositeIndex',
       type: DataTypes.STRING,
     },
+    intervalSchedule: {
+      unique: 'compositeIndex',
+      type: DataTypes.JSON,
+    },
+    type: DataTypes.STRING,
     whitelist: DataTypes.STRING,
     blacklist: DataTypes.STRING,
     status: DataTypes.NUMBER,
