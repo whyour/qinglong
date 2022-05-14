@@ -1,7 +1,6 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import nodeSchedule from 'node-schedule';
-import { Crontab } from '../data/cron';
 import { exec } from 'child_process';
 import {
   ToadScheduler,
@@ -9,6 +8,13 @@ import {
   AsyncTask,
   SimpleIntervalSchedule,
 } from 'toad-scheduler';
+
+interface ScheduleTaskType {
+  id: number;
+  command: string;
+  name?: string;
+  schedule?: string;
+}
 
 @Service()
 export default class ScheduleService {
@@ -20,7 +26,12 @@ export default class ScheduleService {
 
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  async createCronTask({ id = 0, command, name, schedule = '' }: Crontab) {
+  async createCronTask({
+    id = 0,
+    command,
+    name,
+    schedule = '',
+  }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info(
       '[创建cron任务]，任务ID: %s，cron: %s，任务名: %s，执行命令: %s',
@@ -32,7 +43,7 @@ export default class ScheduleService {
 
     this.scheduleStacks.set(
       _id,
-      nodeSchedule.scheduleJob(id + '', schedule, async () => {
+      nodeSchedule.scheduleJob(_id, schedule, async () => {
         try {
           exec(
             command,
@@ -70,15 +81,16 @@ export default class ScheduleService {
     );
   }
 
-  async cancelCronTask({ id = 0, name }: Crontab) {
+  async cancelCronTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info('[取消定时任务]，任务名：%s', name);
     this.scheduleStacks.has(_id) && this.scheduleStacks.get(_id)?.cancel();
   }
 
   async createIntervalTask(
-    { id = 0, command, name = '' }: Crontab,
+    { id = 0, command, name = '' }: ScheduleTaskType,
     schedule: SimpleIntervalSchedule,
+    runImmediately = true,
   ) {
     const _id = this.formatId(id);
     this.logger.info(
@@ -131,12 +143,12 @@ export default class ScheduleService {
       },
     );
 
-    const job = new LongIntervalJob({ ...schedule }, task, _id);
+    const job = new LongIntervalJob({ ...schedule, runImmediately }, task, _id);
 
     this.intervalSchedule.addIntervalJob(job);
   }
 
-  async cancelIntervalTask({ id = 0, name }: Crontab) {
+  async cancelIntervalTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info('[取消interval任务]，任务ID: %s，任务名：%s', _id, name);
     this.intervalSchedule.removeById(_id);
