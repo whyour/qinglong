@@ -80,6 +80,6 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
     isDisabled: DataTypes.NUMBER,
     log_path: DataTypes.STRING,
     schedule_type: DataTypes.STRING,
-    alias: DataTypes.STRING,
+    alias: { type: DataTypes.STRING, unique: 'alias' },
   },
 );

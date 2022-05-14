@@ -41,6 +41,12 @@ const tabList = [
     tab: '脚本',
   },
 ];
+const LangMap: any = {
+  '.py': 'python',
+  '.js': 'javascript',
+  '.sh': 'shell',
+  '.ts': 'typescript',
+};
 
 interface LogItem {
   directory: string;
@@ -87,9 +93,9 @@ const CronDetailModal = ({
         )}
       />
     ),
-    script: (
+    script: scriptInfo.filename && (
       <Editor
-        language="shell"
+        language={LangMap[scriptInfo.filename.slice(-3)] || ''}
         theme={theme}
         value={value}
         options={{
