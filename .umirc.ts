@@ -9,6 +9,7 @@ export default defineConfig({
     type: 'none',
   },
   fastRefresh: {},
+  mfsu: {},
   esbuild: {},
   webpack5: {},
   dynamicImport: {

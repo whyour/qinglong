@@ -6,6 +6,9 @@ import cron_parser from 'cron-parser';
 import EditableTagGroup from '@/components/tag';
 
 const { Option } = Select;
+const repoUrlRegx = /[^\/\:]+\/[^\/]+(?=\.git)/;
+const fileUrlRegx = /[^\/\:]+\/[^\/]+$/;
+
 const SubscriptionModal = ({
   subscription,
   handleCancel,
@@ -51,6 +54,12 @@ const SubscriptionModal = ({
 
   const typeChange = (e) => {
     setType(e.target.value);
+    const _url = form.getFieldValue('url');
+    const _branch = form.getFieldValue('branch');
+    form.setFieldsValue({
+      alias: formatAlias(_url, _branch, e.target.value),
+    });
+    form.validateFields(['url']);
   };
 
   const scheduleTypeChange = (e) => {
@@ -60,6 +69,32 @@ const SubscriptionModal = ({
 
   const pullTypeChange = (e) => {
     setPullType(e.target.value);
+  };
+
+  const onUrlChange = (e) => {
+    const _branch = form.getFieldValue('branch');
+    form.setFieldsValue({
+      alias: formatAlias(e.target.value, _branch),
+    });
+  };
+
+  const onBranchChange = (e) => {
+    const _url = form.getFieldValue('url');
+    form.setFieldsValue({
+      alias: formatAlias(_url, e.target.value),
+    });
+  };
+
+  const formatAlias = (_url: string, _branch: string, _type = type) => {
+    let _alias = '';
+    const _regx = _type === 'file' ? fileUrlRegx : repoUrlRegx;
+    if (_regx.test(_url)) {
+      _alias = _url.match(_regx)![0].replaceAll('/', '_').replaceAll('.', '_');
+    }
+    if (_branch) {
+      _alias = _alias + '_' + _branch;
+    }
+    return _alias;
   };
 
   const IntervalSelect = ({
@@ -109,6 +144,7 @@ const SubscriptionModal = ({
       </Input.Group>
     );
   };
+
   const PullOptions = ({
     value,
     onChange,
@@ -141,6 +177,9 @@ const SubscriptionModal = ({
 
   useEffect(() => {
     form.resetFields();
+    setType('public-repo');
+    setScheduleType('crontab');
+    setPullType('ssh-key');
   }, [subscription, visible]);
 
   return (
@@ -171,13 +210,70 @@ const SubscriptionModal = ({
         <Form.Item name="name" label="别名">
           <Input placeholder="请输入订阅别名" />
         </Form.Item>
-        <Form.Item name="url" label="链接" rules={[{ required: true }]}>
-          <Input placeholder="请输入订阅链接" />
+        <Form.Item
+          name="type"
+          label="类型"
+          rules={[{ required: true }]}
+          initialValue={'public-repo'}
+        >
+          <Radio.Group onChange={typeChange}>
+            <Radio value="public-repo">公开仓库</Radio>
+            <Radio value="private-repo">私有仓库</Radio>
+            <Radio value="file">单个文件</Radio>
+          </Radio.Group>
         </Form.Item>
+        <Form.Item
+          name="url"
+          label="链接"
+          rules={[
+            { required: true },
+            { pattern: type === 'file' ? fileUrlRegx : repoUrlRegx },
+          ]}
+        >
+          <Input
+            placeholder="请输入订阅链接"
+            onPaste={onUrlChange}
+            onChange={onUrlChange}
+          />
+        </Form.Item>
+        {type !== 'file' && (
+          <Form.Item name="branch" label="分支">
+            <Input
+              placeholder="请输入分支"
+              onPaste={onBranchChange}
+              onChange={onBranchChange}
+            />
+          </Form.Item>
+        )}
+        <Form.Item
+          name="alias"
+          label="唯一值"
+          rules={[{ required: true, message: '' }]}
+          tooltip="唯一值用于日志目录和私钥别名"
+        >
+          <Input placeholder="自动生成" disabled />
+        </Form.Item>
+        {type === 'private-repo' && (
+          <>
+            <Form.Item
+              name="pull_type"
+              label="拉取方式"
+              initialValue={'ssh-key'}
+              rules={[{ required: true }]}
+            >
+              <Radio.Group onChange={pullTypeChange}>
+                <Radio value="ssh-key">私钥</Radio>
+                <Radio value="user-pwd">用户名密码/Token</Radio>
+              </Radio.Group>
+            </Form.Item>
+            <PullOptions type={pullType} />
+          </>
+        )}
         <Form.Item
           name="schedule_type"
           label="定时类型"
           initialValue={'crontab'}
+          rules={[{ required: true }]}
         >
           <Radio.Group onChange={scheduleTypeChange}>
             <Radio value="crontab">crontab</Radio>
@@ -209,13 +305,6 @@ const SubscriptionModal = ({
           ) : (
             <Input placeholder="秒(可选) 分 时 天 月 周" />
           )}
-        </Form.Item>
-        <Form.Item name="type" label="类型" initialValue={'public-repo'}>
-          <Radio.Group onChange={typeChange}>
-            <Radio value="public-repo">公开仓库</Radio>
-            <Radio value="private-repo">私有仓库</Radio>
-            <Radio value="file">单个文件</Radio>
-          </Radio.Group>
         </Form.Item>
         {type !== 'file' && (
           <>
@@ -254,29 +343,6 @@ const SubscriptionModal = ({
                 autoSize={true}
                 placeholder="请输入脚本依赖文件关键词，多个关键词竖线分割"
               />
-            </Form.Item>
-            {type === 'private-repo' && (
-              <>
-                <Form.Item
-                  name="pull_type"
-                  label="拉取方式"
-                  initialValue={'ssh-key'}
-                >
-                  <Radio.Group onChange={pullTypeChange}>
-                    <Radio value="ssh-key">私钥</Radio>
-                    <Radio value="user-pwd">用户名密码/Token</Radio>
-                  </Radio.Group>
-                </Form.Item>
-                <PullOptions type={pullType} />
-              </>
-            )}
-            <Form.Item
-              name="alias"
-              label="唯一值"
-              rules={[{ required: true }]}
-              tooltip="唯一值用于日志目录和私钥别名"
-            >
-              <Input placeholder="自动生成" disabled />
             </Form.Item>
           </>
         )}

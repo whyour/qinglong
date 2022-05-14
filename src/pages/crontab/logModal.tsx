@@ -123,8 +123,6 @@ const CronLogModal = ({
       centered
       className="log-modal"
       bodyStyle={{
-        overflowY: 'auto',
-        maxHeight: 'calc(80vh - var(--vh-offset, 0px))',
         minHeight: '300px',
       }}
       forceRender

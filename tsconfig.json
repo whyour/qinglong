@@ -13,7 +13,7 @@
       "@/*": ["src/*"],
       "@@/*": ["src/.umi/*"]
     },
-    "lib": ["dom", "es2017", "esnext.asynciterable"],
+    "lib": ["dom", "es2021", "esnext.asynciterable"],
     "typeRoots": [
       "./node_modules/@types",
       "./back/types",
