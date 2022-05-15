@@ -73,7 +73,7 @@ enum OperationPath {
 const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const columns: any = [
     {
-      title: '任务名',
+      title: '名称',
       dataIndex: 'name',
       key: 'name',
       width: 150,
@@ -127,7 +127,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       },
     },
     {
-      title: '任务',
+      title: '命令',
       dataIndex: 'command',
       key: 'command',
       width: 250,
@@ -152,7 +152,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       },
     },
     {
-      title: '任务定时',
+      title: '定时规则',
       dataIndex: 'schedule',
       key: 'schedule',
       width: 110,

@@ -10,6 +10,7 @@ import {
   Menu,
   Typography,
   Input,
+  Tooltip,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -20,6 +21,9 @@ import {
   EditOutlined,
   StopOutlined,
   DeleteOutlined,
+  FileTextOutlined,
+  PauseCircleOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -28,6 +32,7 @@ import SubscriptionModal from './modal';
 import { getTableScroll } from '@/utils/index';
 import { history } from 'umi';
 import './index.less';
+import SubscriptionLogModal from './logModal';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -39,10 +44,17 @@ export enum SubscriptionStatus {
   'queued',
 }
 
+export enum IntervalSchedule {
+  'days' = '天',
+  'hours' = '时',
+  'minutes' = '分',
+  'seconds' = '秒',
+}
+
 const Subscription = ({ headerStyle, isPhone, theme }: any) => {
   const columns: any = [
     {
-      title: '订阅名',
+      title: '名称',
       dataIndex: 'name',
       key: 'name',
       width: 150,
@@ -53,39 +65,35 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
       },
     },
     {
-      title: '订阅',
-      dataIndex: 'command',
-      key: 'command',
-      width: 250,
+      title: '链接',
+      dataIndex: 'url',
+      key: 'url',
       align: 'center' as const,
-      render: (text: string, record: any) => {
-        return (
-          <Paragraph
-            style={{
-              wordBreak: 'break-all',
-              marginBottom: 0,
-              textAlign: 'left',
-            }}
-            ellipsis={{ tooltip: text, rows: 2 }}
-          >
-            {text}
-          </Paragraph>
-        );
-      },
       sorter: {
-        compare: (a: any, b: any) => a.command.localeCompare(b.command),
-        multiple: 3,
+        compare: (a: any, b: any) => a.name.localeCompare(b.name),
+        multiple: 2,
       },
     },
     {
-      title: '订阅定时',
-      dataIndex: 'schedule',
-      key: 'schedule',
-      width: 110,
+      title: '分支',
+      dataIndex: 'branch',
+      key: 'branch',
+      width: 130,
       align: 'center' as const,
-      sorter: {
-        compare: (a: any, b: any) => a.schedule.localeCompare(b.schedule),
-        multiple: 1,
+    },
+    {
+      title: '定时规则',
+      width: 180,
+      align: 'center' as const,
+      render: (text: string, record: any) => {
+        const { type, value } = record.interval_schedule;
+        return (
+          <span>
+            {record.schedule_type === 'interval'
+              ? `每${value}${(IntervalSchedule as any)[type]}`
+              : record.schedule}
+          </span>
+        );
       },
     },
     {
@@ -93,7 +101,7 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
       key: 'status',
       dataIndex: 'status',
       align: 'center' as const,
-      width: 85,
+      width: 110,
       filters: [
         {
           text: '运行中',
@@ -148,10 +156,45 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
       title: '操作',
       key: 'action',
       align: 'center' as const,
-      width: 100,
+      width: 130,
       render: (text: string, record: any, index: number) => {
+        const isPc = !isPhone;
         return (
           <Space size="middle">
+            {record.status === SubscriptionStatus.idle && (
+              <Tooltip title={isPc ? '运行' : ''}>
+                <a
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runSubscription(record, index);
+                  }}
+                >
+                  <PlayCircleOutlined />
+                </a>
+              </Tooltip>
+            )}
+            {record.status !== SubscriptionStatus.idle && (
+              <Tooltip title={isPc ? '停止' : ''}>
+                <a
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stopSubsciption(record, index);
+                  }}
+                >
+                  <PauseCircleOutlined />
+                </a>
+              </Tooltip>
+            )}
+            <Tooltip title={isPc ? '日志' : ''}>
+              <a
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLogSubscription({ ...record, timestamp: Date.now() });
+                }}
+              >
+                <FileTextOutlined />
+              </a>
+            </Tooltip>
             <MoreBtn key="more" record={record} index={index} />
           </Space>
         );
@@ -168,23 +211,78 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
   const [pageSize, setPageSize] = useState(20);
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [searchValue, setSearchValue] = useState('');
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const [logSubscription, setLogSubscription] = useState<any>();
 
-  const goToScriptManager = (record: any) => {
-    const cmd = record.command.split(' ') as string[];
-    if (cmd[0] === 'task') {
-      if (cmd[1].startsWith('/ql/data/scripts')) {
-        cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
-      }
+  const runSubscription = (record: any, index: number) => {
+    Modal.confirm({
+      title: '确认运行',
+      content: (
+        <>
+          确认运行定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
+        </>
+      ),
+      onOk() {
+        request
+          .put(`${config.apiPrefix}subscriptions/run`, { data: [record.id] })
+          .then((data: any) => {
+            if (data.code === 200) {
+              const result = [...value];
+              const i = result.findIndex((x) => x.id === record.id);
+              result.splice(i, 1, {
+                ...record,
+                status: SubscriptionStatus.running,
+              });
+              setValue(result);
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
 
-      let [p, s] = cmd[1].split('/');
-      if (!s) {
-        s = p;
-        p = '';
-      }
-      history.push(`/script?p=${p}&s=${s}`);
-    } else if (cmd[1] === 'repo') {
-      location.href = cmd[2];
-    }
+  const stopSubsciption = (record: any, index: number) => {
+    Modal.confirm({
+      title: '确认停止',
+      content: (
+        <>
+          确认停止定时任务{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          吗
+        </>
+      ),
+      onOk() {
+        request
+          .put(`${config.apiPrefix}subscriptions/stop`, { data: [record.id] })
+          .then((data: any) => {
+            if (data.code === 200) {
+              const result = [...value];
+              const i = result.findIndex((x) => x.id === record.id);
+              result.splice(i, 1, {
+                ...record,
+                pid: null,
+                status: SubscriptionStatus.idle,
+              });
+              setValue(result);
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
   };
 
   const getSubscriptions = () => {
@@ -437,6 +535,13 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
         visible={isModalVisible}
         handleCancel={handleCancel}
         subscription={editedSubscription}
+      />
+      <SubscriptionLogModal
+        visible={isLogModalVisible}
+        handleCancel={() => {
+          setIsLogModalVisible(false);
+        }}
+        cron={logSubscription}
       />
     </PageContainer>
   );

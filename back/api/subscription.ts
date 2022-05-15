@@ -29,7 +29,7 @@ export default (app: Router) => {
       body: Joi.object({
         type: Joi.string().required(),
         schedule: Joi.string().optional(),
-        intervalSchedule: Joi.object().optional(),
+        interval_schedule: Joi.object().optional(),
         name: Joi.string().optional(),
         url: Joi.string().required(),
         whitelist: Joi.string().optional(),
@@ -158,7 +158,7 @@ export default (app: Router) => {
       body: Joi.object({
         type: Joi.string().required(),
         schedule: Joi.string().optional(),
-        intervalSchedule: Joi.object().optional(),
+        interval_schedule: Joi.object().optional(),
         name: Joi.string().optional(),
         url: Joi.string().required(),
         whitelist: Joi.string().optional(),
