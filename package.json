@@ -47,6 +47,7 @@
     "chokidar": "^3.5.3",
     "cors": "^2.8.5",
     "cron-parser": "^4.2.1",
+    "dayjs": "^1.11.2",
     "dotenv": "^16.0.0",
     "express": "^4.17.3",
     "express-jwt": "^6.1.1",

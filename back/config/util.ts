@@ -232,6 +232,14 @@ export async function fileExist(file: any) {
   });
 }
 
+export async function createFile(file: string, data: string = '') {
+  return new Promise((resolve) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, data);
+    resolve(true);
+  });
+}
+
 export async function concurrentRun(
   fnList: Array<() => Promise<any>> = [],
   max = 5,
