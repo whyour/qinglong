@@ -478,6 +478,13 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
   };
 
   useEffect(() => {
+    if (logSubscription) {
+      localStorage.setItem('logSubscription', logSubscription.id);
+      setIsLogModalVisible(true);
+    }
+  }, [logSubscription]);
+
+  useEffect(() => {
     getSubscriptions();
   }, [searchText]);
 
@@ -541,7 +548,7 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
         handleCancel={() => {
           setIsLogModalVisible(false);
         }}
-        cron={logSubscription}
+        subscription={logSubscription}
       />
     </PageContainer>
   );

@@ -478,11 +478,8 @@ main() {
     repo)
         get_user_info
         get_uniq_path "$p2" "$p6"
-        log_path="$dir_log/update/${log_time}_${uniq_path}.log"
-        echo -e "## 开始执行... $begin_time\n" >>$log_path
-        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" >>$log_path
+            update_repo "$p2" "$p3" "$p4" "$p5" "$p6"
         else
             echo -e "命令输入错误...\n"
             usage
@@ -491,11 +488,8 @@ main() {
     raw)
         get_user_info
         get_uniq_path "$p2"
-        log_path="$dir_log/update/${log_time}_${uniq_path}.log"
-        echo -e "## 开始执行... $begin_time\n" >>$log_path
-        [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
         if [[ -n $p2 ]]; then
-            update_raw "$p2" >>$log_path
+            update_raw "$p2"
         else
             echo -e "命令输入错误...\n"
             usage
