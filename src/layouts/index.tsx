@@ -213,11 +213,11 @@ export default function (props: any) {
   const isQQBrowser = navigator.userAgent.includes('QQBrowser');
 
   const menu = (
-    <Menu className="side-menu-user-drop-menu">
-      <Menu.Item key="1" icon={<LogoutOutlined />} onClick={logout}>
-        退出登录
-      </Menu.Item>
-    </Menu>
+    <Menu
+      className="side-menu-user-drop-menu"
+      items={[{ label: '退出登录', key: 'logout', icon: <LogoutOutlined /> }]}
+      onClick={logout}
+    />
   );
   return loading ? (
     <PageLoading />

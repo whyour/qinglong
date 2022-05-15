@@ -393,30 +393,25 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
       trigger={['click']}
       overlay={
         <Menu
+          items={[
+            { label: '编辑', key: 'edit', icon: <EditOutlined /> },
+            {
+              label: record.is_disabled === 1 ? '启用' : '禁用',
+              key: 'enableOrDisable',
+              icon:
+                record.is_disabled === 1 ? (
+                  <CheckCircleOutlined />
+                ) : (
+                  <StopOutlined />
+                ),
+            },
+            { label: '删除', key: 'delete', icon: <DeleteOutlined /> },
+          ]}
           onClick={({ key, domEvent }) => {
             domEvent.stopPropagation();
             action(key, record, index);
           }}
-        >
-          <Menu.Item key="edit" icon={<EditOutlined />}>
-            编辑
-          </Menu.Item>
-          <Menu.Item
-            key="enableOrDisable"
-            icon={
-              record.is_disabled === 1 ? (
-                <CheckCircleOutlined />
-              ) : (
-                <StopOutlined />
-              )
-            }
-          >
-            {record.is_disabled === 1 ? '启用' : '禁用'}
-          </Menu.Item>
-          <Menu.Item key="delete" icon={<DeleteOutlined />}>
-            删除
-          </Menu.Item>
-        </Menu>
+        />
       }
     >
       <a onClick={(e) => e.stopPropagation()}>

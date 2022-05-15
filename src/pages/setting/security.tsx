@@ -93,6 +93,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
   const onChange = (e) => {
     if (e.file && e.file.response) {
       setAvatar(`/api/static/${e.file.response.data}`);
+      userChange();
     }
   };
 
