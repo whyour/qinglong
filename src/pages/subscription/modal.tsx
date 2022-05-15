@@ -3,7 +3,6 @@ import { Modal, message, InputNumber, Form, Radio, Select, Input } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import cron_parser from 'cron-parser';
-import EditableTagGroup from '@/components/tag';
 
 const { Option } = Select;
 const repoUrlRegx = /[^\/\:]+\/[^\/]+(?=\.git)/;
@@ -39,9 +38,7 @@ const SubscriptionModal = ({
         },
       );
       if (code === 200) {
-        message.success(
-          subscription ? '更新Subscription成功' : '新建Subscription成功',
-        );
+        message.success(subscription ? '更新订阅成功' : '新建订阅成功');
       } else {
         message.error(data);
       }
@@ -108,21 +105,18 @@ const SubscriptionModal = ({
     const [intervalNumber, setIntervalNumber] = useState<number>();
     const intervalTypeChange = (e) => {
       setIntervalType(e.target.value);
-      onChange?.({ [e.target.value]: intervalNumber });
+      onChange?.({ type: e.target.value, value: intervalNumber });
     };
 
     const numberChange = (value: number) => {
       setIntervalNumber(value);
-      onChange?.({ [intervalType]: value });
+      onChange?.({ type: intervalType, value });
     };
 
     useEffect(() => {
       if (value) {
-        const key = Object.keys(value)[0];
-        if (key) {
-          setIntervalType(key);
-          setIntervalNumber(value[key]);
-        }
+        setIntervalType(value.type);
+        setIntervalNumber(value.value);
       }
     }, [value]);
     return (
@@ -131,11 +125,11 @@ const SubscriptionModal = ({
           addonBefore="每"
           precision={0}
           min={1}
-          defaultValue={intervalNumber}
+          value={intervalNumber}
           style={{ width: 'calc(100% - 58px)' }}
           onChange={numberChange}
         />
-        <Select defaultValue={intervalType} onChange={intervalTypeChange}>
+        <Select value={intervalType} onChange={intervalTypeChange}>
           <Option value="days">天</Option>
           <Option value="hours">时</Option>
           <Option value="minutes">分</Option>
@@ -176,10 +170,10 @@ const SubscriptionModal = ({
   };
 
   useEffect(() => {
-    form.resetFields();
-    setType('public-repo');
-    setScheduleType('crontab');
-    setPullType('ssh-key');
+    form.setFieldsValue(subscription || {});
+    setType((subscription && subscription.type) || 'public-repo');
+    setScheduleType((subscription && subscription.schedule_type) || 'crontab');
+    setPullType((subscription && subscription.pull_type) || 'ssh-key');
   }, [subscription, visible]);
 
   return (
@@ -201,14 +195,9 @@ const SubscriptionModal = ({
       onCancel={() => handleCancel()}
       confirmLoading={loading}
     >
-      <Form
-        form={form}
-        name="form_in_modal"
-        initialValues={subscription}
-        layout="vertical"
-      >
-        <Form.Item name="name" label="别名">
-          <Input placeholder="请输入订阅别名" />
+      <Form form={form} name="form_in_modal" layout="vertical">
+        <Form.Item name="name" label="名称">
+          <Input placeholder="请输入订阅名" />
         </Form.Item>
         <Form.Item
           name="type"
@@ -230,7 +219,9 @@ const SubscriptionModal = ({
             { pattern: type === 'file' ? fileUrlRegx : repoUrlRegx },
           ]}
         >
-          <Input
+          <Input.TextArea
+            rows={4}
+            autoSize={true}
             placeholder="请输入订阅链接"
             onPaste={onUrlChange}
             onChange={onUrlChange}
@@ -281,7 +272,7 @@ const SubscriptionModal = ({
           </Radio.Group>
         </Form.Item>
         <Form.Item
-          name={scheduleType === 'crontab' ? 'schedule' : 'intervalSchedule'}
+          name={scheduleType === 'crontab' ? 'schedule' : 'interval_schedule'}
           label="定时规则"
           rules={[
             { required: true },

@@ -2,13 +2,14 @@ import { sequelize } from '.';
 import { DataTypes, Model, ModelDefined } from 'sequelize';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 
+type SimpleIntervalScheduleUnit = keyof SimpleIntervalSchedule;
 export class Subscription {
   id?: number;
   name?: string;
   type?: 'public-repo' | 'private-repo' | 'file';
   schedule_type?: 'crontab' | 'interval';
   schedule?: string;
-  intervalSchedule?: SimpleIntervalSchedule;
+  interval_schedule?: { type: SimpleIntervalScheduleUnit; value: number };
   url?: string;
   whitelist?: string;
   blacklist?: string;
@@ -20,7 +21,7 @@ export class Subscription {
     | { private_key: string }
     | { username: string; password: string };
   pid?: number;
-  isDisabled?: 1 | 0;
+  is_disabled?: 1 | 0;
   log_path?: string;
   alias: string;
   command?: string;
@@ -30,6 +31,10 @@ export class Subscription {
     this.name = options.name;
     this.type = options.type;
     this.schedule = options.schedule;
+    this.status =
+      options.status && SubscriptionStatus[options.status]
+        ? options.status
+        : SubscriptionStatus.idle;
     this.url = options.url;
     this.whitelist = options.whitelist;
     this.blacklist = options.blacklist;
@@ -39,11 +44,11 @@ export class Subscription {
     this.pull_type = options.pull_type;
     this.pull_option = options.pull_option;
     this.pid = options.pid;
-    this.isDisabled = options.isDisabled;
+    this.is_disabled = options.is_disabled;
     this.log_path = options.log_path;
     this.schedule_type = options.schedule_type;
     this.alias = options.alias;
-    this.intervalSchedule = options.intervalSchedule;
+    this.interval_schedule = options.interval_schedule;
   }
 }
 
@@ -72,7 +77,7 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
       unique: 'compositeIndex',
       type: DataTypes.STRING,
     },
-    intervalSchedule: {
+    interval_schedule: {
       unique: 'compositeIndex',
       type: DataTypes.JSON,
     },
@@ -85,7 +90,7 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
     pull_type: DataTypes.STRING,
     pull_option: DataTypes.JSON,
     pid: DataTypes.NUMBER,
-    isDisabled: DataTypes.NUMBER,
+    is_disabled: DataTypes.NUMBER,
     log_path: DataTypes.STRING,
     schedule_type: DataTypes.STRING,
     alias: { type: DataTypes.STRING, unique: 'alias' },

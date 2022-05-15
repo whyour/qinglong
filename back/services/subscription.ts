@@ -100,10 +100,11 @@ export default class SubscriptionService {
       needCreate && this.scheduleService.createCronTask(doc as any);
     } else {
       this.scheduleService.cancelIntervalTask(doc as any);
+      const { type, value } = doc.interval_schedule as any;
       needCreate &&
         this.scheduleService.createIntervalTask(
           doc as any,
-          doc.intervalSchedule as SimpleIntervalSchedule,
+          { [type]: value } as SimpleIntervalSchedule,
         );
     }
   }
