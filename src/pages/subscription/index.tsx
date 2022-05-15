@@ -117,7 +117,7 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
         },
       ],
       onFilter: (value: number, record: any) => {
-        if (record.isDisabled && record.status !== 0) {
+        if (record.is_disabled && record.status !== 0) {
           return value === 2;
         } else {
           return record.status === value;
@@ -125,7 +125,7 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
       },
       render: (text: string, record: any) => (
         <>
-          {(!record.isDisabled ||
+          {(!record.is_disabled ||
             record.status !== SubscriptionStatus.idle) && (
             <>
               {record.status === SubscriptionStatus.idle && (
@@ -143,7 +143,7 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
               )}
             </>
           )}
-          {record.isDisabled === 1 &&
+          {record.is_disabled === 1 &&
             record.status === SubscriptionStatus.idle && (
               <Tag icon={<CloseCircleOutlined />} color="error">
                 已禁用
@@ -341,10 +341,10 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
 
   const enabledOrDisabledSubscription = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.isDisabled === 1 ? '启用' : '禁用'}`,
+      title: `确认${record.is_disabled === 1 ? '启用' : '禁用'}`,
       content: (
         <>
-          确认{record.isDisabled === 1 ? '启用' : '禁用'}
+          确认{record.is_disabled === 1 ? '启用' : '禁用'}
           定时订阅{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
@@ -356,7 +356,7 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
         request
           .put(
             `${config.apiPrefix}subscriptions/${
-              record.isDisabled === 1 ? 'enable' : 'disable'
+              record.is_disabled === 1 ? 'enable' : 'disable'
             }`,
             {
               data: [record.id],
@@ -364,12 +364,12 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
           )
           .then((data: any) => {
             if (data.code === 200) {
-              const newStatus = record.isDisabled === 1 ? 0 : 1;
+              const newStatus = record.is_disabled === 1 ? 0 : 1;
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               result.splice(i, 1, {
                 ...record,
-                isDisabled: newStatus,
+                is_disabled: newStatus,
               });
               setValue(result);
             } else {
@@ -404,14 +404,14 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
           <Menu.Item
             key="enableOrDisable"
             icon={
-              record.isDisabled === 1 ? (
+              record.is_disabled === 1 ? (
                 <CheckCircleOutlined />
               ) : (
                 <StopOutlined />
               )
             }
           >
-            {record.isDisabled === 1 ? '启用' : '禁用'}
+            {record.is_disabled === 1 ? '启用' : '禁用'}
           </Menu.Item>
           <Menu.Item key="delete" icon={<DeleteOutlined />}>
             删除
