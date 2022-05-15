@@ -307,7 +307,7 @@ export default class SubscriptionService {
     for (const doc of docs) {
       this.handleTask(doc, false);
     }
-    await SubscriptionModel.update({ isDisabled: 1 }, { where: { id: ids } });
+    await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
   }
 
   public async enabled(ids: number[]) {
@@ -315,7 +315,7 @@ export default class SubscriptionService {
     for (const doc of docs) {
       this.handleTask(doc);
     }
-    await SubscriptionModel.update({ isDisabled: 0 }, { where: { id: ids } });
+    await SubscriptionModel.update({ is_disabled: 0 }, { where: { id: ids } });
   }
 
   public async log(id: number) {
