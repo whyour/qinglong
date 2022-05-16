@@ -26,12 +26,14 @@ import { Op } from 'sequelize';
 import path from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
+import SockService from './sock';
 
 @Service()
 export default class SubscriptionService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
+    private sockService: SockService,
   ) {}
 
   public async list(searchText?: string): Promise<Subscription[]> {
@@ -94,11 +96,11 @@ export default class SubscriptionService {
     let command = 'ql ';
     const { type, url, whitelist, blacklist, dependences, branch } = doc;
     if (type === 'file') {
-      command += `raw ${url}`;
+      command += `raw "${url}"`;
     } else {
-      command += `repo ${url} ${whitelist || ''} ${blacklist || ''} ${
+      command += `repo "${url}" "${whitelist || ''}" "${blacklist || ''}" "${
         dependences || ''
-      } ${branch || ''}`;
+      }" "${branch || ''}"`;
     }
     return command;
   }
@@ -168,6 +170,11 @@ export default class SubscriptionService {
             'YYYY-MM-DD HH:mm:ss',
           )}  耗时 ${diff} 秒`,
         );
+        this.sockService.sendMessage({
+          type: 'runSubscriptionEnd',
+          message: '订阅执行完成',
+          references: [doc.id as number],
+        });
       },
       onError: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
@@ -179,6 +186,7 @@ export default class SubscriptionService {
 
   public async create(payload: Subscription): Promise<Subscription> {
     const tab = new Subscription(payload);
+    console.log(tab);
     const doc = await this.insert(tab);
     this.handleTask(doc);
     return doc;
@@ -231,6 +239,10 @@ export default class SubscriptionService {
   }
 
   public async remove(ids: number[]) {
+    const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    for (const doc of docs) {
+      this.handleTask(doc, false);
+    }
     await SubscriptionModel.destroy({ where: { id: ids } });
   }
 

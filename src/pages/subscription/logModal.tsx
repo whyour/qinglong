@@ -68,8 +68,8 @@ const SubscriptionLogModal = ({
         {(executing || loading) && <Loading3QuartersOutlined spin />}
         {!executing && !loading && <CheckCircleOutlined />}
         <span style={{ marginLeft: 5 }}>
-          日志-{subscription && subscription.name}
-        </span>{' '}
+          {subscription && subscription.name}
+        </span>
       </>
     );
   };

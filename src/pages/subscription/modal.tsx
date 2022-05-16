@@ -174,6 +174,9 @@ const SubscriptionModal = ({
     setType((subscription && subscription.type) || 'public-repo');
     setScheduleType((subscription && subscription.schedule_type) || 'crontab');
     setPullType((subscription && subscription.pull_type) || 'ssh-key');
+    if (!subscription) {
+      form.resetFields();
+    }
   }, [subscription, visible]);
 
   return (
@@ -300,7 +303,7 @@ const SubscriptionModal = ({
         {type !== 'file' && (
           <>
             <Form.Item
-              name="command"
+              name="whitelist"
               label="白名单"
               rules={[{ whitespace: true }]}
               tooltip="多个关键词竖线分割，支持正则表达式"
@@ -312,7 +315,7 @@ const SubscriptionModal = ({
               />
             </Form.Item>
             <Form.Item
-              name="command"
+              name="blacklist"
               label="黑名单"
               rules={[{ whitespace: true }]}
               tooltip="多个关键词竖线分割，支持正则表达式"
@@ -324,7 +327,7 @@ const SubscriptionModal = ({
               />
             </Form.Item>
             <Form.Item
-              name="command"
+              name="dependences"
               label="依赖文件"
               rules={[{ whitespace: true }]}
               tooltip="多个关键词竖线分割，支持正则表达式"

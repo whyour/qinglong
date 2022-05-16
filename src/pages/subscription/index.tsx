@@ -51,7 +51,7 @@ export enum IntervalSchedule {
   'seconds' = '秒',
 }
 
-const Subscription = ({ headerStyle, isPhone, theme }: any) => {
+const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
   const columns: any = [
     {
       title: '名称',
@@ -73,6 +73,20 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
         compare: (a: any, b: any) => a.name.localeCompare(b.name),
         multiple: 2,
       },
+      render: (text: string, record: any) => {
+        return (
+          <Paragraph
+            style={{
+              wordBreak: 'break-all',
+              marginBottom: 0,
+              textAlign: 'left',
+            }}
+            ellipsis={{ tooltip: text, rows: 2 }}
+          >
+            {text}
+          </Paragraph>
+        );
+      },
     },
     {
       title: '分支',
@@ -80,20 +94,20 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
       key: 'branch',
       width: 130,
       align: 'center' as const,
+      render: (text: string, record: any) => {
+        return record.branch || '-';
+      },
     },
     {
       title: '定时规则',
       width: 180,
       align: 'center' as const,
       render: (text: string, record: any) => {
-        const { type, value } = record.interval_schedule;
-        return (
-          <span>
-            {record.schedule_type === 'interval'
-              ? `每${value}${(IntervalSchedule as any)[type]}`
-              : record.schedule}
-          </span>
-        );
+        if (record.schedule_type === 'interval') {
+          const { type, value } = record.interval_schedule;
+          return `每${value}${(IntervalSchedule as any)[type]}`;
+        }
+        return record.schedule;
       },
     },
     {
@@ -471,6 +485,22 @@ const Subscription = ({ headerStyle, isPhone, theme }: any) => {
       ? 'pinned-subscription subscription'
       : 'subscription';
   };
+
+  useEffect(() => {
+    if (!socketMessage) return;
+    const { type, message, references } = socketMessage;
+    if (type === 'runSubscriptionEnd' && references.length > 0) {
+      const result = [...value];
+      for (let i = 0; i < references.length; i++) {
+        const index = value.findIndex((x) => x.id === references[i]);
+        result.splice(index, 1, {
+          ...result[index],
+          status: SubscriptionStatus.idle,
+        });
+      }
+      setValue(result);
+    }
+  }, [socketMessage]);
 
   useEffect(() => {
     if (logSubscription) {

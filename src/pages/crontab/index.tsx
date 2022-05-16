@@ -200,18 +200,9 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         },
       },
       render: (text: string, record: any) => {
-        const language = navigator.language || navigator.languages[0];
-        return (
-          <span
-            style={{
-              display: 'block',
-            }}
-          >
-            {record.last_running_time
-              ? diffTime(record.last_running_time)
-              : '-'}
-          </span>
-        );
+        return record.last_running_time
+          ? diffTime(record.last_running_time)
+          : '-';
       },
     },
     {
@@ -225,19 +216,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       },
       render: (text: string, record: any) => {
         const language = navigator.language || navigator.languages[0];
-        return (
-          <span
-            style={{
-              display: 'block',
-            }}
-          >
-            {record.nextRunTime
-              .toLocaleString(language, {
-                hour12: false,
-              })
-              .replace(' 24:', ' 00:')}
-          </span>
-        );
+        return record.nextRunTime
+          .toLocaleString(language, {
+            hour12: false,
+          })
+          .replace(' 24:', ' 00:');
       },
     },
 

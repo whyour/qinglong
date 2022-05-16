@@ -40,7 +40,6 @@ export class Subscription {
     this.blacklist = options.blacklist;
     this.dependences = options.dependences;
     this.branch = options.branch;
-    this.status = options.status;
     this.pull_type = options.pull_type;
     this.pull_option = options.pull_option;
     this.pid = options.pid;
