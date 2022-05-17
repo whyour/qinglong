@@ -61,7 +61,7 @@ original_name=(
 )
 
 init_env() {
-    export NODE_PATH=/usr/local/bin:/usr/local/pnpm-global/5/node_modules:/usr/local/lib/node_modules
+    export NODE_PATH=/usr/local/bin:/usr/local/pnpm-global/5/node_modules:/usr/local/lib/node_modules:/root/.local/share/pnpm/global/5/node_modules
     export PYTHONUNBUFFERED=1
 }
 
