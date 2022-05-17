@@ -56,7 +56,9 @@ const SubscriptionModal = ({
     form.setFieldsValue({
       alias: formatAlias(_url, _branch, e.target.value),
     });
-    form.validateFields(['url']);
+    if (_url) {
+      form.validateFields(['url']);
+    }
   };
 
   const scheduleTypeChange = (e) => {
@@ -149,16 +151,28 @@ const SubscriptionModal = ({
     onChange?: (param: any) => void;
   }) => {
     return type === 'ssh-key' ? (
-      <Form.Item name="private_key" label="私钥" rules={[{ required: true }]}>
-        <Input.TextArea rows={4} autoSize={true} placeholder="请输入私钥" />
+      <Form.Item
+        name={['pull_option', 'private_key']}
+        label="私钥"
+        rules={[{ required: true }]}
+      >
+        <Input.TextArea
+          rows={4}
+          autoSize={{ minRows: 1, maxRows: 6 }}
+          placeholder="请输入私钥"
+        />
       </Form.Item>
     ) : (
       <>
-        <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
+        <Form.Item
+          name={['pull_option', 'username']}
+          label="用户名"
+          rules={[{ required: true }]}
+        >
           <Input placeholder="请输入认证用户名" />
         </Form.Item>
         <Form.Item
-          name="password"
+          name={['pull_option', 'password']}
           tooltip="Github已不支持密码认证，请使用Token方式"
           label="密码/Token"
           rules={[{ required: true }]}

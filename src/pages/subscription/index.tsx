@@ -51,6 +51,12 @@ export enum IntervalSchedule {
   'seconds' = '秒',
 }
 
+export enum SubscriptionType {
+  'private-repo' = '私有仓库',
+  'public-repo' = '公开仓库',
+  'file' = '单文件',
+}
+
 const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
   const columns: any = [
     {
@@ -86,6 +92,16 @@ const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
             {text}
           </Paragraph>
         );
+      },
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      width: 130,
+      align: 'center' as const,
+      render: (text: string, record: any) => {
+        return (SubscriptionType as any)[record.type];
       },
     },
     {
