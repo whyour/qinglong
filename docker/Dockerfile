@@ -49,6 +49,7 @@ RUN set -x \
     && chmod 777 ${QL_DIR}/docker/*.sh \
     && pnpm install --prod \
     && rm -rf /root/.pnpm-store \
+    && rm -rf /root/.local/share/pnpm \
     && rm -rf /root/.cache \
     && rm -rf /root/.npm \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
