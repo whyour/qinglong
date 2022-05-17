@@ -101,7 +101,7 @@ export default function (props: any) {
   };
 
   useEffect(() => {
-    if (systemInfo && systemInfo.isInitialized && !user) {
+    if (systemInfo && systemInfo.isInitialized && !user.username) {
       getUser();
     }
   }, [props.location.pathname]);

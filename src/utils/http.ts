@@ -11,7 +11,7 @@ const time = Date.now();
 const errorHandler = function (error: any) {
   if (error.response) {
     const msg = error.data
-      ? error.data.message || error.data
+      ? error.data.message || error.message || error.data
       : error.response.statusText;
     const responseStatus = error.response.status;
     if ([502, 504].includes(responseStatus)) {

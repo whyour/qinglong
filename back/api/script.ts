@@ -129,7 +129,7 @@ export default (app: Router) => {
         if (config.writePathList.every((x) => !path.startsWith(x))) {
           return res.send({
             code: 430,
-            data: '文件路径禁止访问',
+            message: '文件路径禁止访问',
           });
         }
         if (!originFilename) {

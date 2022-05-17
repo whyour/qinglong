@@ -10,7 +10,7 @@ app.get('/api/public/panel/log', (req, res) => {
     'pm2 logs panel --lines 500 --nostream --timestamp',
     (err, stdout, stderr) => {
       if (err || stderr) {
-        return res.send({ code: 400, data: err || stderr });
+        return res.send({ code: 400, message: (err && err.message) || stderr });
       }
       return res.send({ code: 200, data: stdout });
     },

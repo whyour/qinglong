@@ -52,7 +52,7 @@ export default class SystemService {
       });
       return { code: 200, data: { ...result, code } };
     } else {
-      return { code: 400, data: '通知发送失败，请检查参数' };
+      return { code: 400, message: '通知发送失败，请检查参数' };
     }
   }
 
@@ -111,7 +111,7 @@ export default class SystemService {
     } catch (error: any) {
       return {
         code: 400,
-        data: error.message,
+        message: error.message,
       };
     }
   }
@@ -169,9 +169,9 @@ export default class SystemService {
   public async notify({ title, content }: { title: string; content: string }) {
     const isSuccess = await this.notificationService.notify(title, content);
     if (isSuccess) {
-      return { code: 200, data: '通知发送成功' };
+      return { code: 200, message: '通知发送成功' };
     } else {
-      return { code: 400, data: '通知发送失败，请检查参数' };
+      return { code: 400, message: '通知发送失败，请检查系统设置/通知配置' };
     }
   }
 }

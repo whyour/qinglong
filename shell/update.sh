@@ -531,8 +531,8 @@ main() {
     local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
     if [[ $p1 != "repo" ]] && [[ $p1 != "raw" ]]; then
         echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >>$log_path
+        cat $log_path
     fi
-    cat $log_path
 }
 
 main "$@"
