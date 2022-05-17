@@ -13,6 +13,7 @@ import UserService from '../services/user';
 import handler from 'serve-handler';
 import * as Sentry from '@sentry/node';
 import { EnvModel } from '../data/env';
+import { errors } from 'celebrate';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -134,6 +135,7 @@ export default ({ app }: { app: Application }) => {
     next(err);
   });
 
+  app.use(errors());
   app.use(Sentry.Handlers.errorHandler());
 
   app.use(

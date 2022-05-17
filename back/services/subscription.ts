@@ -27,6 +27,7 @@ import path from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
+import SshKeyService from './sshKey';
 
 @Service()
 export default class SubscriptionService {
@@ -34,6 +35,7 @@ export default class SubscriptionService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
+    private sshKeyService: SshKeyService,
   ) {}
 
   public async list(searchText?: string): Promise<Subscription[]> {
@@ -92,21 +94,44 @@ export default class SubscriptionService {
     }
   }
 
-  private formatCommand(doc: Subscription) {
+  private formatCommand(doc: Subscription, url?: string) {
     let command = 'ql ';
-    const { type, url, whitelist, blacklist, dependences, branch } = doc;
+    let _url = url || doc.url;
+    const { type, whitelist, blacklist, dependences, branch } = doc;
     if (type === 'file') {
-      command += `raw "${url}"`;
+      command += `raw "${_url}"`;
     } else {
-      command += `repo "${url}" "${whitelist || ''}" "${blacklist || ''}" "${
+      command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
         dependences || ''
       }" "${branch || ''}"`;
     }
     return command;
   }
 
-  private handleTask(doc: Subscription, needCreate = true) {
-    doc.command = this.formatCommand(doc);
+  private handleTask(doc: Subscription, needCreate = true, needAddKey = true) {
+    let url = doc.url;
+    if (doc.type === 'private-repo') {
+      if (doc.pull_type === 'ssh-key') {
+        const host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
+        url = doc.url!.replace(host, doc.alias);
+        if (needAddKey) {
+          this.sshKeyService.addSSHKey(
+            (doc.pull_option as any).private_key,
+            doc.alias,
+            host,
+          );
+        } else {
+          this.sshKeyService.removeSSHKey(doc.alias, host);
+        }
+      } else {
+        const host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
+        const { username, password } = doc.pull_option as any;
+        url = doc.url!.replace(host, `${username}:${password}@${host}`);
+      }
+    }
+
+    doc.command = this.formatCommand(doc, url as string);
+
     if (doc.schedule_type === 'crontab') {
       this.scheduleService.cancelCronTask(doc as any);
       needCreate &&
@@ -191,7 +216,6 @@ export default class SubscriptionService {
 
   public async create(payload: Subscription): Promise<Subscription> {
     const tab = new Subscription(payload);
-    console.log(tab);
     const doc = await this.insert(tab);
     this.handleTask(doc);
     return doc;
@@ -246,7 +270,7 @@ export default class SubscriptionService {
   public async remove(ids: number[]) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
-      this.handleTask(doc, false);
+      this.handleTask(doc, false, false);
     }
     await SubscriptionModel.destroy({ where: { id: ids } });
   }
