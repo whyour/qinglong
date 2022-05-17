@@ -181,6 +181,11 @@ export default class SubscriptionService {
         const absolutePath = await this.handleLogPath(sub.log_path as string);
         fs.appendFileSync(absolutePath, `\n${message}`);
       },
+      onLog: async (message: string) => {
+        const sub = await this.getDb({ id: doc.id });
+        const absolutePath = await this.handleLogPath(sub.log_path as string);
+        fs.appendFileSync(absolutePath, `\n${message}`);
+      },
     };
   }
 
