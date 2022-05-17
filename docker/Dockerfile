@@ -5,7 +5,7 @@ LABEL maintainer="${QL_MAINTAINER}"
 ARG QL_URL=https://github.com/${QL_MAINTAINER}/qinglong.git
 ARG QL_BRANCH=master
 
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/share/pnpm:/root/.local/share/pnpm/global/5/node_modules \
     LANG=zh_CN.UTF-8 \
     SHELL=/bin/bash \
     PS1="\u@\h:\w \$ " \
