@@ -22,10 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
+        with:
+          cache: 'pnpm'
 
       - name: build front and back
         run: |
-          npm i -g pnpm
           pnpm install
           pnpm build:front
           pnpm build:back
