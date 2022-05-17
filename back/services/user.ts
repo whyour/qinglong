@@ -346,7 +346,7 @@ export default class UserService {
       });
       return { code: 200, data: { ...result, code } };
     } else {
-      return { code: 400, data: '通知发送失败，请检查参数' };
+      return { code: 400, message: '通知发送失败，请检查参数' };
     }
   }
 }
