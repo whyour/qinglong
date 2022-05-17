@@ -27,6 +27,7 @@ export interface TaskCallbacks {
     endTime: dayjs.Dayjs,
     diff: number,
   ) => void;
+  onLog?: (message: string) => void;
   onError?: (message: string) => void;
 }
 
@@ -48,9 +49,13 @@ export default class ScheduleService {
 
         callbacks.onStart?.(cp, startTime);
 
+        cp.stdout.on('data', (data) => {
+          callbacks.onLog?.(data.toString());
+        });
+
         cp.stderr.on('data', (data) => {
           this.logger.error(
-            '执行任务%s失败，时间：%s, 错误信息：%j',
+            '执行任务 %s 失败，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
             data.toString(),
@@ -60,7 +65,7 @@ export default class ScheduleService {
 
         cp.on('error', (err) => {
           this.logger.error(
-            '执行任务%s失败，时间：%s, 错误信息：%j',
+            '创建任务 %s 失败，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
             err,

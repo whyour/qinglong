@@ -29,7 +29,7 @@ import { init } from '../utils/init';
 export default function (props: any) {
   const ctx = useCtx();
   const theme = useTheme();
-  const [user, setUser] = useState<any>();
+  const [user, setUser] = useState<any>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<{ isInitialized: boolean }>();
   const ws = useRef<any>(null);
