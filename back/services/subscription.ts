@@ -124,7 +124,7 @@ export default class SubscriptionService {
     return { url, host };
   }
 
-  private handleTask(doc: Subscription, needCreate = true, needAddKey = true) {
+  public handleTask(doc: Subscription, needCreate = true, needAddKey = true) {
     const { url, host } = this.formatUrl(doc);
     if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
       if (needAddKey) {

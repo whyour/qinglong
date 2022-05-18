@@ -79,6 +79,7 @@ const EnvModal = ({
         <Form.Item
           name="name"
           label="名称"
+          normalize={(value) => value.trim()}
           rules={[
             { required: true, message: '请输入环境变量名称', whitespace: true },
             {
@@ -105,6 +106,7 @@ const EnvModal = ({
         <Form.Item
           name="value"
           label="值"
+          normalize={(value) => value.trim()}
           rules={[
             { required: true, message: '请输入环境变量值', whitespace: true },
           ]}
