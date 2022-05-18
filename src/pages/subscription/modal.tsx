@@ -225,12 +225,13 @@ const SubscriptionModal = ({
           <Radio.Group onChange={typeChange}>
             <Radio value="public-repo">公开仓库</Radio>
             <Radio value="private-repo">私有仓库</Radio>
-            <Radio value="file">单个文件</Radio>
+            <Radio value="file">单文件</Radio>
           </Radio.Group>
         </Form.Item>
         <Form.Item
           name="url"
           label="链接"
+          normalize={(value) => value.trim()}
           rules={[
             { required: true },
             { pattern: type === 'file' ? fileUrlRegx : repoUrlRegx },
@@ -245,7 +246,11 @@ const SubscriptionModal = ({
           />
         </Form.Item>
         {type !== 'file' && (
-          <Form.Item name="branch" label="分支">
+          <Form.Item
+            name="branch"
+            label="分支"
+            normalize={(value) => value.trim()}
+          >
             <Input
               placeholder="请输入分支"
               onPaste={onBranchChange}
@@ -319,7 +324,7 @@ const SubscriptionModal = ({
             <Form.Item
               name="whitelist"
               label="白名单"
-              rules={[{ whitespace: true }]}
+              normalize={(value) => value.trim()}
               tooltip="多个关键词竖线分割，支持正则表达式"
             >
               <Input.TextArea
@@ -331,7 +336,7 @@ const SubscriptionModal = ({
             <Form.Item
               name="blacklist"
               label="黑名单"
-              rules={[{ whitespace: true }]}
+              normalize={(value) => value.trim()}
               tooltip="多个关键词竖线分割，支持正则表达式"
             >
               <Input.TextArea
@@ -343,7 +348,7 @@ const SubscriptionModal = ({
             <Form.Item
               name="dependences"
               label="依赖文件"
-              rules={[{ whitespace: true }]}
+              normalize={(value) => value.trim()}
               tooltip="多个关键词竖线分割，支持正则表达式"
             >
               <Input.TextArea
