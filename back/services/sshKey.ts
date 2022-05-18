@@ -32,7 +32,7 @@ export default class SshKeyService {
   }
 
   private generateSingleSshConfig(alias: string, host: string): string {
-    return `\nHost ${alias}\n    Hostname ${host}\n    IdentityFile=${this.sshPath}/${alias}`;
+    return `\nHost ${alias}\n    Hostname ${host}\n    IdentityFile=${this.sshPath}/${alias}\n    StrictHostKeyChecking no`;
   }
 
   private generateSshConfig(configs: string[]) {
