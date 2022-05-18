@@ -35,7 +35,10 @@ export default class SshKeyService {
   private generateSshConfig(configs: string[]) {
     try {
       for (const config of configs) {
-        fs.appendFileSync(this.sshConfigFilePath, config, { encoding: 'utf8' });
+        fs.appendFileSync(this.sshConfigFilePath, config, {
+          encoding: 'utf8',
+          mode: '400',
+        });
       }
     } catch (error) {
       this.logger.error('写入ssh配置文件失败', error);
@@ -56,6 +59,7 @@ export default class SshKeyService {
   public addSSHKey(key: string, alias: string, host: string): void {
     this.generatePrivateKeyFile(alias, key);
     const config = this.generateSingleSshConfig(alias, host);
+    this.removeSshConfig(config);
     this.generateSshConfig([config]);
   }
 
