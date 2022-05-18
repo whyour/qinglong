@@ -14,7 +14,10 @@ export default class SshKeyService {
 
   private generatePrivateKeyFile(alias: string, key: string): void {
     try {
-      fs.writeFileSync(`${this.sshPath}/${alias}`, key, { encoding: 'utf8' });
+      fs.writeFileSync(`${this.sshPath}/${alias}`, key, {
+        encoding: 'utf8',
+        mode: '400',
+      });
     } catch (error) {
       this.logger.error('生成私钥文件失败', error);
     }
@@ -37,7 +40,6 @@ export default class SshKeyService {
       for (const config of configs) {
         fs.appendFileSync(this.sshConfigFilePath, config, {
           encoding: 'utf8',
-          mode: '400',
         });
       }
     } catch (error) {
@@ -47,10 +49,13 @@ export default class SshKeyService {
 
   private removeSshConfig(config: string) {
     try {
-      fs.readFileSync(this.sshConfigFilePath, { encoding: 'utf8' }).replace(
-        config,
-        '',
-      );
+      const data = fs
+        .readFileSync(this.sshConfigFilePath, { encoding: 'utf8' })
+        .replace(config, '')
+        .replace(/\n\n+/, '\n\n');
+      fs.writeFileSync(this.sshConfigFilePath, data, {
+        encoding: 'utf8',
+      });
     } catch (error) {
       this.logger.error(`删除ssh配置文件${config}失败`, error);
     }

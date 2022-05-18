@@ -96,7 +96,7 @@ export default class SubscriptionService {
 
   private formatCommand(doc: Subscription, url?: string) {
     let command = 'ql ';
-    let _url = url || doc.url;
+    let _url = url || this.formatUrl(doc).url;
     const { type, whitelist, blacklist, dependences, branch } = doc;
     if (type === 'file') {
       command += `raw "${_url}"`;
@@ -108,25 +108,33 @@ export default class SubscriptionService {
     return command;
   }
 
-  private handleTask(doc: Subscription, needCreate = true, needAddKey = true) {
+  private formatUrl(doc: Subscription) {
     let url = doc.url;
+    let host = '';
     if (doc.type === 'private-repo') {
       if (doc.pull_type === 'ssh-key') {
-        const host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
+        host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
         url = doc.url!.replace(host, doc.alias);
-        if (needAddKey) {
-          this.sshKeyService.addSSHKey(
-            (doc.pull_option as any).private_key,
-            doc.alias,
-            host,
-          );
-        } else {
-          this.sshKeyService.removeSSHKey(doc.alias, host);
-        }
       } else {
-        const host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
+        host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
         const { username, password } = doc.pull_option as any;
         url = doc.url!.replace(host, `${username}:${password}@${host}`);
+      }
+    }
+    return { url, host };
+  }
+
+  private handleTask(doc: Subscription, needCreate = true, needAddKey = true) {
+    const { url, host } = this.formatUrl(doc);
+    if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
+      if (needAddKey) {
+        this.sshKeyService.addSSHKey(
+          (doc.pull_option as any).private_key,
+          doc.alias,
+          host,
+        );
+      } else {
+        this.sshKeyService.removeSSHKey(doc.alias, host);
       }
     }
 
