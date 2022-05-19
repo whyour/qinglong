@@ -97,13 +97,13 @@ export default class SubscriptionService {
   private formatCommand(doc: Subscription, url?: string) {
     let command = 'ql ';
     let _url = url || this.formatUrl(doc).url;
-    const { type, whitelist, blacklist, dependences, branch } = doc;
+    const { type, whitelist, blacklist, dependences, branch, extensions } = doc;
     if (type === 'file') {
       command += `raw "${_url}"`;
     } else {
       command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
         dependences || ''
-      }" "${branch || ''}"`;
+      }" "${branch || ''}" "${extensions || ''}"`;
     }
     return command;
   }
@@ -218,6 +218,40 @@ export default class SubscriptionService {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await this.handleLogPath(sub.log_path as string);
         fs.appendFileSync(absolutePath, `\n${message}`);
+      },
+      onBefore: async () => {
+        return new Promise((resolve, reject) => {
+          if (doc.sub_before) {
+            exec(doc.sub_before, async (err, stdout, stderr) => {
+              const absolutePath = await this.handleLogPath(
+                doc.log_path as string,
+              );
+              fs.appendFileSync(
+                absolutePath,
+                stdout || stderr || `${JSON.stringify(err || {})}`,
+              );
+            });
+          } else {
+            resolve();
+          }
+        });
+      },
+      onAfter: async () => {
+        return new Promise((resolve, reject) => {
+          if (doc.sub_after) {
+            exec(doc.sub_after, async (err, stdout, stderr) => {
+              const absolutePath = await this.handleLogPath(
+                doc.log_path as string,
+              );
+              fs.appendFileSync(
+                absolutePath,
+                stdout || stderr || `${JSON.stringify(err || {})}`,
+              );
+            });
+          } else {
+            resolve();
+          }
+        });
       },
     };
   }

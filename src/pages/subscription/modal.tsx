@@ -357,6 +357,37 @@ const SubscriptionModal = ({
                 placeholder="请输入脚本依赖文件关键词，多个关键词竖线分割"
               />
             </Form.Item>
+            <Form.Item
+              name="extensions"
+              label="文件后缀"
+              normalize={(value) => value.trim()}
+              tooltip="仓库需要拉取的文件后缀，多个后缀空格分隔"
+            >
+              <Input placeholder="请输入文件后缀" />
+            </Form.Item>
+            <Form.Item
+              name="sub_before"
+              label="sub_before"
+              normalize={(value) => value.trim()}
+              tooltip="仓库需要拉取的文件后缀，多个后缀空格分隔"
+            >
+              <Input.TextArea
+                rows={4}
+                autoSize={true}
+                placeholder="请输入拉取仓库前要执行的命令"
+              />
+            </Form.Item>
+            <Form.Item
+              name="sub_after"
+              label="sub_after"
+              normalize={(value) => value.trim()}
+            >
+              <Input.TextArea
+                rows={4}
+                autoSize={true}
+                placeholder="请输入拉取仓库后要执行的命令"
+              />
+            </Form.Item>
           </>
         )}
       </Form>
