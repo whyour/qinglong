@@ -21,14 +21,16 @@ export interface TaskCallbacks {
   onStart?: (
     cp: ChildProcessWithoutNullStreams,
     startTime: dayjs.Dayjs,
-  ) => void;
+  ) => Promise<void>;
   onEnd?: (
     cp: ChildProcessWithoutNullStreams,
     endTime: dayjs.Dayjs,
     diff: number,
-  ) => void;
-  onLog?: (message: string) => void;
-  onError?: (message: string) => void;
+  ) => Promise<void>;
+  onLog?: (message: string) => Promise<void>;
+  onError?: (message: string) => Promise<void>;
+  onBefore?: () => Promise<void>;
+  onAfter?: () => Promise<void>;
 }
 
 @Service()
@@ -44,33 +46,34 @@ export default class ScheduleService {
   async runTask(command: string, callbacks: TaskCallbacks = {}) {
     return new Promise(async (resolve, reject) => {
       try {
+        await callbacks.onBefore?.();
         const startTime = dayjs();
         const cp = spawn(command, { shell: '/bin/bash' });
 
-        callbacks.onStart?.(cp, startTime);
+        await callbacks.onStart?.(cp, startTime);
 
-        cp.stdout.on('data', (data) => {
-          callbacks.onLog?.(data.toString());
+        cp.stdout.on('data', async (data) => {
+          await callbacks.onLog?.(data.toString());
         });
 
-        cp.stderr.on('data', (data) => {
+        cp.stderr.on('data', async (data) => {
           this.logger.error(
             '执行任务 %s 失败，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
             data.toString(),
           );
-          callbacks.onError?.(data.toString());
+          await callbacks.onError?.(data.toString());
         });
 
-        cp.on('error', (err) => {
+        cp.on('error', async (err) => {
           this.logger.error(
             '创建任务 %s 失败，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
             err,
           );
-          callbacks.onError?.(JSON.stringify(err));
+          await callbacks.onError?.(JSON.stringify(err));
         });
 
         cp.on('exit', async (code, signal) => {
@@ -82,7 +85,12 @@ export default class ScheduleService {
         cp.on('close', async (code) => {
           const endTime = dayjs();
           this.logger.info(`${command} pid: ${cp.pid} closed ${code}`);
-          callbacks.onEnd?.(cp, endTime, endTime.diff(startTime, 'seconds'));
+          await callbacks.onEnd?.(
+            cp,
+            endTime,
+            endTime.diff(startTime, 'seconds'),
+          );
+          await callbacks.onAfter?.();
           resolve(null);
         });
       } catch (error) {
@@ -92,7 +100,7 @@ export default class ScheduleService {
           new Date().toLocaleString(),
           error,
         );
-        callbacks.onError?.(JSON.stringify(error));
+        await callbacks.onError?.(JSON.stringify(error));
         resolve(null);
       }
     });

@@ -141,6 +141,7 @@ update_repo() {
     local blackword="$3"
     local dependence="$4"
     local branch="$5"
+    local extensions="$6"
     local tmp="${url%/*}"
     local authorTmp1="${tmp##*/}"
     local authorTmp2="${authorTmp1##*:}"
@@ -159,7 +160,7 @@ update_repo() {
     fi
     if [[ $exit_status -eq 0 ]]; then
         echo -e "\n更新${repo_path}成功...\n"
-        diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence"
+        diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions"
     else
         echo -e "\n更新${repo_path}失败，请检查网络...\n"
     fi
@@ -341,8 +342,9 @@ diff_scripts() {
     local path="$3"
     local blackword="$4"
     local dependence="$5"
+    local extensions="$6"
 
-    gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence"
+    gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions"
 
     local list_add="$dir_list_tmp/${uniq_path}_add.list"
     local list_drop="$dir_list_tmp/${uniq_path}_drop.list"
@@ -378,6 +380,9 @@ gen_list_repo() {
 
     local cmd="find ."
     local index=0
+    if [[ $6 ]]; then
+        file_extensions="$6"
+    fi
     for extension in $file_extensions; do
         if [[ $index -eq 0 ]]; then
             cmd="${cmd} -name \"*.${extension}\""
@@ -458,6 +463,7 @@ main() {
     local p4=$4
     local p5=$5
     local p6=$6
+    local p7=$7
     local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
     local log_path="$dir_log/update/${log_time}_$p1.log"
     local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
@@ -479,7 +485,7 @@ main() {
         get_user_info
         get_uniq_path "$p2" "$p6"
         if [[ -n $p2 ]]; then
-            update_repo "$p2" "$p3" "$p4" "$p5" "$p6"
+            update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7"
         else
             echo -e "命令输入错误...\n"
             usage

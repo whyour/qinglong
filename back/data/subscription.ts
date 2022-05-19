@@ -25,6 +25,9 @@ export class Subscription {
   log_path?: string;
   alias: string;
   command?: string;
+  extensions?: string;
+  sub_before?: string;
+  sub_after?: string;
 
   constructor(options: Subscription) {
     this.id = options.id;
@@ -48,6 +51,9 @@ export class Subscription {
     this.schedule_type = options.schedule_type;
     this.alias = options.alias;
     this.interval_schedule = options.interval_schedule;
+    this.extensions = options.extensions;
+    this.sub_before = options.sub_before;
+    this.sub_after = options.sub_after;
   }
 }
 
@@ -85,6 +91,9 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
     blacklist: DataTypes.STRING,
     status: DataTypes.NUMBER,
     dependences: DataTypes.STRING,
+    extensions: DataTypes.STRING,
+    sub_before: DataTypes.STRING,
+    sub_after: DataTypes.STRING,
     branch: DataTypes.STRING,
     pull_type: DataTypes.STRING,
     pull_option: DataTypes.JSON,
