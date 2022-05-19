@@ -18,7 +18,7 @@ import { MobileOutlined } from '@ant-design/icons';
 const FormItem = Form.Item;
 const { Countdown } = Statistic;
 
-const Login = () => {
+const Login = ({ reloadUser }: any) => {
   const [loading, setLoading] = useState(false);
   const [waitTime, setWaitTime] = useState<any>();
   const { theme } = useTheme();
@@ -100,8 +100,8 @@ const Login = () => {
             <div>上次登录状态：{retries > 0 ? `失败${retries}次` : '成功'}</div>
           </>
         ),
-        duration: 5,
       });
+      reloadUser();
       history.push('/crontab');
     } else if (data.code === 100) {
       message.warn(data.message);
