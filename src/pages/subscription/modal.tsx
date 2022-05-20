@@ -367,25 +367,26 @@ const SubscriptionModal = ({
             </Form.Item>
             <Form.Item
               name="sub_before"
-              label="sub_before"
+              label="执行前"
               normalize={(value) => value.trim()}
-              tooltip="仓库需要拉取的文件后缀，多个后缀空格分隔"
+              tooltip="运行订阅前执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js"
             >
               <Input.TextArea
                 rows={4}
                 autoSize={true}
-                placeholder="请输入拉取仓库前要执行的命令"
+                placeholder="请输入运行订阅前要执行的命令"
               />
             </Form.Item>
             <Form.Item
               name="sub_after"
-              label="sub_after"
+              label="执行后"
               normalize={(value) => value.trim()}
+              tooltip="运行订阅后执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js"
             >
               <Input.TextArea
                 rows={4}
                 autoSize={true}
-                placeholder="请输入拉取仓库后要执行的命令"
+                placeholder="请输入运行订阅后要执行的命令"
               />
             </Form.Item>
           </>
