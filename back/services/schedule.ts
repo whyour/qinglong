@@ -50,7 +50,8 @@ export default class ScheduleService {
         const startTime = dayjs();
         const cp = spawn(command, { shell: '/bin/bash' });
 
-        await callbacks.onStart?.(cp, startTime);
+        // TODO:
+        callbacks.onStart?.(cp, startTime);
 
         cp.stdout.on('data', async (data) => {
           await callbacks.onLog?.(data.toString());
