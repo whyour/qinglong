@@ -28,7 +28,7 @@ export default (app: Router) => {
           const fileOrDir = fileList[i];
           const fPath = path.join(config.scriptPath, fileOrDir);
           const dirStat = fs.statSync(fPath);
-          if (['node_modules'].includes(fileOrDir)) {
+          if (['node_modules', 'pnpm-lock.yaml'].includes(fileOrDir)) {
             continue;
           }
 
