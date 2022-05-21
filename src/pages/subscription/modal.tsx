@@ -231,7 +231,6 @@ const SubscriptionModal = ({
         <Form.Item
           name="url"
           label="链接"
-          normalize={(value) => value.trim()}
           rules={[
             { required: true },
             { pattern: type === 'file' ? fileUrlRegx : repoUrlRegx },
@@ -246,11 +245,7 @@ const SubscriptionModal = ({
           />
         </Form.Item>
         {type !== 'file' && (
-          <Form.Item
-            name="branch"
-            label="分支"
-            normalize={(value) => value.trim()}
-          >
+          <Form.Item name="branch" label="分支">
             <Input
               placeholder="请输入分支"
               onPaste={onBranchChange}
@@ -324,7 +319,6 @@ const SubscriptionModal = ({
             <Form.Item
               name="whitelist"
               label="白名单"
-              normalize={(value) => value.trim()}
               tooltip="多个关键词竖线分割，支持正则表达式"
             >
               <Input.TextArea
@@ -336,7 +330,6 @@ const SubscriptionModal = ({
             <Form.Item
               name="blacklist"
               label="黑名单"
-              normalize={(value) => value.trim()}
               tooltip="多个关键词竖线分割，支持正则表达式"
             >
               <Input.TextArea
@@ -348,7 +341,6 @@ const SubscriptionModal = ({
             <Form.Item
               name="dependences"
               label="依赖文件"
-              normalize={(value) => value.trim()}
               tooltip="多个关键词竖线分割，支持正则表达式"
             >
               <Input.TextArea
@@ -360,7 +352,6 @@ const SubscriptionModal = ({
             <Form.Item
               name="extensions"
               label="文件后缀"
-              normalize={(value) => value.trim()}
               tooltip="仓库需要拉取的文件后缀，多个后缀空格分隔"
             >
               <Input placeholder="请输入文件后缀" />
@@ -368,7 +359,6 @@ const SubscriptionModal = ({
             <Form.Item
               name="sub_before"
               label="执行前"
-              normalize={(value) => value.trim()}
               tooltip="运行订阅前执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js"
             >
               <Input.TextArea
@@ -380,7 +370,6 @@ const SubscriptionModal = ({
             <Form.Item
               name="sub_after"
               label="执行后"
-              normalize={(value) => value.trim()}
               tooltip="运行订阅后执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js"
             >
               <Input.TextArea

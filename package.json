@@ -100,7 +100,7 @@
     "@umijs/plugin-esbuild": "^1.4.1",
     "@umijs/test": "^3.5.21",
     "ansi-to-react": "^6.1.6",
-    "antd": "^4.18.9",
+    "antd": "^4.20.5",
     "antd-img-crop": "^4.2.3",
     "codemirror": "^5.65.2",
     "compression-webpack-plugin": "9.2.0",
