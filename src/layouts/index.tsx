@@ -1,11 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import ProLayout, { PageLoading } from '@ant-design/pro-layout';
-import {
-  enable as enableDarkMode,
-  disable as disableDarkMode,
-  auto as followSystemColorScheme,
-  setFetchMethod,
-} from 'darkreader';
+import * as DarkReader from '@umijs/ssr-darkreader';
 import defaultProps from './defaultProps';
 import { Link, history } from 'umi';
 import {
@@ -35,6 +30,13 @@ export default function (props: any) {
   const ws = useRef<any>(null);
   const [socketMessage, setSocketMessage] = useState<any>();
   const [collapsed, setCollapsed] = useState(false);
+  const {
+    enable: enableDarkMode,
+    disable: disableDarkMode,
+    exportGeneratedCSS: collectCSS,
+    setFetchMethod,
+    auto: followSystemColorScheme,
+  } = DarkReader || {};
 
   const logout = () => {
     request.post(`${config.apiPrefix}user/logout`).then(() => {
@@ -121,7 +123,13 @@ export default function (props: any) {
     init();
 
     const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
-    setFetchMethod(window.fetch);
+    if (typeof window === 'undefined') return;
+    if (typeof window.matchMedia === 'undefined') return;
+    if (!DarkReader) {
+      return () => null;
+    }
+    setFetchMethod(fetch);
+
     if (_theme === 'dark') {
       enableDarkMode({});
     } else if (_theme === 'light') {
@@ -129,6 +137,10 @@ export default function (props: any) {
     } else {
       followSystemColorScheme({});
     }
+
+    return () => {
+      disableDarkMode();
+    };
   }, []);
 
   useEffect(() => {
