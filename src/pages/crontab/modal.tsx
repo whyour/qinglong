@@ -75,7 +75,6 @@ const CronModal = ({
         <Form.Item
           name="command"
           label="命令"
-          normalize={(value) => value.trim()}
           rules={[{ required: true, whitespace: true }]}
         >
           <Input.TextArea
@@ -87,7 +86,6 @@ const CronModal = ({
         <Form.Item
           name="schedule"
           label="定时规则"
-          normalize={(value) => value.trim()}
           rules={[
             { required: true },
             {
