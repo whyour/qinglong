@@ -1,10 +1,11 @@
+@import '~antd/es/style/themes/default.less';
 @import '~@/styles/variable.less';
 
 .left-tree {
   &-container {
     overflow: hidden;
     position: relative;
-    background-color: #fff;
+    background-color: @component-background;
     height: calc(100vh - 128px);
     height: calc(100vh - var(--vh-offset, 0px) - 128px);
     display: flex;
@@ -25,6 +26,6 @@
 :global {
   .Pane.vertical.Pane1 {
     padding-right: 5px;
-    border-right: 1px dashed #f0f0f0;
+    border-right: 1px dashed @text-color;
   }
 }

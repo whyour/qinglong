@@ -17,12 +17,7 @@ import {
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import {
-  enable as enableDarkMode,
-  disable as disableDarkMode,
-  auto as followSystemColorScheme,
-  setFetchMethod,
-} from 'darkreader';
+import * as DarkReader from '@umijs/ssr-darkreader';
 import AppModal from './appModal';
 import {
   EditOutlined,
@@ -126,6 +121,13 @@ const Setting = ({
   const [notificationInfo, setNotificationInfo] = useState<any>();
   const [logRemoveFrequency, setLogRemoveFrequency] = useState<number>();
   const [form] = Form.useForm();
+  const {
+    enable: enableDarkMode,
+    disable: disableDarkMode,
+    exportGeneratedCSS: collectCSS,
+    setFetchMethod,
+    auto: followSystemColorScheme,
+  } = DarkReader || {};
 
   const themeChange = (e: any) => {
     setTheme(e.target.value);
@@ -301,15 +303,27 @@ const Setting = ({
   };
 
   useEffect(() => {
-    setFetchMethod(window.fetch);
-    if (theme === 'dark') {
+    const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
+    if (typeof window === 'undefined') return;
+    if (typeof window.matchMedia === 'undefined') return;
+    if (!DarkReader) {
+      return () => null;
+    }
+    setFetchMethod(fetch);
+
+    if (_theme === 'dark') {
       enableDarkMode({});
-    } else if (theme === 'light') {
+    } else if (_theme === 'light') {
       disableDarkMode();
     } else {
       followSystemColorScheme({});
     }
     reloadTheme(theme);
+
+    // unmount
+    return () => {
+      disableDarkMode();
+    };
   }, [theme]);
 
   return (
