@@ -29,8 +29,6 @@ export interface TaskCallbacks {
   ) => Promise<void>;
   onLog?: (message: string) => Promise<void>;
   onError?: (message: string) => Promise<void>;
-  onBefore?: () => Promise<void>;
-  onAfter?: () => Promise<void>;
 }
 
 @Service()
@@ -46,7 +44,6 @@ export default class ScheduleService {
   async runTask(command: string, callbacks: TaskCallbacks = {}) {
     return new Promise(async (resolve, reject) => {
       try {
-        await callbacks.onBefore?.();
         const startTime = dayjs();
         const cp = spawn(command, { shell: '/bin/bash' });
 
@@ -91,7 +88,6 @@ export default class ScheduleService {
             endTime,
             endTime.diff(startTime, 'seconds'),
           );
-          await callbacks.onAfter?.();
           resolve(null);
         });
       } catch (error) {
