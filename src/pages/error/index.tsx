@@ -22,7 +22,7 @@ const Error = ({ user, theme }: any) => {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && user.username) {
       history.push('/crontab');
     }
   }, [user]);
