@@ -101,7 +101,7 @@ const Login = ({ reloadUser }: any) => {
           </>
         ),
       });
-      reloadUser();
+      reloadUser(true);
       history.push('/crontab');
     } else if (data.code === 100) {
       message.warn(data.message);
