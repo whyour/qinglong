@@ -175,17 +175,32 @@ export default class SubscriptionService {
   private taskCallbacks(doc: Subscription): TaskCallbacks {
     return {
       onStart: async (cp: ChildProcessWithoutNullStreams, startTime) => {
+        // 执行sub_before
+        let beforeStr = '';
+        try {
+          if (doc.sub_before) {
+            beforeStr = execSync(doc.sub_before).toString();
+          }
+        } catch (error) {
+          beforeStr = JSON.stringify(error);
+        }
+        if (beforeStr) {
+          beforeStr += '\n';
+        }
+
         const logTime = startTime.format('YYYY-MM-DD-HH-mm-ss');
         const logPath = `${doc.alias}/${logTime}.log`;
         await this.handleLogPath(
           logPath as string,
-          `## 开始执行... ${startTime.format('YYYY-MM-DD HH:mm:ss')}\n`,
+          `${beforeStr}## 开始执行... ${startTime.format(
+            'YYYY-MM-DD HH:mm:ss',
+          )}\n`,
         );
         await SubscriptionModel.update(
           {
             status: SubscriptionStatus.running,
-            pid: cp.pid,
             log_path: logPath,
+            pid: cp.pid,
           },
           { where: { id: doc.id } },
         );
@@ -194,7 +209,7 @@ export default class SubscriptionService {
         const sub = await this.getDb({ id: doc.id });
         await SubscriptionModel.update(
           { status: SubscriptionStatus.idle, pid: undefined },
-          { where: { id: doc.id } },
+          { where: { id: sub.id } },
         );
         const absolutePath = await this.handleLogPath(sub.log_path as string);
         fs.appendFileSync(
@@ -203,6 +218,22 @@ export default class SubscriptionService {
             'YYYY-MM-DD HH:mm:ss',
           )}  耗时 ${diff} 秒`,
         );
+
+        // 执行 sub_after
+        let afterStr = '';
+        try {
+          if (sub.sub_after) {
+            afterStr = execSync(sub.sub_after).toString();
+          }
+        } catch (error) {
+          afterStr = JSON.stringify(error);
+        }
+        if (afterStr) {
+          afterStr = `\n\n${afterStr}`;
+          const absolutePath = await this.handleLogPath(sub.log_path as string);
+          fs.appendFileSync(absolutePath, afterStr);
+        }
+
         this.sockService.sendMessage({
           type: 'runSubscriptionEnd',
           message: '订阅执行完成',
@@ -218,40 +249,6 @@ export default class SubscriptionService {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await this.handleLogPath(sub.log_path as string);
         fs.appendFileSync(absolutePath, `\n${message}`);
-      },
-      onBefore: async () => {
-        return new Promise((resolve, reject) => {
-          if (doc.sub_before) {
-            exec(doc.sub_before, async (err, stdout, stderr) => {
-              const absolutePath = await this.handleLogPath(
-                doc.log_path as string,
-              );
-              fs.appendFileSync(
-                absolutePath,
-                stdout || stderr || `${JSON.stringify(err || {})}`,
-              );
-            });
-          } else {
-            resolve();
-          }
-        });
-      },
-      onAfter: async () => {
-        return new Promise((resolve, reject) => {
-          if (doc.sub_after) {
-            exec(doc.sub_after, async (err, stdout, stderr) => {
-              const absolutePath = await this.handleLogPath(
-                doc.log_path as string,
-              );
-              fs.appendFileSync(
-                absolutePath,
-                stdout || stderr || `${JSON.stringify(err || {})}`,
-              );
-            });
-          } else {
-            resolve();
-          }
-        });
       },
     };
   }
