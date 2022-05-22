@@ -352,7 +352,7 @@ const SubscriptionModal = ({
             <Form.Item
               name="extensions"
               label="文件后缀"
-              tooltip="仓库需要拉取的文件后缀，多个后缀空格分隔"
+              tooltip="仓库需要拉取的文件后缀，多个后缀空格分隔，默认使用配置文件中的RepoFileExtensions"
             >
               <Input placeholder="请输入文件后缀" />
             </Form.Item>
