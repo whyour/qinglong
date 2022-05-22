@@ -86,8 +86,8 @@ export default function (props: any) {
       });
   };
 
-  const reloadUser = () => {
-    getUser(false);
+  const reloadUser = (needLoading = false) => {
+    getUser(needLoading);
   };
 
   const setTheme = () => {
