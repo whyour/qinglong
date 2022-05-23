@@ -23,7 +23,7 @@ import { init } from '../utils/init';
 
 export default function (props: any) {
   const ctx = useCtx();
-  const theme = useTheme();
+  const { theme, reloadTheme } = useTheme();
   const [user, setUser] = useState<any>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<{ isInitialized: boolean }>();
@@ -90,18 +90,6 @@ export default function (props: any) {
     getUser(needLoading);
   };
 
-  const setTheme = () => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const storageTheme = localStorage.getItem('qinglong_dark_theme');
-    const isDark =
-      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
-    if (isDark) {
-      document.body.setAttribute('data-dark', 'true');
-    } else {
-      document.body.setAttribute('data-dark', 'false');
-    }
-  };
-
   useEffect(() => {
     if (systemInfo && systemInfo.isInitialized && !user) {
       getUser();
@@ -115,8 +103,12 @@ export default function (props: any) {
   }, [systemInfo]);
 
   useEffect(() => {
-    setTheme();
-  }, [theme.theme]);
+    if (theme === 'vs-dark') {
+      document.body.setAttribute('data-dark', 'true');
+    } else {
+      document.body.setAttribute('data-dark', 'false');
+    }
+  }, [theme]);
 
   useEffect(() => {
     vhCheck();
@@ -208,10 +200,10 @@ export default function (props: any) {
       return React.Children.map(props.children, (child) => {
         return React.cloneElement(child, {
           ...ctx,
-          ...theme,
+          theme,
           user,
           reloadUser,
-          reloadTheme: setTheme,
+          reloadTheme,
           ws: ws.current,
         });
       });
@@ -331,10 +323,10 @@ export default function (props: any) {
       {React.Children.map(props.children, (child) => {
         return React.cloneElement(child, {
           ...ctx,
-          ...theme,
+          theme,
           user,
           reloadUser,
-          reloadTheme: setTheme,
+          reloadTheme,
           socketMessage,
         });
       })}
