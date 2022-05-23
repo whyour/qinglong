@@ -111,8 +111,7 @@ const Setting = ({
   ];
 
   const [loading, setLoading] = useState(true);
-  const defaultDarken = localStorage.getItem('qinglong_dark_theme') || 'auto';
-  const [theme, setTheme] = useState(defaultDarken);
+  const defaultTheme = localStorage.getItem('qinglong_dark_theme') || 'auto';
   const [dataSource, setDataSource] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedApp, setEditedApp] = useState<any>();
@@ -130,8 +129,18 @@ const Setting = ({
   } = DarkReader || {};
 
   const themeChange = (e: any) => {
-    setTheme(e.target.value);
+    const _theme = e.target.value;
     localStorage.setItem('qinglong_dark_theme', e.target.value);
+    setFetchMethod(fetch);
+
+    if (_theme === 'dark') {
+      enableDarkMode({});
+    } else if (_theme === 'light') {
+      disableDarkMode();
+    } else {
+      followSystemColorScheme({});
+    }
+    reloadTheme();
   };
 
   const getApps = () => {
@@ -302,30 +311,6 @@ const Setting = ({
     });
   };
 
-  useEffect(() => {
-    const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
-    if (typeof window === 'undefined') return;
-    if (typeof window.matchMedia === 'undefined') return;
-    if (!DarkReader) {
-      return () => null;
-    }
-    setFetchMethod(fetch);
-
-    if (_theme === 'dark') {
-      enableDarkMode({});
-    } else if (_theme === 'light') {
-      disableDarkMode();
-    } else {
-      followSystemColorScheme({});
-    }
-    reloadTheme(theme);
-
-    // unmount
-    return () => {
-      disableDarkMode();
-    };
-  }, [theme]);
-
   return (
     <PageContainer
       className="ql-container-wrapper"
@@ -371,11 +356,15 @@ const Setting = ({
         </Tabs.TabPane>
         <Tabs.TabPane tab="其他设置" key="other">
           <Form layout="vertical" form={form}>
-            <Form.Item label="主题设置" name="theme" initialValue={theme}>
+            <Form.Item
+              label="主题设置"
+              name="theme"
+              initialValue={defaultTheme}
+            >
               <Radio.Group
                 options={optionsWithDisabled}
                 onChange={themeChange}
-                value={theme}
+                value={defaultTheme}
                 optionType="button"
                 buttonStyle="solid"
               />

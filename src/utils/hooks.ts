@@ -38,7 +38,15 @@ export const useCtx = () => {
 };
 
 export const useTheme = () => {
-  const [theme, setTheme] = useState<string>('');
+  const [theme, setTheme] = useState<'vs' | 'vs-dark'>();
+
+  const reloadTheme = () => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const storageTheme = localStorage.getItem('qinglong_dark_theme');
+    const isDark =
+      (media.matches && storageTheme !== 'light') || storageTheme === 'dark';
+    setTheme(isDark ? 'vs-dark' : 'vs');
+  };
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -63,5 +71,5 @@ export const useTheme = () => {
     }
   }, []);
 
-  return { theme };
+  return { theme, reloadTheme };
 };
