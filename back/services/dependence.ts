@@ -105,7 +105,7 @@ export default class DependenceService {
     );
 
     const docs = await DependenceModel.findAll({ where: { id: ids } });
-    await this.installOrUninstallDependencies(docs);
+    this.installOrUninstallDependencies(docs);
     return docs;
   }
 
@@ -146,7 +146,6 @@ export default class DependenceService {
       )[dependencies[0].type as any];
       const actionText = isInstall ? '安装' : '删除';
       const depIds = dependencies.map((x) => x.id) as number[];
-      const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
       const startTime = Date.now();
       this.sockService.sendMessage({
         type: socketMessageType,
@@ -161,6 +160,9 @@ export default class DependenceService {
           startTime,
         ).toLocaleString()}\n\n`,
       );
+
+      const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
+
       cp.stdout.on('data', async (data) => {
         this.sockService.sendMessage({
           type: socketMessageType,

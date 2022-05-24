@@ -21,7 +21,7 @@ export default async () => {
   );
 
   // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
-  DependenceModel.findAll({ where: {} }).then(async (docs) => {
+  DependenceModel.findAll({ where: {}, raw: true }).then(async (docs) => {
     const groups = _.groupBy(docs, 'type');
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
