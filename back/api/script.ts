@@ -17,22 +17,19 @@ const route = Router();
 export default (app: Router) => {
   app.use('/scripts', route);
 
-  route.get(
-    '/files',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const result = readDirs(config.scriptPath, config.scriptPath);
-        res.send({
-          code: 200,
-          data: result,
-        });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
+  route.get('/', async (req: Request, res: Response, next: NextFunction) => {
+    const logger: Logger = Container.get('logger');
+    try {
+      const result = readDirs(config.scriptPath, config.scriptPath);
+      res.send({
+        code: 200,
+        data: result,
+      });
+    } catch (e) {
+      logger.error('🔥 error: %o', e);
+      return next(e);
+    }
+  });
 
   route.get(
     '/:file',
