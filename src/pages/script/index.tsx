@@ -93,7 +93,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
   const getScripts = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}scripts/files`)
+      .get(`${config.apiPrefix}scripts`)
       .then((data) => {
         setData(data.data);
         setFilterData(data.data);
@@ -135,7 +135,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
     const newMode = value ? LangMap[value.slice(-3)] : '';
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setSelect(node.key);
-    setTitle(node.parent || node.value);
+    setTitle(node.key);
     setCurrentNode(node);
     getDetail(node);
   };
