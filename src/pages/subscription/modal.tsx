@@ -255,7 +255,7 @@ const SubscriptionModal = ({
                 letterSpacing: isQQBrowser ? -2 : 0,
               }}
             >
-              拷贝repo/raw命令，粘贴导入
+              支持repo/raw命令，粘贴导入
             </small>
           </span>
         )
