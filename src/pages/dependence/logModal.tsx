@@ -7,6 +7,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { PageLoading } from '@ant-design/pro-layout';
+import Ansi from 'ansi-to-react';
 
 const DependenceLogModal = ({
   dependence,
@@ -140,7 +141,7 @@ const DependenceLogModal = ({
               : {}
           }
         >
-          {value}
+          <Ansi>{value}</Ansi>
         </pre>
       )}
     </Modal>
