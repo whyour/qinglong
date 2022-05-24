@@ -117,7 +117,7 @@ ql extra
 # 添加单个脚本文件
 ql raw <file_url>                                             
 # 添加单个仓库的指定脚本
-ql repo <repo_url> <whitelist> <blacklist> <dependence> <branch>   
+ql repo <repo_url> <whitelist> <blacklist> <dependence> <branch> <extensions>
 # 删除旧日志
 ql rmlog <days>                                              
 # 启动tg-bot
@@ -147,6 +147,7 @@ task <file_path> desi <env_name> <account_number>
 * blacklist: 拉取仓库时的黑名单，即就是需要拉取的脚本的路径不包含的字符串
 * dependence: 拉取仓库需要的依赖文件，会直接从仓库拷贝到scripts下的仓库目录，不受黑名单影响
 * branch: 拉取仓库的分支
+* extensions: 拉取仓库的文件后缀
 * days: 需要保留的日志的天数
 * file_path: 任务执行时的文件路径
 * env_name: 任务执行时需要并发或者指定时的环境变量名称
