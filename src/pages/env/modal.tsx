@@ -62,6 +62,7 @@ const EnvModal = ({
       visible={visible}
       forceRender
       centered
+      maskClosable={false}
       onOk={() => {
         form
           .validateFields()

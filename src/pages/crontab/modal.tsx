@@ -50,6 +50,7 @@ const CronModal = ({
       visible={visible}
       forceRender
       centered
+      maskClosable={false}
       onOk={() => {
         form
           .validateFields()
@@ -168,6 +169,7 @@ const CronLabelModal = ({
       visible={visible}
       footer={buttons}
       centered
+      maskClosable={false}
       forceRender
       onCancel={() => handleCancel(false)}
       confirmLoading={loading}

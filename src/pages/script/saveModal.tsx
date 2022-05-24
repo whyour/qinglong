@@ -44,6 +44,7 @@ const SaveModal = ({
       visible={visible}
       forceRender
       centered
+      maskClosable={false}
       onOk={() => {
         form
           .validateFields()

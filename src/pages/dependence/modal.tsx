@@ -72,6 +72,7 @@ const DependenceModal = ({
       visible={visible}
       forceRender
       centered
+      maskClosable={false}
       onOk={() => {
         form
           .validateFields()
