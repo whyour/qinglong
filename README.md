@@ -73,7 +73,27 @@ podman run -dit \
 sudo curl -sSL get.docker.com | sh
 ```
 
-2. 启动容器
+2. 配置国内镜像源
+Configure domestic mirror sources
+
+```bash
+mkdir -p /etc/docker
+tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": [
+    "https://0b27f0a81a00f3560fbdc00ddd2f99e0.mirror.swr.myhuaweicloud.com",
+    "https://ypzju6vq.mirror.aliyuncs.com",
+    "https://registry.docker-cn.com",
+    "http://hub-mirror.c.163.com",
+    "https://docker.mirrors.ustc.edu.cn"
+  ]
+}
+EOF
+systemctl daemon-reload
+systemctl restart docker
+```
+
+3. 启动容器
 
 ```bash
 docker run -dit \
