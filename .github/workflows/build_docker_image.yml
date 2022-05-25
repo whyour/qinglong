@@ -21,14 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2.2.1
-        with:
-          version: 7
-          run_install: false
       - uses: actions/setup-node@v3
 
       - name: build front and back
         run: |
+          npm i -g pnpm
           pnpm install
           pnpm build:front
           pnpm build:back
@@ -59,8 +56,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
-        with:
-          node-version: '14'
 
       - name: Set time zone
         uses: szenius/set-timezone@v1.0
