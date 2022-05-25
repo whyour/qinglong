@@ -34,7 +34,7 @@ export class Crontab {
     this.isDisabled = options.isDisabled || 0;
     this.log_path = options.log_path || '';
     this.isPinned = options.isPinned || 0;
-    this.labels = options.labels || [''];
+    this.labels = options.labels || [];
     this.last_running_time = options.last_running_time || 0;
     this.last_execution_time = options.last_execution_time || 0;
   }
