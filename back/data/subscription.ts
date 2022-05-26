@@ -31,7 +31,7 @@ export class Subscription {
 
   constructor(options: Subscription) {
     this.id = options.id;
-    this.name = options.name;
+    this.name = options.name || options.alias;
     this.type = options.type;
     this.schedule = options.schedule;
     this.status =

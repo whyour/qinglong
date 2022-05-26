@@ -48,7 +48,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        if (cron_parser.parseExpression(req.body.schedule).hasNext()) {
+        if (
+          !req.body.schedule ||
+          cron_parser.parseExpression(req.body.schedule).hasNext()
+        ) {
           const subscriptionService = Container.get(SubscriptionService);
           const data = await subscriptionService.create(req.body);
           return res.send({ code: 200, data });

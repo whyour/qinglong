@@ -105,9 +105,9 @@ const SubscriptionModal = ({
   }) => {
     const [intervalType, setIntervalType] = useState('days');
     const [intervalNumber, setIntervalNumber] = useState<number>();
-    const intervalTypeChange = (e) => {
-      setIntervalType(e.target.value);
-      onChange?.({ type: e.target.value, value: intervalNumber });
+    const intervalTypeChange = (type: string) => {
+      setIntervalType(type);
+      onChange?.({ type, value: intervalNumber });
     };
 
     const numberChange = (value: number) => {
