@@ -35,12 +35,11 @@ RUN set -x \
     && rm -rf /var/cache/apk/* \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
-    && touch ~/.bashrc \
     && git config --global user.email "qinglong@@users.noreply.github.com" \
     && git config --global user.name "qinglong" \
     && npm install -g pnpm \
     && pnpm setup \
-    && source /root/.bashrc \
+    && source ~/.bashrc \
     && pnpm add -g pm2 ts-node typescript tslib \
     && git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && cd ${QL_DIR} \

@@ -304,6 +304,10 @@ patch_version() {
         pnpm i -g ts-node typescript tslib
     fi
 
+    # 兼容pnpm@7 
+    pnpm setup
+    source ~/.bashrc
+
     git config --global pull.rebase false
 
     cp -f $dir_root/.env.example $dir_root/.env
