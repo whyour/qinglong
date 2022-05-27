@@ -17,7 +17,7 @@ const config = new qiniu.conf.Config({ zone: qiniu.zone.Zone_z1 });
 const formUploader = new qiniu.form_up.FormUploader(config);
 const putExtra = new qiniu.form_up.PutExtra(
   '',
-  '',
+  {},
   'text/plain; charset=utf-8',
 );
 // 文件上传
