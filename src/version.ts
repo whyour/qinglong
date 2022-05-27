@@ -1,10 +1,12 @@
-export const version = '2.12.2';
-export const changeLogLink = 'https://t.me/jiao_long/290';
-export const changeLog = `2.12.2 版本说明
-1. 任务详情支持运行、禁用、置顶操作
-2. 依赖管理增加直接强制删除
-3. 修复环境变量引号转义逻辑，感谢 https://github.com/JerryWn12 PR
-4. 修复定时删除日志设置，支持设置为24天以上
-5. 修复拉取脚本，shell发送通知
-6. 修复shell获取日志目录
+export const version = '2.13.0';
+export const changeLogLink = 'https://t.me/jiao_long/303';
+export const changeLog = `2.13.0 版本说明
+1. 新增订阅管理模块，支持公开仓库/私有仓库等
+2. 支持修改头像
+3. 修复特殊字符环境变量异常
+4. 修改定时任务添加标签
+5. 修复添加任务默认会展示一个空标签
+6. 修复用户名显示
+7. 修复依赖安装
+8. 其他bug修复
 `;
