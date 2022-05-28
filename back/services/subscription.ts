@@ -446,7 +446,7 @@ export default class SubscriptionService {
 
   public async log(id: number) {
     const doc = await this.getDb({ id });
-    if (!doc) {
+    if (!doc || !doc.log_path) {
       return '';
     }
 
