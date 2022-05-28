@@ -13,6 +13,7 @@ import _ from 'lodash';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import { Op } from 'sequelize';
+import { concurrentRun } from '../config/util';
 
 @Service()
 export default class DependenceService {
@@ -27,7 +28,7 @@ export default class DependenceService {
       return tab;
     });
     const docs = await this.insert(tabs);
-    await this.installDependenceOneByOne(docs);
+    this.installDependenceOneByOne(docs);
     return docs;
   }
 
@@ -47,7 +48,7 @@ export default class DependenceService {
       status: DependenceStatus.installing,
     });
     const newDoc = await this.updateDb(tab);
-    await this.installDependenceOneByOne([newDoc]);
+    this.installDependenceOneByOne([newDoc]);
     return newDoc;
   }
 
@@ -62,7 +63,7 @@ export default class DependenceService {
       { where: { id: ids } },
     );
     const docs = await DependenceModel.findAll({ where: { id: ids } });
-    await this.installDependenceOneByOne(docs, false, force);
+    this.installDependenceOneByOne(docs, false, force);
     return docs;
   }
 
@@ -98,16 +99,18 @@ export default class DependenceService {
     }
   }
 
-  private async installDependenceOneByOne(
+  private installDependenceOneByOne(
     docs: Dependence[],
     isInstall: boolean = true,
     force: boolean = false,
   ) {
-    for (const dep of docs) {
-      if (dep) {
-        await this.installOrUninstallDependencies([dep], isInstall, force);
-      }
-    }
+    concurrentRun(
+      docs.map(
+        (dep) => async () =>
+          await this.installOrUninstallDependencies([dep], isInstall, force),
+      ),
+      1,
+    );
   }
 
   public async reInstall(ids: number[]): Promise<Dependence[]> {
@@ -117,7 +120,7 @@ export default class DependenceService {
     );
 
     const docs = await DependenceModel.findAll({ where: { id: ids } });
-    await this.installDependenceOneByOne(docs);
+    this.installDependenceOneByOne(docs);
     return docs;
   }
 
