@@ -115,9 +115,13 @@ const CronDetailModal = ({
 
   const onClickItem = (item: LogItem) => {
     localStorage.setItem('logCron', currentCron.id);
-    setLogUrl(`${config.apiPrefix}logs/${item.directory}/${item.filename}`);
+    setLogUrl(
+      `${config.apiPrefix}logs/${item.filename}?path=${item.directory || ''}`,
+    );
     request
-      .get(`${config.apiPrefix}logs/${item.directory}/${item.filename}`)
+      .get(
+        `${config.apiPrefix}logs/${item.filename}?path=${item.directory || ''}`,
+      )
       .then((data) => {
         setLog(data.data);
         setIsLogModalVisible(true);

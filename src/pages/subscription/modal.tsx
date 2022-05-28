@@ -195,7 +195,9 @@ const SubscriptionModal = ({
         dependences,
         branch,
         extensions,
-      ] = text.split(' ').map((x) => x.trim());
+      ] = text
+        .split(' ')
+        .map((x) => x.trim().replace(/\"/g, '').replace(/\'/, ''));
       form.setFieldsValue({
         type:
           type === 'raw'
@@ -210,6 +212,7 @@ const SubscriptionModal = ({
         branch,
         extensions,
       });
+      form.validateFields(['url']);
     }
   }, []);
 
