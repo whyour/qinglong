@@ -510,7 +510,7 @@ const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
       for (let i = 0; i < references.length; i++) {
         const index = value.findIndex((x) => x.id === references[i]);
         result.splice(index, 1, {
-          ...result[index],
+          ...value[index],
           status: SubscriptionStatus.idle,
         });
       }
