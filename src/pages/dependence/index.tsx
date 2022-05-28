@@ -271,9 +271,11 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
       result.push(...dependence);
     } else {
       const index = value.findIndex((x) => x.id === dependence.id);
-      result.splice(index, 1, {
-        ...dependence,
-      });
+      if (index !== -1) {
+        result.splice(index, 1, {
+          ...dependence,
+        });
+      }
     }
     setValue(result);
   };
@@ -324,11 +326,13 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
       .then((data: any) => {
         const index = value.findIndex((x) => x.id === dependence.id);
         const result = [...value];
-        result.splice(index, 1, {
-          ...dependence,
-          ...data.data,
-        });
-        setValue(result);
+        if (index !== -1) {
+          result.splice(index, 1, {
+            ...dependence,
+            ...data.data,
+          });
+          setValue(result);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -371,10 +375,12 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
       const result = [...value];
       for (let i = 0; i < references.length; i++) {
         const index = value.findIndex((x) => x.id === references[i]);
-        result.splice(index, 1, {
-          ...value[index],
-          status,
-        });
+        if (index !== -1) {
+          result.splice(index, 1, {
+            ...value[index],
+            status,
+          });
+        }
       }
       setValue(result);
 
@@ -383,7 +389,9 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
           const _result = [...value];
           for (let i = 0; i < references.length; i++) {
             const index = value.findIndex((x) => x.id === references[i]);
-            _result.splice(index, 1);
+            if (index !== -1) {
+              _result.splice(index, 1);
+            }
           }
           setValue(_result);
         }, 5000);
@@ -483,8 +491,10 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
           if (needRemove) {
             const index = value.findIndex((x) => x.id === logDependence.id);
             const result = [...value];
-            result.splice(index, 1);
-            setValue(result);
+            if (index !== -1) {
+              result.splice(index, 1);
+              setValue(result);
+            }
           } else if ([...value].map((x) => x.id).includes(logDependence.id)) {
             getDependenceDetail(logDependence);
           }

@@ -438,8 +438,10 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
               message.success('删除成功');
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1);
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1);
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -470,11 +472,13 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
             if (data.code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1, {
-                ...record,
-                status: CrontabStatus.running,
-              });
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1, {
+                  ...record,
+                  status: CrontabStatus.running,
+                });
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -505,12 +509,14 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
             if (data.code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1, {
-                ...record,
-                pid: null,
-                status: CrontabStatus.idle,
-              });
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1, {
+                  ...record,
+                  pid: null,
+                  status: CrontabStatus.idle,
+                });
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -550,11 +556,13 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
               const newStatus = record.isDisabled === 1 ? 0 : 1;
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1, {
-                ...record,
-                isDisabled: newStatus,
-              });
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1, {
+                  ...record,
+                  isDisabled: newStatus,
+                });
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -594,11 +602,13 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
               const newStatus = record.isPinned === 1 ? 0 : 1;
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1, {
-                ...record,
-                isPinned: newStatus,
-              });
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1, {
+                  ...record,
+                  isPinned: newStatus,
+                });
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -709,11 +719,13 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
           .parseExpression(data.data.schedule)
           .next()
           .toDate();
-        result.splice(index, 1, {
-          ...cron,
-          ...data.data,
-        });
-        setValue(result);
+        if (index !== -1) {
+          result.splice(index, 1, {
+            ...cron,
+            ...data.data,
+          });
+          setValue(result);
+        }
       })
       .finally(() => setLoading(false));
   };
