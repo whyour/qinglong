@@ -211,8 +211,8 @@ const SubscriptionModal = ({
         dependences,
         branch,
         extensions,
+        alias: formatAlias(url, branch),
       });
-      form.validateFields(['url']);
     }
   }, []);
 

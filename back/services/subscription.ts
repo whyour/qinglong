@@ -160,6 +160,18 @@ export default class SubscriptionService {
     }
   }
 
+  private async promiseExec(command: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      exec(
+        command,
+        { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' },
+        (err, stdout, stderr) => {
+          resolve(stdout || stderr || JSON.stringify(err));
+        },
+      );
+    });
+  }
+
   private async handleLogPath(
     logPath: string,
     data: string = '',
@@ -175,28 +187,8 @@ export default class SubscriptionService {
   private taskCallbacks(doc: Subscription): TaskCallbacks {
     return {
       onStart: async (cp: ChildProcessWithoutNullStreams, startTime) => {
-        // 执行sub_before
-        let beforeStr = '';
-        try {
-          if (doc.sub_before) {
-            beforeStr = execSync(doc.sub_before).toString();
-          }
-        } catch (error: any) {
-          beforeStr =
-            (error.stderr && error.stderr.toString()) || JSON.stringify(error);
-        }
-        if (beforeStr) {
-          beforeStr += '\n';
-        }
-
         const logTime = startTime.format('YYYY-MM-DD-HH-mm-ss');
         const logPath = `${doc.alias}/${logTime}.log`;
-        await this.handleLogPath(
-          logPath as string,
-          `${beforeStr}## 开始执行... ${startTime.format(
-            'YYYY-MM-DD HH:mm:ss',
-          )}\n`,
-        );
         await SubscriptionModel.update(
           {
             status: SubscriptionStatus.running,
@@ -205,14 +197,45 @@ export default class SubscriptionService {
           },
           { where: { id: doc.id } },
         );
+        const absolutePath = await this.handleLogPath(
+          logPath as string,
+          `## 开始执行... ${startTime.format('YYYY-MM-DD HH:mm:ss')}\n`,
+        );
+
+        // 执行sub_before
+        let beforeStr = '';
+        try {
+          if (doc.sub_before) {
+            fs.appendFileSync(absolutePath, `\n## 执行开始前命令... `);
+            beforeStr = await this.promiseExec(doc.sub_before);
+          }
+        } catch (error: any) {
+          beforeStr =
+            (error.stderr && error.stderr.toString()) || JSON.stringify(error);
+        }
+        if (beforeStr) {
+          fs.appendFileSync(absolutePath, `${beforeStr}\n\n`);
+        }
       },
       onEnd: async (cp, endTime, diff) => {
         const sub = await this.getDb({ id: doc.id });
-        await SubscriptionModel.update(
-          { status: SubscriptionStatus.idle, pid: undefined },
-          { where: { id: sub.id } },
-        );
         const absolutePath = await this.handleLogPath(sub.log_path as string);
+
+        // 执行 sub_after
+        let afterStr = '';
+        try {
+          if (sub.sub_after) {
+            fs.appendFileSync(absolutePath, `\n\n## 执行结束后命令... `);
+            afterStr = await this.promiseExec(sub.sub_after);
+          }
+        } catch (error: any) {
+          afterStr =
+            (error.stderr && error.stderr.toString()) || JSON.stringify(error);
+        }
+        if (afterStr) {
+          fs.appendFileSync(absolutePath, `${afterStr}\n`);
+        }
+
         fs.appendFileSync(
           absolutePath,
           `\n## 执行结束... ${endTime.format(
@@ -220,21 +243,10 @@ export default class SubscriptionService {
           )}  耗时 ${diff} 秒`,
         );
 
-        // 执行 sub_after
-        let afterStr = '';
-        try {
-          if (sub.sub_after) {
-            afterStr = execSync(sub.sub_after).toString();
-          }
-        } catch (error: any) {
-          afterStr =
-            (error.stderr && error.stderr.toString()) || JSON.stringify(error);
-        }
-        if (afterStr) {
-          afterStr = `\n\n${afterStr}`;
-          const absolutePath = await this.handleLogPath(sub.log_path as string);
-          fs.appendFileSync(absolutePath, afterStr);
-        }
+        await SubscriptionModel.update(
+          { status: SubscriptionStatus.idle, pid: undefined },
+          { where: { id: sub.id } },
+        );
 
         this.sockService.sendMessage({
           type: 'runSubscriptionEnd',
