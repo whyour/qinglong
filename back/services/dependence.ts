@@ -27,7 +27,7 @@ export default class DependenceService {
       return tab;
     });
     const docs = await this.insert(tabs);
-    this.installOrUninstallDependencies(docs);
+    await this.installDependenceOneByOne(docs);
     return docs;
   }
 
@@ -47,7 +47,7 @@ export default class DependenceService {
       status: DependenceStatus.installing,
     });
     const newDoc = await this.updateDb(tab);
-    this.installOrUninstallDependencies([newDoc]);
+    await this.installDependenceOneByOne([newDoc]);
     return newDoc;
   }
 
@@ -62,7 +62,7 @@ export default class DependenceService {
       { where: { id: ids } },
     );
     const docs = await DependenceModel.findAll({ where: { id: ids } });
-    this.installOrUninstallDependencies(docs, false, force);
+    await this.installDependenceOneByOne(docs, false, force);
     return docs;
   }
 
@@ -98,6 +98,18 @@ export default class DependenceService {
     }
   }
 
+  private async installDependenceOneByOne(
+    docs: Dependence[],
+    isInstall: boolean = true,
+    force: boolean = false,
+  ) {
+    for (const dep of docs) {
+      if (dep) {
+        await this.installOrUninstallDependencies([dep], isInstall, force);
+      }
+    }
+  }
+
   public async reInstall(ids: number[]): Promise<Dependence[]> {
     await DependenceModel.update(
       { status: DependenceStatus.installing, log: [] },
@@ -105,7 +117,7 @@ export default class DependenceService {
     );
 
     const docs = await DependenceModel.findAll({ where: { id: ids } });
-    this.installOrUninstallDependencies(docs);
+    await this.installDependenceOneByOne(docs);
     return docs;
   }
 
