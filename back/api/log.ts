@@ -31,7 +31,7 @@ export default (app: Router) => {
       try {
         const filePath = join(
           config.logPath,
-          req.query.path as string,
+          (req.query.path || '') as string,
           req.params.file,
         );
         const content = getFileContentByName(filePath);

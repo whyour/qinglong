@@ -181,8 +181,9 @@ export default class SubscriptionService {
           if (doc.sub_before) {
             beforeStr = execSync(doc.sub_before).toString();
           }
-        } catch (error) {
-          beforeStr = JSON.stringify(error);
+        } catch (error: any) {
+          beforeStr =
+            (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (beforeStr) {
           beforeStr += '\n';
@@ -225,8 +226,9 @@ export default class SubscriptionService {
           if (sub.sub_after) {
             afterStr = execSync(sub.sub_after).toString();
           }
-        } catch (error) {
-          afterStr = JSON.stringify(error);
+        } catch (error: any) {
+          afterStr =
+            (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (afterStr) {
           afterStr = `\n\n${afterStr}`;
