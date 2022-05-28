@@ -206,7 +206,7 @@ export default class SubscriptionService {
         let beforeStr = '';
         try {
           if (doc.sub_before) {
-            fs.appendFileSync(absolutePath, `\n## 执行开始前命令... `);
+            fs.appendFileSync(absolutePath, `\n## 执行before命令...\n\n`);
             beforeStr = await this.promiseExec(doc.sub_before);
           }
         } catch (error: any) {
@@ -225,7 +225,7 @@ export default class SubscriptionService {
         let afterStr = '';
         try {
           if (sub.sub_after) {
-            fs.appendFileSync(absolutePath, `\n\n## 执行结束后命令... `);
+            fs.appendFileSync(absolutePath, `\n\n## 执行after命令...\n`);
             afterStr = await this.promiseExec(sub.sub_after);
           }
         } catch (error: any) {
