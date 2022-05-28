@@ -305,6 +305,7 @@ patch_version() {
     fi
 
     # 兼容pnpm@7 
+    npm i -g pnpm
     pnpm setup
     source ~/.bashrc
 
