@@ -90,7 +90,7 @@ const DependenceLogModal = ({
   }, [dependence]);
 
   useEffect(() => {
-    if (!socketMessage) return;
+    if (!socketMessage || !dependence) return;
     const { type, message, references } = socketMessage;
     if (
       type === 'installDependence' &&
