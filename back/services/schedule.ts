@@ -106,6 +106,7 @@ export default class ScheduleService {
   async createCronTask(
     { id = 0, command, name, schedule = '' }: ScheduleTaskType,
     callbacks?: TaskCallbacks,
+    runImmediately = false,
   ) {
     const _id = this.formatId(id);
     this.logger.info(
@@ -122,6 +123,10 @@ export default class ScheduleService {
         await this.runTask(command, callbacks);
       }),
     );
+
+    if (runImmediately) {
+      await this.runTask(command, callbacks);
+    }
   }
 
   async cancelCronTask({ id = 0, name }: ScheduleTaskType) {
@@ -160,9 +165,17 @@ export default class ScheduleService {
       },
     );
 
-    const job = new LongIntervalJob({ ...schedule, runImmediately }, task, _id);
+    const job = new LongIntervalJob(
+      { ...schedule, runImmediately: false },
+      task,
+      _id,
+    );
 
     this.intervalSchedule.addIntervalJob(job);
+
+    if (runImmediately) {
+      await this.runTask(command, callbacks);
+    }
   }
 
   async cancelIntervalTask({ id = 0, name }: ScheduleTaskType) {
