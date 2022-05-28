@@ -263,11 +263,13 @@ const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
             if (data.code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1, {
-                ...record,
-                status: SubscriptionStatus.running,
-              });
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1, {
+                  ...record,
+                  status: SubscriptionStatus.running,
+                });
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -298,12 +300,14 @@ const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
             if (data.code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1, {
-                ...record,
-                pid: null,
-                status: SubscriptionStatus.idle,
-              });
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1, {
+                  ...record,
+                  pid: null,
+                  status: SubscriptionStatus.idle,
+                });
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -356,8 +360,10 @@ const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
               message.success('删除成功');
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1);
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1);
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -397,11 +403,13 @@ const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
               const newStatus = record.is_disabled === 1 ? 0 : 1;
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
-              result.splice(i, 1, {
-                ...record,
-                is_disabled: newStatus,
-              });
-              setValue(result);
+              if (i !== -1) {
+                result.splice(i, 1, {
+                  ...record,
+                  is_disabled: newStatus,
+                });
+                setValue(result);
+              }
             } else {
               message.error(data);
             }
@@ -509,10 +517,12 @@ const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
       const result = [...value];
       for (let i = 0; i < references.length; i++) {
         const index = value.findIndex((x) => x.id === references[i]);
-        result.splice(index, 1, {
-          ...value[index],
-          status: SubscriptionStatus.idle,
-        });
+        if (index !== -1) {
+          result.splice(index, 1, {
+            ...value[index],
+            status: SubscriptionStatus.idle,
+          });
+        }
       }
       setValue(result);
     }

@@ -278,13 +278,17 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
                 const index = parentNode.children.findIndex(
                   (y) => y.key === currentNode.key,
                 );
-                parentNode.children.splice(index, 1);
-                newData.splice(parentNodeIndex, 1, { ...parentNode });
+                if (index !== -1 && parentNodeIndex !== -1) {
+                  parentNode.children.splice(index, 1);
+                  newData.splice(parentNodeIndex, 1, { ...parentNode });
+                }
               } else {
                 const index = newData.findIndex(
                   (x) => x.key === currentNode.key,
                 );
-                newData.splice(index, 1);
+                if (index !== -1) {
+                  newData.splice(index, 1);
+                }
               }
               setData(newData);
             } else {
@@ -314,13 +318,15 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
       const _file = { title: filename, key, value: filename, parent: path };
       if (path) {
         const parentNodeIndex = newData.findIndex((x) => x.key === path);
-        const parentNode = newData[parentNodeIndex];
-        if (parentNode.children && parentNode.children.length > 0) {
-          parentNode.children.unshift(_file);
-        } else {
-          parentNode.children = [_file];
+        if (parentNodeIndex !== -1) {
+          const parentNode = newData[parentNodeIndex];
+          if (parentNode.children && parentNode.children.length > 0) {
+            parentNode.children.unshift(_file);
+          } else {
+            parentNode.children = [_file];
+          }
+          newData.splice(parentNodeIndex, 1, { ...parentNode });
         }
-        newData.splice(parentNodeIndex, 1, { ...parentNode });
       } else {
         newData.unshift(_file);
       }
