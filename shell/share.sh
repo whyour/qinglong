@@ -102,7 +102,7 @@ make_dir() {
 
 detect_termux() {
     if [[ ${ANDROID_RUNTIME_ROOT}${ANDROID_ROOT} ]] || [[ $PATH == *com.termux* ]]; then
-        is_termux=1
+        is_termux=0
     else
         is_termux=0
     fi
