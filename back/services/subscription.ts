@@ -286,7 +286,7 @@ export default class SubscriptionService {
 
   public async update(payload: Subscription): Promise<Subscription> {
     const newDoc = await this.updateDb(payload);
-    await this.handleTask(newDoc);
+    await this.handleTask(newDoc, !newDoc.is_disabled);
     return newDoc;
   }
 
@@ -360,7 +360,6 @@ export default class SubscriptionService {
           this.logger.silly(error);
         }
       }
-      await this.handleTask(doc, false);
       const command = this.formatCommand(doc);
       const err = await this.killTask(command);
       const absolutePath = await this.handleLogPath(doc.log_path as string);
