@@ -27,12 +27,11 @@ export default async () => {
     raw: true,
   }).then(async (docs) => {
     const groups = _.groupBy(docs, 'type');
-    for (const key in groups) {
-      if (Object.prototype.hasOwnProperty.call(groups, key)) {
-        const group = groups[key];
-        const depIds = group.map((x) => x.id);
-        await dependenceService.reInstall(depIds as number[]);
-      }
+    const keys = Object.keys(groups).sort((a, b) => parseInt(b) - parseInt(a));
+    for (const key of keys) {
+      const group = groups[key];
+      const depIds = group.map((x) => x.id);
+      await dependenceService.reInstall(depIds as number[]);
     }
   });
 
