@@ -29,7 +29,13 @@ export default (app: Router) => {
       body: Joi.object({
         type: Joi.string().required(),
         schedule: Joi.string().optional().allow('').allow(null),
-        interval_schedule: Joi.object().optional().allow('').allow(null),
+        interval_schedule: Joi.object({
+          type: Joi.string().required(),
+          value: Joi.number().min(1).required(),
+        })
+          .optional()
+          .allow('')
+          .allow(null),
         name: Joi.string().optional().allow('').allow(null),
         url: Joi.string().required(),
         whitelist: Joi.string().optional().allow('').allow(null),
