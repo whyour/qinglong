@@ -114,7 +114,11 @@ const SubscriptionModal = ({
 
     const numberChange = (value: number) => {
       setIntervalNumber(value);
-      onChange?.({ type: intervalType, value });
+      if (!value) {
+        onChange?.(null);
+      } else {
+        onChange?.({ type: intervalType, value });
+      }
     };
 
     useEffect(() => {
