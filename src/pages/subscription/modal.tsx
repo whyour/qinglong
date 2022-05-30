@@ -107,7 +107,9 @@ const SubscriptionModal = ({
     const [intervalNumber, setIntervalNumber] = useState<number>();
     const intervalTypeChange = (type: string) => {
       setIntervalType(type);
-      onChange?.({ type, value: intervalNumber });
+      if (intervalNumber && intervalNumber > 0) {
+        onChange?.({ type, value: intervalNumber });
+      }
     };
 
     const numberChange = (value: number) => {
