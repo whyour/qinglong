@@ -23,6 +23,13 @@ export default class SshKeyService {
     }
   }
 
+  private getConfigRegx(alias: string) {
+    return new RegExp(
+      `Host ${alias}\n.*[^StrictHostKeyChecking]*.*[\n]*.*StrictHostKeyChecking no`,
+      'g',
+    );
+  }
+
   private removePrivateKeyFile(alias: string): void {
     try {
       fs.unlinkSync(`${this.sshPath}/${alias}`);
@@ -47,24 +54,25 @@ export default class SshKeyService {
     }
   }
 
-  private removeSshConfig(config: string) {
+  private removeSshConfig(alias: string) {
     try {
+      const configRegx = this.getConfigRegx(alias);
       const data = fs
         .readFileSync(this.sshConfigFilePath, { encoding: 'utf8' })
-        .replace(config, '')
-        .replace(/\n\n+/, '\n\n');
+        .replace(configRegx, '')
+        .replace(/\n[\n]+/g, '\n');
       fs.writeFileSync(this.sshConfigFilePath, data, {
         encoding: 'utf8',
       });
     } catch (error) {
-      this.logger.error(`删除ssh配置文件${config}失败`, error);
+      this.logger.error(`删除ssh配置文件${alias}失败`, error);
     }
   }
 
   public addSSHKey(key: string, alias: string, host: string): void {
     this.generatePrivateKeyFile(alias, key);
     const config = this.generateSingleSshConfig(alias, host);
-    this.removeSshConfig(config);
+    this.removeSshConfig(alias);
     this.generateSshConfig([config]);
   }
 
