@@ -18,6 +18,7 @@ interface ScheduleTaskType {
 }
 
 export interface TaskCallbacks {
+  onBefore?: (startTime: dayjs.Dayjs) => Promise<void>;
   onStart?: (
     cp: ChildProcessWithoutNullStreams,
     startTime: dayjs.Dayjs,
@@ -45,6 +46,8 @@ export default class ScheduleService {
     return new Promise(async (resolve, reject) => {
       try {
         const startTime = dayjs();
+        await callbacks.onBefore?.(startTime);
+
         const cp = spawn(command, { shell: '/bin/bash' });
 
         // TODO:

@@ -192,14 +192,13 @@ export default class SubscriptionService {
 
   private taskCallbacks(doc: Subscription): TaskCallbacks {
     return {
-      onStart: async (cp: ChildProcessWithoutNullStreams, startTime) => {
+      onBefore: async (startTime) => {
         const logTime = startTime.format('YYYY-MM-DD-HH-mm-ss');
         const logPath = `${doc.alias}/${logTime}.log`;
         await SubscriptionModel.update(
           {
             status: SubscriptionStatus.running,
             log_path: logPath,
-            pid: cp.pid,
           },
           { where: { id: doc.id } },
         );
@@ -220,8 +219,16 @@ export default class SubscriptionService {
             (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (beforeStr) {
-          fs.appendFileSync(absolutePath, `${beforeStr}\n\n`);
+          fs.appendFileSync(absolutePath, `${beforeStr}\n`);
         }
+      },
+      onStart: async (cp: ChildProcessWithoutNullStreams, startTime) => {
+        await SubscriptionModel.update(
+          {
+            pid: cp.pid,
+          },
+          { where: { id: doc.id } },
+        );
       },
       onEnd: async (cp, endTime, diff) => {
         const sub = await this.getDb({ id: doc.id });
@@ -231,7 +238,7 @@ export default class SubscriptionService {
         let afterStr = '';
         try {
           if (sub.sub_after) {
-            fs.appendFileSync(absolutePath, `\n\n## 执行after命令...\n`);
+            fs.appendFileSync(absolutePath, `\n\n## 执行after命令...\n\n`);
             afterStr = await this.promiseExec(sub.sub_after);
           }
         } catch (error: any) {
