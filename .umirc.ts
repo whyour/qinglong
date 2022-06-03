@@ -9,10 +9,6 @@ export default defineConfig({
     type: 'none',
   },
   fastRefresh: {},
-  // antd: {
-  //   dark: true,
-  // },
-  mfsu: {},
   esbuild: {},
   webpack5: {},
   dynamicImport: {

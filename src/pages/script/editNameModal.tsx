@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form, Select, Upload, Radio } from 'antd';
+import {
+  Modal,
+  message,
+  Input,
+  Form,
+  Select,
+  Upload,
+  Radio,
+  TreeSelect,
+} from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { UploadOutlined } from '@ant-design/icons';
@@ -40,7 +49,7 @@ const EditScriptNameModal = ({
       .then(({ code, data }) => {
         if (code === 200) {
           message.success('保存文件成功');
-          const key = values.path ? `${values.path}-` : '';
+          const key = values.path ? `${values.path}/` : '';
           const filename = file ? file.name : values.filename;
           handleCancel({
             filename,
@@ -64,15 +73,33 @@ const EditScriptNameModal = ({
     setType(e.target.value);
   };
 
+  const getDirs = (data) => {
+    for (const item of data) {
+      if (item.children && item.children.length > 0) {
+        item.children = item.children
+          .filter((x) => x.type === 'directory')
+          .map((x) => ({ ...x, disabled: false }));
+        getDirs(item.children);
+      }
+    }
+    return data;
+  };
+
+  useEffect(() => {
+    const originDirs = treeData
+      .filter((x) => x.type === 'directory')
+      .map((x) => ({ ...x, disabled: false }));
+    const dirs = getDirs(originDirs);
+    setDirs(dirs);
+  }, [treeData]);
+
   useEffect(() => {
     form.resetFields();
-    const originDirs = treeData.filter((x) => x.disabled);
-    setDirs([{ key: '' }, ...originDirs]);
   }, [visible]);
 
   return (
     <Modal
-      title="新建文件"
+      title="新建脚本"
       visible={visible}
       forceRender
       centered
@@ -111,16 +138,14 @@ const EditScriptNameModal = ({
             <Input placeholder="请输入文件名" />
           </Form.Item>
         )}
-        <Form.Item
-          label="父目录"
-          name="path"
-          initialValue={dirs && dirs.length > 0 ? dirs[0].key : ''}
-        >
-          <Select placeholder="请选择父目录">
-            {dirs.map((x) => (
-              <Option value={x.key}>{x.key || '根'}</Option>
-            ))}
-          </Select>
+        <Form.Item label="父目录" name="path">
+          <TreeSelect
+            allowClear
+            treeData={dirs}
+            fieldNames={{ value: 'key', label: 'title' }}
+            placeholder="请选择父目录"
+            treeDefaultExpandAll
+          />
         </Form.Item>
         {type === 'upload' && (
           <Form.Item label="文件" name="file">

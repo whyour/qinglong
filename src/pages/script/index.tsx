@@ -104,7 +104,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
 
   const getDetail = (node: any) => {
     request
-      .get(`${config.apiPrefix}scripts/${node.value}?path=${node.parent || ''}`)
+      .get(`${config.apiPrefix}scripts/${node.title}?path=${node.parent || ''}`)
       .then((data) => {
         setValue(data.data);
       });
@@ -117,7 +117,6 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
       const obj = {
         node: {
           title: s,
-          value: s,
           key: p ? vkey : s,
           parent: p,
         },
@@ -209,7 +208,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
         <>
           确认保存文件
           <Text style={{ wordBreak: 'break-all' }} type="warning">
-            {currentNode.value}
+            {currentNode.title}
           </Text>{' '}
           ，保存后不可恢复
         </>
@@ -222,7 +221,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
           request
             .put(`${config.apiPrefix}scripts`, {
               data: {
-                filename: currentNode.value,
+                filename: currentNode.title,
                 path: currentNode.parent || '',
                 content,
               },
@@ -262,7 +261,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
         request
           .delete(`${config.apiPrefix}scripts`, {
             data: {
-              filename: currentNode.value,
+              filename: currentNode.title,
               path: currentNode.parent || '',
             },
           })
@@ -315,8 +314,9 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
   ) => {
     if (filename) {
       const newData = [...data];
-      const _file = { title: filename, key, value: filename, parent: path };
+      const _file = { title: filename, key, parent: path };
       if (path) {
+        // TODO: 更新左侧树数据
         const parentNodeIndex = newData.findIndex((x) => x.key === path);
         if (parentNodeIndex !== -1) {
           const parentNode = newData[parentNodeIndex];
@@ -331,7 +331,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
         newData.unshift(_file);
       }
       setData(newData);
-      onSelect(_file.value, _file);
+      onSelect(_file.title, _file);
       setIsEditing(true);
     }
     setIsAddFileModalVisible(false);
@@ -341,7 +341,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
     request
       .post(`${config.apiPrefix}scripts/download`, {
         data: {
-          filename: currentNode.value,
+          filename: currentNode.title,
         },
       })
       .then((_data: any) => {
@@ -349,7 +349,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = currentNode.value;
+        a.download = currentNode.title;
         document.documentElement.appendChild(a);
         a.click();
         document.documentElement.removeChild(a);

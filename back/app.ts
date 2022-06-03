@@ -9,11 +9,11 @@ import Logger from './loaders/logger';
 async function startServer() {
   const app = express();
 
+  await require('./loaders/db').default();
+
   await require('./loaders/initFile').default();
 
   await require('./loaders/sentry').default({ expressApp: app });
-
-  await require('./loaders/db').default();
 
   await require('./loaders/app').default({ expressApp: app });
 
