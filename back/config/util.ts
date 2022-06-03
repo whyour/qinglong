@@ -277,31 +277,61 @@ export async function concurrentRun(
   return replyList;
 }
 
-export function readDirs(dir: string, baseDir: string = '') {
+export function readDirs(
+  dir: string,
+  baseDir: string = '',
+  blacklist: string[] = [],
+) {
   const relativePath = path.relative(baseDir, dir);
   const files = fs.readdirSync(dir);
-  const result: any = files.map((file: string) => {
-    const subPath = path.join(dir, file);
-    const stats = fs.statSync(subPath);
-    const key = path.join(relativePath, file);
-    if (stats.isDirectory()) {
+  const result: any = files
+    .filter((x) => !blacklist.includes(x))
+    .map((file: string) => {
+      const subPath = path.join(dir, file);
+      const stats = fs.statSync(subPath);
+      const key = path.join(relativePath, file);
+      if (stats.isDirectory()) {
+        return {
+          title: file,
+          value: file,
+          key,
+          type: 'directory',
+          disabled: true,
+          parent: relativePath,
+          children: readDirs(subPath, baseDir),
+        };
+      }
       return {
         title: file,
         value: file,
+        type: 'file',
         key,
-        type: 'directory',
-        disabled: true,
         parent: relativePath,
-        children: readDirs(subPath, baseDir),
       };
-    }
-    return {
-      title: file,
-      value: file,
-      type: 'file',
-      key,
-      parent: relativePath,
-    };
-  });
+    });
+  return result;
+}
+
+export function readDir(
+  dir: string,
+  baseDir: string = '',
+  blacklist: string[] = [],
+) {
+  const relativePath = path.relative(baseDir, dir);
+  const files = fs.readdirSync(dir);
+  const result: any = files
+    .filter((x) => !blacklist.includes(x))
+    .map((file: string) => {
+      const subPath = path.join(dir, file);
+      const stats = fs.statSync(subPath);
+      const key = path.join(relativePath, file);
+      return {
+        title: file,
+        value: file,
+        type: stats.isDirectory() ? 'directory' : 'file',
+        key,
+        parent: relativePath,
+      };
+    });
   return result;
 }
