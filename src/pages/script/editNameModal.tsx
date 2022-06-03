@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form, Select } from 'antd';
+import { Modal, message, Input, Form, Select, Upload, Radio } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
+import { UploadOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -21,21 +22,30 @@ const EditScriptNameModal = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [dirs, setDirs] = useState<any[]>([]);
+  const [file, setFile] = useState<File>();
+  const [type, setType] = useState<'blank' | 'upload'>('blank');
 
   const handleOk = async (values: any) => {
     setLoading(true);
     values.path = values.path || '';
+    const formData = new FormData();
+    formData.append('file', file as any);
+    formData.append('filename', values.filename);
+    formData.append('path', values.path);
+    formData.append('content', '');
     request
       .post(`${config.apiPrefix}scripts`, {
-        data: { filename: values.filename, path: values.path, content: '' },
+        data: formData,
       })
       .then(({ code, data }) => {
         if (code === 200) {
           message.success('保存文件成功');
+          const key = values.path ? `${values.path}-` : '';
+          const filename = file ? file.name : values.filename;
           handleCancel({
-            filename: values.filename,
+            filename,
             path: values.path,
-            key: `${values.path}-${values.filename}`,
+            key: `${key}${filename}`,
           });
         } else {
           message.error(data);
@@ -43,6 +53,15 @@ const EditScriptNameModal = ({
         setLoading(false);
       })
       .finally(() => setLoading(false));
+  };
+
+  const beforeUpload = (file: File) => {
+    setFile(file);
+    return false;
+  };
+
+  const typeChange = (e) => {
+    setType(e.target.value);
   };
 
   useEffect(() => {
@@ -73,12 +92,25 @@ const EditScriptNameModal = ({
     >
       <Form form={form} layout="vertical" name="edit_name_modal">
         <Form.Item
-          name="filename"
-          label="文件名"
-          rules={[{ required: true, message: '请输入文件名' }]}
+          name="type"
+          label="类型"
+          rules={[{ required: true }]}
+          initialValue={'blank'}
         >
-          <Input placeholder="请输入文件名" />
+          <Radio.Group onChange={typeChange}>
+            <Radio value="blank">空文件</Radio>
+            <Radio value="upload">本地上传</Radio>
+          </Radio.Group>
         </Form.Item>
+        {type === 'blank' && (
+          <Form.Item
+            name="filename"
+            label="文件名"
+            rules={[{ required: true, message: '请输入文件名' }]}
+          >
+            <Input placeholder="请输入文件名" />
+          </Form.Item>
+        )}
         <Form.Item
           label="父目录"
           name="path"
@@ -90,6 +122,16 @@ const EditScriptNameModal = ({
             ))}
           </Select>
         </Form.Item>
+        {type === 'upload' && (
+          <Form.Item label="文件" name="file">
+            <Upload.Dragger beforeUpload={beforeUpload} maxCount={1}>
+              <p className="ant-upload-drag-icon">
+                <UploadOutlined />
+              </p>
+              <p className="ant-upload-text">点击或者拖拽文件到此区域上传</p>
+            </Upload.Dragger>
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   );
