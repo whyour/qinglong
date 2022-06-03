@@ -18,9 +18,7 @@ export default async () => {
     await AppModel.sync();
     await AuthModel.sync();
     await EnvModel.sync();
-    await SubscriptionModel.sync({ alter: true });
-
-    await sequelize.sync();
+    await SubscriptionModel.sync();
 
     // try {
     //   const queryInterface = sequelize.getQueryInterface();

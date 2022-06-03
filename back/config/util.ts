@@ -293,7 +293,6 @@ export function readDirs(
       if (stats.isDirectory()) {
         return {
           title: file,
-          value: file,
           key,
           type: 'directory',
           disabled: true,
@@ -303,7 +302,6 @@ export function readDirs(
       }
       return {
         title: file,
-        value: file,
         type: 'file',
         key,
         parent: relativePath,
@@ -327,7 +325,6 @@ export function readDir(
       const key = path.join(relativePath, file);
       return {
         title: file,
-        value: file,
         type: stats.isDirectory() ? 'directory' : 'file',
         key,
         parent: relativePath,
