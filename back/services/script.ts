@@ -1,8 +1,9 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import SockService from './sock';
 import CronService from './cron';
+import ScheduleService, { TaskCallbacks } from './schedule';
 
 @Service()
 export default class ScriptService {
@@ -10,38 +11,37 @@ export default class ScriptService {
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
     private cronService: CronService,
+    private scheduleService: ScheduleService,
   ) {}
 
-  public async runScript(path: string) {
-    const cp = spawn(`task -l ${path} now`, { shell: '/bin/bash' });
+  private taskCallbacks(): TaskCallbacks {
+    return {
+      onEnd: async (cp, endTime, diff) => {
+        this.sockService.sendMessage({
+          type: 'manuallyRunScript',
+          message: `\n## 执行结束... ${endTime.format(
+            'YYYY-MM-DD HH:mm:ss',
+          )}  耗时 ${diff} 秒`,
+        });
+      },
+      onError: async (message: string) => {
+        this.sockService.sendMessage({
+          type: 'manuallyRunScript',
+          message,
+        });
+      },
+      onLog: async (message: string) => {
+        this.sockService.sendMessage({
+          type: 'manuallyRunScript',
+          message,
+        });
+      },
+    };
+  }
 
-    cp.stdout.on('data', (data) => {
-      this.sockService.sendMessage({
-        type: 'manuallyRunScript',
-        message: data.toString(),
-      });
-    });
-
-    cp.stderr.on('data', (data) => {
-      this.sockService.sendMessage({
-        type: 'manuallyRunScript',
-        message: data.toString(),
-      });
-    });
-
-    cp.on('error', (err) => {
-      this.sockService.sendMessage({
-        type: 'manuallyRunScript',
-        message: JSON.stringify(err),
-      });
-    });
-
-    cp.on('close', (err) => {
-      this.sockService.sendMessage({
-        type: 'manuallyRunScript',
-        message: `执行结束`,
-      });
-    });
+  public async runScript(filePath: string) {
+    const command = `task -l ${filePath} now`;
+    this.scheduleService.runTask(command, this.taskCallbacks());
 
     return { code: 200 };
   }

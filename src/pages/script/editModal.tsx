@@ -74,11 +74,13 @@ const EditModal = ({
 
   const run = () => {
     setLog('');
+    const content = editorRef.current.getValue().replace(/\r\n/g, '\n');
     request
       .put(`${config.apiPrefix}scripts/run`, {
         data: {
           filename: cNode.title,
           path: cNode.parent || '',
+          content,
         },
       })
       .then((data) => {
@@ -90,11 +92,13 @@ const EditModal = ({
     if (!cNode || !cNode.title) {
       return;
     }
+    const content = editorRef.current.getValue().replace(/\r\n/g, '\n');
     request
       .put(`${config.apiPrefix}scripts/stop`, {
         data: {
           filename: cNode.title,
           path: cNode.parent || '',
+          content,
         },
       })
       .then((data) => {
