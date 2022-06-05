@@ -11,7 +11,7 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs';
 import { celebrate, Joi } from 'celebrate';
-import path, { join } from 'path';
+import path, { join, parse } from 'path';
 import ScriptService from '../services/script';
 import multer from 'multer';
 const route = Router();
@@ -218,17 +218,18 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
+        content: Joi.string().optional(),
         path: Joi.string().optional().allow(''),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let { filename, path } = req.body as {
-          filename: string;
-          path: string;
-        };
-        const filePath = join(path, filename);
+        let { filename, content, path } = req.body;
+        const { name, ext } = parse(filename);
+        const filePath = join(path, `${name}.swap${ext}`);
+        fs.writeFileSync(filePath, content || '', { encoding: 'utf8' });
+
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.runScript(filePath);
         res.send(result);
@@ -244,17 +245,17 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
+        content: Joi.string().optional().allow(''),
         path: Joi.string().optional().allow(''),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let { filename, path } = req.body as {
-          filename: string;
-          path: string;
-        };
-        const filePath = join(path, filename);
+        let { filename, content, path } = req.body;
+        const { name, ext } = parse(filename);
+        const filePath = join(path, `${name}.swap${ext}`);
+
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.stopScript(filePath);
         res.send(result);
