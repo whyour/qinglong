@@ -1,9 +1,11 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import SockService from './sock';
 import CronService from './cron';
 import ScheduleService, { TaskCallbacks } from './schedule';
+import config from '../config';
 
 @Service()
 export default class ScriptService {
@@ -14,7 +16,7 @@ export default class ScriptService {
     private scheduleService: ScheduleService,
   ) {}
 
-  private taskCallbacks(): TaskCallbacks {
+  private taskCallbacks(filePath: string): TaskCallbacks {
     return {
       onEnd: async (cp, endTime, diff) => {
         this.sockService.sendMessage({
@@ -23,6 +25,9 @@ export default class ScriptService {
             'YYYY-MM-DD HH:mm:ss',
           )}  耗时 ${diff} 秒`,
         });
+        try {
+          fs.unlinkSync(filePath);
+        } catch (error) {}
       },
       onError: async (message: string) => {
         this.sockService.sendMessage({
@@ -40,14 +45,17 @@ export default class ScriptService {
   }
 
   public async runScript(filePath: string) {
-    const command = `task -l ${filePath} now`;
-    this.scheduleService.runTask(command, this.taskCallbacks());
+    const relativePath = path.relative(config.scriptPath, filePath);
+    const command = `task -l ${relativePath} now`;
+    this.scheduleService.runTask(command, this.taskCallbacks(filePath));
 
     return { code: 200 };
   }
 
-  public async stopScript(path: string) {
-    const err = await this.cronService.killTask(`task -l ${path} now`);
+  public async stopScript(filePath: string) {
+    const relativePath = path.relative(config.scriptPath, filePath);
+    const err = await this.cronService.killTask(`task -l ${relativePath} now`);
+
     const str = err ? `\n${err}` : '';
     this.sockService.sendMessage({
       type: 'manuallyRunScript',
