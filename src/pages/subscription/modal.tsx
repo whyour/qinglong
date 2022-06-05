@@ -204,13 +204,15 @@ const SubscriptionModal = ({
       ] = text
         .split(' ')
         .map((x) => x.trim().replace(/\"/g, '').replace(/\'/, ''));
+      const _type =
+        type === 'raw'
+          ? 'file'
+          : url.startsWith('http')
+          ? 'public-repo'
+          : 'private-repo';
+
       form.setFieldsValue({
-        type:
-          type === 'raw'
-            ? 'file'
-            : url.startsWith('http')
-            ? 'public-repo'
-            : 'private-repo',
+        type: _type,
         url,
         whitelist,
         blacklist,
@@ -219,6 +221,7 @@ const SubscriptionModal = ({
         extensions,
         alias: formatAlias(url, branch),
       });
+      setType(_type);
     }
   }, []);
 
