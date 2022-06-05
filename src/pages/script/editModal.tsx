@@ -66,7 +66,7 @@ const EditModal = ({
 
   const getDetail = (node: any) => {
     request
-      .get(`${config.apiPrefix}scripts/${node.value}?path=${node.parent || ''}`)
+      .get(`${config.apiPrefix}scripts/${node.title}?path=${node.parent || ''}`)
       .then((data) => {
         setValue(data.data);
       });
@@ -77,7 +77,7 @@ const EditModal = ({
     request
       .put(`${config.apiPrefix}scripts/run`, {
         data: {
-          filename: cNode.value,
+          filename: cNode.title,
           path: cNode.parent || '',
         },
       })
@@ -87,13 +87,13 @@ const EditModal = ({
   };
 
   const stop = () => {
-    if (!cNode || !cNode.value) {
+    if (!cNode || !cNode.title) {
       return;
     }
     request
       .put(`${config.apiPrefix}scripts/stop`, {
         data: {
-          filename: cNode.value,
+          filename: cNode.title,
           path: cNode.parent || '',
         },
       })
@@ -146,6 +146,7 @@ const EditModal = ({
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
             treeData={treeData}
             placeholder="请选择脚本文件"
+            fieldNames={{ value: 'key', label: 'title' }}
             showSearch
             onSelect={onSelect}
           />
@@ -243,7 +244,7 @@ const EditModal = ({
           content:
             editorRef.current &&
             editorRef.current.getValue().replace(/\r\n/g, '\n'),
-          filename: cNode?.value,
+          filename: cNode?.title,
         }}
       />
       <SettingModal
