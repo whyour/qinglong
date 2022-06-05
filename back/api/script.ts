@@ -218,7 +218,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
-        content: Joi.string().optional(),
+        content: Joi.string().optional().allow(''),
         path: Joi.string().optional().allow(''),
       }),
     }),
@@ -227,7 +227,7 @@ export default (app: Router) => {
       try {
         let { filename, content, path } = req.body;
         const { name, ext } = parse(filename);
-        const filePath = join(path, `${name}.swap${ext}`);
+        const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
         fs.writeFileSync(filePath, content || '', { encoding: 'utf8' });
 
         const scriptService = Container.get(ScriptService);
@@ -254,7 +254,7 @@ export default (app: Router) => {
       try {
         let { filename, content, path } = req.body;
         const { name, ext } = parse(filename);
-        const filePath = join(path, `${name}.swap${ext}`);
+        const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
 
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.stopScript(filePath);
