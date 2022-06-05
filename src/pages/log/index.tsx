@@ -60,7 +60,7 @@ const Log = ({ headerStyle, isPhone, theme }: any) => {
 
   const getLog = (node: any) => {
     request
-      .get(`${config.apiPrefix}logs/${node.value}?path=${node.parent || ''}`)
+      .get(`${config.apiPrefix}logs/${node.title}?path=${node.parent || ''}`)
       .then((data) => {
         setValue(data.data);
       });
@@ -113,6 +113,7 @@ const Log = ({ headerStyle, isPhone, theme }: any) => {
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
             treeData={data}
             placeholder="请选择日志"
+            fieldNames={{ value: 'key', label: 'title' }}
             showSearch
             onSelect={onSelect}
           />,

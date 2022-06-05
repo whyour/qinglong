@@ -451,6 +451,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
                 dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
                 treeData={data}
                 placeholder="请选择脚本"
+                fieldNames={{ value: 'key', label: 'title' }}
                 showSearch
                 onSelect={onSelect}
               />,
