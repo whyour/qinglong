@@ -117,8 +117,7 @@ const EditModal = ({
       return;
     }
 
-    if (_message === '执行结束') {
-      _message = '';
+    if (_message.includes('执行结束')) {
       setTimeout(() => {
         setIsRunning(false);
       }, 300);
