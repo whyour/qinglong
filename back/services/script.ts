@@ -19,12 +19,6 @@ export default class ScriptService {
   private taskCallbacks(filePath: string): TaskCallbacks {
     return {
       onEnd: async (cp, endTime, diff) => {
-        this.sockService.sendMessage({
-          type: 'manuallyRunScript',
-          message: `\n## 执行结束... ${endTime.format(
-            'YYYY-MM-DD HH:mm:ss',
-          )}  耗时 ${diff} 秒`,
-        });
         try {
           fs.unlinkSync(filePath);
         } catch (error) {}

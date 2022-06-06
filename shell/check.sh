@@ -88,6 +88,7 @@ check_pm2() {
 
 main() {
   echo -e "=====> 开始检测"
+  npm i -g pnpm
   pnpm add -g pm2
   copy_dep
   check_ql
