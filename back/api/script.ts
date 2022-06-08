@@ -67,7 +67,6 @@ export default (app: Router) => {
         const content = getFileContentByName(filePath);
         res.send({ code: 200, data: content });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -124,7 +123,6 @@ export default (app: Router) => {
         fs.writeFileSync(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -151,7 +149,6 @@ export default (app: Router) => {
         fs.writeFileSync(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -176,7 +173,6 @@ export default (app: Router) => {
         fs.unlinkSync(filePath);
         res.send({ code: 200 });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -207,7 +203,6 @@ export default (app: Router) => {
           return next(err);
         });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -234,7 +229,6 @@ export default (app: Router) => {
         const result = await scriptService.runScript(filePath);
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -260,7 +254,6 @@ export default (app: Router) => {
         const result = await scriptService.stopScript(filePath);
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

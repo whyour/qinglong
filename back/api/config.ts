@@ -25,7 +25,6 @@ export default (app: Router) => {
             }),
         });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -51,7 +50,6 @@ export default (app: Router) => {
         }
         res.send({ code: 200, data: content });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -76,7 +74,6 @@ export default (app: Router) => {
         fs.writeFileSync(path, content);
         res.send({ code: 200, message: '保存成功' });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

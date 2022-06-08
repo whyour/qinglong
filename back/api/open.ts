@@ -16,7 +16,6 @@ export default (app: Router) => {
         const data = await openService.list();
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -37,7 +36,6 @@ export default (app: Router) => {
         const data = await openService.create(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -59,7 +57,6 @@ export default (app: Router) => {
         const data = await openService.update(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -77,7 +74,6 @@ export default (app: Router) => {
         const data = await openService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -97,7 +93,6 @@ export default (app: Router) => {
         const data = await openService.resetSecret(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -118,7 +113,6 @@ export default (app: Router) => {
         const result = await openService.authToken(req.query as any);
         return res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

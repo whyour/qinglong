@@ -42,7 +42,6 @@ export default (app: Router) => {
           return res.send({ code: 400, message: 'param schedule error' });
         }
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -60,7 +59,6 @@ export default (app: Router) => {
         const data = await cronService.run(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -78,7 +76,6 @@ export default (app: Router) => {
         const data = await cronService.stop(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -102,7 +99,6 @@ export default (app: Router) => {
         );
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -123,7 +119,6 @@ export default (app: Router) => {
         const data = await cronService.addLabels(req.body.ids, req.body.labels);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -141,7 +136,6 @@ export default (app: Router) => {
         const data = await cronService.disabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -159,7 +153,6 @@ export default (app: Router) => {
         const data = await cronService.enabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -179,7 +172,6 @@ export default (app: Router) => {
         const data = await cronService.log(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -210,7 +202,6 @@ export default (app: Router) => {
           return res.send({ code: 400, message: 'param schedule error' });
         }
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -228,7 +219,6 @@ export default (app: Router) => {
         const data = await cronService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -246,7 +236,6 @@ export default (app: Router) => {
         const data = await cronService.pin(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -264,7 +253,6 @@ export default (app: Router) => {
         const data = await cronService.unPin(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -279,7 +267,6 @@ export default (app: Router) => {
         const data = await cronService.import_crontab();
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -299,7 +286,6 @@ export default (app: Router) => {
         const data = await cronService.getDb({ id: req.params.id });
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -328,7 +314,6 @@ export default (app: Router) => {
         });
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -348,7 +333,6 @@ export default (app: Router) => {
         const data = await cronService.logs(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
