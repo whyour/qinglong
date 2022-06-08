@@ -37,7 +37,6 @@ export default (app: Router) => {
         const content = getFileContentByName(filePath);
         res.send({ code: 200, data: content });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

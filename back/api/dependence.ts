@@ -38,7 +38,6 @@ export default (app: Router) => {
         const data = await dependenceService.create(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -61,7 +60,6 @@ export default (app: Router) => {
         const data = await dependenceService.update(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -79,7 +77,6 @@ export default (app: Router) => {
         const data = await dependenceService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -97,7 +94,6 @@ export default (app: Router) => {
         const data = await dependenceService.remove(req.body, true);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -117,7 +113,6 @@ export default (app: Router) => {
         const data = await dependenceService.getDb({ id: req.params.id });
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -135,7 +130,6 @@ export default (app: Router) => {
         const data = await dependenceService.reInstall(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

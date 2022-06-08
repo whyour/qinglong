@@ -136,7 +136,6 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(errors());
-  app.use(Sentry.Handlers.errorHandler());
 
   app.use(
     (
@@ -154,6 +153,29 @@ export default ({ app }: { app: Application }) => {
       return next(err);
     },
   );
+
+  app.use(
+    (
+      err: Error & { errors: any[] },
+      req: Request,
+      res: Response,
+      next: NextFunction,
+    ) => {
+      if (err.name.includes('Sequelize')) {
+        return res
+          .status(500)
+          .send({
+            code: 400,
+            message: `${err.name} ${err.message}`,
+            validation: err.errors,
+          })
+          .end();
+      }
+      return next(err);
+    },
+  );
+
+  app.use(Sentry.Handlers.errorHandler());
 
   app.use(
     (

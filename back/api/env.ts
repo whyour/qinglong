@@ -38,7 +38,6 @@ export default (app: Router) => {
         const data = await envService.create(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -61,7 +60,6 @@ export default (app: Router) => {
         const data = await envService.update(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -79,7 +77,6 @@ export default (app: Router) => {
         const data = await envService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -103,7 +100,6 @@ export default (app: Router) => {
         const data = await envService.move(req.params.id, req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -121,7 +117,6 @@ export default (app: Router) => {
         const data = await envService.disabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -139,7 +134,6 @@ export default (app: Router) => {
         const data = await envService.enabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -160,7 +154,6 @@ export default (app: Router) => {
         const data = await envService.updateNames(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -180,7 +173,6 @@ export default (app: Router) => {
         const data = await envService.getDb(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

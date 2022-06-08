@@ -65,7 +65,6 @@ export default (app: Router) => {
           return res.send({ code: 400, message: 'param schedule error' });
         }
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -83,7 +82,6 @@ export default (app: Router) => {
         const data = await subscriptionService.run(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -101,7 +99,6 @@ export default (app: Router) => {
         const data = await subscriptionService.stop(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -119,7 +116,6 @@ export default (app: Router) => {
         const data = await subscriptionService.disabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -137,7 +133,6 @@ export default (app: Router) => {
         const data = await subscriptionService.enabled(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -157,7 +152,6 @@ export default (app: Router) => {
         const data = await subscriptionService.log(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -201,7 +195,6 @@ export default (app: Router) => {
           return res.send({ code: 400, message: 'param schedule error' });
         }
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -219,7 +212,6 @@ export default (app: Router) => {
         const data = await subscriptionService.remove(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -239,7 +231,6 @@ export default (app: Router) => {
         const data = await subscriptionService.getDb({ id: req.params.id });
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -266,7 +257,6 @@ export default (app: Router) => {
         });
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -286,7 +276,6 @@ export default (app: Router) => {
         const data = await subscriptionService.logs(req.params.id);
         return res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

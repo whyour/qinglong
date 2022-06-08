@@ -39,7 +39,6 @@ export default (app: Router) => {
         const data = await userService.login({ ...req.body }, req);
         return res.send(data);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -54,7 +53,6 @@ export default (app: Router) => {
         await userService.logout(req.platform);
         res.send({ code: 200 });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -75,7 +73,6 @@ export default (app: Router) => {
         await userService.updateUsernameAndPassword(req.body);
         res.send({ code: 200, message: '更新成功' });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -109,7 +106,6 @@ export default (app: Router) => {
         const data = await userService.initTwoFactor();
         res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -129,7 +125,6 @@ export default (app: Router) => {
         const data = await userService.activeTwoFactor(req.body.code);
         res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -144,7 +139,6 @@ export default (app: Router) => {
         const data = await userService.deactiveTwoFactor();
         res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -166,7 +160,6 @@ export default (app: Router) => {
         const data = await userService.twoFactorLogin(req.body, req);
         res.send(data);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -181,7 +174,6 @@ export default (app: Router) => {
         const data = await userService.getLoginLog();
         res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -196,7 +188,6 @@ export default (app: Router) => {
         const data = await userService.getNotificationMode();
         res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -211,7 +202,6 @@ export default (app: Router) => {
         const result = await userService.updateNotificationMode(req.body);
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -232,7 +222,6 @@ export default (app: Router) => {
         await userService.updateUsernameAndPassword(req.body);
         res.send({ code: 200, message: '更新成功' });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -247,7 +236,6 @@ export default (app: Router) => {
         const result = await userService.updateNotificationMode(req.body);
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -263,7 +251,6 @@ export default (app: Router) => {
         const result = await userService.updateAvatar(req.file!.filename);
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },

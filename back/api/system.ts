@@ -54,7 +54,6 @@ export default (app: Router) => {
         const data = await systemService.getLogRemoveFrequency();
         res.send({ code: 200, data });
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -76,7 +75,6 @@ export default (app: Router) => {
         );
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -91,7 +89,6 @@ export default (app: Router) => {
         const result = await systemService.checkUpdate();
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -106,7 +103,6 @@ export default (app: Router) => {
         const result = await systemService.updateSystem();
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
@@ -127,7 +123,6 @@ export default (app: Router) => {
         const result = await systemService.notify(req.body);
         res.send(result);
       } catch (e) {
-        logger.error('🔥 error: %o', e);
         return next(e);
       }
     },
