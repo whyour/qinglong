@@ -39,7 +39,7 @@ AutoStartBot=""
 BotRepoUrl=""
 
 ## 安装bot依赖时指定pip源，默认使用清华源，如不需要源，设置此参数为空
-PipMirror="https://pypi.tuna.tsinghua.edu.cn/simple"
+PipMirror="https://pypi.doubanio.com/simple/"
 
 ## 通知环境变量
 ## 1. Server酱

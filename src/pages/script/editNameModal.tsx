@@ -48,7 +48,7 @@ const EditScriptNameModal = ({
       })
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success('保存文件成功');
+          message.success('新建文件成功');
           const key = values.path ? `${values.path}/` : '';
           const filename = file ? file.name : values.filename;
           handleCancel({
