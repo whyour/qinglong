@@ -64,5 +64,9 @@ export default async () => {
 
   dotenv.config({ path: confFile });
 
+  // 声明QL_DIR环境变量
+  const qlHomePath = path.join(__dirname, '../../');
+  process.env.QL_DIR = qlHomePath;
+
   Logger.info('✌️ Init file down');
 };
