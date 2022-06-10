@@ -78,14 +78,8 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
       unique: 'compositeIndex',
       type: DataTypes.STRING,
     },
-    schedule: {
-      unique: 'compositeIndex',
-      type: DataTypes.STRING,
-    },
-    interval_schedule: {
-      unique: 'compositeIndex',
-      type: DataTypes.JSON,
-    },
+    schedule: DataTypes.STRING,
+    interval_schedule: DataTypes.JSON,
     type: DataTypes.STRING,
     whitelist: DataTypes.STRING,
     blacklist: DataTypes.STRING,
