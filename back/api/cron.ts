@@ -182,9 +182,9 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         labels: Joi.array().optional().allow(null),
-        command: Joi.string().optional(),
-        schedule: Joi.string().optional(),
-        name: Joi.string().optional(),
+        command: Joi.string().required(),
+        schedule: Joi.string().required(),
+        name: Joi.string().optional().allow(null),
         id: Joi.number().required(),
       }),
     }),
@@ -297,10 +297,10 @@ export default (app: Router) => {
       body: Joi.object({
         ids: Joi.array().items(Joi.number().required()),
         status: Joi.string().required(),
-        pid: Joi.string().optional(),
-        log_path: Joi.string().optional(),
-        last_running_time: Joi.number().optional(),
-        last_execution_time: Joi.number().optional(),
+        pid: Joi.string().optional().allow(null),
+        log_path: Joi.string().optional().allow(null),
+        last_running_time: Joi.number().optional().allow(null),
+        last_execution_time: Joi.number().optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
