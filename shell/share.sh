@@ -14,7 +14,6 @@ dir_log=$dir_data/log
 dir_db=$dir_data/db
 dir_dep=$dir_data/deps
 dir_list_tmp=$dir_log/.tmp
-dir_code=$dir_log/code
 dir_update_log=$dir_log/update
 ql_static_repo=$dir_repo/static
 

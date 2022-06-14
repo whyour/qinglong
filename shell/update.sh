@@ -486,7 +486,6 @@ main() {
         run_extra_shell >>$log_path
         ;;
     repo)
-        get_user_info
         get_uniq_path "$p2" "$p6"
         if [[ -n $p2 ]]; then
             update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7"
@@ -496,7 +495,6 @@ main() {
         fi
         ;;
     raw)
-        get_user_info
         get_uniq_path "$p2"
         if [[ -n $p2 ]]; then
             update_raw "$p2"
