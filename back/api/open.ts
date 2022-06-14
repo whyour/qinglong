@@ -25,7 +25,7 @@ export default (app: Router) => {
     '/apps',
     celebrate({
       body: Joi.object({
-        name: Joi.string().optional().allow(''),
+        name: Joi.string().optional().allow('').disallow('system'),
         scopes: Joi.array().items(Joi.string().required()),
       }),
     }),

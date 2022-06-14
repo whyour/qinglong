@@ -80,13 +80,6 @@ export default ({ app }: { app: Application }) => {
     ) {
       return next();
     }
-    const remoteAddress = req.socket.remoteAddress;
-    if (
-      remoteAddress === '::ffff:127.0.0.1' &&
-      originPath === '/api/crons/status'
-    ) {
-      return next();
-    }
 
     const data = fs.readFileSync(config.authConfigFile, 'utf8');
     if (data) {

@@ -69,6 +69,7 @@ export default {
     'cookie.sh',
     'crontab.list',
     'env.sh',
+    'token.json',
   ],
   writePathList: [configPath, scriptPath],
   bakPath,

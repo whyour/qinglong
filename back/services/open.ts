@@ -90,7 +90,9 @@ export default class OpenService {
     }
     try {
       const result = await this.find(condition);
-      return result.map((x) => ({ ...x, tokens: [] }));
+      return result
+        .filter((x) => x.name !== 'system')
+        .map((x) => ({ ...x, tokens: [] }));
     } catch (error) {
       throw error;
     }
@@ -141,5 +143,36 @@ export default class OpenService {
     } else {
       return { code: 400, message: 'client_id或client_seret有误' };
     }
+  }
+
+  public async findSystemToken(): Promise<{
+    value: string;
+    expiration: number;
+  }> {
+    let systemApp = (await AppModel.findOne({
+      where: { name: 'system' },
+    })) as App;
+    if (!systemApp) {
+      systemApp = await this.create({
+        name: 'system',
+        scopes: ['crons'],
+      } as App);
+    }
+    const nowTime = Math.round(Date.now() / 1000);
+    let token;
+    if (
+      !systemApp.tokens ||
+      !systemApp.tokens.length ||
+      nowTime > [...systemApp.tokens].pop()!.expiration
+    ) {
+      const authToken = await this.authToken({
+        client_id: systemApp.client_id,
+        client_secret: systemApp.client_secret,
+      });
+      token = authToken.data;
+    } else {
+      token = [...systemApp.tokens].pop();
+    }
+    return token;
   }
 }
