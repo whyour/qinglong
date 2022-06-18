@@ -28,6 +28,7 @@ import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
 import SshKeyService from './sshKey';
+import dayjs from 'dayjs';
 
 @Service()
 export default class SubscriptionService {
@@ -371,11 +372,10 @@ export default class SubscriptionService {
       const err = await this.killTask(command);
       const absolutePath = await this.handleLogPath(doc.log_path as string);
       const str = err ? `\n${err}` : '';
+
       fs.appendFileSync(
         `${absolutePath}`,
-        `${str}\n## 执行结束...  ${new Date()
-          .toLocaleString('zh', { hour12: false })
-          .replace(' 24:', ' 00:')} `,
+        `${str}\n## 执行结束...  ${dayjs().format('YYYY-MM-DD HH:mm:ss')} `,
       );
     }
 

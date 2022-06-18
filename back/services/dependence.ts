@@ -14,6 +14,7 @@ import { spawn } from 'child_process';
 import SockService from './sock';
 import { Op } from 'sequelize';
 import { concurrentRun } from '../config/util';
+import dayjs from 'dayjs';
 
 @Service()
 export default class DependenceService {
@@ -161,20 +162,17 @@ export default class DependenceService {
       )[dependencies[0].type as any];
       const actionText = isInstall ? '安装' : '删除';
       const depIds = dependencies.map((x) => x.id) as number[];
-      const startTime = Date.now();
+      const startTime = dayjs();
+
+      const message = `开始${actionText}依赖 ${depNames}，开始时间 ${startTime.format(
+        'YYYY-MM-DD HH:mm:ss',
+      )}\n\n`;
       this.sockService.sendMessage({
         type: socketMessageType,
-        message: `开始${actionText}依赖 ${depNames}，开始时间 ${new Date(
-          startTime,
-        ).toLocaleString()}\n\n`,
+        message,
         references: depIds,
       });
-      await this.updateLog(
-        depIds,
-        `开始${actionText}依赖 ${depNames}，开始时间 ${new Date(
-          startTime,
-        ).toLocaleString()}\n\n`,
-      );
+      await this.updateLog(depIds, message);
 
       const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
 
@@ -207,23 +205,19 @@ export default class DependenceService {
       });
 
       cp.on('close', async (code) => {
-        const endTime = Date.now();
+        const endTime = dayjs();
         const isSucceed = code === 0;
         const resultText = isSucceed ? '成功' : '失败';
 
+        const message = `\n依赖${actionText}${resultText}，结束时间 ${endTime.format(
+          'YYYY-MM-DD HH:mm:ss',
+        )}，耗时 ${endTime.diff(startTime, 'second')} 秒`;
         this.sockService.sendMessage({
           type: socketMessageType,
-          message: `\n依赖${actionText}${resultText}，结束时间 ${new Date(
-            endTime,
-          ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
+          message,
           references: depIds,
         });
-        await this.updateLog(
-          depIds,
-          `\n依赖${actionText}${resultText}，结束时间 ${new Date(
-            endTime,
-          ).toLocaleString()}，耗时 ${(endTime - startTime) / 1000} 秒`,
-        );
+        await this.updateLog(depIds, message);
 
         let status = null;
         if (isSucceed) {
