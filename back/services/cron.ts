@@ -10,6 +10,7 @@ import { promises, existsSync } from 'fs';
 import { promisify } from 'util';
 import { Op } from 'sequelize';
 import path from 'path';
+import dayjs from 'dayjs';
 
 @Service()
 export default class CronService {
@@ -201,9 +202,7 @@ export default class CronService {
         const str = err ? `\n${err}` : '';
         fs.appendFileSync(
           `${absolutePath}`,
-          `${str}\n## 执行结束...  ${new Date()
-            .toLocaleString('zh', { hour12: false })
-            .replace(' 24:', ' 00:')} `,
+          `${str}\n## 执行结束...  ${dayjs().format('YYYY-MM-DD HH:mm:ss')} `,
         );
       }
     }
