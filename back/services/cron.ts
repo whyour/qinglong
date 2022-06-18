@@ -202,7 +202,7 @@ export default class CronService {
         const str = err ? `\n${err}` : '';
         fs.appendFileSync(
           `${absolutePath}`,
-          `${str}\n## 执行结束...  ${dayjs().format('YYYY-MM-DD HH:mm:ss')} `,
+          `${str}\n## 执行结束... ${dayjs().format('YYYY-MM-DD HH:mm:ss')} `,
         );
       }
     }
