@@ -12,14 +12,16 @@ diff_cron() {
     local list_task="$2"
     local list_add="$3"
     local list_drop="$4"
-    if [[ -s $list_task ]]; then
+    if [[ -s $list_task ]] && [[ -s $list_scripts]]; then
         grep -vwf $list_task $list_scripts >$list_add
-    elif [[ ! -s $list_task ]] && [[ -s $list_scripts ]]; then
+        grep -vwf $list_scripts $list_task >$list_drop
+    fi
+
+    if [[ ! -s $list_task ]] && [[ -s $list_scripts ]]; then
         cp -f $list_scripts $list_add
     fi
-    if [[ -s $list_scripts ]]; then
-        grep -vwf $list_scripts $list_task >$list_drop
-    else
+
+    if [[ ! -s $list_scripts ]] && [[ -s $list_task ]]; then
         cp -f $list_task $list_drop
     fi
 }
