@@ -155,7 +155,7 @@ export default class OpenService {
     if (!systemApp) {
       systemApp = await this.create({
         name: 'system',
-        scopes: ['crons'],
+        scopes: ['crons', 'system'],
       } as App);
     }
     const nowTime = Math.round(Date.now() / 1000);
