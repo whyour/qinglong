@@ -228,6 +228,7 @@ export default class CronService {
       const killLogs = [];
       if (pids && pids.length > 0) {
         // node 执行脚本时还会有10个子进程，但是ps -ef中不存在，所以截取前三个
+        pids = pids.slice(0, 3);
         for (const id of pids) {
           const c = `kill -9 ${id.slice(1)}`;
           try {
