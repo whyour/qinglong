@@ -198,11 +198,21 @@ export default class CronService {
       const err = await this.killTask(doc.command);
       const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
       const logFileExist = doc.log_path && (await fileExist(absolutePath));
+
+      const endTime = dayjs();
+      const diffTimeStr = doc.last_execution_time
+        ? `，耗时 ${endTime.diff(
+            dayjs(doc.last_execution_time * 1000),
+            'second',
+          )}`
+        : '';
       if (logFileExist) {
         const str = err ? `\n${err}` : '';
         fs.appendFileSync(
           `${absolutePath}`,
-          `${str}\n## 执行结束... ${dayjs().format('YYYY-MM-DD HH:mm:ss')} `,
+          `${str}\n## 执行结束... ${endTime.format(
+            'YYYY-MM-DD HH:mm:ss',
+          )}${diffTimeStr}`,
         );
       }
     }
