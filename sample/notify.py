@@ -61,7 +61,7 @@ push_config = {
     'PUSH_KEY': '',                     # server 酱的 PUSH_KEY，兼容旧版与 Turbo 版
 
     'DEER_KEY': '',                     # PushDeer 的 PUSHDEER_KEY
-    
+
     'PUSH_PLUS_TOKEN': '',              # push+ 微信推送的用户令牌
     'PUSH_PLUS_USER': '',               # push+ 微信推送的群组编码
 
@@ -274,12 +274,12 @@ def pushdeer(title: str, content: str) -> None:
     data = {"text": title, "desp": content, "type": "markdown", "pushkey": push_config.get("DEER_KEY")}
     url = 'https://api2.pushdeer.com/message/push'
     response = requests.post(url, data=data).json()
-    
+
     if len(response.get("content").get("result")) > 0:
         print("PushDeer 推送成功！")
     else:
         print("PushDeer 推送失败！错误信息：", response)
-    
+
 
 def pushplus_bot(title: str, content: str) -> None:
     """
@@ -469,8 +469,8 @@ def telegram_bot(title: str, content: str) -> None:
         url = (
             f"https://api.telegram.org/bot{push_config.get('TG_BOT_TOKEN')}/sendMessage"
         )
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    payload = {
+    headers = {"Content-Type": "application/json"}
+    data = {
         "chat_id": str(push_config.get("TG_USER_ID")),
         "text": f"{title}\n\n{content}",
         "disable_web_page_preview": "true",
@@ -489,9 +489,7 @@ def telegram_bot(title: str, content: str) -> None:
             push_config.get("TG_PROXY_HOST"), push_config.get("TG_PROXY_PORT")
         )
         proxies = {"http": proxyStr, "https": proxyStr}
-    response = requests.post(
-        url=url, headers=headers, params=payload, proxies=proxies
-    ).json()
+    response = requests.post(url=url, headers=headers, json=data, proxies=proxies).json()
 
     if response["ok"]:
         print("tg 推送成功！")
