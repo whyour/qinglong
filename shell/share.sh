@@ -377,6 +377,41 @@ reload_pm2() {
     pm2 start $dir_static/build/public.js -n public --source-map-support --time &>/dev/null
 }
 
+diff_time() {
+    local format="$1"
+    local begin_time="$2"
+    local end_time="$3"
+
+    if [[ $is_macos -eq 1 ]]; then
+        diff_time=$(($(date -j -f "$format" "$end_time" +%s) - $(date -j -f "$format" "$begin_time" +%s)))
+    else
+        diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
+    fi
+    echo "$diff_time"
+}
+
+format_time() {
+    local format="$1"
+    local time="$2"
+
+    if [[ $is_macos -eq 1 ]]; then
+        echo $(date -j -f "$format" "$time" "+%Y-%m-%d %H:%M:%S")
+    else
+        echo $(date -d "$time" "+%Y-%m-%d %H:%M:%S")
+    fi
+}
+
+format_timestamp() {
+    local format="$1"
+    local time="$2"
+
+    if [[ $is_macos -eq 1 ]]; then
+        echo $(date -j -f "$format" "$time" "+%s")
+    else
+        echo $(date -d "$time" "+%s")
+    fi
+}
+
 init_env
 detect_termux
 detect_macos
