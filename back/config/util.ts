@@ -278,6 +278,11 @@ export async function concurrentRun(
   return replyList;
 }
 
+enum FileType {
+  'directory',
+  'file',
+}
+
 export function readDirs(
   dir: string,
   baseDir: string = '',
@@ -298,7 +303,10 @@ export function readDirs(
           type: 'directory',
           disabled: true,
           parent: relativePath,
-          children: readDirs(subPath, baseDir),
+          children: readDirs(subPath, baseDir).sort(
+            (a: any, b: any) =>
+              (FileType as any)[a.type] - (FileType as any)[b.type],
+          ),
         };
       }
       return {
@@ -308,7 +316,9 @@ export function readDirs(
         parent: relativePath,
       };
     });
-  return result;
+  return result.sort(
+    (a: any, b: any) => (FileType as any)[a.type] - (FileType as any)[b.type],
+  );
 }
 
 export function readDir(
