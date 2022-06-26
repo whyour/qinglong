@@ -84,8 +84,8 @@ run_normal() {
         fi
     fi
 
-    local time=$(date)
-    log_time=$(date -d "$time" "+%Y-%m-%d-%H-%M-%S")
+    local time=$(date "+%Y-%m-%d-%H-%M-%S")
+    log_time="$time"
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -99,12 +99,12 @@ run_normal() {
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
     log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $dir_log/$log_path"
+    cmd=">> $dir_log/$log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(date -d "$time" "+%Y-%m-%d %H:%M:%S")
-    local begin_timestamp=$(date -d "$time" "+%s")
+    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
@@ -155,8 +155,8 @@ run_concurrent() {
     [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     define_program "$file_param"
-    local time=$(date)
-    log_time=$(date -d "$time" "+%Y-%m-%d-%H-%M-%S")
+    local time=$(date "+%Y-%m-%d-%H-%M-%S")
+    log_time="$time"
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -170,12 +170,12 @@ run_concurrent() {
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
     log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $dir_log/$log_path"
+    cmd=">> $dir_log/$log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(date -d "$time" "+%Y-%m-%d %H:%M:%S")
-    local begin_timestamp=$(date -d "$time" "+%s")
+    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
@@ -225,8 +225,8 @@ run_designated() {
     fi
 
     define_program "$file_param"
-    local time=$(date)
-    log_time=$(date -d "$time" "+%Y-%m-%d-%H-%M-%S")
+    local time=$(date "+%Y-%m-%d-%H-%M-%S")
+    log_time="$time"
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -240,12 +240,12 @@ run_designated() {
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
     log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $dir_log/$log_path"
+    cmd=">> $dir_log/$log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(date -d "$time" "+%Y-%m-%d %H:%M:%S")
-    local begin_timestamp=$(date -d "$time" "+%s")
+    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
 
     local envs=$(eval echo "\$${env_param}")
     local array=($(echo $envs | sed 's/&/ /g'))
@@ -289,8 +289,8 @@ run_designated() {
 run_else() {
     local file_param="$1"
     define_program "$file_param"
-    local time=$(date)
-    log_time=$(date -d "$time" "+%Y-%m-%d-%H-%M-%S")
+    local time=$(date "+%Y-%m-%d-%H-%M-%S")
+    log_time="$time"
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -304,12 +304,12 @@ run_else() {
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
     log_dir="${log_dir_tmp%.*}"
     log_path="$log_dir/$log_time.log"
-    cmd="&>> $dir_log/$log_path"
+    cmd=">> $dir_log/$log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(date -d "$time" "+%Y-%m-%d %H:%M:%S")
-    local begin_timestamp=$(date -d "$time" "+%s")
+    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd

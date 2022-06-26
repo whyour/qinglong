@@ -538,7 +538,7 @@ main() {
         ;;
     esac
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local diff_time=$(($(date +%s -d "$end_time") - $(date +%s -d "$begin_time")))
+    local diff_time=$(diff_time "%Y-%m-%d %H:%M:%S" "$begin_time" "$end_time")
     if [[ $p1 != "repo" ]] && [[ $p1 != "raw" ]]; then
         echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >>$log_path
         cat $log_path
