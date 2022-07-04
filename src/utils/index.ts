@@ -205,3 +205,39 @@ export function getTableScroll({
   let height = document.body.clientHeight - mainTop - extraHeight;
   return height;
 }
+
+// 自动触发点击事件
+function automaticClick(elment: HTMLElement) {
+  const ev = document.createEvent('MouseEvents');
+  ev.initMouseEvent(
+    'click',
+    true,
+    false,
+    window,
+    0,
+    0,
+    0,
+    0,
+    0,
+    false,
+    false,
+    false,
+    false,
+    0,
+    null,
+  );
+  elment.dispatchEvent(ev);
+}
+
+// 导出文件
+export function exportJson(name: string, data: string) {
+  const urlObject = window.URL || window.webkitURL || window;
+  const export_blob = new Blob([data]);
+  const createA = document.createElementNS(
+    'http://www.w3.org/1999/xhtml',
+    'a',
+  ) as any;
+  createA.href = urlObject.createObjectURL(export_blob);
+  createA.download = name;
+  automaticClick(createA);
+}

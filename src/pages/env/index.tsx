@@ -25,7 +25,7 @@ import EditNameModal from './editNameModal';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
-import { getTableScroll } from '@/utils/index';
+import { exportJson, getTableScroll } from '@/utils/index';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -462,6 +462,13 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
     });
   };
 
+  const exportEnvs = () => {
+    const envs = value
+      .filter((x) => selectedRowIds.includes(x.id))
+      .map((x) => ({ value: x.value, name: x.name, remarks: x.remarks }));
+    exportJson('env.json', JSON.stringify(envs));
+  };
+
   const modifyName = () => {
     setIsEditNameModalVisible(true);
   };
@@ -515,6 +522,13 @@ const Env = ({ headerStyle, isPhone, theme }: any) => {
             onClick={delEnvs}
           >
             批量删除
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => exportEnvs()}
+            style={{ marginLeft: 8, marginRight: 8 }}
+          >
+            批量导出
           </Button>
           <Button
             type="primary"
