@@ -20,6 +20,7 @@ import {
   FileOutlined,
   PlayCircleOutlined,
   PauseCircleOutlined,
+  FullscreenOutlined,
 } from '@ant-design/icons';
 import { CrontabStatus } from './index';
 import { diffTime } from '@/utils/date';
@@ -106,7 +107,8 @@ const CronDetailModal = ({
           glyphMargin: false,
           wordWrap: 'on',
         }}
-        onMount={(editor) => {
+        onMount={(editor, monaco) => {
+          console.log(monaco);
           editorRef.current = editor;
         }}
       />
@@ -352,6 +354,11 @@ const CronDetailModal = ({
     });
   };
 
+  const fullscreen = () => {
+    const editorElement = editorRef.current._domElement as HTMLElement;
+    editorElement.parentElement?.requestFullscreen();
+  };
+
   useEffect(() => {
     if (cron && cron.id) {
       setCurrentCron(cron);
@@ -529,13 +536,20 @@ const CronDetailModal = ({
           }}
           tabBarExtraContent={
             activeTabKey === 'script' && (
-              <Button
-                type="primary"
-                style={{ marginRight: 8 }}
-                onClick={saveFile}
-              >
-                保存
-              </Button>
+              <>
+                <Button
+                  type="primary"
+                  style={{ marginRight: 8 }}
+                  onClick={saveFile}
+                >
+                  保存
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<FullscreenOutlined />}
+                  onClick={fullscreen}
+                />
+              </>
             )
           }
         >
