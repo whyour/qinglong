@@ -62,7 +62,7 @@ export default ({ app }: { app: Application }) => {
         const keyMatch = req.path.match(/\/open\/([a-z]+)\/*/);
         const key = keyMatch && keyMatch[1];
         if (
-          (doc.scopes.includes(key as any) || doc.name === 'system') &&
+          doc.scopes.includes(key as any) &&
           currentToken &&
           currentToken.expiration >= Math.round(Date.now() / 1000)
         ) {
