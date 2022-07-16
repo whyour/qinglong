@@ -170,7 +170,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.getDb(req.params.id);
+        const data = await envService.getDb({ id: req.params.id });
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
