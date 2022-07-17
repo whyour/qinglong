@@ -84,8 +84,8 @@ run_normal() {
         fi
     fi
 
-    local time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_time="$time"
+    local time=$(date "+$time_format")
+    log_time=$(format_log_time "$time_format" "$time")
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -103,8 +103,9 @@ run_normal() {
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
-    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_time=$(format_time "$time_format" "$time")
+    local begin_timestamp=$(format_timestamp "$time_format" "$time")
+    
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
@@ -155,8 +156,8 @@ run_concurrent() {
     [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
     define_program "$file_param"
-    local time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_time="$time"
+    local time=$(date "+$time_format")
+    log_time=$(format_log_time "$time_format" "$time")
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -174,8 +175,8 @@ run_concurrent() {
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
-    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_time=$(format_time "$time_format" "$time")
+    local begin_timestamp=$(format_timestamp "$time_format" "$time")
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
@@ -225,8 +226,8 @@ run_designated() {
     fi
 
     define_program "$file_param"
-    local time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_time="$time"
+    local time=$(date "+$time_format")
+    log_time=$(format_log_time "$time_format" "$time")
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -244,8 +245,8 @@ run_designated() {
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
-    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_time=$(format_time "$time_format" "$time")
+    local begin_timestamp=$(format_timestamp "$time_format" "$time")
 
     local envs=$(eval echo "\$${env_param}")
     local array=($(echo $envs | sed 's/&/ /g'))
@@ -289,8 +290,8 @@ run_designated() {
 run_else() {
     local file_param="$1"
     define_program "$file_param"
-    local time=$(date "+%Y-%m-%d-%H-%M-%S")
-    log_time="$time"
+    local time=$(date "+$time_format")
+    log_time=$(format_log_time "$time_format" "$time")
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
         if [[ $file_param == /* ]]; then
@@ -308,8 +309,8 @@ run_else() {
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
 
-    local begin_time=$(format_time "%Y-%m-%d-%H-%M-%S" "$time")
-    local begin_timestamp=$(format_timestamp "%Y-%m-%d-%H-%M-%S" "$time")
+    local begin_time=$(format_time "$time_format" "$time")
+    local begin_timestamp=$(format_timestamp "$time_format" "$time")
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
@@ -354,6 +355,7 @@ main() {
         timeoutCmd="timeout -k 10s $command_timeout_time "
     fi
 
+    time_format="%Y-%m-%d %H:%M:%S"
     if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
         case $# in
         1)
