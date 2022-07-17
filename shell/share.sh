@@ -401,6 +401,17 @@ format_time() {
     fi
 }
 
+format_log_time() {
+    local format="$1"
+    local time="$2"
+
+    if [[ $is_macos -eq 1 ]]; then
+        echo $(date -j -f "$format" "$time" "+%Y-%m-%d-%H-%M-%S")
+    else
+        echo $(date -d "$time" "+%Y-%m-%d-%H-%M-%S")
+    fi
+}
+
 format_timestamp() {
     local format="$1"
     local time="$2"
