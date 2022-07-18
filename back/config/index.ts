@@ -3,13 +3,16 @@ import path from 'path';
 import { createRandomString } from './util';
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-// 声明QL_DIR环境变量
-let qlHomePath = path.join(__dirname, '../../');
-// 生产环境
-if (qlHomePath.endsWith('/static/')) {
-  qlHomePath = path.join(qlHomePath, '../');
+
+if (!process.env.QL_DIR) {
+  // 声明QL_DIR环境变量
+  let qlHomePath = path.join(__dirname, '../../');
+  // 生产环境
+  if (qlHomePath.endsWith('/static/')) {
+    qlHomePath = path.join(qlHomePath, '../');
+  }
+  process.env.QL_DIR = qlHomePath;
 }
-process.env.QL_DIR = qlHomePath;
 
 const lastVersionFile = `http://qn.whyour.cn/version.ts?v=${Date.now()}`;
 
