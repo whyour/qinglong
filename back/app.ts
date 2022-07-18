@@ -27,16 +27,4 @@ async function startServer() {
   await require('./loaders/server').default({ server });
 }
 
-function initEnv() {
-  process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-  // 声明QL_DIR环境变量
-  let qlHomePath = path.join(__dirname, '../../');
-  // 生产环境
-  if (qlHomePath.endsWith('/static/')) {
-    qlHomePath = path.join(qlHomePath, '../');
-  }
-  process.env.QL_DIR = qlHomePath;
-}
-
-initEnv();
 startServer();

@@ -1,9 +1,9 @@
 import 'reflect-metadata';
-import OpenService from '../back/services/open';
+import OpenService from './services/open';
 import { Container } from 'typedi';
-import LoggerInstance from '../back/loaders/logger';
+import LoggerInstance from './loaders/logger';
 import fs from 'fs';
-import config from '../back/config';
+import config from './config';
 import path from 'path';
 
 const tokenFile = path.join(config.configPath, 'token.json');

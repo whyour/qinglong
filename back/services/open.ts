@@ -170,6 +170,7 @@ export default class OpenService {
         client_secret: systemApp.client_secret,
       });
       token = authToken.data;
+      token.value = token.token;
     } else {
       token = [...systemApp.tokens].pop();
     }
