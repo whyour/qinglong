@@ -97,6 +97,13 @@ let IGOT_PUSH_KEY = '';
 let PUSH_PLUS_TOKEN = '';
 let PUSH_PLUS_USER = '';
 
+// =======================================Cool Push设置区域=======================================
+//官方文档：https://cp.xuthus.cc/docs
+//QQ_SKEY: Cool Push登录授权后推送消息的调用代码Skey
+//QQ_MODE: 推送模式详情请登录获取QQ_SKEY后见https://cp.xuthus.cc/feat
+let QQ_SKEY = '';
+let QQ_MODE = '';
+
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
   GOTIFY_URL = process.env.GOTIFY_URL;
@@ -723,9 +730,9 @@ function qywxamNotify(text, desp) {
         timeout,
       };
       $.post(options_accesstoken, (err, resp, data) => {
-        html = desp.replace(/\n/g, '<br/>');
-        var json = JSON.parse(data);
-        accesstoken = json.access_token;
+        let html = desp.replace(/\n/g, '<br/>');
+        let json = JSON.parse(data);
+        let accesstoken = json.access_token;
         let options;
 
         switch (QYWX_AM_AY[4]) {
