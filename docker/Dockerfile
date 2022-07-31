@@ -39,6 +39,7 @@ RUN set -x \
     && echo "Asia/Shanghai" > /etc/timezone \
     && git config --global user.email "qinglong@@users.noreply.github.com" \
     && git config --global user.name "qinglong" \
+    && git config http.postBuffer 524288000 \
     && npm install -g pnpm \
     && pnpm add -g pm2 ts-node typescript tslib \
     && git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
