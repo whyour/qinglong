@@ -163,11 +163,11 @@ task <file_path> desi <env_name> <account_number>
 
 * file_url: 脚本地址
 * repo_url: 仓库地址
-* whitelist: 拉取仓库时的白名单，即就是需要拉取的脚本的路径包含的字符串
-* blacklist: 拉取仓库时的黑名单，即就是需要拉取的脚本的路径不包含的字符串
-* dependence: 拉取仓库需要的依赖文件，会直接从仓库拷贝到scripts下的仓库目录，不受黑名单影响
+* whitelist: 拉取仓库时的白名单，即就是需要拉取的脚本的路径包含的字符串，多个竖线分割
+* blacklist: 拉取仓库时的黑名单，即就是需要拉取的脚本的路径不包含的字符串，多个竖线分割
+* dependence: 拉取仓库需要的依赖文件，会直接从仓库拷贝到scripts下的仓库目录，不受黑名单影响，多个竖线分割
+* extensions: 拉取仓库的文件后缀，多个竖线分割
 * branch: 拉取仓库的分支
-* extensions: 拉取仓库的文件后缀
 * days: 需要保留的日志的天数
 * file_path: 任务执行时的文件路径
 * env_name: 任务执行时需要并发或者指定时的环境变量名称

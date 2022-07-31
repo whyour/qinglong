@@ -388,6 +388,9 @@ gen_list_repo() {
     local index=0
     if [[ $6 ]]; then
         file_extensions="$6"
+        if [[ $file_extensions =~ "|" ]]; then
+            file_extensions=$(echo $file_extensions | sed 's/|/ /g')
+        fi
     fi
     for extension in $file_extensions; do
         if [[ $index -eq 0 ]]; then
