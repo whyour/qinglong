@@ -200,10 +200,11 @@ const SubscriptionModal = ({
         blacklist,
         dependences,
         branch,
-        extensions,
+        ...extensionsArr
       ] = text
         .split(' ')
-        .map((x) => x.trim().replace(/\"/g, '').replace(/\'/, ''));
+        .map((x: string) => x.trim().replace(/\"/g, '').replace(/\'/, ''));
+      const extensions = extensionsArr.join(' ');
       const _type =
         type === 'raw'
           ? 'file'
