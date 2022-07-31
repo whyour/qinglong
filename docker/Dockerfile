@@ -34,6 +34,7 @@ RUN set -x \
                              openssh \
                              py3-pip \
     && rm -rf /var/cache/apk/* \
+    && apk update \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && git config --global user.email "qinglong@@users.noreply.github.com" \
