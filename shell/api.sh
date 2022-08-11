@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 
 get_token() {
-    local tokenFile="$dir_static/build/token.js"
-    if [[ ! -f  "$tokenFile" ]]; then
-        token=$(ts-node-transpile-only "$dir_root/back/token.ts")
-    else
-        token=$(node "$tokenFile")
-    fi
+    token=$(cat $file_auth_token | jq -r .value)
 }
 
 add_cron_api() {

@@ -24,6 +24,7 @@ file_sharecode=$dir_config/sharecode.sh
 file_config_user=$dir_config/config.sh
 file_auth_sample=$dir_sample/auth.sample.json
 file_auth_user=$dir_config/auth.json
+file_auth_token=$dir_config/token.json
 file_extra_shell=$dir_config/extra.sh
 file_task_before=$dir_config/task_before.sh
 file_task_after=$dir_config/task_after.sh

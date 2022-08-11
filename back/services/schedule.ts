@@ -169,7 +169,7 @@ export default class ScheduleService {
     );
 
     const job = new LongIntervalJob(
-      { ...schedule, runImmediately: false },
+      { runImmediately: false, ...schedule },
       task,
       _id,
     );

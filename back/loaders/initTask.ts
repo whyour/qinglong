@@ -3,11 +3,29 @@ import _ from 'lodash';
 import SystemService from '../services/system';
 import ScheduleService from '../services/schedule';
 import SubscriptionService from '../services/subscription';
+import config from '../config';
+import { fileExist } from '../config/util';
 
 export default async () => {
   const systemService = Container.get(SystemService);
   const scheduleService = Container.get(ScheduleService);
   const subscriptionService = Container.get(SubscriptionService);
+
+  // 生成内置token
+  let tokenCommand = `ts-node-transpile-only ${config.rootPath}/back/token.ts`;
+  const tokenFile = `${config.rootPath}/static/build/token.js`;
+  if (await fileExist(tokenFile)) {
+    tokenCommand = `node ${tokenFile}`;
+  }
+  const cron = {
+    id: 'token',
+    name: '生成token',
+    command: tokenCommand,
+  };
+  scheduleService.createIntervalTask(cron as any, {
+    days: 28,
+    runImmediately: true,
+  });
 
   // 运行删除日志任务
   const data = await systemService.getLogRemoveFrequency();
@@ -17,7 +35,7 @@ export default async () => {
       name: '删除日志',
       command: `ql rmlog ${data.info.frequency}`,
     };
-    await scheduleService.createIntervalTask(cron, {
+    scheduleService.createIntervalTask(cron, {
       days: data.info.frequency,
       runImmediately: true,
     });
