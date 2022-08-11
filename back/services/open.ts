@@ -145,7 +145,7 @@ export default class OpenService {
     }
   }
 
-  public async findSystemToken(): Promise<{
+  public async generateSystemToken(): Promise<{
     value: string;
     expiration: number;
   }> {
@@ -158,22 +158,13 @@ export default class OpenService {
         scopes: ['crons', 'system'],
       } as App);
     }
-    const nowTime = Math.round(Date.now() / 1000);
-    let token;
-    if (
-      !systemApp.tokens ||
-      !systemApp.tokens.length ||
-      nowTime > [...systemApp.tokens].pop()!.expiration
-    ) {
-      const authToken = await this.authToken({
-        client_id: systemApp.client_id,
-        client_secret: systemApp.client_secret,
-      });
-      token = authToken.data;
-      token.value = token.token;
-    } else {
-      token = [...systemApp.tokens].pop();
-    }
-    return token;
+    const { data } = await this.authToken({
+      client_id: systemApp.client_id,
+      client_secret: systemApp.client_secret,
+    });
+    return {
+      ...data,
+      value: data.token,
+    };
   }
 }
