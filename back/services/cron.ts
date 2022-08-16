@@ -279,7 +279,11 @@ export default class CronService {
       if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {
         cmdStr = `task ${cmdStr}`;
       }
-      if (cmdStr.endsWith('.js')) {
+      if (cmdStr.endsWith('.js') 
+        || cmdStr.endsWith('.py')
+        || cmdStr.endsWith('.pyc')
+        || cmdStr.endsWith('.sh')
+        || cmdStr.endsWith('.ts')) {
         cmdStr = `${cmdStr} now`;
       }
 
