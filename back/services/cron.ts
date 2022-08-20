@@ -113,7 +113,15 @@ export default class CronService {
     }
   }
 
-  public async crontabs(searchText?: string): Promise<Crontab[]> {
+  public async crontabs(params?: {
+    searchText: string;
+    page: string;
+    size: string;
+  }): Promise<{ data: Crontab[]; total: number }> {
+    const searchText = params?.searchText;
+    const page = Number(params?.page || '0');
+    const size = Number(params?.size || '0');
+
     let query = {};
     if (searchText) {
       const textArray = searchText.split(':');
@@ -158,12 +166,18 @@ export default class CronService {
           break;
       }
     }
+    let condition: any = {
+      where: query,
+      order: [['createdAt', 'DESC']],
+    };
+    if (page && size) {
+      condition.offset = (page - 1) * size;
+      condition.limit = size;
+    }
     try {
-      const result = await CrontabModel.findAll({
-        where: query,
-        order: [['createdAt', 'DESC']],
-      });
-      return result as any;
+      const result = await CrontabModel.findAll(condition);
+      const count = await CrontabModel.count();
+      return { data: result, total: count };
     } catch (error) {
       throw error;
     }
@@ -441,7 +455,7 @@ export default class CronService {
   private async set_crontab(needReloadSchedule: boolean = false) {
     const tabs = await this.crontabs();
     var crontab_string = '';
-    tabs.forEach((tab) => {
+    tabs.data.forEach((tab) => {
       const _schedule = tab.schedule && tab.schedule.split(/ +/);
       if (tab.isDisabled === 1 || _schedule!.length !== 5) {
         crontab_string += '# ';

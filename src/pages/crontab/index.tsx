@@ -346,12 +346,14 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageConf, setPageConf] = useState<{ page: number; size: number }>(
+    {} as any,
+  );
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
   const [searchValue, setSearchValue] = useState('');
+  const [total, setTotal] = useState<number>();
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -374,10 +376,13 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const getCrons = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}crons?searchValue=${searchText}`)
-      .then((data: any) => {
+      .get(
+        `${config.apiPrefix}crons?searchText=${searchText}&page=${pageConf.page}&size=${pageConf.size}`,
+      )
+      .then((_data: any) => {
+        const { data, total } = _data.data;
         setValue(
-          data.data
+          data
             .sort((a: any, b: any) => {
               const sortA =
                 a.isPinned && a.status !== 0
@@ -403,7 +408,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
               };
             }),
         );
-        setCurrentPage(1);
+        setTotal(total);
       })
       .finally(() => setLoading(false));
   };
@@ -797,9 +802,8 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   };
 
   const onPageChange = (page: number, pageSize: number | undefined) => {
-    setCurrentPage(page);
-    setPageSize(pageSize as number);
-    localStorage.setItem('pageSize', pageSize + '');
+    setPageConf({ page, size: pageSize as number });
+    localStorage.setItem('pageSize', String(pageSize));
   };
 
   const getRowClassName = (record: any, index: number) => {
@@ -814,11 +818,20 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   }, [logCron]);
 
   useEffect(() => {
-    getCrons();
+    setPageConf({ ...pageConf, page: 1 });
   }, [searchText]);
 
   useEffect(() => {
-    setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
+    if (pageConf.page && pageConf.size) {
+      getCrons();
+    }
+  }, [pageConf]);
+
+  useEffect(() => {
+    setPageConf({
+      page: 1,
+      size: parseInt(localStorage.getItem('pageSize') || '2'),
+    });
     setTimeout(() => {
       setTableScrollHeight(getTableScroll());
     });
@@ -906,12 +919,12 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       <Table
         columns={columns}
         pagination={{
-          current: currentPage,
+          current: pageConf.page,
           onChange: onPageChange,
-          pageSize: pageSize,
+          pageSize: pageConf.size,
           showSizeChanger: true,
           simple: isPhone,
-          defaultPageSize: 20,
+          total,
           showTotal: (total: number, range: number[]) =>
             `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
           pageSizeOptions: [20, 100, 500, 1000] as any,
