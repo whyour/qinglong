@@ -14,7 +14,7 @@ export default defineConfig({
   dynamicImport: {
     loading: '@/components/pageLoading',
   },
-  favicon: '/images/g5.ico',
+  favicon: '/images/favicon.svg',
   proxy: {
     '/api/public': {
       target: 'http://127.0.0.1:5400/',
