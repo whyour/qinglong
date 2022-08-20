@@ -168,7 +168,12 @@ export default class CronService {
     }
     let condition: any = {
       where: query,
-      order: [['createdAt', 'DESC']],
+      order: [
+        ['isPinned', 'DESC'],
+        ['isDisabled', 'ASC'],
+        ['status', 'ASC'],
+        ['createdAt', 'DESC'],
+      ],
     };
     if (page && size) {
       condition.offset = (page - 1) * size;
