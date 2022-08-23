@@ -154,6 +154,7 @@ const Login = ({ reloadUser }: any) => {
                   message: '验证码为6位数字',
                 },
               ]}
+              validateTrigger="onBlur"
             >
               <Input
                 placeholder="6位数字"
