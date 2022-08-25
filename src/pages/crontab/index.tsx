@@ -122,7 +122,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         </>
       ),
       sorter: {
-        compare: (a: any, b: any) => a.name.localeCompare(b.name),
+        compare: (a: any, b: any) => a?.name?.localeCompare(b?.name),
         multiple: 2,
       },
     },
@@ -382,31 +382,15 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       .then((_data: any) => {
         const { data, total } = _data.data;
         setValue(
-          data
-            .sort((a: any, b: any) => {
-              const sortA =
-                a.isPinned && a.status !== 0
-                  ? 5
-                  : a.isDisabled && a.status !== 0
-                  ? 4
-                  : a.status;
-              const sortB =
-                b.isPinned && b.status !== 0
-                  ? 5
-                  : b.isDisabled && b.status !== 0
-                  ? 4
-                  : b.status;
-              return CrontabSort[sortA] - CrontabSort[sortB];
-            })
-            .map((x) => {
-              return {
-                ...x,
-                nextRunTime: cron_parser
-                  .parseExpression(x.schedule)
-                  .next()
-                  .toDate(),
-              };
-            }),
+          data.map((x) => {
+            return {
+              ...x,
+              nextRunTime: cron_parser
+                .parseExpression(x.schedule)
+                .next()
+                .toDate(),
+            };
+          }),
         );
         setTotal(total);
       })
@@ -748,11 +732,6 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const rowSelection = {
     selectedRowIds,
     onChange: onSelectChange,
-    selections: [
-      Table.SELECTION_ALL,
-      Table.SELECTION_INVERT,
-      Table.SELECTION_NONE,
-    ],
   };
 
   const delCrons = () => {
@@ -927,7 +906,9 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
           total,
           showTotal: (total: number, range: number[]) =>
             `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
-          pageSizeOptions: [20, 100, 500, 1000] as any,
+          pageSizeOptions: [10, 20, 50, 100, 200, 500, total || 10000].sort(
+            (a, b) => a - b,
+          ),
         }}
         onRow={(record) => {
           return {
