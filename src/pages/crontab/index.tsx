@@ -12,6 +12,7 @@ import {
   Typography,
   Input,
   Popover,
+  Tabs,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -816,29 +817,8 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     });
   }, []);
 
-  return (
-    <PageContainer
-      className="ql-container-wrapper crontab-wrapper"
-      title="定时任务"
-      extra={[
-        <Search
-          placeholder="请输入名称或者关键词"
-          style={{ width: 'auto' }}
-          enterButton
-          allowClear
-          loading={loading}
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          onSearch={onSearch}
-        />,
-        <Button key="2" type="primary" onClick={() => addCron()}>
-          新建任务
-        </Button>,
-      ]}
-      header={{
-        style: headerStyle,
-      }}
-    >
+  const panelContent = (
+    <>
       {selectedRowIds.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <Button type="primary" style={{ marginBottom: 5 }} onClick={delCrons}>
@@ -926,6 +906,42 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         rowSelection={rowSelection}
         rowClassName={getRowClassName}
       />
+    </>
+  );
+
+  return (
+    <PageContainer
+      className="ql-container-wrapper crontab-wrapper"
+      title="定时任务"
+      extra={[
+        <Search
+          placeholder="请输入名称或者关键词"
+          style={{ width: 'auto' }}
+          enterButton
+          allowClear
+          loading={loading}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          onSearch={onSearch}
+        />,
+        <Button key="2" type="primary" onClick={() => addCron()}>
+          新建任务
+        </Button>,
+      ]}
+      header={{
+        style: headerStyle,
+      }}
+    >
+      <Tabs
+        defaultActiveKey="all"
+        size="small"
+        tabPosition="top"
+        className="crontab-view"
+      >
+        <Tabs.TabPane tab="全部任务" key="all">
+          {panelContent}
+        </Tabs.TabPane>
+      </Tabs>
       <CronLogModal
         visible={isLogModalVisible}
         handleCancel={() => {
