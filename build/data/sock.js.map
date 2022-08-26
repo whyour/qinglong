@@ -1,0 +1,1 @@
+{"version":3,"file":"sock.js","sourceRoot":"","sources":["../../../back/data/sock.ts"],"names":[],"mappings":";;;AAAA,MAAa,WAAW;IAKtB,YAAY,OAAoB;QAC9B,IAAI,CAAC,IAAI,GAAG,OAAO,CAAC,IAAI,CAAC;QACzB,IAAI,CAAC,OAAO,GAAG,OAAO,CAAC,OAAO,CAAC;QAC/B,IAAI,CAAC,UAAU,GAAG,OAAO,CAAC,UAAU,CAAC;IACvC,CAAC;CACF;AAVD,kCAUC"}
