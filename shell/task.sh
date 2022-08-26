@@ -24,12 +24,29 @@ define_program() {
 random_delay() {
     local random_delay_max=$RandomDelay
     if [[ $random_delay_max ]] && [[ $random_delay_max -gt 0 ]]; then
-        local current_min=$(date "+%-M")
-        if [[ $current_min -ne 0 ]] && [[ $current_min -ne 30 ]]; then
-            delay_second=$(($(gen_random_num $random_delay_max) + 1))
-            echo -e "\n命令未添加 \"now\"，随机延迟 $delay_second 秒后再执行任务，如需立即终止，请按 CTRL+C...\n"
-            sleep $delay_second
+        local file_param=$1
+        local file_extensions=${RandomDelayFileExtensions-"js"}
+        local ignored_minutes=${RandomDelayIgnoredMinutes-"0 30"}
+
+        if [[ -n $file_extensions ]]; then
+            if ! echo "$file_param" | grep -qE "\.${file_extensions// /$|\\.}$"; then
+                # echo -e "\n当前文件需要准点运行, 放弃随机延迟\n"
+                return
+            fi
         fi
+
+        local current_min
+        current_min=$(date "+%-M")
+        for minute in $ignored_minutes; do
+            if [[ $current_min -eq $minute ]]; then
+                # echo -e "\n当前时间需要准点运行, 放弃随机延迟\n"
+                return
+            fi
+        done
+
+        local delay_second=$(($(gen_random_num "$random_delay_max") + 1))
+        echo -e "\n命令未添加 \"now\"，随机延迟 $delay_second 秒后再执行任务，如需立即终止，请按 CTRL+C...\n"
+        sleep $delay_second
     fi
 }
 
@@ -78,10 +95,8 @@ run_nohup() {
 run_normal() {
     local file_param=$1
     define_program "$file_param"
-    if [[ $file_param == *.js ]]; then
-        if [[ $# -eq 1 ]]; then
-            random_delay
-        fi
+    if [[ $# -eq 1 ]]; then
+        random_delay "$file_param"
     fi
 
     local time=$(date "+$time_format")
@@ -356,7 +371,7 @@ main() {
     fi
 
     time_format="%Y-%m-%d %H:%M:%S"
-    if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
+    if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
         case $# in
         1)
             run_normal "$1"
