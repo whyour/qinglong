@@ -245,7 +245,7 @@ export default class NotificationService {
     const [corpid, corpsecret, touser, agentid, thumb_media_id = '1'] =
       weWorkAppKey.split(',');
     const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken`;
-    const { access_token } = await got
+    const tokenRes: any = await got
       .post(url, {
         timeout: this.timeout,
         retry: 0,
@@ -296,7 +296,7 @@ export default class NotificationService {
 
     const res: any = await got
       .post(
-        `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${access_token}`,
+        `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
         {
           timeout: this.timeout,
           retry: 0,

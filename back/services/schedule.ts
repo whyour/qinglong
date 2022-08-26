@@ -79,13 +79,12 @@ export default class ScheduleService {
 
         cp.on('exit', async (code, signal) => {
           this.logger.info(
-            `${command} pid: ${cp.pid} exit ${code} signal ${signal}`,
+            `任务 ${command} 进程id: ${cp.pid} 退出，退出码 ${code}`,
           );
         });
 
         cp.on('close', async (code) => {
           const endTime = dayjs();
-          this.logger.info(`${command} pid: ${cp.pid} closed ${code}`);
           await callbacks.onEnd?.(
             cp,
             endTime,

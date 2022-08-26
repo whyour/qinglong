@@ -325,16 +325,10 @@ export default class CronService {
 
       cp.on('exit', async (code, signal) => {
         this.logger.info(
-          `${command} pid: ${cp.pid} exit ${code} signal ${signal}`,
+          `任务 ${command} 进程id: ${cp.pid} 退出，退出码 ${code}`,
         );
-        await CrontabModel.update(
-          { status: CrontabStatus.idle, pid: undefined },
-          { where: { id } },
-        );
-        resolve();
       });
       cp.on('close', async (code) => {
-        this.logger.info(`${command} pid: ${cp.pid} closed ${code}`);
         await CrontabModel.update(
           { status: CrontabStatus.idle, pid: undefined },
           { where: { id } },
