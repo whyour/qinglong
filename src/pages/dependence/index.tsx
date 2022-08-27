@@ -444,7 +444,7 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
 
   return (
     <PageContainer
-      className="ql-container-wrapper dependence-wrapper"
+      className="ql-container-wrapper dependence-wrapper ql-container-wrapper-has-tab"
       title="依赖管理"
       extra={[
         <Search

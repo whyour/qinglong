@@ -313,7 +313,7 @@ const Setting = ({
 
   return (
     <PageContainer
-      className="ql-container-wrapper"
+      className="ql-container-wrapper ql-container-wrapper-has-tab"
       title="系统设置"
       header={{
         style: headerStyle,

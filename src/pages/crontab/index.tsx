@@ -964,7 +964,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
 
   return (
     <PageContainer
-      className="ql-container-wrapper crontab-wrapper"
+      className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
       title="定时任务"
       extra={[
         <Search

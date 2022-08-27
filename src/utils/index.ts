@@ -181,8 +181,8 @@ export function getTableScroll({
   id,
 }: { extraHeight?: number; id?: string } = {}) {
   if (typeof extraHeight == 'undefined') {
-    //  47 + 40 + 10 + 24
-    extraHeight = 121;
+    //  47 + 40 + 12
+    extraHeight = 99;
   }
   let tHeader = null;
   if (id) {
