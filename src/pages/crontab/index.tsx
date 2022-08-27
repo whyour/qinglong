@@ -28,6 +28,10 @@ import {
   PauseCircleOutlined,
   FieldTimeOutlined,
   PushpinOutlined,
+  DownOutlined,
+  SettingOutlined,
+  PlusOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -40,6 +44,8 @@ import { diffTime } from '@/utils/date';
 import { getTableScroll } from '@/utils/index';
 import { history } from 'umi';
 import './index.less';
+import ViewCreateModal from './viewCreateModal';
+import ViewManageModal from './viewManageModal';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -355,6 +361,10 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const [detailCron, setDetailCron] = useState<any>();
   const [searchValue, setSearchValue] = useState('');
   const [total, setTotal] = useState<number>();
+  const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
+    useState(false);
+  const [isViewManageModalVisible, setIsViewManageModalVisible] =
+    useState(false);
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -909,6 +919,49 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     </>
   );
 
+  const viewAction = (key: string) => {
+    switch (key) {
+      case 'new':
+        setIsCreateViewModalVisible(true);
+        break;
+      case 'manage':
+        setIsViewManageModalVisible(true);
+        break;
+
+      default:
+        break;
+    }
+  };
+
+  const menu = (
+    <Menu
+      onClick={({ key, domEvent }) => {
+        domEvent.stopPropagation();
+        viewAction(key);
+      }}
+      items={[
+        {
+          label: 'Clicking me will not close the menu.',
+          key: '1',
+          icon: <UnorderedListOutlined />,
+        },
+        {
+          type: 'divider',
+        },
+        {
+          label: '新建视图',
+          key: 'new',
+          icon: <PlusOutlined />,
+        },
+        {
+          label: '视图管理',
+          key: 'manage',
+          icon: <SettingOutlined />,
+        },
+      ]}
+    />
+  );
+
   return (
     <PageContainer
       className="ql-container-wrapper crontab-wrapper"
@@ -937,6 +990,17 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         size="small"
         tabPosition="top"
         className="crontab-view"
+        tabBarExtraContent={
+          <Dropdown overlay={menu} trigger={['click']}>
+            <div className="view-more">
+              <Space>
+                更多
+                <DownOutlined />
+              </Space>
+              <div className="ant-tabs-ink-bar ant-tabs-ink-bar-animated"></div>
+            </div>
+          </Dropdown>
+        }
       >
         <Tabs.TabPane tab="全部任务" key="all">
           {panelContent}
@@ -973,6 +1037,18 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         cron={detailCron}
         theme={theme}
         isPhone={isPhone}
+      />
+      <ViewCreateModal
+        visible={isCreateViewModalVisible}
+        handleCancel={() => {
+          setIsCreateViewModalVisible(false);
+        }}
+      />
+      <ViewManageModal
+        visible={isViewManageModalVisible}
+        handleCancel={() => {
+          setIsViewManageModalVisible(false);
+        }}
       />
     </PageContainer>
   );

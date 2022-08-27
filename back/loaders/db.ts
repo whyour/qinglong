@@ -6,9 +6,9 @@ import { CrontabModel } from '../data/cron';
 import { DependenceModel } from '../data/dependence';
 import { AppModel } from '../data/open';
 import { AuthModel } from '../data/auth';
-import { sequelize } from '../data';
 import { fileExist } from '../config/util';
 import { SubscriptionModel } from '../data/subscription';
+import { CrontabViewModel } from '../data/cronView';
 import config from '../config';
 
 export default async () => {
@@ -19,6 +19,7 @@ export default async () => {
     await AuthModel.sync();
     await EnvModel.sync();
     await SubscriptionModel.sync();
+    await CrontabViewModel.sync();
 
     // try {
     //   const queryInterface = sequelize.getQueryInterface();

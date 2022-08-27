@@ -2,12 +2,103 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import CronService from '../services/cron';
+import CronViewService from '../services/cronView';
 import { celebrate, Joi } from 'celebrate';
 import cron_parser from 'cron-parser';
 const route = Router();
 
 export default (app: Router) => {
   app.use('/crons', route);
+
+  route.get(
+    '/views',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronViewService = Container.get(CronViewService);
+        const data = await cronViewService.list();
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/views',
+    celebrate({
+      body: Joi.object({
+        name: Joi.string().required(),
+        sorts: Joi.string().required(),
+        filters: Joi.string().optional(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronViewService = Container.get(CronViewService);
+        const data = await cronViewService.create(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/views',
+    celebrate({
+      body: Joi.object({
+        name: Joi.string().required(),
+        id: Joi.number().required(),
+        sorts: Joi.string().optional(),
+        filters: Joi.string().optional(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronViewService = Container.get(CronViewService);
+        const data = await cronViewService.update(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/views',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronViewService = Container.get(CronViewService);
+        const data = await cronViewService.remove(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/views/move',
+    celebrate({
+      body: Joi.object({
+        fromIndex: Joi.number().required(),
+        toIndex: Joi.number().required(),
+        id: Joi.number().required(),
+      }),
+    }),
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
+      try {
+        const cronViewService = Container.get(CronViewService);
+        const data = await cronViewService.move(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 
   route.get(
     '/',
