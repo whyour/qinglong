@@ -117,10 +117,14 @@ export default class CronService {
     searchText: string;
     page: string;
     size: string;
+    sortField: string;
+    sortType: string;
   }): Promise<{ data: Crontab[]; total: number }> {
     const searchText = params?.searchText;
     const page = Number(params?.page || '0');
     const size = Number(params?.size || '0');
+    const sortField = params?.sortField || '';
+    const sortType = params?.sortType || '';
 
     let query = {};
     if (searchText) {
@@ -166,14 +170,18 @@ export default class CronService {
           break;
       }
     }
+    let order = [
+      ['isPinned', 'DESC'],
+      ['isDisabled', 'ASC'],
+      ['status', 'ASC'],
+      ['createdAt', 'DESC'],
+    ];
+    if (sortType && sortField) {
+      order.unshift([sortField, sortType]);
+    }
     let condition: any = {
       where: query,
-      order: [
-        ['isPinned', 'DESC'],
-        ['isDisabled', 'ASC'],
-        ['status', 'ASC'],
-        ['createdAt', 'DESC'],
-      ],
+      order: order,
     };
     if (page && size) {
       condition.offset = (page - 1) * size;
@@ -298,11 +306,13 @@ export default class CronService {
       if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {
         cmdStr = `task ${cmdStr}`;
       }
-      if (cmdStr.endsWith('.js') 
-        || cmdStr.endsWith('.py')
-        || cmdStr.endsWith('.pyc')
-        || cmdStr.endsWith('.sh')
-        || cmdStr.endsWith('.ts')) {
+      if (
+        cmdStr.endsWith('.js') ||
+        cmdStr.endsWith('.py') ||
+        cmdStr.endsWith('.pyc') ||
+        cmdStr.endsWith('.sh') ||
+        cmdStr.endsWith('.ts')
+      ) {
         cmdStr = `${cmdStr} now`;
       }
 

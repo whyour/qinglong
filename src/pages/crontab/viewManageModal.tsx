@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, message, Space, Table, Tag, Typography } from 'antd';
+import { Modal, message, Space, Table, Tag, Typography, Button } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
@@ -7,6 +7,7 @@ import { PageLoading } from '@ant-design/pro-layout';
 import Paragraph from 'antd/lib/skeleton/Paragraph';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import ViewCreateModal from './viewCreateModal';
 
 const { Text } = Typography;
 
@@ -69,6 +70,7 @@ const ViewManageModal = ({
       dataIndex: 'name',
       key: 'name',
       align: 'center' as const,
+      width: 70,
     },
     {
       title: '显示',
@@ -101,6 +103,8 @@ const ViewManageModal = ({
   ];
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState<any>(true);
+  const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
+    useState<boolean>(false);
 
   const editView = (record: any, index: number) => {
     // setEditedEnv(record);
@@ -190,11 +194,22 @@ const ViewManageModal = ({
       title="视图管理"
       visible={visible}
       centered
+      width={620}
       onCancel={() => handleCancel()}
       className="view-manage-modal"
       forceRender
       footer={false}
+      maskClosable={false}
     >
+      <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          key="2"
+          type="primary"
+          onClick={() => setIsCreateViewModalVisible(true)}
+        >
+          新建视图
+        </Button>
+      </Space>
       {loading ? (
         <PageLoading />
       ) : (
@@ -216,6 +231,12 @@ const ViewManageModal = ({
           />
         </DndProvider>
       )}
+      <ViewCreateModal
+        visible={isCreateViewModalVisible}
+        handleCancel={() => {
+          setIsCreateViewModalVisible(false);
+        }}
+      />
     </Modal>
   );
 };

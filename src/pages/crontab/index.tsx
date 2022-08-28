@@ -13,6 +13,7 @@ import {
   Input,
   Popover,
   Tabs,
+  TablePaginationConfig,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -46,6 +47,8 @@ import { history } from 'umi';
 import './index.less';
 import ViewCreateModal from './viewCreateModal';
 import ViewManageModal from './viewManageModal';
+import pagination from 'antd/lib/pagination';
+import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -130,7 +133,6 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       ),
       sorter: {
         compare: (a: any, b: any) => a?.name?.localeCompare(b?.name),
-        multiple: 2,
       },
     },
     {
@@ -155,7 +157,6 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       },
       sorter: {
         compare: (a: any, b: any) => a.command.localeCompare(b.command),
-        multiple: 3,
       },
     },
     {
@@ -166,7 +167,6 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       align: 'center' as const,
       sorter: {
         compare: (a: any, b: any) => a.schedule.localeCompare(b.schedule),
-        multiple: 1,
       },
     },
     {
@@ -353,9 +353,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [pageConf, setPageConf] = useState<{ page: number; size: number }>(
-    {} as any,
-  );
+  const [pageConf, setPageConf] = useState<{
+    page: number;
+    size: number;
+    sorter: any;
+  }>({} as any);
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
@@ -365,6 +367,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     useState(false);
   const [isViewManageModalVisible, setIsViewManageModalVisible] =
     useState(false);
+  const [cronViews, setCronViews] = useState<any[]>([]);
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -386,10 +389,15 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
 
   const getCrons = () => {
     setLoading(true);
+    const { page, size, sorter } = pageConf;
+    let url = `${config.apiPrefix}crons?searchText=${searchText}&page=${page}&size=${size}`;
+    if (sorter && sorter.field) {
+      url += `&sortField=${sorter.field}&sortType=${
+        sorter.order === 'ascend' ? 'ASC' : 'DESC'
+      }`;
+    }
     request
-      .get(
-        `${config.apiPrefix}crons?searchText=${searchText}&page=${pageConf.page}&size=${pageConf.size}`,
-      )
+      .get(url)
       .then((_data: any) => {
         const { data, total } = _data.data;
         setValue(
@@ -791,8 +799,13 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     });
   };
 
-  const onPageChange = (page: number, pageSize: number | undefined) => {
-    setPageConf({ page, size: pageSize as number });
+  const onPageChange = (
+    pagination: TablePaginationConfig,
+    filters: Record<string, FilterValue | null>,
+    sorter: SorterResult<any> | SorterResult<any>[],
+  ) => {
+    const { current, pageSize } = pagination;
+    setPageConf({ page: current as number, size: pageSize as number, sorter });
     localStorage.setItem('pageSize', String(pageSize));
   };
 
@@ -821,10 +834,12 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     setPageConf({
       page: 1,
       size: parseInt(localStorage.getItem('pageSize') || '20'),
+      sorter: {},
     });
     setTimeout(() => {
       setTableScrollHeight(getTableScroll());
     });
+    getCronViews();
   }, []);
 
   const panelContent = (
@@ -889,7 +904,6 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         columns={columns}
         pagination={{
           current: pageConf.page,
-          onChange: onPageChange,
           pageSize: pageConf.size,
           showSizeChanger: true,
           simple: isPhone,
@@ -915,6 +929,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         loading={loading}
         rowSelection={rowSelection}
         rowClassName={getRowClassName}
+        onChange={onPageChange}
       />
     </>
   );
@@ -940,11 +955,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         viewAction(key);
       }}
       items={[
-        {
-          label: 'Clicking me will not close the menu.',
-          key: '1',
+        ...[...cronViews].slice(5).map((x) => ({
+          label: x.name,
+          key: x.id,
           icon: <UnorderedListOutlined />,
-        },
+        })),
         {
           type: 'divider',
         },
@@ -961,6 +976,18 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       ]}
     />
   );
+
+  const getCronViews = () => {
+    setLoading(true);
+    request
+      .get(`${config.apiPrefix}crons/views`)
+      .then((data: any) => {
+        setCronViews(data.data);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
 
   return (
     <PageContainer
@@ -1005,6 +1032,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         <Tabs.TabPane tab="全部任务" key="all">
           {panelContent}
         </Tabs.TabPane>
+        {[...cronViews].slice(0, 5).map((x) => (
+          <Tabs.TabPane tab={x.name} key={x.id}>
+            {panelContent}
+          </Tabs.TabPane>
+        ))}
       </Tabs>
       <CronLogModal
         visible={isLogModalVisible}

@@ -28,7 +28,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
-        sorts: Joi.string().required(),
+        sorts: Joi.string().optional(),
         filters: Joi.string().optional(),
       }),
     }),
@@ -107,6 +107,8 @@ export default (app: Router) => {
         searchText: Joi.string().required().allow(''),
         page: Joi.string().required(),
         size: Joi.string().required(),
+        sortField: Joi.string().optional(),
+        sortType: Joi.string().optional(),
         t: Joi.string().required(),
       }),
     }),
