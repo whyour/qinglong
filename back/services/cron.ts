@@ -189,7 +189,7 @@ export default class CronService {
     }
     try {
       const result = await CrontabModel.findAll(condition);
-      const count = await CrontabModel.count();
+      const count = await CrontabModel.count({ where: query });
       return { data: result, total: count };
     } catch (error) {
       throw error;
