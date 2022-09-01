@@ -100,30 +100,17 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/',
-    celebrate({
-      query: Joi.object({
-        searchText: Joi.string().required().allow(''),
-        page: Joi.string().required(),
-        size: Joi.string().required(),
-        sortField: Joi.string().optional(),
-        sortType: Joi.string().optional(),
-        t: Joi.string().required(),
-      }),
-    }),
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const cronService = Container.get(CronService);
-        const data = await cronService.crontabs(req.query as any);
-        return res.send({ code: 200, data });
-      } catch (e) {
-        logger.error('🔥 error: %o', e);
-        return next(e);
-      }
-    },
-  );
+  route.get('/', async (req: Request, res: Response, next: NextFunction) => {
+    const logger: Logger = Container.get('logger');
+    try {
+      const cronService = Container.get(CronService);
+      const data = await cronService.crontabs(req.query as any);
+      return res.send({ code: 200, data });
+    } catch (e) {
+      logger.error('🔥 error: %o', e);
+      return next(e);
+    }
+  });
 
   route.post(
     '/',

@@ -8,7 +8,7 @@ echo -e "======================1. 检测配置文件========================\n"
 make_dir /etc/nginx/conf.d
 make_dir /run/nginx
 cp -fv $nginx_conf /etc/nginx/nginx.conf
-cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
+envsubst '${qlBaseUrl}' < $nginx_app_conf > /etc/nginx/conf.d/front.conf
 pm2 l &>/dev/null
 echo
 

@@ -390,7 +390,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const getCrons = () => {
     setLoading(true);
     const { page, size, sorter } = pageConf;
-    let url = `${config.apiPrefix}crons?searchText=${searchText}&page=${page}&size=${size}`;
+    let url = `${config.apiPrefix}crons?searchValue=${searchText}&page=${page}&size=${size}`;
     if (sorter && sorter.field) {
       url += `&sortField=${sorter.field}&sortType=${
         sorter.order === 'ascend' ? 'ASC' : 'DESC'

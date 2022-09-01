@@ -108,7 +108,6 @@ const CronDetailModal = ({
           wordWrap: 'on',
         }}
         onMount={(editor, monaco) => {
-          console.log(monaco);
           editorRef.current = editor;
         }}
       />

@@ -186,7 +186,7 @@ const ViewManageModal = ({
   );
 
   useEffect(() => {
-    getCronViews();
+    // getCronViews();
   }, []);
 
   return (

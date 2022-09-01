@@ -57,7 +57,7 @@ https://podman.io/getting-started/installation
 ```bash
 podman run -dit \
   --network bridge \
-  -v $PWD/ql:/ql/data \
+  -v $PWD/ql/data:/ql/data \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \
@@ -96,7 +96,7 @@ systemctl restart docker
 
 ```bash
 docker run -dit \
-  -v $PWD/ql:/ql/data \
+  -v $PWD/ql/data:/ql/data \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \
@@ -123,6 +123,10 @@ docker-compose up -d
 # stop
 docker-compose down
 ```
+
+3. access
+
+Open your browser and visit http://{ip}:5700
 
 ## Use
 

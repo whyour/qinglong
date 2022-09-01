@@ -114,13 +114,13 @@ export default class CronService {
   }
 
   public async crontabs(params?: {
-    searchText: string;
+    searchValue: string;
     page: string;
     size: string;
     sortField: string;
     sortType: string;
   }): Promise<{ data: Crontab[]; total: number }> {
-    const searchText = params?.searchText;
+    const searchText = params?.searchValue;
     const page = Number(params?.page || '0');
     const size = Number(params?.size || '0');
     const sortField = params?.sortField || '';
