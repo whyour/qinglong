@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -113,20 +113,34 @@ export default class CronService {
     }
   }
 
-  public async crontabs(params?: {
-    searchValue: string;
-    page: string;
-    size: string;
-    sortField: string;
-    sortType: string;
-  }): Promise<{ data: Crontab[]; total: number }> {
-    const searchText = params?.searchValue;
-    const page = Number(params?.page || '0');
-    const size = Number(params?.size || '0');
-    const sortField = params?.sortField || '';
-    const sortType = params?.sortType || '';
+  private formatViewQuery(query: any, viewQuery: any) {
+    if (viewQuery.filters) {
+      for (const col of viewQuery.filters) {
+        const { property, value, operation } = col;
+        let operate = null;
+        switch (operation) {
+          case 'Reg':
+            operate = Op.like;
+            break;
+          case 'Reg':
+            operate = Op.notLike;
+            break;
+          default:
+            break;
+        }
+        if (operate) {
+          query[property] = {
+            [Op.or]: [
+              { [operate]: `%${value}%` },
+              { [operate]: `%${encodeURIComponent(value)}%` },
+            ],
+          }
+        }
+      }
+    }
+  }
 
-    let query = {};
+  private formatSearchText(query: any, searchText: string | undefined) { 
     if (searchText) {
       const textArray = searchText.split(':');
       switch (textArray[0]) {
@@ -170,12 +184,43 @@ export default class CronService {
           break;
       }
     }
+  }
+
+  private formatViewSort(order: string[][], viewQuery: any) {
+    if (viewQuery.sorts) {
+      for (const [col, sortType] of viewQuery.sorts) {
+        order.unshift([col, sortType]);
+      }
+    }
+  }
+
+  public async crontabs(params?: {
+    searchValue: string;
+    page: string;
+    size: string;
+    sortField: string;
+    sortType: string;
+    queryString: string;
+  }): Promise<{ data: Crontab[]; total: number }> {
+    const searchText = params?.searchValue;
+    const page = Number(params?.page || '0');
+    const size = Number(params?.size || '0');
+    const sortField = params?.sortField || '';
+    const sortType = params?.sortType || '';
+    const viewQuery = JSON.parse(params?.queryString || '{}');
+
+    let query: any = {};
     let order = [
       ['isPinned', 'DESC'],
       ['isDisabled', 'ASC'],
       ['status', 'ASC'],
       ['createdAt', 'DESC'],
     ];
+    
+    this.formatViewQuery(query, viewQuery);
+    this.formatSearchText(query, searchText);
+    this.formatViewSort(order, viewQuery);
+
     if (sortType && sortField) {
       order.unshift([sortField, sortType]);
     }
@@ -229,9 +274,9 @@ export default class CronService {
       const endTime = dayjs();
       const diffTimeStr = doc.last_execution_time
         ? `，耗时 ${endTime.diff(
-            dayjs(doc.last_execution_time * 1000),
-            'second',
-          )}`
+          dayjs(doc.last_execution_time * 1000),
+          'second',
+        )}`
         : '';
       if (logFileExist) {
         const str = err ? `\n${err}` : '';

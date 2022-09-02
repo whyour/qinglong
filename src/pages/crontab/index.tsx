@@ -358,6 +358,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     size: number;
     sorter: any;
   }>({} as any);
+  const [viewConf, setViewConf] = useState<any>();
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
@@ -395,6 +396,9 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       url += `&sortField=${sorter.field}&sortType=${
         sorter.order === 'ascend' ? 'ASC' : 'DESC'
       }`;
+    }
+    if (viewConf) {
+      url += `&queryString=${JSON.stringify({ filters: viewConf.filters })}`;
     }
     request
       .get(url)
@@ -828,7 +832,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     if (pageConf.page && pageConf.size) {
       getCrons();
     }
-  }, [pageConf]);
+  }, [pageConf, viewConf]);
 
   useEffect(() => {
     setPageConf({
@@ -944,6 +948,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         break;
 
       default:
+        tabClick(key);
         break;
     }
   };
@@ -955,7 +960,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         viewAction(key);
       }}
       items={[
-        ...[...cronViews].slice(5).map((x) => ({
+        ...[...cronViews].slice(2).map((x) => ({
           label: x.name,
           key: x.id,
           icon: <UnorderedListOutlined />,
@@ -989,6 +994,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       });
   };
 
+  const tabClick = (key: string) => {
+    const view = cronViews.find(x => x.id == key);
+    setViewConf(view ? view : null);
+  }
+
   return (
     <PageContainer
       className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
@@ -1018,7 +1028,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         tabPosition="top"
         className="crontab-view"
         tabBarExtraContent={
-          <Dropdown overlay={menu} trigger={['click']}>
+          <Dropdown overlay={menu} trigger={['click']} overlayStyle={{minWidth: 200}}>
             <div className="view-more">
               <Space>
                 更多
@@ -1028,11 +1038,12 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
             </div>
           </Dropdown>
         }
+        onTabClick={tabClick}
       >
         <Tabs.TabPane tab="全部任务" key="all">
           {panelContent}
         </Tabs.TabPane>
-        {[...cronViews].slice(0, 5).map((x) => (
+        {[...cronViews].slice(0, 2).map((x) => (
           <Tabs.TabPane tab={x.name} key={x.id}>
             {panelContent}
           </Tabs.TabPane>
@@ -1073,13 +1084,18 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       <ViewCreateModal
         visible={isCreateViewModalVisible}
         handleCancel={() => {
+          getCronViews();
           setIsCreateViewModalVisible(false);
         }}
       />
       <ViewManageModal
+        cronViews={cronViews}
         visible={isViewManageModalVisible}
         handleCancel={() => {
           setIsViewManageModalVisible(false);
+        }}
+        cronViewChange={() => {
+          getCronViews();
         }}
       />
     </PageContainer>

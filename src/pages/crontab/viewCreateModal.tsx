@@ -20,10 +20,14 @@ const PROPERTIES = [
 ];
 
 const OPERATIONS = [
-  { name: '包含', value: 'contains' },
-  { name: '不包含', value: 'noncontains' },
-  // { name: '属于', value: 'belong' },
-  // { name: '不属于', value: 'nonbelong' },
+  { name: '包含', value: 'Reg' },
+  { name: '不包含', value: 'NotReg' },
+  // { name: '属于', value: 'In' },
+  // { name: '不属于', value: 'Nin' },
+  // { name: '等于', value: 'Eq' },
+  // { name: '不等于', value: 'Ne' },
+  // { name: '为空', value: 'IsNull' },
+  // { name: '不为空', value: 'NotNull' },
 ];
 
 const ViewCreateModal = ({
@@ -61,7 +65,7 @@ const ViewCreateModal = ({
   useEffect(() => {
     form.resetFields();
     form.setFieldsValue({
-      filters: [{ property: 'command', operation: 'contains' }],
+      filters: [{ property: 'command', operation: 'Reg' }],
     });
   }, [view, visible]);
 
@@ -154,9 +158,9 @@ const ViewCreateModal = ({
               ))}
               <Form.Item>
                 <a
-                  href=""
+                  href="#"
                   onClick={() =>
-                    add({ property: 'command', operation: 'contains' })
+                    add({ property: 'command', operation: 'Reg' })
                   }
                 >
                   <PlusOutlined />

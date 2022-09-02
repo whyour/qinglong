@@ -28,8 +28,8 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
-        sorts: Joi.string().optional(),
-        filters: Joi.string().optional(),
+        sorts: Joi.array().optional(),
+        filters: Joi.array().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -49,8 +49,8 @@ export default (app: Router) => {
       body: Joi.object({
         name: Joi.string().required(),
         id: Joi.number().required(),
-        sorts: Joi.string().optional(),
-        filters: Joi.string().optional(),
+        sorts: Joi.array().optional(),
+        filters: Joi.array().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {

@@ -3,8 +3,6 @@ import { Modal, message, Space, Table, Tag, Typography, Button } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
-import { PageLoading } from '@ant-design/pro-layout';
-import Paragraph from 'antd/lib/skeleton/Paragraph';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import ViewCreateModal from './viewCreateModal';
@@ -58,11 +56,15 @@ const DragableBodyRow = ({
 };
 
 const ViewManageModal = ({
+  cronViews,
   handleCancel,
   visible,
+  cronViewChange
 }: {
+  cronViews: any[];
   visible: boolean;
   handleCancel: () => void;
+  cronViewChange: () => void;
 }) => {
   const columns: any = [
     {
@@ -72,16 +74,16 @@ const ViewManageModal = ({
       align: 'center' as const,
       width: 70,
     },
-    {
-      title: '显示',
-      key: 'status',
-      dataIndex: 'status',
-      align: 'center' as const,
-      width: 70,
-      render: (text: string, record: any, index: number) => {
-        return <Space size="middle" style={{ cursor: 'text' }}></Space>;
-      },
-    },
+    // {
+    //   title: '显示',
+    //   key: 'isDisabled',
+    //   dataIndex: 'isDisabled',
+    //   align: 'center' as const,
+    //   width: 70,
+    //   render: (text: string, record: any, index: number) => {
+    //     return <Space size="middle" style={{ cursor: 'text' }}></Space>;
+    //   },
+    // },
     {
       title: '操作',
       key: 'action',
@@ -102,7 +104,6 @@ const ViewManageModal = ({
     },
   ];
   const [list, setList] = useState<any[]>([]);
-  const [loading, setLoading] = useState<any>(true);
   const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
     useState<boolean>(false);
 
@@ -129,9 +130,7 @@ const ViewManageModal = ({
           .then((data: any) => {
             if (data.code === 200) {
               message.success('删除成功');
-              const result = [...list];
-              result.splice(index, 1);
-              setList(result);
+              cronViewChange();
             } else {
               message.error(data);
             }
@@ -141,18 +140,6 @@ const ViewManageModal = ({
         console.log('Cancel');
       },
     });
-  };
-
-  const getCronViews = () => {
-    setLoading(true);
-    request
-      .get(`${config.apiPrefix}crons/views`)
-      .then((data: any) => {
-        console.log(data);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
   };
 
   const components = {
@@ -186,8 +173,8 @@ const ViewManageModal = ({
   );
 
   useEffect(() => {
-    // getCronViews();
-  }, []);
+    setList(cronViews);
+  }, [cronViews]);
 
   return (
     <Modal
@@ -201,7 +188,7 @@ const ViewManageModal = ({
       footer={false}
       maskClosable={false}
     >
-      <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <Space style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
         <Button
           key="2"
           type="primary"
@@ -210,30 +197,28 @@ const ViewManageModal = ({
           新建视图
         </Button>
       </Space>
-      {loading ? (
-        <PageLoading />
-      ) : (
-        <DndProvider backend={HTML5Backend}>
-          <Table
-            columns={columns}
-            pagination={false}
-            dataSource={list}
-            rowKey="id"
-            size="middle"
-            components={components}
-            loading={loading}
-            onRow={(record: any, index: number) => {
-              return {
-                index,
-                moveRow,
-              } as any;
-            }}
-          />
-        </DndProvider>
-      )}
+      <DndProvider backend={HTML5Backend}>
+        <Table
+          bordered
+          columns={columns}
+          pagination={false}
+          dataSource={list}
+          rowKey="id"
+          size="middle"
+          style={{ marginBottom: 20 }}
+          components={components}
+          onRow={(record: any, index: number) => {
+            return {
+              index,
+              moveRow,
+            } as any;
+          }}
+        />
+      </DndProvider>
       <ViewCreateModal
         visible={isCreateViewModalVisible}
         handleCancel={() => {
+          cronViewChange();
           setIsCreateViewModalVisible(false);
         }}
       />

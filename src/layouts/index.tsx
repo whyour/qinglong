@@ -186,9 +186,8 @@ export default function (props: any) {
   if (
     ['/login', '/initialization', '/error'].includes(props.location.pathname)
   ) {
-    document.title = `${
-      (config.documentTitleMap as any)[props.location.pathname]
-    } - 控制面板`;
+    document.title = `${(config.documentTitleMap as any)[props.location.pathname]
+      } - 控制面板`;
     if (
       systemInfo?.isInitialized &&
       props.location.pathname === '/initialization'
@@ -282,7 +281,7 @@ export default function (props: any) {
                 shape="square"
                 size="small"
                 icon={<UserOutlined />}
-                src={`/api/static/${user.avatar}`}
+                src={user.avatar ? `/api/static/${user.avatar}` : ''}
               />
               <span style={{ marginLeft: 5 }}>{user.username}</span>
             </span>
@@ -304,7 +303,7 @@ export default function (props: any) {
                   shape="square"
                   size="small"
                   icon={<UserOutlined />}
-                  src={`/api/static/${user.avatar}`}
+                  src={user.avatar ? `/api/static/${user.avatar}` : ''}
                 />
                 <span style={{ marginLeft: 5 }}>{user.username}</span>
               </span>
