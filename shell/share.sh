@@ -67,7 +67,7 @@ import_config() {
     [[ -f $file_config_user ]] && . $file_config_user
     [[ -f $file_env ]] && . $file_env
 
-    ql_base_url=${QlBaseUrl:-"/"}
+    ql_base_url=${QlBaseUrl:-""}
     command_timeout_time=${CommandTimeoutTime:-"1h"}
     proxy_url=${ProxyUrl:-""}
     file_extensions=${RepoFileExtensions:-"js py"}
