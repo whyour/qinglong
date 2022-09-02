@@ -114,7 +114,7 @@ export default class CronService {
   }
 
   private formatViewQuery(query: any, viewQuery: any) {
-    if (viewQuery.filters) {
+    if (viewQuery.filters && viewQuery.filters.length > 0) {
       for (const col of viewQuery.filters) {
         const { property, value, operation } = col;
         let operate = null;
@@ -209,9 +209,9 @@ export default class CronService {
   }
 
   private formatViewSort(order: string[][], viewQuery: any) {
-    if (viewQuery.sorts) {
-      for (const [col, sortType] of viewQuery.sorts) {
-        order.unshift([col, sortType]);
+    if (viewQuery.sorts && viewQuery.sorts.length > 0) {
+      for (const { property, type } of viewQuery.sorts) {
+        order.unshift([property, type]);
       }
     }
   }

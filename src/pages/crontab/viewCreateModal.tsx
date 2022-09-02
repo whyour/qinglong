@@ -76,10 +76,14 @@ const ViewCreateModal = ({
   };
 
   useEffect(() => {
-    form.setFieldsValue(view || {});
     if (!view) {
       form.resetFields();
     }
+    form.setFieldsValue(
+      view || {
+        filters: [{ property: 'command', operation: 'Reg' }],
+      },
+    );
   }, [view, visible]);
 
   const operationElement = (
@@ -164,7 +168,6 @@ const ViewCreateModal = ({
               {fields.map(({ key, name, ...restField }, index) => (
                 <Form.Item
                   label={index === 0 ? '筛选条件' : ''}
-                  required={true}
                   key={key}
                   style={{ marginBottom: 0 }}
                 >
@@ -204,7 +207,6 @@ const ViewCreateModal = ({
               ))}
               <Form.Item>
                 <a
-                  href="#"
                   onClick={() => add({ property: 'command', operation: 'Reg' })}
                 >
                   <PlusOutlined />
@@ -220,7 +222,6 @@ const ViewCreateModal = ({
               {fields.map(({ key, name, ...restField }, index) => (
                 <Form.Item
                   label={index === 0 ? '排序方式' : ''}
-                  required={true}
                   key={key}
                   style={{ marginBottom: 0 }}
                 >
@@ -246,10 +247,7 @@ const ViewCreateModal = ({
                 </Form.Item>
               ))}
               <Form.Item>
-                <a
-                  href="#"
-                  onClick={() => add({ property: 'command', operation: 'ASC' })}
-                >
+                <a onClick={() => add({ property: 'command', type: 'ASC' })}>
                   <PlusOutlined />
                   新增排序方式
                 </a>

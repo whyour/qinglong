@@ -2,7 +2,7 @@ import { sequelize } from '.';
 import { DataTypes, Model } from 'sequelize';
 
 interface SortType {
-  type: 'ASD' | 'DESC';
+  type: 'ASC' | 'DESC';
   value: string;
 }
 
@@ -23,7 +23,7 @@ export class CrontabView {
     this.name = options.name;
     this.id = options.id;
     this.position = options.position;
-    this.isDisabled = options.isDisabled;
+    this.isDisabled = options.isDisabled || 0;
     this.filters = options.filters;
     this.sorts = options.sorts;
   }

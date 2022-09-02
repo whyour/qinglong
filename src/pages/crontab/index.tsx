@@ -399,7 +399,10 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       }`;
     }
     if (viewConf) {
-      url += `&queryString=${JSON.stringify({ filters: viewConf.filters })}`;
+      url += `&queryString=${JSON.stringify({
+        filters: viewConf.filters,
+        sorts: viewConf.sorts,
+      })}`;
     }
     request
       .get(url)
