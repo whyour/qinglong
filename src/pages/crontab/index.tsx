@@ -369,6 +369,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   const [isViewManageModalVisible, setIsViewManageModalVisible] =
     useState(false);
   const [cronViews, setCronViews] = useState<any[]>([]);
+  const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -960,7 +961,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         viewAction(key);
       }}
       items={[
-        ...[...cronViews].slice(2).map((x) => ({
+        ...[...enabledCronViews].slice(2).map((x) => ({
           label: x.name,
           key: x.id,
           icon: <UnorderedListOutlined />,
@@ -988,6 +989,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       .get(`${config.apiPrefix}crons/views`)
       .then((data: any) => {
         setCronViews(data.data);
+        setEnabledCronViews(data.data.filter((x) => !x.isDisabled));
       })
       .finally(() => {
         setLoading(false);
@@ -995,9 +997,9 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
   };
 
   const tabClick = (key: string) => {
-    const view = cronViews.find(x => x.id == key);
+    const view = enabledCronViews.find((x) => x.id == key);
     setViewConf(view ? view : null);
-  }
+  };
 
   return (
     <PageContainer
@@ -1028,7 +1030,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         tabPosition="top"
         className="crontab-view"
         tabBarExtraContent={
-          <Dropdown overlay={menu} trigger={['click']} overlayStyle={{minWidth: 200}}>
+          <Dropdown
+            overlay={menu}
+            trigger={['click']}
+            overlayStyle={{ minWidth: 200 }}
+          >
             <div className="view-more">
               <Space>
                 更多
@@ -1043,7 +1049,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         <Tabs.TabPane tab="全部任务" key="all">
           {panelContent}
         </Tabs.TabPane>
-        {[...cronViews].slice(0, 2).map((x) => (
+        {[...enabledCronViews].slice(0, 2).map((x) => (
           <Tabs.TabPane tab={x.name} key={x.id}>
             {panelContent}
           </Tabs.TabPane>
@@ -1083,9 +1089,12 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       />
       <ViewCreateModal
         visible={isCreateViewModalVisible}
-        handleCancel={() => {
-          getCronViews();
+        handleCancel={(data) => {
           setIsCreateViewModalVisible(false);
+          getCronViews();
+          if (data && data.id === viewConf.id) {
+            setViewConf({ ...viewConf, ...data });
+          }
         }}
       />
       <ViewManageModal
@@ -1094,8 +1103,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         handleCancel={() => {
           setIsViewManageModalVisible(false);
         }}
-        cronViewChange={() => {
+        cronViewChange={(data) => {
           getCronViews();
+          if (data && data.id === viewConf.id) {
+            setViewConf({ ...viewConf, ...data });
+          }
         }}
       />
     </PageContainer>

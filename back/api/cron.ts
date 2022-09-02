@@ -100,6 +100,40 @@ export default (app: Router) => {
     },
   );
 
+  route.put(
+    '/views/disable',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronViewService = Container.get(CronViewService);
+        const data = await cronViewService.disabled(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/views/enable',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronViewService = Container.get(CronViewService);
+        const data = await cronViewService.enabled(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
   route.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const logger: Logger = Container.get('logger');
     try {

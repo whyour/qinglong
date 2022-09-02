@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -122,8 +122,30 @@ export default class CronService {
           case 'Reg':
             operate = Op.like;
             break;
-          case 'Reg':
+          case 'NotReg':
             operate = Op.notLike;
+            break;
+          case 'In':
+            query[Op.or] = [
+              {
+                [property]: value,
+              },
+              property === 'status' && value.includes(2)
+                ? { isDisabled: 1 }
+                : {},
+            ];
+            break;
+          case 'Nin':
+            query[Op.and] = [
+              {
+                [property]: {
+                  [Op.notIn]: value,
+                },
+              },
+              property === 'status' && value.includes(2)
+                ? { isDisabled: { [Op.ne]: 1 } }
+                : {},
+            ];
             break;
           default:
             break;
@@ -134,13 +156,13 @@ export default class CronService {
               { [operate]: `%${value}%` },
               { [operate]: `%${encodeURIComponent(value)}%` },
             ],
-          }
+          };
         }
       }
     }
   }
 
-  private formatSearchText(query: any, searchText: string | undefined) { 
+  private formatSearchText(query: any, searchText: string | undefined) {
     if (searchText) {
       const textArray = searchText.split(':');
       switch (textArray[0]) {
@@ -216,7 +238,7 @@ export default class CronService {
       ['status', 'ASC'],
       ['createdAt', 'DESC'],
     ];
-    
+
     this.formatViewQuery(query, viewQuery);
     this.formatSearchText(query, searchText);
     this.formatViewSort(order, viewQuery);
@@ -274,9 +296,9 @@ export default class CronService {
       const endTime = dayjs();
       const diffTimeStr = doc.last_execution_time
         ? `，耗时 ${endTime.diff(
-          dayjs(doc.last_execution_time * 1000),
-          'second',
-        )}`
+            dayjs(doc.last_execution_time * 1000),
+            'second',
+          )}`
         : '';
       if (logFileExist) {
         const str = err ? `\n${err}` : '';

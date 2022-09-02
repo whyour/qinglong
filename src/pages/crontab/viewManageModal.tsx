@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, message, Space, Table, Tag, Typography, Button } from 'antd';
+import {
+  Modal,
+  message,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  Button,
+  Switch,
+} from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
@@ -59,12 +68,12 @@ const ViewManageModal = ({
   cronViews,
   handleCancel,
   visible,
-  cronViewChange
+  cronViewChange,
 }: {
   cronViews: any[];
   visible: boolean;
   handleCancel: () => void;
-  cronViewChange: () => void;
+  cronViewChange: (data?: any) => void;
 }) => {
   const columns: any = [
     {
@@ -72,22 +81,26 @@ const ViewManageModal = ({
       dataIndex: 'name',
       key: 'name',
       align: 'center' as const,
-      width: 70,
     },
-    // {
-    //   title: '显示',
-    //   key: 'isDisabled',
-    //   dataIndex: 'isDisabled',
-    //   align: 'center' as const,
-    //   width: 70,
-    //   render: (text: string, record: any, index: number) => {
-    //     return <Space size="middle" style={{ cursor: 'text' }}></Space>;
-    //   },
-    // },
+    {
+      title: '显示',
+      key: 'isDisabled',
+      dataIndex: 'isDisabled',
+      align: 'center' as const,
+      width: 100,
+      render: (text: string, record: any, index: number) => {
+        return (
+          <Switch
+            checked={!record.isDisabled}
+            onChange={(checked) => onShowChange(checked, record, index)}
+          />
+        );
+      },
+    },
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 140,
       align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         return (
@@ -106,10 +119,11 @@ const ViewManageModal = ({
   const [list, setList] = useState<any[]>([]);
   const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
     useState<boolean>(false);
+  const [editedView, setEditedView] = useState<any>(null);
 
   const editView = (record: any, index: number) => {
-    // setEditedEnv(record);
-    // setIsModalVisible(true);
+    setEditedView(record);
+    setIsCreateViewModalVisible(true);
   };
 
   const deleteView = (record: any, index: number) => {
@@ -140,6 +154,24 @@ const ViewManageModal = ({
         console.log('Cancel');
       },
     });
+  };
+
+  const onShowChange = (checked: boolean, record: any, index: number) => {
+    console.log(checked);
+    request
+      .put(`${config.apiPrefix}crons/views/${checked ? 'enable' : 'disable'}`, {
+        data: [record.id],
+      })
+      .then((data: any) => {
+        if (data.code === 200) {
+          const _list = [...list];
+          _list.splice(index, 1, { ...list[index], isDisabled: !checked });
+          setList(_list);
+          cronViewChange();
+        } else {
+          message.error(data);
+        }
+      });
   };
 
   const components = {
@@ -188,7 +220,13 @@ const ViewManageModal = ({
       footer={false}
       maskClosable={false}
     >
-      <Space style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+      <Space
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          marginBottom: 10,
+        }}
+      >
         <Button
           key="2"
           type="primary"
@@ -216,9 +254,10 @@ const ViewManageModal = ({
         />
       </DndProvider>
       <ViewCreateModal
+        view={editedView}
         visible={isCreateViewModalVisible}
-        handleCancel={() => {
-          cronViewChange();
+        handleCancel={(data) => {
+          cronViewChange(data);
           setIsCreateViewModalVisible(false);
         }}
       />
