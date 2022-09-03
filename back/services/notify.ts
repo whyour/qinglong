@@ -17,6 +17,7 @@ export default class NotificationService {
     ['goCqHttpBot', this.goCqHttpBot],
     ['serverChan', this.serverChan],
     ['pushDeer', this.pushDeer],
+    ['chat', this.chat],
     ['bark', this.bark],
     ['telegramBot', this.telegramBot],
     ['dingtalkBot', this.dingtalkBot],
@@ -132,6 +133,22 @@ export default class NotificationService {
       .json();
     return (
       res.content.result.length !== undefined && res.content.result.length > 0
+    );
+  }
+
+  private async chat() {
+    const { chatUrl, chattoken } = this.params;
+    const url = `${chatUrl}${chatUrl}`;
+    const res: any = await got
+      .post(url, {
+        timeout: this.timeout,
+        retry: 0,
+        body: `payload={"text":"${this.title}"}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      .json();
+    return (
+      res.success
     );
   }
 
