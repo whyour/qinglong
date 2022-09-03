@@ -140,11 +140,11 @@ if (process.env.DEER_KEY) {
 }
 
 if (process.env.CHAT_URL) {
-  PUSHDEER_KEY = process.env.CHAT_URL;
+  CHAT_URL = process.env.CHAT_URL;
 }
 
 if (process.env.CHAT_TOKEN) {
-  PUSHDEER_KEY = process.env.CHAT_TOKEN;
+  CHAT_TOKEN = process.env.CHAT_TOKEN;
 }
 
 if (process.env.QQ_SKEY) {
