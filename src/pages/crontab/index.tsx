@@ -838,11 +838,14 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     if (pageConf.page && pageConf.size) {
       getCrons();
     }
-    if (viewConf) {
+  }, [pageConf, viewConf]);
+
+  useEffect(() => {
+    if (viewConf && enabledCronViews && enabledCronViews.length > 0) {
       const view = enabledCronViews.slice(2).find((x) => x.id === viewConf.id);
       setMoreMenuActive(!!view);
     }
-  }, [pageConf, viewConf]);
+  }, [viewConf, enabledCronViews]);
 
   useEffect(() => {
     setPageConf({
