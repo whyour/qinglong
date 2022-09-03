@@ -294,12 +294,12 @@ def chat(title: str, content: str) -> None:
     print("chat 服务启动")
     data = 'payload=' + json.dumps({'text': content})
     url = push_config.get("CHAT_URL") + push_config.get("CHAT_TOKEN")
-    response = requests.post(url, data=data).json()
+    response = requests.post(url, data=data)
     
     if response.status_code == 200:
-        print("PushDeer 推送成功！")
+        print("Chat 推送成功！")
     else:
-        print("PushDeer 推送失败！错误信息：", response)    
+        print("Chat 推送失败！错误信息：", response)    
 
         
         
