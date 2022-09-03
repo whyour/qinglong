@@ -138,7 +138,7 @@ export default class NotificationService {
 
   private async chat() {
     const { chatUrl, chattoken } = this.params;
-    const url = `${chatUrl}${chatUrl}`;
+    const url = `${chatUrl}${chattoken}`;
     const res: any = await got
       .post(url, {
         timeout: this.timeout,
