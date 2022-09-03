@@ -171,13 +171,11 @@ export default class CronService {
         case 'schedule':
         case 'label':
           const column = textArray[0] === 'label' ? 'labels' : textArray[0];
-          query = {
-            [column]: {
-              [Op.or]: [
-                { [Op.like]: `%${textArray[1]}%` },
-                { [Op.like]: `%${encodeURIComponent(textArray[1])}%` },
-              ],
-            },
+          query[column] = {
+            [Op.or]: [
+              { [Op.like]: `%${textArray[1]}%` },
+              { [Op.like]: `%${encodeURIComponent(textArray[1])}%` },
+            ],
           };
           break;
         default:
@@ -187,22 +185,20 @@ export default class CronService {
               { [Op.like]: `%${encodeURIComponent(searchText)}%` },
             ],
           };
-          query = {
-            [Op.or]: [
-              {
-                name: reg,
-              },
-              {
-                command: reg,
-              },
-              {
-                schedule: reg,
-              },
-              {
-                labels: reg,
-              },
-            ],
-          };
+          query[Op.or] = [
+            {
+              name: reg,
+            },
+            {
+              command: reg,
+            },
+            {
+              schedule: reg,
+            },
+            {
+              labels: reg,
+            },
+          ];
           break;
       }
     }
