@@ -33,6 +33,7 @@ import {
   SettingOutlined,
   PlusOutlined,
   UnorderedListOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -370,6 +371,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     useState(false);
   const [cronViews, setCronViews] = useState<any[]>([]);
   const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
+  const [moreMenuActive, setMoreMenuActive] = useState(false);
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -836,6 +838,10 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     if (pageConf.page && pageConf.size) {
       getCrons();
     }
+    if (viewConf) {
+      const view = enabledCronViews.slice(2).find((x) => x.id === viewConf.id);
+      setMoreMenuActive(!!view);
+    }
   }, [pageConf, viewConf]);
 
   useEffect(() => {
@@ -965,7 +971,14 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       }}
       items={[
         ...[...enabledCronViews].slice(2).map((x) => ({
-          label: x.name,
+          label: (
+            <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>{x.name}</span>
+              {viewConf?.id === x.id && (
+                <CheckOutlined style={{ color: '#1890ff' }} />
+              )}
+            </Space>
+          ),
           key: x.id,
           icon: <UnorderedListOutlined />,
         })),
@@ -1031,14 +1044,14 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         defaultActiveKey="all"
         size="small"
         tabPosition="top"
-        className="crontab-view"
+        className={`crontab-view ${moreMenuActive ? 'more-active' : ''}`}
         tabBarExtraContent={
           <Dropdown
             overlay={menu}
             trigger={['click']}
             overlayStyle={{ minWidth: 200 }}
           >
-            <div className="view-more">
+            <div className={`view-more ${moreMenuActive ? 'active' : ''}`}>
               <Space>
                 更多
                 <DownOutlined />

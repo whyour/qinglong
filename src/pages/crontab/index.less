@@ -124,6 +124,26 @@
         width: 50px;
       }
     }
+
+    &.active {
+      color: #1890ff;
+
+      .ant-tabs-ink-bar {
+        width: 50px;
+      }
+    }
+  }
+
+  &.more-active {
+    .ant-tabs-nav-list {
+      .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+        color: unset;
+      }
+
+      .ant-tabs-ink-bar {
+        width: 0 !important;
+      }
+    }
   }
 }
 
