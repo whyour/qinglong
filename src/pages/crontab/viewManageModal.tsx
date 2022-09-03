@@ -196,6 +196,7 @@ const ViewManageModal = ({
             newData.splice(dragIndex, 1);
             newData.splice(hoverIndex, 0, { ...dragRow, ...data.data });
             setList(newData);
+            cronViewChange();
           } else {
             message.error(data);
           }
