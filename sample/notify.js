@@ -40,8 +40,8 @@ let SCKEY = '';
 let PUSHDEER_KEY = '';
 
 // =======================================Synology Chat通知设置区域===========================================
-//此处填你申请的PushDeer KEY.
-//(环境变量名 DEER_KEY)
+//此处填你申请的CHAT_URL与CHAT_TOKEN
+//(环境变量名 CHAT_URL CHAT_TOKEN)
 let CHAT_URL = '';
 let CHAT_TOKEN = '';
 
