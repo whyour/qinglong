@@ -39,6 +39,12 @@ let SCKEY = '';
 //(环境变量名 DEER_KEY)
 let PUSHDEER_KEY = '';
 
+// =======================================Synology Chat通知设置区域===========================================
+//此处填你申请的PushDeer KEY.
+//(环境变量名 DEER_KEY)
+let CHAT_URL = '';
+let CHAT_TOKEN = '';
+
 // =======================================Bark App通知设置区域===========================================
 //此处填你BarkAPP的信息(IP/设备码，例如：https://api.day.app/XXXXXXXX)
 let BARK_PUSH = '';
@@ -131,6 +137,14 @@ if (process.env.PUSH_KEY) {
 
 if (process.env.DEER_KEY) {
   PUSHDEER_KEY = process.env.DEER_KEY;
+}
+
+if (process.env.CHAT_URL) {
+  PUSHDEER_KEY = process.env.CHAT_URL;
+}
+
+if (process.env.CHAT_TOKEN) {
+  PUSHDEER_KEY = process.env.CHAT_TOKEN;
 }
 
 if (process.env.QQ_SKEY) {
@@ -239,6 +253,7 @@ async function sendNotify(
     iGotNotify(text, desp, params), //iGot
     gobotNotify(text, desp), //go-cqhttp
     gotifyNotify(text, desp), //gotify
+    ChatNotify(text, desp), //synolog chat
   ]);
 }
 
@@ -404,6 +419,49 @@ function PushDeerNotify(text, desp, time = 2100) {
             }
           } catch (e) {
             $.logErr(e, resp);
+          } finally {
+            resolve(data);
+          }
+        });
+      }, time);
+    } else {
+      resolve();
+    }
+  });
+}
+
+function ChatNotify(text, desp, time = 2100) {
+  return new Promise((resolve) => {
+    if (CHAT_URL && CHAT_TOKEN ) {
+      // 对消息内容进行 urlencode
+      desp = encodeURI(desp);
+      const options = {
+        url: `${CHAT_URL}${CHAT_TOKEN}`,
+        body: `payload={"text":"${desp}"}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      };
+      setTimeout(() => {
+        $.post(options, (err, resp, data) => {
+          try {
+            if (err) {
+              console.log('发送通知调用API失败！！\n');
+              console.log(err);
+            } else {
+              data = JSON.parse(data);
+              if (
+                data.success
+              ) {
+                console.log('Chat发送通知消息成功🎉\n');
+              } else {
+                console.log(
+                  `Chat发送通知消息异常\n${JSON.stringify(data)}`,
+                );
+              }
+            }
+          } catch (e) {
+            $.logErr(e);
           } finally {
             resolve(data);
           }
