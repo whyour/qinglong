@@ -1017,6 +1017,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
 
   const tabClick = (key: string) => {
     const view = enabledCronViews.find((x) => x.id == key);
+    setPageConf({ ...pageConf, page: 1 });
     setViewConf(view ? view : null);
   };
 
