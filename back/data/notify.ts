@@ -4,6 +4,7 @@ export enum NotificationMode {
   'serverChan' = 'serverChan',
   'pushDeer' = 'pushDeer',
   'bark' = 'bark',
+  'chat' = 'chat'
   'telegramBot' = 'telegramBot',
   'dingtalkBot' = 'dingtalkBot',
   'weWorkBot' = 'weWorkBot',
@@ -35,6 +36,11 @@ export class ServerChanNotification extends NotificationBaseInfo {
 
 export class PushDeerNotification extends NotificationBaseInfo {
   public pushDeerKey = '';
+}
+
+export class ChatNotification extends NotificationBaseInfo {
+  public chatUrl = '';
+  public chattoken = '';
 }
 
 export class BarkNotification extends NotificationBaseInfo {
@@ -86,6 +92,7 @@ export interface NotificationInfo
     GotifyNotification,
     ServerChanNotification,
     PushDeerNotification,
+    ChatNotification,
     BarkNotification,
     TelegramBotNotification,
     DingtalkBotNotification,
