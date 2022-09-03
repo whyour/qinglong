@@ -1,13 +1,20 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { CrontabView, CrontabViewModel } from '../data/cronView';
+import { initEnvPosition } from '../data/env';
 
 @Service()
 export default class CronViewService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async create(payload: CrontabView): Promise<CrontabView> {
-    const tab = new CrontabView(payload);
+    let position = initEnvPosition;
+    const views = await this.list();
+    if (views && views.length > 0 && views[views.length - 1].position) {
+      position = views[views.length - 1].position as number;
+    }
+    position = position / 2;
+    const tab = new CrontabView({ ...payload, position });
     const doc = await this.insert(tab);
     return doc;
   }
@@ -32,7 +39,10 @@ export default class CronViewService {
 
   public async list(): Promise<CrontabView[]> {
     try {
-      const result = await CrontabViewModel.findAll({});
+      const result = await CrontabViewModel.findAll({
+        where: {},
+        order: [['position', 'DESC']],
+      });
       return result;
     } catch (error) {
       throw error;

@@ -187,8 +187,8 @@ const ViewManageModal = ({
       }
       const dragRow = list[dragIndex];
       request
-        .put(`${config.apiPrefix}envs/${dragRow.id}/move`, {
-          data: { fromIndex: dragIndex, toIndex: hoverIndex },
+        .put(`${config.apiPrefix}crons/views/move`, {
+          data: { fromIndex: dragIndex, toIndex: hoverIndex, id: dragRow.id },
         })
         .then((data: any) => {
           if (data.code === 200) {
