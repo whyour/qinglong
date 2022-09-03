@@ -104,8 +104,13 @@
 
 .crontab-view {
   .ant-tabs-nav-wrap {
-    min-width: 200px;
     flex: unset !important;
+  }
+
+  .ant-tabs-nav-operations {
+    position: absolute;
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .view-more {
