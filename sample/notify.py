@@ -292,7 +292,7 @@ def chat(title: str, content: str) -> None:
         print("chat 服务的 CHAT_URL或CHAT_TOKEN 未设置!!\n取消推送")
         return
     print("chat 服务启动")
-    data = 'payload=' + json.dumps({'text': content})
+    data = 'payload=' + json.dumps({'text': title + '\n' + content})
     url = push_config.get("CHAT_URL") + push_config.get("CHAT_TOKEN")
     response = requests.post(url, data=data)
     
