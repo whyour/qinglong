@@ -231,7 +231,10 @@ const ViewManageModal = ({
         <Button
           key="2"
           type="primary"
-          onClick={() => setIsCreateViewModalVisible(true)}
+          onClick={() => {
+            setEditedView(null);
+            setIsCreateViewModalVisible(true);
+          }}
         >
           新建视图
         </Button>
