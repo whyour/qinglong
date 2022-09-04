@@ -121,13 +121,16 @@ export default class CronService {
       for (const col of viewQuery.filters) {
         const { property, value, operation } = col;
         let q: any = {};
+        let operate2 = null;
         let operate = null;
         switch (operation) {
           case 'Reg':
             operate = Op.like;
+            operate2 = Op.or;
             break;
           case 'NotReg':
             operate = Op.notLike;
+            operate2 = Op.and;
             break;
           case 'In':
             q[Op.or] = [
@@ -154,9 +157,9 @@ export default class CronService {
           default:
             break;
         }
-        if (operate) {
+        if (operate && operate2) {
           q[property] = {
-            [Op.or]: [
+            [operate2]: [
               { [operate]: `%${value}%` },
               { [operate]: `%${encodeURIComponent(value)}%` },
             ],
