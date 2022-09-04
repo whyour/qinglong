@@ -261,8 +261,8 @@ const ViewManageModal = ({
         view={editedView}
         visible={isCreateViewModalVisible}
         handleCancel={(data) => {
-          cronViewChange(data);
           setIsCreateViewModalVisible(false);
+          cronViewChange(data);
         }}
       />
     </Modal>
