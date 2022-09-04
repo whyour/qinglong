@@ -143,7 +143,7 @@ export default class NotificationService {
       .post(url, {
         timeout: this.timeout,
         retry: 0,
-        body: `payload={"text":"${this.title}"}`,
+        body: `payload={"text":"${this.title}\n${this.content}"}`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       .json();
