@@ -437,7 +437,7 @@ function ChatNotify(text, desp, time = 2100) {
       desp = encodeURI(desp);
       const options = {
         url: `${CHAT_URL}${CHAT_TOKEN}`,
-        body: `payload={"text":"${desp}"}`,
+        body: `payload={"text":"${text}\n${desp}"}`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
