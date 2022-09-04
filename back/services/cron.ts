@@ -115,8 +115,12 @@ export default class CronService {
 
   private formatViewQuery(query: any, viewQuery: any) {
     if (viewQuery.filters && viewQuery.filters.length > 0) {
+      if (!query[Op.and]) {
+        query[Op.and] = [];
+      }
       for (const col of viewQuery.filters) {
         const { property, value, operation } = col;
+        let q: any = {};
         let operate = null;
         switch (operation) {
           case 'Reg':
@@ -126,7 +130,7 @@ export default class CronService {
             operate = Op.notLike;
             break;
           case 'In':
-            query[Op.or] = [
+            q[Op.or] = [
               {
                 [property]: value,
               },
@@ -136,7 +140,7 @@ export default class CronService {
             ];
             break;
           case 'Nin':
-            query[Op.and] = [
+            q[Op.and] = [
               {
                 [property]: {
                   [Op.notIn]: value,
@@ -151,19 +155,24 @@ export default class CronService {
             break;
         }
         if (operate) {
-          query[property] = {
+          q[property] = {
             [Op.or]: [
               { [operate]: `%${value}%` },
               { [operate]: `%${encodeURIComponent(value)}%` },
             ],
           };
         }
+        query[Op.and].push(q);
       }
     }
   }
 
   private formatSearchText(query: any, searchText: string | undefined) {
     if (searchText) {
+      if (!query[Op.and]) {
+        query[Op.and] = [];
+      }
+      let q: any = {};
       const textArray = searchText.split(':');
       switch (textArray[0]) {
         case 'name':
@@ -171,7 +180,7 @@ export default class CronService {
         case 'schedule':
         case 'label':
           const column = textArray[0] === 'label' ? 'labels' : textArray[0];
-          query[column] = {
+          q[column] = {
             [Op.or]: [
               { [Op.like]: `%${textArray[1]}%` },
               { [Op.like]: `%${encodeURIComponent(textArray[1])}%` },
@@ -185,7 +194,7 @@ export default class CronService {
               { [Op.like]: `%${encodeURIComponent(searchText)}%` },
             ],
           };
-          query[Op.or] = [
+          q[Op.or] = [
             {
               name: reg,
             },
@@ -201,6 +210,7 @@ export default class CronService {
           ];
           break;
       }
+      query[Op.and].push(q);
     }
   }
 
