@@ -61,7 +61,10 @@ push_config = {
     'PUSH_KEY': '',                     # server 酱的 PUSH_KEY，兼容旧版与 Turbo 版
 
     'DEER_KEY': '',                     # PushDeer 的 PUSHDEER_KEY
-    
+  
+    'CHAT_URL': '',                     # synology chat url
+    'CHAT_TOKEN': '',                   # synology chat token
+  
     'PUSH_PLUS_TOKEN': '',              # push+ 微信推送的用户令牌
     'PUSH_PLUS_USER': '',               # push+ 微信推送的群组编码
 
@@ -279,8 +282,27 @@ def pushdeer(title: str, content: str) -> None:
         print("PushDeer 推送成功！")
     else:
         print("PushDeer 推送失败！错误信息：", response)
-    
 
+        
+def chat(title: str, content: str) -> None:
+    """
+    通过Chat 推送消息
+    """
+    if not push_config.get("CHAT_URL") or not push_config.get("CHAT_TOKEN"):
+        print("chat 服务的 CHAT_URL或CHAT_TOKEN 未设置!!\n取消推送")
+        return
+    print("chat 服务启动")
+    data = 'payload=' + json.dumps({'text': title + '\n' + content})
+    url = push_config.get("CHAT_URL") + push_config.get("CHAT_TOKEN")
+    response = requests.post(url, data=data)
+    
+    if response.status_code == 200:
+        print("Chat 推送成功！")
+    else:
+        print("Chat 推送失败！错误信息：", response)    
+
+        
+        
 def pushplus_bot(title: str, content: str) -> None:
     """
     通过 push+ 推送消息。
@@ -527,6 +549,8 @@ if push_config.get("PUSH_KEY"):
     notify_function.append(serverJ)
 if push_config.get("DEER_KEY"):
     notify_function.append(pushdeer)
+if push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN"):
+    notify_function.append(chat)
 if push_config.get("PUSH_PLUS_TOKEN"):
     notify_function.append(pushplus_bot)
 if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"):

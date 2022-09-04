@@ -137,4 +137,10 @@ export GOTIFY_PRIORITY=0
 ## deer_key 填写PushDeer的key
 export DEER_KEY=""
 
+## 12. Chat
+## chat_url 填写synology chat地址，http://IP:PORT/webapi/***token=
+## chat_token 填写后面的token
+export CHAT_URL=""
+export CHAT_TOKEN=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
