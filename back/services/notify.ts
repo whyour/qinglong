@@ -137,8 +137,8 @@ export default class NotificationService {
   }
 
   private async chat() {
-    const { chatUrl, chattoken } = this.params;
-    const url = `${chatUrl}${chattoken}`;
+    const { chatUrl, chatToken } = this.params;
+    const url = `${chatUrl}${chatToken}`;
     const res: any = await got
       .post(url, {
         timeout: this.timeout,
@@ -147,9 +147,7 @@ export default class NotificationService {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       .json();
-    return (
-      res.success
-    );
+    return res.success;
   }
 
   private async bark() {

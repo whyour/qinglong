@@ -4,7 +4,7 @@ export enum NotificationMode {
   'serverChan' = 'serverChan',
   'pushDeer' = 'pushDeer',
   'bark' = 'bark',
-  'chat' = 'chat'
+  'chat' = 'chat',
   'telegramBot' = 'telegramBot',
   'dingtalkBot' = 'dingtalkBot',
   'weWorkBot' = 'weWorkBot',
@@ -40,7 +40,7 @@ export class PushDeerNotification extends NotificationBaseInfo {
 
 export class ChatNotification extends NotificationBaseInfo {
   public chatUrl = '';
-  public chattoken = '';
+  public chatToken = '';
 }
 
 export class BarkNotification extends NotificationBaseInfo {

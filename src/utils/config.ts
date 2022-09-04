@@ -90,7 +90,7 @@ export default {
     { value: 'weWorkApp', label: '企业微信应用' },
     { value: 'iGot', label: 'IGot' },
     { value: 'pushPlus', label: 'PushPlus' },
-    { value: 'chat', label: 'chat' },
+    { value: 'chat', label: '群辉chat' },
     { value: 'email', label: '邮箱' },
     { value: 'closed', label: '已关闭' },
   ],
@@ -110,7 +110,7 @@ export default {
         tip: 'chat的url地址',
         required: true,
       },
-      { label: 'chattoken', tip: 'chat的token码', required: true },
+      { label: 'chatToken', tip: 'chat的token码', required: true },
     ],
     goCqHttpBot: [
       {

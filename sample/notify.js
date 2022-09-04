@@ -254,6 +254,7 @@ async function sendNotify(
     gobotNotify(text, desp), //go-cqhttp
     gotifyNotify(text, desp), //gotify
     ChatNotify(text, desp), //synolog chat
+    PushDeerNotify(text, desp), //PushDeer
   ]);
 }
 
@@ -384,7 +385,7 @@ function serverNotify(text, desp, time = 2100) {
   });
 }
 
-function PushDeerNotify(text, desp, time = 2100) {
+function PushDeerNotify(text, desp) {
   return new Promise((resolve) => {
     if (PUSHDEER_KEY) {
       // PushDeer 建议对消息内容进行 urlencode
@@ -397,8 +398,9 @@ function PushDeerNotify(text, desp, time = 2100) {
         },
         timeout,
       };
-      setTimeout(() => {
-        $.post(options, (err, resp, data) => {
+      $.post(
+        options,
+        (err, resp, data) => {
           try {
             if (err) {
               console.log('发送通知调用API失败！！\n');
@@ -422,17 +424,18 @@ function PushDeerNotify(text, desp, time = 2100) {
           } finally {
             resolve(data);
           }
-        });
-      }, time);
+        },
+        time,
+      );
     } else {
       resolve();
     }
   });
 }
 
-function ChatNotify(text, desp, time = 2100) {
+function ChatNotify(text, desp) {
   return new Promise((resolve) => {
-    if (CHAT_URL && CHAT_TOKEN ) {
+    if (CHAT_URL && CHAT_TOKEN) {
       // 对消息内容进行 urlencode
       desp = encodeURI(desp);
       const options = {
@@ -442,31 +445,25 @@ function ChatNotify(text, desp, time = 2100) {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       };
-      setTimeout(() => {
-        $.post(options, (err, resp, data) => {
-          try {
-            if (err) {
-              console.log('发送通知调用API失败！！\n');
-              console.log(err);
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('发送通知调用API失败！！\n');
+            console.log(err);
+          } else {
+            data = JSON.parse(data);
+            if (data.success) {
+              console.log('Chat发送通知消息成功🎉\n');
             } else {
-              data = JSON.parse(data);
-              if (
-                data.success
-              ) {
-                console.log('Chat发送通知消息成功🎉\n');
-              } else {
-                console.log(
-                  `Chat发送通知消息异常\n${JSON.stringify(data)}`,
-                );
-              }
+              console.log(`Chat发送通知消息异常\n${JSON.stringify(data)}`);
             }
-          } catch (e) {
-            $.logErr(e);
-          } finally {
-            resolve(data);
           }
-        });
-      }, time);
+        } catch (e) {
+          $.logErr(e);
+        } finally {
+          resolve(data);
+        }
+      });
     } else {
       resolve();
     }
