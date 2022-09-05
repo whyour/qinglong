@@ -245,15 +245,13 @@ fix_config() {
 }
 
 npm_install_sub() {
-    set_proxy
     if [ $is_termux -eq 1 ]; then
-        npm install --production --no-bin-links --registry=https://registry.npmmirror.com || npm install --production --no-bin-links
+        npm install --production --no-bin-links
     elif ! type pnpm &>/dev/null; then
-        npm install --production --registry=https://registry.npmmirror.com || npm install --production
+        npm install --production
     else
-        pnpm install --loglevel error --production --registry=https://registry.npmmirror.com || pnpm install --production --loglevel error
+        pnpm install --loglevel error --production
     fi
-    unset_proxy
 }
 
 npm_install_1() {

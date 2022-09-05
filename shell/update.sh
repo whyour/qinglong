@@ -338,6 +338,13 @@ patch_version() {
         echo
     fi
 
+    if [[ $PipMirror ]]; then
+      pip3 config set global.index-url $PipMirror
+    fi
+    if [[ $NpmMirror ]]; then
+      npm config set registry $NpmMirror
+    fi
+
 }
 
 ## 对比脚本

@@ -46,8 +46,11 @@ AutoStartBot=""
 ## 是否使用第三方bot，默认不使用，使用时填入仓库地址，存到ql/repo目录下，文件夹命名为diybot
 BotRepoUrl=""
 
-## 安装bot依赖时指定pip源，默认使用清华源，如不需要源，设置此参数为空
+## 安装python依赖时指定pip源，默认使用清华源
 PipMirror="https://pypi.doubanio.com/simple/"
+
+## 安装node依赖时指定pip源，默认使用清华源
+NpmMirror="https://registry.npmmirror.com"
 
 ## 通知环境变量
 ## 1. Server酱

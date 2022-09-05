@@ -11,6 +11,13 @@ cp -fv $nginx_conf /etc/nginx/nginx.conf
 cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
 sed -i "s,QL_BASE_URL,${qlBaseUrl},g" /etc/nginx/conf.d/front.conf
 pm2 l &>/dev/null
+
+if [[ $PipMirror ]]; then
+  pip3 config set global.index-url $PipMirror
+fi
+if [[ $NpmMirror ]]; then
+  npm config set registry $NpmMirror
+fi
 echo
 
 echo -e "======================2. 安装依赖========================\n"
