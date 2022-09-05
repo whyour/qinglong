@@ -28,7 +28,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
-        sorts: Joi.array().optional(),
+        sorts: Joi.array().optional().allow(null),
         filters: Joi.array().optional(),
       }),
     }),
@@ -49,7 +49,7 @@ export default (app: Router) => {
       body: Joi.object({
         name: Joi.string().required(),
         id: Joi.number().required(),
-        sorts: Joi.array().optional(),
+        sorts: Joi.array().optional().allow(null),
         filters: Joi.array().optional(),
       }),
     }),
