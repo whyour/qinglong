@@ -101,9 +101,9 @@ const ViewCreateModal = ({
     </Select>
   );
 
-  const propertyElement = (props: any) => {
+  const propertyElement = (props: any, style: React.CSSProperties = {}) => {
     return (
-      <Select style={{ width: 120 }}>
+      <Select style={style}>
         {props.map((x) => (
           <Select.Option key={x.name} value={x.value}>
             {x.name}
@@ -114,7 +114,7 @@ const ViewCreateModal = ({
   };
 
   const typeElement = (
-    <Select style={{ width: 120 }}>
+    <Select>
       {SORTTYPES.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -170,6 +170,7 @@ const ViewCreateModal = ({
                   label={index === 0 ? '筛选条件' : ''}
                   key={key}
                   style={{ marginBottom: 0 }}
+                  required
                 >
                   <Space className="view-create-modal-filters" align="baseline">
                     <Form.Item
@@ -177,7 +178,7 @@ const ViewCreateModal = ({
                       name={[name, 'property']}
                       rules={[{ required: true }]}
                     >
-                      {propertyElement(PROPERTIES)}
+                      {propertyElement(PROPERTIES, { width: 120 })}
                     </Form.Item>
                     <Form.Item
                       {...restField}
@@ -225,13 +226,13 @@ const ViewCreateModal = ({
                   key={key}
                   style={{ marginBottom: 0 }}
                 >
-                  <Space className="view-create-modal-filters" align="baseline">
+                  <Space className="view-create-modal-sorts" align="baseline">
                     <Form.Item
                       {...restField}
                       name={[name, 'property']}
                       rules={[{ required: true }]}
                     >
-                      {propertyElement(PROPERTIES)}
+                      {propertyElement(PROPERTIES, { width: 240 })}
                     </Form.Item>
                     <Form.Item
                       {...restField}
@@ -240,9 +241,7 @@ const ViewCreateModal = ({
                     >
                       {typeElement}
                     </Form.Item>
-                    {index !== 0 && (
-                      <MinusCircleOutlined onClick={() => remove(name)} />
-                    )}
+                    <MinusCircleOutlined onClick={() => remove(name)} />
                   </Space>
                 </Form.Item>
               ))}
