@@ -153,9 +153,13 @@ const CronDetailModal = ({
         cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
       }
 
-      let [p, s] = cmd[1].split('/');
-      if (!s) {
-        s = p;
+      let p: string, s: string;
+      let index = cmd[1].lastIndexOf('/');
+      if (index >= 0) {
+        s = cmd[1].slice(index + 1);
+        p = cmd[1].slice(0, index);
+      } else {
+        s = cmd[1];
         p = '';
       }
       setScriptInfo({ parent: p, filename: s });
