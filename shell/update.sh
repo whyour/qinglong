@@ -303,7 +303,7 @@ patch_version() {
     fi
 
     if ! type ts-node &>/dev/null; then
-        pnpm i -g ts-node typescript tslib
+        pnpm add -g ts-node typescript tslib
     fi
 
     # 兼容pnpm@7 
