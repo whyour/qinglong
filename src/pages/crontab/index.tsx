@@ -93,10 +93,11 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
         <>
           <a
             onClick={() => {
-              goToScriptManager(record);
+              setDetailCron(record);
+              setIsDetailModalVisible(true);
             }}
           >
-            {record.labels?.length > 0 && record.labels[0] !== '' ? (
+            {record.labels?.length > 0 && record.labels[0] !== '' && false ? (
               <Popover
                 placement="right"
                 trigger={isPhone ? 'click' : 'hover'}
@@ -109,6 +110,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
                         onClick={(e) => {
                           e.stopPropagation();
                           setSearchValue(`label:${label}`);
+                          setSearchText(`label:${label}`);
                         }}
                       >
                         <a>{label}</a>
@@ -140,7 +142,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       title: '命令',
       dataIndex: 'command',
       key: 'command',
-      width: 250,
+      width: 300,
       align: 'center' as const,
       render: (text: string, record: any) => {
         return (
@@ -152,7 +154,13 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
             }}
             ellipsis={{ tooltip: text, rows: 2 }}
           >
-            {text}
+            <a
+              onClick={() => {
+                goToScriptManager(record);
+              }}
+            >
+              {text}
+            </a>
           </Paragraph>
         );
       },
@@ -189,10 +197,10 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
           >
             {record.last_execution_time
               ? new Date(record.last_execution_time * 1000)
-                  .toLocaleString(language, {
-                    hour12: false,
-                  })
-                  .replace(' 24:', ' 00:')
+                .toLocaleString(language, {
+                  hour12: false,
+                })
+                .replace(' 24:', ' 00:')
               : '-'}
           </span>
         );
@@ -396,9 +404,8 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
     const { page, size, sorter } = pageConf;
     let url = `${config.apiPrefix}crons?searchValue=${searchText}&page=${page}&size=${size}`;
     if (sorter && sorter.field) {
-      url += `&sortField=${sorter.field}&sortType=${
-        sorter.order === 'ascend' ? 'ASC' : 'DESC'
-      }`;
+      url += `&sortField=${sorter.field}&sortType=${sorter.order === 'ascend' ? 'ASC' : 'DESC'
+        }`;
     }
     if (viewConf) {
       url += `&queryString=${JSON.stringify({
@@ -562,8 +569,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              record.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             {
               data: [record.id],
@@ -608,8 +614,7 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              record.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             {
               data: [record.id],
@@ -930,14 +935,6 @@ const Crontab = ({ headerStyle, isPhone, theme }: any) => {
           pageSizeOptions: [10, 20, 50, 100, 200, 500, total || 10000].sort(
             (a, b) => a - b,
           ),
-        }}
-        onRow={(record) => {
-          return {
-            onClick: (event) => {
-              setDetailCron(record);
-              setIsDetailModalVisible(true);
-            },
-          };
         }}
         dataSource={value}
         rowKey="id"
