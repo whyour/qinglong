@@ -3,7 +3,7 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import routes from '../api';
 import config from '../config';
-import jwt from 'express-jwt';
+import jwt, { UnauthorizedError } from 'express-jwt';
 import fs from 'fs';
 import { getPlatform, getToken } from '../config/util';
 import Container from 'typedi';
@@ -75,22 +75,24 @@ export default ({ app }: { app: Application }) => {
     if (
       !headerToken &&
       originPath &&
-      config.apiWhiteList.includes(originPath) &&
-      originPath !== '/api/crons/status'
+      config.apiWhiteList.includes(originPath)
     ) {
       return next();
     }
 
     const data = fs.readFileSync(config.authConfigFile, 'utf8');
-    if (data) {
+    if (data && headerToken) {
       const { token = '', tokens = {} } = JSON.parse(data);
       if (headerToken === token || tokens[req.platform] === headerToken) {
         return next();
       }
     }
 
-    const err: any = new Error('UnauthorizedError');
-    err.status = 401;
+    const errorCode = headerToken ? 'invalid_token' : 'credentials_required';
+    const errorMessage = headerToken
+      ? 'jwt malformed'
+      : 'No authorization token was found';
+    const err = new UnauthorizedError(errorCode, { message: errorMessage });
     next(err);
   });
 
@@ -168,7 +170,17 @@ export default ({ app }: { app: Application }) => {
     },
   );
 
-  app.use(Sentry.Handlers.errorHandler());
+  app.use(
+    Sentry.Handlers.errorHandler({
+      shouldHandleError(error) {
+        // 排除 SequelizeUniqueConstraintError / NotFound
+        return (
+          !['SequelizeUniqueConstraintError'].includes(error.name) ||
+          !['Not Found'].includes(error.message)
+        );
+      },
+    }),
+  );
 
   app.use(
     (
