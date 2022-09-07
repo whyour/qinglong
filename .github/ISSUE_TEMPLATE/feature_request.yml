@@ -2,23 +2,39 @@ name: "\U0001F680 New feature proposal"
 description: Suggest an idea for this project
 labels: [":sparkles: feature request"]
 body:
-  - type: textarea
-    id: problem-description
+  - type: markdown
     attributes:
-      label: What problem does this feature solve?
-      description: |
-        Explain your use case, context, and rationale behind this feature request. More importantly, what is the **end user experience** you are trying to build that led to the need for this feature?
-
-        An important design goal of Vue is keeping the API surface small and straightforward. In general, we only consider adding new features that solve a problem that cannot be easily dealt with using existing APIs (i.e. not just an alternative way of doing things that can already be done). The problem should also be common enough to justify the addition.
-      placeholder: Problem description
+      value: |
+        Thanks for your interest in the project and taking the time to fill out this feature report!
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Clear and concise description of the problem
+      description: "Explain your use case, context, and rationale behind this feature request. More importantly, what is the **end user experience** you are trying to build that led to the need for this feature?"
     validations:
       required: true
   - type: textarea
-    id: proposed-API
+    id: suggested-solution
     attributes:
-      label: What does the proposed API look like?
-      description: |
-        Describe how you propose to solve the problem and provide code samples of how the API would work once implemented. Note that you can use [Markdown](https://guides.github.com/features/mastering-markdown/) to format your code blocks.
-      placeholder: Steps to reproduce
+      label: Suggested solution
+      description: "In module [xy] we could provide following implementation..."
     validations:
       required: true
+  - type: textarea
+    id: alternative
+    attributes:
+      label: Alternative
+      description: Clear and concise description of any alternative solutions or features you've considered.
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Any other context or screenshots about the feature request here.
+  - type: checkboxes
+    id: checkboxes
+    attributes:
+      label: Validations
+      description: Before submitting the issue, please make sure you do the following
+      options:
+        - label: Check that there isn't already an issue that request the same feature to avoid creating a duplicate.
+          required: true
