@@ -217,6 +217,22 @@ export default class CronService {
     }
   }
 
+  private formatFilterQuery(query: any, filterQuery: any) {
+    if (filterQuery) {
+      if (!query[Op.and]) {
+        query[Op.and] = [];
+      }
+      const filterKeys: any = Object.keys(filterQuery);
+      for (const key of filterKeys) {
+        let q: any = {};
+        if (filterKeys[key]) {
+          q[key] = filterKeys[key];
+        }
+        query[Op.and].push(q);
+      }
+    }
+  }
+
   private formatViewSort(order: string[][], viewQuery: any) {
     if (viewQuery.sorts && viewQuery.sorts.length > 0) {
       for (const { property, type } of viewQuery.sorts) {
@@ -229,16 +245,16 @@ export default class CronService {
     searchValue: string;
     page: string;
     size: string;
-    sortField: string;
-    sortType: string;
+    sorter: string;
+    filters: string;
     queryString: string;
   }): Promise<{ data: Crontab[]; total: number }> {
     const searchText = params?.searchValue;
     const page = Number(params?.page || '0');
     const size = Number(params?.size || '0');
-    const sortField = params?.sortField || '';
-    const sortType = params?.sortType || '';
     const viewQuery = JSON.parse(params?.queryString || '{}');
+    const filterQuery = JSON.parse(params?.filters || '{}');
+    const sorterQuery = JSON.parse(params?.sorter || '{}');
 
     let query: any = {};
     let order = [
@@ -250,10 +266,14 @@ export default class CronService {
 
     this.formatViewQuery(query, viewQuery);
     this.formatSearchText(query, searchText);
+    this.formatFilterQuery(query, filterQuery);
     this.formatViewSort(order, viewQuery);
 
-    if (sortType && sortField) {
-      order.unshift([sortField, sortType]);
+    if (sorterQuery) {
+      const { field, type } = sorterQuery;
+      if (field && type) {
+        order.unshift([field, type]);
+      }
     }
     let condition: any = {
       where: query,
