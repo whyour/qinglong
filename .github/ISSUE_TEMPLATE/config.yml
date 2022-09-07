@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Telegram Chat
+    url: https://t.me/jiao_long
+    about: Ask questions and discuss with other Vue users in real time.
+  - name: Questions & Discussions
+    url: https://github.com/whyour/qinglong/discussions/new?category=q-a
+    about: Use GitHub discussions for message-board style questions and discussions.
