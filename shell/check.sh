@@ -90,6 +90,9 @@ check_pm2() {
 main() {
   echo -e "=====> 开始检测"
   npm i -g pnpm
+  pnpm setup &>/dev/null
+  source ~/.bashrc
+  pnpm install -g &>/dev/null
   pnpm add -g pm2
   copy_dep
   check_ql

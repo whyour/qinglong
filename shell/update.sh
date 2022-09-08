@@ -295,6 +295,11 @@ update_qinglong() {
 }
 
 patch_version() {
+    # 兼容pnpm@7 
+    pnpm setup &>/dev/null
+    source ~/.bashrc
+    pnpm install -g &>/dev/null
+
     if [[ -f "$dir_root/db/cookie.db" ]]; then
         echo -e "检测到旧的db文件，拷贝为新db...\n"
         mv $dir_root/db/cookie.db $dir_root/db/env.db
@@ -305,10 +310,6 @@ patch_version() {
     if ! type ts-node &>/dev/null; then
         pnpm add -g ts-node typescript tslib
     fi
-
-    # 兼容pnpm@7 
-    pnpm setup
-    source ~/.bashrc
 
     git config --global pull.rebase false
 
