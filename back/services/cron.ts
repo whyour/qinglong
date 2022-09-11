@@ -412,7 +412,7 @@ export default class CronService {
         cmdStr = `${cmdStr} now`;
       }
 
-      const cp = spawn(cmdStr, { shell: '/bin/bash' });
+      const cp = spawn(`ID=${id} ${cmdStr}`, { shell: '/bin/bash' });
 
       await CrontabModel.update(
         { status: CrontabStatus.running, pid: cp.pid },

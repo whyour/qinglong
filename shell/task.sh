@@ -91,14 +91,13 @@ run_nohup() {
     nohup node $file_name &>$log_path &
 }
 
-## 正常运行单个脚本，$1：传入参数
-run_normal() {
-    local file_param=$1
+handle_log_path() {
     define_program "$file_param"
-    if [[ $# -eq 1 ]]; then
-        random_delay "$file_param"
+    
+    local suffix=""
+    if [[ ! -z $ID ]]; then
+        suffix="_${ID}"
     fi
-
     local time=$(date "+$time_format")
     log_time=$(format_log_time "$time_format" "$time")
     log_dir_tmp="${file_param##*/}"
@@ -112,11 +111,21 @@ run_normal() {
     log_dir_tmp_path="${log_dir_tmp_path%/*}"
     log_dir_tmp_path="${log_dir_tmp_path##*/}"
     [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%.*}"
+    log_dir="${log_dir_tmp%.*}${suffix}"
     log_path="$log_dir/$log_time.log"
     cmd=">> $dir_log/$log_path 2>&1"
     [[ "$show_log" == "true" ]] && cmd=""
     make_dir "$dir_log/$log_dir"
+}
+
+## 正常运行单个脚本，$1：传入参数
+run_normal() {
+    local file_param=$1
+    if [[ $# -eq 1 ]]; then
+        random_delay "$file_param"
+    fi
+
+    handle_log_path
 
     local begin_time=$(format_time "$time_format" "$time")
     local begin_timestamp=$(format_timestamp "$time_format" "$time")
@@ -170,25 +179,7 @@ run_concurrent() {
     local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
     [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
 
-    define_program "$file_param"
-    local time=$(date "+$time_format")
-    log_time=$(format_log_time "$time_format" "$time")
-    log_dir_tmp="${file_param##*/}"
-    if [[ $file_param =~ "/" ]]; then
-        if [[ $file_param == /* ]]; then
-            log_dir_tmp_path="${file_param:1}"
-        else
-            log_dir_tmp_path="${file_param}"
-        fi
-    fi
-    log_dir_tmp_path="${log_dir_tmp_path%/*}"
-    log_dir_tmp_path="${log_dir_tmp_path##*/}"
-    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%.*}"
-    log_path="$log_dir/$log_time.log"
-    cmd=">> $dir_log/$log_path 2>&1"
-    [[ "$show_log" == "true" ]] && cmd=""
-    make_dir "$dir_log/$log_dir"
+    handle_log_path
 
     local begin_time=$(format_time "$time_format" "$time")
     local begin_timestamp=$(format_timestamp "$time_format" "$time")
@@ -240,25 +231,7 @@ run_designated() {
         exit 1
     fi
 
-    define_program "$file_param"
-    local time=$(date "+$time_format")
-    log_time=$(format_log_time "$time_format" "$time")
-    log_dir_tmp="${file_param##*/}"
-    if [[ $file_param =~ "/" ]]; then
-        if [[ $file_param == /* ]]; then
-            log_dir_tmp_path="${file_param:1}"
-        else
-            log_dir_tmp_path="${file_param}"
-        fi
-    fi
-    log_dir_tmp_path="${log_dir_tmp_path%/*}"
-    log_dir_tmp_path="${log_dir_tmp_path##*/}"
-    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%.*}"
-    log_path="$log_dir/$log_time.log"
-    cmd=">> $dir_log/$log_path 2>&1"
-    [[ "$show_log" == "true" ]] && cmd=""
-    make_dir "$dir_log/$log_dir"
+    handle_log_path
 
     local begin_time=$(format_time "$time_format" "$time")
     local begin_timestamp=$(format_timestamp "$time_format" "$time")
@@ -304,25 +277,8 @@ run_designated() {
 ## 运行其他命令
 run_else() {
     local file_param="$1"
-    define_program "$file_param"
-    local time=$(date "+$time_format")
-    log_time=$(format_log_time "$time_format" "$time")
-    log_dir_tmp="${file_param##*/}"
-    if [[ $file_param =~ "/" ]]; then
-        if [[ $file_param == /* ]]; then
-            log_dir_tmp_path="${file_param:1}"
-        else
-            log_dir_tmp_path="${file_param}"
-        fi
-    fi
-    log_dir_tmp_path="${log_dir_tmp_path%/*}"
-    log_dir_tmp_path="${log_dir_tmp_path##*/}"
-    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-    log_dir="${log_dir_tmp%.*}"
-    log_path="$log_dir/$log_time.log"
-    cmd=">> $dir_log/$log_path 2>&1"
-    [[ "$show_log" == "true" ]] && cmd=""
-    make_dir "$dir_log/$log_dir"
+
+    handle_log_path
 
     local begin_time=$(format_time "$time_format" "$time")
     local begin_timestamp=$(format_timestamp "$time_format" "$time")

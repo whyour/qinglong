@@ -18,14 +18,15 @@ const run = async () => {
             _schedule &&
             _schedule.length > 5 &&
             task.status !== CrontabStatus.disabled &&
-            !task.isDisabled
+            !task.isDisabled &&
+            task.schedule
           ) {
             schedule.scheduleJob(task.schedule, function () {
               let command = task.command as string;
               if (!command.includes('task ') && !command.includes('ql ')) {
                 command = `task ${command}`;
               }
-              exec(command);
+              exec(`ID=${task.id} ${command}`);
             });
           }
         }
