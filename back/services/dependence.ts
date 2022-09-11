@@ -125,8 +125,11 @@ export default class DependenceService {
     return docs;
   }
 
-  private async find(query: any, sort?: any): Promise<Dependence[]> {
-    const docs = await DependenceModel.findAll({ where: { ...query } });
+  private async find(query: any, sort: any = []): Promise<Dependence[]> {
+    const docs = await DependenceModel.findAll({
+      where: { ...query },
+      order: [...sort, ['createdAt', 'DESC']],
+    });
     return docs;
   }
 

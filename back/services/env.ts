@@ -112,7 +112,10 @@ export default class EnvService {
       };
     }
     try {
-      const result = await this.find(condition, [['position', 'DESC']]);
+      const result = await this.find(condition, [
+        ['position', 'DESC'],
+        ['createdAt', 'DESC'],
+      ]);
       return result as any;
     } catch (error) {
       throw error;
