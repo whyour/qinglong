@@ -62,7 +62,10 @@ export default class SubscriptionService {
     try {
       const result = await SubscriptionModel.findAll({
         where: query,
-        order: [['createdAt', 'DESC']],
+        order: [
+          ['is_disabled', 'ASC'],
+          ['createdAt', 'DESC'],
+        ],
       });
       return result as any;
     } catch (error) {
