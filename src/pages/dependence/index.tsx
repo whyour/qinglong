@@ -320,6 +320,30 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
     });
   };
 
+  const handlereInstallDependencies = () => {
+    Modal.confirm({
+      title: '确认重新安装',
+      content: <>确认重新安装选中的依赖吗</>,
+      onOk() {
+        request
+          .put(`${config.apiPrefix}dependencies/reinstall`, {
+            data: selectedRowIds,
+          })
+          .then((data: any) => {
+            if (data.code === 200) {
+              setSelectedRowIds([]);
+              getDependencies();
+            } else {
+              message.error(data);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
   const getDependenceDetail = (dependence: any) => {
     request
       .get(`${config.apiPrefix}dependencies/${dependence.id}`)
@@ -403,6 +427,13 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
     <>
       {selectedRowIds.length > 0 && (
         <div style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            style={{ marginBottom: 5, marginLeft: 8 }}
+            onClick={() => handlereInstallDependencies()}
+          >
+            批量安装
+          </Button>
           <Button
             type="primary"
             style={{ marginBottom: 5, marginLeft: 8 }}

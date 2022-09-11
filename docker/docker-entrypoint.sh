@@ -4,6 +4,8 @@ dir_shell=/ql/shell
 . $dir_shell/share.sh
 link_shell
 
+export isFirstStartServer=true
+
 echo -e "======================1. 检测配置文件========================\n"
 make_dir /etc/nginx/conf.d
 make_dir /run/nginx

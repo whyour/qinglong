@@ -246,6 +246,8 @@ usage() {
 update_qinglong() {
     patch_version
 
+    export isFirstStartServer=false
+
     local no_restart="$1"
     local all_branch=$(git branch -a)
     local primary_branch="master"
