@@ -98,7 +98,7 @@ handle_log_path() {
     if [[ ! -z $ID ]]; then
         suffix="_${ID}"
     fi
-    local time=$(date "+$time_format")
+    time=$(date "+$time_format")
     log_time=$(format_log_time "$time_format" "$time")
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
