@@ -24,14 +24,16 @@ const AppModal = ({
     }
     const { code, data } = await request[method](`${config.apiPrefix}apps`, {
       data: payload,
+    }).catch((err) => {
+      setLoading(false);
+      return {};
     });
+
     if (code === 200) {
       message.success(app ? '更新应用成功' : '新建应用成功');
-    } else {
-      message.error(data);
+      setLoading(false);
+      handleCancel(data);
     }
-    setLoading(false);
-    handleCancel(data);
   };
 
   useEffect(() => {
@@ -64,7 +66,18 @@ const AppModal = ({
         name="form_app_modal"
         initialValues={app}
       >
-        <Form.Item name="name" label="名称">
+        <Form.Item
+          name="name"
+          label="名称"
+          rules={[
+            {
+              validator: (_, value) =>
+                ['system'].includes(value)
+                  ? Promise.reject(new Error('名称不能为保留关键字'))
+                  : Promise.resolve(),
+            },
+          ]}
+        >
           <Input placeholder="请输入应用名称" />
         </Form.Item>
         <Form.Item name="scopes" label="权限" rules={[{ required: true }]}>
