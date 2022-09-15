@@ -52,11 +52,13 @@ const DependenceModal = ({
           data: payload,
         },
       );
+
       if (code !== 200) {
         message.error(data);
+      } else {
+        handleCancel(data);
       }
       setLoading(false);
-      handleCancel(data);
     } catch (error) {
       setLoading(false);
     }

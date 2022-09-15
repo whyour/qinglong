@@ -28,13 +28,14 @@ const CronModal = ({
       const { code, data } = await request[method](`${config.apiPrefix}crons`, {
         data: payload,
       });
+
       if (code === 200) {
         message.success(cron ? '更新Cron成功' : '新建Cron成功');
+        handleCancel(data);
       } else {
         message.error(data);
       }
       setLoading(false);
-      handleCancel(data);
     } catch (error: any) {
       setLoading(false);
     }
@@ -128,21 +129,26 @@ const CronLabelModal = ({
       .then(async (values) => {
         setLoading(true);
         const payload = { ids, labels: values.labels };
-        const { code, data } = await request[action](
-          `${config.apiPrefix}crons/labels`,
-          {
-            data: payload,
-          },
-        );
-        if (code === 200) {
-          message.success(
-            action === 'post' ? '添加Labels成功' : '删除Labels成功',
+        try {
+          const { code, data } = await request[action](
+            `${config.apiPrefix}crons/labels`,
+            {
+              data: payload,
+            },
           );
-        } else {
-          message.error(data);
+
+          if (code === 200) {
+            message.success(
+              action === 'post' ? '添加Labels成功' : '删除Labels成功',
+            );
+            handleCancel(true);
+          } else {
+            message.error(data);
+          }
+          setLoading(false);
+        } catch (error) {
+          setLoading(false);
         }
-        setLoading(false);
-        handleCancel(true);
       })
       .catch((info) => {
         console.log('Validate Failed:', info);

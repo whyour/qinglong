@@ -17,19 +17,24 @@ const EditNameModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const { code, data } = await request.put(`${config.apiPrefix}envs/name`, {
-      data: {
-        ids,
-        name: values.name,
-      },
-    });
-    if (code === 200) {
-      message.success('更新环境变量名称成功');
-    } else {
-      message.error(data);
+    try {
+      const { code, data } = await request.put(`${config.apiPrefix}envs/name`, {
+        data: {
+          ids,
+          name: values.name,
+        },
+      });
+
+      if (code === 200) {
+        message.success('更新环境变量名称成功');
+        handleCancel();
+      } else {
+        message.error(data);
+      }
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
     }
-    setLoading(false);
-    handleCancel();
   };
 
   useEffect(() => {

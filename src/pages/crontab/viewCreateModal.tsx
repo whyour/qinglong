@@ -65,11 +65,13 @@ const ViewCreateModal = ({
           data: view ? { ...values, id: view.id } : values,
         },
       );
+
       if (code !== 200) {
         message.error(data);
+      } else {
+        handleCancel(data);
       }
       setLoading(false);
-      handleCancel(data);
     } catch (error: any) {
       setLoading(false);
     }

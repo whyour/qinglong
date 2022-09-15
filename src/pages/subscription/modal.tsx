@@ -39,11 +39,11 @@ const SubscriptionModal = ({
       );
       if (code === 200) {
         message.success(subscription ? '更新订阅成功' : '新建订阅成功');
+        handleCancel(data);
       } else {
         message.error(data);
       }
       setLoading(false);
-      handleCancel(data);
     } catch (error: any) {
       setLoading(false);
     }

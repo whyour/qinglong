@@ -22,17 +22,20 @@ const AppModal = ({
     if (app) {
       payload.id = app.id;
     }
-    const { code, data } = await request[method](`${config.apiPrefix}apps`, {
-      data: payload,
-    }).catch((err) => {
-      setLoading(false);
-      return {};
-    });
+    try {
+      const { code, data } = await request[method](`${config.apiPrefix}apps`, {
+        data: payload,
+      });
 
-    if (code === 200) {
-      message.success(app ? '更新应用成功' : '新建应用成功');
+      if (code === 200) {
+        message.success(app ? '更新应用成功' : '新建应用成功');
+        handleCancel(data);
+      } else {
+        message.error(data);
+      }
       setLoading(false);
-      handleCancel(data);
+    } catch (error) {
+      setLoading(false);
     }
   };
 
