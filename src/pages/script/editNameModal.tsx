@@ -32,25 +32,26 @@ const EditScriptNameModal = ({
   const [loading, setLoading] = useState(false);
   const [dirs, setDirs] = useState<any[]>([]);
   const [file, setFile] = useState<File>();
-  const [type, setType] = useState<'blank' | 'upload'>('blank');
+  const [type, setType] = useState<'blank' | 'upload' | 'directory'>('blank');
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    values.path = values.path || '';
+    const { path = '', filename: inputFilename, directory } = values;
     const formData = new FormData();
     formData.append('file', file as any);
-    formData.append('filename', values.filename);
-    formData.append('path', values.path);
+    formData.append('filename', inputFilename);
+    formData.append('path', path);
     formData.append('content', '');
+    formData.append('directory', directory);
     request
       .post(`${config.apiPrefix}scripts`, {
         data: formData,
       })
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success('新建文件成功');
-          const key = values.path ? `${values.path}/` : '';
-          const filename = file ? file.name : values.filename;
+          message.success(directory ? '新建文件夹成功' : '新建文件成功');
+          const key = path ? `${values.path}/` : '';
+          const filename = file ? file.name : inputFilename;
           handleCancel({
             filename,
             path: values.path,
@@ -99,7 +100,7 @@ const EditScriptNameModal = ({
 
   return (
     <Modal
-      title="新建脚本"
+      title="新建"
       visible={visible}
       forceRender
       centered
@@ -126,16 +127,34 @@ const EditScriptNameModal = ({
         >
           <Radio.Group onChange={typeChange}>
             <Radio value="blank">空文件</Radio>
-            <Radio value="upload">本地上传</Radio>
+            <Radio value="upload">本地文件</Radio>
+            <Radio value="directory">文件夹</Radio>
           </Radio.Group>
         </Form.Item>
         {type === 'blank' && (
           <Form.Item
             name="filename"
             label="文件名"
-            rules={[{ required: true, message: '请输入文件名' }]}
+            rules={[
+              { required: true, message: '请输入文件名' },
+              {
+                validator: (_, value) =>
+                  value.includes('/')
+                    ? Promise.reject(new Error('文件名不能包含斜杠'))
+                    : Promise.resolve(),
+              },
+            ]}
           >
             <Input placeholder="请输入文件名" />
+          </Form.Item>
+        )}
+        {type === 'directory' && (
+          <Form.Item
+            name="directory"
+            label="文件夹名"
+            rules={[{ required: true, message: '请输入文件夹名' }]}
+          >
+            <Input placeholder="请输入文件夹名" />
           </Form.Item>
         )}
         <Form.Item label="父目录" name="path">
