@@ -101,7 +101,7 @@ const EditScriptNameModal = ({
   return (
     <Modal
       title="新建"
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}

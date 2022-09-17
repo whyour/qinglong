@@ -445,7 +445,7 @@ const CronDetailModal = ({
         </div>
       }
       centered
-      visible={visible}
+      open={visible}
       forceRender
       footer={false}
       onCancel={() => handleCancel()}

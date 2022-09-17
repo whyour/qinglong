@@ -44,7 +44,7 @@ const EditNameModal = ({
   return (
     <Modal
       title="修改环境变量名称"
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}

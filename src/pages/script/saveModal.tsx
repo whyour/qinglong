@@ -41,7 +41,7 @@ const SaveModal = ({
   return (
     <Modal
       title="保存文件"
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}

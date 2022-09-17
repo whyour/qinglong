@@ -60,7 +60,7 @@ const EnvModal = ({
   return (
     <Modal
       title={env ? '编辑变量' : '新建变量'}
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}

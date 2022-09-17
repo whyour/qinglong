@@ -41,7 +41,7 @@ const SettingModal = ({
   return (
     <Modal
       title="运行设置"
-      visible={visible}
+      open={visible}
       forceRender
       centered
       onCancel={() => handleCancel()}

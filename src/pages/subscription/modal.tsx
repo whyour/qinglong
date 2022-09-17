@@ -272,7 +272,7 @@ const SubscriptionModal = ({
           </span>
         )
       }
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}

@@ -71,7 +71,7 @@ const DependenceModal = ({
   return (
     <Modal
       title={dependence ? '编辑依赖' : '新建依赖'}
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}

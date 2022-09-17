@@ -119,7 +119,7 @@ const CronLogModal = ({
   return (
     <Modal
       title={titleElement()}
-      visible={visible}
+      open={visible}
       centered
       className="log-modal"
       bodyStyle={{

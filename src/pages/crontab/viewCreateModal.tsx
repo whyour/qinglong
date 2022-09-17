@@ -138,7 +138,7 @@ const ViewCreateModal = ({
   return (
     <Modal
       title={view ? '编辑视图' : '新建视图'}
-      visible={visible}
+      open={visible}
       forceRender
       width={580}
       centered

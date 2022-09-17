@@ -46,7 +46,7 @@ const AppModal = ({
   return (
     <Modal
       title={app ? '编辑应用' : '新建应用'}
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}

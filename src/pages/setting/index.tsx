@@ -333,70 +333,87 @@ const Setting = ({
         size="small"
         tabPosition="top"
         onChange={tabChange}
-      >
-        <Tabs.TabPane tab="安全设置" key="security">
-          <SecuritySettings user={user} userChange={reloadUser} />
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="应用设置" key="app">
-          <Table
-            columns={columns}
-            pagination={false}
-            dataSource={dataSource}
-            rowKey="id"
-            size="middle"
-            scroll={{ x: 768 }}
-            loading={loading}
-          />
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="通知设置" key="notification">
-          <NotificationSetting data={notificationInfo} />
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="登录日志" key="login">
-          <LoginLog data={loginLogData} />
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="其他设置" key="other">
-          <Form layout="vertical" form={form}>
-            <Form.Item
-              label="主题设置"
-              name="theme"
-              initialValue={defaultTheme}
-            >
-              <Radio.Group
-                options={optionsWithDisabled}
-                onChange={themeChange}
-                value={defaultTheme}
-                optionType="button"
-                buttonStyle="solid"
+        items={[
+          {
+            key: 'security',
+            label: '安全设置',
+            children: <SecuritySettings user={user} userChange={reloadUser} />,
+          },
+          {
+            key: 'app',
+            label: '应用设置',
+            children: (
+              <Table
+                columns={columns}
+                pagination={false}
+                dataSource={dataSource}
+                rowKey="id"
+                size="middle"
+                scroll={{ x: 768 }}
+                loading={loading}
               />
-            </Form.Item>
-            <Form.Item
-              label="日志删除频率"
-              name="frequency"
-              tooltip="每x天自动删除x天以前的日志"
-            >
-              <Input.Group compact>
-                <InputNumber
-                  addonBefore="每"
-                  addonAfter="天"
-                  style={{ width: 150 }}
-                  min={0}
-                  value={logRemoveFrequency}
-                  onChange={(value) => setLogRemoveFrequency(value)}
-                />
-                <Button type="primary" onClick={updateRemoveLogFrequency}>
-                  确认
-                </Button>
-              </Input.Group>
-            </Form.Item>
-            <Form.Item label="检查更新" name="update">
-              <CheckUpdate socketMessage={socketMessage} />
-            </Form.Item>
-          </Form>
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="关于" key="about">
-          <About />
-        </Tabs.TabPane>
-      </Tabs>
+            ),
+          },
+          {
+            key: 'notification',
+            label: '通知设置',
+            children: <NotificationSetting data={notificationInfo} />,
+          },
+          {
+            key: 'login',
+            label: '登录日志',
+            children: <LoginLog data={loginLogData} />,
+          },
+          {
+            key: 'other',
+            label: '其他设置',
+            children: (
+              <Form layout="vertical" form={form}>
+                <Form.Item
+                  label="主题设置"
+                  name="theme"
+                  initialValue={defaultTheme}
+                >
+                  <Radio.Group
+                    options={optionsWithDisabled}
+                    onChange={themeChange}
+                    value={defaultTheme}
+                    optionType="button"
+                    buttonStyle="solid"
+                  />
+                </Form.Item>
+                <Form.Item
+                  label="日志删除频率"
+                  name="frequency"
+                  tooltip="每x天自动删除x天以前的日志"
+                >
+                  <Input.Group compact>
+                    <InputNumber
+                      addonBefore="每"
+                      addonAfter="天"
+                      style={{ width: 150 }}
+                      min={0}
+                      value={logRemoveFrequency}
+                      onChange={(value) => setLogRemoveFrequency(value)}
+                    />
+                    <Button type="primary" onClick={updateRemoveLogFrequency}>
+                      确认
+                    </Button>
+                  </Input.Group>
+                </Form.Item>
+                <Form.Item label="检查更新" name="update">
+                  <CheckUpdate socketMessage={socketMessage} />
+                </Form.Item>
+              </Form>
+            ),
+          },
+          {
+            key: 'about',
+            label: '关于',
+            children: <About />,
+          },
+        ]}
+      ></Tabs>
       <AppModal
         visible={isModalVisible}
         handleCancel={handleCancel}

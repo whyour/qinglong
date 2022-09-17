@@ -136,7 +136,7 @@ export default function (props: any) {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.username) return;
     ws.current = new SockJS(
       `${location.origin}/api/ws?token=${localStorage.getItem(config.authKey)}`,
     );
@@ -146,9 +146,9 @@ export default function (props: any) {
         const data = JSON.parse(e.data);
         if (data.type === 'ping') {
           if (data && data.message === 'hanhh') {
-            console.log('websocket连接成功', e);
+            console.log('WS connection succeeded !!!');
           } else {
-            console.log('websocket连接失败', e);
+            console.log('WS connection Failed !!!', e);
           }
         }
         setSocketMessage(data);
@@ -186,8 +186,9 @@ export default function (props: any) {
   if (
     ['/login', '/initialization', '/error'].includes(props.location.pathname)
   ) {
-    document.title = `${(config.documentTitleMap as any)[props.location.pathname]
-      } - 控制面板`;
+    document.title = `${
+      (config.documentTitleMap as any)[props.location.pathname]
+    } - 控制面板`;
     if (
       systemInfo?.isInitialized &&
       props.location.pathname === '/initialization'

@@ -48,7 +48,7 @@ const CronModal = ({
   return (
     <Modal
       title={cron ? '编辑任务' : '新建任务'}
-      visible={visible}
+      open={visible}
       forceRender
       centered
       maskClosable={false}
@@ -172,7 +172,7 @@ const CronLabelModal = ({
   return (
     <Modal
       title="批量修改标签"
-      visible={visible}
+      open={visible}
       footer={buttons}
       centered
       maskClosable={false}

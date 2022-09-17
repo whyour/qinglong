@@ -214,7 +214,7 @@ const EditModal = ({
       width={'100%'}
       headerStyle={{ padding: '11px 24px' }}
       onClose={cancel}
-      visible={visible}
+      open={visible}
     >
       <SplitPane
         split="vertical"

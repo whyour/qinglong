@@ -498,17 +498,24 @@ const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
         size="small"
         tabPosition="top"
         onChange={onTabChange}
-      >
-        <Tabs.TabPane tab="NodeJs" key="nodejs">
-          {panelContent()}
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="Python3" key="python3">
-          {panelContent()}
-        </Tabs.TabPane>
-        <Tabs.TabPane tab="Linux" key="linux">
-          {panelContent()}
-        </Tabs.TabPane>
-      </Tabs>
+        items={[
+          {
+            key: 'nodejs',
+            label: 'NodeJs',
+            children: panelContent(),
+          },
+          {
+            key: 'python3',
+            label: 'Python3',
+            children: panelContent(),
+          },
+          {
+            key: 'linux',
+            label: 'Linux',
+            children: panelContent(),
+          },
+        ]}
+      />
       <DependenceModal
         visible={isModalVisible}
         handleCancel={handleCancel}

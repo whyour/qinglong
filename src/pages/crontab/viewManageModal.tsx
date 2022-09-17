@@ -212,7 +212,7 @@ const ViewManageModal = ({
   return (
     <Modal
       title="视图管理"
-      visible={visible}
+      open={visible}
       centered
       width={620}
       onCancel={() => handleCancel()}
