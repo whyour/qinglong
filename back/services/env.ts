@@ -113,6 +113,7 @@ export default class EnvService {
     }
     try {
       const result = await this.find(condition, [
+        ['status', 'ASC'],
         ['position', 'DESC'],
         ['createdAt', 'DESC'],
       ]);
