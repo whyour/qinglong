@@ -29,6 +29,8 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
 import { getTableScroll } from '@/utils/index';
 import DependenceLogModal from './logModal';
+import { useOutletContext } from '@umijs/max';
+import { SharedContext } from '@/layouts';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -48,7 +50,9 @@ enum StatusColor {
   'error',
 }
 
-const Dependence = ({ headerStyle, isPhone, socketMessage }: any) => {
+const Dependence = () => {
+  const { headerStyle, isPhone, socketMessage } =
+    useOutletContext<SharedContext>();
   const columns: any = [
     {
       title: '序号',

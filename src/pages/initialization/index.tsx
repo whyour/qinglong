@@ -10,7 +10,7 @@ import {
   Select,
 } from 'antd';
 import config from '@/utils/config';
-import { history } from 'umi';
+import { history } from '@umijs/max';
 import styles from './index.less';
 import { request } from '@/utils/http';
 
@@ -116,7 +116,9 @@ const Initialization = () => {
               {config.notificationModes
                 .filter((x) => x.value !== 'closed')
                 .map((x) => (
-                  <Option value={x.value}>{x.label}</Option>
+                  <Option key={x.value} value={x.value}>
+                    {x.label}
+                  </Option>
                 ))}
             </Select>
           </Form.Item>

@@ -7,6 +7,8 @@ import { request } from '@/utils/http';
 import styles from './index.module.less';
 import { Controlled as CodeMirror } from 'react-codemirror2';
 import SplitPane from 'react-split-pane';
+import { useOutletContext } from '@umijs/max';
+import { SharedContext } from '@/layouts';
 
 function getFilterData(keyword: string, data: any) {
   const expandedKeys: string[] = [];
@@ -36,7 +38,8 @@ function getFilterData(keyword: string, data: any) {
   return { tree: data, expandedKeys };
 }
 
-const Log = ({ headerStyle, isPhone, theme }: any) => {
+const Log = () => {
+  const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [title, setTitle] = useState('请选择日志文件');
   const [value, setValue] = useState('请选择日志文件');
   const [select, setSelect] = useState<any>();

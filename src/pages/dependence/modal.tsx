@@ -101,7 +101,9 @@ const DependenceModal = ({
         >
           <Select>
             {config.dependenceTypes.map((x, i) => (
-              <Option value={i}>{x}</Option>
+              <Option key={i} value={i}>
+                {x}
+              </Option>
             ))}
           </Select>
         </Form.Item>

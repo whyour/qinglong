@@ -6,10 +6,13 @@ import { request } from '@/utils/http';
 import './index.less';
 import { DiffEditor } from '@monaco-editor/react';
 import ReactDiffViewer from 'react-diff-viewer';
+import { useOutletContext } from '@umijs/max';
+import { SharedContext } from '@/layouts';
 
 const { Option } = Select;
 
-const Diff = ({ headerStyle, isPhone, theme }: any) => {
+const Diff = () => {
+  const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [origin, setOrigin] = useState('config.sample.sh');
   const [current, setCurrent] = useState('config.sh');
   const [originValue, setOriginValue] = useState('');
@@ -95,7 +98,9 @@ const Diff = ({ headerStyle, isPhone, theme }: any) => {
           <Form.Item label="源文件">
             <Select value={origin} onChange={originFileChange}>
               {files.map((x) => (
-                <Option value={x.value}>{x.title}</Option>
+                <Option key={x.value} value={x.value}>
+                  {x.title}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -104,7 +109,9 @@ const Diff = ({ headerStyle, isPhone, theme }: any) => {
           <Form.Item label="当前文件">
             <Select value={current} onChange={currentFileChange}>
               {files.map((x) => (
-                <Option value={x.value}>{x.title}</Option>
+                <Option key={x.value} value={x.value}>
+                  {x.title}
+                </Option>
               ))}
             </Select>
           </Form.Item>

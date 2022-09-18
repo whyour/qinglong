@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Input, Form, Button, message, Avatar, Upload } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import { history } from 'umi';
+import { history } from '@umijs/max';
 import QRCode from 'qrcode.react';
 import { PageLoading } from '@ant-design/pro-layout';
 import { UploadOutlined, UserOutlined } from '@ant-design/icons';

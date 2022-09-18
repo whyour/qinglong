@@ -29,6 +29,8 @@ import LoginLog from './loginLog';
 import NotificationSetting from './notification';
 import CheckUpdate from './checkUpdate';
 import About from './about';
+import { useOutletContext } from '@umijs/max';
+import { SharedContext } from '@/layouts';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -37,14 +39,9 @@ const optionsWithDisabled = [
   { label: '跟随系统', value: 'auto' },
 ];
 
-const Setting = ({
-  headerStyle,
-  isPhone,
-  user,
-  reloadUser,
-  reloadTheme,
-  socketMessage,
-}: any) => {
+const Setting = () => {
+  const { headerStyle, isPhone, user, reloadUser, reloadTheme, socketMessage } =
+    useOutletContext<SharedContext>();
   const columns = [
     {
       title: '名称',

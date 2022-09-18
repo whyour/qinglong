@@ -13,7 +13,7 @@ export default async () => {
 
   // 生成内置token
   let tokenCommand = `ts-node-transpile-only ${config.rootPath}/back/token.ts`;
-  const tokenFile = `${config.rootPath}/static/build/token.js`;
+  const tokenFile = `${config.rootPath}static/build/token.js`;
   if (await fileExist(tokenFile)) {
     tokenCommand = `node ${tokenFile}`;
   }

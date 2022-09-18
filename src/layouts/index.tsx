@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import ProLayout, { PageLoading } from '@ant-design/pro-layout';
 import * as DarkReader from '@umijs/ssr-darkreader';
 import defaultProps from './defaultProps';
-import { Link, history } from 'umi';
+import { Link, history, Outlet, useLocation } from '@umijs/max';
 import {
   LogoutOutlined,
   MenuFoldOutlined,
@@ -21,7 +21,18 @@ import SockJS from 'sockjs-client';
 import * as Sentry from '@sentry/react';
 import { init } from '../utils/init';
 
-export default function (props: any) {
+export interface SharedContext {
+  headerStyle: React.CSSProperties;
+  isPhone: boolean;
+  theme: 'vs' | 'vs-dark';
+  user: any;
+  reloadUser: (needLoading?: boolean) => void;
+  reloadTheme: () => void;
+  socketMessage: any;
+}
+
+export default function () {
+  const location = useLocation();
   const ctx = useCtx();
   const { theme, reloadTheme } = useTheme();
   const [user, setUser] = useState<any>({});
@@ -73,7 +84,7 @@ export default function (props: any) {
       .then(({ code, data }) => {
         if (code === 200 && data.username) {
           setUser(data);
-          if (props.location.pathname === '/') {
+          if (location.pathname === '/') {
             history.push('/crontab');
           }
         } else {
@@ -94,7 +105,7 @@ export default function (props: any) {
     if (systemInfo && systemInfo.isInitialized && !user) {
       getUser();
     }
-  }, [props.location.pathname]);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!systemInfo) {
@@ -138,7 +149,9 @@ export default function (props: any) {
   useEffect(() => {
     if (!user || !user.username) return;
     ws.current = new SockJS(
-      `${location.origin}/api/ws?token=${localStorage.getItem(config.authKey)}`,
+      `${window.location.origin}/api/ws?token=${localStorage.getItem(
+        config.authKey,
+      )}`,
     );
 
     ws.current.onmessage = (e: any) => {
@@ -183,30 +196,27 @@ export default function (props: any) {
     };
   }, []);
 
-  if (
-    ['/login', '/initialization', '/error'].includes(props.location.pathname)
-  ) {
+  if (['/login', '/initialization', '/error'].includes(location.pathname)) {
     document.title = `${
-      (config.documentTitleMap as any)[props.location.pathname]
+      (config.documentTitleMap as any)[location.pathname]
     } - 控制面板`;
-    if (
-      systemInfo?.isInitialized &&
-      props.location.pathname === '/initialization'
-    ) {
+    if (systemInfo?.isInitialized && location.pathname === '/initialization') {
       history.push('/crontab');
     }
 
-    if (systemInfo || props.location.pathname === '/error') {
-      return React.Children.map(props.children, (child) => {
-        return React.cloneElement(child, {
-          ...ctx,
-          theme,
-          user,
-          reloadUser,
-          reloadTheme,
-          ws: ws.current,
-        });
-      });
+    if (systemInfo || location.pathname === '/error') {
+      return (
+        <Outlet
+          context={{
+            ...ctx,
+            theme,
+            user,
+            reloadUser,
+            reloadTheme,
+            ws: ws.current,
+          }}
+        />
+      );
     }
   }
 
@@ -227,7 +237,7 @@ export default function (props: any) {
     <PageLoading />
   ) : (
     <ProLayout
-      selectedKeys={[props.location.pathname]}
+      selectedKeys={[location.pathname]}
       loading={loading}
       ErrorBoundary={Sentry.ErrorBoundary}
       logo={<Image preview={false} src="http://qn.whyour.cn/logo.png" />}
@@ -320,16 +330,16 @@ export default function (props: any) {
       )}
       {...defaultProps}
     >
-      {React.Children.map(props.children, (child) => {
-        return React.cloneElement(child, {
+      <Outlet
+        context={{
           ...ctx,
           theme,
           user,
           reloadUser,
           reloadTheme,
           socketMessage,
-        });
-      })}
+        }}
+      />
     </ProLayout>
   );
 }

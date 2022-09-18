@@ -30,9 +30,10 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import SubscriptionModal from './modal';
 import { getTableScroll } from '@/utils/index';
-import { history } from 'umi';
+import { history, useOutletContext } from '@umijs/max';
 import './index.less';
 import SubscriptionLogModal from './logModal';
+import { SharedContext } from '@/layouts';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -57,7 +58,10 @@ export enum SubscriptionType {
   'file' = '单文件',
 }
 
-const Subscription = ({ headerStyle, isPhone, socketMessage }: any) => {
+const Subscription = () => {
+  const { headerStyle, isPhone, socketMessage } =
+    useOutletContext<SharedContext>();
+
   const columns: any = [
     {
       title: '名称',

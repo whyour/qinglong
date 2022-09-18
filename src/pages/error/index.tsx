@@ -3,11 +3,13 @@ import config from '@/utils/config';
 import { request } from '@/utils/http';
 import Terminal, { ColorMode, LineType } from '../../components/terminal';
 import { PageLoading } from '@ant-design/pro-layout';
-import { history } from 'umi';
+import { history, useOutletContext } from '@umijs/max';
 import Ansi from 'ansi-to-react';
 import './index.less';
+import { SharedContext } from '@/layouts';
 
-const Error = ({ user, theme }: any) => {
+const Error = () => {
+  const { user, theme } = useOutletContext<SharedContext>();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState('暂无日志');
 

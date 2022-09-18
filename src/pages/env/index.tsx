@@ -26,6 +26,8 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
 import { exportJson, getTableScroll } from '@/utils/index';
+import { useOutletContext } from '@umijs/max';
+import { SharedContext } from '@/layouts';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -96,7 +98,8 @@ const DragableBodyRow = ({
   );
 };
 
-const Env = ({ headerStyle, isPhone, theme }: any) => {
+const Env = () => {
+  const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const columns: any = [
     {
       title: '序号',

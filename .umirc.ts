@@ -1,20 +1,15 @@
-import { defineConfig } from 'umi';
+import { defineConfig } from '@umijs/max';
 const CompressionPlugin = require('compression-webpack-plugin');
 
 export default defineConfig({
   hash: true,
-  layout: false,
+  antd: {},
   outputPath: 'static/dist',
-  nodeModulesTransform: {
-    type: 'none',
+  fastRefresh: true,
+  favicons: ['/images/favicon.svg'],
+  mfsu: {
+    strategy: 'eager',
   },
-  fastRefresh: {},
-  esbuild: {},
-  webpack5: {},
-  dynamicImport: {
-    loading: '@/components/pageLoading',
-  },
-  favicon: '/images/favicon.svg',
   proxy: {
     '/api/public': {
       target: 'http://127.0.0.1:5400/',
@@ -26,7 +21,7 @@ export default defineConfig({
       ws: true,
     },
   },
-  chainWebpack: (config) => {
+  chainWebpack: ((config: any) => {
     config.plugin('compression-webpack-plugin').use(
       new CompressionPlugin({
         algorithm: 'gzip',
@@ -35,13 +30,13 @@ export default defineConfig({
         minRatio: 0.6,
       }),
     );
-  },
+  }) as any,
   externals: {
     react: 'window.React',
     'react-dom': 'window.ReactDOM',
   },
-  scripts: [
-    'https://gw.alipayobjects.com/os/lib/react/16.13.1/umd/react.production.min.js',
-    'https://gw.alipayobjects.com/os/lib/react-dom/16.13.1/umd/react-dom.production.min.js',
+  headScripts: [
+    'https://gw.alipayobjects.com/os/lib/react/18.2.0/umd/react.production.min.js',
+    'https://gw.alipayobjects.com/os/lib/react-dom/18.2.0/umd/react-dom.production.min.js',
   ],
 });

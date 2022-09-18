@@ -241,3 +241,31 @@ export function exportJson(name: string, data: string) {
   createA.download = name;
   automaticClick(createA);
 }
+
+export function depthFirstSearch<
+  T extends Record<string, any> & { children?: T[] },
+>(children: T[], condition: (column: T) => boolean, item: T) {
+  const c = [...children];
+  const keys = [];
+
+  (function find(cls: T[] | undefined) {
+    if (!cls) return;
+    for (let i = 0; i < cls?.length; i++) {
+      if (condition(cls[i])) {
+        if (cls[i].children) {
+          cls[i].children!.unshift(item);
+        } else {
+          cls[i].children = [item];
+        }
+        return;
+      }
+      if (cls[i].children) {
+        keys.push(cls[i].key);
+        find(cls[i].children);
+      }
+    }
+  })(c);
+
+  console.log(keys);
+  return c;
+}

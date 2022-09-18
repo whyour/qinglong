@@ -9,16 +9,18 @@ import {
   Statistic,
 } from 'antd';
 import config from '@/utils/config';
-import { history, Link } from 'umi';
+import { history, useOutletContext } from '@umijs/max';
 import styles from './index.less';
 import { request } from '@/utils/http';
 import { useTheme } from '@/utils/hooks';
 import { MobileOutlined } from '@ant-design/icons';
+import { SharedContext } from '@/layouts';
 
 const FormItem = Form.Item;
 const { Countdown } = Statistic;
 
-const Login = ({ reloadUser }: any) => {
+const Login = () => {
+  const { reloadUser } = useOutletContext<SharedContext>();
   const [loading, setLoading] = useState(false);
   const [waitTime, setWaitTime] = useState<any>();
   const { theme } = useTheme();

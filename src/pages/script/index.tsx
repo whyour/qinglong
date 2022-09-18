@@ -33,7 +33,10 @@ import {
 } from '@ant-design/icons';
 import EditScriptNameModal from './editNameModal';
 import debounce from 'lodash/debounce';
-import { history } from 'umi';
+import { history, useOutletContext, useLocation } from '@umijs/max';
+import { parse } from 'query-string';
+import { depthFirstSearch } from '@/utils';
+import { SharedContext } from '@/layouts';
 
 const { Text } = Typography;
 
@@ -72,7 +75,9 @@ const LangMap: any = {
   '.ts': 'typescript',
 };
 
-const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
+const Script = () => {
+  const { headerStyle, isPhone, theme, socketMessage } =
+    useOutletContext<SharedContext>();
   const [title, setTitle] = useState('请选择脚本文件');
   const [value, setValue] = useState('请选择脚本文件');
   const [select, setSelect] = useState<any>();
@@ -111,7 +116,7 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
   };
 
   const initGetScript = () => {
-    const { p, s } = history.location.query as any;
+    const { p, s } = parse(history.location.search);
     if (s) {
       const vkey = `${p}/${s}`;
       const obj = {
@@ -313,20 +318,17 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
     },
   ) => {
     if (filename) {
-      const newData = [...data];
+      let newData = [...data];
       const _file = { title: filename, key, parent: path };
       if (path) {
-        // TODO: 更新左侧树数据
-        const parentNodeIndex = newData.findIndex((x) => x.key === path);
-        if (parentNodeIndex !== -1) {
-          const parentNode = newData[parentNodeIndex];
-          if (parentNode.children && parentNode.children.length > 0) {
-            parentNode.children.unshift(_file);
-          } else {
-            parentNode.children = [_file];
-          }
-          newData.splice(parentNodeIndex, 1, { ...parentNode });
-        }
+        newData = depthFirstSearch(newData, (c) => c.key === path, _file);
+        const keys = path.split('/');
+        const sKeys: string[] = [];
+        keys.reduce((p, c) => {
+          sKeys.push(p);
+          return `${p}/${c}`;
+        });
+        setExpandedKeys([...expandedKeys, ...sKeys, path]);
       } else {
         newData.unshift(_file);
       }
@@ -360,10 +362,6 @@ const Script = ({ headerStyle, isPhone, theme, socketMessage }: any) => {
     const word = searchValue || '';
     const { tree } = getFilterData(word.toLocaleLowerCase(), data);
     setFilterData(tree);
-    setSelect('');
-    setCurrentNode(null);
-    setTitle('请选择脚本文件');
-    setValue('请选择脚本文件');
   }, [data]);
 
   useEffect(() => {

@@ -36,7 +36,7 @@ const EditScriptNameModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const { path = '', filename: inputFilename, directory } = values;
+    const { path = '', filename: inputFilename, directory = '' } = values;
     const formData = new FormData();
     formData.append('file', file as any);
     formData.append('filename', inputFilename);
@@ -50,11 +50,11 @@ const EditScriptNameModal = ({
       .then(({ code, data }) => {
         if (code === 200) {
           message.success(directory ? '新建文件夹成功' : '新建文件成功');
-          const key = path ? `${values.path}/` : '';
+          const key = path ? `${path}/` : '';
           const filename = file ? file.name : inputFilename;
           handleCancel({
             filename,
-            path: values.path,
+            path,
             key: `${key}${filename}`,
           });
         } else {

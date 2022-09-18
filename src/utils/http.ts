@@ -1,7 +1,7 @@
 import { extend } from 'umi-request';
 import { message } from 'antd';
 import config from './config';
-import { history } from 'umi';
+import { history } from '@umijs/max';
 
 message.config({
   duration: 1.5,

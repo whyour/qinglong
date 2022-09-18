@@ -115,8 +115,11 @@ export default (app: Router) => {
         if (!originFilename) {
           originFilename = filename;
         }
-        const originFilePath = `${path}${originFilename.replace(/\//g, '')}`;
-        const filePath = `${path}${filename.replace(/\//g, '')}`;
+        const originFilePath = join(
+          path,
+          `${originFilename.replace(/\//g, '')}`,
+        );
+        const filePath = join(path, `${filename.replace(/\//g, '')}`);
         if (fs.existsSync(originFilePath)) {
           fs.copyFileSync(
             originFilePath,

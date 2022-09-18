@@ -11,8 +11,11 @@ import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import Editor from '@monaco-editor/react';
 import { Controlled as CodeMirror } from 'react-codemirror2';
+import { useOutletContext } from '@umijs/max';
+import { SharedContext } from '@/layouts';
 
-const Config = ({ headerStyle, isPhone, theme }: any) => {
+const Config = () => {
+  const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('config.sh');

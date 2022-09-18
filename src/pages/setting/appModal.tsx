@@ -91,7 +91,11 @@ const AppModal = ({
             style={{ width: '100%' }}
           >
             {config.scopes.map((x) => {
-              return <Select.Option value={x.value}>{x.name}</Select.Option>;
+              return (
+                <Select.Option key={x.value} value={x.value}>
+                  {x.name}
+                </Select.Option>
+              );
             })}
           </Select>
         </Form.Item>
