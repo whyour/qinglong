@@ -112,7 +112,7 @@
     "@umijs/max": "^4.0.21",
     "@umijs/ssr-darkreader": "^4.9.45",
     "ansi-to-react": "^6.1.6",
-    "antd": "^4.20.5",
+    "antd": "^4.23.0",
     "antd-img-crop": "^4.2.3",
     "codemirror": "^5.65.2",
     "compression-webpack-plugin": "9.2.0",
