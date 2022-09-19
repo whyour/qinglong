@@ -108,6 +108,7 @@ const Crontab = () => {
                     {record.labels?.map((label: string) => (
                       <Tag
                         color="blue"
+                        key={label}
                         style={{ cursor: 'point' }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -201,10 +202,10 @@ const Crontab = () => {
           >
             {record.last_execution_time
               ? new Date(record.last_execution_time * 1000)
-                .toLocaleString(language, {
-                  hour12: false,
-                })
-                .replace(' 24:', ' 00:')
+                  .toLocaleString(language, {
+                    hour12: false,
+                  })
+                  .replace(' 24:', ' 00:')
               : '-'}
           </span>
         );
@@ -413,10 +414,11 @@ const Crontab = () => {
   const getCrons = () => {
     setLoading(true);
     const { page, size, sorter, filters } = pageConf;
-    let url = `${config.apiPrefix
-      }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
-        filters,
-      )}`;
+    let url = `${
+      config.apiPrefix
+    }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
+      filters,
+    )}`;
     if (sorter && sorter.field) {
       url += `&sorter=${JSON.stringify({
         field: sorter.field,
@@ -585,7 +587,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${
+              record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             {
               data: [record.id],
@@ -630,7 +633,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${
+              record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             {
               data: [record.id],
@@ -1090,13 +1094,11 @@ const Crontab = () => {
             label: '全部任务',
             children: panelContent,
           },
-          ...[...enabledCronViews].slice(0, 2).map((x) => (
-            {
-              key: x.id,
-              label: x.name,
-              children: panelContent
-            }
-          )),
+          ...[...enabledCronViews].slice(0, 2).map((x) => ({
+            key: x.id,
+            label: x.name,
+            children: panelContent,
+          })),
         ]}
       >
         <Tabs.TabPane tab="全部任务" key="all">

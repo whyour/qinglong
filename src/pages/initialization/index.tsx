@@ -124,6 +124,7 @@ const Initialization = () => {
           </Form.Item>
           {fields.map((x) => (
             <Form.Item
+              key={x.label}
               label={x.label}
               name={x.label}
               extra={x.tip}

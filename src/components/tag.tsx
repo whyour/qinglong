@@ -50,6 +50,7 @@ const EditableTagGroup = ({
         {tag}
       </Tag>
     );
+
     return (
       <span key={tag} style={{ display: 'inline-block', marginBottom: 8 }}>
         {tagElem}
