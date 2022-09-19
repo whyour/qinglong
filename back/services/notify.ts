@@ -26,6 +26,7 @@ export default class NotificationService {
     ['iGot', this.iGot],
     ['pushPlus', this.pushPlus],
     ['email', this.email],
+    ['webhook', this.webhook],
   ]);
 
   private timeout = 10000;
@@ -382,5 +383,20 @@ export default class NotificationService {
     transporter.close();
 
     return !!info.messageId;
+  }
+
+  private async webhook() {
+    const { webhookUrl, webhookBody, webhookHeaders, webhookMethod } =
+      this.params;
+
+    const { statusCode } = await got(webhookUrl, {
+      method: webhookMethod,
+      headers: webhookHeaders,
+      body: webhookBody,
+      timeout: this.timeout,
+      retry: 0,
+    });
+
+    return String(statusCode).includes('20');
   }
 }

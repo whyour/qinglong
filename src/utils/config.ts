@@ -92,6 +92,7 @@ export default {
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'chat', label: '群辉chat' },
     { value: 'email', label: '邮箱' },
+    { value: 'webhook', label: '自定义通知' },
     { value: 'closed', label: '已关闭' },
   ],
   notificationModeMap: {
@@ -221,6 +222,30 @@ export default {
       },
       { label: 'emailUser', tip: '邮箱地址', required: true },
       { label: 'emailPass', tip: '邮箱SMTP授权码', required: true },
+    ],
+    webhook: [
+      {
+        label: 'webhookMethod',
+        tip: '请求方法',
+        required: true,
+        placeholder: '请输入 GET/POST/PUT',
+      },
+      {
+        label: 'webhookUrl',
+        tip: '请求链接',
+        required: true,
+        placeholder: 'https://xxx.cn/api?query=xxx',
+      },
+      {
+        label: 'webhookHeaders',
+        tip: '请求头',
+        placeholder: '{"Custom-Header": "$Header"}',
+      },
+      {
+        label: 'webhookBody',
+        tip: '请求体',
+        placeholder: '{"status": "$STATUS"}',
+      },
     ],
   },
   documentTitleMap: {

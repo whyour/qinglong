@@ -1,3 +1,5 @@
+import { IncomingHttpHeaders } from 'http';
+
 export enum NotificationMode {
   'gotify' = 'gotify',
   'goCqHttpBot' = 'goCqHttpBot',
@@ -12,6 +14,7 @@ export enum NotificationMode {
   'iGot' = 'iGot',
   'pushPlus' = 'pushPlus',
   'email' = 'email',
+  'webhook' = 'webhook',
 }
 
 abstract class NotificationBaseInfo {
@@ -87,6 +90,13 @@ export class EmailNotification extends NotificationBaseInfo {
   public emailPass: string = '';
 }
 
+export class WebhookNotification extends NotificationBaseInfo {
+  public webhookHeaders: IncomingHttpHeaders = {};
+  public webhookBody: any = {};
+  public webhookUrl: string = '';
+  public webhookMethod: 'GET' | 'POST' | 'PUT' = 'GET';
+}
+
 export interface NotificationInfo
   extends GoCqHttpBotNotification,
     GotifyNotification,
@@ -100,4 +110,5 @@ export interface NotificationInfo
     WeWorkAppNotification,
     IGotNotification,
     PushPlusNotification,
-    EmailNotification {}
+    EmailNotification,
+    WebhookNotification {}

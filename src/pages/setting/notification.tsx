@@ -58,7 +58,9 @@ const NotificationSetting = ({ data }: any) => {
         >
           <Select onChange={notificationModeChange}>
             {config.notificationModes.map((x) => (
-              <Option value={x.value}>{x.label}</Option>
+              <Option key={x.value} value={x.value}>
+                {x.label}
+              </Option>
             ))}
           </Select>
         </Form.Item>
@@ -71,7 +73,10 @@ const NotificationSetting = ({ data }: any) => {
             rules={[{ required: x.required }]}
             style={{ maxWidth: 400 }}
           >
-            <Input.TextArea autoSize={true} placeholder={`请输入${x.label}`} />
+            <Input.TextArea
+              autoSize={true}
+              placeholder={x.placeholder || `请输入${x.label}`}
+            />
           </Form.Item>
         ))}
         <Button type="primary" htmlType="submit">
