@@ -150,9 +150,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-          shell, // wechat qq uc 360 2345 sougou liebao maxthon
-          shellVs,
-        },
+        shell, // wechat qq uc 360 2345 sougou liebao maxthon
+        shellVs,
+      },
   );
 
   console.log(
@@ -188,8 +188,8 @@ export function getTableScroll({
   if (id) {
     tHeader = document.getElementById(id)
       ? document
-          .getElementById(id)!
-          .getElementsByClassName('ant-table-thead')[0]
+        .getElementById(id)!
+        .getElementsByClassName('ant-table-thead')[0]
       : null;
   } else {
     tHeader = document.querySelector('.ant-table-wrapper');
@@ -269,3 +269,61 @@ export function depthFirstSearch<
   console.log(keys);
   return c;
 }
+
+export function parseHeaders(headers: string) {
+  if (!headers) return {};
+
+  const parsed: any = {};
+  let key;
+  let val;
+  let i;
+
+  headers && headers.split('\n').forEach(function parser(line) {
+    i = line.indexOf(':');
+    key = line.substring(0, i).trim().toLowerCase();
+    val = line.substring(i + 1).trim();
+
+    if (!key) {
+      return;
+    }
+
+    parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+  });
+
+  return parsed;
+};
+
+export function parseBody(body: string, contentType: 'application/json' | 'multipart/form-data' | 'application/x-www-form-urlencoded') {
+  if (!body) return '';
+
+  const parsed: any = {};
+  let key;
+  let val;
+  let i;
+
+  body && body.split('\n').forEach(function parser(line) {
+    i = line.indexOf(':');
+    key = line.substring(0, i).trim().toLowerCase();
+    val = line.substring(i + 1).trim();
+
+    if (!key || parsed[key]) {
+      return;
+    }
+
+    parsed[key] = val;
+  });
+
+  switch (contentType) {
+    case 'multipart/form-data':
+      return Object.keys(parsed).reduce((p, c) => {
+        p.append(c, parsed[c])
+        return p;
+      }, new FormData());
+    case 'application/x-www-form-urlencoded':
+      return Object.keys(parsed).reduce((p, c) => {
+        return p ? `${p}&${c}=${parsed[c]}` : `${c}=${parsed[c]}`;
+      });
+  }
+
+  return parsed;
+};

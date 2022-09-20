@@ -95,6 +95,7 @@ export class WebhookNotification extends NotificationBaseInfo {
   public webhookBody: any = {};
   public webhookUrl: string = '';
   public webhookMethod: 'GET' | 'POST' | 'PUT' = 'GET';
+  public webhookContentType: 'application/json' | 'multipart/form-data' | 'application/x-www-form-urlencoded' = 'application/json';
 }
 
 export interface NotificationInfo

@@ -206,7 +206,7 @@ export default {
     pushPlus: [
       {
         label: 'pushPlusToken',
-        tip: '微信扫码登录后一对一推送或一对多推送下面的token(您的Token)，不提供PUSH_PLUS_USER则默认为一对一推送',
+        tip: '微信扫码登录后一对一推送或一对多推送下面的token(您的Token)，不提供PUSH_PLUS_USER则默认为一对一推送，参考 https://www.pushplus.plus/',
         required: true,
       },
       {
@@ -228,23 +228,29 @@ export default {
         label: 'webhookMethod',
         tip: '请求方法',
         required: true,
-        placeholder: '请输入 GET/POST/PUT',
+        items: [{ value: 'GET' }, { value: 'POST' }, { value: 'PUT' }],
+      },
+      {
+        label: 'webhookContentType',
+        tip: '请求头Content-Type',
+        required: true,
+        items: [{ value: 'application/json' }, { value: 'multipart/form-data' }, { value: 'application/x-www-form-urlencoded' }],
       },
       {
         label: 'webhookUrl',
-        tip: '请求链接',
+        tip: '请求链接以http或者https开头',
         required: true,
-        placeholder: 'https://xxx.cn/api?query=xxx',
+        placeholder: 'https://xxx.cn/api?query=xxx\n',
       },
       {
         label: 'webhookHeaders',
-        tip: '请求头',
-        placeholder: '{"Custom-Header": "$Header"}',
+        tip: '请求头格式Custom-Header1: Header1，多个换行分割',
+        placeholder: 'Custom-Header1: Header1\nCustom-Header2: Header2',
       },
       {
         label: 'webhookBody',
-        tip: '请求体',
-        placeholder: '{"status": "$STATUS"}',
+        tip: '请求体格式key1: value1，多个换行分割',
+        placeholder: 'key1: value1\nkey2: value2',
       },
     ],
   },
