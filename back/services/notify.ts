@@ -6,6 +6,7 @@ import got from 'got';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { HttpProxyAgent, HttpsProxyAgent } from 'hpagent';
+import { parseBody, parseHeaders } from '../config/util';
 
 @Service()
 export default class NotificationService {
@@ -388,10 +389,12 @@ export default class NotificationService {
     const { webhookUrl, webhookBody, webhookHeaders, webhookMethod, webhookContentType } =
       this.params;
 
-    const bodyParam = this.formatBody(webhookContentType, webhookBody);
+    const headers = parseHeaders(webhookHeaders);
+    const body = parseBody(webhookBody, webhookContentType);
+    const bodyParam = this.formatBody(webhookContentType, body);
     const options = {
       method: webhookMethod,
-      headers: webhookHeaders,
+      headers,
       timeout: this.timeout,
       retry: 0,
       allowGetBody: true,

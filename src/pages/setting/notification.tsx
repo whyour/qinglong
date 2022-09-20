@@ -13,15 +13,11 @@ const NotificationSetting = ({ data }: any) => {
   const [form] = Form.useForm();
 
   const handleOk = (values: any) => {
-    const { type, webhookBody, webhookContentType } = values;
+    const { type } = values;
     if (type == 'closed') {
       values.type = '';
     }
 
-    if (type === 'webhook') {
-      values.webhookHeaders = { ...parseHeaders(values.webhookHeaders) };
-      values.webhookBody = parseBody(webhookBody, webhookContentType);
-    }
     request
       .put(`${config.apiPrefix}user/notification`, {
         data: {

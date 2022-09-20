@@ -3,6 +3,7 @@ import * as path from 'path';
 import got from 'got';
 import iconv from 'iconv-lite';
 import { exec } from 'child_process';
+import FormData from 'form-data';
 
 export function getFileContentByName(fileName: string) {
   if (fs.existsSync(fileName)) {
@@ -355,3 +356,61 @@ export function promiseExec(command: string): Promise<string> {
     );
   });
 }
+
+export function parseHeaders(headers: string) {
+  if (!headers) return {};
+
+  const parsed: any = {};
+  let key;
+  let val;
+  let i;
+
+  headers && headers.split('\n').forEach(function parser(line) {
+    i = line.indexOf(':');
+    key = line.substring(0, i).trim().toLowerCase();
+    val = line.substring(i + 1).trim();
+
+    if (!key) {
+      return;
+    }
+
+    parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+  });
+
+  return parsed;
+};
+
+export function parseBody(body: string, contentType: 'application/json' | 'multipart/form-data' | 'application/x-www-form-urlencoded') {
+  if (!body) return '';
+
+  const parsed: any = {};
+  let key;
+  let val;
+  let i;
+
+  body && body.split('\n').forEach(function parser(line) {
+    i = line.indexOf(':');
+    key = line.substring(0, i).trim().toLowerCase();
+    val = line.substring(i + 1).trim();
+
+    if (!key || parsed[key]) {
+      return;
+    }
+
+    parsed[key] = val;
+  });
+
+  switch (contentType) {
+    case 'multipart/form-data':
+      return Object.keys(parsed).reduce((p, c) => {
+        p.append(c, parsed[c])
+        return p;
+      }, new FormData());
+    case 'application/x-www-form-urlencoded':
+      return Object.keys(parsed).reduce((p, c) => {
+        return p ? `${p}&${c}=${parsed[c]}` : `${c}=${parsed[c]}`;
+      });
+  }
+
+  return parsed;
+};

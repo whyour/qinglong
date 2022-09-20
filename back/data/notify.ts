@@ -91,8 +91,8 @@ export class EmailNotification extends NotificationBaseInfo {
 }
 
 export class WebhookNotification extends NotificationBaseInfo {
-  public webhookHeaders: IncomingHttpHeaders = {};
-  public webhookBody: any = {};
+  public webhookHeaders: string = '';
+  public webhookBody: string = '';
   public webhookUrl: string = '';
   public webhookMethod: 'GET' | 'POST' | 'PUT' = 'GET';
   public webhookContentType: 'application/json' | 'multipart/form-data' | 'application/x-www-form-urlencoded' = 'application/json';
