@@ -1,6 +1,8 @@
-export const version = '2.14.3';
-export const changeLogLink = 'https://t.me/jiao_long/330';
-export const changeLog = `2.14.8 版本说明
-1. 修复安装依赖可能出现的  ERR_PNPM_REGISTRIES_MISMATCH
-2. 今人不见古时月，今月曾经照古人  -> 中秋快乐
+export const version = '2.14.4';
+export const changeLogLink = 'https://t.me/jiao_long/331';
+export const changeLog = `2.14.4 版本说明
+1. 通知设置新增自定义通知
+2. 脚本管理支持新建文件夹
+3. 依赖管理增加批量重新安装
+4. 修复创建应用错误
 `;
