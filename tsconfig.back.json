@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "lib": ["es2017", "esnext.asynciterable", "DOM"],
+    "lib": ["es2021", "esnext.asynciterable", "DOM"],
     "typeRoots": [
       "./node_modules/@types",
       "./src/types",
