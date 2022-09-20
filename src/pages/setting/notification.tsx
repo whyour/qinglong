@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Input, Form, Button, Select, message } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import { parseBody, parseHeaders } from '@/utils';
 
 const { Option } = Select;
 
@@ -28,7 +27,7 @@ const NotificationSetting = ({ data }: any) => {
         if (_data && _data.code === 200) {
           message.success(values.type ? '通知发送成功' : '通知关闭成功');
         } else {
-          message.error(_data.data);
+          message.error(_data.message);
         }
       })
       .catch((error: any) => {

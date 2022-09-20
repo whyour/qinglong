@@ -389,8 +389,12 @@ export default class NotificationService {
     const { webhookUrl, webhookBody, webhookHeaders, webhookMethod, webhookContentType } =
       this.params;
 
+    const { formatBody, formatUrl } = this.formatNotifyContent(webhookUrl, webhookBody);
+    if (!formatUrl && !formatBody) { 
+      return false;
+    }
     const headers = parseHeaders(webhookHeaders);
-    const body = parseBody(webhookBody, webhookContentType);
+    const body = parseBody(formatBody, webhookContentType);
     const bodyParam = this.formatBody(webhookContentType, body);
     const options = {
       method: webhookMethod,
@@ -400,7 +404,7 @@ export default class NotificationService {
       allowGetBody: true,
       ...bodyParam
     }
-    const res = await got(webhookUrl, options);
+    const res = await got(formatUrl, options);
     return String(res.statusCode).startsWith('20');
   }
 
@@ -415,5 +419,16 @@ export default class NotificationService {
         return { body };
     }
     return {};
+  }
+
+  private formatNotifyContent(url: string, body: string) {
+    if (!url.includes('$title') && !body.includes('$title')) {
+      return {};
+    }
+
+    return {
+      formatUrl: url.replaceAll('$title', encodeURIComponent(this.title)).replaceAll('$content', encodeURIComponent(this.content)),
+      formatBody: body.replaceAll('$title', this.title).replaceAll('$content', this.content),
+    }
   }
 }

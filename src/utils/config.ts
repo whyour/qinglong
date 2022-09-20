@@ -238,9 +238,9 @@ export default {
       },
       {
         label: 'webhookUrl',
-        tip: '请求链接以http或者https开头',
+        tip: '请求链接以http或者https开头。url或者body中必须包含$title，$content可选，对应api内容的位置',
         required: true,
-        placeholder: 'https://xxx.cn/api?query=xxx\n',
+        placeholder: 'https://xxx.cn/api?content=$title\n',
       },
       {
         label: 'webhookHeaders',
@@ -249,8 +249,8 @@ export default {
       },
       {
         label: 'webhookBody',
-        tip: '请求体格式key1: value1，多个换行分割',
-        placeholder: 'key1: value1\nkey2: value2',
+        tip: '请求体格式key1: value1，多个换行分割。url或者body中必须包含$title，$content可选，对应api内容的位置',
+        placeholder: 'key1: $title\nkey2: $content',
       },
     ],
   },
