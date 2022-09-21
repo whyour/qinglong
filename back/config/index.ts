@@ -11,7 +11,7 @@ if (!process.env.QL_DIR) {
   if (qlHomePath.endsWith('/static/')) {
     qlHomePath = path.join(qlHomePath, '../');
   }
-  process.env.QL_DIR = qlHomePath;
+  process.env.QL_DIR = qlHomePath.replace(/\/$/g, '');
 }
 
 const lastVersionFile = `http://qn.whyour.cn/version.ts?v=${Date.now()}`;

@@ -190,8 +190,8 @@ const SubscriptionModal = ({
   };
 
   const onPaste = useCallback((e: any) => {
-    const text = e.clipboardData.getData('text');
-    if (!subscription && text.includes('ql ')) {
+    const text = e.clipboardData.getData('text') as string;
+    if (text.startsWith('ql ')) {
       const [
         ,
         type,
@@ -208,8 +208,8 @@ const SubscriptionModal = ({
         type === 'raw'
           ? 'file'
           : url.startsWith('http')
-          ? 'public-repo'
-          : 'private-repo';
+            ? 'public-repo'
+            : 'private-repo';
 
       form.setFieldsValue({
         type: _type,
@@ -222,6 +222,13 @@ const SubscriptionModal = ({
         alias: formatAlias(url, branch),
       });
       setType(_type);
+    }
+  }, []);
+
+  const onNamePaste = useCallback((e) => {
+    const text = e.clipboardData.getData('text') as string;
+    if (text.startsWith('ql ')) {
+      e.preventDefault();
     }
   }, []);
 
@@ -243,34 +250,10 @@ const SubscriptionModal = ({
     }
   }, [subscription, visible]);
 
-  const isFirefox = navigator.userAgent.includes('Firefox');
-  const isSafari =
-    navigator.userAgent.includes('Safari') &&
-    !navigator.userAgent.includes('Chrome');
-  const isQQBrowser = navigator.userAgent.includes('QQBrowser');
-
   return (
     <Modal
       title={
-        subscription ? (
-          '编辑订阅'
-        ) : (
-          <span>
-            新建订阅
-            <small
-              style={{
-                color: '#999',
-                fontWeight: 400,
-                fontSize: isFirefox ? 9 : 12,
-                marginLeft: 2,
-                zoom: isSafari ? 0.66 : 0.8,
-                letterSpacing: isQQBrowser ? -2 : 0,
-              }}
-            >
-              支持repo/raw命令，粘贴导入
-            </small>
-          </span>
-        )
+        subscription ? '编辑订阅' : '新建订阅'
       }
       open={visible}
       forceRender
@@ -291,7 +274,7 @@ const SubscriptionModal = ({
     >
       <Form form={form} name="form_in_modal" layout="vertical">
         <Form.Item name="name" label="名称">
-          <Input placeholder="请输入订阅名" />
+          <Input placeholder="支持拷贝ql repo/raw命令，粘贴导入" onPaste={onNamePaste} />
         </Form.Item>
         <Form.Item
           name="type"
