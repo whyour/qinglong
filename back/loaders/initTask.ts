@@ -18,13 +18,12 @@ export default async () => {
     tokenCommand = `node ${tokenFile}`;
   }
   const cron = {
-    id: 'token',
+    id: NaN,
     name: '生成token',
     command: tokenCommand,
   };
-  scheduleService.createIntervalTask(cron as any, {
+  scheduleService.createIntervalTask(cron, {
     days: 28,
-    runImmediately: true,
   });
 
   // 运行删除日志任务
@@ -37,7 +36,6 @@ export default async () => {
     };
     scheduleService.createIntervalTask(cron, {
       days: data.info.frequency,
-      runImmediately: true,
     });
   }
 

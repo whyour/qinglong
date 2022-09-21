@@ -44,11 +44,7 @@ app
     await require('./loaders/db').default();
 
     await run();
-    Logger.info(`
-      ################################################
-      🛡️  Schedule listening on port: ${config.cronPort} 🛡️
-      ################################################
-    `);
+    Logger.debug('定时任务服务启动成功！');
   })
   .on('error', (err) => {
     Logger.error(err);

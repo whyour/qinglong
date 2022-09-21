@@ -17,7 +17,7 @@ async function startServer() {
 
   const server = app
     .listen(config.port, () => {
-      Logger.debug(`✌️ Back server launched on port ${config.port}`);
+      Logger.debug(`✌️ 后端服务启动成功！`);
     })
     .on('error', (err) => {
       Logger.error(err);

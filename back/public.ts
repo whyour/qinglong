@@ -22,7 +22,7 @@ app
     await require('./loaders/sentry').default({ expressApp: app });
     await require('./loaders/db').default();
 
-    Logger.debug(`✌️ Back server launched on port ${config.publicPort}`);
+    Logger.debug(`✌️ 公共服务启动成功！`);
   })
   .on('error', (err) => {
     Logger.error(err);
