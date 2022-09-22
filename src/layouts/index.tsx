@@ -41,6 +41,7 @@ export default function () {
   const ws = useRef<any>(null);
   const [socketMessage, setSocketMessage] = useState<any>();
   const [collapsed, setCollapsed] = useState(false);
+  const [initLoading, setInitLoading] = useState<boolean>(true);
   const {
     enable: enableDarkMode,
     disable: disableDarkMode,
@@ -64,7 +65,6 @@ export default function () {
           setSystemInfo(data);
           if (!data.isInitialized) {
             history.push('/initialization');
-            setLoading(false);
           } else {
             getUser();
           }
@@ -72,7 +72,8 @@ export default function () {
       })
       .catch((error) => {
         console.log(error);
-      });
+      })
+      .finally(() => setInitLoading(false));
   };
 
   const getUser = (needLoading = true) => {
@@ -191,6 +192,10 @@ export default function () {
       );
     };
   }, []);
+
+  if (initLoading) {
+    return <PageLoading />;
+  }
 
   if (['/login', '/initialization', '/error'].includes(location.pathname)) {
     document.title = `${
