@@ -175,8 +175,10 @@ const Dependence = () => {
       .get(
         `${config.apiPrefix}dependencies?searchValue=${searchText}&type=${type}`,
       )
-      .then((data: any) => {
-        setValue(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setValue(data);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -212,18 +214,14 @@ const Dependence = () => {
           .delete(`${config.apiPrefix}dependencies${force ? '/force' : ''}`, {
             data: [record.id],
           })
-          .then((data: any) => {
-            if (data.code === 200) {
-              if (force) {
-                const i = value.findIndex((x) => x.id === data.data[0].id);
-                if (i !== -1) {
-                  const result = [...value];
-                  result.splice(i, 1);
-                  setValue(result);
-                }
+          .then(({ code, data }) => {
+            if (code === 200 && force) {
+              const i = value.findIndex((x) => x.id === data.data[0].id);
+              if (i !== -1) {
+                const result = [...value];
+                result.splice(i, 1);
+                setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -250,11 +248,9 @@ const Dependence = () => {
           .put(`${config.apiPrefix}dependencies/reinstall`, {
             data: [record.id],
           })
-          .then((data: any) => {
-            if (data.code === 200) {
-              handleDependence(data.data[0]);
-            } else {
-              message.error(data);
+          .then(({ code, data }) => {
+            if (code === 200) {
+              handleDependence(data[0]);
             }
           });
       },
@@ -309,12 +305,10 @@ const Dependence = () => {
           .delete(`${config.apiPrefix}dependencies${forceUrl}`, {
             data: selectedRowIds,
           })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               setSelectedRowIds([]);
               getDependencies();
-            } else {
-              message.error(data);
             }
           });
       },
@@ -333,12 +327,10 @@ const Dependence = () => {
           .put(`${config.apiPrefix}dependencies/reinstall`, {
             data: selectedRowIds,
           })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               setSelectedRowIds([]);
               getDependencies();
-            } else {
-              message.error(data);
             }
           });
       },
@@ -351,15 +343,17 @@ const Dependence = () => {
   const getDependenceDetail = (dependence: any) => {
     request
       .get(`${config.apiPrefix}dependencies/${dependence.id}`)
-      .then((data: any) => {
-        const index = value.findIndex((x) => x.id === dependence.id);
-        const result = [...value];
-        if (index !== -1) {
-          result.splice(index, 1, {
-            ...dependence,
-            ...data.data,
-          });
-          setValue(result);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          const index = value.findIndex((x) => x.id === dependence.id);
+          const result = [...value];
+          if (index !== -1) {
+            result.splice(index, 1, {
+              ...dependence,
+              ...data,
+            });
+            setValue(result);
+          }
         }
       })
       .finally(() => setLoading(false));

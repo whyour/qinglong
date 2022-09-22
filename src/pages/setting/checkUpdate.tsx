@@ -17,17 +17,14 @@ const CheckUpdate = ({ socketMessage }: any) => {
     message.loading('检查更新中...', 0);
     request
       .put(`${config.apiPrefix}system/update-check`)
-      .then((_data: any) => {
+      .then(({ code, data }) => {
         message.destroy();
-        const { code, data } = _data;
         if (code === 200) {
           if (data.hasNewVersion) {
             showConfirmUpdateModal(data);
           } else {
             showForceUpdateModal();
           }
-        } else {
-          message.error(data);
         }
       })
       .catch((error: any) => {

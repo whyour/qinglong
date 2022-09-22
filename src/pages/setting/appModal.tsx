@@ -30,8 +30,6 @@ const AppModal = ({
       if (code === 200) {
         message.success(app ? '更新应用成功' : '新建应用成功');
         handleCancel(data);
-      } else {
-        message.error(data);
       }
       setLoading(false);
     } catch (error) {

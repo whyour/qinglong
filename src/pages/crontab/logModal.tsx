@@ -41,9 +41,12 @@ const CronLogModal = ({
     }
     request
       .get(logUrl ? logUrl : `${config.apiPrefix}crons/${cron.id}/log`)
-      .then((data: any) => {
-        if (localStorage.getItem('logCron') === String(cron.id)) {
-          const log = data.data as string;
+      .then(({ code, data }) => {
+        if (
+          code === 200 &&
+          localStorage.getItem('logCron') === String(cron.id)
+        ) {
+          const log = data as string;
           setValue(log || '暂无日志');
           setExecuting(
             log && !log.includes('执行结束') && !log.includes('重启面板'),

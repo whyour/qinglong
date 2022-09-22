@@ -67,8 +67,10 @@ const EditModal = ({
   const getDetail = (node: any) => {
     request
       .get(`${config.apiPrefix}scripts/${node.title}?path=${node.parent || ''}`)
-      .then((data) => {
-        setValue(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setValue(data);
+        }
       });
   };
 
@@ -83,8 +85,10 @@ const EditModal = ({
           content,
         },
       })
-      .then((data) => {
-        setIsRunning(true);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setIsRunning(true);
+        }
       });
   };
 
@@ -101,8 +105,10 @@ const EditModal = ({
           content,
         },
       })
-      .then((data) => {
-        setIsRunning(false);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setIsRunning(false);
+        }
       });
   };
 

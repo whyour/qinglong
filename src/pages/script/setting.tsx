@@ -26,8 +26,6 @@ const SettingModal = ({
         if (code === 200) {
           message.success('保存文件成功');
           handleCancel(data);
-        } else {
-          message.error(data);
         }
         setLoading(false);
       });

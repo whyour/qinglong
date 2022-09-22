@@ -23,11 +23,9 @@ const NotificationSetting = ({ data }: any) => {
           ...values,
         },
       })
-      .then((_data: any) => {
-        if (_data && _data.code === 200) {
+      .then(({ code, data }) => {
+        if (code === 200) {
           message.success(values.type ? '通知发送成功' : '通知关闭成功');
-        } else {
-          message.error(_data.message);
         }
       })
       .catch((error: any) => {
@@ -75,22 +73,20 @@ const NotificationSetting = ({ data }: any) => {
             rules={[{ required: x.required }]}
             style={{ maxWidth: 400 }}
           >
-            {
-              x.items ? (
-                <Select placeholder={x.placeholder || `请选择${x.label}`}>
-                  {x.items.map((y) => (
-                    <Option key={y.value} value={y.value}>
-                      {y.label || y.value}
-                    </Option>
-                  ))}
-                </Select>
-              ) : (
-                <Input.TextArea
-                  autoSize={true}
-                  placeholder={x.placeholder || `请输入${x.label}`}
-                />
-              )
-            }
+            {x.items ? (
+              <Select placeholder={x.placeholder || `请选择${x.label}`}>
+                {x.items.map((y) => (
+                  <Option key={y.value} value={y.value}>
+                    {y.label || y.value}
+                  </Option>
+                ))}
+              </Select>
+            ) : (
+              <Input.TextArea
+                autoSize={true}
+                placeholder={x.placeholder || `请输入${x.label}`}
+              />
+            )}
           </Form.Item>
         ))}
         <Button type="primary" htmlType="submit">

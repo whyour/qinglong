@@ -141,12 +141,10 @@ const ViewManageModal = ({
       onOk() {
         request
           .delete(`${config.apiPrefix}crons/views`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('删除成功');
               cronViewChange();
-            } else {
-              message.error(data);
             }
           });
       },
@@ -162,14 +160,12 @@ const ViewManageModal = ({
       .put(`${config.apiPrefix}crons/views/${checked ? 'enable' : 'disable'}`, {
         data: [record.id],
       })
-      .then((data: any) => {
-        if (data.code === 200) {
+      .then(({ code, data }) => {
+        if (code === 200) {
           const _list = [...list];
           _list.splice(index, 1, { ...list[index], isDisabled: !checked });
           setList(_list);
           cronViewChange();
-        } else {
-          message.error(data);
         }
       });
   };
@@ -190,15 +186,13 @@ const ViewManageModal = ({
         .put(`${config.apiPrefix}crons/views/move`, {
           data: { fromIndex: dragIndex, toIndex: hoverIndex, id: dragRow.id },
         })
-        .then((data: any) => {
-          if (data.code === 200) {
+        .then(({ code, data }) => {
+          if (code === 200) {
             const newData = [...list];
             newData.splice(dragIndex, 1);
-            newData.splice(hoverIndex, 0, { ...dragRow, ...data.data });
+            newData.splice(hoverIndex, 0, { ...dragRow, ...data });
             setList(newData);
             cronViewChange();
-          } else {
-            message.error(data);
           }
         });
     },

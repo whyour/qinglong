@@ -53,9 +53,7 @@ const DependenceModal = ({
         },
       );
 
-      if (code !== 200) {
-        message.error(data);
-      } else {
+      if (code === 200) {
         handleCancel(data);
       }
       setLoading(false);

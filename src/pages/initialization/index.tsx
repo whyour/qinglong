@@ -41,11 +41,9 @@ const Initialization = () => {
           password: values.password,
         },
       })
-      .then((data) => {
-        if (data.code === 200) {
+      .then(({ code, data }) => {
+        if (code === 200) {
           next();
-        } else {
-          message.error(data.message);
         }
       })
       .finally(() => setLoading(false));
@@ -59,11 +57,9 @@ const Initialization = () => {
           ...values,
         },
       })
-      .then((_data: any) => {
-        if (_data && _data.code === 200) {
+      .then(({ code, data }) => {
+        if (code === 200) {
           next();
-        } else {
-          message.error(_data.message);
         }
       })
       .finally(() => setLoading(false));

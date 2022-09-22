@@ -48,9 +48,12 @@ const DependenceLogModal = ({
     setLoading(true);
     request
       .get(`${config.apiPrefix}dependencies/${dependence.id}`)
-      .then((data: any) => {
-        if (localStorage.getItem('logDependence') === String(dependence.id)) {
-          const log = (data.data.log || []).join('') as string;
+      .then(({ code, data }) => {
+        if (
+          code === 200 &&
+          localStorage.getItem('logDependence') === String(dependence.id)
+        ) {
+          const log = (data.log || []).join('') as string;
           setValue(log);
           setExecuting(!log.includes('结束时间'));
           setIsRemoveFailed(log.includes('删除失败'));
@@ -67,8 +70,10 @@ const DependenceLogModal = ({
       .delete(`${config.apiPrefix}dependencies/force`, {
         data: [dependence.id],
       })
-      .then((data: any) => {
-        cancel(true);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          cancel(true);
+        }
       })
       .finally(() => {
         setRemoveLoading(false);

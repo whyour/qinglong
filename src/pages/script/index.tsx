@@ -99,10 +99,12 @@ const Script = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}scripts`)
-      .then((data) => {
-        setData(data.data);
-        setFilterData(data.data);
-        initGetScript();
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setData(data);
+          setFilterData(data);
+          initGetScript();
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -110,8 +112,10 @@ const Script = () => {
   const getDetail = (node: any) => {
     request
       .get(`${config.apiPrefix}scripts/${node.title}?path=${node.parent || ''}`)
-      .then((data) => {
-        setValue(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setValue(data);
+        }
       });
   };
 
@@ -231,13 +235,11 @@ const Script = () => {
                 content,
               },
             })
-            .then((_data: any) => {
-              if (_data.code === 200) {
+            .then(({ code, data }) => {
+              if (code === 200) {
                 message.success(`保存成功`);
                 setValue(content);
                 setIsEditing(false);
-              } else {
-                message.error(_data);
               }
               resolve(null);
             })
@@ -270,8 +272,8 @@ const Script = () => {
               path: currentNode.parent || '',
             },
           })
-          .then((_data: any) => {
-            if (_data.code === 200) {
+          .then(({ code }) => {
+            if (code === 200) {
               message.success(`删除成功`);
               let newData = [...data];
               if (currentNode.parent) {
@@ -295,8 +297,6 @@ const Script = () => {
                 }
               }
               setData(newData);
-            } else {
-              message.error(_data);
             }
           });
       },
@@ -346,15 +346,17 @@ const Script = () => {
           filename: currentNode.title,
         },
       })
-      .then((_data: any) => {
-        const blob = new Blob([_data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = currentNode.title;
-        document.documentElement.appendChild(a);
-        a.click();
-        document.documentElement.removeChild(a);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          const blob = new Blob([data], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = currentNode.title;
+          document.documentElement.appendChild(a);
+          a.click();
+          document.documentElement.removeChild(a);
+        }
       });
   };
 

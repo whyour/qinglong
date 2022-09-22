@@ -40,8 +40,6 @@ const SubscriptionModal = ({
       if (code === 200) {
         message.success(subscription ? '更新订阅成功' : '新建订阅成功');
         handleCancel(data);
-      } else {
-        message.error(data);
       }
       setLoading(false);
     } catch (error: any) {
@@ -208,8 +206,8 @@ const SubscriptionModal = ({
         type === 'raw'
           ? 'file'
           : url.startsWith('http')
-            ? 'public-repo'
-            : 'private-repo';
+          ? 'public-repo'
+          : 'private-repo';
 
       form.setFieldsValue({
         type: _type,
@@ -252,9 +250,7 @@ const SubscriptionModal = ({
 
   return (
     <Modal
-      title={
-        subscription ? '编辑订阅' : '新建订阅'
-      }
+      title={subscription ? '编辑订阅' : '新建订阅'}
       open={visible}
       forceRender
       centered
@@ -274,7 +270,10 @@ const SubscriptionModal = ({
     >
       <Form form={form} name="form_in_modal" layout="vertical">
         <Form.Item name="name" label="名称">
-          <Input placeholder="支持拷贝ql repo/raw命令，粘贴导入" onPaste={onNamePaste} />
+          <Input
+            placeholder="支持拷贝ql repo/raw命令，粘贴导入"
+            onPaste={onNamePaste}
+          />
         </Form.Item>
         <Form.Item
           name="type"

@@ -40,15 +40,7 @@ const Login = () => {
         },
       })
       .then((data) => {
-        if (data.code === 420) {
-          setLoginInfo({
-            username: values.username,
-            password: values.password,
-          });
-          setTwoFactor(true);
-        } else {
-          checkResponse(data);
-        }
+        checkResponse(data, values);
         setLoading(false);
       })
       .catch(function (error) {
@@ -64,11 +56,7 @@ const Login = () => {
         data: { ...loginInfo, code: values.code },
       })
       .then((data: any) => {
-        if (data.code === 430) {
-          message.error(data.message);
-        } else {
-          checkResponse(data);
-        }
+        checkResponse(data);
         setVerifying(false);
       })
       .catch((error: any) => {
@@ -77,8 +65,11 @@ const Login = () => {
       });
   };
 
-  const checkResponse = (data: any) => {
-    if (data.code === 200) {
+  const checkResponse = (
+    { code, data, message: _message }: any,
+    values?: any,
+  ) => {
+    if (code === 200) {
       const {
         token,
         lastip,
@@ -86,7 +77,7 @@ const Login = () => {
         lastlogon,
         retries = 0,
         platform,
-      } = data.data;
+      } = data;
       localStorage.setItem(config.authKey, token);
       notification.success({
         message: '登录成功！',
@@ -105,13 +96,14 @@ const Login = () => {
       });
       reloadUser(true);
       history.push('/crontab');
-    } else if (data.code === 100) {
-      message.warn(data.message);
-    } else if (data.code === 410) {
-      message.error(data.message);
-      setWaitTime(data.data);
-    } else {
-      message.error(data.message);
+    } else if (code === 410) {
+      setWaitTime(data);
+    } else if (code === 420) {
+      setLoginInfo({
+        username: values.username,
+        password: values.password,
+      });
+      setTwoFactor(true);
     }
   };
 

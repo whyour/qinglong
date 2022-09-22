@@ -54,9 +54,11 @@ const Log = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}logs`)
-      .then((data) => {
-        setData(data.data);
-        setFilterData(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setData(data);
+          setFilterData(data);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -64,8 +66,10 @@ const Log = () => {
   const getLog = (node: any) => {
     request
       .get(`${config.apiPrefix}logs/${node.title}?path=${node.parent || ''}`)
-      .then((data) => {
-        setValue(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setValue(data);
+        }
       });
   };
 

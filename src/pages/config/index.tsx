@@ -25,8 +25,10 @@ const Config = () => {
   const [confirmLoading, setConfirmLoading] = useState(false);
 
   const getConfig = (name: string) => {
-    request.get(`${config.apiPrefix}configs/${name}`).then((data: any) => {
-      setValue(data.data);
+    request.get(`${config.apiPrefix}configs/${name}`).then(({ code, data }) => {
+      if (code === 200) {
+        setValue(data);
+      }
     });
   };
 
@@ -34,8 +36,10 @@ const Config = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}configs/files`)
-      .then((data: any) => {
-        setData(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setData(data);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -50,8 +54,10 @@ const Config = () => {
       .post(`${config.apiPrefix}configs/save`, {
         data: { content, name: select },
       })
-      .then((data: any) => {
-        message.success(data.message);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          message.success('保存成功');
+        }
         setConfirmLoading(false);
       });
   };

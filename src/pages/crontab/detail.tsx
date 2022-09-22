@@ -123,9 +123,11 @@ const CronDetailModal = ({
       .get(
         `${config.apiPrefix}logs/${item.filename}?path=${item.directory || ''}`,
       )
-      .then((data) => {
-        setLog(data.data);
-        setIsLogModalVisible(true);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setLog(data);
+          setIsLogModalVisible(true);
+        }
       });
   };
 
@@ -137,9 +139,9 @@ const CronDetailModal = ({
     setLoading(true);
     request
       .get(`${config.apiPrefix}crons/${cron.id}/logs`)
-      .then((data: any) => {
-        if (data.code === 200) {
-          setLogs(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setLogs(data);
         }
       })
       .finally(() => setLoading(false));
@@ -165,8 +167,10 @@ const CronDetailModal = ({
       setScriptInfo({ parent: p, filename: s });
       request
         .get(`${config.apiPrefix}scripts/${s}?path=${p || ''}`)
-        .then((data) => {
-          setValue(data.data);
+        .then(({ code, data }) => {
+          if (code === 200) {
+            setValue(data);
+          }
         });
     } else {
       setValidTabs([validTabs[0]]);
@@ -198,12 +202,10 @@ const CronDetailModal = ({
                 content,
               },
             })
-            .then((_data: any) => {
-              if (_data.code === 200) {
+            .then(({ code, data }) => {
+              if (code === 200) {
                 setValue(content);
                 message.success(`保存成功`);
-              } else {
-                message.error(_data);
               }
               resolve(null);
             })
@@ -231,14 +233,12 @@ const CronDetailModal = ({
       onOk() {
         request
           .put(`${config.apiPrefix}crons/run`, { data: [currentCron.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               setCurrentCron({ ...currentCron, status: CrontabStatus.running });
               setTimeout(() => {
                 getLogs();
               }, 1000);
-            } else {
-              message.error(data);
             }
           });
       },
@@ -263,11 +263,9 @@ const CronDetailModal = ({
       onOk() {
         request
           .put(`${config.apiPrefix}crons/stop`, { data: [currentCron.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               setCurrentCron({ ...currentCron, status: CrontabStatus.idle });
-            } else {
-              message.error(data);
             }
           });
       },
@@ -300,14 +298,12 @@ const CronDetailModal = ({
               data: [currentCron.id],
             },
           )
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               setCurrentCron({
                 ...currentCron,
                 isDisabled: currentCron.isDisabled === 1 ? 0 : 1,
               });
-            } else {
-              message.error(data);
             }
           });
       },
@@ -340,14 +336,12 @@ const CronDetailModal = ({
               data: [currentCron.id],
             },
           )
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               setCurrentCron({
                 ...currentCron,
                 isPinned: currentCron.isPinned === 1 ? 0 : 1,
               });
-            } else {
-              message.error(data);
             }
           });
       },

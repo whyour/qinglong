@@ -17,8 +17,10 @@ const Error = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}public/panel/log`)
-      .then((data: any) => {
-        setData(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setData(data);
+        }
       })
       .finally(() => setLoading(false));
   };

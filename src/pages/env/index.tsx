@@ -255,8 +255,10 @@ const Env = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}envs?searchValue=${searchText}`)
-      .then((data: any) => {
-        setValue(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setValue(data);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -284,8 +286,8 @@ const Env = () => {
               data: [record.id],
             },
           )
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success(
                 `${record.status === Status.已禁用 ? '启用' : '禁用'}成功`,
               );
@@ -297,8 +299,6 @@ const Env = () => {
                 status: newStatus,
               });
               setValue(result);
-            } else {
-              message.error(data);
             }
           });
       },
@@ -333,14 +333,12 @@ const Env = () => {
       onOk() {
         request
           .delete(`${config.apiPrefix}envs`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('删除成功');
               const result = [...value];
               result.splice(index, 1);
               setValue(result);
-            } else {
-              message.error(data);
             }
           });
       },
@@ -390,14 +388,12 @@ const Env = () => {
         .put(`${config.apiPrefix}envs/${dragRow.id}/move`, {
           data: { fromIndex: dragIndex, toIndex: hoverIndex },
         })
-        .then((data: any) => {
-          if (data.code === 200) {
+        .then(({ code, data }) => {
+          if (code === 200) {
             const newData = [...value];
             newData.splice(dragIndex, 1);
             newData.splice(hoverIndex, 0, { ...dragRow, ...data.data });
             setValue([...newData]);
-          } else {
-            message.error(data);
           }
         });
     },
@@ -426,13 +422,11 @@ const Env = () => {
       onOk() {
         request
           .delete(`${config.apiPrefix}envs`, { data: selectedRowIds })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('批量删除成功');
               setSelectedRowIds([]);
               getEnvs();
-            } else {
-              message.error(data);
             }
           });
       },
@@ -451,11 +445,9 @@ const Env = () => {
           .put(`${config.apiPrefix}envs/${OperationPath[operationStatus]}`, {
             data: selectedRowIds,
           })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               getEnvs();
-            } else {
-              message.error(data);
             }
           });
       },

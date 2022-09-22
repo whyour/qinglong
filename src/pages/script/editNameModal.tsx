@@ -57,8 +57,6 @@ const EditScriptNameModal = ({
             path,
             key: `${key}${filename}`,
           });
-        } else {
-          message.error(data);
         }
         setLoading(false);
       })

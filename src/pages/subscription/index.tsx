@@ -263,8 +263,8 @@ const Subscription = () => {
       onOk() {
         request
           .put(`${config.apiPrefix}subscriptions/run`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               if (i !== -1) {
@@ -274,8 +274,6 @@ const Subscription = () => {
                 });
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -300,8 +298,8 @@ const Subscription = () => {
       onOk() {
         request
           .put(`${config.apiPrefix}subscriptions/stop`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               if (i !== -1) {
@@ -312,8 +310,6 @@ const Subscription = () => {
                 });
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -327,9 +323,11 @@ const Subscription = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}subscriptions?searchValue=${searchText}`)
-      .then((data: any) => {
-        setValue(data.data);
-        setCurrentPage(1);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setValue(data);
+          setCurrentPage(1);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -359,8 +357,8 @@ const Subscription = () => {
       onOk() {
         request
           .delete(`${config.apiPrefix}subscriptions`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('删除成功');
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
@@ -368,8 +366,6 @@ const Subscription = () => {
                 result.splice(i, 1);
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -402,8 +398,8 @@ const Subscription = () => {
               data: [record.id],
             },
           )
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               const newStatus = record.is_disabled === 1 ? 0 : 1;
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
@@ -414,8 +410,6 @@ const Subscription = () => {
                 });
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },

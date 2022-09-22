@@ -44,8 +44,6 @@ const EnvModal = ({
       if (code === 200) {
         message.success(env ? '更新变量成功' : '新建变量成功');
         handleCancel(data);
-      } else {
-        message.error(data);
       }
       setLoading(false);
     } catch (error: any) {

@@ -433,20 +433,22 @@ const Crontab = () => {
     }
     request
       .get(url)
-      .then((_data: any) => {
-        const { data, total } = _data.data;
-        setValue(
-          data.map((x) => {
-            return {
-              ...x,
-              nextRunTime: cron_parser
-                .parseExpression(x.schedule)
-                .next()
-                .toDate(),
-            };
-          }),
-        );
-        setTotal(total);
+      .then(({ code, data: _data }) => {
+        if (code === 200) {
+          const { data, total } = _data;
+          setValue(
+            data.map((x) => {
+              return {
+                ...x,
+                nextRunTime: cron_parser
+                  .parseExpression(x.schedule)
+                  .next()
+                  .toDate(),
+              };
+            }),
+          );
+          setTotal(total);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -476,8 +478,8 @@ const Crontab = () => {
       onOk() {
         request
           .delete(`${config.apiPrefix}crons`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('删除成功');
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
@@ -485,8 +487,6 @@ const Crontab = () => {
                 result.splice(i, 1);
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -511,8 +511,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(`${config.apiPrefix}crons/run`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               if (i !== -1) {
@@ -522,8 +522,6 @@ const Crontab = () => {
                 });
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -548,8 +546,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(`${config.apiPrefix}crons/stop`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               if (i !== -1) {
@@ -560,8 +558,6 @@ const Crontab = () => {
                 });
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -594,8 +590,8 @@ const Crontab = () => {
               data: [record.id],
             },
           )
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               const newStatus = record.isDisabled === 1 ? 0 : 1;
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
@@ -606,8 +602,6 @@ const Crontab = () => {
                 });
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -640,8 +634,8 @@ const Crontab = () => {
               data: [record.id],
             },
           )
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               const newStatus = record.isPinned === 1 ? 0 : 1;
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
@@ -652,8 +646,6 @@ const Crontab = () => {
                 });
                 setValue(result);
               }
-            } else {
-              message.error(data);
             }
           });
       },
@@ -755,19 +747,21 @@ const Crontab = () => {
   const getCronDetail = (cron: any) => {
     request
       .get(`${config.apiPrefix}crons/${cron.id}`)
-      .then((data: any) => {
-        const index = value.findIndex((x) => x.id === cron.id);
-        const result = [...value];
-        data.data.nextRunTime = cron_parser
-          .parseExpression(data.data.schedule)
-          .next()
-          .toDate();
-        if (index !== -1) {
-          result.splice(index, 1, {
-            ...cron,
-            ...data.data,
-          });
-          setValue(result);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          const index = value.findIndex((x) => x.id === cron.id);
+          const result = [...value];
+          data.nextRunTime = cron_parser
+            .parseExpression(data.schedule)
+            .next()
+            .toDate();
+          if (index !== -1) {
+            result.splice(index, 1, {
+              ...cron,
+              ...data,
+            });
+            setValue(result);
+          }
         }
       })
       .finally(() => setLoading(false));
@@ -795,13 +789,11 @@ const Crontab = () => {
       onOk() {
         request
           .delete(`${config.apiPrefix}crons`, { data: selectedRowIds })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('批量删除成功');
               setSelectedRowIds([]);
               getCrons();
-            } else {
-              message.error(data);
             }
           });
       },
@@ -820,11 +812,9 @@ const Crontab = () => {
           .put(`${config.apiPrefix}crons/${OperationPath[operationStatus]}`, {
             data: selectedRowIds,
           })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               getCrons();
-            } else {
-              message.error(data);
             }
           });
       },
@@ -1029,9 +1019,11 @@ const Crontab = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}crons/views`)
-      .then((data: any) => {
-        setCronViews(data.data);
-        setEnabledCronViews(data.data.filter((x) => !x.isDisabled));
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setCronViews(data);
+          setEnabledCronViews(data.filter((x) => !x.isDisabled));
+        }
       })
       .finally(() => {
         setLoading(false);

@@ -68,8 +68,6 @@ export default function () {
           } else {
             getUser();
           }
-        } else {
-          message.error(data);
         }
       })
       .catch((error) => {
@@ -87,8 +85,6 @@ export default function () {
           if (location.pathname === '/') {
             history.push('/crontab');
           }
-        } else {
-          message.error(data);
         }
         needLoading && setLoading(false);
       })

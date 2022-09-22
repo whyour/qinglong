@@ -22,15 +22,23 @@ const Diff = () => {
   const editorRef = useRef<any>(null);
 
   const getConfig = () => {
-    request.get(`${config.apiPrefix}configs/${current}`).then((data) => {
-      setCurrentValue(data.data);
-    });
+    request
+      .get(`${config.apiPrefix}configs/${current}`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setCurrentValue(data);
+        }
+      });
   };
 
   const getSample = () => {
-    request.get(`${config.apiPrefix}configs/${origin}`).then((data) => {
-      setOriginValue(data.data);
-    });
+    request
+      .get(`${config.apiPrefix}configs/${origin}`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setOriginValue(data);
+        }
+      });
   };
 
   const updateConfig = () => {
@@ -42,8 +50,10 @@ const Diff = () => {
       .post(`${config.apiPrefix}configs/save`, {
         data: { content, name: current },
       })
-      .then((data: any) => {
-        message.success(data.message);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          message.success('保存成功');
+        }
       });
   };
 
@@ -51,8 +61,10 @@ const Diff = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}configs/files`)
-      .then((data: any) => {
-        setFiles(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setFiles(data);
+        }
       })
       .finally(() => setLoading(false));
   };

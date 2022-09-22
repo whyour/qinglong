@@ -32,8 +32,6 @@ const CronModal = ({
       if (code === 200) {
         message.success(cron ? '更新Cron成功' : '新建Cron成功');
         handleCancel(data);
-      } else {
-        message.error(data);
       }
       setLoading(false);
     } catch (error: any) {
@@ -142,8 +140,6 @@ const CronLabelModal = ({
               action === 'post' ? '添加Labels成功' : '删除Labels成功',
             );
             handleCancel(true);
-          } else {
-            message.error(data);
           }
           setLoading(false);
         } catch (error) {

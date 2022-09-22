@@ -144,8 +144,10 @@ const Setting = () => {
     setLoading(true);
     request
       .get(`${config.apiPrefix}apps`)
-      .then((data: any) => {
-        setDataSource(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setDataSource(data);
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -175,14 +177,12 @@ const Setting = () => {
       onOk() {
         request
           .delete(`${config.apiPrefix}apps`, { data: [record.id] })
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('删除成功');
               const result = [...dataSource];
               result.splice(index, 1);
               setDataSource(result);
-            } else {
-              message.error(data);
             }
           });
       },
@@ -209,12 +209,10 @@ const Setting = () => {
       onOk() {
         request
           .put(`${config.apiPrefix}apps/${record.id}/reset-secret`)
-          .then((data: any) => {
-            if (data.code === 200) {
+          .then(({ code, data }) => {
+            if (code === 200) {
               message.success('重置成功');
-              handleApp(data.data);
-            } else {
-              message.error(data);
+              handleApp(data);
             }
           });
       },
@@ -247,8 +245,10 @@ const Setting = () => {
   const getLoginLog = () => {
     request
       .get(`${config.apiPrefix}user/login-log`)
-      .then((data: any) => {
-        setLoginLogData(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setLoginLogData(data);
+        }
       })
       .catch((error: any) => {
         console.log(error);
@@ -271,8 +271,10 @@ const Setting = () => {
   const getNotification = () => {
     request
       .get(`${config.apiPrefix}user/notification`)
-      .then((data: any) => {
-        setNotificationInfo(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setNotificationInfo(data);
+        }
       })
       .catch((error: any) => {
         console.log(error);
@@ -282,9 +284,9 @@ const Setting = () => {
   const getLogRemoveFrequency = () => {
     request
       .get(`${config.apiPrefix}system/log/remove`)
-      .then((data: any) => {
-        if (data.data.info) {
-          const { frequency } = data.data.info;
+      .then(({ code, data }) => {
+        if (code === 200 && data.info) {
+          const { frequency } = data.info;
           setLogRemoveFrequency(frequency);
         }
       })
@@ -299,8 +301,10 @@ const Setting = () => {
         .put(`${config.apiPrefix}system/log/remove`, {
           data: { frequency: logRemoveFrequency },
         })
-        .then((data: any) => {
-          message.success('更新成功');
+        .then(({ code, data }) => {
+          if (code === 200) {
+            message.success('更新成功');
+          }
         })
         .catch((error: any) => {
           console.log(error);

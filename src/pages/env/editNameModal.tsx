@@ -28,8 +28,6 @@ const EditNameModal = ({
       if (code === 200) {
         message.success('更新环境变量名称成功');
         handleCancel();
-      } else {
-        message.error(data);
       }
       setLoading(false);
     } catch (error) {

@@ -27,9 +27,11 @@ const SecuritySettings = ({ user, userChange }: any) => {
           password: values.password,
         },
       })
-      .then((data: any) => {
-        localStorage.removeItem(config.authKey);
-        history.push('/login');
+      .then(({ code, data }) => {
+        if (code === 200) {
+          localStorage.removeItem(config.authKey);
+          history.push('/login');
+        }
       })
       .catch((error: any) => {
         console.log(error);
@@ -48,8 +50,8 @@ const SecuritySettings = ({ user, userChange }: any) => {
   const deactiveTowFactor = () => {
     request
       .put(`${config.apiPrefix}user/two-factor/deactive`)
-      .then((data: any) => {
-        if (data.data) {
+      .then(({ code, data }) => {
+        if (code === 200 && data) {
           setTwoFactorActivated(false);
           userChange();
         }
@@ -63,14 +65,16 @@ const SecuritySettings = ({ user, userChange }: any) => {
     setLoading(true);
     request
       .put(`${config.apiPrefix}user/two-factor/active`, { data: { code } })
-      .then((data: any) => {
-        if (data.data) {
-          message.success('激活成功');
-          setTwoFactoring(false);
-          setTwoFactorActivated(true);
-          userChange();
-        } else {
-          message.success('验证失败');
+      .then(({ code, data }) => {
+        if (code === 200) {
+          if (data) {
+            message.success('激活成功');
+            setTwoFactoring(false);
+            setTwoFactorActivated(true);
+            userChange();
+          } else {
+            message.success('验证失败');
+          }
         }
       })
       .catch((error: any) => {
@@ -82,8 +86,10 @@ const SecuritySettings = ({ user, userChange }: any) => {
   const getTwoFactorInfo = () => {
     request
       .get(`${config.apiPrefix}user/two-factor/init`)
-      .then((data: any) => {
-        setTwoFactorInfo(data.data);
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setTwoFactorInfo(data);
+        }
       })
       .catch((error: any) => {
         console.log(error);

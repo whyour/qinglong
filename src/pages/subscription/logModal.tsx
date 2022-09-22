@@ -36,11 +36,12 @@ const SubscriptionLogModal = ({
           ? logUrl
           : `${config.apiPrefix}subscriptions/${subscription.id}/log`,
       )
-      .then((data: any) => {
+      .then(({ code, data }) => {
         if (
+          code === 200 &&
           localStorage.getItem('logSubscription') === String(subscription.id)
         ) {
-          const log = data.data as string;
+          const log = data as string;
           setValue(log || '暂无日志');
           setExecuting(log && !log.includes('执行结束'));
           if (log && !log.includes('执行结束')) {
