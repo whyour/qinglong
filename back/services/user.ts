@@ -24,7 +24,7 @@ export default class UserService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async login(
     payloads: {
@@ -65,15 +65,13 @@ export default class UserService {
         return this.initAuthInfo();
       }
 
-      if (retries > 2 && Date.now() - lastlogon < Math.pow(3, retries) * 1000) {
+      const retriesTime = Math.pow(3, retries) * 1000;
+      if (retries > 2 && timestamp - lastlogon < retriesTime) {
+        const waitTime = Math.ceil((retriesTime - (timestamp - lastlogon)) / 1000);
         return {
           code: 410,
-          message: `失败次数过多，请${Math.round(
-            (Math.pow(3, retries) * 1000 - Date.now() + lastlogon) / 1000,
-          )}秒后重试`,
-          data: Math.round(
-            (Math.pow(3, retries) * 1000 - Date.now() + lastlogon) / 1000,
-          ),
+          message: `失败次数过多，请${waitTime}秒后重试`,
+          data: waitTime,
         };
       }
 
@@ -90,7 +88,7 @@ export default class UserService {
         }
 
         const data = createRandomString(50, 100);
-        const expiration = twoFactorActivated ? 30 : 3;
+        const expiration = twoFactorActivated ? 60 : 20;
         let token = jwt.sign({ data }, config.secret as any, {
           expiresIn: 60 * 60 * 24 * expiration,
           algorithm: 'HS384',
@@ -111,8 +109,7 @@ export default class UserService {
         });
         await this.notificationService.notify(
           '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-            req.platform
+          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${req.platform
           }端 登录成功，ip地址 ${ip}`,
         );
         await this.getLoginLog();
@@ -140,8 +137,7 @@ export default class UserService {
         });
         await this.notificationService.notify(
           '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-            req.platform
+          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${req.platform
           }端 登录失败，ip地址 ${ip}`,
         );
         await this.getLoginLog();
@@ -155,7 +151,16 @@ export default class UserService {
             status: LoginStatus.fail,
           },
         });
-        return { code: 400, message: config.authError };
+        if (retries > 2) {
+          const waitTime = Math.round(Math.pow(3, retries + 1));
+          return {
+            code: 410,
+            message: `失败次数过多，请${waitTime}秒后重试`,
+            data: waitTime,
+          };
+        } else {
+          return { code: 400, message: config.authError };
+        }
       }
     } else {
       return this.initAuthInfo();
