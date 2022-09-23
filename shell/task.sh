@@ -133,8 +133,7 @@ run_normal() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $file_param" | perl -pe "s|.*ID=(.*) $cmd_task $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
+    [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
     cd $dir_scripts
@@ -150,7 +149,7 @@ run_normal() {
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local end_timestamp=$(date "+%s")
     local diff_time=$(expr $end_timestamp - $begin_timestamp)
-    [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+    [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
@@ -187,8 +186,7 @@ run_concurrent() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $file_param" | perl -pe "s|.*ID=(.*) $cmd_task $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
+    [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
     local envs=$(eval echo "\$${env_param}")
@@ -218,7 +216,7 @@ run_concurrent() {
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local end_timestamp=$(date "+%s")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))
-    [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+    [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
@@ -254,8 +252,7 @@ run_designated() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $file_param" | perl -pe "s|.*ID=(.*) $cmd_task $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
+    [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
     cd $dir_scripts
@@ -270,7 +267,7 @@ run_designated() {
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local end_timestamp=$(date "+%s")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))
-    [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+    [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
@@ -285,9 +282,7 @@ run_else() {
 
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
     [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
-
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $@" | perl -pe "s|.*ID=(.*) $cmd_task $@\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    [[ $id ]] && update_cron "\"$id\"" "0" "$$" "$log_path" "$begin_timestamp"
+    [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
     eval . $file_task_before "$@" $cmd
 
     cd $dir_scripts
@@ -304,7 +299,7 @@ run_else() {
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local end_timestamp=$(date "+%s")
     local diff_time=$(( $end_timestamp - $begin_timestamp ))
-    [[ $id ]] && update_cron "\"$id\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+    [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
