@@ -83,7 +83,7 @@ export default class UserService {
           });
           return {
             code: 420,
-            message: '请输入两步验证token',
+            message: '',
           };
         }
 
