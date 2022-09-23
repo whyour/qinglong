@@ -139,12 +139,17 @@ const Script = () => {
     if (node.key === select || !value) {
       return;
     }
-    setValue('加载中...');
-    const newMode = value ? LangMap[value.slice(-3)] : '';
-    setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setSelect(node.key);
     setTitle(node.key);
     setCurrentNode(node);
+    if (node.type === 'directory') {
+      setValue('请选择脚本文件');
+      return;
+    }
+
+    const newMode = value ? LangMap[value.slice(-3)] : '';
+    setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
+    setValue('加载中...');
     getDetail(node);
   };
 
@@ -257,11 +262,11 @@ const Script = () => {
       title: `确认删除`,
       content: (
         <>
-          确认删除文件
+          确认删除
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {select}
-          </Text>{' '}
-          ，删除后不可恢复
+          </Text>
+          文件{currentNode.type === 'directory' ? '夹及其子文件':''}，删除后不可恢复
         </>
       ),
       onOk() {
@@ -270,6 +275,7 @@ const Script = () => {
             data: {
               filename: currentNode.title,
               path: currentNode.parent || '',
+              type: currentNode.type
             },
           })
           .then(({ code }) => {
@@ -520,6 +526,7 @@ const Script = () => {
                   ></Input.Search>
                   <div className={styles['left-tree-scroller']} ref={treeDom}>
                     <Tree
+                      expandAction="click"
                       className={styles['left-tree']}
                       treeData={filterData}
                       showIcon={true}

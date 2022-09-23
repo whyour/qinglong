@@ -4,6 +4,7 @@ import {
   readDirs,
   getLastModifyFilePath,
   readDir,
+  emptyDir,
 } from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
@@ -169,17 +170,23 @@ export default (app: Router) => {
       body: Joi.object({
         filename: Joi.string().required(),
         path: Joi.string().allow(''),
+        type: Joi.string().optional()
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let { filename, path } = req.body as {
+        let { filename, path, type } = req.body as {
           filename: string;
           path: string;
+          type: string;
         };
         const filePath = join(config.scriptPath, path, filename);
-        fs.unlinkSync(filePath);
+        if (type === 'directory') {
+          emptyDir(filePath);          
+        } else {
+          fs.unlinkSync(filePath);
+        }
         res.send({ code: 200 });
       } catch (e) {
         return next(e);

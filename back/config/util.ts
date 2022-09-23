@@ -302,7 +302,6 @@ export function readDirs(
           title: file,
           key,
           type: 'directory',
-          disabled: true,
           parent: relativePath,
           children: readDirs(subPath, baseDir).sort(
             (a: any, b: any) =>
@@ -344,6 +343,21 @@ export function readDir(
     });
   return result;
 }
+
+export function emptyDir(path: string) {
+  const files = fs.readdirSync(path);
+  files.forEach(file => {
+    const filePath = `${path}/${file}`;
+    const stats = fs.statSync(filePath);
+    if (stats.isDirectory()) {
+      emptyDir(filePath);
+    } else {
+      fs.unlinkSync(filePath);
+    }
+  });
+  fs.rmdirSync(path);
+}
+
 
 export function promiseExec(command: string): Promise<string> {
   return new Promise((resolve, reject) => {
