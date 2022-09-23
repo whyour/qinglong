@@ -69,16 +69,16 @@ export default {
         component: '@/pages/dependence/index',
       },
       {
+        path: '/log',
+        name: '日志管理',
+        icon: <IconFont type="ql-icon-log" />,
+        component: '@/pages/log/index',
+      },
+      {
         path: '/diff',
         name: '对比工具',
         icon: <IconFont type="ql-icon-diff" />,
         component: '@/pages/diff/index',
-      },
-      {
-        path: '/log',
-        name: '任务日志',
-        icon: <IconFont type="ql-icon-log" />,
-        component: '@/pages/log/index',
       },
       {
         path: '/setting',

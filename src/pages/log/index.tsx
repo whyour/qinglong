@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Key, useRef } from 'react';
-import { TreeSelect, Tree, Input, Empty } from 'antd';
+import { TreeSelect, Tree, Input, Empty, Button, message, Modal, Tooltip, Typography } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
@@ -9,6 +9,11 @@ import { Controlled as CodeMirror } from 'react-codemirror2';
 import SplitPane from 'react-split-pane';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
+import { DeleteOutlined } from '@ant-design/icons';
+import { depthFirstSearch } from '@/utils';
+import { debounce } from 'lodash';
+
+const { Text } = Typography;
 
 function getFilterData(keyword: string, data: any) {
   const expandedKeys: string[] = [];
@@ -49,6 +54,8 @@ const Log = () => {
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
+  const [currentNode, setCurrentNode] = useState<any>();
+  const [searchValue, setSearchValue] = useState('');
 
   const getLogs = () => {
     setLoading(true);
@@ -77,9 +84,16 @@ const Log = () => {
     if (node.key === select || !value) {
       return;
     }
-    setValue('加载中...');
+    setCurrentNode(node);
     setSelect(value);
     setTitle(node.key);
+
+    if (node.type === 'directory') {
+      setValue('请选择日志文件');
+      return;
+    }
+    
+    setValue('加载中...');
     getLog(node);
   };
 
@@ -90,15 +104,74 @@ const Log = () => {
   const onSearch = useCallback(
     (e) => {
       const keyword = e.target.value;
+      debounceSearch(keyword);
+    },
+    [data, setFilterData],
+  );
+
+  const debounceSearch = useCallback(
+    debounce((keyword) => {
+      setSearchValue(keyword);
       const { tree, expandedKeys } = getFilterData(
         keyword.toLocaleLowerCase(),
         data,
       );
       setFilterData(tree);
       setExpandedKeys(expandedKeys);
-    },
+    }, 300),
     [data, setFilterData],
   );
+
+  const deleteFile = () => {
+    Modal.confirm({
+      title: `确认删除`,
+      content: (
+        <>
+          确认删除
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {select}
+          </Text>
+          文件{currentNode.type === 'directory' ? '夹下所以日志':''}，删除后不可恢复
+        </>
+      ),
+      onOk() {
+        request
+          .delete(`${config.apiPrefix}logs`, {
+            data: {
+              filename: currentNode.title,
+              path: currentNode.parent || '',
+              type: currentNode.type
+            },
+          })
+          .then(({ code }) => {
+            if (code === 200) {
+              message.success(`删除成功`);
+              let newData = [...data];
+              if (currentNode.parent) {
+                newData = depthFirstSearch(newData, (c) => c.key === currentNode.key);
+              } else {
+                const index = newData.findIndex(
+                  (x) => x.key === currentNode.key,
+                );
+                if (index !== -1) {
+                  newData.splice(index, 1);
+                }
+              }
+              setData(newData);
+            }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  useEffect(() => {
+    const word = searchValue || '';
+    const { tree } = getFilterData(word.toLocaleLowerCase(), data);
+    setFilterData(tree);
+  }, [data]);
 
   useEffect(() => {
     getLogs();
@@ -113,7 +186,7 @@ const Log = () => {
       title={title}
       loading={loading}
       extra={
-        isPhone && [
+        isPhone ? [
           <TreeSelect
             className="log-select"
             value={select}
@@ -124,6 +197,15 @@ const Log = () => {
             showSearch
             onSelect={onSelect}
           />,
+        ] : [
+          <Tooltip title="删除">
+            <Button
+              type="primary"
+              disabled={!select}
+              onClick={deleteFile}
+              icon={<DeleteOutlined />}
+            />
+          </Tooltip>,
         ]
       }
       header={{
@@ -144,6 +226,7 @@ const Log = () => {
                   ></Input.Search>
                   <div className={styles['left-tree-scroller']} ref={treeDom}>
                     <Tree
+                      expandAction="click"
                       className={styles['left-tree']}
                       treeData={filterData}
                       showIcon={true}
@@ -199,7 +282,7 @@ const Log = () => {
             onBeforeChange={(editor, data, value) => {
               setValue(value);
             }}
-            onChange={(editor, data, value) => {}}
+            onChange={(editor, data, value) => { }}
           />
         )}
       </div>

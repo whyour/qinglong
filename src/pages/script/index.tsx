@@ -283,17 +283,7 @@ const Script = () => {
               message.success(`删除成功`);
               let newData = [...data];
               if (currentNode.parent) {
-                const parentNodeIndex = newData.findIndex(
-                  (x) => x.key === currentNode.parent,
-                );
-                const parentNode = newData[parentNodeIndex];
-                const index = parentNode.children.findIndex(
-                  (y) => y.key === currentNode.key,
-                );
-                if (index !== -1 && parentNodeIndex !== -1) {
-                  parentNode.children.splice(index, 1);
-                  newData.splice(parentNodeIndex, 1, { ...parentNode });
-                }
+                newData = depthFirstSearch(newData, (c) => c.key === currentNode.key);
               } else {
                 const index = newData.findIndex(
                   (x) => x.key === currentNode.key,

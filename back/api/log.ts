@@ -3,8 +3,9 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import * as fs from 'fs';
 import config from '../config';
-import { getFileContentByName, readDirs } from '../config/util';
+import { emptyDir, getFileContentByName, readDirs } from '../config/util';
 import { join } from 'path';
+import { celebrate, Joi } from 'celebrate';
 const route = Router();
 const blacklist = ['.tmp'];
 
@@ -45,4 +46,34 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.delete(
+    '/',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        path: Joi.string().allow(''),
+        type: Joi.string().optional()
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        let { filename, path, type } = req.body as {
+          filename: string;
+          path: string;
+          type: string;
+        };
+        const filePath = join(config.logPath, path, filename);
+        if (type === 'directory') {
+          emptyDir(filePath);          
+        } else {
+          fs.unlinkSync(filePath);
+        }
+        res.send({ code: 200 });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
 };
