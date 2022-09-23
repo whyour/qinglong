@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback, Key, useRef } from 'react';
-import { TreeSelect, Tree, Input, Empty, Button, message, Modal, Tooltip, Typography } from 'antd';
+import {
+  TreeSelect,
+  Tree,
+  Input,
+  Empty,
+  Button,
+  message,
+  Modal,
+  Tooltip,
+  Typography,
+} from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
@@ -45,9 +55,8 @@ function getFilterData(keyword: string, data: any) {
 
 const Log = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
-  const [title, setTitle] = useState('请选择日志文件');
   const [value, setValue] = useState('请选择日志文件');
-  const [select, setSelect] = useState<any>();
+  const [select, setSelect] = useState<string>('');
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -81,18 +90,18 @@ const Log = () => {
   };
 
   const onSelect = (value: any, node: any) => {
+    setCurrentNode(node);
+    setSelect(value);
+
     if (node.key === select || !value) {
       return;
     }
-    setCurrentNode(node);
-    setSelect(value);
-    setTitle(node.key);
 
     if (node.type === 'directory') {
       setValue('请选择日志文件');
       return;
     }
-    
+
     setValue('加载中...');
     getLog(node);
   };
@@ -131,7 +140,8 @@ const Log = () => {
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {select}
           </Text>
-          文件{currentNode.type === 'directory' ? '夹下所以日志':''}，删除后不可恢复
+          文件{currentNode.type === 'directory' ? '夹下所以日志' : ''}
+          ，删除后不可恢复
         </>
       ),
       onOk() {
@@ -140,7 +150,7 @@ const Log = () => {
             data: {
               filename: currentNode.title,
               path: currentNode.parent || '',
-              type: currentNode.type
+              type: currentNode.type,
             },
           })
           .then(({ code }) => {
@@ -148,7 +158,10 @@ const Log = () => {
               message.success(`删除成功`);
               let newData = [...data];
               if (currentNode.parent) {
-                newData = depthFirstSearch(newData, (c) => c.key === currentNode.key);
+                newData = depthFirstSearch(
+                  newData,
+                  (c) => c.key === currentNode.key,
+                );
               } else {
                 const index = newData.findIndex(
                   (x) => x.key === currentNode.key,
@@ -158,6 +171,7 @@ const Log = () => {
                 }
               }
               setData(newData);
+              initState();
             }
           });
       },
@@ -165,6 +179,12 @@ const Log = () => {
         console.log('Cancel');
       },
     });
+  };
+
+  const initState = () => {
+    setSelect('');
+    setCurrentNode(null);
+    setValue('请选择脚本文件');
   };
 
   useEffect(() => {
@@ -183,30 +203,32 @@ const Log = () => {
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
-      title={title}
+      title={select}
       loading={loading}
       extra={
-        isPhone ? [
-          <TreeSelect
-            className="log-select"
-            value={select}
-            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-            treeData={data}
-            placeholder="请选择日志"
-            fieldNames={{ value: 'key', label: 'title' }}
-            showSearch
-            onSelect={onSelect}
-          />,
-        ] : [
-          <Tooltip title="删除">
-            <Button
-              type="primary"
-              disabled={!select}
-              onClick={deleteFile}
-              icon={<DeleteOutlined />}
-            />
-          </Tooltip>,
-        ]
+        isPhone
+          ? [
+              <TreeSelect
+                className="log-select"
+                value={select}
+                dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+                treeData={data}
+                placeholder="请选择日志"
+                fieldNames={{ value: 'key', label: 'title' }}
+                showSearch
+                onSelect={onSelect}
+              />,
+            ]
+          : [
+              <Tooltip title="删除">
+                <Button
+                  type="primary"
+                  disabled={!select}
+                  onClick={deleteFile}
+                  icon={<DeleteOutlined />}
+                />
+              </Tooltip>,
+            ]
       }
       header={{
         style: headerStyle,
@@ -282,7 +304,7 @@ const Log = () => {
             onBeforeChange={(editor, data, value) => {
               setValue(value);
             }}
-            onChange={(editor, data, value) => { }}
+            onChange={(editor, data, value) => {}}
           />
         )}
       </div>

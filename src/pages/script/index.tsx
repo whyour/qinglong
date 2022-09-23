@@ -78,9 +78,8 @@ const LangMap: any = {
 const Script = () => {
   const { headerStyle, isPhone, theme, socketMessage } =
     useOutletContext<SharedContext>();
-  const [title, setTitle] = useState('请选择脚本文件');
   const [value, setValue] = useState('请选择脚本文件');
-  const [select, setSelect] = useState<any>();
+  const [select, setSelect] = useState<string>('');
   const [data, setData] = useState<any[]>([]);
   const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -136,12 +135,13 @@ const Script = () => {
   };
 
   const onSelect = (value: any, node: any) => {
+    setSelect(node.key);
+    setCurrentNode(node);
+
     if (node.key === select || !value) {
       return;
     }
-    setSelect(node.key);
-    setTitle(node.key);
-    setCurrentNode(node);
+
     if (node.type === 'directory') {
       setValue('请选择脚本文件');
       return;
@@ -266,7 +266,8 @@ const Script = () => {
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {select}
           </Text>
-          文件{currentNode.type === 'directory' ? '夹及其子文件':''}，删除后不可恢复
+          文件{currentNode.type === 'directory' ? '夹及其子文件' : ''}
+          ，删除后不可恢复
         </>
       ),
       onOk() {
@@ -275,7 +276,7 @@ const Script = () => {
             data: {
               filename: currentNode.title,
               path: currentNode.parent || '',
-              type: currentNode.type
+              type: currentNode.type,
             },
           })
           .then(({ code }) => {
@@ -283,7 +284,10 @@ const Script = () => {
               message.success(`删除成功`);
               let newData = [...data];
               if (currentNode.parent) {
-                newData = depthFirstSearch(newData, (c) => c.key === currentNode.key);
+                newData = depthFirstSearch(
+                  newData,
+                  (c) => c.key === currentNode.key,
+                );
               } else {
                 const index = newData.findIndex(
                   (x) => x.key === currentNode.key,
@@ -293,6 +297,7 @@ const Script = () => {
                 }
               }
               setData(newData);
+              initState();
             }
           });
       },
@@ -354,6 +359,12 @@ const Script = () => {
           document.documentElement.removeChild(a);
         }
       });
+  };
+
+  const initState = () => {
+    setSelect('');
+    setCurrentNode(null);
+    setValue('请选择脚本文件');
   };
 
   useEffect(() => {
@@ -436,7 +447,7 @@ const Script = () => {
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
-      title={title}
+      title={select}
       loading={loading}
       extra={
         isPhone
