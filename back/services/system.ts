@@ -70,9 +70,8 @@ export default class SystemService {
     };
     await this.scheduleService.cancelIntervalTask(cron);
     if (frequency > 0) {
-      await this.scheduleService.createIntervalTask(cron, {
+      this.scheduleService.createIntervalTask(cron, {
         days: frequency,
-        runImmediately: true,
       });
     }
     return { code: 200, data: { ...cron } };
