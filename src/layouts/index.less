@@ -243,31 +243,28 @@
   font-size: 13px;
 }
 
-[data-dark='true'] {
-  /* Change autocomplete styles in WebKit */
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  textarea:-webkit-autofill,
-  textarea:-webkit-autofill:hover,
-  textarea:-webkit-autofill:focus,
-  select:-webkit-autofill,
-  select:-webkit-autofill:hover,
-  select:-webkit-autofill:focus {
-    border: 1px solid @border-color-base;
-    box-shadow: none;
-    transition: background-color 5000s ease-in-out 0s;
-    -webkit-text-fill-color: @text-color;
-    caret-color: #e8e6f3 !important;
-  }
+/* Change autocomplete styles in WebKit */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  border: none;
+  box-shadow: none;
+  transition: background-color 5000s ease-in-out 0s;
+  -webkit-text-fill-color: @text-color;
+}
 
-  ::placeholder {
-    opacity: 0.5 !important;
-  }
+::placeholder {
+  opacity: 0.5 !important;
+}
 
-  .ant-select-selection-placeholder {
-    opacity: 0.5 !important;
-  }
+.ant-select-selection-placeholder {
+  opacity: 0.5 !important;
 }
 
 .ant-pro-basicLayout-content {
