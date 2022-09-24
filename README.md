@@ -183,7 +183,7 @@ task <file_path> desi <env_name> <account_number>
 - [crontab-ui](https://github.com/alseambusher/crontab-ui)
 - [Ant Design](https://ant.design)
 - [Ant Design Pro](https://pro.ant.design/)
-- [Umijs3.0](https://umijs.org)
+- [Umijs](https://umijs.org)
 - [darkreader](https://github.com/darkreader/darkreader)
 - [admin-server](https://github.com/sunpu007/admin-server)
 
