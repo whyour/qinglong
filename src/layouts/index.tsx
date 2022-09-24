@@ -20,6 +20,9 @@ import { message, Badge, Modal, Avatar, Dropdown, Menu, Image } from 'antd';
 import SockJS from 'sockjs-client';
 import * as Sentry from '@sentry/react';
 import { init } from '../utils/init';
+import 'codemirror/mode/javascript/javascript';
+import 'codemirror/mode/python/python';
+import 'codemirror/mode/shell/shell';
 
 export interface SharedContext {
   headerStyle: React.CSSProperties;

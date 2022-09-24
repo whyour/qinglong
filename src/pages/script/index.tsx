@@ -453,6 +453,7 @@ const Script = () => {
         isPhone
           ? [
               <TreeSelect
+                treeExpandAction="click"
                 className="log-select"
                 value={select}
                 dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
@@ -564,7 +565,6 @@ const Script = () => {
                 readOnly: !isEditing,
                 fontSize: 12,
                 lineNumbersMinChars: 3,
-                folding: false,
                 glyphMargin: false,
               }}
               onMount={(editor) => {

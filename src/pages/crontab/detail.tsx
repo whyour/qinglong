@@ -103,7 +103,6 @@ const CronDetailModal = ({
           fontSize: 12,
           lineNumbersMinChars: 3,
           fontFamily: 'Source Code Pro',
-          folding: false,
           glyphMargin: false,
           wordWrap: 'on',
         }}
