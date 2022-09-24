@@ -349,8 +349,8 @@ reset_branch() {
     local branch="$1"
     if [[ $branch ]]; then
         part_cmd="origin/${branch}"
-        git checkout -B "$branch"
-        git branch --set-upstream-to=$part_cmd $branch
+        git checkout -B "$branch" &>/dev/null
+        git branch --set-upstream-to=$part_cmd $branch &>/dev/null
     fi
     git reset --hard $part_cmd &>/dev/null
 }

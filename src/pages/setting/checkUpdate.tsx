@@ -137,7 +137,12 @@ const CheckUpdate = ({ socketMessage }: any) => {
     }
 
     const newMessage = `${value}${_message}`;
+    const updateFailed = newMessage.includes('失败，请检查');
+
     modalRef.current.update({
+      maskClosable: updateFailed,
+      closable: updateFailed,
+      okButtonProps: { disabled: !updateFailed },
       content: (
         <div style={{ height: '60vh', overflowY: 'auto' }}>
           <pre
@@ -155,6 +160,10 @@ const CheckUpdate = ({ socketMessage }: any) => {
       ),
     });
     setValue(newMessage);
+
+    if (updateFailed) {
+      message.error('更新失败，请检查网络及日志或稍后再试');
+    }
 
     document.getElementById('log-identifier') &&
       document

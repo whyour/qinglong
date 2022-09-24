@@ -248,7 +248,6 @@ update_qinglong() {
 
     export isFirstStartServer=false
 
-    local no_restart="$1"
     local all_branch=$(git branch -a)
     local primary_branch="master"
     if [[ "${all_branch}" =~ "${current_branch}" ]]; then
@@ -266,10 +265,16 @@ update_qinglong() {
 
         [[ -f $dir_root/package.json ]] && ql_depend_new=$(cat $dir_root/package.json)
         [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
-    else
-        echo -e "\n更新青龙源文件失败，请检查原因...\n"
-    fi
 
+        update_qinglong_static "$1" "$primary_branch"
+    else
+        echo -e "\n更新青龙源文件失败，请检查网络...\n"
+    fi
+}
+
+update_qinglong_static() {
+    local no_restart="$1"
+    local primary_branch="$2"
     local url="https://github.com/whyour/qinglong-static.git"
     if [[ -d ${ql_static_repo}/.git ]]; then
         reset_romote_url ${ql_static_repo} ${url} ${primary_branch}
@@ -291,9 +296,8 @@ update_qinglong() {
             reload_pm2
         fi
     else
-        echo -e "\n更新青龙静态资源失败，请检查原因...\n"
+        echo -e "\n更新青龙静态资源失败，请检查网络...\n"
     fi
-
 }
 
 ## 对比脚本
