@@ -131,7 +131,7 @@
     "react-dnd": "^14.0.2",
     "react-dnd-html5-backend": "^14.0.0",
     "react-dom": "18.x",
-    "react-split-pane": "^0.1.92",
+    "react-split-pane": "git+https://github.com/tomkp/react-split-pane.git#master",
     "sockjs-client": "^1.6.0",
     "ts-node": "^10.6.0",
     "tslib": "^2.4.0",

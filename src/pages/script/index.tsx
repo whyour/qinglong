@@ -375,10 +375,13 @@ const Script = () => {
 
   useEffect(() => {
     getScripts();
-    if (treeDom && treeDom.current) {
+  }, []);
+
+  useEffect(() => {
+    if (treeDom.current) {
       setHeight(treeDom.current.clientHeight);
     }
-  }, []);
+  }, [treeDom.current, data]);
 
   const action = (key: string | number) => {
     switch (key) {

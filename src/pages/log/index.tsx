@@ -195,10 +195,13 @@ const Log = () => {
 
   useEffect(() => {
     getLogs();
-    if (treeDom && treeDom.current) {
+  }, []);
+
+  useEffect(() => {
+    if (treeDom.current) {
       setHeight(treeDom.current.clientHeight);
     }
-  }, []);
+  }, [treeDom.current, data]);
 
   return (
     <PageContainer
