@@ -312,6 +312,7 @@ export function readDirs(
       return {
         title: file,
         type: 'file',
+        isLeaf: true,
         key,
         parent: relativePath,
       };
@@ -346,7 +347,7 @@ export function readDir(
 
 export function emptyDir(path: string) {
   const files = fs.readdirSync(path);
-  files.forEach(file => {
+  files.forEach((file) => {
     const filePath = `${path}/${file}`;
     const stats = fs.statSync(filePath);
     if (stats.isDirectory()) {
@@ -357,7 +358,6 @@ export function emptyDir(path: string) {
   });
   fs.rmdirSync(path);
 }
-
 
 export function promiseExec(command: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -379,22 +379,29 @@ export function parseHeaders(headers: string) {
   let val;
   let i;
 
-  headers && headers.split('\n').forEach(function parser(line) {
-    i = line.indexOf(':');
-    key = line.substring(0, i).trim().toLowerCase();
-    val = line.substring(i + 1).trim();
+  headers &&
+    headers.split('\n').forEach(function parser(line) {
+      i = line.indexOf(':');
+      key = line.substring(0, i).trim().toLowerCase();
+      val = line.substring(i + 1).trim();
 
-    if (!key) {
-      return;
-    }
+      if (!key) {
+        return;
+      }
 
-    parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
-  });
+      parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+    });
 
   return parsed;
-};
+}
 
-export function parseBody(body: string, contentType: 'application/json' | 'multipart/form-data' | 'application/x-www-form-urlencoded') {
+export function parseBody(
+  body: string,
+  contentType:
+    | 'application/json'
+    | 'multipart/form-data'
+    | 'application/x-www-form-urlencoded',
+) {
   if (!body) return '';
 
   const parsed: any = {};
@@ -402,22 +409,23 @@ export function parseBody(body: string, contentType: 'application/json' | 'multi
   let val;
   let i;
 
-  body && body.split('\n').forEach(function parser(line) {
-    i = line.indexOf(':');
-    key = line.substring(0, i).trim().toLowerCase();
-    val = line.substring(i + 1).trim();
+  body &&
+    body.split('\n').forEach(function parser(line) {
+      i = line.indexOf(':');
+      key = line.substring(0, i).trim().toLowerCase();
+      val = line.substring(i + 1).trim();
 
-    if (!key || parsed[key]) {
-      return;
-    }
+      if (!key || parsed[key]) {
+        return;
+      }
 
-    parsed[key] = val;
-  });
+      parsed[key] = val;
+    });
 
   switch (contentType) {
     case 'multipart/form-data':
       return Object.keys(parsed).reduce((p, c) => {
-        p.append(c, parsed[c])
+        p.append(c, parsed[c]);
         return p;
       }, new FormData());
     case 'application/x-www-form-urlencoded':
@@ -427,4 +435,4 @@ export function parseBody(body: string, contentType: 'application/json' | 'multi
   }
 
   return parsed;
-};
+}

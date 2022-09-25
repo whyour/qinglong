@@ -37,36 +37,10 @@ import { history, useOutletContext, useLocation } from '@umijs/max';
 import { parse } from 'query-string';
 import { depthFirstSearch } from '@/utils';
 import { SharedContext } from '@/layouts';
+import useFilterTreeData from '@/hooks/useFilterTreeData';
+import { uniq } from 'lodash';
 
 const { Text } = Typography;
-
-function getFilterData(keyword: string, data: any) {
-  const expandedKeys: string[] = [];
-  if (keyword) {
-    const tree: any = [];
-    data.forEach((item: any) => {
-      if (item.title.toLocaleLowerCase().includes(keyword)) {
-        tree.push(item);
-      } else {
-        const children: any[] = [];
-        (item.children || []).forEach((subItem: any) => {
-          if (subItem.title.toLocaleLowerCase().includes(keyword)) {
-            children.push(subItem);
-          }
-        });
-        if (children.length > 0) {
-          tree.push({
-            ...item,
-            children,
-          });
-          expandedKeys.push(item.key);
-        }
-      }
-    });
-    return { tree, expandedKeys };
-  }
-  return { tree: data, expandedKeys };
-}
 
 const LangMap: any = {
   '.py': 'python',
@@ -81,7 +55,6 @@ const Script = () => {
   const [value, setValue] = useState('请选择脚本文件');
   const [select, setSelect] = useState<string>('');
   const [data, setData] = useState<any[]>([]);
-  const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState('');
   const [height, setHeight] = useState<number>();
@@ -101,7 +74,6 @@ const Script = () => {
       .then(({ code, data }) => {
         if (code === 200) {
           setData(data);
-          setFilterData(data);
           initGetScript();
         }
       })
@@ -153,10 +125,6 @@ const Script = () => {
     getDetail(node);
   };
 
-  const onExpand = (expKeys: any) => {
-    setExpandedKeys(expKeys);
-  };
-
   const onTreeSelect = useCallback(
     (keys: Key[], e: any) => {
       const content = editorRef.current
@@ -187,21 +155,29 @@ const Script = () => {
       const keyword = e.target.value;
       debounceSearch(keyword);
     },
-    [data, setFilterData],
+    [data],
   );
 
   const debounceSearch = useCallback(
     debounce((keyword) => {
       setSearchValue(keyword);
-      const { tree, expandedKeys } = getFilterData(
-        keyword.toLocaleLowerCase(),
-        data,
-      );
-      setExpandedKeys(expandedKeys);
-      setFilterData(tree);
     }, 300),
-    [data, setFilterData],
+    [data],
   );
+
+  const { treeData: filterData, keys: searchExpandedKeys } = useFilterTreeData(
+    data,
+    searchValue,
+    { treeNodeFilterProp: 'title' },
+  );
+
+  useEffect(() => {
+    setExpandedKeys(uniq([...expandedKeys, ...searchExpandedKeys]));
+  }, [searchExpandedKeys]);
+
+  const onExpand = (expKeys: any) => {
+    setExpandedKeys(expKeys);
+  };
 
   const editFile = () => {
     setTimeout(() => {
@@ -368,12 +344,6 @@ const Script = () => {
   };
 
   useEffect(() => {
-    const word = searchValue || '';
-    const { tree } = getFilterData(word.toLocaleLowerCase(), data);
-    setFilterData(tree);
-  }, [data]);
-
-  useEffect(() => {
     getScripts();
   }, []);
 
@@ -462,8 +432,10 @@ const Script = () => {
                 dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
                 treeData={data}
                 placeholder="请选择脚本"
-                fieldNames={{ value: 'key', label: 'title' }}
+                fieldNames={{ value: 'key' }}
+                treeNodeFilterProp="title"
                 showSearch
+                allowClear
                 onSelect={onSelect}
               />,
               <Dropdown overlay={menu} trigger={['click']}>

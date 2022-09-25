@@ -21,44 +21,16 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import { DeleteOutlined } from '@ant-design/icons';
 import { depthFirstSearch } from '@/utils';
-import { debounce } from 'lodash';
+import { debounce, uniq } from 'lodash';
+import useFilterTreeData from '@/hooks/useFilterTreeData';
 
 const { Text } = Typography;
-
-function getFilterData(keyword: string, data: any) {
-  const expandedKeys: string[] = [];
-  if (keyword) {
-    const tree: any = [];
-    data.forEach((item: any) => {
-      if (item.title.toLocaleLowerCase().includes(keyword)) {
-        tree.push(item);
-      } else {
-        const children: any[] = [];
-        (item.children || []).forEach((subItem: any) => {
-          if (subItem.title.toLocaleLowerCase().includes(keyword)) {
-            children.push(subItem);
-          }
-        });
-        if (children.length > 0) {
-          tree.push({
-            ...item,
-            children,
-          });
-          expandedKeys.push(item.key);
-        }
-      }
-    });
-    return { tree, expandedKeys };
-  }
-  return { tree: data, expandedKeys };
-}
 
 const Log = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [value, setValue] = useState('请选择日志文件');
   const [select, setSelect] = useState<string>('');
   const [data, setData] = useState<any[]>([]);
-  const [filterData, setFilterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [height, setHeight] = useState<number>();
   const treeDom = useRef<any>();
@@ -73,7 +45,6 @@ const Log = () => {
       .then(({ code, data }) => {
         if (code === 200) {
           setData(data);
-          setFilterData(data);
         }
       })
       .finally(() => setLoading(false));
@@ -115,21 +86,25 @@ const Log = () => {
       const keyword = e.target.value;
       debounceSearch(keyword);
     },
-    [data, setFilterData],
+    [data],
   );
 
   const debounceSearch = useCallback(
     debounce((keyword) => {
       setSearchValue(keyword);
-      const { tree, expandedKeys } = getFilterData(
-        keyword.toLocaleLowerCase(),
-        data,
-      );
-      setFilterData(tree);
-      setExpandedKeys(expandedKeys);
     }, 300),
-    [data, setFilterData],
+    [data],
   );
+
+  const { treeData: filterData, keys: searchExpandedKeys } = useFilterTreeData(
+    data,
+    searchValue,
+    { treeNodeFilterProp: 'title' },
+  );
+
+  useEffect(() => {
+    setExpandedKeys(uniq([...expandedKeys, ...searchExpandedKeys]));
+  }, [searchExpandedKeys]);
 
   const deleteFile = () => {
     Modal.confirm({
@@ -187,11 +162,9 @@ const Log = () => {
     setValue('请选择脚本文件');
   };
 
-  useEffect(() => {
-    const word = searchValue || '';
-    const { tree } = getFilterData(word.toLocaleLowerCase(), data);
-    setFilterData(tree);
-  }, [data]);
+  const onExpand = (expKeys: any) => {
+    setExpandedKeys(expKeys);
+  };
 
   useEffect(() => {
     getLogs();
@@ -217,8 +190,10 @@ const Log = () => {
                 dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
                 treeData={data}
                 placeholder="请选择日志"
-                fieldNames={{ value: 'key', label: 'title' }}
+                fieldNames={{ value: 'key' }}
+                treeNodeFilterProp="title"
                 showSearch
+                allowClear
                 onSelect={onSelect}
               />,
             ]
@@ -260,6 +235,8 @@ const Log = () => {
                       selectedKeys={[select]}
                       showLine={{ showLeafIcon: true }}
                       onSelect={onTreeSelect}
+                      expandedKeys={expandedKeys}
+                      onExpand={onExpand}
                     ></Tree>
                   </div>
                 </>
