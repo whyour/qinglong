@@ -222,6 +222,7 @@ const EditModal = ({
       onClose={cancel}
       open={visible}
     >
+      {/* @ts-ignore */}
       <SplitPane
         split="vertical"
         minSize={200}

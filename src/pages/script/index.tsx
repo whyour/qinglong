@@ -519,6 +519,7 @@ const Script = () => {
     >
       <div className={`${styles['log-container']} log-container`}>
         {!isPhone && (
+          /*// @ts-ignore*/
           <SplitPane split="vertical" size={200} maxSize={-100}>
             <div className={styles['left-tree-container']}>
               {data.length > 0 ? (
