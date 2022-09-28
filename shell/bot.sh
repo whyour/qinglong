@@ -35,11 +35,10 @@ fi
 cp -f "$repo_path/jbot/requirements.txt" "$dir_data"
 
 cd $dir_data
-cat requirements.txt | while read LREAD
-do
-if [[ ! $(pip3 show "${LREAD%%=*}" 2>/dev/null) ]]; then
-  pip3 --default-timeout=100 install ${LREAD}
-fi
+cat requirements.txt | while read LREAD; do
+  if [[ ! $(pip3 show "${LREAD%%=*}" 2>/dev/null) ]]; then
+    pip3 --default-timeout=100 install ${LREAD}
+  fi
 done
 
 echo -e "\npython3依赖安装成功...\n"
