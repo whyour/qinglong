@@ -119,24 +119,25 @@ handle_log_path() {
 }
 
 check_server() {
-  cpu_idle=$(top -b -n 1 | grep Cpu | awk '{print $8}' | cut -f 1 -d "%")
-  eval echo -e "当前CPU占用 $cpu_use " $cmd
+  cpu_use=$(top -b -n 1 | grep Cpu | awk '{print $8}' | cut -f 1 -d "%")
+
+  mem_free=$(free -m | grep "Mem" | awk '{print $3}')
+  mem_total=$(free -m | grep "Mem" | awk '{print $2}')
+  mem_use=$(printf "%d%%" $((mem_free * 100 / mem_total)) | cut -f 1 -d "%")
+
+  disk_use=$(df -P | grep /dev | grep -v -E '(tmp|boot|shm)' | awk '{print $5}' | cut -f 1 -d "%")
+
+  eval echo "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \\\n" $cmd
   if [[ $cpu_use -gt $cpu_warn ]]; then
     notify_api "CPU异常警告" "当前CPU占用 $cpu_use%"
     exit 1
   fi
 
-  mem_free=$(free -m | grep "Mem" | awk '{print $3}')
-  mem_total=$(free -m | grep "Mem" | awk '{print $2}')
-  mem_use=$(printf "%d%%" $((mem_free * 100 / mem_total)) | cut -f 1 -d "%")
-  eval echo -e "内存剩余 $mem_use% " $cmd
   if [[ $mem_free -lt $mem_warn ]]; then
     notify_api "内存异常警告" "当前内存占用 $mem_use%"
     exit 1
   fi
 
-  disk_use=$(df -P | grep /dev | grep -v -E '(tmp|boot|shm)' | awk '{print $5}' | cut -f 1 -d "%")
-  eval echo -e "磁盘占用 $disk_use% \\\n" $cmd
   if [[ $disk_use -gt $disk_warn ]]; then
     notify_api "磁盘异常警告" "当前磁盘占用 $disk_use%"
     exit 1
