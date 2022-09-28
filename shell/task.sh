@@ -127,7 +127,7 @@ check_server() {
 
   disk_use=$(df -P | grep /dev | grep -v -E '(tmp|boot|shm)' | awk '{print $5}' | cut -f 1 -d "%")
 
-  eval echo "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \\\n" $cmd
+  eval echo -e "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \\\n" $cmd
   if [[ $cpu_use -gt $cpu_warn ]]; then
     notify_api "CPU异常警告" "当前CPU占用 $cpu_use%"
     exit 1
