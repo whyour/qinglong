@@ -119,7 +119,7 @@ handle_log_path() {
 }
 
 check_server() {
-  cpu_use=$(top -b -n 1 | grep Cpu | awk '{print $8}' | cut -f 1 -d "%")
+  cpu_use=$(top -b -n 1 | grep CPU | grep -v -E 'grep|PID' | awk '{print $2}' | cut -f 1 -d "%")
 
   mem_free=$(free -m | grep "Mem" | awk '{print $3}')
   mem_total=$(free -m | grep "Mem" | awk '{print $2}')
