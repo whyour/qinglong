@@ -19,6 +19,11 @@ RepoFileExtensions="js py"
 ## 代理地址，支持http/https/socks，例如 http://127.0.0.1:7890
 ProxyUrl=""
 
+## 资源告警阙值，默认CPU 80%、内存80%、磁盘90%
+CpuWarn=80
+MemoryWarn=80
+DiskWarn=90
+
 ## 设置定时任务执行的超时时间，默认1h，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
 CommandTimeoutTime="1h"
 
