@@ -163,7 +163,7 @@ run_normal() {
     random_delay "$file_param"
   fi
 
-  handle_task_before
+  handle_task_before "$@"
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"
@@ -192,7 +192,7 @@ run_concurrent() {
     exit 1
   fi
 
-  handle_task_before
+  handle_task_before "$@"
 
   local envs=$(eval echo "\$${env_param}")
   local array=($(echo $envs | sed 's/&/ /g'))
@@ -249,7 +249,7 @@ run_designated() {
     exit 1
   fi
 
-  handle_task_before
+  handle_task_before "$@"
 
   local envs=$(eval echo "\$${env_param}")
   local array=($(echo $envs | sed 's/&/ /g'))
@@ -286,7 +286,7 @@ run_designated() {
 run_else() {
   local file_param="$1"
 
-  handle_task_before
+  handle_task_before "$@"
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"
