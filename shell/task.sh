@@ -129,15 +129,8 @@ check_server() {
 
   # eval echo -e "\#\# 当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \\\n" $cmd
   if [[ $cpu_use -gt $cpu_warn ]] || [[ $mem_free -lt $mem_warn ]] || [[ $disk_use -gt $disk_warn ]]; then
-    # echo -e "\#\# 服务器资源占用异常，本次任务跳过执行" $cmd
-    local resource = $(top -b -n 1  | grep -v -E 'grep|Mem|idle|Load' | awk '{$2="";$3="";$4="";$5="";$7="";print $0}' | head -n 10)
+    local resource = $(top -b -n 1 | grep -v -E 'grep|Mem|idle|Load' | awk '{$2="";$3="";$4="";$5="";$7="";print $0}' | head -n 10)
     notify_api "服务器资源异常警告" "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \n资源占用详情 \n\n $resource"
-
-    # end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    # diff_time=$(($end_timestamp - $begin_timestamp))
-    # [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-    # eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
-    # exit 1
   fi
 }
 
@@ -155,6 +148,15 @@ handle_task_before() {
 
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
   eval . $file_task_before "$@" $cmd
+}
+
+handle_task_after() {
+  eval . $file_task_after "$@" $cmd
+  local end_time=$(date '+%Y-%m-%d %H:%M:%S')
+  local end_timestamp=$(date "+%s")
+  local diff_time=$(($end_timestamp - $begin_timestamp))
+  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+  eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
 }
 
 ## 正常运行单个脚本，$1：传入参数
@@ -175,12 +177,7 @@ run_normal() {
 
   eval $timeoutCmd $which_program $file_param $cmd
 
-  eval . $file_task_after "$@" $cmd
-  local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-  local end_timestamp=$(date "+%s")
-  local diff_time=$(expr $end_timestamp - $begin_timestamp)
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-  eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+  handle_task_after "$@"
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
@@ -233,12 +230,7 @@ run_concurrent() {
     [[ -f $single_log_path ]] && rm -f $single_log_path
   done
 
-  eval . $file_task_after "$@" $cmd
-  local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-  local end_timestamp=$(date "+%s")
-  local diff_time=$(($end_timestamp - $begin_timestamp))
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-  eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+  handle_task_after "$@"
 }
 
 run_designated() {
@@ -275,12 +267,7 @@ run_designated() {
   fi
   eval $timeoutCmd $which_program $file_param $cmd
 
-  eval . $file_task_after "$@" $cmd
-  local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-  local end_timestamp=$(date "+%s")
-  local diff_time=$(($end_timestamp - $begin_timestamp))
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-  eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+  handle_task_after "$@"
 }
 
 ## 运行其他命令
@@ -299,12 +286,7 @@ run_else() {
   shift
   eval $timeoutCmd $which_program "$file_param" "$@" $cmd
 
-  eval . $file_task_after "$file_param" "$@" $cmd
-  local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-  local end_timestamp=$(date "+%s")
-  local diff_time=$(($end_timestamp - $begin_timestamp))
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-  eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+  handle_task_after "$@"
 }
 
 ## 命令检测
