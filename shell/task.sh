@@ -127,16 +127,17 @@ check_server() {
 
   disk_use=$(df -P | grep /dev | grep -v -E '(tmp|boot|shm)' | awk '{print $5}' | cut -f 1 -d "%")
 
-  eval echo -e "\#\# 当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \\\n" $cmd
+  # eval echo -e "\#\# 当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \\\n" $cmd
   if [[ $cpu_use -gt $cpu_warn ]] || [[ $mem_free -lt $mem_warn ]] || [[ $disk_use -gt $disk_warn ]]; then
-    echo -e "\#\# 服务器资源占用异常，本次任务跳过执行" $cmd
-    notify_api "服务器资源异常警告" "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use%"
+    # echo -e "\#\# 服务器资源占用异常，本次任务跳过执行" $cmd
+    local resource = $(top -b -n 1  | grep -v -E 'grep|Mem|idle|Load' | awk '{$2="";$3="";$4="";$5="";$7="";print $0}' | head -n 10)
+    notify_api "服务器资源异常警告" "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \n资源占用详情 \n\n $resource"
 
-    end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    diff_time=$(($end_timestamp - $begin_timestamp))
-    [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
-    exit 1
+    # end_time=$(date '+%Y-%m-%d %H:%M:%S')
+    # diff_time=$(($end_timestamp - $begin_timestamp))
+    # [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+    # eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+    # exit 1
   fi
 }
 
