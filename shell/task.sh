@@ -129,7 +129,7 @@ check_server() {
 
   # eval echo -e "\#\# 当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \\\n" $cmd
   if [[ $cpu_use -gt $cpu_warn ]] || [[ $mem_free -lt $mem_warn ]] || [[ $disk_use -gt $disk_warn ]]; then
-    local resource = $(top -b -n 1 | grep -v -E 'grep|Mem|idle|Load' | awk '{$2="";$3="";$4="";$5="";$7="";print $0}' | head -n 10)
+    local resource=$(top -b -n 1 | grep -v -E 'grep|Mem|idle|Load' | awk '{$2="";$3="";$4="";$5="";$7="";print $0}' | head -n 10)
     notify_api "服务器资源异常警告" "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \n资源占用详情 \n\n $resource"
   fi
 }
@@ -170,7 +170,7 @@ run_normal() {
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"
-  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
+  if [[ ${file_param} != /* ]] && [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
     cd ${relative_path}
     file_param=${file_param/$relative_path\//}
   fi
