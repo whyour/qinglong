@@ -67,12 +67,12 @@ export default class EnvService {
     const envs = await this.envs();
     if (toIndex === 0 || toIndex === envs.length - 1) {
       targetPosition = isUpward
-        ? envs[0].position * 2
-        : envs[toIndex].position / 2;
+        ? envs[0].position! * 2
+        : envs[toIndex].position! / 2;
     } else {
       targetPosition = isUpward
-        ? (envs[toIndex].position + envs[toIndex - 1].position) / 2
-        : (envs[toIndex].position + envs[toIndex + 1].position) / 2;
+        ? (envs[toIndex].position! + envs[toIndex - 1].position!) / 2
+        : (envs[toIndex].position! + envs[toIndex + 1].position!) / 2;
     }
     const newDoc = await this.update({
       id,

@@ -3,7 +3,20 @@ import { Container } from 'typedi';
 import EnvService from '../services/env';
 import { Logger } from 'winston';
 import { celebrate, Joi } from 'celebrate';
+import multer from 'multer';
+import config from '../config';
+import fs from 'fs';
 const route = Router();
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, config.scriptPath);
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  },
+});
+const upload = multer({ storage: storage });
 
 export default (app: Router) => {
   app.use('/envs', route);
@@ -172,6 +185,39 @@ export default (app: Router) => {
         const envService = Container.get(EnvService);
         const data = await envService.getDb({ id: req.params.id });
         return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/upload',
+    upload.single('env'),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const fileContent = await fs.promises.readFile(req!.file!.path, 'utf8');
+        const parseContent = JSON.parse(fileContent);
+        const data = Array.isArray(parseContent)
+          ? parseContent
+          : [parseContent];
+        if (data.every((x) => x.name && x.value)) {
+          const result = await envService.create(
+            data.map((x) => ({
+              name: x.name,
+              value: x.value,
+              remarks: x.remarks,
+            })),
+          );
+          return res.send({ code: 200, data: result });
+        } else {
+          return res.send({
+            code: 400,
+            message: '文件缺少name或者value字段，参考导出文件格式',
+          });
+        }
       } catch (e) {
         return next(e);
       }

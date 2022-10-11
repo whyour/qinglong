@@ -76,12 +76,12 @@ export default class CronViewService {
     const views = await this.list();
     if (toIndex === 0 || toIndex === views.length - 1) {
       targetPosition = isUpward
-        ? views[0].position * 2
-        : views[toIndex].position / 2;
+        ? views[0].position! * 2
+        : views[toIndex].position! / 2;
     } else {
       targetPosition = isUpward
-        ? (views[toIndex].position + views[toIndex - 1].position) / 2
-        : (views[toIndex].position + views[toIndex + 1].position) / 2;
+        ? (views[toIndex].position! + views[toIndex - 1].position!) / 2
+        : (views[toIndex].position! + views[toIndex + 1].position!) / 2;
     }
     const newDoc = await this.update({
       id,
