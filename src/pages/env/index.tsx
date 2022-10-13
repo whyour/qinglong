@@ -525,9 +525,6 @@ const Env = () => {
           loading={loading}
           onSearch={onSearch}
         />,
-        <Button key="2" type="primary" onClick={() => addEnv()}>
-          新建变量
-        </Button>,
         <Upload {...uploadProps}>
           <Button
             type="primary"
@@ -537,6 +534,9 @@ const Env = () => {
             导入
           </Button>
         </Upload>,
+        <Button key="2" type="primary" onClick={() => addEnv()}>
+          新建变量
+        </Button>,
       ]}
       header={{
         style: headerStyle,
