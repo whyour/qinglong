@@ -57,6 +57,11 @@ const EditModal = ({
     if (node.key === selectedKey || !value) {
       return;
     }
+
+    if (node.type === 'directory') {
+      return;
+    }
+
     const newMode = LangMap[value.slice(-3)] || '';
     setCNode(node);
     setLanguage(newMode);
@@ -136,10 +141,13 @@ const EditModal = ({
   }, [socketMessage]);
 
   useEffect(() => {
+    setLog('');
     if (currentNode) {
       setCNode(currentNode);
       setValue(content as string);
       setSelectedKey(currentNode.key);
+      const newMode = LangMap[value.slice(-3)] || '';
+      setLanguage(newMode);
     }
   }, [content, currentNode]);
 
@@ -150,6 +158,7 @@ const EditModal = ({
       title={
         <>
           <TreeSelect
+            treeExpandAction="click"
             style={{ marginRight: 8, width: 150 }}
             value={selectedKey}
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}

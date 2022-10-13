@@ -80,6 +80,7 @@ const Config = () => {
       loading={loading}
       extra={[
         <TreeSelect
+          treeExpandAction="click"
           className="config-select"
           value={select}
           dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}

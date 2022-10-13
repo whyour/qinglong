@@ -185,6 +185,7 @@ const Log = () => {
         isPhone
           ? [
               <TreeSelect
+                treeExpandAction="click"
                 className="log-select"
                 value={select}
                 dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
