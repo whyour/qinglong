@@ -433,7 +433,7 @@ main() {
   local p6=$6
   local p7=$7
   local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-  local log_path="$dir_log/update/${log_time}_$p1.log"
+  local log_path="$dir_log/update/$p1_${log_time}.log"
   local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
 
   cmd=">> $log_path 2>&1"
@@ -489,7 +489,7 @@ main() {
     usage
     ;;
   esac
-  if [[ $p1 != "repo" ]] && [[ $p1 != "raw" ]]; then
+  if [[ -f $log_path ]]; then
     cat $log_path
   fi
 }
