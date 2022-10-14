@@ -436,18 +436,16 @@ main() {
   local log_path="$dir_log/update/${log_time}_$p1.log"
   local begin_time=$(date '+%Y-%m-%d %H:%M:%S')
 
+  cmd=">> $log_path 2>&1"
+  [[ "$show_log" == "true" ]] && cmd=""
+  [[ -f $task_error_log_path ]] && cat $task_error_log_path $cmd
+
   case $p1 in
   update)
-    cmd=">> $log_path 2>&1"
-    [[ "$show_log" == "true" ]] && cmd=""
-    eval echo -e "## 开始执行... $begin_time\n" $cmd
-    [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
     eval update_qinglong "$2" $cmd
     ;;
   extra)
-    echo -e "## 开始执行... $begin_time\n" >>$log_path
-    [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
-    run_extra_shell >>$log_path
+    eval run_extra_shell $cmd
     ;;
   repo)
     get_uniq_path "$p2" "$p6"
@@ -468,28 +466,20 @@ main() {
     fi
     ;;
   rmlog)
-    echo -e "## 开始执行... $begin_time\n" >>$log_path
-    [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
-    . $dir_shell/rmlog.sh "$p2" >>$log_path
+    eval . $dir_shell/rmlog.sh "$p2" $cmd
     ;;
   bot)
-    echo -e "## 开始执行... $begin_time\n" >>$log_path
-    [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
-    . $dir_shell/bot.sh >>$log_path
+    eval . $dir_shell/bot.sh $cmd
     ;;
   check)
-    echo -e "## 开始执行... $begin_time\n" >>$log_path
-    [[ -f $task_error_log_path ]] && cat $task_error_log_path >>$log_path
-    . $dir_shell/check.sh >>$log_path
+    eval . $dir_shell/check.sh $cmd
     ;;
   resetlet)
-    echo -e "## 开始执行... $begin_time\n" >>$log_path
     auth_value=$(cat $file_auth_user | jq '.retries =0' -c)
     echo -e "重置登录错误次数成功 \n $auth_value" >>$log_path
     echo "$auth_value" >$file_auth_user
     ;;
   resettfa)
-    echo -e "## 开始执行... $begin_time\n" >>$log_path
     auth_value=$(cat $file_auth_user | jq '.twoFactorActivated =false' | jq '.twoFactorActived =false' -c)
     echo -e "禁用两步验证成功 \n $auth_value" >>$log_path
     echo "$auth_value" >$file_auth_user
@@ -499,10 +489,7 @@ main() {
     usage
     ;;
   esac
-  local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-  local diff_time=$(diff_time "%Y-%m-%d %H:%M:%S" "$begin_time" "$end_time")
   if [[ $p1 != "repo" ]] && [[ $p1 != "raw" ]]; then
-    echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒" >>$log_path
     cat $log_path
   fi
 }
