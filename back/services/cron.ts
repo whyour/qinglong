@@ -420,7 +420,7 @@ export default class CronService {
       );
       cp.stderr.on('data', (data) => {
         if (logFileExist) {
-          fs.appendFileSync(`${absolutePath}`, `${data}`);
+          fs.appendFileSync(`${absolutePath}`, `${data.toString()}`);
         }
       });
       cp.on('error', (err) => {
