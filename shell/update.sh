@@ -432,12 +432,12 @@ main() {
   local p5=$5
   local p6=$6
   local p7=$7
-  local log_dir="${dir_log}/${p1}"
-  make_dir "${log_dir}"
+  local log_dir="${p1}"
+  make_dir "$dir_log/$log_path"
   local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
   local log_path="${log_dir}/${log_time}.log"
 
-  cmd=">> $log_path 2>&1"
+  cmd=">> $dir_log/$log_path 2>&1"
   [[ "$show_log" == "true" ]] && cmd=""
   [[ -f $task_error_log_path ]] && cat $task_error_log_path $cmd
 
