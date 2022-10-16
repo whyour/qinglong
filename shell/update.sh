@@ -433,13 +433,14 @@ main() {
   local p6=$6
   local p7=$7
   local log_dir="${p1}"
-  make_dir "$dir_log/$log_path"
+  make_dir "$dir_log/$log_dir"
   local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
   local log_path="${log_dir}/${log_time}.log"
+  local file_path="$dir_log/$log_path"
 
-  cmd=">> $dir_log/$log_path 2>&1"
+  cmd=">> $file_path 2>&1"
   [[ "$show_log" == "true" ]] && cmd=""
-  [[ -f $task_error_log_path ]] && cat $task_error_log_path $cmd
+  [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
 
   if [[ "$show_log" == "true" ]] && [[ $ID ]]; then
     eval echo -e "请移除 -l 参数" $cmd
@@ -501,8 +502,8 @@ main() {
     ;;
   esac
 
-  if [[ -f $log_path ]]; then
-    cat $log_path
+  if [[ -f $file_path ]]; then
+    cat $file_path
     local end_timestamp=$(date "+%s")
     local diff_time=$(($end_timestamp - $begin_timestamp))
     [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
