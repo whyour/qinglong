@@ -39,7 +39,9 @@ export default (app: Router) => {
       body: Joi.array().items(
         Joi.object({
           value: Joi.string().required(),
-          name: Joi.string().required(),
+          name: Joi.string()
+            .required()
+            .pattern(/^[a-zA-Z_][0-9a-zA-Z_]*$/),
           remarks: Joi.string().optional().allow(''),
         }),
       ),
