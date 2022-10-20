@@ -8,7 +8,7 @@
       "./node_modules/celebrate/lib/index.d.ts"
     ],
     "paths": {
-      "@/*": ["back/*"],
+      "@/*": ["./back/*"],
     },
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,

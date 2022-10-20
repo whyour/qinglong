@@ -61,7 +61,6 @@ podman run -dit \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \
-  --restart unless-stopped \
   docker.io/whyour/qinglong:latest
 ```
 
