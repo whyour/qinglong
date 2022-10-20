@@ -7,6 +7,9 @@
       "./src/types",
       "./node_modules/celebrate/lib/index.d.ts"
     ],
+    "paths": {
+      "@/*": ["back/*"],
+    },
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

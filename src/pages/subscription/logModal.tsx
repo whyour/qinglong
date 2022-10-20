@@ -7,6 +7,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { PageLoading } from '@ant-design/pro-layout';
+import { logEnded } from '@/utils';
 
 const SubscriptionLogModal = ({
   subscription,
@@ -43,8 +44,8 @@ const SubscriptionLogModal = ({
         ) {
           const log = data as string;
           setValue(log || '暂无日志');
-          setExecuting(log && !log.includes('执行结束'));
-          if (log && !log.includes('执行结束')) {
+          setExecuting(log && !logEnded(log));
+          if (log && !logEnded(log)) {
             setTimeout(() => {
               getCronLog();
             }, 2000);

@@ -157,6 +157,7 @@ handle_task_after() {
   local diff_time=$(($end_timestamp - $begin_timestamp))
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
   eval echo -e "\\\n\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+  eval echo -e "\\\n　　　　　" $cmd
 }
 
 ## 正常运行单个脚本，$1：传入参数

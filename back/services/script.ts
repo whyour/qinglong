@@ -6,6 +6,7 @@ import SockService from './sock';
 import CronService from './cron';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import config from '../config';
+import { LOG_END_SYMBOL } from '../config/const';
 
 @Service()
 export default class ScriptService {
@@ -55,7 +56,7 @@ export default class ScriptService {
       type: 'manuallyRunScript',
       message: `${str}\n## 执行结束...  ${new Date()
         .toLocaleString('zh', { hour12: false })
-        .replace(' 24:', ' 00:')} `,
+        .replace(' 24:', ' 00:')}${LOG_END_SYMBOL}`,
     });
 
     return { code: 200 };

@@ -7,6 +7,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { PageLoading } from '@ant-design/pro-layout';
+import { logEnded } from '@/utils';
 
 enum CrontabStatus {
   'running',
@@ -49,9 +50,9 @@ const CronLogModal = ({
           const log = data as string;
           setValue(log || '暂无日志');
           setExecuting(
-            log && !log.includes('执行结束') && !log.includes('重启面板'),
+            log && !logEnded(log) && !log.includes('重启面板'),
           );
-          if (log && !log.includes('执行结束') && !log.includes('重启面板')) {
+          if (log && !logEnded(log) && !log.includes('重启面板')) {
             setTimeout(() => {
               getCronLog();
             }, 2000);

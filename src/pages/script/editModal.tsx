@@ -7,6 +7,7 @@ import Editor from '@monaco-editor/react';
 import SaveModal from './saveModal';
 import SettingModal from './setting';
 import { useTheme } from '@/utils/hooks';
+import { logEnded } from '@/utils';
 
 const { Option } = Select;
 const LangMap: any = {
@@ -128,7 +129,7 @@ const EditModal = ({
       return;
     }
 
-    if (_message.includes('执行结束')) {
+    if (logEnded(_message)) {
       setTimeout(() => {
         setIsRunning(false);
       }, 300);

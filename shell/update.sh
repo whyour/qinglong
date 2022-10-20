@@ -464,8 +464,8 @@ main() {
     if [[ -n $p2 ]]; then
       update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7"
     else
-      echo -e "命令输入错误...\n"
-      usage
+      eval echo -e "命令输入错误...\\\n"
+      eval usage $cmd
     fi
     ;;
   raw)
@@ -473,8 +473,8 @@ main() {
     if [[ -n $p2 ]]; then
       update_raw "$p2"
     else
-      echo -e "命令输入错误...\n"
-      usage
+      eval echo -e "命令输入错误...\\\n"
+      eval usage $cmd
     fi
     ;;
   rmlog)
@@ -497,16 +497,17 @@ main() {
     echo "$auth_value" >$file_auth_user
     ;;
   *)
-    echo -e "命令输入错误...\n"
-    usage
+    eval echo -e "命令输入错误...\\\n" $cmd
+    eval usage $cmd
     ;;
   esac
 
   if [[ -f $file_path ]]; then
-    cat $file_path
     local end_timestamp=$(date "+%s")
     local diff_time=$(($end_timestamp - $begin_timestamp))
     [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+    eval echo -e "\\\n　　　　　　　　　　" $cmd
+    cat $file_path
   fi
 }
 

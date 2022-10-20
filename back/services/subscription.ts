@@ -29,6 +29,7 @@ import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
 import SshKeyService from './sshKey';
 import dayjs from 'dayjs';
+import { LOG_END_SYMBOL } from '../config/const';
 
 @Service()
 export default class SubscriptionService {
@@ -232,7 +233,7 @@ export default class SubscriptionService {
           absolutePath,
           `\n## 执行结束... ${endTime.format(
             'YYYY-MM-DD HH:mm:ss',
-          )}  耗时 ${diff} 秒`,
+          )}  耗时 ${diff} 秒${LOG_END_SYMBOL}`,
         );
 
         await SubscriptionModel.update(
@@ -353,7 +354,7 @@ export default class SubscriptionService {
 
       fs.appendFileSync(
         `${absolutePath}`,
-        `${str}\n## 执行结束...  ${dayjs().format('YYYY-MM-DD HH:mm:ss')} `,
+        `${str}\n## 执行结束...  ${dayjs().format('YYYY-MM-DD HH:mm:ss')}${LOG_END_SYMBOL}`,
       );
     }
 
