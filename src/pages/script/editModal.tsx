@@ -147,7 +147,7 @@ const EditModal = ({
       setCNode(currentNode);
       setValue(content as string);
       setSelectedKey(currentNode.key);
-      const newMode = LangMap[value.slice(-3)] || '';
+      const newMode = LangMap[currentNode.title.slice(-3)] || '';
       setLanguage(newMode);
     }
   }, [content, currentNode]);
