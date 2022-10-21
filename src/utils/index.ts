@@ -1,4 +1,4 @@
-import { LOG_END_SYMBOL } from "./const";
+import { LOG_END_SYMBOL } from './const';
 
 export default function browserType() {
   // 权重：系统 + 系统版本 > 平台 > 内核 + 载体 + 内核版本 + 载体版本 > 外壳 + 外壳版本
@@ -152,9 +152,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-        shell, // wechat qq uc 360 2345 sougou liebao maxthon
-        shellVs,
-      },
+          shell, // wechat qq uc 360 2345 sougou liebao maxthon
+          shellVs,
+        },
   );
 
   console.log(
@@ -190,8 +190,8 @@ export function getTableScroll({
   if (id) {
     tHeader = document.getElementById(id)
       ? document
-        .getElementById(id)!
-        .getElementsByClassName('ant-table-thead')[0]
+          .getElementById(id)!
+          .getElementsByClassName('ant-table-thead')[0]
       : null;
   } else {
     tHeader = document.querySelector('.ant-table-wrapper');
@@ -278,5 +278,5 @@ export function depthFirstSearch<
 
 export function logEnded(log: string): boolean {
   const endTips = [LOG_END_SYMBOL, '执行结束'];
-  return endTips.some(x => !log.includes(x));
+  return endTips.some((x) => log.includes(x));
 }
