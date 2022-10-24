@@ -75,13 +75,13 @@ run_nohup() {
 }
 
 check_server() {
-  cpu_use=$(top -b -n 1 | grep CPU | grep -v -E 'grep|PID' | awk '{print $2}' | cut -f 1 -d "%")
+  cpu_use=$(top -b -n 1 | grep CPU | grep -v -E 'grep|PID' | awk '{print $2}' | cut -f 1 -d "%" | head -n 1)
 
-  mem_free=$(free -m | grep "Mem" | awk '{print $3}')
-  mem_total=$(free -m | grep "Mem" | awk '{print $2}')
-  mem_use=$(printf "%d%%" $((mem_free * 100 / mem_total)) | cut -f 1 -d "%")
+  mem_free=$(free -m | grep "Mem" | awk '{print $3}' | head -n 1)
+  mem_total=$(free -m | grep "Mem" | awk '{print $2}' | head -n 1)
+  mem_use=$(printf "%d%%" $((mem_free * 100 / mem_total)) | cut -f 1 -d "%" | head -n 1)
 
-  disk_use=$(df -P | grep /dev | grep -v -E '(tmp|boot|shm)' | awk '{print $5}' | cut -f 1 -d "%")
+  disk_use=$(df -P | grep /dev | grep -v -E '(tmp|boot|shm)' | awk '{print $5}' | cut -f 1 -d "%" | head -n 1)
 
   if [[ $cpu_use -gt $cpu_warn ]] || [[ $mem_free -lt $mem_warn ]] || [[ $disk_use -gt $disk_warn ]]; then
     local resource=$(top -b -n 1 | grep -v -E 'grep|Mem|idle|Load' | awk '{$2="";$3="";$4="";$5="";$7="";print $0}' | head -n 10)
