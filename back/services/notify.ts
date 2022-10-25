@@ -30,12 +30,12 @@ export default class NotificationService {
     ['webhook', this.webhook],
   ]);
 
-  private timeout = 10000;
+  private timeout = 30000;
   private title = '';
   private content = '';
   private params!: Omit<NotificationInfo, 'type'>;
 
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async notify(
     title: string,
@@ -182,8 +182,9 @@ export default class NotificationService {
       telegramBotUserId,
     } = this.params;
     const authStr = telegramBotProxyAuth ? `${telegramBotProxyAuth}@` : '';
-    const url = `https://${telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
-      }/bot${telegramBotToken}/sendMessage`;
+    const url = `https://${
+      telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
+    }/bot${telegramBotToken}/sendMessage`;
     let agent;
     if (telegramBotProxyHost && telegramBotProxyPort) {
       const options: any = {
@@ -386,11 +387,19 @@ export default class NotificationService {
   }
 
   private async webhook() {
-    const { webhookUrl, webhookBody, webhookHeaders, webhookMethod, webhookContentType } =
-      this.params;
+    const {
+      webhookUrl,
+      webhookBody,
+      webhookHeaders,
+      webhookMethod,
+      webhookContentType,
+    } = this.params;
 
-    const { formatBody, formatUrl } = this.formatNotifyContent(webhookUrl, webhookBody);
-    if (!formatUrl && !formatBody) { 
+    const { formatBody, formatUrl } = this.formatNotifyContent(
+      webhookUrl,
+      webhookBody,
+    );
+    if (!formatUrl && !formatBody) {
       return false;
     }
     const headers = parseHeaders(webhookHeaders);
@@ -402,8 +411,8 @@ export default class NotificationService {
       timeout: this.timeout,
       retry: 0,
       allowGetBody: true,
-      ...bodyParam
-    }
+      ...bodyParam,
+    };
     const res = await got(formatUrl, options);
     return String(res.statusCode).startsWith('20');
   }
@@ -427,8 +436,12 @@ export default class NotificationService {
     }
 
     return {
-      formatUrl: url.replaceAll('$title', encodeURIComponent(this.title)).replaceAll('$content', encodeURIComponent(this.content)),
-      formatBody: body.replaceAll('$title', this.title).replaceAll('$content', this.content),
-    }
+      formatUrl: url
+        .replaceAll('$title', encodeURIComponent(this.title))
+        .replaceAll('$content', encodeURIComponent(this.content)),
+      formatBody: body
+        .replaceAll('$title', this.title)
+        .replaceAll('$content', this.content),
+    };
   }
 }

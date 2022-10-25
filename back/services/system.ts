@@ -89,7 +89,7 @@ export default class SystemService {
       let lastLog = '';
       try {
         const result = await got.get(config.lastVersionFile, {
-          timeout: 6000,
+          timeout: 30000,
           retry: 0,
         });
         const lastVersionFileContent = result.body;
