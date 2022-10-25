@@ -254,6 +254,7 @@ const Env = () => {
   const [searchText, setSearchText] = useState('');
   const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [importLoading, setImportLoading] = useState(false);
+  const tableRef = useRef<any>();
 
   const getEnvs = () => {
     setLoading(true);
@@ -508,10 +509,10 @@ const Env = () => {
   }, [searchText]);
 
   useEffect(() => {
-    setTimeout(() => {
+    if (tableRef.current) {
       setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
-    });
-  }, []);
+    }
+  }, [tableRef.current]);
 
   return (
     <PageContainer
@@ -587,6 +588,7 @@ const Env = () => {
       )}
       <DndProvider backend={HTML5Backend}>
         <Table
+          ref={tableRef}
           columns={columns}
           rowSelection={rowSelection}
           pagination={false}

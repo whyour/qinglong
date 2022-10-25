@@ -1,4 +1,4 @@
-import React, { PureComponent, Fragment, useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Button,
   message,
@@ -388,6 +388,7 @@ const Crontab = () => {
   const [cronViews, setCronViews] = useState<any[]>([]);
   const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
   const [moreMenuActive, setMoreMenuActive] = useState(false);
+  const tableRef = useRef<any>();
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -874,11 +875,14 @@ const Crontab = () => {
       sorter: {},
       filters: {},
     });
-    setTimeout(() => {
-      setTableScrollHeight(getTableScroll());
-    });
     getCronViews();
   }, []);
+
+  useEffect(() => {
+    if (tableRef.current) {
+      setTableScrollHeight(getTableScroll());
+    }
+  }, [tableRef.current]);
 
   const panelContent = (
     <>
@@ -939,6 +943,7 @@ const Crontab = () => {
         </div>
       )}
       <Table
+        ref={tableRef}
         columns={columns}
         pagination={{
           current: pageConf.page,

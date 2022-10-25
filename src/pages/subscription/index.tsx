@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Button,
   message,
@@ -247,6 +247,7 @@ const Subscription = () => {
   const [searchValue, setSearchValue] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logSubscription, setLogSubscription] = useState<any>();
+  const tableRef = useRef<any>();
 
   const runSubscription = (record: any, index: number) => {
     Modal.confirm({
@@ -539,10 +540,13 @@ const Subscription = () => {
 
   useEffect(() => {
     setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
-    setTimeout(() => {
-      setTableScrollHeight(getTableScroll());
-    });
   }, []);
+
+  useEffect(() => {
+    if (tableRef.current) {
+      setTableScrollHeight(getTableScroll());
+    }
+  }, [tableRef.current]);
 
   return (
     <PageContainer
@@ -568,6 +572,7 @@ const Subscription = () => {
       }}
     >
       <Table
+        ref={tableRef}
         columns={columns}
         pagination={{
           current: currentPage,

@@ -168,6 +168,7 @@ const Dependence = () => {
   const [logDependence, setLogDependence] = useState<any>();
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
+  const tableRef = useRef<any>();
 
   const getDependencies = () => {
     setLoading(true);
@@ -368,10 +369,10 @@ const Dependence = () => {
   }, [searchText, type]);
 
   useEffect(() => {
-    setTimeout(() => {
+    if (tableRef.current) {
       setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
-    });
-  }, []);
+    }
+  }, [tableRef.current]);
 
   useEffect(() => {
     if (logDependence) {
@@ -454,6 +455,7 @@ const Dependence = () => {
       )}
       <DndProvider backend={HTML5Backend}>
         <Table
+          ref={tableRef}
           columns={columns}
           rowSelection={rowSelection}
           pagination={false}
