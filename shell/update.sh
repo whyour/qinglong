@@ -230,10 +230,10 @@ run_extra_shell() {
 
 ## 脚本用法
 usage() {
-  echo -e "本脚本用法："
+  echo -e "ql命令使用方法："
   echo -e "1. $cmd_update update                                                                  # 更新并重启青龙"
   echo -e "2. $cmd_update extra                                                                   # 运行自定义脚本"
-  echo -e "3. $cmd_update raw <fileurl>                                                           # 更新单个脚本文件"
+  echo -e "3. $cmd_update raw <fileurl>                                                            # 更新单个脚本文件"
   echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch> <extensions>    # 更新单个仓库的脚本"
   echo -e "5. $cmd_update rmlog <days>                                                            # 删除旧日志"
   echo -e "6. $cmd_update bot                                                                     # 启动tg-bot"
@@ -440,17 +440,25 @@ main() {
 
   cmd=">> $file_path 2>&1"
   [[ "$show_log" == "true" ]] && cmd=""
-  [[ -f $task_error_log_path ]] && eval cat $task_error_log_path $cmd
-
-  if [[ "$show_log" == "true" ]] && [[ $ID ]]; then
-    eval echo -e "请移除 -l 参数" $cmd
-    exit 1
-  fi
 
   local time_format="%Y-%m-%d %H:%M:%S"
   local time=$(date "+$time_format")
   local begin_timestamp=$(format_timestamp "$time_format" "$time")
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
+
+  local begin_time=$(format_time "$time_format" "$time")
+  eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+
+  if [[ -s $task_error_log_path ]]; then
+    eval cat $task_error_log_path $cmd
+    eval echo -e "加载 config.sh 出错，请手动检查" $cmd
+    eval echo $cmd
+  fi
+
+  if [[ "$show_log" == "true" ]] && [[ $ID ]]; then
+    eval echo -e "请移除 -l 参数" $cmd
+    exit 1
+  fi
 
   case $p1 in
   update)
@@ -464,7 +472,7 @@ main() {
     if [[ -n $p2 ]]; then
       update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7"
     else
-      eval echo -e "命令输入错误...\\\n"
+      eval echo -e "命令输入错误...\\\n" $cmd
       eval usage $cmd
     fi
     ;;
@@ -473,7 +481,7 @@ main() {
     if [[ -n $p2 ]]; then
       update_raw "$p2"
     else
-      eval echo -e "命令输入错误...\\\n"
+      eval echo -e "命令输入错误...\\\n" $cmd
       eval usage $cmd
     fi
     ;;
@@ -488,13 +496,13 @@ main() {
     ;;
   resetlet)
     auth_value=$(cat $file_auth_user | jq '.retries =0' -c)
-    echo -e "重置登录错误次数成功 \n $auth_value" >>$log_path
     echo "$auth_value" >$file_auth_user
+    echo -e "重置登录错误次数成功" $cmd
     ;;
   resettfa)
     auth_value=$(cat $file_auth_user | jq '.twoFactorActivated =false' | jq '.twoFactorActived =false' -c)
-    echo -e "禁用两步验证成功 \n $auth_value" >>$log_path
     echo "$auth_value" >$file_auth_user
+    eval echo -e "禁用两步验证成功" $cmd
     ;;
   *)
     eval echo -e "命令输入错误...\\\n" $cmd
@@ -502,11 +510,16 @@ main() {
     ;;
   esac
 
+  local etime=$(date "+$time_format")
+  local end_time=$(format_time "$time_format" "$etime")
+  local end_timestamp=$(format_timestamp "$time_format" "$etime")
+  local diff_time=$(($end_timestamp - $begin_timestamp))
+  eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+
+  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+  eval echo -e "\\\n　　　　　　　　　　" $cmd
+
   if [[ -f $file_path ]]; then
-    local end_timestamp=$(date "+%s")
-    local diff_time=$(($end_timestamp - $begin_timestamp))
-    [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-    eval echo -e "\\\n　　　　　　　　　　" $cmd
     cat $file_path
   fi
 }

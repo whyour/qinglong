@@ -486,4 +486,4 @@ detect_macos
 define_cmd
 fix_config
 
-import_config $1 >$task_error_log_path 2>&1
+import_config $1 2>$task_error_log_path

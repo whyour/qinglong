@@ -97,7 +97,11 @@ handle_task_before() {
 
   [[ $is_macos -eq 0 ]] && check_server
 
-  [[ -f $task_error_log_path ]] && cat $task_error_log_path
+  if [[ -s $task_error_log_path ]]; then
+    eval cat $task_error_log_path $cmd
+    eval echo -e "加载 config.sh 出错，请手动检查" $cmd
+    eval echo $cmd
+  fi
 
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
   . $file_task_before "$@"
@@ -105,9 +109,12 @@ handle_task_before() {
 
 handle_task_after() {
   . $file_task_after "$@"
-  local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-  local end_timestamp=$(date "+%s")
+
+  local etime=$(date "+$time_format")
+  local end_time=$(format_time "$time_format" "$etime")
+  local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
+  
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
   echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒"
   echo -e "\n　　　　　"
