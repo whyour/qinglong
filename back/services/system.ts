@@ -90,7 +90,6 @@ export default class SystemService {
       try {
         const result = await got.get(config.lastVersionFile, {
           timeout: 30000,
-          retry: 0,
         });
         const lastVersionFileContent = result.body;
         lastVersion = lastVersionFileContent.match(versionRegx)![1];

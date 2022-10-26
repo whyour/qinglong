@@ -30,12 +30,15 @@ export default class NotificationService {
     ['webhook', this.webhook],
   ]);
 
-  private timeout = 30000;
   private title = '';
   private content = '';
   private params!: Omit<NotificationInfo, 'type'>;
+  private gotOption = {
+    timeout: 30000,
+    retry: 1,
+  }
 
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   public async notify(
     title: string,
@@ -76,8 +79,7 @@ export default class NotificationService {
     const { gotifyUrl, gotifyToken, gotifyPriority } = this.params;
     const res: any = await got
       .post(`${gotifyUrl}/message?token=${gotifyToken}`, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         body: `title=${encodeURIComponent(
           this.title,
         )}&message=${encodeURIComponent(
@@ -95,8 +97,7 @@ export default class NotificationService {
     const { goCqHttpBotQq, goCqHttpBotToken, goCqHttpBotUrl } = this.params;
     const res: any = await got
       .post(`${goCqHttpBotUrl}?${goCqHttpBotQq}`, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         json: { message: `${this.title}\n${this.content}` },
         headers: { Authorization: 'Bearer ' + goCqHttpBotToken },
       })
@@ -111,8 +112,7 @@ export default class NotificationService {
       : `https://sc.ftqq.com/${serverChanKey}.send`;
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         body: `title=${this.title}&desp=${this.content}`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
@@ -125,8 +125,7 @@ export default class NotificationService {
     const url = `https://api2.pushdeer.com/message/push`;
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         body: `pushkey=${pushDeerKey}&text=${encodeURIComponent(
           this.title,
         )}&desp=${encodeURIComponent(this.content)}&type=markdown`,
@@ -143,8 +142,7 @@ export default class NotificationService {
     const url = `${chatUrl}${chatToken}`;
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         body: `payload={"text":"${this.title}\n${this.content}"}`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
@@ -164,8 +162,7 @@ export default class NotificationService {
     )}?icon=${barkIcon}?sound=${barkSound}&group=${barkGroup}`;
     const res: any = await got
       .get(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
       .json();
@@ -182,9 +179,8 @@ export default class NotificationService {
       telegramBotUserId,
     } = this.params;
     const authStr = telegramBotProxyAuth ? `${telegramBotProxyAuth}@` : '';
-    const url = `https://${
-      telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
-    }/bot${telegramBotToken}/sendMessage`;
+    const url = `https://${telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
+      }/bot${telegramBotToken}/sendMessage`;
     let agent;
     if (telegramBotProxyHost && telegramBotProxyPort) {
       const options: any = {
@@ -203,8 +199,7 @@ export default class NotificationService {
     }
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         body: `chat_id=${telegramBotUserId}&text=${this.title}\n\n${this.content}&disable_web_page_preview=true`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         agent,
@@ -226,8 +221,7 @@ export default class NotificationService {
     const url = `https://oapi.dingtalk.com/robot/send?access_token=${dingtalkBotToken}${secretParam}`;
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         json: {
           msgtype: 'text',
           text: {
@@ -244,8 +238,7 @@ export default class NotificationService {
     const url = `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${weWorkBotKey}`;
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         json: {
           msgtype: 'text',
           text: {
@@ -264,8 +257,7 @@ export default class NotificationService {
     const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken`;
     const tokenRes: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         json: {
           corpid,
           corpsecret,
@@ -315,8 +307,7 @@ export default class NotificationService {
       .post(
         `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
         {
-          timeout: this.timeout,
-          retry: 0,
+          ...this.gotOption,
           json: {
             touser,
             agentid,
@@ -335,8 +326,7 @@ export default class NotificationService {
     const url = `https://push.hellyw.com/${iGotPushKey.toLowerCase()}`;
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         body: `title=${this.title}&content=${this.content}`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
@@ -350,8 +340,7 @@ export default class NotificationService {
     const url = `https://www.pushplus.plus/send`;
     const res: any = await got
       .post(url, {
-        timeout: this.timeout,
-        retry: 0,
+        ...this.gotOption,
         json: {
           token: `${pushPlusToken}`,
           title: `${this.title}`,
@@ -387,19 +376,11 @@ export default class NotificationService {
   }
 
   private async webhook() {
-    const {
-      webhookUrl,
-      webhookBody,
-      webhookHeaders,
-      webhookMethod,
-      webhookContentType,
-    } = this.params;
+    const { webhookUrl, webhookBody, webhookHeaders, webhookMethod, webhookContentType } =
+      this.params;
 
-    const { formatBody, formatUrl } = this.formatNotifyContent(
-      webhookUrl,
-      webhookBody,
-    );
-    if (!formatUrl && !formatBody) {
+    const { formatBody, formatUrl } = this.formatNotifyContent(webhookUrl, webhookBody);
+    if (!formatUrl && !formatBody) { 
       return false;
     }
     const headers = parseHeaders(webhookHeaders);
@@ -408,11 +389,10 @@ export default class NotificationService {
     const options = {
       method: webhookMethod,
       headers,
-      timeout: this.timeout,
-      retry: 0,
+      ...this.gotOption,
       allowGetBody: true,
-      ...bodyParam,
-    };
+      ...bodyParam
+    }
     const res = await got(formatUrl, options);
     return String(res.statusCode).startsWith('20');
   }
@@ -436,12 +416,8 @@ export default class NotificationService {
     }
 
     return {
-      formatUrl: url
-        .replaceAll('$title', encodeURIComponent(this.title))
-        .replaceAll('$content', encodeURIComponent(this.content)),
-      formatBody: body
-        .replaceAll('$title', this.title)
-        .replaceAll('$content', this.content),
-    };
+      formatUrl: url.replaceAll('$title', encodeURIComponent(this.title)).replaceAll('$content', encodeURIComponent(this.content)),
+      formatBody: body.replaceAll('$title', this.title).replaceAll('$content', this.content),
+    }
   }
 }

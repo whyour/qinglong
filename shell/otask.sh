@@ -142,7 +142,7 @@ run_concurrent() {
 
   local envs=$(eval echo "\$${env_param}")
   local array=($(echo $envs | sed 's/&/ /g'))
-  local tempArr=$(echo $num_param | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+  local tempArr=$(echo $num_param | sed  "s/-max/-${#array[@]}/g" | sed  "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
 
@@ -190,7 +190,7 @@ run_designated() {
 
   local envs=$(eval echo "\$${env_param}")
   local array=($(echo $envs | sed 's/&/ /g'))
-  local tempArr=$(echo $num_param | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+  local tempArr=$(echo $num_param | sed  "s/-max/-${#array[@]}/g" | sed  "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
 
