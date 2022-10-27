@@ -108,10 +108,9 @@ const CheckUpdate = ({ socketMessage }: any) => {
       maskClosable: false,
       closable: false,
       okButtonProps: { disabled: true },
-      title: '更新日志',
+      title: '更新中...',
       centered: true,
       content: (
-        <div style={{ height: '60vh', overflowY: 'auto' }}>
           <pre
             style={{
               wordBreak: 'break-all',
@@ -122,7 +121,6 @@ const CheckUpdate = ({ socketMessage }: any) => {
           >
             {value}
           </pre>
-        </div>
       ),
     });
   };
@@ -145,7 +143,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
       closable: updateFailed,
       okButtonProps: { disabled: !updateFailed },
       content: (
-        <div style={{ height: '60vh', overflowY: 'auto' }}>
+        <>
           <pre
             style={{
               wordBreak: 'break-all',
@@ -157,7 +155,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
             {newMessage}
           </pre>
           <div id="log-identifier" style={{ paddingBottom: 5 }}></div>
-        </div>
+        </>
       ),
     });
 

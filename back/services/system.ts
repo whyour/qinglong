@@ -136,10 +136,6 @@ export default class SystemService {
   public async updateSystem() {
     const cp = spawn('ql -l update', { shell: '/bin/bash' });
 
-    this.sockService.sendMessage({
-      type: 'updateSystemVersion',
-      message: `开始更新系统`,
-    });
     cp.stdout.on('data', (data) => {
       this.sockService.sendMessage({
         type: 'updateSystemVersion',
