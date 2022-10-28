@@ -88,6 +88,7 @@ export default {
     { value: 'dingtalkBot', label: '钉钉机器人' },
     { value: 'weWorkBot', label: '企业微信机器人' },
     { value: 'weWorkApp', label: '企业微信应用' },
+    { value: 'aibotk', label: '智能微秘书' },
     { value: 'iGot', label: 'IGot' },
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'chat', label: '群辉chat' },
@@ -193,6 +194,25 @@ export default {
       {
         label: 'weWorkAppKey',
         tip: 'corpid,corpsecret,touser(注:多个成员ID使用|隔开),agentid,消息类型(选填,不填默认文本消息类型) 注意用,号隔开(英文输入法的逗号)，例如：wwcfrs,B-76WERQ,qinglong,1000001,2COat',
+        required: true,
+      },
+    ],
+    aibotk: [
+      {
+        label: 'aibotkKey',
+        tip: '密钥key,智能微秘书个人中心获取apikey，申请地址：https://wechat.aibotk.com/signup?from=ql',
+        required: true,
+      },
+      {
+        label: 'aibotkType',
+        tip: '发送的目标，群组或者好友',
+        required: true,
+        placeholder: '请输入要发送的目标',
+        items: [{ value: 'room', label: '群聊' }, { value: 'contact', label: '好友' }],
+      },
+      {
+        label: 'aibotkName',
+        tip: '要发送的用户昵称或群名，如果目标是群，需要填群名，如果目标是好友，需要填好友昵称',
         required: true,
       },
     ],

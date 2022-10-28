@@ -151,4 +151,13 @@ export DEER_KEY=""
 export CHAT_URL=""
 export CHAT_TOKEN=""
 
+## 13. aibotk
+## 官方说明文档：http://wechat.aibotk.com/oapi/oapi?from=ql
+## aibotk_key (必填)填写智能微秘书个人中心的apikey
+export AIBOTK_KEY=""
+## aibotk_type (必填)填写发送的目标 room 或 contact, 填其他的不生效
+export AIBOTK_TYPE=""
+## aibotk_name (必填)填写群名或用户昵称，和上面的type类型要对应
+export AIBOTK_NAME=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

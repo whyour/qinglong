@@ -11,6 +11,7 @@ export enum NotificationMode {
   'dingtalkBot' = 'dingtalkBot',
   'weWorkBot' = 'weWorkBot',
   'weWorkApp' = 'weWorkApp',
+  'aibotk' = 'aibotk',
   'iGot' = 'iGot',
   'pushPlus' = 'pushPlus',
   'email' = 'email',
@@ -75,6 +76,12 @@ export class WeWorkAppNotification extends NotificationBaseInfo {
   public weWorkAppKey = '';
 }
 
+export class AibotkNotification extends NotificationBaseInfo {
+  public aibotkKey: string = '';
+  public aibotkType: 'room' | 'contact' = 'room';
+  public aibotkName: string = '';
+}
+
 export class IGotNotification extends NotificationBaseInfo {
   public iGotPushKey = '';
 }
@@ -109,6 +116,7 @@ export interface NotificationInfo
     DingtalkBotNotification,
     WeWorkBotNotification,
     WeWorkAppNotification,
+    AibotkNotification,
     IGotNotification,
     PushPlusNotification,
     EmailNotification,

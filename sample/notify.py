@@ -81,6 +81,10 @@ push_config = {
     'TG_PROXY_AUTH': '',                # tg 代理认证参数
     'TG_PROXY_HOST': '',                # tg 机器人的 TG_PROXY_HOST
     'TG_PROXY_PORT': '',                # tg 机器人的 TG_PROXY_PORT
+
+    'AIBOTK_KEY': '',                # 智能微秘书 个人中心的apikey 文档地址：http://wechat.aibotk.com/docs/about
+    'AIBOTK_TYPE': '',                # 智能微秘书 发送目标 room 或 contact
+    'AIBOTK_NAME': '',                # 智能微秘书  发送群名 或者好友昵称和type要对应好
 }
 notify_function = []
 # fmt: on
@@ -521,6 +525,39 @@ def telegram_bot(title: str, content: str) -> None:
         print("tg 推送失败！")
 
 
+def aibotk(title: str, content: str) -> None:
+    """
+    使用 智能微秘书 推送消息。
+    """
+    if not push_config.get("AIBOTK_KEY") or not push_config.get("AIBOTK_TYPE") or not push_config.get("AIBOTK_NAME"):
+        print("智能微秘书 的 AIBOTK_KEY 或者 AIBOTK_TYPE 或者 AIBOTK_NAME 未设置!!\n取消推送")
+        return
+    print("智能微秘书 服务启动")
+
+    if push_config.get("AIBOTK_TYPE") == 'room':
+        url = "https://api-bot.aibotk.com/openapi/v1/chat/room"
+        data = {
+            "apiKey": push_config.get("AIBOTK_KEY"),
+            "roomName": push_config.get("AIBOTK_NAME"),
+            "message": {"type": 1, "content": f'【青龙快讯】\n\n${title}\n${content}' }
+        }
+    else:
+        url = "https://api-bot.aibotk.com/openapi/v1/chat/contact"
+        data = {
+            "apiKey": push_config.get("AIBOTK_KEY"),
+            "name": push_config.get("AIBOTK_NAME"),
+            "message": {"type": 1, "content": f'【青龙快讯】\n\n${title}\n${content}' }
+        }
+    body = json.dumps(data).encode(encoding="utf-8")
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, data=body, headers=headers).json()
+    print(response)
+    if response["code"] == 0:
+        print("智能微秘书 推送成功！")
+    else:
+        print(f'智能微秘书 推送失败！{response["error"]}')
+
+
 def one() -> str:
     """
     获取一条一言。
@@ -561,6 +598,8 @@ if push_config.get("QYWX_KEY"):
     notify_function.append(wecom_bot)
 if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"):
     notify_function.append(telegram_bot)
+if push_config.get("AIBOTK_KEY") and push_config.get("AIBOTK_TYPE") and push_config.get("AIBOTK_NAME"):
+    notify_function.append(aibotk)    
 
 
 def send(title: str, content: str) -> None:
