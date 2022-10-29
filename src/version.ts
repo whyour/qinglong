@@ -1,8 +1,9 @@
-export const version = '2.14.8';
-export const changeLogLink = 'https://t.me/jiao_long/335';
-export const changeLog = `2.14.8 版本说明
-1. 支持环境变量导入，导入格式参考导出文件
-2. 修复创建任务，命令中的引号丢失
-3. 修复调试选择脚本及语言识别
-4. 修复ql和task命令日志打印
+export const version = '2.14.9';
+export const changeLogLink = 'https://t.me/jiao_long/336';
+export const changeLog = `2.14.9 版本说明
+1. 通知支持飞书和智能微秘书，感谢 https://github.com/leochen-g
+2. webhook通知body支持嵌套json
+3. 修复shell获取磁盘占用
+4. 修复定时任务移动端滚动
+5. 其他bug修复
 `;
