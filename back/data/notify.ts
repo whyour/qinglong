@@ -15,6 +15,7 @@ export enum NotificationMode {
   'iGot' = 'iGot',
   'pushPlus' = 'pushPlus',
   'email' = 'email',
+  'feishu' = 'feishu',
   'webhook' = 'webhook',
 }
 
@@ -102,7 +103,14 @@ export class WebhookNotification extends NotificationBaseInfo {
   public webhookBody: string = '';
   public webhookUrl: string = '';
   public webhookMethod: 'GET' | 'POST' | 'PUT' = 'GET';
-  public webhookContentType: 'application/json' | 'multipart/form-data' | 'application/x-www-form-urlencoded' = 'application/json';
+  public webhookContentType:
+    | 'application/json'
+    | 'multipart/form-data'
+    | 'application/x-www-form-urlencoded' = 'application/json';
+}
+
+export class LarkNotification extends NotificationBaseInfo {
+  public larkKey = '';
 }
 
 export interface NotificationInfo
@@ -120,4 +128,5 @@ export interface NotificationInfo
     IGotNotification,
     PushPlusNotification,
     EmailNotification,
-    WebhookNotification {}
+    WebhookNotification,
+    LarkNotification {}

@@ -82,9 +82,9 @@ push_config = {
     'TG_PROXY_HOST': '',                # tg 机器人的 TG_PROXY_HOST
     'TG_PROXY_PORT': '',                # tg 机器人的 TG_PROXY_PORT
 
-    'AIBOTK_KEY': '',                # 智能微秘书 个人中心的apikey 文档地址：http://wechat.aibotk.com/docs/about
-    'AIBOTK_TYPE': '',                # 智能微秘书 发送目标 room 或 contact
-    'AIBOTK_NAME': '',                # 智能微秘书  发送群名 或者好友昵称和type要对应好
+    'AIBOTK_KEY': '',                   # 智能微秘书 个人中心的apikey 文档地址：http://wechat.aibotk.com/docs/about
+    'AIBOTK_TYPE': '',                  # 智能微秘书 发送目标 room 或 contact
+    'AIBOTK_NAME': '',                  # 智能微秘书  发送群名 或者好友昵称和type要对应好
 }
 notify_function = []
 # fmt: on

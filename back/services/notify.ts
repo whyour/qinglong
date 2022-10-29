@@ -29,6 +29,7 @@ export default class NotificationService {
     ['pushPlus', this.pushPlus],
     ['email', this.email],
     ['webhook', this.webhook],
+    ['lark', this.lark],
   ]);
 
   private title = '';
@@ -37,9 +38,9 @@ export default class NotificationService {
   private gotOption = {
     timeout: 30000,
     retry: 1,
-  }
+  };
 
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async notify(
     title: string,
@@ -180,8 +181,9 @@ export default class NotificationService {
       telegramBotUserId,
     } = this.params;
     const authStr = telegramBotProxyAuth ? `${telegramBotProxyAuth}@` : '';
-    const url = `https://${telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
-      }/bot${telegramBotToken}/sendMessage`;
+    const url = `https://${
+      telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
+    }/bot${telegramBotToken}/sendMessage`;
     let agent;
     if (telegramBotProxyHost && telegramBotProxyPort) {
       const options: any = {
@@ -324,30 +326,30 @@ export default class NotificationService {
 
   private async aibotk() {
     const { aibotkKey, aibotkType, aibotkName } = this.params;
-    let url = ''
-    let json = {}
+    let url = '';
+    let json = {};
     switch (aibotkType) {
       case 'room':
-        url = 'https://api-bot.aibotk.com/openapi/v1/chat/room'
+        url = 'https://api-bot.aibotk.com/openapi/v1/chat/room';
         json = {
           apiKey: `${aibotkKey}`,
           roomName: `${aibotkName}`,
           message: {
             type: 1,
-            content: `【青龙快讯】\n\n${this.title}\n${this.content}`
-          }
-        }
+            content: `【青龙快讯】\n\n${this.title}\n${this.content}`,
+          },
+        };
         break;
       case 'contact':
-        url = 'https://api-bot.aibotk.com/openapi/v1/chat/contact'
+        url = 'https://api-bot.aibotk.com/openapi/v1/chat/contact';
         json = {
           apiKey: `${aibotkKey}`,
           name: `${aibotkName}`,
           message: {
             type: 1,
-            content: `【青龙快讯】\n\n${this.title}\n${this.content}`
-          }
-        }
+            content: `【青龙快讯】\n\n${this.title}\n${this.content}`,
+          },
+        };
         break;
     }
 
@@ -355,10 +357,11 @@ export default class NotificationService {
       .post(url, {
         ...this.gotOption,
         json: {
-          ...json
-        }
-      }).json();
-    
+          ...json,
+        },
+      })
+      .json();
+
     return res.code === 0;
   }
 
@@ -394,6 +397,21 @@ export default class NotificationService {
     return res.code === 200;
   }
 
+  private async lark() {
+    const { larkKey } = this.params;
+    const res: any = await got
+      .post(`https://open.feishu.cn/open-apis/bot/v2/hook/${larkKey}`, {
+        ...this.gotOption,
+        json: {
+          msg_type: 'text',
+          content: { text: `${this.title}\n\n${this.content}` },
+        },
+        headers: { 'Content-Type': 'application/json' },
+      })
+      .json();
+    return res.StatusCode === 0;
+  }
+
   private async email() {
     const { emailPass, emailService, emailUser } = this.params;
     const transporter = nodemailer.createTransport({
@@ -417,11 +435,19 @@ export default class NotificationService {
   }
 
   private async webhook() {
-    const { webhookUrl, webhookBody, webhookHeaders, webhookMethod, webhookContentType } =
-      this.params;
+    const {
+      webhookUrl,
+      webhookBody,
+      webhookHeaders,
+      webhookMethod,
+      webhookContentType,
+    } = this.params;
 
-    const { formatBody, formatUrl } = this.formatNotifyContent(webhookUrl, webhookBody);
-    if (!formatUrl && !formatBody) { 
+    const { formatBody, formatUrl } = this.formatNotifyContent(
+      webhookUrl,
+      webhookBody,
+    );
+    if (!formatUrl && !formatBody) {
       return false;
     }
     const headers = parseHeaders(webhookHeaders);
@@ -432,8 +458,8 @@ export default class NotificationService {
       headers,
       ...this.gotOption,
       allowGetBody: true,
-      ...bodyParam
-    }
+      ...bodyParam,
+    };
     const res = await got(formatUrl, options);
     return String(res.statusCode).startsWith('20');
   }
@@ -457,8 +483,12 @@ export default class NotificationService {
     }
 
     return {
-      formatUrl: url.replaceAll('$title', encodeURIComponent(this.title)).replaceAll('$content', encodeURIComponent(this.content)),
-      formatBody: body.replaceAll('$title', this.title).replaceAll('$content', this.content),
-    }
+      formatUrl: url
+        .replaceAll('$title', encodeURIComponent(this.title))
+        .replaceAll('$content', encodeURIComponent(this.content)),
+      formatBody: body
+        .replaceAll('$title', this.title)
+        .replaceAll('$content', this.content),
+    };
   }
 }
