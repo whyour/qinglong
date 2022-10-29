@@ -110,6 +110,16 @@ let PUSH_PLUS_USER = '';
 let QQ_SKEY = '';
 let QQ_MODE = '';
 
+
+// =======================================智能微秘书设置区域=======================================
+//官方文档：http://wechat.aibotk.com/docs/about
+//AIBOTK_KEY： 填写智能微秘书个人中心的apikey
+//AIBOTK_TYPE：填写发送的目标 room 或 contact, 填其他的不生效
+//AIBOTK_NAME: 填写群名或用户昵称，和上面的type类型要对应
+let AIBOTK_KEY = '';
+let AIBOTK_TYPE = '';
+let AIBOTK_NAME = '';
+
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
   GOTIFY_URL = process.env.GOTIFY_URL;
@@ -220,6 +230,15 @@ if (process.env.PUSH_PLUS_TOKEN) {
 if (process.env.PUSH_PLUS_USER) {
   PUSH_PLUS_USER = process.env.PUSH_PLUS_USER;
 }
+if(process.env.AIBOTK_KEY) {
+  AIBOTK_KEY = process.env.AIBOTK_KEY
+}
+if(process.env.AIBOTK_TYPE) {
+  AIBOTK_TYPE = process.env.AIBOTK_TYPE
+}
+if(process.env.AIBOTK_NAME) {
+  AIBOTK_NAME = process.env.AIBOTK_NAME
+}
 //==========================云端环境变量的判断与接收=========================
 
 /**
@@ -255,6 +274,7 @@ async function sendNotify(
     gotifyNotify(text, desp), //gotify
     ChatNotify(text, desp), //synolog chat
     PushDeerNotify(text, desp), //PushDeer
+    aibotkNotify(text, desp), //智能微秘书
   ]);
 }
 
@@ -981,6 +1001,66 @@ function pushPlusNotify(text, desp) {
       resolve();
     }
   });
+}
+
+function aibotkNotify(text, desp) {
+  return new Promise((resolve) => {
+    if(AIBOTK_KEY&&AIBOTK_TYPE&&AIBOTK_NAME) {
+      let json = {};
+      let url = '';
+      switch (AIBOTK_TYPE) {
+        case 'room':
+          url = 'https://api-bot.aibotk.com/openapi/v1/chat/room'
+          json = {
+            apiKey: `${AIBOTK_KEY}`,
+            roomName: `${AIBOTK_NAME}`,
+            message: {
+              type: 1,
+              content: `【青龙快讯】\n\n${text}\n${desp}`
+            }
+          }
+          break;
+        case 'contact':
+          url = 'https://api-bot.aibotk.com/openapi/v1/chat/contact'
+          json = {
+            apiKey: `${AIBOTK_KEY}`,
+            name: `${AIBOTK_NAME}`,
+            message: {
+              type: 1,
+              content: `【青龙快讯】\n\n${text}\n${desp}`
+            }
+          }
+          break;
+      }
+      const options = {
+        url: url,
+        json,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout,
+      };
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('智能微秘书发送通知消息失败！！\n');
+            console.log(err);
+          } else {
+            data = JSON.parse(data);
+            if (data.code === 0) {
+              console.log('智能微秘书发送通知消息成功🎉。\n');
+            } else {
+              console.log(`${data.error}\n`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    }
+  })
 }
 
 module.exports = {

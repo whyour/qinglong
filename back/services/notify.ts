@@ -24,6 +24,7 @@ export default class NotificationService {
     ['dingtalkBot', this.dingtalkBot],
     ['weWorkBot', this.weWorkBot],
     ['weWorkApp', this.weWorkApp],
+    ['aibotk', this.aibotk],
     ['iGot', this.iGot],
     ['pushPlus', this.pushPlus],
     ['email', this.email],
@@ -319,6 +320,46 @@ export default class NotificationService {
       .json();
 
     return res.errcode === 0;
+  }
+
+  private async aibotk() {
+    const { aibotkKey, aibotkType, aibotkName } = this.params;
+    let url = ''
+    let json = {}
+    switch (aibotkType) {
+      case 'room':
+        url = 'https://api-bot.aibotk.com/openapi/v1/chat/room'
+        json = {
+          apiKey: `${aibotkKey}`,
+          roomName: `${aibotkName}`,
+          message: {
+            type: 1,
+            content: `【青龙快讯】\n\n${this.title}\n${this.content}`
+          }
+        }
+        break;
+      case 'contact':
+        url = 'https://api-bot.aibotk.com/openapi/v1/chat/contact'
+        json = {
+          apiKey: `${aibotkKey}`,
+          name: `${aibotkName}`,
+          message: {
+            type: 1,
+            content: `【青龙快讯】\n\n${this.title}\n${this.content}`
+          }
+        }
+        break;
+    }
+
+    const res: any = await got
+      .post(url, {
+        ...this.gotOption,
+        json: {
+          ...json
+        }
+      }).json();
+    
+    return res.code === 0;
   }
 
   private async iGot() {
