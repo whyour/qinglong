@@ -419,7 +419,12 @@ export function parseBody(
         return;
       }
 
-      parsed[key] = val;
+      try {
+        const jsonValue = JSON.parse(val);
+        parsed[key] = jsonValue;
+      } catch (error) {
+        parsed[key] = val;
+      }
     });
 
   switch (contentType) {
