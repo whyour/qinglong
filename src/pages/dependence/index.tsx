@@ -372,7 +372,7 @@ const Dependence = () => {
     if (tableRef.current) {
       setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
     }
-  }, [tableRef.current]);
+  }, []);
 
   useEffect(() => {
     if (logDependence) {

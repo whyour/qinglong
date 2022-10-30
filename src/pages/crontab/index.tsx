@@ -882,7 +882,7 @@ const Crontab = () => {
     if (tableRef.current) {
       setTableScrollHeight(getTableScroll());
     }
-  }, [tableRef.current]);
+  }, []);
 
   const panelContent = (
     <>

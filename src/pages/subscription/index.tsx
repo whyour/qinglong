@@ -546,7 +546,7 @@ const Subscription = () => {
     if (tableRef.current) {
       setTableScrollHeight(getTableScroll());
     }
-  }, [tableRef.current]);
+  }, []);
 
   return (
     <PageContainer

@@ -77,7 +77,7 @@
     "nodemailer": "^6.7.2",
     "p-queue": "7.2.0",
     "reflect-metadata": "^0.1.13",
-    "sequelize": "^6.20.1",
+    "sequelize": "^6.25.3",
     "serve-handler": "^6.1.3",
     "sockjs": "^0.3.24",
     "sqlite3": "npm:@louislam/sqlite3@^15.0.6",

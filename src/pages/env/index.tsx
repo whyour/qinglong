@@ -512,7 +512,7 @@ const Env = () => {
     if (tableRef.current) {
       setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
     }
-  }, [tableRef.current]);
+  }, []);
 
   return (
     <PageContainer
