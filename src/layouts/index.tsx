@@ -244,7 +244,7 @@ export default function () {
       selectedKeys={[location.pathname]}
       loading={loading}
       ErrorBoundary={Sentry.ErrorBoundary}
-      logo={<Image preview={false} src="http://qn.whyour.cn/logo.png" />}
+      logo={<Image preview={false} src="https://qn.whyour.cn/logo.png" />}
       title={
         <>
           <span style={{ fontSize: 16 }}>控制面板</span>

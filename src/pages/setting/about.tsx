@@ -10,7 +10,7 @@ const About = () => {
       <img
         alt="logo"
         style={{ width: 140, marginRight: 20 }}
-        src="http://qn.whyour.cn/logo.png"
+        src="https://qn.whyour.cn/logo.png"
       />
       <div className={styles.right}>
         <span className={styles.title}>青龙</span>

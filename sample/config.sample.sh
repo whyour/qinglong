@@ -67,7 +67,7 @@ export PUSH_KEY=""
 ## 下方填写app提供的设备码，例如：https://api.day.app/123 那么此处的设备码就是123
 export BARK_PUSH=""
 ## 下方填写推送图标设置，自定义推送图标(需iOS15或以上)
-export BARK_ICON="http://qn.whyour.cn/logo.png"
+export BARK_ICON="https://qn.whyour.cn/logo.png"
 ## 下方填写推送声音设置，例如choo，具体值请在bark-推送铃声-查看所有铃声
 export BARK_SOUND=""
 ## 下方填写推送消息分组，默认为"QingLong"

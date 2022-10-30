@@ -129,7 +129,7 @@ const Login = () => {
           <img
             alt="logo"
             className={styles.logo}
-            src="http://qn.whyour.cn/logo.png"
+            src="https://qn.whyour.cn/logo.png"
           />
           <span className={styles.title}>
             {twoFactor ? '两步验证' : config.siteName}
