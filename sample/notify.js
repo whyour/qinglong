@@ -987,7 +987,7 @@ function fsBotNotify(text, desp) {
     if (FSKEY) {
       const options = {
         url: `https://open.feishu.cn/open-apis/bot/v2/hook/${FSKEY}`,
-        json: { msg_type: 'text', content: { text: `${title}\n\n${content}` } },
+        json: { msg_type: 'text', content: { text: `${text}\n\n${desp}` } },
         headers: {
           'Content-Type': 'application/json',
         },
