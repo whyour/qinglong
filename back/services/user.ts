@@ -3,7 +3,6 @@ import winston from 'winston';
 import { createRandomString, getNetIp, getPlatform } from '../config/util';
 import config from '../config';
 import * as fs from 'fs';
-import _ from 'lodash';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
 import { AuthDataType, AuthInfo, AuthModel, LoginStatus } from '../data/auth';

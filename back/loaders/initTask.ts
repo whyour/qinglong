@@ -1,5 +1,4 @@
 import { Container } from 'typedi';
-import _ from 'lodash';
 import SystemService from '../services/system';
 import ScheduleService from '../services/schedule';
 import SubscriptionService from '../services/subscription';

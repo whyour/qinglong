@@ -1,14 +1,14 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { CrontabView, CrontabViewModel } from '../data/cronView';
-import { initEnvPosition } from '../data/env';
+import { initPosition } from '../data/env';
 
 @Service()
 export default class CronViewService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async create(payload: CrontabView): Promise<CrontabView> {
-    let position = initEnvPosition;
+    let position = initPosition;
     const views = await this.list();
     if (views && views.length > 0 && views[views.length - 1].position) {
       position = views[views.length - 1].position as number;

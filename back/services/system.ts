@@ -2,7 +2,6 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
 import * as fs from 'fs';
-import _ from 'lodash';
 import { AuthDataType, AuthInfo, AuthModel, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';

@@ -109,7 +109,6 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
         const data = await envService.move(req.params.id, req.body);

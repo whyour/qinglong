@@ -21,7 +21,8 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import { DeleteOutlined } from '@ant-design/icons';
 import { depthFirstSearch } from '@/utils';
-import { debounce, uniq } from 'lodash';
+import debounce from 'lodash/groupBy';
+import uniq from 'lodash/uniq';
 import useFilterTreeData from '@/hooks/useFilterTreeData';
 
 const { Text } = Typography;

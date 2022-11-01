@@ -1,10 +1,17 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { getFileContentByName } from '../config/util';
 import config from '../config';
 import * as fs from 'fs';
-import { Env, EnvModel, EnvStatus, initEnvPosition } from '../data/env';
-import _ from 'lodash';
+import {
+  Env,
+  EnvModel,
+  EnvStatus,
+  initPosition,
+  maxPosition,
+  minPosition,
+  stepPosition,
+} from '../data/env';
+import groupBy from 'lodash/groupBy';
 import { Op } from 'sequelize';
 
 @Service()
@@ -13,17 +20,22 @@ export default class EnvService {
 
   public async create(payloads: Env[]): Promise<Env[]> {
     const envs = await this.envs();
-    let position = initEnvPosition;
-    if (envs && envs.length > 0 && envs[envs.length - 1].position) {
-      position = envs[envs.length - 1].position as number;
+    let position = initPosition;
+    if (
+      envs &&
+      envs.length > 0 &&
+      typeof envs[envs.length - 1].position === 'number'
+    ) {
+      position = envs[envs.length - 1].position!;
     }
     const tabs = payloads.map((x) => {
-      position = position / 2;
+      position = position - stepPosition;
       const tab = new Env({ ...x, position });
       return tab;
     });
     const docs = await this.insert(tabs);
     await this.set_envs();
+    await this.checkPosition(tabs[tabs.length - 1].position!);
     return docs;
   }
 
@@ -67,25 +79,40 @@ export default class EnvService {
     const envs = await this.envs();
     if (toIndex === 0 || toIndex === envs.length - 1) {
       targetPosition = isUpward
-        ? envs[0].position! * 2
-        : envs[toIndex].position! / 2;
+        ? envs[0].position! + stepPosition
+        : envs[toIndex].position! - stepPosition;
     } else {
       targetPosition = isUpward
         ? (envs[toIndex].position! + envs[toIndex - 1].position!) / 2
         : (envs[toIndex].position! + envs[toIndex + 1].position!) / 2;
     }
+
     const newDoc = await this.update({
       id,
-      position: targetPosition,
+      position: this.getPrecisionPosition(targetPosition),
     });
+
+    await this.checkPosition(targetPosition);
     return newDoc;
   }
 
-  public async envs(
-    searchText: string = '',
-    sort: any = { position: -1 },
-    query: any = {},
-  ): Promise<Env[]> {
+  private async checkPosition(position: number) {
+    const precisionPosition = parseFloat(position.toPrecision(16));
+    if (precisionPosition < minPosition || precisionPosition > maxPosition) {
+      const envs = await this.envs();
+      let position = initPosition;
+      for (const env of envs) {
+        position = position - stepPosition;
+        await this.updateDb({ ...env, position });
+      }
+    }
+  }
+
+  private getPrecisionPosition(position: number): number {
+    return parseFloat(position.toPrecision(16));
+  }
+
+  public async envs(searchText: string = '', query: any = {}): Promise<Env[]> {
     let condition = { ...query };
     if (searchText) {
       const encodeText = encodeURIComponent(searchText);
@@ -155,12 +182,11 @@ export default class EnvService {
   }
 
   public async set_envs() {
-    const envs = await this.envs(
-      '',
-      { position: -1 },
-      { name: { [Op.not]: null }, status: EnvStatus.normal },
-    );
-    const groups = _.groupBy(envs, 'name');
+    const envs = await this.envs('', {
+      name: { [Op.not]: null },
+      status: EnvStatus.normal,
+    });
+    const groups = groupBy(envs, 'name');
     let env_string = '';
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
@@ -168,8 +194,8 @@ export default class EnvService {
 
         // 忽略不符合bash要求的环境变量名称
         if (/^[a-zA-Z_][0-9a-zA-Z_]*$/.test(key)) {
-          let value = _(group)
-            .map('value')
+          let value = group
+            .map((x) => x.value)
             .join('&')
             .replace(/(\\)[^n]/g, '\\\\')
             .replace(/(\\$)/, '\\\\')

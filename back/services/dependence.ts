@@ -9,7 +9,6 @@ import {
   unInstallDependenceCommandTypes,
   DependenceModel,
 } from '../data/dependence';
-import _ from 'lodash';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import { Op } from 'sequelize';

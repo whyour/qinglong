@@ -4,7 +4,7 @@ import { Container } from 'typedi';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import CronService from '../services/cron';
 import EnvService from '../services/env';
-import _ from 'lodash';
+import groupBy from 'lodash/groupBy';
 import { DependenceModel } from '../data/dependence';
 import { Op } from 'sequelize';
 import config from '../config';
@@ -26,7 +26,7 @@ export default async () => {
     order: [['type', 'DESC']],
     raw: true,
   }).then(async (docs) => {
-    const groups = _.groupBy(docs, 'type');
+    const groups = groupBy(docs, 'type');
     const keys = Object.keys(groups).sort((a, b) => parseInt(b) - parseInt(a));
     for (const key of keys) {
       const group = groups[key];

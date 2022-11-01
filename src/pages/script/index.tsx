@@ -38,7 +38,7 @@ import { parse } from 'query-string';
 import { depthFirstSearch } from '@/utils';
 import { SharedContext } from '@/layouts';
 import useFilterTreeData from '@/hooks/useFilterTreeData';
-import { uniq } from 'lodash';
+import uniq from 'lodash/uniq';
 
 const { Text } = Typography;
 

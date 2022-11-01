@@ -26,7 +26,10 @@ export enum EnvStatus {
   'disabled',
 }
 
-export const initEnvPosition = 9999999999;
+export const maxPosition = 9000000000000000;
+export const initPosition = 4500000000000000;
+export const stepPosition = 10000000;
+export const minPosition = 100;
 
 interface EnvInstance extends Model<Env, Env>, Env {}
 export const EnvModel = sequelize.define<EnvInstance>('Env', {

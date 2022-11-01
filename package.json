@@ -97,7 +97,7 @@
     "@types/express": "^4.17.13",
     "@types/express-jwt": "^6.0.4",
     "@types/jsonwebtoken": "^8.5.8",
-    "@types/lodash": "^4.14.179",
+    "@types/lodash": "^4.14.185",
     "@types/multer": "^1.4.7",
     "@types/nedb": "^1.8.12",
     "@types/node": "^17.0.21",
