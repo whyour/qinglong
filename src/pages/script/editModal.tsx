@@ -253,7 +253,15 @@ const EditModal = ({
             editorRef.current = editor;
           }}
         />
-        <pre style={{ height: '100%', whiteSpace: 'break-spaces' }}>{log}</pre>
+        <pre
+          style={{
+            height: '100%',
+            padding: '0 15px',
+            whiteSpace: 'break-spaces',
+          }}
+        >
+          {log}
+        </pre>
       </SplitPane>
       <SaveModal
         visible={saveModalVisible}
