@@ -232,8 +232,7 @@ run_else() {
 
   shift
 
-  local params=$(echo "$@" | sed 's/ /\" \"/g')
-  $timeoutCmd $which_program $file_param \"$params\"
+  $timeoutCmd $which_program $file_param "$@"
 }
 
 ## 命令检测
