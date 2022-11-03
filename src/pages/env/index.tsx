@@ -134,6 +134,7 @@ const Env = () => {
               textAlign: 'left',
             }}
             ellipsis={{ tooltip: text, rows: 2 }}
+            copyable
           >
             {text}
           </Paragraph>
@@ -410,7 +411,7 @@ const Env = () => {
 
     setTimeout(() => {
       if (selectedRowIds.length === 0 || selectedIds.length === 0) {
-        setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
+        setTableScrollHeight(getTableScroll({ extraHeight: 59 }));
       }
     });
   };
@@ -510,7 +511,7 @@ const Env = () => {
 
   useEffect(() => {
     if (tableRef.current) {
-      setTableScrollHeight(getTableScroll({ extraHeight: 87 }));
+      setTableScrollHeight(getTableScroll({ extraHeight: 59 }));
     }
   }, []);
 
@@ -598,7 +599,7 @@ const Env = () => {
           scroll={{ x: 1000, y: tableScrollHeight }}
           components={components}
           loading={loading}
-          onRow={(record: any, index: number) => {
+          onRow={(record: any, index: number | undefined) => {
             return {
               index,
               moveRow,
