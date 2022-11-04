@@ -28,9 +28,10 @@ import EditNameModal from './editNameModal';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
-import { exportJson, getTableScroll } from '@/utils/index';
+import { exportJson } from '@/utils/index';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
+import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -253,9 +254,9 @@ const Env = () => {
   const [editedEnv, setEditedEnv] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
-  const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [importLoading, setImportLoading] = useState(false);
   const tableRef = useRef<any>();
+  const tableScrollHeight = useTableScrollHeight(tableRef, 59)
 
   const getEnvs = () => {
     setLoading(true);
@@ -285,8 +286,7 @@ const Env = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}envs/${
-              record.status === Status.已禁用 ? 'enable' : 'disable'
+            `${config.apiPrefix}envs/${record.status === Status.已禁用 ? 'enable' : 'disable'
             }`,
             {
               data: [record.id],
@@ -408,16 +408,10 @@ const Env = () => {
 
   const onSelectChange = (selectedIds: any[]) => {
     setSelectedRowIds(selectedIds);
-
-    setTimeout(() => {
-      if (selectedRowIds.length === 0 || selectedIds.length === 0) {
-        setTableScrollHeight(getTableScroll({ extraHeight: 59 }));
-      }
-    });
   };
 
   const rowSelection = {
-    selectedRowIds,
+    selectedRowKeys: selectedRowIds,
     onChange: onSelectChange,
   };
 
@@ -508,12 +502,6 @@ const Env = () => {
   useEffect(() => {
     getEnvs();
   }, [searchText]);
-
-  useEffect(() => {
-    if (tableRef.current) {
-      setTableScrollHeight(getTableScroll({ extraHeight: 59 }));
-    }
-  }, []);
 
   return (
     <PageContainer

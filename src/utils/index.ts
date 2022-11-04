@@ -180,19 +180,15 @@ export default function browserType() {
  */
 export function getTableScroll({
   extraHeight,
-  id,
-}: { extraHeight?: number; id?: string } = {}) {
+  target,
+}: { extraHeight?: number; target?: HTMLElement } = {}) {
   if (typeof extraHeight == 'undefined') {
     //  47 + 40 + 12
     extraHeight = 99;
   }
   let tHeader = null;
-  if (id) {
-    tHeader = document.getElementById(id)
-      ? document
-          .getElementById(id)!
-          .getElementsByClassName('ant-table-thead')[0]
-      : null;
+  if (target) {
+    tHeader = target;
   } else {
     tHeader = document.querySelector('.ant-table-wrapper');
   }
@@ -202,7 +198,7 @@ export function getTableScroll({
   if (tHeader) {
     mainTop = tHeader.getBoundingClientRect().top;
   }
-
+  
   //窗体高度-表格内容顶部的高度-表格内容底部的高度
   let height = document.body.clientHeight - mainTop - extraHeight;
   return height;

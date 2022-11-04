@@ -27,10 +27,11 @@ import DependenceModal from './modal';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './index.less';
-import { getTableScroll } from '@/utils/index';
 import DependenceLogModal from './logModal';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
+import useTableScrollHeight from '@/hooks/useTableScrollHeight';
+
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -164,11 +165,11 @@ const Dependence = () => {
   const [editedDependence, setEditedDependence] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
-  const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [logDependence, setLogDependence] = useState<any>();
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
   const tableRef = useRef<any>();
+  const tableScrollHeight = useTableScrollHeight(tableRef, 59)
 
   const getDependencies = () => {
     setLoading(true);
@@ -283,16 +284,10 @@ const Dependence = () => {
 
   const onSelectChange = (selectedIds: any[]) => {
     setSelectedRowIds(selectedIds);
-
-    setTimeout(() => {
-      if (selectedRowIds.length === 0 || selectedIds.length === 0) {
-        setTableScrollHeight(getTableScroll({ extraHeight: 59 }));
-      }
-    });
   };
 
   const rowSelection = {
-    selectedRowIds,
+    selectedRowKeys: selectedRowIds,
     onChange: onSelectChange,
   };
 
@@ -369,12 +364,6 @@ const Dependence = () => {
   }, [searchText, type]);
 
   useEffect(() => {
-    if (tableRef.current) {
-      setTableScrollHeight(getTableScroll({ extraHeight: 59 }));
-    }
-  }, []);
-
-  useEffect(() => {
     if (logDependence) {
       localStorage.setItem('logDependence', logDependence.id);
       setIsLogModalVisible(true);
@@ -422,53 +411,6 @@ const Dependence = () => {
     }
   }, [socketMessage]);
 
-  const panelContent = () => (
-    <>
-      {selectedRowIds.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5, marginLeft: 8 }}
-            onClick={() => handlereInstallDependencies()}
-          >
-            批量安装
-          </Button>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5, marginLeft: 8 }}
-            onClick={() => delDependencies(false)}
-          >
-            批量删除
-          </Button>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5, marginLeft: 8 }}
-            onClick={() => delDependencies(true)}
-          >
-            批量强制删除
-          </Button>
-          <span style={{ marginLeft: 8 }}>
-            已选择
-            <a>{selectedRowIds?.length}</a>项
-          </span>
-        </div>
-      )}
-      <DndProvider backend={HTML5Backend}>
-        <Table
-          ref={tableRef}
-          columns={columns}
-          rowSelection={rowSelection}
-          pagination={false}
-          dataSource={value}
-          rowKey="id"
-          size="middle"
-          scroll={{ x: 768, y: tableScrollHeight }}
-          loading={loading}
-        />
-      </DndProvider>
-    </>
-  );
-
   const onTabChange = (activeKey: string) => {
     setSelectedRowIds([]);
     setType(activeKey);
@@ -503,20 +445,60 @@ const Dependence = () => {
           {
             key: 'nodejs',
             label: 'NodeJs',
-            children: panelContent(),
           },
           {
             key: 'python3',
             label: 'Python3',
-            children: panelContent(),
           },
           {
             key: 'linux',
             label: 'Linux',
-            children: panelContent(),
           },
         ]}
       />
+      <div ref={tableRef}>
+        {selectedRowIds.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={() => handlereInstallDependencies()}
+            >
+              批量安装
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={() => delDependencies(false)}
+            >
+              批量删除
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={() => delDependencies(true)}
+            >
+              批量强制删除
+            </Button>
+            <span style={{ marginLeft: 8 }}>
+              已选择
+              <a>{selectedRowIds?.length}</a>项
+            </span>
+          </div>
+        )}
+        <DndProvider backend={HTML5Backend}>
+          <Table
+            columns={columns}
+            rowSelection={rowSelection}
+            pagination={false}
+            dataSource={value}
+            rowKey="id"
+            size="middle"
+            scroll={{ x: 768, y: tableScrollHeight }}
+            loading={loading}
+          />
+        </DndProvider>
+      </div>
       <DependenceModal
         visible={isModalVisible}
         handleCancel={handleCancel}

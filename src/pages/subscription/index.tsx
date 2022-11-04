@@ -29,11 +29,11 @@ import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import SubscriptionModal from './modal';
-import { getTableScroll } from '@/utils/index';
 import { history, useOutletContext } from '@umijs/max';
 import './index.less';
 import SubscriptionLogModal from './logModal';
 import { SharedContext } from '@/layouts';
+import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -243,11 +243,11 @@ const Subscription = () => {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [searchValue, setSearchValue] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logSubscription, setLogSubscription] = useState<any>();
   const tableRef = useRef<any>();
+  const tableScrollHeight = useTableScrollHeight(tableRef)
 
   const runSubscription = (record: any, index: number) => {
     Modal.confirm({
@@ -540,12 +540,6 @@ const Subscription = () => {
 
   useEffect(() => {
     setPageSize(parseInt(localStorage.getItem('pageSize') || '20'));
-  }, []);
-
-  useEffect(() => {
-    if (tableRef.current) {
-      setTableScrollHeight(getTableScroll());
-    }
   }, []);
 
   return (

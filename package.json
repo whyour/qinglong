@@ -91,6 +91,7 @@
     "@ant-design/icons": "^4.7.0",
     "@ant-design/pro-layout": "^6.33.1",
     "@monaco-editor/react": "4.2.1",
+    "@react-hook/resize-observer": "^1.2.6",
     "@sentry/react": "^7.12.1",
     "@types/body-parser": "^1.19.2",
     "@types/cors": "^2.8.12",

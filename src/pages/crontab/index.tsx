@@ -43,14 +43,13 @@ import CronLogModal from './logModal';
 import CronDetailModal from './detail';
 import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
-import { getTableScroll } from '@/utils/index';
 import { history, useOutletContext } from '@umijs/max';
 import './index.less';
 import ViewCreateModal from './viewCreateModal';
 import ViewManageModal from './viewManageModal';
-import pagination from 'antd/lib/pagination';
 import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import { SharedContext } from '@/layouts';
+import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -202,10 +201,10 @@ const Crontab = () => {
           >
             {record.last_execution_time
               ? new Date(record.last_execution_time * 1000)
-                  .toLocaleString(language, {
-                    hour12: false,
-                  })
-                  .replace(' 24:', ' 00:')
+                .toLocaleString(language, {
+                  hour12: false,
+                })
+                .replace(' 24:', ' 00:')
               : '-'}
           </span>
         );
@@ -376,7 +375,6 @@ const Crontab = () => {
     filters: any;
   }>({} as any);
   const [viewConf, setViewConf] = useState<any>();
-  const [tableScrollHeight, setTableScrollHeight] = useState<number>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
   const [searchValue, setSearchValue] = useState('');
@@ -389,6 +387,7 @@ const Crontab = () => {
   const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
   const [moreMenuActive, setMoreMenuActive] = useState(false);
   const tableRef = useRef<any>();
+  const tableScrollHeight = useTableScrollHeight(tableRef)
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -415,11 +414,10 @@ const Crontab = () => {
   const getCrons = () => {
     setLoading(true);
     const { page, size, sorter, filters } = pageConf;
-    let url = `${
-      config.apiPrefix
-    }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
-      filters,
-    )}`;
+    let url = `${config.apiPrefix
+      }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
+        filters,
+      )}`;
     if (sorter && sorter.field) {
       url += `&sorter=${JSON.stringify({
         field: sorter.field,
@@ -584,8 +582,7 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              record.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             {
               data: [record.id],
@@ -628,8 +625,7 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              record.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             {
               data: [record.id],
@@ -770,16 +766,10 @@ const Crontab = () => {
 
   const onSelectChange = (selectedIds: any[]) => {
     setSelectedRowIds(selectedIds);
-
-    setTimeout(() => {
-      if (selectedRowIds.length === 0 || selectedIds.length === 0) {
-        setTableScrollHeight(getTableScroll());
-      }
-    });
   };
 
   const rowSelection = {
-    selectedRowIds,
+    selectedRowKeys: selectedRowIds,
     onChange: onSelectChange,
   };
 
@@ -877,97 +867,6 @@ const Crontab = () => {
     });
     getCronViews();
   }, []);
-
-  useEffect(() => {
-    if (tableRef.current) {
-      setTableScrollHeight(getTableScroll());
-    }
-  }, []);
-
-  const panelContent = (
-    <>
-      {selectedRowIds.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <Button type="primary" style={{ marginBottom: 5 }} onClick={delCrons}>
-            批量删除
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateCrons(0)}
-            style={{ marginLeft: 8, marginBottom: 5 }}
-          >
-            批量启用
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateCrons(1)}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量禁用
-          </Button>
-          <Button
-            type="primary"
-            style={{ marginRight: 8 }}
-            onClick={() => operateCrons(2)}
-          >
-            批量运行
-          </Button>
-          <Button type="primary" onClick={() => operateCrons(3)}>
-            批量停止
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateCrons(4)}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量置顶
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateCrons(5)}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量取消置顶
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => setIsLabelModalVisible(true)}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量修改标签
-          </Button>
-          <span style={{ marginLeft: 8 }}>
-            已选择
-            <a>{selectedRowIds?.length}</a>项
-          </span>
-        </div>
-      )}
-      <Table
-        ref={tableRef}
-        columns={columns}
-        pagination={{
-          current: pageConf.page,
-          pageSize: pageConf.size,
-          showSizeChanger: true,
-          simple: isPhone,
-          total,
-          showTotal: (total: number, range: number[]) =>
-            `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
-          pageSizeOptions: [10, 20, 50, 100, 200, 500, total || 10000].sort(
-            (a, b) => a - b,
-          ),
-        }}
-        dataSource={value}
-        rowKey="id"
-        size="middle"
-        scroll={{ x: 1000, y: tableScrollHeight }}
-        loading={loading}
-        rowSelection={rowSelection}
-        rowClassName={getRowClassName}
-        onChange={onPageChange}
-      />
-    </>
-  );
 
   const viewAction = (key: string) => {
     switch (key) {
@@ -1090,24 +989,94 @@ const Crontab = () => {
           {
             key: 'all',
             label: '全部任务',
-            children: panelContent,
           },
           ...[...enabledCronViews].slice(0, 2).map((x) => ({
             key: x.id,
             label: x.name,
-            children: panelContent,
           })),
         ]}
-      >
-        <Tabs.TabPane tab="全部任务" key="all">
-          {panelContent}
-        </Tabs.TabPane>
-        {[...enabledCronViews].slice(0, 2).map((x) => (
-          <Tabs.TabPane tab={x.name} key={x.id}>
-            {panelContent}
-          </Tabs.TabPane>
-        ))}
-      </Tabs>
+      />
+      <div ref={tableRef}>
+        {selectedRowIds.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Button type="primary" style={{ marginBottom: 5 }} onClick={delCrons}>
+              批量删除
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateCrons(0)}
+              style={{ marginLeft: 8, marginBottom: 5 }}
+            >
+              批量启用
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateCrons(1)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量禁用
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginRight: 8 }}
+              onClick={() => operateCrons(2)}
+            >
+              批量运行
+            </Button>
+            <Button type="primary" onClick={() => operateCrons(3)}>
+              批量停止
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateCrons(4)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量置顶
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateCrons(5)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量取消置顶
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => setIsLabelModalVisible(true)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量修改标签
+            </Button>
+            <span style={{ marginLeft: 8 }}>
+              已选择
+              <a>{selectedRowIds?.length}</a>项
+            </span>
+          </div>
+        )}
+        <Table
+          columns={columns}
+          pagination={{
+            current: pageConf.page,
+            pageSize: pageConf.size,
+            showSizeChanger: true,
+            simple: isPhone,
+            total,
+            showTotal: (total: number, range: number[]) =>
+              `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+            pageSizeOptions: [10, 20, 50, 100, 200, 500, total || 10000].sort(
+              (a, b) => a - b,
+            ),
+          }}
+          dataSource={value}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 1000, y: tableScrollHeight }}
+          loading={loading}
+          rowSelection={rowSelection}
+          rowClassName={getRowClassName}
+          onChange={onPageChange}
+        />
+      </div>
       <CronLogModal
         visible={isLogModalVisible}
         handleCancel={() => {
