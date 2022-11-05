@@ -40,8 +40,15 @@ const optionsWithDisabled = [
 ];
 
 const Setting = () => {
-  const { headerStyle, isPhone, user, reloadUser, reloadTheme, socketMessage } =
-    useOutletContext<SharedContext>();
+  const {
+    headerStyle,
+    isPhone,
+    user,
+    reloadUser,
+    reloadTheme,
+    socketMessage,
+    systemInfo,
+  } = useOutletContext<SharedContext>();
   const columns = [
     {
       title: '名称',
@@ -411,7 +418,7 @@ const Setting = () => {
           {
             key: 'about',
             label: '关于',
-            children: <About />,
+            children: <About systemInfo={systemInfo} />,
           },
         ]}
       ></Tabs>

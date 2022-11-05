@@ -15,7 +15,18 @@ import './index.less';
 import vhCheck from 'vh-check';
 import { version, changeLogLink, changeLog } from '../version';
 import { useCtx, useTheme } from '@/utils/hooks';
-import { message, Badge, Modal, Avatar, Dropdown, Menu, Image } from 'antd';
+import {
+  message,
+  Badge,
+  Modal,
+  Avatar,
+  Dropdown,
+  Menu,
+  Image,
+  Popover,
+  Descriptions,
+  Tooltip,
+} from 'antd';
 // @ts-ignore
 import SockJS from 'sockjs-client';
 import * as Sentry from '@sentry/react';
@@ -32,6 +43,15 @@ export interface SharedContext {
   reloadUser: (needLoading?: boolean) => void;
   reloadTheme: () => void;
   socketMessage: any;
+  systemInfo: TSystemInfo;
+}
+
+interface TSystemInfo {
+  branch: 'develop' | 'master';
+  isInitialized: boolean;
+  lastCommitId: string;
+  lastCommitTime: string;
+  version: string;
 }
 
 export default function () {
@@ -40,7 +60,7 @@ export default function () {
   const { theme, reloadTheme } = useTheme();
   const [user, setUser] = useState<any>({});
   const [loading, setLoading] = useState<boolean>(true);
-  const [systemInfo, setSystemInfo] = useState<{ isInitialized: boolean }>();
+  const [systemInfo, setSystemInfo] = useState<TSystemInfo>();
   const ws = useRef<any>(null);
   const [socketMessage, setSocketMessage] = useState<any>();
   const [collapsed, setCollapsed] = useState(false);
@@ -256,17 +276,23 @@ export default function () {
               e.stopPropagation();
             }}
           >
-            <span
-              style={{
-                fontSize: isFirefox ? 9 : 12,
-                color: '#666',
-                marginLeft: 2,
-                zoom: isSafari ? 0.66 : 0.8,
-                letterSpacing: isQQBrowser ? -2 : 0,
-              }}
+            <Tooltip
+              title={systemInfo?.branch === 'develop' ? '开发版' : '正式版'}
             >
-              v{version}
-            </span>
+              <Badge size="small" dot={systemInfo?.branch === 'develop'}>
+                <span
+                  style={{
+                    fontSize: isFirefox ? 9 : 12,
+                    color: '#666',
+                    marginLeft: 2,
+                    zoom: isSafari ? 0.66 : 0.8,
+                    letterSpacing: isQQBrowser ? -2 : 0,
+                  }}
+                >
+                  v{version}
+                </span>
+              </Badge>
+            </Tooltip>
           </a>
         </>
       }
@@ -342,6 +368,7 @@ export default function () {
           reloadUser,
           reloadTheme,
           socketMessage,
+          systemInfo,
         }}
       />
     </ProLayout>

@@ -7,6 +7,8 @@ import SystemService from '../services/system';
 import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
 import { EnvModel } from '../data/env';
+import { promiseExec } from '../config/util';
+
 const route = Router();
 
 export default (app: Router) => {
@@ -22,6 +24,15 @@ export default (app: Router) => {
 
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const version = currentVersionFile.match(versionRegx)![1];
+      const lastCommitTime = (
+        await promiseExec('git show -s --format=%ai')
+      ).replace('\n', '');
+      const lastCommitId = (
+        await promiseExec('git rev-parse --short HEAD')
+      ).replace('\n', '');
+      const branch = (
+        await promiseExec('git symbolic-ref --short HEAD')
+      ).replace('\n', '');
 
       let isInitialized = true;
       if (
@@ -37,6 +48,9 @@ export default (app: Router) => {
         data: {
           isInitialized,
           version,
+          lastCommitTime,
+          lastCommitId,
+          branch,
         },
       });
     } catch (e) {
