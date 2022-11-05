@@ -89,7 +89,7 @@ export default class SystemService {
       let lastLog = '';
       try {
         const lastVersionFileContent = await promiseExec(
-          `curl ${config.lastVersionFile}`,
+          `curl ${config.lastVersionFile}?t=${Date.now()}`,
         );
         lastVersion = lastVersionFileContent.match(versionRegx)![1];
         lastLog = lastVersionFileContent.match(logRegx)

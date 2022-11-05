@@ -14,7 +14,7 @@ if (!process.env.QL_DIR) {
   process.env.QL_DIR = qlHomePath.replace(/\/$/g, '');
 }
 
-const lastVersionFile = `https://qn.whyour.cn/version.ts?v=${Date.now()}`;
+const lastVersionFile = `https://qn.whyour.cn/version.ts`;
 
 const rootPath = process.env.QL_DIR as string;
 const envFound = dotenv.config({ path: path.join(rootPath, '.env') });
