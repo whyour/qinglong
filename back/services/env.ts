@@ -103,7 +103,7 @@ export default class EnvService {
       let position = initPosition;
       for (const env of envs) {
         position = position - stepPosition;
-        await this.updateDb({ ...env, position });
+        await this.updateDb({ id: env.id, position });
       }
     }
   }
