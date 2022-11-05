@@ -77,8 +77,6 @@ const CheckUpdate = ({ socketMessage }: any) => {
       content: (
         <pre
           style={{
-            wordBreak: 'break-all',
-            whiteSpace: 'pre-wrap',
             paddingTop: 15,
             fontSize: 12,
             fontWeight: 400,
@@ -111,16 +109,14 @@ const CheckUpdate = ({ socketMessage }: any) => {
       title: '更新中...',
       centered: true,
       content: (
-          <pre
-            style={{
-              wordBreak: 'break-all',
-              whiteSpace: 'pre-wrap',
-              fontSize: 12,
-              fontWeight: 400,
-            }}
-          >
-            {value}
-          </pre>
+        <pre
+          style={{
+            fontSize: 12,
+            fontWeight: 400,
+          }}
+        >
+          {value}
+        </pre>
       ),
     });
   };
@@ -146,8 +142,6 @@ const CheckUpdate = ({ socketMessage }: any) => {
         <>
           <pre
             style={{
-              wordBreak: 'break-all',
-              whiteSpace: 'pre-wrap',
               fontSize: 12,
               fontWeight: 400,
             }}

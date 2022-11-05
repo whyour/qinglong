@@ -257,7 +257,6 @@ const EditModal = ({
           style={{
             height: '100%',
             padding: '0 15px',
-            whiteSpace: 'break-spaces',
           }}
         >
           {log}
