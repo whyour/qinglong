@@ -25,13 +25,15 @@ export default (app: Router) => {
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const version = currentVersionFile.match(versionRegx)![1];
       const lastCommitTime = (
-        await promiseExec('git show -s --format=%ai')
+        await promiseExec(`cd ${config.rootPath} && git show -s --format=%ai`)
       ).replace('\n', '');
       const lastCommitId = (
-        await promiseExec('git rev-parse --short HEAD')
+        await promiseExec(`cd ${config.rootPath} && git rev-parse --short HEAD`)
       ).replace('\n', '');
       const branch = (
-        await promiseExec('git symbolic-ref --short HEAD')
+        await promiseExec(
+          `cd ${config.rootPath} && git symbolic-ref --short HEAD`,
+        )
       ).replace('\n', '');
 
       let isInitialized = true;
