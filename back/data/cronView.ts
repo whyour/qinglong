@@ -7,7 +7,8 @@ interface SortType {
 }
 
 interface FilterType {
-  type: 'or' | 'and';
+  property: string;
+  operation: string;
   value: string;
 }
 
@@ -18,6 +19,7 @@ export class CrontabView {
   isDisabled?: 1 | 0;
   filters?: FilterType[];
   sorts?: SortType[];
+  filterRelation?: 'and' | 'or';
 
   constructor(options: CrontabView) {
     this.name = options.name;
@@ -26,6 +28,7 @@ export class CrontabView {
     this.isDisabled = options.isDisabled || 0;
     this.filters = options.filters;
     this.sorts = options.sorts;
+    this.filterRelation = options.filterRelation;
   }
 }
 
@@ -43,5 +46,6 @@ export const CrontabViewModel = sequelize.define<CronViewInstance>(
     isDisabled: DataTypes.NUMBER,
     filters: DataTypes.JSON,
     sorts: DataTypes.JSON,
+    filterRelation: { type: DataTypes.STRING, defaultValue: 'and' },
   },
 );

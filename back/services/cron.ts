@@ -116,8 +116,9 @@ export default class CronService {
 
   private formatViewQuery(query: any, viewQuery: any) {
     if (viewQuery.filters && viewQuery.filters.length > 0) {
-      if (!query[Op.and]) {
-        query[Op.and] = [];
+      const primaryOperate = viewQuery.filterRelation === 'or' ? Op.or : Op.and;
+      if (!query[primaryOperate]) {
+        query[primaryOperate] = [];
       }
       for (const col of viewQuery.filters) {
         const { property, value, operation } = col;
@@ -166,7 +167,7 @@ export default class CronService {
             ],
           };
         }
-        query[Op.and].push(q);
+        query[primaryOperate].push(q);
       }
     }
   }

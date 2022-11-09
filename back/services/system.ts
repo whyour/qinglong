@@ -9,7 +9,6 @@ import ScheduleService from './schedule';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import got from 'got';
-import { promiseExec } from '../config/util';
 
 @Service()
 export default class SystemService {
@@ -88,9 +87,13 @@ export default class SystemService {
       let lastVersion = '';
       let lastLog = '';
       try {
-        const lastVersionFileContent = await promiseExec(
-          `curl ${config.lastVersionFile}?t=${Date.now()}`,
+        const result = await got.get(
+          `${config.lastVersionFile}?t=${Date.now()}`,
+          {
+            timeout: 30000,
+          },
         );
+        const lastVersionFileContent = result.body;
         lastVersion = lastVersionFileContent.match(versionRegx)![1];
         lastLog = lastVersionFileContent.match(logRegx)
           ? lastVersionFileContent.match(logRegx)![1]

@@ -201,10 +201,10 @@ const Crontab = () => {
           >
             {record.last_execution_time
               ? new Date(record.last_execution_time * 1000)
-                .toLocaleString(language, {
-                  hour12: false,
-                })
-                .replace(' 24:', ' 00:')
+                  .toLocaleString(language, {
+                    hour12: false,
+                  })
+                  .replace(' 24:', ' 00:')
               : '-'}
           </span>
         );
@@ -387,7 +387,7 @@ const Crontab = () => {
   const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
   const [moreMenuActive, setMoreMenuActive] = useState(false);
   const tableRef = useRef<any>();
-  const tableScrollHeight = useTableScrollHeight(tableRef)
+  const tableScrollHeight = useTableScrollHeight(tableRef);
 
   const goToScriptManager = (record: any) => {
     const cmd = record.command.split(' ') as string[];
@@ -414,10 +414,11 @@ const Crontab = () => {
   const getCrons = () => {
     setLoading(true);
     const { page, size, sorter, filters } = pageConf;
-    let url = `${config.apiPrefix
-      }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
-        filters,
-      )}`;
+    let url = `${
+      config.apiPrefix
+    }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
+      filters,
+    )}`;
     if (sorter && sorter.field) {
       url += `&sorter=${JSON.stringify({
         field: sorter.field,
@@ -428,6 +429,7 @@ const Crontab = () => {
       url += `&queryString=${JSON.stringify({
         filters: viewConf.filters,
         sorts: viewConf.sorts,
+        filterRelation: viewConf.filterRelation || 'and',
       })}`;
     }
     request
@@ -582,7 +584,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${
+              record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             {
               data: [record.id],
@@ -625,7 +628,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${
+              record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             {
               data: [record.id],
@@ -999,7 +1003,11 @@ const Crontab = () => {
       <div ref={tableRef}>
         {selectedRowIds.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <Button type="primary" style={{ marginBottom: 5 }} onClick={delCrons}>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5 }}
+              onClick={delCrons}
+            >
               批量删除
             </Button>
             <Button

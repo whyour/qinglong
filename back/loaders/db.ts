@@ -18,8 +18,8 @@ export default async () => {
     await AppModel.sync();
     await AuthModel.sync();
     await EnvModel.sync();
-    await SubscriptionModel.sync();
-    await CrontabViewModel.sync();
+    await SubscriptionModel.sync({ alter: true });
+    await CrontabViewModel.sync({ alter: true });
 
     // try {
     //   const queryInterface = sequelize.getQueryInterface();

@@ -1,7 +1,12 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { CrontabView, CrontabViewModel } from '../data/cronView';
-import { initPosition } from '../data/env';
+import {
+  initPosition,
+  maxPosition,
+  minPosition,
+  stepPosition,
+} from '../data/env';
 
 @Service()
 export default class CronViewService {
@@ -16,6 +21,8 @@ export default class CronViewService {
     position = position / 2;
     const tab = new CrontabView({ ...payload, position });
     const doc = await this.insert(tab);
+
+    await this.checkPosition(tab.position!);
     return doc;
   }
 
@@ -62,6 +69,22 @@ export default class CronViewService {
     await CrontabViewModel.update({ isDisabled: 0 }, { where: { id: ids } });
   }
 
+  private async checkPosition(position: number) {
+    const precisionPosition = parseFloat(position.toPrecision(16));
+    if (precisionPosition < minPosition || precisionPosition > maxPosition) {
+      const envs = await this.list();
+      let position = initPosition;
+      for (const env of envs) {
+        position = position - stepPosition;
+        await this.updateDb({ id: env.id, position });
+      }
+    }
+  }
+
+  private getPrecisionPosition(position: number): number {
+    return parseFloat(position.toPrecision(16));
+  }
+
   public async move({
     id,
     fromIndex,
@@ -85,8 +108,10 @@ export default class CronViewService {
     }
     const newDoc = await this.update({
       id,
-      position: targetPosition,
+      position: this.getPrecisionPosition(targetPosition),
     });
+
+    await this.checkPosition(targetPosition);
     return newDoc;
   }
 }

@@ -30,6 +30,7 @@ export default (app: Router) => {
         name: Joi.string().required(),
         sorts: Joi.array().optional().allow(null),
         filters: Joi.array().optional(),
+        filterRelation: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -51,6 +52,7 @@ export default (app: Router) => {
         id: Joi.number().required(),
         sorts: Joi.array().optional().allow(null),
         filters: Joi.array().optional(),
+        filterRelation: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {

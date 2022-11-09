@@ -28,6 +28,7 @@ export class Subscription {
   extensions?: string;
   sub_before?: string;
   sub_after?: string;
+  proxy?: string;
 
   constructor(options: Subscription) {
     this.id = options.id;
@@ -54,6 +55,7 @@ export class Subscription {
     this.extensions = options.extensions;
     this.sub_before = options.sub_before;
     this.sub_after = options.sub_after;
+    this.proxy = options.proxy;
   }
 }
 
@@ -102,5 +104,6 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
     log_path: DataTypes.STRING,
     schedule_type: DataTypes.STRING,
     alias: { type: DataTypes.STRING, unique: 'alias' },
+    proxy: { type: DataTypes.STRING, allowNull: true },
   },
 );

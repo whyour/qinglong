@@ -12,6 +12,7 @@ import {
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import IconFont from '@/components/iconfont';
 
 const PROPERTIES = [
   { name: '命令', value: 'command' },
@@ -42,6 +43,11 @@ const STATUS = [
   { name: '已禁用', value: 2 },
 ];
 
+enum ViewFilterRelation {
+  'and' = '且',
+  'or' = '或',
+}
+
 const ViewCreateModal = ({
   view,
   handleCancel,
@@ -53,10 +59,11 @@ const ViewCreateModal = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [operationMap, setOperationMap] = useState<any>();
+  const [filterRelation, setFilterRelation] = useState<'and' | 'or'>('and');
 
   const handleOk = async (values: any) => {
     setLoading(true);
+    values.filterRelation = filterRelation;
     const method = view ? 'put' : 'post';
     try {
       const { code, data } = await request[method](
@@ -87,12 +94,7 @@ const ViewCreateModal = ({
   }, [view, visible]);
 
   const operationElement = (
-    <Select
-      style={{ width: 100 }}
-      onChange={() => {
-        setOperationMap({});
-      }}
-    >
+    <Select style={{ width: 100 }}>
       {OPERATIONS.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -164,38 +166,48 @@ const ViewCreateModal = ({
         </Form.Item>
         <Form.List name="filters">
           {(fields, { add, remove }) => (
-            <div style={{ position: 'relative' }} className={`view-filters-container ${fields.length > 1 ? 'active' : ''}`}>
-              {
-                fields.length > 1 && (
-                  <div
+            <div
+              style={{ position: 'relative' }}
+              className={`view-filters-container ${
+                fields.length > 1 ? 'active' : ''
+              }`}
+            >
+              {fields.length > 1 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    width: 50,
+                    borderRadius: 10,
+                    border: '1px solid rgb(190, 220, 255)',
+                    borderRight: 'none',
+                    height: 56 * (fields.length - 1),
+                    top: 46,
+                    left: 15,
+                  }}
+                >
+                  <Button
+                    type="primary"
+                    size="small"
                     style={{
                       position: 'absolute',
-                      width: 50,
-                      borderRadius: 10,
-                      border: '1px solid rgb(190, 220, 255)',
-                      borderRight: 'none',
-                      height: 56 * (fields.length - 1),
-                      top: 46,
-                      left: 15
+                      top: '50%',
+                      translate: '-50% -50%',
+                      padding: '0 0 0 3px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      setFilterRelation(
+                        filterRelation === 'and' ? 'or' : 'and',
+                      );
                     }}
                   >
-                    <Button
-                      type="primary"
-                      size="small"
-                      style={{
-                        position: 'absolute',
-                        top: '50%',
-                        translate: '-50% -50%',
-                        padding: '0 5px',
-                      }}
-                    >
-                      <>
-                        或
-                      </>
-                    </Button>
-                  </div>
-                )
-              }
+                    <>
+                      <span>{ViewFilterRelation[filterRelation]}</span>
+                      <IconFont type="ql-icon-d-caret" />
+                    </>
+                  </Button>
+                </div>
+              )}
               <div>
                 {fields.map(({ key, name, ...restField }, index) => (
                   <Form.Item
@@ -203,9 +215,12 @@ const ViewCreateModal = ({
                     key={key}
                     style={{ marginBottom: 0 }}
                     required
-                    className='filter-item'
+                    className="filter-item"
                   >
-                    <Space className="view-create-modal-filters" align="baseline">
+                    <Space
+                      className="view-create-modal-filters"
+                      align="baseline"
+                    >
                       <Form.Item
                         {...restField}
                         name={[name, 'property']}
@@ -241,7 +256,9 @@ const ViewCreateModal = ({
                 ))}
                 <Form.Item>
                   <a
-                    onClick={() => add({ property: 'command', operation: 'Reg' })}
+                    onClick={() =>
+                      add({ property: 'command', operation: 'Reg' })
+                    }
                   >
                     <PlusOutlined />
                     新增筛选条件
