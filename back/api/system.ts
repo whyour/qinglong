@@ -25,7 +25,7 @@ export default (app: Router) => {
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const version = currentVersionFile.match(versionRegx)![1];
       const lastCommitTime = (
-        await promiseExec(`cd ${config.rootPath} && git show -s --format=%ai`)
+        await promiseExec(`cd ${config.rootPath} && git show -s --format=%ai | head -1`)
       ).replace('\n', '');
       const lastCommitId = (
         await promiseExec(`cd ${config.rootPath} && git rev-parse --short HEAD`)
