@@ -94,7 +94,7 @@ const ViewCreateModal = ({
   }, [view, visible]);
 
   const operationElement = (
-    <Select style={{ width: 100 }}>
+    <Select style={{ width: 80 }}>
       {OPERATIONS.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -226,7 +226,7 @@ const ViewCreateModal = ({
                         name={[name, 'property']}
                         rules={[{ required: true }]}
                       >
-                        {propertyElement(PROPERTIES, { width: 120 })}
+                        {propertyElement(PROPERTIES, { width: 90 })}
                       </Form.Item>
                       <Form.Item
                         {...restField}
