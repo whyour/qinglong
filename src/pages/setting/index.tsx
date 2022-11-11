@@ -31,6 +31,7 @@ import CheckUpdate from './checkUpdate';
 import About from './about';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
+import './index.less'
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -321,7 +322,7 @@ const Setting = () => {
 
   return (
     <PageContainer
-      className="ql-container-wrapper ql-container-wrapper-has-tab"
+      className="ql-container-wrapper ql-container-wrapper-has-tab ql-setting-container"
       title="系统设置"
       header={{
         style: headerStyle,
