@@ -77,13 +77,21 @@ export default class SubscriptionService {
   private formatCommand(doc: Subscription, url?: string) {
     let command = 'ql ';
     let _url = url || this.formatUrl(doc).url;
-    const { type, whitelist, blacklist, dependences, branch, extensions } = doc;
+    const {
+      type,
+      whitelist,
+      blacklist,
+      dependences,
+      branch,
+      extensions,
+      proxy,
+    } = doc;
     if (type === 'file') {
       command += `raw "${_url}"`;
     } else {
       command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
         dependences || ''
-      }" "${branch || ''}" "${extensions || ''}"`;
+      }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}"`;
     }
     return command;
   }
@@ -117,9 +125,10 @@ export default class SubscriptionService {
           (doc.pull_option as any).private_key,
           doc.alias,
           host,
+          doc.proxy,
         );
       } else {
-        this.sshKeyService.removeSSHKey(doc.alias, host);
+        this.sshKeyService.removeSSHKey(doc.alias, host, doc.proxy);
       }
     }
 
@@ -354,7 +363,9 @@ export default class SubscriptionService {
 
       fs.appendFileSync(
         `${absolutePath}`,
-        `${str}\n## 执行结束...  ${dayjs().format('YYYY-MM-DD HH:mm:ss')}${LOG_END_SYMBOL}`,
+        `${str}\n## 执行结束...  ${dayjs().format(
+          'YYYY-MM-DD HH:mm:ss',
+        )}${LOG_END_SYMBOL}`,
       );
     }
 

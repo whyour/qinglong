@@ -144,6 +144,7 @@ update_repo() {
   local dependence="$4"
   local branch="$5"
   local extensions="$6"
+  local proxy="$7"
   local tmp="${url%/*}"
   local authorTmp1="${tmp##*/}"
   local authorTmp2="${authorTmp1##*:}"
@@ -156,9 +157,9 @@ update_repo() {
   local formatUrl="$url"
   if [[ -d ${repo_path}/.git ]]; then
     reset_romote_url ${repo_path} "${formatUrl}" "${branch}"
-    git_pull_scripts ${repo_path} "${branch}"
+    git_pull_scripts ${repo_path} "${branch}" "${proxy}"
   else
-    git_clone_scripts "${formatUrl}" ${repo_path} "${branch}"
+    git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
   fi
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新${repo_path}成功...\n"
@@ -447,7 +448,10 @@ main() {
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
 
   local begin_time=$(format_time "$time_format" "$time")
-  eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+
+  if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
+    eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+  fi
 
   if [[ -s $task_error_log_path ]]; then
     eval cat $task_error_log_path $cmd
@@ -470,7 +474,7 @@ main() {
   repo)
     get_uniq_path "$p2" "$p6"
     if [[ -n $p2 ]]; then
-      update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7"
+      update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7" "$p8"
     else
       eval echo -e "命令输入错误...\\\n" $cmd
       eval usage $cmd
@@ -497,7 +501,7 @@ main() {
   resetlet)
     auth_value=$(cat $file_auth_user | jq '.retries =0' -c)
     echo "$auth_value" >$file_auth_user
-    echo -e "重置登录错误次数成功" $cmd
+    eval echo -e "重置登录错误次数成功" $cmd
     ;;
   resettfa)
     auth_value=$(cat $file_auth_user | jq '.twoFactorActivated =false' | jq '.twoFactorActived =false' -c)
@@ -514,10 +518,12 @@ main() {
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
-  eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
-
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
-  eval echo -e "\\\n　　　　　　　　　　" $cmd
+
+  if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
+    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
+    eval echo -e "\\\n　　　　　　　　　　" $cmd
+  fi
 
   if [[ -f $file_path ]]; then
     cat $file_path

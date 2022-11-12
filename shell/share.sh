@@ -85,6 +85,10 @@ import_config() {
 }
 
 set_proxy() {
+  local proxy="$1"
+  if [[ $proxy ]]; then
+    proxy_url="$proxy"
+  fi
   if [[ $proxy_url ]]; then
     export http_proxy="${proxy_url}"
     export https_proxy="${proxy_url}"
@@ -303,13 +307,14 @@ update_depend() {
 }
 
 git_clone_scripts() {
-  local url=$1
-  local dir=$2
-  local branch=$3
+  local url="$1"
+  local dir="$2"
+  local branch="$3"
+  local proxy="$4"
   [[ $branch ]] && local part_cmd="-b $branch "
   echo -e "开始克隆仓库 $url 到 $dir\n"
 
-  set_proxy
+  set_proxy "$proxy"
   git clone $part_cmd $url $dir
   exit_status=$?
   unset_proxy
@@ -319,10 +324,11 @@ git_pull_scripts() {
   local dir_current=$(pwd)
   local dir_work="$1"
   local branch="$2"
+  local proxy="$3"
   cd $dir_work
   echo -e "开始更新仓库：$dir_work\n"
 
-  set_proxy
+  set_proxy "$proxy"
   git fetch --all
   exit_status=$?
   git pull &>/dev/null
