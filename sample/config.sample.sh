@@ -16,7 +16,7 @@ DefaultCronRule=""
 ## ql repo命令拉取脚本时需要拉取的文件后缀，直接写文件后缀名即可
 RepoFileExtensions="js py"
 
-## 代理地址，支持http/https/socks，例如 http://127.0.0.1:7890
+## 代理地址，支持HTTP/SOCK5，例如 http://127.0.0.1:7890
 ProxyUrl=""
 
 ## 资源告警阙值，默认CPU 80%、内存80%、磁盘90%

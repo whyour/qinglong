@@ -253,10 +253,11 @@ textarea:-webkit-autofill:focus,
 select:-webkit-autofill,
 select:-webkit-autofill:hover,
 select:-webkit-autofill:focus {
-  border: none;
   box-shadow: none;
   transition: background-color 5000s ease-in-out 0s;
   -webkit-text-fill-color: @text-color;
+  caret-color: @text-color;
+  color: @text-color;
 }
 
 ::placeholder {

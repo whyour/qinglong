@@ -439,6 +439,19 @@ const SubscriptionModal = ({
             </Form.Item>
           </>
         )}
+        <Form.Item
+          name="proxy"
+          label="代理"
+          tooltip="公开仓库支持HTTP/SOCK5代理，私有仓库支持SOCK5代理"
+        >
+          <Input
+            placeholder={
+              type === 'private-repo'
+                ? 'SOCK5代理，例如 IP:PORT'
+                : 'HTTP/SOCK5代理，例如 http://127.0.0.1:1080'
+            }
+          />
+        </Form.Item>
       </Form>
     </Modal>
   );
