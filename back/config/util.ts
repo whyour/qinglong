@@ -284,6 +284,20 @@ enum FileType {
   'file',
 }
 
+interface IFile {
+  title: string;
+  key: string;
+  type: 'directory' | 'file',
+  parent: string;
+  mtime: number;
+  children?: IFile[],
+}
+
+export function dirSort(a: IFile, b: IFile) {
+  if (a.type !== b.type) return FileType[a.type] < FileType[b.type] ? -1 : 1
+  else if (a.mtime !== b.mtime) return a.mtime > b.mtime ? -1 : 1
+}
+
 export function readDirs(
   dir: string,
   baseDir: string = '',
@@ -303,10 +317,8 @@ export function readDirs(
           key,
           type: 'directory',
           parent: relativePath,
-          children: readDirs(subPath, baseDir).sort(
-            (a: any, b: any) =>
-              (FileType as any)[a.type] - (FileType as any)[b.type],
-          ),
+          mtime: stats.mtime.getTime(),
+          children: readDirs(subPath, baseDir).sort(dirSort),
         };
       }
       return {
@@ -315,11 +327,10 @@ export function readDirs(
         isLeaf: true,
         key,
         parent: relativePath,
+        mtime: stats.mtime.getTime(),
       };
     });
-  return result.sort(
-    (a: any, b: any) => (FileType as any)[a.type] - (FileType as any)[b.type],
-  );
+  return result.sort(dirSort);
 }
 
 export function readDir(
