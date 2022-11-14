@@ -15,17 +15,6 @@ export default async () => {
   const envService = Container.get(EnvService);
   const dependenceService = Container.get(DependenceService);
 
-  // 更新所有不存在filterRelation的任务视图
-  const views = await CrontabViewModel.findAll({ where: {}, raw: true });
-  for (const view of views) {
-    if (!view.filterRelation) {
-      await CrontabViewModel.update(
-        { filterRelation: 'and' },
-        { where: { id: view.id } },
-      );
-    }
-  }
-
   // 初始化更新所有任务状态为空闲
   await CrontabModel.update(
     { status: CrontabStatus.idle },
