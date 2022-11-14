@@ -119,7 +119,7 @@ export default class OpenService {
         (x) => x.expiration >= timestamp,
       );
       let tokens = invalidTokens;
-      if (invalidTokens.length > 5) {
+      if (invalidTokens.length >= 5) {
         tokens = [
           ...invalidTokens.slice(0, 4),
           { ...invalidTokens[4], expiration },
