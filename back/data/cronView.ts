@@ -49,7 +49,6 @@ export const CrontabViewModel = sequelize.define<CronViewInstance>(
     filterRelation: {
       type: DataTypes.STRING,
       allowNull: true,
-      defaultValue: 'and',
     },
   },
 );
