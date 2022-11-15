@@ -22,9 +22,12 @@ export default async () => {
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
 
+    // 初始化新增字段
+    try {
+      await sequelize.query('alter table CrontabViews add column filterRelation VARCHAR(255)')
+    } catch (error) {}
     try {
       await sequelize.query('alter table Subscriptions add column proxy VARCHAR(255)')
-      await sequelize.query('alter table CrontabViews add column filterRelation VARCHAR(255)')
     } catch (error) {}
 
     // 2.10-2.11 升级
