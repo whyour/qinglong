@@ -10,6 +10,7 @@ import { fileExist } from '../config/util';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
 import config from '../config';
+import { sequelize } from '../data'
 
 export default async () => {
   try {
@@ -18,15 +19,13 @@ export default async () => {
     await AppModel.sync();
     await AuthModel.sync();
     await EnvModel.sync();
-    await SubscriptionModel.sync({ alter: true });
-    await CrontabViewModel.sync({ alter: true });
+    await SubscriptionModel.sync();
+    await CrontabViewModel.sync();
 
-    // try {
-    //   const queryInterface = sequelize.getQueryInterface();
-    //   await queryInterface.addIndex('Crontabs', ['command'], { unique: true });
-    //   await queryInterface.addIndex('Envs', ['name', 'value'], { unique: true });
-    //   await queryInterface.addIndex('Apps', ['name'], { unique: true });
-    // } catch (error) { }
+    try {
+      await sequelize.query('alter table Subscriptions add column proxy VARCHAR(255)')
+      await sequelize.query('alter table CrontabViews add column filterRelation VARCHAR(255)')
+    } catch (error) {}
 
     // 2.10-2.11 升级
     const cronDbFile = path.join(config.rootPath, 'db/crontab.db');
