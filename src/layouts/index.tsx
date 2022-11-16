@@ -50,7 +50,7 @@ interface TSystemInfo {
   branch: 'develop' | 'master';
   isInitialized: boolean;
   lastCommitId: string;
-  lastCommitTime: string;
+  lastCommitTime: number;
   version: string;
 }
 

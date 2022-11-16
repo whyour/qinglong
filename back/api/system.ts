@@ -8,6 +8,7 @@ import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
 import { EnvModel } from '../data/env';
 import { promiseExec } from '../config/util';
+import dayjs from 'dayjs';
 
 const route = Router();
 
@@ -25,7 +26,9 @@ export default (app: Router) => {
       const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
       const version = currentVersionFile.match(versionRegx)![1];
       const lastCommitTime = (
-        await promiseExec(`cd ${config.rootPath} && git show -s --format=%ai | head -1`)
+        await promiseExec(
+          `cd ${config.rootPath} && git show -s --format=%ai | head -1`,
+        )
       ).replace('\n', '');
       const lastCommitId = (
         await promiseExec(`cd ${config.rootPath} && git rev-parse --short HEAD`)
@@ -50,7 +53,7 @@ export default (app: Router) => {
         data: {
           isInitialized,
           version,
-          lastCommitTime,
+          lastCommitTime: dayjs(lastCommitTime).unix(),
           lastCommitId,
           branch,
         },
