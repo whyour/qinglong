@@ -1,0 +1,38 @@
+name: COPY STATIC
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'develop'
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  workflow_dispatch:
+
+jobs:
+  to_gitlab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url:
+            git@gitlab.com:whyour/qinglong-static.git
+          ssh_private_key:
+            ${{ secrets.GITLAB_SSH_PK }}
+
+  to_gitee:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url:
+            git@gitee.com:whyour/qinglong-static.git
+          ssh_private_key:
+            ${{ secrets.GITLAB_SSH_PK }}
