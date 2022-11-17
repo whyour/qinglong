@@ -60,17 +60,28 @@ jobs:
         env:
           GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
           GITHUB_BRANCH: ${{ github.ref_name }}
+          REPO_GITEE: git@gitee.com:whyour/qinglong-static.git
+          REPO_GITLAB: git@gitlab.com:whyour/qinglong-static.git
+          PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
         run: |
           mkdir -p tmp
           cd ./tmp
-          mkdir -p .github/workflows
           cp -rf ../static/* ./
-          cp ../.github/COPY_STATIC.yml ./.github/workflows/
           git init -b ${GITHUB_BRANCH} && git add .
           git config --local user.name 'github-actions[bot]'
           git config --local user.email 'github-actions[bot]@users.noreply.github.com'
           git commit --allow-empty -m "copy static at $(date +'%Y-%m-%d %H:%M:%S')"
           git push --force --quiet "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" ${GITHUB_BRANCH}:${GITHUB_BRANCH}
+
+          mkdir -p ~/.ssh
+          echo "${PRIVATE_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          export GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -l ${PRIVATE_KEY}"
+          git remote add gitee "${REPO_GITEE}"
+          git remote add gitlab "${REPO_GITLAB}"
+          git push --tags --force --prune gitee "refs/remotes/origin/*:refs/heads/*"
+          git push --tags --force --prune gitlab "refs/remotes/origin/*:refs/heads/*"
 
   build:
     needs: build-static
