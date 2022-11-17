@@ -333,7 +333,6 @@ git_pull_scripts() {
   exit_status=$?
   git pull &>/dev/null
   unset_proxy
-  reset_branch "$branch"
 
   cd $dir_current
 }
@@ -344,19 +343,21 @@ reset_romote_url() {
   local url=$2
   local branch="$3"
 
+  cd $dir_work
   if [[ -d "$dir_work/.git" ]]; then
-    cd $dir_work
     [[ -f ".git/index.lock" ]] && rm -f .git/index.lock >/dev/null
     git remote set-url origin $url &>/dev/null
-
-    local part_cmd=""
-    reset_branch "$branch"
-    cd $dir_current
+  else
+    git init
+    git remote add origin $url &>/dev/null
   fi
+  reset_branch "$branch"
+  cd $dir_current
 }
 
 reset_branch() {
   local branch="$1"
+  local part_cmd=""
   if [[ $branch ]]; then
     part_cmd="origin/${branch}"
     git checkout -B "$branch" &>/dev/null
