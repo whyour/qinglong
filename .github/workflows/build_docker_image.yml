@@ -77,7 +77,7 @@ jobs:
           echo "${PRIVATE_KEY}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-          export GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -l ${PRIVATE_KEY}"
+          export GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -l git"
           git remote add gitee "${REPO_GITEE}"
           git remote add gitlab "${REPO_GITLAB}"
           git push --tags --force --prune gitee "refs/remotes/origin/*:refs/heads/*"
