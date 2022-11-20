@@ -61,6 +61,7 @@ push_config = {
     'PUSH_KEY': '',                     # server 酱的 PUSH_KEY，兼容旧版与 Turbo 版
 
     'DEER_KEY': '',                     # PushDeer 的 PUSHDEER_KEY
+    'DEER_URL': '',                     # PushDeer 的 PUSHDEER_URL
   
     'CHAT_URL': '',                     # synology chat url
     'CHAT_TOKEN': '',                   # synology chat token
@@ -280,6 +281,9 @@ def pushdeer(title: str, content: str) -> None:
     print("PushDeer 服务启动")
     data = {"text": title, "desp": content, "type": "markdown", "pushkey": push_config.get("DEER_KEY")}
     url = 'https://api2.pushdeer.com/message/push'
+    if push_config.get("DEER_URL"):
+      url = push_config.get("DEER_URL")
+      
     response = requests.post(url, data=data).json()
     
     if len(response.get("content").get("result")) > 0:

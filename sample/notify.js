@@ -38,6 +38,7 @@ let SCKEY = '';
 //此处填你申请的PushDeer KEY.
 //(环境变量名 DEER_KEY)
 let PUSHDEER_KEY = '';
+let PUSHDEER_URL = '';
 
 // =======================================Synology Chat通知设置区域===========================================
 //此处填你申请的CHAT_URL与CHAT_TOKEN
@@ -151,6 +152,7 @@ if (process.env.PUSH_KEY) {
 
 if (process.env.DEER_KEY) {
   PUSHDEER_KEY = process.env.DEER_KEY;
+  PUSHDEER_URL = process.env.DEER_URL;
 }
 
 if (process.env.CHAT_URL) {
@@ -413,7 +415,7 @@ function PushDeerNotify(text, desp) {
       // PushDeer 建议对消息内容进行 urlencode
       desp = encodeURI(desp);
       const options = {
-        url: `https://api2.pushdeer.com/message/push`,
+        url: PUSHDEER_URL || `https://api2.pushdeer.com/message/push`,
         body: `pushkey=${PUSHDEER_KEY}&text=${text}&desp=${desp}&type=markdown`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

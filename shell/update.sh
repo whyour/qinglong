@@ -252,6 +252,7 @@ update_qinglong() {
   if [ "$githubStatus" == "" ]; then
     mirror="gitee"
   fi
+  echo -e "\n使用 ${mirror} 源更新...\n"
   export isFirstStartServer=false
 
   local all_branch=$(git branch -a)

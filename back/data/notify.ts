@@ -41,6 +41,7 @@ export class ServerChanNotification extends NotificationBaseInfo {
 
 export class PushDeerNotification extends NotificationBaseInfo {
   public pushDeerKey = '';
+  public pushDeerUrl = '';
 }
 
 export class ChatNotification extends NotificationBaseInfo {

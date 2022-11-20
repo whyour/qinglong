@@ -137,6 +137,10 @@ export default {
         tip: 'PushDeer的Key，https://github.com/easychen/pushdeer',
         required: true,
       },
+      {
+        label: 'pushDeerUrl',
+        tip: 'PushDeer的自架API endpoint，默认是 https://api2.pushdeer.com/message/push',
+      },
     ],
     bark: [
       {

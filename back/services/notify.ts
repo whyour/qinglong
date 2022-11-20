@@ -123,8 +123,8 @@ export default class NotificationService {
   }
 
   private async pushDeer() {
-    const { pushDeerKey } = this.params;
-    const url = `https://api2.pushdeer.com/message/push`;
+    const { pushDeerKey, pushDeerUrl } = this.params;
+    const url = pushDeerUrl || `https://api2.pushdeer.com/message/push`;
     const res: any = await got
       .post(url, {
         ...this.gotOption,

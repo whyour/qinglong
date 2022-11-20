@@ -31,7 +31,7 @@ import CheckUpdate from './checkUpdate';
 import About from './about';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
-import './index.less'
+import './index.less';
 
 const { Text } = Typography;
 const optionsWithDisabled = [
@@ -80,10 +80,15 @@ const Setting = () => {
       dataIndex: 'scopes',
       key: 'scopes',
       align: 'center' as const,
+      width: '40%',
       render: (text: string, record: any) => {
-        return record.scopes.map((scope: any) => {
-          return <Tag key={scope}>{(config.scopesMap as any)[scope]}</Tag>;
-        });
+        return (
+          <div style={{ textAlign: 'left' }}>
+            {record.scopes.map((scope: any) => {
+              return <Tag key={scope}>{(config.scopesMap as any)[scope]}</Tag>;
+            })}
+          </div>
+        );
       },
     },
     {
