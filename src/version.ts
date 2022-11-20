@@ -1,11 +1,8 @@
-export const version = '2.15.0';
-export const changeLogLink = 'https://t.me/jiao_long/340';
-export const changeLog = `2.15.0 版本说明
-1. 任务视图筛选条件支持 且/或
-2. 订阅支持设置代理
-3. 修改日志管理列表默认排序
-4. 修复openapi token生成逻辑
-5. 修复日志管理搜索失效
-6. 修复系统最后commit时间获取
-7. 其他优化
+export const version = '2.15.1';
+export const changeLogLink = 'https://t.me/jiao_long/341';
+export const changeLog = `2.15.1 版本说明
+1. 系统更新增加 gitee 更新源
+2. pushDeer 通知增加自架版
+3. 修复移动端最后更新时间展示
+4. 其他优化
 `;
