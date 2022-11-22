@@ -159,6 +159,7 @@ update_repo() {
     reset_romote_url ${repo_path} "${formatUrl}" "${branch}"
     git_pull_scripts ${repo_path} "${branch}" "${proxy}"
   else
+    rm -rf ${repo_path} &>/dev/null
     git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
   fi
   if [[ $exit_status -eq 0 ]]; then
@@ -287,6 +288,7 @@ update_qinglong_static() {
     reset_romote_url ${ql_static_repo} ${url} ${primary_branch}
     git_pull_scripts ${ql_static_repo} ${primary_branch}
   else
+    rm -rf ${ql_static_repo} &>/dev/null
     git_clone_scripts ${url} ${ql_static_repo} ${primary_branch}
   fi
   if [[ $exit_status -eq 0 ]]; then
