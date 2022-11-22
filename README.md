@@ -22,7 +22,7 @@
 [docker-image-size-url]: https://hub.docker.com/r/whyour/qinglong
 </div>
 
-[![](https://user-images.githubusercontent.com/22700758/161788855-c4e51cb8-d4e9-44fe-bb17-ee1a56c8549b.png)](https://whyour.cn)
+[![](https://user-images.githubusercontent.com/22700758/203243067-1a8a570d-b1b4-4837-9f12-d78d83e31f35.jpg)](https://whyour.cn)
 
 简体中文 | [English](./README-en.md)
 
