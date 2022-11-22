@@ -51,21 +51,13 @@ jobs:
         with:
           version: latest
 
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v3
+      - uses: actions/setup-node@v3
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yml') }}
-
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: pnpm install
+          cache: 'pnpm'
 
       - name: build front and back
         run: |
+          pnpm install --frozen-lockfile
           pnpm build:front
           pnpm build:back
 
