@@ -50,13 +50,22 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: latest
-      - uses: actions/setup-node@v3
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v3
         with:
-          cache: 'pnpm'
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yml') }}
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install
 
       - name: build front and back
         run: |
-          pnpm install --frozen-lockfile
           pnpm build:front
           pnpm build:back
 
@@ -147,14 +156,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@v3
@@ -168,8 +169,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
       
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
