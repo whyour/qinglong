@@ -57,7 +57,6 @@ specifiers:
   node-schedule: ^2.1.0
   nodemailer: ^6.7.2
   nodemon: ^2.0.15
-  p-queue: 7.2.0
   prettier: ^2.5.1
   qiniu: ^7.4.0
   qrcode.react: ^1.0.1
@@ -113,7 +112,6 @@ dependencies:
   nedb: 1.8.0
   node-schedule: 2.1.0
   nodemailer: 6.7.8
-  p-queue: 7.2.0
   reflect-metadata: 0.1.13
   sequelize: 6.25.6_@louislam+sqlite3@15.0.6
   serve-handler: 6.1.3
@@ -6482,10 +6480,6 @@ packages:
       es5-ext: 0.10.62
     dev: true
 
-  /eventemitter3/4.0.7:
-    resolution: {integrity: sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==}
-    dev: false
-
   /events/3.3.0:
     resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
     engines: {node: '>=0.8.x'}
@@ -9136,19 +9130,6 @@ packages:
     dependencies:
       aggregate-error: 3.1.0
     dev: true
-
-  /p-queue/7.2.0:
-    resolution: {integrity: sha512-Kvv7p13M46lTYLQ/PsZdaj/1Vj6u/8oiIJgyQyx4oVkOfHdd7M2EZvXigDvcsSzRwanCzQirV5bJPQFoSQt5MA==}
-    engines: {node: '>=12'}
-    dependencies:
-      eventemitter3: 4.0.7
-      p-timeout: 5.1.0
-    dev: false
-
-  /p-timeout/5.1.0:
-    resolution: {integrity: sha512-auFDyzzzGZZZdHz3BtET9VEz0SE/uMEAx7uWfGPucfzEwwe/xH0iVeZibQmANYE/hp9T2+UUZT5m+BKyrDp3Ew==}
-    engines: {node: '>=12'}
-    dev: false
 
   /p-try/2.2.0:
     resolution: {integrity: sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ==}
