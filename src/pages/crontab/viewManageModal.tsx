@@ -81,6 +81,16 @@ const ViewManageModal = ({
       dataIndex: 'name',
       key: 'name',
       align: 'center' as const,
+      render: (text) => (
+        <div style={{ textAlign: 'left', paddingLeft: 30 }}>{text}</div>
+      ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      align: 'center' as const,
+      render: (v) => (v === 1 ? '系统' : '个人'),
     },
     {
       title: '显示',
@@ -100,10 +110,10 @@ const ViewManageModal = ({
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 100,
       align: 'center' as const,
       render: (text: string, record: any, index: number) => {
-        return (
+        return record.type !== 1 ? (
           <Space size="middle">
             <a onClick={() => editView(record, index)}>
               <EditOutlined />
@@ -112,6 +122,8 @@ const ViewManageModal = ({
               <DeleteOutlined />
             </a>
           </Space>
+        ) : (
+          '-'
         );
       },
     },

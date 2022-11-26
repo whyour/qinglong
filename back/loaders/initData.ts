@@ -8,12 +8,27 @@ import groupBy from 'lodash/groupBy';
 import { DependenceModel } from '../data/dependence';
 import { Op } from 'sequelize';
 import config from '../config';
-import { CrontabViewModel } from '../data/cronView';
+import { CrontabViewModel, CronViewType } from '../data/cronView';
+import { initPosition } from '../data/env';
 
 export default async () => {
   const cronService = Container.get(CronService);
   const envService = Container.get(EnvService);
   const dependenceService = Container.get(DependenceService);
+
+  // 初始化新增默认全部任务视图
+  CrontabViewModel.findAll({
+    where: { type: CronViewType.系统, name: '全部任务' },
+    raw: true,
+  }).then((docs) => {
+    if (docs.length === 0) {
+      CrontabViewModel.create({
+        name: '全部任务',
+        type: CronViewType.系统,
+        position: initPosition / 2,
+      });
+    }
+  });
 
   // 初始化更新所有任务状态为空闲
   await CrontabModel.update(

@@ -857,7 +857,7 @@ const Crontab = () => {
 
   useEffect(() => {
     if (viewConf && enabledCronViews && enabledCronViews.length > 0) {
-      const view = enabledCronViews.slice(2).find((x) => x.id === viewConf.id);
+      const view = enabledCronViews.slice(4).find((x) => x.id === viewConf.id);
       setMoreMenuActive(!!view);
     }
   }, [viewConf, enabledCronViews]);
@@ -894,7 +894,7 @@ const Crontab = () => {
         viewAction(key);
       }}
       items={[
-        ...[...enabledCronViews].slice(2).map((x) => ({
+        ...[...enabledCronViews].slice(4).map((x) => ({
           label: (
             <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>{x.name}</span>
@@ -990,11 +990,7 @@ const Crontab = () => {
         }
         onTabClick={tabClick}
         items={[
-          {
-            key: 'all',
-            label: '全部任务',
-          },
-          ...[...enabledCronViews].slice(0, 2).map((x) => ({
+          ...[...enabledCronViews].slice(0, 4).map((x) => ({
             key: x.id,
             label: x.name,
           })),

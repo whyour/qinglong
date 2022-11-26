@@ -10,7 +10,7 @@ import { fileExist } from '../config/util';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
 import config from '../config';
-import { sequelize } from '../data'
+import { sequelize } from '../data';
 
 export default async () => {
   try {
@@ -24,10 +24,17 @@ export default async () => {
 
     // 初始化新增字段
     try {
-      await sequelize.query('alter table CrontabViews add column filterRelation VARCHAR(255)')
+      await sequelize.query(
+        'alter table CrontabViews add column filterRelation VARCHAR(255)',
+      );
     } catch (error) {}
     try {
-      await sequelize.query('alter table Subscriptions add column proxy VARCHAR(255)')
+      await sequelize.query(
+        'alter table Subscriptions add column proxy VARCHAR(255)',
+      );
+    } catch (error) {}
+    try {
+      await sequelize.query('alter table CrontabViews add column type NUMBER');
     } catch (error) {}
 
     // 2.10-2.11 升级

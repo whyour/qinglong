@@ -1,6 +1,11 @@
 import { sequelize } from '.';
 import { DataTypes, Model } from 'sequelize';
 
+export enum CronViewType {
+  '系统' = 1,
+  '个人',
+}
+
 interface SortType {
   type: 'ASC' | 'DESC';
   value: string;
@@ -20,6 +25,7 @@ export class CrontabView {
   filters?: FilterType[];
   sorts?: SortType[];
   filterRelation?: 'and' | 'or';
+  type?: CronViewType;
 
   constructor(options: CrontabView) {
     this.name = options.name;
@@ -29,6 +35,7 @@ export class CrontabView {
     this.filters = options.filters;
     this.sorts = options.sorts;
     this.filterRelation = options.filterRelation;
+    this.type = options.type || CronViewType.个人;
   }
 }
 
@@ -50,5 +57,6 @@ export const CrontabViewModel = sequelize.define<CronViewInstance>(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    type: DataTypes.NUMBER,
   },
 );
