@@ -326,10 +326,10 @@ export default class CronService {
 
       const endTime = dayjs();
       const diffTimeStr = doc.last_execution_time
-        ? `，耗时 ${endTime.diff(
+        ? `  耗时 ${endTime.diff(
             dayjs(doc.last_execution_time * 1000),
             'second',
-          )}`
+          )} 秒`
         : '';
       if (logFileExist) {
         const str = err ? `\n${err}` : '';
