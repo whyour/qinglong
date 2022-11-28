@@ -382,10 +382,6 @@ reload_pm2() {
   echo -e "启动定时任务服务\n"
   pm2 delete schedule --source-map-support --time &>/dev/null
   pm2 start $dir_static/build/schedule.js -n schedule --source-map-support --time &>/dev/null
-
-  echo -e "启动公开服务\n"
-  pm2 delete public --source-map-support --time &>/dev/null
-  pm2 start $dir_static/build/public.js -n public --source-map-support --time &>/dev/null
 }
 
 diff_time() {

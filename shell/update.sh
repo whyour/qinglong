@@ -246,8 +246,6 @@ usage() {
 
 ## 更新qinglong
 update_qinglong() {
-  patch_version &>/dev/null
-
   local mirror="github"
   local githubStatus=$(curl -s -m 3 -IL "https://github.com" | grep 200)
   if [ "$githubStatus" == "" ]; then
