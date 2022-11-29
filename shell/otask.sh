@@ -75,7 +75,7 @@ run_nohup() {
 }
 
 check_server() {
-  local top_result = $(top -b -n 1)
+  local top_result=$(top -b -n 1)
   cpu_use=$(echo $top_result | grep CPU | grep -v -E 'grep|PID' | awk '{print $2}' | cut -f 1 -d "%" | head -n 1)
 
   mem_free=$(free -m | grep "Mem" | awk '{print $3}' | head -n 1)
