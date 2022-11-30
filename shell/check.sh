@@ -87,11 +87,18 @@ check_pm2() {
   fi
 }
 
+start_public() {
+  echo -e "=====> 启动公开服务\n"
+  pm2 delete public --source-map-support --time &>/dev/null
+  pm2 start $dir_static/build/public.js -n public --source-map-support --time &>/dev/null
+}
+
 main() {
   echo -e "=====> 开始检测"
   npm i -g pnpm
-  patch_version
   pnpm add -g pm2
+  patch_version
+  start_public
   copy_dep
   check_ql
   check_nginx
