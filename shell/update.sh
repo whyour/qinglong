@@ -247,14 +247,14 @@ usage() {
 ## 更新qinglong
 update_qinglong() {
   local mirror="github"
-  local githubStatus=$(curl -s -m 3 -IL "https://github.com" | grep 200)
+  local githubStatus=$(curl -s -m 2 -IL "https://github.com" | grep 200)
   if [ "$githubStatus" == "" ]; then
     mirror="gitee"
   fi
   echo -e "\n使用 ${mirror} 源更新...\n"
   export isFirstStartServer=false
 
-  local all_branch=$(git branch -a)
+  local all_branch=$(cd ${dir_root} && git branch -a)
   local primary_branch="master"
   if [[ "${all_branch}" =~ "${current_branch}" ]]; then
     primary_branch="${current_branch}"
