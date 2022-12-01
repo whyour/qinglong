@@ -61,15 +61,21 @@ format_params() {
   params=$(echo "$@" | sed -E 's/([^ ])&([^ ])/\1\\\&\2/g')
 }
 
-show_log="false"
-while getopts ":l" opt; do
+while getopts ":lm:" opt; do
   case $opt in
   l)
     show_log="true"
     ;;
+  m)
+    max_time="$OPTARG"
+    ;;
   esac
 done
-[[ "$show_log" == "true" ]] && shift $(($OPTIND - 1))
+[[ $show_log ]] && shift $(($OPTIND - 1))
+if [[ $max_time ]]; then
+  shift $(($OPTIND - 1))
+  command_timeout_time="$max_time"
+fi
 
 format_params "$@"
 define_program "$@"
