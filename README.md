@@ -41,7 +41,7 @@
 ### 本机部署
 
 ```bash
-# 待完善，可先参考开发步骤
+# 待完善，可先参考开发步骤 (windows暂时不支持)
 ```
 
 ### podman 部署
@@ -159,7 +159,11 @@ task <file_path> now
 # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日，直接记录在日志文件中，且可指定账号执行
 task <file_path> conc <env_name> <account_number>(可选的) 
 # 指定账号执行，无论是否设置了随机延迟，均立即运行 
-task <file_path> desi <env_name> <account_number>         
+task <file_path> desi <env_name> <account_number>      
+# 设置任务超时时间   
+task -m <max_time> <file_path>
+# 实时打印任务日志，创建定时任务时，不用携带此参数
+task -l <file_path>
 ```
 
 2. 参数说明
@@ -175,6 +179,7 @@ task <file_path> desi <env_name> <account_number>
 * file_path: 任务执行时的文件路径
 * env_name: 任务执行时需要并发或者指定时的环境变量名称
 * account_number: 任务执行时指定某个环境变量需要执行的账号序号
+* max_time: 超时时间，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
 
 ## 链接
 
