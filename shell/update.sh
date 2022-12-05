@@ -188,7 +188,7 @@ update_raw() {
     echo -e "下载 ${raw_file_name} 成功...\n"
     cd $dir_raw
     local filename="raw_${raw_file_name}"
-    local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task $filename" | perl -pe "s|.*ID=(.*) $cmd_task $filename\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
+    local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
     cp -f $raw_file_name $dir_scripts/${filename}
     cron_line=$(
       perl -ne "{
@@ -396,12 +396,12 @@ gen_list_repo() {
     filename=$(basename $file)
     cp -f $file "$dir_scripts/${uniq_path}/${filename}"
     echo "${uniq_path}/${filename}" >>"$dir_list_tmp/${uniq_path}_scripts.list"
-    cron_id=$(cat $list_crontab_user | grep -E "$cmd_task ${uniq_path}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task ${uniq_path}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    if [[ $cron_id ]]; then
-      result=$(update_cron_command_api "$cmd_task ${uniq_path}/${filename}:$cron_id")
-    fi
+    # cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* ${uniq_path}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task.* ${uniq_path}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    # if [[ $cron_id ]]; then
+    #   result=$(update_cron_command_api "$cmd_task ${uniq_path}/${filename}:$cron_id")
+    # fi
   done
-  grep -E "${cmd_task} ${uniq_path}" ${list_crontab_user} | perl -pe "s|.*ID=(.*) ${cmd_task} (${uniq_path}.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${uniq_path}_user.list"
+  grep -E "${cmd_task}.* ${uniq_path}" ${list_crontab_user} | perl -pe "s|.*ID=(.*) ${cmd_task}.* (${uniq_path}.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${uniq_path}_user.list"
   cd $dir_current
 }
 

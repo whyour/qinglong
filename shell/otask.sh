@@ -5,6 +5,12 @@ dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
+trap "single_hanle" 2 20 15
+single_hanle() {
+  handle_task_after "$@"
+  exit 1
+}
+
 random_delay() {
   local random_delay_max=$RandomDelay
   if [[ $random_delay_max ]] && [[ $random_delay_max -gt 0 ]]; then
@@ -115,7 +121,7 @@ handle_task_after() {
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
-  
+
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
   echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒"
   echo -e "\n　　　　　"
@@ -150,7 +156,7 @@ run_concurrent() {
 
   local envs=$(eval echo "\$${env_param}")
   local array=($(echo $envs | sed 's/&/ /g'))
-  local tempArr=$(echo $num_param | sed  "s/-max/-${#array[@]}/g" | sed  "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+  local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
 
@@ -198,7 +204,7 @@ run_designated() {
 
   local envs=$(eval echo "\$${env_param}")
   local array=($(echo $envs | sed 's/&/ /g'))
-  local tempArr=$(echo $num_param | sed  "s/-max/-${#array[@]}/g" | sed  "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+  local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
 
