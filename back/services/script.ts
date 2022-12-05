@@ -43,9 +43,10 @@ export default class ScriptService {
   public async runScript(filePath: string) {
     const relativePath = path.relative(config.scriptPath, filePath);
     const command = `task -l ${relativePath} now`;
-    const pid = this.scheduleService.runTask(
+    const pid = await this.scheduleService.runTask(
       command,
       this.taskCallbacks(filePath),
+      'start',
     );
 
     return { code: 200, data: pid };
@@ -60,13 +61,6 @@ export default class ScriptService {
     try {
       await killTask(pid);
     } catch (error) {}
-
-    this.sockService.sendMessage({
-      type: 'manuallyRunScript',
-      message: `${str}\n## 执行结束...  ${new Date()
-        .toLocaleString('zh', { hour12: false })
-        .replace(' 24:', ' 00:')}${LOG_END_SYMBOL}`,
-    });
 
     return { code: 200 };
   }

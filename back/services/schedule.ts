@@ -42,15 +42,21 @@ export default class ScheduleService {
 
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  async runTask(command: string, callbacks: TaskCallbacks = {}) {
+  async runTask(
+    command: string,
+    callbacks: TaskCallbacks = {},
+    completionTime: 'start' | 'end' = 'end',
+  ) {
     return new Promise(async (resolve, reject) => {
-      const startTime = dayjs();
-      await callbacks.onBefore?.(startTime);
-
-      const cp = spawn(command, { shell: '/bin/bash' });
       try {
+        const startTime = dayjs();
+        await callbacks.onBefore?.(startTime);
+
+        const cp = spawn(command, { shell: '/bin/bash' });
+
         // TODO:
         callbacks.onStart?.(cp, startTime);
+        completionTime === 'start' && resolve(cp.pid);
 
         cp.stdout.on('data', async (data) => {
           await callbacks.onLog?.(data.toString());
@@ -100,7 +106,6 @@ export default class ScheduleService {
         );
         await callbacks.onError?.(JSON.stringify(error));
       }
-      resolve(cp.pid);
     });
   }
 
