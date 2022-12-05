@@ -170,7 +170,7 @@ export default (app: Router) => {
       body: Joi.object({
         filename: Joi.string().required(),
         path: Joi.string().allow(''),
-        type: Joi.string().optional()
+        type: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -183,7 +183,7 @@ export default (app: Router) => {
         };
         const filePath = join(config.scriptPath, path, filename);
         if (type === 'directory') {
-          emptyDir(filePath);          
+          emptyDir(filePath);
         } else {
           fs.unlinkSync(filePath);
         }
@@ -255,19 +255,19 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
-        content: Joi.string().optional().allow(''),
         path: Joi.string().optional().allow(''),
+        pid: Joi.number().optional().allow(''),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        let { filename, content, path } = req.body;
+        let { filename, path, pid } = req.body;
         const { name, ext } = parse(filename);
         const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
 
         const scriptService = Container.get(ScriptService);
-        const result = await scriptService.stopScript(filePath);
+        const result = await scriptService.stopScript(filePath, pid);
         res.send(result);
       } catch (e) {
         return next(e);

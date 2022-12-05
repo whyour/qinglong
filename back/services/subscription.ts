@@ -19,9 +19,9 @@ import {
   concurrentRun,
   fileExist,
   createFile,
+  killTask,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
-import { promisify } from 'util';
 import { Op } from 'sequelize';
 import path from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
@@ -351,19 +351,16 @@ export default class SubscriptionService {
     for (const doc of docs) {
       if (doc.pid) {
         try {
-          process.kill(-doc.pid);
+          await killTask(doc.pid);
         } catch (error) {
           this.logger.silly(error);
         }
       }
-      const command = this.formatCommand(doc);
-      const err = await this.killTask(command);
       const absolutePath = await this.handleLogPath(doc.log_path as string);
-      const str = err ? `\n${err}` : '';
 
       fs.appendFileSync(
         `${absolutePath}`,
-        `${str}\n## 执行结束...  ${dayjs().format(
+        `\n## 执行结束...  ${dayjs().format(
           'YYYY-MM-DD HH:mm:ss',
         )}${LOG_END_SYMBOL}`,
       );
@@ -373,41 +370,6 @@ export default class SubscriptionService {
       { status: SubscriptionStatus.idle, pid: undefined },
       { where: { id: ids } },
     );
-  }
-
-  public async killTask(name: string) {
-    let taskCommand = `ps -ef | grep "${name}" | grep -v grep | awk '{print $1}'`;
-    const execAsync = promisify(exec);
-    try {
-      let pid = (await execAsync(taskCommand)).stdout;
-      if (pid) {
-        pid = (await execAsync(`pstree -p ${pid}`)).stdout;
-      } else {
-        return;
-      }
-      let pids = pid.match(/\(\d+/g);
-      const killLogs = [];
-      if (pids && pids.length > 0) {
-        // node 执行脚本时还会有10个子进程，但是ps -ef中不存在，所以截取前三个
-        for (const id of pids) {
-          const c = `kill -9 ${id.slice(1)}`;
-          try {
-            const { stdout, stderr } = await execAsync(c);
-            if (stderr) {
-              killLogs.push(stderr);
-            }
-            if (stdout) {
-              killLogs.push(stdout);
-            }
-          } catch (error: any) {
-            killLogs.push(error.message);
-          }
-        }
-      }
-      return killLogs.length > 0 ? JSON.stringify(killLogs) : '';
-    } catch (e) {
-      return JSON.stringify(e);
-    }
   }
 
   private async runSingle(subscriptionId: number) {

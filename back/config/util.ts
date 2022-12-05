@@ -4,6 +4,8 @@ import got from 'got';
 import iconv from 'iconv-lite';
 import { exec } from 'child_process';
 import FormData from 'form-data';
+import psTreeFun from 'pstree.remy';
+import { promisify } from 'util';
 
 export function getFileContentByName(fileName: string) {
   if (fs.existsSync(fileName)) {
@@ -287,15 +289,15 @@ enum FileType {
 interface IFile {
   title: string;
   key: string;
-  type: 'directory' | 'file',
+  type: 'directory' | 'file';
   parent: string;
   mtime: number;
-  children?: IFile[],
+  children?: IFile[];
 }
 
 export function dirSort(a: IFile, b: IFile) {
-  if (a.type !== b.type) return FileType[a.type] < FileType[b.type] ? -1 : 1
-  else if (a.mtime !== b.mtime) return a.mtime > b.mtime ? -1 : 1
+  if (a.type !== b.type) return FileType[a.type] < FileType[b.type] ? -1 : 1;
+  else if (a.mtime !== b.mtime) return a.mtime > b.mtime ? -1 : 1;
 }
 
 export function readDirs(
@@ -451,4 +453,31 @@ export function parseBody(
   }
 
   return parsed;
+}
+
+export function psTree(pid: number): Promise<number[]> {
+  return new Promise((resolve, reject) => {
+    psTreeFun(pid, (err: any, pids: number[]) => {
+      if (err) {
+        reject(err);
+      }
+      resolve(pids.filter((x) => !isNaN(x)));
+    });
+  });
+}
+
+export async function killTask(pid: number): Promise<number[]> {
+  const pids = await psTree(pid);
+  if (pids.length) {
+    process.kill(pids[0], 2);
+  } else {
+    process.kill(pid, 2);
+  }
+}
+
+export async function getPid(name: string) {
+  let taskCommand = `ps -ef | grep "${name}" | grep -v grep | awk '{print $1}'`;
+  const execAsync = promisify(exec);
+  let pid = (await execAsync(taskCommand)).stdout;
+  return Number(pid);
 }

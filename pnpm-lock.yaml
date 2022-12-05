@@ -58,6 +58,7 @@ specifiers:
   nodemailer: ^6.7.2
   nodemon: ^2.0.15
   prettier: ^2.5.1
+  pstree.remy: ^1.1.8
   qiniu: ^7.4.0
   qrcode.react: ^1.0.1
   query-string: ^7.1.1
@@ -112,6 +113,7 @@ dependencies:
   nedb: 1.8.0
   node-schedule: 2.1.0
   nodemailer: 6.7.8
+  pstree.remy: 1.1.8
   reflect-metadata: 0.1.13
   sequelize: 6.25.6_@louislam+sqlite3@15.0.6
   serve-handler: 6.1.3
@@ -10352,7 +10354,6 @@ packages:
 
   /pstree.remy/1.1.8:
     resolution: {integrity: sha512-77DZwxQmxKnu3aR542U+X8FypNzbfJ+C5XQDk3uWjWxn6151aIMGthWYRXTqT1E5oJvg+ljaa2OJi+VfvCOQ8w==}
-    dev: true
 
   /public-encrypt/4.0.3:
     resolution: {integrity: sha512-zVpa8oKZSz5bTMTFClc1fQOnyyEzpl5ozpi1B5YcvBrdohMjH2rfsBtyXcuNuwjsDIXmBYlF2N5FlJYhR29t8Q==}

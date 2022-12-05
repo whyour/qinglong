@@ -49,6 +49,7 @@ const EditModal = ({
   const { theme } = useTheme();
   const editorRef = useRef<any>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [currentPid, setCurrentPid] = useState(null);
 
   const cancel = () => {
     handleCancel();
@@ -94,6 +95,7 @@ const EditModal = ({
       .then(({ code, data }) => {
         if (code === 200) {
           setIsRunning(true);
+          setCurrentPid(data);
         }
       });
   };
@@ -102,13 +104,12 @@ const EditModal = ({
     if (!cNode || !cNode.title) {
       return;
     }
-    const content = editorRef.current.getValue().replace(/\r\n/g, '\n');
     request
       .put(`${config.apiPrefix}scripts/stop`, {
         data: {
           filename: cNode.title,
           path: cNode.parent || '',
-          content,
+          pid: currentPid,
         },
       })
       .then(({ code, data }) => {

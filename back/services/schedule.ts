@@ -44,12 +44,11 @@ export default class ScheduleService {
 
   async runTask(command: string, callbacks: TaskCallbacks = {}) {
     return new Promise(async (resolve, reject) => {
+      const startTime = dayjs();
+      await callbacks.onBefore?.(startTime);
+
+      const cp = spawn(command, { shell: '/bin/bash' });
       try {
-        const startTime = dayjs();
-        await callbacks.onBefore?.(startTime);
-
-        const cp = spawn(command, { shell: '/bin/bash' });
-
         // TODO:
         callbacks.onStart?.(cp, startTime);
 
@@ -100,8 +99,8 @@ export default class ScheduleService {
           error,
         );
         await callbacks.onError?.(JSON.stringify(error));
-        resolve(null);
       }
+      resolve(cp.pid);
     });
   }
 
