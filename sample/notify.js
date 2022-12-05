@@ -980,6 +980,8 @@ function aibotkNotify(text, desp) {
           resolve(data);
         }
       });
+    } else {
+      resolve();
     }
   });
 }
