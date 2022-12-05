@@ -466,7 +466,7 @@ export function psTree(pid: number): Promise<number[]> {
   });
 }
 
-export async function killTask(pid: number): Promise<number[]> {
+export async function killTask(pid: number) {
   const pids = await psTree(pid);
   if (pids.length) {
     process.kill(pids[0], 2);
