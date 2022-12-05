@@ -56,7 +56,7 @@ format_params() {
   time_format="%Y-%m-%d %H:%M:%S"
   timeoutCmd=""
   if type timeout &>/dev/null; then
-    timeoutCmd="timeout --foreground -s 2 -k 10s $command_timeout_time "
+    timeoutCmd="timeout --foreground -s 14 -k 10s $command_timeout_time "
   fi
   params=$(echo "$@" | sed -E 's/([^ ])&([^ ])/\1\\\&\2/g')
 }
