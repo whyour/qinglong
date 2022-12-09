@@ -17,7 +17,7 @@ const SaveModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const payload = { ...file, ...values, originFilename: file.filename };
+    const payload = { ...file, ...values, originFilename: file.title };
     request
       .post(`${config.apiPrefix}scripts`, {
         data: payload,
@@ -60,7 +60,7 @@ const SaveModal = ({
         form={form}
         layout="vertical"
         name="script_modal"
-        initialValues={file}
+        initialValues={{ filename: file?.title, path: file?.parent || '' }}
       >
         <Form.Item
           name="filename"

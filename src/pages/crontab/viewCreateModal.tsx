@@ -13,19 +13,21 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
+import get from 'lodash/get';
 
 const PROPERTIES = [
   { name: '命令', value: 'command' },
   { name: '名称', value: 'name' },
   { name: '定时规则', value: 'schedule' },
   { name: '状态', value: 'status' },
+  // { name: '标签', value: 'labels' },
 ];
 
 const OPERATIONS = [
   { name: '包含', value: 'Reg' },
   { name: '不包含', value: 'NotReg' },
-  { name: '属于', value: 'In' },
-  { name: '不属于', value: 'Nin' },
+  { name: '属于', value: 'In', type: 'select' },
+  { name: '不属于', value: 'Nin', type: 'select' },
   // { name: '等于', value: 'Eq' },
   // { name: '不等于', value: 'Ne' },
   // { name: '为空', value: 'IsNull' },
@@ -37,11 +39,13 @@ const SORTTYPES = [
   { name: '倒序', value: 'DESC' },
 ];
 
-const STATUS = [
-  { name: '运行中', value: 0 },
-  { name: '空闲中', value: 1 },
-  { name: '已禁用', value: 2 },
-];
+const STATUS_MAP = {
+  status: [
+    { name: '运行中', value: 0 },
+    { name: '空闲中', value: 1 },
+    { name: '已禁用', value: 2 },
+  ],
+};
 
 enum ViewFilterRelation {
   'and' = '且',
@@ -125,15 +129,17 @@ const ViewCreateModal = ({
     </Select>
   );
 
-  const statusElement = (
-    <Select mode="multiple" allowClear placeholder="请选择状态">
-      {STATUS.map((x) => (
-        <Select.Option key={x.name} value={x.value}>
-          {x.name}
-        </Select.Option>
-      ))}
-    </Select>
-  );
+  const statusElement = (property: keyof typeof STATUS_MAP) => {
+    return (
+      <Select mode="tags" allowClear placeholder="回车输入自定义选项">
+        {STATUS_MAP[property]?.map((x) => (
+          <Select.Option key={x.name} value={x.value}>
+            {x.name}
+          </Select.Option>
+        ))}
+      </Select>
+    );
+  };
 
   return (
     <Modal
@@ -239,17 +245,41 @@ const ViewCreateModal = ({
                         {operationElement}
                       </Form.Item>
                       <Form.Item
-                        {...restField}
-                        name={[name, 'value']}
-                        rules={[{ required: true, message: '请输入内容' }]}
+                        noStyle
+                        shouldUpdate={(prevValues, nextValues) => {
+                          return (
+                            get(prevValues, ['filters', name, 'operation']) !==
+                            get(nextValues, ['filters', name, 'operation'])
+                          );
+                        }}
                       >
-                        {['In', 'Nin'].includes(
-                          form.getFieldValue(['filters', index, 'operation']),
-                        ) ? (
-                          statusElement
-                        ) : (
-                          <Input placeholder="请输入内容" />
-                        )}
+                        {() => {
+                          const property = form.getFieldValue([
+                            'filters',
+                            index,
+                            'property',
+                          ]) as 'status';
+                          const operate = form.getFieldValue([
+                            'filters',
+                            name,
+                            'operation',
+                          ]);
+                          return (
+                            <Form.Item
+                              {...restField}
+                              name={[name, 'value']}
+                              rules={[
+                                { required: true, message: '请输入内容' },
+                              ]}
+                            >
+                              {['In', 'Nin'].includes(operate) ? (
+                                statusElement(property)
+                              ) : (
+                                <Input placeholder="请输入内容" />
+                              )}
+                            </Form.Item>
+                          );
+                        }}
                       </Form.Item>
                       {index !== 0 && (
                         <MinusCircleOutlined onClick={() => remove(name)} />

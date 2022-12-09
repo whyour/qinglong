@@ -272,7 +272,7 @@ const EditModal = ({
           content:
             editorRef.current &&
             editorRef.current.getValue().replace(/\r\n/g, '\n'),
-          filename: cNode?.title,
+          ...cNode,
         }}
       />
       <SettingModal
