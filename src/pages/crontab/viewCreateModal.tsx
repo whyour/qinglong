@@ -23,6 +23,12 @@ const PROPERTIES = [
   // { name: '标签', value: 'labels' },
 ];
 
+const EOperation: any = {
+  Reg: '',
+  NotReg: '',
+  In: 'select',
+  Nin: 'select',
+};
 const OPERATIONS = [
   { name: '包含', value: 'Reg' },
   { name: '不包含', value: 'NotReg' },
@@ -131,7 +137,7 @@ const ViewCreateModal = ({
 
   const statusElement = (property: keyof typeof STATUS_MAP) => {
     return (
-      <Select mode="tags" allowClear placeholder="回车输入自定义选项">
+      <Select mode="tags" allowClear placeholder="输入后回车增加自定义选项">
         {STATUS_MAP[property]?.map((x) => (
           <Select.Option key={x.name} value={x.value}>
             {x.name}
@@ -247,10 +253,22 @@ const ViewCreateModal = ({
                       <Form.Item
                         noStyle
                         shouldUpdate={(prevValues, nextValues) => {
-                          return (
-                            get(prevValues, ['filters', name, 'operation']) !==
-                            get(nextValues, ['filters', name, 'operation'])
-                          );
+                          const preOperation =
+                            EOperation[
+                              get(prevValues, ['filters', name, 'operation'])
+                            ];
+                          const nextOperation =
+                            EOperation[
+                              get(nextValues, ['filters', name, 'operation'])
+                            ];
+                          const flag = preOperation !== nextOperation;
+                          if (flag) {
+                            form.setFieldValue(
+                              ['filters', name, 'value'],
+                              nextOperation === 'select' ? [] : '',
+                            );
+                          }
+                          return flag;
                         }}
                       >
                         {() => {
@@ -272,7 +290,7 @@ const ViewCreateModal = ({
                                 { required: true, message: '请输入内容' },
                               ]}
                             >
-                              {['In', 'Nin'].includes(operate) ? (
+                              {EOperation[operate] === 'select' ? (
                                 statusElement(property)
                               ) : (
                                 <Input placeholder="请输入内容" />
