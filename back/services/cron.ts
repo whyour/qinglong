@@ -12,8 +12,7 @@ import {
   killTask,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
-import { promisify } from 'util';
-import { Op } from 'sequelize';
+import { Op, where, col as colFn } from 'sequelize';
 import path from 'path';
 
 @Service()
@@ -164,9 +163,23 @@ export default class CronService {
         }
         if (operate && operate2) {
           q[property] = {
-            [operate2]: [
-              { [operate]: `%${value}%` },
-              { [operate]: `%${encodeURIComponent(value)}%` },
+            [Op.or]: [
+              {
+                [operate2]: [
+                  { [operate]: `%${value}%` },
+                  { [operate]: `%${encodeURIComponent(value)}%` },
+                ],
+              },
+              {
+                [operate2]: [
+                  where(colFn(property), operate, `%${value}%`),
+                  where(
+                    colFn(property),
+                    operate,
+                    `%${encodeURIComponent(value)}%`,
+                  ),
+                ],
+              },
             ],
           };
         }

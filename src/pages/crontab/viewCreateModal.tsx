@@ -20,7 +20,7 @@ const PROPERTIES = [
   { name: '名称', value: 'name' },
   { name: '定时规则', value: 'schedule' },
   { name: '状态', value: 'status' },
-  // { name: '标签', value: 'labels' },
+  { name: '标签', value: 'labels' },
 ];
 
 const EOperation: any = {
