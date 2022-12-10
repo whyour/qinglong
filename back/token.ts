@@ -5,6 +5,7 @@ import LoggerInstance from './loaders/logger';
 import fs from 'fs';
 import config from './config';
 import path from 'path';
+import os from 'os';
 
 const tokenFile = path.join(config.configPath, 'token.json');
 
@@ -25,9 +26,14 @@ async function getToken() {
 
 async function writeFile(data: any) {
   return new Promise<void>((resolve, reject) => {
-    fs.writeFile(tokenFile, JSON.stringify(data), { encoding: 'utf8' }, () => {
-      resolve();
-    });
+    fs.writeFile(
+      tokenFile,
+      `${JSON.stringify(data)}${os.EOL}`,
+      { encoding: 'utf8' },
+      () => {
+        resolve();
+      },
+    );
   });
 }
 

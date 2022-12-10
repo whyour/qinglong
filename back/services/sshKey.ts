@@ -14,7 +14,7 @@ export default class SshKeyService {
 
   private generatePrivateKeyFile(alias: string, key: string): void {
     try {
-      fs.writeFileSync(`${this.sshPath}/${alias}`, key, {
+      fs.writeFileSync(`${this.sshPath}/${alias}`, `${key}${os.EOL}`, {
         encoding: 'utf8',
         mode: '400',
       });
