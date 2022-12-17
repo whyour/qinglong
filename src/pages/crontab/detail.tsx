@@ -29,6 +29,7 @@ import config from '@/utils/config';
 import CronLogModal from './logModal';
 import Editor from '@monaco-editor/react';
 import IconFont from '@/components/iconfont';
+import { getCommandScript } from '@/utils';
 
 const { Text } = Typography;
 
@@ -147,22 +148,10 @@ const CronDetailModal = ({
   };
 
   const getScript = () => {
-    const cmd = cron.command.split(' ') as string[];
-    if (cmd[0] === 'task') {
+    const result = getCommandScript(cron.command);
+    if (Array.isArray(result)) {
       setValidTabs(validTabs);
-      if (cmd[1].startsWith('/ql/data/scripts')) {
-        cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
-      }
-
-      let p: string, s: string;
-      let index = cmd[1].lastIndexOf('/');
-      if (index >= 0) {
-        s = cmd[1].slice(index + 1);
-        p = cmd[1].slice(0, index);
-      } else {
-        s = cmd[1];
-        p = '';
-      }
+      const [s, p] = result;
       setScriptInfo({ parent: p, filename: s });
       request
         .get(`${config.apiPrefix}scripts/${s}?path=${p || ''}`)
@@ -171,7 +160,7 @@ const CronDetailModal = ({
             setValue(data);
           }
         });
-    } else {
+    } else if (result) {
       setValidTabs([validTabs[0]]);
     }
   };

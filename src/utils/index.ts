@@ -198,7 +198,7 @@ export function getTableScroll({
   if (tHeader) {
     mainTop = tHeader.getBoundingClientRect().top;
   }
-  
+
   //窗体高度-表格内容顶部的高度-表格内容底部的高度
   let height = document.body.clientHeight - mainTop - extraHeight;
   return height;
@@ -275,4 +275,32 @@ export function depthFirstSearch<
 export function logEnded(log: string): boolean {
   const endTips = [LOG_END_SYMBOL, '执行结束'];
   return endTips.some((x) => log.includes(x));
+}
+
+export function getCommandScript(
+  command: string,
+): [string, string] | string | undefined {
+  const cmd = command.split(' ') as string[];
+  if (cmd[0] === 'task') {
+    let scriptsPart = cmd.find((x) =>
+      ['.js', '.ts', '.sh', '.py'].some((y) => x.endsWith(y)),
+    );
+    if (!scriptsPart) return;
+    if (scriptsPart.startsWith('/ql/data/scripts')) {
+      scriptsPart = scriptsPart.replace('/ql/data/scripts/', '');
+    }
+
+    let p: string, s: string;
+    let index = scriptsPart.lastIndexOf('/');
+    if (index >= 0) {
+      s = scriptsPart.slice(index + 1);
+      p = scriptsPart.slice(0, index);
+    } else {
+      s = scriptsPart;
+      p = '';
+    }
+    return [s, p];
+  } else if (cmd[1] === 'repo') {
+    return cmd[2];
+  }
 }

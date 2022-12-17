@@ -50,6 +50,7 @@ import ViewManageModal from './viewManageModal';
 import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
+import { getCommandScript } from '@/utils';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -390,24 +391,12 @@ const Crontab = () => {
   const tableScrollHeight = useTableScrollHeight(tableRef);
 
   const goToScriptManager = (record: any) => {
-    const cmd = record.command.split(' ') as string[];
-    if (cmd[0] === 'task') {
-      if (cmd[1].startsWith('/ql/data/scripts')) {
-        cmd[1] = cmd[1].replace('/ql/data/scripts/', '');
-      }
-
-      let p: string, s: string;
-      let index = cmd[1].lastIndexOf('/');
-      if (index >= 0) {
-        s = cmd[1].slice(index + 1);
-        p = cmd[1].slice(0, index);
-      } else {
-        s = cmd[1];
-        p = '';
-      }
+    const result = getCommandScript(record.command);
+    if (Array.isArray(result)) {
+      const [s, p] = result;
       history.push(`/script?p=${p}&s=${s}`);
-    } else if (cmd[1] === 'repo') {
-      location.href = cmd[2];
+    } else if (result) {
+      location.href = result;
     }
   };
 
