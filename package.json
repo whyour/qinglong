@@ -4,7 +4,7 @@
     "start": "concurrently -n w: npm:start:*",
     "start:front": "max dev",
     "start:back": "nodemon",
-    "start:public": "ts-node back/public.ts",
+    "start:public": "ts-node --transpile-only ./back/public.ts",
     "build:front": "max build",
     "build:back": "tsc -p tsconfig.back.json",
     "panel": "npm run build:back && node static/build/app.js",
