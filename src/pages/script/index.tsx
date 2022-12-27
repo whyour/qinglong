@@ -39,6 +39,8 @@ import { depthFirstSearch } from '@/utils';
 import { SharedContext } from '@/layouts';
 import useFilterTreeData from '@/hooks/useFilterTreeData';
 import uniq from 'lodash/uniq';
+import IconFont from '@/components/iconfont';
+import RenameModal from './renameModal';
 
 const { Text } = Typography;
 
@@ -64,20 +66,22 @@ const Script = () => {
   const [isEditing, setIsEditing] = useState(false);
   const editorRef = useRef<any>(null);
   const [isAddFileModalVisible, setIsAddFileModalVisible] = useState(false);
+  const [isRenameFileModalVisible, setIsRenameFileModalVisible] = useState(false);
   const [currentNode, setCurrentNode] = useState<any>();
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
-  const getScripts = () => {
-    setLoading(true);
+  const getScripts = (needLoading: boolean = true) => {
+    needLoading && setLoading(true);
     request
       .get(`${config.apiPrefix}scripts`)
       .then(({ code, data }) => {
         if (code === 200) {
           setData(data);
+          initState();
           initGetScript();
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => needLoading && setLoading(false));
   };
 
   const getDetail = (node: any) => {
@@ -287,6 +291,15 @@ const Script = () => {
     });
   };
 
+  const renameFile = () => {
+    setIsRenameFileModalVisible(true);
+  }
+
+  const handleRenameFileCancel = () => {
+    setIsRenameFileModalVisible(false);
+    getScripts(false);
+  }
+
   const addFile = () => {
     setIsAddFileModalVisible(true);
   };
@@ -381,6 +394,9 @@ const Script = () => {
       case 'delete':
         deleteFile();
         break;
+      case 'rename':
+        renameFile();
+        break;
       default:
         break;
     }
@@ -405,6 +421,12 @@ const Script = () => {
           label: '编辑',
           key: 'edit',
           icon: <EditOutlined />,
+          disabled: !select,
+        },
+        {
+          label: '重命名',
+          key: 'rename',
+          icon: <IconFont type="ql-icon-rename" />,
           disabled: !select,
         },
         {
@@ -469,6 +491,14 @@ const Script = () => {
                   type="primary"
                   onClick={editFile}
                   icon={<EditOutlined />}
+                />
+              </Tooltip>,
+              <Tooltip title="重命名">
+                <Button
+                  disabled={!select}
+                  type="primary"
+                  onClick={renameFile}
+                  icon={<IconFont type="ql-icon-rename" />}
                 />
               </Tooltip>,
               <Tooltip title="删除">
@@ -584,6 +614,11 @@ const Script = () => {
           visible={isAddFileModalVisible}
           treeData={data}
           handleCancel={addFileModalClose}
+        />
+        <RenameModal
+          visible={isRenameFileModalVisible}
+          handleCancel={handleRenameFileCancel}
+          currentNode={currentNode}
         />
       </div>
     </PageContainer>

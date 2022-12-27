@@ -274,4 +274,31 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/rename',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        path: Joi.string().allow(''),
+        newFilename: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        let { filename, path, type, newFilename } = req.body as {
+          filename: string;
+          path: string;
+          type: string;
+          newFilename: string;
+        };
+        const filePath = join(config.scriptPath, path, filename);
+        const newPath = join(config.scriptPath, path, newFilename);
+        fs.renameSync(filePath, newPath);
+        res.send({ code: 200 });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 };
