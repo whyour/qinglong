@@ -1,0 +1,6 @@
+version: 2.15.4
+changeLogLink: https://t.me/jiao_long/355
+changeLog: |
+  1. 脚本管理支持重命名文件/文件夹
+  2. 关于增加更新日志查看
+  3. 修复定时任务脚本识别和跳转
