@@ -35,7 +35,7 @@ random_delay() {
     done
 
     local delay_second=$(($(gen_random_num "$random_delay_max") + 1))
-    echo -e "\n命令未添加 \"now\"，随机延迟 $delay_second 秒后再执行任务，如需立即终止，请按 CTRL+C...\n"
+    echo -e "\n命令未添加 \"now\"，随机延迟 $delay_second 秒后执行\n"
     sleep $delay_second
   fi
 }

@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react';
 import { Integrations } from '@sentry/tracing';
 import { loader } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor';
 
 export function init(version: string) {
   // sentry监控 init
@@ -26,9 +27,7 @@ export function init(version: string) {
 
   // monaco 编辑器配置cdn和locale
   loader.config({
-    paths: {
-      vs: 'https://cdn.staticfile.org/monaco-editor/0.33.0/min/vs',
-    },
+    monaco,
     'vs/nls': {
       availableLanguages: {
         '*': 'zh-cn',

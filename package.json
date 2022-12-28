@@ -91,7 +91,7 @@
   "devDependencies": {
     "@ant-design/icons": "^4.7.0",
     "@ant-design/pro-layout": "^6.33.1",
-    "@monaco-editor/react": "4.2.1",
+    "@monaco-editor/react": "4.4.6",
     "@react-hook/resize-observer": "^1.2.6",
     "@sentry/react": "^7.12.1",
     "@types/body-parser": "^1.19.2",
@@ -122,6 +122,7 @@
     "compression-webpack-plugin": "9.2.0",
     "concurrently": "^7.0.0",
     "lint-staged": "^13.0.3",
+    "monaco-editor": "^0.34.1",
     "nodemon": "^2.0.15",
     "prettier": "^2.5.1",
     "qiniu": "^7.4.0",
