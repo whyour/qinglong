@@ -7,7 +7,7 @@ import SystemService from '../services/system';
 import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
 import { EnvModel } from '../data/env';
-import { promiseExec } from '../config/util';
+import { parseVersion, promiseExec } from '../config/util';
 import dayjs from 'dayjs';
 
 const route = Router();
@@ -21,10 +21,9 @@ export default (app: Router) => {
       const userService = Container.get(UserService);
       const authInfo = await userService.getUserInfo();
       const envCount = await EnvModel.count();
-      const versionRegx = /.*export const version = \'(.*)\'\;/;
-
-      const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
-      const version = currentVersionFile.match(versionRegx)![1];
+      const { version, changeLog, changeLogLink } = await parseVersion(
+        config.versionFile,
+      );
       const lastCommitTime = (
         await promiseExec(
           `cd ${config.rootPath} && git show -s --format=%ai | head -1`,
@@ -56,6 +55,8 @@ export default (app: Router) => {
           lastCommitTime: dayjs(lastCommitTime).unix(),
           lastCommitId,
           branch,
+          changeLog,
+          changeLogLink,
         },
       });
     } catch (e) {

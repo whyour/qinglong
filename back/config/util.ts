@@ -6,6 +6,7 @@ import { exec } from 'child_process';
 import FormData from 'form-data';
 import psTreeFun from 'pstree.remy';
 import { promisify } from 'util';
+import { load } from 'js-yaml';
 
 export function getFileContentByName(fileName: string) {
   if (fs.existsSync(fileName)) {
@@ -481,4 +482,18 @@ export async function getPid(name: string) {
   const execAsync = promisify(exec);
   let pid = (await execAsync(taskCommand)).stdout;
   return Number(pid);
+}
+
+interface IVersion {
+  version: string;
+  changeLogLink: string;
+  changeLog: string;
+}
+
+export async function parseVersion(path: string): Promise<IVersion> {
+  return load(await promisify(fs.readFile)(path, 'utf8')) as IVersion;
+}
+
+export async function parseContentVersion(content: string): Promise<IVersion> {
+  return load(content) as IVersion;
 }

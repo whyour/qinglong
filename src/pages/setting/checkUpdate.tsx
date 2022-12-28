@@ -2,11 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Statistic, Modal, Tag, Button, Spin, message } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import { version } from '../../version';
 
 const { Countdown } = Statistic;
 
-const CheckUpdate = ({ socketMessage }: any) => {
+const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [value, setValue] = useState('');
   const modalRef = useRef<any>();
@@ -23,7 +22,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
           if (data.hasNewVersion) {
             showConfirmUpdateModal(data);
           } else {
-            showForceUpdateModal();
+            showForceUpdateModal(data);
           }
         }
       })
@@ -36,7 +35,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
       });
   };
 
-  const showForceUpdateModal = () => {
+  const showForceUpdateModal = (data: any) => {
     Modal.confirm({
       width: 500,
       title: '更新',
@@ -44,7 +43,7 @@ const CheckUpdate = ({ socketMessage }: any) => {
         <>
           <div>已经是最新版了！</div>
           <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            青龙 {version} 是目前检测到的最新可用版本了。
+            青龙 {data.lastVersion} 是目前检测到的最新可用版本了。
           </div>
         </>
       ),
@@ -70,14 +69,13 @@ const CheckUpdate = ({ socketMessage }: any) => {
         <>
           <div>更新可用</div>
           <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            新版本{lastVersion}可用。你使用的版本为{version}。
+            新版本 {lastVersion} 可用，你使用的版本为 {systemInfo.version}。
           </div>
         </>
       ),
       content: (
         <pre
           style={{
-            paddingTop: 15,
             fontSize: 12,
             fontWeight: 400,
           }}

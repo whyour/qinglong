@@ -13,7 +13,6 @@ import config from '@/utils/config';
 import { request } from '@/utils/http';
 import './index.less';
 import vhCheck from 'vh-check';
-import { version, changeLogLink, changeLog } from '../version';
 import { useCtx, useTheme } from '@/utils/hooks';
 import {
   message,
@@ -52,6 +51,8 @@ interface TSystemInfo {
   lastCommitId: string;
   lastCommitTime: number;
   version: string;
+  changeLog: string;
+  changeLogLink: string;
 }
 
 export default function () {
@@ -89,6 +90,7 @@ export default function () {
           if (!data.isInitialized) {
             history.push('/initialization');
           } else {
+            init(data.version);
             getUser();
           }
         }
@@ -143,7 +145,6 @@ export default function () {
 
   useEffect(() => {
     vhCheck();
-    init();
 
     const _theme = localStorage.getItem('qinglong_dark_theme') || 'auto';
     if (typeof window === 'undefined') return;
@@ -269,7 +270,7 @@ export default function () {
         <>
           <span style={{ fontSize: 16 }}>控制面板</span>
           <a
-            href={changeLogLink}
+            href={systemInfo?.changeLogLink}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => {
@@ -289,7 +290,7 @@ export default function () {
                     letterSpacing: isQQBrowser ? -2 : 0,
                   }}
                 >
-                  v{version}
+                  v{systemInfo?.version}
                 </span>
               </Badge>
             </Tooltip>

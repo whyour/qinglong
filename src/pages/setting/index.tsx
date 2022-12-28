@@ -416,7 +416,10 @@ const Setting = () => {
                   </Input.Group>
                 </Form.Item>
                 <Form.Item label="检查更新" name="update">
-                  <CheckUpdate socketMessage={socketMessage} />
+                  <CheckUpdate
+                    systemInfo={systemInfo}
+                    socketMessage={socketMessage}
+                  />
                 </Form.Item>
               </Form>
             ),

@@ -26,33 +26,6 @@ diff_cron() {
   fi
 }
 
-## 检测配置文件版本
-detect_config_version() {
-  ## 识别出两个文件的版本号
-  ver_config_sample=$(grep " Version: " $file_config_sample | perl -pe "s|.+v((\d+\.?){3})|\1|")
-  [[ -f $file_config_user ]] && ver_config_user=$(grep " Version: " $file_config_user | perl -pe "s|.+v((\d+\.?){3})|\1|")
-
-  ## 删除旧的发送记录文件
-  [[ -f $send_mark ]] && [[ $(cat $send_mark) != $ver_config_sample ]] && rm -f $send_mark
-
-  ## 识别出更新日期和更新内容
-  update_date=$(grep " Date: " $file_config_sample | awk -F ": " '{print $2}')
-  update_content=$(grep " Update Content: " $file_config_sample | awk -F ": " '{print $2}')
-
-  ## 如果是今天，并且版本号不一致，则发送通知
-  if [[ -f $file_config_user ]] && [[ $ver_config_user != $ver_config_sample ]] && [[ $update_date == $(date "+%Y-%m-%d") ]]; then
-    if [[ ! -f $send_mark ]]; then
-      local notify_title="配置文件更新通知"
-      local notify_content="更新日期: $update_date\n用户版本: $ver_config_user\n新的版本: $ver_config_sample\n更新内容: $update_content\n更新说明: 如需使用新功能请对照config.sample.sh，将相关新参数手动增加到你自己的config.sh中，否则请无视本消息。本消息只在该新版本配置文件更新当天发送一次。\n"
-      echo -e $notify_content
-      notify_api "$notify_title" "$notify_content"
-      [[ $? -eq 0 ]] && echo $ver_config_sample >$send_mark
-    fi
-  else
-    [[ -f $send_mark ]] && rm -f $send_mark
-  fi
-}
-
 ## 输出是否有新的或失效的定时任务，$1：新的或失效的任务清单文件路径，$2：新/失效
 output_list_add_drop() {
   local list=$1
@@ -266,7 +239,6 @@ update_qinglong() {
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙源文件成功...\n"
     cp -f $file_config_sample $dir_config/config.sample.sh
-    detect_config_version
     update_depend
 
     [[ -f $dir_root/package.json ]] && ql_depend_new=$(cat $dir_root/package.json)
@@ -291,8 +263,6 @@ update_qinglong_static() {
   fi
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙静态资源成功...\n"
-    local static_version=$(cat $dir_root/src/version.ts | perl -pe "s|.*\'(.*)\';\.*|\1|" | head -1)
-    echo -e "\n当前版本 $static_version...\n"
 
     rm -rf $dir_static/*
     cp -rf $ql_static_repo/* $dir_static

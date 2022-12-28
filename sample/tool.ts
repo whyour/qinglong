@@ -5,14 +5,14 @@ const envFound = dotenv.config();
 const accessKey = process.env.QINIU_AK;
 const secretKey = process.env.QINIU_SK;
 const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-const key = 'version.ts';
+const key = 'version.yaml';
 const options = {
   scope: `${process.env.QINIU_SCOPE}:${key}`,
 };
 const putPolicy = new qiniu.rs.PutPolicy(options);
 const uploadToken = putPolicy.uploadToken(mac);
 
-const localFile = 'src/version.ts';
+const localFile = 'version.yaml';
 const config = new qiniu.conf.Config({ zone: qiniu.zone.Zone_z1 });
 const formUploader = new qiniu.form_up.FormUploader(config);
 const putExtra = new qiniu.form_up.PutExtra(

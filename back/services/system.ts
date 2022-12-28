@@ -9,6 +9,7 @@ import ScheduleService from './schedule';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import got from 'got';
+import { parseContentVersion, parseVersion } from '../config/util';
 
 @Service()
 export default class SystemService {
@@ -78,14 +79,9 @@ export default class SystemService {
 
   public async checkUpdate() {
     try {
-      const versionRegx = /.*export const version = \'(.*)\'\;/;
-      const logRegx = /.*export const changeLog = \`((.*\n.*)+)\`;/;
+      const currentVersionContent = await parseVersion(config.versionFile);
 
-      const currentVersionFile = fs.readFileSync(config.versionFile, 'utf8');
-      const currentVersion = currentVersionFile.match(versionRegx)![1];
-
-      let lastVersion = '';
-      let lastLog = '';
+      let lastVersionContent;
       try {
         const result = await got.get(
           `${config.lastVersionFile}?t=${Date.now()}`,
@@ -93,19 +89,23 @@ export default class SystemService {
             timeout: 30000,
           },
         );
-        const lastVersionFileContent = result.body;
-        lastVersion = lastVersionFileContent.match(versionRegx)![1];
-        lastLog = lastVersionFileContent.match(logRegx)
-          ? lastVersionFileContent.match(logRegx)![1]
-          : '';
+        lastVersionContent = await parseContentVersion(result.body);
       } catch (error) {}
+
+      if (!lastVersionContent) {
+        lastVersionContent = currentVersionContent;
+      }
 
       return {
         code: 200,
         data: {
-          hasNewVersion: this.checkHasNewVersion(currentVersion, lastVersion),
-          lastVersion,
-          lastLog,
+          hasNewVersion: this.checkHasNewVersion(
+            currentVersionContent.version,
+            lastVersionContent.version,
+          ),
+          lastVersion: lastVersionContent.version,
+          lastLog: lastVersionContent.changeLog,
+          lastLogLink: lastVersionContent.changeLogLink,
         },
       };
     } catch (error: any) {

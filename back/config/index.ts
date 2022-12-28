@@ -14,7 +14,7 @@ if (!process.env.QL_DIR) {
   process.env.QL_DIR = qlHomePath.replace(/\/$/g, '');
 }
 
-const lastVersionFile = `https://qn.whyour.cn/version.ts`;
+const lastVersionFile = `https://qn.whyour.cn/version.yaml`;
 
 const rootPath = process.env.QL_DIR as string;
 const envFound = dotenv.config({ path: path.join(rootPath, '.env') });
@@ -40,7 +40,7 @@ const sqliteFile = path.join(samplePath, 'database.sqlite');
 const authError = '错误的用户名密码，请重试';
 const loginFaild = '请先登录!';
 const configString = 'config sample crontab shareCode diy';
-const versionFile = path.join(rootPath, 'src/version.ts');
+const versionFile = path.join(rootPath, 'version.yaml');
 
 if (envFound.error) {
   throw new Error("⚠️  Couldn't find .env file  ⚠️");
