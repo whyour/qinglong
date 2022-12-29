@@ -238,6 +238,7 @@ update_qinglong() {
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙源文件成功...\n"
+    reset_romote_url ${dir_root} "https://${mirror}.com/whyour/qinglong.git" ${primary_branch}
     cp -f $file_config_sample $dir_config/config.sample.sh
     update_depend
 
@@ -263,6 +264,7 @@ update_qinglong_static() {
   fi
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙静态资源成功...\n"
+    reset_romote_url ${ql_static_repo} ${url} ${primary_branch}
 
     rm -rf $dir_static/*
     cp -rf $ql_static_repo/* $dir_static
