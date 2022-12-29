@@ -160,4 +160,18 @@ export AIBOTK_TYPE=""
 ## aibotk_name (必填)填写群名或用户昵称，和上面的type类型要对应
 export AIBOTK_NAME=""
 
+## 14. SMTP
+## 暂时只支持在 Python 中调用 notify.py 以发送 SMTP 邮件通知
+## Node.js 因为无内置 SMTP 功能，暂时不支持在 Node.js 中调用 notify.js 以发送 SMTP 邮件通知，详见 notify.js 的 todo
+## smtp_server 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
+export SMTP_SERVER=""
+## smtp_ssl 填写 SMTP 发送邮件服务器是否使用 SSL，内容应为 true 或 false
+export SMTP_SSL="false"
+## smtp_email 填写 SMTP 收发件邮箱，通知将会由自己发给自己
+export SMTP_EMAIL=""
+## smtp_password 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
+export SMTP_PASSWORD=""
+## smtp_name 填写 SMTP 收发件人姓名，可随意填写
+export SMTP_NAME=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

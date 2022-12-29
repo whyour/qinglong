@@ -9,6 +9,10 @@ import re
 import threading
 import time
 import urllib.parse
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+from email.utils import formataddr
 
 import requests
 
@@ -62,10 +66,10 @@ push_config = {
 
     'DEER_KEY': '',                     # PushDeer 的 PUSHDEER_KEY
     'DEER_URL': '',                     # PushDeer 的 PUSHDEER_URL
-  
+
     'CHAT_URL': '',                     # synology chat url
     'CHAT_TOKEN': '',                   # synology chat token
-  
+
     'PUSH_PLUS_TOKEN': '',              # push+ 微信推送的用户令牌
     'PUSH_PLUS_USER': '',               # push+ 微信推送的群组编码
 
@@ -86,6 +90,12 @@ push_config = {
     'AIBOTK_KEY': '',                   # 智能微秘书 个人中心的apikey 文档地址：http://wechat.aibotk.com/docs/about
     'AIBOTK_TYPE': '',                  # 智能微秘书 发送目标 room 或 contact
     'AIBOTK_NAME': '',                  # 智能微秘书  发送群名 或者好友昵称和type要对应好
+
+    'SMTP_SERVER': '',                  # SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
+    'SMTP_SSL': 'false',                # SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
+    'SMTP_EMAIL': '',                   # SMTP 收发件邮箱，通知将会由自己发给自己
+    'SMTP_PASSWORD': '',                # SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
+    'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
 }
 notify_function = []
 # fmt: on
@@ -282,16 +292,16 @@ def pushdeer(title: str, content: str) -> None:
     data = {"text": title, "desp": content, "type": "markdown", "pushkey": push_config.get("DEER_KEY")}
     url = 'https://api2.pushdeer.com/message/push'
     if push_config.get("DEER_URL"):
-      url = push_config.get("DEER_URL")
-      
+        url = push_config.get("DEER_URL")
+
     response = requests.post(url, data=data).json()
-    
+
     if len(response.get("content").get("result")) > 0:
         print("PushDeer 推送成功！")
     else:
         print("PushDeer 推送失败！错误信息：", response)
 
-        
+
 def chat(title: str, content: str) -> None:
     """
     通过Chat 推送消息
@@ -303,14 +313,14 @@ def chat(title: str, content: str) -> None:
     data = 'payload=' + json.dumps({'text': title + '\n' + content})
     url = push_config.get("CHAT_URL") + push_config.get("CHAT_TOKEN")
     response = requests.post(url, data=data)
-    
+
     if response.status_code == 200:
         print("Chat 推送成功！")
     else:
-        print("Chat 推送失败！错误信息：", response)    
+        print("Chat 推送失败！错误信息：", response)
 
-        
-        
+
+
 def pushplus_bot(title: str, content: str) -> None:
     """
     通过 push+ 推送消息。
@@ -562,6 +572,30 @@ def aibotk(title: str, content: str) -> None:
         print(f'智能微秘书 推送失败！{response["error"]}')
 
 
+def smtp(title: str, content: str) -> None:
+    """
+    使用 SMTP 邮件 推送消息。
+    """
+    if not push_config.get("SMTP_SERVER") or not push_config.get("SMTP_SSL") or not push_config.get("SMTP_EMAIL") or not push_config.get("SMTP_PASSWORD") or not push_config.get("SMTP_NAME"):
+        print("SMTP 邮件 的 SMTP_SERVER 或者 SMTP_SSL 或者 SMTP_EMAIL 或者 SMTP_PASSWORD 或者 SMTP_NAME 未设置!!\n取消推送")
+        return
+    print("SMTP 邮件 服务启动")
+
+    message = MIMEText(content, 'plain', 'utf-8')
+    message['From'] = formataddr((Header(push_config.get("SMTP_NAME"), 'utf-8').encode(), push_config.get("SMTP_EMAIL")))
+    message['To'] = formataddr((Header(push_config.get("SMTP_NAME"), 'utf-8').encode(), push_config.get("SMTP_EMAIL")))
+    message['Subject'] = Header(title, 'utf-8')
+
+    try:
+        smtp_server = smtplib.SMTP_SSL(push_config.get("SMTP_SERVER")) if push_config.get("SMTP_SSL") == 'true' else smtplib.SMTP(push_config.get("SMTP_SERVER"))
+        smtp_server.login(push_config.get("SMTP_EMAIL"), push_config.get("SMTP_PASSWORD"))
+        smtp_server.sendmail(push_config.get("SMTP_EMAIL"), push_config.get("SMTP_EMAIL"), message.as_bytes())
+        smtp_server.close()
+        print("SMTP 邮件 推送成功！")
+    except Exception as e:
+        print(f'SMTP 邮件 推送失败！{e}')
+
+
 def one() -> str:
     """
     获取一条一言。
@@ -603,7 +637,9 @@ if push_config.get("QYWX_KEY"):
 if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"):
     notify_function.append(telegram_bot)
 if push_config.get("AIBOTK_KEY") and push_config.get("AIBOTK_TYPE") and push_config.get("AIBOTK_NAME"):
-    notify_function.append(aibotk)    
+    notify_function.append(aibotk)
+if push_config.get("SMTP_SERVER") and push_config.get("SMTP_SSL") and push_config.get("SMTP_EMAIL") and push_config.get("SMTP_PASSWORD") and push_config.get("SMTP_NAME"):
+    notify_function.append(smtp)
 
 
 def send(title: str, content: str) -> None:
