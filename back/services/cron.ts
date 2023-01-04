@@ -32,7 +32,7 @@ export default class CronService {
     const tab = new Crontab(payload);
     tab.saved = false;
     const doc = await this.insert(tab);
-    await this.set_crontab(this.isSixCron(doc));
+    await this.set_crontab();
     return doc;
   }
 
@@ -43,7 +43,7 @@ export default class CronService {
   public async update(payload: Crontab): Promise<Crontab> {
     payload.saved = false;
     const newDoc = await this.updateDb(payload);
-    await this.set_crontab(this.isSixCron(newDoc));
+    await this.set_crontab();
     return newDoc;
   }
 
@@ -82,7 +82,7 @@ export default class CronService {
 
   public async remove(ids: number[]) {
     await CrontabModel.destroy({ where: { id: ids } });
-    await this.set_crontab(true);
+    await this.set_crontab();
   }
 
   public async pin(ids: number[]) {
@@ -409,12 +409,12 @@ export default class CronService {
 
   public async disabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 1 }, { where: { id: ids } });
-    await this.set_crontab(true);
+    await this.set_crontab();
   }
 
   public async enabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
-    await this.set_crontab(true);
+    await this.set_crontab();
   }
 
   public async log(id: number) {
@@ -530,7 +530,7 @@ export default class CronService {
     return crontab_job_string;
   }
 
-  private async set_crontab(needReloadSchedule: boolean = false) {
+  private async set_crontab() {
     const tabs = await this.crontabs();
     var crontab_string = '';
     tabs.data.forEach((tab) => {
@@ -553,9 +553,7 @@ export default class CronService {
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
-    if (needReloadSchedule) {
-      exec(`pm2 reload schedule`);
-    }
+    exec(`pm2 reload schedule`);
     await CrontabModel.update({ saved: true }, { where: {} });
   }
 
