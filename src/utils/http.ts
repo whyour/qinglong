@@ -56,7 +56,6 @@ _request.interceptors.request.use((url, options) => {
 _request.interceptors.response.use(async (response) => {
   const responseStatus = response.status;
   if ([502, 504].includes(responseStatus)) {
-    message.error('服务异常，请稍后刷新！');
     history.push('/error');
   } else if (responseStatus === 401) {
     if (history.location.pathname !== '/login') {
