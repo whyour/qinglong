@@ -1,0 +1,11 @@
+{
+  "name": "@qinglong/public",
+  "private": true,
+  "scripts": {
+    "start": "nodemon",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@qinglong/env": "workspace:*"
+  }
+}
