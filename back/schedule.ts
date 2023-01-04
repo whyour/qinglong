@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import Logger from './loaders/logger';
 import { CrontabModel, CrontabStatus } from './data/cron';
 import config from './config';
+import { QL_PREFIX, TASK_PREFIX } from './config/const';
 
 const app = express();
 
@@ -23,8 +24,11 @@ const run = async () => {
           ) {
             schedule.scheduleJob(task.schedule, function () {
               let command = task.command as string;
-              if (!command.includes('task ') && !command.includes('ql ')) {
-                command = `task ${command}`;
+              if (
+                !command.startsWith(TASK_PREFIX) &&
+                !command.startsWith(QL_PREFIX)
+              ) {
+                command = `${TASK_PREFIX}${command}`;
               }
               exec(`ID=${task.id} ${command}`);
             });

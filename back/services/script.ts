@@ -6,7 +6,7 @@ import SockService from './sock';
 import CronService from './cron';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import config from '../config';
-import { LOG_END_SYMBOL } from '../config/const';
+import { TASK_COMMAND } from '../config/const';
 import { getPid, killTask } from '../config/util';
 
 @Service()
@@ -42,7 +42,7 @@ export default class ScriptService {
 
   public async runScript(filePath: string) {
     const relativePath = path.relative(config.scriptPath, filePath);
-    const command = `task -l ${relativePath} now`;
+    const command = `${TASK_COMMAND} -l ${relativePath} now`;
     const pid = await this.scheduleService.runTask(
       command,
       this.taskCallbacks(filePath),
@@ -56,7 +56,7 @@ export default class ScriptService {
     let str = '';
     if (!pid) {
       const relativePath = path.relative(config.scriptPath, filePath);
-      pid = await getPid(`task -l ${relativePath} now`);
+      pid = await getPid(`${TASK_COMMAND} -l ${relativePath} now`);
     }
     try {
       await killTask(pid);

@@ -14,6 +14,7 @@ import {
 import { promises, existsSync } from 'fs';
 import { Op, where, col as colFn } from 'sequelize';
 import path from 'path';
+import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 
 @Service()
 export default class CronService {
@@ -361,8 +362,8 @@ export default class CronService {
       this.logger.silly('Original command: ' + command);
 
       let cmdStr = command;
-      if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {
-        cmdStr = `task ${cmdStr}`;
+      if (!cmdStr.startsWith(TASK_PREFIX) && !cmdStr.startsWith(QL_PREFIX)) {
+        cmdStr = `${TASK_PREFIX}${cmdStr}`;
       }
       if (
         cmdStr.endsWith('.js') ||
@@ -519,6 +520,12 @@ export default class CronService {
   }
 
   private make_command(tab: Crontab) {
+    if (
+      !tab.command.startsWith(TASK_PREFIX) &&
+      !tab.command.startsWith(QL_PREFIX)
+    ) {
+      tab.command = `${TASK_PREFIX}${tab.command}`;
+    }
     const crontab_job_string = `ID=${tab.id} ${tab.command}`;
     return crontab_job_string;
   }
