@@ -112,7 +112,6 @@ const Crontab = () => {
                         style={{ cursor: 'point' }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSearchValue(`label:${label}`);
                           setSearchText(`label:${label}`);
                         }}
                       >
@@ -378,7 +377,6 @@ const Crontab = () => {
   const [viewConf, setViewConf] = useState<any>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
-  const [searchValue, setSearchValue] = useState('');
   const [total, setTotal] = useState<number>();
   const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
     useState(false);
@@ -945,8 +943,6 @@ const Crontab = () => {
           enterButton
           allowClear
           loading={loading}
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>

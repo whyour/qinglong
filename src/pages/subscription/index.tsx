@@ -243,11 +243,10 @@ const Subscription = () => {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [searchValue, setSearchValue] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logSubscription, setLogSubscription] = useState<any>();
   const tableRef = useRef<any>();
-  const tableScrollHeight = useTableScrollHeight(tableRef)
+  const tableScrollHeight = useTableScrollHeight(tableRef);
 
   const runSubscription = (record: any, index: number) => {
     Modal.confirm({
@@ -553,8 +552,6 @@ const Subscription = () => {
           enterButton
           allowClear
           loading={loading}
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addSubscription()}>
