@@ -123,7 +123,7 @@
     "compression-webpack-plugin": "9.2.0",
     "concurrently": "^7.0.0",
     "lint-staged": "^13.0.3",
-    "monaco-editor": "^0.34.1",
+    "monaco-editor": "0.33.0",
     "nodemon": "^2.0.15",
     "prettier": "^2.5.1",
     "qiniu": "^7.4.0",
