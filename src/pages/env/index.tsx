@@ -32,8 +32,8 @@ import { exportJson } from '@/utils/index';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
-
-const { Text, Paragraph } = Typography;
+import Copy from '../../components/copy';
+const { Text } = Typography;
 const { Search } = Input;
 
 enum Status {
@@ -128,17 +128,12 @@ const Env = () => {
       width: '35%',
       render: (text: string, record: any) => {
         return (
-          <Paragraph
-            style={{
-              wordBreak: 'break-all',
-              marginBottom: 0,
-              textAlign: 'left',
-            }}
-            ellipsis={{ tooltip: text, rows: 2 }}
-            copyable
-          >
-            {text}
-          </Paragraph>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title={text} placement="topLeft">
+              <div className="text-ellipsis">{text}</div>
+            </Tooltip>
+            <Copy text={text} />
+          </div>
         );
       },
     },
@@ -147,6 +142,13 @@ const Env = () => {
       dataIndex: 'remarks',
       key: 'remarks',
       align: 'center' as const,
+      render: (text: string, record: any) => {
+        return (
+          <Tooltip title={text} placement="topLeft">
+            <div className="text-ellipsis">{text}</div>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '更新时间',
@@ -256,7 +258,7 @@ const Env = () => {
   const [searchText, setSearchText] = useState('');
   const [importLoading, setImportLoading] = useState(false);
   const tableRef = useRef<any>();
-  const tableScrollHeight = useTableScrollHeight(tableRef, 59)
+  const tableScrollHeight = useTableScrollHeight(tableRef, 59);
 
   const getEnvs = () => {
     setLoading(true);
@@ -286,7 +288,8 @@ const Env = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}envs/${record.status === Status.已禁用 ? 'enable' : 'disable'
+            `${config.apiPrefix}envs/${
+              record.status === Status.已禁用 ? 'enable' : 'disable'
             }`,
             {
               data: [record.id],

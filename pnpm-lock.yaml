@@ -23,6 +23,7 @@ specifiers:
   '@types/nodemailer': ^6.4.4
   '@types/qrcode.react': ^1.0.2
   '@types/react': ^18.0.20
+  '@types/react-copy-to-clipboard': ^5.0.4
   '@types/react-dom': ^18.0.6
   '@types/serve-handler': ^6.1.1
   '@types/sockjs': ^0.3.33
@@ -68,6 +69,7 @@ specifiers:
   rc-tween-one: ^3.0.6
   react: 18.2.0
   react-codemirror2: ^7.2.1
+  react-copy-to-clipboard: ^5.1.0
   react-diff-viewer: ^3.1.1
   react-dnd: ^14.0.2
   react-dnd-html5-backend: ^14.0.0
@@ -149,6 +151,7 @@ devDependencies:
   '@types/nodemailer': 6.4.7
   '@types/qrcode.react': 1.0.2
   '@types/react': 18.0.26
+  '@types/react-copy-to-clipboard': 5.0.4
   '@types/react-dom': 18.0.10
   '@types/serve-handler': 6.1.1
   '@types/sockjs': 0.3.33
@@ -172,6 +175,7 @@ devDependencies:
   rc-tween-one: 3.0.6_biqbaboplfbrettd7655fr4n2y
   react: 18.2.0
   react-codemirror2: 7.2.1_6fkkduvahq4qazxosqpy7jy52m
+  react-copy-to-clipboard: 5.1.0_react@18.2.0
   react-diff-viewer: 3.1.1_biqbaboplfbrettd7655fr4n2y
   react-dnd: 14.0.5_h4mwivtpqi233hpr42kd7pn62u
   react-dnd-html5-backend: 14.1.0
@@ -4027,6 +4031,12 @@ packages:
     resolution: {integrity: sha512-EEhsLsD6UsDM1yFhAvy0Cjr6VwmpMWqFBCb9w07wVugF7w9nfajxLuVmngTIpgS6svCnm6Vaw+MZhoDCKnOfsw==}
     dev: true
 
+  /@types/react-copy-to-clipboard/5.0.4:
+    resolution: {integrity: sha512-otTJsJpofYAeaIeOwV5xBUGpo6exXG2HX7X4nseToCB2VgPEBxGBHCm/FecZ676doNR7HCSTVtmohxfG2b3/yQ==}
+    dependencies:
+      '@types/react': 18.0.26
+    dev: true
+
   /@types/react-dom/18.0.10:
     resolution: {integrity: sha512-E42GW/JA4Qv15wQdqJq8DL4JhNpB3prJgjgapN3qJT9K2zO5IIAQh4VXvCEDupoqAwnz0cY4RlXeC/ajX5SFHg==}
     dependencies:
@@ -5022,6 +5032,7 @@ packages:
     resolution: {integrity: sha512-TIGnTpdo+E3+pCyAluZvtED5p5wCqLdezCyhPZzKPcxvFplEt4i+W7OONCKgeZFT3+y5NZZfOOS/Bdcanm1MYA==}
     engines: {node: '>=0.10.0'}
     dev: false
+    optional: true
 
   /ansi-regex/5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -5976,6 +5987,7 @@ packages:
     resolution: {integrity: sha512-RpAVKQA5T63xEj6/giIbUEtZwJ4UFIc3ZtvEkiaUERylqe8xb5IvqcgOurZLahv93CLKfxcw5YI+DZcUBRyLXA==}
     engines: {node: '>=0.10.0'}
     dev: false
+    optional: true
 
   /codemirror/5.65.11:
     resolution: {integrity: sha512-Gp62g2eKSCHYt10axmGhKq3WoJSvVpvhXmowNq7pZdRVowwtvBR/hi2LSP5srtctKkRT33T6/n8Kv1UGp7JW4A==}
@@ -8772,6 +8784,7 @@ packages:
     dependencies:
       number-is-nan: 1.0.1
     dev: false
+    optional: true
 
   /is-fullwidth-code-point/3.0.0:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
@@ -10052,6 +10065,7 @@ packages:
     resolution: {integrity: sha512-4jbtZXNAsfZbAHiiqjLPBiCl16dES1zI4Hpzzxw61Tk+loF+sBDBKx1ICKKKwIqQ7M0mFn1TmkN7euSncWgHiQ==}
     engines: {node: '>=0.10.0'}
     dev: false
+    optional: true
 
   /oauth-sign/0.9.0:
     resolution: {integrity: sha512-fexhUFFPTGV8ybAtSIGbV6gOkSv8UtRbDBnAyLQw4QPKkgNlsH2ByPGtMUqdWkos6YCRmAqViwgZrJc/mRDzZQ==}
@@ -12463,6 +12477,19 @@ packages:
       react: 18.2.0
     dev: true
 
+  /react-copy-to-clipboard/5.1.0_react@18.2.0:
+    resolution: {integrity: sha512-k61RsNgAayIJNoy9yDsYzDe/yAZAzEbEgcz3DZMhF686LEyukcE1hzurxe85JandPUG+yTfGVFzuEw3xt8WP/A==}
+    peerDependencies:
+      react: ^15.3.0 || 16 || 17 || 18
+    peerDependenciesMeta:
+      react:
+        optional: true
+    dependencies:
+      copy-to-clipboard: 3.3.3
+      prop-types: 15.8.1
+      react: 18.2.0
+    dev: true
+
   /react-diff-viewer/3.1.1_biqbaboplfbrettd7655fr4n2y:
     resolution: {integrity: sha512-rmvwNdcClp6ZWdS11m1m01UnBA4OwYaLG/li0dB781e/bQEzsGyj+qewVd6W5ztBwseQ72pO7nwaCcq5jnlzcw==}
     engines: {node: '>= 8'}
@@ -13724,6 +13751,7 @@ packages:
       is-fullwidth-code-point: 1.0.0
       strip-ansi: 3.0.1
     dev: false
+    optional: true
 
   /string-width/4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
@@ -13790,6 +13818,7 @@ packages:
     dependencies:
       ansi-regex: 2.1.1
     dev: false
+    optional: true
 
   /strip-ansi/6.0.1:
     resolution: {integrity: sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==}
@@ -14959,7 +14988,7 @@ packages:
   /wide-align/1.1.5:
     resolution: {integrity: sha512-eDMORYaPNZ4sQIuuYPDHdQvf4gyCF9rEEV/yPxGfwPkRodwEgiMUUXTx/dex+Me0wxx53S+NgUHaP7y3MGlDmg==}
     dependencies:
-      string-width: 1.0.2
+      string-width: 4.2.3
     dev: false
 
   /win-release/1.1.1:
