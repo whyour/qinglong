@@ -51,7 +51,6 @@ import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import { getCommandScript } from '@/utils';
-import { isEqual } from 'lodash';
 import { ColumnProps } from 'antd/lib/table';
 
 const { Text, Paragraph } = Typography;
@@ -107,7 +106,6 @@ const Crontab = () => {
       key: 'name',
       width: 150,
       align: 'center' as const,
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       render: (text: string, record: any) => (
         <>
           <a
@@ -163,7 +161,6 @@ const Crontab = () => {
       key: 'command',
       width: 300,
       align: 'center' as const,
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       render: (text, record) => {
         return (
           <Paragraph
@@ -194,7 +191,6 @@ const Crontab = () => {
       key: 'schedule',
       width: 110,
       align: 'center' as const,
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       sorter: {
         compare: (a, b) => a.schedule.localeCompare(b.schedule),
       },
@@ -210,7 +206,6 @@ const Crontab = () => {
           return (a.last_execution_time || 0) - (b.last_execution_time || 0);
         },
       },
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       render: (text, record) => {
         const language = navigator.language || navigator.languages[0];
         return (
@@ -241,7 +236,6 @@ const Crontab = () => {
           return a.last_running_time - b.last_running_time;
         },
       },
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       render: (text, record) => {
         return record.last_running_time
           ? diffTime(record.last_running_time)
@@ -257,7 +251,6 @@ const Crontab = () => {
           return a.nextRunTime - b.nextRunTime;
         },
       },
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       render: (text, record) => {
         const language = navigator.language || navigator.languages[0];
         return record.nextRunTime
@@ -299,7 +292,6 @@ const Crontab = () => {
           return record.status === value;
         }
       },
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       render: (text, record) => (
         <>
           {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
@@ -337,7 +329,6 @@ const Crontab = () => {
       key: 'action',
       align: 'center' as const,
       width: 100,
-      shouldCellUpdate: (record, prevRecord) => isEqual(record, prevRecord),
       render: (text, record, index) => {
         const isPc = !isPhone;
         return (
