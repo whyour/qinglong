@@ -1,3 +1,12 @@
+FROM python:3.10-alpine as builder
+COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+RUN set -x \
+    && apk update \
+    && apk add nodejs npm \
+    && npm i -g pnpm \
+    && cd /tmp/build \
+    && pnpm install --prod
+
 FROM python:3.10-alpine
 
 ARG QL_MAINTAINER="whyour"
@@ -51,16 +60,12 @@ RUN git clone -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
     && cp -f .env.example .env \
     && chmod 777 ${QL_DIR}/shell/*.sh \
     && chmod 777 ${QL_DIR}/docker/*.sh \
-    && pnpm install --prod \
-    && rm -rf /root/.pnpm-store \
-    && rm -rf /root/.local/share/pnpm/store \
-    && rm -rf /root/.cache \
-    && rm -rf /root/.npm \
     && git clone -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
     && mkdir -p ${QL_DIR}/static \
     && cp -rf /static/* ${QL_DIR}/static \
-    && rm -rf /static \
-    && rm -rf /tmp/build
+    && rm -rf /static
+
+COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
 WORKDIR ${QL_DIR}
     
