@@ -42,7 +42,8 @@
         "monaco-editor",
         "rc-field-form",
         "@types/lodash.merge",
-        "rollup"
+        "rollup",
+        "styled-components"
       ],
       "allowedVersions": {
         "react": "18",
@@ -90,7 +91,7 @@
   },
   "devDependencies": {
     "@ant-design/icons": "^4.7.0",
-    "@ant-design/pro-layout": "^6.33.1",
+    "@ant-design/pro-layout": "6.38.22",
     "@monaco-editor/react": "4.4.6",
     "@react-hook/resize-observer": "^1.2.6",
     "@sentry/react": "^7.12.1",
@@ -114,10 +115,10 @@
     "@types/sockjs": "^0.3.33",
     "@types/sockjs-client": "^1.5.1",
     "@types/uuid": "^8.3.4",
-    "@umijs/max": "^4.0.21",
+    "@umijs/max": "^4.0.42",
     "@umijs/ssr-darkreader": "^4.9.45",
     "ansi-to-react": "^6.1.6",
-    "antd": "^4.23.0",
+    "antd": "^4.24.7",
     "antd-img-crop": "^4.2.3",
     "codemirror": "^5.65.2",
     "compression-webpack-plugin": "9.2.0",

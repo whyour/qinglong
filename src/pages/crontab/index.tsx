@@ -14,6 +14,7 @@ import {
   Popover,
   Tabs,
   TablePaginationConfig,
+  MenuProps,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -684,15 +685,13 @@ const Crontab = () => {
       arrow={{ pointAtCenter: true }}
       placement="bottomRight"
       trigger={['click']}
-      overlay={
-        <Menu
-          items={getMenuItems(record)}
-          onClick={({ key, domEvent }) => {
-            domEvent.stopPropagation();
-            action(key, record, index);
-          }}
-        />
-      }
+      menu={{
+        items: getMenuItems(record),
+        onClick: ({ key, domEvent }) => {
+          domEvent.stopPropagation();
+          action(key, record, index);
+        },
+      }}
     >
       <a onClick={(e) => e.stopPropagation()}>
         <EllipsisOutlined />
@@ -889,41 +888,39 @@ const Crontab = () => {
     }
   };
 
-  const menu = (
-    <Menu
-      onClick={({ key, domEvent }) => {
-        domEvent.stopPropagation();
-        viewAction(key);
-      }}
-      items={[
-        ...[...enabledCronViews].slice(4).map((x) => ({
-          label: (
-            <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>{x.name}</span>
-              {viewConf?.id === x.id && (
-                <CheckOutlined style={{ color: '#1890ff' }} />
-              )}
-            </Space>
-          ),
-          key: x.id,
-          icon: <UnorderedListOutlined />,
-        })),
-        {
-          type: 'divider',
-        },
-        {
-          label: '新建视图',
-          key: 'new',
-          icon: <PlusOutlined />,
-        },
-        {
-          label: '视图管理',
-          key: 'manage',
-          icon: <SettingOutlined />,
-        },
-      ]}
-    />
-  );
+  const menu: MenuProps = {
+    onClick: ({ key, domEvent }) => {
+      domEvent.stopPropagation();
+      viewAction(key);
+    },
+    items: [
+      ...[...enabledCronViews].slice(4).map((x) => ({
+        label: (
+          <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>{x.name}</span>
+            {viewConf?.id === x.id && (
+              <CheckOutlined style={{ color: '#1890ff' }} />
+            )}
+          </Space>
+        ),
+        key: x.id,
+        icon: <UnorderedListOutlined />,
+      })),
+      {
+        type: 'divider' as 'group',
+      },
+      {
+        label: '新建视图',
+        key: 'new',
+        icon: <PlusOutlined />,
+      },
+      {
+        label: '视图管理',
+        key: 'manage',
+        icon: <SettingOutlined />,
+      },
+    ],
+  };
 
   const getCronViews = () => {
     setLoading(true);
@@ -975,7 +972,7 @@ const Crontab = () => {
         className={`crontab-view ${moreMenuActive ? 'more-active' : ''}`}
         tabBarExtraContent={
           <Dropdown
-            overlay={menu}
+            menu={menu}
             trigger={['click']}
             overlayStyle={{ minWidth: 200 }}
           >

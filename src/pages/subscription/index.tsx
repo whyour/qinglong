@@ -427,28 +427,26 @@ const Subscription = () => {
       arrow={{ pointAtCenter: true }}
       placement="bottomRight"
       trigger={['click']}
-      overlay={
-        <Menu
-          items={[
-            { label: '编辑', key: 'edit', icon: <EditOutlined /> },
-            {
-              label: record.is_disabled === 1 ? '启用' : '禁用',
-              key: 'enableOrDisable',
-              icon:
-                record.is_disabled === 1 ? (
-                  <CheckCircleOutlined />
-                ) : (
-                  <StopOutlined />
-                ),
-            },
-            { label: '删除', key: 'delete', icon: <DeleteOutlined /> },
-          ]}
-          onClick={({ key, domEvent }) => {
-            domEvent.stopPropagation();
-            action(key, record, index);
-          }}
-        />
-      }
+      menu={{
+        items: [
+          { label: '编辑', key: 'edit', icon: <EditOutlined /> },
+          {
+            label: record.is_disabled === 1 ? '启用' : '禁用',
+            key: 'enableOrDisable',
+            icon:
+              record.is_disabled === 1 ? (
+                <CheckCircleOutlined />
+              ) : (
+                <StopOutlined />
+              ),
+          },
+          { label: '删除', key: 'delete', icon: <DeleteOutlined /> },
+        ],
+        onClick: ({ key, domEvent }) => {
+          domEvent.stopPropagation();
+          action(key, record, index);
+        },
+      }}
     >
       <a onClick={(e) => e.stopPropagation()}>
         <EllipsisOutlined />

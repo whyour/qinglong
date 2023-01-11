@@ -25,6 +25,7 @@ import {
   Popover,
   Descriptions,
   Tooltip,
+  MenuProps,
 } from 'antd';
 // @ts-ignore
 import SockJS from 'sockjs-client';
@@ -222,9 +223,6 @@ export default function () {
   }
 
   if (['/login', '/initialization', '/error'].includes(location.pathname)) {
-    document.title = `${
-      (config.documentTitleMap as any)[location.pathname]
-    } - 控制面板`;
     if (systemInfo?.isInitialized && location.pathname === '/initialization') {
       history.push('/crontab');
     }
@@ -251,13 +249,17 @@ export default function () {
     !navigator.userAgent.includes('Chrome');
   const isQQBrowser = navigator.userAgent.includes('QQBrowser');
 
-  const menu = (
-    <Menu
-      className="side-menu-user-drop-menu"
-      items={[{ label: '退出登录', key: 'logout', icon: <LogoutOutlined /> }]}
-      onClick={logout}
-    />
-  );
+  const menu: MenuProps = {
+    items: [
+      {
+        label: '退出登录',
+        className: 'side-menu-user-drop-menu',
+        onClick: logout,
+        key: 'logout',
+        icon: <LogoutOutlined />,
+      },
+    ],
+  };
   return loading ? (
     <PageLoading />
   ) : (
@@ -266,6 +268,7 @@ export default function () {
       loading={loading}
       ErrorBoundary={Sentry.ErrorBoundary}
       logo={<Image preview={false} src="https://qn.whyour.cn/logo.png" />}
+      // @ts-ignore
       title={
         <>
           <span style={{ fontSize: 16 }}>控制面板</span>
@@ -308,16 +311,15 @@ export default function () {
         return <Link to={menuItemProps.path}>{defaultDom}</Link>;
       }}
       pageTitleRender={(props, pageName, info) => {
-        if (info && typeof info.pageName === 'string') {
-          return `${info.pageName} - 控制面板`;
-        }
-        return '控制面板';
+        const title =
+          (config.documentTitleMap as any)[location.pathname] || '未找到';
+        return `${title} - 控制面板`;
       }}
       onCollapse={setCollapsed}
       collapsed={collapsed}
       rightContentRender={() =>
         ctx.isPhone && (
-          <Dropdown overlay={menu} placement="bottomRight" trigger={['click']}>
+          <Dropdown menu={menu} placement="bottomRight" trigger={['click']}>
             <span className="side-menu-user-wrapper">
               <Avatar
                 shape="square"
@@ -339,7 +341,7 @@ export default function () {
           }}
         >
           {!collapsed && !ctx.isPhone && (
-            <Dropdown overlay={menu} placement="topLeft" trigger={['hover']}>
+            <Dropdown menu={menu} placement="topLeft" trigger={['hover']}>
               <span className="side-menu-user-wrapper">
                 <Avatar
                   shape="square"

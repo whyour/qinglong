@@ -11,6 +11,7 @@ import {
   Dropdown,
   Menu,
   Empty,
+  MenuProps,
 } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -66,7 +67,8 @@ const Script = () => {
   const [isEditing, setIsEditing] = useState(false);
   const editorRef = useRef<any>(null);
   const [isAddFileModalVisible, setIsAddFileModalVisible] = useState(false);
-  const [isRenameFileModalVisible, setIsRenameFileModalVisible] = useState(false);
+  const [isRenameFileModalVisible, setIsRenameFileModalVisible] =
+    useState(false);
   const [currentNode, setCurrentNode] = useState<any>();
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
@@ -293,12 +295,12 @@ const Script = () => {
 
   const renameFile = () => {
     setIsRenameFileModalVisible(true);
-  }
+  };
 
   const handleRenameFileCancel = () => {
     setIsRenameFileModalVisible(false);
     getScripts(false);
-  }
+  };
 
   const addFile = () => {
     setIsAddFileModalVisible(true);
@@ -402,46 +404,44 @@ const Script = () => {
     }
   };
 
-  const menu = isEditing ? (
-    <Menu
-      items={[
-        { label: '保存', key: 'save', icon: <PlusOutlined /> },
-        { label: '退出编辑', key: 'exit', icon: <EditOutlined /> },
-      ]}
-      onClick={({ key, domEvent }) => {
-        domEvent.stopPropagation();
-        action(key);
-      }}
-    />
-  ) : (
-    <Menu
-      items={[
-        { label: '新建', key: 'add', icon: <PlusOutlined /> },
-        {
-          label: '编辑',
-          key: 'edit',
-          icon: <EditOutlined />,
-          disabled: !select,
+  const menu: MenuProps = isEditing
+    ? {
+        items: [
+          { label: '保存', key: 'save', icon: <PlusOutlined /> },
+          { label: '退出编辑', key: 'exit', icon: <EditOutlined /> },
+        ],
+        onClick: ({ key, domEvent }) => {
+          domEvent.stopPropagation();
+          action(key);
         },
-        {
-          label: '重命名',
-          key: 'rename',
-          icon: <IconFont type="ql-icon-rename" />,
-          disabled: !select,
+      }
+    : {
+        items: [
+          { label: '新建', key: 'add', icon: <PlusOutlined /> },
+          {
+            label: '编辑',
+            key: 'edit',
+            icon: <EditOutlined />,
+            disabled: !select,
+          },
+          {
+            label: '重命名',
+            key: 'rename',
+            icon: <IconFont type="ql-icon-rename" />,
+            disabled: !select,
+          },
+          {
+            label: '删除',
+            key: 'delete',
+            icon: <DeleteOutlined />,
+            disabled: !select,
+          },
+        ],
+        onClick: ({ key, domEvent }) => {
+          domEvent.stopPropagation();
+          menuAction(key);
         },
-        {
-          label: '删除',
-          key: 'delete',
-          icon: <DeleteOutlined />,
-          disabled: !select,
-        },
-      ]}
-      onClick={({ key, domEvent }) => {
-        domEvent.stopPropagation();
-        menuAction(key);
-      }}
-    />
-  );
+      };
 
   return (
     <PageContainer
@@ -464,7 +464,7 @@ const Script = () => {
                 allowClear
                 onSelect={onSelect}
               />,
-              <Dropdown overlay={menu} trigger={['click']}>
+              <Dropdown menu={menu} trigger={['click']}>
                 <Button type="primary" icon={<EllipsisOutlined />} />
               </Dropdown>,
             ]

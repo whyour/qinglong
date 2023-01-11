@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal, message, Input, Form, Statistic, Button } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
@@ -34,7 +34,6 @@ const CronLogModal = ({
   const [loading, setLoading] = useState<any>(true);
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
-  const [theme, setTheme] = useState<string>('');
 
   const getCronLog = (isFirst?: boolean) => {
     if (isFirst) {
@@ -49,10 +48,14 @@ const CronLogModal = ({
         ) {
           const log = data as string;
           setValue(log || '暂无日志');
-          setExecuting(
-            log && !logEnded(log) && !log.includes('重启面板'),
-          );
-          if (log && !logEnded(log) && !log.includes('重启面板')) {
+          const hasNext = log && !logEnded(log) && !log.includes('重启面板');
+          setExecuting(hasNext);
+          setTimeout(() => {
+            document
+              .querySelector('#log-flag')!
+              .scrollIntoView({ behavior: 'smooth' });
+          });
+          if (hasNext) {
             setTimeout(() => {
               getCronLog();
             }, 2000);
@@ -155,6 +158,7 @@ const CronLogModal = ({
           {value}
         </pre>
       )}
+      <div id="log-flag"></div>
     </Modal>
   );
 };
