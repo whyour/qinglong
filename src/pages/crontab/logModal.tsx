@@ -50,12 +50,12 @@ const CronLogModal = ({
           setValue(log || '暂无日志');
           const hasNext = log && !logEnded(log) && !log.includes('重启面板');
           setExecuting(hasNext);
-          setTimeout(() => {
-            document
-              .querySelector('#log-flag')!
-              .scrollIntoView({ behavior: 'smooth' });
-          });
           if (hasNext) {
+            setTimeout(() => {
+              document
+                .querySelector('#log-flag')!
+                .scrollIntoView({ behavior: 'smooth' });
+            });
             setTimeout(() => {
               getCronLog();
             }, 2000);
