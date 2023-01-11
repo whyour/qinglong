@@ -6,10 +6,11 @@ export default defineConfig({
   antd: {},
   outputPath: 'static/dist',
   fastRefresh: true,
-  favicons: ['/images/favicon.svg'],
+  favicons: ['./images/favicon.svg'],
   mfsu: {
     strategy: 'eager',
   },
+  publicPath: process.env.NODE_ENV === 'production' ? './' : '/',
   proxy: {
     '/api/public': {
       target: 'http://127.0.0.1:5400/',
