@@ -1087,6 +1087,16 @@ async function smtpNotify(text, desp) {
   }
 }
 
+function smtpNotify(text, desp) {
+  return new Promise((resolve) => {
+    if (SMTP_SERVER && SMTP_SSL && SMTP_EMAIL && SMTP_PASSWORD && SMTP_NAME) {
+      // todo: Node.js并没有内置的 smtp 实现，需要调用外部库，因为不清楚这个文件的模块依赖情况，所以留给有缘人实现
+    } else {
+      resolve();
+    }
+  });
+}
+
 module.exports = {
   sendNotify,
   BARK_PUSH,

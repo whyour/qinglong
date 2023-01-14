@@ -296,7 +296,7 @@ export default {
   documentTitleMap: {
     '/login': '登录',
     '/initialization': '初始化',
-    '/cron': '定时任务',
+    '/crontab': '定时任务',
     '/env': '环境变量',
     '/subscription': '订阅管理',
     '/config': '配置文件',
@@ -305,6 +305,7 @@ export default {
     '/log': '日志管理',
     '/setting': '系统设置',
     '/error': '错误日志',
+    '/dependence': '依赖管理',
   },
   dependenceTypes: ['nodejs', 'python3', 'linux'],
 };

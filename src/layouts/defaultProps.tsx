@@ -10,6 +10,7 @@ import {
   ContainerOutlined,
 } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
+import { BasicLayoutProps } from '@ant-design/pro-layout';
 
 export default {
   route: {
@@ -93,4 +94,4 @@ export default {
   contentWidth: 'Fixed',
   splitMenus: false,
   siderWidth: 180,
-} as any;
+} as BasicLayoutProps;

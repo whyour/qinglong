@@ -9,20 +9,37 @@ import './index.less';
 import { SharedContext } from '@/layouts';
 
 const Error = () => {
-  const { user, theme } = useOutletContext<SharedContext>();
+  const { user, theme, reloadUser } = useOutletContext<SharedContext>();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState('暂无日志');
 
-  const getLog = () => {
-    setLoading(true);
+  const getTimes = () => {
+    return parseInt(localStorage.getItem('error_retry_times') || '0', 10);
+  };
+
+  let times = getTimes();
+
+  const getLog = (needLoading: boolean = true) => {
+    needLoading && setLoading(true);
     request
       .get(`${config.apiPrefix}public/panel/log`)
       .then(({ code, data }) => {
         if (code === 200) {
           setData(data);
+          if (!data) {
+            times = getTimes();
+            if (times > 5) {
+              return;
+            }
+            localStorage.setItem('error_retry_times', `${times + 1}`);
+            setTimeout(() => {
+              reloadUser();
+              getLog(false);
+            }, 3000);
+          }
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => needLoading && setLoading(false));
   };
 
   useEffect(() => {
@@ -39,7 +56,7 @@ const Error = () => {
     <div className="error-wrapper">
       {loading ? (
         <PageLoading />
-      ) : (
+      ) : data ? (
         <Terminal
           name="服务错误"
           colorMode={theme === 'vs-dark' ? ColorMode.Dark : ColorMode.Light}
@@ -55,6 +72,10 @@ const Error = () => {
             },
           ]}
         />
+      ) : times > 5 ? (
+        <>服务启动超时，请手动进入容器执行 ql -l check 后刷新再试</>
+      ) : (
+        <PageLoading tip="启动中，请稍后..." />
       )}
     </div>
   );

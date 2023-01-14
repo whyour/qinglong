@@ -14,6 +14,7 @@ import {
 import { promises, existsSync } from 'fs';
 import { Op, where, col as colFn } from 'sequelize';
 import path from 'path';
+import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 
 @Service()
 export default class CronService {
@@ -31,7 +32,7 @@ export default class CronService {
     const tab = new Crontab(payload);
     tab.saved = false;
     const doc = await this.insert(tab);
-    await this.set_crontab(this.isSixCron(doc));
+    await this.set_crontab();
     return doc;
   }
 
@@ -42,7 +43,7 @@ export default class CronService {
   public async update(payload: Crontab): Promise<Crontab> {
     payload.saved = false;
     const newDoc = await this.updateDb(payload);
-    await this.set_crontab(this.isSixCron(newDoc));
+    await this.set_crontab();
     return newDoc;
   }
 
@@ -81,7 +82,7 @@ export default class CronService {
 
   public async remove(ids: number[]) {
     await CrontabModel.destroy({ where: { id: ids } });
-    await this.set_crontab(true);
+    await this.set_crontab();
   }
 
   public async pin(ids: number[]) {
@@ -361,8 +362,8 @@ export default class CronService {
       this.logger.silly('Original command: ' + command);
 
       let cmdStr = command;
-      if (!cmdStr.includes('task ') && !cmdStr.includes('ql ')) {
-        cmdStr = `task ${cmdStr}`;
+      if (!cmdStr.startsWith(TASK_PREFIX) && !cmdStr.startsWith(QL_PREFIX)) {
+        cmdStr = `${TASK_PREFIX}${cmdStr}`;
       }
       if (
         cmdStr.endsWith('.js') ||
@@ -408,12 +409,12 @@ export default class CronService {
 
   public async disabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 1 }, { where: { id: ids } });
-    await this.set_crontab(true);
+    await this.set_crontab();
   }
 
   public async enabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
-    await this.set_crontab(true);
+    await this.set_crontab();
   }
 
   public async log(id: number) {
@@ -519,11 +520,17 @@ export default class CronService {
   }
 
   private make_command(tab: Crontab) {
+    if (
+      !tab.command.startsWith(TASK_PREFIX) &&
+      !tab.command.startsWith(QL_PREFIX)
+    ) {
+      tab.command = `${TASK_PREFIX}${tab.command}`;
+    }
     const crontab_job_string = `ID=${tab.id} ${tab.command}`;
     return crontab_job_string;
   }
 
-  private async set_crontab(needReloadSchedule: boolean = false) {
+  private async set_crontab() {
     const tabs = await this.crontabs();
     var crontab_string = '';
     tabs.data.forEach((tab) => {
@@ -546,9 +553,7 @@ export default class CronService {
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
-    if (needReloadSchedule) {
-      exec(`pm2 reload schedule`);
-    }
+    exec(`pm2 reload schedule`);
     await CrontabModel.update({ saved: true }, { where: {} });
   }
 

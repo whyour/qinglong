@@ -80,7 +80,7 @@ const CronModal = ({
           <Input.TextArea
             rows={4}
             autoSize={true}
-            placeholder="请输入要执行的命令"
+            placeholder="使用 task 命令运行脚本或其他任意 Linux 可执行命令"
           />
         </Form.Item>
         <Form.Item

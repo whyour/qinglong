@@ -79,9 +79,9 @@ import_config() {
     default_cron="$(random_range 0 59) $(random_range 0 23) * * *"
   fi
 
-  cpu_warn=${CpuWarn:-80}
-  mem_warn=${MemoryWarn:-80}
-  disk_warn=${DiskWarn:-90}
+  cpu_warn=${CpuWarn}
+  mem_warn=${MemoryWarn}
+  disk_warn=${DiskWarn}
 }
 
 set_proxy() {

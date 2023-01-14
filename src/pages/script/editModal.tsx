@@ -101,7 +101,7 @@ const EditModal = ({
   };
 
   const stop = () => {
-    if (!cNode || !cNode.title) {
+    if (!cNode || !cNode.title || !currentPid) {
       return;
     }
     request

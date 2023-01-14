@@ -14,6 +14,7 @@ import {
   Popover,
   Tabs,
   TablePaginationConfig,
+  MenuProps,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -51,6 +52,7 @@ import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import { getCommandScript } from '@/utils';
+import { ColumnProps } from 'antd/lib/table';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -82,9 +84,23 @@ enum OperationPath {
   'unpin',
 }
 
+export interface ICrontab {
+  name: string;
+  command: string;
+  schedule: string;
+  id: number;
+  status: number;
+  isDisabled?: 1 | 0;
+  isPinned?: 1 | 0;
+  labels?: string[];
+  last_running_time?: number;
+  last_execution_time?: number;
+  nextRunTime: Date;
+}
+
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
-  const columns: any = [
+  const columns: ColumnProps<ICrontab>[] = [
     {
       title: '名称',
       dataIndex: 'name',
@@ -112,7 +128,6 @@ const Crontab = () => {
                         style={{ cursor: 'point' }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSearchValue(`label:${label}`);
                           setSearchText(`label:${label}`);
                         }}
                       >
@@ -138,7 +153,7 @@ const Crontab = () => {
         </>
       ),
       sorter: {
-        compare: (a: any, b: any) => a?.name?.localeCompare(b?.name),
+        compare: (a, b) => a?.name?.localeCompare(b?.name),
       },
     },
     {
@@ -147,7 +162,7 @@ const Crontab = () => {
       key: 'command',
       width: 300,
       align: 'center' as const,
-      render: (text: string, record: any) => {
+      render: (text, record) => {
         return (
           <Paragraph
             style={{
@@ -178,7 +193,7 @@ const Crontab = () => {
       width: 110,
       align: 'center' as const,
       sorter: {
-        compare: (a: any, b: any) => a.schedule.localeCompare(b.schedule),
+        compare: (a, b) => a.schedule.localeCompare(b.schedule),
       },
     },
     {
@@ -188,11 +203,11 @@ const Crontab = () => {
       key: 'last_execution_time',
       width: 150,
       sorter: {
-        compare: (a: any, b: any) => {
-          return a.last_execution_time - b.last_execution_time;
+        compare: (a, b) => {
+          return (a.last_execution_time || 0) - (b.last_execution_time || 0);
         },
       },
-      render: (text: string, record: any) => {
+      render: (text, record) => {
         const language = navigator.language || navigator.languages[0];
         return (
           <span
@@ -222,7 +237,7 @@ const Crontab = () => {
           return a.last_running_time - b.last_running_time;
         },
       },
-      render: (text: string, record: any) => {
+      render: (text, record) => {
         return record.last_running_time
           ? diffTime(record.last_running_time)
           : '-';
@@ -237,7 +252,7 @@ const Crontab = () => {
           return a.nextRunTime - b.nextRunTime;
         },
       },
-      render: (text: string, record: any) => {
+      render: (text, record) => {
         const language = navigator.language || navigator.languages[0];
         return record.nextRunTime
           .toLocaleString(language, {
@@ -271,14 +286,14 @@ const Crontab = () => {
           value: 3,
         },
       ],
-      onFilter: (value: number, record: any) => {
+      onFilter: (value, record) => {
         if (record.isDisabled && record.status !== 0) {
           return value === 2;
         } else {
           return record.status === value;
         }
       },
-      render: (text: string, record: any) => (
+      render: (text, record) => (
         <>
           {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
             <>
@@ -315,7 +330,7 @@ const Crontab = () => {
       key: 'action',
       align: 'center' as const,
       width: 100,
-      render: (text: string, record: any, index: number) => {
+      render: (text, record, index) => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
@@ -378,7 +393,6 @@ const Crontab = () => {
   const [viewConf, setViewConf] = useState<any>();
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [detailCron, setDetailCron] = useState<any>();
-  const [searchValue, setSearchValue] = useState('');
   const [total, setTotal] = useState<number>();
   const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
     useState(false);
@@ -671,15 +685,13 @@ const Crontab = () => {
       arrow={{ pointAtCenter: true }}
       placement="bottomRight"
       trigger={['click']}
-      overlay={
-        <Menu
-          items={getMenuItems(record)}
-          onClick={({ key, domEvent }) => {
-            domEvent.stopPropagation();
-            action(key, record, index);
-          }}
-        />
-      }
+      menu={{
+        items: getMenuItems(record),
+        onClick: ({ key, domEvent }) => {
+          domEvent.stopPropagation();
+          action(key, record, index);
+        },
+      }}
     >
       <a onClick={(e) => e.stopPropagation()}>
         <EllipsisOutlined />
@@ -876,41 +888,39 @@ const Crontab = () => {
     }
   };
 
-  const menu = (
-    <Menu
-      onClick={({ key, domEvent }) => {
-        domEvent.stopPropagation();
-        viewAction(key);
-      }}
-      items={[
-        ...[...enabledCronViews].slice(4).map((x) => ({
-          label: (
-            <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>{x.name}</span>
-              {viewConf?.id === x.id && (
-                <CheckOutlined style={{ color: '#1890ff' }} />
-              )}
-            </Space>
-          ),
-          key: x.id,
-          icon: <UnorderedListOutlined />,
-        })),
-        {
-          type: 'divider',
-        },
-        {
-          label: '新建视图',
-          key: 'new',
-          icon: <PlusOutlined />,
-        },
-        {
-          label: '视图管理',
-          key: 'manage',
-          icon: <SettingOutlined />,
-        },
-      ]}
-    />
-  );
+  const menu: MenuProps = {
+    onClick: ({ key, domEvent }) => {
+      domEvent.stopPropagation();
+      viewAction(key);
+    },
+    items: [
+      ...[...enabledCronViews].slice(4).map((x) => ({
+        label: (
+          <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>{x.name}</span>
+            {viewConf?.id === x.id && (
+              <CheckOutlined style={{ color: '#1890ff' }} />
+            )}
+          </Space>
+        ),
+        key: x.id,
+        icon: <UnorderedListOutlined />,
+      })),
+      {
+        type: 'divider' as 'group',
+      },
+      {
+        label: '新建视图',
+        key: 'new',
+        icon: <PlusOutlined />,
+      },
+      {
+        label: '视图管理',
+        key: 'manage',
+        icon: <SettingOutlined />,
+      },
+    ],
+  };
 
   const getCronViews = () => {
     setLoading(true);
@@ -945,8 +955,6 @@ const Crontab = () => {
           enterButton
           allowClear
           loading={loading}
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
@@ -964,7 +972,7 @@ const Crontab = () => {
         className={`crontab-view ${moreMenuActive ? 'more-active' : ''}`}
         tabBarExtraContent={
           <Dropdown
-            overlay={menu}
+            menu={menu}
             trigger={['click']}
             overlayStyle={{ minWidth: 200 }}
           >

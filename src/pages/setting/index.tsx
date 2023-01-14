@@ -17,7 +17,6 @@ import {
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
-import * as DarkReader from '@umijs/ssr-darkreader';
 import AppModal from './appModal';
 import {
   EditOutlined,
@@ -27,18 +26,13 @@ import {
 import SecuritySettings from './security';
 import LoginLog from './loginLog';
 import NotificationSetting from './notification';
-import CheckUpdate from './checkUpdate';
+import Other from './other';
 import About from './about';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import './index.less';
 
 const { Text } = Typography;
-const optionsWithDisabled = [
-  { label: '亮色', value: 'light' },
-  { label: '暗色', value: 'dark' },
-  { label: '跟随系统', value: 'auto' },
-];
 
 const Setting = () => {
   const {
@@ -121,37 +115,12 @@ const Setting = () => {
   ];
 
   const [loading, setLoading] = useState(true);
-  const defaultTheme = localStorage.getItem('qinglong_dark_theme') || 'auto';
   const [dataSource, setDataSource] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedApp, setEditedApp] = useState<any>();
   const [tabActiveKey, setTabActiveKey] = useState('security');
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
   const [notificationInfo, setNotificationInfo] = useState<any>();
-  const [logRemoveFrequency, setLogRemoveFrequency] = useState<number>();
-  const [form] = Form.useForm();
-  const {
-    enable: enableDarkMode,
-    disable: disableDarkMode,
-    exportGeneratedCSS: collectCSS,
-    setFetchMethod,
-    auto: followSystemColorScheme,
-  } = DarkReader || {};
-
-  const themeChange = (e: any) => {
-    const _theme = e.target.value;
-    localStorage.setItem('qinglong_dark_theme', e.target.value);
-    setFetchMethod(fetch);
-
-    if (_theme === 'dark') {
-      enableDarkMode({});
-    } else if (_theme === 'light') {
-      disableDarkMode();
-    } else {
-      followSystemColorScheme({});
-    }
-    reloadTheme();
-  };
 
   const getApps = () => {
     setLoading(true);
@@ -276,8 +245,6 @@ const Setting = () => {
       getLoginLog();
     } else if (activeKey === 'notification') {
       getNotification();
-    } else if (activeKey === 'other') {
-      getLogRemoveFrequency();
     }
   };
 
@@ -292,37 +259,6 @@ const Setting = () => {
       .catch((error: any) => {
         console.log(error);
       });
-  };
-
-  const getLogRemoveFrequency = () => {
-    request
-      .get(`${config.apiPrefix}system/log/remove`)
-      .then(({ code, data }) => {
-        if (code === 200 && data.info) {
-          const { frequency } = data.info;
-          setLogRemoveFrequency(frequency);
-        }
-      })
-      .catch((error: any) => {
-        console.log(error);
-      });
-  };
-
-  const updateRemoveLogFrequency = () => {
-    setTimeout(() => {
-      request
-        .put(`${config.apiPrefix}system/log/remove`, {
-          data: { frequency: logRemoveFrequency },
-        })
-        .then(({ code, data }) => {
-          if (code === 200) {
-            message.success('更新成功');
-          }
-        })
-        .catch((error: any) => {
-          console.log(error);
-        });
-    });
   };
 
   return (
@@ -382,46 +318,11 @@ const Setting = () => {
             key: 'other',
             label: '其他设置',
             children: (
-              <Form layout="vertical" form={form}>
-                <Form.Item
-                  label="主题设置"
-                  name="theme"
-                  initialValue={defaultTheme}
-                >
-                  <Radio.Group
-                    options={optionsWithDisabled}
-                    onChange={themeChange}
-                    value={defaultTheme}
-                    optionType="button"
-                    buttonStyle="solid"
-                  />
-                </Form.Item>
-                <Form.Item
-                  label="日志删除频率"
-                  name="frequency"
-                  tooltip="每x天自动删除x天以前的日志"
-                >
-                  <Input.Group compact>
-                    <InputNumber
-                      addonBefore="每"
-                      addonAfter="天"
-                      style={{ width: 150 }}
-                      min={0}
-                      value={logRemoveFrequency}
-                      onChange={(value) => setLogRemoveFrequency(value)}
-                    />
-                    <Button type="primary" onClick={updateRemoveLogFrequency}>
-                      确认
-                    </Button>
-                  </Input.Group>
-                </Form.Item>
-                <Form.Item label="检查更新" name="update">
-                  <CheckUpdate
-                    systemInfo={systemInfo}
-                    socketMessage={socketMessage}
-                  />
-                </Form.Item>
-              </Form>
+              <Other
+                reloadTheme={reloadTheme}
+                socketMessage={socketMessage}
+                systemInfo={systemInfo}
+              />
             ),
           },
           {

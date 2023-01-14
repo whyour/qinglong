@@ -5,7 +5,6 @@ on:
     branches:
       - 'master'
       - 'develop'
-    # Sequence of patterns matched against refs/tags
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
   schedule:
@@ -13,7 +12,6 @@ on:
     # note: 这里是GMT时间，北京时间减去八小时即可。如北京时间 22:30 => GMT 14:30
     # minute hour day month dayOfWeek
     - cron: '00 14 * * *' # GMT 14:00 => 北京时间 22:00
-    #- cron: '30 16 * * *' # GMT 16:30（前一天） => 北京时间 00:30
   workflow_dispatch:
 
 jobs:
@@ -155,12 +153,16 @@ jobs:
           build-args: |
             MAINTAINER=${{ github.repository_owner }}
             QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
           network: host
           platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64
-          context: docker/
+          context: .
+          file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=whyour/qinglong:cache
+          cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
       
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
