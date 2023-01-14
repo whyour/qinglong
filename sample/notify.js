@@ -125,6 +125,18 @@ let AIBOTK_NAME = '';
 //FSKEY 飞书机器人的 FSKEY
 let FSKEY = '';
 
+// =======================================SMTP 邮件设置区域=======================================
+// SMTP_SERVER: 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
+// SMTP_SSL: 填写 SMTP 发送邮件服务器是否使用 SSL，内容应为 true 或 false
+// SMTP_EMAIL: 填写 SMTP 收发件邮箱，通知将会由自己发给自己
+// SMTP_PASSWORD: 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
+// SMTP_NAME: 填写 SMTP 收发件人姓名，可随意填写
+let SMTP_SERVER = '';
+let SMTP_SSL = 'false';
+let SMTP_EMAIL = '';
+let SMTP_PASSWORD = '';
+let SMTP_NAME = '';
+
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
   GOTIFY_URL = process.env.GOTIFY_URL;
@@ -250,6 +262,22 @@ if (process.env.AIBOTK_NAME) {
 if (process.env.FSKEY) {
   FSKEY = process.env.FSKEY;
 }
+
+if (process.env.SMTP_SERVER) {
+  SMTP_SERVER = process.env.SMTP_SERVER;
+}
+if (process.env.SMTP_SSL) {
+  SMTP_SSL = process.env.SMTP_SSL;
+}
+if (process.env.SMTP_EMAIL) {
+  SMTP_EMAIL = process.env.SMTP_EMAIL;
+}
+if (process.env.SMTP_PASSWORD) {
+  SMTP_PASSWORD = process.env.SMTP_PASSWORD;
+}
+if (process.env.SMTP_NAME) {
+  SMTP_NAME = process.env.SMTP_NAME;
+}
 //==========================云端环境变量的判断与接收=========================
 
 /**
@@ -287,6 +315,7 @@ async function sendNotify(
     PushDeerNotify(text, desp), //PushDeer
     aibotkNotify(text, desp), //智能微秘书
     fsBotNotify(text, desp), //飞书机器人
+    smtpNotify(text, desp), //SMTP 邮件
   ]);
 }
 
@@ -1016,6 +1045,16 @@ function fsBotNotify(text, desp) {
           resolve(data);
         }
       });
+    } else {
+      resolve();
+    }
+  });
+}
+
+function smtpNotify(text, desp) {
+  return new Promise((resolve) => {
+    if (SMTP_SERVER && SMTP_SSL && SMTP_EMAIL && SMTP_PASSWORD && SMTP_NAME) {
+      // todo: Node.js并没有内置的 smtp 实现，需要调用外部库，因为不清楚这个文件的模块依赖情况，所以留给有缘人实现
     } else {
       resolve();
     }
