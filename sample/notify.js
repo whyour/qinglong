@@ -1051,6 +1051,42 @@ function fsBotNotify(text, desp) {
   });
 }
 
+async function smtpNotify(text, desp) {
+  if (![SMTP_SERVER, SMTP_EMAIL, SMTP_PASSWORD].every(Boolean)) {
+    return;
+  }
+
+  try {
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport(
+      `${SMTP_SSL === 'true' ? 'smtps:' : 'smtp:'}//${SMTP_SERVER}`,
+      {
+        auth: {
+          user: SMTP_EMAIL,
+          pass: SMTP_PASSWORD,
+        },
+      },
+    );
+
+    const addr = SMTP_NAME ? `"${SMTP_NAME}" <${SMTP_EMAIL}>` : SMTP_EMAIL;
+    const info = await transporter.sendMail({
+      from: addr,
+      to: addr,
+      subject: text,
+      text: desp,
+    });
+
+    if (!!info.messageId) {
+      console.log('SMTP发送通知消息成功🎉\n');
+      return true;
+    }
+    console.log('SMTP发送通知消息失败！！\n');
+  } catch (e) {
+    console.log('SMTP发送通知消息出现错误！！\n');
+    console.log(e);
+  }
+}
+
 function smtpNotify(text, desp) {
   return new Promise((resolve) => {
     if (SMTP_SERVER && SMTP_SSL && SMTP_EMAIL && SMTP_PASSWORD && SMTP_NAME) {

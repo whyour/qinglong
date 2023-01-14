@@ -162,7 +162,6 @@ export AIBOTK_NAME=""
 
 ## 14. SMTP
 ## 暂时只支持在 Python 中调用 notify.py 以发送 SMTP 邮件通知
-## Node.js 因为无内置 SMTP 功能，暂时不支持在 Node.js 中调用 notify.js 以发送 SMTP 邮件通知，详见 notify.js 的 todo
 ## smtp_server 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
 export SMTP_SERVER=""
 ## smtp_ssl 填写 SMTP 发送邮件服务器是否使用 SSL，内容应为 true 或 false
