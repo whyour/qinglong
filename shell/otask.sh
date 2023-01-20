@@ -101,6 +101,8 @@ handle_task_before() {
   begin_time=$(format_time "$time_format" "$time")
   begin_timestamp=$(format_timestamp "$time_format" "$time")
 
+  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
+
   echo -e "## 开始执行... $begin_time\n"
 
   [[ $is_macos -eq 0 ]] && check_server
@@ -111,7 +113,6 @@ handle_task_before() {
     eval echo $cmd
   fi
 
-  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
   . $file_task_before "$@"
 }
 
@@ -123,9 +124,10 @@ handle_task_after() {
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
 
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
   echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒"
   echo -e "\n　　　　　"
+
+  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
 }
 
 ## 正常运行单个脚本，$1：传入参数
