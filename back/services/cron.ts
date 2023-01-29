@@ -18,7 +18,7 @@ import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -427,96 +427,32 @@ export default class CronService {
     const logFileExist = doc.log_path && (await fileExist(absolutePath));
     if (logFileExist) {
       return getFileContentByName(`${absolutePath}`);
-    }
-    const [, commandStr, url] = doc.command.split(/ +/);
-    let logPath = this.getKey(commandStr);
-    const isQlCommand = doc.command.startsWith('ql ');
-    const key =
-      (url && ['repo', 'raw'].includes(commandStr) && this.getKey(url)) ||
-      logPath;
-    if (isQlCommand) {
-      logPath = 'update';
-    }
-    let logDir = `${config.logPath}${logPath}`;
-    if (existsSync(logDir)) {
-      let files = await promises.readdir(logDir);
-      if (isQlCommand) {
-        files = files.filter((x) => x.includes(key));
-      }
-      return getFileContentByName(`${logDir}/${files[files.length - 1]}`);
     } else {
-      return '';
+      return '任务未运行或运行失败，请尝试手动运行';
     }
   }
 
   public async logs(id: number) {
     const doc = await this.getDb({ id });
-    if (!doc) {
+    if (!doc || !doc.log_path) {
       return [];
     }
 
-    if (doc.log_path) {
-      const relativeDir = path.dirname(`${doc.log_path}`);
-      const dir = path.resolve(config.logPath, relativeDir);
-      if (existsSync(dir)) {
-        let files = await promises.readdir(dir);
-        return files
-          .map((x) => ({
-            filename: x,
-            directory: relativeDir.replace(config.logPath, ''),
-            time: fs.statSync(`${dir}/${x}`).mtime.getTime(),
-          }))
-          .sort((a, b) => b.time - a.time);
-      }
-    }
-
-    const [, commandStr, url] = doc.command.split(/ +/);
-    let logPath = this.getKey(commandStr);
-    const isQlCommand = doc.command.startsWith('ql ');
-    const key =
-      (url && ['repo', 'raw'].includes(commandStr) && this.getKey(url)) ||
-      logPath;
-    if (isQlCommand) {
-      logPath = 'update';
-    }
-    let logDir = `${config.logPath}${logPath}`;
-    if (existsSync(logDir)) {
-      let files = await promises.readdir(logDir);
-      if (isQlCommand) {
-        files = files.filter((x) => x.includes(key));
-      }
+    const relativeDir = path.dirname(`${doc.log_path}`);
+    const dir = path.resolve(config.logPath, relativeDir);
+    if (existsSync(dir)) {
+      let files = await promises.readdir(dir);
       return files
         .map((x) => ({
           filename: x,
-          directory: logPath,
-          time: fs.statSync(`${logDir}/${x}`).mtime.getTime(),
+          directory: relativeDir.replace(config.logPath, ''),
+          time: fs.statSync(`${dir}/${x}`).mtime.getTime(),
         }))
         .sort((a, b) => b.time - a.time);
     } else {
       return [];
     }
-  }
 
-  private getKey(command: string): string {
-    const start =
-      command.lastIndexOf('/') !== -1 ? command.lastIndexOf('/') + 1 : 0;
-    const end =
-      command.lastIndexOf('.') !== -1
-        ? command.lastIndexOf('.')
-        : command.length;
-
-    const tmpStr = command.substring(0, start - 1);
-    let index = 0;
-    if (tmpStr.lastIndexOf('/') !== -1 && tmpStr.startsWith('http')) {
-      index = tmpStr.lastIndexOf('/');
-    } else if (tmpStr.lastIndexOf(':') !== -1 && tmpStr.startsWith('git@')) {
-      index = tmpStr.lastIndexOf(':');
-    }
-    if (index) {
-      return `${tmpStr.substring(index + 1)}_${command.substring(start, end)}`;
-    } else {
-      return command.substring(start, end);
-    }
   }
 
   private make_command(tab: Crontab) {

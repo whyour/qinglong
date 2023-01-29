@@ -48,7 +48,7 @@ const CronLogModal = ({
         ) {
           const log = data as string;
           setValue(log || '暂无日志');
-          const hasNext = log && !logEnded(log) && !log.includes('重启面板');
+          const hasNext = log && !logEnded(log) && !log.includes('重启面板') && !log.includes('任务未运行或运行失败，请尝试手动运行');
           setExecuting(hasNext);
           setTimeout(() => {
             document
