@@ -152,9 +152,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-          shell, // wechat qq uc 360 2345 sougou liebao maxthon
-          shellVs,
-        },
+        shell, // wechat qq uc 360 2345 sougou liebao maxthon
+        shellVs,
+      },
   );
 
   console.log(
@@ -281,26 +281,25 @@ export function getCommandScript(
   command: string,
 ): [string, string] | string | undefined {
   const cmd = command.split(' ') as string[];
-  if (cmd[0] === 'task') {
-    let scriptsPart = cmd.find((x) =>
-      ['.js', '.ts', '.sh', '.py'].some((y) => x.endsWith(y)),
-    );
-    if (!scriptsPart) return;
-    if (scriptsPart.startsWith('/ql/data/scripts')) {
-      scriptsPart = scriptsPart.replace('/ql/data/scripts/', '');
-    }
-
-    let p: string, s: string;
-    let index = scriptsPart.lastIndexOf('/');
-    if (index >= 0) {
-      s = scriptsPart.slice(index + 1);
-      p = scriptsPart.slice(0, index);
-    } else {
-      s = scriptsPart;
-      p = '';
-    }
-    return [s, p];
-  } else if (cmd[1] === 'repo') {
+  if (cmd[1] === 'repo' || cmd[1] === 'raw') {
     return cmd[2];
   }
+  let scriptsPart = cmd.find((x) =>
+    ['.js', '.ts', '.sh', '.py'].some((y) => x.endsWith(y)),
+  );
+  if (!scriptsPart) return;
+  if (scriptsPart.startsWith('/ql/data/scripts')) {
+    scriptsPart = scriptsPart.replace('/ql/data/scripts/', '');
+  }
+
+  let p: string, s: string;
+  let index = scriptsPart.lastIndexOf('/');
+  if (index >= 0) {
+    s = scriptsPart.slice(index + 1);
+    p = scriptsPart.slice(0, index);
+  } else {
+    s = scriptsPart;
+    p = '';
+  }
+  return [s, p];
 }
