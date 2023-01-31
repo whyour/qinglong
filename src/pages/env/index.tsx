@@ -66,50 +66,6 @@ enum OperationPath {
 
 const type = 'DragableBodyRow';
 
-const DragableBodyRow = ({
-  index,
-  moveRow,
-  className,
-  style,
-  ...restProps
-}: any) => {
-  const ref = useRef();
-  const [{ isOver, dropClassName }, drop] = useDrop({
-    accept: type,
-    collect: (monitor) => {
-      const { index: dragIndex } = (monitor.getItem() as any) || {};
-      if (dragIndex === index) {
-        return {};
-      }
-      return {
-        isOver: monitor.isOver(),
-        dropClassName:
-          dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
-      };
-    },
-    drop: (item: any) => {
-      moveRow(item.index, index);
-    },
-  });
-  const [, drag] = useDrag({
-    type,
-    item: { index },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  });
-  drop(drag(ref));
-
-  return (
-    <tr
-      ref={ref}
-      className={`${className}${isOver ? dropClassName : ''}`}
-      style={{ cursor: 'move', ...style }}
-      {...restProps}
-    />
-  );
-};
-
 const Env = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const columns: any = [
@@ -392,30 +348,68 @@ const Env = () => {
   const vComponents = useMemo(() => {
     return VList({
       height: tableScrollHeight!,
+      resetTopWhenDataChange: false,
     });
   }, [tableScrollHeight]);
-  // const components = useMemo(() => {
-  //   return {
-  //     ...vlistComponent,
-  //     body: {
-  //       ...vlistComponent.body,
-  //       row: DragableBodyRow
-  //     },
-  //     header: {
-  //       cell: ResizableTitle
-  //     }
-  //   };
-  // }, []);
-  const components = {
-    ...vComponents,
-    body: {
-      ...vComponents.body,
-      row: DragableBodyRow,
-    },
+
+  const DragableBodyRow = (props: any) => {
+    const { index, moveRow, className, style, ...restProps } = props;
+    const ref = useRef();
+    const [{ isOver, dropClassName }, drop] = useDrop({
+      accept: type,
+      collect: (monitor) => {
+        const { index: dragIndex } = (monitor.getItem() as any) || {};
+        if (dragIndex === index) {
+          return {};
+        }
+        return {
+          isOver: monitor.isOver(),
+          dropClassName:
+            dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
+        };
+      },
+      drop: (item: any) => {
+        moveRow(item.index, index);
+      },
+    });
+    const [, drag] = useDrag({
+      type,
+      item: { index },
+      collect: (monitor) => ({
+        isDragging: monitor.isDragging(),
+      }),
+    });
+
+    useEffect(() => {
+      drop(drag(ref));
+    }, [drag, drop]);
+
+    const components = useMemo(() => vComponents.body.row, []);
+
+    const tempProps = useMemo(() => {
+      return {
+        ref: ref,
+        className: `${className}${isOver ? dropClassName : ''}`,
+        style: { cursor: 'move', ...style },
+        ...restProps,
+      };
+    }, [className, dropClassName, restProps, style, isOver]);
+
+    return <> {components(tempProps, ref)} </>;
   };
 
+  const components = useMemo(() => {
+    return {
+      ...vComponents,
+      body: {
+        ...vComponents.body,
+        row: DragableBodyRow,
+      },
+    };
+  }, [vComponents]);
+
   const moveRow = useCallback(
-    (dragIndex, hoverIndex) => {
+    (dragIndex: number, hoverIndex: number) => {
       if (dragIndex === hoverIndex) {
         return;
       }
