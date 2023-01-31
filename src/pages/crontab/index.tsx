@@ -721,32 +721,13 @@ const Crontab = () => {
     }
   };
 
-  const handleCancel = (cron?: any) => {
+  const handleCancel = () => {
     setIsModalVisible(false);
-    if (cron) {
-      handleCrons(cron);
-    }
+    getCrons();
   };
 
   const onSearch = (value: string) => {
     setSearchText(value.trim());
-  };
-
-  const handleCrons = (cron: any) => {
-    const index = value.findIndex((x) => x.id === cron.id);
-    const result = [...value];
-    cron.nextRunTime = cron_parser
-      .parseExpression(cron.schedule)
-      .next()
-      .toDate();
-    if (index === -1) {
-      result.unshift(cron);
-    } else {
-      result.splice(index, 1, {
-        ...cron,
-      });
-    }
-    setValue(result);
   };
 
   const getCronDetail = (cron: any) => {

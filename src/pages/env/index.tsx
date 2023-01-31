@@ -323,26 +323,12 @@ const Env = () => {
 
   const handleCancel = (env?: any[]) => {
     setIsModalVisible(false);
-    env && handleEnv(env);
+    getEnvs();
   };
 
   const handleEditNameCancel = (env?: any[]) => {
     setIsEditNameModalVisible(false);
     getEnvs();
-  };
-
-  const handleEnv = (env: any) => {
-    const result = [...value];
-    const index = value.findIndex((x) => x.id === env.id);
-    if (index === -1) {
-      env = Array.isArray(env) ? env : [env];
-      result.push(...env);
-    } else {
-      result.splice(index, 1, {
-        ...env,
-      });
-    }
-    setValue(result);
   };
 
   const vComponents = useMemo(() => {
