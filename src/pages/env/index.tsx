@@ -1,4 +1,10 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, {
+  useCallback,
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+} from 'react';
 import {
   Button,
   message,
@@ -33,6 +39,8 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import Copy from '../../components/copy';
+import { VList } from 'virtuallist-antd';
+
 const { Text } = Typography;
 const { Search } = Input;
 
@@ -381,8 +389,27 @@ const Env = () => {
     setValue(result);
   };
 
+  const vComponents = useMemo(() => {
+    return VList({
+      height: tableScrollHeight!,
+    });
+  }, [tableScrollHeight]);
+  // const components = useMemo(() => {
+  //   return {
+  //     ...vlistComponent,
+  //     body: {
+  //       ...vlistComponent.body,
+  //       row: DragableBodyRow
+  //     },
+  //     header: {
+  //       cell: ResizableTitle
+  //     }
+  //   };
+  // }, []);
   const components = {
+    ...vComponents,
     body: {
+      ...vComponents.body,
       row: DragableBodyRow,
     },
   };
