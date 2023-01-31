@@ -157,7 +157,7 @@ const Crontab = () => {
       },
     },
     {
-      title: '命令',
+      title: '命令/脚本',
       dataIndex: 'command',
       key: 'command',
       width: 300,
