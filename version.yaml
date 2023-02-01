@@ -1,7 +1,8 @@
-version: 2.15.5
-changeLogLink: https://t.me/jiao_long/356
+version: 2.15.6
+changeLogLink: https://t.me/jiao_long/358
 changeLog: |
-  1. 修复定时任务命令不以task开头时，不能自动执行
-  2. 修改服务异常逻辑
-  3. 修复退出调试报错
-  4. 修复脚本编辑器加载慢
+  1. 修复定时任务数据量大时卡顿，丝滑滚动
+  2. 修复查看运行中任务日志时自动向下滚动
+  3. 支持SMTP邮件通知，感谢 https://github.com/WankkoRee，https://github.com/catlair
+  4. 修改资源通知逻辑
+  5. 其他bug修复
