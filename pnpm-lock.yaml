@@ -89,7 +89,7 @@ specifiers:
   umi-request: ^1.4.0
   uuid: ^8.3.2
   vh-check: ^2.0.5
-  virtuallist-antd: ^0.7.5
+  virtuallist-antd: ^0.7.6
   webpack: ^5.70.0
   winston: ^3.6.0
   yargs: ^17.3.1
@@ -188,7 +188,7 @@ devDependencies:
   typescript: 4.8.4
   umi-request: 1.4.0
   vh-check: 2.0.5
-  virtuallist-antd: 0.7.5_antd@4.24.7+react@18.2.0
+  virtuallist-antd: 0.7.6_antd@4.24.7+react@18.2.0
   webpack: 5.75.0
   yorkie: 2.0.0
 
@@ -14854,8 +14854,8 @@ packages:
     resolution: {integrity: sha512-vHtIYWt9uLl2P2tLlatVpMwv9+ezuJCtMNjUVIpzd5Pa/dJXN8AtqkKmVRcNSlmXyCjkCkbMQX/Vs9axmdlfgg==}
     dev: true
 
-  /virtuallist-antd/0.7.5_antd@4.24.7+react@18.2.0:
-    resolution: {integrity: sha512-Z+nyvaqEFo6fw61p+GlM13kjSofFefnEL6siOoOcVQSZpkrx6qkLmFXaoyAR21dZgjEULwCrJdObPAqSZwXpkQ==}
+  /virtuallist-antd/0.7.6_antd@4.24.7+react@18.2.0:
+    resolution: {integrity: sha512-mVlxseQBpdJ4o0KRu1UTIewKQlz44VWAJfN382sjG+OKB5nbCMuJO1U9kODgLVrjD03uxKcE6bUEAeTfdxjkXA==}
     engines: {node: '>=8', npm: '>=5'}
     peerDependencies:
       antd: ^4.1.0
