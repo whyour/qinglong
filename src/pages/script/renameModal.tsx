@@ -12,7 +12,6 @@ const RenameModal = ({
   visible: boolean;
   handleCancel: () => void;
 }) => {
-  console.log(currentNode);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 

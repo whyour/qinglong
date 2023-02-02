@@ -167,7 +167,6 @@ const ViewManageModal = ({
   };
 
   const onShowChange = (checked: boolean, record: any, index: number) => {
-    console.log(checked);
     request
       .put(`${config.apiPrefix}crons/views/${checked ? 'enable' : 'disable'}`, {
         data: [record.id],
