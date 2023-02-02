@@ -387,7 +387,7 @@ const Script = () => {
 
   const menuAction = (key: string | number) => {
     switch (key) {
-      case 'save':
+      case 'add':
         addFile();
         break;
       case 'edit':
