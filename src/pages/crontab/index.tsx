@@ -269,7 +269,7 @@ const Crontab = () => {
       key: 'status',
       dataIndex: 'status',
       align: 'center' as const,
-      width: 85,
+      width: 88,
       filters: [
         {
           text: '运行中',
