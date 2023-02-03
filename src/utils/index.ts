@@ -152,9 +152,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-        shell, // wechat qq uc 360 2345 sougou liebao maxthon
-        shellVs,
-      },
+          shell, // wechat qq uc 360 2345 sougou liebao maxthon
+          shellVs,
+        },
   );
 
   console.log(
@@ -270,6 +270,29 @@ export function depthFirstSearch<
   })(c);
 
   return c;
+}
+
+export function findNode<T extends Record<string, any> & { children?: T[] }>(
+  children: T[],
+  condition: (column: T) => boolean,
+) {
+  const c = [...children];
+
+  let item;
+  function find(cls: T[] | undefined): T | undefined {
+    if (!cls) return;
+    for (let i = 0; i < cls?.length; i++) {
+      if (condition(cls[i])) {
+        item = cls[i];
+      } else if (cls[i].children) {
+        find(cls[i].children);
+      }
+    }
+  }
+
+  find(c);
+
+  return item;
 }
 
 export function logEnded(log: string): boolean {

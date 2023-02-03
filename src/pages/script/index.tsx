@@ -36,7 +36,7 @@ import EditScriptNameModal from './editNameModal';
 import debounce from 'lodash/debounce';
 import { history, useOutletContext, useLocation } from '@umijs/max';
 import { parse } from 'query-string';
-import { depthFirstSearch } from '@/utils';
+import { depthFirstSearch, findNode } from '@/utils';
 import { SharedContext } from '@/layouts';
 import useFilterTreeData from '@/hooks/useFilterTreeData';
 import uniq from 'lodash/uniq';
@@ -80,7 +80,7 @@ const Script = () => {
         if (code === 200) {
           setData(data);
           initState();
-          initGetScript();
+          initGetScript(data);
         }
       })
       .finally(() => needLoading && setLoading(false));
@@ -100,7 +100,7 @@ const Script = () => {
       });
   };
 
-  const initGetScript = () => {
+  const initGetScript = (_data: any) => {
     const { p, s } = parse(history.location.search);
     if (s) {
       const vkey = `${p}/${s}`;
@@ -111,8 +111,11 @@ const Script = () => {
           parent: p,
         },
       };
-      setExpandedKeys([p]);
-      onTreeSelect([vkey], obj);
+      const item = findNode(_data, (c) => c.key === obj.node.key);
+      if (item) {
+        setExpandedKeys([p as string]);
+        onTreeSelect([vkey], obj);
+      }
     }
   };
 
