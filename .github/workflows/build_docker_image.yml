@@ -155,7 +155,7 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
           context: .
           file: ./docker/Dockerfile
           push: true
