@@ -48,8 +48,11 @@ handle_log_path() {
   log_dir="${log_dir_tmp%.*}${suffix}"
   log_path="$log_dir/$log_time.log"
   cmd=">> $dir_log/$log_path 2>&1"
-  [[ "$show_log" == "true" ]] && cmd=""
-  make_dir "$dir_log/$log_dir"
+  if [[ "$show_log" == "true" ]]; then
+    cmd=""
+  else
+    make_dir "$dir_log/$log_dir"
+  fi
 }
 
 format_params() {

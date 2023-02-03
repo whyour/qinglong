@@ -263,7 +263,6 @@ const Crontab = () => {
           .replace(' 24:', ' 00:');
       },
     },
-
     {
       title: '状态',
       key: 'status',
