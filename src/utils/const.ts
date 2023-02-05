@@ -1,1 +1,1 @@
-export const LOG_END_SYMBOL = '\n　　　　　　　　　　';
+export const LOG_END_SYMBOL = '　　　　　';

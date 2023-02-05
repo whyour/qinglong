@@ -179,3 +179,15 @@ tr.drop-over-upward td {
     margin-left: 40px;
   }
 }
+
+.log-modal {
+  .log-container {
+    overflow-y: auto;
+    min-height: 300px;
+    max-height: calc(80vh - 110px);
+    max-height: calc(80vh - var(--vh-offset, 110px));
+
+    padding: 24px;
+    margin: -24px;
+  }
+}

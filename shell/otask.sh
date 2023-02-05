@@ -124,8 +124,7 @@ handle_task_after() {
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
 
-  echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒"
-  echo -e "\n　　　　　"
+  echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
 
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
 }

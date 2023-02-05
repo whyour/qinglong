@@ -499,8 +499,7 @@ main() {
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
-    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒" $cmd
-    eval echo -e "\\\n　　　　　　　　　　" $cmd
+    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒　　　　　" $cmd
   fi
 
   if [[ -f $file_path ]]; then

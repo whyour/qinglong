@@ -34,6 +34,7 @@ const CronLogModal = ({
   const [loading, setLoading] = useState<any>(true);
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
+  const scrollInfoRef = useRef({ value: 0, down: true });
 
   const getCronLog = (isFirst?: boolean) => {
     if (isFirst) {
@@ -44,17 +45,19 @@ const CronLogModal = ({
       .then(({ code, data }) => {
         if (
           code === 200 &&
-          localStorage.getItem('logCron') === String(cron.id)
+          localStorage.getItem('logCron') === String(cron.id) &&
+          data !== value
         ) {
           const log = data as string;
           setValue(log || '暂无日志');
-          const hasNext = log && !logEnded(log) && !log.includes('重启面板') && !log.includes('任务未运行或运行失败，请尝试手动运行');
+          const hasNext = Boolean(
+            log &&
+              !logEnded(log) &&
+              !log.includes('重启面板') &&
+              !log.includes('任务未运行或运行失败，请尝试手动运行'),
+          );
           setExecuting(hasNext);
-          setTimeout(() => {
-            document
-              .querySelector('#log-flag')!
-              .scrollIntoView({ behavior: 'smooth' });
-          }, 1000);
+          autoScroll();
           if (hasNext) {
             setTimeout(() => {
               getCronLog();
@@ -92,9 +95,31 @@ const CronLogModal = ({
       });
   };
 
+  const autoScroll = () => {
+    if (!scrollInfoRef.current.down) {
+      return;
+    }
+
+    setTimeout(() => {
+      document
+        .querySelector('#log-flag')!
+        .scrollIntoView({ behavior: 'smooth' });
+    }, 1000);
+  };
+
   const cancel = () => {
     localStorage.removeItem('logCron');
     handleCancel();
+  };
+
+  const handleScroll = (e) => {
+    const sTop = e.target.scrollTop;
+    if (scrollInfoRef.current.down) {
+      scrollInfoRef.current = {
+        value: sTop,
+        down: sTop > scrollInfoRef.current.value,
+      };
+    }
   };
 
   const titleElement = () => {
@@ -141,24 +166,26 @@ const CronLogModal = ({
         </Button>,
       ]}
     >
-      {loading ? (
-        <PageLoading />
-      ) : (
-        <pre
-          style={
-            isPhone
-              ? {
-                  fontFamily: 'Source Code Pro',
-                  width: 375,
-                  zoom: 0.83,
-                }
-              : {}
-          }
-        >
-          {value}
-        </pre>
-      )}
-      <div id="log-flag"></div>
+      <div onScroll={handleScroll} className="log-container">
+        {loading ? (
+          <PageLoading />
+        ) : (
+          <pre
+            style={
+              isPhone
+                ? {
+                    fontFamily: 'Source Code Pro',
+                    width: 375,
+                    zoom: 0.83,
+                  }
+                : {}
+            }
+          >
+            {value}
+          </pre>
+        )}
+        <div id="log-flag"></div>
+      </div>
     </Modal>
   );
 };

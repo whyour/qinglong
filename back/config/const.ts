@@ -1,4 +1,4 @@
-export const LOG_END_SYMBOL = '\n　　　　　　　　　　';
+export const LOG_END_SYMBOL = '　　　　　';
 
 export const TASK_COMMAND = 'task';
 export const QL_COMMAND = 'ql';
