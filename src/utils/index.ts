@@ -1,4 +1,5 @@
 import { LOG_END_SYMBOL } from './const';
+import cron_parser from 'cron-parser';
 
 export default function browserType() {
   // 权重：系统 + 系统版本 > 平台 > 内核 + 载体 + 内核版本 + 载体版本 > 外壳 + 外壳版本
@@ -325,4 +326,15 @@ export function getCommandScript(
     p = '';
   }
   return [s, p];
+}
+
+export function parseCrontab(schedule: string): Date {
+  try {
+    const time = cron_parser.parseExpression(schedule);
+    if (time) {
+      return time.next().toDate();
+    }
+  } catch (error) {}
+
+  return new Date('1970');
 }

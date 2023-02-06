@@ -13,7 +13,6 @@ import {
   spawn,
 } from 'child_process';
 import fs from 'fs';
-import cron_parser from 'cron-parser';
 import {
   getFileContentByName,
   concurrentRun,
