@@ -125,6 +125,10 @@ let AIBOTK_NAME = '';
 //FSKEY 飞书机器人的 FSKEY
 let FSKEY = '';
 
+// =======================================自定义通知设置区域=======================================
+// 自定义通知 接收回调的URL
+let CUSTOM_URL = '';
+
 // =======================================SMTP 邮件设置区域=======================================
 // SMTP_SERVER: 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
 // SMTP_SSL: 填写 SMTP 发送邮件服务器是否使用 SSL，内容应为 true 或 false
@@ -278,6 +282,9 @@ if (process.env.SMTP_PASSWORD) {
 if (process.env.SMTP_NAME) {
   SMTP_NAME = process.env.SMTP_NAME;
 }
+if (process.env.CUSTOM_URL) {
+    CUSTOM_URL = process.env.CUSTOM_URL;
+}
 //==========================云端环境变量的判断与接收=========================
 
 /**
@@ -316,6 +323,7 @@ async function sendNotify(
     aibotkNotify(text, desp), //智能微秘书
     fsBotNotify(text, desp), //飞书机器人
     smtpNotify(text, desp), //SMTP 邮件
+    customNotify(text, desp), //自定义通知
   ]);
 }
 
@@ -1095,6 +1103,42 @@ function smtpNotify(text, desp) {
       resolve();
     }
   });
+}
+
+function customNotify(text, desp) {
+    return new Promise((resolve) => {
+        const options = {
+            url: `${CUSTOM_URL}`,
+            json: {
+                title: text,
+                content: desp
+            },
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            timeout,
+        };
+        if (CUSTOM_URL) {
+            $.post(options, (err, resp, data) => {
+                try {
+                    if (err) {
+                        console.log('自定义发送通知消息失败！！\n');
+                        console.log(err);
+                    } else {
+                        data = JSON.parse(data);
+                        console.log('自定义发送通知消息成功🎉。\n');
+                        console.log(data);
+                    }
+                } catch (e) {
+                    $.logErr(e, resp);
+                } finally {
+                    resolve(data);
+                }
+            });
+        } else {
+            resolve();
+        }
+    });
 }
 
 module.exports = {
