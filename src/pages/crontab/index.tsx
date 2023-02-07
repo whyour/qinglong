@@ -924,6 +924,7 @@ const Crontab = () => {
   const vComponents = useMemo(() => {
     return VList({
       height: tableScrollHeight!,
+      resetTopWhenDataChange: false,
     });
   }, [tableScrollHeight]);
 
