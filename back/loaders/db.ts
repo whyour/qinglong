@@ -36,6 +36,16 @@ export default async () => {
     try {
       await sequelize.query('alter table CrontabViews add column type NUMBER');
     } catch (error) {}
+    try {
+      await sequelize.query(
+        'alter table Subscriptions add column autoAddCron NUMBER',
+      );
+    } catch (error) {}
+    try {
+      await sequelize.query(
+        'alter table Subscriptions add column autoDelCron NUMBER',
+      );
+    } catch (error) {}
 
     // 2.10-2.11 升级
     const cronDbFile = path.join(config.rootPath, 'db/crontab.db');

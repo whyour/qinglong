@@ -84,13 +84,17 @@ export default class SubscriptionService {
       branch,
       extensions,
       proxy,
+      autoAddCron,
+      autoDelCron,
     } = doc;
     if (type === 'file') {
       command += `raw "${_url}"`;
     } else {
       command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
         dependences || ''
-      }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}"`;
+      }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${
+        Boolean(autoAddCron) || ''
+      }" "${Boolean(autoDelCron) || ''}"`;
     }
     return command;
   }
@@ -280,7 +284,8 @@ export default class SubscriptionService {
   }
 
   public async update(payload: Subscription): Promise<Subscription> {
-    const newDoc = await this.updateDb(payload);
+    const tab = new Subscription(payload);
+    const newDoc = await this.updateDb(tab);
     await this.handleTask(newDoc, !newDoc.is_disabled);
     return newDoc;
   }

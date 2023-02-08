@@ -118,6 +118,8 @@ update_repo() {
   local branch="$5"
   local extensions="$6"
   local proxy="$7"
+  local autoAddCron="$8"
+  local autoDelCron="$9"
   local tmp="${url%/*}"
   local authorTmp1="${tmp##*/}"
   local authorTmp2="${authorTmp1##*:}"
@@ -137,7 +139,7 @@ update_repo() {
   fi
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新${repo_path}成功...\n"
-    diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions"
+    diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
   else
     echo -e "\n更新${repo_path}失败，请检查网络...\n"
   fi
@@ -288,6 +290,15 @@ diff_scripts() {
   local blackword="$4"
   local dependence="$5"
   local extensions="$6"
+  local autoAddCron="$7"
+  local autoDelCron="$8"
+  
+  if [[ ! $autoAddCron ]];then
+    autoAddCron=${AutoAddCron}
+  fi
+  if [[ ! $autoDelCron ]];then
+    autoDelCron=${AutoDelCron}
+  fi
 
   gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions"
 
@@ -297,13 +308,13 @@ diff_scripts() {
 
   if [[ -s $list_drop ]]; then
     output_list_add_drop $list_drop "失效"
-    if [[ ${AutoDelCron} == true ]]; then
+    if [[ ${autoDelCron} == true ]]; then
       del_cron $list_drop $uniq_path
     fi
   fi
   if [[ -s $list_add ]]; then
     output_list_add_drop $list_add "新"
-    if [[ ${AutoAddCron} == true ]]; then
+    if [[ ${autoAddCron} == true ]]; then
       add_cron $list_add $uniq_path
     fi
   fi
@@ -404,13 +415,16 @@ main() {
   done
   [[ "$show_log" == "true" ]] && shift $(($OPTIND - 1))
 
-  local p1=$1
-  local p2=$2
-  local p3=$3
-  local p4=$4
-  local p5=$5
-  local p6=$6
-  local p7=$7
+  local p1="${1}"
+  local p2="${2}"
+  local p3="${3}"
+  local p4="${4}"
+  local p5="${5}"
+  local p6="${6}"
+  local p7="${7}"
+  local p8="${8}"
+  local p9="${9}"
+  local p10="${10}"
   local log_dir="${p1}"
   make_dir "$dir_log/$log_dir"
   local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
@@ -452,7 +466,7 @@ main() {
   repo)
     get_uniq_path "$p2" "$p6"
     if [[ -n $p2 ]]; then
-      update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7" "$p8"
+      update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7" "$p8" "$p9" "$p10"
     else
       eval echo -e "命令输入错误...\\\n" $cmd
       eval usage $cmd

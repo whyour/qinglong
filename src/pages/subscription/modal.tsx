@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, message, InputNumber, Form, Radio, Select, Input } from 'antd';
+import {
+  Modal,
+  message,
+  InputNumber,
+  Form,
+  Radio,
+  Select,
+  Input,
+  Switch,
+} from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import cron_parser from 'cron-parser';
@@ -26,7 +35,11 @@ const SubscriptionModal = ({
   const handleOk = async (values: any) => {
     setLoading(true);
     const method = subscription ? 'put' : 'post';
-    const payload = { ...values };
+    const payload = {
+      ...values,
+      autoAddCron: Boolean(values.autoAddCron),
+      autoDelCron: Boolean(values.autoDelCron),
+    };
     if (subscription) {
       payload.id = subscription.id;
     }
@@ -110,8 +123,8 @@ const SubscriptionModal = ({
       }
     };
 
-    const numberChange = (value: number) => {
-      setIntervalNumber(value);
+    const numberChange = (value: number | null) => {
+      setIntervalNumber(value || 1);
       if (!value) {
         onChange?.(null);
       } else {
@@ -451,6 +464,24 @@ const SubscriptionModal = ({
                 : 'HTTP/SOCK5代理，例如 http://127.0.0.1:1080'
             }
           />
+        </Form.Item>
+        <Form.Item style={{ marginBottom: 0 }} className="inline-form-item">
+          <Form.Item
+            name="autoAddCron"
+            label="自动添加任务"
+            valuePropName="checked"
+            initialValue={true}
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            name="autoDelCron"
+            label="自动删除任务"
+            valuePropName="checked"
+            initialValue={true}
+          >
+            <Switch />
+          </Form.Item>
         </Form.Item>
       </Form>
     </Modal>

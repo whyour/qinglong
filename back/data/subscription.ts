@@ -29,6 +29,8 @@ export class Subscription {
   sub_before?: string;
   sub_after?: string;
   proxy?: string;
+  autoAddCron?: 1 | 0;
+  autoDelCron?: 1 | 0;
 
   constructor(options: Subscription) {
     this.id = options.id;
@@ -56,6 +58,8 @@ export class Subscription {
     this.sub_before = options.sub_before;
     this.sub_after = options.sub_after;
     this.proxy = options.proxy;
+    this.autoAddCron = options.autoAddCron ? 1 : 0;
+    this.autoDelCron = options.autoDelCron ? 1 : 0;
   }
 }
 
@@ -105,5 +109,7 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
     schedule_type: DataTypes.STRING,
     alias: { type: DataTypes.STRING, unique: 'alias' },
     proxy: { type: DataTypes.STRING, allowNull: true },
+    autoAddCron: { type: DataTypes.NUMBER, allowNull: true },
+    autoDelCron: { type: DataTypes.NUMBER, allowNull: true },
   },
 );
