@@ -1,8 +1,10 @@
-version: 2.15.6
-changeLogLink: https://t.me/jiao_long/358
+version: 2.15.7
+changeLogLink: https://t.me/jiao_long/363
 changeLog: |
-  1. 修复定时任务数据量大时卡顿，丝滑滚动
-  2. 修复查看运行中任务日志时自动向下滚动
-  3. 支持SMTP邮件通知，感谢 https://github.com/WankkoRee，https://github.com/catlair
-  4. 修改资源通知逻辑
-  5. 其他bug修复
+  1. 订阅支持自动添加和删除任务设置
+  2. 增加 ppc64le/s390x/386 镜像
+  3. 修改 curl 等命令参数处理逻辑
+  4. 修复移动端新建脚本
+  5. 修改任务日志自动滚动逻辑
+  6. 修复查看任务日志，列表位置重置
+  7. 其他优化
