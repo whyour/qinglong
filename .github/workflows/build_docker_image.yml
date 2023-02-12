@@ -3,6 +3,7 @@ name: Build And Push Docker Image
 on:
   push:
     branches:
+      - 'master'
       - 'develop'
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
@@ -84,6 +85,8 @@ jobs:
           git push --force --quiet gitlab ${GITHUB_BRANCH}:${GITHUB_BRANCH}
 
   build:
+    if: github.ref != 'refs/heads/master'
+
     needs: build-static
 
     runs-on: ubuntu-latest
