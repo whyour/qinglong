@@ -132,11 +132,11 @@ let FSKEY = '';
 
 // =======================================自定义通知设置区域=======================================
 // 自定义通知 接收回调的URL
-let WEBHOOK_URL = 'http://192.168.117.1:7788';
-let WEBHOOK_BODY = 'title: $title \n content: $content';
+let WEBHOOK_URL = '';
+let WEBHOOK_BODY = '';
 let WEBHOOK_HEADERS = '';
-let WEBHOOK_METHOD = 'post';
-let WEBHOOK_CONTENT_TYPE = 'application/json';
+let WEBHOOK_METHOD = '';
+let WEBHOOK_CONTENT_TYPE = '';
 
 // =======================================SMTP 邮件设置区域=======================================
 // SMTP_SERVER: 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
