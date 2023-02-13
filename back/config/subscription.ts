@@ -17,7 +17,7 @@ export function formatUrl(doc: Subscription) {
 }
 
 export function formatCommand(doc: Subscription, url?: string) {
-  let command = 'ql ';
+  let command = `SUB_ID=${doc.id} ql `;
   let _url = url || formatUrl(doc).url;
   const {
     type,

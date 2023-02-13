@@ -326,7 +326,7 @@ git_pull_scripts() {
   local branch="$2"
   local proxy="$3"
   cd $dir_work
-  echo -e "开始更新仓库：$dir_work\n"
+  echo -e "开始更新仓库：$dir_work"
 
   set_proxy "$proxy"
   git fetch --all

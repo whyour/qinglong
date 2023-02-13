@@ -17,6 +17,7 @@ export class Crontab {
   labels?: string[];
   last_running_time?: number;
   last_execution_time?: number;
+  sub_id?: number;
 
   constructor(options: Crontab) {
     this.name = options.name;
@@ -37,6 +38,7 @@ export class Crontab {
     this.labels = options.labels || [];
     this.last_running_time = options.last_running_time || 0;
     this.last_execution_time = options.last_execution_time || 0;
+    this.sub_id = options.sub_id;
   }
 }
 
@@ -72,4 +74,5 @@ export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   labels: DataTypes.JSON,
   last_running_time: DataTypes.NUMBER,
   last_execution_time: DataTypes.NUMBER,
+  sub_id: { type: DataTypes.NUMBER, allowNull: true },
 });

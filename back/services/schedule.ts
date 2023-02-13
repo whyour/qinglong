@@ -63,8 +63,8 @@ export default class ScheduleService {
         });
 
         cp.stderr.on('data', async (data) => {
-          this.logger.error(
-            '执行任务 %s 失败，时间：%s, 错误信息：%j',
+          this.logger.info(
+            '[执行任务失败] %s，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
             data.toString(),
@@ -74,7 +74,7 @@ export default class ScheduleService {
 
         cp.on('error', async (err) => {
           this.logger.error(
-            '创建任务 %s 失败，时间：%s, 错误信息：%j',
+            '[创建任务失败] %s，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
             err,
@@ -84,7 +84,7 @@ export default class ScheduleService {
 
         cp.on('exit', async (code, signal) => {
           this.logger.info(
-            `任务 ${command} 进程id: ${cp.pid} 退出，退出码 ${code}`,
+            `[任务退出] ${command} 进程id: ${cp.pid}，退出码 ${code}`,
           );
         });
 

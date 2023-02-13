@@ -19,10 +19,12 @@ add_cron_api() {
     local schedule=$(echo "$1" | awk -F ":" '{print $1}')
     local command=$(echo "$1" | awk -F ":" '{print $2}')
     local name=$(echo "$1" | awk -F ":" '{print $3}')
+    local sub_id=$(echo "$1" | awk -F ":" '{print $4}')
   else
     local schedule=$1
     local command=$2
     local name=$3
+    local sub_id=$4
   fi
 
   local api=$(
@@ -34,11 +36,11 @@ add_cron_api() {
       -H "Origin: http://0.0.0.0:5700" \
       -H "Referer: http://0.0.0.0:5700/crontab" \
       -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
-      --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\"}" \
+      --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\",\"sub_id\":$sub_id}" \
       --compressed
   )
-  code=$(echo $api | jq -r .code)
-  message=$(echo $api | jq -r .message)
+  code=$(echo "$api" | jq -r .code)
+  message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
     echo -e "$name -> 添加成功"
   else
@@ -73,8 +75,8 @@ update_cron_api() {
       --data-raw "{\"name\":\"$name\",\"command\":\"$command\",\"schedule\":\"$schedule\",\"id\":\"$id\"}" \
       --compressed
   )
-  code=$(echo $api | jq -r .code)
-  message=$(echo $api | jq -r .message)
+  code=$(echo "$api" | jq -r .code)
+  message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
     echo -e "$name -> 更新成功"
   else
@@ -105,8 +107,8 @@ update_cron_command_api() {
       --data-raw "{\"command\":\"$command\",\"id\":\"$id\"}" \
       --compressed
   )
-  code=$(echo $api | jq -r .code)
-  message=$(echo $api | jq -r .message)
+  code=$(echo "$api" | jq -r .code)
+  message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
     echo -e "$command -> 更新成功"
   else
@@ -130,8 +132,8 @@ del_cron_api() {
       --data-raw "[$ids]" \
       --compressed
   )
-  code=$(echo $api | jq -r .code)
-  message=$(echo $api | jq -r .message)
+  code=$(echo "$api" | jq -r .code)
+  message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
     echo -e "成功"
   else
@@ -160,8 +162,8 @@ update_cron() {
       --data-raw "{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime}" \
       --compressed
   )
-  code=$(echo $api | jq -r .code)
-  message=$(echo $api | jq -r .message)
+  code=$(echo "$api" | jq -r .code)
+  message=$(echo "$api" | jq -r .message)
   if [[ $code != 200 ]]; then
     echo -e "\n## 更新任务状态失败(${message})\n" >>$dir_log/$log_path
   fi
@@ -184,8 +186,8 @@ notify_api() {
       --data-raw "{\"title\":\"$title\",\"content\":\"$content\"}" \
       --compressed
   )
-  code=$(echo $api | jq -r .code)
-  message=$(echo $api | jq -r .message)
+  code=$(echo "$api" | jq -r .code)
+  message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
     echo -e "通知发送成功"
   else

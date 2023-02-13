@@ -110,7 +110,6 @@ export default class SshKeyService {
           (doc.pull_option as any).private_key,
         );
         const config = this.generateSingleSshConfig(alias, host, proxy);
-        console.log(config);
         result.push(config);
       }
     }

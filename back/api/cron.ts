@@ -160,6 +160,7 @@ export default (app: Router) => {
         schedule: Joi.string().required(),
         name: Joi.string().optional(),
         labels: Joi.array().optional(),
+        sub_id: Joi.number().optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -316,6 +317,7 @@ export default (app: Router) => {
         command: Joi.string().required(),
         schedule: Joi.string().required(),
         name: Joi.string().optional().allow(null),
+        sub_id: Joi.number().optional().allow(null),
         id: Joi.number().required(),
       }),
     }),
