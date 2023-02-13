@@ -41,11 +41,6 @@ export default async () => {
   // 运行所有订阅
   const subs = await subscriptionService.list();
   for (const sub of subs) {
-    await subscriptionService.handleTask(
-      sub,
-      !sub.is_disabled,
-      true,
-      !sub.is_disabled,
-    );
+    subscriptionService.handleTask(sub, !sub.is_disabled, !sub.is_disabled);
   }
 };

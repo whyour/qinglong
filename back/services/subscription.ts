@@ -29,6 +29,7 @@ import SockService from './sock';
 import SshKeyService from './sshKey';
 import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
+import { formatCommand, formatUrl } from '../config/subscription';
 
 @Service()
 export default class SubscriptionService {
@@ -73,69 +74,14 @@ export default class SubscriptionService {
     }
   }
 
-  private formatCommand(doc: Subscription, url?: string) {
-    let command = 'ql ';
-    let _url = url || this.formatUrl(doc).url;
-    const {
-      type,
-      whitelist,
-      blacklist,
-      dependences,
-      branch,
-      extensions,
-      proxy,
-      autoAddCron,
-      autoDelCron,
-    } = doc;
-    if (type === 'file') {
-      command += `raw "${_url}"`;
-    } else {
-      command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
-        dependences || ''
-      }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${
-        Boolean(autoAddCron) || ''
-      }" "${Boolean(autoDelCron) || ''}"`;
-    }
-    return command;
-  }
-
-  private formatUrl(doc: Subscription) {
-    let url = doc.url;
-    let host = '';
-    if (doc.type === 'private-repo') {
-      if (doc.pull_type === 'ssh-key') {
-        host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
-        url = doc.url!.replace(host, doc.alias);
-      } else {
-        host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
-        const { username, password } = doc.pull_option as any;
-        url = doc.url!.replace(host, `${username}:${password}@${host}`);
-      }
-    }
-    return { url, host };
-  }
-
   public async handleTask(
     doc: Subscription,
     needCreate = true,
-    needAddKey = true,
     runImmediately = false,
   ) {
-    const { url, host } = this.formatUrl(doc);
-    if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
-      if (needAddKey) {
-        this.sshKeyService.addSSHKey(
-          (doc.pull_option as any).private_key,
-          doc.alias,
-          host,
-          doc.proxy,
-        );
-      } else {
-        this.sshKeyService.removeSSHKey(doc.alias, host, doc.proxy);
-      }
-    }
+    const { url } = formatUrl(doc);
 
-    doc.command = this.formatCommand(doc, url as string);
+    doc.command = formatCommand(doc, url as string);
 
     if (doc.schedule_type === 'crontab') {
       this.scheduleService.cancelCronTask(doc as any);
@@ -156,6 +102,11 @@ export default class SubscriptionService {
           this.taskCallbacks(doc),
         ));
     }
+  }
+
+  private async setSshConfig() {
+    const docs = await SubscriptionModel.findAll();
+    this.sshKeyService.setSshConfig(docs);
   }
 
   private async promiseExec(command: string): Promise<string> {
@@ -276,6 +227,7 @@ export default class SubscriptionService {
     const tab = new Subscription(payload);
     const doc = await this.insert(tab);
     await this.handleTask(doc);
+    await this.setSshConfig();
     return doc;
   }
 
@@ -287,6 +239,7 @@ export default class SubscriptionService {
     const tab = new Subscription(payload);
     const newDoc = await this.updateDb(tab);
     await this.handleTask(newDoc, !newDoc.is_disabled);
+    await this.setSshConfig();
     return newDoc;
   }
 
@@ -329,9 +282,10 @@ export default class SubscriptionService {
   public async remove(ids: number[]) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
-      await this.handleTask(doc, false, false);
+      await this.handleTask(doc, false);
     }
     await SubscriptionModel.destroy({ where: { id: ids } });
+    await this.setSshConfig();
   }
 
   public async getDb(query: any): Promise<Subscription> {
@@ -382,7 +336,7 @@ export default class SubscriptionService {
       return;
     }
 
-    const command = this.formatCommand(subscription);
+    const command = formatCommand(subscription);
 
     await this.scheduleService.runTask(
       command,
@@ -391,19 +345,21 @@ export default class SubscriptionService {
   }
 
   public async disabled(ids: number[]) {
+    await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    await this.setSshConfig();
     for (const doc of docs) {
       await this.handleTask(doc, false);
     }
-    await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
   }
 
   public async enabled(ids: number[]) {
+    await SubscriptionModel.update({ is_disabled: 0 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    await this.setSshConfig();
     for (const doc of docs) {
       await this.handleTask(doc);
     }
-    await SubscriptionModel.update({ is_disabled: 0 }, { where: { id: ids } });
   }
 
   public async log(id: number) {

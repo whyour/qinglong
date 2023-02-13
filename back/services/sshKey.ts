@@ -1,8 +1,10 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import fs from 'fs';
+import fs, { existsSync } from 'fs';
 import os from 'os';
 import path from 'path';
+import { Subscription } from '../data/subscription';
+import { formatUrl } from '../config/subscription';
 
 @Service()
 export default class SshKeyService {
@@ -32,7 +34,10 @@ export default class SshKeyService {
 
   private removePrivateKeyFile(alias: string): void {
     try {
-      fs.unlinkSync(`${this.sshPath}/${alias}`);
+      const filePath = path.join(this.sshPath, alias);
+      if (existsSync(filePath)) {
+        fs.unlinkSync(`${this.sshPath}/${alias}`);
+      }
     } catch (error) {
       this.logger.error('删除私钥文件失败', error);
     }
@@ -47,16 +52,14 @@ export default class SshKeyService {
       host = `ssh.github.com\n    Port 443\n    HostkeyAlgorithms +ssh-rsa\n    PubkeyAcceptedAlgorithms +ssh-rsa`;
     }
     const proxyStr = proxy ? `    ProxyCommand nc -v -x ${proxy} %h %p\n` : '';
-    return `\nHost ${alias}\n    Hostname ${host}\n    IdentityFile ${this.sshPath}/${alias}\n    StrictHostKeyChecking no\n${proxyStr}`;
+    return `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${this.sshPath}/${alias}\n    StrictHostKeyChecking no\n${proxyStr}`;
   }
 
   private generateSshConfig(configs: string[]) {
     try {
-      for (const config of configs) {
-        fs.appendFileSync(this.sshConfigFilePath, config, {
-          encoding: 'utf8',
-        });
-      }
+      fs.writeFileSync(this.sshConfigFilePath, configs.join('\n'), {
+        encoding: 'utf8',
+      });
     } catch (error) {
       this.logger.error('写入ssh配置文件失败', error);
     }
@@ -93,5 +96,24 @@ export default class SshKeyService {
     this.removePrivateKeyFile(alias);
     const config = this.generateSingleSshConfig(alias, host, proxy);
     this.removeSshConfig(config);
+  }
+
+  public setSshConfig(docs: Subscription[]) {
+    let result = [];
+    for (const doc of docs) {
+      if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
+        const { alias, proxy } = doc;
+        const { host } = formatUrl(doc);
+        this.removePrivateKeyFile(alias);
+        this.generatePrivateKeyFile(
+          alias,
+          (doc.pull_option as any).private_key,
+        );
+        const config = this.generateSingleSshConfig(alias, host, proxy);
+        console.log(config);
+        result.push(config);
+      }
+    }
+    this.generateSshConfig(result);
   }
 }

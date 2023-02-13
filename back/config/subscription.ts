@@ -1,0 +1,43 @@
+import { Subscription } from '../data/subscription';
+
+export function formatUrl(doc: Subscription) {
+  let url = doc.url;
+  let host = '';
+  if (doc.type === 'private-repo') {
+    if (doc.pull_type === 'ssh-key') {
+      host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
+      url = doc.url!.replace(host, doc.alias);
+    } else {
+      host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
+      const { username, password } = doc.pull_option as any;
+      url = doc.url!.replace(host, `${username}:${password}@${host}`);
+    }
+  }
+  return { url, host };
+}
+
+export function formatCommand(doc: Subscription, url?: string) {
+  let command = 'ql ';
+  let _url = url || formatUrl(doc).url;
+  const {
+    type,
+    whitelist,
+    blacklist,
+    dependences,
+    branch,
+    extensions,
+    proxy,
+    autoAddCron,
+    autoDelCron,
+  } = doc;
+  if (type === 'file') {
+    command += `raw "${_url}"`;
+  } else {
+    command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
+      dependences || ''
+    }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${
+      Boolean(autoAddCron) ?? ''
+    }" "${Boolean(autoDelCron) ?? ''}"`;
+  }
+  return command;
+}
