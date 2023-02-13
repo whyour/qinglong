@@ -11,8 +11,13 @@
  */
 
 const querystring = require('querystring');
+const got = require("got");
 const $ = new Env();
 const timeout = 15000; //超时时间(单位毫秒)
+const gotOption = {
+  timeout: timeout,
+  retry: 1,
+};
 // =======================================gotify通知设置区域==============================================
 //gotify_url 填写gotify地址,如https://push.example.de:8080
 //gotify_token 填写gotify的消息应用token
@@ -127,7 +132,11 @@ let FSKEY = '';
 
 // =======================================自定义通知设置区域=======================================
 // 自定义通知 接收回调的URL
-let CUSTOM_URL = '';
+let WEBHOOK_URL = 'http://192.168.117.1:7788';
+let WEBHOOK_BODY = 'title: $title \n content: $content';
+let WEBHOOK_HEADERS = '';
+let WEBHOOK_METHOD = 'post';
+let WEBHOOK_CONTENT_TYPE = 'application/json';
 
 // =======================================SMTP 邮件设置区域=======================================
 // SMTP_SERVER: 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
@@ -282,8 +291,20 @@ if (process.env.SMTP_PASSWORD) {
 if (process.env.SMTP_NAME) {
   SMTP_NAME = process.env.SMTP_NAME;
 }
-if (process.env.CUSTOM_URL) {
-    CUSTOM_URL = process.env.CUSTOM_URL;
+if (process.env.WEBHOOK_URL) {
+    WEBHOOK_URL = process.env.WEBHOOK_URL;
+}
+if (process.env.WEBHOOK_BODY) {
+  WEBHOOK_BODY = process.env.WEBHOOK_BODY;
+}
+if (process.env.WEBHOOK_HEADERS) {
+  WEBHOOK_HEADERS = process.env.WEBHOOK_HEADERS;
+}
+if (process.env.WEBHOOK_METHOD) {
+  WEBHOOK_METHOD = process.env.WEBHOOK_METHOD;
+}
+if (process.env.WEBHOOK_CONTENT_TYPE) {
+  WEBHOOK_CONTENT_TYPE = process.env.WEBHOOK_CONTENT_TYPE;
 }
 //==========================云端环境变量的判断与接收=========================
 
@@ -323,7 +344,7 @@ async function sendNotify(
     aibotkNotify(text, desp), //智能微秘书
     fsBotNotify(text, desp), //飞书机器人
     smtpNotify(text, desp), //SMTP 邮件
-    customNotify(text, desp), //自定义通知
+    webhookNotify(text, desp), //自定义通知
   ]);
 }
 
@@ -1105,40 +1126,157 @@ function smtpNotify(text, desp) {
   });
 }
 
-function customNotify(text, desp) {
-    return new Promise((resolve) => {
-        const options = {
-            url: `${CUSTOM_URL}`,
-            json: {
-                title: text,
-                content: desp
-            },
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            timeout,
-        };
-        if (CUSTOM_URL) {
-            $.post(options, (err, resp, data) => {
-                try {
-                    if (err) {
-                        console.log('自定义发送通知消息失败！！\n');
-                        console.log(err);
-                    } else {
-                        data = JSON.parse(data);
-                        console.log('自定义发送通知消息成功🎉。\n');
-                        console.log(data);
-                    }
-                } catch (e) {
-                    $.logErr(e, resp);
-                } finally {
-                    resolve(data);
-                }
-            });
-        } else {
-            resolve();
+function webhookNotify(text, desp) {
+  return new Promise((resolve) => {
+    const {
+      webhookUrl,
+      webhookBody,
+      webhookHeaders,
+      webhookMethod,
+      webhookContentType,
+    } = {
+      webhookUrl: WEBHOOK_URL,
+      webhookBody: WEBHOOK_BODY,
+      webhookHeaders: WEBHOOK_HEADERS,
+      webhookMethod: WEBHOOK_METHOD,
+      webhookContentType: WEBHOOK_CONTENT_TYPE
+    }
+    const {formatBody, formatUrl} = formatNotifyContentFun(
+      webhookUrl,
+      webhookBody,
+      text,
+      desp,
+    );
+    if (!formatUrl && !formatBody) {
+      return false;
+    }
+    const headers = parseHeaders(webhookHeaders);
+    const body = parseBody(formatBody, webhookContentType);
+    const bodyParam = formatBodyFun(webhookContentType, body);
+    const options = {
+      method: webhookMethod,
+      headers,
+      ...gotOption,
+      allowGetBody: true,
+      ...bodyParam,
+    };
+
+    if (WEBHOOK_METHOD) {
+      got(formatUrl, options).then(resp => {
+        try {
+          if (resp.statusCode !== 200) {
+            console.log('自定义发送通知消息失败！！\n');
+            console.log(resp.body);
+          } else {
+            console.log('自定义发送通知消息成功🎉。\n');
+            console.log(resp.body);
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(resp.body);
         }
-    });
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+function parseHeaders(headers) {
+  if (!headers) return {};
+
+  const parsed = {};
+  let key;
+  let val;
+  let i;
+
+  headers &&
+  headers.split('\n').forEach(function parser(line) {
+    i = line.indexOf(':');
+    key = line.substring(0, i).trim().toLowerCase();
+    val = line.substring(i + 1).trim();
+
+    if (!key) {
+      return;
+    }
+
+    parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+  });
+
+  return parsed;
+}
+
+function parseBody(
+  body,
+  contentType
+) {
+  if (!body) return '';
+
+  const parsed = {};
+  let key;
+  let val;
+  let i;
+
+  body &&
+  body.split('\n').forEach(function parser(line) {
+    i = line.indexOf(':');
+    key = line.substring(0, i).trim().toLowerCase();
+    val = line.substring(i + 1).trim();
+
+    if (!key || parsed[key]) {
+      return;
+    }
+
+    try {
+      const jsonValue = JSON.parse(val);
+      parsed[key] = jsonValue;
+    } catch (error) {
+      parsed[key] = val;
+    }
+  });
+
+  switch (contentType) {
+    case 'multipart/form-data':
+      return Object.keys(parsed).reduce((p, c) => {
+        p.append(c, parsed[c]);
+        return p;
+      }, new FormData());
+    case 'application/x-www-form-urlencoded':
+      return Object.keys(parsed).reduce((p, c) => {
+        return p ? `${p}&${c}=${parsed[c]}` : `${c}=${parsed[c]}`;
+      });
+  }
+
+  return parsed;
+}
+
+function formatBodyFun(contentType, body) {
+  if (!body) return {};
+  switch (contentType) {
+    case 'application/json':
+      return {json: body};
+    case 'multipart/form-data':
+      return {form: body};
+    case 'application/x-www-form-urlencoded':
+      return {body};
+  }
+  return {};
+}
+
+function formatNotifyContentFun(url, body, title, content) {
+  if (!url.includes('$title') && !body.includes('$title')) {
+    return {};
+  }
+
+  return {
+    formatUrl: url
+      .replaceAll('$title', encodeURIComponent(title))
+      .replaceAll('$content', encodeURIComponent(content)),
+    formatBody: body
+      .replaceAll('$title', title)
+      .replaceAll('$content', content),
+  };
 }
 
 module.exports = {
