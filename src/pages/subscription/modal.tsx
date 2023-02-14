@@ -15,8 +15,8 @@ import cron_parser from 'cron-parser';
 import isNil from 'lodash/isNil';
 
 const { Option } = Select;
-const repoUrlRegx = /[^\/\:]+\/[^\/]+(?=\.git)/;
-const fileUrlRegx = /[^\/\:]+\/[^\/]+$/;
+const repoUrlRegx = /([^\/\:]+\/[^\/]+)(?=\.git)/;
+const fileUrlRegx = /([^\/\:]+\/[^\/\.]+)\.[a-z]+$/;
 
 const SubscriptionModal = ({
   subscription,
@@ -100,7 +100,7 @@ const SubscriptionModal = ({
     let _alias = '';
     const _regx = _type === 'file' ? fileUrlRegx : repoUrlRegx;
     if (_regx.test(_url)) {
-      _alias = _url.match(_regx)![0].replaceAll('/', '_').replaceAll('.', '_');
+      _alias = _url.match(_regx)![1].replaceAll('/', '_').replaceAll('.', '_');
     }
     if (_branch) {
       _alias = _alias + '_' + _branch;
@@ -232,7 +232,7 @@ const SubscriptionModal = ({
         dependences,
         branch,
         extensions,
-        alias: formatAlias(url, branch),
+        alias: formatAlias(url, branch, _type),
       });
       setType(_type);
     }

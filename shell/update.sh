@@ -147,40 +147,48 @@ update_repo() {
 
 ## 更新所有 raw 文件
 update_raw() {
-  echo -e "--------------------------------------------------------------\n"
   local url="$1"
+  local proxy="$2"
+  local autoAddCron="$3"
+  local autoDelCron="$4"
+
+  if [[ ! $autoAddCron ]];then
+    autoAddCron=${AutoAddCron}
+  fi
+  if [[ ! $autoDelCron ]];then
+    autoDelCron=${AutoDelCron}
+  fi
+
   local raw_url="$url"
   local suffix="${raw_url##*.}"
   local raw_file_name="${uniq_path}.${suffix}"
   echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
 
-  set_proxy
-  wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
-  unset_proxy
+  wget -q --no-check-certificate -e "http_proxy=${proxy};https_proxy=${proxy}" -O "$dir_raw/${raw_file_name}.new" ${raw_url}
 
   if [[ $? -eq 0 ]]; then
     mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
     echo -e "下载 ${raw_file_name} 成功...\n"
-    cd $dir_raw
-    local filename="raw_${raw_file_name}"
-    local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
-    cp -f $raw_file_name $dir_scripts/${filename}
-    cron_line=$(
-      perl -ne "{
-                    print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
-                }" $raw_file_name |
-        perl -pe "{
-                    s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$raw_file_name.*|\1|g;
-                    s|\*([\d\*])(.*)|\1\2|g;
-                    s|  | |g;
-                }" | sort -u | head -1
-    )
-    cron_name=$(grep "new Env" $raw_file_name | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
-    [[ -z $cron_name ]] && cron_name="$raw_file_name"
-    [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | head -1 | xargs)
-    [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
-    [[ -z $cron_line ]] && cron_line="$default_cron"
-    if [[ -z $cron_id ]]; then
+    if [[ -z $cron_id ]] && [[ ${autoAddCron} == true ]]; then
+      cd $dir_raw
+      local filename="raw_${raw_file_name}"
+      local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
+      cp -f $raw_file_name $dir_scripts/${filename}
+      cron_line=$(
+        perl -ne "{
+                      print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
+                  }" $raw_file_name |
+          perl -pe "{
+                      s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$raw_file_name.*|\1|g;
+                      s|\*([\d\*])(.*)|\1\2|g;
+                      s|  | |g;
+                  }" | sort -u | head -1
+      )
+      cron_name=$(grep "new Env" $raw_file_name | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:^.\(.*\).$:\1:' | head -1)
+      [[ -z $cron_name ]] && cron_name="$raw_file_name"
+      [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | head -1 | xargs)
+      [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
+      [[ -z $cron_line ]] && cron_line="$default_cron"
       result=$(add_cron_api "$cron_line:$cmd_task $filename:$cron_name:$SUB_ID")
       echo -e "$result\n"
       notify_api "新增任务通知" "\n$result"
@@ -475,7 +483,7 @@ main() {
   raw)
     get_uniq_path "$p2"
     if [[ -n $p2 ]]; then
-      update_raw "$p2"
+      update_raw "$p2" "$p3" "$p4"
     else
       eval echo -e "命令输入错误...\\\n" $cmd
       eval usage $cmd

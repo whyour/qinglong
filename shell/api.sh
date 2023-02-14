@@ -27,6 +27,10 @@ add_cron_api() {
     local sub_id=$4
   fi
 
+  if [[ ! $sub_id ]];then
+    sub_id="null"
+  fi
+
   local api=$(
     curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons?t=$currentTimeStamp" \
       -H "Accept: application/json" \
