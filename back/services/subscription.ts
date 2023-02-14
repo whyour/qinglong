@@ -68,7 +68,7 @@ export default class SubscriptionService {
           ['createdAt', 'DESC'],
         ],
       });
-      return result as any;
+      return result;
     } catch (error) {
       throw error;
     }

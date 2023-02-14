@@ -12,6 +12,7 @@ import {
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import cron_parser from 'cron-parser';
+import isNil from 'lodash/isNil';
 
 const { Option } = Select;
 const repoUrlRegx = /[^\/\:]+\/[^\/]+(?=\.git)/;
@@ -243,6 +244,14 @@ const SubscriptionModal = ({
     }
   }, []);
 
+  const formatParams = (sub) => {
+    return {
+      ...sub,
+      autoAddCron: isNil(sub.autoAddCron) ? true : Boolean(sub.autoAddCron),
+      autoDelCron: isNil(sub.autoDelCron) ? true : Boolean(sub.autoDelCron),
+    };
+  };
+
   useEffect(() => {
     if (visible) {
       window.addEventListener('paste', onPaste);
@@ -252,7 +261,9 @@ const SubscriptionModal = ({
   }, [visible]);
 
   useEffect(() => {
-    form.setFieldsValue(subscription || {});
+    form.setFieldsValue(
+      { ...subscription, ...formatParams(subscription) } || {},
+    );
     setType((subscription && subscription.type) || 'public-repo');
     setScheduleType((subscription && subscription.schedule_type) || 'crontab');
     setPullType((subscription && subscription.pull_type) || 'ssh-key');

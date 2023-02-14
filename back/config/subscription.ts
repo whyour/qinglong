@@ -1,4 +1,5 @@
 import { Subscription } from '../data/subscription';
+import isNil from 'lodash/isNil';
 
 export function formatUrl(doc: Subscription) {
   let url = doc.url;
@@ -33,11 +34,9 @@ export function formatCommand(doc: Subscription, url?: string) {
   if (type === 'file') {
     command += `raw "${_url}"`;
   } else {
-    command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
-      dependences || ''
-    }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${
-      Boolean(autoAddCron) ?? ''
-    }" "${Boolean(autoDelCron) ?? ''}"`;
+    command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${dependences || ''
+      }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${isNil(autoAddCron) ? true : Boolean(autoAddCron)
+      }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
   }
   return command;
 }
