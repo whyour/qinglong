@@ -139,6 +139,7 @@ const SubscriptionModal = ({
         setIntervalNumber(value.value);
       }
     }, [value]);
+
     return (
       <Input.Group compact>
         <InputNumber
@@ -247,8 +248,8 @@ const SubscriptionModal = ({
   const formatParams = (sub) => {
     return {
       ...sub,
-      autoAddCron: isNil(sub.autoAddCron) ? true : Boolean(sub.autoAddCron),
-      autoDelCron: isNil(sub.autoDelCron) ? true : Boolean(sub.autoDelCron),
+      autoAddCron: isNil(sub?.autoAddCron) ? true : Boolean(sub?.autoAddCron),
+      autoDelCron: isNil(sub?.autoDelCron) ? true : Boolean(sub?.autoDelCron),
     };
   };
 
