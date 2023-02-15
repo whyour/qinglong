@@ -16,7 +16,7 @@ import { Op } from 'sequelize';
 
 @Service()
 export default class EnvService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   public async create(payloads: Env[]): Promise<Env[]> {
     const envs = await this.envs();
@@ -92,13 +92,13 @@ export default class EnvService {
       position: this.getPrecisionPosition(targetPosition),
     });
 
-    await this.checkPosition(targetPosition);
+    await this.checkPosition(targetPosition, envs[toIndex].position!);
     return newDoc;
   }
 
-  private async checkPosition(position: number) {
+  private async checkPosition(position: number, edge: number = 0) {
     const precisionPosition = parseFloat(position.toPrecision(16));
-    if (precisionPosition < minPosition || precisionPosition > maxPosition) {
+    if (precisionPosition < minPosition || precisionPosition > maxPosition || Math.abs(precisionPosition - edge) < minPosition) {
       const envs = await this.envs();
       let position = initPosition;
       for (const env of envs) {

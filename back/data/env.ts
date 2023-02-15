@@ -28,7 +28,7 @@ export enum EnvStatus {
 
 export const maxPosition = 9000000000000000;
 export const initPosition = 4500000000000000;
-export const stepPosition = 10000000;
+export const stepPosition = 10000000000;
 export const minPosition = 100;
 
 interface EnvInstance extends Model<Env, Env>, Env {}
