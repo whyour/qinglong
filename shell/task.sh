@@ -32,8 +32,8 @@ handle_log_path() {
   if [[ ! -z $ID ]]; then
     suffix="_${ID}"
   fi
-  time=$(date "+$time_format")
-  log_time=$(format_log_time "$time_format" "$time")
+  time=$(date "+$mtime_format")
+  log_time=$(format_log_time "$mtime_format" "$time")
   log_dir_tmp="${file_param##*/}"
   if [[ $file_param =~ "/" ]]; then
     if [[ $file_param == /* ]]; then
@@ -57,6 +57,7 @@ handle_log_path() {
 
 format_params() {
   time_format="%Y-%m-%d %H:%M:%S"
+  mtime_format="%Y-%m-%d %H:%M:%S.%3N"
   timeoutCmd=""
   if type timeout &>/dev/null; then
     timeoutCmd="timeout --foreground -s 14 -k 10s $command_timeout_time "
