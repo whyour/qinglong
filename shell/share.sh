@@ -413,9 +413,9 @@ format_log_time() {
   local time="$2"
 
   if [[ $is_macos -eq 1 ]]; then
-    echo $(date -j -f "$format" "$time" "+%Y-%m-%d-%H-%M-%S")
+    echo $(date -j -f "$format" "$time" "+%Y-%m-%d-%H-%M-%S-%3N")
   else
-    echo $(date -d "$time" "+%Y-%m-%d-%H-%M-%S")
+    echo $(date -d "$time" "+%Y-%m-%d-%H-%M-%S-%3N")
   fi
 }
 
@@ -450,9 +450,7 @@ patch_version() {
     echo
   fi
 
-  if ! type ts-node &>/dev/null; then
-    pnpm add -g ts-node typescript tslib
-  fi
+  pnpm add -g pm2 ts-node typescript tslib
 
   git config --global pull.rebase false
 

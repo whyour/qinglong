@@ -96,7 +96,6 @@ start_public() {
 main() {
   echo -e "=====> 开始检测"
   npm i -g pnpm
-  pnpm add -g pm2
   patch_version
   start_public
   copy_dep

@@ -231,7 +231,7 @@ usage() {
 update_qinglong() {
   local mirror="github"
   local githubStatus=$(curl -s -m 2 -IL "https://github.com" | grep 200)
-  if [ "$githubStatus" == "" ]; then
+  if [[ ! -z $githubStatus ]]; then
     mirror="gitee"
   fi
   echo -e "使用 ${mirror} 源更新...\n"

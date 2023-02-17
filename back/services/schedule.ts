@@ -5,8 +5,8 @@ import { ChildProcessWithoutNullStreams, exec, spawn } from 'child_process';
 import {
   ToadScheduler,
   LongIntervalJob,
-  AsyncTask,
   SimpleIntervalSchedule,
+  Task,
 } from 'toad-scheduler';
 import dayjs from 'dayjs';
 
@@ -154,12 +154,10 @@ export default class ScheduleService {
       name,
       command,
     );
-    const task = new AsyncTask(
+    const task = new Task(
       name,
-      async () => {
-        return new Promise(async (resolve, reject) => {
-          await this.runTask(command, callbacks);
-        });
+      () => {
+        this.runTask(command, callbacks);
       },
       (err) => {
         this.logger.error(
@@ -180,7 +178,7 @@ export default class ScheduleService {
     this.intervalSchedule.addIntervalJob(job);
 
     if (runImmediately) {
-      await this.runTask(command, callbacks);
+      this.runTask(command, callbacks);
     }
   }
 

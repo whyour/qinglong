@@ -21,6 +21,7 @@ export default async () => {
     name: '生成token',
     command: tokenCommand,
   };
+  await scheduleService.cancelIntervalTask(cron);
   scheduleService.createIntervalTask(cron, {
     days: 28,
   });
@@ -28,12 +29,13 @@ export default async () => {
   // 运行删除日志任务
   const data = await systemService.getLogRemoveFrequency();
   if (data && data.info && data.info.frequency) {
-    const cron = {
+    const rmlogCron = {
       id: data.id,
       name: '删除日志',
       command: `ql rmlog ${data.info.frequency}`,
     };
-    scheduleService.createIntervalTask(cron, {
+    await scheduleService.cancelIntervalTask(rmlogCron);
+    scheduleService.createIntervalTask(rmlogCron, {
       days: data.info.frequency,
     });
   }

@@ -173,7 +173,7 @@ run_concurrent() {
 
   local envs=$(eval echo "\$${env_param}")
   local array=($(echo $envs | sed 's/&/ /g'))
-  single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%N")
+  single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%3N")
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"
