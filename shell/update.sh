@@ -169,11 +169,11 @@ update_raw() {
   if [[ $? -eq 0 ]]; then
     mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
     echo -e "下载 ${raw_file_name} 成功...\n"
+    cd $dir_raw
+    local filename="raw_${raw_file_name}"
+    local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    cp -f $raw_file_name $dir_scripts/${filename}
     if [[ -z $cron_id ]] && [[ ${autoAddCron} == true ]]; then
-      cd $dir_raw
-      local filename="raw_${raw_file_name}"
-      local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
-      cp -f $raw_file_name $dir_scripts/${filename}
       cron_line=$(
         perl -ne "{
                       print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
