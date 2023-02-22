@@ -57,6 +57,10 @@ echo -e "容器启动成功..."
 echo -e "\n请先访问5700端口，登录成功面板之后再执行添加定时任务..."
 echo -e "############################################################\n"
 
-crond -f >/dev/null
+if [ -x "$(command -v crond)" ]; then
+  crond -f >/dev/null
+elif [ -x "$(command -v cron)" ]; then
+  cron -f >/dev/null
+fi
 
 exec "$@"

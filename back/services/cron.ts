@@ -468,7 +468,8 @@ export default class CronService {
 
   private async set_crontab() {
     const tabs = await this.crontabs();
-    var crontab_string = '';
+    var crontab_string = `SHELL=${process.env.SHELL}\n`;
+    crontab_string += `PATH=${process.env.PATH}\n`;
     tabs.data.forEach((tab) => {
       const _schedule = tab.schedule && tab.schedule.split(/ +/);
       if (tab.isDisabled === 1 || _schedule!.length !== 5) {
