@@ -18,7 +18,7 @@ import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -41,8 +41,9 @@ export default class CronService {
   }
 
   public async update(payload: Crontab): Promise<Crontab> {
-    payload.saved = false;
-    const newDoc = await this.updateDb(payload);
+    const tab = new Crontab(payload);
+    tab.saved = false;
+    const newDoc = await this.updateDb(tab);
     await this.set_crontab();
     return newDoc;
   }
@@ -452,7 +453,6 @@ export default class CronService {
     } else {
       return [];
     }
-
   }
 
   private make_command(tab: Crontab) {

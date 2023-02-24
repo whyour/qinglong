@@ -31,7 +31,7 @@ export default class CronViewService {
   }
 
   public async update(payload: CrontabView): Promise<CrontabView> {
-    const newDoc = await this.updateDb(payload);
+    const newDoc = await this.updateDb(new CrontabView(payload));
     return newDoc;
   }
 
