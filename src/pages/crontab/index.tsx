@@ -921,13 +921,6 @@ const Crontab = () => {
     setViewConf(view ? view : null);
   };
 
-  const vComponents = useMemo(() => {
-    return VList({
-      height: tableScrollHeight!,
-      resetTopWhenDataChange: false,
-    });
-  }, [tableScrollHeight]);
-
   return (
     <PageContainer
       className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
@@ -939,8 +932,6 @@ const Crontab = () => {
           enterButton
           allowClear
           loading={loading}
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
@@ -1062,7 +1053,6 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
-          components={vComponents}
         />
       </div>
       <CronLogModal

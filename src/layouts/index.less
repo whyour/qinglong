@@ -9,6 +9,11 @@
     url('../assets/fonts/SourceCodePro-Regular.ttf') format('truetype');
 }
 
+#root {
+  height: 100vh;
+  height: calc(100vh - var(--vh-offset, 0px));
+}
+
 .ant-modal-body {
   max-height: calc(80vh - 110px);
   max-height: calc(80vh - var(--vh-offset, 110px));
@@ -348,8 +353,4 @@ pre {
   word-break: break-all !important;
   white-space: break-spaces !important;
   padding: 0 !important;
-}
-
-.virtuallist .ant-table-tbody > tr > td > div {
-  white-space: unset !important;
 }
