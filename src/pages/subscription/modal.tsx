@@ -243,6 +243,7 @@ const SubscriptionModal = ({
     if (text.startsWith('ql ')) {
       e.preventDefault();
     }
+    onPaste(e);
   }, []);
 
   const formatParams = (sub) => {
@@ -294,9 +295,9 @@ const SubscriptionModal = ({
       confirmLoading={loading}
     >
       <Form form={form} name="form_in_modal" layout="vertical">
-        <Form.Item name="name" label="名称">
+        <Form.Item name="name" label="名称" rules={[{ required: true }]}>
           <Input
-            placeholder="支持拷贝ql repo/raw命令，粘贴导入"
+            placeholder="支持拷贝 ql repo/raw 命令，粘贴导入"
             onPaste={onNamePaste}
           />
         </Form.Item>
