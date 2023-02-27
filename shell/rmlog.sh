@@ -6,7 +6,7 @@ dir_shell=$QL_DIR/shell
 
 days=$1
 
-## 删除运行js脚本的旧日志
+## 删除运行脚本的旧日志
 remove_js_log() {
   local log_full_path_list=$(find $dir_log/ -name "*.log")
   local diff_time
@@ -18,7 +18,13 @@ remove_js_log() {
       else
         diff_time=$(($(date +%s) - $(date +%s -d "$log_date")))
       fi
-      [[ $diff_time -gt $((${days} * 86400)) ]] && rm -vf $log
+      if [[ $diff_time -gt $((${days} * 86400)) ]]; then
+        local log_path=$(echo "$log" | sed "s,${dir_log},,g")
+        local result=$(find_cron_api "log_path=$log_path")
+        if [[ $result ]]; then
+          rm -vf $log
+        fi
+      fi
     fi
   done
 }

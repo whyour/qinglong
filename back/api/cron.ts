@@ -152,6 +152,21 @@ export default (app: Router) => {
     }
   });
 
+  route.get(
+    '/detail',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.find(req.query as any);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
   route.post(
     '/',
     celebrate({

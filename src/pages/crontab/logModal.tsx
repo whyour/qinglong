@@ -54,7 +54,7 @@ const CronLogModal = ({
             log &&
               !logEnded(log) &&
               !log.includes('重启面板') &&
-              !log.includes('任务未运行或运行失败，请尝试手动运行'),
+              !log.includes('任务未运行'),
           );
           setExecuting(hasNext);
           autoScroll();

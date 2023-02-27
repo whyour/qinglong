@@ -261,6 +261,15 @@ export default class CronService {
     }
   }
 
+  public async find(params: { log_path: string }): Promise<Crontab | null> {
+    try {
+      const result = await CrontabModel.findOne({ where: { ...params } });
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   public async crontabs(params?: {
     searchValue: string;
     page: string;
@@ -429,7 +438,7 @@ export default class CronService {
     if (logFileExist) {
       return getFileContentByName(`${absolutePath}`);
     } else {
-      return '任务未运行或运行失败，请尝试手动运行';
+      return '任务未运行';
     }
   }
 
