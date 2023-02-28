@@ -203,13 +203,10 @@ update_raw() {
 
 ## 调用用户自定义的extra.sh
 run_extra_shell() {
-  if [[ ${EnableExtraShell} == true ]]; then
-    if [[ -f $file_extra_shell ]]; then
-      echo -e "--------------------------------------------------------------\n"
-      . $file_extra_shell
-    else
-      echo -e "$file_extra_shell文件不存在，跳过执行...\n"
-    fi
+  if [[ -f $file_extra_shell ]]; then
+    . $file_extra_shell
+  else
+    echo -e "$file_extra_shell文件不存在，跳过执行...\n"
   fi
 }
 
