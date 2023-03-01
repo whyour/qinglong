@@ -330,8 +330,8 @@ git_pull_scripts() {
 
   set_proxy "$proxy"
   git fetch --all
+  git pull 1>/dev/null
   exit_status=$?
-  git pull &>/dev/null
   unset_proxy
 
   cd $dir_current
@@ -357,7 +357,7 @@ reset_romote_url() {
 
 reset_branch() {
   local branch="$1"
-  local part_cmd=""
+  local part_cmd="HEAD"
   if [[ $branch ]]; then
     part_cmd="origin/${branch}"
     git checkout -B "$branch" &>/dev/null
