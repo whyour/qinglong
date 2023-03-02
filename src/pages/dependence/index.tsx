@@ -32,7 +32,6 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 
-
 const { Text } = Typography;
 const { Search } = Input;
 
@@ -57,7 +56,6 @@ const Dependence = () => {
   const columns: any = [
     {
       title: '序号',
-      align: 'center' as const,
       width: 50,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
@@ -67,13 +65,11 @@ const Dependence = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      align: 'center' as const,
     },
     {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
@@ -91,13 +87,11 @@ const Dependence = () => {
       title: '备注',
       dataIndex: 'remark',
       key: 'remark',
-      align: 'center' as const,
     },
     {
       title: '创建时间',
       key: 'timestamp',
       dataIndex: 'timestamp',
-      align: 'center' as const,
       render: (text: string, record: any) => {
         const language = navigator.language || navigator.languages[0];
         const time = record.createdAt || record.timestamp;
@@ -120,7 +114,6 @@ const Dependence = () => {
     {
       title: '操作',
       key: 'action',
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
@@ -169,7 +162,7 @@ const Dependence = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
   const tableRef = useRef<any>();
-  const tableScrollHeight = useTableScrollHeight(tableRef, 59)
+  const tableScrollHeight = useTableScrollHeight(tableRef, 59);
 
   const getDependencies = () => {
     setLoading(true);

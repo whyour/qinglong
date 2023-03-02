@@ -71,7 +71,6 @@ const Env = () => {
   const columns: any = [
     {
       title: '序号',
-      align: 'center' as const,
       width: 60,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
@@ -81,14 +80,12 @@ const Env = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      align: 'center' as const,
       sorter: (a: any, b: any) => a.name.localeCompare(b.name),
     },
     {
       title: '值',
       dataIndex: 'value',
       key: 'value',
-      align: 'center' as const,
       width: '35%',
       render: (text: string, record: any) => {
         return (
@@ -105,7 +102,6 @@ const Env = () => {
       title: '备注',
       dataIndex: 'remarks',
       key: 'remarks',
-      align: 'center' as const,
       render: (text: string, record: any) => {
         return (
           <Tooltip title={text} placement="topLeft">
@@ -118,7 +114,6 @@ const Env = () => {
       title: '更新时间',
       dataIndex: 'timestamp',
       key: 'timestamp',
-      align: 'center' as const,
       width: 165,
       ellipsis: {
         showTitle: false,
@@ -153,7 +148,6 @@ const Env = () => {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
-      align: 'center' as const,
       width: 70,
       filters: [
         {
@@ -180,7 +174,6 @@ const Env = () => {
       title: '操作',
       key: 'action',
       width: 120,
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (

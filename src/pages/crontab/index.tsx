@@ -107,7 +107,6 @@ const Crontab = () => {
       dataIndex: 'name',
       key: 'name',
       width: 150,
-      align: 'center' as const,
       render: (text: string, record: any) => (
         <>
           <a
@@ -163,14 +162,12 @@ const Crontab = () => {
       dataIndex: 'command',
       key: 'command',
       width: 300,
-      align: 'center' as const,
       render: (text, record) => {
         return (
           <Paragraph
             style={{
               wordBreak: 'break-all',
               marginBottom: 0,
-              textAlign: 'left',
             }}
             ellipsis={{ tooltip: text, rows: 2 }}
           >
@@ -193,14 +190,12 @@ const Crontab = () => {
       dataIndex: 'schedule',
       key: 'schedule',
       width: 110,
-      align: 'center' as const,
       sorter: {
         compare: (a, b) => a.schedule.localeCompare(b.schedule),
       },
     },
     {
       title: '最后运行时间',
-      align: 'center' as const,
       dataIndex: 'last_execution_time',
       key: 'last_execution_time',
       width: 150,
@@ -230,7 +225,6 @@ const Crontab = () => {
     },
     {
       title: '最后运行时长',
-      align: 'center' as const,
       width: 120,
       dataIndex: 'last_running_time',
       key: 'last_running_time',
@@ -247,7 +241,6 @@ const Crontab = () => {
     },
     {
       title: '下次运行时间',
-      align: 'center' as const,
       width: 150,
       sorter: {
         compare: (a: any, b: any) => {
@@ -267,7 +260,6 @@ const Crontab = () => {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
-      align: 'center' as const,
       width: 88,
       filters: [
         {
@@ -329,7 +321,6 @@ const Crontab = () => {
     {
       title: '操作',
       key: 'action',
-      align: 'center' as const,
       width: 100,
       render: (text, record, index) => {
         const isPc = !isPhone;

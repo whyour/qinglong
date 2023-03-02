@@ -68,7 +68,6 @@ const Subscription = () => {
       dataIndex: 'name',
       key: 'name',
       width: 150,
-      align: 'center' as const,
       sorter: {
         compare: (a: any, b: any) => a.name.localeCompare(b.name),
         multiple: 2,
@@ -78,7 +77,6 @@ const Subscription = () => {
       title: '链接',
       dataIndex: 'url',
       key: 'url',
-      align: 'center' as const,
       sorter: {
         compare: (a: any, b: any) => a.name.localeCompare(b.name),
         multiple: 2,
@@ -89,7 +87,6 @@ const Subscription = () => {
             style={{
               wordBreak: 'break-all',
               marginBottom: 0,
-              textAlign: 'left',
             }}
             ellipsis={{ tooltip: text, rows: 2 }}
           >
@@ -103,7 +100,6 @@ const Subscription = () => {
       dataIndex: 'type',
       key: 'type',
       width: 130,
-      align: 'center' as const,
       render: (text: string, record: any) => {
         return (SubscriptionType as any)[record.type];
       },
@@ -113,7 +109,6 @@ const Subscription = () => {
       dataIndex: 'branch',
       key: 'branch',
       width: 130,
-      align: 'center' as const,
       render: (text: string, record: any) => {
         return record.branch || '-';
       },
@@ -121,7 +116,6 @@ const Subscription = () => {
     {
       title: '定时规则',
       width: 180,
-      align: 'center' as const,
       render: (text: string, record: any) => {
         if (record.schedule_type === 'interval') {
           const { type, value } = record.interval_schedule;
@@ -134,7 +128,6 @@ const Subscription = () => {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
-      align: 'center' as const,
       width: 110,
       filters: [
         {
@@ -189,7 +182,6 @@ const Subscription = () => {
     {
       title: '操作',
       key: 'action',
-      align: 'center' as const,
       width: 130,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;

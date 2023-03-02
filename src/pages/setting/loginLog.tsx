@@ -18,7 +18,6 @@ enum LoginStatusColor {
 const columns = [
   {
     title: '序号',
-    align: 'center' as const,
     width: 50,
     render: (text: string, record: any, index: number) => {
       return index + 1;
@@ -28,7 +27,6 @@ const columns = [
     title: '登录时间',
     dataIndex: 'timestamp',
     key: 'timestamp',
-    align: 'center' as const,
     render: (text: string, record: any) => {
       return new Date(record.timestamp).toLocaleString();
     },
@@ -37,25 +35,21 @@ const columns = [
     title: '登录地址',
     dataIndex: 'address',
     key: 'address',
-    align: 'center' as const,
   },
   {
     title: '登录IP',
     dataIndex: 'ip',
     key: 'ip',
-    align: 'center' as const,
   },
   {
     title: '登录设备',
     dataIndex: 'platform',
     key: 'platform',
-    align: 'center' as const,
   },
   {
     title: '登录状态',
     dataIndex: 'status',
     key: 'status',
-    align: 'center' as const,
     render: (text: string, record: any) => {
       return (
         <Tag color={LoginStatusColor[record.status]} style={{ marginRight: 0 }}>

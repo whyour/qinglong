@@ -80,23 +80,17 @@ const ViewManageModal = ({
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      align: 'center' as const,
-      render: (text) => (
-        <div style={{ textAlign: 'left', paddingLeft: 30 }}>{text}</div>
-      ),
     },
     {
       title: '类型',
       dataIndex: 'type',
       key: 'type',
-      align: 'center' as const,
       render: (v) => (v === 1 ? '系统' : '个人'),
     },
     {
       title: '显示',
       key: 'isDisabled',
       dataIndex: 'isDisabled',
-      align: 'center' as const,
       width: 100,
       render: (text: string, record: any, index: number) => {
         return (
@@ -111,7 +105,6 @@ const ViewManageModal = ({
       title: '操作',
       key: 'action',
       width: 100,
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         return record.type !== 1 ? (
           <Space size="middle">
