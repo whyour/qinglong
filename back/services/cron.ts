@@ -245,8 +245,11 @@ export default class CronService {
       const filterKeys: any = Object.keys(filterQuery);
       for (const key of filterKeys) {
         let q: any = {};
-        if (filterKeys[key]) {
-          q[key] = filterKeys[key];
+        if (!filterQuery[key]) continue;
+        if (key === 'status' && filterQuery[key].includes(2)) {
+          q = { [Op.or]: [{ [key]: filterQuery[key] }, { isDisabled: 1 }] };
+        } else {
+          q[key] = filterQuery[key];
         }
         query[Op.and].push(q);
       }

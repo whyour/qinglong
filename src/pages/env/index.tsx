@@ -1,4 +1,10 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, {
+  useCallback,
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+} from 'react';
 import {
   Button,
   message,
@@ -33,6 +39,8 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import Copy from '../../components/copy';
+import { VList } from '../../components/vlist';
+
 const { Text } = Typography;
 const { Search } = Input;
 
@@ -57,50 +65,6 @@ enum OperationPath {
 }
 
 const type = 'DragableBodyRow';
-
-const DragableBodyRow = ({
-  index,
-  moveRow,
-  className,
-  style,
-  ...restProps
-}: any) => {
-  const ref = useRef();
-  const [{ isOver, dropClassName }, drop] = useDrop({
-    accept: type,
-    collect: (monitor) => {
-      const { index: dragIndex } = (monitor.getItem() as any) || {};
-      if (dragIndex === index) {
-        return {};
-      }
-      return {
-        isOver: monitor.isOver(),
-        dropClassName:
-          dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
-      };
-    },
-    drop: (item: any) => {
-      moveRow(item.index, index);
-    },
-  });
-  const [, drag] = useDrag({
-    type,
-    item: { index },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  });
-  drop(drag(ref));
-
-  return (
-    <tr
-      ref={ref}
-      className={`${className}${isOver ? dropClassName : ''}`}
-      style={{ cursor: 'move', ...style }}
-      {...restProps}
-    />
-  );
-};
 
 const Env = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
@@ -259,6 +223,10 @@ const Env = () => {
   const [importLoading, setImportLoading] = useState(false);
   const tableRef = useRef<any>();
   const tableScrollHeight = useTableScrollHeight(tableRef, 59);
+  const resetRef = useRef<boolean>(true);
+  const setReset = (v) => {
+    resetRef.current = v;
+  };
 
   const getEnvs = () => {
     setLoading(true);
@@ -273,6 +241,7 @@ const Env = () => {
   };
 
   const enabledOrDisabledEnv = (record: any, index: number) => {
+    setReset(false);
     Modal.confirm({
       title: `确认${record.status === Status.已禁用 ? '启用' : '禁用'}`,
       content: (
@@ -318,16 +287,19 @@ const Env = () => {
   };
 
   const addEnv = () => {
+    setReset(false);
     setEditedEnv(null as any);
     setIsModalVisible(true);
   };
 
   const editEnv = (record: any, index: number) => {
+    setReset(false);
     setEditedEnv(record);
     setIsModalVisible(true);
   };
 
   const deleteEnv = (record: any, index: number) => {
+    setReset(false);
     Modal.confirm({
       title: '确认删除',
       content: (
@@ -367,11 +339,72 @@ const Env = () => {
     getEnvs();
   };
 
-  const components = {
-    body: {
-      row: DragableBodyRow,
-    },
+  const vComponents = useMemo(() => {
+    return VList({
+      height: tableScrollHeight!,
+      reset: resetRef.current,
+      rowHeight: 48,
+      scrollTop: resetRef.current
+        ? 0
+        : tableRef.current?.querySelector('.ant-table-body')?.scrollTop,
+    });
+  }, [tableScrollHeight, resetRef.current]);
+
+  const DragableBodyRow = (props: any) => {
+    const { index, moveRow, className, style, ...restProps } = props;
+    const ref = useRef();
+    const [{ isOver, dropClassName }, drop] = useDrop({
+      accept: type,
+      collect: (monitor) => {
+        const { index: dragIndex } = (monitor.getItem() as any) || {};
+        if (dragIndex === index) {
+          return {};
+        }
+        return {
+          isOver: monitor.isOver(),
+          dropClassName:
+            dragIndex < index ? ' drop-over-downward' : ' drop-over-upward',
+        };
+      },
+      drop: (item: any) => {
+        moveRow(item.index, index);
+      },
+    });
+    const [, drag] = useDrag({
+      type,
+      item: { index },
+      collect: (monitor) => ({
+        isDragging: monitor.isDragging(),
+      }),
+    });
+
+    useEffect(() => {
+      drop(drag(ref));
+    }, [drag, drop]);
+
+    const components = useMemo(() => vComponents.body.row, []);
+
+    const tempProps = useMemo(() => {
+      return {
+        ref: ref,
+        className: `${className}${isOver ? dropClassName : ''}`,
+        style: { cursor: 'move', ...style },
+        ...restProps,
+      };
+    }, [className, dropClassName, restProps, style, isOver]);
+
+    return <> {components(tempProps, ref)} </>;
   };
+
+  const components = useMemo(() => {
+    return {
+      ...vComponents,
+      body: {
+        ...vComponents.body,
+        row: DragableBodyRow,
+      },
+    };
+  }, [vComponents]);
 
   const moveRow = useCallback(
     (dragIndex: number, hoverIndex: number) => {
@@ -399,12 +432,17 @@ const Env = () => {
     setSelectedRowIds(selectedIds);
   };
 
+  useEffect(() => {
+    setReset(false);
+  }, [selectedRowIds]);
+
   const rowSelection = {
     selectedRowKeys: selectedRowIds,
     onChange: onSelectChange,
   };
 
   const delEnvs = () => {
+    setReset(false);
     Modal.confirm({
       title: '确认删除',
       content: <>确认删除选中的变量吗</>,
@@ -426,6 +464,7 @@ const Env = () => {
   };
 
   const operateEnvs = (operationStatus: number) => {
+    setReset(false);
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
       content: <>确认{OperationName[operationStatus]}选中的变量吗</>,
@@ -458,6 +497,7 @@ const Env = () => {
   };
 
   const onSearch = (value: string) => {
+    setReset(true);
     setSearchText(value.trim());
   };
 
@@ -521,69 +561,70 @@ const Env = () => {
         style: headerStyle,
       }}
     >
-      {selectedRowIds.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5 }}
-            onClick={modifyName}
-          >
-            批量修改变量名称
-          </Button>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5, marginLeft: 8 }}
-            onClick={delEnvs}
-          >
-            批量删除
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => exportEnvs()}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量导出
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateEnvs(0)}
-            style={{ marginLeft: 8, marginBottom: 5 }}
-          >
-            批量启用
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateEnvs(1)}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量禁用
-          </Button>
-          <span style={{ marginLeft: 8 }}>
-            已选择
-            <a>{selectedRowIds?.length}</a>项
-          </span>
-        </div>
-      )}
-      <DndProvider backend={HTML5Backend}>
-        <Table
-          ref={tableRef}
-          columns={columns}
-          rowSelection={rowSelection}
-          pagination={false}
-          dataSource={value}
-          rowKey="id"
-          size="middle"
-          scroll={{ x: 1000, y: tableScrollHeight }}
-          components={components}
-          loading={loading}
-          onRow={(record: any, index: number | undefined) => {
-            return {
-              index,
-              moveRow,
-            } as any;
-          }}
-        />
-      </DndProvider>
+      <div ref={tableRef}>
+        {selectedRowIds.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5 }}
+              onClick={modifyName}
+            >
+              批量修改变量名称
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={delEnvs}
+            >
+              批量删除
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => exportEnvs()}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量导出
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(0)}
+              style={{ marginLeft: 8, marginBottom: 5 }}
+            >
+              批量启用
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(1)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量禁用
+            </Button>
+            <span style={{ marginLeft: 8 }}>
+              已选择
+              <a>{selectedRowIds?.length}</a>项
+            </span>
+          </div>
+        )}
+        <DndProvider backend={HTML5Backend}>
+          <Table
+            columns={columns}
+            rowSelection={rowSelection}
+            pagination={false}
+            dataSource={value}
+            rowKey="id"
+            size="middle"
+            scroll={{ x: 1000, y: tableScrollHeight }}
+            components={components}
+            loading={loading}
+            onRow={(record: any, index: number | undefined) => {
+              return {
+                index,
+                moveRow,
+              } as any;
+            }}
+          />
+        </DndProvider>
+      </div>
       <EnvModal
         visible={isModalVisible}
         handleCancel={handleCancel}

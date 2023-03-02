@@ -53,7 +53,7 @@ import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import { getCommandScript, parseCrontab } from '@/utils';
 import { ColumnProps } from 'antd/lib/table';
-import { VList } from 'virtuallist-antd';
+import { VList } from '../../components/vlist';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -339,6 +339,7 @@ const Crontab = () => {
               <Tooltip title={isPc ? '运行' : ''}>
                 <a
                   onClick={(e) => {
+                    setReset(false);
                     e.stopPropagation();
                     runCron(record, index);
                   }}
@@ -351,6 +352,7 @@ const Crontab = () => {
               <Tooltip title={isPc ? '停止' : ''}>
                 <a
                   onClick={(e) => {
+                    setReset(false);
                     e.stopPropagation();
                     stopCron(record, index);
                   }}
@@ -362,6 +364,7 @@ const Crontab = () => {
             <Tooltip title={isPc ? '日志' : ''}>
               <a
                 onClick={(e) => {
+                  setReset(false);
                   e.stopPropagation();
                   setLogCron({ ...record, timestamp: Date.now() });
                 }}
@@ -405,6 +408,10 @@ const Crontab = () => {
   const [moreMenuActive, setMoreMenuActive] = useState(false);
   const tableRef = useRef<any>();
   const tableScrollHeight = useTableScrollHeight(tableRef);
+  const resetRef = useRef<boolean>(true);
+  const setReset = (v) => {
+    resetRef.current = v;
+  };
 
   const goToScriptManager = (record: any) => {
     const result = getCommandScript(record.command);
@@ -424,9 +431,9 @@ const Crontab = () => {
     }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
       filters,
     )}`;
-    if (sorter && sorter.field) {
+    if (sorter && sorter.column && sorter.order) {
       url += `&sorter=${JSON.stringify({
-        field: sorter.field,
+        field: sorter.column.key,
         type: sorter.order === 'ascend' ? 'ASC' : 'DESC',
       })}`;
     }
@@ -688,6 +695,7 @@ const Crontab = () => {
         items: getMenuItems(record),
         onClick: ({ key, domEvent }) => {
           domEvent.stopPropagation();
+          setReset(false);
           action(key, record, index);
         },
       }}
@@ -723,6 +731,7 @@ const Crontab = () => {
   };
 
   const onSearch = (value: string) => {
+    setReset(true);
     setSearchText(value.trim());
   };
 
@@ -749,6 +758,10 @@ const Crontab = () => {
   const onSelectChange = (selectedIds: any[]) => {
     setSelectedRowIds(selectedIds);
   };
+
+  useEffect(() => {
+    setReset(false);
+  }, [selectedRowIds]);
 
   const rowSelection = {
     selectedRowKeys: selectedRowIds,
@@ -777,6 +790,7 @@ const Crontab = () => {
   };
 
   const operateCrons = (operationStatus: number) => {
+    setReset(false);
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
       content: <>确认{OperationName[operationStatus]}选中的定时任务吗</>,
@@ -803,6 +817,7 @@ const Crontab = () => {
     sorter: SorterResult<any> | SorterResult<any>[],
   ) => {
     const { current, pageSize } = pagination;
+    setReset(true);
     setPageConf({
       page: current as number,
       size: pageSize as number,
@@ -917,9 +932,21 @@ const Crontab = () => {
   const tabClick = (key: string) => {
     const view = enabledCronViews.find((x) => x.id == key);
     setSelectedRowIds([]);
+    setReset(true);
     setPageConf({ ...pageConf, page: 1 });
     setViewConf(view ? view : null);
   };
+
+  const vComponents = useMemo(() => {
+    return VList({
+      height: tableScrollHeight,
+      reset: resetRef.current,
+      rowHeight: 69,
+      scrollTop: resetRef.current
+        ? 0
+        : tableRef.current?.querySelector('.ant-table-body')?.scrollTop,
+    });
+  }, [tableScrollHeight, resetRef.current]);
 
   return (
     <PageContainer
@@ -932,6 +959,8 @@ const Crontab = () => {
           enterButton
           allowClear
           loading={loading}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
@@ -1053,6 +1082,7 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
+          components={vComponents}
         />
       </div>
       <CronLogModal
