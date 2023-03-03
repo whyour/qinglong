@@ -226,10 +226,10 @@ usage() {
 
 ## 更新qinglong
 update_qinglong() {
-  local mirror="github"
-  local githubStatus=$(curl -s -m 2 -IL "https://github.com" | grep 200)
+  local mirror="gitee"
+  local githubStatus=$(curl -s -m 2 -IL "https://google.com" | grep 200)
   if [[ ! -z $githubStatus ]]; then
-    mirror="gitee"
+    mirror="github"
   fi
   echo -e "使用 ${mirror} 源更新...\n"
   export isFirstStartServer=false

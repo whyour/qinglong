@@ -3,7 +3,7 @@ lockfileVersion: 5.4
 specifiers:
   '@ant-design/icons': ^4.7.0
   '@ant-design/pro-layout': 6.38.22
-  '@monaco-editor/react': 4.4.6
+  '@monaco-editor/react': 4.2.1
   '@otplib/preset-default': ^12.0.1
   '@react-hook/resize-observer': ^1.2.6
   '@sentry/node': ^7.12.1
@@ -134,7 +134,7 @@ dependencies:
 devDependencies:
   '@ant-design/icons': 4.8.0_biqbaboplfbrettd7655fr4n2y
   '@ant-design/pro-layout': 6.38.22_biqbaboplfbrettd7655fr4n2y
-  '@monaco-editor/react': 4.4.6_jywyd5ymizla4bkdnod6po6m6y
+  '@monaco-editor/react': 4.2.1_jywyd5ymizla4bkdnod6po6m6y
   '@react-hook/resize-observer': 1.2.6_react@18.2.0
   '@sentry/react': 7.28.1_react@18.2.0
   '@types/body-parser': 1.19.2
@@ -3365,12 +3365,12 @@ packages:
       state-local: 1.0.7
     dev: true
 
-  /@monaco-editor/react/4.4.6_jywyd5ymizla4bkdnod6po6m6y:
-    resolution: {integrity: sha512-Gr3uz3LYf33wlFE3eRnta4RxP5FSNxiIV9ENn2D2/rN8KgGAD8ecvcITRtsbbyuOuNkwbuHYxfeaz2Vr+CtyFA==}
+  /@monaco-editor/react/4.2.1_jywyd5ymizla4bkdnod6po6m6y:
+    resolution: {integrity: sha512-yN8qVY0PyFIbqPjfrZ5TbR/wrcfeiwoys8+0QkmyfiOzG74vXxSBOPIUxk7Ly+qCj7qWHPq1uDJskzFGaIqaPA==}
     peerDependencies:
       monaco-editor: '>= 0.25.0 < 1'
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || 18
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || 18
+      react: ^16.8.0 || ^17.0.0 || 18
+      react-dom: ^16.8.0 || ^17.0.0 || 18
     peerDependenciesMeta:
       monaco-editor:
         optional: true
@@ -3384,6 +3384,7 @@ packages:
       prop-types: 15.8.1
       react: 18.2.0
       react-dom: 18.2.0_react@18.2.0
+      state-local: 1.0.7
     dev: true
 
   /@nicolo-ribaudo/chokidar-2/2.1.8-no-fsevents.3:
