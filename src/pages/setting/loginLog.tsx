@@ -45,11 +45,13 @@ const columns = [
     title: '登录设备',
     dataIndex: 'platform',
     key: 'platform',
+    width: 80,
   },
   {
     title: '登录状态',
     dataIndex: 'status',
     key: 'status',
+    width: 80,
     render: (text: string, record: any) => {
       return (
         <Tag color={LoginStatusColor[record.status]} style={{ marginRight: 0 }}>
