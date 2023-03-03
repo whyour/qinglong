@@ -647,6 +647,13 @@ def send(title: str, content: str) -> None:
         print(f"{title} 推送内容为空！")
         return
 
+    # 根据标题跳过一些消息推送，环境变量：SKIP_PUSH_TITLE 用回车分隔
+    skipTitle = os.getenv("SKIP_PUSH_TITLE")
+    if skipTitle:
+        if (title in re.split("\n", skipTitle)):
+            print(f"{title} 在SKIP_PUSH_TITLE环境变量内，跳过推送！")
+            return
+
     hitokoto = push_config.get("HITOKOTO")
 
     text = one() if hitokoto else ""
