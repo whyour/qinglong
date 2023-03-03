@@ -296,6 +296,16 @@ async function sendNotify(
 ) {
   //提供6种通知
   desp += author; //增加作者信息，防止被贩卖等
+  
+  // 根据标题跳过一些消息推送，环境变量：SKIP_PUSH_TITLE 用回车分隔
+  let skipTitle = process.env.SKIP_PUSH_TITLE
+  if(skipTitle) {
+    if(skipTitle.split('\n').includes(text)) {
+      console.info(text + "在SKIP_PUSH_TITLE环境变量内，跳过推送！");
+      return
+    }
+  }
+
   await Promise.all([
     serverNotify(text, desp), //微信server酱
     pushPlusNotify(text, desp), //pushplus(推送加)
