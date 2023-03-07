@@ -104,7 +104,7 @@ export default class SubscriptionService {
     }
   }
 
-  private async setSshConfig() {
+  public async setSshConfig() {
     const docs = await SubscriptionModel.findAll();
     this.sshKeyService.setSshConfig(docs);
   }

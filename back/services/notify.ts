@@ -484,11 +484,11 @@ export default class NotificationService {
 
     return {
       formatUrl: url
-        .replaceAll('$title', encodeURIComponent(this.title))
-        .replaceAll('$content', encodeURIComponent(this.content)),
+        ?.replaceAll('$title', encodeURIComponent(this.title))
+        ?.replaceAll('$content', encodeURIComponent(this.content)),
       formatBody: body
-        .replaceAll('$title', this.title)
-        .replaceAll('$content', this.content),
+        ?.replaceAll('$title', this.title)
+        ?.replaceAll('$content', this.content),
     };
   }
 }

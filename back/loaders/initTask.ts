@@ -41,6 +41,7 @@ export default async () => {
   }
 
   // 运行所有订阅
+  await subscriptionService.setSshConfig();
   const subs = await subscriptionService.list();
   for (const sub of subs) {
     subscriptionService.handleTask(sub, !sub.is_disabled, !sub.is_disabled);
