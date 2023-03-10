@@ -18,7 +18,7 @@ import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -264,9 +264,9 @@ export default class CronService {
     }
   }
 
-  public async find(params: { log_path: string }): Promise<Crontab | null> {
+  public async find({ log_path }: { log_path: string }): Promise<Crontab | null> {
     try {
-      const result = await CrontabModel.findOne({ where: { ...params } });
+      const result = await CrontabModel.findOne({ where: { log_path } });
       return result;
     } catch (error) {
       throw error;

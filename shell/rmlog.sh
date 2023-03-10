@@ -19,10 +19,14 @@ remove_js_log() {
         diff_time=$(($(date +%s) - $(date +%s -d "$log_date")))
       fi
       if [[ $diff_time -gt $((${days} * 86400)) ]]; then
-        local log_path=$(echo "$log" | sed "s,${dir_log},,g")
+        local log_path=$(echo "$log" | sed "s,${dir_log}/,,g")
         local result=$(find_cron_api "log_path=$log_path")
-        if [[ $result ]]; then
+        echo -e "查询文件 $log_path"
+        if [[ -z $result ]]; then
+          echo -e "删除中~"
           rm -vf $log
+        else
+          echo -e "正在被 $result 使用，跳过~"
         fi
       fi
     fi
