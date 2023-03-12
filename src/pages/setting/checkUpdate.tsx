@@ -103,6 +103,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       width: 600,
       maskClosable: false,
       closable: false,
+      keyboard: false,
       okButtonProps: { disabled: true },
       title: '更新中...',
       centered: true,
