@@ -47,9 +47,8 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
           </div>
         </>
       ),
-      okText: '确认',
-      cancelText: '强制更新',
-      onCancel() {
+      okText: '强制更新',
+      onOk() {
         showUpdatingModal();
         request
           .put(`${config.apiPrefix}system/update`)
