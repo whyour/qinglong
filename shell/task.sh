@@ -15,7 +15,7 @@ define_program() {
   elif [[ $file_param == *.sh ]]; then
     which_program="bash"
   elif [[ $file_param == *.ts ]]; then
-    which_program="ts-node-transpile-only"
+    which_program="tsx"
   else
     which_program=""
   fi

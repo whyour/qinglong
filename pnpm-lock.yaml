@@ -84,6 +84,7 @@ specifiers:
   toad-scheduler: ^1.6.0
   ts-node: ^10.6.0
   tslib: ^2.4.0
+  tsx: ^3.12.3
   typedi: ^0.10.0
   typescript: 4.8.4
   umi-request: ^1.4.0
@@ -184,6 +185,7 @@ devDependencies:
   sockjs-client: 1.6.1
   ts-node: 10.9.1_ksn4eycaeggbrckn3ykh37hwf4
   tslib: 2.4.1
+  tsx: 3.12.3
   typescript: 4.8.4
   umi-request: 1.4.0
   vh-check: 2.0.5

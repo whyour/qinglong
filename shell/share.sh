@@ -431,16 +431,17 @@ format_timestamp() {
 }
 
 patch_version() {
+  # 兼容pnpm@7
+  pnpm setup &>/dev/null
+  source ~/.bashrc
+
   if [[ $PipMirror ]]; then
     pip3 config set global.index-url $PipMirror
   fi
   if [[ $NpmMirror ]]; then
-    npm config set registry $NpmMirror
+    pnpm config set registry $NpmMirror
   fi
 
-  # 兼容pnpm@7
-  pnpm setup &>/dev/null
-  source ~/.bashrc
   pnpm install -g &>/dev/null
 
   if [[ -f "$dir_root/db/cookie.db" ]]; then
@@ -450,7 +451,7 @@ patch_version() {
     echo
   fi
 
-  pnpm add -g pm2 ts-node typescript tslib
+  pnpm add -g pm2 tsx
 
   git config --global pull.rebase false
 
