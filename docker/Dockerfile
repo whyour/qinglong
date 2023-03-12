@@ -49,7 +49,7 @@ RUN set -x \
     && git config --global user.name "qinglong" \
     && git config --global http.postBuffer 524288000 \
     && npm install -g pnpm \
-    && pnpm add -g pm2 ts-node typescript tslib \
+    && pnpm add -g pm2 tsx \
     && rm -rf /root/.pnpm-store \
     && rm -rf /root/.local/share/pnpm/store \
     && rm -rf /root/.cache \

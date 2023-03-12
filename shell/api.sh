@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
 
+create_token() {
+  local token_command="tsx ${dir_root}/back/token.ts"
+  local token_file="${dir_root}static/build/token.js"
+  if [[ -f $token_file ]]; then
+    token_command="node ${token_file}"
+  fi
+  token=$(eval "$token_command")
+}
+
 get_token() {
   if [[ -f $file_auth_token ]]; then
     token=$(cat $file_auth_token | jq -r .value)
-  else
-    local token_command="ts-node-transpile-only ${dir_root}/back/token.ts"
-    local token_file="${dir_root}static/build/token.js"
-    if [[ -f $token_file ]]; then
-      token_command="node ${token_file}"
+    local expiration=$(cat $file_auth_token | jq -r .expiration)
+    local currentTimeStamp=$(date +%s)
+    if [[ $currentTimeStamp -ge $expiration ]]; then
+      create_token
     fi
-    token=$(eval "$token_command")
+  else
+    create_token
   fi
 }
 
