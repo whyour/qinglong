@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-## 导入通用变量与函数
-dir_shell=$QL_DIR/shell
-. $dir_shell/share.sh
-
 if [[ -z ${BotRepoUrl} ]]; then
   url="https://github.com/SuMaiKaDe/bot.git"
   repo_path="${dir_repo}/dockerbot"

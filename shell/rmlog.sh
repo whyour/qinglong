@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-## 导入通用变量与函数
-dir_shell=$QL_DIR/shell
-. $dir_shell/share.sh
-
 days=$1
 
 ## 删除运行脚本的旧日志

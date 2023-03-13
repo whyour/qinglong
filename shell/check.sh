@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-dir_shell=$QL_DIR/shell
-. $dir_shell/share.sh
-. $dir_shell/api.sh
-
 reset_env() {
   echo -e "---> 1. 开始检测配置文件\n"
   fix_config
@@ -70,7 +66,7 @@ check_pm2() {
   pm2_log
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/api/user?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5600/api/system?t=$currentTimeStamp" \
       -H 'Accept: */*' \
       -H "Authorization: Bearer $token" \
       -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36' \
