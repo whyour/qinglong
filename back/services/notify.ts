@@ -161,7 +161,7 @@ export default class NotificationService {
       this.title,
     )}/${encodeURIComponent(
       this.content,
-    )}?icon=${barkIcon}?sound=${barkSound}&group=${barkGroup}`;
+    )}?icon=${barkIcon}&sound=${barkSound}&group=${barkGroup}`;
     const res: any = await got
       .get(url, {
         ...this.gotOption,
