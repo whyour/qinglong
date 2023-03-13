@@ -68,7 +68,6 @@ check_pm2() {
   local api=$(
     curl -s --noproxy "*" "http://0.0.0.0:5600/api/system?t=$currentTimeStamp" \
       -H 'Accept: */*' \
-      -H "Authorization: Bearer $token" \
       -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36' \
       -H 'Referer: http://0.0.0.0:5700/crontab' \
       -H 'Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7' \
