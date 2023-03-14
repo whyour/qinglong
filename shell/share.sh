@@ -482,6 +482,19 @@ patch_version() {
   fi
 }
 
+init_nginx() {
+  cp -fv $nginx_conf /etc/nginx/nginx.conf
+  cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
+  sed -i "s,QL_BASE_URL,${qlBaseUrl},g" /etc/nginx/conf.d/front.conf
+  
+  ipv6=$(ip a | grep inet6)
+  ipv6Str=""
+  if [[ $ipv6 ]]; then
+    ipv6Str="listen [::]:5700 ipv6only=on;"
+  fi
+  sed -i "s,IPV6_CONFIG,${ipv6Str},g" /etc/nginx/conf.d/front.conf
+}
+
 init_env
 detect_termux
 detect_macos
