@@ -152,11 +152,20 @@ update_raw() {
   local autoAddCron="$3"
   local autoDelCron="$4"
 
-  if [[ ! $autoAddCron ]];then
+  if [[ ! $autoAddCron ]]; then
     autoAddCron=${AutoAddCron}
   fi
-  if [[ ! $autoDelCron ]];then
+  if [[ ! $autoDelCron ]]; then
     autoDelCron=${AutoDelCron}
+  fi
+
+  local proxyStr=""
+  if [[ $proxy ]]; then
+    if [[ $url == http:* ]]; then
+      proxyStr="-e \"http_proxy=${proxy}\""
+    elif [[ $url == https:* ]]; then
+      proxyStr="-e \"http_proxy=${proxy};https_proxy=${proxy}\""
+    fi
   fi
 
   local raw_url="$url"
@@ -164,7 +173,7 @@ update_raw() {
   local raw_file_name="${uniq_path}.${suffix}"
   echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
 
-  wget -q --no-check-certificate -e "http_proxy=${proxy};https_proxy=${proxy}" -O "$dir_raw/${raw_file_name}.new" ${raw_url}
+  wget -q --no-check-certificate $proxyStr -O "$dir_raw/${raw_file_name}.new" ${raw_url}
 
   if [[ $? -eq 0 ]]; then
     mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
@@ -297,11 +306,11 @@ diff_scripts() {
   local extensions="$6"
   local autoAddCron="$7"
   local autoDelCron="$8"
-  
-  if [[ ! $autoAddCron ]];then
+
+  if [[ ! $autoAddCron ]]; then
     autoAddCron=${AutoAddCron}
   fi
-  if [[ ! $autoDelCron ]];then
+  if [[ ! $autoDelCron ]]; then
     autoDelCron=${AutoDelCron}
   fi
 
