@@ -1,12 +1,11 @@
-version: 2.15.9
-changeLogLink: https://t.me/jiao_long/364
+version: 2.15.10
+changeLogLink: https://t.me/jiao_long/365
 changeLog: |
-  1. 通知脚本增加环境变量 SKIP_PUSH_TITLE，设置需要跳过推送的标题，多个换行符分割分隔，感谢 https://github.com/pharaoh2012
-  2. nginx 增加 ipv6 配置
-  3. 对比工具增加通知文件对比
-  4. 修复文件类型订阅重复添加任务
-  5. 修改自动删除日志逻辑
-  6. 修复定时任务状态筛选，排序
-  7. 修改表格样式
-  8. 修复切换导航，编辑器页面可能崩溃
-  9. 其他 bug 修复
+  1. 增加 ipv6 自动检测
+  2. 修复订阅管理下载 http 协议文件
+  3. 修复日志删除逻辑
+  4. 修复自定义通知
+  5. 修复检查更新弹框逻辑
+  6. 修复 bark 推送声音，感谢 https://github.com/adams549659584
+  7. 修复 task 命令获取 token
+  8. 其他 bug 修复
