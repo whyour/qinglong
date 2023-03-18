@@ -4,8 +4,7 @@ import { Container } from 'typedi';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import CronService from '../services/cron';
 import EnvService from '../services/env';
-import groupBy from 'lodash/groupBy';
-import { DependenceModel } from '../data/dependence';
+import { DependenceModel, DependenceStatus } from '../data/dependence';
 import { Op } from 'sequelize';
 import config from '../config';
 import { CrontabViewModel, CronViewType } from '../data/cronView';
@@ -42,16 +41,14 @@ export default async () => {
     order: [['type', 'DESC']],
     raw: true,
   }).then(async (docs) => {
-    const groups = groupBy(docs, 'type');
-    const keys = Object.keys(groups).sort((a, b) => parseInt(b) - parseInt(a));
-    for (const key of keys) {
-      const group = groups[key];
-      const depIds = group.map((x) => x.id);
-      await dependenceService.reInstall(depIds as number[]);
-    }
+    await DependenceModel.update(
+      { status: DependenceStatus.installing, log: [] },
+      { where: { id: docs.map((x) => x.id!) } },
+    );
+    dependenceService.installDependenceOneByOne(docs);
   });
 
-  // 初始化时执行一次所有的ql repo 任务
+  // 初始化时执行一次所有的 ql repo 任务
   CrontabModel.findAll({
     where: {
       isDisabled: { [Op.ne]: 1 },

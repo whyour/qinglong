@@ -61,7 +61,11 @@ handle_log_path() {
 
 format_params() {
   time_format="%Y-%m-%d %H:%M:%S"
-  mtime_format="%Y-%m-%d %H:%M:%S.%3N"
+  if [[ $is_macos -eq 1 ]]; then
+    mtime_format=$time_format
+  else
+    mtime_format="%Y-%m-%d %H:%M:%S.%3N"
+  fi
   timeoutCmd=""
   if type timeout &>/dev/null; then
     timeoutCmd="timeout --foreground -s 14 -k 10s $command_timeout_time "

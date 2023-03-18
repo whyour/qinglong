@@ -99,7 +99,7 @@ export default class DependenceService {
     }
   }
 
-  private installDependenceOneByOne(
+  public installDependenceOneByOne(
     docs: Dependence[],
     isInstall: boolean = true,
     force: boolean = false,
