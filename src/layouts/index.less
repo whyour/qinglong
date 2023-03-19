@@ -9,9 +9,17 @@
     url('../assets/fonts/SourceCodePro-Regular.ttf') format('truetype');
 }
 
+body {
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
 #root {
   height: 100vh;
   height: calc(100vh - var(--vh-offset, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ant-modal-body {
