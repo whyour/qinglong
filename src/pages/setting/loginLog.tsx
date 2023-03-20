@@ -72,6 +72,7 @@ const LoginLog = ({ data }: any) => {
         rowKey="id"
         size="middle"
         scroll={{ x: 768 }}
+        sticky
       />
     </>
   );
