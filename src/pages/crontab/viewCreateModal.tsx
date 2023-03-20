@@ -232,9 +232,6 @@ const ViewCreateModal = ({
                     <Space
                       className="view-create-modal-filters"
                       align="baseline"
-                      style={
-                        fields.length > 1 ? { width: 'calc(100% - 40px)' } : {}
-                      }
                     >
                       <Form.Item
                         {...restField}
