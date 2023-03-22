@@ -39,7 +39,7 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import Copy from '../../components/copy';
-import { VList } from '../../components/vlist';
+import { useVT } from 'virtualizedtableforantd4';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -216,10 +216,6 @@ const Env = () => {
   const [importLoading, setImportLoading] = useState(false);
   const tableRef = useRef<any>();
   const tableScrollHeight = useTableScrollHeight(tableRef, 59);
-  const resetRef = useRef<boolean>(true);
-  const setReset = (v) => {
-    resetRef.current = v;
-  };
 
   const getEnvs = () => {
     setLoading(true);
@@ -234,7 +230,6 @@ const Env = () => {
   };
 
   const enabledOrDisabledEnv = (record: any, index: number) => {
-    setReset(false);
     Modal.confirm({
       title: `确认${record.status === Status.已禁用 ? '启用' : '禁用'}`,
       content: (
@@ -280,19 +275,16 @@ const Env = () => {
   };
 
   const addEnv = () => {
-    setReset(false);
     setEditedEnv(null as any);
     setIsModalVisible(true);
   };
 
   const editEnv = (record: any, index: number) => {
-    setReset(false);
     setEditedEnv(record);
     setIsModalVisible(true);
   };
 
   const deleteEnv = (record: any, index: number) => {
-    setReset(false);
     Modal.confirm({
       title: '确认删除',
       content: (
@@ -332,20 +324,13 @@ const Env = () => {
     getEnvs();
   };
 
-  const vComponents = useMemo(() => {
-    return VList({
-      height: tableScrollHeight!,
-      reset: resetRef.current,
-      rowHeight: 48,
-      scrollTop: resetRef.current
-        ? 0
-        : tableRef.current?.querySelector('.ant-table-body')?.scrollTop,
-    });
-  }, [tableScrollHeight, resetRef.current]);
+  const [vt, setVT] = useVT(
+    () => ({ scroll: { y: tableScrollHeight } }),
+    [tableScrollHeight],
+  );
 
-  const DragableBodyRow = (props: any) => {
+  const DragableBodyRow = React.forwardRef((props: any, ref) => {
     const { index, moveRow, className, style, ...restProps } = props;
-    const ref = useRef();
     const [{ isOver, dropClassName }, drop] = useDrop({
       accept: type,
       collect: (monitor) => {
@@ -373,31 +358,27 @@ const Env = () => {
 
     useEffect(() => {
       drop(drag(ref));
-    }, [drag, drop]);
+    }, [ref]);
 
-    const components = useMemo(() => vComponents.body.row, []);
+    return (
+      <tr
+        ref={ref}
+        className={`${className}${isOver ? dropClassName : ''}`}
+        style={{ cursor: 'move', ...style }}
+        {...restProps}
+      />
+    );
+  });
 
-    const tempProps = useMemo(() => {
-      return {
-        ref: ref,
-        className: `${className}${isOver ? dropClassName : ''}`,
-        style: { cursor: 'move', ...style },
-        ...restProps,
-      };
-    }, [className, dropClassName, restProps, style, isOver]);
-
-    return <> {components(tempProps, ref)} </>;
-  };
-
-  const components = useMemo(() => {
-    return {
-      ...vComponents,
-      body: {
-        ...vComponents.body,
-        row: DragableBodyRow,
-      },
-    };
-  }, [vComponents]);
+  useEffect(
+    () =>
+      setVT({
+        body: {
+          row: DragableBodyRow,
+        },
+      }),
+    [],
+  );
 
   const moveRow = useCallback(
     (dragIndex: number, hoverIndex: number) => {
@@ -425,17 +406,12 @@ const Env = () => {
     setSelectedRowIds(selectedIds);
   };
 
-  useEffect(() => {
-    setReset(false);
-  }, [selectedRowIds]);
-
   const rowSelection = {
     selectedRowKeys: selectedRowIds,
     onChange: onSelectChange,
   };
 
   const delEnvs = () => {
-    setReset(false);
     Modal.confirm({
       title: '确认删除',
       content: <>确认删除选中的变量吗</>,
@@ -457,7 +433,6 @@ const Env = () => {
   };
 
   const operateEnvs = (operationStatus: number) => {
-    setReset(false);
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
       content: <>确认{OperationName[operationStatus]}选中的变量吗</>,
@@ -490,7 +465,6 @@ const Env = () => {
   };
 
   const onSearch = (value: string) => {
-    setReset(true);
     setSearchText(value.trim());
   };
 
@@ -607,7 +581,7 @@ const Env = () => {
             rowKey="id"
             size="middle"
             scroll={{ x: 1000, y: tableScrollHeight }}
-            components={components}
+            components={vt}
             loading={loading}
             onRow={(record: any, index: number | undefined) => {
               return {

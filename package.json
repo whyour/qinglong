@@ -147,6 +147,7 @@
     "typescript": "4.8.4",
     "umi-request": "^1.4.0",
     "vh-check": "^2.0.5",
+    "virtualizedtableforantd4": "1.3.0",
     "webpack": "^5.70.0",
     "yorkie": "^2.0.0"
   }
