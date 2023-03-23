@@ -1051,7 +1051,7 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
-          components={vt}
+          components={isPhone ? undefined : vt}
         />
       </div>
       <CronLogModal
