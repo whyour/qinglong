@@ -1,11 +1,9 @@
-version: 2.15.10
-changeLogLink: https://t.me/jiao_long/365
+version: 2.15.11
+changeLogLink: https://t.me/jiao_long/366
 changeLog: |
-  1. 增加 ipv6 自动检测
-  2. 修复订阅管理下载 http 协议文件
-  3. 修复日志删除逻辑
-  4. 修复自定义通知
-  5. 修复检查更新弹框逻辑
-  6. 修复 bark 推送声音，感谢 https://github.com/adams549659584
-  7. 修复 task 命令获取 token
-  8. 其他 bug 修复
+  1. 优化手机端操作，更丝滑
+  2. 修复 python Server酱 推送
+  3. 修改初始化依赖安装逻辑
+  4. 修复删除视图筛选条件
+  5. 修改定时任务和环境变量列表滚动
+  6. 其他优化
