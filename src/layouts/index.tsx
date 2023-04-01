@@ -271,7 +271,7 @@ export default function () {
       // @ts-ignore
       title={
         <>
-          <span style={{ fontSize: 16 }}>控制面板</span>
+          <span style={{ fontSize: 16 }}>青龙</span>
           <a
             href={systemInfo?.changeLogLink}
             target="_blank"
@@ -313,7 +313,7 @@ export default function () {
       pageTitleRender={(props, pageName, info) => {
         const title =
           (config.documentTitleMap as any)[location.pathname] || '未找到';
-        return `${title} - 控制面板`;
+        return `${title} - 青龙`;
       }}
       onCollapse={setCollapsed}
       collapsed={collapsed}

@@ -8,7 +8,7 @@
 
 <div align="center">
 
-支持python3、javaScript、shell、typescript 的定时任务管理面板
+支持 Python3、JavaScript、Shell、Typescript 的定时任务管理平台
 
 [![docker version][docker-version-image]][docker-version-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url]
 
@@ -22,7 +22,7 @@
 [docker-image-size-url]: https://hub.docker.com/r/whyour/qinglong
 </div>
 
-[![](https://user-images.githubusercontent.com/22700758/203243067-1a8a570d-b1b4-4837-9f12-d78d83e31f35.jpg)](https://whyour.cn)
+[![](https://user-images.githubusercontent.com/22700758/229290661-03aabe84-8780-4ef0-8e75-2146f4636130.jpeg)](https://whyour.cn)
 
 简体中文 | [English](./README-en.md)
 

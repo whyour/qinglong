@@ -1,5 +1,5 @@
 export default {
-  siteName: '青龙控制面板',
+  siteName: '青龙',
   apiPrefix: '/api/',
   authKey: 'token',
 

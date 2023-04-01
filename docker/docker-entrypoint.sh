@@ -29,10 +29,10 @@ pm2 delete public &>/dev/null
 pm2 start $dir_static/build/public.js -n public --source-map-support --time
 echo -e "监控服务启动成功...\n"
 
-echo -e "======================5. 启动控制面板========================\n"
+echo -e "======================5. 启动主服务========================\n"
 pm2 delete panel &>/dev/null
 pm2 start $dir_static/build/app.js -n panel --source-map-support --time
-echo -e "控制面板启动成功...\n"
+echo -e "主服务启动成功...\n"
 
 echo -e "======================6. 启动定时任务========================\n"
 pm2 delete schedule &>/dev/null
