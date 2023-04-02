@@ -18,7 +18,7 @@ import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -246,8 +246,12 @@ export default class CronService {
       for (const key of filterKeys) {
         let q: any = {};
         if (!filterQuery[key]) continue;
-        if (key === 'status' && filterQuery[key].includes(2)) {
-          q = { [Op.or]: [{ [key]: filterQuery[key] }, { isDisabled: 1 }] };
+        if (key === 'status') {
+          if (filterQuery[key].includes(2)) {
+            q = { [Op.or]: [{ [key]: filterQuery[key] }, { isDisabled: 1 }] };
+          } else {
+            q = { [Op.and]: [{ [key]: filterQuery[key] }, { isDisabled: 0 }] };
+          }
         } else {
           q[key] = filterQuery[key];
         }
@@ -264,7 +268,11 @@ export default class CronService {
     }
   }
 
-  public async find({ log_path }: { log_path: string }): Promise<Crontab | null> {
+  public async find({
+    log_path,
+  }: {
+    log_path: string;
+  }): Promise<Crontab | null> {
     try {
       const result = await CrontabModel.findOne({ where: { log_path } });
       return result;

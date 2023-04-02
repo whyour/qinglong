@@ -279,13 +279,6 @@ const Crontab = () => {
           value: 3,
         },
       ],
-      onFilter: (value, record) => {
-        if (record.isDisabled && record.status !== 0) {
-          return value === 2;
-        } else {
-          return record.status === value;
-        }
-      },
       render: (text, record) => (
         <>
           {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
@@ -1051,7 +1044,7 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
-          components={isPhone ? undefined : vt}
+          // components={isPhone ? undefined : vt}
         />
       </div>
       <CronLogModal
