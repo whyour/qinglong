@@ -73,7 +73,6 @@ sudo curl -sSL get.docker.com | sh
 ```
 
 2. 配置国内镜像源
-Configure domestic mirror sources
 
 ```bash
 mkdir -p /etc/docker
