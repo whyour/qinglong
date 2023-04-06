@@ -19,6 +19,7 @@ const sampleConfigFile = path.join(samplePath, 'config.sample.sh');
 const sampleAuthFile = path.join(samplePath, 'auth.sample.json');
 const homedir = os.homedir();
 const sshPath = path.resolve(homedir, '.ssh');
+const sshdPath = path.join(dataPath, 'ssh.d');
 
 export default async () => {
   const authFileExist = await fileExist(authConfigFile);
@@ -29,6 +30,7 @@ export default async () => {
   const uploadDirExist = await fileExist(uploadPath);
   const sshDirExist = await fileExist(sshPath);
   const bakDirExist = await fileExist(bakPath);
+  const sshdDirExist = await fileExist(sshdPath);
 
   if (!configDirExist) {
     fs.mkdirSync(configPath);
@@ -60,6 +62,10 @@ export default async () => {
 
   if (!bakDirExist) {
     fs.mkdirSync(bakPath);
+  }
+
+  if (!sshdDirExist) {
+    fs.mkdirSync(sshdPath);
   }
 
   dotenv.config({ path: confFile });
