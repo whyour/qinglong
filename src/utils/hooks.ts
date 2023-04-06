@@ -14,11 +14,13 @@ export const useCtx = () => {
       setMarginLeft(0);
       setMarginTop(0);
       setIsPhone(true);
+      document.body.setAttribute('data-mode', 'phone');
     } else {
       setWidth('100%');
       setMarginLeft(0);
       setMarginTop(-72);
       setIsPhone(false);
+      document.body.setAttribute('data-mode', 'desktop');
     }
   }, []);
 

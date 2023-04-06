@@ -6,8 +6,9 @@
   .card-wrapper {
     .ant-card:last-child {
       .ant-card-body {
-        height: calc(80vh - 367px);
-        height: calc(80vh - var(--vh-offset, 0px) - 367px);
+        min-height: 300px;
+        height: calc(90vh - 367px);
+        height: calc(90vh - var(--vh-offset, 0px) - 367px);
         overflow-y: auto;
       }
     }
@@ -193,8 +194,10 @@ tr.drop-over-upward td {
   }
 }
 
-.crontab-wrapper {
-  tbody .ant-table-cell {
-    height: 69px !important;
+body[data-mode='desktop'] {
+  .crontab-wrapper {
+    tbody .ant-table-cell {
+      height: 69px !important;
+    }
   }
 }

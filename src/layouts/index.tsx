@@ -271,7 +271,7 @@ export default function () {
       // @ts-ignore
       title={
         <>
-          <span style={{ fontSize: 16 }}>青龙</span>
+          <span style={{ fontSize: 16, marginRight: 5 }}>青龙</span>
           <a
             href={systemInfo?.changeLogLink}
             target="_blank"

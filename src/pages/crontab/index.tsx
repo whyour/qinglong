@@ -314,7 +314,7 @@ const Crontab = () => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 130,
       render: (text, record, index) => {
         const isPc = !isPhone;
         return (
