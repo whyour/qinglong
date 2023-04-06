@@ -665,7 +665,6 @@ const Crontab = () => {
     index: number;
   }> = ({ record, index }) => (
     <Dropdown
-      arrow={{ pointAtCenter: true }}
       placement="bottomRight"
       trigger={['click']}
       menu={{
