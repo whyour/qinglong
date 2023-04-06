@@ -12,7 +12,7 @@ export default class SshKeyService {
   private homedir = os.homedir();
   private sshPath = config.sshdPath;
   private sshConfigFilePath = path.resolve(this.homedir, '.ssh', 'config');
-  private sshConfigHeader = `Include ${this.sshPath}*.config`;
+  private sshConfigHeader = `Include ${path.join(this.sshPath, '*.config')}`;
 
   constructor(@Inject('logger') private logger: winston.Logger) {
     this.initSshConfigFile()
@@ -27,7 +27,7 @@ export default class SshKeyService {
 
   private generatePrivateKeyFile(alias: string, key: string): void {
     try {
-      fs.writeFileSync(`${this.sshPath}/${alias}`, `${key}${os.EOL}`, {
+      fs.writeFileSync(path.join(this.sshPath, alias), `${key}${os.EOL}`, {
         encoding: 'utf8',
         mode: '400',
       });
@@ -56,8 +56,8 @@ export default class SshKeyService {
       host = `ssh.github.com\n    Port 443\n    HostkeyAlgorithms +ssh-rsa\n    PubkeyAcceptedAlgorithms +ssh-rsa`;
     }
     const proxyStr = proxy ? `    ProxyCommand nc -v -x ${proxy} %h %p\n` : '';
-    const config = `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${this.sshPath}/${alias}\n    StrictHostKeyChecking no\n${proxyStr}`;
-    fs.writeFileSync(`${this.sshPath}/${alias}.config`, config, { encoding: 'utf8' });
+    const config = `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${path.join(this.sshPath, alias)}\n    StrictHostKeyChecking no\n${proxyStr}`;
+    fs.writeFileSync(`${path.join(this.sshPath, `${alias}.config`)}`, config, { encoding: 'utf8' });
   }
 
   private removeSshConfig(alias: string) {
