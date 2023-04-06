@@ -12,7 +12,7 @@ import {
   stepPosition,
 } from '../data/env';
 import groupBy from 'lodash/groupBy';
-import { Op } from 'sequelize';
+import { FindOptions, Op } from 'sequelize';
 
 @Service()
 export default class EnvService {
@@ -49,7 +49,9 @@ export default class EnvService {
   }
 
   public async update(payload: Env): Promise<Env> {
-    const newDoc = await this.updateDb(new Env(payload));
+    const doc = await this.getDb({ id: payload.id })
+    const tab = new Env({ ...doc, ...payload });
+    const newDoc = await this.updateDb(tab);
     await this.set_envs();
     return newDoc;
   }
@@ -162,7 +164,7 @@ export default class EnvService {
     return docs;
   }
 
-  public async getDb(query: any): Promise<Env> {
+  public async getDb(query: FindOptions<Env>['where']): Promise<Env> {
     const doc: any = await EnvModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Env);
   }

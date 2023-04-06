@@ -11,7 +11,7 @@ import {
 } from '../data/dependence';
 import { spawn } from 'child_process';
 import SockService from './sock';
-import { Op } from 'sequelize';
+import { FindOptions, Op } from 'sequelize';
 import { concurrentRun } from '../config/util';
 import dayjs from 'dayjs';
 
@@ -132,7 +132,7 @@ export default class DependenceService {
     return docs;
   }
 
-  public async getDb(query: any): Promise<Dependence> {
+  public async getDb(query:  FindOptions<Dependence>['where']): Promise<Dependence> {
     const doc: any = await DependenceModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Dependence);
   }

@@ -12,13 +12,13 @@ import {
   killTask,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
-import { Op, where, col as colFn } from 'sequelize';
+import { Op, where, col as colFn, FindOptions } from 'sequelize';
 import path from 'path';
 import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -41,7 +41,8 @@ export default class CronService {
   }
 
   public async update(payload: Crontab): Promise<Crontab> {
-    const tab = new Crontab(payload);
+    const doc = await this.getDb({ id: payload.id })
+    const tab = new Crontab({ ...doc, ...payload });
     tab.saved = false;
     const newDoc = await this.updateDb(tab);
     await this.set_crontab();
@@ -332,7 +333,7 @@ export default class CronService {
     }
   }
 
-  public async getDb(query: any): Promise<Crontab> {
+  public async getDb(query: FindOptions<Crontab>['where']): Promise<Crontab> {
     const doc: any = await CrontabModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Crontab);
   }

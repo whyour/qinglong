@@ -21,7 +21,7 @@ import {
   killTask,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
-import { Op } from 'sequelize';
+import { FindOptions, Op } from 'sequelize';
 import path from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
@@ -236,7 +236,8 @@ export default class SubscriptionService {
   }
 
   public async update(payload: Subscription): Promise<Subscription> {
-    const tab = new Subscription(payload);
+    const doc = await this.getDb({ id: payload.id })
+    const tab = new Subscription({ ...doc, ...payload });
     const newDoc = await this.updateDb(tab);
     await this.handleTask(newDoc, !newDoc.is_disabled);
     await this.setSshConfig();
@@ -288,7 +289,7 @@ export default class SubscriptionService {
     await this.setSshConfig();
   }
 
-  public async getDb(query: any): Promise<Subscription> {
+  public async getDb(query: FindOptions<Subscription>['where']): Promise<Subscription> {
     const doc: any = await SubscriptionModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Subscription);
   }
