@@ -138,7 +138,10 @@ export default class ScheduleService {
   async cancelCronTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info('[取消定时任务]，任务名：%s', name);
-    this.scheduleStacks.has(_id) && this.scheduleStacks.get(_id)?.cancel();
+    if (this.scheduleStacks.has(_id)) {
+      this.scheduleStacks.get(_id)?.cancel();
+      this.scheduleStacks.delete(_id);
+    }
   }
 
   async createIntervalTask(

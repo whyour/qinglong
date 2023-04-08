@@ -15,10 +15,11 @@ import { promises, existsSync } from 'fs';
 import { Op, where, col as colFn, FindOptions } from 'sequelize';
 import path from 'path';
 import { TASK_PREFIX, QL_PREFIX } from '../config/const';
+import cronClient from '../schedule/client';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -32,6 +33,11 @@ export default class CronService {
     const tab = new Crontab(payload);
     tab.saved = false;
     const doc = await this.insert(tab);
+    if (this.isSixCron(doc)) {
+      await cronClient.addCron([
+        { id: String(doc.id), schedule: doc.schedule!, command: doc.command },
+      ]);
+    }
     await this.set_crontab();
     return doc;
   }
@@ -41,10 +47,22 @@ export default class CronService {
   }
 
   public async update(payload: Crontab): Promise<Crontab> {
-    const doc = await this.getDb({ id: payload.id })
+    const doc = await this.getDb({ id: payload.id });
     const tab = new Crontab({ ...doc, ...payload });
     tab.saved = false;
     const newDoc = await this.updateDb(tab);
+    if (this.isSixCron(doc)) {
+      await cronClient.delCron([String(newDoc.id)]);
+    }
+    if (this.isSixCron(newDoc)) {
+      await cronClient.addCron([
+        {
+          id: String(newDoc.id),
+          schedule: newDoc.schedule!,
+          command: newDoc.command,
+        },
+      ]);
+    }
     await this.set_crontab();
     return newDoc;
   }
@@ -84,6 +102,7 @@ export default class CronService {
 
   public async remove(ids: number[]) {
     await CrontabModel.destroy({ where: { id: ids } });
+    await cronClient.delCron(ids.map(String));
     await this.set_crontab();
   }
 
@@ -431,11 +450,21 @@ export default class CronService {
 
   public async disabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 1 }, { where: { id: ids } });
+    await cronClient.delCron(ids.map(String));
     await this.set_crontab();
   }
 
   public async enabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
+    const docs = await CrontabModel.findAll({ where: { id: ids } });
+    const sixCron = docs
+      .filter((x) => this.isSixCron(x))
+      .map((doc) => ({
+        id: String(doc.id),
+        schedule: doc.schedule!,
+        command: doc.command,
+      }));
+    await cronClient.addCron(sixCron);
     await this.set_crontab();
   }
 
@@ -487,8 +516,8 @@ export default class CronService {
     return crontab_job_string;
   }
 
-  private async set_crontab() {
-    const tabs = await this.crontabs();
+  private async set_crontab(data?: { data: Crontab[]; total: number }) {
+    const tabs = data ?? (await this.crontabs());
     var crontab_string = '';
     tabs.data.forEach((tab) => {
       const _schedule = tab.schedule && tab.schedule.split(/ +/);
@@ -510,7 +539,6 @@ export default class CronService {
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
-    exec(`pm2 reload schedule`);
     await CrontabModel.update({ saved: true }, { where: {} });
   }
 
@@ -548,7 +576,17 @@ export default class CronService {
     });
   }
 
-  public autosave_crontab() {
-    return this.set_crontab();
+  public async autosave_crontab() {
+    const tabs = await this.crontabs();
+    this.set_crontab(tabs);
+
+    const sixCron = tabs.data
+      .filter((x) => this.isSixCron(x))
+      .map((doc) => ({
+        id: String(doc.id),
+        schedule: doc.schedule!,
+        command: doc.command,
+      }));
+    await cronClient.addCron(sixCron);
   }
 }

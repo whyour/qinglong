@@ -30,7 +30,7 @@ random_delay() {
     done
 
     local delay_second=$(($(gen_random_num "$random_delay_max") + 1))
-    echo -e "\n命令未添加 \"now\"，随机延迟 $delay_second 秒后执行\n"
+    echo -e "任务随机延迟 $delay_second 秒，配置文件参数 RandomDelay 置空可取消延迟 \n"
     sleep $delay_second
   fi
 }
@@ -118,6 +118,8 @@ handle_task_after() {
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
+
+  [[ "$diff_time" == 0 ]] && diff_time=1
 
   echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
 
