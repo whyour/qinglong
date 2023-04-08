@@ -34,9 +34,9 @@ pm2 delete panel &>/dev/null
 pm2 start $dir_static/build/app.js -n panel --source-map-support --time
 echo -e "主服务启动成功...\n"
 
-echo -e "======================6. 启动定时任务========================\n"
+echo -e "======================6. 启动定时服务========================\n"
 pm2 delete schedule &>/dev/null
-pm2 start $dir_static/build/schedule.js -n schedule --source-map-support --time
+pm2 start $dir_static/build/schedule/index.js -n schedule --source-map-support --time
 echo -e "定时任务启动成功...\n"
 
 if [[ $AutoStartBot == true ]]; then

@@ -379,9 +379,9 @@ reload_pm2() {
   pm2 delete panel --source-map-support --time &>/dev/null
   pm2 start $dir_static/build/app.js -n panel --source-map-support --time &>/dev/null
 
-  echo -e "启动定时任务服务\n"
+  echo -e "启动定时服务\n"
   pm2 delete schedule --source-map-support --time &>/dev/null
-  pm2 start $dir_static/build/schedule.js -n schedule --source-map-support --time &>/dev/null
+  pm2 start $dir_static/build/schedule/index.js -n schedule --source-map-support --time &>/dev/null
 }
 
 diff_time() {
