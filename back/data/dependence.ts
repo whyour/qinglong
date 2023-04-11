@@ -28,6 +28,7 @@ export enum DependenceStatus {
   'removing',
   'removed',
   'removeFailed',
+  'queued',
 }
 
 export enum DependenceTypes {

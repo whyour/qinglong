@@ -24,7 +24,7 @@ export default class DependenceService {
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
-      const tab = new Dependence({ ...x, status: DependenceStatus.installing });
+      const tab = new Dependence({ ...x, status: DependenceStatus.queued });
       return tab;
     });
     const docs = await this.insert(tabs);
@@ -45,7 +45,7 @@ export default class DependenceService {
     const tab = new Dependence({
       ...doc,
       ...other,
-      status: DependenceStatus.installing,
+      status: DependenceStatus.queued,
     });
     const newDoc = await this.updateDb(tab);
     this.installDependenceOneByOne([newDoc]);
@@ -59,7 +59,7 @@ export default class DependenceService {
 
   public async remove(ids: number[], force = false): Promise<Dependence[]> {
     await DependenceModel.update(
-      { status: DependenceStatus.removing, log: [] },
+      { status: DependenceStatus.queued, log: [] },
       { where: { id: ids } },
     );
     const docs = await DependenceModel.findAll({ where: { id: ids } });
@@ -105,17 +105,24 @@ export default class DependenceService {
     force: boolean = false,
   ) {
     concurrentRun(
-      docs.map(
-        (dep) => async () =>
-          await this.installOrUninstallDependencies([dep], isInstall, force),
-      ),
+      docs.map((dep) => async () => {
+        const status = isInstall
+          ? DependenceStatus.installing
+          : DependenceStatus.removing;
+        await DependenceModel.update({ status }, { where: { id: dep.id } });
+        return await this.installOrUninstallDependencies(
+          [dep],
+          isInstall,
+          force,
+        );
+      }),
       1,
     );
   }
 
   public async reInstall(ids: number[]): Promise<Dependence[]> {
     await DependenceModel.update(
-      { status: DependenceStatus.installing, log: [] },
+      { status: DependenceStatus.queued, log: [] },
       { where: { id: ids } },
     );
 
@@ -132,7 +139,9 @@ export default class DependenceService {
     return docs;
   }
 
-  public async getDb(query:  FindOptions<Dependence>['where']): Promise<Dependence> {
+  public async getDb(
+    query: FindOptions<Dependence>['where'],
+  ): Promise<Dependence> {
     const doc: any = await DependenceModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Dependence);
   }

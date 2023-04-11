@@ -42,7 +42,7 @@ export default async () => {
     raw: true,
   }).then(async (docs) => {
     await DependenceModel.update(
-      { status: DependenceStatus.installing, log: [] },
+      { status: DependenceStatus.queued, log: [] },
       { where: { id: docs.map((x) => x.id!) } },
     );
     dependenceService.installDependenceOneByOne(docs);

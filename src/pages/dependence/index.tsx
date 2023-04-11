@@ -19,6 +19,8 @@ import {
   DeleteFilled,
   BugOutlined,
   FileTextOutlined,
+  CloseCircleOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -42,6 +44,7 @@ enum Status {
   '删除中',
   '已删除',
   '删除失败',
+  '队列中',
 }
 
 enum StatusColor {
@@ -49,6 +52,37 @@ enum StatusColor {
   'success',
   'error',
 }
+
+const StatusMap: Record<number, { icon: React.ReactNode; color: string }> = {
+  0: {
+    icon: <SyncOutlined spin />,
+    color: 'processing',
+  },
+  1: {
+    icon: <CheckCircleOutlined />,
+    color: 'success',
+  },
+  2: {
+    icon: <CloseCircleOutlined />,
+    color: 'error',
+  },
+  3: {
+    icon: <SyncOutlined spin />,
+    color: 'processing',
+  },
+  4: {
+    icon: <CheckCircleOutlined />,
+    color: 'success',
+  },
+  5: {
+    icon: <CloseCircleOutlined />,
+    color: 'error',
+  },
+  6: {
+    icon: <ClockCircleOutlined />,
+    color: 'default',
+  },
+};
 
 const Dependence = () => {
   const { headerStyle, isPhone, socketMessage } =
@@ -74,7 +108,8 @@ const Dependence = () => {
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
             <Tag
-              color={StatusColor[record.status % 3]}
+              color={StatusMap[record.status].color}
+              icon={StatusMap[record.status].icon}
               style={{ marginRight: 0 }}
             >
               {Status[record.status]}
@@ -366,6 +401,23 @@ const Dependence = () => {
   useEffect(() => {
     if (!socketMessage) return;
     const { type, message, references } = socketMessage;
+    if (
+      type === 'installDependence' &&
+      message.includes('开始时间') &&
+      references.length > 0
+    ) {
+      const result = [...value];
+      for (let i = 0; i < references.length; i++) {
+        const index = value.findIndex((x) => x.id === references[i]);
+        if (index !== -1) {
+          result.splice(index, 1, {
+            ...value[index],
+            status: message.includes('安装') ? Status.安装中 : Status.删除中,
+          });
+        }
+      }
+      setValue(result);
+    }
     if (
       type === 'installDependence' &&
       message.includes('结束时间') &&
