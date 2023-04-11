@@ -439,10 +439,13 @@ patch_version() {
     pip3 config set global.index-url $PipMirror
   fi
   if [[ $NpmMirror ]]; then
-    pnpm config set registry $NpmMirror
+    cd && pnpm config set registry $NpmMirror
+    pnpm install -g
   fi
 
-  pnpm install -g &>/dev/null
+  git config --global pull.rebase false
+
+  cp -f $dir_root/.env.example $dir_root/.env
 
   if [[ -f "$dir_root/db/cookie.db" ]]; then
     echo -e "检测到旧的db文件，拷贝为新db...\n"
@@ -450,12 +453,6 @@ patch_version() {
     rm -rf $dir_root/db/cookie.db
     echo
   fi
-
-  pnpm add -g pm2 tsx
-
-  git config --global pull.rebase false
-
-  cp -f $dir_root/.env.example $dir_root/.env
 
   if [[ -d "$dir_root/db" ]]; then
     echo -e "检测到旧的db目录，拷贝到data目录...\n"

@@ -90,6 +90,8 @@ main() {
   echo -e "=====> 开始检测"
   npm i -g pnpm
   patch_version
+  pnpm add -g pm2 tsx
+  update_depend
   start_public
   copy_dep
   check_ql

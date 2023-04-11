@@ -78,9 +78,14 @@ const Initialization = () => {
     {
       title: '欢迎使用',
       content: (
-        <div className={styles.top} style={{ marginTop: 100 }}>
+        <div className={styles.top} style={{ marginTop: 30 }}>
           <div className={styles.header}>
             <span className={styles.title}>欢迎使用青龙</span>
+            <span className={styles.desc}>
+              支持python3、javaScript、shell、typescript 的定时任务管理面板（A
+              timed task management panel that supports typescript, javaScript,
+              python3, and shell.）
+            </span>
           </div>
           <div className={styles.action}>
             <Button

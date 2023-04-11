@@ -13,10 +13,8 @@ init_nginx
 
 pm2 l &>/dev/null
 
-patch_version &>/dev/null
-echo
-
 echo -e "======================2. 安装依赖========================\n"
+patch_version
 update_depend
 echo
 
