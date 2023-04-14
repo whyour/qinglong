@@ -15,13 +15,22 @@ export default class SshKeyService {
   private sshConfigHeader = `Include ${path.join(this.sshPath, '*.config')}`;
 
   constructor(@Inject('logger') private logger: winston.Logger) {
-    this.initSshConfigFile()
+    this.initSshConfigFile();
   }
 
   private initSshConfigFile() {
-    const config = fs.readFileSync(this.sshConfigFilePath, { encoding: 'utf-8' })
+    let config = '';
+    if (existsSync(this.sshConfigFilePath)) {
+      config = fs.readFileSync(this.sshConfigFilePath, { encoding: 'utf-8' });
+    } else {
+      fs.writeFileSync(this.sshConfigFilePath, '');
+    }
     if (!config.includes(this.sshConfigHeader)) {
-      fs.writeFileSync(this.sshConfigFilePath, `${this.sshConfigHeader}\n\n${config}`, { encoding: 'utf-8' });
+      fs.writeFileSync(
+        this.sshConfigFilePath,
+        `${this.sshConfigHeader}\n\n${config}`,
+        { encoding: 'utf-8' },
+      );
     }
   }
 
@@ -47,17 +56,18 @@ export default class SshKeyService {
     }
   }
 
-  private generateSingleSshConfig(
-    alias: string,
-    host: string,
-    proxy?: string,
-  ) {
+  private generateSingleSshConfig(alias: string, host: string, proxy?: string) {
     if (host === 'github.com') {
       host = `ssh.github.com\n    Port 443\n    HostkeyAlgorithms +ssh-rsa\n    PubkeyAcceptedAlgorithms +ssh-rsa`;
     }
     const proxyStr = proxy ? `    ProxyCommand nc -v -x ${proxy} %h %p\n` : '';
-    const config = `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${path.join(this.sshPath, alias)}\n    StrictHostKeyChecking no\n${proxyStr}`;
-    fs.writeFileSync(`${path.join(this.sshPath, `${alias}.config`)}`, config, { encoding: 'utf8' });
+    const config = `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${path.join(
+      this.sshPath,
+      alias,
+    )}\n    StrictHostKeyChecking no\n${proxyStr}`;
+    fs.writeFileSync(`${path.join(this.sshPath, `${alias}.config`)}`, config, {
+      encoding: 'utf8',
+    });
   }
 
   private removeSshConfig(alias: string) {
