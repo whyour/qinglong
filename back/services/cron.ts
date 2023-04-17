@@ -19,7 +19,7 @@ import cronClient from '../schedule/client';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -51,6 +51,9 @@ export default class CronService {
     const tab = new Crontab({ ...doc, ...payload });
     tab.saved = false;
     const newDoc = await this.updateDb(tab);
+    if (doc.isDisabled === 1) {
+      return newDoc;
+    }
     if (this.isSixCron(doc)) {
       await cronClient.delCron([String(newDoc.id)]);
     }
@@ -581,7 +584,7 @@ export default class CronService {
     this.set_crontab(tabs);
 
     const sixCron = tabs.data
-      .filter((x) => this.isSixCron(x))
+      .filter((x) => this.isSixCron(x) && x.isDisabled !== 1)
       .map((doc) => ({
         id: String(doc.id),
         schedule: doc.schedule!,

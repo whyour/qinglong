@@ -10,6 +10,9 @@ const addCron = (
 ) => {
   for (const item of call.request.crons) {
     const { id, schedule, command } = item;
+    if (scheduleStacks.has(id)) {
+      scheduleStacks.get(id)?.cancel();
+    }
     scheduleStacks.set(
       id,
       nodeSchedule.scheduleJob(id, schedule, async () => {
