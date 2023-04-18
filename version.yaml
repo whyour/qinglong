@@ -1,9 +1,9 @@
-version: 2.15.11
-changeLogLink: https://t.me/jiao_long/366
+version: 2.15.12
+changeLogLink: https://t.me/jiao_long/368
 changeLog: |
-  1. 优化手机端操作，更丝滑
-  2. 修复 python Server酱 推送
-  3. 修改初始化依赖安装逻辑
-  4. 修复删除视图筛选条件
-  5. 修改定时任务和环境变量列表滚动
-  6. 其他优化
+  1. 修复定时任务筛选
+  2. 修复更新环境变量、定时任务、订阅，状态被重置
+  3. 重构六位定时服务
+  4. 修改手机端页面样式
+  5. 修改依赖安装流程
+  6. 其他bug修复
