@@ -54,10 +54,29 @@ https://podman.io/getting-started/installation
 
 2. start the container
 
+Simple
+
 ```bash
 podman run -dit \
   --network bridge \
   -v $PWD/ql/data:/ql/data \
+  -p 5700:5700 \
+  --name qinglong \
+  --hostname qinglong \
+  docker.io/whyour/qinglong:latest
+```
+
+Detailed configuration, data can be migrated
+
+```bash
+podman run -dit \
+  --network bridge \
+  -v $PWD/data/config:/ql/config \
+  -v $PWD/data/log:/ql/log \
+  -v $PWD/data/db:/ql/db \
+  -v $PWD/data/scripts:/ql/scripts \
+  -v $PWD/data/repo:/ql/repo \
+  -v $PWD/data/raw:/ql/raw \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \
@@ -93,9 +112,28 @@ systemctl restart docker
 
 3. start the container
 
+Simple
+
 ```bash
 docker run -dit \
   -v $PWD/ql/data:/ql/data \
+  -p 5700:5700 \
+  --name qinglong \
+  --hostname qinglong \
+  --restart unless-stopped \
+  whyour/qinglong:latest
+```
+
+Detailed configuration, data can be migrated
+
+```bash
+docker run -dit \
+  -v $PWD/data/config:/ql/config \
+  -v $PWD/data/log:/ql/log \
+  -v $PWD/data/db:/ql/db \
+  -v $PWD/data/scripts:/ql/scripts \
+  -v $PWD/data/repo:/ql/repo \
+  -v $PWD/data/raw:/ql/raw \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \
