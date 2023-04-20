@@ -54,10 +54,29 @@ https://podman.io/getting-started/installation
 
 2. 启动容器
 
+简单配置 快速启动
+
 ```bash
 podman run -dit \
   --network bridge \
   -v $PWD/ql/data:/ql/data \
+  -p 5700:5700 \
+  --name qinglong \
+  --hostname qinglong \
+  docker.io/whyour/qinglong:latest
+```
+
+复杂配置 针对可迁移部署
+
+```bash
+podman run -dit \
+  --network bridge \
+  -v $PWD/data/config:/ql/config \
+  -v $PWD/data/log:/ql/log \
+  -v $PWD/data/db:/ql/db \
+  -v $PWD/data/scripts:/ql/scripts \
+  -v $PWD/data/repo:/ql/repo \
+  -v $PWD/data/raw:/ql/raw \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \
@@ -93,9 +112,29 @@ systemctl restart docker
 
 3. 启动容器
 
+简单配置 快速启动
+
 ```bash
 docker run -dit \
   -v $PWD/ql/data:/ql/data \
+  -p 5700:5700 \
+  --name qinglong \
+  --hostname qinglong \
+  --restart unless-stopped \
+  whyour/qinglong:latest
+```
+
+
+复杂配置 针对可迁移部署
+
+```bash
+docker run -dit \
+  -v $PWD/data/config:/ql/config \
+  -v $PWD/data/log:/ql/log \
+  -v $PWD/data/db:/ql/db \
+  -v $PWD/data/scripts:/ql/scripts \
+  -v $PWD/data/repo:/ql/repo \
+  -v $PWD/data/raw:/ql/raw \
   -p 5700:5700 \
   --name qinglong \
   --hostname qinglong \
@@ -113,12 +152,15 @@ sudo curl -L https://github.com/docker/compose/releases/download/1.16.1/docker-c
 
 2. 启动容器
 
+docker-compose 可提供更多个性化设置，所以docker-compose配置为 复杂配置 针对可迁移部署
+
 ```bash
 mkdir qinglong
 wget https://raw.githubusercontent.com/whyour/qinglong/master/docker/docker-compose.yml
 
 # 启动
 docker-compose up -d
+
 # 停止
 docker-compose down
 ```
