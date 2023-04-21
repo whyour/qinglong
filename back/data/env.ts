@@ -13,7 +13,10 @@ export class Env {
   constructor(options: Env) {
     this.value = options.value;
     this.id = options.id;
-    this.status = options.status || EnvStatus.normal;
+    this.status =
+      typeof options.status === 'number' && EnvStatus[options.status]
+        ? options.status
+        : EnvStatus.normal;
     this.timestamp = new Date().toString();
     this.position = options.position;
     this.name = options.name;

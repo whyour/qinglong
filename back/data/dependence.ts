@@ -12,7 +12,10 @@ export class Dependence {
 
   constructor(options: Dependence) {
     this.id = options.id;
-    this.status = options.status || DependenceStatus.installing;
+    this.status =
+      typeof options.status === 'number' && DependenceStatus[options.status]
+        ? options.status
+        : DependenceStatus.installing;
     this.type = options.type || DependenceTypes.nodejs;
     this.timestamp = new Date().toString();
     this.name = options.name;

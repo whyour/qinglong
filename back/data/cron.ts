@@ -26,7 +26,7 @@ export class Crontab {
     this.saved = options.saved;
     this.id = options.id;
     this.status =
-      options.status && CrontabStatus[options.status]
+      typeof options.status === 'number' && CrontabStatus[options.status]
         ? options.status
         : CrontabStatus.idle;
     this.timestamp = new Date().toString();
