@@ -318,6 +318,8 @@ git_clone_scripts() {
   git clone --depth=1 $part_cmd $url $dir
   exit_status=$?
   unset_proxy
+
+  reset_branch "$branch"
 }
 
 git_pull_scripts() {
@@ -328,12 +330,18 @@ git_pull_scripts() {
   cd $dir_work
   echo -e "开始更新仓库：$dir_work"
 
+  local pre_commit_id=$(git rev-parse --short HEAD)
   set_proxy "$proxy"
   git fetch --depth=1 --all
-  git pull --depth=1 1>/dev/null
+  git pull --depth=1 &>/dev/null
   exit_status=$?
   unset_proxy
 
+  reset_branch "$branch"
+  local cur_commit_id=$(git rev-parse --short HEAD)
+  if [[ $cur_commit_id != $pre_commit_id ]]; then
+    exit_status=0
+  fi
   cd $dir_current
 }
 
@@ -351,7 +359,7 @@ reset_romote_url() {
     git init
     git remote add origin $url &>/dev/null
   fi
-  reset_branch "$branch"
+  
   cd $dir_current
 }
 
