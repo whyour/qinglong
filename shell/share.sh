@@ -315,7 +315,7 @@ git_clone_scripts() {
   echo -e "开始克隆仓库 $url 到 $dir\n"
 
   set_proxy "$proxy"
-  git clone $part_cmd $url $dir
+  git clone --depth=1 $part_cmd $url $dir
   exit_status=$?
   unset_proxy
 }
@@ -329,8 +329,8 @@ git_pull_scripts() {
   echo -e "开始更新仓库：$dir_work"
 
   set_proxy "$proxy"
-  git fetch --all
-  git pull 1>/dev/null
+  git fetch --depth=1 --all
+  git pull --depth=1 1>/dev/null
   exit_status=$?
   unset_proxy
 
