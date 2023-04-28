@@ -49,7 +49,7 @@ export default class EnvService {
   }
 
   public async update(payload: Env): Promise<Env> {
-    const doc = await this.getDb({ id: payload.id })
+    const doc = await this.getDb({ id: payload.id });
     const tab = new Env({ ...doc, ...payload });
     const newDoc = await this.updateDb(tab);
     await this.set_envs();
@@ -146,7 +146,6 @@ export default class EnvService {
     }
     try {
       const result = await this.find(condition, [
-        ['status', 'ASC'],
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);

@@ -500,6 +500,36 @@ init_nginx() {
   sed -i "s,IPV6_CONFIG,${ipv6Str},g" /etc/nginx/conf.d/front.conf
 }
 
+handle_task_before() {
+  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
+
+  echo -e "## 开始执行... $begin_time\n"
+
+  [[ $is_macos -eq 0 ]] && check_server
+
+  if [[ -s $task_error_log_path ]]; then
+    cat $task_error_log_path
+    echo -e "加载 config.sh 出错，请手动检查"
+  fi
+
+  . $file_task_before "$@"
+}
+
+handle_task_after() {
+  . $file_task_after "$@"
+
+  local etime=$(date "+$time_format")
+  local end_time=$(format_time "$time_format" "$etime")
+  local end_timestamp=$(format_timestamp "$time_format" "$etime")
+  local diff_time=$(($end_timestamp - $begin_timestamp))
+
+  [[ "$diff_time" == 0 ]] && diff_time=1
+
+  echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
+
+  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+}
+
 init_env
 detect_termux
 detect_macos

@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-trap "single_hanle" 2 20 15 14
-single_hanle() {
-  handle_task_after "$@"
-  exit 1
-}
-
 random_delay() {
   local random_delay_max=$RandomDelay
   if [[ $random_delay_max ]] && [[ $random_delay_max -gt 0 ]]; then
@@ -90,40 +84,6 @@ check_server() {
       notify_api "服务器资源异常警告" "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \n资源占用详情 \n\n $resource"
     fi
   fi
-}
-
-handle_task_before() {
-  begin_time=$(format_time "$time_format" "$time")
-  begin_timestamp=$(format_timestamp "$time_format" "$time")
-
-  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
-
-  echo -e "## 开始执行... $begin_time\n"
-
-  [[ $is_macos -eq 0 ]] && check_server
-
-  if [[ -s $task_error_log_path ]]; then
-    eval cat $task_error_log_path $cmd
-    eval echo -e "加载 config.sh 出错，请手动检查" $cmd
-    eval echo $cmd
-  fi
-
-  . $file_task_before "$@"
-}
-
-handle_task_after() {
-  . $file_task_after "$@"
-
-  local etime=$(date "+$time_format")
-  local end_time=$(format_time "$time_format" "$etime")
-  local end_timestamp=$(format_timestamp "$time_format" "$etime")
-  local diff_time=$(($end_timestamp - $begin_timestamp))
-
-  [[ "$diff_time" == 0 ]] && diff_time=1
-
-  echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
-
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
 }
 
 ## 正常运行单个脚本，$1：传入参数

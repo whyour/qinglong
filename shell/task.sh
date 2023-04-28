@@ -5,6 +5,12 @@ dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
+trap "single_hanle" 2 3 20 15 14
+single_hanle() {
+  eval handle_task_after "$@" "$cmd"
+  exit 1
+}
+
 ## 选择python3还是node
 define_program() {
   local file_param=$1
@@ -32,10 +38,11 @@ handle_log_path() {
     file_param="task"
   fi
 
-  local suffix=""
-  if [[ ! -z $ID ]]; then
-    suffix="_${ID}"
+  if [[ -z $ID ]]; then
+    ID=$(cat $list_crontab_user | grep -E "$cmd_task $file_param" | perl -pe "s|.*ID=(.*) $cmd_task $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
   fi
+  local suffix="_${ID}"
+
   time=$(date "+$mtime_format")
   log_time=$(format_log_time "$mtime_format" "$time")
   log_dir_tmp="${file_param##*/}"
@@ -52,10 +59,9 @@ handle_log_path() {
   log_dir="${log_dir_tmp%.*}${suffix}"
   log_path="$log_dir/$log_time.log"
   cmd=">> $dir_log/$log_path 2>&1"
+  make_dir "$dir_log/$log_dir"
   if [[ "$show_log" == "true" ]]; then
-    cmd=""
-  else
-    make_dir "$dir_log/$log_dir"
+    cmd="2>&1 | tee -a $dir_log/$log_path"
   fi
 }
 
@@ -71,6 +77,11 @@ format_params() {
     timeoutCmd="timeout --foreground -s 14 -k 10s $command_timeout_time "
   fi
   # params=$(echo "$@" | sed -E 's/([^ ])&([^ ])/\1\\\&\2/g')
+}
+
+init_begin_time() {
+  begin_time=$(format_time "$time_format" "$time")
+  begin_timestamp=$(format_timestamp "$time_format" "$time")
 }
 
 while getopts ":lm:" opt; do
@@ -92,8 +103,9 @@ fi
 format_params "$@"
 define_program "$@"
 handle_log_path "$@"
+init_begin_time
 
 eval . $dir_shell/otask.sh "$cmd"
-[[ -f "$dir_log/$log_path" ]] && cat "$dir_log/$log_path"
+[[ -f "$dir_log/$log_path" ]] && [[ ! $show_log ]] && cat "$dir_log/$log_path"
 
 exit 0
