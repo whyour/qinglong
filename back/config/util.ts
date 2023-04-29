@@ -469,11 +469,15 @@ export function psTree(pid: number): Promise<number[]> {
 
 export async function killTask(pid: number) {
   const pids = await psTree(pid);
-  // SIGALRM 14 时钟信号
+  // SIGINT 2 程序终止(interrupt)信号，不会打印额外信息
   if (pids.length) {
-    process.kill(pids[0], 14);
+    try {
+      [pid, ...pids].forEach((x) => {
+        process.kill(x, 2);
+      });
+    } catch (error) {}
   } else {
-    process.kill(pid, 14);
+    process.kill(pid, 2);
   }
 }
 
