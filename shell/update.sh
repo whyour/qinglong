@@ -257,9 +257,6 @@ update_qinglong() {
     cp -f $file_config_sample $dir_config/config.sample.sh
     update_depend
 
-    [[ -f $dir_root/package.json ]] && ql_depend_new=$(cat $dir_root/package.json)
-    [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
-
     update_qinglong_static "$1" "$primary_branch"
   else
     echo -e "\n更新青龙源文件失败，请检查网络...\n"

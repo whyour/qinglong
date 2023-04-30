@@ -267,9 +267,9 @@ npm_install_1() {
   local dir_work=$1
 
   cd $dir_work
-  echo -e "运行 npm install...\n"
+  echo -e "运行 pnpm install...\n"
   npm_install_sub
-  [[ $? -ne 0 ]] && echo -e "\nnpm install 运行不成功，请进入 $dir_work 目录后手动运行 npm install...\n"
+  [[ $? -ne 0 ]] && echo -e "\nnpm install 运行不成功，请进入 $dir_work 目录后手动运行 pnpm install...\n"
   cd $dir_current
 }
 
@@ -278,7 +278,7 @@ npm_install_2() {
   local dir_work=$1
 
   cd $dir_work
-  echo -e "检测到 $dir_work 的依赖包有变化，运行 npm install...\n"
+  echo -e "安装 $dir_work 依赖包...\n"
   npm_install_sub
   if [[ $? -ne 0 ]]; then
     echo -e "\n安装 $dir_work 的依赖包运行不成功，再次尝试一遍...\n"
@@ -302,6 +302,8 @@ update_depend() {
     cp -f $dir_sample/package.json $dir_scripts/package.json
     npm_install_2 $dir_scripts
   fi
+
+  npm_install_2 $dir_root
 
   cd $dir_current
 }
