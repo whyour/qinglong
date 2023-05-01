@@ -34,7 +34,7 @@ define_program() {
 handle_log_path() {
   local file_param=$1
 
-  if [[ -z $file_param ]];then
+  if [[ -z $file_param ]]; then
     file_param="task"
   fi
 
@@ -76,8 +76,10 @@ format_params() {
     mtime_format="%Y-%m-%d %H:%M:%S.%3N"
   fi
   timeoutCmd=""
-  if type timeout &>/dev/null; then
-    timeoutCmd="timeout --foreground -s 2 -k 10s $command_timeout_time "
+  if [[ $command_timeout_time ]]; then
+    if type timeout &>/dev/null; then
+      timeoutCmd="timeout --foreground -s 2 -k 10s $command_timeout_time "
+    fi
   fi
   # params=$(echo "$@" | sed -E 's/([^ ])&([^ ])/\1\\\&\2/g')
 }
