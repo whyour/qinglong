@@ -303,8 +303,6 @@ update_depend() {
     npm_install_2 $dir_scripts
   fi
 
-  npm_install_2 $dir_root
-
   cd $dir_current
 }
 

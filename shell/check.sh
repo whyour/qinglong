@@ -54,9 +54,6 @@ check_ql() {
   echo -e "\n=====> 检测面板\n\n$api\n"
   if [[ $api =~ "<div id=\"root\"></div>" ]]; then
     echo -e "=====> 面板服务启动正常\n"
-  else
-    echo -e "=====> 面板服务异常，重置基础环境\n"
-    reset_env
   fi
 }
 
@@ -74,9 +71,6 @@ check_pm2() {
   echo -e "\n=====> 检测后台\n\n$api\n"
   if [[ $api =~ "{\"code\"" ]]; then
     echo -e "=====> 后台服务启动正常\n"
-  else
-    echo -e "=====> 后台服务异常，重置基础环境并重启后台\n"
-    reset_env
   fi
 }
 
@@ -91,7 +85,7 @@ main() {
   npm i -g pnpm
   patch_version
   pnpm add -g pm2 tsx
-  update_depend
+  reset_env
   start_public
   copy_dep
   check_ql
