@@ -43,7 +43,11 @@ handle_log_path() {
   fi
   local suffix=""
   if [[ ! -z $ID ]]; then
-    suffix="_${ID}"
+    if [[ "$ID" -gt 0 ]] 2>/dev/null; then
+      suffix="_${ID}"
+    else
+      ID=""
+    fi
   fi
 
   time=$(date "+$mtime_format")
@@ -65,6 +69,10 @@ handle_log_path() {
   make_dir "$dir_log/$log_dir"
   if [[ "$show_log" == "true" ]]; then
     cmd="2>&1 | tee -a $dir_log/$log_path"
+  fi
+
+  if [[ "$real_time" == "true" ]]; then
+    cmd=""
   fi
 }
 

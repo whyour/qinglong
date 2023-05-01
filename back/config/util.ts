@@ -7,6 +7,8 @@ import FormData from 'form-data';
 import psTreeFun from 'pstree.remy';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
+import config from './index';
+import { TASK_COMMAND } from './const';
 
 export function getFileContentByName(fileName: string) {
   if (fs.existsSync(fileName)) {
@@ -243,6 +245,18 @@ export async function createFile(file: string, data: string = '') {
     fs.writeFileSync(file, data);
     resolve(true);
   });
+}
+
+export async function handleLogPath(
+  logPath: string,
+  data: string = '',
+): Promise<string> {
+  const absolutePath = path.resolve(config.logPath, logPath);
+  const logFileExist = await fileExist(absolutePath);
+  if (!logFileExist) {
+    await createFile(absolutePath, data);
+  }
+  return absolutePath;
 }
 
 export async function concurrentRun(
@@ -500,4 +514,41 @@ export async function parseVersion(path: string): Promise<IVersion> {
 
 export async function parseContentVersion(content: string): Promise<IVersion> {
   return load(content) as IVersion;
+}
+
+export async function getUniqPath(command: string): Promise<string> {
+  const idStr = `cat ${config.crontabFile} | grep -E "${command}" | perl -pe "s|.*ID=(.*) ${command}.*|\\1|" | head -1 | awk -F " " '{print $1}' | xargs echo -n`;
+  let id = await promiseExec(idStr);
+
+  if (/^\d\d*\d$/.test(id)) {
+    id = `_${id}`;
+  } else {
+    id = '';
+  }
+
+  const items = command.split(/ +/);
+  let str = items[0];
+  if (items[0] === TASK_COMMAND) {
+    str = items[1];
+  }
+
+  const dotIndex = str.lastIndexOf('.');
+
+  if (dotIndex !== -1) {
+    str = str.slice(0, dotIndex);
+  }
+
+  const slashIndex = str.lastIndexOf('/');
+
+  let tempStr = '';
+  if (slashIndex !== -1) {
+    tempStr = str.slice(0, slashIndex);
+    const _slashIndex = tempStr.lastIndexOf('/');
+    if (_slashIndex !== -1) {
+      tempStr = tempStr.slice(_slashIndex + 1);
+    }
+    str = `${tempStr}_${str.slice(slashIndex + 1)}`;
+  }
+
+  return `${str}${id}`;
 }

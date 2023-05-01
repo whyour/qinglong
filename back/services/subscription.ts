@@ -19,6 +19,7 @@ import {
   fileExist,
   createFile,
   killTask,
+  handleLogPath,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { FindOptions, Op } from 'sequelize';
@@ -121,18 +122,6 @@ export default class SubscriptionService {
     });
   }
 
-  private async handleLogPath(
-    logPath: string,
-    data: string = '',
-  ): Promise<string> {
-    const absolutePath = path.resolve(config.logPath, logPath);
-    const logFileExist = await fileExist(absolutePath);
-    if (!logFileExist) {
-      await createFile(absolutePath, data);
-    }
-    return absolutePath;
-  }
-
   private taskCallbacks(doc: Subscription): TaskCallbacks {
     return {
       onBefore: async (startTime) => {
@@ -145,7 +134,7 @@ export default class SubscriptionService {
           },
           { where: { id: doc.id } },
         );
-        const absolutePath = await this.handleLogPath(
+        const absolutePath = await handleLogPath(
           logPath as string,
           `## 开始执行... ${startTime.format('YYYY-MM-DD HH:mm:ss')}\n`,
         );
@@ -175,7 +164,7 @@ export default class SubscriptionService {
       },
       onEnd: async (cp, endTime, diff) => {
         const sub = await this.getDb({ id: doc.id });
-        const absolutePath = await this.handleLogPath(sub.log_path as string);
+        const absolutePath = await handleLogPath(sub.log_path as string);
 
         // 执行 sub_after
         let afterStr = '';
@@ -212,12 +201,12 @@ export default class SubscriptionService {
       },
       onError: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
-        const absolutePath = await this.handleLogPath(sub.log_path as string);
+        const absolutePath = await handleLogPath(sub.log_path as string);
         fs.appendFileSync(absolutePath, `\n${message}`);
       },
       onLog: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
-        const absolutePath = await this.handleLogPath(sub.log_path as string);
+        const absolutePath = await handleLogPath(sub.log_path as string);
         fs.appendFileSync(absolutePath, `\n${message}`);
       },
     };
@@ -236,7 +225,7 @@ export default class SubscriptionService {
   }
 
   public async update(payload: Subscription): Promise<Subscription> {
-    const doc = await this.getDb({ id: payload.id })
+    const doc = await this.getDb({ id: payload.id });
     const tab = new Subscription({ ...doc, ...payload });
     const newDoc = await this.updateDb(tab);
     await this.handleTask(newDoc, !newDoc.is_disabled);
@@ -289,7 +278,9 @@ export default class SubscriptionService {
     await this.setSshConfig();
   }
 
-  public async getDb(query: FindOptions<Subscription>['where']): Promise<Subscription> {
+  public async getDb(
+    query: FindOptions<Subscription>['where'],
+  ): Promise<Subscription> {
     const doc: any = await SubscriptionModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Subscription);
   }
@@ -315,7 +306,7 @@ export default class SubscriptionService {
           this.logger.silly(error);
         }
       }
-      const absolutePath = await this.handleLogPath(doc.log_path as string);
+      const absolutePath = await handleLogPath(doc.log_path as string);
 
       fs.appendFileSync(
         `${absolutePath}`,
@@ -369,7 +360,7 @@ export default class SubscriptionService {
       return '';
     }
 
-    const absolutePath = await this.handleLogPath(doc.log_path as string);
+    const absolutePath = await handleLogPath(doc.log_path as string);
     return getFileContentByName(absolutePath);
   }
 
