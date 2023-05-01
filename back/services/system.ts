@@ -9,7 +9,12 @@ import ScheduleService, { TaskCallbacks } from './schedule';
 import { spawn } from 'child_process';
 import SockService from './sock';
 import got from 'got';
-import { parseContentVersion, parseVersion } from '../config/util';
+import {
+  getPid,
+  killTask,
+  parseContentVersion,
+  parseVersion,
+} from '../config/util';
 import { TASK_COMMAND } from '../config/const';
 
 @Service()
@@ -177,5 +182,18 @@ export default class SystemService {
       command = `${TASK_COMMAND} ${command}`;
     }
     this.scheduleService.runTask(`real_time=true ${command}`, callback);
+  }
+
+  public async stop({ command }: { command: string }) {
+    if (!command.startsWith(TASK_COMMAND)) {
+      command = `${TASK_COMMAND} ${command}`;
+    }
+    const pid = await getPid(command);
+    if (pid) {
+      await killTask(pid);
+      return { code: 200 };
+    } else {
+      return { code: 400, message: '任务未找到' };
+    }
   }
 }

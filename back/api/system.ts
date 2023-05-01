@@ -161,7 +161,6 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const systemService = Container.get(SystemService);
         const uniqPath = await getUniqPath(req.body.command);
@@ -183,6 +182,24 @@ export default (app: Router) => {
             fs.appendFileSync(absolutePath, `\n${message}`);
           },
         });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/command-stop',
+    celebrate({
+      body: Joi.object({
+        command: Joi.string().required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.stop(req.body);
+        res.send(result);
       } catch (e) {
         return next(e);
       }

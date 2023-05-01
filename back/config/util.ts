@@ -496,10 +496,9 @@ export async function killTask(pid: number) {
 }
 
 export async function getPid(name: string) {
-  let taskCommand = `ps -ef | grep "${name}" | grep -v grep | awk '{print $1}'`;
-  const execAsync = promisify(exec);
-  let pid = (await execAsync(taskCommand)).stdout;
-  return Number(pid);
+  const taskCommand = `ps -eo pid,command | grep "${name}" | grep -v grep | awk '{print $1}' | head -1 | xargs echo -n`;
+  const pid = await promiseExec(taskCommand);
+  return pid ? Number(pid) : undefined;
 }
 
 interface IVersion {

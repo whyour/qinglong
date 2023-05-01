@@ -38,7 +38,7 @@ pm2_log() {
 }
 
 check_nginx() {
-  local nginxPid=$(ps -ef | grep nginx | grep -v grep)
+  local nginxPid=$(ps -eo pid,command | grep nginx | grep -v grep)
   echo -e "=====> 检测nginx服务\n$nginxPid"
   if [[ $nginxPid ]]; then
     echo -e "\n=====> nginx服务正常\n"

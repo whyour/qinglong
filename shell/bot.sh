@@ -42,6 +42,6 @@ echo -e "\npython3依赖安装成功...\n"
 echo -e "4、启动bot程序...\n"
 make_dir $dir_log/bot
 cd $dir_data
-ps -ef | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
+ps -eo pid,command | grep "python3 -m jbot" | grep -v grep | awk '{print $1}' | xargs kill -9 2>/dev/null
 nohup python3 -m jbot >$dir_log/bot/nohup.log 2>&1 &
 echo -e "bot启动成功...\n"
