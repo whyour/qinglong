@@ -15,6 +15,7 @@ export default defineConfig({
     '/api/public': {
       target: 'http://127.0.0.1:5400/',
       changeOrigin: true,
+      pathRewrite: { '^/api/public': '/api/' },
     },
     '/api': {
       target: 'http://127.0.0.1:5600/',

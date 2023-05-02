@@ -382,6 +382,7 @@ random_range() {
 
 reload_pm2() {
   pm2 l &>/dev/null
+  pm2 flush &>/dev/null
 
   echo -e "启动面板服务\n"
   pm2 delete panel --source-map-support --time &>/dev/null

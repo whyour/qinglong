@@ -2,14 +2,14 @@ import { credentials } from '@grpc/grpc-js';
 import {
   AddCronRequest,
   AddCronResponse,
-  CronServiceClient,
+  CronClient,
   DeleteCronRequest,
   DeleteCronResponse,
 } from '../protos/cron';
 import config from '../config';
 
 class Client {
-  private client = new CronServiceClient(
+  private client = new CronClient(
     `localhost:${config.cronPort}`,
     credentials.createInsecure(),
   );

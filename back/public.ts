@@ -2,15 +2,21 @@ import express from 'express';
 import { exec } from 'child_process';
 import Logger from './loaders/logger';
 import config from './config';
+import { HealthClient } from './protos/health';
+import { credentials } from '@grpc/grpc-js';
 
 const app = express();
+const client = new HealthClient(
+  `localhost:${config.cronPort}`,
+  credentials.createInsecure(),
+);
 
-app.get('/api/public/panel/log', (req, res) => {
-  exec('tail -n 300 ~/.pm2/logs/panel-error.log', (err, stdout, stderr) => {
-    if (err || stderr) {
-      return res.send({ code: 400, message: (err && err.message) || stderr });
+app.get('/api/health', (req, res) => {
+  client.check({ service: 'cron' }, (err, response) => {
+    if (err) {
+      return res.status(500).send({ error: err });
     }
-    return res.send({ code: 200, data: stdout });
+    return res.status(200).send({ data: response });
   });
 });
 

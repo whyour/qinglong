@@ -15,14 +15,14 @@ import _m0 from 'protobufjs/minimal';
 
 export const protobufPackage = 'com.ql.cron';
 
-export interface Cron {
+export interface ICron {
   id: string;
   schedule: string;
   command: string;
 }
 
 export interface AddCronRequest {
-  crons: Cron[];
+  crons: ICron[];
 }
 
 export interface AddCronResponse {}
@@ -33,12 +33,12 @@ export interface DeleteCronRequest {
 
 export interface DeleteCronResponse {}
 
-function createBaseCron(): Cron {
+function createBaseICron(): ICron {
   return { id: '', schedule: '', command: '' };
 }
 
-export const Cron = {
-  encode(message: Cron, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const ICron = {
+  encode(message: ICron, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.id !== '') {
       writer.uint32(10).string(message.id);
     }
@@ -51,11 +51,11 @@ export const Cron = {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): Cron {
+  decode(input: _m0.Reader | Uint8Array, length?: number): ICron {
     const reader =
       input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCron();
+    const message = createBaseICron();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -89,7 +89,7 @@ export const Cron = {
     return message;
   },
 
-  fromJSON(object: any): Cron {
+  fromJSON(object: any): ICron {
     return {
       id: isSet(object.id) ? String(object.id) : '',
       schedule: isSet(object.schedule) ? String(object.schedule) : '',
@@ -97,7 +97,7 @@ export const Cron = {
     };
   },
 
-  toJSON(message: Cron): unknown {
+  toJSON(message: ICron): unknown {
     const obj: any = {};
     message.id !== undefined && (obj.id = message.id);
     message.schedule !== undefined && (obj.schedule = message.schedule);
@@ -105,12 +105,12 @@ export const Cron = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<Cron>, I>>(base?: I): Cron {
-    return Cron.fromPartial(base ?? {});
+  create<I extends Exact<DeepPartial<ICron>, I>>(base?: I): ICron {
+    return ICron.fromPartial(base ?? {});
   },
 
-  fromPartial<I extends Exact<DeepPartial<Cron>, I>>(object: I): Cron {
-    const message = createBaseCron();
+  fromPartial<I extends Exact<DeepPartial<ICron>, I>>(object: I): ICron {
+    const message = createBaseICron();
     message.id = object.id ?? '';
     message.schedule = object.schedule ?? '';
     message.command = object.command ?? '';
@@ -128,7 +128,7 @@ export const AddCronRequest = {
     writer: _m0.Writer = _m0.Writer.create(),
   ): _m0.Writer {
     for (const v of message.crons) {
-      Cron.encode(v!, writer.uint32(10).fork()).ldelim();
+      ICron.encode(v!, writer.uint32(10).fork()).ldelim();
     }
     return writer;
   },
@@ -146,7 +146,7 @@ export const AddCronRequest = {
             break;
           }
 
-          message.crons.push(Cron.decode(reader, reader.uint32()));
+          message.crons.push(ICron.decode(reader, reader.uint32()));
           continue;
       }
       if ((tag & 7) == 4 || tag == 0) {
@@ -160,7 +160,7 @@ export const AddCronRequest = {
   fromJSON(object: any): AddCronRequest {
     return {
       crons: Array.isArray(object?.crons)
-        ? object.crons.map((e: any) => Cron.fromJSON(e))
+        ? object.crons.map((e: any) => ICron.fromJSON(e))
         : [],
     };
   },
@@ -168,7 +168,7 @@ export const AddCronRequest = {
   toJSON(message: AddCronRequest): unknown {
     const obj: any = {};
     if (message.crons) {
-      obj.crons = message.crons.map((e) => (e ? Cron.toJSON(e) : undefined));
+      obj.crons = message.crons.map((e) => (e ? ICron.toJSON(e) : undefined));
     } else {
       obj.crons = [];
     }
@@ -185,7 +185,7 @@ export const AddCronRequest = {
     object: I,
   ): AddCronRequest {
     const message = createBaseAddCronRequest();
-    message.crons = object.crons?.map((e) => Cron.fromPartial(e)) || [];
+    message.crons = object.crons?.map((e) => ICron.fromPartial(e)) || [];
     return message;
   },
 };
@@ -366,10 +366,10 @@ export const DeleteCronResponse = {
   },
 };
 
-export type CronServiceService = typeof CronServiceService;
-export const CronServiceService = {
+export type CronService = typeof CronService;
+export const CronService = {
   addCron: {
-    path: '/com.ql.cron.CronService/addCron',
+    path: '/com.ql.cron.Cron/addCron',
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: AddCronRequest) =>
@@ -380,7 +380,7 @@ export const CronServiceService = {
     responseDeserialize: (value: Buffer) => AddCronResponse.decode(value),
   },
   delCron: {
-    path: '/com.ql.cron.CronService/delCron',
+    path: '/com.ql.cron.Cron/delCron',
     requestStream: false,
     responseStream: false,
     requestSerialize: (value: DeleteCronRequest) =>
@@ -392,12 +392,12 @@ export const CronServiceService = {
   },
 } as const;
 
-export interface CronServiceServer extends UntypedServiceImplementation {
+export interface CronServer extends UntypedServiceImplementation {
   addCron: handleUnaryCall<AddCronRequest, AddCronResponse>;
   delCron: handleUnaryCall<DeleteCronRequest, DeleteCronResponse>;
 }
 
-export interface CronServiceClient extends Client {
+export interface CronClient extends Client {
   addCron(
     request: AddCronRequest,
     callback: (error: ServiceError | null, response: AddCronResponse) => void,
@@ -439,16 +439,16 @@ export interface CronServiceClient extends Client {
   ): ClientUnaryCall;
 }
 
-export const CronServiceClient = makeGenericClientConstructor(
-  CronServiceService,
-  'com.ql.cron.CronService',
+export const CronClient = makeGenericClientConstructor(
+  CronService,
+  'com.ql.cron.Cron',
 ) as unknown as {
   new (
     address: string,
     credentials: ChannelCredentials,
     options?: Partial<ClientOptions>,
-  ): CronServiceClient;
-  service: typeof CronServiceService;
+  ): CronClient;
+  service: typeof CronService;
 };
 
 type Builtin =

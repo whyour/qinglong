@@ -33,8 +33,8 @@ pm2_log() {
   echo -e "---> pm2日志"
   local panelOut="/root/.pm2/logs/panel-out.log"
   local panelError="/root/.pm2/logs/panel-error.log"
-  tail -n 100 "$panelOut"
-  tail -n 100 "$panelError"
+  tail -n 300 "$panelOut"
+  tail -n 300 "$panelError"
 }
 
 check_nginx() {

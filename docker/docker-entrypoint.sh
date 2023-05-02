@@ -12,6 +12,7 @@ make_dir /run/nginx
 init_nginx
 
 pm2 l &>/dev/null
+pm2 flush &>/dev/null
 
 echo -e "======================2. 安装依赖========================\n"
 patch_version

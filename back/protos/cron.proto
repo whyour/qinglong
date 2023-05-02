@@ -2,18 +2,18 @@ syntax = "proto3";
 
 package com.ql.cron;
 
-service CronService {
+service Cron {
   rpc addCron(AddCronRequest) returns (AddCronResponse);
   rpc delCron(DeleteCronRequest) returns (DeleteCronResponse);
 }
 
-message Cron {
+message ICron {
   string id = 1;
   string schedule = 2;
   string command = 3;
 }
 
-message AddCronRequest { repeated Cron crons = 1; }
+message AddCronRequest { repeated ICron crons = 1; }
 
 message AddCronResponse {}
 
