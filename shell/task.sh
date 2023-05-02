@@ -39,7 +39,7 @@ handle_log_path() {
   fi
 
   if [[ -z $ID ]]; then
-    ID=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    ID=$(cat $list_crontab_user | grep -E "$cmd_task.* $file_param" | perl -pe "s|.*ID=(.*) $cmd_task.* $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
   fi
   local suffix=""
   if [[ ! -z $ID ]]; then

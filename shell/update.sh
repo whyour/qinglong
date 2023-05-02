@@ -46,7 +46,7 @@ del_cron() {
   local ids=""
   echo -e "开始尝试自动删除失效的定时任务...\n"
   for cron in $(cat $list_drop); do
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task $cron" | perl -pe "s|.*ID=(.*) $cmd_task $cron\.*|\1|" | head -1 | head -1 | awk -F " " '{print $1}')
+    local id=$(cat $list_crontab_user | grep -E "$cmd_task.* $cron" | perl -pe "s|.*ID=(.*) $cmd_task.* $cron\.*|\1|" | head -1 | awk -F " " '{print $1}')
     if [[ $ids ]]; then
       ids="$ids,\"$id\""
     else
