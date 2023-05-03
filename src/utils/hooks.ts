@@ -4,7 +4,7 @@ import browserType from './index';
 export const useCtx = () => {
   const [width, setWidth] = useState('100%');
   const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-72);
+  const [marginTop, setMarginTop] = useState(-48);
   const [isPhone, setIsPhone] = useState(false);
   const { platform } = useMemo(() => browserType(), []);
 
@@ -18,7 +18,7 @@ export const useCtx = () => {
     } else {
       setWidth('100%');
       setMarginLeft(0);
-      setMarginTop(-72);
+      setMarginTop(-48);
       setIsPhone(false);
       document.body.setAttribute('data-mode', 'desktop');
     }
