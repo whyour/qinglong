@@ -449,7 +449,7 @@ patch_version() {
   fi
   if [[ $NpmMirror ]]; then
     cd && pnpm config set registry $NpmMirror
-    pnpm install -g --prefer-offline --force
+    pnpm install -g --force
   fi
 
   git config --global pull.rebase false
