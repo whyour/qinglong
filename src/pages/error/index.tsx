@@ -50,7 +50,7 @@ const Error = () => {
     <div className="error-wrapper">
       {loading ? (
         <PageLoading />
-      ) : retryTimes.current < 3 ? (
+      ) : retryTimes.current > 3 ? (
         <div className="code-box">
           <div className="browser-markup"></div>
           <Alert
