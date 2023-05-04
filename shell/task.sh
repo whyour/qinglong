@@ -124,6 +124,6 @@ handle_log_path "$@"
 init_begin_time
 
 eval . $dir_shell/otask.sh "$cmd"
-[[ -f "$dir_log/$log_path" ]] && [[ ! $show_log ]] && cat "$dir_log/$log_path"
+[[ -f "$dir_log/$log_path" ]] && [[ ! $show_log ]] && [[ "$real_time" != "true" ]] && cat "$dir_log/$log_path"
 
 exit 0
