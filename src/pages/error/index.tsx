@@ -13,8 +13,6 @@ const Error = () => {
   const [data, setData] = useState('暂无日志');
   const retryTimes = useRef(1);
 
-  console.log(retryTimes.current);
-
   const getLog = (needLoading: boolean = true) => {
     needLoading && setLoading(true);
     request
@@ -24,9 +22,9 @@ const Error = () => {
           return reloadUser();
         }
         if (retryTimes.current > 3) {
+          setData(error?.details);
           return;
         }
-        setData(error.details);
         retryTimes.current += 1;
         setTimeout(() => {
           reloadUser();

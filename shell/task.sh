@@ -65,6 +65,11 @@ handle_log_path() {
   [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
   log_dir="${log_dir_tmp%.*}${suffix}"
   log_path="$log_dir/$log_time.log"
+
+  if [[ $real_log_path != "${log_path}" ]]; then
+    log_path="$real_log_path"
+  fi
+  
   cmd=">> $dir_log/$log_path 2>&1"
   make_dir "$dir_log/$log_dir"
   if [[ "$show_log" == "true" ]]; then

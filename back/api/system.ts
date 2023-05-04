@@ -164,24 +164,27 @@ export default (app: Router) => {
       try {
         const systemService = Container.get(SystemService);
         const uniqPath = await getUniqPath(req.body.command);
-        const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss');
+        const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logPath = `${uniqPath}/${logTime}.log`;
         res.setHeader('Content-type', 'application/octet-stream');
-        await systemService.run(req.body, {
-          onEnd: async (cp, endTime, diff) => {
-            res.end();
+        await systemService.run(
+          { ...req.body, logPath },
+          {
+            onEnd: async (cp, endTime, diff) => {
+              res.end();
+            },
+            onError: async (message: string) => {
+              res.write(`\n${message}`);
+              const absolutePath = await handleLogPath(logPath);
+              fs.appendFileSync(absolutePath, `\n${message}`);
+            },
+            onLog: async (message: string) => {
+              res.write(`\n${message}`);
+              const absolutePath = await handleLogPath(logPath);
+              fs.appendFileSync(absolutePath, `\n${message}`);
+            },
           },
-          onError: async (message: string) => {
-            res.write(`\n${message}`);
-            const absolutePath = await handleLogPath(logPath);
-            fs.appendFileSync(absolutePath, `\n${message}`);
-          },
-          onLog: async (message: string) => {
-            res.write(`\n${message}`);
-            const absolutePath = await handleLogPath(logPath);
-            fs.appendFileSync(absolutePath, `\n${message}`);
-          },
-        });
+        );
       } catch (e) {
         return next(e);
       }

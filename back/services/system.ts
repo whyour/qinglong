@@ -177,11 +177,17 @@ export default class SystemService {
     }
   }
 
-  public async run({ command }: { command: string }, callback: TaskCallbacks) {
+  public async run(
+    { command, logPath }: { command: string; logPath: string },
+    callback: TaskCallbacks,
+  ) {
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
-    this.scheduleService.runTask(`real_time=true ${command}`, callback);
+    this.scheduleService.runTask(
+      `real_log_path=${logPath} real_time=true ${command}`,
+      callback,
+    );
   }
 
   public async stop({ command }: { command: string }) {

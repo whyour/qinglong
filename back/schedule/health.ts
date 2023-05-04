@@ -13,7 +13,7 @@ const check = async (
       const res = await promiseExec(
         `curl -sf http://localhost:${config.port}/api/system`,
       );
-      console.log(res);
+
       if (res.includes('200')) {
         return callback(null, { status: 1 });
       }
