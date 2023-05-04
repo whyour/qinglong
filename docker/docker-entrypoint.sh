@@ -23,7 +23,7 @@ current_npm_registry=$(cd && pnpm config get registry)
 is_equal_registry=$(echo $current_npm_registry | grep "${NpmMirror}")
 if [[ "$is_equal_registry" == "" ]]; then
   cd && pnpm config set registry $NpmMirror
-  pnpm install -g --force
+  pnpm install -g
 fi
 update_depend
 echo

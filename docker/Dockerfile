@@ -3,7 +3,7 @@ COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
   && apk update \
   && apk add nodejs npm git \
-  && npm i -g pnpm \
+  && npm i -g pnpm@8.3.1 \
   && cd /tmp/build \
   && pnpm --registry https://registry.npmmirror.com install --prod
 
@@ -49,7 +49,7 @@ RUN set -x \
   && git config --global user.email "qinglong@@users.noreply.github.com" \
   && git config --global user.name "qinglong" \
   && git config --global http.postBuffer 524288000 \
-  && npm install -g pnpm \
+  && npm install -g pnpm@8.3.1 \
   && cd && pnpm config set registry https://registry.npmmirror.com \
   && pnpm add -g pm2 tsx \
   && rm -rf /root/.pnpm-store \
@@ -72,7 +72,7 @@ COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
 WORKDIR ${QL_DIR}
 
-HEALTHCHECK --interval=5s --timeout=2s --retries=10 \
+HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
   CMD curl -sf http://127.0.0.1:5400/api/health || exit 1
 
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
