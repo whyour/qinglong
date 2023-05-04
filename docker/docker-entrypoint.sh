@@ -20,7 +20,8 @@ if [[ $PipMirror ]]; then
   pip3 config set global.index-url $PipMirror
 fi
 current_npm_registry=$(cd && pnpm config get registry)
-if [[ $current_npm_registry != $NpmMirror ]]; then
+is_equal_registry=$(echo $current_npm_registry | grep "${NpmMirror}")
+if [[ "$is_equal_registry" == "" ]]; then
   cd && pnpm config set registry $NpmMirror
   pnpm install -g --force
 fi
