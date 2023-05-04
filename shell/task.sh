@@ -66,7 +66,7 @@ handle_log_path() {
   log_dir="${log_dir_tmp%.*}${suffix}"
   log_path="$log_dir/$log_time.log"
 
-  if [[ $real_log_path != "${log_path}" ]]; then
+  if [[ $real_log_path ]]; then
     log_path="$real_log_path"
   fi
   
