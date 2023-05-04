@@ -82,7 +82,6 @@ start_public() {
 
 main() {
   echo -e "=====> 开始检测"
-  rm -rf ~/.pm2
   npm i -g pnpm
   patch_version
   pnpm add -g pm2 tsx
