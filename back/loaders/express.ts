@@ -14,6 +14,7 @@ import handler from 'serve-handler';
 import * as Sentry from '@sentry/node';
 import { EnvModel } from '../data/env';
 import { errors } from 'celebrate';
+import path from 'path';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -25,7 +26,7 @@ export default ({ app }: { app: Application }) => {
       next();
     } else {
       return handler(req, res, {
-        public: 'static/dist',
+        public: path.join(config.rootPath, 'static/dist'),
         rewrites: [{ source: '**', destination: '/index.html' }],
       });
     }

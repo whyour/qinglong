@@ -190,13 +190,22 @@ export default class SystemService {
     );
   }
 
-  public async stop({ command }: { command: string }) {
+  public async stop({ command, pid }: { command: string; pid: number }) {
+    if (!pid && !command) {
+      return { code: 400, message: '参数错误' };
+    }
+
+    if (pid) {
+      await killTask(pid);
+      return { code: 200 };
+    }
+
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
-    const pid = await getPid(command);
-    if (pid) {
-      await killTask(pid);
+    const _pid = await getPid(command);
+    if (_pid) {
+      await killTask(_pid);
       return { code: 200 };
     } else {
       return { code: 400, message: '任务未找到' };

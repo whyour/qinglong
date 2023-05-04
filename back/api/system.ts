@@ -170,6 +170,9 @@ export default (app: Router) => {
         await systemService.run(
           { ...req.body, logPath },
           {
+            onStart: async (cp, startTime) => {
+              res.setHeader('QL-Task-Pid', `${cp.pid}`);
+            },
             onEnd: async (cp, endTime, diff) => {
               res.end();
             },
@@ -195,7 +198,8 @@ export default (app: Router) => {
     '/command-stop',
     celebrate({
       body: Joi.object({
-        command: Joi.string().required(),
+        command: Joi.string().optional(),
+        pid: Joi.number().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
