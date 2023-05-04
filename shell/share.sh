@@ -443,6 +443,7 @@ patch_version() {
   # 兼容pnpm@7
   pnpm setup &>/dev/null
   source ~/.bashrc
+  apk add procps
 
   if [[ $PipMirror ]]; then
     pip3 config set global.index-url $PipMirror

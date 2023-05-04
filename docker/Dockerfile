@@ -40,6 +40,7 @@ RUN set -x \
   nodejs \
   jq \
   openssh \
+  procps \
   npm \
   && rm -rf /var/cache/apk/* \
   && apk update \
