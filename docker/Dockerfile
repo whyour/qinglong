@@ -5,7 +5,7 @@ RUN set -x \
   && apk add nodejs npm git \
   && npm i -g pnpm \
   && cd /tmp/build \
-  && pnpm install --prod
+  && pnpm --registry https://registry.npmmirror.com install --prod
 
 FROM python:3.10-alpine
 
@@ -50,6 +50,7 @@ RUN set -x \
   && git config --global user.name "qinglong" \
   && git config --global http.postBuffer 524288000 \
   && npm install -g pnpm \
+  && cd && pnpm config set registry https://registry.npmmirror.com \
   && pnpm add -g pm2 tsx \
   && rm -rf /root/.pnpm-store \
   && rm -rf /root/.local/share/pnpm/store \

@@ -262,17 +262,6 @@ npm_install_sub() {
   fi
 }
 
-npm_install_1() {
-  local dir_current=$(pwd)
-  local dir_work=$1
-
-  cd $dir_work
-  echo -e "运行 pnpm install...\n"
-  npm_install_sub
-  [[ $? -ne 0 ]] && echo -e "\nnpm install 运行不成功，请进入 $dir_work 目录后手动运行 pnpm install...\n"
-  cd $dir_current
-}
-
 npm_install_2() {
   local dir_current=$(pwd)
   local dir_work=$1
@@ -280,10 +269,6 @@ npm_install_2() {
   cd $dir_work
   echo -e "安装 $dir_work 依赖包...\n"
   npm_install_sub
-  if [[ $? -ne 0 ]]; then
-    echo -e "\n安装 $dir_work 的依赖包运行不成功，再次尝试一遍...\n"
-    npm_install_1 $dir_work
-  fi
   cd $dir_current
 }
 
@@ -440,19 +425,6 @@ format_timestamp() {
 }
 
 patch_version() {
-  # 兼容pnpm@7
-  pnpm setup &>/dev/null
-  source ~/.bashrc
-  apk add procps
-
-  if [[ $PipMirror ]]; then
-    pip3 config set global.index-url $PipMirror
-  fi
-  if [[ $NpmMirror ]]; then
-    cd && pnpm config set registry $NpmMirror
-    pnpm install -g --force
-  fi
-
   git config --global pull.rebase false
 
   cp -f $dir_root/.env.example $dir_root/.env

@@ -1,5 +1,4 @@
 import express from 'express';
-import { exec } from 'child_process';
 import Logger from './loaders/logger';
 import config from './config';
 import { HealthClient } from './protos/health';
