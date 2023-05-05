@@ -25,6 +25,7 @@ app
     await require('./loaders/db').default();
 
     Logger.debug(`✌️ 公共服务启动成功！`);
+    process.send?.('ready');
   })
   .on('error', (err) => {
     Logger.error(err);

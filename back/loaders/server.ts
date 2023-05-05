@@ -9,8 +9,14 @@ export default async ({ server }: { server: Server }) => {
   process.on('SIGINT', () => {
     Logger.info('✌️ Server need close');
     server.close(() => {
-      Logger.info('✌️ Server closed');
-      process.exit(0);
+      setTimeout(() => {
+        process.exit();
+      }, 10000);
     });
+
+    setTimeout(() => {
+      console.log('Forcing server close !!!');
+      process.exit(1);
+    }, 15000);
   });
 };

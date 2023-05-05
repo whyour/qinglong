@@ -16,5 +16,6 @@ server.bindAsync(
   () => {
     server.start();
     Logger.debug(`✌️ 定时服务启动成功！`);
+    process.send?.('ready');
   },
 );

@@ -18,6 +18,7 @@ dir_update_log=$dir_log/update
 ql_static_repo=$dir_repo/static
 
 ## 文件
+file_ecosystem_js=$dir_root/ecosystem.config.js
 file_config_sample=$dir_sample/config.sample.sh
 file_env=$dir_config/env.sh
 file_sharecode=$dir_config/sharecode.sh
@@ -316,6 +317,8 @@ git_pull_scripts() {
   echo -e "开始更新仓库：$dir_work"
 
   local pre_commit_id=$(git rev-parse --short HEAD)
+  reset_branch "$branch"
+
   set_proxy "$proxy"
   git fetch --depth=1 --all
   git pull --depth=1 &>/dev/null
@@ -344,7 +347,7 @@ reset_romote_url() {
     git init
     git remote add origin $url &>/dev/null
   fi
-  
+
   cd $dir_current
 }
 
@@ -353,10 +356,10 @@ reset_branch() {
   local part_cmd="HEAD"
   if [[ $branch ]]; then
     part_cmd="origin/${branch}"
-    git checkout -B "$branch" &>/dev/null
-    git branch --set-upstream-to=$part_cmd $branch &>/dev/null
+    git remote set-branches --add origin $branch &>/dev/null
   fi
   git reset --hard $part_cmd &>/dev/null
+  git checkout --track $part_cmd &>/dev/null
 }
 
 random_range() {
@@ -366,16 +369,9 @@ random_range() {
 }
 
 reload_pm2() {
-  pm2 l &>/dev/null
+  cd $dir_root
   pm2 flush &>/dev/null
-
-  echo -e "启动面板服务\n"
-  pm2 delete panel --source-map-support --time &>/dev/null
-  pm2 start $dir_static/build/app.js -n panel --source-map-support --time &>/dev/null
-
-  echo -e "启动定时服务\n"
-  pm2 delete schedule --source-map-support --time &>/dev/null
-  pm2 start $dir_static/build/schedule/index.js -n schedule --source-map-support --time &>/dev/null
+  pm2 startOrGracefulReload $file_ecosystem_js
 }
 
 diff_time() {
@@ -465,7 +461,7 @@ init_nginx() {
   cp -fv $nginx_conf /etc/nginx/nginx.conf
   cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
   sed -i "s,QL_BASE_URL,${qlBaseUrl},g" /etc/nginx/conf.d/front.conf
-  
+
   ipv6=$(ip a | grep inet6)
   ipv6Str=""
   if [[ $ipv6 ]]; then
