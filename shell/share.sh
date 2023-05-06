@@ -301,11 +301,13 @@ git_clone_scripts() {
   echo -e "开始克隆仓库 $url 到 $dir\n"
 
   set_proxy "$proxy"
+
   git clone --depth=1 $part_cmd $url $dir
   exit_status=$?
-  unset_proxy
 
-  reset_branch "$branch"
+  reset_branch "$branch" "$dir"
+
+  unset_proxy
 }
 
 git_pull_scripts() {
@@ -315,21 +317,22 @@ git_pull_scripts() {
   local proxy="$3"
   cd $dir_work
   echo -e "开始更新仓库：$dir_work"
+  set_proxy "$proxy"
 
   local pre_commit_id=$(git rev-parse --short HEAD)
-  reset_branch "$branch"
+  reset_branch "$branch" "$dir_work"
 
-  set_proxy "$proxy"
   git fetch --depth=1 --all
-  git pull --depth=1 &>/dev/null
+  git pull --depth=1 --allow-unrelated-histories &>/dev/null
   exit_status=$?
-  unset_proxy
 
-  reset_branch "$branch"
+  reset_branch "$branch" "$dir_work"
   local cur_commit_id=$(git rev-parse --short HEAD)
   if [[ $cur_commit_id != $pre_commit_id ]]; then
     exit_status=0
   fi
+
+  unset_proxy
   cd $dir_current
 }
 
@@ -353,11 +356,12 @@ reset_romote_url() {
 
 reset_branch() {
   local branch="$1"
-  local part_cmd="HEAD"
-  if [[ $branch ]]; then
-    part_cmd="origin/${branch}"
-    git remote set-branches --add origin $branch &>/dev/null
+  local dir="$2"
+  if [[ ! $branch ]]; then
+    branch=$(cd $dir && git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
   fi
+  local part_cmd="origin/${branch}"
+  git remote set-branches --add origin $branch &>/dev/null
   git reset --hard $part_cmd &>/dev/null
   git checkout --track $part_cmd &>/dev/null
 }

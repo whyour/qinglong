@@ -41,6 +41,7 @@ RUN set -x \
   jq \
   openssh \
   procps \
+  netcat-openbsd \
   npm \
   && rm -rf /var/cache/apk/* \
   && apk update \
