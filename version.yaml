@@ -1,11 +1,5 @@
-version: 2.15.13
-changeLogLink: https://t.me/jiao_long/373
+version: 2.15.14
+changeLogLink: https://t.me/jiao_long/374
 changeLog: |
-  1. 增加运行、停止指定命令接口 system/command-run、system/command-stop
-  2. 增加容器健康检查
-  3. 移除执行任务默认超时时间
-  4. 修改 task 命令生成日志逻辑和关联任务查询
-  5. 修复更新任务、环境变量、依赖、订阅状态丢失
-  6. 修改系统通知错误提示
-  7. 修复系统通知 gotify 配置
-  8. 其他 bug 修复
+  1. 接口 system/command-run 返回响应头 QL-Task-Pid，system/command-stop 支持 pid 参数
+  2. 其他 bug 修复
