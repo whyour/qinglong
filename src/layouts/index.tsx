@@ -98,8 +98,7 @@ export default function () {
       })
       .catch((error) => {
         console.log(error);
-      })
-      .finally(() => setInitLoading(false));
+      });
   };
 
   const getUser = (needLoading = true) => {
@@ -120,6 +119,22 @@ export default function () {
       });
   };
 
+  const getHealthStatus = () => {
+    request
+      .get(`${config.apiPrefix}public/health`)
+      .then((res) => {
+        if (res?.data?.status === 1) {
+          getSystemInfo();
+        } else {
+          history.push('/error');
+        }
+      })
+      .catch((error) => {
+        history.push('/error');
+      })
+      .finally(() => setInitLoading(false));
+  };
+
   const reloadUser = (needLoading = false) => {
     getUser(needLoading);
   };
@@ -131,10 +146,8 @@ export default function () {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!systemInfo) {
-      getSystemInfo();
-    }
-  }, [systemInfo]);
+    getHealthStatus();
+  }, []);
 
   useEffect(() => {
     if (theme === 'vs-dark') {

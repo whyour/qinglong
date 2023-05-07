@@ -13,9 +13,9 @@ const client = new HealthClient(
 app.get('/api/health', (req, res) => {
   client.check({ service: 'cron' }, (err, response) => {
     if (err) {
-      return res.status(500).send({ error: err });
+      return res.status(500).send({ code: 500, error: err });
     }
-    return res.status(200).send({ data: response });
+    return res.status(200).send({ code: 200, data: response });
   });
 });
 

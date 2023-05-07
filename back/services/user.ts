@@ -1,6 +1,11 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { createRandomString, getNetIp, getPlatform } from '../config/util';
+import {
+  createRandomString,
+  fileExist,
+  getNetIp,
+  getPlatform,
+} from '../config/util';
 import config from '../config';
 import * as fs from 'fs';
 import jwt from 'jsonwebtoken';
@@ -205,17 +210,16 @@ export default class UserService {
   }
 
   private initAuthInfo() {
-    const newPassword = createRandomString(16, 22);
     fs.writeFileSync(
       config.authConfigFile,
       JSON.stringify({
         username: 'admin',
-        password: newPassword,
+        password: 'admin',
       }),
     );
     return {
       code: 100,
-      message: '已初始化密码，请前往auth.json查看并重新登录',
+      message: '未找到认证文件，重新初始化',
     };
   }
 
@@ -240,13 +244,18 @@ export default class UserService {
     return { code: 200, data: avatar, message: '更新成功' };
   }
 
-  public getUserInfo(): Promise<any> {
-    return new Promise((resolve) => {
-      fs.readFile(config.authConfigFile, 'utf8', (err, data) => {
-        if (err) console.log(err);
-        resolve(JSON.parse(data));
-      });
-    });
+  public async getUserInfo(): Promise<any> {
+    const authFileExist = await fileExist(config.authConfigFile);
+    if (!authFileExist) {
+      fs.writeFileSync(
+        config.authConfigFile,
+        JSON.stringify({
+          username: 'admin',
+          password: 'admin',
+        }),
+      );
+    }
+    return this.getAuthInfo();
   }
 
   public initTwoFactor() {

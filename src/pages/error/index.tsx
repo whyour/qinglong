@@ -17,7 +17,7 @@ const Error = () => {
     needLoading && setLoading(true);
     request
       .get(`${config.apiPrefix}public/health`)
-      .then(({ status, error }) => {
+      .then(({ error, status }) => {
         if (status === 1) {
           return reloadUser();
         }
@@ -53,10 +53,32 @@ const Error = () => {
           <div className="browser-markup"></div>
           <Alert
             type="error"
-            message="服务启动超时，请检查如下日志或者进入容器执行 ql -l check 后刷新再试"
+            message={
+              <Typography.Title level={5} type="danger">
+                服务启动超时
+              </Typography.Title>
+            }
+            description={
+              <Typography.Text type="danger">
+                <div>
+                  请先按如下方式修复，如果无法解决，可结合日志
+                  <Typography.Link href="https://github.com/whyour/qinglong/issues/new?assignees=&labels=&template=bug_report.yml">
+                    提交 issue
+                  </Typography.Link>
+                </div>
+                <div>
+                  1. 宿主机执行 docker run --rm -v
+                  /var/run/docker.sock:/var/run/docker.sock
+                  containrrr/watchtower -cR &lt;容器名&gt;
+                </div>
+                <div>2. 容器内执行 ql -l check、ql -l update</div>
+              </Typography.Text>
+            }
             banner
           />
-          <Typography.Paragraph className="log">{data}</Typography.Paragraph>
+          <Typography.Paragraph code className="log">
+            {data}
+          </Typography.Paragraph>
         </div>
       ) : (
         <PageLoading tip="启动中，请稍后..." />

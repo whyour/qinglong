@@ -219,7 +219,7 @@ const Initialization = () => {
             <Button
               type="primary"
               onClick={() => {
-                history.push('/login');
+                window.location.reload();
               }}
             >
               去登录
