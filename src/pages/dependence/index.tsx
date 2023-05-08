@@ -246,7 +246,7 @@ const Dependence = () => {
           })
           .then(({ code, data }) => {
             if (code === 200 && force) {
-              const i = value.findIndex((x) => x.id === data.data[0].id);
+              const i = value.findIndex((x) => x.id === data[0].id);
               if (i !== -1) {
                 const result = [...value];
                 result.splice(i, 1);

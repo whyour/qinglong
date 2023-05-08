@@ -394,7 +394,7 @@ const Env = () => {
           if (code === 200) {
             const newData = [...value];
             newData.splice(dragIndex, 1);
-            newData.splice(hoverIndex, 0, { ...dragRow, ...data.data });
+            newData.splice(hoverIndex, 0, { ...dragRow, ...data });
             setValue([...newData]);
           }
         });
