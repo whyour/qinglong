@@ -508,6 +508,5 @@ init_env
 detect_termux
 detect_macos
 define_cmd
-fix_config
 
 import_config $1 2>$task_error_log_path

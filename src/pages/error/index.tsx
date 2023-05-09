@@ -27,7 +27,6 @@ const Error = () => {
         }
         retryTimes.current += 1;
         setTimeout(() => {
-          reloadUser();
           getLog(false);
         }, 3000);
       })

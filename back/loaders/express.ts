@@ -15,11 +15,21 @@ import * as Sentry from '@sentry/node';
 import { EnvModel } from '../data/env';
 import { errors } from 'celebrate';
 import path from 'path';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
   app.use(cors());
   app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
+
+  app.use(
+    '/api/public',
+    createProxyMiddleware({
+      target: `http://localhost:${config.publicPort}/api`,
+      changeOrigin: true,
+      pathRewrite: { '/api/public': '' },
+    }),
+  );
 
   app.use((req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/open')) {

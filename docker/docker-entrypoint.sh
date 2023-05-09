@@ -10,6 +10,7 @@ echo -e "======================1. 检测配置文件========================\n"
 make_dir /etc/nginx/conf.d
 make_dir /run/nginx
 init_nginx
+fix_config
 
 pm2 l &>/dev/null
 
