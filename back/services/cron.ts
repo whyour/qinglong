@@ -58,7 +58,7 @@ export default class CronService {
       return doc;
     }
 
-    if (this.isNodeCron(doc) && !this.isSpecialSchedule(doc.schedule)) {
+    if (!this.isSpecialSchedule(doc.schedule)) {
       await cronClient.addCron([
         {
           name: doc.name || '',
@@ -88,11 +88,9 @@ export default class CronService {
       return newDoc;
     }
 
-    if (this.isNodeCron(doc)) {
-      await cronClient.delCron([String(doc.id)]);
-    }
+    await cronClient.delCron([String(newDoc.id)]);
 
-    if (this.isNodeCron(newDoc) && !this.isSpecialSchedule(newDoc.schedule)) {
+    if (!this.isSpecialSchedule(newDoc.schedule)) {
       await cronClient.addCron([
         {
           name: doc.name || '',
@@ -542,20 +540,19 @@ export default class CronService {
   public async enabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
     const docs = await CrontabModel.findAll({ where: { id: ids } });
-    const sixCron = docs
-      .filter((x) => this.isNodeCron(x) && !this.isSpecialSchedule(x.schedule))
-      .map((doc) => ({
-        name: doc.name || '',
-        id: String(doc.id),
-        schedule: doc.schedule!,
-        command: this.makeCommand(doc),
-        extra_schedules: doc.extra_schedules || [],
-      }));
+    const crons = docs.map((doc) => ({
+      name: doc.name || '',
+      id: String(doc.id),
+      schedule: doc.schedule!,
+      command: this.makeCommand(doc),
+      extra_schedules: doc.extra_schedules || [],
+    }));
 
     if (isDemoEnv()) {
       return;
     }
-    await cronClient.addCron(sixCron);
+    
+    await cronClient.addCron(crons);
     await this.setCrontab();
   }
 
@@ -651,7 +648,6 @@ export default class CronService {
 
     await writeFileWithLock(config.crontabFile, crontab_string);
 
-    execSync(`crontab ${config.crontabFile}`);
     await CrontabModel.update({ saved: true }, { where: {} });
   }
 
@@ -692,12 +688,7 @@ export default class CronService {
   public async autosave_crontab() {
     const tabs = await this.crontabs();
     const regularCrons = tabs.data
-      .filter(
-        (x) =>
-          x.isDisabled !== 1 &&
-          this.isNodeCron(x) &&
-          !this.isSpecialSchedule(x.schedule),
-      )
+      .filter((x) => x.isDisabled !== 1 && !this.isSpecialSchedule(x.schedule))
       .map((doc) => ({
         name: doc.name || '',
         id: String(doc.id),
