@@ -429,8 +429,6 @@ handle_task_before() {
 
   echo -e "## 开始执行... $begin_time\n"
 
-  [[ $is_macos -eq 0 ]] && check_server
-
   . $file_task_before "$@"
 }
 
