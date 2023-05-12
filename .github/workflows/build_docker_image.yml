@@ -5,8 +5,9 @@ on:
     paths-ignore:
       - "*.md"
     branches:
-      - "master"
-      - "develop"
+      - 'master'
+      - 'develop'
+      - 'debian'
     tags:
       - "v*"
   schedule:
@@ -157,15 +158,14 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
-          # platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
           context: .
           file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=whyour/qinglong:cache
-          cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian,mode=max
 
       - name: Image digest
         run: |
@@ -223,7 +223,7 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
           context: .
           file: ./docker/310.Dockerfile
           push: true
