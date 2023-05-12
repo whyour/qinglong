@@ -60,6 +60,6 @@ fi
 
 log_with_style "SUCCESS" "🎉  容器启动成功!"
 
-crond -f >/dev/null
+tail -f /dev/null
 
 exec "$@"
