@@ -34,11 +34,9 @@ export default class CronService {
     const tab = new Crontab(payload);
     tab.saved = false;
     const doc = await this.insert(tab);
-    if (this.isSixCron(doc)) {
-      await cronClient.addCron([
-        { id: String(doc.id), schedule: doc.schedule!, command: doc.command },
-      ]);
-    }
+    await cronClient.addCron([
+      { id: String(doc.id), schedule: doc.schedule!, command: doc.command },
+    ]);
     await this.set_crontab();
     return doc;
   }
@@ -55,18 +53,15 @@ export default class CronService {
     if (doc.isDisabled === 1) {
       return newDoc;
     }
-    if (this.isSixCron(doc)) {
-      await cronClient.delCron([String(newDoc.id)]);
-    }
-    if (this.isSixCron(newDoc)) {
-      await cronClient.addCron([
-        {
-          id: String(newDoc.id),
-          schedule: newDoc.schedule!,
-          command: newDoc.command,
-        },
-      ]);
-    }
+
+    await cronClient.delCron([String(newDoc.id)]);
+    await cronClient.addCron([
+      {
+        id: String(newDoc.id),
+        schedule: newDoc.schedule!,
+        command: newDoc.command,
+      },
+    ]);
     await this.set_crontab();
     return newDoc;
   }
@@ -458,14 +453,12 @@ export default class CronService {
   public async enabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
     const docs = await CrontabModel.findAll({ where: { id: ids } });
-    const sixCron = docs
-      .filter((x) => this.isSixCron(x))
-      .map((doc) => ({
-        id: String(doc.id),
-        schedule: doc.schedule!,
-        command: doc.command,
-      }));
-    await cronClient.addCron(sixCron);
+    const crons = docs.map((doc) => ({
+      id: String(doc.id),
+      schedule: doc.schedule!,
+      command: doc.command,
+    }));
+    await cronClient.addCron(crons);
     await this.set_crontab();
   }
 
@@ -539,7 +532,6 @@ export default class CronService {
     this.logger.silly(crontab_string);
     fs.writeFileSync(config.crontabFile, crontab_string);
 
-    execSync(`crontab ${config.crontabFile}`);
     await CrontabModel.update({ saved: true }, { where: {} });
   }
 
@@ -582,7 +574,7 @@ export default class CronService {
     this.set_crontab(tabs);
 
     const sixCron = tabs.data
-      .filter((x) => this.isSixCron(x) && x.isDisabled !== 1)
+      .filter((x) => x.isDisabled !== 1)
       .map((doc) => ({
         id: String(doc.id),
         schedule: doc.schedule!,
