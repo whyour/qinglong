@@ -322,11 +322,14 @@ git_pull_scripts() {
   echo -e "开始更新仓库：$dir_work"
   set_proxy "$proxy"
 
+  if [[ ! $branch ]]; then
+    branch=$(cd $dir_work && git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+  fi
+
   local pre_commit_id=$(git rev-parse --short HEAD)
   reset_branch "$branch" "$dir_work"
 
-  git fetch --depth=1 --all
-  git pull --depth=1 --allow-unrelated-histories &>/dev/null
+  git fetch --depth 1 origin $branch
   exit_status=$?
 
   reset_branch "$branch" "$dir_work"
@@ -359,14 +362,10 @@ reset_romote_url() {
 
 reset_branch() {
   local branch="$1"
-  local dir="$2"
-  if [[ ! $branch ]]; then
-    branch=$(cd $dir && git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-  fi
   local part_cmd="origin/${branch}"
-  git remote set-branches --add origin $branch &>/dev/null
+  git remote set-branches origin $branch
   git reset --hard $part_cmd &>/dev/null
-  git checkout --track $part_cmd &>/dev/null
+  git checkout -b $branch $part_cmd &>/dev/null
 }
 
 random_range() {
