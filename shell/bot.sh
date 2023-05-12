@@ -9,7 +9,7 @@ else
 fi
 
 echo -e "\n1、安装bot依赖...\n"
-apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
+apt install -y gcc python3-dev musl-dev
 echo -e "\nbot依赖安装成功...\n"
 
 echo -e "2、下载bot所需文件...\n"
