@@ -5,6 +5,7 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs';
 import { celebrate, Joi } from 'celebrate';
+import { join } from 'path';
 const route = Router();
 
 export default (app: Router) => {
@@ -41,11 +42,11 @@ export default (app: Router) => {
         }
         if (req.params.file.includes('sample')) {
           content = getFileContentByName(
-            `${config.samplePath}${req.params.file}`,
+            join(config.samplePath, req.params.file),
           );
         } else {
           content = getFileContentByName(
-            `${config.configPath}${req.params.file}`,
+            join(config.samplePath, req.params.file),
           );
         }
         res.send({ code: 200, data: content });
@@ -70,7 +71,7 @@ export default (app: Router) => {
         if (config.blackFileList.includes(name)) {
           res.send({ code: 403, message: '文件无法访问' });
         }
-        const path = `${config.configPath}${name}`;
+        const path = join(config.configPath, name);
         fs.writeFileSync(path, content);
         res.send({ code: 200, message: '保存成功' });
       } catch (e) {

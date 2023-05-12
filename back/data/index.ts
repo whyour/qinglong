@@ -1,9 +1,10 @@
 import { Sequelize, Transaction } from 'sequelize';
 import config from '../config/index';
+import { join } from 'path';
 
 export const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: `${config.dbPath}database.sqlite`,
+  storage: join(config.dbPath, 'database.sqlite'),
   logging: false,
   retry: {
     max: 10,

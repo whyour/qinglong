@@ -4,6 +4,7 @@ import ScheduleService from '../services/schedule';
 import SubscriptionService from '../services/subscription';
 import config from '../config';
 import { fileExist } from '../config/util';
+import { join } from 'path';
 
 export default async () => {
   const systemService = Container.get(SystemService);
@@ -11,8 +12,9 @@ export default async () => {
   const subscriptionService = Container.get(SubscriptionService);
 
   // 生成内置token
-  let tokenCommand = `tsx ${config.rootPath}/back/token.ts`;
-  const tokenFile = `${config.rootPath}static/build/token.js`;
+  let tokenCommand = `tsx ${join(config.rootPath, 'back/token.ts')}`;
+  const tokenFile = join(config.rootPath, 'static/build/token.js');
+
   if (await fileExist(tokenFile)) {
     tokenCommand = `node ${tokenFile}`;
   }

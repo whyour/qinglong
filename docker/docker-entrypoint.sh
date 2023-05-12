@@ -35,8 +35,14 @@ echo -e "nginx启动成功...\n"
 echo -e "======================4. 启动pm2服务========================\n"
 reload_pm2
 
+if [[ $AutoStartBot == true ]]; then
+  echo -e "======================5. 启动bot========================\n"
+  nohup ql -l bot >$dir_log/bot.log 2>&1 &
+  echo -e "bot后台启动中...\n"
+fi
+
 if [[ $EnableExtraShell == true ]]; then
-  echo -e "====================5. 执行自定义脚本========================\n"
+  echo -e "====================6. 执行自定义脚本========================\n"
   nohup ql -l extra >$dir_log/extra.log 2>&1 &
   echo -e "自定义脚本后台执行中...\n"
 fi
