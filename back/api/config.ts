@@ -46,7 +46,7 @@ export default (app: Router) => {
           );
         } else {
           content = getFileContentByName(
-            join(config.samplePath, req.params.file),
+            join(config.configPath, req.params.file),
           );
         }
         res.send({ code: 200, data: content });
