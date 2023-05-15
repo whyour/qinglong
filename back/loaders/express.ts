@@ -38,6 +38,17 @@ export default ({ app }: { app: Application }) => {
       return handler(req, res, {
         public: path.join(config.rootPath, 'static/dist'),
         rewrites: [{ source: '**', destination: '/index.html' }],
+        headers: [
+          {
+            source: 'index.html',
+            headers: [
+              {
+                key: 'Cache-Control',
+                value: 'no-cache',
+              },
+            ],
+          },
+        ],
       });
     }
   });

@@ -29,7 +29,6 @@ RUN set -x \
   && apk upgrade \
   && apk --no-cache add -f bash \
   coreutils \
-  moreutils \
   git \
   curl \
   wget \
