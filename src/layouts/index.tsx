@@ -280,11 +280,10 @@ export default function () {
       selectedKeys={[location.pathname]}
       loading={loading}
       ErrorBoundary={Sentry.ErrorBoundary}
-      logo={<Image preview={false} src="https://qn.whyour.cn/logo.png" />}
-      // @ts-ignore
-      title={
+      logo={
         <>
-          <span style={{ fontSize: 16, marginRight: 5 }}>青龙</span>
+          <Image preview={false} src="https://qn.whyour.cn/logo.png" />
+          <span className="title">青龙</span>
           <a
             href={systemInfo?.changeLogLink}
             target="_blank"
@@ -313,6 +312,7 @@ export default function () {
           </a>
         </>
       }
+      title={false}
       menuItemRender={(menuItemProps: any, defaultDom: any) => {
         if (
           menuItemProps.isUrl ||

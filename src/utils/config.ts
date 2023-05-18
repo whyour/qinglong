@@ -1,6 +1,8 @@
+const baseUrl = window.__ENV__QlBaseUrl || '/';
+
 export default {
   siteName: '青龙',
-  apiPrefix: '/api/',
+  apiPrefix: `${baseUrl}api/`,
   authKey: 'token',
 
   /* Layout configuration, specify which layout to use for route. */

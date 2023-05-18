@@ -457,12 +457,6 @@ main() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
   fi
 
-  if [[ -s $task_error_log_path ]]; then
-    eval cat $task_error_log_path $cmd
-    eval echo -e "加载 config.sh 出错，请手动检查" $cmd
-    eval echo $cmd
-  fi
-
   if [[ "$show_log" == "true" ]] && [[ $ID ]]; then
     eval echo -e "请移除 -l 参数" $cmd
     exit 1

@@ -35,7 +35,6 @@ file_notify_js_sample=$dir_sample/notify.js
 file_notify_py_sample=$dir_sample/notify.py
 file_notify_py=$dir_scripts/notify.py
 file_notify_js=$dir_scripts/sendNotify.js
-task_error_log_path=$dir_log/task_error.log
 nginx_app_conf=$dir_root/docker/front.conf
 nginx_conf=$dir_root/docker/nginx.conf
 dep_notify_py=$dir_dep/notify.py
@@ -68,7 +67,7 @@ import_config() {
   [[ -f $file_config_user ]] && . $file_config_user
   [[ -f $file_env ]] && . $file_env
 
-  ql_base_url=${QlBaseUrl:-""}
+  ql_base_url=${QlBaseUrl:-"/"}
   command_timeout_time=${CommandTimeoutTime:-""}
   proxy_url=${ProxyUrl:-""}
   file_extensions=${RepoFileExtensions:-"js py"}
@@ -468,7 +467,15 @@ patch_version() {
 init_nginx() {
   cp -fv $nginx_conf /etc/nginx/nginx.conf
   cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
-  sed -i "s,QL_BASE_URL,${qlBaseUrl},g" /etc/nginx/conf.d/front.conf
+  local location_url="/"
+  local root_or_alias="root"
+  if [[ $ql_base_url != "/" ]]; then
+    location_url="^~${ql_base_url%*/}"
+    root_or_alias="alias"
+  fi
+  sed -i "s,QL_BASE_URL_LOCATION,${location_url},g" /etc/nginx/conf.d/front.conf
+  sed -i "s,QL_BASE_URL,${ql_base_url},g" /etc/nginx/conf.d/front.conf
+  sed -i "s,QL_ROOT_OR_ALIAS,${root_or_alias},g" /etc/nginx/conf.d/front.conf
 
   ipv6=$(ip a | grep inet6)
   ipv6Str=""
@@ -484,11 +491,6 @@ handle_task_before() {
   echo -e "## 开始执行... $begin_time\n"
 
   [[ $is_macos -eq 0 ]] && check_server
-
-  if [[ -s $task_error_log_path ]]; then
-    cat $task_error_log_path
-    echo -e "加载 config.sh 出错，请手动检查"
-  fi
 
   . $file_task_before "$@"
 }
@@ -513,4 +515,4 @@ detect_termux
 detect_macos
 define_cmd
 
-import_config $1 2>$task_error_log_path
+import_config $1
