@@ -253,9 +253,9 @@ const ViewCreateModal = ({
                         name={[name, 'value']}
                         rules={[{ required: true, message: '请输入内容' }]}
                       >
-                        {EOperation[filtersValue[name]['operation']] ===
+                        {EOperation[filtersValue?.[name]['operation']] ===
                         'select' ? (
-                          statusElement(filtersValue[name]['property'])
+                          statusElement(filtersValue?.[name]['property'])
                         ) : (
                           <Input placeholder="请输入内容" />
                         )}
