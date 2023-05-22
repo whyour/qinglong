@@ -1,14 +1,12 @@
 version: '2'
 services:
   web:
+    # alpine 基础镜像版本
     image: whyour/qinglong:latest
+    # debian-slim 基础镜像版本
+    # image: whyour/qinglong:debian  
     volumes:
       - ./data:/ql/data
     ports:
       - "0.0.0.0:5700:5700"
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:5400/api/health", "||", "exit", "1"]
-      interval: 2m
-      timeout: 10s
-      retries: 3

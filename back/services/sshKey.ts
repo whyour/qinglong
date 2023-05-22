@@ -60,7 +60,9 @@ export default class SshKeyService {
     if (host === 'github.com') {
       host = `ssh.github.com\n    Port 443\n    HostkeyAlgorithms +ssh-rsa\n    PubkeyAcceptedAlgorithms +ssh-rsa`;
     }
-    const proxyStr = proxy ? `    ProxyCommand nc -v -x ${proxy} %h %p\n` : '';
+    const proxyStr = proxy
+      ? `    ProxyCommand nc -v -x ${proxy} %h %p 2>/dev/null\n`
+      : '';
     const config = `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${path.join(
       this.sshPath,
       alias,
