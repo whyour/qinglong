@@ -7,7 +7,7 @@ export default defineConfig({
   antd: {},
   outputPath: 'static/dist',
   fastRefresh: true,
-  favicons: ['./images/favicon.svg'],
+  favicons: [`https://qn.whyour.cn/favicon.svg`],
   mfsu: {
     strategy: 'eager',
   },

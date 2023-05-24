@@ -93,7 +93,11 @@ export default class NotificationService {
           },
         })
         .json();
-      return typeof res.id === 'number';
+      if (typeof res.id === 'number') {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -109,7 +113,11 @@ export default class NotificationService {
           headers: { Authorization: 'Bearer ' + goCqHttpBotToken },
         })
         .json();
-      return res.retcode === 0;
+      if (res.retcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -128,7 +136,11 @@ export default class NotificationService {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         .json();
-      return res.errno === 0 || res.data.errno === 0;
+      if (res.errno === 0 || res.data.errno === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -147,9 +159,14 @@ export default class NotificationService {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         .json();
-      return (
-        res.content.result.length !== undefined && res.content.result.length > 0
-      );
+      if (
+        res.content.result.length !== undefined &&
+        res.content.result.length > 0
+      ) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -166,7 +183,11 @@ export default class NotificationService {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         .json();
-      return res.success;
+      if (res.success) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -190,7 +211,11 @@ export default class NotificationService {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         .json();
-      return res.code === 200;
+      if (res.code === 200) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -234,7 +259,11 @@ export default class NotificationService {
           agent,
         })
         .json();
-      return !!res.ok;
+      if (res.ok) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -263,7 +292,11 @@ export default class NotificationService {
           },
         })
         .json();
-      return res.errcode === 0;
+      if (res.errcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -284,7 +317,11 @@ export default class NotificationService {
           },
         })
         .json();
-      return res.errcode === 0;
+      if (res.errcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -359,7 +396,11 @@ export default class NotificationService {
         )
         .json();
 
-      return res.errcode === 0;
+      if (res.errcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -403,8 +444,11 @@ export default class NotificationService {
           },
         })
         .json();
-
-      return res.code === 0;
+      if (res.code === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -422,7 +466,11 @@ export default class NotificationService {
         })
         .json();
 
-      return res.ret === 0;
+      if (res.ret === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -444,7 +492,11 @@ export default class NotificationService {
         })
         .json();
 
-      return res.code === 200;
+      if (res.code === 200) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -468,7 +520,11 @@ export default class NotificationService {
           headers: { 'Content-Type': 'application/json' },
         })
         .json();
-      return res.StatusCode === 0;
+      if (res.StatusCode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -495,7 +551,11 @@ export default class NotificationService {
 
       transporter.close();
 
-      return !!info.messageId;
+      if (info.messageId) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(info));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
@@ -529,7 +589,11 @@ export default class NotificationService {
     };
     try {
       const res = await got(formatUrl, options);
-      return String(res.statusCode).startsWith('20');
+      if (String(res.statusCode).startsWith('20')) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }

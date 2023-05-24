@@ -4,7 +4,7 @@ import config from './config';
 import { history } from '@umijs/max';
 
 message.config({
-  duration: 1.5,
+  duration: 2,
 });
 
 const time = Date.now();
@@ -23,7 +23,10 @@ const errorHandler = function (error: any) {
         history.push('/login');
       }
     } else {
-      message.error(msg);
+      message.error({
+        content: msg,
+        style: { maxWidth: 500, margin: '0 auto' },
+      });
     }
   } else {
     console.log(error.message);
@@ -66,7 +69,11 @@ _request.interceptors.response.use(async (response) => {
     const res = await response.clone().json();
     if (res.code !== 200) {
       const msg = res.message || res.data;
-      msg && message.error(msg);
+      msg &&
+        message.error({
+          content: msg,
+          style: { maxWidth: 500, margin: '0 auto' },
+        });
     }
     return res;
   }
