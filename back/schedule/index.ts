@@ -13,7 +13,10 @@ server.addService(CronService, { addCron, delCron });
 server.bindAsync(
   `localhost:${config.cronPort}`,
   ServerCredentials.createInsecure(),
-  () => {
+  (err, port) => {
+    if (err) {
+      throw err;
+    }
     server.start();
     Logger.debug(`✌️ 定时服务启动成功！`);
     process.send?.('ready');

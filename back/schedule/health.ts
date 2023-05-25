@@ -17,10 +17,13 @@ const check = async (
       if (res.includes('200')) {
         return callback(null, { status: 1 });
       }
-      const errLog = await promiseExec(
+      const panelErrLog = await promiseExec(
         `tail -n 300 ~/.pm2/logs/panel-error.log`,
       );
-      return callback(new Error(errLog));
+      const scheduleErrLog = await promiseExec(
+        `tail -n 300 ~/.pm2/logs/schedule-error.log`,
+      );
+      return callback(new Error(`${scheduleErrLog}\n${panelErrLog}`));
 
     default:
       return callback(null, { status: 1 });
