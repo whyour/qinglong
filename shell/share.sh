@@ -468,14 +468,18 @@ init_nginx() {
   cp -fv $nginx_conf /etc/nginx/nginx.conf
   cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
   local location_url="/"
-  local root_or_alias="root"
+  local aliasStr=""
+  local rootStr=""
   if [[ $ql_base_url != "/" ]]; then
     location_url="^~${ql_base_url%*/}"
-    root_or_alias="alias"
+    aliasStr="alias ${dir_static}/dist;"
+  else
+    rootStr="root ${dir_static}/dist;"
   fi
+  sed -i "s,QL_ALIAS_CONFIG,${aliasStr},g" /etc/nginx/conf.d/front.conf
+  sed -i "s,QL_ROOT_CONFIG,${rootStr},g" /etc/nginx/conf.d/front.conf
   sed -i "s,QL_BASE_URL_LOCATION,${location_url},g" /etc/nginx/conf.d/front.conf
   sed -i "s,QL_BASE_URL,${ql_base_url},g" /etc/nginx/conf.d/front.conf
-  sed -i "s,QL_ROOT_OR_ALIAS,${root_or_alias},g" /etc/nginx/conf.d/front.conf
 
   ipv6=$(ip a | grep inet6)
   ipv6Str=""
