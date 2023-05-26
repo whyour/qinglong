@@ -193,7 +193,7 @@ run_else() {
   local relative_path="${file_param%/*}"
   if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
     cd ${relative_path}
-    file_param=${file_param/$relative_path\//}
+    file_param=${file_param/$relative_path\//.\/}
   fi
 
   shift
