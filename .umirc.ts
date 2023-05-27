@@ -40,7 +40,7 @@ export default defineConfig({
     'react-dom': 'window.ReactDOM',
   },
   headScripts: [
-    `${baseUrl}api/env.js`,
+    `./api/env.js`,
     'https://gw.alipayobjects.com/os/lib/react/18.2.0/umd/react.production.min.js',
     'https://gw.alipayobjects.com/os/lib/react-dom/18.2.0/umd/react-dom.production.min.js',
   ],

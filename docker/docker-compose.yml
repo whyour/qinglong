@@ -9,4 +9,7 @@ services:
       - ./data:/ql/data
     ports:
       - "0.0.0.0:5700:5700"
+    environment:
+      # 部署路径非必须，以斜杠开头和结尾，比如 /test/
+      QlBaseUrl: '/'
     restart: unless-stopped
