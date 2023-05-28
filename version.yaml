@@ -1,5 +1,6 @@
-version: 2.15.14
-changeLogLink: https://t.me/jiao_long/374
+version: 2.15.15
+changeLogLink: https://t.me/jiao_long/376
 changeLog: |
-  1. 接口 system/command-run 返回响应头 QL-Task-Pid，system/command-stop 支持 pid 参数
-  2. 其他 bug 修复
+  1. 支持非跟目录部署，启动时增加参数 -e QlBaseUrl="/test/"，参数前后需要斜杠
+  2. 修复 task 执行可执行文件路径，感谢 https://github.com/jzksnsjswkw
+  3. 其他 bug 修复
