@@ -243,10 +243,9 @@ update_qinglong() {
   echo -e "使用 ${mirror} 源更新...\n"
   export isFirstStartServer=false
 
-  local all_branch=$(cd ${dir_root} && git branch -a)
   local primary_branch="master"
-  if [[ "${all_branch}" =~ "${current_branch}" ]]; then
-    primary_branch="${current_branch}"
+  if [[ "${QL_BRANCH}" == "develop" ]]; then
+    primary_branch="develop"
   fi
   [[ -f $dir_root/package.json ]] && ql_depend_old=$(cat $dir_root/package.json)
   reset_romote_url ${dir_root} "https://${mirror}.com/whyour/qinglong.git" ${primary_branch}

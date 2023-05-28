@@ -85,8 +85,6 @@ jobs:
           git push --force --quiet gitlab ${GITHUB_BRANCH}:${GITHUB_BRANCH}
 
   build:
-    if: github.ref != 'refs/heads/master'
-
     needs: build-static
 
     runs-on: ubuntu-latest
@@ -131,11 +129,14 @@ jobs:
             ghcr.io/${{ github.repository }}
           # generate Docker tags based on the following events/attributes
           #   nightly, master, pr-2, 1.2.3, 1.2, 1
+          flavor: |
+            latest=false
           tags: |
             type=schedule,pattern=nightly
             type=edge
-            type=ref,event=branch
             type=ref,event=pr
+            type=ref,event=branch,enable=${{ github.ref != format('refs/heads/{0}', 'master') }}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
