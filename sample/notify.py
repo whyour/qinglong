@@ -96,6 +96,8 @@ push_config = {
     'SMTP_EMAIL': '',                   # SMTP 收发件邮箱，通知将会由自己发给自己
     'SMTP_PASSWORD': '',                # SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
     'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
+    
+	'WEBHOOK_URL': '',                  # webhook自定义通知 接收回调的URL
 }
 notify_function = []
 # fmt: on
@@ -604,6 +606,23 @@ def smtp(title: str, content: str) -> None:
     except Exception as e:
         print(f'SMTP 邮件 推送失败！{e}')
 
+def webhook_notify(title: str, content: str) -> None:
+    """
+    通过 WEBHOOK 推送消息。
+    """
+    if not push_config.get("WEBHOOK_URL"):
+        print("WEBHOOK 服务的 WEBHOOK_URL 未设置!!\n取消推送")
+        return
+    print("WEBHOOK服务启动")
+
+    url = f"{push_config.get('WEBHOOK_URL')}"
+    headers = {"Content-Type": "application/json;charset=utf-8"}
+    data = {"title": f"{title}", "content": f"{content}"}
+    response = requests.post(
+        url=url, data=json.dumps(data), headers=headers, timeout=15
+    ).json()
+
+    print("WEBHOOK 推送成功！")
 
 def one() -> str:
     """
@@ -649,7 +668,8 @@ if push_config.get("AIBOTK_KEY") and push_config.get("AIBOTK_TYPE") and push_con
     notify_function.append(aibotk)
 if push_config.get("SMTP_SERVER") and push_config.get("SMTP_SSL") and push_config.get("SMTP_EMAIL") and push_config.get("SMTP_PASSWORD") and push_config.get("SMTP_NAME"):
     notify_function.append(smtp)
-
+if push_config.get("WEBHOOK_URL"):
+    notify_function.append(webhook_notify)
 
 def send(title: str, content: str) -> None:
     if not content:

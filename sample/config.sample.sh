@@ -164,4 +164,7 @@ export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
 
+## 15. webhook
+export WEBHOOK_URL=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

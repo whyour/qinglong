@@ -137,6 +137,9 @@ let SMTP_EMAIL = '';
 let SMTP_PASSWORD = '';
 let SMTP_NAME = '';
 
+// =======================================webhook设置区域=======================================
+let WEBHOOK_URL = '';
+
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
   GOTIFY_URL = process.env.GOTIFY_URL;
@@ -278,6 +281,10 @@ if (process.env.SMTP_PASSWORD) {
 if (process.env.SMTP_NAME) {
   SMTP_NAME = process.env.SMTP_NAME;
 }
+
+if (process.env.WEBHOOK_URL) {
+  WEBHOOK_URL = process.env.WEBHOOK_URL;
+}
 //==========================云端环境变量的判断与接收=========================
 
 /**
@@ -288,6 +295,7 @@ if (process.env.SMTP_NAME) {
  * @param author 作者仓库等信息  例：`本通知 By：https://github.com/whyour/qinglong`
  * @returns {Promise<unknown>}
  */
+
 async function sendNotify(
   text,
   desp,
@@ -309,7 +317,7 @@ async function sendNotify(
   await Promise.all([
     serverNotify(text, desp), //微信server酱
     pushPlusNotify(text, desp), //pushplus(推送加)
-  ]);
+ ]);
   //由于上述两种微信通知需点击进去才能查看到详情，故text(标题内容)携带了账号序号以及昵称信息，方便不点击也可知道是哪个京东哪个活动
   text = text.match(/.*?(?=\s?-)/g) ? text.match(/.*?(?=\s?-)/g)[0] : text;
   await Promise.all([
@@ -326,7 +334,9 @@ async function sendNotify(
     aibotkNotify(text, desp), //智能微秘书
     fsBotNotify(text, desp), //飞书机器人
     smtpNotify(text, desp), //SMTP 邮件
+    webhookNotify(text, desp), //webhook
   ]);
+  
 }
 
 function gotifyNotify(text, desp) {
@@ -1101,6 +1111,46 @@ function smtpNotify(text, desp) {
   return new Promise((resolve) => {
     if (SMTP_SERVER && SMTP_SSL && SMTP_EMAIL && SMTP_PASSWORD && SMTP_NAME) {
       // todo: Node.js并没有内置的 smtp 实现，需要调用外部库，因为不清楚这个文件的模块依赖情况，所以留给有缘人实现
+    } else {
+      resolve();
+    }
+  });
+}
+
+function webhookNotify(text, desp) {
+  console.log(text);
+  return new Promise((resolve) => {
+    console.log(WEBHOOK_URL);
+    if (WEBHOOK_URL) {
+      const options = {
+        url: `${WEBHOOK_URL}`,
+        body: `title=${encodeURIComponent(text)}&message=${encodeURIComponent(
+          desp,
+        )}&priority=${''}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      };
+      $.post(options, (err, resp, data) => {
+        console.log(options);
+        try {
+          if (err) {
+            console.log('webhook发送通知调用API失败！！\n');
+            console.log(err);
+          } else {
+            data = JSON.parse(data);
+            if (data.id) {
+              console.log('webhook发送通知消息成功🎉\n');
+            } else {
+              console.log(`${data.message}\n`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve();
+        }
+      });
     } else {
       resolve();
     }
