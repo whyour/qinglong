@@ -17,6 +17,12 @@ import { errors } from 'celebrate';
 import path from 'path';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { serveEnv } from '../config/serverEnv';
+import rateLimit from 'express-rate-limit'
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+})
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -125,6 +131,7 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(rewrite('/open/*', '/api/$1'));
+  app.use('/api', limiter)
   app.use(config.api.prefix, routes());
 
   app.use((req, res, next) => {

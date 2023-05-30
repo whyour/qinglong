@@ -14,7 +14,7 @@ import SockService from './sock';
 import { FindOptions, Op } from 'sequelize';
 import { concurrentRun } from '../config/util';
 import dayjs from 'dayjs';
-import { runCronWithLimit } from 'back/shared/pLimit';
+import { runCronWithLimit } from '../shared/pLimit';
 
 @Service()
 export default class DependenceService {
