@@ -1,6 +1,5 @@
 import { ServerUnaryCall, sendUnaryData } from '@grpc/grpc-js';
 import { HealthCheckRequest, HealthCheckResponse } from '../protos/health';
-import { exec } from 'child_process';
 import config from '../config';
 import { promiseExec } from '../config/util';
 

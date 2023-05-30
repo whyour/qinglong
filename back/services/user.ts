@@ -15,7 +15,6 @@ import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import { Request } from 'express';
 import ScheduleService from './schedule';
-import { spawn } from 'child_process';
 import SockService from './sock';
 import dayjs from 'dayjs';
 

@@ -8,9 +8,6 @@ import {
 } from '../data/subscription';
 import {
   ChildProcessWithoutNullStreams,
-  exec,
-  execSync,
-  spawn,
 } from 'child_process';
 import fs from 'fs';
 import {
@@ -20,6 +17,7 @@ import {
   createFile,
   killTask,
   handleLogPath,
+  promiseExec,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { FindOptions, Op } from 'sequelize';
@@ -39,7 +37,7 @@ export default class SubscriptionService {
     private scheduleService: ScheduleService,
     private sockService: SockService,
     private sshKeyService: SshKeyService,
-  ) {}
+  ) { }
 
   public async list(searchText?: string): Promise<Subscription[]> {
     let query = {};
@@ -110,18 +108,6 @@ export default class SubscriptionService {
     this.sshKeyService.setSshConfig(docs);
   }
 
-  private async promiseExec(command: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      exec(
-        command,
-        { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' },
-        (err, stdout, stderr) => {
-          resolve(stdout || stderr || JSON.stringify(err));
-        },
-      );
-    });
-  }
-
   private taskCallbacks(doc: Subscription): TaskCallbacks {
     return {
       onBefore: async (startTime) => {
@@ -144,7 +130,7 @@ export default class SubscriptionService {
         try {
           if (doc.sub_before) {
             fs.appendFileSync(absolutePath, `\n## 执行before命令...\n\n`);
-            beforeStr = await this.promiseExec(doc.sub_before);
+            beforeStr = await promiseExec(doc.sub_before);
           }
         } catch (error: any) {
           beforeStr =
@@ -171,7 +157,7 @@ export default class SubscriptionService {
         try {
           if (sub.sub_after) {
             fs.appendFileSync(absolutePath, `\n\n## 执行after命令...\n\n`);
-            afterStr = await this.promiseExec(sub.sub_after);
+            afterStr = await promiseExec(sub.sub_after);
           }
         } catch (error: any) {
           afterStr =
@@ -290,10 +276,9 @@ export default class SubscriptionService {
       { status: SubscriptionStatus.queued },
       { where: { id: ids } },
     );
-    concurrentRun(
-      ids.map((id) => async () => await this.runSingle(id)),
-      10,
-    );
+    ids.forEach(id => {
+      this.runSingle(id)
+    })
   }
 
   public async stop(ids: number[]) {
@@ -330,7 +315,7 @@ export default class SubscriptionService {
 
     const command = formatCommand(subscription);
 
-    await this.scheduleService.runTask(
+    this.scheduleService.runTask(
       command,
       this.taskCallbacks(subscription),
     );

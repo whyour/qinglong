@@ -2,7 +2,7 @@ import { ServerUnaryCall, sendUnaryData } from '@grpc/grpc-js';
 import { AddCronRequest, AddCronResponse } from '../protos/cron';
 import nodeSchedule from 'node-schedule';
 import { scheduleStacks } from './data';
-import { exec } from 'child_process';
+import { runCron } from '../shared/runCron';
 
 const addCron = (
   call: ServerUnaryCall<AddCronRequest, AddCronResponse>,
@@ -16,7 +16,7 @@ const addCron = (
     scheduleStacks.set(
       id,
       nodeSchedule.scheduleJob(id, schedule, async () => {
-        exec(`ID=${id} ${command}`);
+        runCron(`ID=${id} ${command}`)
       }),
     );
   }
