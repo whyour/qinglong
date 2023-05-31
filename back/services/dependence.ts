@@ -105,11 +105,7 @@ export default class DependenceService {
     isInstall: boolean = true,
     force: boolean = false,
   ) {
-    docs.forEach(async (dep) => {
-      const status = isInstall
-        ? DependenceStatus.installing
-        : DependenceStatus.removing;
-      await DependenceModel.update({ status }, { where: { id: dep.id } });
+    docs.forEach((dep) => {
       this.installOrUninstallDependencies(
         [dep],
         isInstall,
@@ -161,6 +157,13 @@ export default class DependenceService {
           resolve(null);
           return;
         }
+
+        const depIds = dependencies.map((x) => x.id) as number[];
+        const status = isInstall
+          ? DependenceStatus.installing
+          : DependenceStatus.removing;
+        await DependenceModel.update({ status }, { where: { id: depIds } });
+
         const socketMessageType = !force
           ? 'installDependence'
           : 'uninstallDependence';
@@ -171,7 +174,6 @@ export default class DependenceService {
             : unInstallDependenceCommandTypes
         )[dependencies[0].type as any];
         const actionText = isInstall ? '安装' : '删除';
-        const depIds = dependencies.map((x) => x.id) as number[];
         const startTime = dayjs();
 
         const message = `开始${actionText}依赖 ${depNames}，开始时间 ${startTime.format(

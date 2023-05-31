@@ -26,13 +26,6 @@ export interface AppToken {
 
 export type AppScope = 'envs' | 'crons' | 'configs' | 'scripts' | 'logs';
 
-export enum CrontabStatus {
-  'running',
-  'idle',
-  'disabled',
-  'queued',
-}
-
 interface AppInstance extends Model<App, App>, App {}
 export const AppModel = sequelize.define<AppInstance>('App', {
   name: { type: DataTypes.STRING, unique: 'name' },

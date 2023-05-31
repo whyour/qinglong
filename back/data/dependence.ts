@@ -15,7 +15,7 @@ export class Dependence {
     this.status =
       typeof options.status === 'number' && DependenceStatus[options.status]
         ? options.status
-        : DependenceStatus.installing;
+        : DependenceStatus.queued;
     this.type = options.type || DependenceTypes.nodejs;
     this.timestamp = new Date().toString();
     this.name = options.name;
