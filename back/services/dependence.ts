@@ -9,7 +9,7 @@ import {
   unInstallDependenceCommandTypes,
   DependenceModel,
 } from '../data/dependence';
-import { spawn } from 'child_process';
+import { spawn } from 'cross-spawn';
 import SockService from './sock';
 import { FindOptions, Op } from 'sequelize';
 import { concurrentRun } from '../config/util';

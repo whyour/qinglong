@@ -2,7 +2,7 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
-import { exec, execSync, spawn } from 'child_process';
+import { exec, execSync } from 'child_process';
 import fs from 'fs';
 import cron_parser from 'cron-parser';
 import {
@@ -17,6 +17,7 @@ import path from 'path';
 import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 import cronClient from '../schedule/client';
 import { runCronWithLimit } from '../shared/pLimit';
+import { spawn } from 'cross-spawn';
 
 @Service()
 export default class CronService {

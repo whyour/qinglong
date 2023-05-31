@@ -6,7 +6,7 @@ import { AuthDataType, AuthInfo, AuthModel, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
-import { spawn } from 'child_process';
+import { spawn } from 'cross-spawn';
 import SockService from './sock';
 import got from 'got';
 import {

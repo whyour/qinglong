@@ -1,7 +1,7 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import nodeSchedule from 'node-schedule';
-import { ChildProcessWithoutNullStreams, exec, spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams } from 'child_process';
 import {
   ToadScheduler,
   LongIntervalJob,
@@ -10,6 +10,7 @@ import {
 } from 'toad-scheduler';
 import dayjs from 'dayjs';
 import { runCronWithLimit } from '../shared/pLimit';
+import { spawn } from 'cross-spawn';
 
 interface ScheduleTaskType {
   id: number;
