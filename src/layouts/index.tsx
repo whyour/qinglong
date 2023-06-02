@@ -283,33 +283,35 @@ export default function () {
       logo={
         <>
           <Image preview={false} src="https://qn.whyour.cn/logo.png" />
-          <span className="title">青龙</span>
-          <a
-            href={systemInfo?.changeLogLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <Tooltip
-              title={systemInfo?.branch === 'develop' ? '开发版' : '正式版'}
+          <div className="title">
+            <span className="title">青龙</span>
+            <a
+              href={systemInfo?.changeLogLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
             >
-              <Badge size="small" dot={systemInfo?.branch === 'develop'}>
-                <span
-                  style={{
-                    fontSize: isFirefox ? 9 : 12,
-                    color: '#666',
-                    marginLeft: 2,
-                    zoom: isSafari ? 0.66 : 0.8,
-                    letterSpacing: isQQBrowser ? -2 : 0,
-                  }}
-                >
-                  v{systemInfo?.version}
-                </span>
-              </Badge>
-            </Tooltip>
-          </a>
+              <Tooltip
+                title={systemInfo?.branch === 'develop' ? '开发版' : '正式版'}
+              >
+                <Badge size="small" dot={systemInfo?.branch === 'develop'}>
+                  <span
+                    style={{
+                      fontSize: isFirefox ? 9 : 12,
+                      color: '#666',
+                      marginLeft: 2,
+                      zoom: isSafari ? 0.66 : 0.8,
+                      letterSpacing: isQQBrowser ? -2 : 0,
+                    }}
+                  >
+                    v{systemInfo?.version}
+                  </span>
+                </Badge>
+              </Tooltip>
+            </a>
+          </div>
         </>
       }
       title={false}

@@ -333,6 +333,7 @@ select:-webkit-autofill:focus {
 
 .ant-pro-sider-logo {
   .title {
+    display: flex;
     height: 32px;
     margin: 0 5px;
     font-weight: 600;
@@ -340,6 +341,11 @@ select:-webkit-autofill:focus {
     line-height: 32px;
     vertical-align: middle;
     animation: pro-layout-title-hide 0.3s;
+
+    a {
+      display: inline-flex;
+      align-items: center;
+    }
   }
 
   img {
@@ -352,6 +358,10 @@ select:-webkit-autofill:focus {
   a img {
     // 移动端logo被拉伸
     width: auto !important;
+  }
+
+  .ant-image {
+    display: inline-flex;
   }
 }
 
@@ -395,4 +405,16 @@ pre {
 
 textarea.ant-input {
   word-break: break-all;
+}
+
+.ant-pro-sider-collapsed,
+body[data-mode='phone'] header {
+  .title {
+    display: none;
+  }
+}
+
+.ant-pro-sider.ant-layout-sider.ant-pro-sider-fixed {
+  box-shadow: none;
+  border-right: 1px solid #eee;
 }
