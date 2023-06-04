@@ -6,9 +6,7 @@ import {
   SubscriptionModel,
   SubscriptionStatus,
 } from '../data/subscription';
-import {
-  ChildProcessWithoutNullStreams,
-} from 'child_process';
+import { ChildProcessWithoutNullStreams } from 'child_process';
 import fs from 'fs';
 import {
   getFileContentByName,
@@ -37,7 +35,7 @@ export default class SubscriptionService {
     private scheduleService: ScheduleService,
     private sockService: SockService,
     private sshKeyService: SshKeyService,
-  ) { }
+  ) {}
 
   public async list(searchText?: string): Promise<Subscription[]> {
     let query = {};
@@ -45,7 +43,7 @@ export default class SubscriptionService {
       const reg = {
         [Op.or]: [
           { [Op.like]: `%${searchText}%` },
-          { [Op.like]: `%${encodeURIComponent(searchText)}%` },
+          { [Op.like]: `%${encodeURI(searchText)}%` },
         ],
       };
       query = {
@@ -276,9 +274,9 @@ export default class SubscriptionService {
       { status: SubscriptionStatus.queued },
       { where: { id: ids } },
     );
-    ids.forEach(id => {
-      this.runSingle(id)
-    })
+    ids.forEach((id) => {
+      this.runSingle(id);
+    });
   }
 
   public async stop(ids: number[]) {
@@ -315,10 +313,7 @@ export default class SubscriptionService {
 
     const command = formatCommand(subscription);
 
-    this.scheduleService.runTask(
-      command,
-      this.taskCallbacks(subscription),
-    );
+    this.scheduleService.runTask(command, this.taskCallbacks(subscription));
   }
 
   public async disabled(ids: number[]) {

@@ -21,7 +21,7 @@ export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
@@ -79,7 +79,7 @@ export default class DependenceService {
   ): Promise<Dependence[]> {
     let condition = { ...query, type: DependenceTypes[type as any] };
     if (searchValue) {
-      const encodeText = encodeURIComponent(searchValue);
+      const encodeText = encodeURI(searchValue);
       const reg = {
         [Op.or]: [
           { [Op.like]: `%${searchValue}%` },
@@ -106,12 +106,8 @@ export default class DependenceService {
     force: boolean = false,
   ) {
     docs.forEach((dep) => {
-      this.installOrUninstallDependencies(
-        [dep],
-        isInstall,
-        force,
-      )
-    })
+      this.installOrUninstallDependencies([dep], isInstall, force);
+    });
   }
 
   public async reInstall(ids: number[]): Promise<Dependence[]> {
@@ -186,7 +182,9 @@ export default class DependenceService {
         });
         await this.updateLog(depIds, message);
 
-        const cp = spawn(`${depRunCommand} ${depNames}`, { shell: '/bin/bash' });
+        const cp = spawn(`${depRunCommand} ${depNames}`, {
+          shell: '/bin/bash',
+        });
 
         cp.stdout.on('data', async (data) => {
           this.sockService.sendMessage({
@@ -250,6 +248,6 @@ export default class DependenceService {
           resolve(null);
         });
       });
-    })
+    });
   }
 }

@@ -75,7 +75,7 @@ export default class OpenService {
   ): Promise<App[]> {
     let condition = { ...query };
     if (searchText) {
-      const encodeText = encodeURIComponent(searchText);
+      const encodeText = encodeURI(searchText);
       const reg = {
         [Op.or]: [
           { [Op.like]: `%${searchText}%` },

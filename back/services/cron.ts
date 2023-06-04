@@ -21,7 +21,7 @@ import { spawn } from 'cross-spawn';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -194,17 +194,13 @@ export default class CronService {
               {
                 [operate2]: [
                   { [operate]: `%${value}%` },
-                  { [operate]: `%${encodeURIComponent(value)}%` },
+                  { [operate]: `%${encodeURI(value)}%` },
                 ],
               },
               {
                 [operate2]: [
                   where(colFn(property), operate, `%${value}%`),
-                  where(
-                    colFn(property),
-                    operate,
-                    `%${encodeURIComponent(value)}%`,
-                  ),
+                  where(colFn(property), operate, `%${encodeURI(value)}%`),
                 ],
               },
             ],
@@ -231,7 +227,7 @@ export default class CronService {
           q[column] = {
             [Op.or]: [
               { [Op.like]: `%${textArray[1]}%` },
-              { [Op.like]: `%${encodeURIComponent(textArray[1])}%` },
+              { [Op.like]: `%${encodeURI(textArray[1])}%` },
             ],
           };
           break;
@@ -239,7 +235,7 @@ export default class CronService {
           const reg = {
             [Op.or]: [
               { [Op.like]: `%${searchText}%` },
-              { [Op.like]: `%${encodeURIComponent(searchText)}%` },
+              { [Op.like]: `%${encodeURI(searchText)}%` },
             ],
           };
           q[Op.or] = [
@@ -367,9 +363,9 @@ export default class CronService {
       { status: CrontabStatus.queued },
       { where: { id: ids } },
     );
-    ids.forEach(id => {
-      this.runSingle(id)
-    })
+    ids.forEach((id) => {
+      this.runSingle(id);
+    });
   }
 
   public async stop(ids: number[]) {
@@ -451,7 +447,7 @@ export default class CronService {
           resolve();
         });
       });
-    })
+    });
   }
 
   public async disabled(ids: number[]) {
