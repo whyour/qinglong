@@ -10,12 +10,18 @@ export default async ({ expressApp }: { expressApp: Application }) => {
   const { version } = await parseVersion(config.versionFile);
 
   Sentry.init({
+    ignoreErrors: [
+      /SequelizeUniqueConstraintError/i,
+      /Validation error/i,
+      /UnauthorizedError/i,
+      /celebrate request validation failed/i,
+    ],
     dsn: 'https://f4b5b55fb3c645b29a5dc2d70a1a4ef4@o1098464.ingest.sentry.io/6122819',
     integrations: [
       new Sentry.Integrations.Http({ tracing: true }),
       new Tracing.Integrations.Express({ app: expressApp }),
     ],
-    tracesSampleRate: 0.1,
+    tracesSampleRate: 0.8,
     release: version,
   });
 

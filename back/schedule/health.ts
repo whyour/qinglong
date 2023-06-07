@@ -10,19 +10,22 @@ const check = async (
   switch (call.request.service) {
     case 'cron':
       const res = await promiseExec(
-        `curl -sf http://localhost:${config.port}/api/system`,
+        `curl -s http://localhost:${config.port}/api/system`,
       );
 
       if (res.includes('200')) {
         return callback(null, { status: 1 });
       }
+
       const panelErrLog = await promiseExec(
         `tail -n 300 ~/.pm2/logs/panel-error.log`,
       );
       const scheduleErrLog = await promiseExec(
         `tail -n 300 ~/.pm2/logs/schedule-error.log`,
       );
-      return callback(new Error(`${scheduleErrLog}\n${panelErrLog}`));
+      return callback(
+        new Error(`${scheduleErrLog || ''}\n${panelErrLog || ''}\n${res}`),
+      );
 
     default:
       return callback(null, { status: 1 });

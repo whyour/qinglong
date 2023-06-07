@@ -10,19 +10,11 @@ import Container from 'typedi';
 import OpenService from '../services/open';
 import rewrite from 'express-urlrewrite';
 import UserService from '../services/user';
-import handler from 'serve-handler';
 import * as Sentry from '@sentry/node';
 import { EnvModel } from '../data/env';
 import { errors } from 'celebrate';
-import path from 'path';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { serveEnv } from '../config/serverEnv';
-import rateLimit from 'express-rate-limit'
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-})
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -131,7 +123,6 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(rewrite('/open/*', '/api/$1'));
-  app.use('/api', limiter)
   app.use(config.api.prefix, routes());
 
   app.use((req, res, next) => {
@@ -178,18 +169,6 @@ export default ({ app }: { app: Application }) => {
       }
       return next(err);
     },
-  );
-
-  app.use(
-    Sentry.Handlers.errorHandler({
-      shouldHandleError(error) {
-        // 排除 SequelizeUniqueConstraintError / NotFound
-        return (
-          !['SequelizeUniqueConstraintError'].includes(error.name) ||
-          !['Not Found'].includes(error.message)
-        );
-      },
-    }),
   );
 
   app.use(
