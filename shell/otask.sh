@@ -38,7 +38,7 @@ gen_array_scripts() {
     if [[ -f $file ]] && [[ $file == *.js && $file != sendNotify.js ]]; then
       let i++
       array_scripts[i]=$(echo "$file" | perl -pe "s|$dir_scripts/||g")
-      array_scripts_name[i]=$(grep "new Env" $file | awk -F "'|\"" '{print $2}' | head -1)
+      array_scripts_name[i]=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | head -1)
       [[ -z ${array_scripts_name[i]} ]] && array_scripts_name[i]="<未识别出活动名称>"
     fi
   done
