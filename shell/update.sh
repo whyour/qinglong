@@ -363,10 +363,10 @@ gen_list_repo() {
   done
   files=$(eval $cmd | sed 's/^..//')
   if [[ $path ]]; then
-    files=$(echo "$files" | egrep $path)
+    files=$(echo "$files" | egrep "$path")
   fi
   if [[ $blackword ]]; then
-    files=$(echo "$files" | egrep -v $blackword)
+    files=$(echo "$files" | egrep -v "$blackword")
   fi
 
   cp -f $file_notify_js "${dir_scripts}/${uniq_path}"
@@ -374,7 +374,7 @@ gen_list_repo() {
 
   if [[ $dependence ]]; then
     cd ${repo_path}
-    results=$(eval $cmd | sed 's/^..//' | egrep $dependence)
+    results=$(eval $cmd | sed 's/^..//' | egrep "$dependence")
     for _file in ${results}; do
       file_path=$(dirname $_file)
       make_dir "${dir_scripts}/${uniq_path}/${file_path}"
@@ -387,7 +387,7 @@ gen_list_repo() {
   fi
 
   for file in ${files}; do
-    filename=$(basename $file)
+    filename=$(basename "$file")
     cp -f $file "$dir_scripts/${uniq_path}/${filename}"
     echo "${uniq_path}/${filename}" >>"$dir_list_tmp/${uniq_path}_scripts.list"
     # cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* ${uniq_path}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task.* ${uniq_path}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
