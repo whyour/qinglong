@@ -5,7 +5,7 @@ let pickedEnv: Record<string, string>;
 
 function getPickedEnv() {
   if (pickedEnv) return pickedEnv;
-  const picked = pick(process.env, ['QlBaseUrl']);
+  const picked = pick(process.env, ['QlBaseUrl', 'DeployEnv']);
   pickedEnv = picked as Record<string, string>;
   return picked;
 }

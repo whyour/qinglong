@@ -13,4 +13,5 @@ declare module 'pstree.remy';
 
 interface Window {
   __ENV__QlBaseUrl: string;
+  __ENV__DeployEnv: string;
 }
