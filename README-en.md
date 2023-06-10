@@ -1,30 +1,29 @@
-<p align="center">
-  <a href="https://github.com/whyour/qinglong">
-    <img width="150" src="https://user-images.githubusercontent.com/22700758/191449379-f9f56204-0e31-4a16-be5a-331f52696a73.png">
-  </a>
-</p>
-
-<h1 align="center">Green Dragon</h1>
-
 <div align="center">
+<img width="100" src="https://user-images.githubusercontent.com/22700758/191449379-f9f56204-0e31-4a16-be5a-331f52696a73.png">
+
+<h1 align="center">Qinglong</h1>
+
+[简体中文](./README.md) | English
 
 Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 
-[![docker version][docker-version-image]][docker-version-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url]
+[![npm version][npm-version-image]][npm-version-url] [![docker pulls][docker-pulls-image]][docker-pulls-url] [![docker stars][docker-stars-image]][docker-stars-url] [![docker image size][docker-image-size-image]][docker-image-size-url]
 
+[npm-version-image]: https://img.shields.io/npm/v/@whyour/qinglong?style=flat
+[npm-version-url]: https://www.npmjs.com/package/@whyour/qinglong?activeTab=readme
 [docker-pulls-image]: https://img.shields.io/docker/pulls/whyour/qinglong?style=flat
 [docker-pulls-url]: https://hub.docker.com/r/whyour/qinglong
-[docker-version-image]: https://img.shields.io/docker/v/whyour/qinglong?style=flat
-[docker-version-url]: https://hub.docker.com/r/whyour/qinglong/tags?page=1&ordering=last_updated
 [docker-stars-image]: https://img.shields.io/docker/stars/whyour/qinglong?style=flat
 [docker-stars-url]: https://hub.docker.com/r/whyour/qinglong
 [docker-image-size-image]: https://img.shields.io/docker/image-size/whyour/qinglong?style=flat
 [docker-image-size-url]: https://hub.docker.com/r/whyour/qinglong
+
+[Demo](http://demo.dlww.cc:4433/) / [Issues](https://github.com/whyour/qinglong/issues) / [Telegram Channel](https://t.me/jiao_long) / [Buy Me a Coffee](https://www.buymeacoffee.com/qinglong)
+
+[演示](http://demo.dlww.cc:4433/) / [反馈](https://github.com/whyour/qinglong/issues) / [Telegram 频道](https://t.me/jiao_long) / [打赏开发者](https://user-images.githubusercontent.com/22700758/244744295-29cd0cd1-c8bb-4ea1-adf6-29bd390ad4dd.jpg)
 </div>
 
-[![](https://user-images.githubusercontent.com/22700758/229290661-03aabe84-8780-4ef0-8e75-2146f4636130.jpeg)](https://whyour.cn)
-
-[简体中文](./README.md) | English
+![cover](https://user-images.githubusercontent.com/22700758/244847235-8dc1ca21-e03f-4606-9458-0541fab60413.png)
 
 ## Features
 
@@ -38,62 +37,10 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 
 ## Deployment
 
-### Local Deployment
+### Docker (Recommended)
 
 ```bash
-# To be refined, see the development steps first (not supported on windows yet)
-```
-
-### Podman Deployment
-
-1. podman installation
-
-```bash
-https://podman.io/getting-started/installation
-```
-
-2. start the container
-
-```bash
-podman run -dit \
-  --network bridge \
-  -v $PWD/ql/data:/ql/data \
-  -p 5700:5700 \
-  --name qinglong \
-  --hostname qinglong \
-  docker.io/whyour/qinglong:latest
-```
-
-### Docker Deployment
-
-1. docker installation
-
-```bash
-sudo curl -sSL get.docker.com | sh
-```
-
-2. configure domestic mirror sources
-
-```bash
-mkdir -p /etc/docker
-tee /etc/docker/daemon.json <<-'EOF'
-{
-  "registry-mirrors": [
-    "https://0b27f0a81a00f3560fbdc00ddd2f99e0.mirror.swr.myhuaweicloud.com",
-    "https://ypzju6vq.mirror.aliyuncs.com",
-    "https://registry.docker-cn.com",
-    "http://hub-mirror.c.163.com",
-    "https://docker.mirrors.ustc.edu.cn"
-  ]
-}
-EOF
-systemctl daemon-reload
-systemctl restart docker
-```
-
-3. start the container
-
-```bash
+# curl -sSL get.docker.com | sh
 docker run -dit \
   -v $PWD/ql/data:/ql/data \
   -p 5700:5700 \
@@ -103,17 +50,10 @@ docker run -dit \
   whyour/qinglong:latest
 ```
 
-### Docker-compose Deployment
-
-1. docker-compose installation
+### Docker-compose (Recommended)
 
 ```bash
-sudo curl -L https://github.com/docker/compose/releases/download/1.16.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
-```
-
-2. start the container
-
-```bash
+# curl -L https://github.com/docker/compose/releases/download/1.16.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
 mkdir qinglong
 wget https://raw.githubusercontent.com/whyour/qinglong/master/docker/docker-compose.yml
 
@@ -123,9 +63,32 @@ docker-compose up -d
 docker-compose down
 ```
 
-3. access
+### Podman (Recommended)
 
-Open your browser and visit http://{ip}:5700
+```bash
+# https://podman.io/getting-started/installation
+podman run -dit \
+  --network bridge \
+  -v $PWD/ql/data:/ql/data \
+  -p 5700:5700 \
+  --name qinglong \
+  --hostname qinglong \
+  docker.io/whyour/qinglong:latest
+```
+
+### Local
+
+It is recommended to use a pure system installation to avoid losing the original system data, you need to install node/npm/python3/pip3 yourself
+
+```bash
+npm install -g @whyour/qinglong
+qinglong
+# Add the environment variables QL_DIR and QL_DATA_DIR when prompted
+export QL_DIR=""
+export QL_DATA_DIR=""
+# Run again
+qinglong
+```
 
 ## Use
 
@@ -181,16 +144,6 @@ task -l <file_path>
 * account_number: Specify the account number of an environment variable to be executed when the task is executed
 * max_time: Timeout, suffix "s" for seconds (default), "m" for minutes, "h" for hours, "d" for days
 
-## Links
-
-- [nevinee](https://gitee.com/evine)
-- [crontab-ui](https://github.com/alseambusher/crontab-ui)
-- [Ant Design](https://ant.design)
-- [Ant Design Pro](https://pro.ant.design/)
-- [Umijs](https://umijs.org)
-- [darkreader](https://github.com/darkreader/darkreader)
-- [admin-server](https://github.com/sunpu007/admin-server)
-
 ## Development
 
 ```bash
@@ -205,9 +158,15 @@ $ pnpm start
 
 Open your browser and visit http://127.0.0.1:5700
 
-## Communication
+## Links
 
-[telegram channel](https://t.me/jiao_long)
+- [nevinee](https://gitee.com/evine)
+- [crontab-ui](https://github.com/alseambusher/crontab-ui)
+- [Ant Design](https://ant.design)
+- [Ant Design Pro](https://pro.ant.design/)
+- [Umijs](https://umijs.org)
+- [darkreader](https://github.com/darkreader/darkreader)
+- [admin-server](https://github.com/sunpu007/admin-server)
 
 ## Name Origin
 
