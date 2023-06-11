@@ -30,10 +30,10 @@ add_cron_api() {
     local name=$(echo "$1" | awk -F ":" '{print $3}')
     local sub_id=$(echo "$1" | awk -F ":" '{print $4}')
   else
-    local schedule=$1
-    local command=$2
-    local name=$3
-    local sub_id=$4
+    local schedule="$1"
+    local command="$2"
+    local name="$3"
+    local sub_id="$4"
   fi
 
   if [[ ! $sub_id ]];then
@@ -69,10 +69,10 @@ update_cron_api() {
     local name=$(echo "$1" | awk -F ":" '{print $3}')
     local id=$(echo "$1" | awk -F ":" '{print $4}')
   else
-    local schedule=$1
-    local command=$2
-    local name=$3
-    local id=$4
+    local schedule="$1"
+    local command="$2"
+    local name="$3"
+    local id="$4"
   fi
 
   local api=$(
@@ -103,8 +103,8 @@ update_cron_command_api() {
     local command=$(echo "$1" | awk -F ":" '{print $1}')
     local id=$(echo "$1" | awk -F ":" '{print $2}')
   else
-    local command=$1
-    local id=$2
+    local command="$1"
+    local id="$2"
   fi
 
   local api=$(
@@ -130,7 +130,7 @@ update_cron_command_api() {
 }
 
 del_cron_api() {
-  local ids=$1
+  local ids="$1"
   local currentTimeStamp=$(date +%s)
   local api=$(
     curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons?t=$currentTimeStamp" \
@@ -183,8 +183,8 @@ update_cron() {
 }
 
 notify_api() {
-  local title=$1
-  local content=$2
+  local title="$1"
+  local content="$2"
   local currentTimeStamp=$(date +%s)
   local api=$(
     curl -s --noproxy "*" "http://0.0.0.0:5600/open/system/notify?t=$currentTimeStamp" \
@@ -209,7 +209,7 @@ notify_api() {
 }
 
 find_cron_api() {
-  local params=$1
+  local params="$1"
   local currentTimeStamp=$(date +%s)
   local api=$(
     curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons/detail?$params&t=$currentTimeStamp" \
