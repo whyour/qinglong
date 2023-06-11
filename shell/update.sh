@@ -44,7 +44,7 @@ del_cron() {
   local path=$2
   local detail=""
   local ids=""
-  echo -e "开始尝试自动删除失效的定时任务...\n"
+  echo -e "开始尝试自动删除失效的定时任务..."
   for cron in $(cat $list_drop); do
     local id=$(cat $list_crontab_user | grep -E "$cmd_task.* $cron" | perl -pe "s|.*ID=(.*) $cmd_task.* $cron\.*|\1|" | head -1 | awk -F " " '{print $1}')
     if [[ $ids ]]; then
@@ -75,7 +75,7 @@ del_cron() {
 add_cron() {
   local list_add=$1
   local path=$2
-  echo -e "开始尝试自动添加定时任务...\n"
+  echo -e "开始尝试自动添加定时任务..."
   local detail=""
   cd $dir_scripts
   for file in $(cat $list_add); do

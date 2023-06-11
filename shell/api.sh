@@ -202,7 +202,7 @@ notify_api() {
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "通知发送成功"
+    echo -e "通知发送成功🎉"
   else
     echo -e "通知失败(${message})"
   fi
