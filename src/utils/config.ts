@@ -196,12 +196,20 @@ export default {
         tip: '企业微信机器人的 webhook(详见文档 https://work.weixin.qq.com/api/doc/90000/90136/91770)，例如：693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa',
         required: true,
       },
+      {
+        label: 'weWorkOrigin',
+        tip: '企业微信代理地址',
+      },
     ],
     weWorkApp: [
       {
         label: 'weWorkAppKey',
         tip: 'corpid,corpsecret,touser(注:多个成员ID使用|隔开),agentid,消息类型(选填,不填默认文本消息类型) 注意用,号隔开(英文输入法的逗号)，例如：wwcfrs,B-76WERQ,qinglong,1000001,2COat',
         required: true,
+      },
+      {
+        label: 'weWorkOrigin',
+        tip: '企业微信代理地址',
       },
     ],
     aibotk: [

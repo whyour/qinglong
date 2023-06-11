@@ -303,8 +303,8 @@ export default class NotificationService {
   }
 
   private async weWorkBot() {
-    const { weWorkBotKey } = this.params;
-    const url = `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${weWorkBotKey}`;
+    const { weWorkBotKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } = this.params;
+    const url = `${weWorkOrigin}/cgi-bin/webhook/send?key=${weWorkBotKey}`;
     try {
       const res: any = await got
         .post(url, {
@@ -328,10 +328,10 @@ export default class NotificationService {
   }
 
   private async weWorkApp() {
-    const { weWorkAppKey } = this.params;
+    const { weWorkAppKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } = this.params;
     const [corpid, corpsecret, touser, agentid, thumb_media_id = '1'] =
       weWorkAppKey.split(',');
-    const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken`;
+    const url = `${weWorkOrigin}/cgi-bin/gettoken`;
     const tokenRes: any = await got
       .post(url, {
         ...this.gotOption,
@@ -383,7 +383,7 @@ export default class NotificationService {
     try {
       const res: any = await got
         .post(
-          `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
+          `${weWorkOrigin}/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
           {
             ...this.gotOption,
             json: {

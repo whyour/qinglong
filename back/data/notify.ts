@@ -72,10 +72,12 @@ export class DingtalkBotNotification extends NotificationBaseInfo {
 
 export class WeWorkBotNotification extends NotificationBaseInfo {
   public weWorkBotKey = '';
+  public weWorkOrigin = '';
 }
 
 export class WeWorkAppNotification extends NotificationBaseInfo {
   public weWorkAppKey = '';
+  public weWorkOrigin = '';
 }
 
 export class AibotkNotification extends NotificationBaseInfo {
