@@ -824,12 +824,6 @@ const Crontab = () => {
   }, [viewConf, enabledCronViews]);
 
   useEffect(() => {
-    setPageConf({
-      page: 1,
-      size: parseInt(localStorage.getItem('pageSize') || '20'),
-      sorter: {},
-      filters: {},
-    });
     getCronViews();
   }, []);
 
@@ -889,7 +883,17 @@ const Crontab = () => {
       .then(({ code, data }) => {
         if (code === 200) {
           setCronViews(data);
-          setEnabledCronViews(data.filter((x) => !x.isDisabled));
+          const firstEnableView = data.filter((x) => !x.isDisabled);
+          setEnabledCronViews(firstEnableView);
+          setPageConf({
+            page: 1,
+            size: parseInt(localStorage.getItem('pageSize') || '20'),
+            sorter: {},
+            filters: {},
+          });
+          setViewConf({
+            ...firstEnableView[0],
+          });
         }
       })
       .finally(() => {

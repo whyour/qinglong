@@ -75,6 +75,10 @@ const ViewManageModal = ({
   handleCancel: () => void;
   cronViewChange: (data?: any) => void;
 }) => {
+  const islastEnableView = (record) => {
+    return list.filter((x) => !x.isDisabled).length <= 1 && !record.isDisabled;
+  };
+
   const columns: any = [
     {
       title: '名称',
@@ -95,6 +99,7 @@ const ViewManageModal = ({
       render: (text: string, record: any, index: number) => {
         return (
           <Switch
+            disabled={islastEnableView(record)}
             checked={!record.isDisabled}
             onChange={(checked) => onShowChange(checked, record, index)}
           />
@@ -111,9 +116,11 @@ const ViewManageModal = ({
             <a onClick={() => editView(record, index)}>
               <EditOutlined />
             </a>
-            <a onClick={() => deleteView(record, index)}>
-              <DeleteOutlined />
-            </a>
+            {!islastEnableView(record) && (
+              <a onClick={() => deleteView(record, index)}>
+                <DeleteOutlined />
+              </a>
+            )}
           </Space>
         ) : (
           '-'
