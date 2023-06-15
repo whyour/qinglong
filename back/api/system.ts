@@ -47,8 +47,7 @@ export default (app: Router) => {
       if (
         Object.keys(authInfo).length === 2 &&
         authInfo.username === 'admin' &&
-        authInfo.password === 'admin' &&
-        envCount === 0
+        authInfo.password === 'admin'
       ) {
         isInitialized = false;
       }

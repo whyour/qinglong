@@ -101,53 +101,6 @@ const Initialization = () => {
       ),
     },
     {
-      title: '通知设置',
-      content: (
-        <Form onFinish={submitNotification} layout="vertical">
-          <Form.Item
-            label="通知方式"
-            name="type"
-            rules={[{ required: true, message: '请选择通知方式' }]}
-            style={{ maxWidth: 350 }}
-          >
-            <Select
-              onChange={notificationModeChange}
-              placeholder="请选择通知方式"
-            >
-              {config.notificationModes
-                .filter((x) => x.value !== 'closed')
-                .map((x) => (
-                  <Option key={x.value} value={x.value}>
-                    {x.label}
-                  </Option>
-                ))}
-            </Select>
-          </Form.Item>
-          {fields.map((x) => (
-            <Form.Item
-              key={x.label}
-              label={x.label}
-              name={x.label}
-              extra={x.tip}
-              rules={[{ required: x.required }]}
-              style={{ maxWidth: 400 }}
-            >
-              <Input.TextArea
-                autoSize={true}
-                placeholder={`请输入${x.label}`}
-              />
-            </Form.Item>
-          ))}
-          <Button type="primary" htmlType="submit" loading={loading}>
-            保存
-          </Button>
-          <Button type="link" htmlType="button" onClick={() => next()}>
-            跳过
-          </Button>
-        </Form>
-      ),
-    },
-    {
       title: '账户设置',
       content: (
         <Form onFinish={submitAccountSetting} layout="vertical">
@@ -198,6 +151,53 @@ const Initialization = () => {
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={loading}>
             提交
+          </Button>
+        </Form>
+      ),
+    },
+    {
+      title: '通知设置',
+      content: (
+        <Form onFinish={submitNotification} layout="vertical">
+          <Form.Item
+            label="通知方式"
+            name="type"
+            rules={[{ required: true, message: '请选择通知方式' }]}
+            style={{ maxWidth: 350 }}
+          >
+            <Select
+              onChange={notificationModeChange}
+              placeholder="请选择通知方式"
+            >
+              {config.notificationModes
+                .filter((x) => x.value !== 'closed')
+                .map((x) => (
+                  <Option key={x.value} value={x.value}>
+                    {x.label}
+                  </Option>
+                ))}
+            </Select>
+          </Form.Item>
+          {fields.map((x) => (
+            <Form.Item
+              key={x.label}
+              label={x.label}
+              name={x.label}
+              extra={x.tip}
+              rules={[{ required: x.required }]}
+              style={{ maxWidth: 400 }}
+            >
+              <Input.TextArea
+                autoSize={true}
+                placeholder={`请输入${x.label}`}
+              />
+            </Form.Item>
+          ))}
+          <Button type="primary" htmlType="submit" loading={loading}>
+            保存
+          </Button>
+          <Button type="link" htmlType="button" onClick={() => next()}>
+            跳过
           </Button>
         </Form>
       ),

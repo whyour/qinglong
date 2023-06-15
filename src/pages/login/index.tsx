@@ -105,6 +105,10 @@ const Login = () => {
         password: values.password,
       });
       setTwoFactor(true);
+    } else if (code === 100) {
+      setTimeout(() => {
+        location.reload();
+      }, 1000);
     }
   };
 

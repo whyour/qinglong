@@ -33,6 +33,7 @@ import { SharedContext } from '@/layouts';
 import './index.less';
 
 const { Text } = Typography;
+const isDemoEnv = window.__ENV__DeployEnv === 'demo';
 
 const Setting = () => {
   const {
@@ -275,11 +276,17 @@ const Setting = () => {
         tabPosition="top"
         onChange={tabChange}
         items={[
-          {
-            key: 'security',
-            label: '安全设置',
-            children: <SecuritySettings user={user} userChange={reloadUser} />,
-          },
+          ...(!isDemoEnv
+            ? [
+                {
+                  key: 'security',
+                  label: '安全设置',
+                  children: (
+                    <SecuritySettings user={user} userChange={reloadUser} />
+                  ),
+                },
+              ]
+            : []),
           {
             key: 'app',
             label: '应用设置',
