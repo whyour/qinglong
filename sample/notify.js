@@ -465,7 +465,7 @@ function PushDeerNotify(text, desp) {
       desp = encodeURI(desp);
       const options = {
         url: PUSHDEER_URL || `https://api2.pushdeer.com/message/push`,
-        body: `pushkey=${PUSHDEER_KEY}&text=${text}&desp=${desp}&type=markdown`,
+        body: `pushkey=${PUSHDEER_KEY}&text=${text}&desp=${desp}&type="markdown"`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
