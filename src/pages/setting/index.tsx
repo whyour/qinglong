@@ -106,7 +106,7 @@ const Setting = () => {
     },
   ];
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [dataSource, setDataSource] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedApp, setEditedApp] = useState<any>();
