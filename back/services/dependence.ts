@@ -14,14 +14,14 @@ import SockService from './sock';
 import { FindOptions, Op } from 'sequelize';
 import { concurrentRun } from '../config/util';
 import dayjs from 'dayjs';
-import { runCronWithLimit } from '../shared/pLimit';
+import { runOneByOne, runWithCpuLimit } from '../shared/pLimit';
 
 @Service()
 export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
@@ -106,7 +106,7 @@ export default class DependenceService {
     force: boolean = false,
   ) {
     docs.forEach((dep) => {
-      this.installOrUninstallDependencies([dep], isInstall, force);
+      this.installOrUninstallDependency(dep, isInstall, force);
     });
   }
 
@@ -142,19 +142,14 @@ export default class DependenceService {
     await DependenceModel.update({ log: newLog }, { where: { id: ids } });
   }
 
-  public installOrUninstallDependencies(
-    dependencies: Dependence[],
+  public installOrUninstallDependency(
+    dependency: Dependence,
     isInstall: boolean = true,
     force: boolean = false,
   ) {
-    return runCronWithLimit(() => {
+    return runOneByOne(() => {
       return new Promise(async (resolve) => {
-        if (dependencies.length === 0) {
-          resolve(null);
-          return;
-        }
-
-        const depIds = dependencies.map((x) => x.id) as number[];
+        const depIds = [dependency.id!];
         const status = isInstall
           ? DependenceStatus.installing
           : DependenceStatus.removing;
@@ -163,16 +158,16 @@ export default class DependenceService {
         const socketMessageType = !force
           ? 'installDependence'
           : 'uninstallDependence';
-        const depNames = dependencies.map((x) => x.name).join(' ');
+        const depName = dependency.name;
         const depRunCommand = (
           isInstall
             ? InstallDependenceCommandTypes
             : unInstallDependenceCommandTypes
-        )[dependencies[0].type as any];
+        )[dependency.type as any];
         const actionText = isInstall ? '安装' : '删除';
         const startTime = dayjs();
 
-        const message = `开始${actionText}依赖 ${depNames}，开始时间 ${startTime.format(
+        const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
           'YYYY-MM-DD HH:mm:ss',
         )}\n\n`;
         this.sockService.sendMessage({
@@ -182,7 +177,7 @@ export default class DependenceService {
         });
         await this.updateLog(depIds, message);
 
-        const cp = spawn(`${depRunCommand} ${depNames}`, {
+        const cp = spawn(`${depRunCommand} ${depName}`, {
           shell: '/bin/bash',
         });
 

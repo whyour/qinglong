@@ -1,10 +1,17 @@
 import pLimit from "p-limit";
 import os from 'os';
 
-const cronLimit = pLimit(os.cpus().length);
+const cpuLimit = pLimit(os.cpus().length);
+const oneLimit = pLimit(1);
 
-export function runCronWithLimit<T>(fn: () => Promise<T>): Promise<T> {
-  return cronLimit(() => {
+export function runWithCpuLimit<T>(fn: () => Promise<T>): Promise<T> {
+  return cpuLimit(() => {
+    return fn();
+  });
+}
+
+export function runOneByOne<T>(fn: () => Promise<T>): Promise<T> {
+  return oneLimit(() => {
     return fn();
   });
 }

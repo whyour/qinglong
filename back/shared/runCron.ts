@@ -1,9 +1,9 @@
 import { spawn } from 'cross-spawn';
-import { runCronWithLimit } from "./pLimit";
+import { runWithCpuLimit } from "./pLimit";
 import Logger from '../loaders/logger';
 
 export function runCron(cmd: string): Promise<number> {
-  return runCronWithLimit(() => {
+  return runWithCpuLimit(() => {
     return new Promise(async (resolve: any) => {
       Logger.silly('运行命令: ' + cmd);
 
