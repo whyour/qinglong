@@ -1,6 +1,11 @@
-version: 2.15.15
-changeLogLink: https://t.me/jiao_long/376
+version: 2.15.16
+changeLogLink: https://t.me/jiao_long/378
 changeLog: |
-  1. 支持非跟目录部署，启动时增加参数 -e QlBaseUrl="/test/"，参数前后需要斜杠
-  2. 修复 task 执行可执行文件路径，感谢 https://github.com/jzksnsjswkw
-  3. 其他 bug 修复
+  1. 企业微信通知增加代理地址配置 QYWX_ORIGIN
+  2. 重构任务并发执行逻辑，依赖并发安装逻辑
+  3. 修复关闭全部任务视图，默认视图筛选错误
+  4. 增加初始化文件写入，修复参数含有空格影响 task/ql 命令
+  5. 修复初始化界面、侧边栏、错误页样式
+  6. 修复拉取订阅文件包含空格出错
+  7. 修改 api 限流策略，修复检查检查日志
+  8. 修复环境变量列表搜索字符转码
