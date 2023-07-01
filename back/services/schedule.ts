@@ -9,7 +9,7 @@ import {
   Task,
 } from 'toad-scheduler';
 import dayjs from 'dayjs';
-import { runWithCpuLimit } from '../shared/pLimit';
+import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
 
 interface ScheduleTaskType {
@@ -49,7 +49,7 @@ export default class ScheduleService {
     callbacks: TaskCallbacks = {},
     completionTime: 'start' | 'end' = 'end',
   ) {
-    return runWithCpuLimit(() => {
+    return taskLimit.runWithCpuLimit(() => {
       return new Promise(async (resolve, reject) => {
         try {
           const startTime = dayjs();

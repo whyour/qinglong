@@ -60,9 +60,9 @@ const { Search } = Input;
 
 export enum CrontabStatus {
   'running',
+  'queued',
   'idle',
   'disabled',
-  'queued',
 }
 
 const CrontabSort: any = { 0: 0, 5: 1, 3: 2, 1: 3, 4: 4 };

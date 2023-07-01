@@ -44,9 +44,9 @@ export class Crontab {
 
 export enum CrontabStatus {
   'running',
+  'queued',
   'idle',
   'disabled',
-  'queued',
 }
 
 interface CronInstance extends Model<Crontab, Crontab>, Crontab {}

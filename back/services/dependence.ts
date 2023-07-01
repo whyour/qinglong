@@ -14,7 +14,7 @@ import SockService from './sock';
 import { FindOptions, Op } from 'sequelize';
 import { concurrentRun } from '../config/util';
 import dayjs from 'dayjs';
-import { runOneByOne, runWithCpuLimit } from '../shared/pLimit';
+import taskLimit from '../shared/pLimit';
 
 @Service()
 export default class DependenceService {
@@ -147,7 +147,7 @@ export default class DependenceService {
     isInstall: boolean = true,
     force: boolean = false,
   ) {
-    return runOneByOne(() => {
+    return taskLimit.runOneByOne(() => {
       return new Promise(async (resolve) => {
         const depIds = [dependency.id!];
         const status = isInstall

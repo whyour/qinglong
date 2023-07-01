@@ -18,10 +18,13 @@ const confFile = path.join(configPath, 'config.sh');
 const authConfigFile = path.join(configPath, 'auth.json');
 const sampleConfigFile = path.join(samplePath, 'config.sample.sh');
 const sampleAuthFile = path.join(samplePath, 'auth.sample.json');
+const sampleTaskShellFile = path.join(samplePath, 'task.sample.sh');
 const sampleNotifyJsFile = path.join(samplePath, 'notify.js');
 const sampleNotifyPyFile = path.join(samplePath, 'notify.py');
 const scriptNotifyJsFile = path.join(scriptPath, 'sendNotify.js');
 const scriptNotifyPyFile = path.join(scriptPath, 'notify.py');
+const TaskBeforeFile = path.join(configPath, 'task_before.sh');
+const TaskAfterFile = path.join(configPath, 'task_after.sh');
 const homedir = os.homedir();
 const sshPath = path.resolve(homedir, '.ssh');
 const sshdPath = path.join(dataPath, 'ssh.d');
@@ -39,6 +42,8 @@ export default async () => {
   const tmpDirExist = await fileExist(tmpPath);
   const scriptNotifyJsFileExist = await fileExist(scriptNotifyJsFile);
   const scriptNotifyPyFileExist = await fileExist(scriptNotifyPyFile);
+  const TaskBeforeFileExist = await fileExist(TaskBeforeFile);
+  const TaskAfterFileExist = await fileExist(TaskAfterFile);
 
   if (!configDirExist) {
     fs.mkdirSync(configPath);
@@ -87,6 +92,14 @@ export default async () => {
 
   if (!scriptNotifyPyFileExist) {
     fs.writeFileSync(scriptNotifyPyFile, fs.readFileSync(sampleNotifyPyFile));
+  }
+
+  if (!TaskBeforeFileExist) {
+    fs.writeFileSync(TaskBeforeFile, fs.readFileSync(sampleTaskShellFile));
+  }
+
+  if (!TaskAfterFileExist) {
+    fs.writeFileSync(TaskAfterFile, fs.readFileSync(sampleTaskShellFile));
   }
 
   dotenv.config({ path: confFile });

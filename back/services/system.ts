@@ -2,7 +2,7 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
 import * as fs from 'fs';
-import { AuthDataType, AuthInfo, AuthModel, LoginStatus } from '../data/auth';
+import { AuthDataType, AuthInfo, AuthModel, AuthModelInfo } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
@@ -16,6 +16,7 @@ import {
   parseVersion,
 } from '../config/util';
 import { TASK_COMMAND } from '../config/const';
+import taskLimit from '../shared/pLimit'
 
 @Service()
 export default class SystemService {
@@ -28,8 +29,8 @@ export default class SystemService {
     private sockService: SockService,
   ) {}
 
-  public async getLogRemoveFrequency() {
-    const doc = await this.getDb({ type: AuthDataType.removeLogFrequency });
+  public async getSystemConfig() {
+    const doc = await this.getDb({ type: AuthDataType.systemConfig });
     return doc || {};
   }
 
@@ -62,25 +63,30 @@ export default class SystemService {
     }
   }
 
-  public async updateLogRemoveFrequency(frequency: number) {
-    const oDoc = await this.getLogRemoveFrequency();
+  public async updateSystemConfig(info: AuthModelInfo) {
+    const oDoc = await this.getSystemConfig();
     const result = await this.updateAuthDb({
       ...oDoc,
-      type: AuthDataType.removeLogFrequency,
-      info: { frequency },
+      type: AuthDataType.systemConfig,
+      info,
     });
-    const cron = {
-      id: result.id,
-      name: '删除日志',
-      command: `ql rmlog ${frequency}`,
-    };
-    await this.scheduleService.cancelIntervalTask(cron);
-    if (frequency > 0) {
-      this.scheduleService.createIntervalTask(cron, {
-        days: frequency,
-      });
+    if (info.logRemoveFrequency) {
+      const cron = {
+        id: result.id,
+        name: '删除日志',
+        command: `ql rmlog ${info.logRemoveFrequency}`,
+      };
+      await this.scheduleService.cancelIntervalTask(cron);
+      if (info.logRemoveFrequency > 0) {
+        this.scheduleService.createIntervalTask(cron, {
+          days: info.logRemoveFrequency,
+        });
+      }
     }
-    return { code: 200, data: { ...cron } };
+    if (info.cronConcurrency) {
+      await taskLimit.setCustomLimit(info.cronConcurrency);
+    }
+    return { code: 200, data: info };
   }
 
   public async checkUpdate() {

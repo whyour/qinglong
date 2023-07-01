@@ -70,12 +70,12 @@ export default (app: Router) => {
   });
 
   route.get(
-    '/log/remove',
+    '/config',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const systemService = Container.get(SystemService);
-        const data = await systemService.getLogRemoveFrequency();
+        const data = await systemService.getSystemConfig();
         res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -84,18 +84,19 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/log/remove',
+    '/config',
     celebrate({
       body: Joi.object({
-        frequency: Joi.number().required(),
+        logRemoveFrequency: Joi.number().optional().allow(null),
+        cronConcurrency: Joi.number().optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const systemService = Container.get(SystemService);
-        const result = await systemService.updateLogRemoveFrequency(
-          req.body.frequency,
+        const result = await systemService.updateSystemConfig(
+          req.body,
         );
         res.send(result);
       } catch (e) {

@@ -7,21 +7,21 @@ import fs from 'fs';
 import cron_parser from 'cron-parser';
 import {
   getFileContentByName,
-  concurrentRun,
   fileExist,
   killTask,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
-import { Op, where, col as colFn, FindOptions } from 'sequelize';
+import { Op, where, col as colFn, FindOptions, fn } from 'sequelize';
 import path from 'path';
 import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 import cronClient from '../schedule/client';
-import { runWithCpuLimit } from '../shared/pLimit';
+import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
+import { Fn } from 'sequelize/types/utils';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -281,7 +281,7 @@ export default class CronService {
     }
   }
 
-  private formatViewSort(order: string[][], viewQuery: any) {
+  private formatViewSort(order: (string | Fn)[][], viewQuery: any) {
     if (viewQuery.sorts && viewQuery.sorts.length > 0) {
       for (const { property, type } of viewQuery.sorts) {
         order.unshift([property, type]);
@@ -387,7 +387,7 @@ export default class CronService {
   }
 
   private async runSingle(cronId: number): Promise<number> {
-    return runWithCpuLimit(() => {
+    return taskLimit.runWithCpuLimit(() => {
       return new Promise(async (resolve: any) => {
         const cron = await this.getDb({ id: cronId });
         if (cron.status !== CrontabStatus.queued) {

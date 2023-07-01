@@ -29,7 +29,7 @@ export default async () => {
   });
 
   // 运行删除日志任务
-  const data = await systemService.getLogRemoveFrequency();
+  const data = await systemService.getSystemConfig();
   if (data && data.info && data.info.frequency) {
     const rmlogCron = {
       id: data.id,

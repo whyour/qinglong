@@ -91,6 +91,10 @@ export TG_API_HOST=""
 export DD_BOT_TOKEN=""
 export DD_BOT_SECRET=""
 
+## 企业微信反向代理地址
+## (环境变量名 QYWX_ORIGIN)
+export QYWX_ORIGIN=""
+
 ## 5. 企业微信机器人
 ## 官方说明文档：https://work.weixin.qq.com/api/doc/90000/90136/91770
 ## 下方填写密钥，企业微信推送 webhook 后面的 key

@@ -32,7 +32,7 @@ export default async () => {
   // 初始化更新所有任务状态为空闲
   await CrontabModel.update(
     { status: CrontabStatus.idle },
-    { where: { status: [CrontabStatus.running, CrontabStatus.queued] } },
+    { where: { status: { [Op.ne]: CrontabStatus.disabled } } },
   );
 
   // 初始化时安装所有处于安装中，安装成功，安装失败的依赖

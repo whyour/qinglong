@@ -81,7 +81,7 @@ const Error = () => {
           </Typography.Paragraph>
         </div>
       ) : (
-        <PageLoading style={{ paddingTop: 0 }} tip="启动中，请稍后..." />
+        <PageLoading tip="启动中，请稍后..." />
       )}
     </div>
   );

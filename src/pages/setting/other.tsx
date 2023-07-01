@@ -19,7 +19,10 @@ const Other = ({
   reloadTheme,
 }: Pick<SharedContext, 'socketMessage' | 'reloadTheme' | 'systemInfo'>) => {
   const defaultTheme = localStorage.getItem('qinglong_dark_theme') || 'auto';
-  const [logRemoveFrequency, setLogRemoveFrequency] = useState<number | null>();
+  const [systemConfig, setSystemConfig] = useState<{
+    logRemoveFrequency?: number | null;
+    cronConcurrency?: number | null;
+  }>();
   const [form] = Form.useForm();
 
   const {
@@ -45,13 +48,12 @@ const Other = ({
     reloadTheme();
   };
 
-  const getLogRemoveFrequency = () => {
+  const getSystemConfig = () => {
     request
-      .get(`${config.apiPrefix}system/log/remove`)
+      .get(`${config.apiPrefix}system/config`)
       .then(({ code, data }) => {
         if (code === 200 && data.info) {
-          const { frequency } = data.info;
-          setLogRemoveFrequency(frequency);
+          setSystemConfig(data.info);
         }
       })
       .catch((error: any) => {
@@ -59,25 +61,23 @@ const Other = ({
       });
   };
 
-  const updateRemoveLogFrequency = () => {
-    setTimeout(() => {
-      request
-        .put(`${config.apiPrefix}system/log/remove`, {
-          data: { frequency: logRemoveFrequency },
-        })
-        .then(({ code, data }) => {
-          if (code === 200) {
-            message.success('更新成功');
-          }
-        })
-        .catch((error: any) => {
-          console.log(error);
-        });
-    });
+  const updateSystemConfig = () => {
+    request
+      .put(`${config.apiPrefix}system/config`, {
+        data: { ...systemConfig },
+      })
+      .then(({ code, data }) => {
+        if (code === 200) {
+          message.success('更新成功');
+        }
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
   };
 
   useEffect(() => {
-    getLogRemoveFrequency();
+    getSystemConfig();
   }, []);
 
   return (
@@ -100,12 +100,29 @@ const Other = ({
           <InputNumber
             addonBefore="每"
             addonAfter="天"
-            style={{ width: 150 }}
+            style={{ width: 142 }}
             min={0}
-            value={logRemoveFrequency}
-            onChange={(value) => setLogRemoveFrequency(value)}
+            value={systemConfig?.logRemoveFrequency}
+            onChange={(value) => {
+              setSystemConfig({ ...systemConfig, logRemoveFrequency: value });
+            }}
           />
-          <Button type="primary" onClick={updateRemoveLogFrequency}>
+          <Button type="primary" onClick={updateSystemConfig}>
+            确认
+          </Button>
+        </Input.Group>
+      </Form.Item>
+      <Form.Item label="定时任务并发数" name="frequency">
+        <Input.Group compact>
+          <InputNumber
+            style={{ width: 142 }}
+            min={1}
+            value={systemConfig?.cronConcurrency}
+            onChange={(value) => {
+              setSystemConfig({ ...systemConfig, cronConcurrency: value });
+            }}
+          />
+          <Button type="primary" onClick={updateSystemConfig}>
             确认
           </Button>
         </Input.Group>
