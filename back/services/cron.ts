@@ -17,7 +17,6 @@ import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 import cronClient from '../schedule/client';
 import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
-import { Fn } from 'sequelize/types/utils';
 
 @Service()
 export default class CronService {
@@ -281,7 +280,7 @@ export default class CronService {
     }
   }
 
-  private formatViewSort(order: (string | Fn)[][], viewQuery: any) {
+  private formatViewSort(order: string[][], viewQuery: any) {
     if (viewQuery.sorts && viewQuery.sorts.length > 0) {
       for (const { property, type } of viewQuery.sorts) {
         order.unshift([property, type]);

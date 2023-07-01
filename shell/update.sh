@@ -130,13 +130,9 @@ update_repo() {
   make_dir "${dir_scripts}/${uniq_path}"
 
   local formatUrl="$url"
-  if [[ -d ${repo_path}/.git ]]; then
-    reset_romote_url ${repo_path} "${formatUrl}" "${branch}"
-    git_pull_scripts ${repo_path} "${branch}" "${proxy}"
-  else
-    rm -rf ${repo_path} &>/dev/null
-    git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
-  fi
+  rm -rf ${repo_path} &>/dev/null
+  git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
+
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新${repo_path}成功...\n"
     diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
@@ -269,13 +265,9 @@ update_qinglong_static() {
   local no_restart="$1"
   local primary_branch="$2"
   local url="https://${mirror}.com/whyour/qinglong-static.git"
-  if [[ -d ${ql_static_repo}/.git ]]; then
-    reset_romote_url ${ql_static_repo} ${url} ${primary_branch}
-    git_pull_scripts ${ql_static_repo} ${primary_branch}
-  else
-    rm -rf ${ql_static_repo} &>/dev/null
-    git_clone_scripts ${url} ${ql_static_repo} ${primary_branch}
-  fi
+  rm -rf ${ql_static_repo} &>/dev/null
+  git_clone_scripts ${url} ${ql_static_repo} ${primary_branch}
+
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙静态资源成功...\n"
 

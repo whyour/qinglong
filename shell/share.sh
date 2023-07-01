@@ -300,7 +300,7 @@ git_clone_scripts() {
   local branch="$3"
   local proxy="$4"
   [[ $branch ]] && local part_cmd="-b $branch "
-  echo -e "开始克隆仓库 $url 到 $dir\n"
+  echo -e "开始拉取 $url 到 $dir\n"
 
   set_proxy "$proxy"
 
