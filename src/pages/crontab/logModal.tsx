@@ -8,13 +8,8 @@ import {
 } from '@ant-design/icons';
 import { PageLoading } from '@ant-design/pro-layout';
 import { logEnded } from '@/utils';
+import { CrontabStatus } from './type';
 
-enum CrontabStatus {
-  'running',
-  'idle',
-  'disabled',
-  'queued',
-}
 const { Countdown } = Statistic;
 
 const CronLogModal = ({

@@ -54,50 +54,10 @@ import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import { getCommandScript, parseCrontab } from '@/utils';
 import { ColumnProps } from 'antd/lib/table';
 import { useVT } from 'virtualizedtableforantd4';
+import { ICrontab, OperationName, OperationPath, CrontabStatus } from './type';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
-
-export enum CrontabStatus {
-  'running',
-  'queued',
-  'idle',
-  'disabled',
-}
-
-const CrontabSort: any = { 0: 0, 5: 1, 3: 2, 1: 3, 4: 4 };
-
-enum OperationName {
-  '启用',
-  '禁用',
-  '运行',
-  '停止',
-  '置顶',
-  '取消置顶',
-}
-
-enum OperationPath {
-  'enable',
-  'disable',
-  'run',
-  'stop',
-  'pin',
-  'unpin',
-}
-
-export interface ICrontab {
-  name: string;
-  command: string;
-  schedule: string;
-  id: number;
-  status: number;
-  isDisabled?: 1 | 0;
-  isPinned?: 1 | 0;
-  labels?: string[];
-  last_running_time?: number;
-  last_execution_time?: number;
-  nextRunTime: Date;
-}
 
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
@@ -264,19 +224,19 @@ const Crontab = () => {
       filters: [
         {
           text: '运行中',
-          value: 0,
+          value: CrontabStatus.running,
         },
         {
           text: '空闲中',
-          value: 1,
+          value: CrontabStatus.idle,
         },
         {
           text: '已禁用',
-          value: 2,
+          value: CrontabStatus.disabled,
         },
         {
           text: '队列中',
-          value: 3,
+          value: CrontabStatus.queued,
         },
       ],
       render: (text, record) => (

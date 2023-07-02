@@ -267,7 +267,7 @@ export default class CronService {
         let q: any = {};
         if (!filterQuery[key]) continue;
         if (key === 'status') {
-          if (filterQuery[key].includes(2)) {
+          if (filterQuery[key].includes(CrontabStatus.disabled)) {
             q = { [Op.or]: [{ [key]: filterQuery[key] }, { isDisabled: 1 }] };
           } else {
             q = { [Op.and]: [{ [key]: filterQuery[key] }, { isDisabled: 0 }] };

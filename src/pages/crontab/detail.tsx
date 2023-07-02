@@ -22,7 +22,7 @@ import {
   PauseCircleOutlined,
   FullscreenOutlined,
 } from '@ant-design/icons';
-import { CrontabStatus } from './index';
+import { CrontabStatus } from './type';
 import { diffTime } from '@/utils/date';
 import { request } from '@/utils/http';
 import config from '@/utils/config';

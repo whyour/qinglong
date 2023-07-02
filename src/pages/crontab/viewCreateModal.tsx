@@ -14,6 +14,7 @@ import config from '@/utils/config';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
 import get from 'lodash/get';
+import { CrontabStatus } from './type';
 
 const PROPERTIES = [
   { name: '命令', value: 'command' },
@@ -47,9 +48,9 @@ const SORTTYPES = [
 
 const STATUS_MAP = {
   status: [
-    { name: '运行中', value: 0 },
-    { name: '空闲中', value: 1 },
-    { name: '已禁用', value: 2 },
+    { name: '运行中', value: CrontabStatus.running },
+    { name: '空闲中', value: CrontabStatus.idle },
+    { name: '已禁用', value: CrontabStatus.disabled },
   ],
 };
 
