@@ -43,9 +43,9 @@ export class Crontab {
 }
 
 export enum CrontabStatus {
-  'running',
-  'queued',
-  'idle',
+  'running' = 0,
+  'queued' = 0.5,
+  'idle' = 1,
   'disabled',
 }
 
