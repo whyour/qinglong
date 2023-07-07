@@ -231,56 +231,71 @@ usage() {
 
 ## 更新qinglong
 update_qinglong() {
+  rm -rf "${dir_tmp}/*"
   local mirror="gitee"
+  local downloadQLUrl="https://gitee.com/whyour/qinglong/repository/archive"
+  local downloadStaticUrl="https://gitee.com/whyour/qinglong-static/repository/archive"
   local githubStatus=$(curl -s -m 2 -IL "https://google.com" | grep 200)
   if [[ ! -z $githubStatus ]]; then
     mirror="github"
+    downloadQLUrl="https://github.com/whyour/qinglong/archive/refs/heads"
+    downloadStaticUrl="https://github.com/whyour/qinglong-static/archive/refs/heads"
   fi
   echo -e "使用 ${mirror} 源更新...\n"
-  export isFirstStartServer=false
 
   local primary_branch="master"
   if [[ "${QL_BRANCH}" == "develop" ]]; then
     primary_branch="develop"
   fi
-  [[ -f $dir_root/package.json ]] && ql_depend_old=$(cat $dir_root/package.json)
-  reset_romote_url ${dir_root} "https://${mirror}.com/whyour/qinglong.git" ${primary_branch}
-  git_pull_scripts $dir_root ${primary_branch}
+
+  wget -cqO "${dir_tmp}/ql.zip" "${downloadQLUrl}/${primary_branch}.zip"
+  exit_status=$?
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙源文件成功...\n"
-    cp -f $file_config_sample $dir_config/config.sample.sh
-    update_depend
-
-    [[ -f $dir_root/package.json ]] && ql_depend_new=$(cat $dir_root/package.json)
-    [[ "$ql_depend_old" != "$ql_depend_new" ]] && npm_install_2 $dir_root
-
-    update_qinglong_static "$1" "$primary_branch"
+    unzip -oq "${dir_tmp}/ql.zip"
+    
+    update_qinglong_static
   else
     echo -e "\n更新青龙源文件失败，请检查网络...\n"
   fi
 }
 
 update_qinglong_static() {
-  local no_restart="$1"
-  local primary_branch="$2"
-  local url="https://${mirror}.com/whyour/qinglong-static.git"
-  rm -rf ${ql_static_repo} &>/dev/null
-  git_clone_scripts ${url} ${ql_static_repo} ${primary_branch}
+  wget -cqO "${dir_tmp}/static.zip" "${downloadStaticUrl}/${primary_branch}.zip"
+  exit_status=$?
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙静态资源成功...\n"
+    unzip -oq "${dir_tmp}/static.zip"
 
-    rm -rf $dir_static/*
-    cp -rf $ql_static_repo/* $dir_static
-    if [[ $no_restart != "no-restart" ]]; then
-      nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-      echo -e "重启面板中..."
-      sleep 3
-      reload_pm2
-    fi
+    check_update_dep
   else
     echo -e "\n更新青龙静态资源失败，请检查网络...\n"
+  fi
+}
+
+check_update_dep() {
+  echo -e "\n开始检测依赖...\n"
+  if [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+    cp -f $dir_sample/package.json $dir_scripts/package.json
+    npm_install_2 $dir_scripts
+  fi
+  if [[ $(diff $dir_root/package.json ${dir_tmp}/qinglong-${primary_branch}/package.json) ]]; then
+    npm_install_2 "${dir_tmp}/qinglong-${primary_branch}"
+  fi
+
+  if [[ $exit_status -eq 0 ]]; then
+    echo -e "\n依赖检测安装成功...\n"
+
+    cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}
+    rm -rf $dir_static/*
+    cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}
+    cp -f $file_config_sample $dir_config/config.sample.sh
+
+    reload_pm2
+  else
+    echo -e "\n依赖检测安装失败，请检查网络...\n"
   fi
 }
 

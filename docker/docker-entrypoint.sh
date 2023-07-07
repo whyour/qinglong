@@ -4,8 +4,6 @@ dir_shell=/ql/shell
 . $dir_shell/share.sh
 link_shell
 
-export isFirstStartServer=true
-
 echo -e "======================1. 检测配置文件========================\n"
 make_dir /etc/nginx/conf.d
 make_dir /run/nginx
@@ -25,7 +23,10 @@ if [[ "$is_equal_registry" == "" ]]; then
   cd && pnpm config set registry $NpmMirror
   pnpm install -g
 fi
-update_depend
+if [[ ! -s $dir_scripts/package.json ]] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+  cp -f $dir_sample/package.json $dir_scripts/package.json
+  npm_install_2 $dir_scripts
+fi
 echo
 
 echo -e "======================3. 启动nginx========================\n"

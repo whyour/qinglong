@@ -2,6 +2,7 @@
 
 ## 目录
 dir_root=$QL_DIR
+dir_tmp=$dir_root/.tmp
 dir_data=$dir_root/data
 dir_shell=$dir_root/shell
 dir_sample=$dir_root/sample
@@ -175,6 +176,7 @@ define_cmd() {
 }
 
 fix_config() {
+  make_dir $dir_tmp
   make_dir $dir_static
   make_dir $dir_data
   make_dir $dir_config
@@ -263,6 +265,7 @@ npm_install_sub() {
   else
     pnpm install --loglevel error --production
   fi
+  exit_status=$?
 }
 
 npm_install_2() {
@@ -283,88 +286,20 @@ diff_and_copy() {
   fi
 }
 
-update_depend() {
-  local dir_current=$(pwd)
-
-  if [[ ! -s $dir_scripts/package.json ]] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
-    cp -f $dir_sample/package.json $dir_scripts/package.json
-    npm_install_2 $dir_scripts
-  fi
-
-  cd $dir_current
-}
-
 git_clone_scripts() {
   local url="$1"
   local dir="$2"
   local branch="$3"
   local proxy="$4"
   [[ $branch ]] && local part_cmd="-b $branch "
-  echo -e "开始拉取 $url 到 $dir\n"
+  echo -e "开始拉取仓库 ${uniq_path} 到 $dir\n"
 
   set_proxy "$proxy"
 
   git clone --depth=1 $part_cmd $url $dir
   exit_status=$?
 
-  reset_branch "$branch" "$dir"
-
   unset_proxy
-}
-
-git_pull_scripts() {
-  local dir_current=$(pwd)
-  local dir_work="$1"
-  local branch="$2"
-  local proxy="$3"
-  cd $dir_work
-  echo -e "开始更新仓库：$dir_work"
-  set_proxy "$proxy"
-
-  if [[ ! $branch ]]; then
-    branch=$(cd $dir_work && git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-  fi
-
-  local pre_commit_id=$(git rev-parse --short HEAD)
-  reset_branch "$branch" "$dir_work"
-
-  git fetch --depth 1 origin $branch
-  exit_status=$?
-
-  reset_branch "$branch" "$dir_work"
-  local cur_commit_id=$(git rev-parse --short HEAD)
-  if [[ $cur_commit_id != $pre_commit_id ]]; then
-    exit_status=0
-  fi
-
-  unset_proxy
-  cd $dir_current
-}
-
-reset_romote_url() {
-  local dir_current=$(pwd)
-  local dir_work=$1
-  local url=$2
-  local branch="$3"
-
-  cd $dir_work
-  if [[ -d "$dir_work/.git" ]]; then
-    [[ -f ".git/index.lock" ]] && rm -f .git/index.lock >/dev/null
-    git remote set-url origin $url &>/dev/null
-  else
-    git init
-    git remote add origin $url &>/dev/null
-  fi
-
-  cd $dir_current
-}
-
-reset_branch() {
-  local branch="$1"
-  local part_cmd="origin/${branch}"
-  git remote set-branches origin $branch
-  git reset --hard $part_cmd &>/dev/null
-  git checkout -b $branch $part_cmd &>/dev/null
 }
 
 random_range() {
@@ -378,6 +313,7 @@ reload_pm2() {
   # 代理会影响 grpc 服务
   unset_proxy
   pm2 flush &>/dev/null
+  pm2 kill &>/dev/null
   pm2 startOrGracefulReload $file_ecosystem_js
 }
 
