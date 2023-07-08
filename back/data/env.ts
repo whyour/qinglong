@@ -34,7 +34,7 @@ export const initPosition = 4500000000000000;
 export const stepPosition = 10000000000;
 export const minPosition = 100;
 
-interface EnvInstance extends Model<Env, Env>, Env {}
+export interface EnvInstance extends Model<Env, Env>, Env {}
 export const EnvModel = sequelize.define<EnvInstance>('Env', {
   value: { type: DataTypes.STRING, unique: 'compositeIndex' },
   timestamp: DataTypes.STRING,

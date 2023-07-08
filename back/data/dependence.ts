@@ -52,7 +52,7 @@ export enum unInstallDependenceCommandTypes {
   'apk del',
 }
 
-interface DependenceInstance
+export interface DependenceInstance
   extends Model<Dependence, Dependence>,
     Dependence {}
 export const DependenceModel = sequelize.define<DependenceInstance>(

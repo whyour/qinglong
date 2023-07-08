@@ -2,7 +2,7 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
 import * as fs from 'fs';
-import { AuthDataType, AuthInfo, AuthModel, AuthModelInfo } from '../data/auth';
+import { AuthDataType, AuthInfo, AuthInstance, AuthModel, AuthModelInfo } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
@@ -34,15 +34,15 @@ export default class SystemService {
     return doc || {};
   }
 
-  private async updateAuthDb(payload: AuthInfo): Promise<any> {
+  private async updateAuthDb(payload: AuthInfo): Promise<AuthInstance> {
     await AuthModel.upsert({ ...payload });
     const doc = await this.getDb({ type: payload.type });
     return doc;
   }
 
-  public async getDb(query: any): Promise<any> {
+  public async getDb(query: any): Promise<AuthInstance> {
     const doc: any = await AuthModel.findOne({ where: { ...query } });
-    return doc && (doc.get({ plain: true }) as any);
+    return doc && (doc.get({ plain: true }));
   }
 
   public async updateNotificationMode(notificationInfo: NotificationInfo) {

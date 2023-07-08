@@ -30,15 +30,15 @@ export default async () => {
 
   // 运行删除日志任务
   const data = await systemService.getSystemConfig();
-  if (data && data.info && data.info.frequency) {
+  if (data && data.info && data.info.logRemoveFrequency) {
     const rmlogCron = {
-      id: data.id,
+      id: data.id as number,
       name: '删除日志',
-      command: `ql rmlog ${data.info.frequency}`,
+      command: `ql rmlog ${data.info.logRemoveFrequency}`,
     };
     await scheduleService.cancelIntervalTask(rmlogCron);
     scheduleService.createIntervalTask(rmlogCron, {
-      days: data.info.frequency,
+      days: data.info.logRemoveFrequency,
     });
   }
 

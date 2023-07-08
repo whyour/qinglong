@@ -70,7 +70,7 @@ export enum SubscriptionStatus {
   'queued',
 }
 
-interface SubscriptionInstance
+export interface SubscriptionInstance
   extends Model<Subscription, Subscription>,
     Subscription {}
 export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
