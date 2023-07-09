@@ -25,7 +25,6 @@ export default (app: Router) => {
     try {
       const userService = Container.get(UserService);
       const authInfo = await userService.getUserInfo();
-      const envCount = await EnvModel.count();
       const { version, changeLog, changeLogLink } = await parseVersion(
         config.versionFile,
       );
@@ -95,9 +94,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const systemService = Container.get(SystemService);
-        const result = await systemService.updateSystemConfig(
-          req.body,
-        );
+        const result = await systemService.updateSystemConfig(req.body);
         res.send(result);
       } catch (e) {
         return next(e);

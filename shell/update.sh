@@ -231,7 +231,7 @@ usage() {
 
 ## 更新qinglong
 update_qinglong() {
-  rm -rf "${dir_tmp}/*"
+  rm -rf ${dir_tmp}/*
   local mirror="gitee"
   local downloadQLUrl="https://gitee.com/whyour/qinglong/repository/archive"
   local downloadStaticUrl="https://gitee.com/whyour/qinglong-static/repository/archive"
@@ -253,7 +253,8 @@ update_qinglong() {
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙源文件成功...\n"
-    unzip -oq "${dir_tmp}/ql.zip"
+    cd 
+    unzip -oq ${dir_tmp}/ql.zip -d ${dir_tmp}
     
     update_qinglong_static
   else
@@ -267,7 +268,7 @@ update_qinglong_static() {
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙静态资源成功...\n"
-    unzip -oq "${dir_tmp}/static.zip"
+    unzip -oq ${dir_tmp}/static.zip -d ${dir_tmp}
 
     check_update_dep
   else
@@ -288,9 +289,9 @@ check_update_dep() {
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n依赖检测安装成功...\n"
 
-    cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}
+    cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
     rm -rf $dir_static/*
-    cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}
+    cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
     cp -f $file_config_sample $dir_config/config.sample.sh
 
     reload_pm2
