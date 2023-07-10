@@ -4,6 +4,7 @@ import { AuthDataType, AuthModel } from "../data/auth";
 
 class TaskLimit {
   private oneLimit = pLimit(1);
+  private updateLogLimit = pLimit(1);
   private cpuLimit = pLimit(Math.max(os.cpus().length, 4));
 
   constructor() {
@@ -22,15 +23,15 @@ class TaskLimit {
   }
 
   public runWithCpuLimit<T>(fn: () => Promise<T>): Promise<T> {
-    return this.cpuLimit(() => {
-      return fn();
-    });
+    return this.cpuLimit(fn);
   }
 
   public runOneByOne<T>(fn: () => Promise<T>): Promise<T> {
-    return this.oneLimit(() => {
-      return fn();
-    });
+    return this.oneLimit(fn);
+  }
+
+  public updateDepLog<T>(fn: () => Promise<T>): Promise<T> {
+    return this.updateLogLimit(fn);
   }
 }
 

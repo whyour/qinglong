@@ -33,6 +33,7 @@ import DependenceLogModal from './logModal';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
+import dayjs from 'dayjs';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -124,26 +125,19 @@ const Dependence = () => {
       key: 'remark',
     },
     {
+      title: '更新时间',
+      key: 'updatedAt',
+      dataIndex: 'updatedAt',
+      render: (text: string) => {
+        return <span>{dayjs(text).format('YYYY-MM-DD HH:mm:ss')}</span>;
+      },
+    },
+    {
       title: '创建时间',
-      key: 'timestamp',
-      dataIndex: 'timestamp',
-      render: (text: string, record: any) => {
-        const language = navigator.language || navigator.languages[0];
-        const time = record.createdAt || record.timestamp;
-        const date = new Date(time)
-          .toLocaleString(language, {
-            hour12: false,
-          })
-          .replace(' 24:', ' 00:');
-        return (
-          <Tooltip
-            placement="topLeft"
-            title={date}
-            trigger={['hover', 'click']}
-          >
-            <span>{date}</span>
-          </Tooltip>
-        );
+      key: 'createdAt',
+      dataIndex: 'createdAt',
+      render: (text: string) => {
+        return <span>{dayjs(text).format('YYYY-MM-DD HH:mm:ss')}</span>;
       },
     },
     {

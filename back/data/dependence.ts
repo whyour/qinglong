@@ -4,9 +4,9 @@ import { DataTypes, Model, ModelDefined } from 'sequelize';
 export class Dependence {
   timestamp?: string;
   id?: number;
-  status?: DependenceStatus;
-  type?: DependenceTypes;
-  name?: number;
+  status: DependenceStatus;
+  type: DependenceTypes;
+  name: string;
   log?: string[];
   remark?: string;
 
@@ -42,19 +42,31 @@ export enum DependenceTypes {
 
 export enum InstallDependenceCommandTypes {
   'pnpm add -g',
-  'pip3 install',
+  'pip3 install --disable-pip-version-check --root-user-action=ignore',
   'apk add',
+}
+
+export enum GetDependenceCommandTypes {
+  'pnpm ls -g ',
+  'pip3 list --disable-pip-version-check --root-user-action=ignore',
+  'apk info',
+}
+
+export enum versionDependenceCommandTypes {
+  '@',
+  '==',
+  '=',
 }
 
 export enum unInstallDependenceCommandTypes {
   'pnpm remove -g',
-  'pip3 uninstall -y',
+  'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
   'apk del',
 }
 
 export interface DependenceInstance
   extends Model<Dependence, Dependence>,
-    Dependence {}
+  Dependence { }
 export const DependenceModel = sequelize.define<DependenceInstance>(
   'Dependence',
   {

@@ -399,6 +399,18 @@ export function promiseExec(command: string): Promise<string> {
   });
 }
 
+export function promiseExecSuccess(command: string): Promise<string> {
+  return new Promise((resolve) => {
+    exec(
+      command,
+      { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' },
+      (err, stdout, stderr) => {
+        resolve(stdout || '');
+      },
+    );
+  });
+}
+
 export function parseHeaders(headers: string) {
   if (!headers) return {};
 

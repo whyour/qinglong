@@ -8,11 +8,13 @@ import {
   DependenceTypes,
   unInstallDependenceCommandTypes,
   DependenceModel,
+  GetDependenceCommandTypes,
+  versionDependenceCommandTypes,
 } from '../data/dependence';
 import { spawn } from 'cross-spawn';
 import SockService from './sock';
 import { FindOptions, Op } from 'sequelize';
-import { concurrentRun } from '../config/util';
+import { promiseExecSuccess } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 
@@ -21,7 +23,7 @@ export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
@@ -137,9 +139,17 @@ export default class DependenceService {
   }
 
   private async updateLog(ids: number[], log: string): Promise<void> {
-    const doc = await DependenceModel.findOne({ where: { id: ids } });
-    const newLog = doc?.log ? [...doc.log, log] : [log];
-    await DependenceModel.update({ log: newLog }, { where: { id: ids } });
+    taskLimit.updateDepLog(async () => {
+      const docs = await DependenceModel.findAll({ where: { id: ids } });
+      for (const doc of docs) {
+        const newLog = doc?.log ? [...doc.log, log] : [log];
+        await DependenceModel.update(
+          { log: newLog },
+          { where: { id: doc.id } },
+        );
+      }
+      return null;
+    });
   }
 
   public installOrUninstallDependency(
@@ -155,7 +165,7 @@ export default class DependenceService {
           : DependenceStatus.removing;
         await DependenceModel.update({ status }, { where: { id: depIds } });
 
-        const socketMessageType = !force
+        const socketMessageType = isInstall
           ? 'installDependence'
           : 'uninstallDependence';
         const depName = dependency.name;
@@ -163,7 +173,7 @@ export default class DependenceService {
           isInstall
             ? InstallDependenceCommandTypes
             : unInstallDependenceCommandTypes
-        )[dependency.type as any];
+        )[dependency.type];
         const actionText = isInstall ? '安装' : '删除';
         const startTime = dayjs();
 
@@ -175,7 +185,39 @@ export default class DependenceService {
           message,
           references: depIds,
         });
-        await this.updateLog(depIds, message);
+        this.updateLog(depIds, message);
+
+        // 判断是否已经安装过依赖
+        if (isInstall) {
+          const getCommandPrefix = GetDependenceCommandTypes[dependency.type];
+          const depVersionStr = versionDependenceCommandTypes[dependency.type];
+          const [_depName] = dependency.name.split(depVersionStr);
+          const depInfo = (
+            await promiseExecSuccess(
+              dependency.type === DependenceTypes.linux
+                ? `${getCommandPrefix} ${_depName}`
+                : `${getCommandPrefix} | grep "${_depName}"`,
+            )
+          ).replace(/\s{2,}/, ' ');
+
+          if (depInfo) {
+            const endTime = dayjs();
+            const _message = `检测到已经安装 ${_depName}\n\n${depInfo}\n跳过安装\n\n依赖${actionText}成功，结束时间 ${endTime.format(
+              'YYYY-MM-DD HH:mm:ss',
+            )}，耗时 ${endTime.diff(startTime, 'second')} 秒`;
+            this.sockService.sendMessage({
+              type: socketMessageType,
+              message: _message,
+              references: depIds,
+            });
+            this.updateLog(depIds, _message);
+            await DependenceModel.update(
+              { status: DependenceStatus.installed },
+              { where: { id: depIds } },
+            );
+            return resolve(null);
+          }
+        }
 
         const cp = spawn(`${depRunCommand} ${depName}`, {
           shell: '/bin/bash',
@@ -187,7 +229,7 @@ export default class DependenceService {
             message: data.toString(),
             references: depIds,
           });
-          await this.updateLog(depIds, data.toString());
+          this.updateLog(depIds, data.toString());
         });
 
         cp.stderr.on('data', async (data) => {
@@ -196,7 +238,7 @@ export default class DependenceService {
             message: data.toString(),
             references: depIds,
           });
-          await this.updateLog(depIds, data.toString());
+          this.updateLog(depIds, data.toString());
         });
 
         cp.on('error', async (err) => {
@@ -205,7 +247,7 @@ export default class DependenceService {
             message: JSON.stringify(err),
             references: depIds,
           });
-          await this.updateLog(depIds, JSON.stringify(err));
+          this.updateLog(depIds, JSON.stringify(err));
         });
 
         cp.on('close', async (code) => {
@@ -221,7 +263,7 @@ export default class DependenceService {
             message,
             references: depIds,
           });
-          await this.updateLog(depIds, message);
+          this.updateLog(depIds, message);
 
           let status = null;
           if (isSucceed) {
