@@ -25,22 +25,9 @@ export default (app: Router) => {
     try {
       const userService = Container.get(UserService);
       const authInfo = await userService.getUserInfo();
-      const { version, changeLog, changeLogLink } = await parseVersion(
+      const { version, changeLog, changeLogLink, publishTime } = await parseVersion(
         config.versionFile,
       );
-      const lastCommitTime = (
-        await promiseExec(
-          `cd ${config.rootPath} && git show -s --format=%ai | head -1`,
-        )
-      ).replace('\n', '');
-      const lastCommitId = (
-        await promiseExec(`cd ${config.rootPath} && git rev-parse --short HEAD`)
-      ).replace('\n', '');
-      const branch = (
-        await promiseExec(
-          `cd ${config.rootPath} && git symbolic-ref --short HEAD`,
-        )
-      ).replace('\n', '');
 
       let isInitialized = true;
       if (
@@ -55,9 +42,8 @@ export default (app: Router) => {
         data: {
           isInitialized,
           version,
-          lastCommitTime: dayjs(lastCommitTime).unix(),
-          lastCommitId,
-          branch,
+          publishTime: dayjs(publishTime).unix(),
+          branch: process.env.QL_BRANCH || 'master',
           changeLog,
           changeLogLink,
         },

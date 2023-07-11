@@ -49,8 +49,7 @@ export interface SharedContext {
 interface TSystemInfo {
   branch: 'develop' | 'master';
   isInitialized: boolean;
-  lastCommitId: string;
-  lastCommitTime: number;
+  publishTime: number;
   version: string;
   changeLog: string;
   changeLogLink: string;

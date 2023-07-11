@@ -517,6 +517,7 @@ interface IVersion {
   version: string;
   changeLogLink: string;
   changeLog: string;
+  publishTime: string;
 }
 
 export async function parseVersion(path: string): Promise<IVersion> {
