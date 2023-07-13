@@ -47,7 +47,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
           </div>
         </>
       ),
-      okText: '强制更新',
+      okText: '重新下载',
       onOk() {
         showUpdatingModal();
         request
@@ -82,7 +82,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
           {lastLog}
         </pre>
       ),
-      okText: '更新',
+      okText: '下载更新',
       cancelText: '以后再说',
       onOk() {
         showUpdatingModal();
@@ -104,7 +104,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       closable: false,
       keyboard: false,
       okButtonProps: { disabled: true },
-      title: '更新中...',
+      title: '下载更新中...',
       centered: true,
       content: (
         <pre
@@ -119,6 +119,50 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
     });
   };
 
+  const showReloadModal = () => {
+    Modal.confirm({
+      width: 600,
+      maskClosable: false,
+      title: '确认重启',
+      centered: true,
+      content: '系统安装包下载成功，确认重启',
+      okText: '重启',
+      onOk() {
+        request
+          .put(`${config.apiPrefix}system/reload`)
+          .then((_data: any) => {
+            message.warning({
+              content: (
+                <span>
+                  系统将在
+                  <Countdown
+                    className="inline-countdown"
+                    format="ss"
+                    value={Date.now() + 1000 * 15}
+                  />
+                  秒后自动刷新
+                </span>
+              ),
+              duration: 15,
+            });
+            setTimeout(() => {
+              window.location.reload();
+            }, 14);
+          })
+          .catch((error: any) => {
+            console.log(error);
+          });
+      },
+      onCancel() {
+        modalRef.current.update({
+          maskClosable: true,
+          closable: true,
+          okButtonProps: { disabled: false },
+        });
+      },
+    });
+  };
+
   useEffect(() => {
     if (!modalRef.current || !socketMessage) {
       return;
@@ -130,7 +174,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
     }
 
     const newMessage = `${value}${_message}`;
-    const updateFailed = newMessage.includes('失败，请检查');
+    const updateFailed = newMessage.includes('失败');
 
     modalRef.current.update({
       maskClosable: updateFailed,
@@ -162,24 +206,10 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
         .getElementById('log-identifier')!
         .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    if (_message.includes('重启面板')) {
-      message.warning({
-        content: (
-          <span>
-            系统将在
-            <Countdown
-              className="inline-countdown"
-              format="ss"
-              value={Date.now() + 1000 * 30}
-            />
-            秒后自动刷新
-          </span>
-        ),
-        duration: 30,
-      });
+    if (_message.includes('更新包下载成功')) {
       setTimeout(() => {
-        window.location.reload();
-      }, 30000);
+        showReloadModal();
+      }, 1000);
     }
   }, [socketMessage]);
 

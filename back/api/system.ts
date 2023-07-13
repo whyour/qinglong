@@ -117,6 +117,20 @@ export default (app: Router) => {
   );
 
   route.put(
+    '/reload',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.reloadSystem();
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
     '/notify',
     celebrate({
       body: Joi.object({

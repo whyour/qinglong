@@ -229,9 +229,24 @@ usage() {
   echo -e "9. $cmd_update resettfa                                                                # 禁用两步登录"
 }
 
+reload_qinglong() {
+  local primary_branch="master"
+  if [[ "${QL_BRANCH}" == "develop" ]]; then
+    primary_branch="develop"
+  fi
+
+  cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
+  rm -rf $dir_static/*
+  cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
+  cp -f $file_config_sample $dir_config/config.sample.sh
+
+  reload_pm2
+}
+
 ## 更新qinglong
 update_qinglong() {
   rm -rf ${dir_tmp}/*
+  local needRestart=${1:-"true"}
   local mirror="gitee"
   local downloadQLUrl="https://gitee.com/whyour/qinglong/repository/archive"
   local downloadStaticUrl="https://gitee.com/whyour/qinglong-static/repository/archive"
@@ -253,9 +268,9 @@ update_qinglong() {
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n更新青龙源文件成功...\n"
-    cd 
+
     unzip -oq ${dir_tmp}/ql.zip -d ${dir_tmp}
-    
+
     update_qinglong_static
   else
     echo -e "\n更新青龙源文件失败，请检查网络...\n"
@@ -288,13 +303,16 @@ check_update_dep() {
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n依赖检测安装成功...\n"
+    echo -e "\n更新包下载成功...\n"
 
-    cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
-    rm -rf $dir_static/*
-    cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
-    cp -f $file_config_sample $dir_config/config.sample.sh
+    if [[ "$needRestart" == 'true' ]]; then
+      cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
+      rm -rf $dir_static/*
+      cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
+      cp -f $file_config_sample $dir_config/config.sample.sh
 
-    reload_pm2
+      reload_pm2
+    fi
   else
     echo -e "\n依赖检测安装失败，请检查网络...\n"
   fi
@@ -473,6 +491,9 @@ main() {
   update)
     fix_config
     eval update_qinglong "$2" $cmd
+    ;;
+  reload)
+    eval reload_qinglong $cmd
     ;;
   extra)
     eval run_extra_shell $cmd

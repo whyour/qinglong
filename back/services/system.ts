@@ -154,7 +154,7 @@ export default class SystemService {
   }
 
   public async updateSystem() {
-    const cp = spawn('ql -l update', { shell: '/bin/bash' });
+    const cp = spawn('ql -l update false', { shell: '/bin/bash' });
 
     cp.stdout.on('data', (data) => {
       this.sockService.sendMessage({
@@ -173,6 +173,33 @@ export default class SystemService {
     cp.on('error', (err) => {
       this.sockService.sendMessage({
         type: 'updateSystemVersion',
+        message: JSON.stringify(err),
+      });
+    });
+
+    return { code: 200 };
+  }
+
+  public async reloadSystem() {
+    const cp = spawn('ql -l reload', { shell: '/bin/bash' });
+
+    cp.stdout.on('data', (data) => {
+      this.sockService.sendMessage({
+        type: 'reloadSystem',
+        message: data.toString(),
+      });
+    });
+
+    cp.stderr.on('data', (data) => {
+      this.sockService.sendMessage({
+        type: 'reloadSystem',
+        message: data.toString(),
+      });
+    });
+
+    cp.on('error', (err) => {
+      this.sockService.sendMessage({
+        type: 'reloadSystem',
         message: JSON.stringify(err),
       });
     });
