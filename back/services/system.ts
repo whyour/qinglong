@@ -1,7 +1,7 @@
+import { Response } from 'express';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
-import * as fs from 'fs';
 import {
   AuthDataType,
   AuthInfo,
@@ -23,6 +23,8 @@ import {
 } from '../config/util';
 import { TASK_COMMAND } from '../config/const';
 import taskLimit from '../shared/pLimit';
+import tar from 'tar';
+import fs from 'fs';
 
 @Service()
 export default class SystemService {
@@ -33,7 +35,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -108,7 +110,7 @@ export default class SystemService {
           },
         );
         lastVersionContent = await parseContentVersion(result.body);
-      } catch (error) {}
+      } catch (error) { }
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -248,6 +250,20 @@ export default class SystemService {
       return { code: 200 };
     } else {
       return { code: 400, message: '任务未找到' };
+    }
+  }
+
+  public async exportData(res: Response) {
+    try {
+      await tar.create({ gzip: true, file: config.dataTgzFile, cwd: config.rootPath }, ['data'])
+      const dataFile = fs.createReadStream(config.dataTgzFile);
+      res.writeHead(200, {
+        'Content-Type': 'application/force-download',
+        'Content-Disposition': 'attachment; filename=data.tgz'
+      });
+      dataFile.pipe(res);
+    } catch (error: any) {
+      return res.send({ code: 400, message: error.message });
     }
   }
 }

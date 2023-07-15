@@ -5,6 +5,7 @@ import config from '@/utils/config';
 import { request } from '@/utils/http';
 import CheckUpdate from './checkUpdate';
 import { SharedContext } from '@/layouts';
+import { saveAs } from 'file-saver';
 import './index.less';
 
 const optionsWithDisabled = [
@@ -76,6 +77,17 @@ const Other = ({
       });
   };
 
+  const exportData = () => {
+    request
+      .put(`${config.apiPrefix}system/data/export`, { responseType: 'blob' })
+      .then((res) => {
+        saveAs(res, 'data.tgz');
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
+  };
+
   useEffect(() => {
     getSystemConfig();
   }, []);
@@ -126,6 +138,11 @@ const Other = ({
             确认
           </Button>
         </Input.Group>
+      </Form.Item>
+      <Form.Item label="数据备份还原" name="frequency">
+        <Button type="primary" onClick={exportData}>
+          备份
+        </Button>
       </Form.Item>
       <Form.Item label="检查更新" name="update">
         <CheckUpdate systemInfo={systemInfo} socketMessage={socketMessage} />

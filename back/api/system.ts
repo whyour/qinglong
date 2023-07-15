@@ -209,4 +209,16 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/data/export',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        await systemService.exportData(res);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 };

@@ -66,16 +66,19 @@ _request.interceptors.response.use(async (response) => {
       history.push('/login');
     }
   } else {
-    const res = await response.clone().json();
-    if (res.code !== 200) {
-      const msg = res.message || res.data;
-      msg &&
-        message.error({
-          content: msg,
-          style: { maxWidth: 500, margin: '0 auto' },
-        });
-    }
-    return res;
+    try {
+      const res = await response.clone().json();
+      if (res.code !== 200) {
+        const msg = res.message || res.data;
+        msg &&
+          message.error({
+            content: msg,
+            style: { maxWidth: 500, margin: '0 auto' },
+          });
+      }
+      return res;
+    } catch (error) { }
+    return response;
   }
   return response;
 });
