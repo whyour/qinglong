@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Button, InputNumber, Form, Radio, message, Input } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Button,
+  InputNumber,
+  Form,
+  Radio,
+  message,
+  Input,
+  Upload,
+  Modal,
+  Progress,
+} from 'antd';
 import * as DarkReader from '@umijs/ssr-darkreader';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
@@ -7,6 +17,8 @@ import CheckUpdate from './checkUpdate';
 import { SharedContext } from '@/layouts';
 import { saveAs } from 'file-saver';
 import './index.less';
+import { UploadOutlined } from '@ant-design/icons';
+import Countdown from 'antd/lib/statistic/Countdown';
 
 const optionsWithDisabled = [
   { label: '亮色', value: 'light' },
@@ -25,6 +37,8 @@ const Other = ({
     cronConcurrency?: number | null;
   }>();
   const [form] = Form.useForm();
+  const modalRef = useRef<any>();
+  const [exportLoading, setExportLoading] = useState(false);
 
   const {
     enable: enableDarkMode,
@@ -78,6 +92,7 @@ const Other = ({
   };
 
   const exportData = () => {
+    setExportLoading(true);
     request
       .put(`${config.apiPrefix}system/data/export`, { responseType: 'blob' })
       .then((res) => {
@@ -85,7 +100,73 @@ const Other = ({
       })
       .catch((error: any) => {
         console.log(error);
+      })
+      .finally(() => setExportLoading(false));
+  };
+
+  const showUploadModal = (progress: number) => {
+    if (modalRef.current) {
+      modalRef.current.update({
+        content: (
+          <Progress
+            style={{ display: 'flex', justifyContent: 'center' }}
+            type="circle"
+            percent={progress}
+          />
+        ),
       });
+    } else {
+      modalRef.current = Modal.info({
+        width: 600,
+        maskClosable: false,
+        title: '上传中...',
+        centered: true,
+        content: (
+          <Progress
+            style={{ display: 'flex', justifyContent: 'center' }}
+            type="circle"
+            percent={progress}
+          />
+        ),
+      });
+    }
+  };
+
+  const showReloadModal = () => {
+    Modal.confirm({
+      width: 600,
+      maskClosable: false,
+      title: '确认重启',
+      centered: true,
+      content: '备份数据上传成功，确认覆盖数据',
+      okText: '重启',
+      onOk() {
+        request
+          .put(`${config.apiPrefix}system/reload`, { data: { type: 'data' } })
+          .then((_data: any) => {
+            message.success({
+              content: (
+                <span>
+                  系统将在
+                  <Countdown
+                    className="inline-countdown"
+                    format="ss"
+                    value={Date.now() + 1000 * 15}
+                  />
+                  秒后自动刷新
+                </span>
+              ),
+              duration: 15,
+            });
+            setTimeout(() => {
+              window.location.reload();
+            }, 14000);
+          })
+          .catch((error: any) => {
+            console.log(error);
+          });
+      },
+    });
   };
 
   useEffect(() => {
@@ -140,9 +221,32 @@ const Other = ({
         </Input.Group>
       </Form.Item>
       <Form.Item label="数据备份还原" name="frequency">
-        <Button type="primary" onClick={exportData}>
+        <Button type="primary" onClick={exportData} loading={exportLoading}>
           备份
         </Button>
+        <Upload
+          method="put"
+          showUploadList={false}
+          maxCount={1}
+          action="/api/system/data/import"
+          onChange={(e) => {
+            if (e.event?.percent) {
+              const percent = parseFloat(e.event?.percent.toFixed(1));
+              showUploadModal(percent);
+              if (e.event?.percent === 100) {
+                showReloadModal();
+              }
+            }
+          }}
+          name="data"
+          headers={{
+            Authorization: `Bearer ${localStorage.getItem(config.authKey)}`,
+          }}
+        >
+          <Button icon={<UploadOutlined />} style={{ marginLeft: 8 }}>
+            还原数据
+          </Button>
+        </Upload>
       </Form.Item>
       <Form.Item label="检查更新" name="update">
         <CheckUpdate systemInfo={systemInfo} socketMessage={socketMessage} />

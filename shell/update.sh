@@ -230,15 +230,23 @@ usage() {
 }
 
 reload_qinglong() {
+  local reload_target="${1}"
   local primary_branch="master"
   if [[ "${QL_BRANCH}" == "develop" ]]; then
     primary_branch="develop"
   fi
 
-  cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
-  rm -rf $dir_static/*
-  cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
-  cp -f $file_config_sample $dir_config/config.sample.sh
+  if [[ "$reload_target" == 'system' ]]; then
+    cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
+    rm -rf $dir_static/*
+    cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
+    cp -f $file_config_sample $dir_config/config.sample.sh
+  fi
+
+  if [[ "$reload_target" == 'data' ]]; then
+    rm -rf ${dir_data}
+    cp -rf ${dir_tmp}/data ${dir_root}/
+  fi
 
   reload_pm2
 }
@@ -246,7 +254,6 @@ reload_qinglong() {
 ## 更新qinglong
 update_qinglong() {
   rm -rf ${dir_tmp}/*
-  local needRestart=${1:-"true"}
   local mirror="gitee"
   local downloadQLUrl="https://gitee.com/whyour/qinglong/repository/archive"
   local downloadStaticUrl="https://gitee.com/whyour/qinglong-static/repository/archive"
@@ -490,10 +497,11 @@ main() {
   case $p1 in
   update)
     fix_config
-    eval update_qinglong "$2" $cmd
+    local needRestart=${p2:-"true"}
+    eval update_qinglong $cmd
     ;;
   reload)
-    eval reload_qinglong $cmd
+    eval reload_qinglong "$p2" $cmd
     ;;
   extra)
     eval run_extra_shell $cmd

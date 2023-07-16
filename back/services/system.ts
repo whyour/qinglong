@@ -20,11 +20,13 @@ import {
   killTask,
   parseContentVersion,
   parseVersion,
+  promiseExec,
 } from '../config/util';
 import { TASK_COMMAND } from '../config/const';
 import taskLimit from '../shared/pLimit';
 import tar from 'tar';
 import fs from 'fs';
+import path from 'path';
 
 @Service()
 export default class SystemService {
@@ -182,8 +184,8 @@ export default class SystemService {
     return { code: 200 };
   }
 
-  public async reloadSystem() {
-    const cp = spawn('ql -l reload', { shell: '/bin/bash' });
+  public async reloadSystem(target: 'system' | 'data') {
+    const cp = spawn(`ql -l reload ${target || ''}`, { shell: '/bin/bash' });
 
     cp.stdout.on('data', (data) => {
       this.sockService.sendMessage({
@@ -264,6 +266,16 @@ export default class SystemService {
       dataFile.pipe(res);
     } catch (error: any) {
       return res.send({ code: 400, message: error.message });
+    }
+  }
+
+  public async importData() {
+    try {
+      await promiseExec(`rm -rf ${path.join(config.tmpPath, 'data')}`);
+      await tar.x({ file: config.dataTgzFile, cwd: config.tmpPath });
+      return { code: 200 };
+    } catch (error: any) {
+      return { code: 400, message: error.message };
     }
   }
 }

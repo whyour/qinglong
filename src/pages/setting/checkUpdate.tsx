@@ -129,9 +129,9 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       okText: '重启',
       onOk() {
         request
-          .put(`${config.apiPrefix}system/reload`)
+          .put(`${config.apiPrefix}system/reload`, { data: { type: 'system' } })
           .then((_data: any) => {
-            message.warning({
+            message.success({
               content: (
                 <span>
                   系统将在
@@ -147,7 +147,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
             });
             setTimeout(() => {
               window.location.reload();
-            }, 14);
+            }, 14000);
           })
           .catch((error: any) => {
             console.log(error);

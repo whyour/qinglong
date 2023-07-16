@@ -14,8 +14,18 @@ import {
   promiseExec,
 } from '../config/util';
 import dayjs from 'dayjs';
+import multer from 'multer';
 
 const route = Router();
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, config.tmpPath);
+  },
+  filename: function (req, file, cb) {
+    cb(null, 'data.tgz');
+  },
+});
+const upload = multer({ storage: storage });
 
 export default (app: Router) => {
   app.use('/system', route);
@@ -118,11 +128,16 @@ export default (app: Router) => {
 
   route.put(
     '/reload',
+    celebrate({
+      body: Joi.object({
+        type: Joi.string().required(),
+      }),
+    }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const systemService = Container.get(SystemService);
-        const result = await systemService.reloadSystem();
+        const result = await systemService.reloadSystem(req.body.type);
         res.send(result);
       } catch (e) {
         return next(e);
@@ -216,6 +231,20 @@ export default (app: Router) => {
       try {
         const systemService = Container.get(SystemService);
         await systemService.exportData(res);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/data/import',
+    upload.single('data'),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.importData();
+        res.send(result);
       } catch (e) {
         return next(e);
       }
