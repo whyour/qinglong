@@ -129,7 +129,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       okText: '重启',
       onOk() {
         request
-          .put(`${config.apiPrefix}system/reload`, { data: { type: 'system' } })
+          .put(`${config.apiPrefix}system/reload`, { type: 'system' })
           .then((_data: any) => {
             message.success({
               content: (

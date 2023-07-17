@@ -35,10 +35,8 @@ const Login = () => {
     setWaitTime(null);
     request
       .post(`${config.apiPrefix}user/login`, {
-        data: {
-          username: values.username,
-          password: values.password,
-        },
+        username: values.username,
+        password: values.password,
       })
       .then((data) => {
         checkResponse(data, values);
@@ -54,7 +52,8 @@ const Login = () => {
     setVerifying(true);
     request
       .put(`${config.apiPrefix}user/two-factor/login`, {
-        data: { ...loginInfo, code: values.code },
+        ...loginInfo,
+        code: values.code,
       })
       .then((data: any) => {
         checkResponse(data);

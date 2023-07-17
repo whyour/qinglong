@@ -1,17 +1,36 @@
-import { extend } from 'umi-request';
 import { message } from 'antd';
 import config from './config';
 import { history } from '@umijs/max';
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+} from 'axios';
+
+interface IResponseData {
+  code?: number;
+  data?: any;
+  message?: string;
+}
+
+type Override<
+  T,
+  K extends Partial<{ [P in keyof T]: any }> | string,
+> = K extends string
+  ? Omit<T, K> & { [P in keyof T]: T[P] | unknown }
+  : Omit<T, keyof K> & K;
 
 message.config({
   duration: 2,
 });
 
 const time = Date.now();
-const errorHandler = function (error: any) {
+const errorHandler = function (
+  error: AxiosError,
+) {
   if (error.response) {
-    const msg = error.data
-      ? error.data.message || error.message || error.data
+    const msg = error.response.data
+      ? error.response.data.message || error.message || error.response.data
       : error.response.statusText;
     const responseStatus = error.response.status;
     if ([502, 504].includes(responseStatus)) {
@@ -32,10 +51,14 @@ const errorHandler = function (error: any) {
     console.log(error.message);
   }
 
-  throw error; // 如果throw. 错误将继续抛出.
+  return Promise.reject(error);
 };
 
-const _request = extend({ timeout: 60000, params: { t: time }, errorHandler });
+let _request = axios.create({
+  timeout: 60000,
+  params: { t: time },
+});
+
 const apiWhiteList = [
   '/api/user/login',
   '/open/auth/token',
@@ -45,15 +68,13 @@ const apiWhiteList = [
   '/api/user/notification/init',
 ];
 
-_request.interceptors.request.use((url, options) => {
+_request.interceptors.request.use((_config) => {
   const token = localStorage.getItem(config.authKey);
-  if (token && !apiWhiteList.includes(url)) {
-    const headers = {
-      Authorization: `Bearer ${token}`,
-    };
-    return { url, options: { ...options, headers } };
+  if (token && !apiWhiteList.includes(_config.url!)) {
+    _config.headers.Authorization = `Bearer ${token}`;
+    return _config;
   }
-  return { url, options };
+  return _config;
 });
 
 _request.interceptors.response.use(async (response) => {
@@ -67,7 +88,7 @@ _request.interceptors.response.use(async (response) => {
     }
   } else {
     try {
-      const res = await response.clone().json();
+      const res = response.data;
       if (res.code !== 200) {
         const msg = res.message || res.data;
         msg &&
@@ -81,6 +102,25 @@ _request.interceptors.response.use(async (response) => {
     return response;
   }
   return response;
-});
+}, errorHandler);
 
-export const request = _request;
+export const request = _request as Override<AxiosInstance, {
+  get<T = IResponseData, D = any>(
+    url: string,
+    config?: AxiosRequestConfig<D>,
+  ): Promise<T>;
+  delete<T = IResponseData, D = any>(
+    url: string,
+    config?: AxiosRequestConfig<D>,
+  ): Promise<T>;
+  post<T = IResponseData, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>,
+  ): Promise<T>;
+  put<T = IResponseData, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>,
+  ): Promise<T>;
+}>;

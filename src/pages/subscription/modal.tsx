@@ -47,9 +47,7 @@ const SubscriptionModal = ({
     try {
       const { code, data } = await request[method](
         `${config.apiPrefix}subscriptions`,
-        {
-          data: payload,
-        },
+        payload,
       );
       if (code === 200) {
         message.success(subscription ? '更新订阅成功' : '新建订阅成功');

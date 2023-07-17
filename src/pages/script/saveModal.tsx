@@ -19,9 +19,7 @@ const SaveModal = ({
     setLoading(true);
     const payload = { ...file, ...values, originFilename: file.title };
     request
-      .post(`${config.apiPrefix}scripts`, {
-        data: payload,
-      })
+      .post(`${config.apiPrefix}scripts`, payload)
       .then(({ code, data }) => {
         if (code === 200) {
           message.success('保存文件成功');

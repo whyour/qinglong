@@ -80,9 +80,7 @@ const ViewCreateModal = ({
     try {
       const { code, data } = await request[method](
         `${config.apiPrefix}crons/views`,
-        {
-          data: view ? { ...values, id: view.id } : values,
-        },
+        view ? { ...values, id: view.id } : values,
       );
 
       if (code === 200) {

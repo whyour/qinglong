@@ -248,9 +248,7 @@ const Env = () => {
             `${config.apiPrefix}envs/${
               record.status === Status.已禁用 ? 'enable' : 'disable'
             }`,
-            {
-              data: [record.id],
-            },
+            [record.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -388,7 +386,8 @@ const Env = () => {
       const dragRow = value[dragIndex];
       request
         .put(`${config.apiPrefix}envs/${dragRow.id}/move`, {
-          data: { fromIndex: dragIndex, toIndex: hoverIndex },
+          fromIndex: dragIndex,
+          toIndex: hoverIndex,
         })
         .then(({ code, data }) => {
           if (code === 200) {
@@ -438,9 +437,10 @@ const Env = () => {
       content: <>确认{OperationName[operationStatus]}选中的变量吗</>,
       onOk() {
         request
-          .put(`${config.apiPrefix}envs/${OperationPath[operationStatus]}`, {
-            data: selectedRowIds,
-          })
+          .put(
+            `${config.apiPrefix}envs/${OperationPath[operationStatus]}`,
+            selectedRowIds,
+          )
           .then(({ code, data }) => {
             if (code === 200) {
               getEnvs();
@@ -477,9 +477,7 @@ const Env = () => {
       try {
         const { code, data } = await request.post(
           `${config.apiPrefix}envs/upload`,
-          {
-            data: formData,
-          },
+          formData,
         );
 
         if (code === 200) {

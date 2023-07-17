@@ -223,11 +223,9 @@ const Script = () => {
         return new Promise((resolve, reject) => {
           request
             .put(`${config.apiPrefix}scripts`, {
-              data: {
-                filename: currentNode.title,
-                path: currentNode.parent || '',
-                content,
-              },
+              filename: currentNode.title,
+              path: currentNode.parent || '',
+              content,
             })
             .then(({ code, data }) => {
               if (code === 200) {
@@ -341,9 +339,7 @@ const Script = () => {
   const downloadFile = () => {
     request
       .post(`${config.apiPrefix}scripts/download`, {
-        data: {
-          filename: currentNode.title,
-        },
+        filename: currentNode.title,
       })
       .then(({ code, data }) => {
         if (code === 200) {

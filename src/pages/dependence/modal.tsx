@@ -48,9 +48,7 @@ const DependenceModal = ({
     try {
       const { code, data } = await request[method](
         `${config.apiPrefix}dependencies`,
-        {
-          data: payload,
-        },
+        payload,
       );
 
       if (code === 200) {
@@ -122,7 +120,11 @@ const DependenceModal = ({
           name="name"
           label="名称"
           rules={[
-            { required: true, message: '请输入依赖名称，支持指定版本', whitespace: true },
+            {
+              required: true,
+              message: '请输入依赖名称，支持指定版本',
+              whitespace: true,
+            },
           ]}
         >
           <Input.TextArea

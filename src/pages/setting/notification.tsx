@@ -20,9 +20,7 @@ const NotificationSetting = ({ data }: any) => {
 
     request
       .put(`${config.apiPrefix}user/notification`, {
-        data: {
-          ...values,
-        },
+        values,
       })
       .then(({ code, data }) => {
         if (code === 200) {

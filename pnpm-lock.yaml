@@ -228,6 +228,9 @@ devDependencies:
   antd-img-crop:
     specifier: ^4.2.3
     version: 4.12.2(antd@4.24.10)(react-dom@18.2.0)(react@18.2.0)
+  axios:
+    specifier: ^1.4.0
+    version: 1.4.0
   codemirror:
     specifier: ^5.65.2
     version: 5.65.13
@@ -306,9 +309,6 @@ devDependencies:
   typescript:
     specifier: 4.8.4
     version: 4.8.4
-  umi-request:
-    specifier: ^1.4.0
-    version: 1.4.0
   vh-check:
     specifier: ^2.0.5
     version: 2.0.5
@@ -5856,6 +5856,16 @@ packages:
       - debug
     dev: true
 
+  /axios@1.4.0:
+    resolution: {integrity: sha512-S4XCWMEmzvo64T9GfvQDOXgYRDJ/wsSZc7Jvdgx5u1sd0JwsuPLqb3SYmusag+edF6ziyMensPVqLTSc1PiSEA==}
+    dependencies:
+      follow-redirects: 1.15.2
+      form-data: 4.0.0
+      proxy-from-env: 1.1.0
+    transitivePeerDependencies:
+      - debug
+    dev: true
+
   /babel-jest@29.5.0:
     resolution: {integrity: sha512-mA4eCDh5mSo2EcA9xQjVTpmbbNk32Zb3Q3QFQsNhaK56Q+yoXowzFodLux30HRgyOho5rsQ6B0P9QpMkvvnJ0Q==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
@@ -7431,8 +7441,11 @@ packages:
 
   /encoding@0.1.13:
     resolution: {integrity: sha512-ETBauow1T35Y/WZMkio9jiM0Z5xjHHmJ4XmjZOq1l/dXz3lr2sRn87nJy20RupqSh1F2m3HHPSp8ShIPQJrJ3A==}
+    requiresBuild: true
     dependencies:
       iconv-lite: 0.6.3
+    dev: false
+    optional: true
 
   /end-of-stream@1.4.4:
     resolution: {integrity: sha512-+uw1inIHVPQoaVuHzRyXd21icM+cnt4CzD5rW+NC1wjOUSTOs+Te7FOv7AhN7vS9x/oIyhLP5PR1H+phQAHu5Q==}
@@ -9354,13 +9367,6 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /isomorphic-fetch@2.2.1:
-    resolution: {integrity: sha512-9c4TNAKYXM5PRyVcwUZrF3W09nQ+sO7+jydgs4ZGW9dhsLG2VOlISJABombdQqQRXCwuYG3sYV/puGf5rp0qmA==}
-    dependencies:
-      node-fetch: 1.7.3
-      whatwg-fetch: 3.6.2
-    dev: true
-
   /isomorphic-unfetch@4.0.2:
     resolution: {integrity: sha512-1Yd+CF/7al18/N2BDbsLBcp6RO3tucSW+jcLq24dqdX5MNbCNTw1z4BsGsp4zNmjr/Izm2cs/cEqZPp4kvWSCA==}
     dependencies:
@@ -10400,13 +10406,6 @@ packages:
   /node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
-    dev: true
-
-  /node-fetch@1.7.3:
-    resolution: {integrity: sha512-NhZ4CsKx7cYm2vSrBAr2PvFOe6sWDf0UYLRqA6svUYg7+/TSfVAu49jYC4BvQ4Sms9SZgdqGBgroqfDhJdTyKQ==}
-    dependencies:
-      encoding: 0.1.13
-      is-stream: 1.1.0
     dev: true
 
   /node-fetch@2.6.11:
@@ -14742,13 +14741,6 @@ packages:
     hasBin: true
     dev: true
 
-  /umi-request@1.4.0:
-    resolution: {integrity: sha512-OknwtQZddZHi0Ggi+Vr/olJ7HNMx4AzlywyK0W3NZBT7B0stjeZ9lcztA85dBgdAj3KVk8uPJPZSnGaDjELhrA==}
-    dependencies:
-      isomorphic-fetch: 2.2.1
-      qs: 6.11.2
-    dev: true
-
   /umi@4.0.70(@types/node@17.0.45)(@types/react@18.2.8)(eslint@8.35.0)(prettier@2.8.8)(react-dom@18.2.0)(react@18.2.0)(sockjs-client@1.6.1)(stylelint@14.8.2)(typescript@4.8.4)(webpack@5.85.1):
     resolution: {integrity: sha512-e6GwzZXC1U+XPJhLaOMIr6IBWpi8mGap6ExRkApidfbYZ8HxilvrVHnaLUYSykp206RhZBnJWI7r99mYu3e5eQ==}
     engines: {node: '>=14'}
@@ -15236,10 +15228,6 @@ packages:
   /websocket-extensions@0.1.4:
     resolution: {integrity: sha512-OqedPIGOfsDlo31UNwYbCFMSaO9m9G/0faIHj5/dZFDMFqPTcx6UwqyOy3COEaEOg/9VsGIpdqn62W5KhoKSpg==}
     engines: {node: '>=0.8.0'}
-
-  /whatwg-fetch@3.6.2:
-    resolution: {integrity: sha512-bJlen0FcuU/0EMLrdbJ7zOnW6ITZLrZMIarMUVmdKtsGvZna8vxKYaexICWPfZ8qwf9fzNq+UEIZrnSaApt6RA==}
-    dev: true
 
   /whatwg-url@5.0.0:
     resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}

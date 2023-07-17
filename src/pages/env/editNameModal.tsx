@@ -19,10 +19,8 @@ const EditNameModal = ({
     setLoading(true);
     try {
       const { code, data } = await request.put(`${config.apiPrefix}envs/name`, {
-        data: {
-          ids,
-          name: values.name,
-        },
+        ids,
+        name: values.name,
       });
 
       if (code === 200) {

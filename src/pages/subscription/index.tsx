@@ -254,7 +254,7 @@ const Subscription = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}subscriptions/run`, { data: [record.id] })
+          .put(`${config.apiPrefix}subscriptions/run`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               const result = [...value];
@@ -289,7 +289,7 @@ const Subscription = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}subscriptions/stop`, { data: [record.id] })
+          .put(`${config.apiPrefix}subscriptions/stop`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               const result = [...value];
@@ -386,9 +386,7 @@ const Subscription = () => {
             `${config.apiPrefix}subscriptions/${
               record.is_disabled === 1 ? 'enable' : 'disable'
             }`,
-            {
-              data: [record.id],
-            },
+            [record.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {

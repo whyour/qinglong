@@ -269,9 +269,7 @@ const Dependence = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}dependencies/reinstall`, {
-            data: [record.id],
-          })
+          .put(`${config.apiPrefix}dependencies/reinstall`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               handleDependence(data[0]);
@@ -342,9 +340,7 @@ const Dependence = () => {
       content: <>确认重新安装选中的依赖吗</>,
       onOk() {
         request
-          .put(`${config.apiPrefix}dependencies/reinstall`, {
-            data: selectedRowIds,
-          })
+          .put(`${config.apiPrefix}dependencies/reinstall`, selectedRowIds)
           .then(({ code, data }) => {
             if (code === 200) {
               setSelectedRowIds([]);

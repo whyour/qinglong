@@ -21,11 +21,9 @@ const RenameModal = ({
       const { code, data } = await request.put(
         `${config.apiPrefix}scripts/rename`,
         {
-          data: {
-            filename: currentNode.title,
-            path: currentNode.parent || '',
-            newFilename: values.name,
-          },
+          filename: currentNode.title,
+          path: currentNode.parent || '',
+          newFilename: values.name,
         },
       );
 

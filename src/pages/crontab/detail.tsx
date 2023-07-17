@@ -184,11 +184,9 @@ const CronDetailModal = ({
         return new Promise((resolve, reject) => {
           request
             .put(`${config.apiPrefix}scripts`, {
-              data: {
-                filename: scriptInfo.filename,
-                path: scriptInfo.parent || '',
-                content,
-              },
+              filename: scriptInfo.filename,
+              path: scriptInfo.parent || '',
+              content,
             })
             .then(({ code, data }) => {
               if (code === 200) {
@@ -220,7 +218,7 @@ const CronDetailModal = ({
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/run`, { data: [currentCron.id] })
+          .put(`${config.apiPrefix}crons/run`, [currentCron.id])
           .then(({ code, data }) => {
             if (code === 200) {
               setCurrentCron({ ...currentCron, status: CrontabStatus.running });
@@ -250,7 +248,7 @@ const CronDetailModal = ({
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/stop`, { data: [currentCron.id] })
+          .put(`${config.apiPrefix}crons/stop`, [currentCron.id] )
           .then(({ code, data }) => {
             if (code === 200) {
               setCurrentCron({ ...currentCron, status: CrontabStatus.idle });
@@ -282,9 +280,7 @@ const CronDetailModal = ({
             `${config.apiPrefix}crons/${
               currentCron.isDisabled === 1 ? 'enable' : 'disable'
             }`,
-            {
-              data: [currentCron.id],
-            },
+           [currentCron.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -320,9 +316,7 @@ const CronDetailModal = ({
             `${config.apiPrefix}crons/${
               currentCron.isPinned === 1 ? 'unpin' : 'pin'
             }`,
-            {
-              data: [currentCron.id],
-            },
+            [currentCron.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {

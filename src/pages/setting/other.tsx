@@ -19,6 +19,7 @@ import { saveAs } from 'file-saver';
 import './index.less';
 import { UploadOutlined } from '@ant-design/icons';
 import Countdown from 'antd/lib/statistic/Countdown';
+import useProgress from './progress';
 
 const optionsWithDisabled = [
   { label: '亮色', value: 'light' },
@@ -39,6 +40,8 @@ const Other = ({
   const [form] = Form.useForm();
   const modalRef = useRef<any>();
   const [exportLoading, setExportLoading] = useState(false);
+  const showUploadProgress = useProgress('上传');
+  const showDownloadProgress = useProgress('下载');
 
   const {
     enable: enableDarkMode,
@@ -78,9 +81,7 @@ const Other = ({
 
   const updateSystemConfig = () => {
     request
-      .put(`${config.apiPrefix}system/config`, {
-        data: { ...systemConfig },
-      })
+      .put(`${config.apiPrefix}system/config`, systemConfig)
       .then(({ code, data }) => {
         if (code === 200) {
           message.success('更新成功');
@@ -94,7 +95,18 @@ const Other = ({
   const exportData = () => {
     setExportLoading(true);
     request
-      .put(`${config.apiPrefix}system/data/export`, { responseType: 'blob' })
+      .put<Blob>(
+        `${config.apiPrefix}system/data/export`,
+        {},
+        {
+          responseType: 'blob',
+          onDownloadProgress: (e) => {
+            if (e.progress) {
+              showDownloadProgress(parseFloat((e.progress * 100).toFixed(1)));
+            }
+          },
+        },
+      )
       .then((res) => {
         saveAs(res, 'data.tgz');
       })
@@ -102,34 +114,6 @@ const Other = ({
         console.log(error);
       })
       .finally(() => setExportLoading(false));
-  };
-
-  const showUploadModal = (progress: number) => {
-    if (modalRef.current) {
-      modalRef.current.update({
-        content: (
-          <Progress
-            style={{ display: 'flex', justifyContent: 'center' }}
-            type="circle"
-            percent={progress}
-          />
-        ),
-      });
-    } else {
-      modalRef.current = Modal.info({
-        width: 600,
-        maskClosable: false,
-        title: '上传中...',
-        centered: true,
-        content: (
-          <Progress
-            style={{ display: 'flex', justifyContent: 'center' }}
-            type="circle"
-            percent={progress}
-          />
-        ),
-      });
-    }
   };
 
   const showReloadModal = () => {
@@ -142,8 +126,8 @@ const Other = ({
       okText: '重启',
       onOk() {
         request
-          .put(`${config.apiPrefix}system/reload`, { data: { type: 'data' } })
-          .then((_data: any) => {
+          .put(`${config.apiPrefix}system/reload`, { type: 'data' })
+          .then(() => {
             message.success({
               content: (
                 <span>
@@ -231,8 +215,7 @@ const Other = ({
           action="/api/system/data/import"
           onChange={(e) => {
             if (e.event?.percent) {
-              const percent = parseFloat(e.event?.percent.toFixed(1));
-              showUploadModal(percent);
+              showUploadProgress(parseFloat(e.event?.percent.toFixed(1)));
               if (e.event?.percent === 100) {
                 showReloadModal();
               }

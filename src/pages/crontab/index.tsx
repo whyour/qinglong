@@ -457,7 +457,7 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/run`, { data: [record.id] })
+          .put(`${config.apiPrefix}crons/run`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               const result = [...value];
@@ -492,7 +492,7 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/stop`, { data: [record.id] })
+          .put(`${config.apiPrefix}crons/stop`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               const result = [...value];
@@ -533,9 +533,7 @@ const Crontab = () => {
             `${config.apiPrefix}crons/${
               record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
-            {
-              data: [record.id],
-            },
+            [record.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -577,9 +575,7 @@ const Crontab = () => {
             `${config.apiPrefix}crons/${
               record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
-            {
-              data: [record.id],
-            },
+            [record.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -725,9 +721,10 @@ const Crontab = () => {
       content: <>确认{OperationName[operationStatus]}选中的定时任务吗</>,
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/${OperationPath[operationStatus]}`, {
-            data: selectedRowIds,
-          })
+          .put(
+            `${config.apiPrefix}crons/${OperationPath[operationStatus]}`,
+            selectedRowIds,
+          )
           .then(({ code, data }) => {
             if (code === 200) {
               getCrons();

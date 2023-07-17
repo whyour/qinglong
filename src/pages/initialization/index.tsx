@@ -36,10 +36,8 @@ const Initialization = () => {
     setLoading(true);
     request
       .put(`${config.apiPrefix}user/init`, {
-        data: {
-          username: values.username,
-          password: values.password,
-        },
+        username: values.username,
+        password: values.password,
       })
       .then(({ code, data }) => {
         if (code === 200) {
@@ -53,9 +51,7 @@ const Initialization = () => {
     setLoading(true);
     request
       .put(`${config.apiPrefix}user/notification/init`, {
-        data: {
-          ...values,
-        },
+        values,
       })
       .then(({ code, data }) => {
         if (code === 200) {

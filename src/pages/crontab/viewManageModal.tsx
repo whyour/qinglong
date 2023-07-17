@@ -168,9 +168,9 @@ const ViewManageModal = ({
 
   const onShowChange = (checked: boolean, record: any, index: number) => {
     request
-      .put(`${config.apiPrefix}crons/views/${checked ? 'enable' : 'disable'}`, {
-        data: [record.id],
-      })
+      .put(`${config.apiPrefix}crons/views/${checked ? 'enable' : 'disable'}`, [
+        record.id,
+      ])
       .then(({ code, data }) => {
         if (code === 200) {
           const _list = [...list];
@@ -195,7 +195,9 @@ const ViewManageModal = ({
       const dragRow = list[dragIndex];
       request
         .put(`${config.apiPrefix}crons/views/move`, {
-          data: { fromIndex: dragIndex, toIndex: hoverIndex, id: dragRow.id },
+          fromIndex: dragIndex,
+          toIndex: hoverIndex,
+          id: dragRow.id,
         })
         .then(({ code, data }) => {
           if (code === 200) {

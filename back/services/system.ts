@@ -261,7 +261,8 @@ export default class SystemService {
       const dataFile = fs.createReadStream(config.dataTgzFile);
       res.writeHead(200, {
         'Content-Type': 'application/force-download',
-        'Content-Disposition': 'attachment; filename=data.tgz'
+        'Content-Disposition': 'attachment; filename=data.tgz',
+        'Content-length': fs.statSync(config.dataTgzFile).size
       });
       dataFile.pipe(res);
     } catch (error: any) {

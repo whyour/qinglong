@@ -25,9 +25,10 @@ const CronModal = ({
       payload.id = cron.id;
     }
     try {
-      const { code, data } = await request[method](`${config.apiPrefix}crons`, {
-        data: payload,
-      });
+      const { code, data } = await request[method](
+        `${config.apiPrefix}crons`,
+        payload,
+      );
 
       if (code === 200) {
         message.success(cron ? '更新Cron成功' : '新建Cron成功');
@@ -130,9 +131,7 @@ const CronLabelModal = ({
         try {
           const { code, data } = await request[action](
             `${config.apiPrefix}crons/labels`,
-            {
-              data: payload,
-            },
+            payload,
           );
 
           if (code === 200) {

@@ -37,9 +37,10 @@ const EnvModal = ({
       payload = { ...values, id: env.id };
     }
     try {
-      const { code, data } = await request[method](`${config.apiPrefix}envs`, {
-        data: payload,
-      });
+      const { code, data } = await request[method](
+        `${config.apiPrefix}envs`,
+        payload,
+      );
 
       if (code === 200) {
         message.success(env ? '更新变量成功' : '新建变量成功');

@@ -23,9 +23,10 @@ const AppModal = ({
       payload.id = app.id;
     }
     try {
-      const { code, data } = await request[method](`${config.apiPrefix}apps`, {
-        data: payload,
-      });
+      const { code, data } = await request[method](
+        `${config.apiPrefix}apps`,
+        payload,
+      );
 
       if (code === 200) {
         message.success(app ? '更新应用成功' : '新建应用成功');
