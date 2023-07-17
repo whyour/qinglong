@@ -313,8 +313,8 @@ reload_pm2() {
   # 代理会影响 grpc 服务
   unset_proxy
   pm2 flush &>/dev/null
-  pm2 kill &>/dev/null
-  pm2 startOrGracefulReload $file_ecosystem_js
+  pm2 startOrGracefulReload $file_ecosystem_js --update-env
+  pm2 sendSignal SIGKILL panel &>/dev/null
 }
 
 diff_time() {

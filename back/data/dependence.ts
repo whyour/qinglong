@@ -18,7 +18,7 @@ export class Dependence {
         : DependenceStatus.queued;
     this.type = options.type || DependenceTypes.nodejs;
     this.timestamp = new Date().toString();
-    this.name = options.name;
+    this.name = options.name.trim();
     this.log = options.log || [];
     this.remark = options.remark || '';
   }

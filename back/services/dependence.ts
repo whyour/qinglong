@@ -168,7 +168,7 @@ export default class DependenceService {
         const socketMessageType = isInstall
           ? 'installDependence'
           : 'uninstallDependence';
-        const depName = dependency.name;
+        const depName = dependency.name.trim();
         const depRunCommand = (
           isInstall
             ? InstallDependenceCommandTypes
@@ -191,7 +191,7 @@ export default class DependenceService {
         if (isInstall) {
           const getCommandPrefix = GetDependenceCommandTypes[dependency.type];
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
-          const [_depName] = dependency.name.split(depVersionStr);
+          const [_depName] = dependency.name.trim().split(depVersionStr);
           const depInfo = (
             await promiseExecSuccess(
               dependency.type === DependenceTypes.linux
