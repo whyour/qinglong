@@ -239,7 +239,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
         头像
       </div>
       <Avatar size={128} shape="square" icon={<UserOutlined />} src={avatar} />
-      <ImgCrop rotate>
+      <ImgCrop rotationSlider>
         <Upload
           method="put"
           showUploadList={false}

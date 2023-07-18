@@ -138,7 +138,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
                   <Countdown
                     className="inline-countdown"
                     format="ss"
-                    value={Date.now() + 1000 * 15}
+                    value={Date.now() + 1000 * 30}
                   />
                   秒后自动刷新
                 </span>
@@ -147,7 +147,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
             });
             setTimeout(() => {
               window.location.reload();
-            }, 14000);
+            }, 30000);
           })
           .catch((error: any) => {
             console.log(error);

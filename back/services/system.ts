@@ -25,7 +25,6 @@ import {
 import { TASK_COMMAND } from '../config/const';
 import taskLimit from '../shared/pLimit';
 import tar from 'tar';
-import fs from 'fs';
 import path from 'path';
 
 @Service()
@@ -258,13 +257,7 @@ export default class SystemService {
   public async exportData(res: Response) {
     try {
       await tar.create({ gzip: true, file: config.dataTgzFile, cwd: config.rootPath }, ['data'])
-      const dataFile = fs.createReadStream(config.dataTgzFile);
-      res.writeHead(200, {
-        'Content-Type': 'application/force-download',
-        'Content-Disposition': 'attachment; filename=data.tgz',
-        'Content-length': fs.statSync(config.dataTgzFile).size
-      });
-      dataFile.pipe(res);
+      res.download(config.dataTgzFile);
     } catch (error: any) {
       return res.send({ code: 400, message: error.message });
     }
