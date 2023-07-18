@@ -715,6 +715,8 @@ if (
     and push_config.get("SMTP_NAME")
 ):
     notify_function.append(smtp)
+if push_config.get("PUSHME_KEY"):
+    notify_function.append(pushme)
 
 
 def send(title: str, content: str) -> None:
