@@ -100,6 +100,7 @@ const Other = ({
         {},
         {
           responseType: 'blob',
+          timeout: 86400000,
           onDownloadProgress: (e) => {
             if (e.progress) {
               showDownloadProgress(parseFloat((e.progress * 100).toFixed(1)));
