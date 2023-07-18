@@ -142,6 +142,7 @@ let SMTP_PASSWORD = '';
 let SMTP_NAME = '';
 
 // =======================================PushMe通知设置区域===========================================
+//官方文档：https://push.i-i.me/
 //此处填你的PushMe KEY.
 let PUSHME_KEY = '';
 
