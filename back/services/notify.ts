@@ -574,10 +574,10 @@ export default class NotificationService {
           },
           headers: { 'Content-Type': 'application/json' },
         });
-      if (res === 'success') {
+      if (res.body === 'success') {
         return true;
       } else {
-        throw new Error(res);
+        throw new Error(res.body);
       }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
