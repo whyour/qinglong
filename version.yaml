@@ -1,7 +1,7 @@
-version: 2.15.18
-changeLogLink: https://t.me/jiao_long/384
-publishTime: 2023-07-19 21:21
+version: 2.15.19
+changeLogLink: https://t.me/jiao_long/385
+publishTime: 2023-07-20 23:59
 changeLog: |
-  1. 增加备份恢复功能
-  2. 重构系统检查更新逻辑
-  3. 修复系统设置自动删除日志启动时失效
+  1. 通知支持 pushMe
+  2. 修复系统通知设置保存失败
+  3. 修复判断依赖已安装逻辑
