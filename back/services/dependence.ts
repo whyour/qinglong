@@ -23,7 +23,7 @@ export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
@@ -191,16 +191,27 @@ export default class DependenceService {
         if (isInstall) {
           const getCommandPrefix = GetDependenceCommandTypes[dependency.type];
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
-          const [_depName] = dependency.name.trim().split(depVersionStr);
+          const [_depName, _depVersion] = dependency.name
+            .trim()
+            .split(depVersionStr);
+          const isNodeDependence = dependency.type === DependenceTypes.nodejs;
+          const isLinuxDependence = dependency.type === DependenceTypes.linux;
+          const isPythonDependence = dependency.type === DependenceTypes.python3;
           const depInfo = (
             await promiseExecSuccess(
-              dependency.type === DependenceTypes.linux
-                ? `${getCommandPrefix} ${_depName}`
-                : `${getCommandPrefix} | grep "${_depName}"`,
+              isNodeDependence
+                ? `${getCommandPrefix} | grep "${_depName}" | head -1`
+                : `${getCommandPrefix} ${_depName}`,
             )
           ).replace(/\s{2,}/, ' ');
 
-          if (depInfo) {
+          if (
+            depInfo &&
+            ((isNodeDependence && depInfo.split(' ')?.[0] === _depName) ||
+              (isLinuxDependence && depInfo.toLocaleLowerCase().includes('installed')) ||
+              isPythonDependence) &&
+            (!_depVersion || depInfo.includes(_depVersion))
+          ) {
             const endTime = dayjs();
             const _message = `检测到已经安装 ${_depName}\n\n${depInfo}\n跳过安装\n\n依赖${actionText}成功，结束时间 ${endTime.format(
               'YYYY-MM-DD HH:mm:ss',
