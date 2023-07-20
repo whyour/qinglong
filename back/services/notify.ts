@@ -28,6 +28,7 @@ export default class NotificationService {
     ['iGot', this.iGot],
     ['pushPlus', this.pushPlus],
     ['email', this.email],
+    ['pushMe', this.pushMe],
     ['webhook', this.webhook],
     ['lark', this.lark],
   ]);
@@ -555,6 +556,28 @@ export default class NotificationService {
         return true;
       } else {
         throw new Error(JSON.stringify(info));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  private async pushMe() {
+    const { pushMeKey } = this.params;
+    try {
+      const res: any = await got
+        .post(`https://push.i-i.me/?push_key=${pushMeKey}`, {
+          ...this.gotOption,
+          json: {
+            title: this.title,
+            content: this.content
+          },
+          headers: { 'Content-Type': 'application/json' },
+        });
+      if (res === 'success') {
+        return true;
+      } else {
+        throw new Error(res);
       }
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
