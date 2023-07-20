@@ -19,9 +19,7 @@ const NotificationSetting = ({ data }: any) => {
     }
 
     request
-      .put(`${config.apiPrefix}user/notification`, {
-        values,
-      })
+      .put(`${config.apiPrefix}user/notification`, values)
       .then(({ code, data }) => {
         if (code === 200) {
           message.success(values.type ? '通知发送成功' : '通知关闭成功');

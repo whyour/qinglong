@@ -98,6 +98,8 @@ push_config = {
     'SMTP_EMAIL': '',                   # SMTP 收发件邮箱，通知将会由自己发给自己
     'SMTP_PASSWORD': '',                # SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
     'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
+
+    'PUSHME_KEY': '',                     # PushMe 酱的 PUSHME_KEY
 }
 notify_function = []
 # fmt: on
@@ -637,6 +639,27 @@ def smtp(title: str, content: str) -> None:
     except Exception as e:
         print(f"SMTP 邮件 推送失败！{e}")
 
+def pushme(title: str, content: str) -> None:
+    """
+    使用 PushMe 推送消息。
+    """
+    if not push_config.get("PUSHME_KEY"):
+        print("PushMe 服务的 PUSHME_KEY 未设置!!\n取消推送")
+        return
+    print("PushMe 服务启动")
+
+    url = f'https://push.i-i.me/?push_key={push_config.get("PUSHME_KEY")}'
+    data = {
+        "title": title,
+        "content": content,
+    }
+    response = requests.post(url, data=data)
+
+    if response == 'success':
+        print("PushMe 推送成功！")
+    else:
+        print("PushMe 推送失败！{response}")
+
 
 def one() -> str:
     """
@@ -692,6 +715,8 @@ if (
     and push_config.get("SMTP_NAME")
 ):
     notify_function.append(smtp)
+if push_config.get("PUSHME_KEY"):
+    notify_function.append(pushme)
 
 
 def send(title: str, content: str) -> None:

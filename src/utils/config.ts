@@ -96,6 +96,7 @@ export default {
     { value: 'chat', label: '群晖chat' },
     { value: 'email', label: '邮箱' },
     { value: 'lark', label: '飞书机器人' },
+    { value: 'pushMe', label: 'PushMe' },
     { value: 'webhook', label: '自定义通知' },
     { value: 'closed', label: '已关闭' },
   ],
@@ -267,6 +268,13 @@ export default {
       },
       { label: 'emailUser', tip: '邮箱地址', required: true },
       { label: 'emailPass', tip: '邮箱SMTP授权码', required: true },
+    ],
+    pushMe: [
+      {
+        label: 'pushMeKey',
+        tip: 'PushMe的Key，https://push.i-i.me/',
+        required: true,
+      },
     ],
     webhook: [
       {

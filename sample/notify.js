@@ -141,6 +141,11 @@ let SMTP_EMAIL = '';
 let SMTP_PASSWORD = '';
 let SMTP_NAME = '';
 
+// =======================================PushMe通知设置区域===========================================
+//官方文档：https://push.i-i.me/
+//此处填你的PushMe KEY.
+let PUSHME_KEY = '';
+
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
   GOTIFY_URL = process.env.GOTIFY_URL;
@@ -288,6 +293,9 @@ if (process.env.SMTP_PASSWORD) {
 if (process.env.SMTP_NAME) {
   SMTP_NAME = process.env.SMTP_NAME;
 }
+if (process.env.PUSHME_KEY) {
+  PUSHME_KEY = process.env.PUSHME_KEY;
+}
 //==========================云端环境变量的判断与接收=========================
 
 /**
@@ -336,6 +344,7 @@ async function sendNotify(
     aibotkNotify(text, desp), //智能微秘书
     fsBotNotify(text, desp), //飞书机器人
     smtpNotify(text, desp), //SMTP 邮件
+    PushMeNotify(text, desp), //PushMe
   ]);
 }
 
@@ -1111,6 +1120,41 @@ function smtpNotify(text, desp) {
   return new Promise((resolve) => {
     if (SMTP_SERVER && SMTP_SSL && SMTP_EMAIL && SMTP_PASSWORD && SMTP_NAME) {
       // todo: Node.js并没有内置的 smtp 实现，需要调用外部库，因为不清楚这个文件的模块依赖情况，所以留给有缘人实现
+    } else {
+      resolve();
+    }
+  });
+}
+
+function PushMeNotify(text, desp) {
+  return new Promise((resolve) => {
+    if (PUSHME_KEY) {
+      const options = {
+        url: `https://push.i-i.me?push_key=${PUSHME_KEY}`,
+        json: { title: text, content: desp },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout,
+      };
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('PushMeNotify发送通知调用API失败！！\n');
+            console.log(err);
+          } else {
+            if (data === 'success') {
+              console.log('PushMe发送通知消息成功🎉\n');
+            } else {
+              console.log(`${data}\n`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
     } else {
       resolve();
     }

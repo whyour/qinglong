@@ -15,6 +15,7 @@ export enum NotificationMode {
   'iGot' = 'iGot',
   'pushPlus' = 'pushPlus',
   'email' = 'email',
+  'pushMe' = 'pushMe',
   'feishu' = 'feishu',
   'webhook' = 'webhook',
 }
@@ -101,6 +102,10 @@ export class EmailNotification extends NotificationBaseInfo {
   public emailPass: string = '';
 }
 
+export class PushMeNotification extends NotificationBaseInfo {
+  public pushMeKey: string = '';
+}
+
 export class WebhookNotification extends NotificationBaseInfo {
   public webhookHeaders: string = '';
   public webhookBody: string = '';
@@ -131,5 +136,6 @@ export interface NotificationInfo
     IGotNotification,
     PushPlusNotification,
     EmailNotification,
+    PushMeNotification,
     WebhookNotification,
     LarkNotification {}

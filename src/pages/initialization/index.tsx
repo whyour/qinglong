@@ -50,9 +50,7 @@ const Initialization = () => {
   const submitNotification = (values: any) => {
     setLoading(true);
     request
-      .put(`${config.apiPrefix}user/notification/init`, {
-        values,
-      })
+      .put(`${config.apiPrefix}user/notification/init`, values)
       .then(({ code, data }) => {
         if (code === 200) {
           next();
