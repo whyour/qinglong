@@ -143,7 +143,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
                   秒后自动刷新
                 </span>
               ),
-              duration: 15,
+              duration: 30,
             });
             setTimeout(() => {
               window.location.reload();

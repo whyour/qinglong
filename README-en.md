@@ -35,6 +35,24 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 - Support dark mode
 - Support cell phone operation
 
+## Version
+### docker
+
+The `latest` image is built on `alpine` and the `debian` image is built on `debian-slim`. If you need to use a dependency that is not supported by `alpine`, it is recommended that you use the `debian` image.
+
+```bash
+docker pull whyour/qinglong:latest
+docker pull whyour/qinglong:debian
+```
+
+### npm
+
+The npm version supports `debian/ubuntu/centos/alpine` systems and requires `node/python3` to be installed.
+
+```bash
+npm i @whyour/qinglong
+```
+
 ## Deployment
 
 ### Docker (Recommended)

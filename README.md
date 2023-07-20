@@ -37,6 +37,24 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 - 支持暗黑模式
 - 支持手机端操作
 
+## 版本
+### docker
+
+`latest` 镜像是基于 `alpine` 构建，`debian` 镜像是基于 `debian-slim` 构建。如果需要使用 `alpine` 不支持的依赖，建议使用 `debian` 镜像
+
+```bash
+docker pull whyour/qinglong:latest
+docker pull whyour/qinglong:debian
+```
+
+### npm
+
+npm 版本支持 `debian/ubuntu/centos/alpine` 系统，需要自行安装 `node/python3`
+
+```bash
+npm i @whyour/qinglong
+```
+
 ## 部署
 
 ### docker (推荐)
