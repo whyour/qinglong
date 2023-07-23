@@ -60,6 +60,11 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build:front
           pnpm build:back
+      
+      - name: publich npm package
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+          npm publish
 
       - name: copy to static repo
         env:
