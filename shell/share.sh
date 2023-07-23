@@ -4,6 +4,11 @@
 dir_root=$QL_DIR
 dir_tmp=$dir_root/.tmp
 dir_data=$dir_root/data
+
+if [[ $QL_DATA_DIR ]]; then
+  dir_data=$QL_DATA_DIR
+fi
+
 dir_shell=$dir_root/shell
 dir_sample=$dir_root/sample
 dir_static=$dir_root/static

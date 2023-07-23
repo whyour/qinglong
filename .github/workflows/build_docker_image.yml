@@ -54,6 +54,11 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build:front
           pnpm build:back
+      
+      - name: publich npm package
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+          npm publish
 
       - name: copy to static repo
         env:
@@ -141,7 +146,6 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

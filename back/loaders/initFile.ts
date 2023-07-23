@@ -5,7 +5,12 @@ import Logger from './logger';
 import { fileExist } from '../config/util';
 
 const rootPath = process.env.QL_DIR as string;
-const dataPath = path.join(rootPath, 'data/');
+let dataPath = path.join(rootPath, 'data/');
+
+if (process.env.QL_DATA_DIR) {
+  dataPath = process.env.QL_DATA_DIR;
+}
+
 const configPath = path.join(dataPath, 'config/');
 const scriptPath = path.join(dataPath, 'scripts/');
 const logPath = path.join(dataPath, 'log/');
