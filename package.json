@@ -1,5 +1,16 @@
 {
-  "private": true,
+  "name": "@whyour/qinglong",
+  "version": "0.7.6",
+  "description": "Timed task management platform supporting Python3, JavaScript, Shell, Typescript",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whyour/qinglong.git"
+  },
+  "author": "whyour",
+  "license": "Apache License 2.0",
+  "bugs": {
+    "url": "https://github.com/whyour/qinglong/issues"
+  },
   "scripts": {
     "start": "concurrently -n w: npm:start:*",
     "start:front": "max dev",
@@ -27,6 +38,11 @@
     "*.ts?(x)": [
       "prettier --parser=typescript --write"
     ]
+  },
+  "bin": {
+    "ql": "shell/update.sh",
+    "task": "shell/task.sh",
+    "qinglong": "shell/start.sh"
   },
   "pnpm": {
     "peerDependencyRules": {

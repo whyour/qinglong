@@ -49,7 +49,7 @@ export enum InstallDependenceCommandTypes {
 export enum GetDependenceCommandTypes {
   'pnpm ls -g ',
   'pip3 show --disable-pip-version-check',
-  'apk info -es',
+  'apt info',
 }
 
 export enum versionDependenceCommandTypes {
