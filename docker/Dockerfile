@@ -1,6 +1,6 @@
 FROM node:20-slim as nodebuilder
 
-FROM python:3.11-slim as builder
+FROM python:3.11-slim-bullseye as builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
 COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
@@ -12,7 +12,7 @@ RUN set -x && \
   cd /tmp/build && \
   pnpm install --prod
 
-FROM python:3.11-slim
+FROM python:3.11-slim-bullseye
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -38,6 +38,9 @@ RUN set -x && \
   apt install --no-install-recommends -y git \
   curl \
   wget \
+  tzdata \
+  perl \
+  openssl \
   nginx \
   jq \
   procps \
