@@ -168,4 +168,9 @@ export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
 
+## 15. PushMe
+## 官方说明文档：https://push.i-i.me/
+## PUSHME_KEY (必填)填写PushMe APP上获取的push_key
+export PUSHME_KEY=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
