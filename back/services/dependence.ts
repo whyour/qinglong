@@ -209,7 +209,7 @@ export default class DependenceService {
                 ? `${getCommandPrefix} | grep "${depName}" | head -1`
                 : `${getCommandPrefix} ${depName}`,
             )
-          ).replace(/\s{2,}/, ' ');
+          ).replace(/\s{2,}/, ' ').replace(/\s+$/, '');
 
           if (
             depInfo &&
@@ -219,7 +219,7 @@ export default class DependenceService {
             (!depVersion || depInfo.includes(depVersion))
           ) {
             const endTime = dayjs();
-            const _message = `检测到已经安装 ${depName}\n\n${depInfo}\n跳过安装\n\n依赖${actionText}成功，结束时间 ${endTime.format(
+            const _message = `检测到已经安装 ${depName}\n\n${depInfo}\n\n跳过安装\n\n依赖${actionText}成功，结束时间 ${endTime.format(
               'YYYY-MM-DD HH:mm:ss',
             )}，耗时 ${endTime.diff(startTime, 'second')} 秒`;
             this.sockService.sendMessage({
@@ -236,7 +236,7 @@ export default class DependenceService {
           }
         }
 
-        const cp = spawn(`${depRunCommand} ${depName}`, {
+        const cp = spawn(`${depRunCommand} ${dependency.name.trim()}`, {
           shell: '/bin/bash',
         });
 

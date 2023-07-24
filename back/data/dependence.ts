@@ -43,13 +43,13 @@ export enum DependenceTypes {
 export enum InstallDependenceCommandTypes {
   'pnpm add -g',
   'pip3 install --disable-pip-version-check --root-user-action=ignore',
-  'apk add',
+  'apk add --no-check-certificate',
 }
 
 export enum GetDependenceCommandTypes {
   'pnpm ls -g ',
   'pip3 show --disable-pip-version-check',
-  'apk info',
+  'apk info -es',
 }
 
 export enum versionDependenceCommandTypes {
