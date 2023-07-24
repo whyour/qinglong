@@ -11,6 +11,7 @@ interface IResponseData {
   code?: number;
   data?: any;
   message?: string;
+  error?: any;
 }
 
 type Override<

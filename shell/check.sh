@@ -79,8 +79,6 @@ main() {
   npm i -g pnpm@8.3.1
   patch_version
 
-  apk add procps netcat-openbsd
-
   if [[ $PipMirror ]]; then
     pip3 config set global.index-url $PipMirror
   fi

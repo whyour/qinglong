@@ -1,7 +1,6 @@
-version: 2.15.18
-changeLogLink: https://t.me/jiao_long/384
-publishTime: 2023-07-19 21:21
+version: 2.15.20
+changeLogLink: https://t.me/jiao_long/386
+publishTime: 2023-07-22 16:00
 changeLog: |
-  1. 增加备份恢复功能
-  2. 重构系统检查更新逻辑
-  3. 修复系统设置自动删除日志启动时失效
+  1. 修复判断 linux 依赖已安装逻辑
+  2. 修复未启动完成时，页面提示 500

@@ -290,7 +290,7 @@ const Dependence = () => {
   const handleDependence = (dependence: any) => {
     const result = [...value];
     if (Array.isArray(dependence)) {
-      result.push(...dependence);
+      result.unshift(...dependence);
     } else {
       const index = value.findIndex((x) => x.id === dependence.id);
       if (index !== -1) {

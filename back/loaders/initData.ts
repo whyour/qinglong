@@ -38,7 +38,7 @@ export default async () => {
   // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
   DependenceModel.findAll({
     where: {},
-    order: [['type', 'DESC']],
+    order: [['type', 'DESC'], ['createdAt', 'DESC']],
     raw: true,
   }).then(async (docs) => {
     await DependenceModel.update(
