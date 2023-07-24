@@ -1,7 +1,6 @@
-version: 2.15.19
-changeLogLink: https://t.me/jiao_long/385
-publishTime: 2023-07-20 23:59
+version: 2.15.20
+changeLogLink: https://t.me/jiao_long/386
+publishTime: 2023-07-22 16:00
 changeLog: |
-  1. 通知支持 pushMe
-  2. 修复系统通知设置保存失败
-  3. 修复判断依赖已安装逻辑
+  1. 修复判断 linux 依赖已安装逻辑
+  2. 修复未启动完成时，页面提示 500
