@@ -655,10 +655,10 @@ def pushme(title: str, content: str) -> None:
     }
     response = requests.post(url, data=data)
 
-    if response == 'success':
+    if response.status_code == 200 and response.text == "success":
         print("PushMe 推送成功！")
     else:
-        print("PushMe 推送失败！{response}")
+        print(f"PushMe 推送失败！{response.status_code} {response.text}")
 
 
 def one() -> str:
