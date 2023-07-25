@@ -13,12 +13,21 @@ const logPath = path.join(dataPath, 'log/');
 const uploadPath = path.join(dataPath, 'upload/');
 const bakPath = path.join(dataPath, 'bak/');
 const samplePath = path.join(rootPath, 'sample/');
+const tmpPath = path.join(logPath, '.tmp/');
 const confFile = path.join(configPath, 'config.sh');
 const authConfigFile = path.join(configPath, 'auth.json');
 const sampleConfigFile = path.join(samplePath, 'config.sample.sh');
 const sampleAuthFile = path.join(samplePath, 'auth.sample.json');
+const sampleTaskShellFile = path.join(samplePath, 'task.sample.sh');
+const sampleNotifyJsFile = path.join(samplePath, 'notify.js');
+const sampleNotifyPyFile = path.join(samplePath, 'notify.py');
+const scriptNotifyJsFile = path.join(scriptPath, 'sendNotify.js');
+const scriptNotifyPyFile = path.join(scriptPath, 'notify.py');
+const TaskBeforeFile = path.join(configPath, 'task_before.sh');
+const TaskAfterFile = path.join(configPath, 'task_after.sh');
 const homedir = os.homedir();
 const sshPath = path.resolve(homedir, '.ssh');
+const sshdPath = path.join(dataPath, 'ssh.d');
 
 export default async () => {
   const authFileExist = await fileExist(authConfigFile);
@@ -29,17 +38,15 @@ export default async () => {
   const uploadDirExist = await fileExist(uploadPath);
   const sshDirExist = await fileExist(sshPath);
   const bakDirExist = await fileExist(bakPath);
+  const sshdDirExist = await fileExist(sshdPath);
+  const tmpDirExist = await fileExist(tmpPath);
+  const scriptNotifyJsFileExist = await fileExist(scriptNotifyJsFile);
+  const scriptNotifyPyFileExist = await fileExist(scriptNotifyPyFile);
+  const TaskBeforeFileExist = await fileExist(TaskBeforeFile);
+  const TaskAfterFileExist = await fileExist(TaskAfterFile);
 
   if (!configDirExist) {
     fs.mkdirSync(configPath);
-  }
-
-  if (!authFileExist) {
-    fs.writeFileSync(authConfigFile, fs.readFileSync(sampleAuthFile));
-  }
-
-  if (!confFileExist) {
-    fs.writeFileSync(confFile, fs.readFileSync(sampleConfigFile));
   }
 
   if (!scriptDirExist) {
@@ -48,6 +55,10 @@ export default async () => {
 
   if (!logDirExist) {
     fs.mkdirSync(logPath);
+  }
+
+  if (!tmpDirExist) {
+    fs.mkdirSync(tmpPath);
   }
 
   if (!uploadDirExist) {
@@ -60,6 +71,35 @@ export default async () => {
 
   if (!bakDirExist) {
     fs.mkdirSync(bakPath);
+  }
+
+  if (!sshdDirExist) {
+    fs.mkdirSync(sshdPath);
+  }
+
+  // 初始化文件
+  if (!authFileExist) {
+    fs.writeFileSync(authConfigFile, fs.readFileSync(sampleAuthFile));
+  }
+
+  if (!confFileExist) {
+    fs.writeFileSync(confFile, fs.readFileSync(sampleConfigFile));
+  }
+
+  if (!scriptNotifyJsFileExist) {
+    fs.writeFileSync(scriptNotifyJsFile, fs.readFileSync(sampleNotifyJsFile));
+  }
+
+  if (!scriptNotifyPyFileExist) {
+    fs.writeFileSync(scriptNotifyPyFile, fs.readFileSync(sampleNotifyPyFile));
+  }
+
+  if (!TaskBeforeFileExist) {
+    fs.writeFileSync(TaskBeforeFile, fs.readFileSync(sampleTaskShellFile));
+  }
+
+  if (!TaskAfterFileExist) {
+    fs.writeFileSync(TaskAfterFile, fs.readFileSync(sampleTaskShellFile));
   }
 
   dotenv.config({ path: confFile });

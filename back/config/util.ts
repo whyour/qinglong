@@ -7,6 +7,8 @@ import FormData from 'form-data';
 import psTreeFun from 'pstree.remy';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
+import config from './index';
+import { TASK_COMMAND } from './const';
 
 export function getFileContentByName(fileName: string) {
   if (fs.existsSync(fileName)) {
@@ -245,6 +247,18 @@ export async function createFile(file: string, data: string = '') {
   });
 }
 
+export async function handleLogPath(
+  logPath: string,
+  data: string = '',
+): Promise<string> {
+  const absolutePath = path.resolve(config.logPath, logPath);
+  const logFileExist = await fileExist(absolutePath);
+  if (!logFileExist) {
+    await createFile(absolutePath, data);
+  }
+  return absolutePath;
+}
+
 export async function concurrentRun(
   fnList: Array<() => Promise<any>> = [],
   max = 5,
@@ -385,6 +399,18 @@ export function promiseExec(command: string): Promise<string> {
   });
 }
 
+export function promiseExecSuccess(command: string): Promise<string> {
+  return new Promise((resolve) => {
+    exec(
+      command,
+      { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' },
+      (err, stdout, stderr) => {
+        resolve(stdout || '');
+      },
+    );
+  });
+}
+
 export function parseHeaders(headers: string) {
   if (!headers) return {};
 
@@ -469,25 +495,29 @@ export function psTree(pid: number): Promise<number[]> {
 
 export async function killTask(pid: number) {
   const pids = await psTree(pid);
-  // SIGALRM 14 时钟信号
+  // SIGINT 2 程序终止(interrupt)信号，不会打印额外信息
   if (pids.length) {
-    process.kill(pids[0], 14);
+    try {
+      [pid, ...pids].forEach((x) => {
+        process.kill(x, 2);
+      });
+    } catch (error) {}
   } else {
-    process.kill(pid, 14);
+    process.kill(pid, 2);
   }
 }
 
 export async function getPid(name: string) {
-  let taskCommand = `ps -ef | grep "${name}" | grep -v grep | awk '{print $1}'`;
-  const execAsync = promisify(exec);
-  let pid = (await execAsync(taskCommand)).stdout;
-  return Number(pid);
+  const taskCommand = `ps -eo pid,command | grep "${name}" | grep -v grep | awk '{print $1}' | head -1 | xargs echo -n`;
+  const pid = await promiseExec(taskCommand);
+  return pid ? Number(pid) : undefined;
 }
 
 interface IVersion {
   version: string;
   changeLogLink: string;
   changeLog: string;
+  publishTime: string;
 }
 
 export async function parseVersion(path: string): Promise<IVersion> {
@@ -496,4 +526,41 @@ export async function parseVersion(path: string): Promise<IVersion> {
 
 export async function parseContentVersion(content: string): Promise<IVersion> {
   return load(content) as IVersion;
+}
+
+export async function getUniqPath(command: string): Promise<string> {
+  const idStr = `cat ${config.crontabFile} | grep -E "${command}" | perl -pe "s|.*ID=(.*) ${command}.*|\\1|" | head -1 | awk -F " " '{print $1}' | xargs echo -n`;
+  let id = await promiseExec(idStr);
+
+  if (/^\d\d*\d$/.test(id)) {
+    id = `_${id}`;
+  } else {
+    id = '';
+  }
+
+  const items = command.split(/ +/);
+  let str = items[0];
+  if (items[0] === TASK_COMMAND) {
+    str = items[1];
+  }
+
+  const dotIndex = str.lastIndexOf('.');
+
+  if (dotIndex !== -1) {
+    str = str.slice(0, dotIndex);
+  }
+
+  const slashIndex = str.lastIndexOf('/');
+
+  let tempStr = '';
+  if (slashIndex !== -1) {
+    tempStr = str.slice(0, slashIndex);
+    const _slashIndex = tempStr.lastIndexOf('/');
+    if (_slashIndex !== -1) {
+      tempStr = tempStr.slice(_slashIndex + 1);
+    }
+    str = `${tempStr}_${str.slice(slashIndex + 1)}`;
+  }
+
+  return `${str}${id}`;
 }

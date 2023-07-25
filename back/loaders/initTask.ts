@@ -4,6 +4,7 @@ import ScheduleService from '../services/schedule';
 import SubscriptionService from '../services/subscription';
 import config from '../config';
 import { fileExist } from '../config/util';
+import { join } from 'path';
 
 export default async () => {
   const systemService = Container.get(SystemService);
@@ -11,8 +12,9 @@ export default async () => {
   const subscriptionService = Container.get(SubscriptionService);
 
   // 生成内置token
-  let tokenCommand = `ts-node-transpile-only ${config.rootPath}/back/token.ts`;
-  const tokenFile = `${config.rootPath}static/build/token.js`;
+  let tokenCommand = `tsx ${join(config.rootPath, 'back/token.ts')}`;
+  const tokenFile = join(config.rootPath, 'static/build/token.js');
+
   if (await fileExist(tokenFile)) {
     tokenCommand = `node ${tokenFile}`;
   }
@@ -21,31 +23,29 @@ export default async () => {
     name: '生成token',
     command: tokenCommand,
   };
+  await scheduleService.cancelIntervalTask(cron);
   scheduleService.createIntervalTask(cron, {
     days: 28,
   });
 
   // 运行删除日志任务
-  const data = await systemService.getLogRemoveFrequency();
-  if (data && data.info && data.info.frequency) {
-    const cron = {
-      id: data.id,
+  const data = await systemService.getSystemConfig();
+  if (data && data.info && data.info.logRemoveFrequency) {
+    const rmlogCron = {
+      id: data.id as number,
       name: '删除日志',
-      command: `ql rmlog ${data.info.frequency}`,
+      command: `ql rmlog ${data.info.logRemoveFrequency}`,
     };
-    scheduleService.createIntervalTask(cron, {
-      days: data.info.frequency,
+    await scheduleService.cancelIntervalTask(rmlogCron);
+    scheduleService.createIntervalTask(rmlogCron, {
+      days: data.info.logRemoveFrequency,
     });
   }
 
   // 运行所有订阅
+  await subscriptionService.setSshConfig();
   const subs = await subscriptionService.list();
   for (const sub of subs) {
-    await subscriptionService.handleTask(
-      sub,
-      !sub.is_disabled,
-      true,
-      !sub.is_disabled,
-    );
+    subscriptionService.handleTask(sub, !sub.is_disabled, !sub.is_disabled);
   }
 };

@@ -2,6 +2,7 @@
 
 ## 目录
 dir_root=$QL_DIR
+dir_tmp=$dir_root/.tmp
 dir_data=$dir_root/data
 dir_shell=$dir_root/shell
 dir_sample=$dir_root/sample
@@ -18,6 +19,7 @@ dir_update_log=$dir_log/update
 ql_static_repo=$dir_repo/static
 
 ## 文件
+file_ecosystem_js=$dir_root/ecosystem.config.js
 file_config_sample=$dir_sample/config.sample.sh
 file_env=$dir_config/env.sh
 file_sharecode=$dir_config/sharecode.sh
@@ -34,7 +36,6 @@ file_notify_js_sample=$dir_sample/notify.js
 file_notify_py_sample=$dir_sample/notify.py
 file_notify_py=$dir_scripts/notify.py
 file_notify_js=$dir_scripts/sendNotify.js
-task_error_log_path=$dir_log/task_error.log
 nginx_app_conf=$dir_root/docker/front.conf
 nginx_conf=$dir_root/docker/nginx.conf
 dep_notify_py=$dir_dep/notify.py
@@ -67,8 +68,8 @@ import_config() {
   [[ -f $file_config_user ]] && . $file_config_user
   [[ -f $file_env ]] && . $file_env
 
-  ql_base_url=${QlBaseUrl:-""}
-  command_timeout_time=${CommandTimeoutTime:-"1h"}
+  ql_base_url=${QlBaseUrl:-"/"}
+  command_timeout_time=${CommandTimeoutTime:-""}
   proxy_url=${ProxyUrl:-""}
   file_extensions=${RepoFileExtensions:-"js py"}
   current_branch=${QL_BRANCH}
@@ -98,6 +99,9 @@ set_proxy() {
 unset_proxy() {
   unset http_proxy
   unset https_proxy
+  unset ftp_proxy
+  unset all_proxy
+  unset no_proxy
 }
 
 make_dir() {
@@ -172,6 +176,7 @@ define_cmd() {
 }
 
 fix_config() {
+  make_dir $dir_tmp
   make_dir $dir_static
   make_dir $dir_data
   make_dir $dir_config
@@ -260,17 +265,7 @@ npm_install_sub() {
   else
     pnpm install --loglevel error --production
   fi
-}
-
-npm_install_1() {
-  local dir_current=$(pwd)
-  local dir_work=$1
-
-  cd $dir_work
-  echo -e "运行 npm install...\n"
-  npm_install_sub
-  [[ $? -ne 0 ]] && echo -e "\nnpm install 运行不成功，请进入 $dir_work 目录后手动运行 npm install...\n"
-  cd $dir_current
+  exit_status=$?
 }
 
 npm_install_2() {
@@ -278,12 +273,8 @@ npm_install_2() {
   local dir_work=$1
 
   cd $dir_work
-  echo -e "检测到 $dir_work 的依赖包有变化，运行 npm install...\n"
+  echo -e "安装 $dir_work 依赖包...\n"
   npm_install_sub
-  if [[ $? -ne 0 ]]; then
-    echo -e "\n安装 $dir_work 的依赖包运行不成功，再次尝试一遍...\n"
-    npm_install_1 $dir_work
-  fi
   cd $dir_current
 }
 
@@ -295,75 +286,20 @@ diff_and_copy() {
   fi
 }
 
-update_depend() {
-  local dir_current=$(pwd)
-
-  if [[ ! -s $dir_scripts/package.json ]] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
-    cp -f $dir_sample/package.json $dir_scripts/package.json
-    npm_install_2 $dir_scripts
-  fi
-
-  cd $dir_current
-}
-
 git_clone_scripts() {
   local url="$1"
   local dir="$2"
   local branch="$3"
   local proxy="$4"
   [[ $branch ]] && local part_cmd="-b $branch "
-  echo -e "开始克隆仓库 $url 到 $dir\n"
+  echo -e "开始拉取仓库 ${uniq_path} 到 $dir\n"
 
   set_proxy "$proxy"
-  git clone $part_cmd $url $dir
+
+  git clone --depth=1 $part_cmd $url $dir
   exit_status=$?
+
   unset_proxy
-}
-
-git_pull_scripts() {
-  local dir_current=$(pwd)
-  local dir_work="$1"
-  local branch="$2"
-  local proxy="$3"
-  cd $dir_work
-  echo -e "开始更新仓库：$dir_work\n"
-
-  set_proxy "$proxy"
-  git fetch --all
-  exit_status=$?
-  git pull &>/dev/null
-  unset_proxy
-
-  cd $dir_current
-}
-
-reset_romote_url() {
-  local dir_current=$(pwd)
-  local dir_work=$1
-  local url=$2
-  local branch="$3"
-
-  cd $dir_work
-  if [[ -d "$dir_work/.git" ]]; then
-    [[ -f ".git/index.lock" ]] && rm -f .git/index.lock >/dev/null
-    git remote set-url origin $url &>/dev/null
-  else
-    git init
-    git remote add origin $url &>/dev/null
-  fi
-  reset_branch "$branch"
-  cd $dir_current
-}
-
-reset_branch() {
-  local branch="$1"
-  local part_cmd=""
-  if [[ $branch ]]; then
-    part_cmd="origin/${branch}"
-    git checkout -B "$branch" &>/dev/null
-    git branch --set-upstream-to=$part_cmd $branch &>/dev/null
-  fi
-  git reset --hard $part_cmd &>/dev/null
 }
 
 random_range() {
@@ -373,15 +309,11 @@ random_range() {
 }
 
 reload_pm2() {
-  pm2 l &>/dev/null
-
-  echo -e "启动面板服务\n"
-  pm2 delete panel --source-map-support --time &>/dev/null
-  pm2 start $dir_static/build/app.js -n panel --source-map-support --time &>/dev/null
-
-  echo -e "启动定时任务服务\n"
-  pm2 delete schedule --source-map-support --time &>/dev/null
-  pm2 start $dir_static/build/schedule.js -n schedule --source-map-support --time &>/dev/null
+  cd $dir_root
+  # 代理会影响 grpc 服务
+  unset_proxy
+  pm2 flush &>/dev/null
+  pm2 startOrGracefulReload $file_ecosystem_js --update-env
 }
 
 diff_time() {
@@ -413,9 +345,9 @@ format_log_time() {
   local time="$2"
 
   if [[ $is_macos -eq 1 ]]; then
-    echo $(date -j -f "$format" "$time" "+%Y-%m-%d-%H-%M-%S")
+    echo $(date -j -f "$format" "$time" "+%Y-%m-%d-%H-%M-%S-%3N")
   else
-    echo $(date -d "$time" "+%Y-%m-%d-%H-%M-%S")
+    echo $(date -d "$time" "+%Y-%m-%d-%H-%M-%S-%3N")
   fi
 }
 
@@ -431,17 +363,9 @@ format_timestamp() {
 }
 
 patch_version() {
-  if [[ $PipMirror ]]; then
-    pip3 config set global.index-url $PipMirror
-  fi
-  if [[ $NpmMirror ]]; then
-    npm config set registry $NpmMirror
-  fi
+  git config --global pull.rebase false
 
-  # 兼容pnpm@7
-  pnpm setup &>/dev/null
-  source ~/.bashrc
-  pnpm install -g &>/dev/null
+  cp -f $dir_root/.env.example $dir_root/.env
 
   if [[ -f "$dir_root/db/cookie.db" ]]; then
     echo -e "检测到旧的db文件，拷贝为新db...\n"
@@ -449,14 +373,6 @@ patch_version() {
     rm -rf $dir_root/db/cookie.db
     echo
   fi
-
-  if ! type ts-node &>/dev/null; then
-    pnpm add -g ts-node typescript tslib
-  fi
-
-  git config --global pull.rebase false
-
-  cp -f $dir_root/.env.example $dir_root/.env
 
   if [[ -d "$dir_root/db" ]]; then
     echo -e "检测到旧的db目录，拷贝到data目录...\n"
@@ -483,10 +399,59 @@ patch_version() {
   fi
 }
 
+init_nginx() {
+  cp -fv $nginx_conf /etc/nginx/nginx.conf
+  cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
+  local location_url="/"
+  local aliasStr=""
+  local rootStr=""
+  if [[ $ql_base_url != "/" ]]; then
+    location_url="^~${ql_base_url%*/}"
+    aliasStr="alias ${dir_static}/dist;"
+  else
+    rootStr="root ${dir_static}/dist;"
+  fi
+  sed -i "s,QL_ALIAS_CONFIG,${aliasStr},g" /etc/nginx/conf.d/front.conf
+  sed -i "s,QL_ROOT_CONFIG,${rootStr},g" /etc/nginx/conf.d/front.conf
+  sed -i "s,QL_BASE_URL_LOCATION,${location_url},g" /etc/nginx/conf.d/front.conf
+  sed -i "s,QL_BASE_URL,${ql_base_url},g" /etc/nginx/conf.d/front.conf
+
+  ipv6=$(ip a | grep inet6)
+  ipv6Str=""
+  if [[ $ipv6 ]]; then
+    ipv6Str="listen [::]:5700 ipv6only=on;"
+  fi
+  sed -i "s,IPV6_CONFIG,${ipv6Str},g" /etc/nginx/conf.d/front.conf
+}
+
+handle_task_before() {
+  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
+
+  echo -e "## 开始执行... $begin_time\n"
+
+  [[ $is_macos -eq 0 ]] && check_server
+
+  . $file_task_before "$@"
+}
+
+handle_task_after() {
+  . $file_task_after "$@"
+
+  local etime=$(date "+$time_format")
+  local end_time=$(format_time "$time_format" "$etime")
+  local end_timestamp=$(format_timestamp "$time_format" "$etime")
+  local diff_time=$(($end_timestamp - $begin_timestamp))
+
+  [[ "$diff_time" == 0 ]] && diff_time=1
+
+  echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
+
+  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+}
+
 init_env
 detect_termux
 detect_macos
 define_cmd
-fix_config
 
-import_config $1 2>$task_error_log_path
+import_config $1

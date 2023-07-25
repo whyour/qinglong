@@ -29,14 +29,16 @@ export class Subscription {
   sub_before?: string;
   sub_after?: string;
   proxy?: string;
+  autoAddCron?: 1 | 0;
+  autoDelCron?: 1 | 0;
 
   constructor(options: Subscription) {
     this.id = options.id;
     this.name = options.name || options.alias;
     this.type = options.type;
     this.schedule = options.schedule;
-    this.status =
-      options.status && SubscriptionStatus[options.status]
+    this.status = this.status =
+      typeof options.status === 'number' && SubscriptionStatus[options.status]
         ? options.status
         : SubscriptionStatus.idle;
     this.url = options.url;
@@ -56,6 +58,8 @@ export class Subscription {
     this.sub_before = options.sub_before;
     this.sub_after = options.sub_after;
     this.proxy = options.proxy;
+    this.autoAddCron = options.autoAddCron ? 1 : 0;
+    this.autoDelCron = options.autoDelCron ? 1 : 0;
   }
 }
 
@@ -66,7 +70,7 @@ export enum SubscriptionStatus {
   'queued',
 }
 
-interface SubscriptionInstance
+export interface SubscriptionInstance
   extends Model<Subscription, Subscription>,
     Subscription {}
 export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
@@ -105,5 +109,7 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
     schedule_type: DataTypes.STRING,
     alias: { type: DataTypes.STRING, unique: 'alias' },
     proxy: { type: DataTypes.STRING, allowNull: true },
+    autoAddCron: { type: DataTypes.NUMBER, allowNull: true },
+    autoDelCron: { type: DataTypes.NUMBER, allowNull: true },
   },
 );

@@ -6,8 +6,9 @@
   .card-wrapper {
     .ant-card:last-child {
       .ant-card-body {
-        height: calc(80vh - 367px);
-        height: calc(80vh - var(--vh-offset, 0px) - 367px);
+        min-height: 300px;
+        height: calc(90vh - 367px);
+        height: calc(90vh - var(--vh-offset, 0px) - 367px);
         overflow-y: auto;
       }
     }
@@ -155,7 +156,7 @@
 .view-create-modal-sorts {
   display: flex;
 
-  .ant-space-item:nth-child(2) {
+  .ant-space-item:nth-child(1) {
     flex: 1;
   }
 }
@@ -177,6 +178,7 @@ tr.drop-over-upward td {
 .view-filters-container.active {
   .filter-item > div > .ant-form-item-control {
     margin-left: 40px;
+    width: calc(100% - 40px);
   }
 }
 
@@ -189,5 +191,13 @@ tr.drop-over-upward td {
 
     padding: 24px;
     margin: -24px;
+  }
+}
+
+body[data-mode='desktop'] {
+  .crontab-wrapper {
+    tbody .ant-table-cell {
+      height: 69px !important;
+    }
   }
 }

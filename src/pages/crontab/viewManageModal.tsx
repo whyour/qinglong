@@ -75,32 +75,31 @@ const ViewManageModal = ({
   handleCancel: () => void;
   cronViewChange: (data?: any) => void;
 }) => {
+  const islastEnableView = (record) => {
+    return list.filter((x) => !x.isDisabled).length <= 1 && !record.isDisabled;
+  };
+
   const columns: any = [
     {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      align: 'center' as const,
-      render: (text) => (
-        <div style={{ textAlign: 'left', paddingLeft: 30 }}>{text}</div>
-      ),
     },
     {
       title: '类型',
       dataIndex: 'type',
       key: 'type',
-      align: 'center' as const,
       render: (v) => (v === 1 ? '系统' : '个人'),
     },
     {
       title: '显示',
       key: 'isDisabled',
       dataIndex: 'isDisabled',
-      align: 'center' as const,
       width: 100,
       render: (text: string, record: any, index: number) => {
         return (
           <Switch
+            disabled={islastEnableView(record)}
             checked={!record.isDisabled}
             onChange={(checked) => onShowChange(checked, record, index)}
           />
@@ -111,16 +110,17 @@ const ViewManageModal = ({
       title: '操作',
       key: 'action',
       width: 100,
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         return record.type !== 1 ? (
           <Space size="middle">
             <a onClick={() => editView(record, index)}>
               <EditOutlined />
             </a>
-            <a onClick={() => deleteView(record, index)}>
-              <DeleteOutlined />
-            </a>
+            {!islastEnableView(record) && (
+              <a onClick={() => deleteView(record, index)}>
+                <DeleteOutlined />
+              </a>
+            )}
           </Space>
         ) : (
           '-'
@@ -168,9 +168,9 @@ const ViewManageModal = ({
 
   const onShowChange = (checked: boolean, record: any, index: number) => {
     request
-      .put(`${config.apiPrefix}crons/views/${checked ? 'enable' : 'disable'}`, {
-        data: [record.id],
-      })
+      .put(`${config.apiPrefix}crons/views/${checked ? 'enable' : 'disable'}`, [
+        record.id,
+      ])
       .then(({ code, data }) => {
         if (code === 200) {
           const _list = [...list];
@@ -195,7 +195,9 @@ const ViewManageModal = ({
       const dragRow = list[dragIndex];
       request
         .put(`${config.apiPrefix}crons/views/move`, {
-          data: { fromIndex: dragIndex, toIndex: hoverIndex, id: dragRow.id },
+          fromIndex: dragIndex,
+          toIndex: hoverIndex,
+          id: dragRow.id,
         })
         .then(({ code, data }) => {
           if (code === 200) {

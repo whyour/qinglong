@@ -18,6 +18,7 @@ import { SharedContext } from '@/layouts';
 
 const FormItem = Form.Item;
 const { Countdown } = Statistic;
+const isDemoEnv = window.__ENV__DeployEnv === 'demo';
 
 const Login = () => {
   const { reloadUser } = useOutletContext<SharedContext>();
@@ -34,10 +35,8 @@ const Login = () => {
     setWaitTime(null);
     request
       .post(`${config.apiPrefix}user/login`, {
-        data: {
-          username: values.username,
-          password: values.password,
-        },
+        username: values.username,
+        password: values.password,
       })
       .then((data) => {
         checkResponse(data, values);
@@ -53,7 +52,8 @@ const Login = () => {
     setVerifying(true);
     request
       .put(`${config.apiPrefix}user/two-factor/login`, {
-        data: { ...loginInfo, code: values.code },
+        ...loginInfo,
+        code: values.code,
       })
       .then((data: any) => {
         checkResponse(data);
@@ -104,6 +104,10 @@ const Login = () => {
         password: values.password,
       });
       setTwoFactor(true);
+    } else if (code === 100) {
+      setTimeout(() => {
+        location.reload();
+      }, 1000);
     }
   };
 
@@ -169,10 +173,16 @@ const Login = () => {
         ) : (
           <Form layout="vertical" onFinish={handleOk}>
             <FormItem name="username" label="用户名" hasFeedback>
-              <Input placeholder="用户名" autoFocus />
+              <Input
+                placeholder={`用户名${isDemoEnv ? ': admin' : ''}`}
+                autoFocus
+              />
             </FormItem>
             <FormItem name="password" label="密码" hasFeedback>
-              <Input type="password" placeholder="密码" />
+              <Input
+                type="password"
+                placeholder={`密码${isDemoEnv ? ': 123' : ''}`}
+              />
             </FormItem>
             <Row>
               {waitTime ? (

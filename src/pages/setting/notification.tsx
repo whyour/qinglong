@@ -12,17 +12,14 @@ const NotificationSetting = ({ data }: any) => {
   const [form] = Form.useForm();
 
   const handleOk = (values: any) => {
+    setLoading(true);
     const { type } = values;
     if (type == 'closed') {
       values.type = '';
     }
 
     request
-      .put(`${config.apiPrefix}user/notification`, {
-        data: {
-          ...values,
-        },
-      })
+      .put(`${config.apiPrefix}user/notification`, values)
       .then(({ code, data }) => {
         if (code === 200) {
           message.success(values.type ? '通知发送成功' : '通知关闭成功');
@@ -30,7 +27,8 @@ const NotificationSetting = ({ data }: any) => {
       })
       .catch((error: any) => {
         console.log(error);
-      });
+      })
+      .finally(() => setLoading(false));
   };
 
   const notificationModeChange = (value: string) => {
@@ -56,7 +54,7 @@ const NotificationSetting = ({ data }: any) => {
           style={{ maxWidth: 400 }}
           initialValue={notificationMode}
         >
-          <Select onChange={notificationModeChange}>
+          <Select onChange={notificationModeChange} disabled={loading}>
             {config.notificationModes.map((x) => (
               <Option key={x.value} value={x.value}>
                 {x.label}
@@ -74,7 +72,10 @@ const NotificationSetting = ({ data }: any) => {
             style={{ maxWidth: 400 }}
           >
             {x.items ? (
-              <Select placeholder={x.placeholder || `请选择${x.label}`}>
+              <Select
+                placeholder={x.placeholder || `请选择${x.label}`}
+                disabled={loading}
+              >
                 {x.items.map((y) => (
                   <Option key={y.value} value={y.value}>
                     {y.label || y.value}
@@ -83,14 +84,15 @@ const NotificationSetting = ({ data }: any) => {
               </Select>
             ) : (
               <Input.TextArea
+                disabled={loading}
                 autoSize={true}
                 placeholder={x.placeholder || `请输入${x.label}`}
               />
             )}
           </Form.Item>
         ))}
-        <Button type="primary" htmlType="submit">
-          保存
+        <Button type="primary" htmlType="submit" disabled={loading}>
+          {loading ? '测试中...' : '保存'}
         </Button>
       </Form>
     </div>

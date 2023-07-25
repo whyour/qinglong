@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package com.ql.cron;
+
+service Cron {
+  rpc addCron(AddCronRequest) returns (AddCronResponse);
+  rpc delCron(DeleteCronRequest) returns (DeleteCronResponse);
+}
+
+message ICron {
+  string id = 1;
+  string schedule = 2;
+  string command = 3;
+}
+
+message AddCronRequest { repeated ICron crons = 1; }
+
+message AddCronResponse {}
+
+message DeleteCronRequest { repeated string ids = 1; }
+
+message DeleteCronResponse {}

@@ -36,10 +36,8 @@ const Initialization = () => {
     setLoading(true);
     request
       .put(`${config.apiPrefix}user/init`, {
-        data: {
-          username: values.username,
-          password: values.password,
-        },
+        username: values.username,
+        password: values.password,
       })
       .then(({ code, data }) => {
         if (code === 200) {
@@ -52,11 +50,7 @@ const Initialization = () => {
   const submitNotification = (values: any) => {
     setLoading(true);
     request
-      .put(`${config.apiPrefix}user/notification/init`, {
-        data: {
-          ...values,
-        },
-      })
+      .put(`${config.apiPrefix}user/notification/init`, values)
       .then(({ code, data }) => {
         if (code === 200) {
           next();
@@ -78,9 +72,14 @@ const Initialization = () => {
     {
       title: '欢迎使用',
       content: (
-        <div className={styles.top} style={{ marginTop: 100 }}>
+        <div className={styles.top} style={{ marginTop: 30 }}>
           <div className={styles.header}>
-            <span className={styles.title}>欢迎使用青龙控制面板</span>
+            <span className={styles.title}>欢迎使用青龙</span>
+            <span className={styles.desc}>
+              支持python3、javaScript、shell、typescript 的定时任务管理面板（A
+              timed task management panel that supports typescript, javaScript,
+              python3, and shell.）
+            </span>
           </div>
           <div className={styles.action}>
             <Button
@@ -93,53 +92,6 @@ const Initialization = () => {
             </Button>
           </div>
         </div>
-      ),
-    },
-    {
-      title: '通知设置',
-      content: (
-        <Form onFinish={submitNotification} layout="vertical">
-          <Form.Item
-            label="通知方式"
-            name="type"
-            rules={[{ required: true, message: '请选择通知方式' }]}
-            style={{ maxWidth: 350 }}
-          >
-            <Select
-              onChange={notificationModeChange}
-              placeholder="请选择通知方式"
-            >
-              {config.notificationModes
-                .filter((x) => x.value !== 'closed')
-                .map((x) => (
-                  <Option key={x.value} value={x.value}>
-                    {x.label}
-                  </Option>
-                ))}
-            </Select>
-          </Form.Item>
-          {fields.map((x) => (
-            <Form.Item
-              key={x.label}
-              label={x.label}
-              name={x.label}
-              extra={x.tip}
-              rules={[{ required: x.required }]}
-              style={{ maxWidth: 400 }}
-            >
-              <Input.TextArea
-                autoSize={true}
-                placeholder={`请输入${x.label}`}
-              />
-            </Form.Item>
-          ))}
-          <Button type="primary" htmlType="submit" loading={loading}>
-            保存
-          </Button>
-          <Button type="link" htmlType="button" onClick={() => next()}>
-            跳过
-          </Button>
-        </Form>
       ),
     },
     {
@@ -198,6 +150,53 @@ const Initialization = () => {
       ),
     },
     {
+      title: '通知设置',
+      content: (
+        <Form onFinish={submitNotification} layout="vertical">
+          <Form.Item
+            label="通知方式"
+            name="type"
+            rules={[{ required: true, message: '请选择通知方式' }]}
+            style={{ maxWidth: 350 }}
+          >
+            <Select
+              onChange={notificationModeChange}
+              placeholder="请选择通知方式"
+            >
+              {config.notificationModes
+                .filter((x) => x.value !== 'closed')
+                .map((x) => (
+                  <Option key={x.value} value={x.value}>
+                    {x.label}
+                  </Option>
+                ))}
+            </Select>
+          </Form.Item>
+          {fields.map((x) => (
+            <Form.Item
+              key={x.label}
+              label={x.label}
+              name={x.label}
+              extra={x.tip}
+              rules={[{ required: x.required }]}
+              style={{ maxWidth: 400 }}
+            >
+              <Input.TextArea
+                autoSize={true}
+                placeholder={`请输入${x.label}`}
+              />
+            </Form.Item>
+          ))}
+          <Button type="primary" htmlType="submit" loading={loading}>
+            保存
+          </Button>
+          <Button type="link" htmlType="button" onClick={() => next()}>
+            跳过
+          </Button>
+        </Form>
+      ),
+    },
+    {
       title: '完成安装',
       content: (
         <div className={styles.top} style={{ marginTop: 80 }}>
@@ -214,7 +213,7 @@ const Initialization = () => {
             <Button
               type="primary"
               onClick={() => {
-                history.push('/login');
+                window.location.reload();
               }}
             >
               去登录

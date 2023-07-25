@@ -19,6 +19,8 @@ import {
   DeleteFilled,
   BugOutlined,
   FileTextOutlined,
+  CloseCircleOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -31,7 +33,7 @@ import DependenceLogModal from './logModal';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
-
+import dayjs from 'dayjs';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -43,6 +45,7 @@ enum Status {
   '删除中',
   '已删除',
   '删除失败',
+  '队列中',
 }
 
 enum StatusColor {
@@ -51,13 +54,43 @@ enum StatusColor {
   'error',
 }
 
+const StatusMap: Record<number, { icon: React.ReactNode; color: string }> = {
+  0: {
+    icon: <SyncOutlined spin />,
+    color: 'processing',
+  },
+  1: {
+    icon: <CheckCircleOutlined />,
+    color: 'success',
+  },
+  2: {
+    icon: <CloseCircleOutlined />,
+    color: 'error',
+  },
+  3: {
+    icon: <SyncOutlined spin />,
+    color: 'processing',
+  },
+  4: {
+    icon: <CheckCircleOutlined />,
+    color: 'success',
+  },
+  5: {
+    icon: <CloseCircleOutlined />,
+    color: 'error',
+  },
+  6: {
+    icon: <ClockCircleOutlined />,
+    color: 'default',
+  },
+};
+
 const Dependence = () => {
   const { headerStyle, isPhone, socketMessage } =
     useOutletContext<SharedContext>();
   const columns: any = [
     {
       title: '序号',
-      align: 'center' as const,
       width: 50,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
@@ -67,18 +100,17 @@ const Dependence = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      align: 'center' as const,
     },
     {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
             <Tag
-              color={StatusColor[record.status % 3]}
+              color={StatusMap[record.status].color}
+              icon={StatusMap[record.status].icon}
               style={{ marginRight: 0 }}
             >
               {Status[record.status]}
@@ -91,36 +123,26 @@ const Dependence = () => {
       title: '备注',
       dataIndex: 'remark',
       key: 'remark',
-      align: 'center' as const,
+    },
+    {
+      title: '更新时间',
+      key: 'updatedAt',
+      dataIndex: 'updatedAt',
+      render: (text: string) => {
+        return <span>{dayjs(text).format('YYYY-MM-DD HH:mm:ss')}</span>;
+      },
     },
     {
       title: '创建时间',
-      key: 'timestamp',
-      dataIndex: 'timestamp',
-      align: 'center' as const,
-      render: (text: string, record: any) => {
-        const language = navigator.language || navigator.languages[0];
-        const time = record.createdAt || record.timestamp;
-        const date = new Date(time)
-          .toLocaleString(language, {
-            hour12: false,
-          })
-          .replace(' 24:', ' 00:');
-        return (
-          <Tooltip
-            placement="topLeft"
-            title={date}
-            trigger={['hover', 'click']}
-          >
-            <span>{date}</span>
-          </Tooltip>
-        );
+      key: 'createdAt',
+      dataIndex: 'createdAt',
+      render: (text: string) => {
+        return <span>{dayjs(text).format('YYYY-MM-DD HH:mm:ss')}</span>;
       },
     },
     {
       title: '操作',
       key: 'action',
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
@@ -169,7 +191,7 @@ const Dependence = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
   const tableRef = useRef<any>();
-  const tableScrollHeight = useTableScrollHeight(tableRef, 59)
+  const tableScrollHeight = useTableScrollHeight(tableRef, 59);
 
   const getDependencies = () => {
     setLoading(true);
@@ -218,7 +240,7 @@ const Dependence = () => {
           })
           .then(({ code, data }) => {
             if (code === 200 && force) {
-              const i = value.findIndex((x) => x.id === data.data[0].id);
+              const i = value.findIndex((x) => x.id === data[0].id);
               if (i !== -1) {
                 const result = [...value];
                 result.splice(i, 1);
@@ -247,9 +269,7 @@ const Dependence = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}dependencies/reinstall`, {
-            data: [record.id],
-          })
+          .put(`${config.apiPrefix}dependencies/reinstall`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               handleDependence(data[0]);
@@ -270,7 +290,7 @@ const Dependence = () => {
   const handleDependence = (dependence: any) => {
     const result = [...value];
     if (Array.isArray(dependence)) {
-      result.push(...dependence);
+      result.unshift(...dependence);
     } else {
       const index = value.findIndex((x) => x.id === dependence.id);
       if (index !== -1) {
@@ -320,9 +340,7 @@ const Dependence = () => {
       content: <>确认重新安装选中的依赖吗</>,
       onOk() {
         request
-          .put(`${config.apiPrefix}dependencies/reinstall`, {
-            data: selectedRowIds,
-          })
+          .put(`${config.apiPrefix}dependencies/reinstall`, selectedRowIds)
           .then(({ code, data }) => {
             if (code === 200) {
               setSelectedRowIds([]);
@@ -373,6 +391,23 @@ const Dependence = () => {
   useEffect(() => {
     if (!socketMessage) return;
     const { type, message, references } = socketMessage;
+    if (
+      type === 'installDependence' &&
+      message.includes('开始时间') &&
+      references.length > 0
+    ) {
+      const result = [...value];
+      for (let i = 0; i < references.length; i++) {
+        const index = value.findIndex((x) => x.id === references[i]);
+        if (index !== -1) {
+          result.splice(index, 1, {
+            ...value[index],
+            status: message.includes('安装') ? Status.安装中 : Status.删除中,
+          });
+        }
+      }
+      setValue(result);
+    }
     if (
       type === 'installDependence' &&
       message.includes('结束时间') &&

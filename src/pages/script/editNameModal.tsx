@@ -44,9 +44,7 @@ const EditScriptNameModal = ({
     formData.append('content', '');
     formData.append('directory', directory);
     request
-      .post(`${config.apiPrefix}scripts`, {
-        data: formData,
-      })
+      .post(`${config.apiPrefix}scripts`, formData)
       .then(({ code, data }) => {
         if (code === 200) {
           message.success(directory ? '新建文件夹成功' : '新建文件成功');

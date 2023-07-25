@@ -1,6 +1,5 @@
 .error-wrapper {
   display: flex;
-  align-items: center;
   justify-content: center;
   height: 100vh;
 
@@ -8,5 +7,47 @@
     max-width: 90%;
     height: calc(100vh - 80px);
     overflow-y: auto;
+  }
+
+  .code-box {
+    position: relative;
+    display: inline-block;
+    width: 80vw;
+    height: 90vh;
+    margin: 16px;
+    background-color: #ffffff;
+    border: 1px solid rgba(5, 5, 5, 0.06);
+    border-radius: 6px;
+    -webkit-transition: all 0.2s;
+    transition: all 0.2s;
+    border-radius: 6px 6px 0 0;
+    color: rgba(0, 0, 0, 0.88);
+    border-bottom: 1px solid rgba(5, 5, 5, 0.06);
+
+    .browser-markup {
+      position: relative;
+      border-top: 2em solid rgba(230, 230, 230, 0.7);
+      border-radius: 3px 3px 0 0;
+
+      &::before {
+        position: absolute;
+        top: -1.25em;
+        left: 1em;
+        display: block;
+        width: 0.5em;
+        height: 0.5em;
+        background-color: #f44;
+        border-radius: 50%;
+        box-shadow: 0 0 0 2px #f44, 1.5em 0 0 2px #9b3, 3em 0 0 2px #fb5;
+        content: '';
+      }
+    }
+
+    .log {
+      height: calc(90vh - 150px);
+      overflow-y: auto;
+      padding: 12px;
+      white-space: pre-line;
+    }
   }
 }

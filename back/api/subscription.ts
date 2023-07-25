@@ -50,6 +50,8 @@ export default (app: Router) => {
         schedule_type: Joi.string().required(),
         alias: Joi.string().required(),
         proxy: Joi.string().optional().allow('').allow(null),
+        autoAddCron: Joi.boolean().optional().allow('').allow(null),
+        autoDelCron: Joi.boolean().optional().allow('').allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -179,6 +181,8 @@ export default (app: Router) => {
         sub_after: Joi.string().optional().allow('').allow(null),
         alias: Joi.string().required(),
         proxy: Joi.string().optional().allow('').allow(null),
+        autoAddCron: Joi.boolean().optional().allow('').allow(null),
+        autoDelCron: Joi.boolean().optional().allow('').allow(null),
         id: Joi.number().required(),
       }),
     }),

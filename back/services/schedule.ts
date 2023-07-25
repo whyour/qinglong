@@ -1,14 +1,16 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import nodeSchedule from 'node-schedule';
-import { ChildProcessWithoutNullStreams, exec, spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams } from 'child_process';
 import {
   ToadScheduler,
   LongIntervalJob,
-  AsyncTask,
   SimpleIntervalSchedule,
+  Task,
 } from 'toad-scheduler';
 import dayjs from 'dayjs';
+import taskLimit from '../shared/pLimit';
+import { spawn } from 'cross-spawn';
 
 interface ScheduleTaskType {
   id: number;
@@ -40,73 +42,74 @@ export default class ScheduleService {
 
   private maxBuffer = 200 * 1024 * 1024;
 
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   async runTask(
     command: string,
     callbacks: TaskCallbacks = {},
     completionTime: 'start' | 'end' = 'end',
   ) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const startTime = dayjs();
-        await callbacks.onBefore?.(startTime);
+    return taskLimit.runWithCpuLimit(() => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const startTime = dayjs();
+          await callbacks.onBefore?.(startTime);
 
-        const cp = spawn(command, { shell: '/bin/bash' });
+          const cp = spawn(command, { shell: '/bin/bash' });
 
-        // TODO:
-        callbacks.onStart?.(cp, startTime);
-        completionTime === 'start' && resolve(cp.pid);
+          callbacks.onStart?.(cp, startTime);
+          completionTime === 'start' && resolve(cp.pid);
 
-        cp.stdout.on('data', async (data) => {
-          await callbacks.onLog?.(data.toString());
-        });
+          cp.stdout.on('data', async (data) => {
+            await callbacks.onLog?.(data.toString());
+          });
 
-        cp.stderr.on('data', async (data) => {
-          this.logger.error(
-            '执行任务 %s 失败，时间：%s, 错误信息：%j',
+          cp.stderr.on('data', async (data) => {
+            this.logger.info(
+              '[执行任务失败] %s，时间：%s, 错误信息：%j',
+              command,
+              new Date().toLocaleString(),
+              data.toString(),
+            );
+            await callbacks.onError?.(data.toString());
+          });
+
+          cp.on('error', async (err) => {
+            this.logger.error(
+              '[创建任务失败] %s，时间：%s, 错误信息：%j',
+              command,
+              new Date().toLocaleString(),
+              err,
+            );
+            await callbacks.onError?.(JSON.stringify(err));
+          });
+
+          cp.on('exit', async (code, signal) => {
+            this.logger.info(
+              `[任务退出] ${command} 进程id: ${cp.pid}，退出码 ${code}`,
+            );
+          });
+
+          cp.on('close', async (code) => {
+            const endTime = dayjs();
+            await callbacks.onEnd?.(
+              cp,
+              endTime,
+              endTime.diff(startTime, 'seconds'),
+            );
+            resolve(null);
+          });
+        } catch (error) {
+          await this.logger.error(
+            '执行任务%s失败，时间：%s, 错误信息：%j',
             command,
             new Date().toLocaleString(),
-            data.toString(),
+            error,
           );
-          await callbacks.onError?.(data.toString());
-        });
-
-        cp.on('error', async (err) => {
-          this.logger.error(
-            '创建任务 %s 失败，时间：%s, 错误信息：%j',
-            command,
-            new Date().toLocaleString(),
-            err,
-          );
-          await callbacks.onError?.(JSON.stringify(err));
-        });
-
-        cp.on('exit', async (code, signal) => {
-          this.logger.info(
-            `任务 ${command} 进程id: ${cp.pid} 退出，退出码 ${code}`,
-          );
-        });
-
-        cp.on('close', async (code) => {
-          const endTime = dayjs();
-          await callbacks.onEnd?.(
-            cp,
-            endTime,
-            endTime.diff(startTime, 'seconds'),
-          );
-          resolve(null);
-        });
-      } catch (error) {
-        await this.logger.error(
-          '执行任务%s失败，时间：%s, 错误信息：%j',
-          command,
-          new Date().toLocaleString(),
-          error,
-        );
-        await callbacks.onError?.(JSON.stringify(error));
-      }
-    });
+          await callbacks.onError?.(JSON.stringify(error));
+        }
+      });
+    })
   }
 
   async createCronTask(
@@ -126,19 +129,22 @@ export default class ScheduleService {
     this.scheduleStacks.set(
       _id,
       nodeSchedule.scheduleJob(_id, schedule, async () => {
-        await this.runTask(command, callbacks);
+        this.runTask(command, callbacks);
       }),
     );
 
     if (runImmediately) {
-      await this.runTask(command, callbacks);
+      this.runTask(command, callbacks);
     }
   }
 
   async cancelCronTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info('[取消定时任务]，任务名：%s', name);
-    this.scheduleStacks.has(_id) && this.scheduleStacks.get(_id)?.cancel();
+    if (this.scheduleStacks.has(_id)) {
+      this.scheduleStacks.get(_id)?.cancel();
+      this.scheduleStacks.delete(_id);
+    }
   }
 
   async createIntervalTask(
@@ -154,12 +160,10 @@ export default class ScheduleService {
       name,
       command,
     );
-    const task = new AsyncTask(
+    const task = new Task(
       name,
-      async () => {
-        return new Promise(async (resolve, reject) => {
-          await this.runTask(command, callbacks);
-        });
+      () => {
+        this.runTask(command, callbacks);
       },
       (err) => {
         this.logger.error(
@@ -180,7 +184,7 @@ export default class ScheduleService {
     this.intervalSchedule.addIntervalJob(job);
 
     if (runImmediately) {
-      await this.runTask(command, callbacks);
+      this.runTask(command, callbacks);
     }
   }
 

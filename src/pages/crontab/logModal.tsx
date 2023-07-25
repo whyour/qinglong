@@ -8,13 +8,8 @@ import {
 } from '@ant-design/icons';
 import { PageLoading } from '@ant-design/pro-layout';
 import { logEnded } from '@/utils';
+import { CrontabStatus } from './type';
 
-enum CrontabStatus {
-  'running',
-  'idle',
-  'disabled',
-  'queued',
-}
 const { Countdown } = Statistic;
 
 const CronLogModal = ({
@@ -51,10 +46,7 @@ const CronLogModal = ({
           const log = data as string;
           setValue(log || '暂无日志');
           const hasNext = Boolean(
-            log &&
-              !logEnded(log) &&
-              !log.includes('重启面板') &&
-              !log.includes('任务未运行或运行失败，请尝试手动运行'),
+            log && !logEnded(log) && !log.includes('任务未运行'),
           );
           setExecuting(hasNext);
           autoScroll();
@@ -62,29 +54,6 @@ const CronLogModal = ({
             setTimeout(() => {
               getCronLog();
             }, 2000);
-          }
-          if (
-            log &&
-            log.includes('重启面板') &&
-            cron.status === CrontabStatus.running
-          ) {
-            message.warning({
-              content: (
-                <span>
-                  系统将在
-                  <Countdown
-                    className="inline-countdown"
-                    format="ss"
-                    value={Date.now() + 1000 * 30}
-                  />
-                  秒后自动刷新
-                </span>
-              ),
-              duration: 10,
-            });
-            setTimeout(() => {
-              window.location.reload();
-            }, 30000);
           }
         }
       })

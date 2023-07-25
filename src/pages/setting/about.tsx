@@ -31,12 +31,9 @@ const About = ({ systemInfo }: { systemInfo: SharedContext['systemInfo'] }) => {
             {TVersion[systemInfo.branch]} v{systemInfo.version}
           </Descriptions.Item>
           <Descriptions.Item label="更新时间" span={3}>
-            {dayjs(systemInfo.lastCommitTime * 1000).format(
-              'YYYY-MM-DD HH:mm:ss',
+            {dayjs(systemInfo.publishTime * 1000).format(
+              'YYYY-MM-DD HH:mm',
             )}
-          </Descriptions.Item>
-          <Descriptions.Item label="更新ID" span={3}>
-            {systemInfo.lastCommitId}
           </Descriptions.Item>
           <Descriptions.Item label="更新日志" span={3}>
             <Link

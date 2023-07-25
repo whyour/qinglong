@@ -49,8 +49,7 @@ export interface SharedContext {
 interface TSystemInfo {
   branch: 'develop' | 'master';
   isInitialized: boolean;
-  lastCommitId: string;
-  lastCommitTime: number;
+  publishTime: number;
   version: string;
   changeLog: string;
   changeLogLink: string;
@@ -98,8 +97,7 @@ export default function () {
       })
       .catch((error) => {
         console.log(error);
-      })
-      .finally(() => setInitLoading(false));
+      });
   };
 
   const getUser = (needLoading = true) => {
@@ -120,6 +118,22 @@ export default function () {
       });
   };
 
+  const getHealthStatus = () => {
+    request
+      .get(`${config.apiPrefix}public/health`)
+      .then((res) => {
+        if (res?.data?.status === 1) {
+          getSystemInfo();
+        } else {
+          history.push('/error');
+        }
+      })
+      .catch((error) => {
+        history.push('/error');
+      })
+      .finally(() => setInitLoading(false));
+  };
+
   const reloadUser = (needLoading = false) => {
     getUser(needLoading);
   };
@@ -131,10 +145,8 @@ export default function () {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!systemInfo) {
-      getSystemInfo();
-    }
-  }, [systemInfo]);
+    getHealthStatus();
+  }, []);
 
   useEffect(() => {
     if (theme === 'vs-dark') {
@@ -267,39 +279,41 @@ export default function () {
       selectedKeys={[location.pathname]}
       loading={loading}
       ErrorBoundary={Sentry.ErrorBoundary}
-      logo={<Image preview={false} src="https://qn.whyour.cn/logo.png" />}
-      // @ts-ignore
-      title={
+      logo={
         <>
-          <span style={{ fontSize: 16 }}>控制面板</span>
-          <a
-            href={systemInfo?.changeLogLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <Tooltip
-              title={systemInfo?.branch === 'develop' ? '开发版' : '正式版'}
+          <Image preview={false} src="https://qn.whyour.cn/logo.png" />
+          <div className="title">
+            <span className="title">青龙</span>
+            <a
+              href={systemInfo?.changeLogLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
             >
-              <Badge size="small" dot={systemInfo?.branch === 'develop'}>
-                <span
-                  style={{
-                    fontSize: isFirefox ? 9 : 12,
-                    color: '#666',
-                    marginLeft: 2,
-                    zoom: isSafari ? 0.66 : 0.8,
-                    letterSpacing: isQQBrowser ? -2 : 0,
-                  }}
-                >
-                  v{systemInfo?.version}
-                </span>
-              </Badge>
-            </Tooltip>
-          </a>
+              <Tooltip
+                title={systemInfo?.branch === 'develop' ? '开发版' : '正式版'}
+              >
+                <Badge size="small" dot={systemInfo?.branch === 'develop'}>
+                  <span
+                    style={{
+                      fontSize: isFirefox ? 9 : 12,
+                      color: '#666',
+                      marginLeft: 2,
+                      zoom: isSafari ? 0.66 : 0.8,
+                      letterSpacing: isQQBrowser ? -2 : 0,
+                    }}
+                  >
+                    v{systemInfo?.version}
+                  </span>
+                </Badge>
+              </Tooltip>
+            </a>
+          </div>
         </>
       }
+      title={false}
       menuItemRender={(menuItemProps: any, defaultDom: any) => {
         if (
           menuItemProps.isUrl ||
@@ -313,7 +327,7 @@ export default function () {
       pageTitleRender={(props, pageName, info) => {
         const title =
           (config.documentTitleMap as any)[location.pathname] || '未找到';
-        return `${title} - 控制面板`;
+        return `${title} - 青龙`;
       }}
       onCollapse={setCollapsed}
       collapsed={collapsed}

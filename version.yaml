@@ -1,8 +1,6 @@
-version: 2.15.6
-changeLogLink: https://t.me/jiao_long/358
+version: 2.15.20
+changeLogLink: https://t.me/jiao_long/386
+publishTime: 2023-07-22 16:00
 changeLog: |
-  1. 修复定时任务数据量大时卡顿，丝滑滚动
-  2. 修复查看运行中任务日志时自动向下滚动
-  3. 支持SMTP邮件通知，感谢 https://github.com/WankkoRee，https://github.com/catlair
-  4. 修改资源通知逻辑
-  5. 其他bug修复
+  1. 修复判断 linux 依赖已安装逻辑
+  2. 修复未启动完成时，页面提示 500

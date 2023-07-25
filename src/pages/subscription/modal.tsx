@@ -1,12 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, message, InputNumber, Form, Radio, Select, Input } from 'antd';
+import {
+  Modal,
+  message,
+  InputNumber,
+  Form,
+  Radio,
+  Select,
+  Input,
+  Switch,
+} from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import cron_parser from 'cron-parser';
+import isNil from 'lodash/isNil';
 
 const { Option } = Select;
-const repoUrlRegx = /[^\/\:]+\/[^\/]+(?=\.git)/;
-const fileUrlRegx = /[^\/\:]+\/[^\/]+$/;
+const repoUrlRegx = /([^\/\:]+\/[^\/]+)(?=\.git)/;
+const fileUrlRegx = /([^\/\:]+\/[^\/\.]+)\.[a-z]+$/;
 
 const SubscriptionModal = ({
   subscription,
@@ -26,16 +36,18 @@ const SubscriptionModal = ({
   const handleOk = async (values: any) => {
     setLoading(true);
     const method = subscription ? 'put' : 'post';
-    const payload = { ...values };
+    const payload = {
+      ...values,
+      autoAddCron: Boolean(values.autoAddCron),
+      autoDelCron: Boolean(values.autoDelCron),
+    };
     if (subscription) {
       payload.id = subscription.id;
     }
     try {
       const { code, data } = await request[method](
         `${config.apiPrefix}subscriptions`,
-        {
-          data: payload,
-        },
+        payload,
       );
       if (code === 200) {
         message.success(subscription ? '更新订阅成功' : '新建订阅成功');
@@ -86,7 +98,7 @@ const SubscriptionModal = ({
     let _alias = '';
     const _regx = _type === 'file' ? fileUrlRegx : repoUrlRegx;
     if (_regx.test(_url)) {
-      _alias = _url.match(_regx)![0].replaceAll('/', '_').replaceAll('.', '_');
+      _alias = _url.match(_regx)![1].replaceAll('/', '_').replaceAll('.', '_');
     }
     if (_branch) {
       _alias = _alias + '_' + _branch;
@@ -110,8 +122,8 @@ const SubscriptionModal = ({
       }
     };
 
-    const numberChange = (value: number) => {
-      setIntervalNumber(value);
+    const numberChange = (value: number | null) => {
+      setIntervalNumber(value || 1);
       if (!value) {
         onChange?.(null);
       } else {
@@ -125,6 +137,7 @@ const SubscriptionModal = ({
         setIntervalNumber(value.value);
       }
     }, [value]);
+
     return (
       <Input.Group compact>
         <InputNumber
@@ -217,7 +230,7 @@ const SubscriptionModal = ({
         dependences,
         branch,
         extensions,
-        alias: formatAlias(url, branch),
+        alias: formatAlias(url, branch, _type),
       });
       setType(_type);
     }
@@ -228,7 +241,16 @@ const SubscriptionModal = ({
     if (text.startsWith('ql ')) {
       e.preventDefault();
     }
+    onPaste(e);
   }, []);
+
+  const formatParams = (sub) => {
+    return {
+      ...sub,
+      autoAddCron: isNil(sub?.autoAddCron) ? true : Boolean(sub?.autoAddCron),
+      autoDelCron: isNil(sub?.autoDelCron) ? true : Boolean(sub?.autoDelCron),
+    };
+  };
 
   useEffect(() => {
     if (visible) {
@@ -239,7 +261,9 @@ const SubscriptionModal = ({
   }, [visible]);
 
   useEffect(() => {
-    form.setFieldsValue(subscription || {});
+    form.setFieldsValue(
+      { ...subscription, ...formatParams(subscription) } || {},
+    );
     setType((subscription && subscription.type) || 'public-repo');
     setScheduleType((subscription && subscription.schedule_type) || 'crontab');
     setPullType((subscription && subscription.pull_type) || 'ssh-key');
@@ -269,9 +293,9 @@ const SubscriptionModal = ({
       confirmLoading={loading}
     >
       <Form form={form} name="form_in_modal" layout="vertical">
-        <Form.Item name="name" label="名称">
+        <Form.Item name="name" label="名称" rules={[{ required: true }]}>
           <Input
-            placeholder="支持拷贝ql repo/raw命令，粘贴导入"
+            placeholder="支持拷贝 ql repo/raw 命令，粘贴导入"
             onPaste={onNamePaste}
           />
         </Form.Item>
@@ -451,6 +475,24 @@ const SubscriptionModal = ({
                 : 'HTTP/SOCK5代理，例如 http://127.0.0.1:1080'
             }
           />
+        </Form.Item>
+        <Form.Item style={{ marginBottom: 0 }} className="inline-form-item">
+          <Form.Item
+            name="autoAddCron"
+            label="自动添加任务"
+            valuePropName="checked"
+            initialValue={true}
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            name="autoDelCron"
+            label="自动删除任务"
+            valuePropName="checked"
+            initialValue={true}
+          >
+            <Switch />
+          </Form.Item>
         </Form.Item>
       </Form>
     </Modal>

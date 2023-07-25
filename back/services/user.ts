@@ -1,16 +1,20 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { createRandomString, getNetIp, getPlatform } from '../config/util';
+import {
+  createRandomString,
+  fileExist,
+  getNetIp,
+  getPlatform,
+} from '../config/util';
 import config from '../config';
 import * as fs from 'fs';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
-import { AuthDataType, AuthInfo, AuthModel, LoginStatus } from '../data/auth';
+import { AuthDataType, AuthInfo, AuthModel, AuthModelInfo, LoginStatus } from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import { Request } from 'express';
 import ScheduleService from './schedule';
-import { spawn } from 'child_process';
 import SockService from './sock';
 import dayjs from 'dayjs';
 
@@ -23,7 +27,7 @@ export default class UserService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async login(
     payloads: {
@@ -115,8 +119,7 @@ export default class UserService {
         });
         await this.notificationService.notify(
           '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-            req.platform
+          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${req.platform
           }端 登录成功，ip地址 ${ip}`,
         );
         await this.getLoginLog();
@@ -144,8 +147,7 @@ export default class UserService {
         });
         await this.notificationService.notify(
           '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-            req.platform
+          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${req.platform
           }端 登录失败，ip地址 ${ip}`,
         );
         await this.getLoginLog();
@@ -183,12 +185,12 @@ export default class UserService {
     });
   }
 
-  public async getLoginLog(): Promise<AuthInfo[]> {
+  public async getLoginLog(): Promise<Array<AuthModelInfo | undefined>> {
     const docs = await AuthModel.findAll({
       where: { type: AuthDataType.loginLog },
     });
     if (docs && docs.length > 0) {
-      const result = docs.sort((a, b) => b.info.timestamp - a.info.timestamp);
+      const result = docs.sort((a, b) => b.info!.timestamp! - a.info!.timestamp!);
       if (result.length > 100) {
         await AuthModel.destroy({
           where: { id: result[result.length - 1].id },
@@ -205,17 +207,16 @@ export default class UserService {
   }
 
   private initAuthInfo() {
-    const newPassword = createRandomString(16, 22);
     fs.writeFileSync(
       config.authConfigFile,
       JSON.stringify({
         username: 'admin',
-        password: newPassword,
+        password: 'admin',
       }),
     );
     return {
       code: 100,
-      message: '已初始化密码，请前往auth.json查看并重新登录',
+      message: '未找到认证文件，重新初始化',
     };
   }
 
@@ -240,13 +241,18 @@ export default class UserService {
     return { code: 200, data: avatar, message: '更新成功' };
   }
 
-  public getUserInfo(): Promise<any> {
-    return new Promise((resolve) => {
-      fs.readFile(config.authConfigFile, 'utf8', (err, data) => {
-        if (err) console.log(err);
-        resolve(JSON.parse(data));
-      });
-    });
+  public async getUserInfo(): Promise<any> {
+    const authFileExist = await fileExist(config.authConfigFile);
+    if (!authFileExist) {
+      fs.writeFileSync(
+        config.authConfigFile,
+        JSON.stringify({
+          username: 'admin',
+          password: 'admin',
+        }),
+      );
+    }
+    return this.getAuthInfo();
   }
 
   public initTwoFactor() {

@@ -14,6 +14,7 @@ import config from '@/utils/config';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
 import get from 'lodash/get';
+import { CrontabStatus } from './type';
 
 const PROPERTIES = [
   { name: '命令', value: 'command' },
@@ -47,9 +48,9 @@ const SORTTYPES = [
 
 const STATUS_MAP = {
   status: [
-    { name: '运行中', value: 0 },
-    { name: '空闲中', value: 1 },
-    { name: '已禁用', value: 2 },
+    { name: '运行中', value: CrontabStatus.running },
+    { name: '空闲中', value: CrontabStatus.idle },
+    { name: '已禁用', value: CrontabStatus.disabled },
   ],
 };
 
@@ -70,6 +71,7 @@ const ViewCreateModal = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [filterRelation, setFilterRelation] = useState<'and' | 'or'>('and');
+  const filtersValue = Form.useWatch('filters', form);
 
   const handleOk = async (values: any) => {
     setLoading(true);
@@ -78,9 +80,7 @@ const ViewCreateModal = ({
     try {
       const { code, data } = await request[method](
         `${config.apiPrefix}crons/views`,
-        {
-          data: view ? { ...values, id: view.id } : values,
-        },
+        view ? { ...values, id: view.id } : values,
       );
 
       if (code === 200) {
@@ -126,7 +126,7 @@ const ViewCreateModal = ({
   };
 
   const typeElement = (
-    <Select>
+    <Select style={{ width: 80 }}>
       {SORTTYPES.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -204,7 +204,7 @@ const ViewCreateModal = ({
                       position: 'absolute',
                       top: '50%',
                       translate: '-50% -50%',
-                      padding: '0 0 0 3px',
+                      padding: '0 3px',
                       cursor: 'pointer',
                     }}
                     onClick={() => {
@@ -221,9 +221,9 @@ const ViewCreateModal = ({
                 </div>
               )}
               <div>
-                {fields.map(({ key, name, ...restField }, index) => (
+                {fields.map(({ key, name, ...restField }) => (
                   <Form.Item
-                    label={index === 0 ? '筛选条件' : ''}
+                    label={name === 0 ? '筛选条件' : ''}
                     key={key}
                     style={{ marginBottom: 0 }}
                     required
@@ -232,9 +232,6 @@ const ViewCreateModal = ({
                     <Space
                       className="view-create-modal-filters"
                       align="baseline"
-                      style={
-                        fields.length > 1 ? { width: 'calc(100% - 40px)' } : {}
-                      }
                     >
                       <Form.Item
                         {...restField}
@@ -251,55 +248,18 @@ const ViewCreateModal = ({
                         {operationElement}
                       </Form.Item>
                       <Form.Item
-                        noStyle
-                        shouldUpdate={(prevValues, nextValues) => {
-                          const preOperation =
-                            EOperation[
-                              get(prevValues, ['filters', name, 'operation'])
-                            ];
-                          const nextOperation =
-                            EOperation[
-                              get(nextValues, ['filters', name, 'operation'])
-                            ];
-                          const flag = preOperation !== nextOperation;
-                          if (flag) {
-                            form.setFieldValue(
-                              ['filters', name, 'value'],
-                              nextOperation === 'select' ? [] : '',
-                            );
-                          }
-                          return flag;
-                        }}
+                        {...restField}
+                        name={[name, 'value']}
+                        rules={[{ required: true, message: '请输入内容' }]}
                       >
-                        {() => {
-                          const property = form.getFieldValue([
-                            'filters',
-                            index,
-                            'property',
-                          ]) as 'status';
-                          const operate = form.getFieldValue([
-                            'filters',
-                            name,
-                            'operation',
-                          ]);
-                          return (
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'value']}
-                              rules={[
-                                { required: true, message: '请输入内容' },
-                              ]}
-                            >
-                              {EOperation[operate] === 'select' ? (
-                                statusElement(property)
-                              ) : (
-                                <Input placeholder="请输入内容" />
-                              )}
-                            </Form.Item>
-                          );
-                        }}
+                        {EOperation[filtersValue?.[name]['operation']] ===
+                        'select' ? (
+                          statusElement(filtersValue?.[name]['property'])
+                        ) : (
+                          <Input placeholder="请输入内容" />
+                        )}
                       </Form.Item>
-                      {index !== 0 && (
+                      {name !== 0 && (
                         <MinusCircleOutlined onClick={() => remove(name)} />
                       )}
                     </Space>
@@ -321,39 +281,77 @@ const ViewCreateModal = ({
         </Form.List>
         <Form.List name="sorts">
           {(fields, { add, remove }) => (
-            <>
-              {fields.map(({ key, name, ...restField }, index) => (
-                <Form.Item
-                  label={index === 0 ? '排序方式' : ''}
-                  key={key}
-                  style={{ marginBottom: 0 }}
+            <div
+              style={{ position: 'relative' }}
+              className={`view-filters-container ${
+                fields.length > 1 ? 'active' : ''
+              }`}
+            >
+              {fields.length > 1 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    width: 50,
+                    borderRadius: 10,
+                    border: '1px solid rgb(190, 220, 255)',
+                    borderRight: 'none',
+                    height: 56 * (fields.length - 1),
+                    top: 46,
+                    left: 15,
+                  }}
                 >
-                  <Space className="view-create-modal-sorts" align="baseline">
-                    <Form.Item
-                      {...restField}
-                      name={[name, 'property']}
-                      rules={[{ required: true }]}
-                    >
-                      {propertyElement(PROPERTIES, { width: 240 })}
-                    </Form.Item>
-                    <Form.Item
-                      {...restField}
-                      name={[name, 'type']}
-                      rules={[{ required: true }]}
-                    >
-                      {typeElement}
-                    </Form.Item>
-                    <MinusCircleOutlined onClick={() => remove(name)} />
-                  </Space>
+                  <Button
+                    type="primary"
+                    size="small"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      translate: '-50% -50%',
+                      padding: '0 3px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <>
+                      <span>{ViewFilterRelation[filterRelation]}</span>
+                    </>
+                  </Button>
+                </div>
+              )}
+              <div>
+                {fields.map(({ key, name, ...restField }) => (
+                  <Form.Item
+                    label={name === 0 ? '排序方式' : ''}
+                    key={key}
+                    style={{ marginBottom: 0 }}
+                    className="filter-item"
+                  >
+                    <Space className="view-create-modal-sorts" align="baseline">
+                      <Form.Item
+                        {...restField}
+                        name={[name, 'property']}
+                        rules={[{ required: true }]}
+                      >
+                        {propertyElement(PROPERTIES)}
+                      </Form.Item>
+                      <Form.Item
+                        {...restField}
+                        name={[name, 'type']}
+                        rules={[{ required: true }]}
+                      >
+                        {typeElement}
+                      </Form.Item>
+                      <MinusCircleOutlined onClick={() => remove(name)} />
+                    </Space>
+                  </Form.Item>
+                ))}
+                <Form.Item>
+                  <a onClick={() => add({ property: 'command', type: 'ASC' })}>
+                    <PlusOutlined />
+                    新增排序方式
+                  </a>
                 </Form.Item>
-              ))}
-              <Form.Item>
-                <a onClick={() => add({ property: 'command', type: 'ASC' })}>
-                  <PlusOutlined />
-                  新增排序方式
-                </a>
-              </Form.Item>
-            </>
+              </div>
+            </div>
           )}
         </Form.List>
       </Form>

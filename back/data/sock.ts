@@ -16,4 +16,5 @@ export type SockMessageType =
   | 'uninstallDependence'
   | 'updateSystemVersion'
   | 'manuallyRunScript'
-  | 'runSubscriptionEnd';
+  | 'runSubscriptionEnd'
+  | 'reloadSystem';

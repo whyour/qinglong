@@ -152,6 +152,21 @@ export default (app: Router) => {
     }
   });
 
+  route.get(
+    '/detail',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.find(req.query as any);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
   route.post(
     '/',
     celebrate({
@@ -160,6 +175,7 @@ export default (app: Router) => {
         schedule: Joi.string().required(),
         name: Joi.string().optional(),
         labels: Joi.array().optional(),
+        sub_id: Joi.number().optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -316,6 +332,7 @@ export default (app: Router) => {
         command: Joi.string().required(),
         schedule: Joi.string().required(),
         name: Joi.string().optional().allow(null),
+        sub_id: Joi.number().optional().allow(null),
         id: Joi.number().required(),
       }),
     }),
