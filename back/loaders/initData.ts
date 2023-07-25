@@ -4,8 +4,7 @@ import { Container } from 'typedi';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import CronService from '../services/cron';
 import EnvService from '../services/env';
-import groupBy from 'lodash/groupBy';
-import { DependenceModel } from '../data/dependence';
+import { DependenceModel, DependenceStatus } from '../data/dependence';
 import { Op } from 'sequelize';
 import config from '../config';
 import { CrontabViewModel, CronViewType } from '../data/cronView';
@@ -33,25 +32,23 @@ export default async () => {
   // 初始化更新所有任务状态为空闲
   await CrontabModel.update(
     { status: CrontabStatus.idle },
-    { where: { status: [CrontabStatus.running, CrontabStatus.queued] } },
+    { where: {} },
   );
 
   // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
   DependenceModel.findAll({
     where: {},
-    order: [['type', 'DESC']],
+    order: [['type', 'DESC'], ['createdAt', 'DESC']],
     raw: true,
   }).then(async (docs) => {
-    const groups = groupBy(docs, 'type');
-    const keys = Object.keys(groups).sort((a, b) => parseInt(b) - parseInt(a));
-    for (const key of keys) {
-      const group = groups[key];
-      const depIds = group.map((x) => x.id);
-      await dependenceService.reInstall(depIds as number[]);
-    }
+    await DependenceModel.update(
+      { status: DependenceStatus.queued, log: [] },
+      { where: { id: docs.map((x) => x.id!) } },
+    );
+    dependenceService.installDependenceOneByOne(docs);
   });
 
-  // 初始化时执行一次所有的ql repo 任务
+  // 初始化时执行一次所有的 ql repo 任务
   CrontabModel.findAll({
     where: {
       isDisabled: { [Op.ne]: 1 },

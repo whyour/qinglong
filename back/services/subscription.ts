@@ -6,12 +6,7 @@ import {
   SubscriptionModel,
   SubscriptionStatus,
 } from '../data/subscription';
-import {
-  ChildProcessWithoutNullStreams,
-  exec,
-  execSync,
-  spawn,
-} from 'child_process';
+import { ChildProcessWithoutNullStreams } from 'child_process';
 import fs from 'fs';
 import {
   getFileContentByName,
@@ -19,9 +14,11 @@ import {
   fileExist,
   createFile,
   killTask,
+  handleLogPath,
+  promiseExec,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
-import { Op } from 'sequelize';
+import { FindOptions, Op } from 'sequelize';
 import path from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
@@ -29,6 +26,7 @@ import SockService from './sock';
 import SshKeyService from './sshKey';
 import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
+import { formatCommand, formatUrl } from '../config/subscription';
 
 @Service()
 export default class SubscriptionService {
@@ -45,7 +43,7 @@ export default class SubscriptionService {
       const reg = {
         [Op.or]: [
           { [Op.like]: `%${searchText}%` },
-          { [Op.like]: `%${encodeURIComponent(searchText)}%` },
+          { [Op.like]: `%${encodeURI(searchText)}%` },
         ],
       };
       query = {
@@ -67,71 +65,20 @@ export default class SubscriptionService {
           ['createdAt', 'DESC'],
         ],
       });
-      return result as any;
+      return result;
     } catch (error) {
       throw error;
     }
   }
 
-  private formatCommand(doc: Subscription, url?: string) {
-    let command = 'ql ';
-    let _url = url || this.formatUrl(doc).url;
-    const {
-      type,
-      whitelist,
-      blacklist,
-      dependences,
-      branch,
-      extensions,
-      proxy,
-    } = doc;
-    if (type === 'file') {
-      command += `raw "${_url}"`;
-    } else {
-      command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
-        dependences || ''
-      }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}"`;
-    }
-    return command;
-  }
-
-  private formatUrl(doc: Subscription) {
-    let url = doc.url;
-    let host = '';
-    if (doc.type === 'private-repo') {
-      if (doc.pull_type === 'ssh-key') {
-        host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
-        url = doc.url!.replace(host, doc.alias);
-      } else {
-        host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
-        const { username, password } = doc.pull_option as any;
-        url = doc.url!.replace(host, `${username}:${password}@${host}`);
-      }
-    }
-    return { url, host };
-  }
-
   public async handleTask(
     doc: Subscription,
     needCreate = true,
-    needAddKey = true,
     runImmediately = false,
   ) {
-    const { url, host } = this.formatUrl(doc);
-    if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
-      if (needAddKey) {
-        this.sshKeyService.addSSHKey(
-          (doc.pull_option as any).private_key,
-          doc.alias,
-          host,
-          doc.proxy,
-        );
-      } else {
-        this.sshKeyService.removeSSHKey(doc.alias, host, doc.proxy);
-      }
-    }
+    const { url } = formatUrl(doc);
 
-    doc.command = this.formatCommand(doc, url as string);
+    doc.command = formatCommand(doc, url as string);
 
     if (doc.schedule_type === 'crontab') {
       this.scheduleService.cancelCronTask(doc as any);
@@ -154,28 +101,9 @@ export default class SubscriptionService {
     }
   }
 
-  private async promiseExec(command: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      exec(
-        command,
-        { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' },
-        (err, stdout, stderr) => {
-          resolve(stdout || stderr || JSON.stringify(err));
-        },
-      );
-    });
-  }
-
-  private async handleLogPath(
-    logPath: string,
-    data: string = '',
-  ): Promise<string> {
-    const absolutePath = path.resolve(config.logPath, logPath);
-    const logFileExist = await fileExist(absolutePath);
-    if (!logFileExist) {
-      await createFile(absolutePath, data);
-    }
-    return absolutePath;
+  public async setSshConfig() {
+    const docs = await SubscriptionModel.findAll();
+    this.sshKeyService.setSshConfig(docs);
   }
 
   private taskCallbacks(doc: Subscription): TaskCallbacks {
@@ -190,7 +118,7 @@ export default class SubscriptionService {
           },
           { where: { id: doc.id } },
         );
-        const absolutePath = await this.handleLogPath(
+        const absolutePath = await handleLogPath(
           logPath as string,
           `## 开始执行... ${startTime.format('YYYY-MM-DD HH:mm:ss')}\n`,
         );
@@ -200,7 +128,7 @@ export default class SubscriptionService {
         try {
           if (doc.sub_before) {
             fs.appendFileSync(absolutePath, `\n## 执行before命令...\n\n`);
-            beforeStr = await this.promiseExec(doc.sub_before);
+            beforeStr = await promiseExec(doc.sub_before);
           }
         } catch (error: any) {
           beforeStr =
@@ -220,14 +148,14 @@ export default class SubscriptionService {
       },
       onEnd: async (cp, endTime, diff) => {
         const sub = await this.getDb({ id: doc.id });
-        const absolutePath = await this.handleLogPath(sub.log_path as string);
+        const absolutePath = await handleLogPath(sub.log_path as string);
 
         // 执行 sub_after
         let afterStr = '';
         try {
           if (sub.sub_after) {
             fs.appendFileSync(absolutePath, `\n\n## 执行after命令...\n\n`);
-            afterStr = await this.promiseExec(sub.sub_after);
+            afterStr = await promiseExec(sub.sub_after);
           }
         } catch (error: any) {
           afterStr =
@@ -257,12 +185,12 @@ export default class SubscriptionService {
       },
       onError: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
-        const absolutePath = await this.handleLogPath(sub.log_path as string);
+        const absolutePath = await handleLogPath(sub.log_path as string);
         fs.appendFileSync(absolutePath, `\n${message}`);
       },
       onLog: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
-        const absolutePath = await this.handleLogPath(sub.log_path as string);
+        const absolutePath = await handleLogPath(sub.log_path as string);
         fs.appendFileSync(absolutePath, `\n${message}`);
       },
     };
@@ -272,6 +200,7 @@ export default class SubscriptionService {
     const tab = new Subscription(payload);
     const doc = await this.insert(tab);
     await this.handleTask(doc);
+    await this.setSshConfig();
     return doc;
   }
 
@@ -280,8 +209,11 @@ export default class SubscriptionService {
   }
 
   public async update(payload: Subscription): Promise<Subscription> {
-    const newDoc = await this.updateDb(payload);
+    const doc = await this.getDb({ id: payload.id });
+    const tab = new Subscription({ ...doc, ...payload });
+    const newDoc = await this.updateDb(tab);
     await this.handleTask(newDoc, !newDoc.is_disabled);
+    await this.setSshConfig();
     return newDoc;
   }
 
@@ -324,12 +256,15 @@ export default class SubscriptionService {
   public async remove(ids: number[]) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
-      await this.handleTask(doc, false, false);
+      await this.handleTask(doc, false);
     }
     await SubscriptionModel.destroy({ where: { id: ids } });
+    await this.setSshConfig();
   }
 
-  public async getDb(query: any): Promise<Subscription> {
+  public async getDb(
+    query: FindOptions<Subscription>['where'],
+  ): Promise<Subscription> {
     const doc: any = await SubscriptionModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Subscription);
   }
@@ -339,10 +274,9 @@ export default class SubscriptionService {
       { status: SubscriptionStatus.queued },
       { where: { id: ids } },
     );
-    concurrentRun(
-      ids.map((id) => async () => await this.runSingle(id)),
-      10,
-    );
+    ids.forEach((id) => {
+      this.runSingle(id);
+    });
   }
 
   public async stop(ids: number[]) {
@@ -355,7 +289,7 @@ export default class SubscriptionService {
           this.logger.silly(error);
         }
       }
-      const absolutePath = await this.handleLogPath(doc.log_path as string);
+      const absolutePath = await handleLogPath(doc.log_path as string);
 
       fs.appendFileSync(
         `${absolutePath}`,
@@ -377,28 +311,27 @@ export default class SubscriptionService {
       return;
     }
 
-    const command = this.formatCommand(subscription);
+    const command = formatCommand(subscription);
 
-    await this.scheduleService.runTask(
-      command,
-      this.taskCallbacks(subscription),
-    );
+    this.scheduleService.runTask(command, this.taskCallbacks(subscription));
   }
 
   public async disabled(ids: number[]) {
+    await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    await this.setSshConfig();
     for (const doc of docs) {
       await this.handleTask(doc, false);
     }
-    await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
   }
 
   public async enabled(ids: number[]) {
+    await SubscriptionModel.update({ is_disabled: 0 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    await this.setSshConfig();
     for (const doc of docs) {
       await this.handleTask(doc);
     }
-    await SubscriptionModel.update({ is_disabled: 0 }, { where: { id: ids } });
   }
 
   public async log(id: number) {
@@ -407,7 +340,7 @@ export default class SubscriptionService {
       return '';
     }
 
-    const absolutePath = await this.handleLogPath(doc.log_path as string);
+    const absolutePath = await handleLogPath(doc.log_path as string);
     return getFileContentByName(absolutePath);
   }
 

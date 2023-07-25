@@ -1,43 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
-import Terminal, { ColorMode, LineType } from '../../components/terminal';
 import { PageLoading } from '@ant-design/pro-layout';
 import { history, useOutletContext } from '@umijs/max';
-import Ansi from 'ansi-to-react';
 import './index.less';
 import { SharedContext } from '@/layouts';
+import { Alert, Typography } from 'antd';
 
 const Error = () => {
   const { user, theme, reloadUser } = useOutletContext<SharedContext>();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState('暂无日志');
-
-  const getTimes = () => {
-    return parseInt(localStorage.getItem('error_retry_times') || '0', 10);
-  };
-
-  let times = getTimes();
+  const retryTimes = useRef(1);
 
   const getLog = (needLoading: boolean = true) => {
     needLoading && setLoading(true);
     request
-      .get(`${config.apiPrefix}public/panel/log`)
-      .then(({ code, data }) => {
-        if (code === 200) {
-          setData(data);
-          if (!data) {
-            times = getTimes();
-            if (times > 5) {
-              return;
-            }
-            localStorage.setItem('error_retry_times', `${times + 1}`);
-            setTimeout(() => {
-              reloadUser();
-              getLog(false);
-            }, 3000);
-          }
+      .get(`${config.apiPrefix}public/health`)
+      .then(({ error, data }) => {
+        if (data?.status === 1) {
+          return;
         }
+        if (retryTimes.current > 3) {
+          setData(error?.details);
+          return;
+        }
+        retryTimes.current += 1;
+        setTimeout(() => {
+          getLog(false);
+        }, 3000);
       })
       .finally(() => needLoading && setLoading(false));
   };
@@ -56,24 +47,39 @@ const Error = () => {
     <div className="error-wrapper">
       {loading ? (
         <PageLoading />
-      ) : data ? (
-        <Terminal
-          name="服务错误"
-          colorMode={theme === 'vs-dark' ? ColorMode.Dark : ColorMode.Light}
-          lineData={[
-            { type: LineType.Input, value: 'pm2 logs panel' },
-            {
-              type: LineType.Output,
-              value: (
-                <pre>
-                  <Ansi>{data}</Ansi>
-                </pre>
-              ),
-            },
-          ]}
-        />
-      ) : times > 5 ? (
-        <>服务启动超时，请手动进入容器执行 ql -l check 后刷新再试</>
+      ) : retryTimes.current > 3 ? (
+        <div className="code-box">
+          <div className="browser-markup"></div>
+          <Alert
+            type="error"
+            message={
+              <Typography.Title level={5} type="danger">
+                服务启动超时
+              </Typography.Title>
+            }
+            description={
+              <Typography.Text type="danger">
+                <div>请先按如下方式修复：</div>
+                <div>
+                  1. 宿主机执行 docker run --rm -v
+                  /var/run/docker.sock:/var/run/docker.sock
+                  containrrr/watchtower -cR &lt;容器名&gt;
+                </div>
+                <div>2. 容器内执行 ql -l check、ql -l update</div>
+                <div>
+                  3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果
+                  <Typography.Link href="https://github.com/whyour/qinglong/issues/new?assignees=&labels=&template=bug_report.yml">
+                    提交 issue
+                  </Typography.Link>
+                </div>
+              </Typography.Text>
+            }
+            banner
+          />
+          <Typography.Paragraph code className="log">
+            {data}
+          </Typography.Paragraph>
+        </div>
       ) : (
         <PageLoading tip="启动中，请稍后..." />
       )}

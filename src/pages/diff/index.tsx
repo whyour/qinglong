@@ -48,7 +48,8 @@ const Diff = () => {
 
     request
       .post(`${config.apiPrefix}configs/save`, {
-        data: { content, name: current },
+        content,
+        name: current,
       })
       .then(({ code, data }) => {
         if (code === 200) {

@@ -53,51 +53,11 @@ import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import { getCommandScript, parseCrontab } from '@/utils';
 import { ColumnProps } from 'antd/lib/table';
-import { VList } from 'virtuallist-antd';
+import { useVT } from 'virtualizedtableforantd4';
+import { ICrontab, OperationName, OperationPath, CrontabStatus } from './type';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
-
-export enum CrontabStatus {
-  'running',
-  'idle',
-  'disabled',
-  'queued',
-}
-
-const CrontabSort: any = { 0: 0, 5: 1, 3: 2, 1: 3, 4: 4 };
-
-enum OperationName {
-  '启用',
-  '禁用',
-  '运行',
-  '停止',
-  '置顶',
-  '取消置顶',
-}
-
-enum OperationPath {
-  'enable',
-  'disable',
-  'run',
-  'stop',
-  'pin',
-  'unpin',
-}
-
-export interface ICrontab {
-  name: string;
-  command: string;
-  schedule: string;
-  id: number;
-  status: number;
-  isDisabled?: 1 | 0;
-  isPinned?: 1 | 0;
-  labels?: string[];
-  last_running_time?: number;
-  last_execution_time?: number;
-  nextRunTime: Date;
-}
 
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
@@ -107,7 +67,6 @@ const Crontab = () => {
       dataIndex: 'name',
       key: 'name',
       width: 150,
-      align: 'center' as const,
       render: (text: string, record: any) => (
         <>
           <a
@@ -163,14 +122,12 @@ const Crontab = () => {
       dataIndex: 'command',
       key: 'command',
       width: 300,
-      align: 'center' as const,
       render: (text, record) => {
         return (
           <Paragraph
             style={{
               wordBreak: 'break-all',
               marginBottom: 0,
-              textAlign: 'left',
             }}
             ellipsis={{ tooltip: text, rows: 2 }}
           >
@@ -193,14 +150,12 @@ const Crontab = () => {
       dataIndex: 'schedule',
       key: 'schedule',
       width: 110,
-      align: 'center' as const,
       sorter: {
         compare: (a, b) => a.schedule.localeCompare(b.schedule),
       },
     },
     {
       title: '最后运行时间',
-      align: 'center' as const,
       dataIndex: 'last_execution_time',
       key: 'last_execution_time',
       width: 150,
@@ -230,7 +185,6 @@ const Crontab = () => {
     },
     {
       title: '最后运行时长',
-      align: 'center' as const,
       width: 120,
       dataIndex: 'last_running_time',
       key: 'last_running_time',
@@ -247,7 +201,6 @@ const Crontab = () => {
     },
     {
       title: '下次运行时间',
-      align: 'center' as const,
       width: 150,
       sorter: {
         compare: (a: any, b: any) => {
@@ -267,33 +220,25 @@ const Crontab = () => {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
-      align: 'center' as const,
       width: 88,
       filters: [
         {
           text: '运行中',
-          value: 0,
+          value: CrontabStatus.running,
         },
         {
           text: '空闲中',
-          value: 1,
+          value: CrontabStatus.idle,
         },
         {
           text: '已禁用',
-          value: 2,
+          value: CrontabStatus.disabled,
         },
         {
           text: '队列中',
-          value: 3,
+          value: CrontabStatus.queued,
         },
       ],
-      onFilter: (value, record) => {
-        if (record.isDisabled && record.status !== 0) {
-          return value === 2;
-        } else {
-          return record.status === value;
-        }
-      },
       render: (text, record) => (
         <>
           {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
@@ -329,8 +274,7 @@ const Crontab = () => {
     {
       title: '操作',
       key: 'action',
-      align: 'center' as const,
-      width: 100,
+      width: 130,
       render: (text, record, index) => {
         const isPc = !isPhone;
         return (
@@ -424,9 +368,9 @@ const Crontab = () => {
     }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
       filters,
     )}`;
-    if (sorter && sorter.field) {
+    if (sorter && sorter.column && sorter.order) {
       url += `&sorter=${JSON.stringify({
-        field: sorter.field,
+        field: sorter.column.key,
         type: sorter.order === 'ascend' ? 'ASC' : 'DESC',
       })}`;
     }
@@ -513,7 +457,7 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/run`, { data: [record.id] })
+          .put(`${config.apiPrefix}crons/run`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               const result = [...value];
@@ -548,7 +492,7 @@ const Crontab = () => {
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/stop`, { data: [record.id] })
+          .put(`${config.apiPrefix}crons/stop`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
               const result = [...value];
@@ -589,9 +533,7 @@ const Crontab = () => {
             `${config.apiPrefix}crons/${
               record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
-            {
-              data: [record.id],
-            },
+            [record.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -633,9 +575,7 @@ const Crontab = () => {
             `${config.apiPrefix}crons/${
               record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
-            {
-              data: [record.id],
-            },
+            [record.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -681,7 +621,6 @@ const Crontab = () => {
     index: number;
   }> = ({ record, index }) => (
     <Dropdown
-      arrow={{ pointAtCenter: true }}
       placement="bottomRight"
       trigger={['click']}
       menu={{
@@ -782,9 +721,10 @@ const Crontab = () => {
       content: <>确认{OperationName[operationStatus]}选中的定时任务吗</>,
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/${OperationPath[operationStatus]}`, {
-            data: selectedRowIds,
-          })
+          .put(
+            `${config.apiPrefix}crons/${OperationPath[operationStatus]}`,
+            selectedRowIds,
+          )
           .then(({ code, data }) => {
             if (code === 200) {
               getCrons();
@@ -841,12 +781,6 @@ const Crontab = () => {
   }, [viewConf, enabledCronViews]);
 
   useEffect(() => {
-    setPageConf({
-      page: 1,
-      size: parseInt(localStorage.getItem('pageSize') || '20'),
-      sorter: {},
-      filters: {},
-    });
     getCronViews();
   }, []);
 
@@ -906,7 +840,17 @@ const Crontab = () => {
       .then(({ code, data }) => {
         if (code === 200) {
           setCronViews(data);
-          setEnabledCronViews(data.filter((x) => !x.isDisabled));
+          const firstEnableView = data.filter((x) => !x.isDisabled);
+          setEnabledCronViews(firstEnableView);
+          setPageConf({
+            page: 1,
+            size: parseInt(localStorage.getItem('pageSize') || '20'),
+            sorter: {},
+            filters: {},
+          });
+          setViewConf({
+            ...firstEnableView[0],
+          });
         }
       })
       .finally(() => {
@@ -921,11 +865,10 @@ const Crontab = () => {
     setViewConf(view ? view : null);
   };
 
-  const vComponents = useMemo(() => {
-    return VList({
-      height: tableScrollHeight!,
-    });
-  }, [tableScrollHeight]);
+  const [vt] = useVT(
+    () => ({ scroll: { y: tableScrollHeight } }),
+    [tableScrollHeight],
+  );
 
   return (
     <PageContainer
@@ -1061,7 +1004,7 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
-          components={vComponents}
+          // components={isPhone ? undefined : vt}
         />
       </div>
       <CronLogModal

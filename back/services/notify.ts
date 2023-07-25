@@ -28,6 +28,7 @@ export default class NotificationService {
     ['iGot', this.iGot],
     ['pushPlus', this.pushPlus],
     ['email', this.email],
+    ['pushMe', this.pushMe],
     ['webhook', this.webhook],
     ['lark', this.lark],
   ]);
@@ -36,7 +37,7 @@ export default class NotificationService {
   private content = '';
   private params!: Omit<NotificationInfo, 'type'>;
   private gotOption = {
-    timeout: 30000,
+    timeout: 10000,
     retry: 1,
   };
 
@@ -78,33 +79,49 @@ export default class NotificationService {
   }
 
   private async gotify() {
-    const { gotifyUrl, gotifyToken, gotifyPriority } = this.params;
-    const res: any = await got
-      .post(`${gotifyUrl}/message?token=${gotifyToken}`, {
-        ...this.gotOption,
-        body: `title=${encodeURIComponent(
-          this.title,
-        )}&message=${encodeURIComponent(
-          this.content,
-        )}&priority=${gotifyPriority}`,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      })
-      .json();
-    return typeof res.id === 'number';
+    const { gotifyUrl, gotifyToken, gotifyPriority = 1 } = this.params;
+    try {
+      const res: any = await got
+        .post(`${gotifyUrl}/message?token=${gotifyToken}`, {
+          ...this.gotOption,
+          body: `title=${encodeURIComponent(
+            this.title,
+          )}&message=${encodeURIComponent(
+            this.content,
+          )}&priority=${gotifyPriority}`,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        })
+        .json();
+      if (typeof res.id === 'number') {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async goCqHttpBot() {
     const { goCqHttpBotQq, goCqHttpBotToken, goCqHttpBotUrl } = this.params;
-    const res: any = await got
-      .post(`${goCqHttpBotUrl}?${goCqHttpBotQq}`, {
-        ...this.gotOption,
-        json: { message: `${this.title}\n${this.content}` },
-        headers: { Authorization: 'Bearer ' + goCqHttpBotToken },
-      })
-      .json();
-    return res.retcode === 0;
+    try {
+      const res: any = await got
+        .post(`${goCqHttpBotUrl}?${goCqHttpBotQq}`, {
+          ...this.gotOption,
+          json: { message: `${this.title}\n${this.content}` },
+          headers: { Authorization: 'Bearer ' + goCqHttpBotToken },
+        })
+        .json();
+      if (res.retcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async serverChan() {
@@ -112,63 +129,97 @@ export default class NotificationService {
     const url = serverChanKey.startsWith('SCT')
       ? `https://sctapi.ftqq.com/${serverChanKey}.send`
       : `https://sc.ftqq.com/${serverChanKey}.send`;
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        body: `title=${this.title}&desp=${this.content}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      .json();
-    return res.errno === 0 || res.data.errno === 0;
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          body: `title=${this.title}&desp=${this.content}`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+        .json();
+      if (res.errno === 0 || res.data.errno === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async pushDeer() {
     const { pushDeerKey, pushDeerUrl } = this.params;
     const url = pushDeerUrl || `https://api2.pushdeer.com/message/push`;
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        body: `pushkey=${pushDeerKey}&text=${encodeURIComponent(
-          this.title,
-        )}&desp=${encodeURIComponent(this.content)}&type=markdown`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      .json();
-    return (
-      res.content.result.length !== undefined && res.content.result.length > 0
-    );
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          body: `pushkey=${pushDeerKey}&text=${encodeURIComponent(
+            this.title,
+          )}&desp=${encodeURIComponent(this.content)}&type=markdown`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+        .json();
+      if (
+        res.content.result.length !== undefined &&
+        res.content.result.length > 0
+      ) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async chat() {
     const { chatUrl, chatToken } = this.params;
     const url = `${chatUrl}${chatToken}`;
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        body: `payload={"text":"${this.title}\n${this.content}"}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      .json();
-    return res.success;
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          body: `payload={"text":"${this.title}\n${this.content}"}`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+        .json();
+      if (res.success) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async bark() {
     let { barkPush, barkIcon, barkSound, barkGroup } = this.params;
-    if (!barkPush.startsWith('http') && !barkPush.startsWith('https')) {
+    if (!barkPush.startsWith('http')) {
       barkPush = `https://api.day.app/${barkPush}`;
     }
     const url = `${barkPush}/${encodeURIComponent(
       this.title,
     )}/${encodeURIComponent(
       this.content,
-    )}?icon=${barkIcon}?sound=${barkSound}&group=${barkGroup}`;
-    const res: any = await got
-      .get(url, {
-        ...this.gotOption,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      .json();
-    return res.code === 200;
+    )}?icon=${barkIcon}&sound=${barkSound}&group=${barkGroup}`;
+
+    try {
+      const res: any = await got
+        .get(url, {
+          ...this.gotOption,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+        .json();
+      if (res.code === 200) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async telegramBot() {
@@ -200,15 +251,23 @@ export default class NotificationService {
         https: httpsAgent,
       };
     }
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        body: `chat_id=${telegramBotUserId}&text=${this.title}\n\n${this.content}&disable_web_page_preview=true`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        agent,
-      })
-      .json();
-    return !!res.ok;
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          body: `chat_id=${telegramBotUserId}&text=${this.title}\n\n${this.content}&disable_web_page_preview=true`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          agent,
+        })
+        .json();
+      if (res.ok) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async dingtalkBot() {
@@ -222,42 +281,58 @@ export default class NotificationService {
       secretParam = `&timestamp=${dateNow}&sign=${result}`;
     }
     const url = `https://oapi.dingtalk.com/robot/send?access_token=${dingtalkBotToken}${secretParam}`;
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        json: {
-          msgtype: 'text',
-          text: {
-            content: ` ${this.title}\n\n${this.content}`,
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          json: {
+            msgtype: 'text',
+            text: {
+              content: ` ${this.title}\n\n${this.content}`,
+            },
           },
-        },
-      })
-      .json();
-    return res.errcode === 0;
+        })
+        .json();
+      if (res.errcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async weWorkBot() {
-    const { weWorkBotKey } = this.params;
-    const url = `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${weWorkBotKey}`;
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        json: {
-          msgtype: 'text',
-          text: {
-            content: ` ${this.title}\n\n${this.content}`,
+    const { weWorkBotKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } = this.params;
+    const url = `${weWorkOrigin}/cgi-bin/webhook/send?key=${weWorkBotKey}`;
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          json: {
+            msgtype: 'text',
+            text: {
+              content: ` ${this.title}\n\n${this.content}`,
+            },
           },
-        },
-      })
-      .json();
-    return res.errcode === 0;
+        })
+        .json();
+      if (res.errcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async weWorkApp() {
-    const { weWorkAppKey } = this.params;
+    const { weWorkAppKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } = this.params;
     const [corpid, corpsecret, touser, agentid, thumb_media_id = '1'] =
       weWorkAppKey.split(',');
-    const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken`;
+    const url = `${weWorkOrigin}/cgi-bin/gettoken`;
     const tokenRes: any = await got
       .post(url, {
         ...this.gotOption,
@@ -306,22 +381,30 @@ export default class NotificationService {
         break;
     }
 
-    const res: any = await got
-      .post(
-        `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
-        {
-          ...this.gotOption,
-          json: {
-            touser,
-            agentid,
-            safe: '0',
-            ...options,
+    try {
+      const res: any = await got
+        .post(
+          `${weWorkOrigin}/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
+          {
+            ...this.gotOption,
+            json: {
+              touser,
+              agentid,
+              safe: '0',
+              ...options,
+            },
           },
-        },
-      )
-      .json();
+        )
+        .json();
 
-    return res.errcode === 0;
+      if (res.errcode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async aibotk() {
@@ -353,85 +436,152 @@ export default class NotificationService {
         break;
     }
 
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        json: {
-          ...json,
-        },
-      })
-      .json();
-
-    return res.code === 0;
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          json: {
+            ...json,
+          },
+        })
+        .json();
+      if (res.code === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async iGot() {
     const { iGotPushKey } = this.params;
     const url = `https://push.hellyw.com/${iGotPushKey.toLowerCase()}`;
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        body: `title=${this.title}&content=${this.content}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      .json();
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          body: `title=${this.title}&content=${this.content}`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+        .json();
 
-    return res.ret === 0;
+      if (res.ret === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async pushPlus() {
     const { pushPlusToken, pushPlusUser } = this.params;
     const url = `https://www.pushplus.plus/send`;
-    const res: any = await got
-      .post(url, {
-        ...this.gotOption,
-        json: {
-          token: `${pushPlusToken}`,
-          title: `${this.title}`,
-          content: `${this.content.replace(/[\n\r]/g, '<br>')}`,
-          topic: `${pushPlusUser || ''}`,
-        },
-      })
-      .json();
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          json: {
+            token: `${pushPlusToken}`,
+            title: `${this.title}`,
+            content: `${this.content.replace(/[\n\r]/g, '<br>')}`,
+            topic: `${pushPlusUser || ''}`,
+          },
+        })
+        .json();
 
-    return res.code === 200;
+      if (res.code === 200) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async lark() {
-    const { larkKey } = this.params;
-    const res: any = await got
-      .post(`https://open.feishu.cn/open-apis/bot/v2/hook/${larkKey}`, {
-        ...this.gotOption,
-        json: {
-          msg_type: 'text',
-          content: { text: `${this.title}\n\n${this.content}` },
-        },
-        headers: { 'Content-Type': 'application/json' },
-      })
-      .json();
-    return res.StatusCode === 0;
+    let { larkKey } = this.params;
+
+    if (!larkKey.startsWith('http')) {
+      larkKey = `https://open.feishu.cn/open-apis/bot/v2/hook/${larkKey}`;
+    }
+
+    try {
+      const res: any = await got
+        .post(larkKey, {
+          ...this.gotOption,
+          json: {
+            msg_type: 'text',
+            content: { text: `${this.title}\n\n${this.content}` },
+          },
+          headers: { 'Content-Type': 'application/json' },
+        })
+        .json();
+      if (res.StatusCode === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async email() {
     const { emailPass, emailService, emailUser } = this.params;
-    const transporter = nodemailer.createTransport({
-      service: emailService,
-      auth: {
-        user: emailUser,
-        pass: emailPass,
-      },
-    });
 
-    const info = await transporter.sendMail({
-      from: `"青龙快讯" <${emailUser}>`,
-      to: `${emailUser}`,
-      subject: `${this.title}`,
-      html: `${this.content.replace(/\n/g, '<br/>')}`,
-    });
+    try {
+      const transporter = nodemailer.createTransport({
+        service: emailService,
+        auth: {
+          user: emailUser,
+          pass: emailPass,
+        },
+      });
 
-    transporter.close();
+      const info = await transporter.sendMail({
+        from: `"青龙快讯" <${emailUser}>`,
+        to: `${emailUser}`,
+        subject: `${this.title}`,
+        html: `${this.content.replace(/\n/g, '<br/>')}`,
+      });
 
-    return !!info.messageId;
+      transporter.close();
+
+      if (info.messageId) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(info));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  private async pushMe() {
+    const { pushMeKey } = this.params;
+    try {
+      const res: any = await got
+        .post(`https://push.i-i.me/?push_key=${pushMeKey}`, {
+          ...this.gotOption,
+          json: {
+            title: this.title,
+            content: this.content
+          },
+          headers: { 'Content-Type': 'application/json' },
+        });
+      if (res.body === 'success') {
+        return true;
+      } else {
+        throw new Error(res.body);
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private async webhook() {
@@ -460,8 +610,16 @@ export default class NotificationService {
       allowGetBody: true,
       ...bodyParam,
     };
-    const res = await got(formatUrl, options);
-    return String(res.statusCode).startsWith('20');
+    try {
+      const res = await got(formatUrl, options);
+      if (String(res.statusCode).startsWith('20')) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 
   private formatBody(contentType: string, body: any): object {
@@ -484,11 +642,11 @@ export default class NotificationService {
 
     return {
       formatUrl: url
-        .replaceAll('$title', encodeURIComponent(this.title))
-        .replaceAll('$content', encodeURIComponent(this.content)),
+        ?.replaceAll('$title', encodeURIComponent(this.title))
+        ?.replaceAll('$content', encodeURIComponent(this.content)),
       formatBody: body
-        .replaceAll('$title', this.title)
-        .replaceAll('$content', this.content),
+        ?.replaceAll('$title', this.title)
+        ?.replaceAll('$content', this.content),
     };
   }
 }

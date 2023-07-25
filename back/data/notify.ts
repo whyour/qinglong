@@ -15,6 +15,7 @@ export enum NotificationMode {
   'iGot' = 'iGot',
   'pushPlus' = 'pushPlus',
   'email' = 'email',
+  'pushMe' = 'pushMe',
   'feishu' = 'feishu',
   'webhook' = 'webhook',
 }
@@ -72,10 +73,12 @@ export class DingtalkBotNotification extends NotificationBaseInfo {
 
 export class WeWorkBotNotification extends NotificationBaseInfo {
   public weWorkBotKey = '';
+  public weWorkOrigin = '';
 }
 
 export class WeWorkAppNotification extends NotificationBaseInfo {
   public weWorkAppKey = '';
+  public weWorkOrigin = '';
 }
 
 export class AibotkNotification extends NotificationBaseInfo {
@@ -97,6 +100,10 @@ export class EmailNotification extends NotificationBaseInfo {
   public emailService: string = '';
   public emailUser: string = '';
   public emailPass: string = '';
+}
+
+export class PushMeNotification extends NotificationBaseInfo {
+  public pushMeKey: string = '';
 }
 
 export class WebhookNotification extends NotificationBaseInfo {
@@ -129,5 +136,6 @@ export interface NotificationInfo
     IGotNotification,
     PushPlusNotification,
     EmailNotification,
+    PushMeNotification,
     WebhookNotification,
     LarkNotification {}

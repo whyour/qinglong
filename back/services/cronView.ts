@@ -7,6 +7,7 @@ import {
   minPosition,
   stepPosition,
 } from '../data/env';
+import { FindOptions } from 'sequelize';
 
 @Service()
 export default class CronViewService {
@@ -31,7 +32,9 @@ export default class CronViewService {
   }
 
   public async update(payload: CrontabView): Promise<CrontabView> {
-    const newDoc = await this.updateDb(payload);
+    const doc = await this.getDb({ id: payload.id })
+    const tab = new CrontabView({ ...doc, ...payload });
+    const newDoc = await this.updateDb(tab);
     return newDoc;
   }
 
@@ -56,7 +59,7 @@ export default class CronViewService {
     }
   }
 
-  public async getDb(query: any): Promise<CrontabView> {
+  public async getDb(query: FindOptions<CrontabView>['where']): Promise<CrontabView> {
     const doc: any = await CrontabViewModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as CrontabView);
   }

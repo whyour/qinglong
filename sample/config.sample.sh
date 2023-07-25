@@ -1,9 +1,3 @@
-## Version: v2.8.0
-## Date: 2021-06-20
-## Update Content: 可持续发展纲要\n1. session管理破坏性修改\n2. 配置管理可编辑config下文件\n3. 自定义脚本改为查看脚本\n4. 移除互助相关
-
-## 上面版本号中，如果第2位数字有变化，那么代表增加了新的参数，如果只有第3位数字有变化，仅代表更新了注释，没有增加新的参数，可更新可不更新
-
 ## 在运行 ql repo 命令时，是否自动删除失效的脚本与定时任务
 AutoDelCron="true"
 
@@ -24,11 +18,8 @@ CpuWarn=80
 MemoryWarn=80
 DiskWarn=90
 
-## 设置定时任务执行的超时时间，默认1h，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
-CommandTimeoutTime="1h"
-
-## 设置批量执行任务时的并发数，默认同时执行5个任务
-MaxConcurrentNum="5"
+## 设置定时任务执行的超时时间，例如1h，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
+CommandTimeoutTime=""
 
 ## 在运行 task 命令时，随机延迟启动任务的最大延迟时间
 ## 默认给javascript任务加随机延迟，如 RandomDelay="300" ，表示任务将在 1-300 秒内随机延迟一个秒数，然后再运行，取消延迟赋值为空
@@ -99,6 +90,10 @@ export TG_API_HOST=""
 ## 下方填写token后面的内容，只需 https://oapi.dingtalk.com/robot/send?access_token=XXX 等于=符号后面的XXX即可
 export DD_BOT_TOKEN=""
 export DD_BOT_SECRET=""
+
+## 企业微信反向代理地址
+## (环境变量名 QYWX_ORIGIN)
+export QYWX_ORIGIN=""
 
 ## 5. 企业微信机器人
 ## 官方说明文档：https://work.weixin.qq.com/api/doc/90000/90136/91770
@@ -172,5 +167,10 @@ export SMTP_EMAIL=""
 export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
+
+## 15. PushMe
+## 官方说明文档：https://push.i-i.me/
+## PUSHME_KEY (必填)填写PushMe APP上获取的push_key
+export PUSHME_KEY=""
 
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

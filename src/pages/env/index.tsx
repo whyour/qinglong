@@ -39,7 +39,7 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import Copy from '../../components/copy';
-import { VList } from 'virtuallist-antd';
+import { useVT } from 'virtualizedtableforantd4';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -71,7 +71,6 @@ const Env = () => {
   const columns: any = [
     {
       title: '序号',
-      align: 'center' as const,
       width: 60,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
@@ -81,14 +80,12 @@ const Env = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      align: 'center' as const,
       sorter: (a: any, b: any) => a.name.localeCompare(b.name),
     },
     {
       title: '值',
       dataIndex: 'value',
       key: 'value',
-      align: 'center' as const,
       width: '35%',
       render: (text: string, record: any) => {
         return (
@@ -105,7 +102,6 @@ const Env = () => {
       title: '备注',
       dataIndex: 'remarks',
       key: 'remarks',
-      align: 'center' as const,
       render: (text: string, record: any) => {
         return (
           <Tooltip title={text} placement="topLeft">
@@ -118,7 +114,6 @@ const Env = () => {
       title: '更新时间',
       dataIndex: 'timestamp',
       key: 'timestamp',
-      align: 'center' as const,
       width: 165,
       ellipsis: {
         showTitle: false,
@@ -153,7 +148,6 @@ const Env = () => {
       title: '状态',
       key: 'status',
       dataIndex: 'status',
-      align: 'center' as const,
       width: 70,
       filters: [
         {
@@ -180,7 +174,6 @@ const Env = () => {
       title: '操作',
       key: 'action',
       width: 120,
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
@@ -255,9 +248,7 @@ const Env = () => {
             `${config.apiPrefix}envs/${
               record.status === Status.已禁用 ? 'enable' : 'disable'
             }`,
-            {
-              data: [record.id],
-            },
+            [record.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -331,16 +322,13 @@ const Env = () => {
     getEnvs();
   };
 
-  const vComponents = useMemo(() => {
-    return VList({
-      height: tableScrollHeight!,
-      resetTopWhenDataChange: false,
-    });
-  }, [tableScrollHeight]);
+  const [vt, setVT] = useVT(
+    () => ({ scroll: { y: tableScrollHeight } }),
+    [tableScrollHeight],
+  );
 
-  const DragableBodyRow = (props: any) => {
+  const DragableBodyRow = React.forwardRef((props: any, ref) => {
     const { index, moveRow, className, style, ...restProps } = props;
-    const ref = useRef();
     const [{ isOver, dropClassName }, drop] = useDrop({
       accept: type,
       collect: (monitor) => {
@@ -368,31 +356,27 @@ const Env = () => {
 
     useEffect(() => {
       drop(drag(ref));
-    }, [drag, drop]);
+    }, [ref]);
 
-    const components = useMemo(() => vComponents.body.row, []);
+    return (
+      <tr
+        ref={ref}
+        className={`${className}${isOver ? dropClassName : ''}`}
+        style={{ cursor: 'move', ...style }}
+        {...restProps}
+      />
+    );
+  });
 
-    const tempProps = useMemo(() => {
-      return {
-        ref: ref,
-        className: `${className}${isOver ? dropClassName : ''}`,
-        style: { cursor: 'move', ...style },
-        ...restProps,
-      };
-    }, [className, dropClassName, restProps, style, isOver]);
-
-    return <> {components(tempProps, ref)} </>;
-  };
-
-  const components = useMemo(() => {
-    return {
-      ...vComponents,
-      body: {
-        ...vComponents.body,
-        row: DragableBodyRow,
-      },
-    };
-  }, [vComponents]);
+  useEffect(
+    () =>
+      setVT({
+        body: {
+          row: DragableBodyRow,
+        },
+      }),
+    [],
+  );
 
   const moveRow = useCallback(
     (dragIndex: number, hoverIndex: number) => {
@@ -402,13 +386,14 @@ const Env = () => {
       const dragRow = value[dragIndex];
       request
         .put(`${config.apiPrefix}envs/${dragRow.id}/move`, {
-          data: { fromIndex: dragIndex, toIndex: hoverIndex },
+          fromIndex: dragIndex,
+          toIndex: hoverIndex,
         })
         .then(({ code, data }) => {
           if (code === 200) {
             const newData = [...value];
             newData.splice(dragIndex, 1);
-            newData.splice(hoverIndex, 0, { ...dragRow, ...data.data });
+            newData.splice(hoverIndex, 0, { ...dragRow, ...data });
             setValue([...newData]);
           }
         });
@@ -452,9 +437,10 @@ const Env = () => {
       content: <>确认{OperationName[operationStatus]}选中的变量吗</>,
       onOk() {
         request
-          .put(`${config.apiPrefix}envs/${OperationPath[operationStatus]}`, {
-            data: selectedRowIds,
-          })
+          .put(
+            `${config.apiPrefix}envs/${OperationPath[operationStatus]}`,
+            selectedRowIds,
+          )
           .then(({ code, data }) => {
             if (code === 200) {
               getEnvs();
@@ -491,9 +477,7 @@ const Env = () => {
       try {
         const { code, data } = await request.post(
           `${config.apiPrefix}envs/upload`,
-          {
-            data: formData,
-          },
+          formData,
         );
 
         if (code === 200) {
@@ -542,69 +526,70 @@ const Env = () => {
         style: headerStyle,
       }}
     >
-      {selectedRowIds.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5 }}
-            onClick={modifyName}
-          >
-            批量修改变量名称
-          </Button>
-          <Button
-            type="primary"
-            style={{ marginBottom: 5, marginLeft: 8 }}
-            onClick={delEnvs}
-          >
-            批量删除
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => exportEnvs()}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量导出
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateEnvs(0)}
-            style={{ marginLeft: 8, marginBottom: 5 }}
-          >
-            批量启用
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => operateEnvs(1)}
-            style={{ marginLeft: 8, marginRight: 8 }}
-          >
-            批量禁用
-          </Button>
-          <span style={{ marginLeft: 8 }}>
-            已选择
-            <a>{selectedRowIds?.length}</a>项
-          </span>
-        </div>
-      )}
-      <DndProvider backend={HTML5Backend}>
-        <Table
-          ref={tableRef}
-          columns={columns}
-          rowSelection={rowSelection}
-          pagination={false}
-          dataSource={value}
-          rowKey="id"
-          size="middle"
-          scroll={{ x: 1000, y: tableScrollHeight }}
-          components={components}
-          loading={loading}
-          onRow={(record: any, index: number | undefined) => {
-            return {
-              index,
-              moveRow,
-            } as any;
-          }}
-        />
-      </DndProvider>
+      <div ref={tableRef}>
+        {selectedRowIds.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5 }}
+              onClick={modifyName}
+            >
+              批量修改变量名称
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={delEnvs}
+            >
+              批量删除
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => exportEnvs()}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量导出
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(0)}
+              style={{ marginLeft: 8, marginBottom: 5 }}
+            >
+              批量启用
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(1)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              批量禁用
+            </Button>
+            <span style={{ marginLeft: 8 }}>
+              已选择
+              <a>{selectedRowIds?.length}</a>项
+            </span>
+          </div>
+        )}
+        <DndProvider backend={HTML5Backend}>
+          <Table
+            columns={columns}
+            rowSelection={rowSelection}
+            pagination={false}
+            dataSource={value}
+            rowKey="id"
+            size="middle"
+            scroll={{ x: 1000, y: tableScrollHeight }}
+            components={vt}
+            loading={loading}
+            onRow={(record: any, index: number | undefined) => {
+              return {
+                index,
+                moveRow,
+              } as any;
+            }}
+          />
+        </DndProvider>
+      </div>
       <EnvModal
         visible={isModalVisible}
         handleCancel={handleCancel}

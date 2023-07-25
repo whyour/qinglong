@@ -183,7 +183,7 @@ export function getTableScroll({
   extraHeight,
   target,
 }: { extraHeight?: number; target?: HTMLElement } = {}) {
-  if (typeof extraHeight == 'undefined') {
+  if (typeof extraHeight === 'undefined') {
     //  47 + 40 + 12
     extraHeight = 99;
   }

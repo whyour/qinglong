@@ -1,6 +1,8 @@
+const baseUrl = window.__ENV__QlBaseUrl || '/';
+
 export default {
-  siteName: '青龙控制面板',
-  apiPrefix: '/api/',
+  siteName: '青龙',
+  apiPrefix: `${baseUrl}api/`,
   authKey: 'token',
 
   /* Layout configuration, specify which layout to use for route. */
@@ -91,9 +93,10 @@ export default {
     { value: 'aibotk', label: '智能微秘书' },
     { value: 'iGot', label: 'IGot' },
     { value: 'pushPlus', label: 'PushPlus' },
-    { value: 'chat', label: '群辉chat' },
+    { value: 'chat', label: '群晖chat' },
     { value: 'email', label: '邮箱' },
     { value: 'lark', label: '飞书机器人' },
+    { value: 'pushMe', label: 'PushMe' },
     { value: 'webhook', label: '自定义通知' },
     { value: 'closed', label: '已关闭' },
   ],
@@ -194,12 +197,20 @@ export default {
         tip: '企业微信机器人的 webhook(详见文档 https://work.weixin.qq.com/api/doc/90000/90136/91770)，例如：693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa',
         required: true,
       },
+      {
+        label: 'weWorkOrigin',
+        tip: '企业微信代理地址',
+      },
     ],
     weWorkApp: [
       {
         label: 'weWorkAppKey',
         tip: 'corpid,corpsecret,touser(注:多个成员ID使用|隔开),agentid,消息类型(选填,不填默认文本消息类型) 注意用,号隔开(英文输入法的逗号)，例如：wwcfrs,B-76WERQ,qinglong,1000001,2COat',
         required: true,
+      },
+      {
+        label: 'weWorkOrigin',
+        tip: '企业微信代理地址',
       },
     ],
     aibotk: [
@@ -257,6 +268,13 @@ export default {
       },
       { label: 'emailUser', tip: '邮箱地址', required: true },
       { label: 'emailPass', tip: '邮箱SMTP授权码', required: true },
+    ],
+    pushMe: [
+      {
+        label: 'pushMeKey',
+        tip: 'PushMe的Key，https://push.i-i.me/',
+        required: true,
+      },
     ],
     webhook: [
       {

@@ -22,10 +22,8 @@ const SecuritySettings = ({ user, userChange }: any) => {
   const handleOk = (values: any) => {
     request
       .put(`${config.apiPrefix}user`, {
-        data: {
-          username: values.username,
-          password: values.password,
-        },
+        username: values.username,
+        password: values.password,
       })
       .then(({ code, data }) => {
         if (code === 200) {
@@ -64,7 +62,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
   const completeTowFactor = () => {
     setLoading(true);
     request
-      .put(`${config.apiPrefix}user/two-factor/active`, { data: { code } })
+      .put(`${config.apiPrefix}user/two-factor/active`, { code })
       .then(({ code, data }) => {
         if (code === 200) {
           if (data) {
@@ -241,7 +239,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
         头像
       </div>
       <Avatar size={128} shape="square" icon={<UserOutlined />} src={avatar} />
-      <ImgCrop rotate>
+      <ImgCrop rotationSlider>
         <Upload
           method="put"
           showUploadList={false}

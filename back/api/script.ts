@@ -94,7 +94,7 @@ export default (app: Router) => {
           path += '/';
         }
         if (!path.startsWith('/')) {
-          path = `${config.scriptPath}${path}`;
+          path = join(config.scriptPath, path);
         }
         if (config.writePathList.every((x) => !path.startsWith(x))) {
           return res.send({
@@ -124,7 +124,7 @@ export default (app: Router) => {
         if (fs.existsSync(originFilePath)) {
           fs.copyFileSync(
             originFilePath,
-            `${config.bakPath}${originFilename.replace(/\//g, '')}`,
+            join(config.bakPath, originFilename.replace(/\//g, '')),
           );
           if (filename !== originFilename) {
             fs.unlinkSync(originFilePath);
@@ -207,7 +207,7 @@ export default (app: Router) => {
         let { filename } = req.body as {
           filename: string;
         };
-        const filePath = `${config.scriptPath}${filename}`;
+        const filePath = join(config.scriptPath, filename);
         // const stats = fs.statSync(filePath);
         // res.set({
         //   'Content-Type': 'application/octet-stream', //告诉浏览器这是一个二进制文件

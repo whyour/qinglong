@@ -33,6 +33,7 @@ import { SharedContext } from '@/layouts';
 import './index.less';
 
 const { Text } = Typography;
+const isDemoEnv = window.__ENV__DeployEnv === 'demo';
 
 const Setting = () => {
   const {
@@ -49,13 +50,11 @@ const Setting = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      align: 'center' as const,
     },
     {
       title: 'Client ID',
       dataIndex: 'client_id',
       key: 'client_id',
-      align: 'center' as const,
       render: (text: string, record: any) => {
         return <Text copyable>{record.client_id}</Text>;
       },
@@ -64,7 +63,6 @@ const Setting = () => {
       title: 'Client Secret',
       dataIndex: 'client_secret',
       key: 'client_secret',
-      align: 'center' as const,
       render: (text: string, record: any) => {
         return <Text copyable={{ text: record.client_secret }}>*******</Text>;
       },
@@ -73,22 +71,16 @@ const Setting = () => {
       title: '权限',
       dataIndex: 'scopes',
       key: 'scopes',
-      align: 'center' as const,
       width: '40%',
       render: (text: string, record: any) => {
-        return (
-          <div style={{ textAlign: 'left' }}>
-            {record.scopes.map((scope: any) => {
-              return <Tag key={scope}>{(config.scopesMap as any)[scope]}</Tag>;
-            })}
-          </div>
-        );
+        return record.scopes.map((scope: any) => {
+          return <Tag key={scope}>{(config.scopesMap as any)[scope]}</Tag>;
+        });
       },
     },
     {
       title: '操作',
       key: 'action',
-      align: 'center' as const,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
@@ -261,6 +253,12 @@ const Setting = () => {
       });
   };
 
+  useEffect(() => {
+    if (isDemoEnv) {
+      getApps();
+    }
+  }, []);
+
   return (
     <PageContainer
       className="ql-container-wrapper ql-container-wrapper-has-tab ql-setting-container"
@@ -284,11 +282,17 @@ const Setting = () => {
         tabPosition="top"
         onChange={tabChange}
         items={[
-          {
-            key: 'security',
-            label: '安全设置',
-            children: <SecuritySettings user={user} userChange={reloadUser} />,
-          },
+          ...(!isDemoEnv
+            ? [
+                {
+                  key: 'security',
+                  label: '安全设置',
+                  children: (
+                    <SecuritySettings user={user} userChange={reloadUser} />
+                  ),
+                },
+              ]
+            : []),
           {
             key: 'app',
             label: '应用设置',

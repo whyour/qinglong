@@ -6,6 +6,7 @@ import { celebrate, Joi } from 'celebrate';
 import multer from 'multer';
 import path from 'path';
 import { v4 as uuidV4 } from 'uuid';
+import rateLimit from 'express-rate-limit';
 import config from '../config';
 const route = Router();
 
@@ -26,6 +27,10 @@ export default (app: Router) => {
 
   route.post(
     '/login',
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 100,
+    }),
     celebrate({
       body: Joi.object({
         username: Joi.string().required(),

@@ -11,7 +11,7 @@ echo -e "提交master代码"
 git push
 
 echo -e "更新cdn文件"
-ts-node sample/tool.ts
+tsx sample/tool.ts
 
 string=$(cat version.yaml | grep "version" | egrep "[^ ]*" -o | egrep "\d\.*")
 version="v$string"

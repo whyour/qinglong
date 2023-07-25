@@ -39,7 +39,7 @@ export class CrontabView {
   }
 }
 
-interface CronViewInstance
+export interface CronViewInstance
   extends Model<CrontabView, CrontabView>,
     CrontabView {}
 export const CrontabViewModel = sequelize.define<CronViewInstance>(

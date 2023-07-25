@@ -51,9 +51,7 @@ const Config = () => {
       : value;
 
     request
-      .post(`${config.apiPrefix}configs/save`, {
-        data: { content, name: select },
-      })
+      .post(`${config.apiPrefix}configs/save`, { content, name: select })
       .then(({ code, data }) => {
         if (code === 200) {
           message.success('保存成功');

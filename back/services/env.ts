@@ -12,7 +12,7 @@ import {
   stepPosition,
 } from '../data/env';
 import groupBy from 'lodash/groupBy';
-import { Op } from 'sequelize';
+import { FindOptions, Op } from 'sequelize';
 
 @Service()
 export default class EnvService {
@@ -49,7 +49,9 @@ export default class EnvService {
   }
 
   public async update(payload: Env): Promise<Env> {
-    const newDoc = await this.updateDb(payload);
+    const doc = await this.getDb({ id: payload.id });
+    const tab = new Env({ ...doc, ...payload });
+    const newDoc = await this.updateDb(tab);
     await this.set_envs();
     return newDoc;
   }
@@ -92,13 +94,17 @@ export default class EnvService {
       position: this.getPrecisionPosition(targetPosition),
     });
 
-    await this.checkPosition(targetPosition);
+    await this.checkPosition(targetPosition, envs[toIndex].position!);
     return newDoc;
   }
 
-  private async checkPosition(position: number) {
+  private async checkPosition(position: number, edge: number = 0) {
     const precisionPosition = parseFloat(position.toPrecision(16));
-    if (precisionPosition < minPosition || precisionPosition > maxPosition) {
+    if (
+      precisionPosition < minPosition ||
+      precisionPosition > maxPosition ||
+      Math.abs(precisionPosition - edge) < minPosition
+    ) {
       const envs = await this.envs();
       let position = initPosition;
       for (const env of envs) {
@@ -115,7 +121,7 @@ export default class EnvService {
   public async envs(searchText: string = '', query: any = {}): Promise<Env[]> {
     let condition = { ...query };
     if (searchText) {
-      const encodeText = encodeURIComponent(searchText);
+      const encodeText = encodeURI(searchText);
       const reg = {
         [Op.or]: [
           { [Op.like]: `%${searchText}%` },
@@ -140,7 +146,6 @@ export default class EnvService {
     }
     try {
       const result = await this.find(condition, [
-        ['status', 'ASC'],
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);
@@ -158,7 +163,7 @@ export default class EnvService {
     return docs;
   }
 
-  public async getDb(query: any): Promise<Env> {
+  public async getDb(query: FindOptions<Env>['where']): Promise<Env> {
     const doc: any = await EnvModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as Env);
   }
