@@ -236,7 +236,7 @@ export default class DependenceService {
           }
         }
 
-        const cp = spawn(`source ${config.shareShellFile} && set_proxy && ${depRunCommand} ${dependency.name.trim()}`, {
+        const cp = spawn(`${depRunCommand} ${dependency.name.trim()}`, {
           shell: '/bin/bash',
         });
 
