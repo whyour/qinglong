@@ -17,7 +17,7 @@ const addCron = (
       scheduleStacks.get(id)?.cancel();
     }
 
-    let cmdStr = command;
+    let cmdStr = command.trim();
     if (!cmdStr.startsWith(TASK_PREFIX) && !cmdStr.startsWith(QL_PREFIX)) {
       cmdStr = `${TASK_PREFIX}${cmdStr}`;
     }
@@ -25,8 +25,12 @@ const addCron = (
     scheduleStacks.set(
       id,
       nodeSchedule.scheduleJob(id, schedule, async () => {
-        Logger.silly(`当前时间: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}，运行命令: ${cmdStr}`);
-        runCron(`ID=${id} ${cmdStr}`)
+        Logger.info(
+          `当前时间: ${dayjs().format(
+            'YYYY-MM-DD HH:mm:ss',
+          )}，运行命令: ${cmdStr}`,
+        );
+        runCron(`ID=${id} ${cmdStr}`);
       }),
     );
   }

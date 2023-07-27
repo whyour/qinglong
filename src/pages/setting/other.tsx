@@ -207,7 +207,7 @@ const Other = ({
       </Form.Item>
       <Form.Item label="数据备份还原" name="frequency">
         <Button type="primary" onClick={exportData} loading={exportLoading}>
-          备份
+          {exportLoading ? '生成数据中...' : '备份'}
         </Button>
         <Upload
           method="put"

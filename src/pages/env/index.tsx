@@ -214,7 +214,7 @@ const Env = () => {
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
   const [importLoading, setImportLoading] = useState(false);
-  const tableRef = useRef<any>();
+  const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef, 59);
 
   const getEnvs = () => {

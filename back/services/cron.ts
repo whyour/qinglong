@@ -507,13 +507,14 @@ export default class CronService {
   }
 
   private make_command(tab: Crontab) {
+    let command = tab.command.trim();
     if (
-      !tab.command.startsWith(TASK_PREFIX) &&
-      !tab.command.startsWith(QL_PREFIX)
+      !command.startsWith(TASK_PREFIX) &&
+      !command.startsWith(QL_PREFIX)
     ) {
-      tab.command = `${TASK_PREFIX}${tab.command}`;
+      command = `${TASK_PREFIX}${tab.command}`;
     }
-    const crontab_job_string = `ID=${tab.id} ${tab.command}`;
+    const crontab_job_string = `ID=${tab.id} ${command}`;
     return crontab_job_string;
   }
 

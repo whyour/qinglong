@@ -237,7 +237,7 @@ const Subscription = () => {
   const [pageSize, setPageSize] = useState(20);
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logSubscription, setLogSubscription] = useState<any>();
-  const tableRef = useRef<any>();
+  const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
 
   const runSubscription = (record: any, index: number) => {

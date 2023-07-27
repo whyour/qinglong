@@ -30,6 +30,8 @@ import CronLogModal from './logModal';
 import Editor from '@monaco-editor/react';
 import IconFont from '@/components/iconfont';
 import { getCommandScript } from '@/utils';
+import VirtualList from 'rc-virtual-list';
+import useScrollHeight from '@/hooks/useScrollHeight';
 
 const { Text } = Typography;
 
@@ -81,19 +83,28 @@ const CronDetailModal = ({
   const [logUrl, setLogUrl] = useState('');
   const [validTabs, setValidTabs] = useState(tabList);
   const [currentCron, setCurrentCron] = useState<any>({});
+  const listRef = useRef<HTMLDivElement>(null);
+  const tableScrollHeight = useScrollHeight(listRef);
 
   const contentList: any = {
     log: (
-      <List
-        dataSource={logs}
-        loading={loading}
-        renderItem={(item) => (
-          <List.Item className="log-item" onClick={() => onClickItem(item)}>
-            <FileOutlined style={{ marginRight: 10 }} />
-            {item.directory}/{item.filename}
-          </List.Item>
-        )}
-      />
+      <div ref={listRef}>
+        <List>
+          <VirtualList
+            data={logs}
+            height={tableScrollHeight}
+            itemHeight={47}
+            itemKey="filename"
+          >
+            {(item) => (
+              <List.Item className="log-item" onClick={() => onClickItem(item)}>
+                <FileOutlined style={{ marginRight: 10 }} />
+                {item.directory}/{item.filename}
+              </List.Item>
+            )}
+          </VirtualList>
+        </List>
+      </div>
     ),
     script: scriptInfo.filename && (
       <Editor
@@ -248,7 +259,7 @@ const CronDetailModal = ({
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/stop`, [currentCron.id] )
+          .put(`${config.apiPrefix}crons/stop`, [currentCron.id])
           .then(({ code, data }) => {
             if (code === 200) {
               setCurrentCron({ ...currentCron, status: CrontabStatus.idle });
@@ -280,7 +291,7 @@ const CronDetailModal = ({
             `${config.apiPrefix}crons/${
               currentCron.isDisabled === 1 ? 'enable' : 'disable'
             }`,
-           [currentCron.id],
+            [currentCron.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {

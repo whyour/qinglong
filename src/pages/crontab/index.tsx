@@ -347,7 +347,7 @@ const Crontab = () => {
   const [cronViews, setCronViews] = useState<any[]>([]);
   const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
   const [moreMenuActive, setMoreMenuActive] = useState(false);
-  const tableRef = useRef<any>();
+  const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
 
   const goToScriptManager = (record: any) => {

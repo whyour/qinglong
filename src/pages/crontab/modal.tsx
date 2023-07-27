@@ -31,7 +31,7 @@ const CronModal = ({
       );
 
       if (code === 200) {
-        message.success(cron ? '更新Cron成功' : '新建Cron成功');
+        message.success(cron ? '更新任务成功' : '新建任务成功');
         handleCancel(data);
       }
       setLoading(false);
