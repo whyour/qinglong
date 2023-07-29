@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import {
   TreeSelect,
@@ -55,7 +56,7 @@ const LangMap: any = {
 const Script = () => {
   const { headerStyle, isPhone, theme, socketMessage } =
     useOutletContext<SharedContext>();
-  const [value, setValue] = useState('请选择脚本文件');
+  const [value, setValue] = useState(intl.get('请选择脚本文件'));
   const [select, setSelect] = useState<string>('');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -128,7 +129,7 @@ const Script = () => {
     }
 
     if (node.type === 'directory') {
-      setValue('请选择脚本文件');
+      setValue(intl.get('请选择脚本文件'));
       return;
     }
 
@@ -146,7 +147,7 @@ const Script = () => {
       if (content !== value) {
         Modal.confirm({
           title: `确认离开`,
-          content: <>当前修改未保存，确定离开吗</>,
+          content: <>{intl.get('当前修改未保存，确定离开吗')}</>,
           onOk() {
             onSelect(keys[0], e.node);
             setIsEditing(false);
@@ -209,11 +210,11 @@ const Script = () => {
       title: `确认保存`,
       content: (
         <>
-          确认保存文件
+          {intl.get('确认保存文件')}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentNode.title}
           </Text>{' '}
-          ，保存后不可恢复
+          {intl.get('，保存后不可恢复')}
         </>
       ),
       onOk() {
@@ -249,12 +250,13 @@ const Script = () => {
       title: `确认删除`,
       content: (
         <>
-          确认删除
+          {intl.get('确认删除')}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {select}
           </Text>
-          文件{currentNode.type === 'directory' ? '夹及其子文件' : ''}
-          ，删除后不可恢复
+          {intl.get('文件')}
+          {currentNode.type === 'directory' ? intl.get('夹及其子文件') : ''}
+          {intl.get('，删除后不可恢复')}
         </>
       ),
       onOk() {
@@ -358,7 +360,7 @@ const Script = () => {
   const initState = () => {
     setSelect('');
     setCurrentNode(null);
-    setValue('请选择脚本文件');
+    setValue(intl.get('请选择脚本文件'));
   };
 
   useEffect(() => {
@@ -406,8 +408,8 @@ const Script = () => {
   const menu: MenuProps = isEditing
     ? {
         items: [
-          { label: '保存', key: 'save', icon: <PlusOutlined /> },
-          { label: '退出编辑', key: 'exit', icon: <EditOutlined /> },
+          { label: intl.get('保存'), key: 'save', icon: <PlusOutlined /> },
+          { label: intl.get('退出编辑'), key: 'exit', icon: <EditOutlined /> },
         ],
         onClick: ({ key, domEvent }) => {
           domEvent.stopPropagation();
@@ -416,21 +418,21 @@ const Script = () => {
       }
     : {
         items: [
-          { label: '新建', key: 'add', icon: <PlusOutlined /> },
+          { label: intl.get('创建'), key: 'add', icon: <PlusOutlined /> },
           {
-            label: '编辑',
+            label: intl.get('编辑'),
             key: 'edit',
             icon: <EditOutlined />,
             disabled: !select,
           },
           {
-            label: '重命名',
+            label: intl.get('重命名'),
             key: 'rename',
             icon: <IconFont type="ql-icon-rename" />,
             disabled: !select,
           },
           {
-            label: '删除',
+            label: intl.get('删除'),
             key: 'delete',
             icon: <DeleteOutlined />,
             disabled: !select,
@@ -456,7 +458,7 @@ const Script = () => {
                 value={select}
                 dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
                 treeData={data}
-                placeholder="请选择脚本"
+                placeholder={intl.get('请选择脚本')}
                 fieldNames={{ value: 'key' }}
                 treeNodeFilterProp="title"
                 showSearch
@@ -470,21 +472,21 @@ const Script = () => {
           : isEditing
           ? [
               <Button type="primary" onClick={saveFile}>
-                保存
+                {intl.get('保存')}
               </Button>,
               <Button type="primary" onClick={cancelEdit}>
-                退出编辑
+                {intl.get('退出编辑')}
               </Button>,
             ]
           : [
-              <Tooltip title="新建">
+              <Tooltip title={intl.get('创建')}>
                 <Button
                   type="primary"
                   onClick={addFile}
                   icon={<PlusOutlined />}
                 />
               </Tooltip>,
-              <Tooltip title="编辑">
+              <Tooltip title={intl.get('编辑')}>
                 <Button
                   disabled={!select}
                   type="primary"
@@ -492,7 +494,7 @@ const Script = () => {
                   icon={<EditOutlined />}
                 />
               </Tooltip>,
-              <Tooltip title="重命名">
+              <Tooltip title={intl.get('重命名')}>
                 <Button
                   disabled={!select}
                   type="primary"
@@ -500,7 +502,7 @@ const Script = () => {
                   icon={<IconFont type="ql-icon-rename" />}
                 />
               </Tooltip>,
-              <Tooltip title="删除">
+              <Tooltip title={intl.get('删除')}>
                 <Button
                   type="primary"
                   disabled={!select}
@@ -514,7 +516,7 @@ const Script = () => {
                   setIsLogModalVisible(true);
                 }}
               >
-                调试
+                {intl.get('调试')}
               </Button>,
             ]
       }
@@ -532,7 +534,7 @@ const Script = () => {
                   <Input.Search
                     className={styles['left-tree-search']}
                     onChange={onSearch}
-                    placeholder="请输入脚本名"
+                    placeholder={intl.get('请输入脚本名')}
                     allowClear
                   ></Input.Search>
                   <div className={styles['left-tree-scroller']} ref={treeDom}>
@@ -560,7 +562,7 @@ const Script = () => {
                   }}
                 >
                   <Empty
-                    description="暂无脚本"
+                    description={intl.get('暂无脚本')}
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
                 </div>

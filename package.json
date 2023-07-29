@@ -153,6 +153,7 @@
     "react-dnd": "^14.0.2",
     "react-dnd-html5-backend": "^14.0.0",
     "react-dom": "18.2.0",
+    "react-intl-universal": "^2.6.21",
     "react-split-pane": "^0.1.92",
     "sockjs-client": "^1.6.0",
     "ts-node": "^10.6.0",

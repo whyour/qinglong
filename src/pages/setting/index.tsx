@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useState, useEffect } from 'react';
 import {
   Button,
@@ -47,7 +48,7 @@ const Setting = () => {
   } = useOutletContext<SharedContext>();
   const columns = [
     {
-      title: '名称',
+      title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
     },
@@ -68,7 +69,7 @@ const Setting = () => {
       },
     },
     {
-      title: '权限',
+      title: intl.get('权限'),
       dataIndex: 'scopes',
       key: 'scopes',
       width: '40%',
@@ -79,23 +80,23 @@ const Setting = () => {
       },
     },
     {
-      title: '操作',
+      title: intl.get('操作'),
       key: 'action',
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
           <Space size="middle" style={{ paddingLeft: 8 }}>
-            <Tooltip title={isPc ? '编辑' : ''}>
+            <Tooltip title={isPc ? intl.get('编辑') : ''}>
               <a onClick={() => editApp(record, index)}>
                 <EditOutlined />
               </a>
             </Tooltip>
-            <Tooltip title={isPc ? '重置secret' : ''}>
+            <Tooltip title={isPc ? intl.get('重置secret') : ''}>
               <a onClick={() => resetSecret(record, index)}>
                 <ReloadOutlined />
               </a>
             </Tooltip>
-            <Tooltip title={isPc ? '删除' : ''}>
+            <Tooltip title={isPc ? intl.get('删除') : ''}>
               <a onClick={() => deleteApp(record, index)}>
                 <DeleteOutlined />
               </a>
@@ -138,14 +139,14 @@ const Setting = () => {
 
   const deleteApp = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认删除',
+      title: intl.get('确认删除'),
       content: (
         <>
-          确认删除应用{' '}
+          {intl.get('确认删除应用')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -168,16 +169,18 @@ const Setting = () => {
 
   const resetSecret = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认重置',
+      title: intl.get('确认重置'),
       content: (
         <>
-          确认重置应用{' '}
+          {intl.get('确认重置应用')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          的Secret吗
+          {intl.get('的Secret吗')}
           <br />
-          <Text type="secondary">重置Secret会让当前应用所有token失效</Text>
+          <Text type="secondary">
+            {intl.get('重置Secret会让当前应用所有token失效')}
+          </Text>
         </>
       ),
       onOk() {
@@ -262,7 +265,7 @@ const Setting = () => {
   return (
     <PageContainer
       className="ql-container-wrapper ql-container-wrapper-has-tab ql-setting-container"
-      title="系统设置"
+      title={intl.get('系统设置')}
       header={{
         style: headerStyle,
       }}
@@ -270,7 +273,7 @@ const Setting = () => {
         tabActiveKey === 'app'
           ? [
               <Button key="2" type="primary" onClick={() => addApp()}>
-                新建应用
+                {intl.get('创建应用')}
               </Button>,
             ]
           : []
@@ -286,7 +289,7 @@ const Setting = () => {
             ? [
                 {
                   key: 'security',
-                  label: '安全设置',
+                  label: intl.get('安全设置'),
                   children: (
                     <SecuritySettings user={user} userChange={reloadUser} />
                   ),
@@ -295,7 +298,7 @@ const Setting = () => {
             : []),
           {
             key: 'app',
-            label: '应用设置',
+            label: intl.get('应用设置'),
             children: (
               <Table
                 columns={columns}
@@ -310,17 +313,17 @@ const Setting = () => {
           },
           {
             key: 'notification',
-            label: '通知设置',
+            label: intl.get('通知设置'),
             children: <NotificationSetting data={notificationInfo} />,
           },
           {
             key: 'login',
-            label: '登录日志',
+            label: intl.get('登录日志'),
             children: <LoginLog data={loginLogData} />,
           },
           {
             key: 'other',
-            label: '其他设置',
+            label: intl.get('其他设置'),
             children: (
               <Other
                 reloadTheme={reloadTheme}
@@ -331,7 +334,7 @@ const Setting = () => {
           },
           {
             key: 'about',
-            label: '关于',
+            label: intl.get('关于'),
             children: <About systemInfo={systemInfo} />,
           },
         ]}

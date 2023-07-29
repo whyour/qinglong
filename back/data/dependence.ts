@@ -66,7 +66,7 @@ export enum unInstallDependenceCommandTypes {
 
 export interface DependenceInstance
   extends Model<Dependence, Dependence>,
-  Dependence { }
+    Dependence {}
 export const DependenceModel = sequelize.define<DependenceInstance>(
   'Dependence',
   {

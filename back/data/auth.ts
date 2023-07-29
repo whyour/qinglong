@@ -39,12 +39,14 @@ export interface LoginLogInfo {
   address?: string;
   ip?: string;
   platform?: string;
-  status?: LoginStatus,
+  status?: LoginStatus;
 }
 
-export type AuthModelInfo = SystemConfigInfo & Partial<NotificationInfo> & LoginLogInfo;
+export type AuthModelInfo = SystemConfigInfo &
+  Partial<NotificationInfo> &
+  LoginLogInfo;
 
-export interface AuthInstance extends Model<AuthInfo, AuthInfo>, AuthInfo { }
+export interface AuthInstance extends Model<AuthInfo, AuthInfo>, AuthInfo {}
 export const AuthModel = sequelize.define<AuthInstance>('Auth', {
   ip: DataTypes.STRING,
   type: DataTypes.STRING,

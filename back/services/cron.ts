@@ -5,11 +5,7 @@ import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import { exec, execSync } from 'child_process';
 import fs from 'fs';
 import cron_parser from 'cron-parser';
-import {
-  getFileContentByName,
-  fileExist,
-  killTask,
-} from '../config/util';
+import { getFileContentByName, fileExist, killTask } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { Op, where, col as colFn, FindOptions, fn } from 'sequelize';
 import path from 'path';
@@ -20,7 +16,7 @@ import { spawn } from 'cross-spawn';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -508,10 +504,7 @@ export default class CronService {
 
   private make_command(tab: Crontab) {
     let command = tab.command.trim();
-    if (
-      !command.startsWith(TASK_PREFIX) &&
-      !command.startsWith(QL_PREFIX)
-    ) {
+    if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
       command = `${TASK_PREFIX}${tab.command}`;
     }
     const crontab_job_string = `ID=${tab.id} ${command}`;

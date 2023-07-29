@@ -1,11 +1,7 @@
 import { message } from 'antd';
 import config from './config';
 import { history } from '@umijs/max';
-import axios, {
-  AxiosError,
-  AxiosInstance,
-  AxiosRequestConfig,
-} from 'axios';
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 
 interface IResponseData {
   code?: number;
@@ -26,9 +22,7 @@ message.config({
 });
 
 const time = Date.now();
-const errorHandler = function (
-  error: AxiosError,
-) {
+const errorHandler = function (error: AxiosError) {
   if (error.response) {
     const msg = error.response.data
       ? error.response.data.message || error.message || error.response.data
@@ -99,29 +93,32 @@ _request.interceptors.response.use(async (response) => {
           });
       }
       return res;
-    } catch (error) { }
+    } catch (error) {}
     return response;
   }
   return response;
 }, errorHandler);
 
-export const request = _request as Override<AxiosInstance, {
-  get<T = IResponseData, D = any>(
-    url: string,
-    config?: AxiosRequestConfig<D>,
-  ): Promise<T>;
-  delete<T = IResponseData, D = any>(
-    url: string,
-    config?: AxiosRequestConfig<D>,
-  ): Promise<T>;
-  post<T = IResponseData, D = any>(
-    url: string,
-    data?: D,
-    config?: AxiosRequestConfig<D>,
-  ): Promise<T>;
-  put<T = IResponseData, D = any>(
-    url: string,
-    data?: D,
-    config?: AxiosRequestConfig<D>,
-  ): Promise<T>;
-}>;
+export const request = _request as Override<
+  AxiosInstance,
+  {
+    get<T = IResponseData, D = any>(
+      url: string,
+      config?: AxiosRequestConfig<D>,
+    ): Promise<T>;
+    delete<T = IResponseData, D = any>(
+      url: string,
+      config?: AxiosRequestConfig<D>,
+    ): Promise<T>;
+    post<T = IResponseData, D = any>(
+      url: string,
+      data?: D,
+      config?: AxiosRequestConfig<D>,
+    ): Promise<T>;
+    put<T = IResponseData, D = any>(
+      url: string,
+      data?: D,
+      config?: AxiosRequestConfig<D>,
+    ): Promise<T>;
+  }
+>;

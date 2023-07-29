@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   Button,
@@ -90,20 +91,22 @@ const Dependence = () => {
     useOutletContext<SharedContext>();
   const columns: any = [
     {
-      title: '序号',
-      width: 50,
+      title: intl.get('序号'),
+      width: 80,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },
     },
     {
-      title: '名称',
+      title: intl.get('名称'),
       dataIndex: 'name',
+      width: 120,
       key: 'name',
     },
     {
-      title: '状态',
+      title: intl.get('状态'),
       key: 'status',
+      width: 100,
       dataIndex: 'status',
       render: (text: string, record: any, index: number) => {
         return (
@@ -113,41 +116,45 @@ const Dependence = () => {
               icon={StatusMap[record.status].icon}
               style={{ marginRight: 0 }}
             >
-              {Status[record.status]}
+              {intl.get(Status[record.status])}
             </Tag>
           </Space>
         );
       },
     },
     {
-      title: '备注',
+      title: intl.get('备注'),
       dataIndex: 'remark',
+      width: 120,
       key: 'remark',
     },
     {
-      title: '更新时间',
+      title: intl.get('更新时间'),
       key: 'updatedAt',
       dataIndex: 'updatedAt',
+      width: 150,
       render: (text: string) => {
         return <span>{dayjs(text).format('YYYY-MM-DD HH:mm:ss')}</span>;
       },
     },
     {
-      title: '创建时间',
+      title: intl.get('创建时间'),
       key: 'createdAt',
       dataIndex: 'createdAt',
+      width: 150,
       render: (text: string) => {
         return <span>{dayjs(text).format('YYYY-MM-DD HH:mm:ss')}</span>;
       },
     },
     {
-      title: '操作',
+      title: intl.get('操作'),
       key: 'action',
+      width: 150,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
-            <Tooltip title={isPc ? '日志' : ''}>
+            <Tooltip title={isPc ? intl.get('日志') : ''}>
               <a
                 onClick={() => {
                   setLogDependence({ ...record, timestamp: Date.now() });
@@ -159,17 +166,17 @@ const Dependence = () => {
             {record.status !== Status.安装中 &&
               record.status !== Status.删除中 && (
                 <>
-                  <Tooltip title={isPc ? '重新安装' : ''}>
+                  <Tooltip title={isPc ? intl.get('重新安装') : ''}>
                     <a onClick={() => reInstallDependence(record, index)}>
                       <BugOutlined />
                     </a>
                   </Tooltip>
-                  <Tooltip title={isPc ? '删除' : ''}>
+                  <Tooltip title={isPc ? intl.get('删除') : ''}>
                     <a onClick={() => deleteDependence(record, index)}>
                       <DeleteOutlined />
                     </a>
                   </Tooltip>
-                  <Tooltip title={isPc ? '强制删除' : ''}>
+                  <Tooltip title={isPc ? intl.get('强制删除') : ''}>
                     <a onClick={() => deleteDependence(record, index, true)}>
                       <DeleteFilled />
                     </a>
@@ -223,14 +230,14 @@ const Dependence = () => {
     force: boolean = false,
   ) => {
     Modal.confirm({
-      title: '确认删除',
+      title: intl.get('确认删除'),
       content: (
         <>
-          确认删除依赖{' '}
+          {intl.get('确认删除依赖')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -257,14 +264,14 @@ const Dependence = () => {
 
   const reInstallDependence = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认重新安装',
+      title: intl.get('确认重新安装'),
       content: (
         <>
-          确认重新安装{' '}
+          {intl.get('确认重新安装')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -314,8 +321,8 @@ const Dependence = () => {
   const delDependencies = (force: boolean) => {
     const forceUrl = force ? '/force' : '';
     Modal.confirm({
-      title: '确认删除',
-      content: <>确认删除选中的依赖吗</>,
+      title: intl.get('确认删除'),
+      content: <>{intl.get('确认删除选中的依赖吗')}</>,
       onOk() {
         request
           .delete(`${config.apiPrefix}dependencies${forceUrl}`, {
@@ -336,8 +343,8 @@ const Dependence = () => {
 
   const handlereInstallDependencies = () => {
     Modal.confirm({
-      title: '确认重新安装',
-      content: <>确认重新安装选中的依赖吗</>,
+      title: intl.get('确认重新安装'),
+      content: <>{intl.get('确认重新安装选中的依赖吗')}</>,
       onOk() {
         request
           .put(`${config.apiPrefix}dependencies/reinstall`, selectedRowIds)
@@ -454,17 +461,17 @@ const Dependence = () => {
   return (
     <PageContainer
       className="ql-container-wrapper dependence-wrapper ql-container-wrapper-has-tab"
-      title="依赖管理"
+      title={intl.get('依赖管理')}
       extra={[
         <Search
-          placeholder="请输入名称"
+          placeholder={intl.get('请输入名称')}
           style={{ width: 'auto' }}
           enterButton
           loading={loading}
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addDependence()}>
-          新建依赖
+          {intl.get('创建依赖')}
         </Button>,
       ]}
       header={{
@@ -499,25 +506,26 @@ const Dependence = () => {
               style={{ marginBottom: 5, marginLeft: 8 }}
               onClick={() => handlereInstallDependencies()}
             >
-              批量安装
+              {intl.get('批量安装')}
             </Button>
             <Button
               type="primary"
               style={{ marginBottom: 5, marginLeft: 8 }}
               onClick={() => delDependencies(false)}
             >
-              批量删除
+              {intl.get('批量删除')}
             </Button>
             <Button
               type="primary"
               style={{ marginBottom: 5, marginLeft: 8 }}
               onClick={() => delDependencies(true)}
             >
-              批量强制删除
+              {intl.get('批量强制删除')}
             </Button>
             <span style={{ marginLeft: 8 }}>
-              已选择
-              <a>{selectedRowIds?.length}</a>项
+              {intl.get('已选择')}
+              <a>{selectedRowIds?.length}</a>
+              {intl.get('项')}
             </span>
           </div>
         )}

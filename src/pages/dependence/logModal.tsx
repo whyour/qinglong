@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form, Statistic, Button } from 'antd';
 import { request } from '@/utils/http';
@@ -38,7 +39,7 @@ const DependenceLogModal = ({
         {executing && <Loading3QuartersOutlined spin />}
         {!executing && <CheckCircleOutlined />}
         <span style={{ marginLeft: 5 }}>
-          日志 - {dependence && dependence.name}
+          {intl.get('日志 -')} {dependence && dependence.name}
         </span>{' '}
       </>
     );
@@ -130,7 +131,7 @@ const DependenceLogModal = ({
       onCancel={() => cancel()}
       footer={[
         <Button type="primary" onClick={footerClick} loading={removeLoading}>
-          {isRemoveFailed ? '强制删除' : '知道了'}
+          {isRemoveFailed ? intl.get('强制删除') : intl.get('知道了')}
         </Button>,
       ]}
     >

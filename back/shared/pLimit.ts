@@ -1,6 +1,6 @@
-import pLimit from "p-limit";
+import pLimit from 'p-limit';
 import os from 'os';
-import { AuthDataType, AuthModel } from "../data/auth";
+import { AuthDataType, AuthModel } from '../data/auth';
 
 class TaskLimit {
   private oneLimit = pLimit(1);
@@ -17,7 +17,9 @@ class TaskLimit {
       return;
     }
     await AuthModel.sync();
-    const doc = await AuthModel.findOne({ where: { type: AuthDataType.systemConfig } });
+    const doc = await AuthModel.findOne({
+      where: { type: AuthDataType.systemConfig },
+    });
     if (doc?.info?.cronConcurrency) {
       this.cpuLimit = pLimit(doc?.info?.cronConcurrency);
     }

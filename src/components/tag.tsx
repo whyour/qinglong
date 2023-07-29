@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import { Tag, Input } from 'antd';
 import { TweenOneGroup } from 'rc-tween-one';
 import { PlusOutlined } from '@ant-design/icons';
@@ -101,7 +102,7 @@ const EditableTagGroup = ({
           onClick={showInput}
           style={{ borderStyle: 'dashed', cursor: 'pointer' }}
         >
-          <PlusOutlined /> 新建
+          <PlusOutlined /> {intl.get('新建')}
         </Tag>
       )}
     </>

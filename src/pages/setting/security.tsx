@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Typography, Input, Form, Button, message, Avatar, Upload } from 'antd';
 import { request } from '@/utils/http';
@@ -110,8 +111,8 @@ const SecuritySettings = ({ user, userChange }: any) => {
     <>
       {twoFactorInfo ? (
         <div>
-          <Title level={5}>第一步</Title>
-          下载两步验证手机应用，比如 Google Authenticator 、
+          <Title level={5}>{intl.get('第一步')}</Title>
+          {intl.get('下载两步验证手机应用，比如 Google Authenticator 、')}
           <Link
             href="https://www.microsoft.com/en-us/security/mobile-authenticator-app"
             target="_blank"
@@ -137,9 +138,10 @@ const SecuritySettings = ({ user, userChange }: any) => {
             LastPass Authenticator
           </Link>
           <Title style={{ marginTop: 5 }} level={5}>
-            第二步
+            {intl.get('第二步')}
           </Title>
-          使用手机应用扫描二维码，或者输入秘钥 {twoFactorInfo?.secret}
+          {intl.get('使用手机应用扫描二维码，或者输入秘钥')}{' '}
+          {twoFactorInfo?.secret}
           <div style={{ marginTop: 10 }}>
             <QRCode
               style={{ border: '1px solid #21262d', borderRadius: 6 }}
@@ -149,9 +151,9 @@ const SecuritySettings = ({ user, userChange }: any) => {
             />
           </div>
           <Title style={{ marginTop: 5 }} level={5}>
-            第三步
+            {intl.get('第三步')}
           </Title>
-          输入手机应用上的6位数字
+          {intl.get('输入手机应用上的6位数字')}
           <Input
             style={{ margin: '10px 0 10px 0', display: 'block', maxWidth: 200 }}
             value={code}
@@ -159,7 +161,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
             placeholder="123456"
           />
           <Button type="primary" loading={loading} onClick={completeTowFactor}>
-            完成设置
+            {intl.get('完成设置')}
           </Button>
         </div>
       ) : (
@@ -176,35 +178,35 @@ const SecuritySettings = ({ user, userChange }: any) => {
           paddingBottom: 4,
         }}
       >
-        修改用户名密码
+        {intl.get('修改用户名密码')}
       </div>
       <Form onFinish={handleOk} layout="vertical">
         <Form.Item
-          label="用户名"
+          label={intl.get('用户名')}
           name="username"
           rules={[{ required: true }]}
           hasFeedback
           style={{ maxWidth: 300 }}
         >
-          <Input placeholder="用户名" />
+          <Input placeholder={intl.get('用户名')} />
         </Form.Item>
         <Form.Item
-          label="密码"
+          label={intl.get('密码')}
           name="password"
           rules={[
             { required: true },
             {
               pattern: /^(?!admin$).*$/,
-              message: '密码不能为admin',
+              message: intl.get('密码不能为admin'),
             },
           ]}
           hasFeedback
           style={{ maxWidth: 300 }}
         >
-          <Input type="password" placeholder="密码" />
+          <Input type="password" placeholder={intl.get('密码')} />
         </Form.Item>
         <Button type="primary" htmlType="submit">
-          保存
+          {intl.get('保存')}
         </Button>
       </Form>
 
@@ -217,14 +219,14 @@ const SecuritySettings = ({ user, userChange }: any) => {
           marginTop: 16,
         }}
       >
-        两步验证
+        {intl.get('两步验证')}
       </div>
       <Button
         type="primary"
         danger={twoFactorActivated}
         onClick={activeOrDeactiveTwoFactor}
       >
-        {twoFactorActivated ? '禁用' : '启用'}
+        {twoFactorActivated ? intl.get('禁用') : intl.get('启用')}
       </Button>
 
       <div
@@ -236,7 +238,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
           marginTop: 16,
         }}
       >
-        头像
+        {intl.get('头像')}
       </div>
       <Avatar size={128} shape="square" icon={<UserOutlined />} src={avatar} />
       <ImgCrop rotationSlider>
@@ -252,7 +254,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
           }}
         >
           <Button icon={<UploadOutlined />} style={{ marginLeft: 8 }}>
-            更换头像
+            {intl.get('更换头像')}
           </Button>
         </Upload>
       </ImgCrop>

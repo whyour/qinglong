@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Typography, Table, Tag, Button, Spin, message } from 'antd';
 import { request } from '@/utils/http';
@@ -17,45 +18,48 @@ enum LoginStatusColor {
 
 const columns = [
   {
-    title: '序号',
-    width: 50,
+    title: intl.get('序号'),
+    width: 40,
     render: (text: string, record: any, index: number) => {
       return index + 1;
     },
   },
   {
-    title: '登录时间',
+    title: intl.get('登录时间'),
     dataIndex: 'timestamp',
     key: 'timestamp',
+    width: 120,
     render: (text: string, record: any) => {
       return new Date(record.timestamp).toLocaleString();
     },
   },
   {
-    title: '登录地址',
+    title: intl.get('登录地址'),
     dataIndex: 'address',
+    width: 120,
     key: 'address',
   },
   {
-    title: '登录IP',
+    title: intl.get('登录IP'),
     dataIndex: 'ip',
+    width: 100,
     key: 'ip',
   },
   {
-    title: '登录设备',
+    title: intl.get('登录设备'),
     dataIndex: 'platform',
     key: 'platform',
     width: 80,
   },
   {
-    title: '登录状态',
+    title: intl.get('登录状态'),
     dataIndex: 'status',
     key: 'status',
     width: 80,
     render: (text: string, record: any) => {
       return (
         <Tag color={LoginStatusColor[record.status]} style={{ marginRight: 0 }}>
-          {LoginStatus[record.status]}
+          {intl.get(LoginStatus[record.status])}
         </Tag>
       );
     },

@@ -36,7 +36,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -111,7 +111,7 @@ export default class SystemService {
           },
         );
         lastVersionContent = await parseContentVersion(result.body);
-      } catch (error) { }
+      } catch (error) {}
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -256,7 +256,10 @@ export default class SystemService {
 
   public async exportData(res: Response) {
     try {
-      await tar.create({ gzip: true, file: config.dataTgzFile, cwd: config.rootPath }, ['data'])
+      await tar.create(
+        { gzip: true, file: config.dataTgzFile, cwd: config.rootPath },
+        ['data'],
+      );
       res.download(config.dataTgzFile);
     } catch (error: any) {
       return res.send({ code: 400, message: error.message });

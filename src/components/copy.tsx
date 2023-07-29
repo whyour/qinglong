@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useRef, useState, useEffect } from 'react';
 import { Tooltip, Typography } from 'antd';
 import { CopyOutlined, CheckOutlined } from '@ant-design/icons';
@@ -28,7 +29,10 @@ const Copy = ({ text }: { text: string }) => {
   return (
     <Link onClick={copyText} style={{ marginLeft: 1 }}>
       <CopyToClipboard text={text}>
-        <Tooltip key="copy" title={copied ? '复制成功' : '复制'}>
+        <Tooltip
+          key="copy"
+          title={copied ? intl.get('复制成功') : intl.get('复制')}
+        >
           {copied ? <CheckOutlined /> : <CopyOutlined />}
         </Tooltip>
       </CopyToClipboard>

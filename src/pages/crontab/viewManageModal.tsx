@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
@@ -81,18 +82,18 @@ const ViewManageModal = ({
 
   const columns: any = [
     {
-      title: '名称',
+      title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
     },
     {
-      title: '类型',
+      title: intl.get('类型'),
       dataIndex: 'type',
       key: 'type',
-      render: (v) => (v === 1 ? '系统' : '个人'),
+      render: (v) => (v === 1 ? intl.get('系统') : intl.get('个人')),
     },
     {
-      title: '显示',
+      title: intl.get('显示'),
       key: 'isDisabled',
       dataIndex: 'isDisabled',
       width: 100,
@@ -107,7 +108,7 @@ const ViewManageModal = ({
       },
     },
     {
-      title: '操作',
+      title: intl.get('操作'),
       key: 'action',
       width: 100,
       render: (text: string, record: any, index: number) => {
@@ -140,14 +141,14 @@ const ViewManageModal = ({
 
   const deleteView = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认删除',
+      title: intl.get('确认删除'),
       content: (
         <>
-          确认删除视图{' '}
+          {intl.get('确认删除视图')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -218,7 +219,7 @@ const ViewManageModal = ({
 
   return (
     <Modal
-      title="视图管理"
+      title={intl.get('视图管理')}
       open={visible}
       centered
       width={620}
@@ -243,7 +244,7 @@ const ViewManageModal = ({
             setIsCreateViewModalVisible(true);
           }}
         >
-          新建视图
+          {intl.get('创建视图')}
         </Button>
       </Space>
       <DndProvider backend={HTML5Backend}>
