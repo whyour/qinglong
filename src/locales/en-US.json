@@ -394,5 +394,18 @@
   "强制删除": "Force Delete",
   "全部任务": "All Tasks",
   "关联订阅": "Associate Subscription",
-  "订阅": "Subscription"
+  "订阅": "Subscription",
+  "创建": "Create",
+  "创建订阅成功": "Subscription created successfully",
+  "gotify的url地址,例如 https://push.example.de:8080": "Gotify URL address, e.g., https://push.example.de:8080",
+  "BARK推送图标,自定义推送图标 (需iOS15或以上才能显示)": "BARK push icon, custom push icon (requires iOS 15 or above to display)",
+  "BARK推送铃声,铃声列表去APP查看复制填写": "BARK push ringtone, check the ringtone list in the APP and copy it",
+  "BARK推送消息的分组, 默认为qinglong": "BARK push message grouping, default is qinglong",
+  "telegram代理配置认证参数, 用户名与密码用英文冒号连接 user:password": "Telegram proxy configuration authentication parameters, connect username and password with a colon, e.g., user:password",
+  "企业微信机器人的 webhook(详见文档 https://work.weixin.qq.com/api/doc/90000/90136/91770)，例如：693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa": "WeChat Work Bot webhook (see documentation at https://work.weixin.qq.com/api/doc/90000/90136/91770), e.g., 693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa",
+  "corpid,corpsecret,touser(注:多个成员ID使用|隔开),agentid,消息类型(选填,不填默认文本消息类型) 注意用,号隔开(英文输入法的逗号)，例如：wwcfrs,B-76WERQ,qinglong,1000001,2COat": "corpid, corpsecret, touser (note: separate multiple member IDs with |), agentid, message type (optional, defaults to text message type) – separated by commas (`,`), e.g., wwcfrs, B-76WERQ, qinglong, 1000001, 2COat",
+  "密钥key,智能微秘书个人中心获取apikey，申请地址：https://wechat.aibotk.com/signup?from=ql": "Key, obtain the API key from the Smart WeChat Assistant's personal center, apply at: https://wechat.aibotk.com/signup?from=ql",
+  "一对多推送的“群组编码”（一对多推送下面->您的群组(如无则新建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）": "The 'Group Code' for one-to-many push (under one-to-many push->Your Group (create one if none exists)->Group Code. If you are the creator of the group, you also need to click 'View QR Code' for scanning and binding, otherwise you cannot receive group message push)",
+  "同时删除关联任务和脚本": "Delete associated tasks and scripts as well",
+  "夹及其子文件": "Folder and its sub-files"
 }

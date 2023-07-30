@@ -106,7 +106,7 @@ const Dependence = () => {
     {
       title: intl.get('状态'),
       key: 'status',
-      width: 100,
+      width: 120,
       dataIndex: 'status',
       render: (text: string, record: any, index: number) => {
         return (

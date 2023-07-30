@@ -195,7 +195,7 @@ const EditModal = ({
           >
             {intl.get('清空日志')}
           </Button>
-          <Button
+          {/* <Button
             type="primary"
             style={{ marginRight: 8 }}
             onClick={() => {
@@ -203,7 +203,7 @@ const EditModal = ({
             }}
           >
             {intl.get('设置')}
-          </Button>
+          </Button> */}
           <Button
             type="primary"
             style={{ marginRight: 8 }}

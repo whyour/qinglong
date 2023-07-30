@@ -12,6 +12,7 @@ import {
   Typography,
   Input,
   Tooltip,
+  Checkbox,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -240,6 +241,7 @@ const Subscription = () => {
   const [logSubscription, setLogSubscription] = useState<any>();
   const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
+  const deleteCheckRef = useRef(false);
 
   const runSubscription = (record: any, index: number) => {
     Modal.confirm({
@@ -335,6 +337,10 @@ const Subscription = () => {
     setIsModalVisible(true);
   };
 
+  const onCheckChange = (e) => {
+    deleteCheckRef.current = e.target.checked;
+  };
+
   const delSubscription = (record: any, index: number) => {
     Modal.confirm({
       title: intl.get('确认删除'),
@@ -345,11 +351,19 @@ const Subscription = () => {
             {record.name}
           </Text>{' '}
           {intl.get('吗')}
+          <div style={{ marginTop: 20 }}>
+            <Checkbox onChange={onCheckChange}>
+              {intl.get('同时删除关联任务和脚本')}
+            </Checkbox>
+          </div>
         </>
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}subscriptions`, { data: [record.id] })
+          .delete(`${config.apiPrefix}subscriptions`, {
+            data: [record.id],
+            params: { force: deleteCheckRef.current },
+          })
           .then(({ code, data }) => {
             if (code === 200) {
               message.success('删除成功');
