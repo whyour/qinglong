@@ -129,6 +129,7 @@
     "@types/uuid": "^8.3.4",
     "@umijs/max": "^4.0.72",
     "@umijs/ssr-darkreader": "^4.9.45",
+    "ahooks": "^3.7.8",
     "ansi-to-react": "^6.1.6",
     "antd": "^4.24.8",
     "antd-img-crop": "^4.2.3",

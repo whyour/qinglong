@@ -56,6 +56,7 @@ import { getCommandScript, parseCrontab } from '@/utils';
 import { ColumnProps } from 'antd/lib/table';
 import { useVT } from 'virtualizedtableforantd4';
 import { ICrontab, OperationName, OperationPath, CrontabStatus } from './type';
+import Name from '@/components/name';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -67,6 +68,7 @@ const Crontab = () => {
       title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
+      fixed: isPhone ? undefined : 'left',
       width: 120,
       render: (text: string, record: any) => (
         <>
@@ -122,7 +124,7 @@ const Crontab = () => {
       title: intl.get('命令/脚本'),
       dataIndex: 'command',
       key: 'command',
-      width: 240,
+      width: 200,
       render: (text, record) => {
         return (
           <Paragraph
@@ -147,81 +149,10 @@ const Crontab = () => {
       },
     },
     {
-      title: intl.get('定时规则'),
-      dataIndex: 'schedule',
-      key: 'schedule',
-      width: 140,
-      sorter: {
-        compare: (a, b) => a.schedule.localeCompare(b.schedule),
-      },
-    },
-    {
-      title: intl.get('最后运行时长'),
-      width: 150,
-      dataIndex: 'last_running_time',
-      key: 'last_running_time',
-      sorter: {
-        compare: (a: any, b: any) => {
-          return a.last_running_time - b.last_running_time;
-        },
-      },
-      render: (text, record) => {
-        return record.last_running_time
-          ? diffTime(record.last_running_time)
-          : '-';
-      },
-    },
-    {
-      title: intl.get('最后运行时间'),
-      dataIndex: 'last_execution_time',
-      key: 'last_execution_time',
-      width: 120,
-      sorter: {
-        compare: (a, b) => {
-          return (a.last_execution_time || 0) - (b.last_execution_time || 0);
-        },
-      },
-      render: (text, record) => {
-        const language = navigator.language || navigator.languages[0];
-        return (
-          <span
-            style={{
-              display: 'block',
-            }}
-          >
-            {record.last_execution_time
-              ? new Date(record.last_execution_time * 1000)
-                  .toLocaleString(language, {
-                    hour12: false,
-                  })
-                  .replace(' 24:', ' 00:')
-              : '-'}
-          </span>
-        );
-      },
-    },
-    {
-      title: intl.get('下次运行时间'),
-      width: 120,
-      sorter: {
-        compare: (a: any, b: any) => {
-          return a.nextRunTime - b.nextRunTime;
-        },
-      },
-      render: (text, record) => {
-        const language = navigator.language || navigator.languages[0];
-        return record.nextRunTime
-          .toLocaleString(language, {
-            hour12: false,
-          })
-          .replace(' 24:', ' 00:');
-      },
-    },
-    {
       title: intl.get('状态'),
       key: 'status',
       dataIndex: 'status',
-      width: 88,
+      width: 100,
       filters: [
         {
           text: intl.get('运行中'),
@@ -273,9 +204,96 @@ const Crontab = () => {
       ),
     },
     {
+      title: intl.get('定时规则'),
+      dataIndex: 'schedule',
+      key: 'schedule',
+      width: 150,
+      sorter: {
+        compare: (a, b) => a.schedule.localeCompare(b.schedule),
+      },
+    },
+    {
+      title: intl.get('最后运行时长'),
+      width: 180,
+      dataIndex: 'last_running_time',
+      key: 'last_running_time',
+      sorter: {
+        compare: (a: any, b: any) => {
+          return a.last_running_time - b.last_running_time;
+        },
+      },
+      render: (text, record) => {
+        return record.last_running_time
+          ? diffTime(record.last_running_time)
+          : '-';
+      },
+    },
+    {
+      title: intl.get('最后运行时间'),
+      dataIndex: 'last_execution_time',
+      key: 'last_execution_time',
+      width: 150,
+      sorter: {
+        compare: (a, b) => {
+          return (a.last_execution_time || 0) - (b.last_execution_time || 0);
+        },
+      },
+      render: (text, record) => {
+        const language = navigator.language || navigator.languages[0];
+        return (
+          <span
+            style={{
+              display: 'block',
+            }}
+          >
+            {record.last_execution_time
+              ? new Date(record.last_execution_time * 1000)
+                  .toLocaleString(language, {
+                    hour12: false,
+                  })
+                  .replace(' 24:', ' 00:')
+              : '-'}
+          </span>
+        );
+      },
+    },
+    {
+      title: intl.get('下次运行时间'),
+      width: 150,
+      sorter: {
+        compare: (a: any, b: any) => {
+          return a.nextRunTime - b.nextRunTime;
+        },
+      },
+      render: (text, record) => {
+        const language = navigator.language || navigator.languages[0];
+        return record.nextRunTime
+          .toLocaleString(language, {
+            hour12: false,
+          })
+          .replace(' 24:', ' 00:');
+      },
+    },
+    {
+      title: intl.get('关联订阅'),
+      width: 190,
+      render: (text, record: any) =>
+        record.sub_id ? (
+          <Name
+            service={() =>
+              request.get(`${config.apiPrefix}subscriptions/${record.sub_id}`)
+            }
+            options={{ ready: record?.sub_id, cacheKey: record.sub_id }}
+          />
+        ) : (
+          '-'
+        ),
+    },
+    {
       title: intl.get('操作'),
       key: 'action',
       width: 130,
+      fixed: isPhone ? undefined : 'right',
       render: (text, record, index) => {
         const isPc = !isPhone;
         return (
@@ -350,6 +368,7 @@ const Crontab = () => {
   const [moreMenuActive, setMoreMenuActive] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
+  const [activeKey, setActiveKey] = useState('');
 
   const goToScriptManager = (record: any) => {
     const result = getCommandScript(record.command);
@@ -784,6 +803,9 @@ const Crontab = () => {
     if (pageConf.page && pageConf.size) {
       getCrons();
     }
+    if (viewConf && viewConf.id) {
+      setActiveKey(viewConf.id);
+    }
   }, [pageConf, viewConf]);
 
   useEffect(() => {
@@ -883,11 +905,6 @@ const Crontab = () => {
     setViewConf(view ? view : null);
   };
 
-  const [vt] = useVT(
-    () => ({ scroll: { y: tableScrollHeight } }),
-    [tableScrollHeight],
-  );
-
   return (
     <PageContainer
       className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
@@ -914,6 +931,7 @@ const Crontab = () => {
       <Tabs
         defaultActiveKey="all"
         size="small"
+        activeKey={activeKey}
         tabPosition="top"
         className={`crontab-view ${moreMenuActive ? 'more-active' : ''}`}
         tabBarExtraContent={
@@ -1023,7 +1041,6 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
-          // components={isPhone ? undefined : vt}
         />
       </div>
       <CronLogModal
@@ -1063,9 +1080,6 @@ const Crontab = () => {
         handleCancel={(data) => {
           setIsCreateViewModalVisible(false);
           getCronViews();
-          if (data && data.id === viewConf.id) {
-            setViewConf({ ...viewConf, ...data });
-          }
         }}
       />
       <ViewManageModal
@@ -1076,9 +1090,6 @@ const Crontab = () => {
         }}
         cronViewChange={(data) => {
           getCronViews();
-          if (data && data.id === viewConf.id) {
-            setViewConf({ ...viewConf, ...data });
-          }
         }}
       />
     </PageContainer>

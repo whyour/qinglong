@@ -14,15 +14,16 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
-import get from 'lodash/get';
 import { CrontabStatus } from './type';
+import { useRequest } from 'ahooks';
 
 const PROPERTIES = [
   { name: intl.get('命令'), value: 'command' },
   { name: intl.get('名称'), value: 'name' },
   { name: intl.get('定时规则'), value: 'schedule' },
-  { name: intl.get('状态'), value: 'status' },
+  { name: intl.get('状态'), value: 'status', onlySelect: true },
   { name: intl.get('标签'), value: 'labels' },
+  { name: intl.get('订阅'), value: 'sub_id', onlySelect: true },
 ];
 
 const EOperation: any = {
@@ -47,14 +48,6 @@ const SORTTYPES = [
   { name: intl.get('倒序'), value: 'DESC' },
 ];
 
-const STATUS_MAP = {
-  status: [
-    { name: intl.get('运行中'), value: CrontabStatus.running },
-    { name: intl.get('空闲中'), value: CrontabStatus.idle },
-    { name: intl.get('已禁用'), value: CrontabStatus.disabled },
-  ],
-};
-
 enum ViewFilterRelation {
   'and' = '且',
   'or' = '或',
@@ -73,6 +66,21 @@ const ViewCreateModal = ({
   const [loading, setLoading] = useState(false);
   const [filterRelation, setFilterRelation] = useState<'and' | 'or'>('and');
   const filtersValue = Form.useWatch('filters', form);
+  const { data } = useRequest(
+    () => request.get(`${config.apiPrefix}subscriptions`),
+    {
+      cacheKey: 'subscriptions',
+    },
+  );
+
+  const STATUS_MAP = {
+    status: [
+      { name: intl.get('运行中'), value: CrontabStatus.running },
+      { name: intl.get('空闲中'), value: CrontabStatus.idle },
+      { name: intl.get('已禁用'), value: CrontabStatus.disabled },
+    ],
+    sub_id: data?.data.map((x) => ({ name: x.name, value: x.id })),
+  };
 
   const handleOk = async (values: any) => {
     setLoading(true);
@@ -105,7 +113,7 @@ const ViewCreateModal = ({
   }, [view, visible]);
 
   const operationElement = (
-    <Select style={{ width: 80 }}>
+    <Select style={{ width: 120 }}>
       {OPERATIONS.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -243,7 +251,7 @@ const ViewCreateModal = ({
                         name={[name, 'property']}
                         rules={[{ required: true }]}
                       >
-                        {propertyElement(PROPERTIES, { width: 90 })}
+                        {propertyElement(PROPERTIES, { width: 120 })}
                       </Form.Item>
                       <Form.Item
                         {...restField}

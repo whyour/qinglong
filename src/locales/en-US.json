@@ -392,5 +392,7 @@
   "个人": "Personal",
   "重新安装": "Reinstall",
   "强制删除": "Force Delete",
-  "全部任务": "All Tasks"
+  "全部任务": "All Tasks",
+  "关联订阅": "Associate Subscription",
+  "订阅": "Subscription"
 }
