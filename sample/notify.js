@@ -344,7 +344,7 @@ async function sendNotify(
     aibotkNotify(text, desp), //智能微秘书
     fsBotNotify(text, desp), //飞书机器人
     smtpNotify(text, desp), //SMTP 邮件
-    PushMeNotify(text, desp), //PushMe
+    PushMeNotify(text, desp, params), //PushMe
   ]);
 }
 
@@ -1126,12 +1126,12 @@ function smtpNotify(text, desp) {
   });
 }
 
-function PushMeNotify(text, desp) {
+function PushMeNotify(text, desp, params = {}) {
   return new Promise((resolve) => {
     if (PUSHME_KEY) {
       const options = {
         url: `https://push.i-i.me?push_key=${PUSHME_KEY}`,
-        json: { title: text, content: desp },
+        json: { title: text, content: desp, ...params },
         headers: {
           'Content-Type': 'application/json',
         },
