@@ -1,5 +1,5 @@
 import { spawn } from 'cross-spawn';
-import taskLimit from "./pLimit";
+import taskLimit from './pLimit';
 import Logger from '../loaders/logger';
 
 export function runCron(cmd: string): Promise<number> {
@@ -27,11 +27,9 @@ export function runCron(cmd: string): Promise<number> {
       });
 
       cp.on('close', async (code) => {
-        Logger.info(
-          `[任务退出] ${cmd} 进程id: ${cp.pid} 退出，退出码 ${code}`,
-        );
+        Logger.info(`[任务退出] ${cmd} 进程id: ${cp.pid} 退出，退出码 ${code}`);
         resolve();
       });
     });
-  })
+  });
 }

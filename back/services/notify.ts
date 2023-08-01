@@ -304,7 +304,8 @@ export default class NotificationService {
   }
 
   private async weWorkBot() {
-    const { weWorkBotKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } = this.params;
+    const { weWorkBotKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } =
+      this.params;
     const url = `${weWorkOrigin}/cgi-bin/webhook/send?key=${weWorkBotKey}`;
     try {
       const res: any = await got
@@ -329,7 +330,8 @@ export default class NotificationService {
   }
 
   private async weWorkApp() {
-    const { weWorkAppKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } = this.params;
+    const { weWorkAppKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } =
+      this.params;
     const [corpid, corpsecret, touser, agentid, thumb_media_id = '1'] =
       weWorkAppKey.split(',');
     const url = `${weWorkOrigin}/cgi-bin/gettoken`;
@@ -565,15 +567,17 @@ export default class NotificationService {
   private async pushMe() {
     const { pushMeKey } = this.params;
     try {
-      const res: any = await got
-        .post(`https://push.i-i.me/?push_key=${pushMeKey}`, {
+      const res: any = await got.post(
+        `https://push.i-i.me/?push_key=${pushMeKey}`,
+        {
           ...this.gotOption,
           json: {
             title: this.title,
-            content: this.content
+            content: this.content,
           },
           headers: { 'Content-Type': 'application/json' },
-        });
+        },
+      );
       if (res.body === 'success') {
         return true;
       } else {

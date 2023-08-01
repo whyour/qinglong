@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
@@ -36,7 +37,7 @@ const SaveModal = ({
 
   return (
     <Modal
-      title="保存文件"
+      title={intl.get('保存文件')}
       open={visible}
       forceRender
       centered
@@ -62,13 +63,13 @@ const SaveModal = ({
       >
         <Form.Item
           name="filename"
-          label="文件名"
-          rules={[{ required: true, message: '请输入文件名' }]}
+          label={intl.get('文件名')}
+          rules={[{ required: true, message: intl.get('请输入文件名') }]}
         >
-          <Input placeholder="请输入文件名" />
+          <Input placeholder={intl.get('请输入文件名')} />
         </Form.Item>
-        <Form.Item name="path" label="保存目录">
-          <Input placeholder="请输入保存目录，默认scripts目录" />
+        <Form.Item name="path" label={intl.get('保存目录')}>
+          <Input placeholder={intl.get('请输入保存目录，默认scripts目录')} />
         </Form.Item>
       </Form>
     </Modal>

@@ -21,7 +21,7 @@ export class Crontab {
 
   constructor(options: Crontab) {
     this.name = options.name;
-    this.command = options.command;
+    this.command = options.command.trim();
     this.schedule = options.schedule;
     this.saved = options.saved;
     this.id = options.id;

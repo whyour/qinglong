@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Button,
@@ -11,6 +12,7 @@ import {
   Typography,
   Input,
   Tooltip,
+  Checkbox,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -64,7 +66,7 @@ const Subscription = () => {
 
   const columns: any = [
     {
-      title: '名称',
+      title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
       width: 150,
@@ -74,7 +76,7 @@ const Subscription = () => {
       },
     },
     {
-      title: '链接',
+      title: intl.get('链接'),
       dataIndex: 'url',
       key: 'url',
       sorter: {
@@ -96,7 +98,7 @@ const Subscription = () => {
       },
     },
     {
-      title: '类型',
+      title: intl.get('类型'),
       dataIndex: 'type',
       key: 'type',
       width: 130,
@@ -105,7 +107,7 @@ const Subscription = () => {
       },
     },
     {
-      title: '分支',
+      title: intl.get('分支'),
       dataIndex: 'branch',
       key: 'branch',
       width: 130,
@@ -114,7 +116,7 @@ const Subscription = () => {
       },
     },
     {
-      title: '定时规则',
+      title: intl.get('定时规则'),
       width: 180,
       render: (text: string, record: any) => {
         if (record.schedule_type === 'interval') {
@@ -125,21 +127,21 @@ const Subscription = () => {
       },
     },
     {
-      title: '状态',
+      title: intl.get('状态'),
       key: 'status',
       dataIndex: 'status',
       width: 110,
       filters: [
         {
-          text: '运行中',
+          text: intl.get('运行中'),
           value: 0,
         },
         {
-          text: '空闲中',
+          text: intl.get('空闲中'),
           value: 1,
         },
         {
-          text: '已禁用',
+          text: intl.get('已禁用'),
           value: 2,
         },
       ],
@@ -157,7 +159,7 @@ const Subscription = () => {
             <>
               {record.status === SubscriptionStatus.idle && (
                 <Tag icon={<ClockCircleOutlined />} color="default">
-                  空闲中
+                  {intl.get('空闲中')}
                 </Tag>
               )}
               {record.status === SubscriptionStatus.running && (
@@ -165,7 +167,7 @@ const Subscription = () => {
                   icon={<Loading3QuartersOutlined spin />}
                   color="processing"
                 >
-                  运行中
+                  {intl.get('运行中')}
                 </Tag>
               )}
             </>
@@ -173,14 +175,14 @@ const Subscription = () => {
           {record.is_disabled === 1 &&
             record.status === SubscriptionStatus.idle && (
               <Tag icon={<CloseCircleOutlined />} color="error">
-                已禁用
+                {intl.get('已禁用')}
               </Tag>
             )}
         </>
       ),
     },
     {
-      title: '操作',
+      title: intl.get('操作'),
       key: 'action',
       width: 130,
       render: (text: string, record: any, index: number) => {
@@ -188,7 +190,7 @@ const Subscription = () => {
         return (
           <Space size="middle">
             {record.status === SubscriptionStatus.idle && (
-              <Tooltip title={isPc ? '运行' : ''}>
+              <Tooltip title={isPc ? intl.get('运行') : ''}>
                 <a
                   onClick={(e) => {
                     e.stopPropagation();
@@ -200,7 +202,7 @@ const Subscription = () => {
               </Tooltip>
             )}
             {record.status !== SubscriptionStatus.idle && (
-              <Tooltip title={isPc ? '停止' : ''}>
+              <Tooltip title={isPc ? intl.get('停止') : ''}>
                 <a
                   onClick={(e) => {
                     e.stopPropagation();
@@ -211,7 +213,7 @@ const Subscription = () => {
                 </a>
               </Tooltip>
             )}
-            <Tooltip title={isPc ? '日志' : ''}>
+            <Tooltip title={isPc ? intl.get('日志') : ''}>
               <a
                 onClick={(e) => {
                   e.stopPropagation();
@@ -237,19 +239,20 @@ const Subscription = () => {
   const [pageSize, setPageSize] = useState(20);
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logSubscription, setLogSubscription] = useState<any>();
-  const tableRef = useRef<any>();
+  const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
+  const deleteCheckRef = useRef(false);
 
   const runSubscription = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认运行',
+      title: intl.get('确认运行'),
       content: (
         <>
-          确认运行定时任务{' '}
+          {intl.get('确认运行定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -277,14 +280,14 @@ const Subscription = () => {
 
   const stopSubsciption = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认停止',
+      title: intl.get('确认停止'),
       content: (
         <>
-          确认停止定时任务{' '}
+          {intl.get('确认停止定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -334,21 +337,33 @@ const Subscription = () => {
     setIsModalVisible(true);
   };
 
+  const onCheckChange = (e) => {
+    deleteCheckRef.current = e.target.checked;
+  };
+
   const delSubscription = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认删除',
+      title: intl.get('确认删除'),
       content: (
         <>
-          确认删除定时订阅{' '}
+          {intl.get('确认删除定时订阅')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
+          <div style={{ marginTop: 20 }}>
+            <Checkbox onChange={onCheckChange}>
+              {intl.get('同时删除关联任务和脚本')}
+            </Checkbox>
+          </div>
         </>
       ),
       onOk() {
         request
-          .delete(`${config.apiPrefix}subscriptions`, { data: [record.id] })
+          .delete(`${config.apiPrefix}subscriptions`, {
+            data: [record.id],
+            params: { force: deleteCheckRef.current },
+          })
           .then(({ code, data }) => {
             if (code === 200) {
               message.success('删除成功');
@@ -369,15 +384,18 @@ const Subscription = () => {
 
   const enabledOrDisabledSubscription = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.is_disabled === 1 ? '启用' : '禁用'}`,
+      title: `确认${
+        record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用')
+      }`,
       content: (
         <>
-          确认{record.is_disabled === 1 ? '启用' : '禁用'}
-          定时订阅{' '}
+          {intl.get('确认')}
+          {record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用')}
+          {intl.get('定时订阅')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -418,9 +436,10 @@ const Subscription = () => {
       trigger={['click']}
       menu={{
         items: [
-          { label: '编辑', key: 'edit', icon: <EditOutlined /> },
+          { label: intl.get('编辑'), key: 'edit', icon: <EditOutlined /> },
           {
-            label: record.is_disabled === 1 ? '启用' : '禁用',
+            label:
+              record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用'),
             key: 'enableOrDisable',
             icon:
               record.is_disabled === 1 ? (
@@ -429,7 +448,7 @@ const Subscription = () => {
                 <StopOutlined />
               ),
           },
-          { label: '删除', key: 'delete', icon: <DeleteOutlined /> },
+          { label: intl.get('删除'), key: 'delete', icon: <DeleteOutlined /> },
         ],
         onClick: ({ key, domEvent }) => {
           domEvent.stopPropagation();
@@ -531,10 +550,10 @@ const Subscription = () => {
   return (
     <PageContainer
       className="ql-container-wrapper subscriptiontab-wrapper"
-      title="订阅管理"
+      title={intl.get('订阅管理')}
       extra={[
         <Search
-          placeholder="请输入名称或者关键词"
+          placeholder={intl.get('请输入名称或者关键词')}
           style={{ width: 'auto' }}
           enterButton
           allowClear
@@ -542,7 +561,7 @@ const Subscription = () => {
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addSubscription()}>
-          新建订阅
+          {intl.get('创建订阅')}
         </Button>,
       ]}
       header={{

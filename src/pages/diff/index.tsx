@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { PureComponent, useRef, useState, useEffect } from 'react';
 import { Button, message, Select, Form, Row, Col } from 'antd';
 import config from '@/utils/config';
@@ -93,7 +94,7 @@ const Diff = () => {
   return (
     <PageContainer
       className="ql-container-wrapper"
-      title="对比工具"
+      title={intl.get('对比工具')}
       loading={loading}
       header={{
         style: headerStyle,
@@ -101,14 +102,14 @@ const Diff = () => {
       extra={
         !isPhone && [
           <Button key="1" type="primary" onClick={updateConfig}>
-            保存
+            {intl.get('保存')}
           </Button>,
         ]
       }
     >
       <Row gutter={24} className="diff-switch-file">
         <Col span={12}>
-          <Form.Item label="源文件">
+          <Form.Item label={intl.get('源文件')}>
             <Select value={origin} onChange={originFileChange}>
               {files.map((x) => (
                 <Option key={x.value} value={x.value}>
@@ -119,7 +120,7 @@ const Diff = () => {
           </Form.Item>
         </Col>
         <Col span={12}>
-          <Form.Item label="当前文件">
+          <Form.Item label={intl.get('当前文件')}>
             <Select value={current} onChange={currentFileChange}>
               {files.map((x) => (
                 <Option key={x.value} value={x.value}>

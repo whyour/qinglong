@@ -34,9 +34,11 @@ export function formatCommand(doc: Subscription, url?: string) {
   if (type === 'file') {
     command += `raw "${_url}"`;
   } else {
-    command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${dependences || ''
-      }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${isNil(autoAddCron) ? true : Boolean(autoAddCron)
-      }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
+    command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
+      dependences || ''
+    }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${
+      isNil(autoAddCron) ? true : Boolean(autoAddCron)
+    }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
   }
   return command;
 }

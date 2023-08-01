@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React from 'react';
 import { Button, Result, Typography } from 'antd';
 
@@ -9,7 +10,7 @@ const NotFound: React.FC = () => (
     title="404"
     extra={
       <Button type="primary">
-        <Link href="/">返回首页</Link>
+        <Link href="/">{intl.get('返回首页')}</Link>
       </Button>
     }
   />

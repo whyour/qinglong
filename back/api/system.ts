@@ -35,9 +35,8 @@ export default (app: Router) => {
     try {
       const userService = Container.get(UserService);
       const authInfo = await userService.getUserInfo();
-      const { version, changeLog, changeLogLink, publishTime } = await parseVersion(
-        config.versionFile,
-      );
+      const { version, changeLog, changeLogLink, publishTime } =
+        await parseVersion(config.versionFile);
 
       let isInitialized = true;
       if (

@@ -10,7 +10,13 @@ import config from '../config';
 import * as fs from 'fs';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
-import { AuthDataType, AuthInfo, AuthModel, AuthModelInfo, LoginStatus } from '../data/auth';
+import {
+  AuthDataType,
+  AuthInfo,
+  AuthModel,
+  AuthModelInfo,
+  LoginStatus,
+} from '../data/auth';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import { Request } from 'express';
@@ -27,7 +33,7 @@ export default class UserService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async login(
     payloads: {
@@ -119,7 +125,8 @@ export default class UserService {
         });
         await this.notificationService.notify(
           '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${req.platform
+          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
+            req.platform
           }端 登录成功，ip地址 ${ip}`,
         );
         await this.getLoginLog();
@@ -147,7 +154,8 @@ export default class UserService {
         });
         await this.notificationService.notify(
           '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${req.platform
+          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
+            req.platform
           }端 登录失败，ip地址 ${ip}`,
         );
         await this.getLoginLog();
@@ -190,7 +198,9 @@ export default class UserService {
       where: { type: AuthDataType.loginLog },
     });
     if (docs && docs.length > 0) {
-      const result = docs.sort((a, b) => b.info!.timestamp! - a.info!.timestamp!);
+      const result = docs.sort(
+        (a, b) => b.info!.timestamp! - a.info!.timestamp!,
+      );
       if (result.length > 100) {
         await AuthModel.destroy({
           where: { id: result[result.length - 1].id },

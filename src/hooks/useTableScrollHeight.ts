@@ -1,9 +1,9 @@
-import { MutableRefObject, useLayoutEffect, useState } from 'react';
+import { RefObject, useState } from 'react';
 import useResizeObserver from '@react-hook/resize-observer';
 import { getTableScroll } from '@/utils';
 
 export default <T extends HTMLElement>(
-  target: MutableRefObject<T>,
+  target: RefObject<T>,
   extraHeight?: number,
 ) => {
   const [height, setHeight] = useState<number>(0);

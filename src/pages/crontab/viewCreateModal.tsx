@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import {
   Modal,
@@ -13,15 +14,16 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
-import get from 'lodash/get';
 import { CrontabStatus } from './type';
+import { useRequest } from 'ahooks';
 
 const PROPERTIES = [
-  { name: '命令', value: 'command' },
-  { name: '名称', value: 'name' },
-  { name: '定时规则', value: 'schedule' },
-  { name: '状态', value: 'status' },
-  { name: '标签', value: 'labels' },
+  { name: intl.get('命令'), value: 'command' },
+  { name: intl.get('名称'), value: 'name' },
+  { name: intl.get('定时规则'), value: 'schedule' },
+  { name: intl.get('状态'), value: 'status', onlySelect: true },
+  { name: intl.get('标签'), value: 'labels' },
+  { name: intl.get('订阅'), value: 'sub_id', onlySelect: true },
 ];
 
 const EOperation: any = {
@@ -31,10 +33,10 @@ const EOperation: any = {
   Nin: 'select',
 };
 const OPERATIONS = [
-  { name: '包含', value: 'Reg' },
-  { name: '不包含', value: 'NotReg' },
-  { name: '属于', value: 'In', type: 'select' },
-  { name: '不属于', value: 'Nin', type: 'select' },
+  { name: intl.get('包含'), value: 'Reg' },
+  { name: intl.get('不包含'), value: 'NotReg' },
+  { name: intl.get('属于'), value: 'In', type: 'select' },
+  { name: intl.get('不属于'), value: 'Nin', type: 'select' },
   // { name: '等于', value: 'Eq' },
   // { name: '不等于', value: 'Ne' },
   // { name: '为空', value: 'IsNull' },
@@ -42,17 +44,9 @@ const OPERATIONS = [
 ];
 
 const SORTTYPES = [
-  { name: '顺序', value: 'ASC' },
-  { name: '倒序', value: 'DESC' },
+  { name: intl.get('顺序'), value: 'ASC' },
+  { name: intl.get('倒序'), value: 'DESC' },
 ];
-
-const STATUS_MAP = {
-  status: [
-    { name: '运行中', value: CrontabStatus.running },
-    { name: '空闲中', value: CrontabStatus.idle },
-    { name: '已禁用', value: CrontabStatus.disabled },
-  ],
-};
 
 enum ViewFilterRelation {
   'and' = '且',
@@ -72,6 +66,21 @@ const ViewCreateModal = ({
   const [loading, setLoading] = useState(false);
   const [filterRelation, setFilterRelation] = useState<'and' | 'or'>('and');
   const filtersValue = Form.useWatch('filters', form);
+  const { data } = useRequest(
+    () => request.get(`${config.apiPrefix}subscriptions`),
+    {
+      cacheKey: 'subscriptions',
+    },
+  );
+
+  const STATUS_MAP = {
+    status: [
+      { name: intl.get('运行中'), value: CrontabStatus.running },
+      { name: intl.get('空闲中'), value: CrontabStatus.idle },
+      { name: intl.get('已禁用'), value: CrontabStatus.disabled },
+    ],
+    sub_id: data?.data.map((x) => ({ name: x.name, value: x.id })),
+  };
 
   const handleOk = async (values: any) => {
     setLoading(true);
@@ -104,7 +113,7 @@ const ViewCreateModal = ({
   }, [view, visible]);
 
   const operationElement = (
-    <Select style={{ width: 80 }}>
+    <Select style={{ width: 120 }}>
       {OPERATIONS.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -137,7 +146,11 @@ const ViewCreateModal = ({
 
   const statusElement = (property: keyof typeof STATUS_MAP) => {
     return (
-      <Select mode="tags" allowClear placeholder="输入后回车增加自定义选项">
+      <Select
+        mode="tags"
+        allowClear
+        placeholder={intl.get('输入后回车增加自定义选项')}
+      >
         {STATUS_MAP[property]?.map((x) => (
           <Select.Option key={x.name} value={x.value}>
             {x.name}
@@ -149,7 +162,7 @@ const ViewCreateModal = ({
 
   return (
     <Modal
-      title={view ? '编辑视图' : '新建视图'}
+      title={view ? intl.get('编辑视图') : intl.get('创建视图')}
       open={visible}
       forceRender
       width={580}
@@ -171,10 +184,10 @@ const ViewCreateModal = ({
       <Form form={form} layout="vertical" name="env_modal">
         <Form.Item
           name="name"
-          label="视图名称"
-          rules={[{ required: true, message: '请输入视图名称' }]}
+          label={intl.get('视图名称')}
+          rules={[{ required: true, message: intl.get('请输入视图名称') }]}
         >
-          <Input placeholder="请输入视图名称" />
+          <Input placeholder={intl.get('请输入视图名称')} />
         </Form.Item>
         <Form.List name="filters">
           {(fields, { add, remove }) => (
@@ -223,7 +236,7 @@ const ViewCreateModal = ({
               <div>
                 {fields.map(({ key, name, ...restField }) => (
                   <Form.Item
-                    label={name === 0 ? '筛选条件' : ''}
+                    label={name === 0 ? intl.get('筛选条件') : ''}
                     key={key}
                     style={{ marginBottom: 0 }}
                     required
@@ -238,7 +251,7 @@ const ViewCreateModal = ({
                         name={[name, 'property']}
                         rules={[{ required: true }]}
                       >
-                        {propertyElement(PROPERTIES, { width: 90 })}
+                        {propertyElement(PROPERTIES, { width: 120 })}
                       </Form.Item>
                       <Form.Item
                         {...restField}
@@ -250,13 +263,15 @@ const ViewCreateModal = ({
                       <Form.Item
                         {...restField}
                         name={[name, 'value']}
-                        rules={[{ required: true, message: '请输入内容' }]}
+                        rules={[
+                          { required: true, message: intl.get('请输入内容') },
+                        ]}
                       >
                         {EOperation[filtersValue?.[name]['operation']] ===
                         'select' ? (
                           statusElement(filtersValue?.[name]['property'])
                         ) : (
-                          <Input placeholder="请输入内容" />
+                          <Input placeholder={intl.get('请输入内容')} />
                         )}
                       </Form.Item>
                       {name !== 0 && (
@@ -272,7 +287,7 @@ const ViewCreateModal = ({
                     }
                   >
                     <PlusOutlined />
-                    新增筛选条件
+                    {intl.get('新增筛选条件')}
                   </a>
                 </Form.Item>
               </div>
@@ -320,7 +335,7 @@ const ViewCreateModal = ({
               <div>
                 {fields.map(({ key, name, ...restField }) => (
                   <Form.Item
-                    label={name === 0 ? '排序方式' : ''}
+                    label={name === 0 ? intl.get('排序方式') : ''}
                     key={key}
                     style={{ marginBottom: 0 }}
                     className="filter-item"
@@ -347,7 +362,7 @@ const ViewCreateModal = ({
                 <Form.Item>
                   <a onClick={() => add({ property: 'command', type: 'ASC' })}>
                     <PlusOutlined />
-                    新增排序方式
+                    {intl.get('新增排序方式')}
                   </a>
                 </Form.Item>
               </div>

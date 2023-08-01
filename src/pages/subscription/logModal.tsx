@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form, Statistic, Button } from 'antd';
 import { request } from '@/utils/http';
@@ -43,7 +44,7 @@ const SubscriptionLogModal = ({
           localStorage.getItem('logSubscription') === String(subscription.id)
         ) {
           const log = data as string;
-          setValue(log || '暂无日志');
+          setValue(log || intl.get('暂无日志'));
           setExecuting(log && !logEnded(log));
           if (log && !logEnded(log)) {
             setTimeout(() => {
@@ -106,7 +107,7 @@ const SubscriptionLogModal = ({
       onCancel={() => cancel()}
       footer={[
         <Button type="primary" onClick={() => cancel()}>
-          知道了
+          {intl.get('知道了')}
         </Button>,
       ]}
     >

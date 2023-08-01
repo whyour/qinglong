@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form, Select } from 'antd';
 import { request } from '@/utils/http';
@@ -29,7 +30,9 @@ const AppModal = ({
       );
 
       if (code === 200) {
-        message.success(app ? '更新应用成功' : '新建应用成功');
+        message.success(
+          app ? intl.get('更新应用成功') : intl.get('创建应用成功'),
+        );
         handleCancel(data);
       }
       setLoading(false);
@@ -44,7 +47,7 @@ const AppModal = ({
 
   return (
     <Modal
-      title={app ? '编辑应用' : '新建应用'}
+      title={app ? intl.get('编辑应用') : intl.get('创建应用')}
       open={visible}
       forceRender
       centered
@@ -70,22 +73,26 @@ const AppModal = ({
       >
         <Form.Item
           name="name"
-          label="名称"
+          label={intl.get('名称')}
           rules={[
             {
               validator: (_, value) =>
                 ['system'].includes(value)
-                  ? Promise.reject(new Error('名称不能为保留关键字'))
+                  ? Promise.reject(new Error(intl.get('名称不能为保留关键字')))
                   : Promise.resolve(),
             },
           ]}
         >
-          <Input placeholder="请输入应用名称" />
+          <Input placeholder={intl.get('请输入应用名称')} />
         </Form.Item>
-        <Form.Item name="scopes" label="权限" rules={[{ required: true }]}>
+        <Form.Item
+          name="scopes"
+          label={intl.get('权限')}
+          rules={[{ required: true }]}
+        >
           <Select
             mode="multiple"
-            placeholder="请选择模块权限"
+            placeholder={intl.get('请选择模块权限')}
             allowClear
             style={{ width: '100%' }}
           >

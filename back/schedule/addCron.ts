@@ -3,6 +3,9 @@ import { AddCronRequest, AddCronResponse } from '../protos/cron';
 import nodeSchedule from 'node-schedule';
 import { scheduleStacks } from './data';
 import { runCron } from '../shared/runCron';
+import { QL_PREFIX, TASK_PREFIX } from '../config/const';
+import Logger from '../loaders/logger';
+import dayjs from 'dayjs';
 
 const addCron = (
   call: ServerUnaryCall<AddCronRequest, AddCronResponse>,
@@ -13,10 +16,21 @@ const addCron = (
     if (scheduleStacks.has(id)) {
       scheduleStacks.get(id)?.cancel();
     }
+
+    let cmdStr = command.trim();
+    if (!cmdStr.startsWith(TASK_PREFIX) && !cmdStr.startsWith(QL_PREFIX)) {
+      cmdStr = `${TASK_PREFIX}${cmdStr}`;
+    }
+
     scheduleStacks.set(
       id,
       nodeSchedule.scheduleJob(id, schedule, async () => {
-        runCron(`ID=${id} ${command}`)
+        Logger.info(
+          `当前时间: ${dayjs().format(
+            'YYYY-MM-DD HH:mm:ss',
+          )}，运行命令: ${cmdStr}`,
+        );
+        runCron(`ID=${id} ${cmdStr}`);
       }),
     );
   }

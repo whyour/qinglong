@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { Fragment, useEffect, useState } from 'react';
 import {
   Button,
@@ -80,17 +81,29 @@ const Login = () => {
       } = data;
       localStorage.setItem(config.authKey, token);
       notification.success({
-        message: '登录成功！',
+        message: intl.get('登录成功！'),
         description: (
           <>
             <div>
-              上次登录时间：
+              {intl.get('上次登录时间：')}
               {lastlogon ? new Date(lastlogon).toLocaleString() : '-'}
             </div>
-            <div>上次登录地点：{lastaddr || '-'}</div>
-            <div>上次登录IP：{lastip || '-'}</div>
-            <div>上次登录设备：{platform || '-'}</div>
-            <div>上次登录状态：{retries > 0 ? `失败${retries}次` : '成功'}</div>
+            <div>
+              {intl.get('上次登录地点：')}
+              {lastaddr || '-'}
+            </div>
+            <div>
+              {intl.get('上次登录IP：')}
+              {lastip || '-'}
+            </div>
+            <div>
+              {intl.get('上次登录设备：')}
+              {platform || '-'}
+            </div>
+            <div>
+              {intl.get('上次登录状态：')}
+              {retries > 0 ? `失败${retries}次` : intl.get('成功')}
+            </div>
           </>
         ),
       });
@@ -136,7 +149,7 @@ const Login = () => {
             src="https://qn.whyour.cn/logo.png"
           />
           <span className={styles.title}>
-            {twoFactor ? '两步验证' : config.siteName}
+            {twoFactor ? intl.get('两步验证') : config.siteName}
           </span>
         </div>
       </div>
@@ -145,17 +158,17 @@ const Login = () => {
           <Form layout="vertical" onFinish={completeTowFactor}>
             <FormItem
               name="code"
-              label="验证码"
+              label={intl.get('验证码')}
               rules={[
                 {
                   pattern: /^[0-9]{6}$/,
-                  message: '验证码为6位数字',
+                  message: intl.get('验证码为6位数字'),
                 },
               ]}
               validateTrigger="onBlur"
             >
               <Input
-                placeholder="6位数字"
+                placeholder={intl.get('6位数字')}
                 onChange={codeInputChange}
                 autoFocus
                 autoComplete="off"
@@ -167,27 +180,27 @@ const Login = () => {
               style={{ width: '100%' }}
               loading={verifying}
             >
-              验证
+              {intl.get('验证')}
             </Button>
           </Form>
         ) : (
           <Form layout="vertical" onFinish={handleOk}>
-            <FormItem name="username" label="用户名" hasFeedback>
+            <FormItem name="username" label={intl.get('用户名')} hasFeedback>
               <Input
-                placeholder={`用户名${isDemoEnv ? ': admin' : ''}`}
+                placeholder={`${intl.get('用户名')}${isDemoEnv ? ': admin' : ''}`}
                 autoFocus
               />
             </FormItem>
-            <FormItem name="password" label="密码" hasFeedback>
+            <FormItem name="password" label={intl.get('密码')} hasFeedback>
               <Input
                 type="password"
-                placeholder={`密码${isDemoEnv ? ': 123' : ''}`}
+                placeholder={`${intl.get('密码')}${isDemoEnv ? ': 123' : ''}`}
               />
             </FormItem>
             <Row>
               {waitTime ? (
                 <Button type="primary" style={{ width: '100%' }} disabled>
-                  请
+                  {intl.get('请')}
                   <Countdown
                     valueStyle={{
                       color:
@@ -200,7 +213,7 @@ const Login = () => {
                     format="ss"
                     value={Date.now() + 1000 * waitTime}
                   />
-                  秒后重试
+                  {intl.get('秒后重试')}
                 </Button>
               ) : (
                 <Button
@@ -209,7 +222,7 @@ const Login = () => {
                   style={{ width: '100%' }}
                   loading={loading}
                 >
-                  登录
+                  {intl.get('登录')}
                 </Button>
               )}
             </Row>
@@ -220,7 +233,9 @@ const Login = () => {
         {twoFactor ? (
           <div style={{ paddingLeft: 20, position: 'relative' }}>
             <MobileOutlined style={{ position: 'absolute', left: 0, top: 4 }} />
-            在您的设备上打开两步验证应用程序以查看您的身份验证代码并验证您的身份。
+            {intl.get(
+              '在您的设备上打开两步验证应用程序以查看您的身份验证代码并验证您的身份。',
+            )}
           </div>
         ) : (
           ''

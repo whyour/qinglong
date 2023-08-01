@@ -23,7 +23,7 @@ export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
@@ -193,7 +193,9 @@ export default class DependenceService {
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
           let depVersion = '';
           if (depName.includes(depVersionStr)) {
-            const symbolRegx = new RegExp(`(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`);
+            const symbolRegx = new RegExp(
+              `(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`,
+            );
             const [, _depName, _depVersion] = depName.match(symbolRegx) || [];
             if (_depVersion && _depName) {
               depName = _depName;
@@ -202,19 +204,23 @@ export default class DependenceService {
           }
           const isNodeDependence = dependency.type === DependenceTypes.nodejs;
           const isLinuxDependence = dependency.type === DependenceTypes.linux;
-          const isPythonDependence = dependency.type === DependenceTypes.python3;
+          const isPythonDependence =
+            dependency.type === DependenceTypes.python3;
           const depInfo = (
             await promiseExecSuccess(
               isNodeDependence
                 ? `${getCommandPrefix} | grep "${depName}" | head -1`
                 : `${getCommandPrefix} ${depName}`,
             )
-          ).replace(/\s{2,}/, ' ').replace(/\s+$/, '');
+          )
+            .replace(/\s{2,}/, ' ')
+            .replace(/\s+$/, '');
 
           if (
             depInfo &&
             ((isNodeDependence && depInfo.split(' ')?.[0] === depName) ||
-              (isLinuxDependence && depInfo.toLocaleLowerCase().includes('installed')) ||
+              (isLinuxDependence &&
+                depInfo.toLocaleLowerCase().includes('installed')) ||
               isPythonDependence) &&
             (!depVersion || depInfo.includes(depVersion))
           ) {
