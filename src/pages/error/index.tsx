@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useState, useEffect, useRef } from 'react';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
@@ -54,22 +55,24 @@ const Error = () => {
             type="error"
             message={
               <Typography.Title level={5} type="danger">
-                服务启动超时
+                {intl.get('服务启动超时')}
               </Typography.Title>
             }
             description={
               <Typography.Text type="danger">
-                <div>请先按如下方式修复：</div>
+                <div>{intl.get('请先按如下方式修复：')}</div>
                 <div>
                   1. 宿主机执行 docker run --rm -v
                   /var/run/docker.sock:/var/run/docker.sock
                   containrrr/watchtower -cR &lt;容器名&gt;
                 </div>
-                <div>2. 容器内执行 ql -l check、ql -l update</div>
+                <div>{intl.get('2. 容器内执行 ql -l check、ql -l update')}</div>
                 <div>
-                  3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果
+                  {intl.get(
+                    '3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果',
+                  )}
                   <Typography.Link href="https://github.com/whyour/qinglong/issues/new?assignees=&labels=&template=bug_report.yml">
-                    提交 issue
+                    {intl.get('提交 issue')}
                   </Typography.Link>
                 </div>
               </Typography.Text>
@@ -81,7 +84,7 @@ const Error = () => {
           </Typography.Paragraph>
         </div>
       ) : (
-        <PageLoading tip="启动中，请稍后..." />
+        <PageLoading tip={intl.get('启动中，请稍后...')} />
       )}
     </div>
   );

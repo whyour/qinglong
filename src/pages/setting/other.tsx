@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Button,
@@ -22,9 +23,9 @@ import Countdown from 'antd/lib/statistic/Countdown';
 import useProgress from './progress';
 
 const optionsWithDisabled = [
-  { label: '亮色', value: 'light' },
-  { label: '暗色', value: 'dark' },
-  { label: '跟随系统', value: 'auto' },
+  { label: intl.get('亮色'), value: 'light' },
+  { label: intl.get('暗色'), value: 'dark' },
+  { label: intl.get('跟随系统'), value: 'auto' },
 ];
 
 const Other = ({
@@ -121,10 +122,10 @@ const Other = ({
     Modal.confirm({
       width: 600,
       maskClosable: false,
-      title: '确认重启',
+      title: intl.get('确认重启'),
       centered: true,
-      content: '备份数据上传成功，确认覆盖数据',
-      okText: '重启',
+      content: intl.get('备份数据上传成功，确认覆盖数据'),
+      okText: intl.get('重启'),
       onOk() {
         request
           .put(`${config.apiPrefix}system/reload`, { type: 'data' })
@@ -132,13 +133,13 @@ const Other = ({
             message.success({
               content: (
                 <span>
-                  系统将在
+                  {intl.get('系统将在')}
                   <Countdown
                     className="inline-countdown"
                     format="ss"
                     value={Date.now() + 1000 * 30}
                   />
-                  秒后自动刷新
+                  {intl.get('秒后自动刷新')}
                 </span>
               ),
               duration: 30,
@@ -160,7 +161,11 @@ const Other = ({
 
   return (
     <Form layout="vertical" form={form}>
-      <Form.Item label="主题设置" name="theme" initialValue={defaultTheme}>
+      <Form.Item
+        label={intl.get('主题设置')}
+        name="theme"
+        initialValue={defaultTheme}
+      >
         <Radio.Group
           options={optionsWithDisabled}
           onChange={themeChange}
@@ -170,15 +175,15 @@ const Other = ({
         />
       </Form.Item>
       <Form.Item
-        label="日志删除频率"
+        label={intl.get('日志删除频率')}
         name="frequency"
-        tooltip="每x天自动删除x天以前的日志"
+        tooltip={intl.get('每x天自动删除x天以前的日志')}
       >
         <Input.Group compact>
           <InputNumber
-            addonBefore="每"
-            addonAfter="天"
-            style={{ width: 142 }}
+            addonBefore={intl.get('每')}
+            addonAfter={intl.get('天')}
+            style={{ width: 180 }}
             min={0}
             value={systemConfig?.logRemoveFrequency}
             onChange={(value) => {
@@ -186,14 +191,14 @@ const Other = ({
             }}
           />
           <Button type="primary" onClick={updateSystemConfig}>
-            确认
+            {intl.get('确认')}
           </Button>
         </Input.Group>
       </Form.Item>
-      <Form.Item label="定时任务并发数" name="frequency">
+      <Form.Item label={intl.get('定时任务并发数')} name="frequency">
         <Input.Group compact>
           <InputNumber
-            style={{ width: 142 }}
+            style={{ width: 150 }}
             min={1}
             value={systemConfig?.cronConcurrency}
             onChange={(value) => {
@@ -201,13 +206,13 @@ const Other = ({
             }}
           />
           <Button type="primary" onClick={updateSystemConfig}>
-            确认
+            {intl.get('确认')}
           </Button>
         </Input.Group>
       </Form.Item>
-      <Form.Item label="数据备份还原" name="frequency">
+      <Form.Item label={intl.get('数据备份还原')} name="frequency">
         <Button type="primary" onClick={exportData} loading={exportLoading}>
-          备份
+          {exportLoading ? intl.get('生成数据中...') : intl.get('备份')}
         </Button>
         <Upload
           method="put"
@@ -228,11 +233,11 @@ const Other = ({
           }}
         >
           <Button icon={<UploadOutlined />} style={{ marginLeft: 8 }}>
-            还原数据
+            {intl.get('还原数据')}
           </Button>
         </Upload>
       </Form.Item>
-      <Form.Item label="检查更新" name="update">
+      <Form.Item label={intl.get('检查更新')} name="update">
         <CheckUpdate systemInfo={systemInfo} socketMessage={socketMessage} />
       </Form.Item>
     </Form>

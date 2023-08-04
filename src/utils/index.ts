@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import { LOG_END_SYMBOL } from './const';
 import cron_parser from 'cron-parser';
 
@@ -297,7 +298,7 @@ export function findNode<T extends Record<string, any> & { children?: T[] }>(
 }
 
 export function logEnded(log: string): boolean {
-  const endTips = [LOG_END_SYMBOL, '执行结束'];
+  const endTips = [LOG_END_SYMBOL, intl.get('执行结束')];
   return endTips.some((x) => log.includes(x));
 }
 

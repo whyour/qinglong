@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import Logger from './logger';
 import { fileExist } from '../config/util';
 
-const rootPath = process.env.QL_DIR as string;;
+const rootPath = process.env.QL_DIR as string;
 const dataPath = path.join(rootPath, 'data/');
 const configPath = path.join(dataPath, 'config/');
 const scriptPath = path.join(dataPath, 'scripts/');

@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form, Button } from 'antd';
 import { request } from '@/utils/http';
@@ -31,7 +32,9 @@ const CronModal = ({
       );
 
       if (code === 200) {
-        message.success(cron ? '更新Cron成功' : '新建Cron成功');
+        message.success(
+          cron ? intl.get('更新任务成功') : intl.get('创建任务成功'),
+        );
         handleCancel(data);
       }
       setLoading(false);
@@ -46,7 +49,7 @@ const CronModal = ({
 
   return (
     <Modal
-      title={cron ? '编辑任务' : '新建任务'}
+      title={cron ? intl.get('编辑任务') : intl.get('创建任务')}
       open={visible}
       forceRender
       centered
@@ -70,23 +73,25 @@ const CronModal = ({
         name="form_in_modal"
         initialValues={cron}
       >
-        <Form.Item name="name" label="名称">
-          <Input placeholder="请输入任务名称" />
+        <Form.Item name="name" label={intl.get('名称')}>
+          <Input placeholder={intl.get('请输入任务名称')} />
         </Form.Item>
         <Form.Item
           name="command"
-          label="命令/脚本"
+          label={intl.get('命令/脚本')}
           rules={[{ required: true, whitespace: true }]}
         >
           <Input.TextArea
             rows={4}
             autoSize={true}
-            placeholder="支持输入脚本路径/任意系统可执行命令/task 脚本路径"
+            placeholder={intl.get(
+              '支持输入脚本路径/任意系统可执行命令/task 脚本路径',
+            )}
           />
         </Form.Item>
         <Form.Item
           name="schedule"
-          label="定时规则"
+          label={intl.get('定时规则')}
           rules={[
             { required: true },
             {
@@ -100,9 +105,9 @@ const CronModal = ({
             },
           ]}
         >
-          <Input placeholder="秒(可选) 分 时 天 月 周" />
+          <Input placeholder={intl.get('秒(可选) 分 时 天 月 周')} />
         </Form.Item>
-        <Form.Item name="labels" label="标签">
+        <Form.Item name="labels" label={intl.get('标签')}>
           <EditableTagGroup />
         </Form.Item>
       </Form>
@@ -136,7 +141,9 @@ const CronLabelModal = ({
 
           if (code === 200) {
             message.success(
-              action === 'post' ? '添加Labels成功' : '删除Labels成功',
+              action === 'post'
+                ? intl.get('添加Labels成功')
+                : intl.get('删除Labels成功'),
             );
             handleCancel(true);
           }
@@ -155,18 +162,18 @@ const CronLabelModal = ({
   }, [ids, visible]);
 
   const buttons = [
-    <Button onClick={() => handleCancel(false)}>取消</Button>,
+    <Button onClick={() => handleCancel(false)}>{intl.get('取消')}</Button>,
     <Button type="primary" danger onClick={() => update('delete')}>
-      删除
+      {intl.get('删除')}
     </Button>,
     <Button type="primary" onClick={() => update('post')}>
-      添加
+      {intl.get('添加')}
     </Button>,
   ];
 
   return (
     <Modal
-      title="批量修改标签"
+      title={intl.get('批量修改标签')}
       open={visible}
       footer={buttons}
       centered
@@ -176,7 +183,7 @@ const CronLabelModal = ({
       confirmLoading={loading}
     >
       <Form form={form} layout="vertical" name="form_in_label_modal">
-        <Form.Item name="labels" label="标签">
+        <Form.Item name="labels" label={intl.get('标签')}>
           <EditableTagGroup />
         </Form.Item>
       </Form>

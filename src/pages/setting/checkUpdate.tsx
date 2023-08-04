@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState, useRef } from 'react';
 import { Statistic, Modal, Tag, Button, Spin, message } from 'antd';
 import { request } from '@/utils/http';
@@ -38,16 +39,17 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
   const showForceUpdateModal = (data: any) => {
     Modal.confirm({
       width: 500,
-      title: '更新',
+      title: intl.get('更新'),
       content: (
         <>
-          <div>已经是最新版了！</div>
+          <div>{intl.get('已经是最新版了！')}</div>
           <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            青龙 {data.lastVersion} 是目前检测到的最新可用版本了。
+            {intl.get('青龙')} {data.lastVersion}{' '}
+            {intl.get('是目前检测到的最新可用版本了。')}
           </div>
         </>
       ),
-      okText: '重新下载',
+      okText: intl.get('重新下载'),
       onOk() {
         showUpdatingModal();
         request
@@ -66,9 +68,10 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       width: 500,
       title: (
         <>
-          <div>更新可用</div>
+          <div>{intl.get('更新可用')}</div>
           <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            新版本 {lastVersion} 可用，你使用的版本为 {systemInfo.version}。
+            {intl.get('新版本')} {lastVersion}{' '}
+            {intl.get('可用，你使用的版本为')} {systemInfo.version}。
           </div>
         </>
       ),
@@ -82,8 +85,8 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
           {lastLog}
         </pre>
       ),
-      okText: '下载更新',
-      cancelText: '以后再说',
+      okText: intl.get('下载更新'),
+      cancelText: intl.get('以后再说'),
       onOk() {
         showUpdatingModal();
         request
@@ -104,7 +107,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       closable: false,
       keyboard: false,
       okButtonProps: { disabled: true },
-      title: '下载更新中...',
+      title: intl.get('下载更新中...'),
       centered: true,
       content: (
         <pre
@@ -123,10 +126,10 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
     Modal.confirm({
       width: 600,
       maskClosable: false,
-      title: '确认重启',
+      title: intl.get('确认重启'),
       centered: true,
-      content: '系统安装包下载成功，确认重启',
-      okText: '重启',
+      content: intl.get('系统安装包下载成功，确认重启'),
+      okText: intl.get('重启'),
       onOk() {
         request
           .put(`${config.apiPrefix}system/reload`, { type: 'system' })
@@ -134,13 +137,13 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
             message.success({
               content: (
                 <span>
-                  系统将在
+                  {intl.get('系统将在')}
                   <Countdown
                     className="inline-countdown"
                     format="ss"
                     value={Date.now() + 1000 * 30}
                   />
-                  秒后自动刷新
+                  {intl.get('秒后自动刷新')}
                 </span>
               ),
               duration: 30,
@@ -216,7 +219,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
   return (
     <>
       <Button type="primary" onClick={checkUpgrade}>
-        检查更新
+        {intl.get('检查更新')}
       </Button>
     </>
   );

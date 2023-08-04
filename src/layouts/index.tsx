@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState, useRef } from 'react';
 import ProLayout, { PageLoading } from '@ant-design/pro-layout';
 import * as DarkReader from '@umijs/ssr-darkreader';
@@ -264,7 +265,7 @@ export default function () {
   const menu: MenuProps = {
     items: [
       {
-        label: '退出登录',
+        label: intl.get('退出登录'),
         className: 'side-menu-user-drop-menu',
         onClick: logout,
         key: 'logout',
@@ -283,7 +284,7 @@ export default function () {
         <>
           <Image preview={false} src="https://qn.whyour.cn/logo.png" />
           <div className="title">
-            <span className="title">青龙</span>
+            <span className="title">{intl.get('青龙')}</span>
             <a
               href={systemInfo?.changeLogLink}
               target="_blank"
@@ -293,7 +294,11 @@ export default function () {
               }}
             >
               <Tooltip
-                title={systemInfo?.branch === 'develop' ? '开发版' : '正式版'}
+                title={
+                  systemInfo?.branch === 'develop'
+                    ? intl.get('开发版')
+                    : intl.get('正式版')
+                }
               >
                 <Badge size="small" dot={systemInfo?.branch === 'develop'}>
                   <span
@@ -326,8 +331,9 @@ export default function () {
       }}
       pageTitleRender={(props, pageName, info) => {
         const title =
-          (config.documentTitleMap as any)[location.pathname] || '未找到';
-        return `${title} - 青龙`;
+          (config.documentTitleMap as any)[location.pathname] ||
+          intl.get('未找到');
+        return `${title} - ${intl.get('青龙')}`;
       }}
       onCollapse={setCollapsed}
       collapsed={collapsed}

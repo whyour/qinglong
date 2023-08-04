@@ -30,7 +30,7 @@ export default async ({ server }: { server: Server }) => {
     Logger.error('Uncaught exception:', error);
     process.exit(1);
   });
-  
+
   process.on('unhandledRejection', (reason, promise) => {
     Logger.error('Unhandled rejection:', reason);
     process.exit(1);
