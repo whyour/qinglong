@@ -42,7 +42,7 @@ export default class ScheduleService {
 
   private maxBuffer = 200 * 1024 * 1024;
 
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   async runTask(
     command: string,
@@ -109,7 +109,7 @@ export default class ScheduleService {
           await callbacks.onError?.(JSON.stringify(error));
         }
       });
-    })
+    });
   }
 
   async createCronTask(

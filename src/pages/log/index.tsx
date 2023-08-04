@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal'
 import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import {
   TreeSelect,
@@ -29,7 +30,7 @@ const { Text } = Typography;
 
 const Log = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
-  const [value, setValue] = useState('请选择日志文件');
+  const [value, setValue] = useState(intl.get('请选择日志文件'));
   const [select, setSelect] = useState<string>('');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,7 +71,7 @@ const Log = () => {
     }
 
     if (node.type === 'directory') {
-      setValue('请选择日志文件');
+      setValue(intl.get('请选择日志文件'));
       return;
     }
 
@@ -112,12 +113,12 @@ const Log = () => {
       title: `确认删除`,
       content: (
         <>
-          确认删除
+          {intl.get('确认删除')}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {select}
           </Text>
-          文件{currentNode.type === 'directory' ? '夹下所以日志' : ''}
-          ，删除后不可恢复
+          {intl.get('文件')}{currentNode.type === 'directory' ? intl.get('夹下所以日志') : ''}
+          {intl.get('，删除后不可恢复')}
         </>
       ),
       onOk() {
@@ -160,7 +161,7 @@ const Log = () => {
   const initState = () => {
     setSelect('');
     setCurrentNode(null);
-    setValue('请选择脚本文件');
+    setValue(intl.get('请选择脚本文件'));
   };
 
   const onExpand = (expKeys: any) => {
@@ -191,7 +192,7 @@ const Log = () => {
                 value={select}
                 dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
                 treeData={data}
-                placeholder="请选择日志"
+                placeholder={intl.get('请选择日志')}
                 fieldNames={{ value: 'key' }}
                 treeNodeFilterProp="title"
                 showSearch
@@ -200,7 +201,7 @@ const Log = () => {
               />,
             ]
           : [
-              <Tooltip title="删除">
+              <Tooltip title={intl.get('删除')}>
                 <Button
                   type="primary"
                   disabled={!select}
@@ -224,7 +225,7 @@ const Log = () => {
                   <Input.Search
                     className={styles['left-tree-search']}
                     onChange={onSearch}
-                    placeholder="请输入日志名"
+                    placeholder={intl.get('请输入日志名')}
                     allowClear
                   ></Input.Search>
                   <div className={styles['left-tree-scroller']} ref={treeDom}>
@@ -252,7 +253,7 @@ const Log = () => {
                   }}
                 >
                   <Empty
-                    description="暂无日志"
+                    description={intl.get('暂无日志')}
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
                 </div>

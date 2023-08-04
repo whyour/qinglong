@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
@@ -30,17 +31,19 @@ import CronLogModal from './logModal';
 import Editor from '@monaco-editor/react';
 import IconFont from '@/components/iconfont';
 import { getCommandScript } from '@/utils';
+import VirtualList from 'rc-virtual-list';
+import useScrollHeight from '@/hooks/useScrollHeight';
 
 const { Text } = Typography;
 
 const tabList = [
   {
     key: 'log',
-    tab: '日志',
+    tab: intl.get('日志'),
   },
   {
     key: 'script',
-    tab: '脚本',
+    tab: intl.get('脚本'),
   },
 ];
 const LangMap: any = {
@@ -81,19 +84,28 @@ const CronDetailModal = ({
   const [logUrl, setLogUrl] = useState('');
   const [validTabs, setValidTabs] = useState(tabList);
   const [currentCron, setCurrentCron] = useState<any>({});
+  const listRef = useRef<HTMLDivElement>(null);
+  const tableScrollHeight = useScrollHeight(listRef);
 
   const contentList: any = {
     log: (
-      <List
-        dataSource={logs}
-        loading={loading}
-        renderItem={(item) => (
-          <List.Item className="log-item" onClick={() => onClickItem(item)}>
-            <FileOutlined style={{ marginRight: 10 }} />
-            {item.directory}/{item.filename}
-          </List.Item>
-        )}
-      />
+      <div ref={listRef}>
+        <List>
+          <VirtualList
+            data={logs}
+            height={tableScrollHeight}
+            itemHeight={47}
+            itemKey="filename"
+          >
+            {(item) => (
+              <List.Item className="log-item" onClick={() => onClickItem(item)}>
+                <FileOutlined style={{ marginRight: 10 }} />
+                {item.directory}/{item.filename}
+              </List.Item>
+            )}
+          </VirtualList>
+        </List>
+      </div>
     ),
     script: scriptInfo.filename && (
       <Editor
@@ -170,11 +182,11 @@ const CronDetailModal = ({
       title: `确认保存`,
       content: (
         <>
-          确认保存文件
+          {intl.get('确认保存文件')}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {scriptInfo.filename}
           </Text>{' '}
-          ，保存后不可恢复
+          {intl.get('，保存后不可恢复')}
         </>
       ),
       onOk() {
@@ -206,14 +218,14 @@ const CronDetailModal = ({
 
   const runCron = () => {
     Modal.confirm({
-      title: '确认运行',
+      title: intl.get('确认运行'),
       content: (
         <>
-          确认运行定时任务{' '}
+          {intl.get('确认运行定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -236,19 +248,19 @@ const CronDetailModal = ({
 
   const stopCron = () => {
     Modal.confirm({
-      title: '确认停止',
+      title: intl.get('确认停止'),
       content: (
         <>
-          确认停止定时任务{' '}
+          {intl.get('确认停止定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
         request
-          .put(`${config.apiPrefix}crons/stop`, [currentCron.id] )
+          .put(`${config.apiPrefix}crons/stop`, [currentCron.id])
           .then(({ code, data }) => {
             if (code === 200) {
               setCurrentCron({ ...currentCron, status: CrontabStatus.idle });
@@ -263,15 +275,18 @@ const CronDetailModal = ({
 
   const enabledOrDisabledCron = () => {
     Modal.confirm({
-      title: `确认${currentCron.isDisabled === 1 ? '启用' : '禁用'}`,
+      title: `确认${
+        currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
+      }`,
       content: (
         <>
-          确认{currentCron.isDisabled === 1 ? '启用' : '禁用'}
-          定时任务{' '}
+          {intl.get('确认')}
+          {currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')}
+          {intl.get('定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -280,7 +295,7 @@ const CronDetailModal = ({
             `${config.apiPrefix}crons/${
               currentCron.isDisabled === 1 ? 'enable' : 'disable'
             }`,
-           [currentCron.id],
+            [currentCron.id],
           )
           .then(({ code, data }) => {
             if (code === 200) {
@@ -299,15 +314,18 @@ const CronDetailModal = ({
 
   const pinOrUnPinCron = () => {
     Modal.confirm({
-      title: `确认${currentCron.isPinned === 1 ? '取消置顶' : '置顶'}`,
+      title: `确认${
+        currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
+      }`,
       content: (
         <>
-          确认{currentCron.isPinned === 1 ? '取消置顶' : '置顶'}
-          定时任务{' '}
+          {intl.get('确认')}
+          {currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')}
+          {intl.get('定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -367,7 +385,9 @@ const CronDetailModal = ({
           <div className="operations">
             <Tooltip
               title={
-                currentCron.status === CrontabStatus.idle ? '运行' : '停止'
+                currentCron.status === CrontabStatus.idle
+                  ? intl.get('运行')
+                  : intl.get('停止')
               }
             >
               <Button
@@ -385,7 +405,13 @@ const CronDetailModal = ({
                 }
               />
             </Tooltip>
-            <Tooltip title={currentCron.isDisabled === 1 ? '启用' : '禁用'}>
+            <Tooltip
+              title={
+                currentCron.isDisabled === 1
+                  ? intl.get('启用')
+                  : intl.get('禁用')
+              }
+            >
               <Button
                 type="link"
                 icon={
@@ -401,7 +427,13 @@ const CronDetailModal = ({
                 onClick={enabledOrDisabledCron}
               />
             </Tooltip>
-            <Tooltip title={currentCron.isPinned === 1 ? '取消置顶' : '置顶'}>
+            <Tooltip
+              title={
+                currentCron.isPinned === 1
+                  ? intl.get('取消置顶')
+                  : intl.get('置顶')
+              }
+            >
               <Button
                 type="link"
                 icon={
@@ -431,20 +463,20 @@ const CronDetailModal = ({
       <div className="card-wrapper">
         <Card>
           <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">任务</div>
+            <div className="cron-detail-info-title">{intl.get('任务')}</div>
             <div className="cron-detail-info-value">{currentCron.command}</div>
           </div>
         </Card>
         <Card style={{ marginTop: 10 }}>
           <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">状态</div>
+            <div className="cron-detail-info-title">{intl.get('状态')}</div>
             <div className="cron-detail-info-value">
               {(!currentCron.isDisabled ||
                 currentCron.status !== CrontabStatus.idle) && (
                 <>
                   {currentCron.status === CrontabStatus.idle && (
                     <Tag icon={<ClockCircleOutlined />} color="default">
-                      空闲中
+                      {intl.get('空闲中')}
                     </Tag>
                   )}
                   {currentCron.status === CrontabStatus.running && (
@@ -452,12 +484,12 @@ const CronDetailModal = ({
                       icon={<Loading3QuartersOutlined spin />}
                       color="processing"
                     >
-                      运行中
+                      {intl.get('运行中')}
                     </Tag>
                   )}
                   {currentCron.status === CrontabStatus.queued && (
                     <Tag icon={<FieldTimeOutlined />} color="default">
-                      队列中
+                      {intl.get('队列中')}
                     </Tag>
                   )}
                 </>
@@ -465,17 +497,19 @@ const CronDetailModal = ({
               {currentCron.isDisabled === 1 &&
                 currentCron.status === CrontabStatus.idle && (
                   <Tag icon={<CloseCircleOutlined />} color="error">
-                    已禁用
+                    {intl.get('已禁用')}
                   </Tag>
                 )}
             </div>
           </div>
           <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">定时</div>
+            <div className="cron-detail-info-title">{intl.get('定时')}</div>
             <div className="cron-detail-info-value">{currentCron.schedule}</div>
           </div>
           <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">最后运行时间</div>
+            <div className="cron-detail-info-title">
+              {intl.get('最后运行时间')}
+            </div>
             <div className="cron-detail-info-value">
               {currentCron.last_execution_time
                 ? new Date(currentCron.last_execution_time * 1000)
@@ -487,7 +521,9 @@ const CronDetailModal = ({
             </div>
           </div>
           <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">最后运行时长</div>
+            <div className="cron-detail-info-title">
+              {intl.get('最后运行时长')}
+            </div>
             <div className="cron-detail-info-value">
               {currentCron.last_running_time
                 ? diffTime(currentCron.last_running_time)
@@ -495,7 +531,9 @@ const CronDetailModal = ({
             </div>
           </div>
           <div className="cron-detail-info-item">
-            <div className="cron-detail-info-title">下次运行时间</div>
+            <div className="cron-detail-info-title">
+              {intl.get('下次运行时间')}
+            </div>
             <div className="cron-detail-info-value">
               {currentCron.nextRunTime &&
                 currentCron.nextRunTime
@@ -521,7 +559,7 @@ const CronDetailModal = ({
                   style={{ marginRight: 8 }}
                   onClick={saveFile}
                 >
-                  保存
+                  {intl.get('保存')}
                 </Button>
                 <Button
                   type="primary"

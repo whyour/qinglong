@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import {
   Modal,
@@ -47,7 +48,9 @@ const EditScriptNameModal = ({
       .post(`${config.apiPrefix}scripts`, formData)
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success(directory ? '新建文件夹成功' : '新建文件成功');
+          message.success(
+            directory ? intl.get('创建文件夹成功') : intl.get('创建文件成功'),
+          );
           const key = path ? `${path}/` : '';
           const filename = file ? file.name : inputFilename;
           handleCancel({
@@ -96,7 +99,7 @@ const EditScriptNameModal = ({
 
   return (
     <Modal
-      title="新建"
+      title={intl.get('创建')}
       open={visible}
       forceRender
       centered
@@ -117,58 +120,60 @@ const EditScriptNameModal = ({
       <Form form={form} layout="vertical" name="edit_name_modal">
         <Form.Item
           name="type"
-          label="类型"
+          label={intl.get('类型')}
           rules={[{ required: true }]}
           initialValue={'blank'}
         >
           <Radio.Group onChange={typeChange}>
-            <Radio value="blank">空文件</Radio>
-            <Radio value="upload">本地文件</Radio>
-            <Radio value="directory">文件夹</Radio>
+            <Radio value="blank">{intl.get('空文件')}</Radio>
+            <Radio value="upload">{intl.get('本地文件')}</Radio>
+            <Radio value="directory">{intl.get('文件夹')}</Radio>
           </Radio.Group>
         </Form.Item>
         {type === 'blank' && (
           <Form.Item
             name="filename"
-            label="文件名"
+            label={intl.get('文件名')}
             rules={[
-              { required: true, message: '请输入文件名' },
+              { required: true, message: intl.get('请输入文件名') },
               {
                 validator: (_, value) =>
                   value.includes('/')
-                    ? Promise.reject(new Error('文件名不能包含斜杠'))
+                    ? Promise.reject(new Error(intl.get('文件名不能包含斜杠')))
                     : Promise.resolve(),
               },
             ]}
           >
-            <Input placeholder="请输入文件名" />
+            <Input placeholder={intl.get('请输入文件名')} />
           </Form.Item>
         )}
         {type === 'directory' && (
           <Form.Item
             name="directory"
-            label="文件夹名"
-            rules={[{ required: true, message: '请输入文件夹名' }]}
+            label={intl.get('文件夹名')}
+            rules={[{ required: true, message: intl.get('请输入文件夹名') }]}
           >
-            <Input placeholder="请输入文件夹名" />
+            <Input placeholder={intl.get('请输入文件夹名')} />
           </Form.Item>
         )}
-        <Form.Item label="父目录" name="path">
+        <Form.Item label={intl.get('父目录')} name="path">
           <TreeSelect
             allowClear
             treeData={dirs}
             fieldNames={{ value: 'key', label: 'title' }}
-            placeholder="请选择父目录"
+            placeholder={intl.get('请选择父目录')}
             treeDefaultExpandAll
           />
         </Form.Item>
         {type === 'upload' && (
-          <Form.Item label="文件" name="file">
+          <Form.Item label={intl.get('文件')} name="file">
             <Upload.Dragger beforeUpload={beforeUpload} maxCount={1}>
               <p className="ant-upload-drag-icon">
                 <UploadOutlined />
               </p>
-              <p className="ant-upload-text">点击或者拖拽文件到此区域上传</p>
+              <p className="ant-upload-text">
+                {intl.get('点击或者拖拽文件到此区域上传')}
+              </p>
             </Upload.Dragger>
           </Form.Item>
         )}

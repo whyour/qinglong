@@ -16,10 +16,11 @@ import {
   killTask,
   handleLogPath,
   promiseExec,
+  emptyDir,
 } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { FindOptions, Op } from 'sequelize';
-import path from 'path';
+import path, { join } from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
@@ -27,6 +28,8 @@ import SshKeyService from './sshKey';
 import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
 import { formatCommand, formatUrl } from '../config/subscription';
+import { CrontabModel } from '../data/cron';
+import CrontabService from './cron';
 
 @Service()
 export default class SubscriptionService {
@@ -35,7 +38,8 @@ export default class SubscriptionService {
     private scheduleService: ScheduleService,
     private sockService: SockService,
     private sshKeyService: SshKeyService,
-  ) {}
+    private crontabService: CrontabService,
+  ) { }
 
   public async list(searchText?: string): Promise<Subscription[]> {
     let query = {};
@@ -253,13 +257,24 @@ export default class SubscriptionService {
     );
   }
 
-  public async remove(ids: number[]) {
+  public async remove(ids: number[], query: any) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       await this.handleTask(doc, false);
     }
     await SubscriptionModel.destroy({ where: { id: ids } });
     await this.setSshConfig();
+
+    if (query?.force === true) {
+      const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
+      if (crons?.length) {
+        await this.crontabService.remove(crons.map(x => x.id!))
+      }
+      for (const doc of docs) {
+        const filePath = join(config.scriptPath, doc.alias);
+        emptyDir(filePath);
+      }
+    }
   }
 
   public async getDb(

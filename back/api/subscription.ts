@@ -210,12 +210,16 @@ export default (app: Router) => {
     '/',
     celebrate({
       body: Joi.array().items(Joi.number().required()),
+      query: Joi.object({
+        force: Joi.boolean().optional(),
+        t: Joi.number()
+      })
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const subscriptionService = Container.get(SubscriptionService);
-        const data = await subscriptionService.remove(req.body);
+        const data = await subscriptionService.remove(req.body, req.query);
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);

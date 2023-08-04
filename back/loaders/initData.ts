@@ -30,15 +30,15 @@ export default async () => {
   });
 
   // 初始化更新所有任务状态为空闲
-  await CrontabModel.update(
-    { status: CrontabStatus.idle },
-    { where: {} },
-  );
+  await CrontabModel.update({ status: CrontabStatus.idle }, { where: {} });
 
   // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
   DependenceModel.findAll({
     where: {},
-    order: [['type', 'DESC'], ['createdAt', 'DESC']],
+    order: [
+      ['type', 'DESC'],
+      ['createdAt', 'DESC'],
+    ],
     raw: true,
   }).then(async (docs) => {
     await DependenceModel.update(

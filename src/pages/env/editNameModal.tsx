@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal'
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
@@ -39,7 +40,7 @@ const EditNameModal = ({
 
   return (
     <Modal
-      title="修改环境变量名称"
+      title={intl.get('修改环境变量名称')}
       open={visible}
       forceRender
       centered
@@ -60,9 +61,9 @@ const EditNameModal = ({
       <Form form={form} layout="vertical" name="edit_name_modal">
         <Form.Item
           name="name"
-          rules={[{ required: true, message: '请输入新的环境变量名称' }]}
+          rules={[{ required: true, message: intl.get('请输入新的环境变量名称') }]}
         >
-          <Input placeholder="请输入新的环境变量名称" />
+          <Input placeholder={intl.get('请输入新的环境变量名称')} />
         </Form.Item>
       </Form>
     </Modal>

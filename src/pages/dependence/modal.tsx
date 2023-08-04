@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form, Radio, Select } from 'antd';
 import { request } from '@/utils/http';
@@ -66,7 +67,7 @@ const DependenceModal = ({
 
   return (
     <Modal
-      title={dependence ? '编辑依赖' : '新建依赖'}
+      title={dependence ? intl.get('编辑依赖') : intl.get('创建依赖')}
       open={visible}
       forceRender
       centered
@@ -92,7 +93,7 @@ const DependenceModal = ({
       >
         <Form.Item
           name="type"
-          label="依赖类型"
+          label={intl.get('依赖类型')}
           initialValue={DependenceTypes[defaultType as any]}
         >
           <Select>
@@ -106,23 +107,23 @@ const DependenceModal = ({
         {!dependence && (
           <Form.Item
             name="split"
-            label="自动拆分"
+            label={intl.get('自动拆分')}
             initialValue="0"
-            tooltip="多个依赖是否换行分割"
+            tooltip={intl.get('多个依赖是否换行分割')}
           >
             <Radio.Group>
-              <Radio value="1">是</Radio>
-              <Radio value="0">否</Radio>
+              <Radio value="1">{intl.get('是')}</Radio>
+              <Radio value="0">{intl.get('否')}</Radio>
             </Radio.Group>
           </Form.Item>
         )}
         <Form.Item
           name="name"
-          label="名称"
+          label={intl.get('名称')}
           rules={[
             {
               required: true,
-              message: '请输入依赖名称，支持指定版本',
+              message: intl.get('请输入依赖名称，支持指定版本'),
               whitespace: true,
             },
           ]}
@@ -130,11 +131,11 @@ const DependenceModal = ({
           <Input.TextArea
             rows={4}
             autoSize={true}
-            placeholder="请输入依赖名称"
+            placeholder={intl.get('请输入依赖名称')}
           />
         </Form.Item>
-        <Form.Item name="remark" label="备注">
-          <Input placeholder="请输入备注" />
+        <Form.Item name="remark" label={intl.get('备注')}>
+          <Input placeholder={intl.get('请输入备注')} />
         </Form.Item>
       </Form>
     </Modal>

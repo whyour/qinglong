@@ -53,7 +53,7 @@ export default (app: Router) => {
       body: Joi.object({
         filename: Joi.string().required(),
         path: Joi.string().allow(''),
-        type: Joi.string().optional()
+        type: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -65,7 +65,7 @@ export default (app: Router) => {
         };
         const filePath = join(config.logPath, path, filename);
         if (type === 'directory') {
-          emptyDir(filePath);          
+          emptyDir(filePath);
         } else {
           fs.unlinkSync(filePath);
         }
@@ -75,5 +75,4 @@ export default (app: Router) => {
       }
     },
   );
-
 };

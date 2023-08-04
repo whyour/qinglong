@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal'
 import React, {
   PureComponent,
   Fragment,
@@ -93,7 +94,7 @@ const Config = () => {
           type="primary"
           onClick={updateConfig}
         >
-          保存
+          {intl.get('保存')}
         </Button>,
       ]}
       header={{

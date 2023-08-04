@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal'
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form, Radio } from 'antd';
 import { request } from '@/utils/http';
@@ -43,7 +44,7 @@ const EnvModal = ({
       );
 
       if (code === 200) {
-        message.success(env ? '更新变量成功' : '新建变量成功');
+        message.success(env ? intl.get('更新变量成功') : intl.get('创建变量成功'));
         handleCancel(data);
       }
       setLoading(false);
@@ -58,7 +59,7 @@ const EnvModal = ({
 
   return (
     <Modal
-      title={env ? '编辑变量' : '新建变量'}
+      title={env ? intl.get('编辑变量') : intl.get('创建变量')}
       open={visible}
       forceRender
       centered
@@ -79,45 +80,45 @@ const EnvModal = ({
       <Form form={form} layout="vertical" name="env_modal" initialValues={env}>
         <Form.Item
           name="name"
-          label="名称"
+          label={intl.get('名称')}
           rules={[
-            { required: true, message: '请输入环境变量名称', whitespace: true },
+            { required: true, message: intl.get('请输入环境变量名称'), whitespace: true },
             {
               pattern: /^[a-zA-Z_][0-9a-zA-Z_]*$/,
-              message: '只能输入字母数字下划线，且不能以数字开头',
+              message: intl.get('只能输入字母数字下划线，且不能以数字开头'),
             },
           ]}
         >
-          <Input placeholder="请输入环境变量名称" />
+          <Input placeholder={intl.get('请输入环境变量名称')} />
         </Form.Item>
         {!env && (
           <Form.Item
             name="split"
-            label="自动拆分"
+            label={intl.get('自动拆分')}
             initialValue="0"
-            tooltip="多个依赖是否换行分割"
+            tooltip={intl.get('多个依赖是否换行分割')}
           >
             <Radio.Group>
-              <Radio value="1">是</Radio>
-              <Radio value="0">否</Radio>
+              <Radio value="1">{intl.get('是')}</Radio>
+              <Radio value="0">{intl.get('否')}</Radio>
             </Radio.Group>
           </Form.Item>
         )}
         <Form.Item
           name="value"
-          label="值"
+          label={intl.get('值')}
           rules={[
-            { required: true, message: '请输入环境变量值', whitespace: true },
+            { required: true, message: intl.get('请输入环境变量值'), whitespace: true },
           ]}
         >
           <Input.TextArea
             rows={4}
             autoSize={true}
-            placeholder="请输入环境变量值"
+            placeholder={intl.get('请输入环境变量值')}
           />
         </Form.Item>
-        <Form.Item name="remarks" label="备注">
-          <Input placeholder="请输入备注" />
+        <Form.Item name="remarks" label={intl.get('备注')}>
+          <Input placeholder={intl.get('请输入备注')} />
         </Form.Item>
       </Form>
     </Modal>

@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal'
 import React, {
   useCallback,
   useRef,
@@ -70,20 +71,20 @@ const Env = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const columns: any = [
     {
-      title: '序号',
-      width: 60,
+      title: intl.get('序号'),
+      width: 80,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },
     },
     {
-      title: '名称',
+      title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
       sorter: (a: any, b: any) => a.name.localeCompare(b.name),
     },
     {
-      title: '值',
+      title: intl.get('值'),
       dataIndex: 'value',
       key: 'value',
       width: '35%',
@@ -99,7 +100,7 @@ const Env = () => {
       },
     },
     {
-      title: '备注',
+      title: intl.get('备注'),
       dataIndex: 'remarks',
       key: 'remarks',
       render: (text: string, record: any) => {
@@ -111,7 +112,7 @@ const Env = () => {
       },
     },
     {
-      title: '更新时间',
+      title: intl.get('更新时间'),
       dataIndex: 'timestamp',
       key: 'timestamp',
       width: 165,
@@ -145,17 +146,17 @@ const Env = () => {
       },
     },
     {
-      title: '状态',
+      title: intl.get('状态'),
       key: 'status',
       dataIndex: 'status',
-      width: 70,
+      width: 80,
       filters: [
         {
-          text: '已启用',
+          text: intl.get('已启用'),
           value: 0,
         },
         {
-          text: '已禁用',
+          text: intl.get('已禁用'),
           value: 1,
         },
       ],
@@ -164,28 +165,28 @@ const Env = () => {
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
             <Tag color={StatusColor[record.status]} style={{ marginRight: 0 }}>
-              {Status[record.status]}
+              {intl.get(Status[record.status])}
             </Tag>
           </Space>
         );
       },
     },
     {
-      title: '操作',
+      title: intl.get('操作'),
       key: 'action',
       width: 120,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
-            <Tooltip title={isPc ? '编辑' : ''}>
+            <Tooltip title={isPc ? intl.get('编辑') : ''}>
               <a onClick={() => editEnv(record, index)}>
                 <EditOutlined />
               </a>
             </Tooltip>
             <Tooltip
               title={
-                isPc ? (record.status === Status.已禁用 ? '启用' : '禁用') : ''
+                isPc ? (record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')) : ''
               }
             >
               <a onClick={() => enabledOrDisabledEnv(record, index)}>
@@ -196,7 +197,7 @@ const Env = () => {
                 )}
               </a>
             </Tooltip>
-            <Tooltip title={isPc ? '删除' : ''}>
+            <Tooltip title={isPc ? intl.get('删除') : ''}>
               <a onClick={() => deleteEnv(record, index)}>
                 <DeleteOutlined />
               </a>
@@ -214,7 +215,7 @@ const Env = () => {
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
   const [importLoading, setImportLoading] = useState(false);
-  const tableRef = useRef<any>();
+  const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef, 59);
 
   const getEnvs = () => {
@@ -231,15 +232,15 @@ const Env = () => {
 
   const enabledOrDisabledEnv = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.status === Status.已禁用 ? '启用' : '禁用'}`,
+      title: `确认${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}`,
       content: (
         <>
-          确认{record.status === Status.已禁用 ? '启用' : '禁用'}
+          {intl.get('确认')}{record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}
           Env{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.value}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -253,7 +254,7 @@ const Env = () => {
           .then(({ code, data }) => {
             if (code === 200) {
               message.success(
-                `${record.status === Status.已禁用 ? '启用' : '禁用'}成功`,
+                `${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}成功`,
               );
               const newStatus =
                 record.status === Status.已禁用 ? Status.已启用 : Status.已禁用;
@@ -284,14 +285,14 @@ const Env = () => {
 
   const deleteEnv = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认删除',
+      title: intl.get('确认删除'),
       content: (
         <>
-          确认删除变量{' '}
+          {intl.get('确认删除变量')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}: {record.value}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -412,8 +413,8 @@ const Env = () => {
 
   const delEnvs = () => {
     Modal.confirm({
-      title: '确认删除',
-      content: <>确认删除选中的变量吗</>,
+      title: intl.get('确认删除'),
+      content: <>{intl.get('确认删除选中的变量吗')}</>,
       onOk() {
         request
           .delete(`${config.apiPrefix}envs`, { data: selectedRowIds })
@@ -434,7 +435,7 @@ const Env = () => {
   const operateEnvs = (operationStatus: number) => {
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
-      content: <>确认{OperationName[operationStatus]}选中的变量吗</>,
+      content: <>{intl.get('确认')}{OperationName[operationStatus]}{intl.get('选中的变量吗')}</>,
       onOk() {
         request
           .put(
@@ -500,10 +501,10 @@ const Env = () => {
   return (
     <PageContainer
       className="ql-container-wrapper env-wrapper"
-      title="环境变量"
+      title={intl.get('环境变量')}
       extra={[
         <Search
-          placeholder="请输入名称/值/备注"
+          placeholder={intl.get('请输入名称/值/备注')}
           style={{ width: 'auto' }}
           enterButton
           loading={loading}
@@ -515,11 +516,11 @@ const Env = () => {
             icon={<UploadOutlined />}
             loading={importLoading}
           >
-            导入
+            {intl.get('导入')}
           </Button>
         </Upload>,
         <Button key="2" type="primary" onClick={() => addEnv()}>
-          新建变量
+          {intl.get('创建变量')}
         </Button>,
       ]}
       header={{
@@ -534,39 +535,39 @@ const Env = () => {
               style={{ marginBottom: 5 }}
               onClick={modifyName}
             >
-              批量修改变量名称
+              {intl.get('批量修改变量名称')}
             </Button>
             <Button
               type="primary"
               style={{ marginBottom: 5, marginLeft: 8 }}
               onClick={delEnvs}
             >
-              批量删除
+              {intl.get('批量删除')}
             </Button>
             <Button
               type="primary"
               onClick={() => exportEnvs()}
               style={{ marginLeft: 8, marginRight: 8 }}
             >
-              批量导出
+              {intl.get('批量导出')}
             </Button>
             <Button
               type="primary"
               onClick={() => operateEnvs(0)}
               style={{ marginLeft: 8, marginBottom: 5 }}
             >
-              批量启用
+              {intl.get('批量启用')}
             </Button>
             <Button
               type="primary"
               onClick={() => operateEnvs(1)}
               style={{ marginLeft: 8, marginRight: 8 }}
             >
-              批量禁用
+              {intl.get('批量禁用')}
             </Button>
             <span style={{ marginLeft: 8 }}>
-              已选择
-              <a>{selectedRowIds?.length}</a>项
+              {intl.get('已选择')}
+              <a>{selectedRowIds?.length}</a>{intl.get('项')}
             </span>
           </div>
         )}

@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Button,
@@ -55,6 +56,7 @@ import { getCommandScript, parseCrontab } from '@/utils';
 import { ColumnProps } from 'antd/lib/table';
 import { useVT } from 'virtualizedtableforantd4';
 import { ICrontab, OperationName, OperationPath, CrontabStatus } from './type';
+import Name from '@/components/name';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -63,10 +65,11 @@ const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const columns: ColumnProps<ICrontab>[] = [
     {
-      title: '名称',
+      title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
-      width: 150,
+      fixed: isPhone ? undefined : 'left',
+      width: 120,
       render: (text: string, record: any) => (
         <>
           <a
@@ -118,10 +121,10 @@ const Crontab = () => {
       },
     },
     {
-      title: '命令/脚本',
+      title: intl.get('命令/脚本'),
       dataIndex: 'command',
       key: 'command',
-      width: 300,
+      width: 200,
       render: (text, record) => {
         return (
           <Paragraph
@@ -146,16 +149,87 @@ const Crontab = () => {
       },
     },
     {
-      title: '定时规则',
+      title: intl.get('状态'),
+      key: 'status',
+      dataIndex: 'status',
+      width: 100,
+      filters: [
+        {
+          text: intl.get('运行中'),
+          value: CrontabStatus.running,
+        },
+        {
+          text: intl.get('空闲中'),
+          value: CrontabStatus.idle,
+        },
+        {
+          text: intl.get('已禁用'),
+          value: CrontabStatus.disabled,
+        },
+        {
+          text: intl.get('队列中'),
+          value: CrontabStatus.queued,
+        },
+      ],
+      render: (text, record) => (
+        <>
+          {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
+            <>
+              {record.status === CrontabStatus.idle && (
+                <Tag icon={<ClockCircleOutlined />} color="default">
+                  {intl.get('空闲中')}
+                </Tag>
+              )}
+              {record.status === CrontabStatus.running && (
+                <Tag
+                  icon={<Loading3QuartersOutlined spin />}
+                  color="processing"
+                >
+                  {intl.get('运行中')}
+                </Tag>
+              )}
+              {record.status === CrontabStatus.queued && (
+                <Tag icon={<FieldTimeOutlined />} color="default">
+                  {intl.get('队列中')}
+                </Tag>
+              )}
+            </>
+          )}
+          {record.isDisabled === 1 && record.status === CrontabStatus.idle && (
+            <Tag icon={<CloseCircleOutlined />} color="error">
+              {intl.get('已禁用')}
+            </Tag>
+          )}
+        </>
+      ),
+    },
+    {
+      title: intl.get('定时规则'),
       dataIndex: 'schedule',
       key: 'schedule',
-      width: 110,
+      width: 150,
       sorter: {
         compare: (a, b) => a.schedule.localeCompare(b.schedule),
       },
     },
     {
-      title: '最后运行时间',
+      title: intl.get('最后运行时长'),
+      width: 180,
+      dataIndex: 'last_running_time',
+      key: 'last_running_time',
+      sorter: {
+        compare: (a: any, b: any) => {
+          return a.last_running_time - b.last_running_time;
+        },
+      },
+      render: (text, record) => {
+        return record.last_running_time
+          ? diffTime(record.last_running_time)
+          : '-';
+      },
+    },
+    {
+      title: intl.get('最后运行时间'),
       dataIndex: 'last_execution_time',
       key: 'last_execution_time',
       width: 150,
@@ -184,23 +258,7 @@ const Crontab = () => {
       },
     },
     {
-      title: '最后运行时长',
-      width: 120,
-      dataIndex: 'last_running_time',
-      key: 'last_running_time',
-      sorter: {
-        compare: (a: any, b: any) => {
-          return a.last_running_time - b.last_running_time;
-        },
-      },
-      render: (text, record) => {
-        return record.last_running_time
-          ? diffTime(record.last_running_time)
-          : '-';
-      },
-    },
-    {
-      title: '下次运行时间',
+      title: intl.get('下次运行时间'),
       width: 150,
       sorter: {
         compare: (a: any, b: any) => {
@@ -217,70 +275,31 @@ const Crontab = () => {
       },
     },
     {
-      title: '状态',
-      key: 'status',
-      dataIndex: 'status',
-      width: 88,
-      filters: [
-        {
-          text: '运行中',
-          value: CrontabStatus.running,
-        },
-        {
-          text: '空闲中',
-          value: CrontabStatus.idle,
-        },
-        {
-          text: '已禁用',
-          value: CrontabStatus.disabled,
-        },
-        {
-          text: '队列中',
-          value: CrontabStatus.queued,
-        },
-      ],
-      render: (text, record) => (
-        <>
-          {(!record.isDisabled || record.status !== CrontabStatus.idle) && (
-            <>
-              {record.status === CrontabStatus.idle && (
-                <Tag icon={<ClockCircleOutlined />} color="default">
-                  空闲中
-                </Tag>
-              )}
-              {record.status === CrontabStatus.running && (
-                <Tag
-                  icon={<Loading3QuartersOutlined spin />}
-                  color="processing"
-                >
-                  运行中
-                </Tag>
-              )}
-              {record.status === CrontabStatus.queued && (
-                <Tag icon={<FieldTimeOutlined />} color="default">
-                  队列中
-                </Tag>
-              )}
-            </>
-          )}
-          {record.isDisabled === 1 && record.status === CrontabStatus.idle && (
-            <Tag icon={<CloseCircleOutlined />} color="error">
-              已禁用
-            </Tag>
-          )}
-        </>
-      ),
+      title: intl.get('关联订阅'),
+      width: 190,
+      render: (text, record: any) =>
+        record.sub_id ? (
+          <Name
+            service={() =>
+              request.get(`${config.apiPrefix}subscriptions/${record.sub_id}`)
+            }
+            options={{ ready: record?.sub_id, cacheKey: record.sub_id }}
+          />
+        ) : (
+          '-'
+        ),
     },
     {
-      title: '操作',
+      title: intl.get('操作'),
       key: 'action',
       width: 130,
+      fixed: isPhone ? undefined : 'right',
       render: (text, record, index) => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
             {record.status === CrontabStatus.idle && (
-              <Tooltip title={isPc ? '运行' : ''}>
+              <Tooltip title={isPc ? intl.get('运行') : ''}>
                 <a
                   onClick={(e) => {
                     e.stopPropagation();
@@ -292,7 +311,7 @@ const Crontab = () => {
               </Tooltip>
             )}
             {record.status !== CrontabStatus.idle && (
-              <Tooltip title={isPc ? '停止' : ''}>
+              <Tooltip title={isPc ? intl.get('停止') : ''}>
                 <a
                   onClick={(e) => {
                     e.stopPropagation();
@@ -303,7 +322,7 @@ const Crontab = () => {
                 </a>
               </Tooltip>
             )}
-            <Tooltip title={isPc ? '日志' : ''}>
+            <Tooltip title={isPc ? intl.get('日志') : ''}>
               <a
                 onClick={(e) => {
                   e.stopPropagation();
@@ -347,8 +366,9 @@ const Crontab = () => {
   const [cronViews, setCronViews] = useState<any[]>([]);
   const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
   const [moreMenuActive, setMoreMenuActive] = useState(false);
-  const tableRef = useRef<any>();
+  const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
+  const [activeKey, setActiveKey] = useState('');
 
   const goToScriptManager = (record: any) => {
     const result = getCommandScript(record.command);
@@ -412,14 +432,14 @@ const Crontab = () => {
 
   const delCron = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认删除',
+      title: intl.get('确认删除'),
       content: (
         <>
-          确认删除定时任务{' '}
+          {intl.get('确认删除定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -445,14 +465,14 @@ const Crontab = () => {
 
   const runCron = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认运行',
+      title: intl.get('确认运行'),
       content: (
         <>
-          确认运行定时任务{' '}
+          {intl.get('确认运行定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -480,14 +500,14 @@ const Crontab = () => {
 
   const stopCron = (record: any, index: number) => {
     Modal.confirm({
-      title: '确认停止',
+      title: intl.get('确认停止'),
       content: (
         <>
-          确认停止定时任务{' '}
+          {intl.get('确认停止定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -516,15 +536,18 @@ const Crontab = () => {
 
   const enabledOrDisabledCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.isDisabled === 1 ? '启用' : '禁用'}`,
+      title: `确认${
+        record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
+      }`,
       content: (
         <>
-          确认{record.isDisabled === 1 ? '启用' : '禁用'}
-          定时任务{' '}
+          {intl.get('确认')}
+          {record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')}
+          {intl.get('定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -558,15 +581,18 @@ const Crontab = () => {
 
   const pinOrUnPinCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.isPinned === 1 ? '取消置顶' : '置顶'}`,
+      title: `确认${
+        record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
+      }`,
       content: (
         <>
-          确认{record.isPinned === 1 ? '取消置顶' : '置顶'}
-          定时任务{' '}
+          {intl.get('确认')}
+          {record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')}
+          {intl.get('定时任务')}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -600,16 +626,16 @@ const Crontab = () => {
 
   const getMenuItems = (record: any) => {
     return [
-      { label: '编辑', key: 'edit', icon: <EditOutlined /> },
+      { label: intl.get('编辑'), key: 'edit', icon: <EditOutlined /> },
       {
-        label: record.isDisabled === 1 ? '启用' : '禁用',
+        label: record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'),
         key: 'enableOrDisable',
         icon:
           record.isDisabled === 1 ? <CheckCircleOutlined /> : <StopOutlined />,
       },
-      { label: '删除', key: 'delete', icon: <DeleteOutlined /> },
+      { label: intl.get('删除'), key: 'delete', icon: <DeleteOutlined /> },
       {
-        label: record.isPinned === 1 ? '取消置顶' : '置顶',
+        label: record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'),
         key: 'pinOrUnPin',
         icon: record.isPinned === 1 ? <StopOutlined /> : <PushpinOutlined />,
       },
@@ -696,8 +722,8 @@ const Crontab = () => {
 
   const delCrons = () => {
     Modal.confirm({
-      title: '确认删除',
-      content: <>确认删除选中的定时任务吗</>,
+      title: intl.get('确认删除'),
+      content: <>{intl.get('确认删除选中的定时任务吗')}</>,
       onOk() {
         request
           .delete(`${config.apiPrefix}crons`, { data: selectedRowIds })
@@ -718,7 +744,13 @@ const Crontab = () => {
   const operateCrons = (operationStatus: number) => {
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
-      content: <>确认{OperationName[operationStatus]}选中的定时任务吗</>,
+      content: (
+        <>
+          {intl.get('确认')}
+          {OperationName[operationStatus]}
+          {intl.get('选中的定时任务吗')}
+        </>
+      ),
       onOk() {
         request
           .put(
@@ -771,6 +803,9 @@ const Crontab = () => {
     if (pageConf.page && pageConf.size) {
       getCrons();
     }
+    if (viewConf && viewConf.id) {
+      setActiveKey(viewConf.id);
+    }
   }, [pageConf, viewConf]);
 
   useEffect(() => {
@@ -821,12 +856,12 @@ const Crontab = () => {
         type: 'divider' as 'group',
       },
       {
-        label: '新建视图',
+        label: intl.get('创建视图'),
         key: 'new',
         icon: <PlusOutlined />,
       },
       {
-        label: '视图管理',
+        label: intl.get('视图管理'),
         key: 'manage',
         icon: <SettingOutlined />,
       },
@@ -840,7 +875,12 @@ const Crontab = () => {
       .then(({ code, data }) => {
         if (code === 200) {
           setCronViews(data);
-          const firstEnableView = data.filter((x) => !x.isDisabled);
+          const firstEnableView = data
+            .filter((x) => !x.isDisabled)
+            .map((x) => ({
+              ...x,
+              name: x.name === '全部任务' ? intl.get('全部任务') : x.name,
+            }));
           setEnabledCronViews(firstEnableView);
           setPageConf({
             page: 1,
@@ -865,18 +905,13 @@ const Crontab = () => {
     setViewConf(view ? view : null);
   };
 
-  const [vt] = useVT(
-    () => ({ scroll: { y: tableScrollHeight } }),
-    [tableScrollHeight],
-  );
-
   return (
     <PageContainer
       className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
-      title="定时任务"
+      title={intl.get('定时任务')}
       extra={[
         <Search
-          placeholder="请输入名称或者关键词"
+          placeholder={intl.get('请输入名称或者关键词')}
           style={{ width: 'auto' }}
           enterButton
           allowClear
@@ -886,7 +921,7 @@ const Crontab = () => {
           onSearch={onSearch}
         />,
         <Button key="2" type="primary" onClick={() => addCron()}>
-          新建任务
+          {intl.get('创建任务')}
         </Button>,
       ]}
       header={{
@@ -896,6 +931,7 @@ const Crontab = () => {
       <Tabs
         defaultActiveKey="all"
         size="small"
+        activeKey={activeKey}
         tabPosition="top"
         className={`crontab-view ${moreMenuActive ? 'more-active' : ''}`}
         tabBarExtraContent={
@@ -906,7 +942,7 @@ const Crontab = () => {
           >
             <div className={`view-more ${moreMenuActive ? 'active' : ''}`}>
               <Space>
-                更多
+                {intl.get('更多')}
                 <DownOutlined />
               </Space>
               <div className="ant-tabs-ink-bar ant-tabs-ink-bar-animated"></div>
@@ -929,56 +965,57 @@ const Crontab = () => {
               style={{ marginBottom: 5 }}
               onClick={delCrons}
             >
-              批量删除
+              {intl.get('批量删除')}
             </Button>
             <Button
               type="primary"
               onClick={() => operateCrons(0)}
               style={{ marginLeft: 8, marginBottom: 5 }}
             >
-              批量启用
+              {intl.get('批量启用')}
             </Button>
             <Button
               type="primary"
               onClick={() => operateCrons(1)}
               style={{ marginLeft: 8, marginRight: 8 }}
             >
-              批量禁用
+              {intl.get('批量禁用')}
             </Button>
             <Button
               type="primary"
               style={{ marginRight: 8 }}
               onClick={() => operateCrons(2)}
             >
-              批量运行
+              {intl.get('批量运行')}
             </Button>
             <Button type="primary" onClick={() => operateCrons(3)}>
-              批量停止
+              {intl.get('批量停止')}
             </Button>
             <Button
               type="primary"
               onClick={() => operateCrons(4)}
               style={{ marginLeft: 8, marginRight: 8 }}
             >
-              批量置顶
+              {intl.get('批量置顶')}
             </Button>
             <Button
               type="primary"
               onClick={() => operateCrons(5)}
               style={{ marginLeft: 8, marginRight: 8 }}
             >
-              批量取消置顶
+              {intl.get('批量取消置顶')}
             </Button>
             <Button
               type="primary"
               onClick={() => setIsLabelModalVisible(true)}
               style={{ marginLeft: 8, marginRight: 8 }}
             >
-              批量修改标签
+              {intl.get('批量修改标签')}
             </Button>
             <span style={{ marginLeft: 8 }}>
-              已选择
-              <a>{selectedRowIds?.length}</a>项
+              {intl.get('已选择')}
+              <a>{selectedRowIds?.length}</a>
+              {intl.get('项')}
             </span>
           </div>
         )}
@@ -1004,7 +1041,6 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
-          // components={isPhone ? undefined : vt}
         />
       </div>
       <CronLogModal
@@ -1044,9 +1080,6 @@ const Crontab = () => {
         handleCancel={(data) => {
           setIsCreateViewModalVisible(false);
           getCronViews();
-          if (data && data.id === viewConf.id) {
-            setViewConf({ ...viewConf, ...data });
-          }
         }}
       />
       <ViewManageModal
@@ -1057,9 +1090,6 @@ const Crontab = () => {
         }}
         cronViewChange={(data) => {
           getCronViews();
-          if (data && data.id === viewConf.id) {
-            setViewConf({ ...viewConf, ...data });
-          }
         }}
       />
     </PageContainer>

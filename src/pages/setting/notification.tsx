@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Typography, Input, Form, Button, Select, message } from 'antd';
 import { request } from '@/utils/http';
@@ -22,7 +23,9 @@ const NotificationSetting = ({ data }: any) => {
       .put(`${config.apiPrefix}user/notification`, values)
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success(values.type ? '通知发送成功' : '通知关闭成功');
+          message.success(
+            values.type ? intl.get('通知发送成功') : intl.get('通知关闭成功'),
+          );
         }
       })
       .catch((error: any) => {
@@ -48,7 +51,7 @@ const NotificationSetting = ({ data }: any) => {
     <div>
       <Form onFinish={handleOk} form={form} layout="vertical">
         <Form.Item
-          label="通知方式"
+          label={intl.get('通知方式')}
           name="type"
           rules={[{ required: true }]}
           style={{ maxWidth: 400 }}
@@ -92,7 +95,7 @@ const NotificationSetting = ({ data }: any) => {
           </Form.Item>
         ))}
         <Button type="primary" htmlType="submit" disabled={loading}>
-          {loading ? '测试中...' : '保存'}
+          {loading ? intl.get('测试中...') : intl.get('保存')}
         </Button>
       </Form>
     </div>
