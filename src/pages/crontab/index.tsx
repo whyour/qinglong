@@ -905,6 +905,11 @@ const Crontab = () => {
     setViewConf(view ? view : null);
   };
 
+  const [vt] = useVT(
+    () => ({ scroll: { y: tableScrollHeight } }),
+    [tableScrollHeight],
+  );
+
   return (
     <PageContainer
       className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
@@ -1041,6 +1046,7 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
+          components={isPhone || pageConf.size < 50 ? undefined : vt}
         />
       </div>
       <CronLogModal
