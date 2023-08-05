@@ -49,6 +49,7 @@ const { Text } = Typography;
 const LangMap: any = {
   '.py': 'python',
   '.js': 'javascript',
+  '.mjs': 'javascript',
   '.sh': 'shell',
   '.ts': 'typescript',
 };

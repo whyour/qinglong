@@ -14,7 +14,7 @@ single_hanle() {
 ## 选择python3还是node
 define_program() {
   local file_param=$1
-  if [[ $file_param == *.js ]]; then
+  if [[ $file_param == *.js ]] || [[ $file_param == *.mjs ]]; then
     which_program="node"
   elif [[ $file_param == *.py ]] || [[ $file_param == *.pyc ]]; then
     which_program="python3"
