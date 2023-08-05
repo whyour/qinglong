@@ -186,7 +186,7 @@ const Env = () => {
             </Tooltip>
             <Tooltip
               title={
-                isPc ? (record.status === Status.已intl.get('禁用') ? intl.get('启用') : intl.get('禁用')) : ''
+                isPc ? (record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')) : ''
               }
             >
               <a onClick={() => enabledOrDisabledEnv(record, index)}>
@@ -232,10 +232,10 @@ const Env = () => {
 
   const enabledOrDisabledEnv = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.status === Status.已intl.get('禁用') ? intl.get('启用') : intl.get('禁用')}`,
+      title: `确认${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}`,
       content: (
         <>
-          {intl.get('确认')}{record.status === Status.已intl.get('禁用') ? intl.get('启用') : intl.get('禁用')}
+          {intl.get('确认')}{record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}
           Env{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.value}
@@ -254,7 +254,7 @@ const Env = () => {
           .then(({ code, data }) => {
             if (code === 200) {
               message.success(
-                `${record.status === Status.已intl.get('禁用') ? intl.get('启用') : intl.get('禁用')}成功`,
+                `${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}${intl.get('成功')}`,
               );
               const newStatus =
                 record.status === Status.已禁用 ? Status.已启用 : Status.已禁用;

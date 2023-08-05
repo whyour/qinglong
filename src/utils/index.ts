@@ -1,5 +1,5 @@
 import intl from 'react-intl-universal';
-import { LOG_END_SYMBOL } from './const';
+import { LANG_MAP, LOG_END_SYMBOL } from './const';
 import cron_parser from 'cron-parser';
 
 export default function browserType() {
@@ -154,9 +154,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-          shell, // wechat qq uc 360 2345 sougou liebao maxthon
-          shellVs,
-        },
+        shell, // wechat qq uc 360 2345 sougou liebao maxthon
+        shellVs,
+      },
   );
 
   console.log(
@@ -335,7 +335,18 @@ export function parseCrontab(schedule: string): Date {
     if (time) {
       return time.next().toDate();
     }
-  } catch (error) {}
+  } catch (error) { }
 
   return new Date('1970');
+}
+
+export function getExtension(filename: string) {
+  if (!filename) return '';
+  const arr = filename.split('.');
+  return `.${arr[arr.length - 1]}`;
+}
+
+export function getEditorMode(filename: string) {
+  const extension = getExtension(filename) as keyof typeof LANG_MAP;
+  return LANG_MAP[extension];
 }
