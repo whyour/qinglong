@@ -49,7 +49,7 @@ const { Text } = Typography;
 const LangMap: any = {
   '.py': 'python',
   '.js': 'javascript',
-  '.mjs': 'javascript',
+  '.mjs': 'typescript',
   '.sh': 'shell',
   '.ts': 'typescript',
 };
@@ -136,7 +136,7 @@ const Script = () => {
 
     const newMode = value ? LangMap[value.slice(-3)] : '';
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
-    setValue('加载中...');
+    setValue(intl.get('加载中...'));
     getDetail(node);
   };
 
@@ -202,7 +202,7 @@ const Script = () => {
 
   const cancelEdit = () => {
     setIsEditing(false);
-    setValue('加载中...');
+    setValue(intl.get('加载中...'));
     getDetail(currentNode);
   };
 

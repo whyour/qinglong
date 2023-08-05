@@ -29,7 +29,7 @@ const RenameModal = ({
       );
 
       if (code === 200) {
-        message.success('更新名称成功');
+        message.success(intl.get('更新名称成功'));
         handleCancel();
       }
       setLoading(false);

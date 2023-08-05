@@ -41,8 +41,8 @@ const Other = ({
   const [form] = Form.useForm();
   const modalRef = useRef<any>();
   const [exportLoading, setExportLoading] = useState(false);
-  const showUploadProgress = useProgress('上传');
-  const showDownloadProgress = useProgress('下载');
+  const showUploadProgress = useProgress(intl.get('上传'));
+  const showDownloadProgress = useProgress(intl.get('下载'));
 
   const {
     enable: enableDarkMode,
@@ -85,7 +85,7 @@ const Other = ({
       .put(`${config.apiPrefix}system/config`, systemConfig)
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success('更新成功');
+          message.success(intl.get('更新成功'));
         }
       })
       .catch((error: any) => {

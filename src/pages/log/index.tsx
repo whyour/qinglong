@@ -75,7 +75,7 @@ const Log = () => {
       return;
     }
 
-    setValue('加载中...');
+    setValue(intl.get('加载中...'));
     getLog(node);
   };
 

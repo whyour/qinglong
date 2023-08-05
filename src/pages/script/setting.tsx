@@ -23,7 +23,7 @@ const SettingModal = ({
       .post(`${config.apiPrefix}scripts`, payload)
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success('保存文件成功');
+          message.success(intl.get('保存文件成功'));
           handleCancel(data);
         }
         setLoading(false);

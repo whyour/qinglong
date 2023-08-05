@@ -49,7 +49,7 @@ const tabList = [
 const LangMap: any = {
   '.py': 'python',
   '.js': 'javascript',
-  '.mjs': 'javascript',
+  '.mjs': 'typescript',
   '.sh': 'shell',
   '.ts': 'typescript',
 };

@@ -392,7 +392,7 @@ const SubscriptionModal = ({
                 ) {
                   return Promise.resolve();
                 } else {
-                  return Promise.reject('Subscription表达式格式有误');
+                  return Promise.reject(intl.get('Subscription表达式格式有误'));
                 }
               },
             },

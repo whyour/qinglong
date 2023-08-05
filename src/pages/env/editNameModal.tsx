@@ -25,7 +25,7 @@ const EditNameModal = ({
       });
 
       if (code === 200) {
-        message.success('更新环境变量名称成功');
+        message.success(intl.get('更新环境变量名称成功'));
         handleCancel();
       }
       setLoading(false);

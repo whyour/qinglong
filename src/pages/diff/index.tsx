@@ -54,7 +54,7 @@ const Diff = () => {
       })
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success('保存成功');
+          message.success(intl.get('保存成功'));
         }
       });
   };

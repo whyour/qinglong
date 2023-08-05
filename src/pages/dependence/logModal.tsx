@@ -56,8 +56,8 @@ const DependenceLogModal = ({
         ) {
           const log = (data.log || []).join('') as string;
           setValue(log);
-          setExecuting(!log.includes('结束时间'));
-          setIsRemoveFailed(log.includes('删除失败'));
+          setExecuting(!log.includes(intl.get('结束时间')));
+          setIsRemoveFailed(log.includes(intl.get('删除失败')));
         }
       })
       .finally(() => {
@@ -103,9 +103,9 @@ const DependenceLogModal = ({
       references.length > 0 &&
       references.includes(dependence.id)
     ) {
-      if (message.includes('结束时间')) {
+      if (message.includes(intl.get('结束时间'))) {
         setExecuting(false);
-        setIsRemoveFailed(message.includes('删除失败'));
+        setIsRemoveFailed(message.includes(intl.get('删除失败')));
       }
       setValue(`${value}${message}`);
     }

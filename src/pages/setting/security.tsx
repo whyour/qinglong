@@ -67,12 +67,12 @@ const SecuritySettings = ({ user, userChange }: any) => {
       .then(({ code, data }) => {
         if (code === 200) {
           if (data) {
-            message.success('激活成功');
+            message.success(intl.get('激活成功'));
             setTwoFactoring(false);
             setTwoFactorActivated(true);
             userChange();
           } else {
-            message.success('验证失败');
+            message.success(intl.get('验证失败'));
           }
         }
       })

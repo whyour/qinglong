@@ -26,7 +26,7 @@ const CronLogModal = ({
   data?: string;
   logUrl?: string;
 }) => {
-  const [value, setValue] = useState<string>('启动中...');
+  const [value, setValue] = useState<string>(intl.get('启动中...'));
   const [loading, setLoading] = useState<any>(true);
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
@@ -47,7 +47,7 @@ const CronLogModal = ({
           const log = data as string;
           setValue(log || intl.get('暂无日志'));
           const hasNext = Boolean(
-            log && !logEnded(log) && !log.includes('任务未运行'),
+            log && !logEnded(log) && !log.includes(intl.get('任务未运行')),
           );
           setExecuting(hasNext);
           autoScroll();

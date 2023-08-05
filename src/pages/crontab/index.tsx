@@ -447,7 +447,7 @@ const Crontab = () => {
           .delete(`${config.apiPrefix}crons`, { data: [record.id] })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('删除成功');
+              message.success(intl.get('删除成功'));
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               if (i !== -1) {
@@ -729,7 +729,7 @@ const Crontab = () => {
           .delete(`${config.apiPrefix}crons`, { data: selectedRowIds })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('批量删除成功');
+              message.success(intl.get('批量删除成功'));
               setSelectedRowIds([]);
               getCrons();
             }
@@ -879,7 +879,7 @@ const Crontab = () => {
             .filter((x) => !x.isDisabled)
             .map((x) => ({
               ...x,
-              name: x.name === '全部任务' ? intl.get('全部任务') : x.name,
+              name: x.name === intl.get('全部任务') ? intl.get('全部任务') : x.name,
             }));
           setEnabledCronViews(firstEnableView);
           setPageConf({
