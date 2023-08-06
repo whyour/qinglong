@@ -162,7 +162,7 @@ const Other = ({
   return (
     <Form layout="vertical" form={form}>
       <Form.Item
-        label={intl.get('主题设置')}
+        label={intl.get('主题')}
         name="theme"
         initialValue={defaultTheme}
       >

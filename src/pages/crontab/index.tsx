@@ -879,7 +879,7 @@ const Crontab = () => {
             .filter((x) => !x.isDisabled)
             .map((x) => ({
               ...x,
-              name: x.name === intl.get('全部任务') ? intl.get('全部任务') : x.name,
+              name: x.name === '全部任务' ? intl.get('全部任务') : x.name,
             }));
           setEnabledCronViews(firstEnableView);
           setPageConf({
