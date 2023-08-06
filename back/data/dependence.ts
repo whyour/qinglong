@@ -62,7 +62,7 @@ export enum versionDependenceCommandTypes {
 export enum unInstallDependenceCommandTypes {
   'pnpm remove -g',
   'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
-  'apt remove',
+  'apt remove -y',
 }
 
 export interface DependenceInstance
