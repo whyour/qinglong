@@ -37,7 +37,7 @@ async function linkCommand() {
     if (fs.existsSync(target)) {
       fs.unlinkSync(target);
     }
-    fs.symlink(source, target, (err) => {});
+    fs.symlink(source, target, (err) => { });
   }
 }
 

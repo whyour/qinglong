@@ -47,7 +47,7 @@ const CronLogModal = ({
           const log = data as string;
           setValue(log || intl.get('暂无日志'));
           const hasNext = Boolean(
-            log && !logEnded(log) && !log.includes(intl.get('任务未运行')),
+            log && !logEnded(log) && !log.includes('任务未运行'),
           );
           setExecuting(hasNext);
           autoScroll();

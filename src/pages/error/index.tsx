@@ -9,17 +9,22 @@ import { SharedContext } from '@/layouts';
 import { Alert, Typography } from 'antd';
 
 const Error = () => {
-  const { user, theme, reloadUser } = useOutletContext<SharedContext>();
+  const { user } = useOutletContext<SharedContext>();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(intl.get('暂无日志'));
   const retryTimes = useRef(1);
 
-  const getLog = (needLoading: boolean = true) => {
+  const getHealthStatus = (needLoading: boolean = true) => {
     needLoading && setLoading(true);
     request
       .get(`${config.apiPrefix}public/health`)
       .then(({ error, data }) => {
         if (data?.status === 1) {
+          if (retryTimes.current > 1) {
+            setTimeout(() => {
+              window.location.reload();
+            });
+          }
           return;
         }
         if (retryTimes.current > 3) {
@@ -28,7 +33,7 @@ const Error = () => {
         }
         retryTimes.current += 1;
         setTimeout(() => {
-          getLog(false);
+          getHealthStatus(false);
         }, 3000);
       })
       .finally(() => needLoading && setLoading(false));
@@ -41,7 +46,7 @@ const Error = () => {
   }, [user]);
 
   useEffect(() => {
-    getLog();
+    getHealthStatus();
   }, []);
 
   return (

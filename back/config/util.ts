@@ -387,28 +387,22 @@ export function emptyDir(path: string) {
   fs.rmdirSync(path);
 }
 
-export function promiseExec(command: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(
-      command,
-      { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' },
-      (err, stdout, stderr) => {
-        resolve(stdout || stderr || JSON.stringify(err));
-      },
-    );
-  });
+export async function promiseExec(command: string): Promise<string> {
+  try {
+    const { stderr, stdout } = await promisify(exec)(command, { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' });
+    return stdout || stderr;
+  } catch (error) {
+    return JSON.stringify(error);
+  }
 }
 
-export function promiseExecSuccess(command: string): Promise<string> {
-  return new Promise((resolve) => {
-    exec(
-      command,
-      { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' },
-      (err, stdout, stderr) => {
-        resolve(stdout || '');
-      },
-    );
-  });
+export async function promiseExecSuccess(command: string): Promise<string> {
+  try {
+    const { stdout } = await promisify(exec)(command, { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' });
+    return stdout || '';
+  } catch (error) {
+    return '';
+  }
 }
 
 export function parseHeaders(headers: string) {
@@ -501,7 +495,7 @@ export async function killTask(pid: number) {
       [pid, ...pids].forEach((x) => {
         process.kill(x, 2);
       });
-    } catch (error) {}
+    } catch (error) { }
   } else {
     process.kill(pid, 2);
   }
