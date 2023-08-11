@@ -125,6 +125,6 @@ export default async () => {
     Logger.info('✌️ DB loaded');
   } catch (error) {
     Logger.info('✌️ DB load failed');
-    Logger.info(error);
+    Logger.error(error);
   }
 };
