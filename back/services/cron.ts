@@ -161,7 +161,7 @@ export default class CronService {
           case 'In':
             q[Op.or] = [
               {
-                [property]: value,
+                [property]: Array.isArray(value) ? value : [value],
               },
               property === 'status' && value.includes(2)
                 ? { isDisabled: 1 }
@@ -172,7 +172,7 @@ export default class CronService {
             q[Op.and] = [
               {
                 [property]: {
-                  [Op.notIn]: value,
+                  [Op.notIn]: Array.isArray(value) ? value : [value],
                 },
               },
               property === 'status' && value.includes(2)
