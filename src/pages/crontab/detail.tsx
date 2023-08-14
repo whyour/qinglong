@@ -30,7 +30,7 @@ import config from '@/utils/config';
 import CronLogModal from './logModal';
 import Editor from '@monaco-editor/react';
 import IconFont from '@/components/iconfont';
-import { getCommandScript } from '@/utils';
+import { getCommandScript, getEditorMode } from '@/utils';
 import VirtualList from 'rc-virtual-list';
 import useScrollHeight from '@/hooks/useScrollHeight';
 
@@ -46,12 +46,6 @@ const tabList = [
     tab: intl.get('脚本'),
   },
 ];
-const LangMap: any = {
-  '.py': 'python',
-  '.js': 'javascript',
-  '.sh': 'shell',
-  '.ts': 'typescript',
-};
 
 interface LogItem {
   directory: string;
@@ -109,7 +103,7 @@ const CronDetailModal = ({
     ),
     script: scriptInfo.filename && (
       <Editor
-        language={LangMap[scriptInfo.filename.slice(-3)] || ''}
+        language={getEditorMode(scriptInfo.filename)}
         theme={theme}
         value={value}
         options={{

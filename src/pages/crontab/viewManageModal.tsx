@@ -157,7 +157,7 @@ const ViewManageModal = ({
           .delete(`${config.apiPrefix}crons/views`, { data: [record.id] })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('删除成功');
+              message.success(intl.get('删除成功'));
               cronViewChange();
             }
           });

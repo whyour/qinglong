@@ -99,7 +99,7 @@ const CronModal = ({
                 if (!value || cronParse.parseExpression(value).hasNext()) {
                   return Promise.resolve();
                 } else {
-                  return Promise.reject('Cron表达式格式有误');
+                  return Promise.reject(intl.get('Cron表达式格式有误'));
                 }
               },
             },

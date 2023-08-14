@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal'
 import { message } from 'antd';
 import config from './config';
 import { history } from '@umijs/max';
@@ -32,7 +33,7 @@ const errorHandler = function (error: AxiosError) {
       history.push('/error');
     } else if (responseStatus === 401) {
       if (history.location.pathname !== '/login') {
-        message.error('登录已过期，请重新登录');
+        message.error(intl.get('登录已过期，请重新登录'));
         localStorage.removeItem(config.authKey);
         history.push('/login');
       }

@@ -254,7 +254,7 @@ const Env = () => {
           .then(({ code, data }) => {
             if (code === 200) {
               message.success(
-                `${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}成功`,
+                `${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}${intl.get('成功')}`,
               );
               const newStatus =
                 record.status === Status.已禁用 ? Status.已启用 : Status.已禁用;
@@ -300,7 +300,7 @@ const Env = () => {
           .delete(`${config.apiPrefix}envs`, { data: [record.id] })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('删除成功');
+              message.success(intl.get('删除成功'));
               const result = [...value];
               result.splice(index, 1);
               setValue(result);
@@ -420,7 +420,7 @@ const Env = () => {
           .delete(`${config.apiPrefix}envs`, { data: selectedRowIds })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('批量删除成功');
+              message.success(intl.get('批量删除成功'));
               setSelectedRowIds([]);
               getEnvs();
             }

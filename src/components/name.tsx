@@ -13,7 +13,7 @@ export default function Name<
   options: Options<TData, [TParams]>;
 }) {
   const { loading, data } = useRequest(service, options);
-  console.log(loading, data);
+
   return (
     <Spin spinning={loading}>
       <Typography.Text ellipsis={true}>{data?.data?.name}</Typography.Text>

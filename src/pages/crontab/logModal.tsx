@@ -26,7 +26,7 @@ const CronLogModal = ({
   data?: string;
   logUrl?: string;
 }) => {
-  const [value, setValue] = useState<string>('启动中...');
+  const [value, setValue] = useState<string>(intl.get('启动中...'));
   const [loading, setLoading] = useState<any>(true);
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);

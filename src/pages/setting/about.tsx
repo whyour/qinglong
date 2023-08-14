@@ -10,6 +10,7 @@ const { Link } = Typography;
 enum TVersion {
   'develop' = '开发版',
   'master' = '正式版',
+  'debian' = '正式版'
 }
 
 const About = ({ systemInfo }: { systemInfo: SharedContext['systemInfo'] }) => {

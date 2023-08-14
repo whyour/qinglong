@@ -13,9 +13,6 @@ export default defineConfig({
   outputPath: 'static/dist',
   fastRefresh: true,
   favicons: [`https://qn.whyour.cn/favicon.svg`],
-  mfsu: {
-    strategy: 'eager',
-  },
   publicPath: process.env.NODE_ENV === 'production' ? './' : '/',
   proxy: {
     [`${baseUrl}api/public`]: {

@@ -8,21 +8,9 @@ import Editor from '@monaco-editor/react';
 import SaveModal from './saveModal';
 import SettingModal from './setting';
 import { useTheme } from '@/utils/hooks';
-import { logEnded } from '@/utils';
+import { getEditorMode, logEnded } from '@/utils';
 
 const { Option } = Select;
-const LangMap: any = {
-  '.py': 'python',
-  '.js': 'javascript',
-  '.sh': 'shell',
-  '.ts': 'typescript',
-};
-const prefixMap: any = {
-  python: '.py',
-  javascript: '.js',
-  shell: '.sh',
-  typescript: '.ts',
-};
 
 const EditModal = ({
   treeData,
@@ -65,7 +53,7 @@ const EditModal = ({
       return;
     }
 
-    const newMode = LangMap[value.slice(-3)] || '';
+    const newMode = getEditorMode(value);
     setCNode(node);
     setLanguage(newMode);
     getDetail(node);
@@ -145,7 +133,7 @@ const EditModal = ({
       setCNode(currentNode);
       setValue(content as string);
       setSelectedKey(currentNode.key);
-      const newMode = LangMap[currentNode.title.slice(-3)] || '';
+      const newMode = getEditorMode(currentNode.title);
       setLanguage(newMode);
     }
   }, [content, currentNode]);

@@ -37,7 +37,7 @@ import EditScriptNameModal from './editNameModal';
 import debounce from 'lodash/debounce';
 import { history, useOutletContext, useLocation } from '@umijs/max';
 import { parse } from 'query-string';
-import { depthFirstSearch, findNode } from '@/utils';
+import { depthFirstSearch, findNode, getEditorMode } from '@/utils';
 import { SharedContext } from '@/layouts';
 import useFilterTreeData from '@/hooks/useFilterTreeData';
 import uniq from 'lodash/uniq';
@@ -45,13 +45,6 @@ import IconFont from '@/components/iconfont';
 import RenameModal from './renameModal';
 
 const { Text } = Typography;
-
-const LangMap: any = {
-  '.py': 'python',
-  '.js': 'javascript',
-  '.sh': 'shell',
-  '.ts': 'typescript',
-};
 
 const Script = () => {
   const { headerStyle, isPhone, theme, socketMessage } =
@@ -133,9 +126,9 @@ const Script = () => {
       return;
     }
 
-    const newMode = value ? LangMap[value.slice(-3)] : '';
+    const newMode = getEditorMode(value);
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
-    setValue('加载中...');
+    setValue(intl.get('加载中...'));
     getDetail(node);
   };
 
@@ -201,7 +194,7 @@ const Script = () => {
 
   const cancelEdit = () => {
     setIsEditing(false);
-    setValue('加载中...');
+    setValue(intl.get('加载中...'));
     getDetail(currentNode);
   };
 
