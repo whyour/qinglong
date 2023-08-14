@@ -366,7 +366,7 @@ const Subscription = () => {
           })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('删除成功');
+              message.success(intl.get('删除成功'));
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               if (i !== -1) {

@@ -1,6 +1,12 @@
-version: 2.15.20
-changeLogLink: https://t.me/jiao_long/386
-publishTime: 2023-07-22 16:00
+version: 2.16.0
+changeLogLink: https://t.me/jiao_long/388
+publishTime: 2023-08-06 16:00
 changeLog: |
-  1. 修复判断 linux 依赖已安装逻辑
-  2. 修复未启动完成时，页面提示 500
+  1. 多语言支持英文界面
+  2. 定时任务增加关联订阅
+  3. 删除订阅支持自动删除任务和脚本
+  4. 定时任务支持运行 mjs 后缀文件
+  5. PushMe消息通道增加 params 参数
+  6. 修复 6 位 cron 不以 task 开头定时任务运行失败
+  7. 修复任务详情日志列表过多卡顿
+  8. 修复定时任务列表虚拟滚动

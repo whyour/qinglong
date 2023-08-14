@@ -187,7 +187,9 @@ const Login = () => {
           <Form layout="vertical" onFinish={handleOk}>
             <FormItem name="username" label={intl.get('用户名')} hasFeedback>
               <Input
-                placeholder={`${intl.get('用户名')}${isDemoEnv ? ': admin' : ''}`}
+                placeholder={`${intl.get('用户名')}${
+                  isDemoEnv ? ': admin' : ''
+                }`}
                 autoFocus
               />
             </FormItem>

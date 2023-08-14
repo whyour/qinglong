@@ -14,7 +14,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
   const checkUpgrade = () => {
     if (updateLoading) return;
     setUpdateLoading(true);
-    message.loading('检查更新中...', 0);
+    message.loading(intl.get('检查更新中...'), 0);
     request
       .put(`${config.apiPrefix}system/update-check`)
       .then(({ code, data }) => {
@@ -177,7 +177,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
     }
 
     const newMessage = `${value}${_message}`;
-    const updateFailed = newMessage.includes('失败');
+    const updateFailed = newMessage.includes(intl.get('失败'));
 
     modalRef.current.update({
       maskClosable: updateFailed,
@@ -198,8 +198,8 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       ),
     });
 
-    if (updateFailed && !value.includes('失败，请检查')) {
-      message.error('更新失败，请检查网络及日志或稍后再试');
+    if (updateFailed && !value.includes(intl.get('失败，请检查'))) {
+      message.error(intl.get('更新失败，请检查网络及日志或稍后再试'));
     }
 
     setValue(newMessage);
@@ -209,7 +209,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
         .getElementById('log-identifier')!
         .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    if (_message.includes('更新包下载成功')) {
+    if (_message.includes(intl.get('更新包下载成功'))) {
       setTimeout(() => {
         showReloadModal();
       }, 1000);

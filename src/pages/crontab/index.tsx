@@ -447,7 +447,7 @@ const Crontab = () => {
           .delete(`${config.apiPrefix}crons`, { data: [record.id] })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('删除成功');
+              message.success(intl.get('删除成功'));
               const result = [...value];
               const i = result.findIndex((x) => x.id === record.id);
               if (i !== -1) {
@@ -729,7 +729,7 @@ const Crontab = () => {
           .delete(`${config.apiPrefix}crons`, { data: selectedRowIds })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('批量删除成功');
+              message.success(intl.get('批量删除成功'));
               setSelectedRowIds([]);
               getCrons();
             }
@@ -905,6 +905,11 @@ const Crontab = () => {
     setViewConf(view ? view : null);
   };
 
+  const [vt] = useVT(
+    () => ({ scroll: { y: tableScrollHeight } }),
+    [tableScrollHeight],
+  );
+
   return (
     <PageContainer
       className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
@@ -1041,6 +1046,7 @@ const Crontab = () => {
           rowSelection={rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
+          components={isPhone || pageConf.size < 50 ? undefined : vt}
         />
       </div>
       <CronLogModal

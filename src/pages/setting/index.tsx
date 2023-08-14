@@ -154,7 +154,7 @@ const Setting = () => {
           .delete(`${config.apiPrefix}apps`, { data: [record.id] })
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('删除成功');
+              message.success(intl.get('删除成功'));
               const result = [...dataSource];
               result.splice(index, 1);
               setDataSource(result);
@@ -188,7 +188,7 @@ const Setting = () => {
           .put(`${config.apiPrefix}apps/${record.id}/reset-secret`)
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('重置成功');
+              message.success(intl.get('重置成功'));
               handleApp(data);
             }
           });
