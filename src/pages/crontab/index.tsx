@@ -68,7 +68,7 @@ const Crontab = () => {
       title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
-      fixed: isPhone ? undefined : 'left',
+      fixed: 'left',
       width: 120,
       render: (text: string, record: any) => (
         <>

@@ -124,9 +124,6 @@ const CronLogModal = ({
       open={visible}
       centered
       className="log-modal"
-      bodyStyle={{
-        minHeight: '300px',
-      }}
       forceRender
       onOk={() => cancel()}
       onCancel={() => cancel()}

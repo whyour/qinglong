@@ -32,9 +32,16 @@ body {
 }
 
 .log-modal {
-  .ant-modal {
-    padding-bottom: 0 !important;
-    width: 580px !important;
+  &.ant-modal {
+    max-width: 1000px !important;
+    width: 80vw !important;
+  }
+
+  .ant-modal-body {
+    overflow-y: auto;
+    min-height: 300px;
+    max-height: 80vh;
+    max-height: calc(80vh - var(--vh-offset, 0px));
   }
 
   pre {
