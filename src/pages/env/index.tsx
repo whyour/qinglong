@@ -1,4 +1,4 @@
-import intl from 'react-intl-universal'
+import intl from 'react-intl-universal';
 import React, {
   useCallback,
   useRef,
@@ -149,7 +149,7 @@ const Env = () => {
       title: intl.get('状态'),
       key: 'status',
       dataIndex: 'status',
-      width: 80,
+      width: 100,
       filters: [
         {
           text: intl.get('已启用'),
@@ -186,7 +186,11 @@ const Env = () => {
             </Tooltip>
             <Tooltip
               title={
-                isPc ? (record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')) : ''
+                isPc
+                  ? record.status === Status.已禁用
+                    ? intl.get('启用')
+                    : intl.get('禁用')
+                  : ''
               }
             >
               <a onClick={() => enabledOrDisabledEnv(record, index)}>
@@ -232,10 +236,15 @@ const Env = () => {
 
   const enabledOrDisabledEnv = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}`,
+      title: `确认${
+        record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')
+      }`,
       content: (
         <>
-          {intl.get('确认')}{record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}
+          {intl.get('确认')}
+          {record.status === Status.已禁用
+            ? intl.get('启用')
+            : intl.get('禁用')}
           Env{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.value}
@@ -254,7 +263,11 @@ const Env = () => {
           .then(({ code, data }) => {
             if (code === 200) {
               message.success(
-                `${record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')}${intl.get('成功')}`,
+                `${
+                  record.status === Status.已禁用
+                    ? intl.get('启用')
+                    : intl.get('禁用')
+                }${intl.get('成功')}`,
               );
               const newStatus =
                 record.status === Status.已禁用 ? Status.已启用 : Status.已禁用;
@@ -435,7 +448,13 @@ const Env = () => {
   const operateEnvs = (operationStatus: number) => {
     Modal.confirm({
       title: `确认${OperationName[operationStatus]}`,
-      content: <>{intl.get('确认')}{OperationName[operationStatus]}{intl.get('选中的变量吗')}</>,
+      content: (
+        <>
+          {intl.get('确认')}
+          {OperationName[operationStatus]}
+          {intl.get('选中的变量吗')}
+        </>
+      ),
       onOk() {
         request
           .put(
@@ -567,7 +586,8 @@ const Env = () => {
             </Button>
             <span style={{ marginLeft: 8 }}>
               {intl.get('已选择')}
-              <a>{selectedRowIds?.length}</a>{intl.get('项')}
+              <a>{selectedRowIds?.length}</a>
+              {intl.get('项')}
             </span>
           </div>
         )}
@@ -579,7 +599,7 @@ const Env = () => {
             dataSource={value}
             rowKey="id"
             size="middle"
-            scroll={{ x: 1000, y: tableScrollHeight }}
+            scroll={{ x: 1200, y: tableScrollHeight }}
             components={vt}
             loading={loading}
             onRow={(record: any, index: number | undefined) => {

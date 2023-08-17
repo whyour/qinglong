@@ -20,7 +20,7 @@ src/.umi
 src/.umi-production
 src/.umi-test
 .env.local
-env
+.env
 history
 version.ts
 config

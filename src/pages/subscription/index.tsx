@@ -184,45 +184,39 @@ const Subscription = () => {
     {
       title: intl.get('操作'),
       key: 'action',
-      width: 130,
+      width: 140,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
             {record.status === SubscriptionStatus.idle && (
-              <Tooltip title={isPc ? intl.get('运行') : ''}>
-                <a
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    runSubscription(record, index);
-                  }}
-                >
-                  <PlayCircleOutlined />
-                </a>
-              </Tooltip>
-            )}
-            {record.status !== SubscriptionStatus.idle && (
-              <Tooltip title={isPc ? intl.get('停止') : ''}>
-                <a
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    stopSubsciption(record, index);
-                  }}
-                >
-                  <PauseCircleOutlined />
-                </a>
-              </Tooltip>
-            )}
-            <Tooltip title={isPc ? intl.get('日志') : ''}>
               <a
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLogSubscription({ ...record, timestamp: Date.now() });
+                  runSubscription(record, index);
                 }}
               >
-                <FileTextOutlined />
+                {intl.get('运行')}
               </a>
-            </Tooltip>
+            )}
+            {record.status !== SubscriptionStatus.idle && (
+              <a
+                onClick={(e) => {
+                  e.stopPropagation();
+                  stopSubsciption(record, index);
+                }}
+              >
+                {intl.get('停止')}
+              </a>
+            )}
+            <a
+              onClick={(e) => {
+                e.stopPropagation();
+                setLogSubscription({ ...record, timestamp: Date.now() });
+              }}
+            >
+              {intl.get('日志')}
+            </a>
             <MoreBtn key="more" record={record} index={index} />
           </Space>
         );
