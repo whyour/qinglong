@@ -241,10 +241,9 @@ const SubscriptionModal = ({
 
   const onNamePaste = useCallback((e) => {
     const text = e.clipboardData.getData('text') as string;
-    if (text.startsWith('ql ')) {
+    if (text.includes('ql repo') || text.includes('ql raw')) {
       e.preventDefault();
     }
-    onPaste(e);
   }, []);
 
   const formatParams = (sub) => {
@@ -330,7 +329,7 @@ const SubscriptionModal = ({
             rows={4}
             autoSize={true}
             placeholder={intl.get('请输入订阅链接')}
-            onPaste={onUrlChange}
+            onPaste={onNamePaste}
             onChange={onUrlChange}
           />
         </Form.Item>
@@ -338,7 +337,7 @@ const SubscriptionModal = ({
           <Form.Item name="branch" label={intl.get('分支')}>
             <Input
               placeholder={intl.get('请输入分支')}
-              onPaste={onBranchChange}
+              onPaste={onNamePaste}
               onChange={onBranchChange}
             />
           </Form.Item>
@@ -401,7 +400,10 @@ const SubscriptionModal = ({
           {scheduleType === 'interval' ? (
             <IntervalSelect />
           ) : (
-            <Input placeholder={intl.get('秒(可选) 分 时 天 月 周')} />
+            <Input
+              onPaste={onNamePaste}
+              placeholder={intl.get('秒(可选) 分 时 天 月 周')}
+            />
           )}
         </Form.Item>
         {type !== 'file' && (
@@ -417,6 +419,7 @@ const SubscriptionModal = ({
                 placeholder={intl.get(
                   '请输入脚本筛选白名单关键词，多个关键词竖线分割',
                 )}
+                onPaste={onNamePaste}
               />
             </Form.Item>
             <Form.Item
@@ -430,6 +433,7 @@ const SubscriptionModal = ({
                 placeholder={intl.get(
                   '请输入脚本筛选黑名单关键词，多个关键词竖线分割',
                 )}
+                onPaste={onNamePaste}
               />
             </Form.Item>
             <Form.Item
@@ -443,6 +447,7 @@ const SubscriptionModal = ({
                 placeholder={intl.get(
                   '请输入脚本依赖文件关键词，多个关键词竖线分割',
                 )}
+                onPaste={onNamePaste}
               />
             </Form.Item>
             <Form.Item
@@ -452,7 +457,10 @@ const SubscriptionModal = ({
                 '仓库需要拉取的文件后缀，多个后缀空格分隔，默认使用配置文件中的RepoFileExtensions',
               )}
             >
-              <Input placeholder={intl.get('请输入文件后缀')} />
+              <Input
+                onPaste={onNamePaste}
+                placeholder={intl.get('请输入文件后缀')}
+              />
             </Form.Item>
             <Form.Item
               name="sub_before"
@@ -462,6 +470,7 @@ const SubscriptionModal = ({
               )}
             >
               <Input.TextArea
+                onPaste={onNamePaste}
                 rows={4}
                 autoSize={true}
                 placeholder={intl.get('请输入运行订阅前要执行的命令')}
@@ -475,6 +484,7 @@ const SubscriptionModal = ({
               )}
             >
               <Input.TextArea
+                onPaste={onNamePaste}
                 rows={4}
                 autoSize={true}
                 placeholder={intl.get('请输入运行订阅后要执行的命令')}
@@ -490,6 +500,7 @@ const SubscriptionModal = ({
           )}
         >
           <Input
+            onPaste={onNamePaste}
             placeholder={
               type === 'private-repo'
                 ? 'SOCK5代理，例如 IP:PORT'
