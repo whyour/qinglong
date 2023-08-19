@@ -116,7 +116,6 @@ const SubscriptionLogModal = ({
             isPhone
               ? {
                   fontFamily: 'Source Code Pro',
-                  width: 375,
                   zoom: 0.83,
                 }
               : {}
