@@ -277,7 +277,7 @@ export default class DependenceService {
             depInfo &&
             ((isNodeDependence && depInfo.split(' ')?.[0] === depName) ||
               (isLinuxDependence &&
-                depInfo.toLocaleLowerCase().includes('installed')) ||
+                depInfo.toLocaleLowerCase().includes('apt-manual-installed')) ||
               isPythonDependence) &&
             (!depVersion || depInfo.includes(depVersion))
           ) {
