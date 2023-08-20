@@ -21,11 +21,14 @@ import {
   parseContentVersion,
   parseVersion,
   promiseExec,
+  readDirs,
 } from '../config/util';
 import { TASK_COMMAND } from '../config/const';
 import taskLimit from '../shared/pLimit';
 import tar from 'tar';
 import path from 'path';
+import fs from 'fs';
+import { sum } from 'lodash';
 
 @Service()
 export default class SystemService {
@@ -274,5 +277,30 @@ export default class SystemService {
     } catch (error: any) {
       return { code: 400, message: error.message };
     }
+  }
+
+  public async getSystemLog(res: Response) {
+    const result = readDirs(config.systemLogPath, config.systemLogPath);
+    const logs = result.reverse().filter((x) => x.title.endsWith('.log'));
+    res.set({
+      'Content-Length': sum(logs.map((x) => x.size)),
+    });
+    (function sendFiles(res, fileNames) {
+      if (fileNames.length === 0) {
+        res.end();
+        return;
+      }
+
+      const currentLog = fileNames.shift();
+      if (currentLog) {
+        const currentFileStream = fs.createReadStream(
+          path.join(config.systemLogPath, currentLog.title),
+        );
+        currentFileStream.on('end', () => {
+          sendFiles(res, fileNames);
+        });
+        currentFileStream.pipe(res, { end: false });
+      }
+    })(res, logs);
   }
 }

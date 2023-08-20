@@ -122,9 +122,10 @@ export default async () => {
       });
     }
 
+    console.log('✌️ DB loaded');
     Logger.info('✌️ DB loaded');
   } catch (error) {
-    Logger.info('✌️ DB load failed');
+    console.error('✌️ DB load failed');
     Logger.error(error);
   }
 };

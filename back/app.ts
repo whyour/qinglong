@@ -18,10 +18,12 @@ async function startServer() {
   const server = app
     .listen(config.port, () => {
       Logger.debug(`✌️ 后端服务启动成功！`);
+      console.debug(`✌️ 后端服务启动成功！`);
       process.send?.('ready');
     })
     .on('error', (err) => {
       Logger.error(err);
+      console.error(err);
       process.exit(1);
     });
 

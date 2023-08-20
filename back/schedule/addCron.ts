@@ -22,11 +22,18 @@ const addCron = (
       cmdStr = `${TASK_PREFIX}${cmdStr}`;
     }
 
+    Logger.info(
+      '[schedule][创建定时任务], 任务ID: %s, cron: %s, 执行命令: %s',
+      id,
+      schedule,
+      command,
+    );
+
     scheduleStacks.set(
       id,
       nodeSchedule.scheduleJob(id, schedule, async () => {
         Logger.info(
-          `当前时间: ${dayjs().format(
+          `[schedule] 时间: ${dayjs().format(
             'YYYY-MM-DD HH:mm:ss',
           )}，运行命令: ${cmdStr}`,
         );

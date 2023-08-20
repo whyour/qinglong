@@ -448,5 +448,7 @@
   "编辑订阅": "Edit Subscription",
   "Subscription表达式格式有误": "Incorrect Subscription Expression Format",
   "一对多推送的“群组编码”（一对多推送下面->您的群组(如无则新建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）": "The 'Group Code' for One-to-Many Push (Below One-to-Many Push->Your Group (if not, create one)->Group Code, if you are the creator of the group, you also need to click 'View QR Code' to scan and bind, otherwise you cannot receive group messages)",
-  "登录已过期，请重新登录": "Login session has expired, please log in again"
+  "登录已过期，请重新登录": "Login session has expired, please log in again",
+  "系统日志": "System Logs",
+  "主题": "Theme"
 }

@@ -16,7 +16,7 @@ import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
 import styles from './index.module.less';
-import { Controlled as CodeMirror } from 'react-codemirror2';
+import CodeMirror from '@uiw/react-codemirror';
 import SplitPane from 'react-split-pane';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
@@ -278,17 +278,11 @@ const Log = () => {
         {isPhone && (
           <CodeMirror
             value={value}
-            options={{
-              lineNumbers: true,
-              lineWrapping: true,
-              styleActiveLine: true,
-              matchBrackets: true,
-              readOnly: true,
-            }}
-            onBeforeChange={(editor, data, value) => {
+            readOnly={true}
+            theme={theme.includes('dark') ? 'dark' : 'light'}
+            onChange={(value, viewUpdate) => {
               setValue(value);
             }}
-            onChange={(editor, data, value) => {}}
           />
         )}
       </div>

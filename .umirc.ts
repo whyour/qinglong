@@ -4,6 +4,7 @@ const CompressionPlugin = require('compression-webpack-plugin');
 const baseUrl = process.env.QlBaseUrl || '/';
 export default defineConfig({
   hash: true,
+  jsMinifier: 'terser',
   antd: {},
   locale: {
     antd: true,

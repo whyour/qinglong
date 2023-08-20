@@ -20,7 +20,7 @@ import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
 import styles from './index.module.less';
 import EditModal from './editModal';
-import { Controlled as CodeMirror } from 'react-codemirror2';
+import CodeMirror from '@uiw/react-codemirror';
 import SplitPane from 'react-split-pane';
 import {
   DeleteOutlined,
@@ -43,6 +43,7 @@ import useFilterTreeData from '@/hooks/useFilterTreeData';
 import uniq from 'lodash/uniq';
 import IconFont from '@/components/iconfont';
 import RenameModal from './renameModal';
+import { langs } from '@uiw/codemirror-extensions-langs';
 
 const { Text } = Typography;
 
@@ -580,18 +581,14 @@ const Script = () => {
         {isPhone && (
           <CodeMirror
             value={value}
-            options={{
-              lineNumbers: true,
-              lineWrapping: true,
-              styleActiveLine: true,
-              matchBrackets: true,
-              mode,
-              readOnly: !isEditing,
-            }}
-            onBeforeChange={(editor, data, value) => {
+            extensions={
+              mode ? [langs[mode as keyof typeof langs]()] : undefined
+            }
+            theme={theme.includes('dark') ? 'dark' : 'light'}
+            readOnly={!isEditing}
+            onChange={(value) => {
               setValue(value);
             }}
-            onChange={(editor, data, value) => {}}
           />
         )}
         <EditModal

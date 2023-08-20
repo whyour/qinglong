@@ -1,5 +1,5 @@
 import intl from 'react-intl-universal';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Button,
   InputNumber,
@@ -32,6 +32,7 @@ import About from './about';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import './index.less';
+import CodeMirror from '@uiw/react-codemirror';
 
 const { Text } = Typography;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
@@ -41,6 +42,7 @@ const Setting = () => {
     headerStyle,
     isPhone,
     user,
+    theme,
     reloadUser,
     reloadTheme,
     socketMessage,
@@ -113,7 +115,9 @@ const Setting = () => {
   const [editedApp, setEditedApp] = useState<any>();
   const [tabActiveKey, setTabActiveKey] = useState('security');
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
+  const [systemLogData, setSystemLogData] = useState<string>('');
   const [notificationInfo, setNotificationInfo] = useState<any>();
+  const systemLogRef = useRef<any>();
 
   const getApps = () => {
     setLoading(true);
@@ -232,6 +236,19 @@ const Setting = () => {
       });
   };
 
+  const getSystemLog = () => {
+    request
+      .get<Blob>(`${config.apiPrefix}system/log`, {
+        responseType: 'blob',
+      })
+      .then(async (res) => {
+        setSystemLogData(await res.text());
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
+  };
+
   const tabChange = (activeKey: string) => {
     setTabActiveKey(activeKey);
     if (activeKey === 'app') {
@@ -240,6 +257,8 @@ const Setting = () => {
       getLoginLog();
     } else if (activeKey === 'notification') {
       getNotification();
+    } else if (activeKey === 'syslog') {
+      getSystemLog();
     }
   };
 
@@ -329,6 +348,30 @@ const Setting = () => {
                 reloadTheme={reloadTheme}
                 socketMessage={socketMessage}
                 systemInfo={systemInfo}
+              />
+            ),
+          },
+          {
+            key: 'syslog',
+            label: intl.get('系统日志'),
+            children: (
+              <CodeMirror
+                ref={systemLogRef}
+                maxHeight={`calc(100vh - ${
+                  systemLogRef.current?.editor?.getBoundingClientRect()?.top +
+                  16
+                }px)`}
+                value={systemLogData}
+                onCreateEditor={(view) => {
+                  setTimeout(() => {
+                    view.scrollDOM.scrollTo({
+                      top: view.scrollDOM.scrollHeight,
+                      behavior: 'smooth',
+                    });
+                  }, 300);
+                }}
+                readOnly={true}
+                theme={theme.includes('dark') ? 'dark' : 'light'}
               />
             ),
           },

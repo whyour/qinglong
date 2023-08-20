@@ -249,4 +249,17 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.get(
+    '/log',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        await systemService.getSystemLog(res);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
 };

@@ -15,6 +15,7 @@ import { EnvModel } from '../data/env';
 import { errors } from 'celebrate';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { serveEnv } from '../config/serverEnv';
+import Logger from './logger';
 
 export default ({ app }: { app: Application }) => {
   app.enable('trust proxy');
@@ -28,6 +29,7 @@ export default ({ app }: { app: Application }) => {
       target: `http://localhost:${config.publicPort}/api`,
       changeOrigin: true,
       pathRewrite: { '/api/public': '' },
+      logProvider: () => Logger
     }),
   );
 

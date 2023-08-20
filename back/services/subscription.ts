@@ -301,7 +301,7 @@ export default class SubscriptionService {
         try {
           await killTask(doc.pid);
         } catch (error) {
-          this.logger.silly(error);
+          this.logger.error(error);
         }
       }
       const absolutePath = await handleLogPath(doc.log_path as string);

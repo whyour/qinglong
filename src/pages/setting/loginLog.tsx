@@ -19,7 +19,7 @@ enum LoginStatusColor {
 const columns = [
   {
     title: intl.get('序号'),
-    width: 40,
+    width: 50,
     render: (text: string, record: any, index: number) => {
       return index + 1;
     },
@@ -75,7 +75,7 @@ const LoginLog = ({ data }: any) => {
         dataSource={data}
         rowKey="id"
         size="middle"
-        scroll={{ x: 768 }}
+        scroll={{ x: 1000 }}
         sticky
       />
     </>

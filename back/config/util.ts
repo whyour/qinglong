@@ -307,22 +307,28 @@ interface IFile {
   type: 'directory' | 'file';
   parent: string;
   mtime: number;
+  size?: number;
   children?: IFile[];
 }
 
-export function dirSort(a: IFile, b: IFile) {
-  if (a.type !== b.type) return FileType[a.type] < FileType[b.type] ? -1 : 1;
-  else if (a.mtime !== b.mtime) return a.mtime > b.mtime ? -1 : 1;
+export function dirSort(a: IFile, b: IFile): number {
+  if (a.type !== b.type) {
+    return FileType[a.type] < FileType[b.type] ? -1 : 1
+  }else if (a.mtime !== b.mtime) {
+    return a.mtime > b.mtime ? -1 : 1
+  } else {
+    return 0;
+  }
 }
 
 export function readDirs(
   dir: string,
   baseDir: string = '',
   blacklist: string[] = [],
-) {
+): IFile[] {
   const relativePath = path.relative(baseDir, dir);
   const files = fs.readdirSync(dir);
-  const result: any = files
+  const result: IFile[] = files
     .filter((x) => !blacklist.includes(x))
     .map((file: string) => {
       const subPath = path.join(dir, file);
@@ -344,6 +350,7 @@ export function readDirs(
         isLeaf: true,
         key,
         parent: relativePath,
+        size: stats.size,
         mtime: stats.mtime.getTime(),
       };
     });

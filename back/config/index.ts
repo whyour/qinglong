@@ -30,6 +30,7 @@ const logPath = path.join(dataPath, 'log/');
 const dbPath = path.join(dataPath, 'db/');
 const uploadPath = path.join(dataPath, 'upload/');
 const sshdPath = path.join(dataPath, 'ssh.d/');
+const systemLogPath = path.join(dataPath, 'syslog/');
 
 const envFile = path.join(configPath, 'env.sh');
 const confFile = path.join(configPath, 'config.sh');
@@ -110,4 +111,5 @@ export default {
   lastVersionFile,
   sqliteFile,
   sshdPath,
+  systemLogPath,
 };

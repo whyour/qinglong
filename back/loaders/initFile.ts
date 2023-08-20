@@ -28,6 +28,7 @@ const TaskAfterFile = path.join(configPath, 'task_after.sh');
 const homedir = os.homedir();
 const sshPath = path.resolve(homedir, '.ssh');
 const sshdPath = path.join(dataPath, 'ssh.d');
+const systemLogPath = path.join(dataPath, 'syslog');
 
 export default async () => {
   const authFileExist = await fileExist(authConfigFile);
@@ -39,6 +40,7 @@ export default async () => {
   const sshDirExist = await fileExist(sshPath);
   const bakDirExist = await fileExist(bakPath);
   const sshdDirExist = await fileExist(sshdPath);
+  const systemLogDirExist = await fileExist(systemLogPath);
   const tmpDirExist = await fileExist(tmpPath);
   const scriptNotifyJsFileExist = await fileExist(scriptNotifyJsFile);
   const scriptNotifyPyFileExist = await fileExist(scriptNotifyPyFile);
@@ -77,6 +79,10 @@ export default async () => {
     fs.mkdirSync(sshdPath);
   }
 
+  if (!systemLogDirExist) {
+    fs.mkdirSync(systemLogPath);
+  }
+
   // 初始化文件
   if (!authFileExist) {
     fs.writeFileSync(authConfigFile, fs.readFileSync(sampleAuthFile));
@@ -105,4 +111,5 @@ export default async () => {
   dotenv.config({ path: confFile });
 
   Logger.info('✌️ Init file down');
+  console.log('✌️ Init file down');
 };

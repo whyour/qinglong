@@ -29,4 +29,5 @@ export default async ({ expressApp }: { expressApp: Application }) => {
   expressApp.use(Sentry.Handlers.tracingHandler());
 
   Logger.info('✌️ Sentry loaded');
+  console.log('✌️ Sentry loaded');
 };

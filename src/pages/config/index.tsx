@@ -11,9 +11,10 @@ import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
 import Editor from '@monaco-editor/react';
-import { Controlled as CodeMirror } from 'react-codemirror2';
+import CodeMirror from '@uiw/react-codemirror';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
+import { langs } from '@uiw/codemirror-extensions-langs';
 
 const Config = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
@@ -104,16 +105,11 @@ const Config = () => {
       {isPhone ? (
         <CodeMirror
           value={value}
-          options={{
-            lineNumbers: true,
-            styleActiveLine: true,
-            matchBrackets: true,
-            mode: 'shell',
-          }}
-          onBeforeChange={(editor, data, value) => {
+          theme={theme.includes('dark') ? 'dark' : 'light'}
+          extensions={[langs.shell()]}
+          onChange={(value) => {
             setValue(value);
           }}
-          onChange={(editor, data, value) => {}}
         />
       ) : (
         <Editor

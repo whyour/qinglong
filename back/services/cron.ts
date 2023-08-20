@@ -370,7 +370,7 @@ export default class CronService {
         try {
           await killTask(doc.pid);
         } catch (error) {
-          this.logger.silly(error);
+          this.logger.error(error);
         }
       }
     }
@@ -530,7 +530,6 @@ export default class CronService {
       }
     });
 
-    this.logger.silly(crontab_string);
     fs.writeFileSync(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);

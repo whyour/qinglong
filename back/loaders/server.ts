@@ -10,9 +10,11 @@ export default async ({ server }: { server: Server }) => {
 
   process.on('SIGINT', (singal) => {
     Logger.warn(`Server need close, singal ${singal}`);
+    console.warn(`Server need close, singal ${singal}`);
     exitTime++;
     if (exitTime >= 3) {
       Logger.warn('Forcing server close');
+      console.warn('Forcing server close');
       clearTimeout(timer);
       process.exit(1);
     }
@@ -28,11 +30,13 @@ export default async ({ server }: { server: Server }) => {
 
   process.on('uncaughtException', (error) => {
     Logger.error('Uncaught exception:', error);
+    console.error('Uncaught exception:', error);
     process.exit(1);
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    Logger.error('Unhandled rejection:', reason);
+    Logger.error('Unhandled rejection:', reason, promise);
+    console.error('Unhandled rejection:', reason, promise);
     process.exit(1);
   });
 };
