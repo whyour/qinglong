@@ -400,7 +400,7 @@ const Dependence = () => {
     const { type, message, references } = socketMessage;
     if (
       type === 'installDependence' &&
-      message.includes(intl.get('开始时间')) &&
+      message.includes('开始时间') &&
       references.length > 0
     ) {
       const result = [...value];
@@ -409,7 +409,7 @@ const Dependence = () => {
         if (index !== -1) {
           result.splice(index, 1, {
             ...value[index],
-            status: message.includes(intl.get('安装')) ? Status.安装中 : Status.删除中,
+            status: message.includes('安装') ? Status.安装中 : Status.删除中,
           });
         }
       }
@@ -417,14 +417,14 @@ const Dependence = () => {
     }
     if (
       type === 'installDependence' &&
-      message.includes(intl.get('结束时间')) &&
+      message.includes('结束时间') &&
       references.length > 0
     ) {
       let status;
-      if (message.includes(intl.get('安装'))) {
-        status = message.includes(intl.get('成功')) ? Status.已安装 : Status.安装失败;
+      if (message.includes('安装')) {
+        status = message.includes('成功') ? Status.已安装 : Status.安装失败;
       } else {
-        status = message.includes(intl.get('成功')) ? Status.已删除 : Status.删除失败;
+        status = message.includes('成功') ? Status.已删除 : Status.删除失败;
       }
       const result = [...value];
       for (let i = 0; i < references.length; i++) {
