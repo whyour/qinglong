@@ -185,7 +185,7 @@ const Initialization = () => {
               style={{ maxWidth: 400 }}
             >
               <Input.TextArea
-                autoSize={true}
+                autoSize={{ minRows: 1, maxRows: 5 }}
                 placeholder={`请输入${x.label}`}
               />
             </Form.Item>

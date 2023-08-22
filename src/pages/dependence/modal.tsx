@@ -130,7 +130,7 @@ const DependenceModal = ({
         >
           <Input.TextArea
             rows={4}
-            autoSize={true}
+            autoSize={{ minRows: 1, maxRows: 5 }}
             placeholder={intl.get('请输入依赖名称')}
           />
         </Form.Item>

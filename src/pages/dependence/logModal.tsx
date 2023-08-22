@@ -56,8 +56,8 @@ const DependenceLogModal = ({
         ) {
           const log = (data.log || []).join('') as string;
           setValue(log);
-          setExecuting(!log.includes(intl.get('结束时间')));
-          setIsRemoveFailed(log.includes(intl.get('删除失败')));
+          setExecuting(!log.includes('结束时间'));
+          setIsRemoveFailed(log.includes('删除失败'));
         }
       })
       .finally(() => {

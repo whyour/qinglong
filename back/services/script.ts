@@ -53,10 +53,9 @@ export default class ScriptService {
   }
 
   public async stopScript(filePath: string, pid: number) {
-    let str = '';
     if (!pid) {
       const relativePath = path.relative(config.scriptPath, filePath);
-      pid = await getPid(`${TASK_COMMAND} -l ${relativePath} now`);
+      pid = await getPid(`${TASK_COMMAND} -l ${relativePath} now`) as number;
     }
     try {
       await killTask(pid);

@@ -83,7 +83,7 @@ const CronModal = ({
         >
           <Input.TextArea
             rows={4}
-            autoSize={true}
+            autoSize={{ minRows: 1, maxRows: 5 }}
             placeholder={intl.get(
               '支持输入脚本路径/任意系统可执行命令/task 脚本路径',
             )}

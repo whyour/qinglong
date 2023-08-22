@@ -326,8 +326,7 @@ const SubscriptionModal = ({
           ]}
         >
           <Input.TextArea
-            rows={4}
-            autoSize={true}
+            autoSize={{ minRows: 1, maxRows: 5 }}
             placeholder={intl.get('请输入订阅链接')}
             onPaste={onNamePaste}
             onChange={onUrlChange}
@@ -415,7 +414,7 @@ const SubscriptionModal = ({
             >
               <Input.TextArea
                 rows={4}
-                autoSize={true}
+                autoSize={{ minRows: 1, maxRows: 5 }}
                 placeholder={intl.get(
                   '请输入脚本筛选白名单关键词，多个关键词竖线分割',
                 )}
@@ -429,7 +428,7 @@ const SubscriptionModal = ({
             >
               <Input.TextArea
                 rows={4}
-                autoSize={true}
+                autoSize={{ minRows: 1, maxRows: 5 }}
                 placeholder={intl.get(
                   '请输入脚本筛选黑名单关键词，多个关键词竖线分割',
                 )}
@@ -443,7 +442,7 @@ const SubscriptionModal = ({
             >
               <Input.TextArea
                 rows={4}
-                autoSize={true}
+                autoSize={{ minRows: 1, maxRows: 5 }}
                 placeholder={intl.get(
                   '请输入脚本依赖文件关键词，多个关键词竖线分割',
                 )}
@@ -472,7 +471,7 @@ const SubscriptionModal = ({
               <Input.TextArea
                 onPaste={onNamePaste}
                 rows={4}
-                autoSize={true}
+                autoSize={{ minRows: 1, maxRows: 5 }}
                 placeholder={intl.get('请输入运行订阅前要执行的命令')}
               />
             </Form.Item>
@@ -486,7 +485,7 @@ const SubscriptionModal = ({
               <Input.TextArea
                 onPaste={onNamePaste}
                 rows={4}
-                autoSize={true}
+                autoSize={{ minRows: 1, maxRows: 5 }}
                 placeholder={intl.get('请输入运行订阅后要执行的命令')}
               />
             </Form.Item>

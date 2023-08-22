@@ -265,9 +265,11 @@ export default (app: Router) => {
         let { filename, path, pid } = req.body;
         const { name, ext } = parse(filename);
         const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
+        const logPath = join(config.logPath, path, `${name}.swap`);
 
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.stopScript(filePath, pid);
+        emptyDir(logPath);
         res.send(result);
       } catch (e) {
         return next(e);

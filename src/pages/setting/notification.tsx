@@ -88,7 +88,7 @@ const NotificationSetting = ({ data }: any) => {
             ) : (
               <Input.TextArea
                 disabled={loading}
-                autoSize={true}
+                autoSize={{ minRows: 1, maxRows: 5 }}
                 placeholder={x.placeholder || `请输入${x.label}`}
               />
             )}

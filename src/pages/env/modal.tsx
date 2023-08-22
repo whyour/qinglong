@@ -1,4 +1,4 @@
-import intl from 'react-intl-universal'
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form, Radio } from 'antd';
 import { request } from '@/utils/http';
@@ -44,7 +44,9 @@ const EnvModal = ({
       );
 
       if (code === 200) {
-        message.success(env ? intl.get('更新变量成功') : intl.get('创建变量成功'));
+        message.success(
+          env ? intl.get('更新变量成功') : intl.get('创建变量成功'),
+        );
         handleCancel(data);
       }
       setLoading(false);
@@ -82,7 +84,11 @@ const EnvModal = ({
           name="name"
           label={intl.get('名称')}
           rules={[
-            { required: true, message: intl.get('请输入环境变量名称'), whitespace: true },
+            {
+              required: true,
+              message: intl.get('请输入环境变量名称'),
+              whitespace: true,
+            },
             {
               pattern: /^[a-zA-Z_][0-9a-zA-Z_]*$/,
               message: intl.get('只能输入字母数字下划线，且不能以数字开头'),
@@ -108,12 +114,15 @@ const EnvModal = ({
           name="value"
           label={intl.get('值')}
           rules={[
-            { required: true, message: intl.get('请输入环境变量值'), whitespace: true },
+            {
+              required: true,
+              message: intl.get('请输入环境变量值'),
+              whitespace: true,
+            },
           ]}
         >
           <Input.TextArea
-            rows={4}
-            autoSize={true}
+            autoSize={{ minRows: 1, maxRows: 8 }}
             placeholder={intl.get('请输入环境变量值')}
           />
         </Form.Item>
