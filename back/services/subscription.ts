@@ -304,14 +304,6 @@ export default class SubscriptionService {
           this.logger.error(error);
         }
       }
-      const absolutePath = await handleLogPath(doc.log_path as string);
-
-      fs.appendFileSync(
-        `${absolutePath}`,
-        `\n## 执行结束...  ${dayjs().format(
-          'YYYY-MM-DD HH:mm:ss',
-        )}${LOG_END_SYMBOL}`,
-      );
     }
 
     await SubscriptionModel.update(

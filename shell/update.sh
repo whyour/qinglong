@@ -31,7 +31,7 @@ output_list_add_drop() {
   local list=$1
   local type=$2
   if [[ -s $list ]]; then
-    echo -e "检测到有${type}的定时任务：\n"
+    echo -e "检测到有${type}的定时任务:"
     cat $list
     echo
   fi
@@ -134,10 +134,10 @@ update_repo() {
   git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "\n更新${repo_path}成功...\n"
+    echo -e "\n拉取 ${uniq_path} 成功...\n"
     diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
   else
-    echo -e "\n更新${repo_path}失败，请检查网络...\n"
+    echo -e "\n拉取 ${uniq_path} 失败，请检查网络...\n"
   fi
 }
 
