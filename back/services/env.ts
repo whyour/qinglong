@@ -204,9 +204,9 @@ export default class EnvService {
             .join('&')
             .replace(/(\\)[^n]/g, '\\\\')
             .replace(/(\\$)/, '\\\\')
-            .replace(/"/g, '\\"')
+            .replace(/'/g, "\\'")
             .trim();
-          env_string += `export ${key}="${value}"\n`;
+          env_string += `export ${key}='${value}'\n`;
         }
       }
     }
