@@ -39,6 +39,7 @@ RUN set -x && \
   tzdata \
   perl \
   openssl \
+  openssh-client \
   jq \
   procps \
   netcat \
