@@ -392,10 +392,10 @@ export default class CronService {
         }
 
         let { id, command, log_path } = cron;
-        const uniqPath = await getUniqPath(command);
+        const uniqPath = await getUniqPath(command, `${id}`);
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
-        if (!log_path?.includes(uniqPath)) {
+        if (log_path?.split('/')?.every(x => x !== uniqPath)) {
           fs.mkdirSync(logDirPath, { recursive: true });
         }
         const logPath = `${uniqPath}/${logTime}.log`;

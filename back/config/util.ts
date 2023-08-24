@@ -314,7 +314,7 @@ interface IFile {
 export function dirSort(a: IFile, b: IFile): number {
   if (a.type !== b.type) {
     return FileType[a.type] < FileType[b.type] ? -1 : 1
-  }else if (a.mtime !== b.mtime) {
+  } else if (a.mtime !== b.mtime) {
     return a.mtime > b.mtime ? -1 : 1
   } else {
     return 0;
@@ -529,11 +529,8 @@ export async function parseContentVersion(content: string): Promise<IVersion> {
   return load(content) as IVersion;
 }
 
-export async function getUniqPath(command: string): Promise<string> {
-  const idStr = `cat ${config.crontabFile} | grep -E "${command}" | perl -pe "s|.*ID=(.*) ${command}.*|\\1|" | head -1 | awk -F " " '{print $1}' | xargs echo -n`;
-  let id = await promiseExec(idStr);
-
-  if (/^\d\d*\d$/.test(id)) {
+export async function getUniqPath(command: string, id: string): Promise<string> {
+  if (/^\d+$/.test(id)) {
     id = `_${id}`;
   } else {
     id = '';

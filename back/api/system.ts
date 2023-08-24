@@ -174,7 +174,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const systemService = Container.get(SystemService);
-        const uniqPath = await getUniqPath(req.body.command);
+        const command = req.body.command
+        const idStr = `cat ${config.crontabFile} | grep -E "${command}" | perl -pe "s|.*ID=(.*) ${command}.*|\\1|" | head -1 | awk -F " " '{print $1}' | xargs echo -n`;
+        let id = await promiseExec(idStr);
+        const uniqPath = await getUniqPath(command, id);
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logPath = `${uniqPath}/${logTime}.log`;
         res.setHeader('Content-type', 'application/octet-stream');

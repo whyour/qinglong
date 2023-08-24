@@ -71,50 +71,22 @@ const Crontab = () => {
       fixed: 'left',
       width: 120,
       render: (text: string, record: any) => (
-        <>
+        <Paragraph
+          style={{
+            wordBreak: 'break-all',
+            marginBottom: 0,
+          }}
+          ellipsis={{ tooltip: text, rows: 2 }}
+        >
           <a
             onClick={() => {
               setDetailCron(record);
               setIsDetailModalVisible(true);
             }}
           >
-            {record.labels?.length > 0 && record.labels[0] !== '' && false ? (
-              <Popover
-                placement="right"
-                trigger={isPhone ? 'click' : 'hover'}
-                content={
-                  <div>
-                    {record.labels?.map((label: string) => (
-                      <Tag
-                        color="blue"
-                        key={label}
-                        style={{ cursor: 'point' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSearchValue(`label:${label}`);
-                          setSearchText(`label:${label}`);
-                        }}
-                      >
-                        <a>{label}</a>
-                      </Tag>
-                    ))}
-                  </div>
-                }
-              >
-                {record.name || '-'}
-              </Popover>
-            ) : (
-              record.name || '-'
-            )}
-            {record.isPinned ? (
-              <span>
-                <PushpinOutlined />
-              </span>
-            ) : (
-              ''
-            )}
+            {record.name || '-'}
           </a>
-        </>
+        </Paragraph>
       ),
       sorter: {
         compare: (a, b) => a?.name?.localeCompare(b?.name),
