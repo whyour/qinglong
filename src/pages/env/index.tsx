@@ -91,11 +91,7 @@ const Env = () => {
       render: (text: string, record: any) => {
         return (
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Tooltip
-              title={text}
-              placement="topLeft"
-              overlayInnerStyle={{ maxHeight: 400, overflowY: 'auto' }}
-            >
+            <Tooltip title={text} placement="topLeft">
               <div className="text-ellipsis">{text}</div>
             </Tooltip>
             <Copy text={text} />

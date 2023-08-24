@@ -69,7 +69,7 @@ const Crontab = () => {
       dataIndex: 'name',
       key: 'name',
       fixed: 'left',
-      width: 140,
+      width: 120,
       render: (text: string, record: any) => (
         <>
           <a
@@ -124,7 +124,7 @@ const Crontab = () => {
       title: intl.get('命令/脚本'),
       dataIndex: 'command',
       key: 'command',
-      width: 220,
+      width: 240,
       render: (text, record) => {
         return (
           <Paragraph

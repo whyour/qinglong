@@ -5,7 +5,7 @@ import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import { exec, execSync } from 'child_process';
 import fs from 'fs';
 import cron_parser from 'cron-parser';
-import { getFileContentByName, fileExist, killTask } from '../config/util';
+import { getFileContentByName, fileExist, killTask, getUniqPath } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { Op, where, col as colFn, FindOptions, fn } from 'sequelize';
 import path from 'path';
@@ -13,10 +13,11 @@ import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 import cronClient from '../schedule/client';
 import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
+import dayjs from 'dayjs';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isSixCron(cron: Crontab) {
     const { schedule } = cron;
@@ -391,8 +392,14 @@ export default class CronService {
         }
 
         let { id, command, log_path } = cron;
-        const absolutePath = path.resolve(config.logPath, `${log_path}`);
-        const logFileExist = log_path && (await fileExist(absolutePath));
+        const uniqPath = await getUniqPath(command);
+        const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
+        const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
+        if (!log_path?.includes(uniqPath)) {
+          fs.mkdirSync(logDirPath, { recursive: true });
+        }
+        const logPath = `${uniqPath}/${logTime}.log`;
+        const absolutePath = path.resolve(config.logPath, `${logPath}`);
 
         this.logger.silly('Running job');
         this.logger.silly('ID: ' + id);
@@ -412,21 +419,17 @@ export default class CronService {
           cmdStr = `${cmdStr} now`;
         }
 
-        const cp = spawn(`ID=${id} ${cmdStr}`, { shell: '/bin/bash' });
+        const cp = spawn(`real_log_path=${logPath} ID=${id} ${cmdStr}`, { shell: '/bin/bash' });
 
         await CrontabModel.update(
-          { status: CrontabStatus.running, pid: cp.pid },
+          { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
           { where: { id } },
         );
         cp.stderr.on('data', (data) => {
-          if (logFileExist) {
-            fs.appendFileSync(`${absolutePath}`, `${data.toString()}`);
-          }
+          fs.appendFileSync(`${absolutePath}`, `${data.toString()}`);
         });
         cp.on('error', (err) => {
-          if (logFileExist) {
-            fs.appendFileSync(`${absolutePath}`, `${JSON.stringify(err)}`);
-          }
+          fs.appendFileSync(`${absolutePath}`, `${JSON.stringify(err)}`);
         });
 
         cp.on('exit', async (code, signal) => {
