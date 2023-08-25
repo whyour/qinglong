@@ -456,7 +456,7 @@ class WeCom:
         return respone["errmsg"]
 
     def send_mpnews(self, title, message, media_id, touser="@all"):
-        send_url = f"https://{self.ORIGIN}/cgi-bin/message/send?access_token={self.get_access_token()}"
+        send_url = f"{self.ORIGIN}/cgi-bin/message/send?access_token={self.get_access_token()}"
         send_values = {
             "touser": touser,
             "msgtype": "mpnews",
