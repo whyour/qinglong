@@ -33,7 +33,7 @@ const addCron = (
       id,
       nodeSchedule.scheduleJob(id, schedule, async () => {
         Logger.info(
-          `[schedule] 时间: ${dayjs().format(
+          `[schedule][准备运行任务] 时间: ${dayjs().format(
             'YYYY-MM-DD HH:mm:ss',
           )}，运行命令: ${cmdStr}`,
         );
