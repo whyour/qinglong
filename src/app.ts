@@ -1,4 +1,5 @@
 const baseUrl = window.__ENV__QlBaseUrl || '/';
+import { setLocale } from '@umijs/max';
 import intl from 'react-intl-universal';
 
 export function rootContainer(container: any) {
@@ -9,6 +10,7 @@ export function rootContainer(container: any) {
   let currentLocale = intl.determineLocale({
     urlLocaleKey: 'lang',
     cookieLocaleKey: 'lang',
+    localStorageLocaleKey: 'lang',
   }).slice(0, 2);
 
   if (!currentLocale || !Object.keys(locales).includes(currentLocale)) {
@@ -16,6 +18,7 @@ export function rootContainer(container: any) {
   }
 
   intl.init({ currentLocale, locales });
+  setLocale(currentLocale === 'zh' ? 'zh-CN' : 'en-US');
   return container;
 }
 

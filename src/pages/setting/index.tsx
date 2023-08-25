@@ -243,6 +243,9 @@ const Setting = () => {
       })
       .then(async (res) => {
         setSystemLogData(await res.text());
+        setTimeout(() => {
+          getSystemLog();
+        }, 5000);
       })
       .catch((error: any) => {
         console.log(error);
@@ -336,22 +339,6 @@ const Setting = () => {
             children: <NotificationSetting data={notificationInfo} />,
           },
           {
-            key: 'login',
-            label: intl.get('登录日志'),
-            children: <LoginLog data={loginLogData} />,
-          },
-          {
-            key: 'other',
-            label: intl.get('其他设置'),
-            children: (
-              <Other
-                reloadTheme={reloadTheme}
-                socketMessage={socketMessage}
-                systemInfo={systemInfo}
-              />
-            ),
-          },
-          {
             key: 'syslog',
             label: intl.get('系统日志'),
             children: (
@@ -372,6 +359,22 @@ const Setting = () => {
                 }}
                 readOnly={true}
                 theme={theme.includes('dark') ? 'dark' : 'light'}
+              />
+            ),
+          },
+          {
+            key: 'login',
+            label: intl.get('登录日志'),
+            children: <LoginLog data={loginLogData} />,
+          },
+          {
+            key: 'other',
+            label: intl.get('其他设置'),
+            children: (
+              <Other
+                reloadTheme={reloadTheme}
+                socketMessage={socketMessage}
+                systemInfo={systemInfo}
               />
             ),
           },
