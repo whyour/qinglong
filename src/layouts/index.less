@@ -39,8 +39,16 @@ body {
   .ant-modal-body {
     overflow-y: auto;
     min-height: 300px;
-    max-height: 80vh;
-    max-height: calc(80vh - var(--vh-offset, 0px));
+    max-height: calc(80vh - 110px);
+    max-height: calc(80vh - var(--vh-offset, 110px));
+    padding: 0;
+    display: flex;
+
+    .log-container {
+      width: 100%;
+      padding: 24px;
+      overflow-y: auto;
+    }
   }
 
   pre {

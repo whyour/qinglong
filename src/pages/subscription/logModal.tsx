@@ -108,22 +108,24 @@ const SubscriptionLogModal = ({
         </Button>,
       ]}
     >
-      {loading ? (
-        <PageLoading />
-      ) : (
-        <pre
-          style={
-            isPhone
-              ? {
-                  fontFamily: 'Source Code Pro',
-                  zoom: 0.83,
-                }
-              : {}
-          }
-        >
-          {value}
-        </pre>
-      )}
+      <div className="log-container">
+        {loading ? (
+          <PageLoading />
+        ) : (
+          <pre
+            style={
+              isPhone
+                ? {
+                    fontFamily: 'Source Code Pro',
+                    zoom: 0.83,
+                  }
+                : {}
+            }
+          >
+            {value}
+          </pre>
+        )}
+      </div>
     </Modal>
   );
 };

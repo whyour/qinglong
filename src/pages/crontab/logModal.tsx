@@ -50,8 +50,8 @@ const CronLogModal = ({
             log && !logEnded(log) && !log.includes('任务未运行'),
           );
           setExecuting(hasNext);
-          autoScroll();
           if (hasNext) {
+            autoScroll();
             setTimeout(() => {
               getCronLog();
             }, 2000);
@@ -74,7 +74,7 @@ const CronLogModal = ({
       document
         .querySelector('#log-flag')!
         .scrollIntoView({ behavior: 'smooth' });
-    }, 1000);
+    }, 600);
   };
 
   const cancel = () => {
