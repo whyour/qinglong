@@ -33,6 +33,7 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import './index.less';
 import CodeMirror from '@uiw/react-codemirror';
+import useResizeObserver from '@react-hook/resize-observer';
 
 const { Text } = Typography;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
@@ -117,7 +118,15 @@ const Setting = () => {
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
   const [systemLogData, setSystemLogData] = useState<string>('');
   const [notificationInfo, setNotificationInfo] = useState<any>();
-  const systemLogRef = useRef<any>();
+  const containergRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number>(0);
+
+  useResizeObserver(containergRef, (entry) => {
+    const _height = entry.target.parentElement?.parentElement?.offsetHeight;
+    if (_height && height !== _height - 66) {
+      setHeight(_height - 66);
+    }
+  });
 
   const getApps = () => {
     setLoading(true);
@@ -301,90 +310,88 @@ const Setting = () => {
           : []
       }
     >
-      <Tabs
-        defaultActiveKey="security"
-        size="small"
-        tabPosition="top"
-        onChange={tabChange}
-        items={[
-          ...(!isDemoEnv
-            ? [
-                {
-                  key: 'security',
-                  label: intl.get('安全设置'),
-                  children: (
-                    <SecuritySettings user={user} userChange={reloadUser} />
-                  ),
-                },
-              ]
-            : []),
-          {
-            key: 'app',
-            label: intl.get('应用设置'),
-            children: (
-              <Table
-                columns={columns}
-                pagination={false}
-                dataSource={dataSource}
-                rowKey="id"
-                size="middle"
-                scroll={{ x: 768 }}
-                loading={loading}
-              />
-            ),
-          },
-          {
-            key: 'notification',
-            label: intl.get('通知设置'),
-            children: <NotificationSetting data={notificationInfo} />,
-          },
-          {
-            key: 'syslog',
-            label: intl.get('系统日志'),
-            children: (
-              <CodeMirror
-                ref={systemLogRef}
-                maxHeight={`calc(100vh - ${
-                  systemLogRef.current?.editor?.getBoundingClientRect()?.top +
-                  16
-                }px)`}
-                value={systemLogData}
-                onCreateEditor={(view) => {
-                  setTimeout(() => {
-                    view.scrollDOM.scrollTo({
-                      top: view.scrollDOM.scrollHeight,
-                      behavior: 'smooth',
-                    });
-                  }, 300);
-                }}
-                readOnly={true}
-                theme={theme.includes('dark') ? 'dark' : 'light'}
-              />
-            ),
-          },
-          {
-            key: 'login',
-            label: intl.get('登录日志'),
-            children: <LoginLog data={loginLogData} />,
-          },
-          {
-            key: 'other',
-            label: intl.get('其他设置'),
-            children: (
-              <Other
-                reloadTheme={reloadTheme}
-                socketMessage={socketMessage}
-                systemInfo={systemInfo}
-              />
-            ),
-          },
-          {
-            key: 'about',
-            label: intl.get('关于'),
-            children: <About systemInfo={systemInfo} />,
-          },
-        ]}
-      ></Tabs>
+      <div ref={containergRef}>
+        <Tabs
+          defaultActiveKey="security"
+          size="small"
+          tabPosition="top"
+          onChange={tabChange}
+          items={[
+            ...(!isDemoEnv
+              ? [
+                  {
+                    key: 'security',
+                    label: intl.get('安全设置'),
+                    children: (
+                      <SecuritySettings user={user} userChange={reloadUser} />
+                    ),
+                  },
+                ]
+              : []),
+            {
+              key: 'app',
+              label: intl.get('应用设置'),
+              children: (
+                <Table
+                  columns={columns}
+                  pagination={false}
+                  dataSource={dataSource}
+                  rowKey="id"
+                  size="middle"
+                  scroll={{ x: 768 }}
+                  loading={loading}
+                />
+              ),
+            },
+            {
+              key: 'notification',
+              label: intl.get('通知设置'),
+              children: <NotificationSetting data={notificationInfo} />,
+            },
+            {
+              key: 'syslog',
+              label: intl.get('系统日志'),
+              children: (
+                <CodeMirror
+                  maxHeight={`${height}px`}
+                  value={systemLogData}
+                  onCreateEditor={(view) => {
+                    setTimeout(() => {
+                      view.scrollDOM.scrollTo({
+                        top: view.scrollDOM.scrollHeight,
+                        behavior: 'smooth',
+                      });
+                    }, 300);
+                  }}
+                  readOnly={true}
+                  theme={theme.includes('dark') ? 'dark' : 'light'}
+                />
+              ),
+            },
+            {
+              key: 'login',
+              label: intl.get('登录日志'),
+              children: <LoginLog data={loginLogData} />,
+            },
+            {
+              key: 'other',
+              label: intl.get('其他设置'),
+              children: (
+                <Other
+                  reloadTheme={reloadTheme}
+                  socketMessage={socketMessage}
+                  systemInfo={systemInfo}
+                />
+              ),
+            },
+            {
+              key: 'about',
+              label: intl.get('关于'),
+              children: <About systemInfo={systemInfo} />,
+            },
+          ]}
+        ></Tabs>
+      </div>
       <AppModal
         visible={isModalVisible}
         handleCancel={handleCancel}

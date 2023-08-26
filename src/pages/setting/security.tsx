@@ -188,7 +188,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
           hasFeedback
           style={{ maxWidth: 300 }}
         >
-          <Input placeholder={intl.get('用户名')} />
+          <Input autoComplete="username" placeholder={intl.get('用户名')} />
         </Form.Item>
         <Form.Item
           label={intl.get('密码')}
@@ -203,7 +203,11 @@ const SecuritySettings = ({ user, userChange }: any) => {
           hasFeedback
           style={{ maxWidth: 300 }}
         >
-          <Input type="password" placeholder={intl.get('密码')} />
+          <Input
+            type="password"
+            autoComplete="current-password"
+            placeholder={intl.get('密码')}
+          />
         </Form.Item>
         <Button type="primary" htmlType="submit">
           {intl.get('保存')}

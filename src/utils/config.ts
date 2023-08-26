@@ -174,7 +174,7 @@ export default {
       },
       {
         label: 'barkGroup',
-        tip: intl.get('BARK推送消息的分组, 默认为qinglong'),
+        tip: intl.get('BARK推送消息的分组，默认为qinglong'),
       },
     ],
     telegramBot: [
