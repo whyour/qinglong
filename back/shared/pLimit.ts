@@ -37,9 +37,7 @@ class TaskLimit {
 
   public runWithCpuLimit<T>(fn: () => Promise<T>): Promise<T> {
     Logger.info(
-      `[schedule][任务加入队列] 时间: ${dayjs().format(
-        'YYYY-MM-DD HH:mm:ss',
-      )}, 运行中任务数: ${this.cpuLimitActiveCount}, 等待中任务数: ${this.cpuLimitPendingCount}`,
+      `[schedule][任务加入队列] 运行中任务数: ${this.cpuLimitActiveCount}, 等待中任务数: ${this.cpuLimitPendingCount}`,
     );
     return this.cpuLimit(fn);
   }

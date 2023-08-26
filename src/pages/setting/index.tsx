@@ -252,9 +252,6 @@ const Setting = () => {
       })
       .then(async (res) => {
         setSystemLogData(await res.text());
-        setTimeout(() => {
-          getSystemLog();
-        }, 5000);
       })
       .catch((error: any) => {
         console.log(error);

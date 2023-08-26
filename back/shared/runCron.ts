@@ -11,17 +11,15 @@ export function runCron(cmd: string): Promise<number> {
 
       cp.stderr.on('data', (data) => {
         Logger.info(
-          '[schedule][执行任务失败] %s, 时间: %s, 错误信息: %j',
+          '[schedule][执行任务失败] 命令: %s, 错误信息: %j',
           cmd,
-          new Date().toLocaleString(),
           data.toString(),
         );
       });
       cp.on('error', (err) => {
         Logger.error(
-          '[schedule][创建任务失败] %s, 时间: %s, 错误信息: %j',
+          '[schedule][创建任务失败] 命令: %s, 错误信息: %j',
           cmd,
-          new Date().toLocaleString(),
           err,
         );
       });
