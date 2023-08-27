@@ -5,7 +5,7 @@ import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import { exec, execSync } from 'child_process';
 import fs from 'fs';
 import cron_parser from 'cron-parser';
-import { getFileContentByName, fileExist, killTask, getUniqPath } from '../config/util';
+import { getFileContentByName, fileExist, killTask, getUniqPath, safeJSONParse } from '../config/util';
 import { promises, existsSync } from 'fs';
 import { Op, where, col as colFn, FindOptions, fn } from 'sequelize';
 import path from 'path';
@@ -309,9 +309,9 @@ export default class CronService {
     const searchText = params?.searchValue;
     const page = Number(params?.page || '0');
     const size = Number(params?.size || '0');
-    const viewQuery = JSON.parse(params?.queryString || '{}');
-    const filterQuery = JSON.parse(params?.filters || '{}');
-    const sorterQuery = JSON.parse(params?.sorter || '{}');
+    const viewQuery = safeJSONParse(params?.queryString);
+    const filterQuery = safeJSONParse(params?.filters);
+    const sorterQuery = safeJSONParse(params?.sorter);
 
     let query: any = {};
     let order = [

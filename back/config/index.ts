@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { createRandomString } from './util';
+import { createRandomString } from './share';
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 

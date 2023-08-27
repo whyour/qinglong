@@ -5,7 +5,7 @@ import routes from '../api';
 import config from '../config';
 import jwt, { UnauthorizedError } from 'express-jwt';
 import fs from 'fs';
-import { getPlatform, getToken } from '../config/util';
+import { getPlatform, getToken, safeJSONParse } from '../config/util';
 import Container from 'typedi';
 import OpenService from '../services/open';
 import rewrite from 'express-urlrewrite';
@@ -38,7 +38,7 @@ export default ({ app }: { app: Application }) => {
 
   app.use(
     jwt({
-      secret: config.secret as string,
+      secret: config.secret,
       algorithms: ['HS384'],
     }).unless({
       path: [...config.apiWhiteList, /^\/open\//],
@@ -85,7 +85,7 @@ export default ({ app }: { app: Application }) => {
 
     const data = fs.readFileSync(config.authConfigFile, 'utf8');
     if (data && headerToken) {
-      const { token = '', tokens = {} } = JSON.parse(data);
+      const { token = '', tokens = {} } = safeJSONParse(data);
       if (headerToken === token || tokens[req.platform] === headerToken) {
         return next();
       }

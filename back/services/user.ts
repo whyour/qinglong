@@ -5,6 +5,7 @@ import {
   fileExist,
   getNetIp,
   getPlatform,
+  safeJSONParse,
 } from '../config/util';
 import config from '../config';
 import * as fs from 'fs';
@@ -327,7 +328,7 @@ export default class UserService {
 
   private getAuthInfo() {
     const content = fs.readFileSync(config.authConfigFile, 'utf8');
-    return JSON.parse(content || '{}');
+    return safeJSONParse(content);
   }
 
   private updateAuthInfo(authInfo: any, info: any) {

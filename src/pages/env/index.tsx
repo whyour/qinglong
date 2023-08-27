@@ -42,7 +42,7 @@ import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import Copy from '../../components/copy';
 import { useVT } from 'virtualizedtableforantd4';
 
-const { Text } = Typography;
+const { Paragraph } = Typography;
 const { Search } = Input;
 
 enum Status {
@@ -246,9 +246,14 @@ const Env = () => {
             ? intl.get('启用')
             : intl.get('禁用')}
           Env{' '}
-          <Text style={{ wordBreak: 'break-all' }} type="warning">
+          <Paragraph
+            style={{ wordBreak: 'break-all', display: 'inline' }}
+            ellipsis={{ rows: 6, expandable: true }}
+            type="warning"
+            copyable
+          >
             {record.value}
-          </Text>{' '}
+          </Paragraph>{' '}
           {intl.get('吗')}
         </>
       ),
@@ -302,9 +307,14 @@ const Env = () => {
       content: (
         <>
           {intl.get('确认删除变量')}{' '}
-          <Text style={{ wordBreak: 'break-all' }} type="warning">
+          <Paragraph
+            style={{ wordBreak: 'break-all', display: 'inline' }}
+            ellipsis={{ rows: 6, expandable: true }}
+            type="warning"
+            copyable
+          >
             {record.name}: {record.value}
-          </Text>{' '}
+          </Paragraph>{' '}
           {intl.get('吗')}
         </>
       ),

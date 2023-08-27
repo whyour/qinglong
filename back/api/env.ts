@@ -6,6 +6,7 @@ import { celebrate, Joi } from 'celebrate';
 import multer from 'multer';
 import config from '../config';
 import fs from 'fs';
+import { safeJSONParse } from '../config/util';
 const route = Router();
 
 const storage = multer.diskStorage({
@@ -200,7 +201,7 @@ export default (app: Router) => {
       try {
         const envService = Container.get(EnvService);
         const fileContent = await fs.promises.readFile(req!.file!.path, 'utf8');
-        const parseContent = JSON.parse(fileContent);
+        const parseContent = safeJSONParse(fileContent);
         const data = Array.isArray(parseContent)
           ? parseContent
           : [parseContent];
