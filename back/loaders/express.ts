@@ -26,7 +26,7 @@ export default ({ app }: { app: Application }) => {
   app.use(
     '/api/public',
     createProxyMiddleware({
-      target: `http://localhost:${config.publicPort}/api`,
+      target: `http://0.0.0.0:${config.publicPort}/api`,
       changeOrigin: true,
       pathRewrite: { '/api/public': '' },
       logProvider: () => Logger

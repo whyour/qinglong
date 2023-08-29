@@ -10,7 +10,7 @@ import config from '../config';
 
 class Client {
   private client = new CronClient(
-    `localhost:${config.cronPort}`,
+    `0.0.0.0:${config.cronPort}`,
     credentials.createInsecure(),
   );
 
