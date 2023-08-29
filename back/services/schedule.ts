@@ -66,7 +66,7 @@ export default class ScheduleService {
 
           cp.stderr.on('data', async (data) => {
             this.logger.info(
-              '[执行任务失败] 命令: %s, 错误信息: %j',
+              '[panel][执行任务失败] 命令: %s, 错误信息: %j',
               command,
               data.toString(),
             );
@@ -75,7 +75,7 @@ export default class ScheduleService {
 
           cp.on('error', async (err) => {
             this.logger.error(
-              '[创建任务失败] 命令: %s, 错误信息: %j',
+              '[panel][创建任务失败] 命令: %s, 错误信息: %j',
               command,
               err,
             );
@@ -84,7 +84,7 @@ export default class ScheduleService {
 
           cp.on('exit', async (code, signal) => {
             this.logger.info(
-              `[任务退出] ${command} 进程id: ${cp.pid}, 退出码 ${code}`,
+              `[panel][任务退出] ${command} 进程id: ${cp.pid}, 退出码 ${code}`,
             );
           });
 
@@ -98,8 +98,8 @@ export default class ScheduleService {
             resolve(null);
           });
         } catch (error) {
-          await this.logger.error(
-            '[执行任务失败] 命令: %s, 错误信息: %j',
+          this.logger.error(
+            '[panel][执行任务失败] 命令: %s, 错误信息: %j',
             command,
             error,
           );
@@ -116,7 +116,7 @@ export default class ScheduleService {
   ) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[创建cron任务], 任务ID: %s, cron: %s, 任务名: %s, 执行命令: %s',
+      '[panel][创建cron任务], 任务ID: %s, cron: %s, 任务名: %s, 执行命令: %s',
       _id,
       schedule,
       name,
@@ -137,7 +137,7 @@ export default class ScheduleService {
 
   async cancelCronTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
-    this.logger.info('[取消定时任务], 任务名: %s', name);
+    this.logger.info('[panel][取消定时任务], 任务名: %s', name);
     if (this.scheduleStacks.has(_id)) {
       this.scheduleStacks.get(_id)?.cancel();
       this.scheduleStacks.delete(_id);
@@ -152,7 +152,7 @@ export default class ScheduleService {
   ) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[创建interval任务], 任务ID: %s, 任务名: %s, 执行命令: %s',
+      '[panel][创建interval任务], 任务ID: %s, 任务名: %s, 执行命令: %s',
       _id,
       name,
       command,

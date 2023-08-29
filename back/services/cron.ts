@@ -434,7 +434,7 @@ export default class CronService {
 
         cp.on('exit', async (code, signal) => {
           this.logger.info(
-            `任务 ${command} 进程id: ${cp.pid} 退出，退出码 ${code}`,
+            `[panel][任务退出] 任务 ${command} 进程id: ${cp.pid}, 退出码 ${code}`,
           );
         });
         cp.on('close', async (code) => {
