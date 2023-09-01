@@ -86,6 +86,11 @@ check_server() {
   fi
 }
 
+env_str_to_array() {
+  local IFS="&"
+  read -ra array <<<"${!env_param}"
+}
+
 ## 正常运行单个脚本，$1：传入参数
 run_normal() {
   local file_param=$1
@@ -113,8 +118,7 @@ run_concurrent() {
     exit 1
   fi
 
-  local envs=$(eval echo "\$${env_param}")
-  local array=($(echo $envs | sed 's/&/ /g'))
+  env_str_to_array
   local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
@@ -125,11 +129,13 @@ run_concurrent() {
     let n++
   done
 
-  local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
-  [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
+  local cookieStr=$(
+    IFS="&"
+    echo "${array_run[*]}"
+  )
+  [[ ! -z $cookieStr ]] && export "${env_param}=${cookieStr}"
 
-  local envs=$(eval echo "\$${env_param}")
-  local array=($(echo $envs | sed 's/&/ /g'))
+  env_str_to_array
   single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%3N")
 
   cd $dir_scripts
@@ -139,7 +145,7 @@ run_concurrent() {
     file_param=${file_param/$relative_path\//}
   fi
   for i in "${!array[@]}"; do
-    export ${env_param}=${array[i]}
+    export "${env_param}=${array[i]}"
     single_log_path="$dir_log/$log_dir/${single_log_time}_$((i + 1)).log"
     eval $timeoutCmd $which_program $file_param &>$single_log_path &
   done
@@ -161,8 +167,7 @@ run_designated() {
     exit 1
   fi
 
-  local envs=$(eval echo "\$${env_param}")
-  local array=($(echo $envs | sed 's/&/ /g'))
+  env_str_to_array
   local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
@@ -173,8 +178,11 @@ run_designated() {
     let n++
   done
 
-  local cookieStr=$(echo ${array_run[*]} | sed 's/\ /\&/g')
-  [[ ! -z $cookieStr ]] && export ${env_param}=${cookieStr}
+  local cookieStr=$(
+    IFS="&"
+    echo "${array_run[*]}"
+  )
+  [[ ! -z $cookieStr ]] && export "${env_param}=${cookieStr}"
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"

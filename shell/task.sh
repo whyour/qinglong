@@ -69,7 +69,7 @@ handle_log_path() {
   if [[ $real_log_path ]]; then
     log_path="$real_log_path"
   fi
-  
+
   cmd=">> $dir_log/$log_path 2>&1"
   make_dir "$dir_log/$log_dir"
   if [[ "$show_log" == "true" ]]; then

@@ -36,7 +36,7 @@ add_cron_api() {
     local sub_id="$4"
   fi
 
-  if [[ ! $sub_id ]];then
+  if [[ ! $sub_id ]]; then
     sub_id="null"
   fi
 
