@@ -75,16 +75,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
           </div>
         </>
       ),
-      content: (
-        <pre
-          style={{
-            fontSize: 12,
-            fontWeight: 400,
-          }}
-        >
-          {lastLog}
-        </pre>
-      ),
+      content: <pre>{lastLog}</pre>,
       okText: intl.get('下载更新'),
       cancelText: intl.get('以后再说'),
       onOk() {
@@ -109,16 +100,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       okButtonProps: { disabled: true },
       title: intl.get('下载更新中...'),
       centered: true,
-      content: (
-        <pre
-          style={{
-            fontSize: 12,
-            fontWeight: 400,
-          }}
-        >
-          {value}
-        </pre>
-      ),
+      content: <pre>{value}</pre>,
     });
   };
 
@@ -185,14 +167,7 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       okButtonProps: { disabled: !updateFailed },
       content: (
         <>
-          <pre
-            style={{
-              fontSize: 12,
-              fontWeight: 400,
-            }}
-          >
-            {newMessage}
-          </pre>
+          <pre>{newMessage}</pre>
           <div id="log-identifier" style={{ paddingBottom: 5 }}></div>
         </>
       ),

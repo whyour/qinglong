@@ -202,9 +202,7 @@ export default class EnvService {
           let value = group
             .map((x) => x.value)
             .join('&')
-            .replace(/(\\)[^n]/g, '\\\\')
-            .replace(/(\\$)/, '\\\\')
-            .replace(/'/g, "\\'")
+            .replace(/'/g, "'\\''")
             .trim();
           env_string += `export ${key}='${value}'\n`;
         }
