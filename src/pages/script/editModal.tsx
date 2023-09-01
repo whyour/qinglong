@@ -224,6 +224,7 @@ const EditModal = ({
         minSize={200}
         defaultSize="50%"
         style={{ height: 'calc(100vh - 55px)' }}
+        pane2Style={{ overflowY: 'auto' }}
       >
         <Editor
           language={language}
