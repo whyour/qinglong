@@ -1,10 +1,13 @@
-version: 2.16.1
-changeLogLink: https://t.me/jiao_long/392
-publishTime: 2023-08-21 23:00
+version: 2.16.2
+changeLogLink: https://t.me/jiao_long/393
+publishTime: 2023-09-02 07:00
 changeLog: |
-  1. 系统设置增加系统日志，展示系统和任务运行日志
-  2. 修复 python 企业微信推送
-  3. 修复 debian 版本关于页面报错
-  4. 修复添加订阅粘贴 ql 命令链接参数可能错误
-  5. 修改日志弹框样式
-  6. 其他 bug 修复
+  1. 系统设置增加语言设置
+  2. 修复环境变量有空格时并发数量错误
+  3. 修复环境变量特殊字符转义
+  4. 修复仓库订阅 ssh 配置
+  5. 修复停止订阅执行日志
+  6. 修改定时任务置顶样式
+  7. 修改任务日志样式
+  8. 修复环境变量值 tip 样式
+  9. 其他 bug 修复
