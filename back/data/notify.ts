@@ -55,6 +55,8 @@ export class BarkNotification extends NotificationBaseInfo {
   public barkIcon = 'https://qn.whyour.cn/logo.png';
   public barkSound = '';
   public barkGroup = 'qinglong';
+  public barkLevel = 'active';
+  public barkUrl = '';
 }
 
 export class TelegramBotNotification extends NotificationBaseInfo {

@@ -40,6 +40,8 @@ push_config = {
     'BARK_GROUP': '',                   # bark 推送分组
     'BARK_SOUND': '',                   # bark 推送声音
     'BARK_ICON': '',                    # bark 推送图标
+    'BARK_LEVEL': '',                   # bark 推送时效性
+    'BARK_URL': '',                     # bark 推送跳转URL
 
     'CONSOLE': True,                    # 控制台输出
 
@@ -130,6 +132,8 @@ def bark(title: str, content: str) -> None:
         "BARK_GROUP": "group",
         "BARK_SOUND": "sound",
         "BARK_ICON": "icon",
+        "BARK_LEVEL": "level",
+        "BARK_URL": "url",
     }
     params = ""
     for pair in filter(

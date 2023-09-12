@@ -55,6 +55,10 @@ let BARK_ICON = 'https://qn.whyour.cn/logo.png';
 let BARK_SOUND = '';
 //BARK app推送消息的分组, 默认为"QingLong"
 let BARK_GROUP = 'QingLong';
+//BARK app推送消息的时效性, 默认为"active"
+let BARK_LEVEL = 'active';
+//BARK app推送消息的跳转URL
+let BARK_URL = '';
 
 // =======================================telegram机器人通知设置区域===========================================
 //此处填你telegram bot 的Token，telegram机器人通知推送必填项.例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw
@@ -210,6 +214,12 @@ if (process.env.BARK_PUSH) {
   }
   if (process.env.BARK_GROUP) {
     BARK_GROUP = process.env.BARK_GROUP;
+  }
+  if (process.env.BARK_LEVEL) {
+    BARK_LEVEL = process.env.BARK_LEVEL;
+  }
+  if (process.env.BARK_URL) {
+    BARK_URL = process.env.BARK_URL;
   }
 } else {
   if (
@@ -552,7 +562,7 @@ function BarkNotify(text, desp, params = {}) {
       const options = {
         url: `${BARK_PUSH}/${encodeURIComponent(text)}/${encodeURIComponent(
           desp,
-        )}?icon=${BARK_ICON}&sound=${BARK_SOUND}&group=${BARK_GROUP}&${querystring.stringify(
+        )}?icon=${BARK_ICON}&sound=${BARK_SOUND}&group=${BARK_GROUP}&level=${BARK_LEVEL}&url=${BARK_URL}&${querystring.stringify(
           params,
         )}`,
         headers: {

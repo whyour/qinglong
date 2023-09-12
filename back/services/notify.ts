@@ -195,7 +195,7 @@ export default class NotificationService {
   }
 
   private async bark() {
-    let { barkPush, barkIcon, barkSound, barkGroup } = this.params;
+    let { barkPush, barkIcon, barkSound, barkGroup, barkLevel, barkUrl } = this.params;
     if (!barkPush.startsWith('http')) {
       barkPush = `https://api.day.app/${barkPush}`;
     }
@@ -203,7 +203,7 @@ export default class NotificationService {
       this.title,
     )}/${encodeURIComponent(
       this.content,
-    )}?icon=${barkIcon}&sound=${barkSound}&group=${barkGroup}`;
+    )}?icon=${barkIcon}&sound=${barkSound}&group=${barkGroup}&level=${barkLevel}&url=${barkUrl}`;
 
     try {
       const res: any = await got
