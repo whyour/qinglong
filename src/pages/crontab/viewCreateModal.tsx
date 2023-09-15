@@ -107,20 +107,25 @@ const ViewCreateModal = ({
     }
     form.setFieldsValue(
       view || {
-        filters: [{ property: 'command', operation: 'Reg' }],
+        filters: [{ property: 'command' }],
       },
     );
   }, [view, visible]);
 
-  const operationElement = (
-    <Select style={{ width: 120 }}>
-      {OPERATIONS.map((x) => (
-        <Select.Option key={x.name} value={x.value}>
-          {x.name}
-        </Select.Option>
-      ))}
-    </Select>
-  );
+  const OperationElement = ({ name }: { name: number }) => {
+    const property = form.getFieldValue(['filters', name, 'property']);
+    return (
+      <Select style={{ width: 120 }}>
+        {OPERATIONS.filter((x) =>
+          STATUS_MAP[property as 'status' | 'sub_id'] ? x.type === 'select' : x,
+        ).map((x) => (
+          <Select.Option key={x.name} value={x.value}>
+            {x.name}
+          </Select.Option>
+        ))}
+      </Select>
+    );
+  };
 
   const propertyElement = (props: any, style: React.CSSProperties = {}) => {
     return (
@@ -135,7 +140,7 @@ const ViewCreateModal = ({
   };
 
   const typeElement = (
-    <Select style={{ width: 80 }}>
+    <Select style={{ width: 80 }} placeholder={intl.get('请选择操作符')}>
       {SORTTYPES.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -256,9 +261,9 @@ const ViewCreateModal = ({
                       <Form.Item
                         {...restField}
                         name={[name, 'operation']}
-                        rules={[{ required: true }]}
+                        rules={[{ required: true, message: intl.get('请选择操作符') }]}
                       >
-                        {operationElement}
+                        <OperationElement name={name} />
                       </Form.Item>
                       <Form.Item
                         {...restField}

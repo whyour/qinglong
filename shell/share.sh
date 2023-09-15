@@ -69,6 +69,7 @@ import_config() {
   [[ -f $file_env ]] && . $file_env
 
   ql_base_url=${QlBaseUrl:-"/"}
+  ql_port=${QlPort:-"5700"}
   command_timeout_time=${CommandTimeoutTime:-""}
   proxy_url=${ProxyUrl:-""}
   file_extensions=${RepoFileExtensions:-"js py"}
@@ -416,12 +417,15 @@ init_nginx() {
   sed -i "s,QL_BASE_URL_LOCATION,${location_url},g" /etc/nginx/conf.d/front.conf
   sed -i "s,QL_BASE_URL,${ql_base_url},g" /etc/nginx/conf.d/front.conf
 
-  ipv6=$(ip a | grep inet6)
-  ipv6Str=""
+  local ipv6=$(ip a | grep inet6)
+  local ipv6Str=""
   if [[ $ipv6 ]]; then
-    ipv6Str="listen [::]:5700 ipv6only=on;"
+    ipv6Str="listen [::]:${ql_port} ipv6only=on;"
   fi
+
+  local ipv4Str="listen ${ql_port};"
   sed -i "s,IPV6_CONFIG,${ipv6Str},g" /etc/nginx/conf.d/front.conf
+  sed -i "s,IPV4_CONFIG,${ipv4Str},g" /etc/nginx/conf.d/front.conf
 }
 
 handle_task_before() {
