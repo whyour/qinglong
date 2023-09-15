@@ -31,9 +31,9 @@ export default class CronService {
     const tab = new Crontab(payload);
     tab.saved = false;
     const doc = await this.insert(tab);
-    if (this.isSixCron(doc)) {
+    if (this.isSixCron(doc) || doc.extra_schedules?.length) {
       await cronClient.addCron([
-        { id: String(doc.id), schedule: doc.schedule!, command: doc.command },
+        { id: String(doc.id), schedule: doc.schedule!, command: doc.command, extraSchedules: doc.extra_schedules || [] },
       ]);
     }
     await this.set_crontab();
@@ -52,15 +52,16 @@ export default class CronService {
     if (doc.isDisabled === 1) {
       return newDoc;
     }
-    if (this.isSixCron(doc)) {
+    if (this.isSixCron(doc) || doc.extra_schedules?.length) {
       await cronClient.delCron([String(newDoc.id)]);
     }
-    if (this.isSixCron(newDoc)) {
+    if (this.isSixCron(newDoc) || doc.extra_schedules?.length) {
       await cronClient.addCron([
         {
           id: String(newDoc.id),
           schedule: newDoc.schedule!,
           command: newDoc.command,
+          extraSchedules: newDoc.extra_schedules || []
         },
       ]);
     }
@@ -463,6 +464,7 @@ export default class CronService {
         id: String(doc.id),
         schedule: doc.schedule!,
         command: doc.command,
+        extraSchedules: doc.extra_schedules || []
       }));
     await cronClient.addCron(sixCron);
     await this.set_crontab();
@@ -519,7 +521,7 @@ export default class CronService {
     var crontab_string = '';
     tabs.data.forEach((tab) => {
       const _schedule = tab.schedule && tab.schedule.split(/ +/);
-      if (tab.isDisabled === 1 || _schedule!.length !== 5) {
+      if (tab.isDisabled === 1 || _schedule!.length !== 5 || tab.extra_schedules?.length) {
         crontab_string += '# ';
         crontab_string += tab.schedule;
         crontab_string += ' ';
@@ -583,6 +585,7 @@ export default class CronService {
         id: String(doc.id),
         schedule: doc.schedule!,
         command: doc.command,
+        extraSchedules: doc.extra_schedules || []
       }));
     await cronClient.addCron(sixCron);
   }

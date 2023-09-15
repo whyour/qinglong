@@ -195,7 +195,7 @@ const ViewCreateModal = ({
           <Input placeholder={intl.get('请输入视图名称')} />
         </Form.Item>
         <Form.List name="filters">
-          {(fields, { add, remove }) => (
+          {(fields, { add, remove }, { errors }) => (
             <div
               style={{ position: 'relative' }}
               className={`view-filters-container ${
@@ -297,12 +297,13 @@ const ViewCreateModal = ({
                     {intl.get('新增筛选条件')}
                   </a>
                 </Form.Item>
+                <Form.ErrorList errors={errors} />
               </div>
             </div>
           )}
         </Form.List>
         <Form.List name="sorts">
-          {(fields, { add, remove }) => (
+          {(fields, { add, remove }, { errors }) => (
             <div
               style={{ position: 'relative' }}
               className={`view-filters-container ${
@@ -372,6 +373,7 @@ const ViewCreateModal = ({
                     {intl.get('新增排序方式')}
                   </a>
                 </Form.Item>
+                <Form.ErrorList errors={errors} />
               </div>
             </div>
           )}

@@ -48,7 +48,10 @@ export default async () => {
     } catch (error) {}
     try {
       await sequelize.query('alter table Crontabs add column sub_id NUMBER');
-    } catch (error) {}
+    } catch (error) { }
+    try {
+      await sequelize.query('alter table Crontabs add column extra_schedules JSON');
+    } catch (error) { }
 
     // 2.10-2.11 升级
     const cronDbFile = path.join(config.rootPath, 'db/crontab.db');

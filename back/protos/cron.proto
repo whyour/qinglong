@@ -7,10 +7,13 @@ service Cron {
   rpc delCron(DeleteCronRequest) returns (DeleteCronResponse);
 }
 
+message ISchedule { string schedule = 1; }
+
 message ICron {
   string id = 1;
   string schedule = 2;
   string command = 3;
+  repeated ISchedule extra_schedules = 4;
 }
 
 message AddCronRequest { repeated ICron crons = 1; }

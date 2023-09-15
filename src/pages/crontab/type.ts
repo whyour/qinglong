@@ -35,4 +35,6 @@ export interface ICrontab {
   last_running_time?: number;
   last_execution_time?: number;
   nextRunTime: Date;
+  sub_id: number;
+  extra_schedules?: Array<{ schedule: string; }>;
 }

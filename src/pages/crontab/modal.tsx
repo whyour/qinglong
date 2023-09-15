@@ -1,10 +1,11 @@
 import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form, Button } from 'antd';
+import { Modal, message, Input, Form, Button, Space } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import cronParse from 'cron-parser';
 import EditableTagGroup from '@/components/tag';
+import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 
 const CronModal = ({
   cron,
@@ -107,6 +108,38 @@ const CronModal = ({
         >
           <Input placeholder={intl.get('秒(可选) 分 时 天 月 周')} />
         </Form.Item>
+        <Form.List name="extra_schedules">
+          {(fields, { add, remove }, { errors }) => (
+            <>
+              {fields.map(({ key, name, ...restField }) => (
+                <Form.Item key={key} noStyle>
+                  <Space className="view-create-modal-sorts" align="baseline">
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'schedule']}
+                      rules={[{ required: true }]}
+                    >
+                      <Input
+                        placeholder={intl.get('秒(可选) 分 时 天 月 周')}
+                      />
+                    </Form.Item>
+                    <MinusCircleOutlined
+                      className="dynamic-delete-button"
+                      onClick={() => remove(name)}
+                    />
+                  </Space>
+                </Form.Item>
+              ))}
+              <Form.Item>
+                <a onClick={() => add({ schedule: '' })}>
+                  <PlusOutlined />
+                  {intl.get('新增定时规则')}
+                </a>
+              </Form.Item>
+              <Form.ErrorList errors={errors} />
+            </>
+          )}
+        </Form.List>
         <Form.Item name="labels" label={intl.get('标签')}>
           <EditableTagGroup />
         </Form.Item>

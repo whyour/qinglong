@@ -183,6 +183,20 @@ const Crontab = () => {
       sorter: {
         compare: (a, b) => a.schedule.localeCompare(b.schedule),
       },
+      render: (text, record) => {
+        return record.extra_schedules?.length ? (
+          <Popover
+            placement="right"
+            content={record.extra_schedules?.map((x) => (
+              <div>{x.schedule}</div>
+            ))}
+          >
+            {text}
+          </Popover>
+        ) : (
+          text
+        );
+      },
     },
     {
       title: intl.get('最后运行时长'),

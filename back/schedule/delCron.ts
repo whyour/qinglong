@@ -13,7 +13,7 @@ const delCron = (
         '[schedule][取消定时任务], 任务ID: %s',
         id,
       );
-      scheduleStacks.get(id)?.cancel();
+      scheduleStacks.get(id)?.forEach(x => x.cancel());
       scheduleStacks.delete(id);
     }
   }
