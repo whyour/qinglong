@@ -1,19 +1,17 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "lib": ["es2021", "esnext.asynciterable", "DOM"],
-    "typeRoots": [
-      "./node_modules/@types",
-      "./src/types",
-      "./node_modules/celebrate/lib/index.d.ts"
-    ],
+    "lib": ["ESNext"],
+    "typeRoots": ["./node_modules/celebrate/lib", "./node_modules/@types"],
     "paths": {
-      "@/*": ["./back/*"],
+      "@/*": ["./back/*"]
     },
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
     "moduleResolution": "node",
     "module": "commonjs",
     "pretty": true,
@@ -24,5 +22,6 @@
     "esModuleInterop": true
   },
   "include": ["./back/**/*"],
-  "exclude": ["node_modules", "tests"]
+  "exclude": ["node_modules"],
+  "files": ["./back/index.d.ts"]
 }

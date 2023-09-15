@@ -28,7 +28,7 @@ import taskLimit from '../shared/pLimit';
 import tar from 'tar';
 import path from 'path';
 import fs from 'fs';
-import { sum } from 'lodash';
+import sum from 'lodash/sum';
 
 @Service()
 export default class SystemService {
@@ -84,7 +84,7 @@ export default class SystemService {
     });
     if (info.logRemoveFrequency) {
       const cron = {
-        id: result.id,
+        id: result.id || NaN,
         name: '删除日志',
         command: `ql rmlog ${info.logRemoveFrequency}`,
       };

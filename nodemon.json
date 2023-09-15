@@ -1,6 +1,5 @@
 {
   "watch": ["back", ".env"],
   "ext": "js,ts,json",
-  "ignore": ["src/**/*.spec.ts"],
-  "exec": "ts-node  --transpile-only ./back/app.ts"
+  "exec": "ts-node -P tsconfig.back.json ./back/app.ts"
 }

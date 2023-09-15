@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { pick } from 'lodash';
+import pick from 'lodash/pick';
 
 let pickedEnv: Record<string, string>;
 

@@ -1,6 +1,6 @@
 import { Container } from 'typedi';
 import SystemService from '../services/system';
-import ScheduleService from '../services/schedule';
+import ScheduleService, { ScheduleTaskType } from '../services/schedule';
 import SubscriptionService from '../services/subscription';
 import config from '../config';
 import { fileExist } from '../config/util';
@@ -22,7 +22,7 @@ export default async () => {
     id: NaN,
     name: '生成token',
     command: tokenCommand,
-  };
+  } as ScheduleTaskType;
   await scheduleService.cancelIntervalTask(cron);
   scheduleService.createIntervalTask(cron, {
     days: 28,

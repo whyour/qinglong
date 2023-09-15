@@ -3,3 +3,5 @@ declare namespace Express {
     platform: 'desktop' | 'mobile';
   }
 }
+
+declare module 'pstree.remy';

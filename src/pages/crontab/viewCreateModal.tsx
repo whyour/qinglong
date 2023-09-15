@@ -115,7 +115,7 @@ const ViewCreateModal = ({
   const OperationElement = ({ name }: { name: number }) => {
     const property = form.getFieldValue(['filters', name, 'property']);
     return (
-      <Select style={{ width: 120 }}>
+      <Select style={{ width: 120 }} placeholder={intl.get('请选择操作符')}>
         {OPERATIONS.filter((x) =>
           STATUS_MAP[property as 'status' | 'sub_id'] ? x.type === 'select' : x,
         ).map((x) => (
@@ -140,7 +140,7 @@ const ViewCreateModal = ({
   };
 
   const typeElement = (
-    <Select style={{ width: 80 }} placeholder={intl.get('请选择操作符')}>
+    <Select style={{ width: 80 }}>
       {SORTTYPES.map((x) => (
         <Select.Option key={x.name} value={x.value}>
           {x.name}
@@ -261,7 +261,9 @@ const ViewCreateModal = ({
                       <Form.Item
                         {...restField}
                         name={[name, 'operation']}
-                        rules={[{ required: true, message: intl.get('请选择操作符') }]}
+                        rules={[
+                          { required: true, message: intl.get('请选择操作符') },
+                        ]}
                       >
                         <OperationElement name={name} />
                       </Form.Item>

@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
 
-interface ScheduleTaskType {
+export interface ScheduleTaskType {
   id: number;
   command: string;
   name?: string;

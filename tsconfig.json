@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "target": "ESNext",
+    "module": "ES2015",
+    "moduleResolution": "Bundler",
     "importHelpers": true,
     "jsx": "react-jsx",
     "esModuleInterop": true,
@@ -14,11 +14,6 @@
       "@@/*": ["src/.umi/*"]
     },
     "lib": ["dom", "es2021", "esnext.asynciterable"],
-    "typeRoots": [
-      "./node_modules/@types",
-      "./back/types",
-      "./node_modules/celebrate/lib/index.d.ts"
-    ],
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
