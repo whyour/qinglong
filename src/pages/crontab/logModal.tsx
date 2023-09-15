@@ -82,12 +82,12 @@ const CronLogModal = ({
     handleCancel();
   };
 
-  const handleScroll = (e) => {
-    const sTop = e.target.scrollTop;
+  const handleScroll: React.UIEventHandler<HTMLDivElement> = (e) => {
+    const sTop = (e.target as HTMLDivElement).scrollTop;
     if (scrollInfoRef.current.down) {
       scrollInfoRef.current = {
         value: sTop,
-        down: sTop > scrollInfoRef.current.value,
+        down: sTop > scrollInfoRef.current.value || !sTop,
       };
     }
   };
@@ -105,6 +105,7 @@ const CronLogModal = ({
   useEffect(() => {
     if (cron && cron.id && visible) {
       getCronLog(true);
+      scrollInfoRef.current.down = true;
     }
   }, [cron, visible]);
 
