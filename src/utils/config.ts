@@ -176,6 +176,14 @@ export default {
         label: 'barkGroup',
         tip: intl.get('BARK推送消息的分组，默认为qinglong'),
       },
+      {
+        label: 'barkLevel',
+        tip: intl.get('BARK推送消息的时效性，默认为active'),
+      },
+      {
+        label: 'barkUrl',
+        tip: intl.get('BARK推送消息的跳转URL'),
+      },
     ],
     telegramBot: [
       {

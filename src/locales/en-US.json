@@ -352,6 +352,8 @@
   "BARK推送图标，自定义推送图标 (需iOS15或以上才能显示)": "BARK push icon, custom push icon (requires iOS 15 or above to display)",
   "BARK推送铃声，铃声列表去APP查看复制填写": "BARK push ringtone, check and copy from the APP's ringtone list",
   "BARK推送消息的分组，默认为qinglong": "BARK push message grouping, default is qinglong",
+  "BARK推送消息的时效性，默认为active": "BARK push message redirecting URL",
+  "BARK推送消息的跳转URL": "BARK push message grouping, default is qinglong",
   "telegram机器人的token，例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw": "Telegram Bot token, e.g., 1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw",
   "telegram用户的id，例如：129xxx206": "Telegram user ID, e.g., 129xxx206",
   "代理IP": "Proxy IP",
