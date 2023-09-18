@@ -87,7 +87,8 @@ jobs:
   build:
     needs: build-static
 
-    runs-on: ubuntu-latest
+    # 由于 ubuntu-latest 中使用 linux6.x 内核 linux/s390x npm 无法使用
+    runs-on: ubuntu-20.04
 
     permissions:
       packages: write
