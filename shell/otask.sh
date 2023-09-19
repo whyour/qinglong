@@ -94,7 +94,7 @@ env_str_to_array() {
 ## 正常运行单个脚本，$1：传入参数
 run_normal() {
   local file_param=$1
-  if [[ $# -eq 1 ]] && [[ "$real_time" != "true" ]]; then
+  if [[ $# -eq 1 ]] && [[ "$real_time" != "true" ]] && [[ "$no_delay" != "true" ]]; then
     random_delay "$file_param"
   fi
 

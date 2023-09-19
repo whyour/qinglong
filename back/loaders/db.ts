@@ -52,6 +52,12 @@ export default async () => {
     try {
       await sequelize.query('alter table Crontabs add column extra_schedules JSON');
     } catch (error) { }
+    try {
+      await sequelize.query('alter table Crontabs add column task_before TEXT');
+    } catch (error) { }
+    try {
+      await sequelize.query('alter table Crontabs add column task_after TEXT');
+    } catch (error) { }
 
     // 2.10-2.11 升级
     const cronDbFile = path.join(config.rootPath, 'db/crontab.db');

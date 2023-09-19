@@ -436,10 +436,22 @@ handle_task_before() {
   [[ $is_macos -eq 0 ]] && check_server
 
   . $file_task_before "$@"
+
+  if [[ $task_before ]]; then
+    echo -e "执行前置命令\n"
+    eval "$task_before"
+    echo -e "\n执行前置命令结束\n"
+  fi
 }
 
 handle_task_after() {
   . $file_task_after "$@"
+
+  if [[ $task_after ]]; then
+    echo -e "\n执行后置命令\n"
+    eval "$task_after"
+    echo -e "\n执行后置命令结束"
+  fi
 
   local etime=$(date "+$time_format")
   local end_time=$(format_time "$time_format" "$etime")

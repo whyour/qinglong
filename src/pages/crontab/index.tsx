@@ -43,7 +43,6 @@ import { request } from '@/utils/http';
 import CronModal, { CronLabelModal } from './modal';
 import CronLogModal from './logModal';
 import CronDetailModal from './detail';
-import cron_parser from 'cron-parser';
 import { diffTime } from '@/utils/date';
 import { history, useOutletContext } from '@umijs/max';
 import './index.less';

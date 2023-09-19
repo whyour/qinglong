@@ -16,11 +16,6 @@ const addCron = (
       scheduleStacks.get(id)?.forEach((x) => x.cancel());
     }
 
-    let cmdStr = command.trim();
-    if (!cmdStr.startsWith(TASK_PREFIX) && !cmdStr.startsWith(QL_PREFIX)) {
-      cmdStr = `${TASK_PREFIX}${cmdStr}`;
-    }
-
     Logger.info(
       '[schedule][创建定时任务], 任务ID: %s, cron: %s, 执行命令: %s',
       id,
@@ -41,14 +36,14 @@ const addCron = (
 
     scheduleStacks.set(id, [
       nodeSchedule.scheduleJob(id, schedule, async () => {
-        Logger.info(`[schedule][准备运行任务] 命令: ${cmdStr}`);
-        runCron(`ID=${id} ${cmdStr}`);
+        Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
+        runCron(command);
       }),
       ...(extraSchedules?.length
         ? extraSchedules.map((x) =>
           nodeSchedule.scheduleJob(id, x.schedule, async () => {
-            Logger.info(`[schedule][准备运行任务] 命令: ${cmdStr}`);
-            runCron(`ID=${id} ${cmdStr}`);
+            Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
+            runCron(command);
           }),
         )
         : []),

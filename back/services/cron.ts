@@ -33,7 +33,7 @@ export default class CronService {
     const doc = await this.insert(tab);
     if (this.isSixCron(doc) || doc.extra_schedules?.length) {
       await cronClient.addCron([
-        { id: String(doc.id), schedule: doc.schedule!, command: doc.command, extraSchedules: doc.extra_schedules || [] },
+        { id: String(doc.id), schedule: doc.schedule!, command: this.makeCommand(doc), extraSchedules: doc.extra_schedules || [] },
       ]);
     }
     await this.set_crontab();
@@ -60,7 +60,7 @@ export default class CronService {
         {
           id: String(newDoc.id),
           schedule: newDoc.schedule!,
-          command: newDoc.command,
+          command: this.makeCommand(newDoc),
           extraSchedules: newDoc.extra_schedules || []
         },
       ]);
@@ -406,21 +406,7 @@ export default class CronService {
         this.logger.silly('ID: ' + id);
         this.logger.silly('Original command: ' + command);
 
-        let cmdStr = command;
-        if (!cmdStr.startsWith(TASK_PREFIX) && !cmdStr.startsWith(QL_PREFIX)) {
-          cmdStr = `${TASK_PREFIX}${cmdStr}`;
-        }
-        if (
-          cmdStr.endsWith('.js') ||
-          cmdStr.endsWith('.py') ||
-          cmdStr.endsWith('.pyc') ||
-          cmdStr.endsWith('.sh') ||
-          cmdStr.endsWith('.ts')
-        ) {
-          cmdStr = `${cmdStr} now`;
-        }
-
-        const cp = spawn(`real_log_path=${logPath} ID=${id} ${cmdStr}`, { shell: '/bin/bash' });
+        const cp = spawn(`real_log_path=${logPath} no_delay=true ${this.makeCommand(cron)}`, { shell: '/bin/bash' });
 
         await CrontabModel.update(
           { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
@@ -507,12 +493,22 @@ export default class CronService {
     }
   }
 
-  private make_command(tab: Crontab) {
+  private makeCommand(tab: Crontab) {
     let command = tab.command.trim();
     if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
       command = `${TASK_PREFIX}${tab.command}`;
     }
-    const crontab_job_string = `ID=${tab.id} ${command}`;
+    let commandVariable = `ID=${tab.id} `
+    if (tab.task_before) {
+      commandVariable += `task_before='${tab.task_before.replace(/'/g, "'\\''")
+        .trim()}' `;
+    }
+    if (tab.task_after) {
+      commandVariable += `task_after='${tab.task_after.replace(/'/g, "'\\''")
+        .trim()}' `;
+    }
+
+    const crontab_job_string = `${commandVariable}${command}`;
     return crontab_job_string;
   }
 
@@ -525,12 +521,12 @@ export default class CronService {
         crontab_string += '# ';
         crontab_string += tab.schedule;
         crontab_string += ' ';
-        crontab_string += this.make_command(tab);
+        crontab_string += this.makeCommand(tab);
         crontab_string += '\n';
       } else {
         crontab_string += tab.schedule;
         crontab_string += ' ';
-        crontab_string += this.make_command(tab);
+        crontab_string += this.makeCommand(tab);
         crontab_string += '\n';
       }
     });
@@ -584,7 +580,7 @@ export default class CronService {
       .map((doc) => ({
         id: String(doc.id),
         schedule: doc.schedule!,
-        command: doc.command,
+        command: this.makeCommand(doc),
         extraSchedules: doc.extra_schedules || []
       }));
     await cronClient.addCron(sixCron);

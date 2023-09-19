@@ -456,5 +456,9 @@
   "语言": "Language",
   "中...": "ing...",
   "请选择操作符": "Please select operator",
-  "新增定时规则": "New Timing Rules"
+  "新增定时规则": "Add Timing Rules",
+  "运行任务前执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js": "Run commands before executing the task, e.g., cp/mv/python3 xxx.py/node xxx.js",
+  "运行任务后执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js": "Run commands after executing the task, e.g., cp/mv/python3 xxx.py/node xxx.js",
+  "请输入运行任务前要执行的命令": "Please enter the command to run before executing the task",
+  "请输入运行任务后要执行的命令": "Please enter the command to run after executing the task"
 }

@@ -143,6 +143,32 @@ const CronModal = ({
         <Form.Item name="labels" label={intl.get('标签')}>
           <EditableTagGroup />
         </Form.Item>
+        <Form.Item
+          name="task_before"
+          label={intl.get('执行前')}
+          tooltip={intl.get(
+            '运行任务前执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js',
+          )}
+        >
+          <Input.TextArea
+            rows={4}
+            autoSize={{ minRows: 1, maxRows: 5 }}
+            placeholder={intl.get('请输入运行任务前要执行的命令')}
+          />
+        </Form.Item>
+        <Form.Item
+          name="task_after"
+          label={intl.get('执行后')}
+          tooltip={intl.get(
+            '运行任务后执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js',
+          )}
+        >
+          <Input.TextArea
+            rows={4}
+            autoSize={{ minRows: 1, maxRows: 5 }}
+            placeholder={intl.get('请输入运行任务后要执行的命令')}
+          />
+        </Form.Item>
       </Form>
     </Modal>
   );
