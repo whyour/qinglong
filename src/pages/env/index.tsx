@@ -82,6 +82,16 @@ const Env = () => {
       dataIndex: 'name',
       key: 'name',
       sorter: (a: any, b: any) => a.name.localeCompare(b.name),
+      render: (text: string, record: any) => {
+        return (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title={text} placement="topLeft">
+              <div className="text-ellipsis">{text}</div>
+            </Tooltip>
+            <Copy text={text} />
+          </div>
+        );
+      },
     },
     {
       title: intl.get('值'),
