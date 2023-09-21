@@ -273,13 +273,13 @@ update_qinglong() {
   exit_status=$?
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "\n更新青龙源文件成功...\n"
+    echo -e "更新青龙源文件成功...\n"
 
     unzip -oq ${dir_tmp}/ql.zip -d ${dir_tmp}
 
     update_qinglong_static
   else
-    echo -e "\n更新青龙源文件失败，请检查网络...\n"
+    echo -e "更新青龙源文件失败，请检查网络...\n"
   fi
 }
 
@@ -288,28 +288,29 @@ update_qinglong_static() {
   exit_status=$?
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "\n更新青龙静态资源成功...\n"
+    echo -e "更新青龙静态资源成功...\n"
     unzip -oq ${dir_tmp}/static.zip -d ${dir_tmp}
 
     check_update_dep
   else
-    echo -e "\n更新青龙静态资源失败，请检查网络...\n"
+    echo -e "更新青龙静态资源失败，请检查网络...\n"
   fi
 }
 
 check_update_dep() {
   echo -e "\n开始检测依赖...\n"
-  if [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
+  if [[ ! -s $dir_scripts/package.json ]] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
     cp -f $dir_sample/package.json $dir_scripts/package.json
     npm_install_2 $dir_scripts
   fi
+
   if [[ $(diff $dir_root/package.json ${dir_tmp}/qinglong-${primary_branch}/package.json) ]]; then
     npm_install_2 "${dir_tmp}/qinglong-${primary_branch}"
   fi
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "\n依赖检测安装成功...\n"
-    echo -e "\n更新包下载成功...\n"
+    echo -e "更新包下载成功..."
 
     if [[ "$needRestart" == 'true' ]]; then
       cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/

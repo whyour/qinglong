@@ -46,7 +46,6 @@ const Setting = () => {
     theme,
     reloadUser,
     reloadTheme,
-    socketMessage,
     systemInfo,
   } = useOutletContext<SharedContext>();
   const columns = [
@@ -376,7 +375,6 @@ const Setting = () => {
               children: (
                 <Other
                   reloadTheme={reloadTheme}
-                  socketMessage={socketMessage}
                   systemInfo={systemInfo}
                 />
               ),

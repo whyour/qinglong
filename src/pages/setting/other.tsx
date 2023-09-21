@@ -24,9 +24,8 @@ import useProgress from './progress';
 
 const Other = ({
   systemInfo,
-  socketMessage,
   reloadTheme,
-}: Pick<SharedContext, 'socketMessage' | 'reloadTheme' | 'systemInfo'>) => {
+}: Pick<SharedContext, 'reloadTheme' | 'systemInfo'>) => {
   const defaultTheme = localStorage.getItem('qinglong_dark_theme') || 'auto';
   const [systemConfig, setSystemConfig] = useState<{
     logRemoveFrequency?: number | null;
@@ -274,7 +273,7 @@ const Other = ({
         </Upload>
       </Form.Item>
       <Form.Item label={intl.get('检查更新')} name="update">
-        <CheckUpdate systemInfo={systemInfo} socketMessage={socketMessage} />
+        <CheckUpdate systemInfo={systemInfo} />
       </Form.Item>
     </Form>
   );

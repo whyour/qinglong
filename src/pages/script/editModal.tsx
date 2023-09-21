@@ -1,5 +1,11 @@
 import intl from 'react-intl-universal';
-import React, { useEffect, useState, useRef } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useReducer,
+} from 'react';
 import { Drawer, Button, Tabs, Badge, Select, TreeSelect } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
@@ -9,6 +15,7 @@ import SaveModal from './saveModal';
 import SettingModal from './setting';
 import { useTheme } from '@/utils/hooks';
 import { getEditorMode, logEnded } from '@/utils';
+import WebSocketManager from '@/utils/websocket';
 
 const { Option } = Select;
 
@@ -18,12 +25,10 @@ const EditModal = ({
   content,
   handleCancel,
   visible,
-  socketMessage,
 }: {
   treeData?: any;
   content?: string;
   visible: boolean;
-  socketMessage: any;
   currentNode: any;
   handleCancel: () => void;
 }) => {
@@ -34,12 +39,11 @@ const EditModal = ({
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
   const [settingModalVisible, setSettingModalVisible] =
     useState<boolean>(false);
-  const [log, setLog] = useState<string>('');
+  const [log, setLog] = useState('');
   const { theme } = useTheme();
   const editorRef = useRef<any>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [currentPid, setCurrentPid] = useState(null);
-
   const cancel = () => {
     handleCancel();
   };
@@ -104,28 +108,25 @@ const EditModal = ({
       });
   };
 
-  useEffect(() => {
-    if (!socketMessage) {
-      return;
-    }
-
-    let { type, message: _message, references } = socketMessage;
-
-    if (type !== 'manuallyRunScript') {
-      return;
-    }
-
+  const handleMessage = useCallback((payload: any) => {
+    let { message: _message } = payload;
     if (logEnded(_message)) {
       setTimeout(() => {
         setIsRunning(false);
       }, 300);
     }
 
-    if (log) {
-      _message = `\n${_message}`;
-    }
-    setLog(`${log}${_message}`);
-  }, [socketMessage]);
+    setLog(p=>`${p}${_message}`);
+  }, []);
+
+  useEffect(() => {
+    const ws = WebSocketManager.getInstance();
+    ws.subscribe('manuallyRunScript', handleMessage);
+
+    return () => {
+      ws.unsubscribe('manuallyRunScript', handleMessage);
+    };
+  }, []);
 
   useEffect(() => {
     setLog('');

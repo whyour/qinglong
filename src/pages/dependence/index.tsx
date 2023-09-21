@@ -35,6 +35,7 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import dayjs from 'dayjs';
+import WebSocketManager from '@/utils/websocket';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -87,8 +88,7 @@ const StatusMap: Record<number, { icon: React.ReactNode; color: string }> = {
 };
 
 const Dependence = () => {
-  const { headerStyle, isPhone, socketMessage } =
-    useOutletContext<SharedContext>();
+  const { headerStyle, isPhone } = useOutletContext<SharedContext>();
   const columns: any = [
     {
       title: intl.get('序号'),
@@ -109,11 +109,12 @@ const Dependence = () => {
       width: 120,
       dataIndex: 'status',
       render: (text: string, record: any, index: number) => {
+        console.log(record.status);
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
             <Tag
-              color={StatusMap[record.status].color}
-              icon={StatusMap[record.status].icon}
+              color={StatusMap[record.status]?.color}
+              icon={StatusMap[record.status]?.icon}
               style={{ marginRight: 0 }}
             >
               {intl.get(Status[record.status])}
@@ -395,63 +396,62 @@ const Dependence = () => {
     }
   }, [logDependence]);
 
-  useEffect(() => {
-    if (!socketMessage) return;
-    const { type, message, references } = socketMessage;
-    if (
-      type === 'installDependence' &&
-      message.includes('开始时间') &&
-      references.length > 0
-    ) {
-      const result = [...value];
-      for (let i = 0; i < references.length; i++) {
-        const index = value.findIndex((x) => x.id === references[i]);
-        if (index !== -1) {
-          result.splice(index, 1, {
-            ...value[index],
-            status: message.includes('安装') ? Status.安装中 : Status.删除中,
-          });
-        }
-      }
-      setValue(result);
+  const handleMessage = useCallback((payload: any) => {
+    const { message, references } = payload;
+    let status: number | undefined = undefined;
+    if (message.includes('开始时间') && references.length > 0) {
+      status = message.includes('安装') ? Status.安装中 : Status.删除中;
     }
-    if (
-      type === 'installDependence' &&
-      message.includes('结束时间') &&
-      references.length > 0
-    ) {
-      let status;
+    if (message.includes('结束时间') && references.length > 0) {
       if (message.includes('安装')) {
         status = message.includes('成功') ? Status.已安装 : Status.安装失败;
       } else {
         status = message.includes('成功') ? Status.已删除 : Status.删除失败;
       }
-      const result = [...value];
-      for (let i = 0; i < references.length; i++) {
-        const index = value.findIndex((x) => x.id === references[i]);
-        if (index !== -1) {
-          result.splice(index, 1, {
-            ...value[index],
-            status,
-          });
-        }
-      }
-      setValue(result);
 
       if (status === Status.已删除) {
         setTimeout(() => {
-          const _result = [...value];
-          for (let i = 0; i < references.length; i++) {
-            const index = value.findIndex((x) => x.id === references[i]);
-            if (index !== -1) {
-              _result.splice(index, 1);
+          setValue((p) => {
+            const _result = [...p];
+            for (let i = 0; i < references.length; i++) {
+              const index = p.findIndex((x) => x.id === references[i]);
+              if (index !== -1) {
+                _result.splice(index, 1);
+              }
             }
-          }
-          setValue(_result);
+            return _result;
+          });
         }, 5000);
+        return;
       }
     }
-  }, [socketMessage]);
+    if (typeof status === 'number') {
+      setValue((p) => {
+        const result = [...p];
+        for (let i = 0; i < references.length; i++) {
+          const index = p.findIndex((x) => x.id === references[i]);
+          if (index !== -1) {
+            result.splice(index, 1, {
+              ...p[index],
+              status,
+            });
+          }
+        }
+        return result;
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const ws = WebSocketManager.getInstance();
+    ws.subscribe('installDependence', handleMessage);
+    ws.subscribe('uninstallDependence', handleMessage);
+
+    return () => {
+      ws.unsubscribe('installDependence', handleMessage);
+      ws.unsubscribe('uninstallDependence', handleMessage);
+    };
+  }, []);
 
   const onTabChange = (activeKey: string) => {
     setSelectedRowIds([]);
@@ -548,24 +548,25 @@ const Dependence = () => {
         dependence={editedDependence}
         defaultType={type}
       />
-      <DependenceLogModal
-        visible={isLogModalVisible}
-        handleCancel={(needRemove?: boolean) => {
-          setIsLogModalVisible(false);
-          if (needRemove) {
-            const index = value.findIndex((x) => x.id === logDependence.id);
-            const result = [...value];
-            if (index !== -1) {
-              result.splice(index, 1);
-              setValue(result);
+      {logDependence && (
+        <DependenceLogModal
+          visible={isLogModalVisible}
+          handleCancel={(needRemove?: boolean) => {
+            setIsLogModalVisible(false);
+            if (needRemove) {
+              const index = value.findIndex((x) => x.id === logDependence.id);
+              const result = [...value];
+              if (index !== -1) {
+                result.splice(index, 1);
+                setValue(result);
+              }
+            } else if ([...value].map((x) => x.id).includes(logDependence.id)) {
+              getDependenceDetail(logDependence);
             }
-          } else if ([...value].map((x) => x.id).includes(logDependence.id)) {
-            getDependenceDetail(logDependence);
-          }
-        }}
-        socketMessage={socketMessage}
-        dependence={logDependence}
-      />
+          }}
+          dependence={logDependence}
+        />
+      )}
     </PageContainer>
   );
 };

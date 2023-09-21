@@ -1,5 +1,5 @@
 import intl from 'react-intl-universal';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Button,
   message,
@@ -36,6 +36,7 @@ import './index.less';
 import SubscriptionLogModal from './logModal';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
+import WebSocketManager from '@/utils/websocket';
 
 const { Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -61,8 +62,7 @@ export enum SubscriptionType {
 }
 
 const Subscription = () => {
-  const { headerStyle, isPhone, socketMessage } =
-    useOutletContext<SharedContext>();
+  const { headerStyle, isPhone } = useOutletContext<SharedContext>();
 
   const columns: any = [
     {
@@ -508,23 +508,31 @@ const Subscription = () => {
       : 'subscription';
   };
 
-  useEffect(() => {
-    if (!socketMessage) return;
-    const { type, message, references } = socketMessage;
-    if (type === 'runSubscriptionEnd' && references.length > 0) {
-      const result = [...value];
+  const handleMessage = useCallback((payload: any) => {
+    const { message, references } = payload;
+    setValue((p) => {
+      const result = [...p];
       for (let i = 0; i < references.length; i++) {
-        const index = value.findIndex((x) => x.id === references[i]);
+        const index = p.findIndex((x) => x.id === references[i]);
         if (index !== -1) {
           result.splice(index, 1, {
-            ...value[index],
+            ...p[index],
             status: SubscriptionStatus.idle,
           });
         }
       }
-      setValue(result);
-    }
-  }, [socketMessage]);
+      return result;
+    });
+  }, []);
+
+  useEffect(() => {
+    const ws = WebSocketManager.getInstance();
+    ws.subscribe('runSubscriptionEnd', handleMessage);
+
+    return () => {
+      ws.unsubscribe('runSubscriptionEnd', handleMessage);
+    };
+  }, []);
 
   useEffect(() => {
     if (logSubscription) {

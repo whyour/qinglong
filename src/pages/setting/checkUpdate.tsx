@@ -1,12 +1,14 @@
 import intl from 'react-intl-universal';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Statistic, Modal, Tag, Button, Spin, message } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
+import WebSocketManager from '@/utils/websocket';
+import Ansi from 'ansi-to-react';
 
 const { Countdown } = Statistic;
 
-const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
+const CheckUpdate = ({ systemInfo }: any) => {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [value, setValue] = useState('');
   const modalRef = useRef<any>();
@@ -149,17 +151,8 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
   };
 
   useEffect(() => {
-    if (!modalRef.current || !socketMessage) {
-      return;
-    }
-    const { type, message: _message, references } = socketMessage;
-
-    if (type !== 'updateSystemVersion') {
-      return;
-    }
-
-    const newMessage = `${value}${_message}`;
-    const updateFailed = newMessage.includes('失败');
+    if (!value) return;
+    const updateFailed = value.includes('失败，请检查');
 
     modalRef.current.update({
       maskClosable: updateFailed,
@@ -167,29 +160,46 @@ const CheckUpdate = ({ socketMessage, systemInfo }: any) => {
       okButtonProps: { disabled: !updateFailed },
       content: (
         <>
-          <pre>{newMessage}</pre>
+          <pre>
+            <Ansi>{value}</Ansi>
+          </pre>
           <div id="log-identifier" style={{ paddingBottom: 5 }}></div>
         </>
       ),
     });
+  }, [value]);
 
-    if (updateFailed && !value.includes('失败，请检查')) {
+  const handleMessage = useCallback((payload: any) => {
+    let { message: _message } = payload;
+    const updateFailed = _message.includes('失败，请检查');
+
+    if (updateFailed) {
       message.error(intl.get('更新失败，请检查网络及日志或稍后再试'));
     }
 
-    setValue(newMessage);
-
-    document.getElementById('log-identifier') &&
+    setTimeout(() => {
       document
-        .getElementById('log-identifier')!
-        .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        .querySelector('#log-identifier')!
+        .scrollIntoView({ behavior: 'smooth' });
+    }, 600);
 
     if (_message.includes('更新包下载成功')) {
       setTimeout(() => {
         showReloadModal();
       }, 1000);
     }
-  }, [socketMessage]);
+
+    setValue((p) => `${p}${_message}`);
+  }, []);
+
+  useEffect(() => {
+    const ws = WebSocketManager.getInstance();
+    ws.subscribe('updateSystemVersion', handleMessage);
+
+    return () => {
+      ws.unsubscribe('updateSystemVersion', handleMessage);
+    };
+  }, []);
 
   return (
     <>

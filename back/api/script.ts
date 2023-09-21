@@ -34,7 +34,7 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     try {
       let result = [];
-      const blacklist = ['node_modules', '.git'];
+      const blacklist = ['node_modules', '.git', '.pnpm'];
       if (req.query.path) {
         const targetPath = path.join(
           config.scriptPath,

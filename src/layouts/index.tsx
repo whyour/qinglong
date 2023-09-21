@@ -1,5 +1,5 @@
 import intl from 'react-intl-universal';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import ProLayout, { PageLoading } from '@ant-design/pro-layout';
 import * as DarkReader from '@umijs/ssr-darkreader';
 import defaultProps from './defaultProps';
@@ -29,9 +29,9 @@ import {
   MenuProps,
 } from 'antd';
 // @ts-ignore
-import SockJS from 'sockjs-client';
 import * as Sentry from '@sentry/react';
 import { init } from '../utils/init';
+import WebSocketManager from '../utils/websocket';
 
 export interface SharedContext {
   headerStyle: React.CSSProperties;
@@ -40,7 +40,6 @@ export interface SharedContext {
   user: any;
   reloadUser: (needLoading?: boolean) => void;
   reloadTheme: () => void;
-  socketMessage: any;
   systemInfo: TSystemInfo;
 }
 
@@ -60,8 +59,6 @@ export default function () {
   const [user, setUser] = useState<any>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<TSystemInfo>();
-  const ws = useRef<any>(null);
-  const [socketMessage, setSocketMessage] = useState<any>();
   const [collapsed, setCollapsed] = useState(false);
   const [initLoading, setInitLoading] = useState<boolean>(true);
   const {
@@ -180,32 +177,14 @@ export default function () {
 
   useEffect(() => {
     if (!user || !user.username) return;
-    ws.current = new SockJS(
+    const ws = WebSocketManager.getInstance(
       `${window.location.origin}/api/ws?token=${localStorage.getItem(
         config.authKey,
       )}`,
     );
 
-    ws.current.onmessage = (e: any) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'ping') {
-          if (data && data.message === 'hanhh') {
-            console.log('WS connection succeeded !!!');
-          } else {
-            console.log('WS connection Failed !!!', e);
-          }
-        }
-        setSocketMessage(data);
-      } catch (error) {
-        console.log('websocket连接失败', e);
-      }
-    };
-
-    const wsCurrent = ws.current;
-
     return () => {
-      wsCurrent.close();
+      ws.close();
     };
   }, [user]);
 
@@ -387,7 +366,6 @@ export default function () {
           user,
           reloadUser,
           reloadTheme,
-          socketMessage,
           systemInfo,
         }}
       />

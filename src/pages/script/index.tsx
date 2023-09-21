@@ -48,7 +48,7 @@ import { langs } from '@uiw/codemirror-extensions-langs';
 const { Text } = Typography;
 
 const Script = () => {
-  const { headerStyle, isPhone, theme, socketMessage } =
+  const { headerStyle, isPhone, theme } =
     useOutletContext<SharedContext>();
   const [value, setValue] = useState(intl.get('请选择脚本文件'));
   const [select, setSelect] = useState<string>('');
@@ -591,16 +591,15 @@ const Script = () => {
             }}
           />
         )}
-        <EditModal
+        {isLogModalVisible && <EditModal
           visible={isLogModalVisible}
           treeData={data}
           currentNode={currentNode}
           content={value}
-          socketMessage={socketMessage}
           handleCancel={() => {
             setIsLogModalVisible(false);
           }}
-        />
+        />}
         <EditScriptNameModal
           visible={isAddFileModalVisible}
           treeData={data}
