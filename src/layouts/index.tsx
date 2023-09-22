@@ -225,7 +225,6 @@ export default function () {
             user,
             reloadUser,
             reloadTheme,
-            ws: ws.current,
           }}
         />
       );
