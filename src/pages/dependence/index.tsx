@@ -100,7 +100,7 @@ const Dependence = () => {
     {
       title: intl.get('名称'),
       dataIndex: 'name',
-      width: 120,
+      width: 180,
       key: 'name',
     },
     {
@@ -126,7 +126,7 @@ const Dependence = () => {
     {
       title: intl.get('备注'),
       dataIndex: 'remark',
-      width: 120,
+      width: 100,
       key: 'remark',
     },
     {
@@ -150,7 +150,7 @@ const Dependence = () => {
     {
       title: intl.get('操作'),
       key: 'action',
-      width: 150,
+      width: 140,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (

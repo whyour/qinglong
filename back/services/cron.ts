@@ -449,7 +449,7 @@ export default class CronService {
       .map((doc) => ({
         id: String(doc.id),
         schedule: doc.schedule!,
-        command: doc.command,
+        command: this.makeCommand(doc),
         extraSchedules: doc.extra_schedules || []
       }));
     await cronClient.addCron(sixCron);
