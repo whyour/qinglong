@@ -112,10 +112,14 @@ const ViewCreateModal = ({
     );
   }, [view, visible]);
 
-  const OperationElement = ({ name }: { name: number }) => {
+  const OperationElement = ({ name, ...others }: { name: number }) => {
     const property = form.getFieldValue(['filters', name, 'property']);
     return (
-      <Select style={{ width: 120 }} placeholder={intl.get('请选择操作符')}>
+      <Select
+        style={{ width: 120 }}
+        placeholder={intl.get('请选择操作符')}
+        {...others}
+      >
         {OPERATIONS.filter((x) =>
           STATUS_MAP[property as 'status' | 'sub_id'] ? x.type === 'select' : x,
         ).map((x) => (
