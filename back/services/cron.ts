@@ -53,9 +53,9 @@ export default class CronService {
       return newDoc;
     }
     if (this.isSixCron(doc) || doc.extra_schedules?.length) {
-      await cronClient.delCron([String(newDoc.id)]);
+      await cronClient.delCron([String(doc.id)]);
     }
-    if (this.isSixCron(newDoc) || doc.extra_schedules?.length) {
+    if (this.isSixCron(newDoc) || newDoc.extra_schedules?.length) {
       await cronClient.addCron([
         {
           id: String(newDoc.id),
