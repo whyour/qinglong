@@ -10,6 +10,7 @@ import {
 import { PageLoading } from '@ant-design/pro-layout';
 import { logEnded } from '@/utils';
 import { CrontabStatus } from './type';
+import Ansi from 'ansi-to-react';
 
 const { Countdown } = Statistic;
 
@@ -148,7 +149,7 @@ const CronLogModal = ({
                 : {}
             }
           >
-            {value}
+            <Ansi>{value}</Ansi>
           </pre>
         )}
         <div id="log-flag"></div>

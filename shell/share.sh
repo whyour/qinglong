@@ -460,7 +460,7 @@ handle_task_after() {
 
   [[ "$diff_time" == 0 ]] && diff_time=1
 
-  echo -e "\n\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
+  echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
 
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
 }

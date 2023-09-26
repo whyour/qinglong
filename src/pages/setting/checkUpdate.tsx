@@ -77,7 +77,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
           </div>
         </>
       ),
-      content: <pre>{lastLog}</pre>,
+      content: <pre><Ansi>{lastLog}</Ansi></pre>,
       okText: intl.get('下载更新'),
       cancelText: intl.get('以后再说'),
       onOk() {
@@ -102,7 +102,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
       okButtonProps: { disabled: true },
       title: intl.get('下载更新中...'),
       centered: true,
-      content: <pre>{value}</pre>,
+      content: <pre><Ansi>{value}</Ansi></pre>,
     });
   };
 

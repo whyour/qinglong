@@ -14,6 +14,8 @@ import cronClient from '../schedule/client';
 import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
 import dayjs from 'dayjs';
+import pickBy from 'lodash/pickBy';
+import omit from 'lodash/omit';
 
 @Service()
 export default class CronService {
@@ -89,7 +91,7 @@ export default class CronService {
     last_running_time: number;
     last_execution_time: number;
   }) {
-    const options: any = {
+    let options: any = {
       status,
       pid,
       log_path,
@@ -99,7 +101,13 @@ export default class CronService {
       options.last_running_time = last_running_time;
     }
 
-    return await CrontabModel.update({ ...options }, { where: { id: ids } });
+    for (const id of ids) {
+      const cron = await this.getDb({ id });
+      if (status === CrontabStatus.idle && log_path !== cron.log_path) {
+        options = omit(options, ['status', 'log_path', 'pid']);
+      }
+      await CrontabModel.update({ ...pickBy(options, (v) => v === 0 || !!v) }, { where: { id } });
+    }
   }
 
   public async remove(ids: number[]) {

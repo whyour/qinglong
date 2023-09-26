@@ -458,13 +458,12 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
         const data = await cronService.status({
           ...req.body,
-          status: parseInt(req.body.status),
-          pid: parseInt(req.body.pid) || '',
+          status: req.body.status ? parseInt(req.body.status) : undefined,
+          pid: req.body.pid ? parseInt(req.body.pid) : undefined,
         });
         return res.send({ code: 200, data });
       } catch (e) {

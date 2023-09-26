@@ -16,6 +16,7 @@ import SettingModal from './setting';
 import { useTheme } from '@/utils/hooks';
 import { getEditorMode, logEnded } from '@/utils';
 import WebSocketManager from '@/utils/websocket';
+import Ansi from 'ansi-to-react';
 
 const { Option } = Select;
 
@@ -116,7 +117,7 @@ const EditModal = ({
       }, 300);
     }
 
-    setLog(p=>`${p}${_message}`);
+    setLog((p) => `${p}${_message}`);
   }, []);
 
   useEffect(() => {
@@ -246,7 +247,7 @@ const EditModal = ({
             padding: '0 15px',
           }}
         >
-          {log}
+          <Ansi>{log}</Ansi>
         </pre>
       </SplitPane>
       <SaveModal

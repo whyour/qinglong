@@ -25,8 +25,8 @@ body {
 }
 
 .ant-modal-body {
-  max-height: calc(90vh - 110px);
-  max-height: calc(90vh - var(--vh-offset, 110px));
+  max-height: calc(80vh - 110px);
+  max-height: calc(80vh - var(--vh-offset, 110px));
   overflow-y: auto;
 }
 
@@ -181,6 +181,7 @@ body {
       .react-codemirror2,
       .CodeMirror {
         height: 100%;
+        overflow: auto;
       }
     }
   }
