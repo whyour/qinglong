@@ -1,6 +1,14 @@
 import intl from 'react-intl-universal';
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, message, Input, Form, Statistic, Button } from 'antd';
+import {
+  Modal,
+  message,
+  Input,
+  Form,
+  Statistic,
+  Button,
+  Typography,
+} from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import {
@@ -50,10 +58,15 @@ const CronLogModal = ({
           const hasNext = Boolean(
             log && !logEnded(log) && !log.includes('任务未运行'),
           );
+          if (!hasNext && !logEnded(value) && value !== intl.get('启动中...')) {
+            setTimeout(() => {
+              autoScroll();
+            });
+          }
           setExecuting(hasNext);
           if (hasNext) {
-            autoScroll();
             setTimeout(() => {
+              autoScroll();
               getCronLog();
             }, 2000);
           }
@@ -88,18 +101,20 @@ const CronLogModal = ({
     if (scrollInfoRef.current.down) {
       scrollInfoRef.current = {
         value: sTop,
-        down: sTop > scrollInfoRef.current.value || !sTop,
+        down: sTop - scrollInfoRef.current.value > -5 || !sTop,
       };
     }
   };
 
   const titleElement = () => {
     return (
-      <>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         {(executing || loading) && <Loading3QuartersOutlined spin />}
         {!executing && !loading && <CheckCircleOutlined />}
-        <span style={{ marginLeft: 5 }}>{cron && cron.name}</span>
-      </>
+        <Typography.Text ellipsis={true} style={{ marginLeft: 5 }}>
+          {cron && cron.name}
+        </Typography.Text>
+      </div>
     );
   };
 

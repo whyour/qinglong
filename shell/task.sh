@@ -5,7 +5,7 @@ dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
 
-trap "single_hanle" 2 3 20 15 14
+trap "single_hanle" 2 3 20 15 14 19 1
 single_hanle() {
   eval handle_task_after "$@" "$cmd"
   exit 1
