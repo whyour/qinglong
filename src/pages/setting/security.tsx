@@ -97,14 +97,16 @@ const SecuritySettings = ({ user, userChange }: any) => {
 
   const onChange = (e) => {
     if (e.file && e.file.response) {
-      setAvatar(`/api/static/${e.file.response.data}`);
+      setAvatar(
+        `${config.apiPrefix}static/${e.file.response.data}`,
+      );
       userChange();
     }
   };
 
   useEffect(() => {
     setTwoFactorActivated(user && user.twoFactorActivated);
-    setAvatar(user.avatar && `/api/static/${user.avatar}`);
+    setAvatar(user.avatar && `${config.apiPrefix}static/${user.avatar}`);
   }, [user]);
 
   return twoFactoring ? (
@@ -250,7 +252,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
           method="put"
           showUploadList={false}
           maxCount={1}
-          action="/api/user/avatar"
+          action={`${config.apiPrefix}user/avatar`}
           onChange={onChange}
           name="avatar"
           headers={{

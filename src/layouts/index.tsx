@@ -178,7 +178,7 @@ export default function () {
   useEffect(() => {
     if (!user || !user.username) return;
     const ws = WebSocketManager.getInstance(
-      `${window.location.origin}${window.__ENV__QlBaseUrl || '/'}api/ws?token=${localStorage.getItem(
+      `${window.location.origin}${config.apiPrefix}ws?token=${localStorage.getItem(
         config.authKey,
       )}`,
     );
@@ -320,7 +320,7 @@ export default function () {
                 shape="square"
                 size="small"
                 icon={<UserOutlined />}
-                src={user.avatar ? `/api/static/${user.avatar}` : ''}
+                src={user.avatar ? `${config.apiPrefix}static/${user.avatar}` : ''}
               />
               <span style={{ marginLeft: 5 }}>{user.username}</span>
             </span>
@@ -342,7 +342,7 @@ export default function () {
                   shape="square"
                   size="small"
                   icon={<UserOutlined />}
-                  src={user.avatar ? `/api/static/${user.avatar}` : ''}
+                  src={user.avatar ? `${config.apiPrefix}static/${user.avatar}` : ''}
                 />
                 <span style={{ marginLeft: 5 }}>{user.username}</span>
               </span>

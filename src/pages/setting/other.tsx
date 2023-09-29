@@ -253,7 +253,7 @@ const Other = ({
           method="put"
           showUploadList={false}
           maxCount={1}
-          action="/api/system/data/import"
+          action={`${config.apiPrefix}system/data/import`}
           onChange={(e) => {
             if (e.event?.percent) {
               showUploadProgress(parseFloat(e.event?.percent.toFixed(1)));
