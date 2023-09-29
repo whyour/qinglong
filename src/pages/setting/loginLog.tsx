@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Table, Tag, Button, Spin, message } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
+import dayjs from 'dayjs';
 
 const { Text, Link } = Typography;
 
@@ -30,7 +31,7 @@ const columns = [
     key: 'timestamp',
     width: 120,
     render: (text: string, record: any) => {
-      return new Date(record.timestamp).toLocaleString();
+      return dayjs(record.timestamp).format('YYYY-MM-DD HH:mm:ss');
     },
   },
   {

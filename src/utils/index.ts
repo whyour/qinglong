@@ -329,7 +329,7 @@ export function getCommandScript(
   return [s, p];
 }
 
-export function parseCrontab(schedule: string): Date {
+export function parseCrontab(schedule: string): Date | null {
   try {
     const time = cron_parser.parseExpression(schedule);
     if (time) {
@@ -337,7 +337,20 @@ export function parseCrontab(schedule: string): Date {
     }
   } catch (error) { }
 
-  return new Date('1970');
+  return null;
+}
+
+export function getCrontabsNextDate(schedule: string, extra_schedules: string[]): Date | null {
+  let date = parseCrontab(schedule)
+  if (extra_schedules?.length) {
+    extra_schedules.forEach(x => {
+      const _date = parseCrontab(x)
+      if (_date && (!date || _date < date)) {
+        date = _date;
+      }
+    })
+  }
+  return date;
 }
 
 export function getExtension(filename: string) {

@@ -33,6 +33,7 @@ import IconFont from '@/components/iconfont';
 import { getCommandScript, getEditorMode } from '@/utils';
 import VirtualList from 'rc-virtual-list';
 import useScrollHeight from '@/hooks/useScrollHeight';
+import dayjs from 'dayjs';
 
 const { Text } = Typography;
 
@@ -51,8 +52,6 @@ interface LogItem {
   directory: string;
   filename: string;
 }
-
-const language = navigator.language || navigator.languages[0];
 
 const CronDetailModal = ({
   cron = {},
@@ -498,7 +497,12 @@ const CronDetailModal = ({
           </div>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">{intl.get('定时')}</div>
-            <div className="cron-detail-info-value">{currentCron.schedule}</div>
+            <div className="cron-detail-info-value">
+              <div>{currentCron.schedule}</div>
+              {currentCron.extra_schedules?.map((x) => (
+                <div key={x.schedule}>{x.schedule}</div>
+              ))}
+            </div>
           </div>
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">
@@ -506,11 +510,9 @@ const CronDetailModal = ({
             </div>
             <div className="cron-detail-info-value">
               {currentCron.last_execution_time
-                ? new Date(currentCron.last_execution_time * 1000)
-                    .toLocaleString(language, {
-                      hour12: false,
-                    })
-                    .replace(' 24:', ' 00:')
+                ? dayjs(currentCron.last_execution_time * 1000).format(
+                    'YYYY-MM-DD HH:mm:ss',
+                  )
                 : '-'}
             </div>
           </div>
@@ -530,11 +532,7 @@ const CronDetailModal = ({
             </div>
             <div className="cron-detail-info-value">
               {currentCron.nextRunTime &&
-                currentCron.nextRunTime
-                  .toLocaleString(language, {
-                    hour12: false,
-                  })
-                  .replace(' 24:', ' 00:')}
+                dayjs(currentCron.nextRunTime).format('YYYY-MM-DD HH:mm:ss')}
             </div>
           </div>
         </Card>

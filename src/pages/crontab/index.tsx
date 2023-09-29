@@ -51,13 +51,14 @@ import ViewManageModal from './viewManageModal';
 import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
-import { getCommandScript, parseCrontab } from '@/utils';
+import { getCommandScript, getCrontabsNextDate, parseCrontab } from '@/utils';
 import { ColumnProps } from 'antd/lib/table';
 import { useVT } from 'virtualizedtableforantd4';
 import { ICrontab, OperationName, OperationPath, CrontabStatus } from './type';
 import Name from '@/components/name';
+import dayjs from 'dayjs';
 
-const { Text, Paragraph } = Typography;
+const { Text, Paragraph, Link } = Typography;
 const { Search } = Input;
 
 const Crontab = () => {
@@ -74,17 +75,18 @@ const Crontab = () => {
           style={{
             wordBreak: 'break-all',
             marginBottom: 0,
+            color: '#1890ff'
           }}
           ellipsis={{ tooltip: text, rows: 2 }}
         >
-          <a
+          <Link
             onClick={() => {
               setDetailCron(record);
               setIsDetailModalVisible(true);
             }}
           >
             {record.name || '-'}
-          </a>
+          </Link>
         </Paragraph>
       ),
       sorter: {
@@ -183,17 +185,29 @@ const Crontab = () => {
         compare: (a, b) => a.schedule.localeCompare(b.schedule),
       },
       render: (text, record) => {
-        return record.extra_schedules?.length ? (
-          <Popover
-            placement="right"
-            content={record.extra_schedules?.map((x) => (
-              <div>{x.schedule}</div>
-            ))}
+        return (
+          <Paragraph
+            style={{
+              wordBreak: 'break-all',
+              marginBottom: 0,
+            }}
+            ellipsis={{
+              tooltip: {
+                placement: 'right',
+                title: (
+                  <>
+                    <div>{text}</div>
+                    {record.extra_schedules?.map((x) => (
+                      <div key={x.schedule}>{x.schedule}</div>
+                    ))}
+                  </>
+                ),
+              },
+              rows: 2,
+            }}
           >
             {text}
-          </Popover>
-        ) : (
-          text
+          </Paragraph>
         );
       },
     },
@@ -224,7 +238,6 @@ const Crontab = () => {
         },
       },
       render: (text, record) => {
-        const language = navigator.language || navigator.languages[0];
         return (
           <span
             style={{
@@ -232,11 +245,9 @@ const Crontab = () => {
             }}
           >
             {record.last_execution_time
-              ? new Date(record.last_execution_time * 1000)
-                  .toLocaleString(language, {
-                    hour12: false,
-                  })
-                  .replace(' 24:', ' 00:')
+              ? dayjs(record.last_execution_time * 1000).format(
+                  'YYYY-MM-DD HH:mm:ss',
+                )
               : '-'}
           </span>
         );
@@ -251,12 +262,7 @@ const Crontab = () => {
         },
       },
       render: (text, record) => {
-        const language = navigator.language || navigator.languages[0];
-        return record.nextRunTime
-          .toLocaleString(language, {
-            hour12: false,
-          })
-          .replace(' 24:', ' 00:');
+        return dayjs(record.nextRunTime).format('YYYY-MM-DD HH:mm:ss');
       },
     },
     {
@@ -389,7 +395,7 @@ const Crontab = () => {
             data.map((x) => {
               return {
                 ...x,
-                nextRunTime: parseCrontab(x.schedule),
+                nextRunTime: getCrontabsNextDate(x.schedule, x.extra_schedules),
               };
             }),
           );
@@ -677,7 +683,10 @@ const Crontab = () => {
         if (code === 200) {
           const index = value.findIndex((x) => x.id === cron.id);
           const result = [...value];
-          data.nextRunTime = parseCrontab(data.schedule);
+          data.nextRunTime = getCrontabsNextDate(
+            data.schedule,
+            data.extra_schedules,
+          );
           if (index !== -1) {
             result.splice(index, 1, {
               ...cron,

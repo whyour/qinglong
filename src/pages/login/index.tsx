@@ -16,6 +16,7 @@ import { request } from '@/utils/http';
 import { useTheme } from '@/utils/hooks';
 import { MobileOutlined } from '@ant-design/icons';
 import { SharedContext } from '@/layouts';
+import dayjs from 'dayjs';
 
 const FormItem = Form.Item;
 const { Countdown } = Statistic;
@@ -86,7 +87,7 @@ const Login = () => {
           <>
             <div>
               {intl.get('上次登录时间：')}
-              {lastlogon ? new Date(lastlogon).toLocaleString() : '-'}
+              {lastlogon ? dayjs(lastlogon).format('YYYY-MM-DD HH:mm:ss') : '-'}
             </div>
             <div>
               {intl.get('上次登录地点：')}
