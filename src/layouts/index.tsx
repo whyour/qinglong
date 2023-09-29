@@ -178,7 +178,7 @@ export default function () {
   useEffect(() => {
     if (!user || !user.username) return;
     const ws = WebSocketManager.getInstance(
-      `${window.location.origin}/api/ws?token=${localStorage.getItem(
+      `${window.location.origin}${window.__ENV__QlBaseUrl || '/'}api/ws?token=${localStorage.getItem(
         config.authKey,
       )}`,
     );

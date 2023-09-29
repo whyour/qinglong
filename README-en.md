@@ -63,7 +63,7 @@ docker run -dit \
   -v $PWD/ql/data:/ql/data \
   # The 5700 after the colon is the default port, if QlPort is set, it needs to be the same as QlPort.
   -p 5700:5700 \
-  # Deployment paths are not required and begin and end with a slash, e.g. /test/.
+  # Deployment paths are not required, e.g. /test.
   -e QlBaseUrl="/" \
   # Deployment port is not required, when using host mode, you can set the port after service startup, default 5700
   -e QlPort="5700" \
@@ -95,7 +95,7 @@ podman run -dit \
   -v $PWD/ql/data:/ql/data \
   # The 5700 after the colon is the default port, if QlPort is set, it needs to be the same as QlPort.
   -p 5700:5700 \
-  # Deployment paths are not required and begin and end with a slash, e.g. /test/.
+  # Deployment paths are not required, e.g. /test.
   -e QlBaseUrl="/" \
   # Deployment port is not required, when using host mode, you can set the port after service startup, default 5700
   -e QlPort="5700" \

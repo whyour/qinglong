@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "ES2015",
-    "moduleResolution": "Bundler",
+    "module": "commonjs",
+    "moduleResolution": "node",
     "importHelpers": true,
     "jsx": "react-jsx",
     "esModuleInterop": true,
@@ -25,14 +25,7 @@
   "include": ["src/**/*", ".umirc.ts", "typings.d.ts", "back/**/*"],
   "exclude": [
     "node_modules",
-    "lib",
-    "es",
     "static",
     "data",
-    "typings",
-    "**/__test__",
-    "test",
-    "docs",
-    "tests"
   ]
 }
