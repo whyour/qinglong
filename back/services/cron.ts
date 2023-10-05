@@ -35,7 +35,7 @@ export default class CronService {
     const doc = await this.insert(tab);
     if (this.isSixCron(doc) || doc.extra_schedules?.length) {
       await cronClient.addCron([
-        { id: String(doc.id), schedule: doc.schedule!, command: this.makeCommand(doc), extraSchedules: doc.extra_schedules || [] },
+        { name: doc.name || '', id: String(doc.id), schedule: doc.schedule!, command: this.makeCommand(doc), extraSchedules: doc.extra_schedules || [] },
       ]);
     }
     await this.set_crontab();
@@ -60,6 +60,7 @@ export default class CronService {
     if (this.isSixCron(newDoc) || newDoc.extra_schedules?.length) {
       await cronClient.addCron([
         {
+          name: doc.name || '',
           id: String(newDoc.id),
           schedule: newDoc.schedule!,
           command: this.makeCommand(newDoc),
@@ -391,14 +392,17 @@ export default class CronService {
     );
   }
 
-  private async runSingle(cronId: number): Promise<number> {
-    return taskLimit.runWithCpuLimit(() => {
+  private async runSingle(cronId: number): Promise<number | void> {
+    return taskLimit.runWithCronLimit(() => {
       return new Promise(async (resolve: any) => {
         const cron = await this.getDb({ id: cronId });
+        const params = { name: cron.name, command: cron.command, schedule: cron.schedule, extraSchedules: cron.extra_schedules };
         if (cron.status !== CrontabStatus.queued) {
-          resolve();
+          resolve(params);
           return;
         }
+
+        this.logger.info(`[panel][开始执行任务] 参数 ${JSON.stringify(params)}`);
 
         let { id, command, log_path } = cron;
         const uniqPath = await getUniqPath(command, `${id}`);
@@ -409,10 +413,6 @@ export default class CronService {
         }
         const logPath = `${uniqPath}/${logTime}.log`;
         const absolutePath = path.resolve(config.logPath, `${logPath}`);
-
-        this.logger.silly('Running job');
-        this.logger.silly('ID: ' + id);
-        this.logger.silly('Original command: ' + command);
 
         const cp = spawn(`real_log_path=${logPath} no_delay=true ${this.makeCommand(cron)}`, { shell: '/bin/bash' });
 
@@ -427,17 +427,12 @@ export default class CronService {
           fs.appendFileSync(`${absolutePath}`, `${JSON.stringify(err)}`);
         });
 
-        cp.on('exit', async (code, signal) => {
-          this.logger.info(
-            `[panel][任务退出] 任务 ${command} 进程id: ${cp.pid}, 退出码 ${code}`,
-          );
-        });
         cp.on('close', async (code) => {
           await CrontabModel.update(
             { status: CrontabStatus.idle, pid: undefined },
             { where: { id } },
           );
-          resolve();
+          resolve({ ...params, pid: cp.pid, code });
         });
       });
     });
@@ -455,6 +450,7 @@ export default class CronService {
     const sixCron = docs
       .filter((x) => this.isSixCron(x))
       .map((doc) => ({
+        name: doc.name || '',
         id: String(doc.id),
         schedule: doc.schedule!,
         command: this.makeCommand(doc),
@@ -586,6 +582,7 @@ export default class CronService {
     const sixCron = tabs.data
       .filter((x) => this.isSixCron(x) && x.isDisabled !== 1)
       .map((doc) => ({
+        name: doc.name || '',
         id: String(doc.id),
         schedule: doc.schedule!,
         command: this.makeCommand(doc),

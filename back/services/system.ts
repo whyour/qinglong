@@ -39,7 +39,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -114,7 +114,7 @@ export default class SystemService {
           },
         );
         lastVersionContent = await parseContentVersion(result.body);
-      } catch (error) {}
+      } catch (error) { }
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -232,6 +232,9 @@ export default class SystemService {
     this.scheduleService.runTask(
       `real_log_path=${logPath} real_time=true ${command}`,
       callback,
+      {
+        command,
+      }
     );
   }
 

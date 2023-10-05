@@ -24,6 +24,7 @@ export interface ICron {
   schedule: string;
   command: string;
   extraSchedules: ISchedule[];
+  name: string;
 }
 
 export interface AddCronRequest {
@@ -97,7 +98,7 @@ export const ISchedule = {
 };
 
 function createBaseICron(): ICron {
-  return { id: "", schedule: "", command: "", extraSchedules: [] };
+  return { id: "", schedule: "", command: "", extraSchedules: [], name: "" };
 }
 
 export const ICron = {
@@ -113,6 +114,9 @@ export const ICron = {
     }
     for (const v of message.extraSchedules) {
       ISchedule.encode(v!, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.name !== "") {
+      writer.uint32(42).string(message.name);
     }
     return writer;
   },
@@ -152,6 +156,13 @@ export const ICron = {
 
           message.extraSchedules.push(ISchedule.decode(reader, reader.uint32()));
           continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -169,6 +180,7 @@ export const ICron = {
       extraSchedules: Array.isArray(object?.extraSchedules)
         ? object.extraSchedules.map((e: any) => ISchedule.fromJSON(e))
         : [],
+      name: isSet(object.name) ? String(object.name) : "",
     };
   },
 
@@ -182,6 +194,7 @@ export const ICron = {
     } else {
       obj.extraSchedules = [];
     }
+    message.name !== undefined && (obj.name = message.name);
     return obj;
   },
 
@@ -195,6 +208,7 @@ export const ICron = {
     message.schedule = object.schedule ?? "";
     message.command = object.command ?? "";
     message.extraSchedules = object.extraSchedules?.map((e) => ISchedule.fromPartial(e)) || [];
+    message.name = object.name ?? "";
     return message;
   },
 };

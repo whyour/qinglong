@@ -74,7 +74,11 @@ const CronModal = ({
         name="form_in_modal"
         initialValues={cron}
       >
-        <Form.Item name="name" label={intl.get('名称')}>
+        <Form.Item
+          name="name"
+          label={intl.get('名称')}
+          rules={[{ required: true, whitespace: true }]}
+        >
           <Input placeholder={intl.get('请输入任务名称')} />
         </Form.Item>
         <Form.Item

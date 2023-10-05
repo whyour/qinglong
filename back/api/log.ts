@@ -65,7 +65,7 @@ export default (app: Router) => {
         };
         const filePath = join(config.logPath, path, filename);
         if (type === 'directory') {
-          emptyDir(filePath);
+          await emptyDir(filePath);
         } else {
           fs.unlinkSync(filePath);
         }

@@ -183,7 +183,7 @@ export default (app: Router) => {
         };
         const filePath = join(config.scriptPath, path, filename);
         if (type === 'directory') {
-          emptyDir(filePath);
+          await emptyDir(filePath);
         } else {
           fs.unlinkSync(filePath);
         }
@@ -260,7 +260,6 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         let { filename, path, pid } = req.body;
         const { name, ext } = parse(filename);
@@ -269,7 +268,9 @@ export default (app: Router) => {
 
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.stopScript(filePath, pid);
-        emptyDir(logPath);
+        setTimeout(() => {
+          emptyDir(logPath);
+        }, 3000);
         res.send(result);
       } catch (e) {
         return next(e);

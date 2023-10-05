@@ -320,7 +320,11 @@ export default class SubscriptionService {
 
     const command = formatCommand(subscription);
 
-    this.scheduleService.runTask(command, this.taskCallbacks(subscription));
+    this.scheduleService.runTask(command, this.taskCallbacks(subscription), {
+      name: subscription.name,
+      schedule: subscription.schedule,
+      command
+    });
   }
 
   public async disabled(ids: number[]) {

@@ -298,13 +298,17 @@ export function readDir(
   return result;
 }
 
-export function emptyDir(path: string) {
+export async function emptyDir(path: string) {
+  const pathExist = await fileExist(path);
+  if (!pathExist) {
+    return;
+  }
   const files = fs.readdirSync(path);
-  files.forEach((file) => {
+  files.forEach(async (file) => {
     const filePath = `${path}/${file}`;
     const stats = fs.statSync(filePath);
     if (stats.isDirectory()) {
-      emptyDir(filePath);
+      await emptyDir(filePath);
     } else {
       fs.unlinkSync(filePath);
     }

@@ -42,15 +42,22 @@ export default class ScheduleService {
 
   private maxBuffer = 200 * 1024 * 1024;
 
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   async runTask(
     command: string,
     callbacks: TaskCallbacks = {},
+    params: {
+      schedule?: string;
+      name?: string;
+      command?: string;
+    },
     completionTime: 'start' | 'end' = 'end',
   ) {
-    return taskLimit.runWithCpuLimit(() => {
+    return taskLimit.runWithCronLimit(() => {
       return new Promise(async (resolve, reject) => {
+        this.logger.info(`[panel][开始执行任务] 参数 ${JSON.stringify({ ...params, command })}`);
+
         try {
           const startTime = dayjs();
           await callbacks.onBefore?.(startTime);
@@ -82,12 +89,6 @@ export default class ScheduleService {
             await callbacks.onError?.(JSON.stringify(err));
           });
 
-          cp.on('exit', async (code, signal) => {
-            this.logger.info(
-              `[panel][任务退出] ${command} 进程id: ${cp.pid}, 退出码 ${code}`,
-            );
-          });
-
           cp.on('close', async (code) => {
             const endTime = dayjs();
             await callbacks.onEnd?.(
@@ -95,7 +96,7 @@ export default class ScheduleService {
               endTime,
               endTime.diff(startTime, 'seconds'),
             );
-            resolve(null);
+            resolve({ ...params, pid: cp.pid, code });
           });
         } catch (error) {
           this.logger.error(
@@ -126,12 +127,20 @@ export default class ScheduleService {
     this.scheduleStacks.set(
       _id,
       nodeSchedule.scheduleJob(_id, schedule, async () => {
-        this.runTask(command, callbacks);
+        this.runTask(command, callbacks, {
+          name,
+          schedule,
+          command,
+        });
       }),
     );
 
     if (runImmediately) {
-      this.runTask(command, callbacks);
+      this.runTask(command, callbacks, {
+        name,
+        schedule,
+        command,
+      });
     }
   }
 
@@ -160,7 +169,10 @@ export default class ScheduleService {
     const task = new Task(
       name,
       () => {
-        this.runTask(command, callbacks);
+        this.runTask(command, callbacks, {
+          name,
+          command,
+        });
       },
       (err) => {
         this.logger.error(
@@ -180,7 +192,10 @@ export default class ScheduleService {
     this.intervalSchedule.addIntervalJob(job);
 
     if (runImmediately) {
-      this.runTask(command, callbacks);
+      this.runTask(command, callbacks, {
+        name,
+        command,
+      });
     }
   }
 

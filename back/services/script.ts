@@ -16,14 +16,14 @@ export default class ScriptService {
     private sockService: SockService,
     private cronService: CronService,
     private scheduleService: ScheduleService,
-  ) {}
+  ) { }
 
   private taskCallbacks(filePath: string): TaskCallbacks {
     return {
       onEnd: async (cp, endTime, diff) => {
         try {
           fs.unlinkSync(filePath);
-        } catch (error) {}
+        } catch (error) { }
       },
       onError: async (message: string) => {
         this.sockService.sendMessage({
@@ -46,6 +46,7 @@ export default class ScriptService {
     const pid = await this.scheduleService.runTask(
       command,
       this.taskCallbacks(filePath),
+      { command },
       'start',
     );
 
@@ -59,7 +60,7 @@ export default class ScriptService {
     }
     try {
       await killTask(pid);
-    } catch (error) {}
+    } catch (error) { }
 
     return { code: 200 };
   }

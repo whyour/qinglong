@@ -14,6 +14,7 @@ message ICron {
   string schedule = 2;
   string command = 3;
   repeated ISchedule extra_schedules = 4;
+  string name = 5;
 }
 
 message AddCronRequest { repeated ICron crons = 1; }
