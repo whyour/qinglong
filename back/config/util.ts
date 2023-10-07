@@ -84,6 +84,11 @@ export async function getNetIp(req: any) {
   if (ip.includes('127.0') || ip.includes('192.168') || ip.includes('10.7')) {
     ip = '';
   }
+
+  if (!ip) {
+    return { address: `获取失败`, ip };
+  }
+
   try {
     const baiduApi = got
       .get(`https://www.cip.cc/${ip}`, { timeout: 10000, retry: 0 })
