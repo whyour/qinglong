@@ -23,7 +23,7 @@ export function runCron(cmd: string, options?: { schedule: string; extraSchedule
         );
       });
 
-      cp.on('close', async (code) => {
+      cp.on('exit', async (code) => {
         resolve({ ...options, command: cmd, pid: cp.pid, code });
       });
     });

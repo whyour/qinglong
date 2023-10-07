@@ -427,7 +427,7 @@ export default class CronService {
           fs.appendFileSync(`${absolutePath}`, `${JSON.stringify(err)}`);
         });
 
-        cp.on('close', async (code) => {
+        cp.on('exit', async (code) => {
           await CrontabModel.update(
             { status: CrontabStatus.idle, pid: undefined },
             { where: { id } },

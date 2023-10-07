@@ -273,7 +273,7 @@ export default class DependenceService {
           this.updateLog(depIds, JSON.stringify(err));
         });
 
-        cp.on('close', async (code) => {
+        cp.on('exit', async (code) => {
           const endTime = dayjs();
           const isSucceed = code === 0;
           const resultText = isSucceed ? '成功' : '失败';

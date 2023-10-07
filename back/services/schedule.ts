@@ -89,7 +89,7 @@ export default class ScheduleService {
             await callbacks.onError?.(JSON.stringify(err));
           });
 
-          cp.on('close', async (code) => {
+          cp.on('exit', async (code) => {
             const endTime = dayjs();
             await callbacks.onEnd?.(
               cp,
