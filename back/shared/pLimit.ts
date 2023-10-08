@@ -33,12 +33,17 @@ class TaskLimit {
     })
     this.cronLimit.on('completed', (param) => {
       Logger.info(
-        `[schedule][任务处理完成] 运行中任务数: ${this.cronLimitActiveCount - 1}, 等待中任务数: ${this.cronLimitPendingCount}, 参数 ${JSON.stringify(param)}`,
+        `[schedule][任务处理成功] 参数 ${JSON.stringify(param)}`,
       );
     });
     this.cronLimit.on('error', error => {
       Logger.error(
-        `[schedule][处理任务错误] 运行中任务数: ${this.cronLimitActiveCount}, 等待中任务数: ${this.cronLimitPendingCount}, 参数 ${JSON.stringify(error)}`,
+        `[schedule][任务处理错误] 参数 ${JSON.stringify(error)}`,
+      );
+    });
+    this.cronLimit.on('next', () => {
+      Logger.info(
+        `[schedule][任务处理结束] 运行中任务数: ${this.cronLimitActiveCount}, 等待中任务数: ${this.cronLimitPendingCount}`,
       );
     });
     this.cronLimit.on('idle', () => {
