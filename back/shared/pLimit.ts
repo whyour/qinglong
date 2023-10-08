@@ -18,6 +18,7 @@ class TaskLimit {
 
   constructor() {
     this.setCustomLimit();
+    this.handleEvents();
   }
 
   private handleEvents() {
@@ -55,8 +56,7 @@ class TaskLimit {
 
   public async setCustomLimit(limit?: number) {
     if (limit) {
-      this.cronLimit = new PQueue({ concurrency: limit });;
-      this.handleEvents();
+      this.cronLimit.concurrency = limit;
       return;
     }
     await AuthModel.sync();
@@ -64,8 +64,7 @@ class TaskLimit {
       where: { type: AuthDataType.systemConfig },
     });
     if (doc?.info?.cronConcurrency) {
-      this.cronLimit = new PQueue({ concurrency: doc?.info?.cronConcurrency });
-      this.handleEvents();
+      this.cronLimit.concurrency = doc.info.cronConcurrency;
     }
   }
 
