@@ -40,6 +40,7 @@ const CronLogModal = ({
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
   const scrollInfoRef = useRef({ value: 0, down: true });
+  const uniqPath = logUrl ? logUrl : String(cron?.id);
 
   const getCronLog = (isFirst?: boolean) => {
     if (isFirst) {
@@ -50,7 +51,7 @@ const CronLogModal = ({
       .then(({ code, data }) => {
         if (
           code === 200 &&
-          localStorage.getItem('logCron') === String(cron.id) &&
+          localStorage.getItem('logCron') === uniqPath &&
           data !== value
         ) {
           const log = data as string;

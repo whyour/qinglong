@@ -120,10 +120,11 @@ const CronDetailModal = ({
   };
 
   const onClickItem = (item: LogItem) => {
-    localStorage.setItem('logCron', currentCron.id);
-    setLogUrl(
-      `${config.apiPrefix}logs/${item.filename}?path=${item.directory || ''}`,
-    );
+    const url = `${config.apiPrefix}logs/${item.filename}?path=${
+      item.directory || ''
+    }`;
+    localStorage.setItem('logCron', url);
+    setLogUrl(url);
     request
       .get(
         `${config.apiPrefix}logs/${item.filename}?path=${item.directory || ''}`,
