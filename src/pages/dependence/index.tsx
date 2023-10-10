@@ -92,7 +92,7 @@ const Dependence = () => {
   const columns: any = [
     {
       title: intl.get('序号'),
-      width: 80,
+      width: 90,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },

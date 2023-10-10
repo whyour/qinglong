@@ -153,11 +153,23 @@ const CronModal = ({
           tooltip={intl.get(
             '运行任务前执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js',
           )}
+          rules={[
+            {
+              validator(rule, value) {
+                if (value.includes(' task ') || value.startsWith('task ')) {
+                  return Promise.reject(intl.get('不能包含 task 命令'));
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
         >
           <Input.TextArea
             rows={4}
             autoSize={{ minRows: 1, maxRows: 5 }}
-            placeholder={intl.get('请输入运行任务前要执行的命令')}
+            placeholder={intl.get(
+              '请输入运行任务前要执行的命令，不能包含 task 命令',
+            )}
           />
         </Form.Item>
         <Form.Item
@@ -166,11 +178,23 @@ const CronModal = ({
           tooltip={intl.get(
             '运行任务后执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js',
           )}
+          rules={[
+            {
+              validator(rule, value) {
+                if (value.includes(' task ') || value.startsWith('task ')) {
+                  return Promise.reject(intl.get('不能包含 task 命令'));
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
         >
           <Input.TextArea
             rows={4}
             autoSize={{ minRows: 1, maxRows: 5 }}
-            placeholder={intl.get('请输入运行任务后要执行的命令')}
+            placeholder={intl.get(
+              '请输入运行任务后要执行的命令，不能包含 task 命令',
+            )}
           />
         </Form.Item>
       </Form>

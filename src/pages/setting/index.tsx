@@ -334,7 +334,7 @@ const Setting = () => {
                   dataSource={dataSource}
                   rowKey="id"
                   size="middle"
-                  scroll={{ x: 768 }}
+                  scroll={{ x: 1000 }}
                   loading={loading}
                 />
               ),
