@@ -241,6 +241,8 @@ main() {
   fi
 }
 
-handle_task_before "$@"
+handle_task_start "$@"
+run_task_before "$@"
 main "$@"
-handle_task_after "$@"
+run_task_after "$@"
+handle_task_end "$@"

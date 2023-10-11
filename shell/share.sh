@@ -416,7 +416,7 @@ init_nginx() {
     location_url="^~${ql_base_url%*/}"
     aliasStr="alias ${dir_static}/dist;"
     if ! grep -q "<base href=\"$ql_base_url\">" "${dir_static}/dist/index.html"; then
-      awk -v text="<base href=\"$ql_base_url\">" '/<link/ && !inserted {print text; inserted=1} 1' "${dir_static}/dist/index.html" > temp.html
+      awk -v text="<base href=\"$ql_base_url\">" '/<link/ && !inserted {print text; inserted=1} 1' "${dir_static}/dist/index.html" >temp.html
       mv temp.html "${dir_static}/dist/index.html"
     fi
   else
@@ -438,11 +438,12 @@ init_nginx() {
   sed -i "s,IPV4_CONFIG,${ipv4Str},g" /etc/nginx/conf.d/front.conf
 }
 
-handle_task_before() {
+handle_task_start() {
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
-
   echo -e "## 开始执行... $begin_time\n"
+}
 
+run_task_before() {
   [[ $is_macos -eq 0 ]] && check_server
 
   . $file_task_before "$@"
@@ -454,7 +455,7 @@ handle_task_before() {
   fi
 }
 
-handle_task_after() {
+run_task_after() {
   . $file_task_after "$@"
 
   if [[ $task_after ]]; then
@@ -462,7 +463,9 @@ handle_task_after() {
     eval "$task_after"
     echo -e "\n执行后置命令结束"
   fi
+}
 
+handle_task_end() {
   local etime=$(date "+$time_format")
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
@@ -471,7 +474,6 @@ handle_task_after() {
   [[ "$diff_time" == 0 ]] && diff_time=1
 
   echo -e "\n## 执行结束... $end_time  耗时 $diff_time 秒　　　　　"
-
   [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
 }
 
