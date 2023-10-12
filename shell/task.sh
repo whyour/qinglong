@@ -7,7 +7,7 @@ dir_shell=$QL_DIR/shell
 
 trap "single_hanle" 2 3 20 15 14 19 1
 single_hanle() {
-  eval handle_task_after "$@" "$cmd"
+  eval handle_task_end "$@" "$cmd"
   exit 1
 }
 

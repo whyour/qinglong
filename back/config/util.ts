@@ -423,11 +423,11 @@ export function psTree(pid: number): Promise<number[]> {
 
 export async function killTask(pid: number) {
   const pids = await psTree(pid);
-  // SIGINT 2 程序终止(interrupt)信号，不会打印额外信息
+
   if (pids.length) {
     try {
-      [pid, ...pids].forEach((x) => {
-        process.kill(x, 2);
+      [pid, ...pids].reverse().forEach((x) => {
+        process.kill(x, 15);
       });
     } catch (error) { }
   } else {
