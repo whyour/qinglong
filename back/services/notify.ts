@@ -1,12 +1,12 @@
-import { NotificationInfo } from '../data/notify';
-import { Service, Inject } from 'typedi';
-import winston from 'winston';
-import UserService from './user';
-import got from 'got';
-import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import got from 'got';
 import { HttpProxyAgent, HttpsProxyAgent } from 'hpagent';
+import nodemailer from 'nodemailer';
+import { Inject, Service } from 'typedi';
+import winston from 'winston';
 import { parseBody, parseHeaders } from '../config/util';
+import { NotificationInfo } from '../data/notify';
+import UserService from './user';
 
 @Service()
 export default class NotificationService {
@@ -31,6 +31,7 @@ export default class NotificationService {
     ['pushMe', this.pushMe],
     ['webhook', this.webhook],
     ['lark', this.lark],
+    ['chronocat', this.chronocat],
   ]);
 
   private title = '';
@@ -195,7 +196,8 @@ export default class NotificationService {
   }
 
   private async bark() {
-    let { barkPush, barkIcon, barkSound, barkGroup, barkLevel, barkUrl } = this.params;
+    let { barkPush, barkIcon, barkSound, barkGroup, barkLevel, barkUrl } =
+      this.params;
     if (!barkPush.startsWith('http')) {
       barkPush = `https://api.day.app/${barkPush}`;
     }
@@ -583,6 +585,63 @@ export default class NotificationService {
       } else {
         throw new Error(res.body);
       }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  private async chronocat() {
+    const { chronocatURL, chronocatQQ, chronocatToekn } = this.params;
+    try {
+      const user_ids = chronocatQQ
+        .match(/user_id=(\d+)/g)
+        ?.map((match: any) => match.split('=')[1]);
+      const group_ids = chronocatQQ
+        .match(/group_id=(\d+)/g)
+        ?.map((match: any) => match.split('=')[1]);
+
+      const url = `${chronocatURL}/api/message/send`;
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${chronocatToekn}`,
+      };
+
+      for (const [chat_type, ids] of [
+        [1, user_ids],
+        [2, group_ids],
+      ]) {
+        if (!ids) {
+          continue;
+        }
+        let _ids: any = ids;
+        for (const chat_id of _ids) {
+          const data = {
+            peer: {
+              chatType: chat_type,
+              peerUin: chat_id,
+            },
+            elements: [
+              {
+                elementType: 1,
+                textElement: {
+                  content: `${this.title}\n\n${this.content}`,
+                },
+              },
+            ],
+          };
+          const res: any = await got.post(url, {
+            ...this.gotOption,
+            json: data,
+            headers,
+          });
+          if (res.body === 'success') {
+            return true;
+          } else {
+            throw new Error(res.body);
+          }
+        }
+      }
+      return false;
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
