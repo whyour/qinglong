@@ -156,7 +156,10 @@ const CronModal = ({
           rules={[
             {
               validator(rule, value) {
-                if (value.includes(' task ') || value.startsWith('task ')) {
+                if (
+                  value &&
+                  (value.includes(' task ') || value.startsWith('task '))
+                ) {
                   return Promise.reject(intl.get('不能包含 task 命令'));
                 }
                 return Promise.resolve();
@@ -181,7 +184,10 @@ const CronModal = ({
           rules={[
             {
               validator(rule, value) {
-                if (value.includes(' task ') || value.startsWith('task ')) {
+                if (
+                  value &&
+                  (value.includes(' task ') || value.startsWith('task '))
+                ) {
                   return Promise.reject(intl.get('不能包含 task 命令'));
                 }
                 return Promise.resolve();
