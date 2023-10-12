@@ -671,7 +671,6 @@ def chronocat(title: str, content: str) -> None:
     """
     使用 CHRONOCAT 推送消息。
     """
-    # 检查 CHRONOCAT 的配置是否完整
     if not push_config.get("CHRONOCAT_URL") or not push_config.get("CHRONOCAT_QQ") or not push_config.get(
             "CHRONOCAT_TOKEN"):
         print("CHRONOCAT 服务的 CHRONOCAT_URL 或 CHRONOCAT_QQ 未设置!!\n取消推送")
@@ -679,18 +678,15 @@ def chronocat(title: str, content: str) -> None:
 
     print("CHRONOCAT 服务启动")
 
-    # 提取 user_id 和 group_id
     user_ids = re.findall(r"user_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
     group_ids = re.findall(r"group_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
 
-    # 设置请求的 URL 和 Headers
     url = f'{push_config.get("CHRONOCAT_URL")}/api/message/send'
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {push_config.get("CHRONOCAT_TOKEN")}'
     }
 
-    # 发送消息
     for chat_type, ids in [(1, user_ids), (2, group_ids)]:
         if not ids:
             continue
