@@ -32,8 +32,8 @@ import About from './about';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import './index.less';
-import CodeMirror from '@uiw/react-codemirror';
 import useResizeObserver from '@react-hook/resize-observer';
+import SystemLog from './systemLog';
 
 const { Text } = Typography;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
@@ -347,22 +347,7 @@ const Setting = () => {
             {
               key: 'syslog',
               label: intl.get('系统日志'),
-              children: (
-                <CodeMirror
-                  maxHeight={`${height}px`}
-                  value={systemLogData}
-                  onCreateEditor={(view) => {
-                    setTimeout(() => {
-                      view.scrollDOM.scrollTo({
-                        top: view.scrollDOM.scrollHeight,
-                        behavior: 'smooth',
-                      });
-                    }, 300);
-                  }}
-                  readOnly={true}
-                  theme={theme.includes('dark') ? 'dark' : 'light'}
-                />
-              ),
+              children: <SystemLog data={systemLogData} height={height} theme={theme}/>,
             },
             {
               key: 'login',
