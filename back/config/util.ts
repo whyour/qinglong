@@ -309,7 +309,7 @@ export async function emptyDir(path: string) {
     return;
   }
   const files = fs.readdirSync(path);
-  files.forEach(async (file) => {
+  for (const file of files) {
     const filePath = `${path}/${file}`;
     const stats = fs.statSync(filePath);
     if (stats.isDirectory()) {
@@ -317,7 +317,7 @@ export async function emptyDir(path: string) {
     } else {
       fs.unlinkSync(filePath);
     }
-  });
+  }
   fs.rmdirSync(path);
 }
 
