@@ -98,6 +98,7 @@ export default {
     { value: 'email', label: intl.get('邮箱') },
     { value: 'lark', label: intl.get('飞书机器人') },
     { value: 'pushMe', label: 'PushMe' },
+    { value: 'chronocat', label: 'Chronocat' },
     { value: 'webhook', label: intl.get('自定义通知') },
     { value: 'closed', label: intl.get('已关闭') },
   ],
@@ -126,14 +127,16 @@ export default {
     goCqHttpBot: [
       {
         label: 'goCqHttpBotUrl',
-        tip: intl.get('推送到个人QQ: http://127.0.0.1/send_private_msg，群：http://127.0.0.1/send_group_msg',
+        tip: intl.get(
+          '推送到个人QQ: http://127.0.0.1/send_private_msg，群：http://127.0.0.1/send_group_msg',
         ),
         required: true,
       },
       { label: 'goCqHttpBotToken', tip: intl.get('访问密钥'), required: true },
       {
         label: 'goCqHttpBotQq',
-        tip: intl.get('如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群',
+        tip: intl.get(
+          '如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群',
         ),
         required: true,
       },
@@ -153,14 +156,16 @@ export default {
       },
       {
         label: 'pushDeerUrl',
-        tip: intl.get('PushDeer的自架API endpoint，默认是 https://api2.pushdeer.com/message/push',
+        tip: intl.get(
+          'PushDeer的自架API endpoint，默认是 https://api2.pushdeer.com/message/push',
         ),
       },
     ],
     bark: [
       {
         label: 'barkPush',
-        tip: intl.get('Bark的信息IP/设备码，例如：https://api.day.app/XXXXXXXX',
+        tip: intl.get(
+          'Bark的信息IP/设备码，例如：https://api.day.app/XXXXXXXX',
         ),
         required: true,
       },
@@ -188,7 +193,8 @@ export default {
     telegramBot: [
       {
         label: 'telegramBotToken',
-        tip: intl.get('telegram机器人的token，例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw',
+        tip: intl.get(
+          'telegram机器人的token，例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw',
         ),
         required: true,
       },
@@ -201,7 +207,8 @@ export default {
       { label: 'telegramBotProxyPort', tip: intl.get('代理端口') },
       {
         label: 'telegramBotProxyAuth',
-        tip: intl.get('telegram代理配置认证参数，用户名与密码用英文冒号连接 user:password',
+        tip: intl.get(
+          'telegram代理配置认证参数，用户名与密码用英文冒号连接 user:password',
         ),
       },
       {
@@ -212,20 +219,23 @@ export default {
     dingtalkBot: [
       {
         label: 'dingtalkBotToken',
-        tip: intl.get('钉钉机器人webhook token，例如：5a544165465465645d0f31dca676e7bd07415asdasd',
+        tip: intl.get(
+          '钉钉机器人webhook token，例如：5a544165465465645d0f31dca676e7bd07415asdasd',
         ),
         required: true,
       },
       {
         label: 'dingtalkBotSecret',
-        tip: intl.get('密钥，机器人安全设置页面，加签一栏下面显示的SEC开头的字符串',
+        tip: intl.get(
+          '密钥，机器人安全设置页面，加签一栏下面显示的SEC开头的字符串',
         ),
       },
     ],
     weWorkBot: [
       {
         label: 'weWorkBotKey',
-        tip: intl.get('企业微信机器人的webhook(详见文档 https://work.weixin.qq.com/api/doc/90000/90136/91770)，例如：693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa',
+        tip: intl.get(
+          '企业微信机器人的webhook(详见文档 https://work.weixin.qq.com/api/doc/90000/90136/91770)，例如：693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa',
         ),
         required: true,
       },
@@ -237,7 +247,8 @@ export default {
     weWorkApp: [
       {
         label: 'weWorkAppKey',
-        tip: intl.get('corpid、corpsecret、touser(注:多个成员ID使用|隔开)、agentid、消息类型(选填，不填默认文本消息类型) 注意用,号隔开(英文输入法的逗号)，例如：wwcfrs,B-76WERQ,qinglong,1000001,2COat',
+        tip: intl.get(
+          'corpid、corpsecret、touser(注:多个成员ID使用|隔开)、agentid、消息类型(选填，不填默认文本消息类型) 注意用,号隔开(英文输入法的逗号)，例如：wwcfrs,B-76WERQ,qinglong,1000001,2COat',
         ),
         required: true,
       },
@@ -249,7 +260,8 @@ export default {
     aibotk: [
       {
         label: 'aibotkKey',
-        tip: intl.get('密钥key，智能微秘书个人中心获取apikey，申请地址：https://wechat.aibotk.com/signup?from=ql',
+        tip: intl.get(
+          '密钥key，智能微秘书个人中心获取apikey，申请地址：https://wechat.aibotk.com/signup?from=ql',
         ),
         required: true,
       },
@@ -265,7 +277,8 @@ export default {
       },
       {
         label: 'aibotkName',
-        tip: intl.get('要发送的用户昵称或群名，如果目标是群，需要填群名，如果目标是好友，需要填好友昵称',
+        tip: intl.get(
+          '要发送的用户昵称或群名，如果目标是群，需要填群名，如果目标是好友，需要填好友昵称',
         ),
         required: true,
       },
@@ -273,7 +286,8 @@ export default {
     iGot: [
       {
         label: 'iGotPushKey',
-        tip: intl.get('iGot的信息推送key，例如：https://push.hellyw.com/XXXXXXXX',
+        tip: intl.get(
+          'iGot的信息推送key，例如：https://push.hellyw.com/XXXXXXXX',
         ),
         required: true,
       },
@@ -281,20 +295,23 @@ export default {
     pushPlus: [
       {
         label: 'pushPlusToken',
-        tip: intl.get('微信扫码登录后一对一推送或一对多推送下面的token(您的Token)，不提供PUSH_PLUS_USER则默认为一对一推送，参考 https://www.pushplus.plus/',
+        tip: intl.get(
+          '微信扫码登录后一对一推送或一对多推送下面的token(您的Token)，不提供PUSH_PLUS_USER则默认为一对一推送，参考 https://www.pushplus.plus/',
         ),
         required: true,
       },
       {
         label: 'pushPlusUser',
-        tip: intl.get('一对多推送的“群组编码”（一对多推送下面->您的群组(如无则创建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）',
+        tip: intl.get(
+          '一对多推送的“群组编码”（一对多推送下面->您的群组(如无则创建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）',
         ),
       },
     ],
     lark: [
       {
         label: 'larkKey',
-        tip: intl.get('飞书群组机器人：https://www.feishu.cn/hc/zh-CN/articles/360024984973',
+        tip: intl.get(
+          '飞书群组机器人：https://www.feishu.cn/hc/zh-CN/articles/360024984973',
         ),
         required: true,
       },
@@ -302,7 +319,8 @@ export default {
     email: [
       {
         label: 'emailService',
-        tip: intl.get('邮箱服务名称，比如126、163、Gmail、QQ等，支持列表https://nodemailer.com/smtp/well-known/',
+        tip: intl.get(
+          '邮箱服务名称，比如126、163、Gmail、QQ等，支持列表https://nodemailer.com/smtp/well-known/',
         ),
         required: true,
       },
@@ -313,6 +331,29 @@ export default {
       {
         label: 'pushMeKey',
         tip: intl.get('PushMe的Key，https://push.i-i.me/'),
+        required: true,
+      },
+    ],
+    chronocat: [
+      {
+        label: 'chronocatURL',
+        tip: intl.get(
+          'Chronocat Red 服务的连接地址 https://chronocat.vercel.app/install/docker/official/',
+        ),
+        required: true,
+      },
+      {
+        label: 'chronocatQQ',
+        tip: intl.get(
+          '个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx',
+        ),
+        required: true,
+      },
+      {
+        label: 'chronocatToken',
+        tip: intl.get(
+          'docker安装在持久化config目录下的chronocat.yml文件可找到',
+        ),
         required: true,
       },
     ],
@@ -335,7 +376,8 @@ export default {
       },
       {
         label: 'webhookUrl',
-        tip: intl.get('请求链接以http或者https开头。url或者body中必须包含$title，$content可选，对应api内容的位置',
+        tip: intl.get(
+          '请求链接以http或者https开头。url或者body中必须包含$title，$content可选，对应api内容的位置',
         ),
         required: true,
         placeholder: 'https://xxx.cn/api?content=$title\n',
@@ -347,7 +389,8 @@ export default {
       },
       {
         label: 'webhookBody',
-        tip: intl.get('请求体格式key1: value1，多个换行分割。url或者body中必须包含$title，$content可选，对应api内容的位置',
+        tip: intl.get(
+          '请求体格式key1: value1，多个换行分割。url或者body中必须包含$title，$content可选，对应api内容的位置',
         ),
         placeholder: 'key1: $title\nkey2: $content',
       },

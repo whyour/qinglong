@@ -102,6 +102,9 @@ push_config = {
     'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
 
     'PUSHME_KEY': '',                     # PushMe 酱的 PUSHME_KEY
+    'CHRONOCAT_QQ': '',  # qq号
+    'CHRONOCAT_TOKEN': '',  # CHRONOCAT 的token
+    'CHRONOCAT_URL': ''  # CHRONOCAT的url地址
 }
 notify_function = []
 # fmt: on
@@ -663,6 +666,57 @@ def pushme(title: str, content: str) -> None:
         print("PushMe 推送成功！")
     else:
         print(f"PushMe 推送失败！{response.status_code} {response.text}")
+
+def chronocat(title: str, content: str) -> None:
+    """
+    使用 CHRONOCAT 推送消息。
+    """
+    if not push_config.get("CHRONOCAT_URL") or not push_config.get("CHRONOCAT_QQ") or not push_config.get(
+            "CHRONOCAT_TOKEN"):
+        print("CHRONOCAT 服务的 CHRONOCAT_URL 或 CHRONOCAT_QQ 未设置!!\n取消推送")
+        return
+
+    print("CHRONOCAT 服务启动")
+
+    user_ids = re.findall(r"user_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
+    group_ids = re.findall(r"group_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
+
+    url = f'{push_config.get("CHRONOCAT_URL")}/api/message/send'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {push_config.get("CHRONOCAT_TOKEN")}'
+    }
+
+    for chat_type, ids in [(1, user_ids), (2, group_ids)]:
+        if not ids:
+            continue
+        for chat_id in ids:
+            data = {
+                "peer": {
+                    "chatType": chat_type,
+                    "peerUin": chat_id
+                },
+                "elements": [
+                    {
+                        "elementType": 1,
+                        "textElement": {
+                            "content": f'{title}\n\n{content}'
+                        }
+                    }
+                ]
+            }
+            response = requests.post(url, headers=headers, data=json.dumps(data))
+            if response.status_code == 200:
+                if chat_type == 1:
+                    print(f'QQ个人消息:{ids}推送成功！')
+                else:
+                    print(f'QQ群消息:{ids}推送成功！')
+            else:
+                if chat_type == 1:
+                    print(f'QQ个人消息:{ids}推送失败！')
+                else:
+                    print(f'QQ群消息:{ids}推送失败！')
+
 
 
 def one() -> str:

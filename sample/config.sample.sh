@@ -173,4 +173,13 @@ export SMTP_NAME=""
 ## PUSHME_KEY (必填)填写PushMe APP上获取的push_key
 export PUSHME_KEY=""
 
+## 13. CHRONOCAT
+## CHRONOCAT_URL 推送 http://127.0.0.1:16530
+## CHRONOCAT_TOKEN 填写在CHRONOCAT文件生成的访问密钥
+## CHRONOCAT_QQ 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx
+## CHRONOCAT相关API https://chronocat.vercel.app/install/docker/official/
+export CHRONOCAT_URL="" 
+export CHRONOCAT_QQ="" #
+export CHRONOCAT_TOKEN=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

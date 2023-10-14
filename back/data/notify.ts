@@ -18,6 +18,7 @@ export enum NotificationMode {
   'pushMe' = 'pushMe',
   'feishu' = 'feishu',
   'webhook' = 'webhook',
+  'chronocat' = 'Chronocat',
 }
 
 abstract class NotificationBaseInfo {
@@ -108,6 +109,12 @@ export class PushMeNotification extends NotificationBaseInfo {
   public pushMeKey: string = '';
 }
 
+export class ChronocatNotification extends NotificationBaseInfo {
+  public chronocatURL: string = '';
+  public chronocatQQ: string = '';
+  public chronocatToekn: string = '';
+}
+
 export class WebhookNotification extends NotificationBaseInfo {
   public webhookHeaders: string = '';
   public webhookBody: string = '';
@@ -140,4 +147,6 @@ export interface NotificationInfo
     EmailNotification,
     PushMeNotification,
     WebhookNotification,
+    ChronocatNotification,
     LarkNotification {}
+    

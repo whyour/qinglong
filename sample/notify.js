@@ -150,6 +150,15 @@ let SMTP_NAME = '';
 //此处填你的PushMe KEY.
 let PUSHME_KEY = '';
 
+// =======================================CHRONOCAT通知设置区域===========================================
+// CHRONOCAT_URL Red协议连接地址 例： http://127.0.0.1:16530
+// CHRONOCAT_TOKEN 填写在CHRONOCAT文件生成的访问密钥
+// CHRONOCAT_QQ 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群
+// CHRONOCAT相关API https://chronocat.vercel.app/install/docker/official/
+let CHRONOCAT_URL = ''; // CHRONOCAT Red协议连接地址
+let CHRONOCAT_TOKEN = ''; //CHRONOCAT 生成的访问密钥
+let CHRONOCAT_QQ = ''; // 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx
+
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
   GOTIFY_URL = process.env.GOTIFY_URL;
@@ -306,6 +315,16 @@ if (process.env.SMTP_NAME) {
 if (process.env.PUSHME_KEY) {
   PUSHME_KEY = process.env.PUSHME_KEY;
 }
+
+if (process.env.CHRONOCAT_URL) {
+  CHRONOCAT_URL = process.env.CHRONOCAT_URL;
+}
+if (process.env.CHRONOCAT_QQ) {
+  CHRONOCAT_QQ = process.env.CHRONOCAT_QQ;
+}
+if (process.env.CHRONOCAT_TOKEN) {
+  CHRONOCAT_TOKEN = process.env.CHRONOCAT_TOKEN;
+}
 //==========================云端环境变量的判断与接收=========================
 
 /**
@@ -355,6 +374,7 @@ async function sendNotify(
     fsBotNotify(text, desp), //飞书机器人
     smtpNotify(text, desp), //SMTP 邮件
     PushMeNotify(text, desp, params), //PushMe
+    ChronocatNotify(text, desp), // Chronocat
   ]);
 }
 
@@ -1167,6 +1187,81 @@ function PushMeNotify(text, desp, params = {}) {
       });
     } else {
       resolve();
+    }
+  });
+}
+
+function ChronocatNotify(title, desp) {
+  return new Promise((resolve) => {
+    if (!CHRONOCAT_TOKEN || !CHRONOCAT_QQ || !CHRONOCAT_URL) {
+      console.log(
+        'CHRONOCAT 服务的 CHRONOCAT_URL 或 CHRONOCAT_QQ 未设置!!\n取消推送',
+      );
+      return;
+    }
+
+    console.log('CHRONOCAT 服务启动');
+    const user_ids = CHRONOCAT_QQ.match(/user_id=(\d+)/g)?.map(
+      (match) => match.split('=')[1],
+    );
+    const group_ids = CHRONOCAT_QQ.match(/group_id=(\d+)/g)?.map(
+      (match) => match.split('=')[1],
+    );
+
+    const url = `${CHRONOCAT_URL}/api/message/send`;
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${CHRONOCAT_TOKEN}`,
+    };
+
+    for (const [chat_type, ids] of [
+      [1, user_ids],
+      [2, group_ids],
+    ]) {
+      if (!ids) {
+        continue;
+      }
+      for (const chat_id of ids) {
+        const data = {
+          peer: {
+            chatType: chat_type,
+            peerUin: chat_id,
+          },
+          elements: [
+            {
+              elementType: 1,
+              textElement: {
+                content: `${title}\n\n${desp}`,
+              },
+            },
+          ],
+        };
+        const options = {
+          url: url,
+          json: data,
+          headers,
+          timeout,
+        };
+        $.post(options, (err, resp, data) => {
+          try {
+            if (err) {
+              console.log('Chronocat发送QQ通知消息失败！！\n');
+              console.log(err);
+            } else {
+              data = JSON.parse(data);
+              if (chat_type === 1) {
+                console.log(`QQ个人消息:${ids}推送成功！`);
+              } else {
+                console.log(`QQ群消息:${ids}推送成功！`);
+              }
+            }
+          } catch (e) {
+            $.logErr(e, resp);
+          } finally {
+            resolve(data);
+          }
+        });
+      }
     }
   });
 }
