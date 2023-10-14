@@ -100,9 +100,6 @@ set_proxy() {
 unset_proxy() {
   unset http_proxy
   unset https_proxy
-  unset ftp_proxy
-  unset all_proxy
-  unset no_proxy
 }
 
 make_dir() {
@@ -311,10 +308,8 @@ random_range() {
 
 reload_pm2() {
   cd $dir_root
-  # 代理会影响 grpc 服务
-  unset_proxy
   pm2 flush &>/dev/null
-  pm2 startOrGracefulReload $file_ecosystem_js --update-env
+  env ALL_PROXY= HTTP_PROXY= HTTPS_PROXY= all_proxy= http_proxy= https_proxy= pm2 startOrGracefulReload $file_ecosystem_js --update-env
 }
 
 diff_time() {
