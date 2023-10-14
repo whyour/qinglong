@@ -105,7 +105,7 @@ run_normal() {
     file_param=${file_param/$relative_path\//}
   fi
 
-  $timeoutCmd $which_program $file_param
+  $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
@@ -147,7 +147,7 @@ run_concurrent() {
   for i in "${!array[@]}"; do
     export "${env_param}=${array[i]}"
     single_log_path="$dir_log/$log_dir/${single_log_time}_$((i + 1)).log"
-    eval $timeoutCmd $which_program $file_param &>$single_log_path &
+    eval $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
   done
 
   wait
@@ -190,7 +190,7 @@ run_designated() {
     cd ${relative_path}
     file_param=${file_param/$relative_path\//}
   fi
-  $timeoutCmd $which_program $file_param
+  $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 ## 运行其他命令
@@ -241,8 +241,8 @@ main() {
   fi
 }
 
-handle_task_start "$@"
-run_task_before "$@"
-main "$@"
-run_task_after "$@"
-handle_task_end "$@"
+handle_task_start "${task_shell_params[@]}"
+run_task_before "${task_shell_params[@]}"
+main "${task_shell_params[@]}"
+run_task_after "${task_shell_params[@]}"
+handle_task_end "${task_shell_params[@]}"

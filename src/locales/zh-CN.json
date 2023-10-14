@@ -461,5 +461,10 @@
   "运行任务后执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js": "运行任务后执行的命令，比如 cp/mv/python3 xxx.py/node xxx.js",
   "请输入运行任务前要执行的命令，不能包含 task 命令": "请输入运行任务前要执行的命令，不能包含 task 命令",
   "请输入运行任务后要执行的命令，不能包含 task 命令": "请输入运行任务后要执行的命令，不能包含 task 命令",
-  "不能包含 task 命令": "不能包含 task 命令"
+  "不能包含 task 命令": "不能包含 task 命令",
+  "Chronocat Red 服务的连接地址 https://chronocat.vercel.app/install/docker/official/": "Chronocat Red 服务的连接地址 https://chronocat.vercel.app/install/docker/official/",
+  "个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx": "个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx",
+  "docker安装在持久化config目录下的chronocat.yml文件可找到": "docker安装在持久化config目录下的chronocat.yml文件可找到",
+  "请选择": "请选择",
+  "请输入": "请输入"
 }

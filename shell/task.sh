@@ -95,6 +95,21 @@ format_params() {
     fi
   fi
   # params=$(echo "$@" | sed -E 's/([^ ])&([^ ])/\1\\\&\2/g')
+
+  # 分割 task 内置参数和脚本参数
+  task_shell_params=()
+  script_params=()
+  found_double_dash=false
+
+  for arg in "$@"; do
+    if $found_double_dash; then
+      script_params+=("$arg")
+    elif [ "$arg" == "--" ]; then
+      found_double_dash=true
+    else
+      task_shell_params+=("$arg")
+    fi
+  done
 }
 
 init_begin_time() {
@@ -119,8 +134,8 @@ if [[ $max_time ]]; then
 fi
 
 format_params "$@"
-define_program "$@"
-handle_log_path "$@"
+define_program "${task_shell_params[@]}"
+handle_log_path "${task_shell_params[@]}"
 init_begin_time
 
 eval . $dir_shell/otask.sh "$cmd"

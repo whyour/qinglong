@@ -76,7 +76,7 @@ const NotificationSetting = ({ data }: any) => {
           >
             {x.items ? (
               <Select
-                placeholder={x.placeholder || `请选择${x.label}`}
+                placeholder={x.placeholder || `${intl.get('请选择')} ${x.label}`}
                 disabled={loading}
               >
                 {x.items.map((y) => (
@@ -89,7 +89,7 @@ const NotificationSetting = ({ data }: any) => {
               <Input.TextArea
                 disabled={loading}
                 autoSize={{ minRows: 1, maxRows: 5 }}
-                placeholder={x.placeholder || `请输入${x.label}`}
+                placeholder={x.placeholder || `${intl.get('请输入')} ${x.label}`}
               />
             )}
           </Form.Item>

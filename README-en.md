@@ -36,6 +36,7 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 - Support cell phone operation
 
 ## Version
+
 ### docker
 
 The `latest` image is built on `alpine` and the `debian` image is built on `debian-slim`. If you need to use a dependency that is not supported by `alpine`, it is recommended that you use the `debian` image.
@@ -118,9 +119,30 @@ export QL_DATA_DIR=""
 qinglong
 ```
 
-## Use
+## Built-in commands
 
-1. built-in commands
+1. task
+
+```bash
+# Execute in sequence, if a random delay is set, it will be randomly delayed by a certain number of seconds
+task <file_path>                                             
+# Execute in sequence, regardless of whether a random delay is set, all run immediately, 
+# and the foreground will output the day, while recorded in the log file
+task <file_path> now                                         
+# Concurrent execution, regardless of whether a random delay is set, are run immediately, 
+# the foreground does not generate the day, directly recorded in the log file, and can be specified account execution
+task <file_path> conc <env_name> <account_number>(Optional) 
+# Specify the account to execute and run immediately regardless of whether a random delay is set 
+task <file_path> desi <env_name> <account_number>       
+# Set task timeout   
+task -m <max_time> <file_path>
+# Print task log in real time, no need to carry this parameter when creating timed tasks
+task -l <file_path>
+# Use -- to split, -- followed by a parameter that is passed to the script, as in the following example, the script receives the parameter -u whyour -p password
+task <file_path> -- -u whyour -p password
+```
+
+1. ql
 
 ```bash
 # Update and restart Green Dragon
@@ -141,36 +163,21 @@ ql check
 ql resetlet                                                  
 # Disable two-step login
 ql resettfa                                                  
-
-# Execute in sequence, if a random delay is set, it will be randomly delayed by a certain number of seconds
-task <file_path>                                             
-# Execute in sequence, regardless of whether a random delay is set, all run immediately, 
-# and the foreground will output the day, while recorded in the log file
-task <file_path> now                                         
-# Concurrent execution, regardless of whether a random delay is set, are run immediately, 
-# the foreground does not generate the day, directly recorded in the log file, and can be specified account execution
-task <file_path> conc <env_name> <account_number>(Optional) 
-# Specify the account to execute and run immediately regardless of whether a random delay is set 
-task <file_path> desi <env_name> <account_number>       
-# Set task timeout   
-task -m <max_time> <file_path>
-# Print task log in real time, no need to carry this parameter when creating timed tasks
-task -l <file_path>  
 ```
 
-2. parameter description
+1. parameter description
 
-* file_url: Script address
-* repo_url: Repository address
-* whitelist: The whitelist when pulling the repository, i.e., the string contained in the path of the script to be pulled
-* blacklist: Blacklisting when pulling repositories, i.e. strings that are not included in the path of the script to be pulled
-* dependence: Pulling the dependencies needed for the repository will be copied directly from the repository to the repository directory under scripts, regardless of the blacklist
-* branch: Pull the branch of the repository
-* days: Number of days of logs to be kept
-* file_path: File path for task execution
-* env_name: The name of the environment variable that needs to be concurrent or specified at the time of task execution
-* account_number: Specify the account number of an environment variable to be executed when the task is executed
-* max_time: Timeout, suffix "s" for seconds (default), "m" for minutes, "h" for hours, "d" for days
+- file_url: Script address
+- repo_url: Repository address
+- whitelist: The whitelist when pulling the repository, i.e., the string contained in the path of the script to be pulled
+- blacklist: Blacklisting when pulling repositories, i.e. strings that are not included in the path of the script to be pulled
+- dependence: Pulling the dependencies needed for the repository will be copied directly from the repository to the repository directory under scripts, regardless of the blacklist
+- branch: Pull the branch of the repository
+- days: Number of days of logs to be kept
+- file_path: File path for task execution
+- env_name: The name of the environment variable that needs to be concurrent or specified at the time of task execution
+- account_number: Specify the account number of an environment variable to be executed when the task is executed
+- max_time: Timeout, suffix "s" for seconds (default), "m" for minutes, "h" for hours, "d" for days
 
 ## Development
 
@@ -184,7 +191,7 @@ $ pnpm install
 $ pnpm start
 ```
 
-Open your browser and visit http://127.0.0.1:5700
+Open your browser and visit <http://127.0.0.1:5700>
 
 ## Links
 
