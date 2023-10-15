@@ -11,6 +11,7 @@
  */
 
 const querystring = require('querystring');
+const got = require('got');
 const $ = new Env();
 const timeout = 15000; //超时时间(单位毫秒)
 // =======================================gotify通知设置区域==============================================
@@ -158,6 +159,14 @@ let PUSHME_KEY = '';
 let CHRONOCAT_URL = ''; // CHRONOCAT Red协议连接地址
 let CHRONOCAT_TOKEN = ''; //CHRONOCAT 生成的访问密钥
 let CHRONOCAT_QQ = ''; // 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx
+
+// =======================================自定义通知设置区域=======================================
+// 自定义通知 接收回调的URL
+let WEBHOOK_URL = '';
+let WEBHOOK_BODY = '';
+let WEBHOOK_HEADERS = '';
+let WEBHOOK_METHOD = '';
+let WEBHOOK_CONTENT_TYPE = '';
 
 //==========================云端环境变量的判断与接收=========================
 if (process.env.GOTIFY_URL) {
@@ -325,6 +334,22 @@ if (process.env.CHRONOCAT_QQ) {
 if (process.env.CHRONOCAT_TOKEN) {
   CHRONOCAT_TOKEN = process.env.CHRONOCAT_TOKEN;
 }
+
+if (process.env.WEBHOOK_URL) {
+  WEBHOOK_URL = process.env.WEBHOOK_URL;
+}
+if (process.env.WEBHOOK_BODY) {
+  WEBHOOK_BODY = process.env.WEBHOOK_BODY;
+}
+if (process.env.WEBHOOK_HEADERS) {
+  WEBHOOK_HEADERS = process.env.WEBHOOK_HEADERS;
+}
+if (process.env.WEBHOOK_METHOD) {
+  WEBHOOK_METHOD = process.env.WEBHOOK_METHOD;
+}
+if (process.env.WEBHOOK_CONTENT_TYPE) {
+  WEBHOOK_CONTENT_TYPE = process.env.WEBHOOK_CONTENT_TYPE;
+}
 //==========================云端环境变量的判断与接收=========================
 
 /**
@@ -375,6 +400,7 @@ async function sendNotify(
     smtpNotify(text, desp), //SMTP 邮件
     PushMeNotify(text, desp, params), //PushMe
     ChronocatNotify(text, desp), // Chronocat
+    webhookNotify(text, desp), //自定义通知
   ]);
 }
 
@@ -1264,6 +1290,145 @@ function ChronocatNotify(title, desp) {
       }
     }
   });
+}
+
+function webhookNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { formatBody, formatUrl } = formatNotifyContentFun(
+      WEBHOOK_URL,
+      WEBHOOK_BODY,
+      text,
+      desp,
+    );
+    if (!formatUrl && !formatBody) {
+      resolve();
+      return;
+    }
+    const headers = parseHeaders(WEBHOOK_HEADERS);
+    const body = parseBody(formatBody, WEBHOOK_CONTENT_TYPE);
+    const bodyParam = formatBodyFun(WEBHOOK_CONTENT_TYPE, body);
+    const options = {
+      method: WEBHOOK_METHOD,
+      headers,
+      allowGetBody: true,
+      ...bodyParam,
+      timeout,
+      retry: 1,
+    };
+
+    if (WEBHOOK_METHOD) {
+      got(formatUrl, options).then((resp) => {
+        try {
+          if (resp.statusCode !== 200) {
+            console.log('自定义发送通知消息失败！！\n');
+            console.log(resp.body);
+          } else {
+            console.log('自定义发送通知消息成功🎉。\n');
+            console.log(resp.body);
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(resp.body);
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+function parseHeaders(headers) {
+  if (!headers) return {};
+
+  const parsed = {};
+  let key;
+  let val;
+  let i;
+
+  headers &&
+    headers.split('\n').forEach(function parser(line) {
+      i = line.indexOf(':');
+      key = line.substring(0, i).trim().toLowerCase();
+      val = line.substring(i + 1).trim();
+
+      if (!key) {
+        return;
+      }
+
+      parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+    });
+
+  return parsed;
+}
+
+function parseBody(body, contentType) {
+  if (!body) return '';
+
+  const parsed = {};
+  let key;
+  let val;
+  let i;
+
+  body &&
+    body.split('\n').forEach(function parser(line) {
+      i = line.indexOf(':');
+      key = line.substring(0, i).trim().toLowerCase();
+      val = line.substring(i + 1).trim();
+
+      if (!key || parsed[key]) {
+        return;
+      }
+
+      try {
+        const jsonValue = JSON.parse(val);
+        parsed[key] = jsonValue;
+      } catch (error) {
+        parsed[key] = val;
+      }
+    });
+
+  switch (contentType) {
+    case 'multipart/form-data':
+      return Object.keys(parsed).reduce((p, c) => {
+        p.append(c, parsed[c]);
+        return p;
+      }, new FormData());
+    case 'application/x-www-form-urlencoded':
+      return Object.keys(parsed).reduce((p, c) => {
+        return p ? `${p}&${c}=${parsed[c]}` : `${c}=${parsed[c]}`;
+      });
+  }
+
+  return parsed;
+}
+
+function formatBodyFun(contentType, body) {
+  if (!body) return {};
+  switch (contentType) {
+    case 'application/json':
+      return { json: body };
+    case 'multipart/form-data':
+      return { form: body };
+    case 'application/x-www-form-urlencoded':
+      return { body };
+  }
+  return {};
+}
+
+function formatNotifyContentFun(url, body, title, content) {
+  if (!url.includes('$title') && !body.includes('$title')) {
+    return {};
+  }
+
+  return {
+    formatUrl: url
+      .replaceAll('$title', encodeURIComponent(title))
+      .replaceAll('$content', encodeURIComponent(content)),
+    formatBody: body
+      .replaceAll('$title', title)
+      .replaceAll('$content', content),
+  };
 }
 
 module.exports = {
