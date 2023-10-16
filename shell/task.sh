@@ -139,6 +139,7 @@ handle_log_path "${task_shell_params[@]}"
 init_begin_time
 
 eval . $dir_shell/otask.sh "$cmd"
-[[ -f "$dir_log/$log_path" ]] && [[ ! $show_log ]] && [[ "$real_time" != "true" ]] && cat "$dir_log/$log_path"
+# mac cat 无法正常退出
+# [[ -f "$dir_log/$log_path" ]] && [[ ! $show_log ]] && [[ "$real_time" != "true" ]] && cat "$dir_log/$log_path"
 
 exit 0
