@@ -502,7 +502,7 @@ export default class CronService {
     if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
       command = `${TASK_PREFIX}${tab.command}`;
     }
-    let commandVariable = `ID=${tab.id} `
+    let commandVariable = `no_tee=true ID=${tab.id} `
     if (tab.task_before) {
       commandVariable += `task_before='${tab.task_before.replace(/'/g, "'\\''")
         .trim()}' `;

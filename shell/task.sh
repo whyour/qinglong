@@ -70,10 +70,10 @@ handle_log_path() {
     log_path="$real_log_path"
   fi
 
-  cmd=">> $dir_log/$log_path 2>&1"
+  cmd="2>&1 | tee -a $dir_log/$log_path"
   make_dir "$dir_log/$log_dir"
-  if [[ "$show_log" == "true" ]]; then
-    cmd="2>&1 | tee -a $dir_log/$log_path"
+  if [[ "$no_tee" == "true" ]]; then
+    cmd=">> $dir_log/$log_path 2>&1"
   fi
 
   if [[ "$real_time" == "true" ]]; then
@@ -139,7 +139,4 @@ handle_log_path "${task_shell_params[@]}"
 init_begin_time
 
 eval . $dir_shell/otask.sh "$cmd"
-# mac cat 无法正常退出
-# [[ -f "$dir_log/$log_path" ]] && [[ ! $show_log ]] && [[ "$real_time" != "true" ]] && cat "$dir_log/$log_path"
-
 exit 0
