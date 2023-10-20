@@ -1,6 +1,7 @@
 #!/bin/bash
 
 dir_shell=/ql/shell
+. $dir_shell/env.sh
 . $dir_shell/share.sh
 link_shell
 

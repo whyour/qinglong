@@ -19,7 +19,6 @@ dir_update_log=$dir_log/update
 ql_static_repo=$dir_repo/static
 
 ## 文件
-file_ecosystem_js=$dir_root/ecosystem.config.js
 file_config_sample=$dir_sample/config.sample.sh
 file_env=$dir_config/env.sh
 file_sharecode=$dir_config/sharecode.sh
@@ -308,8 +307,9 @@ random_range() {
 
 reload_pm2() {
   cd $dir_root
+  restore_env_vars
   pm2 flush &>/dev/null
-  env ALL_PROXY= HTTP_PROXY= HTTPS_PROXY= all_proxy= http_proxy= https_proxy= pm2 startOrGracefulReload $file_ecosystem_js --update-env
+  pm2 startOrGracefulReload ecosystem.config.js
 }
 
 diff_time() {

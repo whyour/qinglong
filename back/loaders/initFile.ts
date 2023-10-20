@@ -108,8 +108,6 @@ export default async () => {
     fs.writeFileSync(TaskAfterFile, fs.readFileSync(sampleTaskShellFile));
   }
 
-  dotenv.config({ path: confFile });
-
   Logger.info('✌️ Init file down');
   console.log('✌️ Init file down');
 };
