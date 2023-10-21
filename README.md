@@ -71,8 +71,6 @@ task <file_path> conc <env_name> <account_number>(可选的)
 task <file_path> desi <env_name> <account_number>      
 # 设置任务超时时间   
 task -m <max_time> <file_path>
-# 实时打印任务日志，创建定时任务时，不用携带此参数
-task -l <file_path>
 # 使用 -- 分割，-- 后面的参数会传给脚本，下面的例子，脚本就可接收到参数 -u whyour -p password
 task <file_path> -- -u whyour -p password
 ```

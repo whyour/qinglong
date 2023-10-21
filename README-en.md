@@ -71,8 +71,6 @@ task <file_path> conc <env_name> <account_number>(Optional)
 task <file_path> desi <env_name> <account_number>       
 # Set task timeout   
 task -m <max_time> <file_path>
-# Print task log in real time, no need to carry this parameter when creating timed tasks
-task -l <file_path>
 # Use -- to split, -- followed by a parameter that is passed to the script, as in the following example, the script receives the parameter -u whyour -p password
 task <file_path> -- -u whyour -p password
 ```

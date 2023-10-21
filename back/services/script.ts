@@ -42,7 +42,7 @@ export default class ScriptService {
 
   public async runScript(filePath: string) {
     const relativePath = path.relative(config.scriptPath, filePath);
-    const command = `${TASK_COMMAND} -l ${relativePath} now`;
+    const command = `${TASK_COMMAND} ${relativePath} now`;
     const pid = await this.scheduleService.runTask(
       command,
       this.taskCallbacks(filePath),
@@ -56,7 +56,7 @@ export default class ScriptService {
   public async stopScript(filePath: string, pid: number) {
     if (!pid) {
       const relativePath = path.relative(config.scriptPath, filePath);
-      pid = await getPid(`${TASK_COMMAND} -l ${relativePath} now`) as number;
+      pid = await getPid(`${TASK_COMMAND} ${relativePath} now`) as number;
     }
     try {
       await killTask(pid);
