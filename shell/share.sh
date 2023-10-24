@@ -454,8 +454,6 @@ handle_task_start() {
 }
 
 run_task_before() {
-  [[ $is_macos -eq 0 ]] && check_server
-
   . $file_task_before "$@"
 
   if [[ $task_before ]]; then
