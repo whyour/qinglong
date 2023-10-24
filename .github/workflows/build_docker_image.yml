@@ -55,11 +55,6 @@ jobs:
           pnpm build:front
           pnpm build:back
       
-      - name: publich npm package
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
-          npm publish
-
       - name: copy to static repo
         env:
           GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
@@ -231,10 +226,35 @@ jobs:
           context: .
           file: ./docker/310.Dockerfile
           push: true
-          tags: whyour/qinglong:python3.10
-          cache-from: type=registry,ref=whyour/qinglong:cache-python3.10
-          cache-to: type=registry,ref=whyour/qinglong:cache-python3.10,mode=max
+          tags: whyour/qinglong:debian-python3.10
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian-python3.10
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian-python3.10,mode=max
 
       - name: Image digest
         run: |
           echo ${{ steps.docker_build_310.outputs.digest }}
+
+  publish:
+      needs: build
+
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - uses: pnpm/action-setup@v2
+          with:
+            version: '8.3.1'
+
+        - uses: actions/setup-node@v3
+          with:
+            cache: 'pnpm'
+
+        - name: build front and back
+          run: |
+            pnpm install --frozen-lockfile
+            pnpm build:front
+            pnpm build:back
+        
+        - name: publich npm package
+          run: |
+            echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+            npm publish
