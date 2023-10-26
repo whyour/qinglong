@@ -362,8 +362,13 @@ const CronDetailModal = ({
     <Modal
       title={
         <div className="crontab-title-wrapper">
-          <div>
-            <span>{currentCron.name}</span>
+          <div style={{ minWidth: 0 }}>
+            <Typography.Text
+              style={{width: '100%'}}
+              ellipsis={{ tooltip: currentCron.name }}
+            >
+              {currentCron.name}
+            </Typography.Text>
             {currentCron.labels?.length > 0 && currentCron.labels[0] !== '' && (
               <Divider type="vertical"></Divider>
             )}
