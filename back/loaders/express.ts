@@ -18,7 +18,7 @@ import { serveEnv } from '../config/serverEnv';
 import Logger from './logger';
 
 export default ({ app }: { app: Application }) => {
-  app.enable('trust proxy');
+  app.set('trust proxy', 'loopback');
   app.use(cors());
   app.get(`${config.api.prefix}/env.js`, serveEnv);
   app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
