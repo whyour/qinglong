@@ -105,7 +105,6 @@ export default ({ app }: { app: Application }) => {
     }
     const userService = Container.get(UserService);
     const authInfo = await userService.getUserInfo();
-    const envCount = await EnvModel.count();
 
     let isInitialized = true;
     if (
