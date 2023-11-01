@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import got from 'got';
 import iconv from 'iconv-lite';
@@ -13,22 +13,24 @@ import Logger from '../loaders/logger';
 
 export * from './share';
 
-export function getFileContentByName(fileName: string) {
-  if (fs.existsSync(fileName)) {
-    return fs.readFileSync(fileName, 'utf8');
+export async function getFileContentByName(fileName: string) {
+  const _exsit = await fileExist(fileName);
+  if (_exsit) {
+    return await fs.readFile(fileName, 'utf8');
   }
   return '';
 }
 
-export function getLastModifyFilePath(dir: string) {
+export async function getLastModifyFilePath(dir: string) {
   let filePath = '';
 
-  if (fs.existsSync(dir)) {
-    const arr = fs.readdirSync(dir);
+  const _exsit = await fileExist(dir);
+  if (_exsit) {
+    const arr = await fs.readdir(dir);
 
-    arr.forEach((item) => {
+    arr.forEach(async (item) => {
       const fullpath = path.join(dir, item);
-      const stats = fs.statSync(fullpath);
+      const stats = await fs.stat(fullpath);
       if (stats.isFile()) {
         if (stats.mtimeMs >= 0) {
           filePath = fullpath;
@@ -152,22 +154,17 @@ export function getPlatform(userAgent: string): 'mobile' | 'desktop' {
 }
 
 export async function fileExist(file: any) {
-  return new Promise((resolve) => {
-    try {
-      fs.accessSync(file);
-      resolve(true);
-    } catch (error) {
-      resolve(false);
-    }
-  });
+  try {
+    await fs.access(file);
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 export async function createFile(file: string, data: string = '') {
-  return new Promise((resolve) => {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, data);
-    resolve(true);
-  });
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, data);
 }
 
 export async function handleLogPath(
@@ -244,18 +241,18 @@ export function dirSort(a: IFile, b: IFile): number {
   }
 }
 
-export function readDirs(
+export async function readDirs(
   dir: string,
   baseDir: string = '',
   blacklist: string[] = [],
-): IFile[] {
+): Promise<IFile[]> {
   const relativePath = path.relative(baseDir, dir);
-  const files = fs.readdirSync(dir);
-  const result: IFile[] = files
+  const files = await fs.readdir(dir);
+  const result: IFile[] = await Promise.all(files
     .filter((x) => !blacklist.includes(x))
-    .map((file: string) => {
+    .map(async (file: string) => {
       const subPath = path.join(dir, file);
-      const stats = fs.statSync(subPath);
+      const stats = await fs.stat(subPath);
       const key = path.join(relativePath, file);
       if (stats.isDirectory()) {
         return {
@@ -264,7 +261,7 @@ export function readDirs(
           type: 'directory',
           parent: relativePath,
           mtime: stats.mtime.getTime(),
-          children: readDirs(subPath, baseDir).sort(dirSort),
+          children: (await readDirs(subPath, baseDir)).sort(dirSort),
         };
       }
       return {
@@ -276,22 +273,22 @@ export function readDirs(
         size: stats.size,
         mtime: stats.mtime.getTime(),
       };
-    });
+    }));
   return result.sort(dirSort);
 }
 
-export function readDir(
+export async function readDir(
   dir: string,
   baseDir: string = '',
   blacklist: string[] = [],
 ) {
   const relativePath = path.relative(baseDir, dir);
-  const files = fs.readdirSync(dir);
+  const files = await fs.readdir(dir);
   const result: any = files
     .filter((x) => !blacklist.includes(x))
-    .map((file: string) => {
+    .map(async (file: string) => {
       const subPath = path.join(dir, file);
-      const stats = fs.statSync(subPath);
+      const stats = await fs.stat(subPath);
       const key = path.join(relativePath, file);
       return {
         title: file,
@@ -301,24 +298,6 @@ export function readDir(
       };
     });
   return result;
-}
-
-export async function emptyDir(path: string) {
-  const pathExist = await fileExist(path);
-  if (!pathExist) {
-    return;
-  }
-  const files = fs.readdirSync(path);
-  for (const file of files) {
-    const filePath = `${path}/${file}`;
-    const stats = fs.statSync(filePath);
-    if (stats.isDirectory()) {
-      await emptyDir(filePath);
-    } else {
-      fs.unlinkSync(filePath);
-    }
-  }
-  fs.rmdirSync(path);
 }
 
 export async function promiseExec(command: string): Promise<string> {
@@ -449,7 +428,7 @@ interface IVersion {
 }
 
 export async function parseVersion(path: string): Promise<IVersion> {
-  return load(await promisify(fs.readFile)(path, 'utf8')) as IVersion;
+  return load(await fs.readFile(path, 'utf8')) as IVersion;
 }
 
 export async function parseContentVersion(content: string): Promise<IVersion> {
@@ -500,5 +479,16 @@ export function safeJSONParse(value?: string) {
   } catch (error) {
     Logger.error('[JSON.parse失败]', error)
     return {};
+  }
+}
+
+export async function rmPath(path: string) {
+  try {
+    const _exsit = await fileExist(path);
+    if (_exsit) {
+      await fs.rm(path, { force: true, recursive: true, maxRetries: 5 });
+    }
+  } catch (error) {
+    Logger.error('[rmPath失败]', error)
   }
 }

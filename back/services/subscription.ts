@@ -7,7 +7,6 @@ import {
   SubscriptionStatus,
 } from '../data/subscription';
 import { ChildProcessWithoutNullStreams } from 'child_process';
-import fs from 'fs';
 import {
   getFileContentByName,
   concurrentRun,
@@ -16,9 +15,9 @@ import {
   killTask,
   handleLogPath,
   promiseExec,
-  emptyDir,
+  rmPath,
 } from '../config/util';
-import { promises, existsSync } from 'fs';
+import fs from 'fs/promises';
 import { FindOptions, Op } from 'sequelize';
 import path, { join } from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
@@ -39,7 +38,7 @@ export default class SubscriptionService {
     private sockService: SockService,
     private sshKeyService: SshKeyService,
     private crontabService: CrontabService,
-  ) { }
+  ) {}
 
   public async list(searchText?: string): Promise<Subscription[]> {
     let query = {};
@@ -107,7 +106,7 @@ export default class SubscriptionService {
 
   public async setSshConfig() {
     const docs = await SubscriptionModel.findAll();
-    this.sshKeyService.setSshConfig(docs);
+    await this.sshKeyService.setSshConfig(docs);
   }
 
   private taskCallbacks(doc: Subscription): TaskCallbacks {
@@ -131,7 +130,7 @@ export default class SubscriptionService {
         let beforeStr = '';
         try {
           if (doc.sub_before) {
-            fs.appendFileSync(absolutePath, `\n## 执行before命令...\n\n`);
+            await fs.appendFile(absolutePath, `\n## 执行before命令...\n\n`);
             beforeStr = await promiseExec(doc.sub_before);
           }
         } catch (error: any) {
@@ -139,7 +138,7 @@ export default class SubscriptionService {
             (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (beforeStr) {
-          fs.appendFileSync(absolutePath, `${beforeStr}\n`);
+          await fs.appendFile(absolutePath, `${beforeStr}\n`);
         }
       },
       onStart: async (cp: ChildProcessWithoutNullStreams, startTime) => {
@@ -158,7 +157,7 @@ export default class SubscriptionService {
         let afterStr = '';
         try {
           if (sub.sub_after) {
-            fs.appendFileSync(absolutePath, `\n\n## 执行after命令...\n\n`);
+            await fs.appendFile(absolutePath, `\n\n## 执行after命令...\n\n`);
             afterStr = await promiseExec(sub.sub_after);
           }
         } catch (error: any) {
@@ -166,10 +165,10 @@ export default class SubscriptionService {
             (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (afterStr) {
-          fs.appendFileSync(absolutePath, `${afterStr}\n`);
+          await fs.appendFile(absolutePath, `${afterStr}\n`);
         }
 
-        fs.appendFileSync(
+        await fs.appendFile(
           absolutePath,
           `\n## 执行结束... ${endTime.format(
             'YYYY-MM-DD HH:mm:ss',
@@ -190,12 +189,12 @@ export default class SubscriptionService {
       onError: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await handleLogPath(sub.log_path as string);
-        fs.appendFileSync(absolutePath, `\n${message}`);
+        await fs.appendFile(absolutePath, `\n${message}`);
       },
       onLog: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await handleLogPath(sub.log_path as string);
-        fs.appendFileSync(absolutePath, `\n${message}`);
+        await fs.appendFile(absolutePath, `\n${message}`);
       },
     };
   }
@@ -268,11 +267,11 @@ export default class SubscriptionService {
     if (query?.force === true) {
       const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
       if (crons?.length) {
-        await this.crontabService.remove(crons.map(x => x.id!))
+        await this.crontabService.remove(crons.map((x) => x.id!));
       }
       for (const doc of docs) {
         const filePath = join(config.scriptPath, doc.alias);
-        emptyDir(filePath);
+        await rmPath(filePath);
       }
     }
   }
@@ -323,7 +322,7 @@ export default class SubscriptionService {
     this.scheduleService.runTask(command, this.taskCallbacks(subscription), {
       name: subscription.name,
       schedule: subscription.schedule,
-      command
+      command,
     });
   }
 
@@ -352,7 +351,7 @@ export default class SubscriptionService {
     }
 
     const absolutePath = await handleLogPath(doc.log_path as string);
-    return getFileContentByName(absolutePath);
+    return await getFileContentByName(absolutePath);
   }
 
   public async logs(id: number) {
@@ -364,15 +363,18 @@ export default class SubscriptionService {
     if (doc.log_path) {
       const relativeDir = path.dirname(`${doc.log_path}`);
       const dir = path.resolve(config.logPath, relativeDir);
-      if (existsSync(dir)) {
-        let files = await promises.readdir(dir);
-        return files
-          .map((x) => ({
-            filename: x,
-            directory: relativeDir.replace(config.logPath, ''),
-            time: fs.statSync(`${dir}/${x}`).mtime.getTime(),
-          }))
-          .sort((a, b) => b.time - a.time);
+      const _exist = await fileExist(dir);
+      if (_exist) {
+        let files = await fs.readdir(dir);
+        return (
+          await Promise.all(
+            files.map(async (x) => ({
+              filename: x,
+              directory: relativeDir.replace(config.logPath, ''),
+              time: (await fs.stat(`${dir}/${x}`)).mtime.getTime(),
+            })),
+          )
+        ).sort((a, b) => b.time - a.time);
       }
     }
   }

@@ -39,7 +39,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -114,7 +114,7 @@ export default class SystemService {
           },
         );
         lastVersionContent = await parseContentVersion(result.body);
-      } catch (error) { }
+      } catch (error) {}
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -234,7 +234,7 @@ export default class SystemService {
       callback,
       {
         command,
-      }
+      },
     );
   }
 
@@ -283,7 +283,7 @@ export default class SystemService {
   }
 
   public async getSystemLog(res: Response) {
-    const result = readDirs(config.systemLogPath, config.systemLogPath);
+    const result = await readDirs(config.systemLogPath, config.systemLogPath);
     const logs = result.reverse().filter((x) => x.title.endsWith('.log'));
     res.set({
       'Content-Length': sum(logs.map((x) => x.size)),

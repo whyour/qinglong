@@ -1,7 +1,6 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import dotenv from 'dotenv';
 import Logger from './logger';
 import { fileExist } from '../config/util';
 
@@ -48,64 +47,70 @@ export default async () => {
   const TaskAfterFileExist = await fileExist(TaskAfterFile);
 
   if (!configDirExist) {
-    fs.mkdirSync(configPath);
+    await fs.mkdir(configPath);
   }
 
   if (!scriptDirExist) {
-    fs.mkdirSync(scriptPath);
+    await fs.mkdir(scriptPath);
   }
 
   if (!logDirExist) {
-    fs.mkdirSync(logPath);
+    await fs.mkdir(logPath);
   }
 
   if (!tmpDirExist) {
-    fs.mkdirSync(tmpPath);
+    await fs.mkdir(tmpPath);
   }
 
   if (!uploadDirExist) {
-    fs.mkdirSync(uploadPath);
+    await fs.mkdir(uploadPath);
   }
 
   if (!sshDirExist) {
-    fs.mkdirSync(sshPath);
+    await fs.mkdir(sshPath);
   }
 
   if (!bakDirExist) {
-    fs.mkdirSync(bakPath);
+    await fs.mkdir(bakPath);
   }
 
   if (!sshdDirExist) {
-    fs.mkdirSync(sshdPath);
+    await fs.mkdir(sshdPath);
   }
 
   if (!systemLogDirExist) {
-    fs.mkdirSync(systemLogPath);
+    await fs.mkdir(systemLogPath);
   }
 
   // 初始化文件
   if (!authFileExist) {
-    fs.writeFileSync(authConfigFile, fs.readFileSync(sampleAuthFile));
+    await fs.writeFile(authConfigFile, await fs.readFile(sampleAuthFile));
   }
 
   if (!confFileExist) {
-    fs.writeFileSync(confFile, fs.readFileSync(sampleConfigFile));
+    await fs.writeFile(confFile, await fs.readFile(sampleConfigFile));
   }
 
   if (!scriptNotifyJsFileExist) {
-    fs.writeFileSync(scriptNotifyJsFile, fs.readFileSync(sampleNotifyJsFile));
+    await fs.writeFile(
+      scriptNotifyJsFile,
+      await fs.readFile(sampleNotifyJsFile),
+    );
   }
 
   if (!scriptNotifyPyFileExist) {
-    fs.writeFileSync(scriptNotifyPyFile, fs.readFileSync(sampleNotifyPyFile));
+    await fs.writeFile(
+      scriptNotifyPyFile,
+      await fs.readFile(sampleNotifyPyFile),
+    );
   }
 
   if (!TaskBeforeFileExist) {
-    fs.writeFileSync(TaskBeforeFile, fs.readFileSync(sampleTaskShellFile));
+    await fs.writeFile(TaskBeforeFile, await fs.readFile(sampleTaskShellFile));
   }
 
   if (!TaskAfterFileExist) {
-    fs.writeFileSync(TaskAfterFile, fs.readFileSync(sampleTaskShellFile));
+    await fs.writeFile(TaskAfterFile, await fs.readFile(sampleTaskShellFile));
   }
 
   Logger.info('✌️ Init file down');

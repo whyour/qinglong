@@ -8,7 +8,7 @@ import {
   safeJSONParse,
 } from '../config/util';
 import config from '../config';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
 import {
@@ -44,12 +44,13 @@ export default class UserService {
     req: Request,
     needTwoFactor = true,
   ): Promise<any> {
-    if (!fs.existsSync(config.authConfigFile)) {
+    const _exist = await fileExist(config.authConfigFile);
+    if (!_exist) {
       return this.initAuthInfo();
     }
 
     let { username, password } = payloads;
-    const content = this.getAuthInfo();
+    const content = await this.getAuthInfo();
     const timestamp = Date.now();
     if (content) {
       let {
@@ -187,7 +188,7 @@ export default class UserService {
   }
 
   public async logout(platform: string): Promise<any> {
-    const authInfo = this.getAuthInfo();
+    const authInfo = await this.getAuthInfo();
     this.updateAuthInfo(authInfo, {
       token: '',
       tokens: { ...authInfo.tokens, [platform]: '' },
@@ -217,8 +218,8 @@ export default class UserService {
     return doc;
   }
 
-  private initAuthInfo() {
-    fs.writeFileSync(
+  private async initAuthInfo() {
+    await fs.writeFile(
       config.authConfigFile,
       JSON.stringify({
         username: 'admin',
@@ -255,7 +256,7 @@ export default class UserService {
   public async getUserInfo(): Promise<any> {
     const authFileExist = await fileExist(config.authConfigFile);
     if (!authFileExist) {
-      fs.writeFileSync(
+      await fs.writeFile(
         config.authConfigFile,
         JSON.stringify({
           username: 'admin',
@@ -266,16 +267,16 @@ export default class UserService {
     return this.getAuthInfo();
   }
 
-  public initTwoFactor() {
+  public async initTwoFactor() {
     const secret = authenticator.generateSecret();
-    const authInfo = this.getAuthInfo();
+    const authInfo = await this.getAuthInfo();
     const otpauth = authenticator.keyuri(authInfo.username, 'qinglong', secret);
     this.updateAuthInfo(authInfo, { twoFactorSecret: secret });
     return { secret, url: otpauth };
   }
 
-  public activeTwoFactor(code: string) {
-    const authInfo = this.getAuthInfo();
+  public async activeTwoFactor(code: string) {
+    const authInfo = await this.getAuthInfo();
     const isValid = authenticator.verify({
       token: code,
       secret: authInfo.twoFactorSecret,
@@ -294,7 +295,7 @@ export default class UserService {
     }: { username: string; password: string; code: string },
     req: any,
   ) {
-    const authInfo = this.getAuthInfo();
+    const authInfo = await this.getAuthInfo();
     const { isTwoFactorChecking, twoFactorSecret } = authInfo;
     if (!isTwoFactorChecking) {
       return { code: 450, message: '未知错误' };
@@ -326,13 +327,13 @@ export default class UserService {
     return true;
   }
 
-  private getAuthInfo() {
-    const content = fs.readFileSync(config.authConfigFile, 'utf8');
+  private async getAuthInfo() {
+    const content = await fs.readFile(config.authConfigFile, 'utf8');
     return safeJSONParse(content);
   }
 
-  private updateAuthInfo(authInfo: any, info: any) {
-    fs.writeFileSync(
+  private async updateAuthInfo(authInfo: any, info: any) {
+    await fs.writeFile(
       config.authConfigFile,
       JSON.stringify({ ...authInfo, ...info }),
     );
