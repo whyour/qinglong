@@ -112,7 +112,7 @@ export class PushMeNotification extends NotificationBaseInfo {
 export class ChronocatNotification extends NotificationBaseInfo {
   public chronocatURL: string = '';
   public chronocatQQ: string = '';
-  public chronocatToekn: string = '';
+  public chronocatToken: string = '';
 }
 
 export class WebhookNotification extends NotificationBaseInfo {

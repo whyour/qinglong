@@ -591,7 +591,7 @@ export default class NotificationService {
   }
 
   private async chronocat() {
-    const { chronocatURL, chronocatQQ, chronocatToekn } = this.params;
+    const { chronocatURL, chronocatQQ, chronocatToken } = this.params;
     try {
       const user_ids = chronocatQQ
         .match(/user_id=(\d+)/g)
@@ -603,7 +603,7 @@ export default class NotificationService {
       const url = `${chronocatURL}/api/message/send`;
       const headers = {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${chronocatToekn}`,
+        Authorization: `Bearer ${chronocatToken}`,
       };
 
       for (const [chat_type, ids] of [
