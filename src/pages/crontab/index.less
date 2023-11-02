@@ -6,9 +6,9 @@
   .card-wrapper {
     .ant-card:last-child {
       .ant-card-body {
-        min-height: 300px;
-        height: calc(90vh - 367px);
-        height: calc(90vh - var(--vh-offset, 0px) - 367px);
+        min-height: 0;
+        height: calc(80vh - 314px);
+        height: calc(80vh - var(--vh-offset, 0px) - 314px);
         overflow-y: auto;
 
         > div {
@@ -21,6 +21,8 @@
   .ant-modal-body {
     background: #eee;
     padding: 12px;
+    max-height: calc(80vh - 57px);
+    max-height: calc(80vh - var(--vh-offset, 57px));
   }
 
   .ant-card-body {

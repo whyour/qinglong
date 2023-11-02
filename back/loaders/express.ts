@@ -4,7 +4,7 @@ import cors from 'cors';
 import routes from '../api';
 import config from '../config';
 import jwt, { UnauthorizedError } from 'express-jwt';
-import fs from 'fs';
+import fs from 'fs/promises';
 import { getPlatform, getToken, safeJSONParse } from '../config/util';
 import Container from 'typedi';
 import OpenService from '../services/open';
@@ -18,7 +18,7 @@ import { serveEnv } from '../config/serverEnv';
 import Logger from './logger';
 
 export default ({ app }: { app: Application }) => {
-  app.enable('trust proxy');
+  app.set('trust proxy', 'loopback');
   app.use(cors());
   app.get(`${config.api.prefix}/env.js`, serveEnv);
   app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
@@ -29,7 +29,7 @@ export default ({ app }: { app: Application }) => {
       target: `http://0.0.0.0:${config.publicPort}/api`,
       changeOrigin: true,
       pathRewrite: { '/api/public': '' },
-      logProvider: () => Logger
+      logProvider: () => Logger,
     }),
   );
 
@@ -83,7 +83,7 @@ export default ({ app }: { app: Application }) => {
       return next();
     }
 
-    const data = fs.readFileSync(config.authConfigFile, 'utf8');
+    const data = await fs.readFile(config.authConfigFile, 'utf8');
     if (data && headerToken) {
       const { token = '', tokens = {} } = safeJSONParse(data);
       if (headerToken === token || tokens[req.platform] === headerToken) {
@@ -105,7 +105,6 @@ export default ({ app }: { app: Application }) => {
     }
     const userService = Container.get(UserService);
     const authInfo = await userService.getUserInfo();
-    const envCount = await EnvModel.count();
 
     let isInitialized = true;
     if (

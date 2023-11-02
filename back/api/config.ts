@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
 import { join } from 'path';
 const route = Router();
@@ -16,7 +16,7 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        const fileList = fs.readdirSync(config.configPath, 'utf-8');
+        const fileList = await fs.readdir(config.configPath, 'utf-8');
         res.send({
           code: 200,
           data: fileList
@@ -41,11 +41,11 @@ export default (app: Router) => {
           res.send({ code: 403, message: '文件无法访问' });
         }
         if (req.params.file.includes('sample')) {
-          content = getFileContentByName(
+          content = await getFileContentByName(
             join(config.samplePath, req.params.file),
           );
         } else {
-          content = getFileContentByName(
+          content = await getFileContentByName(
             join(config.configPath, req.params.file),
           );
         }
@@ -72,7 +72,7 @@ export default (app: Router) => {
           res.send({ code: 403, message: '文件无法访问' });
         }
         const path = join(config.configPath, name);
-        fs.writeFileSync(path, content);
+        await fs.writeFile(path, content);
         res.send({ code: 200, message: '保存成功' });
       } catch (e) {
         return next(e);

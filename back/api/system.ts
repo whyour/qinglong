@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import config from '../config';
 import SystemService from '../services/system';
 import { celebrate, Joi } from 'celebrate';
@@ -174,7 +174,7 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const systemService = Container.get(SystemService);
-        const command = req.body.command
+        const command = req.body.command;
         const idStr = `cat ${config.crontabFile} | grep -E "${command}" | perl -pe "s|.*ID=(.*) ${command}.*|\\1|" | head -1 | awk -F " " '{print $1}' | xargs echo -n`;
         let id = await promiseExec(idStr);
         const uniqPath = await getUniqPath(command, id);
@@ -193,12 +193,12 @@ export default (app: Router) => {
             onError: async (message: string) => {
               res.write(`\n${message}`);
               const absolutePath = await handleLogPath(logPath);
-              fs.appendFileSync(absolutePath, `\n${message}`);
+              await fs.appendFile(absolutePath, `\n${message}`);
             },
             onLog: async (message: string) => {
               res.write(`\n${message}`);
               const absolutePath = await handleLogPath(logPath);
-              fs.appendFileSync(absolutePath, `\n${message}`);
+              await fs.appendFile(absolutePath, `\n${message}`);
             },
           },
         );
@@ -253,16 +253,12 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/log',
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const systemService = Container.get(SystemService);
-        await systemService.getSystemLog(res);
-      } catch (e) {
-        return next(e);
-      }
-    },
-  );
-
+  route.get('/log', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const systemService = Container.get(SystemService);
+      await systemService.getSystemLog(res);
+    } catch (e) {
+      return next(e);
+    }
+  });
 };

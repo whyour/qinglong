@@ -1,22 +1,21 @@
 import sockJs from 'sockjs';
 import { Server } from 'http';
-import Logger from './logger';
 import { Container } from 'typedi';
 import SockService from '../services/sock';
 import config from '../config/index';
-import fs from 'fs';
+import fs from 'fs/promises';
 import { getPlatform, safeJSONParse } from '../config/util';
 
 export default async ({ server }: { server: Server }) => {
   const echo = sockJs.createServer({ prefix: '/api/ws', log: () => {} });
   const sockService = Container.get(SockService);
 
-  echo.on('connection', (conn) => {
+  echo.on('connection', async (conn) => {
     if (!conn.headers || !conn.url || !conn.pathname) {
       conn.close('404');
     }
 
-    const data = fs.readFileSync(config.authConfigFile, 'utf8');
+    const data = await fs.readFile(config.authConfigFile, 'utf8');
     const platform = getPlatform(conn.headers['user-agent'] || '') || 'desktop';
     const headerToken = conn.url.replace(`${conn.pathname}?token=`, '');
     if (data) {

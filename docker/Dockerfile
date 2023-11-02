@@ -49,9 +49,8 @@ RUN set -x \
   && git config --global user.email "qinglong@@users.noreply.github.com" \
   && git config --global user.name "qinglong" \
   && git config --global http.postBuffer 524288000 \
-  && npm install -g pnpm@8.3.1 \
+  && npm install -g pnpm@8.3.1 pm2 tsx \
   && cd && pnpm config set registry https://registry.npmmirror.com \
-  && pnpm add -g pm2 tsx \
   && rm -rf /root/.pnpm-store \
   && rm -rf /root/.local/share/pnpm/store \
   && rm -rf /root/.cache \

@@ -1,18 +1,6 @@
-version: 2.16.4
-changeLogLink: https://t.me/jiao_long/395
-publishTime: 2023-10-18 23:00
+version: 2.16.5
+changeLogLink: https://t.me/jiao_long/396
+publishTime: 2023-10-29 20:00
 changeLog: |
-  1. 脚本推送增加自定义 webhook 方式
-  3. 增加 chronocat 无头模式的QQNT推送
-  2. task 命令支持给脚本传参，使用 -- 分割，后面的参数都会传给脚本
-  4. 系统日志增加置顶置底按钮
-  5. 定时任务详情增加额外定时展示
-  6. 定时任务增加前后规则校验，不能包含 task 命令
-  7. 修复定时任务间隔较小，任务状态不准确
-  8. 修复定时任务日志滚动
-  9. 修复 QlBaseUrl 末尾不加斜杠无法访问
-  10. 修复定时任务详情页查看历史日志异常
-  11. 修复定时任务添加 task_after 命令无法停止
-  12. 修复清空文件夹报错
-  13. 修复设置代理时, schedule 服务通信异常
-  14. 其他优化
+  1. 修复注释或删除环境变量可能无效
+  2. 修复定时任务详情日志列表样式

@@ -42,7 +42,7 @@ export default class NotificationService {
     retry: 1,
   };
 
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   public async notify(
     title: string,
@@ -234,9 +234,8 @@ export default class NotificationService {
       telegramBotUserId,
     } = this.params;
     const authStr = telegramBotProxyAuth ? `${telegramBotProxyAuth}@` : '';
-    const url = `https://${
-      telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
-    }/bot${telegramBotToken}/sendMessage`;
+    const url = `https://${telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
+      }/bot${telegramBotToken}/sendMessage`;
     let agent;
     if (telegramBotProxyHost && telegramBotProxyPort) {
       const options: any = {
@@ -562,7 +561,7 @@ export default class NotificationService {
         throw new Error(JSON.stringify(info));
       }
     } catch (error: any) {
-      throw new Error(error.response ? error.response.body : error);
+      throw error;
     }
   }
 

@@ -1,7 +1,7 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import {
   Env,
   EnvModel,
@@ -208,6 +208,6 @@ export default class EnvService {
         }
       }
     }
-    fs.writeFileSync(config.envFile, env_string);
+    await fs.writeFile(config.envFile, env_string);
   }
 }

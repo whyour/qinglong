@@ -96,6 +96,53 @@ const Initialization = () => {
       ),
     },
     {
+      title: intl.get('通知设置'),
+      content: (
+        <Form onFinish={submitNotification} layout="vertical">
+          <Form.Item
+            label={intl.get('通知方式')}
+            name="type"
+            rules={[{ required: true, message: intl.get('请选择通知方式') }]}
+            style={{ maxWidth: 350 }}
+          >
+            <Select
+              onChange={notificationModeChange}
+              placeholder={intl.get('请选择通知方式')}
+            >
+              {config.notificationModes
+                .filter((x) => x.value !== 'closed')
+                .map((x) => (
+                  <Option key={x.value} value={x.value}>
+                    {x.label}
+                  </Option>
+                ))}
+            </Select>
+          </Form.Item>
+          {fields.map((x) => (
+            <Form.Item
+              key={x.label}
+              label={x.label}
+              name={x.label}
+              extra={x.tip}
+              rules={[{ required: x.required }]}
+              style={{ maxWidth: 400 }}
+            >
+              <Input.TextArea
+                autoSize={{ minRows: 1, maxRows: 5 }}
+                placeholder={`请输入${x.label}`}
+              />
+            </Form.Item>
+          ))}
+          <Button type="primary" htmlType="submit" loading={loading}>
+            {intl.get('保存')}
+          </Button>
+          <Button type="link" htmlType="button" onClick={() => next()}>
+            {intl.get('跳过')}
+          </Button>
+        </Form>
+      ),
+    },
+    {
       title: intl.get('账户设置'),
       content: (
         <Form onFinish={submitAccountSetting} layout="vertical">
@@ -148,53 +195,6 @@ const Initialization = () => {
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={loading}>
             {intl.get('提交')}
-          </Button>
-        </Form>
-      ),
-    },
-    {
-      title: intl.get('通知设置'),
-      content: (
-        <Form onFinish={submitNotification} layout="vertical">
-          <Form.Item
-            label={intl.get('通知方式')}
-            name="type"
-            rules={[{ required: true, message: intl.get('请选择通知方式') }]}
-            style={{ maxWidth: 350 }}
-          >
-            <Select
-              onChange={notificationModeChange}
-              placeholder={intl.get('请选择通知方式')}
-            >
-              {config.notificationModes
-                .filter((x) => x.value !== 'closed')
-                .map((x) => (
-                  <Option key={x.value} value={x.value}>
-                    {x.label}
-                  </Option>
-                ))}
-            </Select>
-          </Form.Item>
-          {fields.map((x) => (
-            <Form.Item
-              key={x.label}
-              label={x.label}
-              name={x.label}
-              extra={x.tip}
-              rules={[{ required: x.required }]}
-              style={{ maxWidth: 400 }}
-            >
-              <Input.TextArea
-                autoSize={{ minRows: 1, maxRows: 5 }}
-                placeholder={`请输入${x.label}`}
-              />
-            </Form.Item>
-          ))}
-          <Button type="primary" htmlType="submit" loading={loading}>
-            {intl.get('保存')}
-          </Button>
-          <Button type="link" htmlType="button" onClick={() => next()}>
-            {intl.get('跳过')}
           </Button>
         </Form>
       ),

@@ -3,7 +3,7 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import * as fs from 'fs';
 import config from '../config';
-import { emptyDir, getFileContentByName, readDirs } from '../config/util';
+import { getFileContentByName, readDirs, rmPath } from '../config/util';
 import { join } from 'path';
 import { celebrate, Joi } from 'celebrate';
 const route = Router();
@@ -39,7 +39,7 @@ export default (app: Router) => {
           (req.query.path || '') as string,
           req.params.file,
         );
-        const content = getFileContentByName(filePath);
+        const content = await getFileContentByName(filePath);
         res.send({ code: 200, data: content });
       } catch (e) {
         return next(e);
@@ -64,11 +64,7 @@ export default (app: Router) => {
           type: string;
         };
         const filePath = join(config.logPath, path, filename);
-        if (type === 'directory') {
-          await emptyDir(filePath);
-        } else {
-          fs.unlinkSync(filePath);
-        }
+        await rmPath(filePath);
         res.send({ code: 200 });
       } catch (e) {
         return next(e);
