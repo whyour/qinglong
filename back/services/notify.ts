@@ -634,7 +634,7 @@ export default class NotificationService {
             json: data,
             headers,
           });
-          if (res.body === 'success') {
+          if (res.statusCode === 200) {
             return true;
           } else {
             throw new Error(res.body);
