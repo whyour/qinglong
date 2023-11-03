@@ -320,7 +320,7 @@ export default {
       {
         label: 'emailService',
         tip: intl.get(
-          '邮箱服务名称，比如126、163、Gmail、QQ等，支持列表https://nodemailer.com/smtp/well-known/',
+          '邮箱服务名称，比如126、163、Gmail、QQ等，支持列表https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json',
         ),
         required: true,
       },
