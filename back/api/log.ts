@@ -15,7 +15,7 @@ export default (app: Router) => {
   route.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const logger: Logger = Container.get('logger');
     try {
-      const result = readDirs(config.logPath, config.logPath, blacklist);
+      const result = await readDirs(config.logPath, config.logPath, blacklist);
       res.send({
         code: 200,
         data: result,
