@@ -1223,6 +1223,7 @@ function ChronocatNotify(title, desp) {
       console.log(
         'CHRONOCAT 服务的 CHRONOCAT_URL 或 CHRONOCAT_QQ 未设置!!\n取消推送',
       );
+      resolve();
       return;
     }
 
