@@ -138,7 +138,7 @@ update_repo() {
     echo -e "\n拉取 ${uniq_path} 成功...\n"
     diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
   else
-    echo -e "\n拉取 ${uniq_path} 失败，请检查网络...\n"
+    echo -e "\n拉取 ${uniq_path} 失败，请检查日志...\n"
   fi
 }
 

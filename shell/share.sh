@@ -70,7 +70,6 @@ import_config() {
   ql_base_url=${QlBaseUrl:-"/"}
   ql_port=${QlPort:-"5700"}
   command_timeout_time=${CommandTimeoutTime:-""}
-  proxy_url=${ProxyUrl:-""}
   file_extensions=${RepoFileExtensions:-"js py"}
   current_branch=${QL_BRANCH}
 
@@ -88,9 +87,6 @@ import_config() {
 set_proxy() {
   local proxy="$1"
   if [[ $proxy ]]; then
-    proxy_url="$proxy"
-  fi
-  if [[ $proxy_url ]]; then
     export http_proxy="${proxy_url}"
     export https_proxy="${proxy_url}"
   fi
@@ -293,7 +289,7 @@ git_clone_scripts() {
 
   set_proxy "$proxy"
 
-  git clone --depth=1 $part_cmd $url $dir 2>&1
+  git clone --depth=1 $part_cmd $url $dir
   exit_status=$?
 
   unset_proxy
