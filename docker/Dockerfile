@@ -1,13 +1,13 @@
-FROM python:3.10-alpine as builder
+FROM python:3.11-alpine as builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
   && apk update \
   && apk add nodejs npm git \
   && npm i -g pnpm@8.3.1 \
   && cd /tmp/build \
-  && pnpm --registry https://registry.npmmirror.com install --prod
+  && pnpm install --prod
 
-FROM python:3.10-alpine
+FROM python:3.11-alpine
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -24,7 +24,6 @@ ENV PNPM_HOME=/root/.local/share/pnpm \
   QL_BRANCH=${QL_BRANCH}
 
 RUN set -x \
-  && sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
   && apk update -f \
   && apk upgrade \
   && apk --no-cache add -f bash \
@@ -50,7 +49,6 @@ RUN set -x \
   && git config --global user.name "qinglong" \
   && git config --global http.postBuffer 524288000 \
   && npm install -g pnpm@8.3.1 pm2 tsx \
-  && cd && pnpm config set registry https://registry.npmmirror.com \
   && rm -rf /root/.pnpm-store \
   && rm -rf /root/.local/share/pnpm/store \
   && rm -rf /root/.cache \
