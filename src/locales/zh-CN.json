@@ -466,5 +466,14 @@
   "个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx": "个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx",
   "docker安装在持久化config目录下的chronocat.yml文件可找到": "docker安装在持久化config目录下的chronocat.yml文件可找到",
   "请选择": "请选择",
-  "请输入": "请输入"
+  "请输入": "请输入",
+  "依赖设置": "依赖设置",
+  "Node 软件包镜像源": "Node 软件包镜像源",
+  "Python 软件包镜像源": "Python 软件包镜像源",
+  "Linux 软件包镜像源": "Linux 软件包镜像源",
+  "代理与镜像源二选一即可": "代理与镜像源二选一即可",
+  "代理地址, 支持HTTP(S)/SOCK5": "代理地址, 支持HTTP(S)/SOCK5",
+  "NPM 镜像源": "NPM 镜像源",
+  "PyPI 镜像源": "PyPI 镜像源",
+  "alpine linux 镜像源": "alpine linux 镜像源"
 }

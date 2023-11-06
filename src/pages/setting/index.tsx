@@ -34,6 +34,7 @@ import { SharedContext } from '@/layouts';
 import './index.less';
 import useResizeObserver from '@react-hook/resize-observer';
 import SystemLog from './systemLog';
+import Dependence from './dependence';
 
 const { Text } = Typography;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
@@ -353,6 +354,11 @@ const Setting = () => {
               key: 'login',
               label: intl.get('登录日志'),
               children: <LoginLog data={loginLogData} />,
+            },
+            {
+              key: 'dependence',
+              label: intl.get('依赖设置'),
+              children: <Dependence />
             },
             {
               key: 'other',

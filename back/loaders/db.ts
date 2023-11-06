@@ -5,7 +5,7 @@ import { EnvModel } from '../data/env';
 import { CrontabModel } from '../data/cron';
 import { DependenceModel } from '../data/dependence';
 import { AppModel } from '../data/open';
-import { AuthModel } from '../data/auth';
+import { SystemModel } from '../data/system';
 import { fileExist } from '../config/util';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
@@ -17,7 +17,7 @@ export default async () => {
     await CrontabModel.sync();
     await DependenceModel.sync();
     await AppModel.sync();
-    await AuthModel.sync();
+    await SystemModel.sync();
     await EnvModel.sync();
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
@@ -75,7 +75,7 @@ export default async () => {
     const dependenceCount = await DependenceModel.count();
     const envCount = await EnvModel.count();
     const appCount = await AppModel.count();
-    const authCount = await AuthModel.count();
+    const authCount = await SystemModel.count();
     if (crondbExist && cronCount === 0) {
       const cronDb = new DataStore({
         filename: cronDbFile,
@@ -127,7 +127,7 @@ export default async () => {
       });
       authDb.persistence.compactDatafile();
       authDb.find({}).exec(async (err, docs) => {
-        await AuthModel.bulkCreate(docs, { ignoreDuplicates: true });
+        await SystemModel.bulkCreate(docs, { ignoreDuplicates: true });
       });
     }
 

@@ -5,10 +5,10 @@ import config from '../config';
 import {
   AuthDataType,
   AuthInfo,
-  AuthInstance,
-  AuthModel,
-  AuthModelInfo,
-} from '../data/auth';
+  SystemInstance,
+  SystemModel,
+  SystemModelInfo,
+} from '../data/system';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
@@ -43,17 +43,17 @@ export default class SystemService {
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
-    return doc || ({} as AuthInstance);
+    return doc || ({} as SystemInstance);
   }
 
-  private async updateAuthDb(payload: AuthInfo): Promise<AuthInstance> {
-    await AuthModel.upsert({ ...payload });
+  private async updateAuthDb(payload: AuthInfo): Promise<SystemInstance> {
+    await SystemModel.upsert({ ...payload });
     const doc = await this.getDb({ type: payload.type });
     return doc;
   }
 
-  public async getDb(query: any): Promise<AuthInstance> {
-    const doc: any = await AuthModel.findOne({ where: { ...query } });
+  public async getDb(query: any): Promise<SystemInstance> {
+    const doc: any = await SystemModel.findOne({ where: { ...query } });
     return doc && doc.get({ plain: true });
   }
 
@@ -75,11 +75,10 @@ export default class SystemService {
     }
   }
 
-  public async updateSystemConfig(info: AuthModelInfo) {
+  public async updateSystemConfig(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const result = await this.updateAuthDb({
       ...oDoc,
-      type: AuthDataType.systemConfig,
       info,
     });
     if (info.logRemoveFrequency) {

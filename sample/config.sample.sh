@@ -10,6 +10,9 @@ DefaultCronRule=""
 ## ql repo命令拉取脚本时需要拉取的文件后缀，直接写文件后缀名即可
 RepoFileExtensions="js py"
 
+## 代理地址，支持HTTP/SOCK5，例如 http://127.0.0.1:7890
+ProxyUrl=""
+
 ## 资源告警阙值，默认CPU 80%、内存80%、磁盘90%
 CpuWarn=80
 MemoryWarn=80
@@ -18,7 +21,7 @@ DiskWarn=90
 ## 设置定时任务执行的超时时间，例如1h，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
 CommandTimeoutTime=""
 
-## 在使用 task 命令执行 JavaScript 脚本1时，随机延迟启动任务的最大延迟时间
+## 在运行 task 命令时，随机延迟启动任务的最大延迟时间
 ## 默认给javascript任务加随机延迟，如 RandomDelay="300" ，表示任务将在 1-300 秒内随机延迟一个秒数，然后再运行，取消延迟赋值为空
 RandomDelay=""
 
@@ -30,14 +33,20 @@ RandomDelayFileExtensions=""
 ## 默认是第0分钟和第30分钟，例如21:00或21:30分的任务将会准点运行。不需要准点运行赋值为空
 RandomDelayIgnoredMinutes=""
 
-## 如果你自己会写shell脚本，并且希望在每次容器启动时，额外运行你的 shell 脚本，请赋值为 "true"，默认为true
-EnableExtraShell=""
+## 如果你自己会写shell脚本，并且希望在每次运行 ql update 命令时，额外运行你的 shell 脚本，请赋值为 "true"，默认为true
+EnableExtraShell="true"
 
 ## 是否自动启动bot，默认不启动，设置为true时自动启动，目前需要自行克隆bot仓库所需代码，存到ql/repo目录下，文件夹命名为dockerbot
 AutoStartBot=""
 
 ## 是否使用第三方bot，默认不使用，使用时填入仓库地址，存到ql/repo目录下，文件夹命名为diybot
 BotRepoUrl=""
+
+## 安装python依赖时指定pip源
+PipMirror=""
+
+## 安装node依赖时指定npm源
+NpmMirror=""
 
 ## 通知环境变量
 ## 1. Server酱

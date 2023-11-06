@@ -5,7 +5,7 @@ import { NotificationInfo } from './notify';
 export class AuthInfo {
   ip?: string;
   type: AuthDataType;
-  info?: AuthModelInfo;
+  info?: SystemModelInfo;
   id?: number;
 
   constructor(options: AuthInfo) {
@@ -32,6 +32,10 @@ export enum AuthDataType {
 export interface SystemConfigInfo {
   logRemoveFrequency?: number;
   cronConcurrency?: number;
+  dependenceProxy?: string;
+  nodeMirror?: string;
+  pythonMirror?: string;
+  linuxMirror?: string;
 }
 
 export interface LoginLogInfo {
@@ -42,12 +46,12 @@ export interface LoginLogInfo {
   status?: LoginStatus;
 }
 
-export type AuthModelInfo = SystemConfigInfo &
+export type SystemModelInfo = SystemConfigInfo &
   Partial<NotificationInfo> &
   LoginLogInfo;
 
-export interface AuthInstance extends Model<AuthInfo, AuthInfo>, AuthInfo {}
-export const AuthModel = sequelize.define<AuthInstance>('Auth', {
+export interface SystemInstance extends Model<AuthInfo, AuthInfo>, AuthInfo { }
+export const SystemModel = sequelize.define<SystemInstance>('Auth', {
   ip: DataTypes.STRING,
   type: DataTypes.STRING,
   info: {

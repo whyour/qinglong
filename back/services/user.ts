@@ -14,10 +14,10 @@ import { authenticator } from '@otplib/preset-default';
 import {
   AuthDataType,
   AuthInfo,
-  AuthModel,
-  AuthModelInfo,
+  SystemModel,
+  SystemModelInfo,
   LoginStatus,
-} from '../data/auth';
+} from '../data/system';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
 import { Request } from 'express';
@@ -195,8 +195,8 @@ export default class UserService {
     });
   }
 
-  public async getLoginLog(): Promise<Array<AuthModelInfo | undefined>> {
-    const docs = await AuthModel.findAll({
+  public async getLoginLog(): Promise<Array<SystemModelInfo | undefined>> {
+    const docs = await SystemModel.findAll({
       where: { type: AuthDataType.loginLog },
     });
     if (docs && docs.length > 0) {
@@ -204,7 +204,7 @@ export default class UserService {
         (a, b) => b.info!.timestamp! - a.info!.timestamp!,
       );
       if (result.length > 100) {
-        await AuthModel.destroy({
+        await SystemModel.destroy({
           where: { id: result[result.length - 1].id },
         });
       }
@@ -214,7 +214,7 @@ export default class UserService {
   }
 
   private async insertDb(payload: AuthInfo): Promise<AuthInfo> {
-    const doc = await AuthModel.create({ ...payload }, { returning: true });
+    const doc = await SystemModel.create({ ...payload }, { returning: true });
     return doc;
   }
 
@@ -345,21 +345,21 @@ export default class UserService {
   }
 
   private async updateAuthDb(payload: AuthInfo): Promise<any> {
-    let doc = await AuthModel.findOne({ type: payload.type });
+    let doc = await SystemModel.findOne({ type: payload.type });
     if (doc) {
-      const updateResult = await AuthModel.update(payload, {
+      const updateResult = await SystemModel.update(payload, {
         where: { id: doc.id },
         returning: true,
       });
       doc = updateResult[1][0];
     } else {
-      doc = await AuthModel.create(payload, { returning: true });
+      doc = await SystemModel.create(payload, { returning: true });
     }
     return doc;
   }
 
   public async getDb(query: any): Promise<any> {
-    const doc: any = await AuthModel.findOne({ where: { ...query } });
+    const doc: any = await SystemModel.findOne({ where: { ...query } });
     return doc && (doc.get({ plain: true }) as any);
   }
 

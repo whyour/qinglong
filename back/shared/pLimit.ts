@@ -1,6 +1,6 @@
 import PQueue, { QueueAddOptions } from 'p-queue-cjs';
 import os from 'os';
-import { AuthDataType, AuthModel } from '../data/auth';
+import { AuthDataType, SystemModel } from '../data/system';
 import Logger from '../loaders/logger';
 
 class TaskLimit {
@@ -59,8 +59,8 @@ class TaskLimit {
       this.cronLimit.concurrency = limit;
       return;
     }
-    await AuthModel.sync();
-    const doc = await AuthModel.findOne({
+    await SystemModel.sync();
+    const doc = await SystemModel.findOne({
       where: { type: AuthDataType.systemConfig },
     });
     if (doc?.info?.cronConcurrency) {
