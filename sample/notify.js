@@ -398,8 +398,8 @@ async function sendNotify(
     aibotkNotify(text, desp), //智能微秘书
     fsBotNotify(text, desp), //飞书机器人
     smtpNotify(text, desp), //SMTP 邮件
-    PushMeNotify(text, desp, params), //PushMe
-    ChronocatNotify(text, desp), // Chronocat
+    pushMeNotify(text, desp, params), //PushMe
+    chronocatNotify(text, desp), // Chronocat
     webhookNotify(text, desp), //自定义通知
   ]);
 }
@@ -1172,17 +1172,7 @@ async function smtpNotify(text, desp) {
   }
 }
 
-function smtpNotify(text, desp) {
-  return new Promise((resolve) => {
-    if (SMTP_SERVER && SMTP_SSL && SMTP_EMAIL && SMTP_PASSWORD && SMTP_NAME) {
-      // todo: Node.js并没有内置的 smtp 实现，需要调用外部库，因为不清楚这个文件的模块依赖情况，所以留给有缘人实现
-    } else {
-      resolve();
-    }
-  });
-}
-
-function PushMeNotify(text, desp, params = {}) {
+function pushMeNotify(text, desp, params = {}) {
   return new Promise((resolve) => {
     if (PUSHME_KEY) {
       const options = {
@@ -1217,17 +1207,13 @@ function PushMeNotify(text, desp, params = {}) {
   });
 }
 
-function ChronocatNotify(title, desp) {
+function chronocatNotify(title, desp) {
   return new Promise((resolve) => {
     if (!CHRONOCAT_TOKEN || !CHRONOCAT_QQ || !CHRONOCAT_URL) {
-      console.log(
-        'CHRONOCAT 服务的 CHRONOCAT_URL 或 CHRONOCAT_QQ 未设置!!\n取消推送',
-      );
       resolve();
       return;
     }
 
-    console.log('CHRONOCAT 服务启动');
     const user_ids = CHRONOCAT_QQ.match(/user_id=(\d+)/g)?.map(
       (match) => match.split('=')[1],
     );
