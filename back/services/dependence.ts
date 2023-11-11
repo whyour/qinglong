@@ -61,12 +61,23 @@ export default class DependenceService {
   }
 
   public async remove(ids: number[], force = false): Promise<Dependence[]> {
-    await DependenceModel.update(
-      { status: DependenceStatus.queued, log: [] },
-      { where: { id: ids } },
-    );
     const docs = await DependenceModel.findAll({ where: { id: ids } });
-    this.installDependenceOneByOne(docs, false, force);
+    const unInstalledDeps = docs.filter(
+      (x) => x.status !== DependenceStatus.installed,
+    );
+    const installedDeps = docs.filter(
+      (x) => x.status === DependenceStatus.installed,
+    );
+    await this.removeDb(unInstalledDeps.map((x) => x.id!));
+
+    if (installedDeps.length) {
+      await DependenceModel.update(
+        { status: DependenceStatus.queued, log: [] },
+        { where: { id: ids } },
+      );
+
+      this.installDependenceOneByOne(docs, false, force);
+    }
     return docs;
   }
 
