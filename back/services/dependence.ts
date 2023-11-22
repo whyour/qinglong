@@ -130,7 +130,7 @@ export default class DependenceService {
     );
 
     const docs = await DependenceModel.findAll({ where: { id: ids } });
-    this.installDependenceOneByOne(docs);
+    this.installDependenceOneByOne(docs, true, true);
     return docs;
   }
 
@@ -199,7 +199,7 @@ export default class DependenceService {
         this.updateLog(depIds, message);
 
         // 判断是否已经安装过依赖
-        if (isInstall) {
+        if (isInstall && !force) {
           const getCommandPrefix = GetDependenceCommandTypes[dependency.type];
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
           let depVersion = '';
