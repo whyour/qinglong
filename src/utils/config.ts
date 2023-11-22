@@ -369,6 +369,7 @@ export default {
         tip: intl.get('请求头Content-Type'),
         required: true,
         items: [
+          { value: 'text/plain' },
           { value: 'application/json' },
           { value: 'multipart/form-data' },
           { value: 'application/x-www-form-urlencoded' },

@@ -26,9 +26,9 @@ import omit from 'lodash/omit';
 export default class CronService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  private isSixCron(cron: Crontab) {
-    const { schedule } = cron;
-    if (Number(schedule?.split(/ +/).length) > 5) {
+  private isNodeCron(cron: Crontab) {
+    const { schedule, extra_schedules } = cron;
+    if (Number(schedule?.split(/ +/).length) > 5 || extra_schedules?.length) {
       return true;
     }
     return false;
@@ -38,7 +38,7 @@ export default class CronService {
     const tab = new Crontab(payload);
     tab.saved = false;
     const doc = await this.insert(tab);
-    if (this.isSixCron(doc) || doc.extra_schedules?.length) {
+    if (this.isNodeCron(doc)) {
       await cronClient.addCron([
         {
           name: doc.name || '',
@@ -65,10 +65,10 @@ export default class CronService {
     if (doc.isDisabled === 1) {
       return newDoc;
     }
-    if (this.isSixCron(doc) || doc.extra_schedules?.length) {
+    if (this.isNodeCron(doc)) {
       await cronClient.delCron([String(doc.id)]);
     }
-    if (this.isSixCron(newDoc) || newDoc.extra_schedules?.length) {
+    if (this.isNodeCron(newDoc)) {
       await cronClient.addCron([
         {
           name: doc.name || '',
@@ -472,7 +472,7 @@ export default class CronService {
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
     const docs = await CrontabModel.findAll({ where: { id: ids } });
     const sixCron = docs
-      .filter((x) => this.isSixCron(x))
+      .filter((x) => this.isNodeCron(x))
       .map((doc) => ({
         name: doc.name || '',
         id: String(doc.id),
@@ -613,7 +613,7 @@ export default class CronService {
     this.set_crontab(tabs);
 
     const sixCron = tabs.data
-      .filter((x) => this.isSixCron(x) && x.isDisabled !== 1)
+      .filter((x) => this.isNodeCron(x) && x.isDisabled !== 1)
       .map((doc) => ({
         name: doc.name || '',
         id: String(doc.id),

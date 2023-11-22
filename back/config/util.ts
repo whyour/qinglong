@@ -61,7 +61,8 @@ export async function getNetIp(req: any) {
       ...req.ips,
       req.socket.remoteAddress,
     ]),
-  ];
+  ].filter(Boolean);
+
   let ip = ipArray[0];
 
   if (ipArray.length > 1) {
@@ -82,6 +83,7 @@ export async function getNetIp(req: any) {
       break;
     }
   }
+
   ip = ip.substr(ip.lastIndexOf(':') + 1, ip.length);
   if (ip.includes('127.0') || ip.includes('192.168') || ip.includes('10.7')) {
     ip = '';
@@ -347,9 +349,12 @@ export function parseBody(
   contentType:
     | 'application/json'
     | 'multipart/form-data'
-    | 'application/x-www-form-urlencoded',
+    | 'application/x-www-form-urlencoded'
+    | 'text/plain',
 ) {
-  if (!body) return '';
+  if (contentType === 'text/plain' || !body) {
+    return body;
+  }
 
   const parsed: any = {};
   let key;

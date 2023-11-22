@@ -749,8 +749,8 @@ def parse_headers(headers):
 
 
 def parse_body(body, content_type):
-    if not body:
-        return ""
+    if not body or content_type == "text/plain":
+        return body
 
     parsed = {}
     lines = body.split("\n")

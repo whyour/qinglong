@@ -21,8 +21,7 @@ DiskWarn=90
 ## 设置定时任务执行的超时时间，例如1h，后缀"s"代表秒(默认值), "m"代表分, "h"代表小时, "d"代表天
 CommandTimeoutTime=""
 
-## 在运行 task 命令时，随机延迟启动任务的最大延迟时间
-## 默认给javascript任务加随机延迟，如 RandomDelay="300" ，表示任务将在 1-300 秒内随机延迟一个秒数，然后再运行，取消延迟赋值为空
+## 在运行 task 命令时，随机延迟启动任务的最大延迟时间，如 RandomDelay="300" ，表示任务将在 1-300 秒内随机延迟一个秒数，然后再运行，取消延迟赋值为空
 RandomDelay=""
 
 ## 需要随机延迟运行任务的文件后缀，直接写后缀名即可，多个后缀用空格分开，例如: js py ts
@@ -33,8 +32,8 @@ RandomDelayFileExtensions=""
 ## 默认是第0分钟和第30分钟，例如21:00或21:30分的任务将会准点运行。不需要准点运行赋值为空
 RandomDelayIgnoredMinutes=""
 
-## 如果你自己会写shell脚本，并且希望在每次运行 ql update 命令时，额外运行你的 shell 脚本，请赋值为 "true"，默认为true
-EnableExtraShell="true"
+## 如果你自己会写shell脚本，并且希望在每次容器启动时，额外运行你的 shell 脚本，请赋值为 "true"
+EnableExtraShell=""
 
 ## 是否自动启动bot，默认不启动，设置为true时自动启动，目前需要自行克隆bot仓库所需代码，存到ql/repo目录下，文件夹命名为dockerbot
 AutoStartBot=""

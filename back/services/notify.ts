@@ -659,9 +659,11 @@ export default class NotificationService {
       webhookUrl,
       webhookBody,
     );
+
     if (!formatUrl && !formatBody) {
-      return false;
+      throw new Error('Url 或者 Body 中必须包含 $title')
     }
+
     const headers = parseHeaders(webhookHeaders);
     const body = parseBody(formatBody, webhookContentType);
     const bodyParam = this.formatBody(webhookContentType, body);
@@ -692,6 +694,7 @@ export default class NotificationService {
       case 'multipart/form-data':
         return { form: body };
       case 'application/x-www-form-urlencoded':
+      case 'text/plain':
         return { body };
     }
     return {};
