@@ -71,7 +71,7 @@ const Error = () => {
                   /var/run/docker.sock:/var/run/docker.sock
                   containrrr/watchtower -cR &lt;容器名&gt;
                 </div>
-                <div>{intl.get('2. 容器内执行 ql -l check、ql -l update')}</div>
+                <div>{intl.get('2. 容器内执行 ql check、ql update')}</div>
                 <div>
                   {intl.get(
                     '3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果'

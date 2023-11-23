@@ -476,8 +476,10 @@ main() {
   local log_path="${log_dir}/${log_time}.log"
   local file_path="$dir_log/$log_path"
 
-  cmd=">> $file_path 2>&1"
-  [[ "$show_log" == "true" ]] && cmd=""
+  cmd="2>&1 | tee -a $file_path"
+  if [[ "$no_tee" == "true" ]]; then
+    cmd=">> $file_path 2>&1"
+  fi
 
   local time_format="%Y-%m-%d %H:%M:%S"
   local time=$(date "+$time_format")
@@ -488,11 +490,6 @@ main() {
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
-  fi
-
-  if [[ "$show_log" == "true" ]] && [[ $ID ]]; then
-    eval echo -e "请移除 -l 参数" $cmd
-    exit 1
   fi
 
   case $p1 in
@@ -558,10 +555,6 @@ main() {
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒　　　　　" $cmd
-  fi
-
-  if [[ -f $file_path ]]; then
-    cat $file_path
   fi
 }
 

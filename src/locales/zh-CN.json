@@ -141,7 +141,7 @@
   "服务启动超时": "服务启动超时",
   "请先按如下方式修复：": "请先按如下方式修复：",
   "1. 宿主机执行 docker run --rm -v\n                  /var/run/docker.sock:/var/run/docker.sock\n                  containrrr/watchtower -cR <容器名>": "1. 宿主机执行 docker run --rm -v\n                  /var/run/docker.sock:/var/run/docker.sock\n                  containrrr/watchtower -cR <容器名>",
-  "2. 容器内执行 ql -l check、ql -l update": "2. 容器内执行 ql -l check、ql -l update",
+  "2. 容器内执行 ql check、ql update": "2. 容器内执行 ql check、ql update",
   "3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果": "3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果",
   "提交 issue": "提交 issue",
   "启动中，请稍后...": "启动中，请稍后...",
