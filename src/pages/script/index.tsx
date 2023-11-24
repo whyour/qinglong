@@ -136,7 +136,6 @@ const Script = () => {
     (keys: Key[], e: any) => {
       const node = e.node;
       if (node.key === select && isEditing) {
-        console.log('do nothing');
         return;
       }
       const content = editorRef.current
