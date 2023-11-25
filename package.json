@@ -86,6 +86,7 @@
     "p-queue-cjs": "7.3.4",
     "protobufjs": "^7.2.3",
     "pstree.remy": "^1.1.8",
+    "react-hotkeys-hook": "^4.4.1",
     "reflect-metadata": "^0.1.13",
     "sequelize": "^6.25.5",
     "serve-handler": "^6.1.3",

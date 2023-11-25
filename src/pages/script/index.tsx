@@ -44,12 +44,11 @@ import uniq from 'lodash/uniq';
 import IconFont from '@/components/iconfont';
 import RenameModal from './renameModal';
 import { langs } from '@uiw/codemirror-extensions-langs';
-
+import { useHotkeys } from 'react-hotkeys-hook';
 const { Text } = Typography;
 
 const Script = () => {
-  const { headerStyle, isPhone, theme } =
-    useOutletContext<SharedContext>();
+  const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [value, setValue] = useState(intl.get('请选择脚本文件'));
   const [select, setSelect] = useState<string>('');
   const [data, setData] = useState<any[]>([]);
@@ -135,6 +134,10 @@ const Script = () => {
 
   const onTreeSelect = useCallback(
     (keys: Key[], e: any) => {
+      const node = e.node;
+      if (node.key === select && isEditing) {
+        return;
+      }
       const content = editorRef.current
         ? editorRef.current.getValue().replace(/\r\n/g, '\n')
         : value;
@@ -155,7 +158,7 @@ const Script = () => {
         onSelect(keys[0], e.node);
       }
     },
-    [value],
+    [value, select, isEditing],
   );
 
   const onSearch = useCallback(
@@ -185,6 +188,14 @@ const Script = () => {
 
   const onExpand = (expKeys: any) => {
     setExpandedKeys(expKeys);
+  };
+
+  const onDoubleClick = (e: any, node: any) => {
+    if (node.type === 'file') {
+      setSelect(node.key);
+      setCurrentNode(node);
+      setIsEditing(true);
+    }
   };
 
   const editFile = () => {
@@ -367,6 +378,16 @@ const Script = () => {
     }
   }, [treeDom.current, data]);
 
+  useHotkeys(
+    'meta+s',
+    (e) => {
+      if (isEditing) {
+        saveFile();
+      }
+    },
+    { enableOnFormTags: ['textarea'], preventDefault: true },
+  );
+
   const action = (key: string | number) => {
     switch (key) {
       case 'save':
@@ -543,6 +564,7 @@ const Script = () => {
                       onExpand={onExpand}
                       showLine={{ showLeafIcon: true }}
                       onSelect={onTreeSelect}
+                      onDoubleClick={onDoubleClick}
                     ></Tree>
                   </div>
                 </>
@@ -591,15 +613,17 @@ const Script = () => {
             }}
           />
         )}
-        {isLogModalVisible && <EditModal
-          visible={isLogModalVisible}
-          treeData={data}
-          currentNode={currentNode}
-          content={value}
-          handleCancel={() => {
-            setIsLogModalVisible(false);
-          }}
-        />}
+        {isLogModalVisible && (
+          <EditModal
+            visible={isLogModalVisible}
+            treeData={data}
+            currentNode={currentNode}
+            content={value}
+            handleCancel={() => {
+              setIsLogModalVisible(false);
+            }}
+          />
+        )}
         <EditScriptNameModal
           visible={isAddFileModalVisible}
           treeData={data}
