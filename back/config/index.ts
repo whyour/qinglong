@@ -47,6 +47,7 @@ const configString = 'config sample crontab shareCode diy';
 const versionFile = path.join(rootPath, 'version.yaml');
 const dataTgzFile = path.join(tmpPath, 'data.tgz');
 const shareShellFile = path.join(shellPath, 'share.sh');
+const dependenceProxyFile = path.join(configPath, 'dependence-proxy.sh');
 
 if (envFound.error) {
   throw new Error("⚠️  Couldn't find .env file  ⚠️");
@@ -68,6 +69,7 @@ export default {
   dataPath,
   dataTgzFile,
   shareShellFile,
+  dependenceProxyFile,
   configString,
   loginFaild,
   authError,
@@ -89,6 +91,7 @@ export default {
     'config.sh.sample',
     'cookie.sh',
     'crontab.list',
+    'dependence-proxy.sh',
     'env.sh',
     'token.json',
   ],

@@ -15,6 +15,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import { langs } from '@uiw/codemirror-extensions-langs';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 const Config = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
@@ -67,6 +68,14 @@ const Config = () => {
     setTitle(node.value);
     getConfig(node.value);
   };
+
+  useHotkeys(
+    'meta+s',
+    (e) => {
+      updateConfig();
+    },
+    { enableOnFormTags: ['textarea'], preventDefault: true },
+  );
 
   useEffect(() => {
     getFiles();

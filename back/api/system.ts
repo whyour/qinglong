@@ -6,7 +6,6 @@ import config from '../config';
 import SystemService from '../services/system';
 import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
-import { EnvModel } from '../data/env';
 import {
   getUniqPath,
   handleLogPath,
@@ -78,19 +77,107 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/config',
+    '/config/log-remove-frequency',
     celebrate({
       body: Joi.object({
-        logRemoveFrequency: Joi.number().optional().allow(null),
-        cronConcurrency: Joi.number().optional().allow(null),
+        logRemoveFrequency: Joi.number().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const systemService = Container.get(SystemService);
-        const result = await systemService.updateSystemConfig(req.body);
+        const result = await systemService.updateLogRemoveFrequency(req.body);
         res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/config/cron-concurrency',
+    celebrate({
+      body: Joi.object({
+        cronConcurrency: Joi.number().allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.updateCronConcurrency(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/config/dependence-proxy',
+    celebrate({
+      body: Joi.object({
+        dependenceProxy: Joi.string().allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.updateDependenceProxy(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/config/node-mirror',
+    celebrate({
+      body: Joi.object({
+        nodeMirror: Joi.string().allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        res.setHeader('Content-type', 'application/octet-stream');
+        await systemService.updateNodeMirror(req.body, res);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/config/python-mirror',
+    celebrate({
+      body: Joi.object({
+        pythonMirror: Joi.string().allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.updatePythonMirror(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/config/linux-mirror',
+    celebrate({
+      body: Joi.object({
+        linuxMirror: Joi.string().allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        res.setHeader('Content-type', 'application/octet-stream');
+        await systemService.updateLinuxMirror(req.body, res);
       } catch (e) {
         return next(e);
       }

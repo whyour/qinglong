@@ -14,7 +14,7 @@ import {
 import { spawn } from 'cross-spawn';
 import SockService from './sock';
 import { FindOptions, Op } from 'sequelize';
-import { promiseExecSuccess } from '../config/util';
+import { fileExist, promiseExecSuccess } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 
@@ -252,10 +252,18 @@ export default class DependenceService {
             return resolve(null);
           }
         }
-
-        const cp = spawn(`${depRunCommand} ${dependency.name.trim()}`, {
-          shell: '/bin/bash',
-        });
+        const dependenceProxyFileExist = await fileExist(
+          config.dependenceProxyFile,
+        );
+        const proxyStr = dependenceProxyFileExist
+          ? `pnpm config get registry && source ${config.dependenceProxyFile} &&`
+          : '';
+        const cp = spawn(
+          `${proxyStr} ${depRunCommand} ${dependency.name.trim()}`,
+          {
+            shell: '/bin/bash',
+          },
+        );
 
         cp.stdout.on('data', async (data) => {
           this.sockService.sendMessage({

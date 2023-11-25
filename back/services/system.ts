@@ -75,29 +75,138 @@ export default class SystemService {
     }
   }
 
-  public async updateSystemConfig(info: SystemModelInfo) {
+  public async updateLogRemoveFrequency(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const result = await this.updateAuthDb({
       ...oDoc,
-      info,
+      info: { ...oDoc.info, ...info },
     });
-    if (info.logRemoveFrequency) {
-      const cron = {
-        id: result.id || NaN,
-        name: '删除日志',
-        command: `ql rmlog ${info.logRemoveFrequency}`,
-      };
+    const cron = {
+      id: result.id || NaN,
+      name: '删除日志',
+      command: `ql rmlog ${info.logRemoveFrequency}`,
+    };
+    if (oDoc.info?.logRemoveFrequency) {
       await this.scheduleService.cancelIntervalTask(cron);
-      if (info.logRemoveFrequency > 0) {
-        this.scheduleService.createIntervalTask(cron, {
-          days: info.logRemoveFrequency,
-        });
-      }
     }
+    if (info.logRemoveFrequency && info.logRemoveFrequency > 0) {
+      this.scheduleService.createIntervalTask(cron, {
+        days: info.logRemoveFrequency,
+      });
+    }
+    return { code: 200, data: info };
+  }
+
+  public async updateCronConcurrency(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, ...info },
+    });
     if (info.cronConcurrency) {
       await taskLimit.setCustomLimit(info.cronConcurrency);
     }
     return { code: 200, data: info };
+  }
+
+  public async updateDependenceProxy(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, ...info },
+    });
+    if (info.dependenceProxy) {
+      await fs.promises.writeFile(
+        config.dependenceProxyFile,
+        `export http_proxy="${info.dependenceProxy}"\nexport https_proxy="${info.dependenceProxy}"`,
+      );
+    } else {
+      await fs.promises.rm(config.dependenceProxyFile);
+    }
+    return { code: 200, data: info };
+  }
+
+  public async updateNodeMirror(info: SystemModelInfo, res: Response) {
+    const oDoc = await this.getSystemConfig();
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, ...info },
+    });
+    let cmd = 'pnpm config delete registry';
+    if (info.nodeMirror) {
+      cmd = `pnpm config set registry ${info.nodeMirror}`;
+    }
+    const command = `cd && ${cmd} && pnpm i -g`;
+    this.scheduleService.runTask(
+      command,
+      {
+        onStart: async (cp) => {
+          res.setHeader('QL-Task-Pid', `${cp.pid}`);
+        },
+        onEnd: async () => {
+          res.end();
+        },
+        onError: async (message: string) => {
+          res.write(`\n${message}`);
+        },
+        onLog: async (message: string) => {
+          res.write(`\n${message}`);
+        },
+      },
+      {
+        command,
+      },
+    );
+  }
+
+  public async updatePythonMirror(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, ...info },
+    });
+    let cmd = 'pip config unset global.index-url';
+    if (info.pythonMirror) {
+      cmd = `pip3 config set global.index-url ${info.pythonMirror}`;
+    }
+    await promiseExec(cmd);
+    return { code: 200, data: info };
+  }
+
+  public async updateLinuxMirror(info: SystemModelInfo, res: Response) {
+    const oDoc = await this.getSystemConfig();
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, ...info },
+    });
+    let targetDomain = 'dl-cdn.alpinelinux.org';
+    if (info.linuxMirror) {
+      targetDomain = info.linuxMirror;
+    }
+    const command = `sed -i 's/${
+      oDoc.info?.linuxMirror || 'dl-cdn.alpinelinux.org'
+    }/${targetDomain}/g' /etc/apk/repositories && apk update -f`;
+
+    this.scheduleService.runTask(
+      command,
+      {
+        onStart: async (cp) => {
+          res.setHeader('QL-Task-Pid', `${cp.pid}`);
+        },
+        onEnd: async () => {
+          res.end();
+        },
+        onError: async (message: string) => {
+          res.write(`\n${message}`);
+        },
+        onLog: async (message: string) => {
+          res.write(`\n${message}`);
+        },
+      },
+      {
+        command,
+      },
+    );
   }
 
   public async checkUpdate() {

@@ -21,6 +21,12 @@ import './index.less';
 import { UploadOutlined } from '@ant-design/icons';
 import Countdown from 'antd/lib/statistic/Countdown';
 import useProgress from './progress';
+import pick from 'lodash/pick';
+
+const dataMap = {
+  'log-remove-frequency': 'logRemoveFrequency',
+  'cron-concurrency': 'cronConcurrency',
+};
 
 const Other = ({
   systemInfo,
@@ -32,7 +38,6 @@ const Other = ({
     cronConcurrency?: number | null;
   }>();
   const [form] = Form.useForm();
-  const modalRef = useRef<any>();
   const [exportLoading, setExportLoading] = useState(false);
   const showUploadProgress = useProgress(intl.get('上传'));
   const showDownloadProgress = useProgress(intl.get('下载'));
@@ -80,9 +85,12 @@ const Other = ({
       });
   };
 
-  const updateSystemConfig = () => {
+  const updateSystemConfig = (path: keyof typeof dataMap) => {
     request
-      .put(`${config.apiPrefix}system/config`, systemConfig)
+      .put(
+        `${config.apiPrefix}system/config/${path}`,
+        pick(systemConfig, dataMap[path]),
+      )
       .then(({ code, data }) => {
         if (code === 200) {
           message.success(intl.get('更新成功'));
@@ -207,7 +215,9 @@ const Other = ({
           />
           <Button
             type="primary"
-            onClick={updateSystemConfig}
+            onClick={() => {
+              updateSystemConfig('log-remove-frequency');
+            }}
             style={{ width: 84 }}
           >
             {intl.get('确认')}
@@ -226,7 +236,9 @@ const Other = ({
           />
           <Button
             type="primary"
-            onClick={updateSystemConfig}
+            onClick={() => {
+              updateSystemConfig('cron-concurrency');
+            }}
             style={{ width: 84 }}
           >
             {intl.get('确认')}
