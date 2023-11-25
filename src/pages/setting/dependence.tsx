@@ -86,7 +86,7 @@ const Dependence = () => {
         >
           <Input.Group compact>
             <Input
-              placeholder={intl.get('代理地址, 支持HTTP(S)/SOCK5, ip:port')}
+              placeholder={intl.get('代理地址, 支持HTTP(S)/SOCK5')}
               style={{ width: 330 }}
               value={systemConfig?.dependenceProxy}
               onChange={(e) => {

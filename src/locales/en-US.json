@@ -472,7 +472,7 @@
   "Python 软件包镜像源": "Python Software Package Mirror Source",
   "Linux 软件包镜像源": "Linux Software Package Mirror Source",
   "代理与镜像源二选一即可": "Either Proxy or Mirror Source can be chosen",
-  "代理地址, 支持HTTP(S)/SOCK5, ip:port": "Proxy Address, supports HTTP(S)/SOCK5, ip:port",
+  "代理地址, 支持HTTP(S)/SOCK5": "Proxy Address, supports HTTP(S)/SOCK5",
   "NPM 镜像源": "NPM Mirror Source",
   "PyPI 镜像源": "PyPI Mirror Source",
   "alpine linux 镜像源": "Alpine Linux Mirror Source"

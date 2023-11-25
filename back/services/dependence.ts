@@ -256,7 +256,7 @@ export default class DependenceService {
           config.dependenceProxyFile,
         );
         const proxyStr = dependenceProxyFileExist
-          ? `pnpm config get registry && source ${config.dependenceProxyFile} &&`
+          ? `source ${config.dependenceProxyFile} &&`
           : '';
         const cp = spawn(
           `${proxyStr} ${depRunCommand} ${dependency.name.trim()}`,
