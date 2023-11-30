@@ -6,6 +6,7 @@ import { request } from '@/utils/http';
 import './index.less';
 import Ansi from 'ansi-to-react';
 import pick from 'lodash/pick';
+import WebSocketManager from '@/utils/websocket';
 
 const dataMap = {
   'dependence-proxy': 'dependenceProxy',
@@ -38,18 +39,13 @@ const Dependence = () => {
   };
 
   const updateSystemConfigStream = (path: keyof typeof dataMap) => {
-    setLog('执行中...');
+    setLog('执行中...\n');
     request
       .put<string>(
         `${config.apiPrefix}system/config/${path}`,
         pick(systemConfig, dataMap[path]),
-        {
-          responseType: 'stream',
-        },
       )
-      .then((res) => {
-        setLog(() => res);
-      })
+      .then((res) => {})
       .catch((error: any) => {
         console.log(error);
       });
@@ -72,6 +68,22 @@ const Dependence = () => {
       });
   };
 
+  const handleMessage = (payload: any) => {
+    const { message } = payload;
+    setLog((p) => `${p}${message}`);
+  };
+
+  useEffect(() => {
+    const ws = WebSocketManager.getInstance();
+    ws.subscribe('updateNodeMirror', handleMessage);
+    ws.subscribe('updateLinuxMirror', handleMessage);
+
+    return () => {
+      ws.subscribe('updateNodeMirror', handleMessage);
+      ws.unsubscribe('updateLinuxMirror', handleMessage);
+    };
+  }, []);
+
   useEffect(() => {
     getSystemConfig();
   }, []);
@@ -87,7 +99,7 @@ const Dependence = () => {
           <Input.Group compact>
             <Input
               placeholder={intl.get('代理地址, 支持HTTP(S)/SOCK5')}
-              style={{ width: 330 }}
+              style={{ width: 360 }}
               value={systemConfig?.dependenceProxy}
               onChange={(e) => {
                 setSystemConfig({
@@ -110,7 +122,7 @@ const Dependence = () => {
         <Form.Item label={intl.get('Node 软件包镜像源')} name="node">
           <Input.Group compact>
             <Input
-              style={{ width: 330 }}
+              style={{ width: 360 }}
               placeholder={intl.get('NPM 镜像源')}
               value={systemConfig?.nodeMirror}
               onChange={(e) => {
@@ -134,7 +146,7 @@ const Dependence = () => {
         <Form.Item label={intl.get('Python 软件包镜像源')} name="python">
           <Input.Group compact>
             <Input
-              style={{ width: 330 }}
+              style={{ width: 360 }}
               placeholder={intl.get('PyPI 镜像源')}
               value={systemConfig?.pythonMirror}
               onChange={(e) => {
@@ -158,8 +170,10 @@ const Dependence = () => {
         <Form.Item label={intl.get('Linux 软件包镜像源')} name="linux">
           <Input.Group compact>
             <Input
-              style={{ width: 330 }}
-              placeholder={intl.get('alpine linux 镜像源')}
+              style={{ width: 360 }}
+              placeholder={intl.get(
+                'alpine linux 镜像源, 例如 mirrors.aliyun.com',
+              )}
               value={systemConfig?.linuxMirror}
               onChange={(e) => {
                 setSystemConfig({
@@ -185,7 +199,7 @@ const Dependence = () => {
           fontFamily: 'Source Code Pro',
           zoom: 0.83,
           maxHeight: '100%',
-          overflowY: 'auto'
+          overflowY: 'auto',
         }}
       >
         <Ansi>{log}</Ansi>

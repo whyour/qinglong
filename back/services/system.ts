@@ -142,15 +142,19 @@ export default class SystemService {
       {
         onStart: async (cp) => {
           res.setHeader('QL-Task-Pid', `${cp.pid}`);
-        },
-        onEnd: async () => {
           res.end();
         },
+        onEnd: async () => {
+          this.sockService.sendMessage({
+            type: 'updateNodeMirror',
+            message: 'update node mirror end',
+          });
+        },
         onError: async (message: string) => {
-          res.write(`\n${message}`);
+          this.sockService.sendMessage({ type: 'updateNodeMirror', message });
         },
         onLog: async (message: string) => {
-          res.write(`\n${message}`);
+          this.sockService.sendMessage({ type: 'updateNodeMirror', message });
         },
       },
       {
@@ -192,15 +196,19 @@ export default class SystemService {
       {
         onStart: async (cp) => {
           res.setHeader('QL-Task-Pid', `${cp.pid}`);
-        },
-        onEnd: async () => {
           res.end();
         },
+        onEnd: async () => {
+          this.sockService.sendMessage({
+            type: 'updateLinuxMirror',
+            message: 'update linux mirror end',
+          });
+        },
         onError: async (message: string) => {
-          res.write(`\n${message}`);
+          this.sockService.sendMessage({ type: 'updateLinuxMirror', message });
         },
         onLog: async (message: string) => {
-          res.write(`\n${message}`);
+          this.sockService.sendMessage({ type: 'updateLinuxMirror', message });
         },
       },
       {

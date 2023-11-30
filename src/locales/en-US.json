@@ -475,5 +475,5 @@
   "代理地址, 支持HTTP(S)/SOCK5": "Proxy Address, supports HTTP(S)/SOCK5",
   "NPM 镜像源": "NPM Mirror Source",
   "PyPI 镜像源": "PyPI Mirror Source",
-  "alpine linux 镜像源": "Alpine Linux Mirror Source"
+  "alpine linux 镜像源, 例如 mirrors.aliyun.com": "Alpine Linux Mirror Source, e.g. mirrors.aliyun.com"
 }

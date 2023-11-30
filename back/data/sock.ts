@@ -17,4 +17,6 @@ export type SockMessageType =
   | 'updateSystemVersion'
   | 'manuallyRunScript'
   | 'runSubscriptionEnd'
-  | 'reloadSystem';
+  | 'reloadSystem'
+  | 'updateNodeMirror'
+  | 'updateLinuxMirror';
