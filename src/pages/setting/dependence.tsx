@@ -24,6 +24,7 @@ const Dependence = () => {
   }>();
   const [form] = Form.useForm();
   const [log, setLog] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
   const getSystemConfig = () => {
     request
@@ -39,7 +40,8 @@ const Dependence = () => {
   };
 
   const updateSystemConfigStream = (path: keyof typeof dataMap) => {
-    setLog('执行中...\n');
+    setLoading(true);
+    setLog('in progress...\n');
     request
       .put<string>(
         `${config.apiPrefix}system/config/${path}`,
@@ -52,6 +54,7 @@ const Dependence = () => {
   };
 
   const updateSystemConfig = (path: keyof typeof dataMap) => {
+    setLoading(true);
     setLog('');
     request
       .put(
@@ -65,12 +68,19 @@ const Dependence = () => {
       })
       .catch((error: any) => {
         console.log(error);
-      });
+      })
+      .finally(() => setLoading(false));
   };
 
   const handleMessage = (payload: any) => {
     const { message } = payload;
     setLog((p) => `${p}${message}`);
+    if (
+      message.includes('update node mirror end') ||
+      message.includes('update linux mirror end')
+    ) {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -110,6 +120,7 @@ const Dependence = () => {
             />
             <Button
               type="primary"
+              loading={loading}
               onClick={() => {
                 updateSystemConfig('dependence-proxy');
               }}
@@ -134,6 +145,7 @@ const Dependence = () => {
             />
             <Button
               type="primary"
+              loading={loading}
               onClick={() => {
                 updateSystemConfigStream('node-mirror');
               }}
@@ -158,6 +170,7 @@ const Dependence = () => {
             />
             <Button
               type="primary"
+              loading={loading}
               onClick={() => {
                 updateSystemConfig('python-mirror');
               }}
@@ -184,6 +197,7 @@ const Dependence = () => {
             />
             <Button
               type="primary"
+              loading={loading}
               onClick={() => {
                 updateSystemConfigStream('linux-mirror');
               }}
