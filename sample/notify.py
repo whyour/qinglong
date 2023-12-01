@@ -534,7 +534,7 @@ def telegram_bot(title: str, content: str) -> None:
     print("tg 服务启动")
 
     if push_config.get("TG_API_HOST"):
-        url = f"https://{push_config.get('TG_API_HOST')}/bot{push_config.get('TG_BOT_TOKEN')}/sendMessage"
+        url = f"{push_config.get('TG_API_HOST')}/bot{push_config.get('TG_BOT_TOKEN')}/sendMessage"
     else:
         url = (
             f"https://api.telegram.org/bot{push_config.get('TG_BOT_TOKEN')}/sendMessage"

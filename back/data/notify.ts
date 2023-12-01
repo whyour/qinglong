@@ -66,7 +66,7 @@ export class TelegramBotNotification extends NotificationBaseInfo {
   public telegramBotProxyHost = '';
   public telegramBotProxyPort = '';
   public telegramBotProxyAuth = '';
-  public telegramBotApiHost = 'api.telegram.org';
+  public telegramBotApiHost = 'https://api.telegram.org';
 }
 
 export class DingtalkBotNotification extends NotificationBaseInfo {

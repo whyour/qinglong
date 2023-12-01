@@ -42,7 +42,7 @@ export default class NotificationService {
     retry: 1,
   };
 
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async notify(
     title: string,
@@ -234,8 +234,9 @@ export default class NotificationService {
       telegramBotUserId,
     } = this.params;
     const authStr = telegramBotProxyAuth ? `${telegramBotProxyAuth}@` : '';
-    const url = `https://${telegramBotApiHost ? telegramBotApiHost : 'api.telegram.org'
-      }/bot${telegramBotToken}/sendMessage`;
+    const url = `${
+      telegramBotApiHost ? telegramBotApiHost : 'https://api.telegram.org'
+    }/bot${telegramBotToken}/sendMessage`;
     let agent;
     if (telegramBotProxyHost && telegramBotProxyPort) {
       const options: any = {
@@ -661,7 +662,7 @@ export default class NotificationService {
     );
 
     if (!formatUrl && !formatBody) {
-      throw new Error('Url 或者 Body 中必须包含 $title')
+      throw new Error('Url 或者 Body 中必须包含 $title');
     }
 
     const headers = parseHeaders(webhookHeaders);
