@@ -64,6 +64,7 @@ cd ${QL_DIR}
 cp -f .env.example .env
 chmod 777 ${QL_DIR}/shell/*.sh
 
+. $dir_shell/env.sh
 . ${QL_DIR}/shell/share.sh
 
 make_dir /etc/nginx/conf.d
@@ -83,7 +84,6 @@ if [[ "$is_equal_registry" == "" ]]; then
   cd && pnpm config set registry $NpmMirror
   pnpm install -g
 fi
-update_depend
 
 reload_pm2
 
