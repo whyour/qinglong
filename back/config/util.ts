@@ -364,7 +364,7 @@ export function parseBody(
   body &&
     body.split('\n').forEach(function parser(line) {
       i = line.indexOf(':');
-      key = line.substring(0, i).trim().toLowerCase();
+      key = line.substring(0, i).trim();
       val = line.substring(i + 1).trim();
 
       if (!key || parsed[key]) {
