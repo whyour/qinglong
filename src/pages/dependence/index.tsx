@@ -109,7 +109,6 @@ const Dependence = () => {
       width: 120,
       dataIndex: 'status',
       render: (text: string, record: any, index: number) => {
-        console.log(record.status);
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
             <Tag
