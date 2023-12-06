@@ -1,6 +1,5 @@
 import { Application } from 'express';
 import * as Sentry from '@sentry/node';
-import * as Tracing from '@sentry/tracing';
 import Logger from './logger';
 import config from '../config';
 import fs from 'fs';
@@ -16,10 +15,10 @@ export default async ({ expressApp }: { expressApp: Application }) => {
       /UnauthorizedError/i,
       /celebrate request validation failed/i,
     ],
-    dsn: 'https://f4b5b55fb3c645b29a5dc2d70a1a4ef4@o1098464.ingest.sentry.io/6122819',
+    dsn: 'https://8b5c84cfef3e22541bc84de0ed00497b@o1098464.ingest.sentry.io/6122819',
     integrations: [
       new Sentry.Integrations.Http({ tracing: true }),
-      new Tracing.Integrations.Express({ app: expressApp }),
+      new Sentry.Integrations.Express({ app: expressApp }),
     ],
     tracesSampleRate: 0.8,
     release: version,
