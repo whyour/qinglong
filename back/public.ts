@@ -8,6 +8,7 @@ const app = express();
 const client = new HealthClient(
   `0.0.0.0:${config.cronPort}`,
   credentials.createInsecure(),
+  { 'grpc.enable_http_proxy': 0 },
 );
 
 app.get('/api/health', (req, res) => {

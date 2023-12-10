@@ -7,7 +7,7 @@ import { check } from './health';
 import config from '../config';
 import Logger from '../loaders/logger';
 
-const server = new Server();
+const server = new Server({ 'grpc.enable_http_proxy': 0 });
 server.addService(HealthService, { check });
 server.addService(CronService, { addCron, delCron });
 server.bindAsync(

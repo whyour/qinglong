@@ -8,10 +8,12 @@ async function linkToNodeModule(src: string, dst?: string) {
   const target = path.join(config.rootPath, 'node_modules', dst || src);
   const source = path.join(config.rootPath, src);
 
-  const stats = await fs.lstat(target);
-  if (!stats) {
-    await fs.symlink(source, target, 'dir');
-  }
+  try {
+    const stats = await fs.lstat(target);
+    if (!stats) {
+      await fs.symlink(source, target, 'dir');
+    }
+  } catch (error) {}
 }
 
 async function linkCommand() {

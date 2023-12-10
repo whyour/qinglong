@@ -12,6 +12,7 @@ class Client {
   private client = new CronClient(
     `0.0.0.0:${config.cronPort}`,
     credentials.createInsecure(),
+    { 'grpc.enable_http_proxy': 0 },
   );
 
   addCron(request: AddCronRequest['crons']): Promise<AddCronResponse> {

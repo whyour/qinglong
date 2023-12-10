@@ -71,6 +71,7 @@ import_config() {
   ql_port=${QlPort:-"5700"}
   command_timeout_time=${CommandTimeoutTime:-""}
   file_extensions=${RepoFileExtensions:-"js py"}
+  proxy_url=${ProxyUrl:-""}
   current_branch=${QL_BRANCH}
 
   if [[ -n "${DefaultCronRule}" ]]; then
@@ -87,6 +88,9 @@ import_config() {
 set_proxy() {
   local proxy="$1"
   if [[ $proxy ]]; then
+    proxy_url="$proxy"
+  fi
+  if [[ $proxy_url ]]; then
     export http_proxy="${proxy_url}"
     export https_proxy="${proxy_url}"
   fi
