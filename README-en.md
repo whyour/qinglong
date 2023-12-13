@@ -162,6 +162,12 @@ podman run -dit \
   --hostname qinglong \
   docker.io/whyour/qinglong:latest
 ```
+### Deploy on Sealos (oneClick deployment)
+
+> Click the button below to deploy with one click.👇
+
+[![Deploy-on-Sealos.svg](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://cloud.sealos.io/?openapp=system-fastdeploy?templateName=qinglong)
+
 
 ### Local
 

@@ -164,6 +164,13 @@ podman run -dit \
   docker.io/whyour/qinglong:latest
 ```
 
+### sealos (一键部署)
+
+点击以下按钮一键部署（部署后访问出现 404 请等待 3~5 分钟）：
+
+[![Deploy-on-Sealos.svg](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://cloud.sealos.io/?openapp=system-fastdeploy?templateName=qinglong)
+
+
 ### 本机
 
 建议使用纯净系统安装，避免系统原有数据丢失，需要自己安装 node/npm/python3/pip3
