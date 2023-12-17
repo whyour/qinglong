@@ -195,12 +195,12 @@ const Dependence = () => {
         <Form.Item
           label={intl.get('Linux 软件包镜像源')}
           name="linux"
-          tooltip={intl.get('alpine linux 镜像源')}
+          tooltip={intl.get('debian linux 镜像源')}
         >
           <Input.Group compact>
             <Input
               style={{ width: 250 }}
-              placeholder={'https://mirrors.aliyun.com'}
+              placeholder={'http://deb.debian.org'}
               value={systemConfig?.linuxMirror}
               onChange={(e) => {
                 setSystemConfig({
