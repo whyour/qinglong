@@ -266,11 +266,10 @@ const Log = () => {
               options={{
                 readOnly: true,
                 fontSize: 12,
+                minimap: { enabled: false },
                 lineNumbersMinChars: 3,
-                fontFamily: 'Source Code Pro',
                 folding: false,
                 glyphMargin: false,
-                wordWrap: 'on',
               }}
             />
           </SplitPane>

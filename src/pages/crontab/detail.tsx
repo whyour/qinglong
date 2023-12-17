@@ -107,10 +107,9 @@ const CronDetailModal = ({
         value={value}
         options={{
           fontSize: 12,
+          minimap: { enabled: false },
           lineNumbersMinChars: 3,
-          fontFamily: 'Source Code Pro',
           glyphMargin: false,
-          wordWrap: 'on',
         }}
         onMount={(editor, monaco) => {
           editorRef.current = editor;
@@ -364,7 +363,7 @@ const CronDetailModal = ({
         <div className="crontab-title-wrapper">
           <div style={{ minWidth: 0 }}>
             <Typography.Text
-              style={{width: '100%'}}
+              style={{ width: '100%' }}
               ellipsis={{ tooltip: currentCron.name }}
             >
               {currentCron.name}

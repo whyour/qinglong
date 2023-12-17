@@ -183,13 +183,21 @@ export default class SystemService {
       ...oDoc,
       info: { ...oDoc.info, ...info },
     });
-    let targetDomain = 'dl-cdn.alpinelinux.org';
+    let defaultDomain = 'https://dl-cdn.alpinelinux.org';
+    let targetDomain = 'https://dl-cdn.alpinelinux.org';
+    if (oDoc.info?.linuxMirror) {
+      defaultDomain = oDoc.info.linuxMirror;
+    }
     if (info.linuxMirror) {
       targetDomain = info.linuxMirror;
     }
-    const command = `sed -i 's/${
-      oDoc.info?.linuxMirror || 'dl-cdn.alpinelinux.org'
-    }/${targetDomain}/g' /etc/apk/repositories && apk update -f`;
+    const command = `sed -i 's/${defaultDomain.replace(
+      /\//g,
+      '\\/',
+    )}/${targetDomain.replace(
+      /\//g,
+      '\\/',
+    )}/g' /etc/apk/repositories && apk update -f`;
 
     this.scheduleService.runTask(
       command,
