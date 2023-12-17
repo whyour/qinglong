@@ -213,15 +213,15 @@ export default class SystemService {
       ...oDoc,
       info: { ...oDoc.info, ...info },
     });
-    let defaultDomain = 'https://dl-cdn.alpinelinux.org';
-    let targetDomain = 'https://dl-cdn.alpinelinux.org';
+    let defaultDomain = 'http://deb.debian.org';
+    let targetDomain = 'http://deb.debian.org';
     if (os.platform() !== 'linux') {
       return;
     }
-    const content = await fs.promises.readFile('/etc/apk/repositories', {
+    const content = await fs.promises.readFile('/etc/apt/sources.list', {
       encoding: 'utf-8',
     });
-    const domainMatch = content.match(/(http.*)\/alpine\/.*/);
+    const domainMatch = content.match(/(http.*)\/debian /);
     if (domainMatch) {
       defaultDomain = domainMatch[1];
     }
@@ -234,7 +234,7 @@ export default class SystemService {
     )}/${targetDomain.replace(
       /\//g,
       '\\/',
-    )}/g' /etc/apk/repositories && apk update -f`;
+    )}/g' /etc/apt/sources.list && apt update`;
 
     this.scheduleService.runTask(
       command,
