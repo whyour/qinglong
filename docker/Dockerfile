@@ -1,4 +1,4 @@
-FROM python:3.11-alpine as builder
+FROM python:3.11-alpine3.18 as builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
   && apk update \
@@ -7,7 +7,7 @@ RUN set -x \
   && cd /tmp/build \
   && pnpm install --prod
 
-FROM python:3.11-alpine
+FROM python:3.11-alpine3.18
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
