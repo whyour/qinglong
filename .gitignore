@@ -22,11 +22,4 @@
 .env
 .history
 .version.ts
-
-/config
-/log
-/db
-/manual_log
-/scripts
-/bak
 /.tmp

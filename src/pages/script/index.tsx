@@ -50,7 +50,7 @@ const { Text } = Typography;
 const Script = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [value, setValue] = useState(intl.get('请选择脚本文件'));
-  const [select, setSelect] = useState<string>('');
+  const [select, setSelect] = useState<string>(intl.get('请选择脚本文件'));
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState('');
@@ -363,7 +363,7 @@ const Script = () => {
   };
 
   const initState = () => {
-    setSelect('');
+    setSelect(intl.get('请选择脚本文件'));
     setCurrentNode(null);
     setValue(intl.get('请选择脚本文件'));
   };
@@ -462,7 +462,16 @@ const Script = () => {
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
-      title={select}
+      title={
+        <>
+          {select}
+          {currentNode?.type === 'file' && (
+            <span style={{ marginLeft: 6, fontSize: 12, color: '#999' }}>
+              {(currentNode.size / 1024).toFixed(3)}KB
+            </span>
+          )}
+        </>
+      }
       loading={loading}
       extra={
         isPhone

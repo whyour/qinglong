@@ -46,6 +46,13 @@ export default (app: Router) => {
           config.scriptPath,
           config.scriptPath,
           blacklist,
+          (a, b) => {
+            if (a.type === b.type) {
+              return a.title.localeCompare(b.title);
+            } else {
+              return a.type === 'directory' ? -1 : 1;
+            }
+          },
         );
       }
       res.send({

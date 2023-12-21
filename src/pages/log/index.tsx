@@ -1,4 +1,4 @@
-import intl from 'react-intl-universal'
+import intl from 'react-intl-universal';
 import { useState, useEffect, useCallback, Key, useRef } from 'react';
 import {
   TreeSelect,
@@ -31,7 +31,7 @@ const { Text } = Typography;
 const Log = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [value, setValue] = useState(intl.get('请选择日志文件'));
-  const [select, setSelect] = useState<string>('');
+  const [select, setSelect] = useState<string>(intl.get('请选择日志文件'));
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [height, setHeight] = useState<number>();
@@ -117,7 +117,8 @@ const Log = () => {
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {select}
           </Text>
-          {intl.get('文件')}{currentNode.type === 'directory' ? intl.get('夹下所以日志') : ''}
+          {intl.get('文件')}
+          {currentNode.type === 'directory' ? intl.get('夹下所以日志') : ''}
           {intl.get('，删除后不可恢复')}
         </>
       ),
@@ -181,7 +182,16 @@ const Log = () => {
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
-      title={select}
+      title={
+        <>
+          {select}
+          {currentNode?.type === 'file' && (
+            <span style={{ marginLeft: 6, fontSize: 12, color: '#999' }}>
+              {(currentNode.size / 1024).toFixed(3)}KB
+            </span>
+          )}
+        </>
+      }
       loading={loading}
       extra={
         isPhone

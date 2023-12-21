@@ -234,12 +234,12 @@ interface IFile {
 }
 
 export function dirSort(a: IFile, b: IFile): number {
-  if (a.type !== b.type) {
-    return FileType[a.type] < FileType[b.type] ? -1 : 1
-  } else if (a.mtime !== b.mtime) {
-    return a.mtime > b.mtime ? -1 : 1
+  if (a.type === 'file' && b.type === 'file') {
+    return b.mtime - a.mtime;
+  } else if (a.type === 'directory' && b.type === 'directory') {
+    return a.title.localeCompare(b.title);
   } else {
-    return 0;
+    return a.type === 'directory' ? -1 : 1;
   }
 }
 
@@ -247,36 +247,39 @@ export async function readDirs(
   dir: string,
   baseDir: string = '',
   blacklist: string[] = [],
+  sort: (a: IFile, b: IFile) => number = dirSort,
 ): Promise<IFile[]> {
   const relativePath = path.relative(baseDir, dir);
   const files = await fs.readdir(dir);
-  const result: IFile[] = await Promise.all(files
-    .filter((x) => !blacklist.includes(x))
-    .map(async (file: string) => {
-      const subPath = path.join(dir, file);
-      const stats = await fs.stat(subPath);
-      const key = path.join(relativePath, file);
-      if (stats.isDirectory()) {
+  const result: IFile[] = await Promise.all(
+    files
+      .filter((x) => !blacklist.includes(x))
+      .map(async (file: string) => {
+        const subPath = path.join(dir, file);
+        const stats = await fs.stat(subPath);
+        const key = path.join(relativePath, file);
+        if (stats.isDirectory()) {
+          return {
+            title: file,
+            key,
+            type: 'directory',
+            parent: relativePath,
+            mtime: stats.mtime.getTime(),
+            children: (await readDirs(subPath, baseDir)).sort(sort),
+          };
+        }
         return {
           title: file,
+          type: 'file',
+          isLeaf: true,
           key,
-          type: 'directory',
           parent: relativePath,
+          size: stats.size,
           mtime: stats.mtime.getTime(),
-          children: (await readDirs(subPath, baseDir)).sort(dirSort),
         };
-      }
-      return {
-        title: file,
-        type: 'file',
-        isLeaf: true,
-        key,
-        parent: relativePath,
-        size: stats.size,
-        mtime: stats.mtime.getTime(),
-      };
-    }));
-  return result.sort(dirSort);
+      }),
+  );
+  return result.sort(sort);
 }
 
 export async function readDir(
@@ -304,7 +307,10 @@ export async function readDir(
 
 export async function promiseExec(command: string): Promise<string> {
   try {
-    const { stderr, stdout } = await promisify(exec)(command, { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' });
+    const { stderr, stdout } = await promisify(exec)(command, {
+      maxBuffer: 200 * 1024 * 1024,
+      encoding: 'utf8',
+    });
     return stdout || stderr;
   } catch (error) {
     return JSON.stringify(error);
@@ -313,7 +319,10 @@ export async function promiseExec(command: string): Promise<string> {
 
 export async function promiseExecSuccess(command: string): Promise<string> {
   try {
-    const { stdout } = await promisify(exec)(command, { maxBuffer: 200 * 1024 * 1024, encoding: 'utf8' });
+    const { stdout } = await promisify(exec)(command, {
+      maxBuffer: 200 * 1024 * 1024,
+      encoding: 'utf8',
+    });
     return stdout || '';
   } catch (error) {
     return '';
@@ -413,7 +422,7 @@ export async function killTask(pid: number) {
       [pid, ...pids].reverse().forEach((x) => {
         process.kill(x, 15);
       });
-    } catch (error) { }
+    } catch (error) {}
   } else {
     process.kill(pid, 2);
   }
@@ -440,7 +449,10 @@ export async function parseContentVersion(content: string): Promise<IVersion> {
   return load(content) as IVersion;
 }
 
-export async function getUniqPath(command: string, id: string): Promise<string> {
+export async function getUniqPath(
+  command: string,
+  id: string,
+): Promise<string> {
   if (/^\d+$/.test(id)) {
     id = `_${id}`;
   } else {
@@ -482,7 +494,7 @@ export function safeJSONParse(value?: string) {
   try {
     return JSON.parse(value);
   } catch (error) {
-    Logger.error('[JSON.parse失败]', error)
+    Logger.error('[JSON.parse失败]', error);
     return {};
   }
 }
@@ -494,6 +506,6 @@ export async function rmPath(path: string) {
       await fs.rm(path, { force: true, recursive: true, maxRetries: 5 });
     }
   } catch (error) {
-    Logger.error('[rmPath失败]', error)
+    Logger.error('[rmPath失败]', error);
   }
 }

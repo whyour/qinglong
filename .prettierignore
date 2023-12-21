@@ -21,12 +21,5 @@ src/.umi-production
 src/.umi-test
 .env.local
 .env
-history
 version.ts
-config
-log
-db
-manual_log
-scripts
-bak
-.tmp
+/.tmp
