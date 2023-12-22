@@ -242,13 +242,13 @@ export default class UserService {
     if (password === 'admin') {
       return { code: 400, message: '密码不能设置为admin' };
     }
-    const authInfo = this.getAuthInfo();
+    const authInfo = await this.getAuthInfo();
     this.updateAuthInfo(authInfo, { username, password });
     return { code: 200, message: '更新成功' };
   }
 
   public async updateAvatar(avatar: string) {
-    const authInfo = this.getAuthInfo();
+    const authInfo = await this.getAuthInfo();
     this.updateAuthInfo(authInfo, { avatar });
     return { code: 200, data: avatar, message: '更新成功' };
   }
@@ -264,7 +264,7 @@ export default class UserService {
         }),
       );
     }
-    return this.getAuthInfo();
+    return await this.getAuthInfo();
   }
 
   public async initTwoFactor() {
@@ -317,8 +317,8 @@ export default class UserService {
     }
   }
 
-  public deactiveTwoFactor() {
-    const authInfo = this.getAuthInfo();
+  public async deactiveTwoFactor() {
+    const authInfo = await this.getAuthInfo();
     this.updateAuthInfo(authInfo, {
       twoFactorActivated: false,
       twoFactorActived: false,
