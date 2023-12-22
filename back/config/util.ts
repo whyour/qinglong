@@ -251,34 +251,39 @@ export async function readDirs(
 ): Promise<IFile[]> {
   const relativePath = path.relative(baseDir, dir);
   const files = await fs.readdir(dir);
-  const result: IFile[] = await Promise.all(
-    files
-      .filter((x) => !blacklist.includes(x))
-      .map(async (file: string) => {
-        const subPath = path.join(dir, file);
-        const stats = await fs.stat(subPath);
-        const key = path.join(relativePath, file);
-        if (stats.isDirectory()) {
-          return {
-            title: file,
-            key,
-            type: 'directory',
-            parent: relativePath,
-            mtime: stats.mtime.getTime(),
-            children: (await readDirs(subPath, baseDir)).sort(sort),
-          };
-        }
-        return {
-          title: file,
-          type: 'file',
-          isLeaf: true,
-          key,
-          parent: relativePath,
-          size: stats.size,
-          mtime: stats.mtime.getTime(),
-        };
-      }),
-  );
+  const result: IFile[] = [];
+
+  for (const file of files) {
+    const subPath = path.join(dir, file);
+    const stats = await fs.stat(subPath);
+    const key = path.join(relativePath, file);
+
+    if (blacklist.includes(file) || stats.isSymbolicLink()) {
+      continue;
+    }
+
+    if (stats.isDirectory()) {
+      const children = await readDirs(subPath, baseDir, blacklist, sort);
+      result.push({
+        title: file,
+        key,
+        type: 'directory',
+        parent: relativePath,
+        mtime: stats.mtime.getTime(),
+        children: children.sort(sort),
+      });
+    } else {
+      result.push({
+        title: file,
+        type: 'file',
+        key,
+        parent: relativePath,
+        size: stats.size,
+        mtime: stats.mtime.getTime(),
+      });
+    }
+  }
+
   return result.sort(sort);
 }
 
