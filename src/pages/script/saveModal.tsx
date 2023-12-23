@@ -26,6 +26,8 @@ const SaveModal = ({
           message.success(intl.get('保存文件成功'));
           handleCancel(data);
         }
+      })
+      .finally(() => {
         setLoading(false);
       });
   };
