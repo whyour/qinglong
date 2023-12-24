@@ -10,7 +10,7 @@ const check = async (
   switch (call.request.service) {
     case 'cron':
       const res = await promiseExec(
-        `curl -s http://0.0.0.0:${config.port}/api/system`,
+        `curl -s --noproxy '*' http://0.0.0.0:${config.port}/api/system`,
       );
 
       if (res.includes('200')) {
