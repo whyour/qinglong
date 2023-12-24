@@ -9,9 +9,6 @@ reset_env() {
   npm_install_2 $dir_root
   echo -e "---> 青龙依赖安装完成\n"
 
-  echo -e "---> 3. 开始安装脚本依赖\n"
-  cp -f $dir_sample/package.json $dir_scripts/package.json
-  npm_install_2 $dir_scripts
   echo -e "---> 脚本依赖安装完成\n"
 }
 

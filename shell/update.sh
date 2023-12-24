@@ -300,11 +300,6 @@ update_qinglong_static() {
 
 check_update_dep() {
   echo -e "\n开始检测依赖...\n"
-  if [[ ! -s $dir_scripts/package.json ]] || [[ $(diff $dir_sample/package.json $dir_scripts/package.json) ]]; then
-    cp -f $dir_sample/package.json $dir_scripts/package.json
-    npm_install_2 $dir_scripts
-  fi
-
   if [[ $(diff $dir_root/package.json ${dir_tmp}/qinglong-${primary_branch}/package.json) ]]; then
     npm_install_2 "${dir_tmp}/qinglong-${primary_branch}"
   fi

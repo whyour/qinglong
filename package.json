@@ -96,7 +96,8 @@
     "uuid": "^8.3.2",
     "winston": "^3.6.0",
     "winston-daily-rotate-file": "^4.7.1",
-    "yargs": "^17.3.1"
+    "yargs": "^17.3.1",
+    "tough-cookie": "^4.0.0"
   },
   "devDependencies": {
     "@ant-design/icons": "^4.7.0",

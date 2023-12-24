@@ -13,7 +13,7 @@
 const querystring = require('querystring');
 const got = require('got');
 const $ = new Env();
-const timeout = 15000;// 超时时间(单位毫秒)
+const timeout = 15000; // 超时时间(单位毫秒)
 // =======================================gotify通知设置区域==============================================
 // gotify_url 填写gotify地址,如https://push.example.de:8080
 // gotify_token 填写gotify的消息应用token
@@ -27,7 +27,7 @@ let GOTIFY_PRIORITY = 0;
 // gobot_qq 填写推送到个人QQ或者QQ群号
 // go-cqhttp相关API https://docs.go-cqhttp.org/api
 let GOBOT_URL = ''; // 推送到个人QQ: http://127.0.0.1/send_private_msg  群：http://127.0.0.1/send_group_msg
-let GOBOT_TOKEN = '';// 访问密钥
+let GOBOT_TOKEN = ''; // 访问密钥
 let GOBOT_QQ = ''; // 如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群
 
 // =======================================微信server酱通知设置区域===========================================
@@ -69,9 +69,9 @@ let TG_BOT_TOKEN = '';
 // (环境变量名 TG_USER_ID)
 let TG_USER_ID = '';
 // tg推送HTTP代理设置(不懂可忽略,telegram机器人通知推送功能中非必填)
-let TG_PROXY_HOST = '';// 例如:127.0.0.1(环境变量名:TG_PROXY_HOST)
-let TG_PROXY_PORT = '';// 例如:1080(环境变量名:TG_PROXY_PORT)
-let TG_PROXY_AUTH = '';// tg代理配置认证参数
+let TG_PROXY_HOST = ''; // 例如:127.0.0.1(环境变量名:TG_PROXY_HOST)
+let TG_PROXY_PORT = ''; // 例如:1080(环境变量名:TG_PROXY_PORT)
+let TG_PROXY_AUTH = ''; // tg代理配置认证参数
 // Telegram api自建的反向代理地址(不懂可忽略,telegram机器人通知推送功能中非必填),默认tg官方api(环境变量名:TG_API_HOST)
 let TG_API_HOST = 'https://api.telegram.org';
 // =======================================钉钉机器人通知设置区域===========================================
@@ -157,7 +157,7 @@ let PUSHME_KEY = '';
 // CHRONOCAT_QQ 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群
 // CHRONOCAT相关API https://chronocat.vercel.app/install/docker/official/
 let CHRONOCAT_URL = ''; // CHRONOCAT Red协议连接地址
-let CHRONOCAT_TOKEN = '';// CHRONOCAT 生成的访问密钥
+let CHRONOCAT_TOKEN = ''; // CHRONOCAT 生成的访问密钥
 let CHRONOCAT_QQ = ''; // 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx
 
 // =======================================自定义通知设置区域=======================================
@@ -219,7 +219,7 @@ if (process.env.BARK_PUSH) {
     process.env.BARK_PUSH.indexOf('https') > -1 ||
     process.env.BARK_PUSH.indexOf('http') > -1
   ) {
-   // 兼容BARK自建用户
+    // 兼容BARK自建用户
     BARK_PUSH = process.env.BARK_PUSH;
   } else {
     BARK_PUSH = `https://api.day.app/${process.env.BARK_PUSH}`;
@@ -245,7 +245,7 @@ if (process.env.BARK_PUSH) {
     BARK_PUSH.indexOf('https') === -1 &&
     BARK_PUSH.indexOf('http') === -1
   ) {
-   // 兼容BARK本地用户只填写设备码的情况
+    // 兼容BARK本地用户只填写设备码的情况
     BARK_PUSH = `https://api.day.app/${BARK_PUSH}`;
   }
 }
@@ -366,8 +366,8 @@ async function sendNotify(
   params = {},
   author = '\n\n本通知 By：https://github.com/whyour/qinglong',
 ) {
- // 提供6种通知
-  desp += author;// 增加作者信息，防止被贩卖等
+  // 提供6种通知
+  desp += author; // 增加作者信息，防止被贩卖等
 
   // 根据标题跳过一些消息推送，环境变量：SKIP_PUSH_TITLE 用回车分隔
   let skipTitle = process.env.SKIP_PUSH_TITLE;
@@ -379,28 +379,28 @@ async function sendNotify(
   }
 
   await Promise.all([
-    serverNotify(text, desp),// 微信server酱
-    pushPlusNotify(text, desp),// pushplus(推送加)
+    serverNotify(text, desp), // 微信server酱
+    pushPlusNotify(text, desp), // pushplus(推送加)
   ]);
- // 由于上述两种微信通知需点击进去才能查看到详情，故text(标题内容)携带了账号序号以及昵称信息，方便不点击也可知道是哪个京东哪个活动
+  // 由于上述两种微信通知需点击进去才能查看到详情，故text(标题内容)携带了账号序号以及昵称信息，方便不点击也可知道是哪个京东哪个活动
   text = text.match(/.*?(?=\s?-)/g) ? text.match(/.*?(?=\s?-)/g)[0] : text;
   await Promise.all([
-    BarkNotify(text, desp, params),// iOS Bark APP
-    tgBotNotify(text, desp),// telegram 机器人
-    ddBotNotify(text, desp),// 钉钉机器人
-    qywxBotNotify(text, desp),// 企业微信机器人
-    qywxamNotify(text, desp),// 企业微信应用消息推送
-    iGotNotify(text, desp, params),// iGot
-    gobotNotify(text, desp),// go-cqhttp
-    gotifyNotify(text, desp),// gotify
-    ChatNotify(text, desp),// synolog chat
-    PushDeerNotify(text, desp),// PushDeer
-    aibotkNotify(text, desp),// 智能微秘书
-    fsBotNotify(text, desp),// 飞书机器人
-    smtpNotify(text, desp),// SMTP 邮件
-    pushMeNotify(text, desp, params),// PushMe
+    BarkNotify(text, desp, params), // iOS Bark APP
+    tgBotNotify(text, desp), // telegram 机器人
+    ddBotNotify(text, desp), // 钉钉机器人
+    qywxBotNotify(text, desp), // 企业微信机器人
+    qywxamNotify(text, desp), // 企业微信应用消息推送
+    iGotNotify(text, desp, params), // iGot
+    gobotNotify(text, desp), // go-cqhttp
+    gotifyNotify(text, desp), // gotify
+    ChatNotify(text, desp), // synolog chat
+    PushDeerNotify(text, desp), // PushDeer
+    aibotkNotify(text, desp), // 智能微秘书
+    fsBotNotify(text, desp), // 飞书机器人
+    smtpNotify(text, desp), // SMTP 邮件
+    pushMeNotify(text, desp, params), // PushMe
     chronocatNotify(text, desp), // Chronocat
-    webhookNotify(text, desp),// 自定义通知
+    webhookNotify(text, desp), // 自定义通知
   ]);
 }
 
@@ -482,7 +482,7 @@ function gobotNotify(text, desp) {
 function serverNotify(text, desp) {
   return new Promise((resolve) => {
     if (SCKEY) {
-     // 微信server酱推送通知一个\n不会换行，需要两个\n才能换行，故做此替换
+      // 微信server酱推送通知一个\n不会换行，需要两个\n才能换行，故做此替换
       desp = desp.replace(/[\n\r]/g, '\n\n');
       const options = {
         url: SCKEY.includes('SCT')
@@ -501,7 +501,7 @@ function serverNotify(text, desp) {
             console.log(err);
           } else {
             data = JSON.parse(data);
-           // server酱和Server酱·Turbo版的返回json格式不太一样
+            // server酱和Server酱·Turbo版的返回json格式不太一样
             if (data.errno === 0 || data.data.errno === 0) {
               console.log('server酱发送通知消息成功🎉\n');
             } else if (data.errno === 1024) {
@@ -657,15 +657,19 @@ function tgBotNotify(text, desp) {
         timeout,
       };
       if (TG_PROXY_HOST && TG_PROXY_PORT) {
-        const tunnel = require('tunnel');
+        const { HttpProxyAgent, HttpsProxyAgent } = require('hpagent');
+        const options = {
+          keepAlive: true,
+          keepAliveMsecs: 1000,
+          maxSockets: 256,
+          maxFreeSockets: 256,
+          proxy: `http://${TG_PROXY_AUTH}${TG_PROXY_HOST}:${TG_PROXY_PORT}`,
+        };
+        const httpAgent = new HttpProxyAgent(options);
+        const httpsAgent = new HttpsProxyAgent(options);
         const agent = {
-          https: tunnel.httpsOverHttp({
-            proxy: {
-              host: TG_PROXY_HOST,
-              port: TG_PROXY_PORT * 1,
-              proxyAuth: TG_PROXY_AUTH,
-            },
-          }),
+          http: httpAgent,
+          https: httpsAgent,
         };
         Object.assign(options, { agent });
       }
@@ -885,7 +889,7 @@ function qywxamNotify(text, desp) {
             };
         }
         if (!QYWX_AM_AY[4]) {
-         // 如不提供第四个参数,则默认进行文本消息类型推送
+          // 如不提供第四个参数,则默认进行文本消息类型推送
           options = {
             msgtype: 'text',
             text: {
