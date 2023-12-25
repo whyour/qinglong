@@ -76,14 +76,6 @@ main() {
   npm i -g pnpm@8.3.1 pm2 tsx
   patch_version
 
-  if [[ $PipMirror ]]; then
-    pip3 config set global.index-url $PipMirror
-  fi
-  if [[ $NpmMirror ]]; then
-    cd && pnpm config set registry $NpmMirror
-    pnpm install -g
-  fi
-
   reset_env
   copy_dep
   check_ql

@@ -25,9 +25,6 @@ fi
 echo -e "\nbot文件下载成功...\n"
 
 echo -e "3、安装python3依赖...\n"
-if [[ $PipMirror ]]; then
-  pip3 config set global.index-url $PipMirror
-fi
 cp -f "$repo_path/jbot/requirements.txt" "$dir_data"
 
 cd $dir_data

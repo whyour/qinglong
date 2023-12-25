@@ -361,8 +361,6 @@ format_timestamp() {
 patch_version() {
   git config --global pull.rebase false
 
-  cp -f $dir_root/.env.example $dir_root/.env
-
   if [[ -f "$dir_root/db/cookie.db" ]]; then
     echo -e "检测到旧的db文件，拷贝为新db...\n"
     mv $dir_root/db/cookie.db $dir_root/db/env.db

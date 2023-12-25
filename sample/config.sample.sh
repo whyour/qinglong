@@ -41,12 +41,6 @@ AutoStartBot=""
 ## 是否使用第三方bot，默认不使用，使用时填入仓库地址，存到ql/repo目录下，文件夹命名为diybot
 BotRepoUrl=""
 
-## 安装python依赖时指定pip源
-PipMirror=""
-
-## 安装node依赖时指定npm源
-NpmMirror=""
-
 ## 通知环境变量
 ## 1. Server酱
 ## https://sct.ftqq.com
