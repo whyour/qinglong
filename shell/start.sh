@@ -57,7 +57,6 @@ else
 fi
 
 npm install -g pnpm@8.3.1
-cd && pnpm config set registry https://registry.npmmirror.com
 pnpm add -g pm2 tsx
 
 cd ${QL_DIR}
@@ -75,15 +74,6 @@ fix_config
 pm2 l &>/dev/null
 
 patch_version
-if [[ $PipMirror ]]; then
-  pip3 config set global.index-url $PipMirror
-fi
-current_npm_registry=$(cd && pnpm config get registry)
-is_equal_registry=$(echo $current_npm_registry | grep "${NpmMirror}")
-if [[ "$is_equal_registry" == "" ]]; then
-  cd && pnpm config set registry $NpmMirror
-  pnpm install -g
-fi
 
 reload_pm2
 
