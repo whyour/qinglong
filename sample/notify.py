@@ -841,60 +841,61 @@ def one() -> str:
     return res["hitokoto"] + "    ----" + res["from"]
 
 
-if push_config.get("BARK_PUSH"):
-    notify_function.append(bark)
-if push_config.get("CONSOLE"):
-    notify_function.append(console)
-if push_config.get("DD_BOT_TOKEN") and push_config.get("DD_BOT_SECRET"):
-    notify_function.append(dingding_bot)
-if push_config.get("FSKEY"):
-    notify_function.append(feishu_bot)
-if push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ"):
-    notify_function.append(go_cqhttp)
-if push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN"):
-    notify_function.append(gotify)
-if push_config.get("IGOT_PUSH_KEY"):
-    notify_function.append(iGot)
-if push_config.get("PUSH_KEY"):
-    notify_function.append(serverJ)
-if push_config.get("DEER_KEY"):
-    notify_function.append(pushdeer)
-if push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN"):
-    notify_function.append(chat)
-if push_config.get("PUSH_PLUS_TOKEN"):
-    notify_function.append(pushplus_bot)
-if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"):
-    notify_function.append(qmsg_bot)
-if push_config.get("QYWX_AM"):
-    notify_function.append(wecom_app)
-if push_config.get("QYWX_KEY"):
-    notify_function.append(wecom_bot)
-if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"):
-    notify_function.append(telegram_bot)
-if (
-    push_config.get("AIBOTK_KEY")
-    and push_config.get("AIBOTK_TYPE")
-    and push_config.get("AIBOTK_NAME")
-):
-    notify_function.append(aibotk)
-if (
-    push_config.get("SMTP_SERVER")
-    and push_config.get("SMTP_SSL")
-    and push_config.get("SMTP_EMAIL")
-    and push_config.get("SMTP_PASSWORD")
-    and push_config.get("SMTP_NAME")
-):
-    notify_function.append(smtp)
-if push_config.get("PUSHME_KEY"):
-    notify_function.append(pushme)
-if (
-    push_config.get("CHRONOCAT_URL")
-    and push_config.get("CHRONOCAT_QQ")
-    and push_config.get("CHRONOCAT_TOKEN")
-):
-    notify_function.append(chronocat)
-if push_config.get("WEBHOOK_URL") and push_config.get("WEBHOOK_METHOD"):
-    notify_function.append(custom_notify)
+def add_notify_function():
+    if push_config.get("BARK_PUSH"):
+        notify_function.append(bark)
+    if push_config.get("CONSOLE"):
+        notify_function.append(console)
+    if push_config.get("DD_BOT_TOKEN") and push_config.get("DD_BOT_SECRET"):
+        notify_function.append(dingding_bot)
+    if push_config.get("FSKEY"):
+        notify_function.append(feishu_bot)
+    if push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ"):
+        notify_function.append(go_cqhttp)
+    if push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN"):
+        notify_function.append(gotify)
+    if push_config.get("IGOT_PUSH_KEY"):
+        notify_function.append(iGot)
+    if push_config.get("PUSH_KEY"):
+        notify_function.append(serverJ)
+    if push_config.get("DEER_KEY"):
+        notify_function.append(pushdeer)
+    if push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN"):
+        notify_function.append(chat)
+    if push_config.get("PUSH_PLUS_TOKEN"):
+        notify_function.append(pushplus_bot)
+    if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"):
+        notify_function.append(qmsg_bot)
+    if push_config.get("QYWX_AM"):
+        notify_function.append(wecom_app)
+    if push_config.get("QYWX_KEY"):
+        notify_function.append(wecom_bot)
+    if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"):
+        notify_function.append(telegram_bot)
+    if (
+        push_config.get("AIBOTK_KEY")
+        and push_config.get("AIBOTK_TYPE")
+        and push_config.get("AIBOTK_NAME")
+    ):
+        notify_function.append(aibotk)
+    if (
+        push_config.get("SMTP_SERVER")
+        and push_config.get("SMTP_SSL")
+        and push_config.get("SMTP_EMAIL")
+        and push_config.get("SMTP_PASSWORD")
+        and push_config.get("SMTP_NAME")
+    ):
+        notify_function.append(smtp)
+    if push_config.get("PUSHME_KEY"):
+        notify_function.append(pushme)
+    if (
+        push_config.get("CHRONOCAT_URL")
+        and push_config.get("CHRONOCAT_QQ")
+        and push_config.get("CHRONOCAT_TOKEN")
+    ):
+        notify_function.append(chronocat)
+    if push_config.get("WEBHOOK_URL") and push_config.get("WEBHOOK_METHOD"):
+        notify_function.append(custom_notify)
 
 
 def send(title: str, content: str) -> None:
@@ -910,10 +911,9 @@ def send(title: str, content: str) -> None:
             return
 
     hitokoto = push_config.get("HITOKOTO")
+    content += "\n\n" + one() if hitokoto else ""
 
-    text = one() if hitokoto else ""
-    content += "\n\n" + text
-
+    add_notify_function()
     ts = [
         threading.Thread(target=mode, args=(title, content), name=mode.__name__)
         for mode in notify_function
