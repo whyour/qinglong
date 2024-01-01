@@ -1,9 +1,5 @@
 lockfileVersion: '6.0'
 
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
-
 dependencies:
   '@grpc/grpc-js':
     specifier: ^1.8.13
@@ -167,8 +163,8 @@ devDependencies:
     specifier: ^6.0.4
     version: 6.0.4
   '@types/file-saver':
-    specifier: ^2.0.5
-    version: 2.0.5
+    specifier: 2.0.2
+    version: 2.0.2
   '@types/js-yaml':
     specifier: ^4.0.5
     version: 4.0.5
@@ -254,8 +250,8 @@ devDependencies:
     specifier: ^7.0.0
     version: 7.6.0
   file-saver:
-    specifier: ^2.0.5
-    version: 2.0.5
+    specifier: 2.0.2
+    version: 2.0.2
   lint-staged:
     specifier: ^13.0.3
     version: 13.2.2
@@ -4879,8 +4875,8 @@ packages:
       '@types/qs': 6.9.7
       '@types/serve-static': 1.15.1
 
-  /@types/file-saver@2.0.5:
-    resolution: {integrity: sha512-zv9kNf3keYegP5oThGLaPk8E081DFDuwfqjtiTzm6PoxChdJ1raSuADf2YGCVIyrSynLrgc8JWv296s7Q7pQSQ==}
+  /@types/file-saver@2.0.2:
+    resolution: {integrity: sha512-xbqnZmGrCEqi/KUzOkeUSe77p7APvLuyellGaAoeww3CHJ1AbjQWjPSCFtKIzZn8L7LpEax4NXnC+gfa6nM7IA==}
     dev: true
 
   /@types/graceful-fs@4.1.6:
@@ -8925,8 +8921,8 @@ packages:
       flat-cache: 3.0.4
     dev: true
 
-  /file-saver@2.0.5:
-    resolution: {integrity: sha512-P9bmyZ3h/PRG+Nzga+rbdI4OEpNDzAVyy74uVO9ATgzLK6VtAsYybF/+TOCvrc0MO793d6+42lLyZTw7/ArVzA==}
+  /file-saver@2.0.2:
+    resolution: {integrity: sha512-Wz3c3XQ5xroCxd1G8b7yL0Ehkf0TC9oYC6buPFkNnU9EnaPlifeAFCyCh+iewXTyFRcg0a6j3J7FmJsIhlhBdw==}
     dev: true
 
   /file-stream-rotator@0.6.1:
@@ -16452,3 +16448,7 @@ packages:
       - bluebird
       - supports-color
     dev: false
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
