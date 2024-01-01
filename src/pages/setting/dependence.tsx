@@ -124,7 +124,7 @@ const Dependence = () => {
               onClick={() => {
                 updateSystemConfig('dependence-proxy');
               }}
-              style={{ width: 84 }}
+              style={{ width: 100 }}
             >
               {intl.get('确认')}
             </Button>
@@ -149,7 +149,7 @@ const Dependence = () => {
               onClick={() => {
                 updateSystemConfigStream('node-mirror');
               }}
-              style={{ width: 84 }}
+              style={{ width: 100 }}
             >
               {intl.get('确认')}
             </Button>
@@ -174,7 +174,7 @@ const Dependence = () => {
               onClick={() => {
                 updateSystemConfig('python-mirror');
               }}
-              style={{ width: 84 }}
+              style={{ width: 100 }}
             >
               {intl.get('确认')}
             </Button>
@@ -201,7 +201,7 @@ const Dependence = () => {
               onClick={() => {
                 updateSystemConfigStream('linux-mirror');
               }}
-              style={{ width: 84 }}
+              style={{ width: 100 }}
             >
               {intl.get('确认')}
             </Button>
