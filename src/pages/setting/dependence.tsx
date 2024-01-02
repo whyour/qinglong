@@ -100,7 +100,7 @@ const Dependence = () => {
 
   return (
     <div className="dependence-config-wrapper">
-      <Form layout="vertical" form={form}>
+      <Form layout="vertical" form={form} style={{ flexShrink: 0 }}>
         <Form.Item
           label={intl.get('代理')}
           name="proxy"
