@@ -22,6 +22,7 @@ ENV PNPM_HOME=/root/.local/share/pnpm \
   PS1="\u@\h:\w \$ " \
   QL_DIR=/ql \
   QL_BRANCH=${QL_BRANCH}
+EXPOSE 5700
 
 RUN set -x \
   && apk update -f \
