@@ -25,6 +25,7 @@ import { depthFirstSearch } from '@/utils';
 import debounce from 'lodash/debounce';
 import uniq from 'lodash/uniq';
 import useFilterTreeData from '@/hooks/useFilterTreeData';
+import prettyBytes from 'pretty-bytes';
 
 const { Text } = Typography;
 
@@ -186,8 +187,16 @@ const Log = () => {
         <>
           {select}
           {currentNode?.type === 'file' && (
-            <span style={{ marginLeft: 6, fontSize: 12, color: '#999' }}>
-              {(currentNode.size / 1024).toFixed(3)}KB
+            <span
+              style={{
+                marginLeft: 6,
+                fontSize: 12,
+                color: '#999',
+                display: 'inline-block',
+                height: 14,
+              }}
+            >
+              {prettyBytes(currentNode.size)}
             </span>
           )}
         </>

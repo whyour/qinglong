@@ -132,7 +132,12 @@ const Other = ({
       maskClosable: false,
       title: intl.get('确认重启'),
       centered: true,
-      content: intl.get('备份数据上传成功，确认覆盖数据'),
+      content: (
+        <>
+          <div>{intl.get('备份数据上传成功，确认覆盖数据')}</div>
+          <div>{intl.get('如果恢复失败，可进入容器执行')} ql reload data</div>
+        </>
+      ),
       okText: intl.get('重启'),
       onOk() {
         request

@@ -145,6 +145,7 @@
     "monaco-editor": "0.33.0",
     "nodemon": "^3.0.1",
     "prettier": "^2.5.1",
+    "pretty-bytes": "6.1.1",
     "qiniu": "^7.4.0",
     "qrcode.react": "^1.0.1",
     "query-string": "^7.1.1",

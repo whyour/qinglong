@@ -45,6 +45,7 @@ import IconFont from '@/components/iconfont';
 import RenameModal from './renameModal';
 import { langs } from '@uiw/codemirror-extensions-langs';
 import { useHotkeys } from 'react-hotkeys-hook';
+import prettyBytes from 'pretty-bytes';
 const { Text } = Typography;
 
 const Script = () => {
@@ -466,8 +467,16 @@ const Script = () => {
         <>
           {select}
           {currentNode?.type === 'file' && (
-            <span style={{ marginLeft: 6, fontSize: 12, color: '#999' }}>
-              {(currentNode.size / 1024).toFixed(3)}KB
+            <span
+              style={{
+                marginLeft: 6,
+                fontSize: 12,
+                color: '#999',
+                display: 'inline-block',
+                height: 14,
+              }}
+            >
+              {prettyBytes(currentNode.size)}
             </span>
           )}
         </>
