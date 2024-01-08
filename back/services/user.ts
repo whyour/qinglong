@@ -24,6 +24,9 @@ import { Request } from 'express';
 import ScheduleService from './schedule';
 import SockService from './sock';
 import dayjs from 'dayjs';
+import IP2Region from 'ip2region';
+import requestIp from 'request-ip';
+import uniq from 'lodash/uniq';
 
 @Service()
 export default class UserService {
@@ -103,7 +106,16 @@ export default class UserService {
         };
       }
 
-      const { ip, address } = await getNetIp(req);
+      const ip = requestIp.getClientIp(req) || '';
+      const query = new IP2Region();
+      const ipAddress = query.search(ip);
+      let address = '';
+      if (ipAddress) {
+        const { country, province, city, isp } = ipAddress;
+        address = uniq([country, province, city, isp])
+          .filter(Boolean)
+          .join(' ');
+      }
       if (username === cUsername && password === cPassword) {
         const data = createRandomString(50, 100);
         const expiration = twoFactorActivated ? 60 : 20;
@@ -125,13 +137,12 @@ export default class UserService {
           platform: req.platform,
           isTwoFactorChecking: false,
         });
-        await this.notificationService.notify(
+        this.notificationService.notify(
           '登录通知',
           `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
             req.platform
           }端 登录成功，ip地址 ${ip}`,
         );
-        await this.getLoginLog();
         await this.insertDb({
           type: AuthDataType.loginLog,
           info: {
@@ -154,13 +165,12 @@ export default class UserService {
           lastaddr: address,
           platform: req.platform,
         });
-        await this.notificationService.notify(
+        this.notificationService.notify(
           '登录通知',
           `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
             req.platform
           }端 登录失败，ip地址 ${ip}`,
         );
-        await this.getLoginLog();
         await this.insertDb({
           type: AuthDataType.loginLog,
           info: {

@@ -61,6 +61,9 @@ dependencies:
   iconv-lite:
     specifier: ^0.6.3
     version: 0.6.3
+  ip2region:
+    specifier: 2.3.0
+    version: 2.3.0(@types/node@17.0.45)
   js-yaml:
     specifier: ^4.1.0
     version: 4.1.0
@@ -94,6 +97,9 @@ dependencies:
   reflect-metadata:
     specifier: ^0.1.13
     version: 0.1.13
+  request-ip:
+    specifier: 3.3.0
+    version: 3.3.0
   sequelize:
     specifier: ^6.25.5
     version: 6.32.0(@whyour/sqlite3@1.0.4)
@@ -201,6 +207,9 @@ devDependencies:
   '@types/react-dom':
     specifier: ^18.0.6
     version: 18.2.4
+  '@types/request-ip':
+    specifier: 0.0.41
+    version: 0.0.41
   '@types/serve-handler':
     specifier: ^6.1.1
     version: 6.1.1
@@ -5053,6 +5062,12 @@ packages:
       csstype: 3.1.2
     dev: true
 
+  /@types/request-ip@0.0.41:
+    resolution: {integrity: sha512-Qzz0PM2nSZej4lsLzzNfADIORZhhxO7PED0fXpg4FjXiHuJ/lMyUg+YFF5q8x9HPZH3Gl6N+NOM8QZjItNgGKg==}
+    dependencies:
+      '@types/node': 17.0.45
+    dev: true
+
   /@types/responselike@1.0.0:
     resolution: {integrity: sha512-85Y2BjiufFzaMIlvJDvTTB8Fxl2xfLo4HgmHzVBz08w4wDePCTjYw66PdrolO0kzli3yam/YCgRufyo1DdQVTA==}
     dependencies:
@@ -9829,6 +9844,14 @@ packages:
       loose-envify: 1.4.0
     dev: true
 
+  /ip2region@2.3.0(@types/node@17.0.45):
+    resolution: {integrity: sha512-zV5Xsadzrx9Ej6heoyhbXMsfGWWQ3C6bAIYStrHhw9kzLpGpVNlnAyRBxxPgxA1GNqr1Ti7oUxcWsMWNN3jZBg==}
+    peerDependencies:
+      '@types/node': '*'
+    dependencies:
+      '@types/node': 17.0.45
+    dev: false
+
   /ip@1.1.8:
     resolution: {integrity: sha512-PuExPYUiu6qMBQb4l06ecm6T6ujzhmh+MeJcW9wa89PoAz5pvd4zPgN5WJV104mb6S2T1AwNIAaB70JNrLQWhg==}
     dev: true
@@ -14210,6 +14233,10 @@ packages:
       lodash: 4.17.21
       strip-ansi: 6.0.1
     dev: true
+
+  /request-ip@3.3.0:
+    resolution: {integrity: sha512-cA6Xh6e0fDBBBwH77SLJaJPBmD3nWVAcF9/XAcsrIHdjhFzFiB5aNQFytdjCGPezU3ROwrR11IddKAM08vohxA==}
+    dev: false
 
   /require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}

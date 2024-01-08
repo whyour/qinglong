@@ -94,29 +94,31 @@ export async function getNetIp(req: any) {
   }
 
   try {
-    const baiduApi = got
-      .get(`https://www.cip.cc/${ip}`, { timeout: 10000, retry: 0 })
+    const csdnApi = got
+      .get(`https://searchplugin.csdn.net/api/v1/ip/get?ip=${ip}`, {
+        timeout: 10000,
+        retry: 0,
+      })
       .text();
-    const ipApi = got
+    const pconlineApi = got
       .get(`https://whois.pconline.com.cn/ipJson.jsp?ip=${ip}&json=true`, {
         timeout: 10000,
         retry: 0,
       })
       .buffer();
-    const [data, ipApiBody] = await await Promise.all<any>([baiduApi, ipApi]);
-
-    const ipRegx = /.*IP	:(.*)\n/;
-    const addrRegx = /.*数据二	:(.*)\n/;
-    if (data && ipRegx.test(data) && addrRegx.test(data)) {
-      const ip = data.match(ipRegx)[1];
-      const addr = data.match(addrRegx)[1];
-      return { address: addr, ip };
-    } else if (ipApiBody) {
-      const { addr, ip } = JSON.parse(iconv.decode(ipApiBody, 'GBK'));
-      return { address: `${addr}`, ip };
-    } else {
-      return { address: `获取失败`, ip };
+    const [csdnBody, pconlineBody] = await await Promise.all<any>([
+      csdnApi,
+      pconlineApi,
+    ]);
+    const csdnRes = JSON.parse(csdnBody);
+    const pconlineRes = JSON.parse(iconv.decode(pconlineBody, 'GBK'));
+    let address = '';
+    if (csdnBody && csdnRes.code == 200) {
+      address = csdnRes.data.address;
+    } else if (pconlineRes && pconlineRes.addr) {
+      address = pconlineRes.addr;
     }
+    return { address, ip };
   } catch (error) {
     return { address: `获取失败`, ip };
   }

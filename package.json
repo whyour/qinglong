@@ -97,7 +97,9 @@
     "winston": "^3.6.0",
     "winston-daily-rotate-file": "^4.7.1",
     "yargs": "^17.3.1",
-    "tough-cookie": "^4.0.0"
+    "tough-cookie": "^4.0.0",
+    "request-ip": "3.3.0",
+    "ip2region": "2.3.0"
   },
   "devDependencies": {
     "@ant-design/icons": "^4.7.0",
@@ -128,6 +130,7 @@
     "@types/sockjs-client": "^1.5.1",
     "@types/tar": "^6.1.5",
     "@types/uuid": "^8.3.4",
+    "@types/request-ip": "0.0.41",
     "@uiw/codemirror-extensions-langs": "^4.21.9",
     "@uiw/react-codemirror": "^4.21.9",
     "@umijs/max": "^4.0.72",
