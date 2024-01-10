@@ -36,7 +36,7 @@ const EditModal = ({
   const [value, setValue] = useState('');
   const [language, setLanguage] = useState<string>('javascript');
   const [cNode, setCNode] = useState<any>();
-  const [selectedKey, setSelectedKey] = useState<string>('');
+  const [selectedKey, setSelectedKey] = useState<string>();
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
   const [settingModalVisible, setSettingModalVisible] =
     useState<boolean>(false);
@@ -148,7 +148,7 @@ const EditModal = ({
         <>
           <TreeSelect
             treeExpandAction="click"
-            style={{ marginRight: 8, width: 150 }}
+            style={{ marginRight: 8, width: 300 }}
             value={selectedKey}
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
             treeData={treeData}
@@ -156,6 +156,7 @@ const EditModal = ({
             fieldNames={{ value: 'key', label: 'title' }}
             showSearch
             onSelect={onSelect}
+            treeLine={{ showLeafIcon: true }}
           />
           <Select
             value={language}
