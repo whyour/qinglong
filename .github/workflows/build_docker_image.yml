@@ -2,6 +2,9 @@ name: Build And Push Docker Image
 
 on:
   push:
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
     branches:
       - 'master'
       - 'develop'

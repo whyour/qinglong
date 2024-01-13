@@ -56,7 +56,7 @@ npm i @whyour/qinglong
 
 ## Built-in commands
 
-1. task
+- task
 
 ```bash
 # Execute in sequence, if a random delay is set, it will be randomly delayed by a certain number of seconds
@@ -75,7 +75,7 @@ task -m <max_time> <file_path>
 task <file_path> -- -u whyour -p password
 ```
 
-1. ql
+- ql
 
 ```bash
 # Update and restart Green Dragon
@@ -98,19 +98,17 @@ ql resetlet
 ql resettfa                                                  
 ```
 
-1. parameter description
-
-- file_url: Script address
-- repo_url: Repository address
-- whitelist: The whitelist when pulling the repository, i.e., the string contained in the path of the script to be pulled
-- blacklist: Blacklisting when pulling repositories, i.e. strings that are not included in the path of the script to be pulled
-- dependence: Pulling the dependencies needed for the repository will be copied directly from the repository to the repository directory under scripts, regardless of the blacklist
-- branch: Pull the branch of the repository
-- days: Number of days of logs to be kept
-- file_path: File path for task execution
-- env_name: The name of the environment variable that needs to be concurrent or specified at the time of task execution
-- account_number: Specify the account number of an environment variable to be executed when the task is executed
-- max_time: Timeout, suffix "s" for seconds (default), "m" for minutes, "h" for hours, "d" for days
+| Parameter | Description |
+|---|---|
+| file_url | Script address |
+| repo_url | Repository address |
+| whitelist | The whitelist when pulling the repository, i.e., the string contained in the path of the script to be pulled |
+| blacklist | Blacklisting when pulling repositories, i.e. strings that are not included in the path of the script to be pulled |
+| dependence | Pulling the dependencies needed for the repository will be copied directly from the repository to the repository directory under scripts, regardless of the blacklist |
+| extensions | Pull the branch of the repository |
+| branch | Number of days of logs to be kept |
+| days | File path for task execution |
+| file_path | The name of the environment variable that needs to be concurrent or specified at the time of task execution |
 
 ## Deployment
 
