@@ -325,7 +325,7 @@ export default {
         required: true,
       },
       { label: 'emailUser', tip: intl.get('邮箱地址'), required: true },
-      { label: 'emailPass', tip: intl.get('邮箱SMTP授权码'), required: true },
+      { label: 'emailPass', tip: intl.get('SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定'), required: true },
     ],
     pushMe: [
       {

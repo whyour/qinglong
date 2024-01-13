@@ -113,13 +113,6 @@ let IGOT_PUSH_KEY = '';
 let PUSH_PLUS_TOKEN = '';
 let PUSH_PLUS_USER = '';
 
-// =======================================Cool Push设置区域=======================================
-// 官方文档：https://cp.xuthus.cc/docs
-// QQ_SKEY: Cool Push登录授权后推送消息的调用代码Skey
-// QQ_MODE: 推送模式详情请登录获取QQ_SKEY后见https://cp.xuthus.cc/feat
-let QQ_SKEY = '';
-let QQ_MODE = '';
-
 // =======================================智能微秘书设置区域=======================================
 // 官方文档：http://wechat.aibotk.com/docs/about
 // AIBOTK_KEY： 填写智能微秘书个人中心的apikey
@@ -135,13 +128,11 @@ let AIBOTK_NAME = '';
 let FSKEY = '';
 
 // =======================================SMTP 邮件设置区域=======================================
-// SMTP_SERVER: 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
-// SMTP_SSL: 填写 SMTP 发送邮件服务器是否使用 SSL，内容应为 true 或 false
+// SMTP_SERVICE: 邮箱服务名称，比如126、163、Gmail、QQ等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
 // SMTP_EMAIL: 填写 SMTP 收发件邮箱，通知将会由自己发给自己
 // SMTP_PASSWORD: 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
 // SMTP_NAME: 填写 SMTP 收发件人姓名，可随意填写
-let SMTP_SERVER = '';
-let SMTP_SSL = 'false';
+let SMTP_SERVICE = '';
 let SMTP_EMAIL = '';
 let SMTP_PASSWORD = '';
 let SMTP_NAME = '';
@@ -306,11 +297,8 @@ if (process.env.FSKEY) {
   FSKEY = process.env.FSKEY;
 }
 
-if (process.env.SMTP_SERVER) {
-  SMTP_SERVER = process.env.SMTP_SERVER;
-}
-if (process.env.SMTP_SSL) {
-  SMTP_SSL = process.env.SMTP_SSL;
+if (process.env.SMTP_SERVICE) {
+  SMTP_SERVICE = process.env.SMTP_SERVICE;
 }
 if (process.env.SMTP_EMAIL) {
   SMTP_EMAIL = process.env.SMTP_EMAIL;
@@ -1141,31 +1129,31 @@ function fsBotNotify(text, desp) {
 }
 
 async function smtpNotify(text, desp) {
-  if (![SMTP_SERVER, SMTP_EMAIL, SMTP_PASSWORD].every(Boolean)) {
+  if (![SMTP_EMAIL, SMTP_PASSWORD].every(Boolean) || !SMTP_SERVICE) {
     return;
   }
 
   try {
     const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport(
-      `${SMTP_SSL === 'true' ? 'smtps:' : 'smtp:'}//${SMTP_SERVER}`,
-      {
-        auth: {
-          user: SMTP_EMAIL,
-          pass: SMTP_PASSWORD,
-        },
+    const transporter = nodemailer.createTransport({
+      service: SMTP_SERVICE,
+      auth: {
+        user: SMTP_EMAIL,
+        pass: SMTP_PASSWORD,
       },
-    );
+    });
 
     const addr = SMTP_NAME ? `"${SMTP_NAME}" <${SMTP_EMAIL}>` : SMTP_EMAIL;
     const info = await transporter.sendMail({
       from: addr,
       to: addr,
       subject: text,
-      text: desp,
+      html: `${desp.replace(/\n/g, '<br/>')}`,
     });
 
-    if (!!info.messageId) {
+    transporter.close();
+
+    if (info.messageId) {
       console.log('SMTP发送通知消息成功🎉\n');
       return true;
     }
@@ -1311,11 +1299,9 @@ function webhookNotify(text, desp) {
       got(formatUrl, options).then((resp) => {
         try {
           if (resp.statusCode !== 200) {
-            console.log('自定义发送通知消息失败！！\n');
-            console.log(resp.body);
+            console.log(`自定义发送通知消息失败！！\n${resp.body}`);
           } else {
-            console.log('自定义发送通知消息成功🎉。\n');
-            console.log(resp.body);
+            console.log(`自定义发送通知消息成功🎉。\n${resp.body}`);
           }
         } catch (e) {
           $.logErr(e, resp);

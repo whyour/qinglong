@@ -149,11 +149,8 @@ export AIBOTK_TYPE=""
 export AIBOTK_NAME=""
 
 ## 14. SMTP
-## 暂时只支持在 Python 中调用 notify.py 以发送 SMTP 邮件通知
-## smtp_server 填写 SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
-export SMTP_SERVER=""
-## smtp_ssl 填写 SMTP 发送邮件服务器是否使用 SSL，内容应为 true 或 false
-export SMTP_SSL="false"
+## 邮箱服务名称，比如126、163、Gmail、QQ等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
+export SMTP_SERVICE=""
 ## smtp_email 填写 SMTP 收发件邮箱，通知将会由自己发给自己
 export SMTP_EMAIL=""
 ## smtp_password 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
