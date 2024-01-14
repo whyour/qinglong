@@ -98,7 +98,7 @@ ql resetlet
 ql resettfa                                                  
 ```
 
-| Parameter | Description |
+| **Parameter** | **Description** |
 |---|---|
 | file_url | Script address |
 | repo_url | Repository address |

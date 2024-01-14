@@ -6,10 +6,26 @@ import config from '../config';
 import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
 import { join } from 'path';
+import { SAMPLE_FILES } from '../config/const';
+import got from 'got';
 const route = Router();
 
 export default (app: Router) => {
   app.use('/configs', route);
+
+  route.get(
+    '/sample',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        res.send({
+          code: 200,
+          data: SAMPLE_FILES,
+        });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 
   route.get(
     '/files',
@@ -40,9 +56,14 @@ export default (app: Router) => {
         if (config.blackFileList.includes(req.params.file)) {
           res.send({ code: 403, message: '文件无法访问' });
         }
-        if (req.params.file.includes('sample')) {
+        if (req.params.file.startsWith('sample/')) {
+          const res = await got.get(
+            `https://gitlab.com/whyour/qinglong/-/raw/master/${req.params.file}`,
+          );
+          content = res.body;
+        } else if (req.params.file.startsWith('data/scripts/')) {
           content = await getFileContentByName(
-            join(config.samplePath, req.params.file),
+            join(config.rootPath, req.params.file),
           );
         } else {
           content = await getFileContentByName(

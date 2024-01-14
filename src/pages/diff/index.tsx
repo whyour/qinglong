@@ -9,22 +9,24 @@ import { DiffEditor } from '@monaco-editor/react';
 import ReactDiffViewer from 'react-diff-viewer';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
+import { getEditorMode } from '@/utils';
 
 const { Option } = Select;
 
 const Diff = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
-  const [origin, setOrigin] = useState('config.sample.sh');
+  const [origin, setOrigin] = useState('sample/config.sample.sh');
   const [current, setCurrent] = useState('config.sh');
   const [originValue, setOriginValue] = useState('');
   const [currentValue, setCurrentValue] = useState('');
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState<any[]>([]);
   const editorRef = useRef<any>(null);
+  const [language, setLanguage] = useState<string>('shell');
 
   const getConfig = () => {
     request
-      .get(`${config.apiPrefix}configs/${current}`)
+      .get(`${config.apiPrefix}configs/${encodeURIComponent(current)}`)
       .then(({ code, data }) => {
         if (code === 200) {
           setCurrentValue(data);
@@ -34,7 +36,7 @@ const Diff = () => {
 
   const getSample = () => {
     request
-      .get(`${config.apiPrefix}configs/${origin}`)
+      .get(`${config.apiPrefix}configs/${encodeURIComponent(origin)}`)
       .then(({ code, data }) => {
         if (code === 200) {
           setOriginValue(data);
@@ -62,7 +64,7 @@ const Diff = () => {
   const getFiles = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}configs/files`)
+      .get(`${config.apiPrefix}configs/sample`)
       .then(({ code, data }) => {
         if (code === 200) {
           setFiles(data);
@@ -71,12 +73,11 @@ const Diff = () => {
       .finally(() => setLoading(false));
   };
 
-  const originFileChange = (value: string) => {
+  const originFileChange = (value: string, op) => {
+    setCurrent(op.extra.target);
     setOrigin(value);
-  };
-
-  const currentFileChange = (value: string) => {
-    setCurrent(value);
+    const newMode = getEditorMode(value);
+    setLanguage(newMode);
   };
 
   useEffect(() => {
@@ -112,7 +113,7 @@ const Diff = () => {
           <Form.Item label={intl.get('源文件')}>
             <Select value={origin} onChange={originFileChange}>
               {files.map((x) => (
-                <Option key={x.value} value={x.value}>
+                <Option key={x.value} value={x.value} extra={x}>
                   {x.title}
                 </Option>
               ))}
@@ -121,13 +122,7 @@ const Diff = () => {
         </Col>
         <Col span={12}>
           <Form.Item label={intl.get('当前文件')}>
-            <Select value={current} onChange={currentFileChange}>
-              {files.map((x) => (
-                <Option key={x.value} value={x.value}>
-                  {x.title}
-                </Option>
-              ))}
-            </Select>
+            <span className="ant-form-text">{current}</span>
           </Form.Item>
         </Col>
       </Row>
@@ -159,7 +154,7 @@ const Diff = () => {
         />
       ) : (
         <DiffEditor
-          language={'shell'}
+          language={language}
           original={originValue}
           modified={currentValue}
           options={{

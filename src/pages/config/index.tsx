@@ -1,4 +1,4 @@
-import intl from 'react-intl-universal'
+import intl from 'react-intl-universal';
 import React, {
   PureComponent,
   Fragment,
@@ -16,6 +16,7 @@ import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import { langs } from '@uiw/codemirror-extensions-langs';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { getEditorMode } from '@/utils';
 
 const Config = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
@@ -26,6 +27,7 @@ const Config = () => {
   const [data, setData] = useState<any[]>([]);
   const editorRef = useRef<any>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [language, setLanguage] = useState<string>('shell');
 
   const getConfig = (name: string) => {
     request.get(`${config.apiPrefix}configs/${name}`).then(({ code, data }) => {
@@ -67,6 +69,8 @@ const Config = () => {
     setSelect(value);
     setTitle(node.value);
     getConfig(node.value);
+    const newMode = getEditorMode(value);
+    setLanguage(newMode);
   };
 
   useHotkeys(
@@ -122,7 +126,7 @@ const Config = () => {
         />
       ) : (
         <Editor
-          defaultLanguage="shell"
+          language={language}
           value={value}
           theme={theme}
           options={{
