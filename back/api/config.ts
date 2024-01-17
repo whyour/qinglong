@@ -14,7 +14,7 @@ export default (app: Router) => {
   app.use('/configs', route);
 
   route.get(
-    '/sample',
+    '/samples',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         res.send({
