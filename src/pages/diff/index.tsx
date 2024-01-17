@@ -64,7 +64,7 @@ const Diff = () => {
   const getFiles = () => {
     setLoading(true);
     request
-      .get(`${config.apiPrefix}configs/sample`)
+      .get(`${config.apiPrefix}configs/samples`)
       .then(({ code, data }) => {
         if (code === 200) {
           setFiles(data);
