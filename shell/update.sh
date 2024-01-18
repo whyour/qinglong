@@ -476,6 +476,9 @@ main() {
   if [[ "$no_tee" == "true" ]]; then
     cmd=">> $file_path 2>&1"
   fi
+  if [[ "$real_time" == "true" ]]; then
+    cmd=""
+  fi
 
   local time_format="%Y-%m-%d %H:%M:%S"
   local time=$(date "+$time_format")

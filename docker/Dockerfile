@@ -40,6 +40,7 @@ RUN set -x \
   openssh \
   procps \
   netcat-openbsd \
+  unzip \
   npm \
   && rm -rf /var/cache/apk/* \
   && apk update \

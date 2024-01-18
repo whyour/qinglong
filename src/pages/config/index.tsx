@@ -30,11 +30,13 @@ const Config = () => {
   const [language, setLanguage] = useState<string>('shell');
 
   const getConfig = (name: string) => {
-    request.get(`${config.apiPrefix}configs/${name}`).then(({ code, data }) => {
-      if (code === 200) {
-        setValue(data);
-      }
-    });
+    request
+      .get(`${config.apiPrefix}configs/detail?path=${encodeURIComponent(name)}`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setValue(data);
+        }
+      });
   };
 
   const getFiles = () => {

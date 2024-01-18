@@ -9,6 +9,7 @@ import { Op } from 'sequelize';
 import config from '../config';
 import { CrontabViewModel, CronViewType } from '../data/cronView';
 import { initPosition } from '../data/env';
+import { AuthDataType, SystemModel } from '../data/system';
 
 export default async () => {
   const cronService = Container.get(CronService);
@@ -127,4 +128,7 @@ export default async () => {
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
   await envService.set_envs();
+
+  // 初始化增加系统配置
+  await SystemModel.upsert({ type: AuthDataType.systemConfig });
 };

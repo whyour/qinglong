@@ -3,6 +3,7 @@ const baseUrl = window.__ENV__QlBaseUrl || '/';
 
 export default {
   siteName: intl.get('青龙'),
+  baseUrl,
   apiPrefix: `${baseUrl}api/`,
   authKey: 'token',
 

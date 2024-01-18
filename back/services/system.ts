@@ -284,7 +284,7 @@ export default class SystemService {
   }
 
   public async updateSystem() {
-    const cp = spawn('no_tee=true ql update false', { shell: '/bin/bash' });
+    const cp = spawn('real_time=true ql update false', { shell: '/bin/bash' });
 
     cp.stdout.on('data', (data) => {
       this.sockService.sendMessage({
@@ -311,7 +311,7 @@ export default class SystemService {
   }
 
   public async reloadSystem(target: 'system' | 'data') {
-    const cmd = `no_tee=true ql reload ${target || ''}`;
+    const cmd = `real_time=true ql reload ${target || ''}`;
     const cp = spawn(cmd, { shell: '/bin/bash' });
 
     cp.stdout.on('data', (data) => {

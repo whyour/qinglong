@@ -48,27 +48,24 @@ export default (app: Router) => {
   );
 
   route.get(
-    '/:file',
+    '/detail',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         let content = '';
-        if (config.blackFileList.includes(req.params.file)) {
+        const _path = req.query.path as string;
+        if (config.blackFileList.includes(_path) || !_path) {
           res.send({ code: 403, message: '文件无法访问' });
         }
-        if (req.params.file.startsWith('sample/')) {
+        if (_path.startsWith('sample/')) {
           const res = await got.get(
-            `https://gitlab.com/whyour/qinglong/-/raw/master/${req.params.file}`,
+            `https://gitlab.com/whyour/qinglong/-/raw/master/${_path}`,
           );
           content = res.body;
-        } else if (req.params.file.startsWith('data/scripts/')) {
-          content = await getFileContentByName(
-            join(config.rootPath, req.params.file),
-          );
+        } else if (_path.startsWith('data/scripts/')) {
+          content = await getFileContentByName(join(config.rootPath, _path));
         } else {
-          content = await getFileContentByName(
-            join(config.configPath, req.params.file),
-          );
+          content = await getFileContentByName(join(config.configPath, _path));
         }
         res.send({ code: 200, data: content });
       } catch (e) {
