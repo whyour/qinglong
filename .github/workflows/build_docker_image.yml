@@ -172,7 +172,7 @@ jobs:
           echo ${{ steps.docker_build.outputs.digest }}
   
   build310:
-    if: ${{ github.ref_name == 'master' }}
+    if: ${{ github.ref_name == 'debian' }}
     needs: build-static
 
     runs-on: ubuntu-20.04
