@@ -267,8 +267,8 @@ update_qinglong() {
   echo -e "使用 ${mirror} 源更新...\n"
 
   local primary_branch="master"
-  if [[ "${QL_BRANCH}" == "develop" ]]; then
-    primary_branch="develop"
+  if [[ "${QL_BRANCH}" == "develop" ]] || [[ "${QL_BRANCH}" == "debian" ]] || [[ "${QL_BRANCH}" == "debian-dev" ]]; then
+    primary_branch="${QL_BRANCH}"
   fi
 
   wget -cqO "${dir_tmp}/ql.zip" "${downloadQLUrl}/${primary_branch}.zip"
