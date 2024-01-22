@@ -77,7 +77,11 @@ const CheckUpdate = ({ systemInfo }: any) => {
           </div>
         </>
       ),
-      content: <pre><Ansi>{lastLog}</Ansi></pre>,
+      content: (
+        <pre>
+          <Ansi>{lastLog}</Ansi>
+        </pre>
+      ),
       okText: intl.get('下载更新'),
       cancelText: intl.get('以后再说'),
       onOk() {
@@ -102,8 +106,39 @@ const CheckUpdate = ({ systemInfo }: any) => {
       okButtonProps: { disabled: true },
       title: intl.get('下载更新中...'),
       centered: true,
-      content: <pre><Ansi>{value}</Ansi></pre>,
+      content: (
+        <pre>
+          <Ansi>{value}</Ansi>
+        </pre>
+      ),
     });
+  };
+
+  const reloadSystem = () => {
+    request
+      .put(`${config.apiPrefix}system/reload`, { type: 'system' })
+      .then((_data: any) => {
+        message.success({
+          content: (
+            <span>
+              {intl.get('系统将在')}
+              <Countdown
+                className="inline-countdown"
+                format="ss"
+                value={Date.now() + 1000 * 30}
+              />
+              {intl.get('秒后自动刷新')}
+            </span>
+          ),
+          duration: 30,
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 30000);
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
   };
 
   const showReloadModal = () => {
@@ -115,30 +150,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
       content: intl.get('系统安装包下载成功，确认重启'),
       okText: intl.get('重启'),
       onOk() {
-        request
-          .put(`${config.apiPrefix}system/reload`, { type: 'system' })
-          .then((_data: any) => {
-            message.success({
-              content: (
-                <span>
-                  {intl.get('系统将在')}
-                  <Countdown
-                    className="inline-countdown"
-                    format="ss"
-                    value={Date.now() + 1000 * 30}
-                  />
-                  {intl.get('秒后自动刷新')}
-                </span>
-              ),
-              duration: 30,
-            });
-            setTimeout(() => {
-              window.location.reload();
-            }, 30000);
-          })
-          .catch((error: any) => {
-            console.log(error);
-          });
+        reloadSystem();
       },
       onCancel() {
         modalRef.current.update({
@@ -205,6 +217,9 @@ const CheckUpdate = ({ systemInfo }: any) => {
     <>
       <Button type="primary" onClick={checkUpgrade}>
         {intl.get('检查更新')}
+      </Button>
+      <Button type="primary" onClick={reloadSystem} style={{ marginLeft: 8 }}>
+        {intl.get('重新启动')}
       </Button>
     </>
   );
