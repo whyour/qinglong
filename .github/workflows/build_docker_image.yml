@@ -3,7 +3,6 @@ name: Build And Push Docker Image
 on:
   push:
     paths-ignore:
-      - ".github/**"
       - "*.md"
     branches:
       - "master"
@@ -181,8 +180,8 @@ jobs:
           file: ./docker/310.Dockerfile
           push: true
           tags: whyour/qinglong:python3.10
-          cache-from: type=registry,ref=whyour/qinglong:cache
-          cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
+          cache-from: type=registry,ref=whyour/qinglong:cache-python3.10
+          cache-to: type=registry,ref=whyour/qinglong:cache-python3.10,mode=max
 
       - name: Image digest
         run: |
