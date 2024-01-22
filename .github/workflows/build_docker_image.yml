@@ -3,15 +3,15 @@ name: Build And Push Docker Image
 on:
   push:
     paths-ignore:
-      - '.github/**'
-      - '*.md'
+      - ".github/**"
+      - "*.md"
     branches:
-      - 'master'
-      - 'develop'
+      - "master"
+      - "develop"
     tags:
-      - 'v*'
+      - "v*"
   schedule:
-    - cron: '00 20 * * *'
+    - cron: "00 20 * * *"
   workflow_dispatch:
 
 jobs:
@@ -23,11 +23,9 @@ jobs:
           fetch-depth: 0
       - uses: pixta-dev/repository-mirroring-action@v1
         with:
-          target_repo_url:
-            git@gitlab.com:whyour/qinglong.git
-          ssh_private_key:
-            ${{ secrets.GITLAB_SSH_PK }}
-  
+          target_repo_url: git@gitlab.com:whyour/qinglong.git
+          ssh_private_key: ${{ secrets.GITLAB_SSH_PK }}
+
   to_gitee:
     runs-on: ubuntu-latest
     steps:
@@ -36,10 +34,8 @@ jobs:
           fetch-depth: 0
       - uses: pixta-dev/repository-mirroring-action@v1
         with:
-          target_repo_url:
-            git@gitee.com:whyour/qinglong.git
-          ssh_private_key:
-            ${{ secrets.GITLAB_SSH_PK }}
+          target_repo_url: git@gitee.com:whyour/qinglong.git
+          ssh_private_key: ${{ secrets.GITLAB_SSH_PK }}
 
   build-static:
     runs-on: ubuntu-latest
@@ -47,11 +43,11 @@ jobs:
       - uses: actions/checkout@v3
       - uses: pnpm/action-setup@v2
         with:
-          version: '8.3.1'
+          version: "8.3.1"
 
       - uses: actions/setup-node@v3
         with:
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: build front and back
         run: |
@@ -101,10 +97,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
         with:
-          version: '8.3.1'
+          version: "8.3.1"
       - uses: actions/setup-node@v4
         with:
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: Setup timezone
         uses: szenius/set-timezone@v1.2
@@ -150,7 +146,7 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@v5
@@ -169,6 +165,26 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=whyour/qinglong:cache
           cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
-      
+
+      - name: Build and push python3.10
+        if: ${{ github.ref_name == 'master' }}
+        id: docker_build_310
+        uses: docker/build-push-action@v5
+        with:
+          build-args: |
+            MAINTAINER=${{ github.repository_owner }}
+            QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+          network: host
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          context: .
+          file: ./docker/310.Dockerfile
+          push: true
+          tags: whyour/qinglong:python3.10
+          cache-from: type=registry,ref=whyour/qinglong:cache
+          cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
+
       - name: Image digest
-        run: echo ${{ steps.docker_build.outputs.digest }}
+        run: |
+          echo ${{ steps.docker_build.outputs.digest }}
+          echo ${{ steps.docker_build_310.outputs.digest }}
