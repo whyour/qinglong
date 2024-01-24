@@ -10,11 +10,31 @@ import config from '../config';
 import { CrontabViewModel, CronViewType } from '../data/cronView';
 import { initPosition } from '../data/env';
 import { AuthDataType, SystemModel } from '../data/system';
+import SystemService from '../services/system';
 
 export default async () => {
   const cronService = Container.get(CronService);
   const envService = Container.get(EnvService);
   const dependenceService = Container.get(DependenceService);
+  const systemService = Container.get(SystemService);
+
+  // 初始化更新 linux/python/nodejs 镜像源配置
+  const systemConfig = await systemService.getSystemConfig();
+  if (systemConfig.info?.pythonMirror) {
+    systemService.updatePythonMirror({
+      linuxMirror: systemConfig.info?.linuxMirror,
+    });
+  }
+  if (systemConfig.info?.linuxMirror) {
+    systemService.updateLinuxMirror({
+      linuxMirror: systemConfig.info?.linuxMirror,
+    });
+  }
+  if (systemConfig.info?.nodeMirror) {
+    systemService.updateNodeMirror({
+      linuxMirror: systemConfig.info?.linuxMirror,
+    });
+  }
 
   // 初始化新增默认全部任务视图
   CrontabViewModel.findAll({
@@ -46,7 +66,9 @@ export default async () => {
       { status: DependenceStatus.queued, log: [] },
       { where: { id: docs.map((x) => x.id!) } },
     );
-    dependenceService.installDependenceOneByOne(docs);
+    setTimeout(() => {
+      dependenceService.installDependenceOneByOne(docs);
+    }, 5000);
   });
 
   // 初始化时执行一次所有的 ql repo 任务

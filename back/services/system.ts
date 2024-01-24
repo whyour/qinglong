@@ -126,7 +126,7 @@ export default class SystemService {
     return { code: 200, data: info };
   }
 
-  public async updateNodeMirror(info: SystemModelInfo, res: Response) {
+  public async updateNodeMirror(info: SystemModelInfo, res?: Response) {
     const oDoc = await this.getSystemConfig();
     await this.updateAuthDb({
       ...oDoc,
@@ -141,8 +141,8 @@ export default class SystemService {
       command,
       {
         onStart: async (cp) => {
-          res.setHeader('QL-Task-Pid', `${cp.pid}`);
-          res.end();
+          res?.setHeader('QL-Task-Pid', `${cp.pid}`);
+          res?.end();
         },
         onEnd: async () => {
           this.sockService.sendMessage({
@@ -177,7 +177,7 @@ export default class SystemService {
     return { code: 200, data: info };
   }
 
-  public async updateLinuxMirror(info: SystemModelInfo, res: Response) {
+  public async updateLinuxMirror(info: SystemModelInfo, res?: Response) {
     const oDoc = await this.getSystemConfig();
     await this.updateAuthDb({
       ...oDoc,
@@ -203,8 +203,8 @@ export default class SystemService {
       command,
       {
         onStart: async (cp) => {
-          res.setHeader('QL-Task-Pid', `${cp.pid}`);
-          res.end();
+          res?.setHeader('QL-Task-Pid', `${cp.pid}`);
+          res?.end();
         },
         onEnd: async () => {
           this.sockService.sendMessage({
