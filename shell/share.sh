@@ -271,6 +271,7 @@ npm_install_2() {
 
   cd $dir_work
   echo -e "安装 $dir_work 依赖包...\n"
+  npm config set registry https://registry.npmmirror.com
   npm_install_sub
   cd $dir_current
 }
