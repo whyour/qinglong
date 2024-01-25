@@ -476,6 +476,6 @@
   "代理地址, 支持HTTP(S)/SOCK5": "代理地址, 支持HTTP(S)/SOCK5",
   "NPM 镜像源": "NPM 镜像源",
   "PyPI 镜像源": "PyPI 镜像源",
-  "alpine linux 镜像源, 例如 https://mirrors.aliyun.com": "alpine linux 镜像源, 例如 https://mirrors.aliyun.com",
+  "alpine linux 镜像源": "alpine linux 镜像源",
   "如果恢复失败，可进入容器执行": "如果恢复失败，可进入容器执行"
 }

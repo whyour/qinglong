@@ -105,11 +105,15 @@ const Dependence = () => {
           label={intl.get('代理')}
           name="proxy"
           extra={intl.get('代理与镜像源二选一即可')}
+          tooltip={{
+            title: intl.get('代理地址, 支持HTTP(S)/SOCK5'),
+            placement: 'topLeft',
+          }}
         >
           <Input.Group compact>
             <Input
-              placeholder={intl.get('代理地址, 支持HTTP(S)/SOCK5')}
-              style={{ width: 360 }}
+              placeholder={'http://1.1.1.1:8080'}
+              style={{ width: 250 }}
               value={systemConfig?.dependenceProxy}
               onChange={(e) => {
                 setSystemConfig({
@@ -130,11 +134,15 @@ const Dependence = () => {
             </Button>
           </Input.Group>
         </Form.Item>
-        <Form.Item label={intl.get('Node 软件包镜像源')} name="node">
+        <Form.Item
+          label={intl.get('Node 软件包镜像源')}
+          name="node"
+          tooltip={intl.get('NPM 镜像源')}
+        >
           <Input.Group compact>
             <Input
-              style={{ width: 360 }}
-              placeholder={intl.get('NPM 镜像源')}
+              style={{ width: 250 }}
+              placeholder={'https://registry.npmmirror.com'}
               value={systemConfig?.nodeMirror}
               onChange={(e) => {
                 setSystemConfig({
@@ -155,11 +163,15 @@ const Dependence = () => {
             </Button>
           </Input.Group>
         </Form.Item>
-        <Form.Item label={intl.get('Python 软件包镜像源')} name="python">
+        <Form.Item
+          label={intl.get('Python 软件包镜像源')}
+          name="python"
+          tooltip={intl.get('PyPI 镜像源')}
+        >
           <Input.Group compact>
             <Input
-              style={{ width: 360 }}
-              placeholder={intl.get('PyPI 镜像源')}
+              style={{ width: 250 }}
+              placeholder={'https://pypi.doubanio.com/simple/'}
               value={systemConfig?.pythonMirror}
               onChange={(e) => {
                 setSystemConfig({
@@ -180,13 +192,15 @@ const Dependence = () => {
             </Button>
           </Input.Group>
         </Form.Item>
-        <Form.Item label={intl.get('Linux 软件包镜像源')} name="linux">
+        <Form.Item
+          label={intl.get('Linux 软件包镜像源')}
+          name="linux"
+          tooltip={intl.get('alpine linux 镜像源')}
+        >
           <Input.Group compact>
             <Input
-              style={{ width: 360 }}
-              placeholder={intl.get(
-                'alpine linux 镜像源, 例如 https://mirrors.aliyun.com',
-              )}
+              style={{ width: 250 }}
+              placeholder={'https://mirrors.aliyun.com'}
               value={systemConfig?.linuxMirror}
               onChange={(e) => {
                 setSystemConfig({
