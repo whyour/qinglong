@@ -23,6 +23,10 @@ ENV PNPM_HOME=/root/.local/share/pnpm \
   QL_DIR=/ql \
   QL_BRANCH=${QL_BRANCH}
 
+VOLUME /ql/data
+  
+EXPOSE 5700
+
 RUN set -x \
   && apk update -f \
   && apk upgrade \
