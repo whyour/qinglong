@@ -33,6 +33,7 @@ COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_module
 
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+  ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
   apt update && \
   apt upgrade -y && \
   apt install --no-install-recommends -y git \
