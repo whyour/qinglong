@@ -89,7 +89,7 @@
     "sequelize": "^6.25.5",
     "serve-handler": "^6.1.3",
     "sockjs": "^0.3.24",
-    "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.0.4",
+    "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.0.3",
     "tar": "^6.1.15",
     "toad-scheduler": "^1.6.0",
     "typedi": "^0.10.0",

@@ -173,6 +173,7 @@ curl --silent --location https://rpm.nodesource.com/setup_20.x | sudo bash
 ```
 
 ```bash
+npm install -g node-pre-gyp pnpm@8.3.1
 npm install -g @whyour/qinglong
 qinglong
 # 根据提示增加环境变量 QL_DIR 和 QL_DATA_DIR
