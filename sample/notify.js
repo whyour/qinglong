@@ -816,7 +816,18 @@ function ChangeUserId(desp) {
   }
 }
 
-function qywxamNotify(text, desp) {
+async function qywxamNotify(text, desp) {
+  const MAX_LENGTH = 900;
+  if (desp.length > MAX_LENGTH) {
+    let d = desp.substr(0, MAX_LENGTH) + "\n==More==";
+    await do_qywxamNotify(text, d);
+    await qywxamNotify(text, desp.substr(MAX_LENGTH));
+  } else {
+    return await do_qywxamNotify(text,desp);
+  }
+}
+
+function do_qywxamNotify(text, desp) {
   return new Promise((resolve) => {
     if (QYWX_AM) {
       const QYWX_AM_AY = QYWX_AM.split(',');
