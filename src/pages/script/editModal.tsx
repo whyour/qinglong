@@ -67,7 +67,11 @@ const EditModal = ({
 
   const getDetail = (node: any) => {
     request
-      .get(`${config.apiPrefix}scripts/${node.title}?path=${node.parent || ''}`)
+      .get(
+        `${config.apiPrefix}scripts/detail?file=${node.title}&path=${
+          node.parent || ''
+        }`,
+      )
       .then(({ code, data }) => {
         if (code === 200) {
           setValue(data);

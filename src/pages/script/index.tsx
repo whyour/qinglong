@@ -84,9 +84,9 @@ const Script = () => {
   const getDetail = (node: any) => {
     request
       .get(
-        `${config.apiPrefix}scripts/${encodeURIComponent(node.title)}?path=${
-          node.parent || ''
-        }`,
+        `${config.apiPrefix}scripts/detail?file=${encodeURIComponent(
+          node.title,
+        )}&path=${node.parent || ''}`,
       )
       .then(({ code, data }) => {
         if (code === 200) {

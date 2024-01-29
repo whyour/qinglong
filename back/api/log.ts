@@ -27,7 +27,7 @@ export default (app: Router) => {
   });
 
   route.get(
-    '/:file',
+    '/detail',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
@@ -37,7 +37,7 @@ export default (app: Router) => {
         const filePath = join(
           config.logPath,
           (req.query.path || '') as string,
-          req.params.file,
+          req.query.file as string,
         );
         const content = await getFileContentByName(filePath);
         res.send({ code: 200, data: content });

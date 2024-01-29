@@ -119,21 +119,17 @@ const CronDetailModal = ({
   };
 
   const onClickItem = (item: LogItem) => {
-    const url = `${config.apiPrefix}logs/${item.filename}?path=${
+    const url = `${config.apiPrefix}logs/detail?file=${item.filename}&path=${
       item.directory || ''
     }`;
     localStorage.setItem('logCron', url);
     setLogUrl(url);
-    request
-      .get(
-        `${config.apiPrefix}logs/${item.filename}?path=${item.directory || ''}`,
-      )
-      .then(({ code, data }) => {
-        if (code === 200) {
-          setLog(data);
-          setIsLogModalVisible(true);
-        }
-      });
+    request.get(url).then(({ code, data }) => {
+      if (code === 200) {
+        setLog(data);
+        setIsLogModalVisible(true);
+      }
+    });
   };
 
   const onTabChange = (key: string) => {
@@ -159,7 +155,7 @@ const CronDetailModal = ({
       const [s, p] = result;
       setScriptInfo({ parent: p, filename: s });
       request
-        .get(`${config.apiPrefix}scripts/${s}?path=${p || ''}`)
+        .get(`${config.apiPrefix}scripts/detail?file=${s}&path=${p || ''}`)
         .then(({ code, data }) => {
           if (code === 200) {
             setValue(data);
