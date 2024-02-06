@@ -380,13 +380,43 @@ const Script = () => {
   }, [treeDom.current, data]);
 
   useHotkeys(
-    'meta+s',
+    'mod+s',
     (e) => {
       if (isEditing) {
         saveFile();
       }
     },
     { enableOnFormTags: ['textarea'], preventDefault: true },
+  );
+
+  useHotkeys(
+    'mod+d',
+    (e) => {
+      if (currentNode.title) {
+        deleteFile();
+      }
+    },
+    { preventDefault: true },
+  );
+
+  useHotkeys(
+    'mod+o',
+    (e) => {
+      if (!isEditing) {
+        addFile();
+      }
+    },
+    { preventDefault: true },
+  );
+
+  useHotkeys(
+    'mod+e',
+    (e) => {
+      if (currentNode.title) {
+        cancelEdit();
+      }
+    },
+    { preventDefault: true },
   );
 
   const action = (key: string | number) => {

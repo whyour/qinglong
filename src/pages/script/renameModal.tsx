@@ -62,7 +62,12 @@ const RenameModal = ({
       onCancel={() => handleCancel()}
       confirmLoading={loading}
     >
-      <Form form={form} layout="vertical" name="edit_name_modal">
+      <Form
+        form={form}
+        initialValues={{ name: currentNode?.title }}
+        layout="vertical"
+        name="edit_name_modal"
+      >
         <Form.Item
           name="name"
           rules={[{ required: true, message: intl.get('请输入新名称') }]}

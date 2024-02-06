@@ -76,7 +76,7 @@ const Config = () => {
   };
 
   useHotkeys(
-    'meta+s',
+    'mod+s',
     (e) => {
       updateConfig();
     },
