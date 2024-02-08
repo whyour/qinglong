@@ -78,6 +78,7 @@ jobs:
           export GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -l git"
           git remote add gitee "${REPO_GITEE}"
           git remote add gitlab "${REPO_GITLAB}"
+          git gc
           git push --force --quiet gitee ${GITHUB_BRANCH}:${GITHUB_BRANCH}
           git push --force --quiet gitlab ${GITHUB_BRANCH}:${GITHUB_BRANCH}
 
