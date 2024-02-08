@@ -1,12 +1,12 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import path from 'path';
+import path, { join } from 'path';
 import SockService from './sock';
 import CronService from './cron';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import config from '../config';
 import { TASK_COMMAND } from '../config/const';
-import { getPid, killTask, rmPath } from '../config/util';
+import { getFileContentByName, getPid, killTask, rmPath } from '../config/util';
 
 @Service()
 export default class ScriptService {
@@ -60,5 +60,11 @@ export default class ScriptService {
     } catch (error) {}
 
     return { code: 200 };
+  }
+
+  public async getFile(filePath: string, fileName: string) {
+    const _filePath = join(config.scriptPath, filePath, fileName);
+    const content = await getFileContentByName(_filePath);
+    return content;
   }
 }

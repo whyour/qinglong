@@ -75,14 +75,28 @@ export default (app: Router) => {
   route.get(
     '/detail',
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
-        const filePath = join(
-          config.scriptPath,
+        const scriptService = Container.get(ScriptService);
+        const content = await scriptService.getFile(
           req.query.path as string,
           req.query.file as string,
         );
-        const content = await getFileContentByName(filePath);
+        res.send({ code: 200, data: content });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/:file',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const scriptService = Container.get(ScriptService);
+        const content = await scriptService.getFile(
+          req.query.path as string,
+          req.params.file,
+        );
         res.send({ code: 200, data: content });
       } catch (e) {
         return next(e);

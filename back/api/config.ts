@@ -7,7 +7,7 @@ import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
 import { join } from 'path';
 import { SAMPLE_FILES } from '../config/const';
-import got from 'got';
+import ConfigService from '../services/config';
 const route = Router();
 
 export default (app: Router) => {
@@ -50,24 +50,9 @@ export default (app: Router) => {
   route.get(
     '/detail',
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
-        let content = '';
-        const _path = req.query.path as string;
-        if (config.blackFileList.includes(_path) || !_path) {
-          res.send({ code: 403, message: '文件无法访问' });
-        }
-        if (_path.startsWith('sample/')) {
-          const res = await got.get(
-            `https://gitlab.com/whyour/qinglong/-/raw/master/${_path}`,
-          );
-          content = res.body;
-        } else if (_path.startsWith('data/scripts/')) {
-          content = await getFileContentByName(join(config.rootPath, _path));
-        } else {
-          content = await getFileContentByName(join(config.configPath, _path));
-        }
-        res.send({ code: 200, data: content });
+        const configService = Container.get(ConfigService);
+        await configService.getFile(req.query.path as string, res);
       } catch (e) {
         return next(e);
       }
@@ -95,6 +80,18 @@ export default (app: Router) => {
         }
         await fs.writeFile(path, content);
         res.send({ code: 200, message: '保存成功' });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/:file',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const configService = Container.get(ConfigService);
+        await configService.getFile(req.params.file, res);
       } catch (e) {
         return next(e);
       }

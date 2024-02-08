@@ -29,7 +29,6 @@ export default (app: Router) => {
   route.get(
     '/detail',
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         if (blacklist.includes(req.path)) {
           return res.send({ code: 403, message: '暂无权限' });
@@ -38,6 +37,26 @@ export default (app: Router) => {
           config.logPath,
           (req.query.path || '') as string,
           req.query.file as string,
+        );
+        const content = await getFileContentByName(filePath);
+        res.send({ code: 200, data: content });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/:file',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (blacklist.includes(req.path)) {
+          return res.send({ code: 403, message: '暂无权限' });
+        }
+        const filePath = join(
+          config.logPath,
+          (req.query.path || '') as string,
+          req.params.file,
         );
         const content = await getFileContentByName(filePath);
         res.send({ code: 200, data: content });
