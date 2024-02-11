@@ -114,9 +114,9 @@ const CheckUpdate = ({ systemInfo }: any) => {
     });
   };
 
-  const reloadSystem = () => {
+  const reloadSystem = (type?: string) => {
     request
-      .put(`${config.apiPrefix}system/reload`, { type: 'system' })
+      .put(`${config.apiPrefix}system/reload`, { type })
       .then((_data: any) => {
         message.success({
           content: (
@@ -150,7 +150,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
       content: intl.get('系统安装包下载成功，确认重启'),
       okText: intl.get('重启'),
       onOk() {
-        reloadSystem();
+        reloadSystem('system');
       },
       onCancel() {
         modalRef.current.update({
@@ -218,7 +218,11 @@ const CheckUpdate = ({ systemInfo }: any) => {
       <Button type="primary" onClick={checkUpgrade}>
         {intl.get('检查更新')}
       </Button>
-      <Button type="primary" onClick={reloadSystem} style={{ marginLeft: 8 }}>
+      <Button
+        type="primary"
+        onClick={() => reloadSystem()}
+        style={{ marginLeft: 8 }}
+      >
         {intl.get('重新启动')}
       </Button>
     </>
