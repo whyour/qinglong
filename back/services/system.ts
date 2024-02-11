@@ -177,7 +177,11 @@ export default class SystemService {
     return { code: 200, data: info };
   }
 
-  public async updateLinuxMirror(info: SystemModelInfo, res?: Response) {
+  public async updateLinuxMirror(
+    info: SystemModelInfo,
+    res?: Response,
+    onEnd?: () => void,
+  ) {
     const oDoc = await this.getSystemConfig();
     await this.updateAuthDb({
       ...oDoc,
@@ -185,8 +189,12 @@ export default class SystemService {
     });
     let defaultDomain = 'https://dl-cdn.alpinelinux.org';
     let targetDomain = 'https://dl-cdn.alpinelinux.org';
-    if (oDoc.info?.linuxMirror) {
-      defaultDomain = oDoc.info.linuxMirror;
+    const content = await fs.promises.readFile('/etc/apk/repositories', {
+      encoding: 'utf-8',
+    });
+    const domainMatch = content.match(/(http.*)\/alpine\/.*/);
+    if (domainMatch) {
+      defaultDomain = domainMatch[1];
     }
     if (info.linuxMirror) {
       targetDomain = info.linuxMirror;
@@ -211,6 +219,7 @@ export default class SystemService {
             type: 'updateLinuxMirror',
             message: 'update linux mirror end',
           });
+          onEnd?.();
         },
         onError: async (message: string) => {
           this.sockService.sendMessage({ type: 'updateLinuxMirror', message });

@@ -18,21 +18,47 @@ export default async () => {
   const dependenceService = Container.get(DependenceService);
   const systemService = Container.get(SystemService);
 
+  const installDependencies = () => {
+    // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
+    DependenceModel.findAll({
+      where: {},
+      order: [
+        ['type', 'DESC'],
+        ['createdAt', 'DESC'],
+      ],
+      raw: true,
+    }).then(async (docs) => {
+      await DependenceModel.update(
+        { status: DependenceStatus.queued, log: [] },
+        { where: { id: docs.map((x) => x.id!) } },
+      );
+      setTimeout(() => {
+        dependenceService.installDependenceOneByOne(docs);
+      }, 5000);
+    });
+  };
+
   // 初始化更新 linux/python/nodejs 镜像源配置
   const systemConfig = await systemService.getSystemConfig();
   if (systemConfig.info?.pythonMirror) {
     systemService.updatePythonMirror({
-      linuxMirror: systemConfig.info?.linuxMirror,
+      pythonMirror: systemConfig.info?.pythonMirror,
     });
   }
   if (systemConfig.info?.linuxMirror) {
-    systemService.updateLinuxMirror({
-      linuxMirror: systemConfig.info?.linuxMirror,
-    });
+    systemService.updateLinuxMirror(
+      {
+        linuxMirror: systemConfig.info?.linuxMirror,
+      },
+      undefined,
+      () => installDependencies(),
+    );
+  } else {
+    installDependencies();
   }
   if (systemConfig.info?.nodeMirror) {
     systemService.updateNodeMirror({
-      linuxMirror: systemConfig.info?.linuxMirror,
+      nodeMirror: systemConfig.info?.nodeMirror,
     });
   }
 
@@ -52,24 +78,6 @@ export default async () => {
 
   // 初始化更新所有任务状态为空闲
   await CrontabModel.update({ status: CrontabStatus.idle }, { where: {} });
-
-  // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
-  DependenceModel.findAll({
-    where: {},
-    order: [
-      ['type', 'DESC'],
-      ['createdAt', 'DESC'],
-    ],
-    raw: true,
-  }).then(async (docs) => {
-    await DependenceModel.update(
-      { status: DependenceStatus.queued, log: [] },
-      { where: { id: docs.map((x) => x.id!) } },
-    );
-    setTimeout(() => {
-      dependenceService.installDependenceOneByOne(docs);
-    }, 5000);
-  });
 
   // 初始化时执行一次所有的 ql repo 任务
   CrontabModel.findAll({
