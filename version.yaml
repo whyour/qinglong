@@ -1,28 +1,13 @@
-version: 2.17.0
-changeLogLink: https://t.me/jiao_long/401
-publishTime: 2024-01-17 23:00
+version: 2.17.1
+changeLogLink: https://t.me/jiao_long/402
+publishTime: 2024-02-07 23:00
 changeLog: |
-  1. 系统设置增加依赖代理和镜像源设置
-  2. 更新 python 版本为 3.11
-  3. webhook 通知 body 增加 text/plain 类型，修复多定时任务服务重启未初始化
-  4. 重新安装依赖时不检查是否已安装
-  5. 配置管理、脚本管理增加双击目录进入编辑，ctrl/cmd + s 保存文件，感谢 https://github.com/luckrnx09
-  6. 系统设置增加依赖代理和镜像设置
-  7. 通知参数 TG_API_HOST 改为以 http 开头
-  8. 修改对比工具数据源，修复编辑器语言
-  9. 修改获取登录 ip 和 ip 地址方式
-  10. 修复备份数据 60 秒中断
-  11. 移除 config.sh 中 PipMirror 和 NpmMirror 配置
-  12. 修复健康检查命令
-  13. JavaScript 通知文件 tunnel 替换为 hpagent，移除 scripts 目录下 package.json
-  14. 日志和脚本增加文件大小展示，修改脚本管理列表排序
-  15. 修复 notify.js smtp 通知
-  16. 修改 schedule 服务代理环境变量
-  17. 修复任务详情脚本行数展示
-  18. 修复自定义通知 body 中 key 被自动转为小写
-  19. 修复初始化设置通知 shell 映射，邮箱通知错误提示
-  20. 修复邮件服务支持列表链接失效，感谢 https://github.com/Tunglies
-  21. 修复 chronocat 通知成功判断，感谢 https://github.com/youfak
-  22. 修复 chronocat 调用就结束执行的问题，感谢 https://github.com/6dylan6
-  23. 移除随机延迟相关配置及 ProxyUrl 默认值，修复拉库通知可能失败
-  24. 其他 bug 修复
+  1. 系统设置增加重启
+  2. 修复 debian 系统内更新源代码分支错误
+  3. 修复启动时依赖配置未初始化
+  4. 修复未开启一言时多余空行, 通知渠道改发送前检查，感谢 https://github.com/Cp0204
+  5. Dockerfile 添加发布端口和数据卷 https://github.com/Akimio521
+  6. 修复有反向代理时脚本管理获取文件可能失败
+  7. 脚本管理重命名增加默认值，增加新建(mod+o)、删除快捷键(mod+d)
+  8. 修复对比工具保存文件
+  9. 其他 bug 修复
