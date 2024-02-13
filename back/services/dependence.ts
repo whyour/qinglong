@@ -14,7 +14,12 @@ import {
 import { spawn } from 'cross-spawn';
 import SockService from './sock';
 import { FindOptions, Op } from 'sequelize';
-import { fileExist, promiseExecSuccess } from '../config/util';
+import {
+  fileExist,
+  getPid,
+  killTask,
+  promiseExecSuccess,
+} from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 
@@ -86,11 +91,21 @@ export default class DependenceService {
   }
 
   public async dependencies(
-    { searchValue, type }: { searchValue: string; type: string },
-    sort: any = { position: -1 },
+    {
+      searchValue,
+      type,
+      status,
+    }: { searchValue: string; type: string; status: string },
+    sort: any = [],
     query: any = {},
   ): Promise<Dependence[]> {
-    let condition = { ...query, type: DependenceTypes[type as any] };
+    let condition = {
+      ...query,
+      type: DependenceTypes[type as any],
+    };
+    if (status) {
+      condition.status = status.split(',').map(Number);
+    }
     if (searchValue) {
       const encodeText = encodeURI(searchValue);
       const reg = {
@@ -106,7 +121,7 @@ export default class DependenceService {
       };
     }
     try {
-      const result = await this.find(condition);
+      const result = await this.find(condition, sort);
       return result as any;
     } catch (error) {
       throw error;
@@ -132,6 +147,18 @@ export default class DependenceService {
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     this.installDependenceOneByOne(docs, true, true);
     return docs;
+  }
+
+  public async cancel(ids: number[]) {
+    const docs = await DependenceModel.findAll({ where: { id: ids } });
+    for (const doc of docs) {
+      taskLimit.removeQueuedDependency(doc);
+      const depRunCommand = InstallDependenceCommandTypes[doc.type];
+      const cmd = `${depRunCommand} ${doc.name.trim()}`;
+      const pid = await getPid(cmd);
+      pid && (await killTask(pid));
+    }
+    await this.removeDb(ids);
   }
 
   private async find(query: any, sort: any = []): Promise<Dependence[]> {
@@ -168,8 +195,14 @@ export default class DependenceService {
     isInstall: boolean = true,
     force: boolean = false,
   ) {
-    return taskLimit.runOneByOne(() => {
+    return taskLimit.runDependeny(dependency, () => {
       return new Promise(async (resolve) => {
+        if (taskLimit.firstDependencyId !== dependency.id) {
+          return resolve(null);
+        }
+
+        taskLimit.removeQueuedDependency(dependency);
+
         const depIds = [dependency.id!];
         const status = isInstall
           ? DependenceStatus.installing

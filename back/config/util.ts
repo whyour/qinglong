@@ -435,8 +435,8 @@ export async function killTask(pid: number) {
   }
 }
 
-export async function getPid(name: string) {
-  const taskCommand = `ps -eo pid,command | grep "${name}" | grep -v grep | awk '{print $1}' | head -1 | xargs echo -n`;
+export async function getPid(cmd: string) {
+  const taskCommand = `ps -eo pid,command | grep "${cmd}" | grep -v grep | awk '{print $1}' | head -1 | xargs echo -n`;
   const pid = await promiseExec(taskCommand);
   return pid ? Number(pid) : undefined;
 }

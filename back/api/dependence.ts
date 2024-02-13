@@ -134,4 +134,20 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/cancel',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const dependenceService = Container.get(DependenceService);
+        await dependenceService.cancel(req.body);
+        return res.send({ code: 200 });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 };

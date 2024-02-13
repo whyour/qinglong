@@ -36,6 +36,8 @@ import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import dayjs from 'dayjs';
 import WebSocketManager from '@/utils/websocket';
+import { DependenceStatus } from './type';
+import IconFont from '@/components/iconfont';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -108,6 +110,36 @@ const Dependence = () => {
       key: 'status',
       width: 120,
       dataIndex: 'status',
+      filters: [
+        {
+          text: intl.get('队列中'),
+          value: DependenceStatus.queued,
+        },
+        {
+          text: intl.get('安装中'),
+          value: DependenceStatus.installing,
+        },
+        {
+          text: intl.get('已安装'),
+          value: DependenceStatus.installed,
+        },
+        {
+          text: intl.get('安装失败'),
+          value: DependenceStatus.installFailed,
+        },
+        {
+          text: intl.get('删除中'),
+          value: DependenceStatus.removing,
+        },
+        {
+          text: intl.get('已删除'),
+          value: DependenceStatus.removed,
+        },
+        {
+          text: intl.get('删除失败'),
+          value: DependenceStatus.removeFailed,
+        },
+      ],
       render: (text: string, record: any, index: number) => {
         return (
           <Space size="middle" style={{ cursor: 'text' }}>
@@ -163,26 +195,32 @@ const Dependence = () => {
                 <FileTextOutlined />
               </a>
             </Tooltip>
-            {record.status !== Status.安装中 &&
-              record.status !== Status.删除中 && (
-                <>
-                  <Tooltip title={isPc ? intl.get('重新安装') : ''}>
-                    <a onClick={() => reInstallDependence(record, index)}>
-                      <BugOutlined />
-                    </a>
-                  </Tooltip>
-                  <Tooltip title={isPc ? intl.get('删除') : ''}>
-                    <a onClick={() => deleteDependence(record, index)}>
-                      <DeleteOutlined />
-                    </a>
-                  </Tooltip>
-                  <Tooltip title={isPc ? intl.get('强制删除') : ''}>
-                    <a onClick={() => deleteDependence(record, index, true)}>
-                      <DeleteFilled />
-                    </a>
-                  </Tooltip>
-                </>
-              )}
+            {[Status.队列中, Status.安装中].includes(record.status) && (
+              <Tooltip title={isPc ? intl.get('取消安装') : ''}>
+                <a onClick={() => cancelDependence(record)}>
+                  <IconFont type="ql-icon-quxiaoanzhuang" />
+                </a>
+              </Tooltip>
+            )}
+            {![Status.安装中, Status.删除中].includes(record.status) && (
+              <>
+                <Tooltip title={isPc ? intl.get('重新安装') : ''}>
+                  <a onClick={() => reInstallDependence(record, index)}>
+                    <BugOutlined />
+                  </a>
+                </Tooltip>
+                <Tooltip title={isPc ? intl.get('删除') : ''}>
+                  <a onClick={() => deleteDependence(record, index)}>
+                    <DeleteOutlined />
+                  </a>
+                </Tooltip>
+                <Tooltip title={isPc ? intl.get('强制删除') : ''}>
+                  <a onClick={() => deleteDependence(record, index, true)}>
+                    <DeleteFilled />
+                  </a>
+                </Tooltip>
+              </>
+            )}
           </Space>
         );
       },
@@ -200,11 +238,15 @@ const Dependence = () => {
   const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef, 59);
 
-  const getDependencies = () => {
+  const getDependencies = (status?: number[]) => {
     setLoading(true);
     request
       .get(
-        `${config.apiPrefix}dependencies?searchValue=${searchText}&type=${type}`,
+        `${
+          config.apiPrefix
+        }dependencies?searchValue=${searchText}&type=${type}&status=${
+          status || ''
+        }`,
       )
       .then(({ code, data }) => {
         if (code === 200) {
@@ -281,6 +323,31 @@ const Dependence = () => {
             if (code === 200) {
               handleDependence(data[0]);
             }
+          });
+      },
+      onCancel() {
+        console.log('Cancel');
+      },
+    });
+  };
+
+  const cancelDependence = (record: any) => {
+    Modal.confirm({
+      title: intl.get('确认取消安装'),
+      content: (
+        <>
+          {intl.get('确认取消安装')}{' '}
+          <Text style={{ wordBreak: 'break-all' }} type="warning">
+            {record.name}
+          </Text>{' '}
+          {intl.get('吗')}
+        </>
+      ),
+      onOk() {
+        request
+          .put(`${config.apiPrefix}dependencies/cancel`, [record.id])
+          .then(() => {
+            getDependencies();
           });
       },
       onCancel() {
@@ -538,6 +605,9 @@ const Dependence = () => {
             size="middle"
             scroll={{ x: 768, y: tableScrollHeight }}
             loading={loading}
+            onChange={(pagination, filters) => {
+              getDependencies(filters?.status as number[]);
+            }}
           />
         </DndProvider>
       </div>
