@@ -29,6 +29,7 @@ import tar from 'tar';
 import path from 'path';
 import fs from 'fs';
 import sum from 'lodash/sum';
+import { DependenceModel, DependenceStatus, DependenceTypes } from '../data/dependence';
 
 @Service()
 export default class SystemService {
@@ -136,7 +137,13 @@ export default class SystemService {
     if (info.nodeMirror) {
       cmd = `pnpm config set registry ${info.nodeMirror}`;
     }
-    const command = `cd && ${cmd} && pnpm i -g`;
+    let command = `cd && ${cmd}`;
+    const docs = await DependenceModel.findAll({
+      where: { type: DependenceTypes.nodejs, status: DependenceStatus.installed },
+    });
+    if (docs.length > 0) {
+      command += ` && pnpm i -g`;
+    }
     this.scheduleService.runTask(
       command,
       {
