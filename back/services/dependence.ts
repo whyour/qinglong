@@ -153,10 +153,17 @@ export default class DependenceService {
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
-      const depRunCommand = InstallDependenceCommandTypes[doc.type];
-      const cmd = `${depRunCommand} ${doc.name.trim()}`;
-      const pid = await getPid(cmd);
-      pid && (await killTask(pid));
+      const depInstallCommand = InstallDependenceCommandTypes[doc.type];
+      const depUnInstallCommand = unInstallDependenceCommandTypes[doc.type];
+      const installCmd = `${depInstallCommand} ${doc.name.trim()}`;
+      const unInstallCmd = `${depUnInstallCommand} ${doc.name.trim()}`;
+      const pids = await Promise.all([
+        getPid(installCmd),
+        getPid(unInstallCmd),
+      ]);
+      for (const pid of pids) {
+        pid && (await killTask(pid));
+      }
     }
     await this.removeDb(ids);
   }

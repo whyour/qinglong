@@ -36,21 +36,11 @@ import { SharedContext } from '@/layouts';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import dayjs from 'dayjs';
 import WebSocketManager from '@/utils/websocket';
-import { DependenceStatus } from './type';
+import { DependenceStatus, Status } from './type';
 import IconFont from '@/components/iconfont';
 
 const { Text } = Typography;
 const { Search } = Input;
-
-enum Status {
-  '安装中',
-  '已安装',
-  '安装失败',
-  '删除中',
-  '已删除',
-  '删除失败',
-  '队列中',
-}
 
 enum StatusColor {
   'processing',
@@ -186,23 +176,24 @@ const Dependence = () => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
-            <Tooltip title={isPc ? intl.get('日志') : ''}>
-              <a
-                onClick={() => {
-                  setLogDependence({ ...record, timestamp: Date.now() });
-                }}
-              >
-                <FileTextOutlined />
-              </a>
-            </Tooltip>
-            {[Status.队列中, Status.安装中].includes(record.status) && (
+            {![Status.队列中].includes(record.status) && (
+              <Tooltip title={isPc ? intl.get('日志') : ''}>
+                <a
+                  onClick={() => {
+                    setLogDependence({ ...record, timestamp: Date.now() });
+                  }}
+                >
+                  <FileTextOutlined />
+                </a>
+              </Tooltip>
+            )}
+            {[Status.队列中, Status.安装中, Status.删除中].includes(record.status) ? (
               <Tooltip title={isPc ? intl.get('取消安装') : ''}>
                 <a onClick={() => cancelDependence(record)}>
                   <IconFont type="ql-icon-quxiaoanzhuang" />
                 </a>
               </Tooltip>
-            )}
-            {![Status.安装中, Status.删除中].includes(record.status) && (
+            ) : (
               <>
                 <Tooltip title={isPc ? intl.get('重新安装') : ''}>
                   <a onClick={() => reInstallDependence(record, index)}>
@@ -487,7 +478,7 @@ const Dependence = () => {
             }
             return _result;
           });
-        }, 5000);
+        }, 300);
         return;
       }
     }
