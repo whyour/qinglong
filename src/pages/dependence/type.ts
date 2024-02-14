@@ -6,6 +6,7 @@ export enum DependenceStatus {
   'removed',
   'removeFailed',
   'queued',
+  'cancelled',
 }
 
 export enum Status {
@@ -16,4 +17,5 @@ export enum Status {
   '已删除',
   '删除失败',
   '队列中',
+  '已取消',
 }

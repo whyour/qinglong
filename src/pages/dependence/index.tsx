@@ -22,6 +22,7 @@ import {
   FileTextOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
+  MinusCircleOutlined,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -77,6 +78,10 @@ const StatusMap: Record<number, { icon: React.ReactNode; color: string }> = {
     icon: <ClockCircleOutlined />,
     color: 'default',
   },
+  7: {
+    icon: <MinusCircleOutlined />,
+    color: 'default',
+  },
 };
 
 const Dependence = () => {
@@ -129,6 +134,10 @@ const Dependence = () => {
           text: intl.get('删除失败'),
           value: DependenceStatus.removeFailed,
         },
+        {
+          text: intl.get('已取消'),
+          value: DependenceStatus.cancelled,
+        },
       ],
       render: (text: string, record: any, index: number) => {
         return (
@@ -176,7 +185,7 @@ const Dependence = () => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
-            {![Status.队列中].includes(record.status) && (
+            {![Status.队列中, Status.已取消].includes(record.status) && (
               <Tooltip title={isPc ? intl.get('日志') : ''}>
                 <a
                   onClick={() => {
@@ -187,7 +196,9 @@ const Dependence = () => {
                 </a>
               </Tooltip>
             )}
-            {[Status.队列中, Status.安装中, Status.删除中].includes(record.status) ? (
+            {[Status.队列中, Status.安装中, Status.删除中].includes(
+              record.status,
+            ) ? (
               <Tooltip title={isPc ? intl.get('取消安装') : ''}>
                 <a onClick={() => cancelDependence(record)}>
                   <IconFont type="ql-icon-quxiaoanzhuang" />
@@ -200,11 +211,13 @@ const Dependence = () => {
                     <BugOutlined />
                   </a>
                 </Tooltip>
-                <Tooltip title={isPc ? intl.get('删除') : ''}>
-                  <a onClick={() => deleteDependence(record, index)}>
-                    <DeleteOutlined />
-                  </a>
-                </Tooltip>
+                {Status.已安装 === record.status && (
+                  <Tooltip title={isPc ? intl.get('删除') : ''}>
+                    <a onClick={() => deleteDependence(record, index)}>
+                      <DeleteOutlined />
+                    </a>
+                  </Tooltip>
+                )}
                 <Tooltip title={isPc ? intl.get('强制删除') : ''}>
                   <a onClick={() => deleteDependence(record, index, true)}>
                     <DeleteFilled />

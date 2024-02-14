@@ -165,7 +165,10 @@ export default class DependenceService {
         pid && (await killTask(pid));
       }
     }
-    await this.removeDb(ids);
+    await DependenceModel.update(
+      { status: DependenceStatus.cancelled },
+      { where: { id: ids } },
+    );
   }
 
   private async find(query: any, sort: any = []): Promise<Dependence[]> {
