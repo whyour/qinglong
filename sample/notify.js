@@ -1284,7 +1284,8 @@ function webhookNotify(text, desp) {
       return;
     }
     const headers = parseHeaders(WEBHOOK_HEADERS);
-    const body = parseBody(formatBody, WEBHOOK_CONTENT_TYPE);
+    const formatBodyChar = formatBody.replace(/\\n/g, '\n');
+    const body = parseBody(formatBodyChar, WEBHOOK_CONTENT_TYPE);
     const bodyParam = formatBodyFun(WEBHOOK_CONTENT_TYPE, body);
     const options = {
       method: WEBHOOK_METHOD,
