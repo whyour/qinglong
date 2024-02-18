@@ -1273,19 +1273,24 @@ function chronocatNotify(title, desp) {
 
 function webhookNotify(text, desp) {
   return new Promise((resolve) => {
-    const { formatBody, formatUrl } = formatNotifyContentFun(
+    const formatUrl = formatNotifyContentFun(
       WEBHOOK_URL,
-      WEBHOOK_BODY,
-      text,
-      desp,
+      encodeURIComponent(text),
+      encodeURIComponent(desp),
     );
-    if (!formatUrl && !formatBody) {
+
+    if (!formatUrl) {
       resolve();
       return;
     }
     const headers = parseHeaders(WEBHOOK_HEADERS);
-    const body = parseBody(formatBody, WEBHOOK_CONTENT_TYPE);
+    const body = parseBody(WEBHOOK_BODY, WEBHOOK_CONTENT_TYPE,text,desp);
+    if (!body) {
+      resolve();
+      return;
+    }
     const bodyParam = formatBodyFun(WEBHOOK_CONTENT_TYPE, body);
+
     const options = {
       method: WEBHOOK_METHOD,
       headers,
@@ -1294,14 +1299,15 @@ function webhookNotify(text, desp) {
       timeout,
       retry: 1,
     };
-
     if (WEBHOOK_METHOD) {
       got(formatUrl, options).then((resp) => {
         try {
           if (resp.statusCode !== 200) {
-            console.log(`自定义发送通知消息失败！！\n${resp.body}`);
+            console.log('自定义发送通知消息失败！！\n');
+            console.log(resp.body);
           } else {
-            console.log(`自定义发送通知消息成功🎉。\n${resp.body}`);
+            console.log('自定义发送通知消息成功🎉。\n');
+            console.log(resp.body);
           }
         } catch (e) {
           $.logErr(e, resp);
@@ -1339,20 +1345,19 @@ function parseHeaders(headers) {
   return parsed;
 }
 
-function parseBody(body, contentType) {
-  if (contentType === 'text/plain' || !body) {
-    return body;
-  }
+function parseBody(body, contentType,notifyTitle,notifyDesp) {
+  if (!body) return '';
+
+  const formatBodyChar = body.replace(/\\n/g, '\n');
 
   const parsed = {};
   let key;
   let val;
   let i;
-
-  body &&
-    body.split('\n').forEach(function parser(line) {
+  formatBodyChar &&
+    formatBodyChar.split('\n').forEach(function parser(line) {
       i = line.indexOf(':');
-      key = line.substring(0, i).trim();
+      key = line.substring(0, i).trim().toLowerCase();
       val = line.substring(i + 1).trim();
 
       if (!key || parsed[key]) {
@@ -1360,10 +1365,10 @@ function parseBody(body, contentType) {
       }
 
       try {
-        const jsonValue = JSON.parse(val);
-        parsed[key] = jsonValue;
+        const jsonValue = JSON.parse(val);   
+        parsed[key] = formatNotifyContentFun(jsonValue,notifyTitle,notifyDesp);
       } catch (error) {
-        parsed[key] = val;
+        parsed[key] = formatNotifyContentFun(val,notifyTitle,notifyDesp);
       }
     });
 
@@ -1395,19 +1400,18 @@ function formatBodyFun(contentType, body) {
   return {};
 }
 
-function formatNotifyContentFun(url, body, title, content) {
-  if (!url.includes('$title') && !body.includes('$title')) {
-    return {};
+
+function formatNotifyContentFun(originalContent, title, content) {
+  if (!originalContent) {
+    return "";
+  }
+  if (!originalContent.includes('$content') && !originalContent.includes('$title')) {
+    return originalContent;
   }
 
-  return {
-    formatUrl: url
-      .replaceAll('$title', encodeURIComponent(title))
-      .replaceAll('$content', encodeURIComponent(content)),
-    formatBody: body
+  return originalContent
       .replaceAll('$title', title)
-      .replaceAll('$content', content),
-  };
+      .replaceAll('$content', content);
 }
 
 module.exports = {
