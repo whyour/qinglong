@@ -629,31 +629,42 @@ def telegram_bot(title: str, content: str, **kwargs) -> None:
         print("tg 推送失败！")
 
 
-def aibotk(title: str, content: str) -> None:
+def aibotk(title: str, content: str, **kwargs) -> None:
     """
     使用 智能微秘书 推送消息。
     """
-    if (
-        not push_config.get("AIBOTK_KEY")
-        or not push_config.get("AIBOTK_TYPE")
-        or not push_config.get("AIBOTK_NAME")
+    if not (
+        kwargs.get("AIBOTK_KEY")
+        and kwargs.get("AIBOTK_TYPE")
+        and kwargs.get("AIBOTK_NAME")
+    )or (
+        push_config.get("AIBOTK_KEY")
+        and push_config.get("AIBOTK_TYPE")
+        and push_config.get("AIBOTK_NAME")
     ):
         print("智能微秘书 的 AIBOTK_KEY 或者 AIBOTK_TYPE 或者 AIBOTK_NAME 未设置!!\n取消推送")
         return
     print("智能微秘书 服务启动")
-
-    if push_config.get("AIBOTK_TYPE") == "room":
+    if kwargs.get("AIBOTK_KEY") and kwargs.get("AIBOTK_TYPE") and kwargs.get("AIBOTK_NAME"):
+        AIBOTK_KEY = kwargs.get("AIBOTK_KEY")
+        AIBOTK_TYPE = kwargs.get("AIBOTK_TYPE")
+        AIBOTK_NAME = kwargs.get("AIBOTK_NAME")
+    else:
+        AIBOTK_KEY = push_config.get("AIBOTK_KEY")
+        AIBOTK_TYPE = push_config.get("AIBOTK_TYPE")
+        AIBOTK_NAME = push_config.get("AIBOTK_NAME")
+    if AIBOTK_TYPE == "room":
         url = "https://api-bot.aibotk.com/openapi/v1/chat/room"
         data = {
-            "apiKey": push_config.get("AIBOTK_KEY"),
-            "roomName": push_config.get("AIBOTK_NAME"),
+            "apiKey": AIBOTK_KEY,
+            "roomName": AIBOTK_NAME,
             "message": {"type": 1, "content": f"【青龙快讯】\n\n{title}\n{content}"},
         }
     else:
         url = "https://api-bot.aibotk.com/openapi/v1/chat/contact"
         data = {
-            "apiKey": push_config.get("AIBOTK_KEY"),
-            "name": push_config.get("AIBOTK_NAME"),
+            "apiKey": AIBOTK_KEY,
+            "name": AIBOTK_NAME,
             "message": {"type": 1, "content": f"【青龙快讯】\n\n{title}\n{content}"},
         }
     body = json.dumps(data).encode(encoding="utf-8")
