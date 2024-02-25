@@ -284,16 +284,16 @@ def gotify(title: str, content: str, **kwargs) -> None:
         print("gotify 推送失败！")
 
 
-def iGot(title: str, content: str) -> None:
+def iGot(title: str, content: str, **kwargs) -> None:
     """
     使用 iGot 推送消息。
     """
-    if not push_config.get("IGOT_PUSH_KEY"):
+    if not (kwargs.get("IGOT_PUSH_KEY") or push_config.get("IGOT_PUSH_KEY")):
         print("iGot 服务的 IGOT_PUSH_KEY 未设置!!\n取消推送")
         return
     print("iGot 服务启动")
-
-    url = f'https://push.hellyw.com/{push_config.get("IGOT_PUSH_KEY")}'
+    IGOT_PUSH_KEY = kwargs.get("IGOT_PUSH_KEY", push_config.get("IGOT_PUSH_KEY"))
+    url = f'https://push.hellyw.com/{IGOT_PUSH_KEY}'
     data = {"title": title, "content": content}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     response = requests.post(url, data=data, headers=headers).json()
