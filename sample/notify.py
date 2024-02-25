@@ -304,20 +304,21 @@ def iGot(title: str, content: str, **kwargs) -> None:
         print(f'iGot 推送失败！{response["errMsg"]}')
 
 
-def serverJ(title: str, content: str) -> None:
+def serverJ(title: str, content: str, **kwargs) -> None:
     """
     通过 serverJ 推送消息。
     """
-    if not push_config.get("PUSH_KEY"):
+    if not (kwargs.get("PUSH_KEY") or push_config.get("PUSH_KEY")):
         print("serverJ 服务的 PUSH_KEY 未设置!!\n取消推送")
         return
     print("serverJ 服务启动")
+    PUSH_KEY = kwargs.get("PUSH_KEY", push_config.get("PUSH_KEY"))
 
     data = {"text": title, "desp": content.replace("\n", "\n\n")}
-    if push_config.get("PUSH_KEY").find("SCT") != -1:
-        url = f'https://sctapi.ftqq.com/{push_config.get("PUSH_KEY")}.send'
+    if PUSH_KEY.find("SCT") != -1:
+        url = f'https://sctapi.ftqq.com/{PUSH_KEY}.send'
     else:
-        url = f'https://sc.ftqq.com/{push_config.get("PUSH_KEY")}.send'
+        url = f'https://sc.ftqq.com/{PUSH_KEY}.send'
     response = requests.post(url, data=data).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
