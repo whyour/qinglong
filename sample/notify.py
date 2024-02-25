@@ -634,14 +634,18 @@ def aibotk(title: str, content: str, **kwargs) -> None:
     使用 智能微秘书 推送消息。
     """
     if not (
-        kwargs.get("AIBOTK_KEY")
-        and kwargs.get("AIBOTK_TYPE")
-        and kwargs.get("AIBOTK_NAME")
-    )or (
-        push_config.get("AIBOTK_KEY")
-        and push_config.get("AIBOTK_TYPE")
-        and push_config.get("AIBOTK_NAME")
-    ):
+        (
+            kwargs.get("AIBOTK_KEY")
+            and kwargs.get("AIBOTK_TYPE")
+            and kwargs.get("AIBOTK_NAME")
+        ) 
+        or
+        (
+            push_config.get("AIBOTK_KEY")
+            and push_config.get("AIBOTK_TYPE")
+            and push_config.get("AIBOTK_NAME")
+        )
+        ):
         print("智能微秘书 的 AIBOTK_KEY 或者 AIBOTK_TYPE 或者 AIBOTK_NAME 未设置!!\n取消推送")
         return
     print("智能微秘书 服务启动")
