@@ -227,16 +227,24 @@ def feishu_bot(title: str, content: str, **kwargs) -> None:
         print("飞书 推送失败！错误信息如下：\n", response)
 
 
-def go_cqhttp(title: str, content: str) -> None:
+def go_cqhttp(title: str, content: str, **kwargs) -> None:
     """
     使用 go_cqhttp 推送消息。
     """
-    if not push_config.get("GOBOT_URL") or not push_config.get("GOBOT_QQ"):
+    if not ((kwargs.get("GOBOT_URL") and kwargs.get("GOBOT_QQ")) or (push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ"))):
         print("go-cqhttp 服务的 GOBOT_URL 或 GOBOT_QQ 未设置!!\n取消推送")
         return
     print("go-cqhttp 服务启动")
+    if kwargs.get("GOBOT_URL") and kwargs.get("GOBOT_QQ"):
+        GOBOT_URL = kwargs.get("GOBOT_URL")
+        GOBOT_QQ = kwargs.get("GOBOT_QQ")
+        GOBOT_TOKEN = kwargs.get("GOBOT_TOKEN")
+    else:
+        GOBOT_URL = push_config.get("GOBOT_URL")
+        GOBOT_QQ = push_config.get("GOBOT_QQ")
+        GOBOT_TOKEN = push_config.get("GOBOT_TOKEN")
 
-    url = f'{push_config.get("GOBOT_URL")}?access_token={push_config.get("GOBOT_TOKEN")}&{push_config.get("GOBOT_QQ")}&message=标题:{title}\n内容:{content}'
+    url = f'{GOBOT_URL}?access_token={GOBOT_TOKEN}&{GOBOT_QQ}&message=标题:{title}\n内容:{content}'
     response = requests.get(url).json()
 
     if response["status"] == "ok":
