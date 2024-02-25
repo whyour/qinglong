@@ -578,7 +578,9 @@ def aibotk(title: str, content: str) -> None:
         or not push_config.get("AIBOTK_TYPE")
         or not push_config.get("AIBOTK_NAME")
     ):
-        print("智能微秘书 的 AIBOTK_KEY 或者 AIBOTK_TYPE 或者 AIBOTK_NAME 未设置!!\n取消推送")
+        print(
+            "智能微秘书 的 AIBOTK_KEY 或者 AIBOTK_TYPE 或者 AIBOTK_NAME 未设置!!\n取消推送"
+        )
         return
     print("智能微秘书 服务启动")
 
@@ -748,29 +750,25 @@ def parse_headers(headers):
     return parsed
 
 
+def parse_string(input_string):
+    matches = {}
+    pattern = r'(\w+):\s*((?:(?!\n\w+:).)*)'
+    regex = re.compile(pattern)
+    for match in regex.finditer(input_string):
+        key, value = match.group(1).strip(), match.group(2).strip()
+        try:
+            json_value = json.loads(value)
+            matches[key] = json_value
+        except:
+            matches[key] = value
+    return matches
+
+
 def parse_body(body, content_type):
     if not body or content_type == "text/plain":
         return body
 
-    parsed = {}
-    lines = body.split("\n")
-
-    for line in lines:
-        i = line.find(":")
-        if i == -1:
-            continue
-
-        key = line[:i].strip()
-        val = line[i + 1 :].strip()
-
-        if not key or key in parsed:
-            continue
-
-        try:
-            json_value = json.loads(val)
-            parsed[key] = json_value
-        except:
-            parsed[key] = val
+    parsed = parse_string(input_string)
 
     if content_type == "application/x-www-form-urlencoded":
         data = urlencode(parsed, doseq=True)
