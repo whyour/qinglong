@@ -419,16 +419,22 @@ def pushplus_bot(title: str, content: str, **kwargs) -> None:
             print("PUSHPLUS 推送失败！")
 
 
-def qmsg_bot(title: str, content: str) -> None:
+def qmsg_bot(title: str, content: str, **kwargs) -> None:
     """
     使用 qmsg 推送消息。
     """
-    if not push_config.get("QMSG_KEY") or not push_config.get("QMSG_TYPE"):
+    if not ((kwargs.get("QMSG_KEY") and kwargs.get("QMSG_TYPE")) or (push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"))):
         print("qmsg 的 QMSG_KEY 或者 QMSG_TYPE 未设置!!\n取消推送")
         return
     print("qmsg 服务启动")
+    if kwargs.get("QMSG_KEY") and kwargs.get("QMSG_TYPE"):
+        QMSG_KEY = kwargs.get("QMSG_KEY")
+        QMSG_TYPE = kwargs.get("QMSG_TYPE")
+    else:
+        QMSG_KEY = push_config.get("QMSG_KEY")
+        QMSG_TYPE = push_config.get("QMSG_TYPE")
 
-    url = f'https://qmsg.zendee.cn/{push_config.get("QMSG_TYPE")}/{push_config.get("QMSG_KEY")}'
+    url = f'https://qmsg.zendee.cn/{QMSG_TYPE}/{QMSG_KEY}'
     payload = {"msg": f'{title}\n\n{content.replace("----", "-")}'.encode("utf-8")}
     response = requests.post(url=url, params=payload).json()
 
