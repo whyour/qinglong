@@ -253,20 +253,28 @@ def go_cqhttp(title: str, content: str, **kwargs) -> None:
         print("go-cqhttp 推送失败！")
 
 
-def gotify(title: str, content: str) -> None:
+def gotify(title: str, content: str, **kwargs) -> None:
     """
     使用 gotify 推送消息。
     """
-    if not push_config.get("GOTIFY_URL") or not push_config.get("GOTIFY_TOKEN"):
+    if not ((kwargs.get("GOTIFY_URL") and kwargs.get("GOTIFY_TOKEN")) or (push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN"))):
         print("gotify 服务的 GOTIFY_URL 或 GOTIFY_TOKEN 未设置!!\n取消推送")
         return
     print("gotify 服务启动")
+    if kwargs.get("GOTIFY_URL") and kwargs.get("GOTIFY_TOKEN"):
+        GOTIFY_URL = kwargs.get("GOTIFY_URL")
+        GOTIFY_TOKEN = kwargs.get("GOBOTGOTIFY_TOKEN_QQ")
+        GOTIFY_PRIORITY = kwargs.get("GOTIFY_PRIORITY")
+    else:
+        GOTIFY_URL = push_config.get("GOTIFY_URL")
+        GOTIFY_TOKEN = push_config.get("GOTIFY_TOKEN")
+        GOTIFY_PRIORITY = kwargs.get("GOTIFY_PRIORITY")
 
-    url = f'{push_config.get("GOTIFY_URL")}/message?token={push_config.get("GOTIFY_TOKEN")}'
+    url = f'{GOTIFY_URL}/message?token={GOTIFY_TOKEN}'
     data = {
         "title": title,
         "message": content,
-        "priority": push_config.get("GOTIFY_PRIORITY"),
+        "priority": GOTIFY_PRIORITY,
     }
     response = requests.post(url, data=data).json()
 
