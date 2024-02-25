@@ -123,19 +123,19 @@ for k in push_config:
         push_config[k] = v
 
 
-def bark(title: str, content: str) -> None:
+def bark(title: str, content: str, **kwargs) -> None:
     """
     使用 bark 推送消息。
     """
-    if not push_config.get("BARK_PUSH"):
+    if not (push_config.get("BARK_PUSH") or kwargs.get("BARK_PUSH")):
         print("bark 服务的 BARK_PUSH 未设置!!\n取消推送")
         return
     print("bark 服务启动")
-
-    if push_config.get("BARK_PUSH").startswith("http"):
-        url = f'{push_config.get("BARK_PUSH")}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
+    BARK_PUSH = kwargs.get("BARK_PUSH", push_config.get("BARK_PUSH"))
+    if BARK_PUSH.startswith("http"):
+        url = f'{BARK_PUSH}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
     else:
-        url = f'https://api.day.app/{push_config.get("BARK_PUSH")}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
+        url = f'https://api.day.app/{BARK_PUSH}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
 
     bark_params = {
         "BARK_ARCHIVE": "isArchive",
@@ -149,11 +149,12 @@ def bark(title: str, content: str) -> None:
     for pair in filter(
         lambda pairs: pairs[0].startswith("BARK_")
         and pairs[0] != "BARK_PUSH"
-        and pairs[1]
+        and (pairs[1] or kwargs.get(pairs[0]))
         and bark_params.get(pairs[0]),
         push_config.items(),
     ):
-        params += f"{bark_params.get(pair[0])}={pair[1]}&"
+        value = kwargs.get(pair[0], pair[1])
+        params += f"{bark_params.get(pair[0])}={value}&"
     if params:
         url = url + "?" + params.rstrip("&")
     response = requests.get(url).json()
@@ -164,7 +165,7 @@ def bark(title: str, content: str) -> None:
         print("bark 推送失败！")
 
 
-def console(title: str, content: str) -> None:
+def console(title: str, content: str, **kwargs) -> None:
     """
     使用 控制台 推送消息。
     """
@@ -898,7 +899,7 @@ def add_notify_function():
         notify_function.append(custom_notify)
 
 
-def send(title: str, content: str) -> None:
+def send(title: str, content: str, **kwargs) -> None:
     if not content:
         print(f"{title} 推送内容为空！")
         return
@@ -915,7 +916,7 @@ def send(title: str, content: str) -> None:
 
     add_notify_function()
     ts = [
-        threading.Thread(target=mode, args=(title, content), name=mode.__name__)
+        threading.Thread(target=mode, args=(title, content),kwargs=kwargs, name=mode.__name__)
         for mode in notify_function
     ]
     [t.start() for t in ts]
