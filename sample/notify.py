@@ -444,14 +444,15 @@ def qmsg_bot(title: str, content: str, **kwargs) -> None:
         print(f'qmsg 推送失败！{response["reason"]}')
 
 
-def wecom_app(title: str, content: str) -> None:
+def wecom_app(title: str, content: str, **kwargs) -> None:
     """
     通过 企业微信 APP 推送消息。
     """
-    if not push_config.get("QYWX_AM"):
+    if not (kwargs.get("QYWX_AM") or push_config.get("QYWX_AM")):
         print("QYWX_AM 未设置!!\n取消推送")
         return
-    QYWX_AM_AY = re.split(",", push_config.get("QYWX_AM"))
+    QYWX_AM = kwargs.get("QYWX_AM", push_config.get("QYWX_AM"))
+    QYWX_AM_AY = re.split(",", QYWX_AM)
     if 4 < len(QYWX_AM_AY) > 5:
         print("QYWX_AM 设置错误!!\n取消推送")
         return
