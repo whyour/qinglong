@@ -776,27 +776,42 @@ def pushme(title: str, content: str, **kwargs) -> None:
         print(f"PushMe 推送失败！{response.status_code} {response.text}")
 
 
-def chronocat(title: str, content: str) -> None:
+def chronocat(title: str, content: str, **kwargs) -> None:
     """
     使用 CHRONOCAT 推送消息。
     """
-    if (
-        not push_config.get("CHRONOCAT_URL")
-        or not push_config.get("CHRONOCAT_QQ")
-        or not push_config.get("CHRONOCAT_TOKEN")
-    ):
+    if not ((
+        push_config.get("CHRONOCAT_URL")
+        and push_config.get("CHRONOCAT_QQ")
+        and push_config.get("CHRONOCAT_TOKEN")
+    ) or (
+        push_config.get("CHRONOCAT_URL")
+        and push_config.get("CHRONOCAT_QQ")
+        and push_config.get("CHRONOCAT_TOKEN")
+    )):
         print("CHRONOCAT 服务的 CHRONOCAT_URL 或 CHRONOCAT_QQ 未设置!!\n取消推送")
         return
-
     print("CHRONOCAT 服务启动")
+    if (
+        kwargs.get("CHRONOCAT_URL")
+        and kwargs.get("CHRONOCAT_QQ")
+        and kwargs.get("CHRONOCAT_TOKEN")
+    ):
+        CHRONOCAT_URL = kwargs.get("CHRONOCAT_URL")
+        CHRONOCAT_QQ = kwargs.get("CHRONOCAT_QQ")
+        CHRONOCAT_TOKEN = kwargs.get("CHRONOCAT_TOKEN")
+    else:
+        CHRONOCAT_URL = push_config.get("CHRONOCAT_URL")
+        CHRONOCAT_QQ = push_config.get("CHRONOCAT_QQ")
+        CHRONOCAT_TOKEN = push_config.get("CHRONOCAT_TOKEN")
 
-    user_ids = re.findall(r"user_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
-    group_ids = re.findall(r"group_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
+    user_ids = re.findall(r"user_id=(\d+)", CHRONOCAT_QQ)
+    group_ids = re.findall(r"group_id=(\d+)", CHRONOCAT_QQ)
 
-    url = f'{push_config.get("CHRONOCAT_URL")}/api/message/send'
+    url = f'{CHRONOCAT_URL}/api/message/send'
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f'Bearer {push_config.get("CHRONOCAT_TOKEN")}',
+        "Authorization": f'Bearer {CHRONOCAT_TOKEN}',
     }
 
     for chat_type, ids in [(1, user_ids), (2, group_ids)]:
