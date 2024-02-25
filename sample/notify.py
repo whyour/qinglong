@@ -357,16 +357,23 @@ def pushdeer(title: str, content: str, **kwargs) -> None:
         print("PushDeer 推送失败！错误信息：", response)
 
 
-def chat(title: str, content: str) -> None:
+def chat(title: str, content: str, **kwargs) -> None:
     """
     通过Chat 推送消息
     """
-    if not push_config.get("CHAT_URL") or not push_config.get("CHAT_TOKEN"):
+    if not ((kwargs.get("CHAT_URL") and kwargs.get("CHAT_TOKEN")) or (push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN"))):
         print("chat 服务的 CHAT_URL或CHAT_TOKEN 未设置!!\n取消推送")
         return
     print("chat 服务启动")
+    if kwargs.get("CHAT_URL") and kwargs.get("CHAT_TOKEN"):
+        CHAT_URL = kwargs.get("CHAT_URL")
+        CHAT_TOKEN = kwargs.get("CHAT_TOKEN")
+    else:
+        CHAT_URL = push_config.get("CHAT_URL")
+        CHAT_TOKEN = push_config.get("CHAT_TOKEN")
+
     data = "payload=" + json.dumps({"text": title + "\n" + content})
-    url = push_config.get("CHAT_URL") + push_config.get("CHAT_TOKEN")
+    url = CHAT_URL + CHAT_TOKEN
     response = requests.post(url, data=data)
 
     if response.status_code == 200:
