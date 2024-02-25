@@ -208,16 +208,16 @@ def dingding_bot(title: str, content: str, **kwargs) -> None:
         print("钉钉机器人 推送失败！")
 
 
-def feishu_bot(title: str, content: str) -> None:
+def feishu_bot(title: str, content: str, **kwargs) -> None:
     """
     使用 飞书机器人 推送消息。
     """
-    if not push_config.get("FSKEY"):
+    if not (kwargs.get("DD_BOT_SECRET") or push_config.get("FSKEY")):
         print("飞书 服务的 FSKEY 未设置!!\n取消推送")
         return
     print("飞书 服务启动")
-
-    url = f'https://open.feishu.cn/open-apis/bot/v2/hook/{push_config.get("FSKEY")}'
+    FSKEY = kwargs.get("DD_BOT_SECRET", push_config.get("FSKEY"))
+    url = f'https://open.feishu.cn/open-apis/bot/v2/hook/{FSKEY}'
     data = {"msg_type": "text", "content": {"text": f"{title}\n\n{content}"}}
     response = requests.post(url, data=json.dumps(data)).json()
 
