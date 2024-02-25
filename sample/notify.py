@@ -677,50 +677,74 @@ def aibotk(title: str, content: str, **kwargs) -> None:
         print(f'智能微秘书 推送失败！{response["error"]}')
 
 
-def smtp(title: str, content: str) -> None:
+def smtp(title: str, content: str, **kwargs) -> None:
     """
     使用 SMTP 邮件 推送消息。
     """
-    if (
-        not push_config.get("SMTP_SERVER")
-        or not push_config.get("SMTP_SSL")
-        or not push_config.get("SMTP_EMAIL")
-        or not push_config.get("SMTP_PASSWORD")
-        or not push_config.get("SMTP_NAME")
-    ):
+    if not ((
+        kwargs.get("SMTP_SERVER")
+        and kwargs.get("SMTP_SSL")
+        and kwargs.get("SMTP_EMAIL")
+        and kwargs.get("SMTP_PASSWORD")
+        and kwargs.get("SMTP_NAME")
+    ) or (
+        push_config.get("SMTP_SERVER")
+        and push_config.get("SMTP_SSL")
+        and push_config.get("SMTP_EMAIL")
+        and push_config.get("SMTP_PASSWORD")
+        and push_config.get("SMTP_NAME")
+    )):
         print(
             "SMTP 邮件 的 SMTP_SERVER 或者 SMTP_SSL 或者 SMTP_EMAIL 或者 SMTP_PASSWORD 或者 SMTP_NAME 未设置!!\n取消推送"
         )
         return
     print("SMTP 邮件 服务启动")
+    if (
+        kwargs.get("SMTP_SERVER")
+        and kwargs.get("SMTP_SSL")
+        and kwargs.get("SMTP_EMAIL")
+        and kwargs.get("SMTP_PASSWORD")
+        and kwargs.get("SMTP_NAME")
+    ):
+        SMTP_SERVER = kwargs.get("SMTP_SERVER")
+        SMTP_SSL = kwargs.get("SMTP_SSL")
+        SMTP_EMAIL = kwargs.get("SMTP_EMAIL")
+        SMTP_PASSWORD = kwargs.get("SMTP_PASSWORD")
+        SMTP_NAME = kwargs.get("SMTP_NAME")
+    else:
+        SMTP_SERVER = push_config.get("SMTP_SERVER")
+        SMTP_SSL = push_config.get("SMTP_SSL")
+        SMTP_EMAIL = push_config.get("SMTP_EMAIL")
+        SMTP_PASSWORD = push_config.get("SMTP_PASSWORD")
+        SMTP_NAME = push_config.get("SMTP_NAME")
 
     message = MIMEText(content, "plain", "utf-8")
     message["From"] = formataddr(
         (
-            Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
-            push_config.get("SMTP_EMAIL"),
+            Header(SMTP_NAME, "utf-8").encode(),
+            SMTP_EMAIL,
         )
     )
     message["To"] = formataddr(
         (
-            Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
-            push_config.get("SMTP_EMAIL"),
+            Header(SMTP_NAME, "utf-8").encode(),
+            SMTP_EMAIL,
         )
     )
     message["Subject"] = Header(title, "utf-8")
 
     try:
         smtp_server = (
-            smtplib.SMTP_SSL(push_config.get("SMTP_SERVER"))
-            if push_config.get("SMTP_SSL") == "true"
-            else smtplib.SMTP(push_config.get("SMTP_SERVER"))
+            smtplib.SMTP_SSL(SMTP_SERVER)
+            if SMTP_SSL == "true"
+            else smtplib.SMTP(SMTP_SERVER)
         )
         smtp_server.login(
-            push_config.get("SMTP_EMAIL"), push_config.get("SMTP_PASSWORD")
+            SMTP_EMAIL, SMTP_PASSWORD
         )
         smtp_server.sendmail(
-            push_config.get("SMTP_EMAIL"),
-            push_config.get("SMTP_EMAIL"),
+            SMTP_EMAIL,
+            SMTP_EMAIL,
             message.as_bytes(),
         )
         smtp_server.close()
