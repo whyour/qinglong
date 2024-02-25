@@ -753,16 +753,17 @@ def smtp(title: str, content: str, **kwargs) -> None:
         print(f"SMTP 邮件 推送失败！{e}")
 
 
-def pushme(title: str, content: str) -> None:
+def pushme(title: str, content: str, **kwargs) -> None:
     """
     使用 PushMe 推送消息。
     """
-    if not push_config.get("PUSHME_KEY"):
+    if not (kwargs.get("PUSHME_KEY") or push_config.get("PUSHME_KEY")):
         print("PushMe 服务的 PUSHME_KEY 未设置!!\n取消推送")
         return
     print("PushMe 服务启动")
+    PUSHME_KEY = kwargs.get("PUSHME_KEY", push_config.get("PUSHME_KEY"))
 
-    url = f'https://push.i-i.me/?push_key={push_config.get("PUSHME_KEY")}'
+    url = f'https://push.i-i.me/?push_key={PUSHME_KEY}'
     data = {
         "title": title,
         "content": content,
