@@ -382,21 +382,23 @@ def chat(title: str, content: str, **kwargs) -> None:
         print("Chat 推送失败！错误信息：", response)
 
 
-def pushplus_bot(title: str, content: str) -> None:
+def pushplus_bot(title: str, content: str, **kwargs) -> None:
     """
     通过 push+ 推送消息。
     """
-    if not push_config.get("PUSH_PLUS_TOKEN"):
+    if not (kwargs.get("PUSH_PLUS_TOKEN") or push_config.get("PUSH_PLUS_TOKEN")):
         print("PUSHPLUS 服务的 PUSH_PLUS_TOKEN 未设置!!\n取消推送")
         return
     print("PUSHPLUS 服务启动")
+    PUSH_PLUS_TOKEN = kwargs.get("PUSH_PLUS_TOKEN", push_config.get("PUSH_PLUS_TOKEN"))
+    PUSH_PLUS_USER = kwargs.get("PUSH_PLUS_USER", push_config.get("PUSH_PLUS_USER"))
 
     url = "http://www.pushplus.plus/send"
     data = {
-        "token": push_config.get("PUSH_PLUS_TOKEN"),
+        "token": PUSH_PLUS_TOKEN,
         "title": title,
         "content": content,
-        "topic": push_config.get("PUSH_PLUS_USER"),
+        "topic": PUSH_PLUS_USER,
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
