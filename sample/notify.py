@@ -327,23 +327,27 @@ def serverJ(title: str, content: str, **kwargs) -> None:
         print(f'serverJ 推送失败！错误码：{response["message"]}')
 
 
-def pushdeer(title: str, content: str) -> None:
+def pushdeer(title: str, content: str, **kwargs) -> None:
     """
     通过PushDeer 推送消息
     """
-    if not push_config.get("DEER_KEY"):
+    if not (kwargs.get("DEER_KEY") or push_config.get("DEER_KEY")):
         print("PushDeer 服务的 DEER_KEY 未设置!!\n取消推送")
         return
     print("PushDeer 服务启动")
+    DEER_KEY = kwargs.get("DEER_KEY", push_config.get("DEER_KEY"))
+
     data = {
         "text": title,
         "desp": content,
         "type": "markdown",
-        "pushkey": push_config.get("DEER_KEY"),
+        "pushkey": DEER_KEY,
     }
     url = "https://api2.pushdeer.com/message/push"
     if push_config.get("DEER_URL"):
         url = push_config.get("DEER_URL")
+    if kwargs.get("DEER_URL"):
+        url = kwargs.get("DEER_URL")
 
     response = requests.post(url, data=data).json()
 
