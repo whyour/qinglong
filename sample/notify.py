@@ -542,20 +542,23 @@ class WeCom:
         return respone["errmsg"]
 
 
-def wecom_bot(title: str, content: str) -> None:
+def wecom_bot(title: str, content: str, **kwargs) -> None:
     """
     通过 企业微信机器人 推送消息。
     """
-    if not push_config.get("QYWX_KEY"):
+    if not (kwargs.get("QYWX_KEY") or push_config.get("QYWX_KEY")):
         print("企业微信机器人 服务的 QYWX_KEY 未设置!!\n取消推送")
         return
     print("企业微信机器人服务启动")
+    QYWX_KEY = kwargs.get("QYWX_KEY", push_config.get("QYWX_KEY"))
 
     origin = "https://qyapi.weixin.qq.com"
     if push_config.get("QYWX_ORIGIN"):
         origin = push_config.get("QYWX_ORIGIN")
+    if kwargs.get("QYWX_ORIGIN"):
+        origin = kwargs.get("QYWX_ORIGIN")
 
-    url = f"{origin}/cgi-bin/webhook/send?key={push_config.get('QYWX_KEY')}"
+    url = f"{origin}/cgi-bin/webhook/send?key={QYWX_KEY}"
     headers = {"Content-Type": "application/json;charset=utf-8"}
     data = {"msgtype": "text", "text": {"content": f"{title}\n\n{content}"}}
     response = requests.post(
