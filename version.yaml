@@ -1,13 +1,7 @@
-version: 2.17.1
-changeLogLink: https://t.me/jiao_long/402
-publishTime: 2024-02-07 23:00
+version: 2.17.2
+changeLogLink: https://t.me/jiao_long/403
+publishTime: 2024-03-02 17:00
 changeLog: |
-  1. 系统设置增加重启
-  2. 修复 debian 系统内更新源代码分支错误
-  3. 修复启动时依赖配置未初始化
-  4. 修复未开启一言时多余空行, 通知渠道改发送前检查，感谢 https://github.com/Cp0204
-  5. Dockerfile 添加发布端口和数据卷 https://github.com/Akimio521
-  6. 修复有反向代理时脚本管理获取文件可能失败
-  7. 脚本管理重命名增加默认值，增加新建(mod+o)、删除快捷键(mod+d)
-  8. 修复对比工具保存文件
-  9. 其他 bug 修复
+  1. 依赖管理支持队列中依赖取消安装，支持状态筛选
+  2. 修复 webhook 通知 body 拆分逻辑
+  3. 企业微信有长度限制，超长的进行分段提交 https://github.com/pharaoh2012

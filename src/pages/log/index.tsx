@@ -68,12 +68,12 @@ const Log = () => {
   };
 
   const onSelect = (value: any, node: any) => {
-    setCurrentNode(node);
-    setSelect(value);
-
     if (node.key === select || !value) {
       return;
     }
+
+    setCurrentNode(node);
+    setSelect(value);
 
     if (node.type === 'directory') {
       setValue(intl.get('请选择日志文件'));

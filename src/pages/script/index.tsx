@@ -115,12 +115,12 @@ const Script = () => {
   };
 
   const onSelect = (value: any, node: any) => {
-    setSelect(node.key);
-    setCurrentNode(node);
-
     if (node.key === select || !value) {
       return;
     }
+
+    setSelect(node.key);
+    setCurrentNode(node);
 
     if (node.type === 'directory') {
       setValue(intl.get('请选择脚本文件'));
