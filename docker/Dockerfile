@@ -3,11 +3,11 @@ COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
   && apk update \
   && apk add nodejs npm git \
-  && npm i -g pnpm@8.3.1 \
+  && npm i -g pnpm@8.3.1 pm2 tsx \
   && cd /tmp/build \
   && pnpm install --prod
 
-FROM python:3.11-alpine3.18
+FROM python:3.11-alpine
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -72,6 +72,7 @@ RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
   && rm -rf /static
 
 COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
+COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
 
 WORKDIR ${QL_DIR}
 
