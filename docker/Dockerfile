@@ -27,6 +27,9 @@ VOLUME /ql/data
   
 EXPOSE 5700
 
+COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=builder /usr/local/bin/. /usr/local/bin/
+
 RUN set -x \
   && apk update -f \
   && apk upgrade \
@@ -70,7 +73,6 @@ RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
   && rm -rf /static
 
 COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
-COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
 
 WORKDIR ${QL_DIR}
 
