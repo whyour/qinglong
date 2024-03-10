@@ -116,7 +116,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
 
   const reloadSystem = (type?: string) => {
     request
-      .put(`${config.apiPrefix}system/reload`, { type })
+      .put(`${config.apiPrefix}update/${type}`)
       .then((_data: any) => {
         message.success({
           content: (
@@ -220,7 +220,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
       </Button>
       <Button
         type="primary"
-        onClick={() => reloadSystem()}
+        onClick={() => reloadSystem('system')}
         style={{ marginLeft: 8 }}
       >
         {intl.get('重新启动')}

@@ -141,7 +141,7 @@ const Other = ({
       okText: intl.get('重启'),
       onOk() {
         request
-          .put(`${config.apiPrefix}system/reload`, { type: 'data' })
+          .put(`${config.apiPrefix}update/data`)
           .then(() => {
             message.success({
               content: (

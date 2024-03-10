@@ -16,6 +16,11 @@ export default defineConfig({
   favicons: [`https://qn.whyour.cn/favicon.svg`],
   publicPath: process.env.NODE_ENV === 'production' ? './' : '/',
   proxy: {
+    [`${baseUrl}api/update`]: {
+      target: 'http://127.0.0.1:5300/',
+      changeOrigin: true,
+      pathRewrite: { [`^${baseUrl}api/update`]: '/api' },
+    },
     [`${baseUrl}api/public`]: {
       target: 'http://127.0.0.1:5400/',
       changeOrigin: true,
