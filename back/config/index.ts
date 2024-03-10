@@ -57,6 +57,7 @@ export default {
   port: parseInt(process.env.BACK_PORT as string, 10),
   cronPort: parseInt(process.env.CRON_PORT as string, 10),
   publicPort: parseInt(process.env.PUBLIC_PORT as string, 10),
+  updatePort: parseInt(process.env.UPDATE_PORT as string, 10),
   secret: process.env.SECRET || createRandomString(16, 32),
   logs: {
     level: process.env.LOG_LEVEL || 'silly',

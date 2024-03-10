@@ -329,28 +329,7 @@ export default class SystemService {
   public async reloadSystem(target: 'system' | 'data') {
     const cmd = `real_time=true ql reload ${target || ''}`;
     const cp = spawn(cmd, { shell: '/bin/bash' });
-
-    cp.stdout.on('data', (data) => {
-      this.sockService.sendMessage({
-        type: 'reloadSystem',
-        message: data.toString(),
-      });
-    });
-
-    cp.stderr.on('data', (data) => {
-      this.sockService.sendMessage({
-        type: 'reloadSystem',
-        message: data.toString(),
-      });
-    });
-
-    cp.on('error', (err) => {
-      this.sockService.sendMessage({
-        type: 'reloadSystem',
-        message: JSON.stringify(err),
-      });
-    });
-
+    cp.unref();
     return { code: 200 };
   }
 
