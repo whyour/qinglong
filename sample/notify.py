@@ -133,9 +133,9 @@ def bark(title: str, content: str, **kwargs) -> None:
     print("bark 服务启动")
     BARK_PUSH = kwargs.get("BARK_PUSH", push_config.get("BARK_PUSH"))
     if BARK_PUSH.startswith("http"):
-        url = f'{BARK_PUSH}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
+        url = f"{BARK_PUSH}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}"
     else:
-        url = f'https://api.day.app/{BARK_PUSH}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
+        url = f"https://api.day.app/{BARK_PUSH}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}"
 
     bark_params = {
         "BARK_ARCHIVE": "isArchive",
@@ -176,7 +176,10 @@ def dingding_bot(title: str, content: str, **kwargs) -> None:
     """
     使用 钉钉机器人 推送消息。
     """
-    if not ((kwargs.get("DD_BOT_SECRET") and kwargs.get("DD_BOT_TOKEN")) or (push_config.get("DD_BOT_SECRET") and push_config.get("DD_BOT_TOKEN"))):
+    if not (
+        (kwargs.get("DD_BOT_SECRET") and kwargs.get("DD_BOT_TOKEN"))
+        or (push_config.get("DD_BOT_SECRET") and push_config.get("DD_BOT_TOKEN"))
+    ):
         print("钉钉机器人 服务的 DD_BOT_SECRET 或者 DD_BOT_TOKEN 未设置!!\n取消推送")
         return
     print("钉钉机器人 服务启动")
@@ -195,7 +198,7 @@ def dingding_bot(title: str, content: str, **kwargs) -> None:
         secret_enc, string_to_sign_enc, digestmod=hashlib.sha256
     ).digest()
     sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
-    url = f'https://oapi.dingtalk.com/robot/send?access_token={DD_BOT_TOKEN}&timestamp={timestamp}&sign={sign}'
+    url = f"https://oapi.dingtalk.com/robot/send?access_token={DD_BOT_TOKEN}&timestamp={timestamp}&sign={sign}"
     headers = {"Content-Type": "application/json;charset=utf-8"}
     data = {"msgtype": "text", "text": {"content": f"{title}\n\n{content}"}}
     response = requests.post(
@@ -217,7 +220,7 @@ def feishu_bot(title: str, content: str, **kwargs) -> None:
         return
     print("飞书 服务启动")
     FSKEY = kwargs.get("DD_BOT_SECRET", push_config.get("FSKEY"))
-    url = f'https://open.feishu.cn/open-apis/bot/v2/hook/{FSKEY}'
+    url = f"https://open.feishu.cn/open-apis/bot/v2/hook/{FSKEY}"
     data = {"msg_type": "text", "content": {"text": f"{title}\n\n{content}"}}
     response = requests.post(url, data=json.dumps(data)).json()
 
@@ -231,7 +234,10 @@ def go_cqhttp(title: str, content: str, **kwargs) -> None:
     """
     使用 go_cqhttp 推送消息。
     """
-    if not ((kwargs.get("GOBOT_URL") and kwargs.get("GOBOT_QQ")) or (push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ"))):
+    if not (
+        (kwargs.get("GOBOT_URL") and kwargs.get("GOBOT_QQ"))
+        or (push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ"))
+    ):
         print("go-cqhttp 服务的 GOBOT_URL 或 GOBOT_QQ 未设置!!\n取消推送")
         return
     print("go-cqhttp 服务启动")
@@ -244,7 +250,7 @@ def go_cqhttp(title: str, content: str, **kwargs) -> None:
         GOBOT_QQ = push_config.get("GOBOT_QQ")
         GOBOT_TOKEN = push_config.get("GOBOT_TOKEN")
 
-    url = f'{GOBOT_URL}?access_token={GOBOT_TOKEN}&{GOBOT_QQ}&message=标题:{title}\n内容:{content}'
+    url = f"{GOBOT_URL}?access_token={GOBOT_TOKEN}&{GOBOT_QQ}&message=标题:{title}\n内容:{content}"
     response = requests.get(url).json()
 
     if response["status"] == "ok":
@@ -257,7 +263,10 @@ def gotify(title: str, content: str, **kwargs) -> None:
     """
     使用 gotify 推送消息。
     """
-    if not ((kwargs.get("GOTIFY_URL") and kwargs.get("GOTIFY_TOKEN")) or (push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN"))):
+    if not (
+        (kwargs.get("GOTIFY_URL") and kwargs.get("GOTIFY_TOKEN"))
+        or (push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN"))
+    ):
         print("gotify 服务的 GOTIFY_URL 或 GOTIFY_TOKEN 未设置!!\n取消推送")
         return
     print("gotify 服务启动")
@@ -270,7 +279,7 @@ def gotify(title: str, content: str, **kwargs) -> None:
         GOTIFY_TOKEN = push_config.get("GOTIFY_TOKEN")
         GOTIFY_PRIORITY = kwargs.get("GOTIFY_PRIORITY")
 
-    url = f'{GOTIFY_URL}/message?token={GOTIFY_TOKEN}'
+    url = f"{GOTIFY_URL}/message?token={GOTIFY_TOKEN}"
     data = {
         "title": title,
         "message": content,
@@ -293,7 +302,7 @@ def iGot(title: str, content: str, **kwargs) -> None:
         return
     print("iGot 服务启动")
     IGOT_PUSH_KEY = kwargs.get("IGOT_PUSH_KEY", push_config.get("IGOT_PUSH_KEY"))
-    url = f'https://push.hellyw.com/{IGOT_PUSH_KEY}'
+    url = f"https://push.hellyw.com/{IGOT_PUSH_KEY}"
     data = {"title": title, "content": content}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     response = requests.post(url, data=data, headers=headers).json()
@@ -316,9 +325,9 @@ def serverJ(title: str, content: str, **kwargs) -> None:
 
     data = {"text": title, "desp": content.replace("\n", "\n\n")}
     if PUSH_KEY.find("SCT") != -1:
-        url = f'https://sctapi.ftqq.com/{PUSH_KEY}.send'
+        url = f"https://sctapi.ftqq.com/{PUSH_KEY}.send"
     else:
-        url = f'https://sc.ftqq.com/{PUSH_KEY}.send'
+        url = f"https://sc.ftqq.com/{PUSH_KEY}.send"
     response = requests.post(url, data=data).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
@@ -361,7 +370,10 @@ def chat(title: str, content: str, **kwargs) -> None:
     """
     通过Chat 推送消息
     """
-    if not ((kwargs.get("CHAT_URL") and kwargs.get("CHAT_TOKEN")) or (push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN"))):
+    if not (
+        (kwargs.get("CHAT_URL") and kwargs.get("CHAT_TOKEN"))
+        or (push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN"))
+    ):
         print("chat 服务的 CHAT_URL或CHAT_TOKEN 未设置!!\n取消推送")
         return
     print("chat 服务启动")
@@ -423,7 +435,10 @@ def qmsg_bot(title: str, content: str, **kwargs) -> None:
     """
     使用 qmsg 推送消息。
     """
-    if not ((kwargs.get("QMSG_KEY") and kwargs.get("QMSG_TYPE")) or (push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"))):
+    if not (
+        (kwargs.get("QMSG_KEY") and kwargs.get("QMSG_TYPE"))
+        or (push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"))
+    ):
         print("qmsg 的 QMSG_KEY 或者 QMSG_TYPE 未设置!!\n取消推送")
         return
     print("qmsg 服务启动")
@@ -434,7 +449,7 @@ def qmsg_bot(title: str, content: str, **kwargs) -> None:
         QMSG_KEY = push_config.get("QMSG_KEY")
         QMSG_TYPE = push_config.get("QMSG_TYPE")
 
-    url = f'https://qmsg.zendee.cn/{QMSG_TYPE}/{QMSG_KEY}'
+    url = f"https://qmsg.zendee.cn/{QMSG_TYPE}/{QMSG_KEY}"
     payload = {"msg": f'{title}\n\n{content.replace("----", "-")}'.encode("utf-8")}
     response = requests.post(url=url, params=payload).json()
 
@@ -575,7 +590,10 @@ def telegram_bot(title: str, content: str, **kwargs) -> None:
     """
     使用 telegram 机器人 推送消息。
     """
-    if not ((kwargs.get("TG_BOT_TOKEN") and kwargs.get("TG_USER_ID")) or (push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"))):
+    if not (
+        (kwargs.get("TG_BOT_TOKEN") and kwargs.get("TG_USER_ID"))
+        or (push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"))
+    ):
         print("tg 服务的 TG_BOT_TOKEN 或者 TG_USER_ID 未设置!!\n取消推送")
         return
     print("tg 服务启动")
@@ -590,9 +608,7 @@ def telegram_bot(title: str, content: str, **kwargs) -> None:
         TG_API_HOST = kwargs.get("TG_API_HOST", push_config.get("TG_API_HOST"))
         url = f"{TG_API_HOST}/bot{TG_BOT_TOKEN}/sendMessage"
     else:
-        url = (
-            f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-        )
+        url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     payload = {
         "chat_id": str(TG_USER_ID),
@@ -600,7 +616,10 @@ def telegram_bot(title: str, content: str, **kwargs) -> None:
         "disable_web_page_preview": "true",
     }
     proxies = None
-    if not ((kwargs.get("TG_PROXY_HOST") and kwargs.get("TG_PROXY_PORT")) or (push_config.get("TG_PROXY_HOST") and push_config.get("TG_PROXY_PORT"))):
+    if not (
+        (kwargs.get("TG_PROXY_HOST") and kwargs.get("TG_PROXY_PORT"))
+        or (push_config.get("TG_PROXY_HOST") and push_config.get("TG_PROXY_PORT"))
+    ):
         if kwargs.get("TG_PROXY_HOST") and kwargs.get("TG_PROXY_PORT"):
             TG_PROXY_HOST = kwargs.get("TG_PROXY_HOST")
             TG_PROXY_PORT = kwargs.get("TG_PROXY_PORT")
@@ -608,16 +627,12 @@ def telegram_bot(title: str, content: str, **kwargs) -> None:
             TG_PROXY_HOST = kwargs.get("TG_PROXY_HOST")
             TG_PROXY_PORT = kwargs.get("TG_PROXY_PORT")
         if kwargs.get("TG_PROXY_AUTH") or push_config.get("TG_PROXY_AUTH"):
-            TG_PROXY_AUTH = kwargs.get("TG_PROXY_AUTH", push_config.get("TG_PROXY_AUTH"))
-        if TG_PROXY_AUTH is not None and "@" not in TG_PROXY_HOST:
-            TG_PROXY_HOST = (
-                TG_PROXY_AUTH
-                + "@"
-                + TG_PROXY_HOST
+            TG_PROXY_AUTH = kwargs.get(
+                "TG_PROXY_AUTH", push_config.get("TG_PROXY_AUTH")
             )
-        proxyStr = "http://{}:{}".format(
-            TG_PROXY_HOST, TG_PROXY_PORT
-        )
+        if TG_PROXY_AUTH is not None and "@" not in TG_PROXY_HOST:
+            TG_PROXY_HOST = TG_PROXY_AUTH + "@" + TG_PROXY_HOST
+        proxyStr = "http://{}:{}".format(TG_PROXY_HOST, TG_PROXY_PORT)
         proxies = {"http": proxyStr, "https": proxyStr}
     response = requests.post(
         url=url, headers=headers, params=payload, proxies=proxies
@@ -638,20 +653,23 @@ def aibotk(title: str, content: str, **kwargs) -> None:
             kwargs.get("AIBOTK_KEY")
             and kwargs.get("AIBOTK_TYPE")
             and kwargs.get("AIBOTK_NAME")
-        ) 
-        or
-        (
+        )
+        or (
             push_config.get("AIBOTK_KEY")
             and push_config.get("AIBOTK_TYPE")
             and push_config.get("AIBOTK_NAME")
         )
-        ):
+    ):
         print(
             "智能微秘书 的 AIBOTK_KEY 或者 AIBOTK_TYPE 或者 AIBOTK_NAME 未设置!!\n取消推送"
         )
         return
     print("智能微秘书 服务启动")
-    if kwargs.get("AIBOTK_KEY") and kwargs.get("AIBOTK_TYPE") and kwargs.get("AIBOTK_NAME"):
+    if (
+        kwargs.get("AIBOTK_KEY")
+        and kwargs.get("AIBOTK_TYPE")
+        and kwargs.get("AIBOTK_NAME")
+    ):
         AIBOTK_KEY = kwargs.get("AIBOTK_KEY")
         AIBOTK_TYPE = kwargs.get("AIBOTK_TYPE")
         AIBOTK_NAME = kwargs.get("AIBOTK_NAME")
@@ -687,19 +705,22 @@ def smtp(title: str, content: str, **kwargs) -> None:
     """
     使用 SMTP 邮件 推送消息。
     """
-    if not ((
-        kwargs.get("SMTP_SERVER")
-        and kwargs.get("SMTP_SSL")
-        and kwargs.get("SMTP_EMAIL")
-        and kwargs.get("SMTP_PASSWORD")
-        and kwargs.get("SMTP_NAME")
-    ) or (
-        push_config.get("SMTP_SERVER")
-        and push_config.get("SMTP_SSL")
-        and push_config.get("SMTP_EMAIL")
-        and push_config.get("SMTP_PASSWORD")
-        and push_config.get("SMTP_NAME")
-    )):
+    if not (
+        (
+            kwargs.get("SMTP_SERVER")
+            and kwargs.get("SMTP_SSL")
+            and kwargs.get("SMTP_EMAIL")
+            and kwargs.get("SMTP_PASSWORD")
+            and kwargs.get("SMTP_NAME")
+        )
+        or (
+            push_config.get("SMTP_SERVER")
+            and push_config.get("SMTP_SSL")
+            and push_config.get("SMTP_EMAIL")
+            and push_config.get("SMTP_PASSWORD")
+            and push_config.get("SMTP_NAME")
+        )
+    ):
         print(
             "SMTP 邮件 的 SMTP_SERVER 或者 SMTP_SSL 或者 SMTP_EMAIL 或者 SMTP_PASSWORD 或者 SMTP_NAME 未设置!!\n取消推送"
         )
@@ -745,9 +766,7 @@ def smtp(title: str, content: str, **kwargs) -> None:
             if SMTP_SSL == "true"
             else smtplib.SMTP(SMTP_SERVER)
         )
-        smtp_server.login(
-            SMTP_EMAIL, SMTP_PASSWORD
-        )
+        smtp_server.login(SMTP_EMAIL, SMTP_PASSWORD)
         smtp_server.sendmail(
             SMTP_EMAIL,
             SMTP_EMAIL,
@@ -769,7 +788,7 @@ def pushme(title: str, content: str, **kwargs) -> None:
     print("PushMe 服务启动")
     PUSHME_KEY = kwargs.get("PUSHME_KEY", push_config.get("PUSHME_KEY"))
 
-    url = f'https://push.i-i.me/?push_key={PUSHME_KEY}'
+    url = f"https://push.i-i.me/?push_key={PUSHME_KEY}"
     data = {
         "title": title,
         "content": content,
@@ -786,15 +805,18 @@ def chronocat(title: str, content: str, **kwargs) -> None:
     """
     使用 CHRONOCAT 推送消息。
     """
-    if not ((
-        push_config.get("CHRONOCAT_URL")
-        and push_config.get("CHRONOCAT_QQ")
-        and push_config.get("CHRONOCAT_TOKEN")
-    ) or (
-        push_config.get("CHRONOCAT_URL")
-        and push_config.get("CHRONOCAT_QQ")
-        and push_config.get("CHRONOCAT_TOKEN")
-    )):
+    if not (
+        (
+            push_config.get("CHRONOCAT_URL")
+            and push_config.get("CHRONOCAT_QQ")
+            and push_config.get("CHRONOCAT_TOKEN")
+        )
+        or (
+            push_config.get("CHRONOCAT_URL")
+            and push_config.get("CHRONOCAT_QQ")
+            and push_config.get("CHRONOCAT_TOKEN")
+        )
+    ):
         print("CHRONOCAT 服务的 CHRONOCAT_URL 或 CHRONOCAT_QQ 未设置!!\n取消推送")
         return
     print("CHRONOCAT 服务启动")
@@ -814,10 +836,10 @@ def chronocat(title: str, content: str, **kwargs) -> None:
     user_ids = re.findall(r"user_id=(\d+)", CHRONOCAT_QQ)
     group_ids = re.findall(r"group_id=(\d+)", CHRONOCAT_QQ)
 
-    url = f'{CHRONOCAT_URL}/api/message/send'
+    url = f"{CHRONOCAT_URL}/api/message/send"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f'Bearer {CHRONOCAT_TOKEN}',
+        "Authorization": f"Bearer {CHRONOCAT_TOKEN}",
     }
 
     for chat_type, ids in [(1, user_ids), (2, group_ids)]:
@@ -865,13 +887,14 @@ def parse_headers(headers):
     return parsed
 
 
-def parse_string(input_string):
+def parse_string(input_string, value_format_fn=None):
     matches = {}
-    pattern = r'(\w+):\s*((?:(?!\n\w+:).)*)'
+    pattern = r"(\w+):\s*((?:(?!\n\w+:).)*)"
     regex = re.compile(pattern)
     for match in regex.finditer(input_string):
         key, value = match.group(1).strip(), match.group(2).strip()
         try:
+            value = value_format_fn(value) if value_format_fn else value
             json_value = json.loads(value)
             matches[key] = json_value
         except:
@@ -879,11 +902,11 @@ def parse_string(input_string):
     return matches
 
 
-def parse_body(body, content_type):
+def parse_body(body, content_type, value_format_fn=None):
     if not body or content_type == "text/plain":
         return body
 
-    parsed = parse_string(input_string)
+    parsed = parse_string(input_string, value_format_fn)
 
     if content_type == "application/x-www-form-urlencoded":
         data = urlencode(parsed, doseq=True)
@@ -924,16 +947,19 @@ def custom_notify(title: str, content: str) -> None:
     WEBHOOK_BODY = push_config.get("WEBHOOK_BODY")
     WEBHOOK_HEADERS = push_config.get("WEBHOOK_HEADERS")
 
-    formatUrl, formatBody = format_notify_content(
-        WEBHOOK_URL, WEBHOOK_BODY, title, content
-    )
-
-    if not formatUrl and not formatBody:
+    if "$title" not in WEBHOOK_URL and "$title" not in WEBHOOK_BODY:
         print("请求头或者请求体中必须包含 $title 和 $content")
         return
 
     headers = parse_headers(WEBHOOK_HEADERS)
-    body = parse_body(formatBody, WEBHOOK_CONTENT_TYPE)
+    body = parse_body(
+        WEBHOOK_BODY,
+        WEBHOOK_CONTENT_TYPE,
+        lambda v: v.replace("$title", title).replace("$content", content),
+    )
+    formatted_url = WEBHOOK_URL.replace(
+        "$title", urllib.parse.quote_plus(title)
+    ).replace("$content", urllib.parse.quote_plus(content))
     response = requests.request(
         method=WEBHOOK_METHOD, url=formatUrl, headers=headers, timeout=15, data=body
     )
@@ -1028,7 +1054,9 @@ def send(title: str, content: str, **kwargs) -> None:
 
     add_notify_function()
     ts = [
-        threading.Thread(target=mode, args=(title, content),kwargs=kwargs, name=mode.__name__)
+        threading.Thread(
+            target=mode, args=(title, content), kwargs=kwargs, name=mode.__name__
+        )
         for mode in notify_function
     ]
     [t.start() for t in ts]

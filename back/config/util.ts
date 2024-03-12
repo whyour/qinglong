@@ -360,7 +360,10 @@ export function parseHeaders(headers: string) {
   return parsed;
 }
 
-function parseString(input: string): Record<string, string> {
+function parseString(
+  input: string,
+  valueFormatFn?: (v: string) => string,
+): Record<string, string> {
   const regex = /(\w+):\s*((?:(?!\n\w+:).)*)/g;
   const matches: Record<string, string> = {};
 
@@ -372,9 +375,10 @@ function parseString(input: string): Record<string, string> {
       continue;
     }
 
-    const _value = value.trim();
+    let _value = value.trim();
 
     try {
+      _value = valueFormatFn ? valueFormatFn(_value) : _value;
       const jsonValue = JSON.parse(_value);
       matches[_key] = jsonValue;
     } catch (error) {
@@ -392,12 +396,13 @@ export function parseBody(
     | 'multipart/form-data'
     | 'application/x-www-form-urlencoded'
     | 'text/plain',
+  valueFormatFn?: (v: string) => string,
 ) {
   if (contentType === 'text/plain' || !body) {
     return body;
   }
 
-  const parsed = parseString(body);
+  const parsed = parseString(body, valueFormatFn);
 
   switch (contentType) {
     case 'multipart/form-data':

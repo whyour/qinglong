@@ -656,17 +656,14 @@ export default class NotificationService {
       webhookContentType,
     } = this.params;
 
-    const { formatBody, formatUrl } = this.formatNotifyContent(
-      webhookUrl,
-      webhookBody,
-    );
-
-    if (!formatUrl && !formatBody) {
+    if (!webhookUrl.includes('$title') && !webhookBody.includes('$title')) {
       throw new Error('Url 或者 Body 中必须包含 $title');
     }
 
     const headers = parseHeaders(webhookHeaders);
-    const body = parseBody(formatBody, webhookContentType);
+    const body = parseBody(webhookBody, webhookContentType, (v) =>
+      v?.replaceAll('$title', this.title)?.replaceAll('$content', this.content),
+    );
     const bodyParam = this.formatBody(webhookContentType, body);
     const options = {
       method: webhookMethod,
@@ -676,6 +673,9 @@ export default class NotificationService {
       ...bodyParam,
     };
     try {
+      const formatUrl = webhookUrl
+        ?.replaceAll('$title', encodeURIComponent(this.title))
+        ?.replaceAll('$content', encodeURIComponent(this.content));
       const res = await got(formatUrl, options);
       if (String(res.statusCode).startsWith('20')) {
         return true;
@@ -699,20 +699,5 @@ export default class NotificationService {
         return { body };
     }
     return {};
-  }
-
-  private formatNotifyContent(url: string, body: string) {
-    if (!url.includes('$title') && !body.includes('$title')) {
-      return {};
-    }
-
-    return {
-      formatUrl: url
-        ?.replaceAll('$title', encodeURIComponent(this.title))
-        ?.replaceAll('$content', encodeURIComponent(this.content)),
-      formatBody: body
-        ?.replaceAll('$title', this.title)
-        ?.replaceAll('$content', this.content),
-    };
   }
 }
