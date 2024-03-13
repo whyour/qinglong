@@ -201,7 +201,7 @@ const Dependence = () => {
           <Input.Group compact>
             <Input
               style={{ width: 250 }}
-              placeholder={'http://deb.debian.org'}
+              placeholder={'http://mirrors.aliyun.com'}
               value={systemConfig?.linuxMirror}
               onChange={(e) => {
                 setSystemConfig({
