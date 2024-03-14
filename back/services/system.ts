@@ -1,20 +1,14 @@
+import { spawn } from 'cross-spawn';
 import { Response } from 'express';
-import { Service, Inject } from 'typedi';
+import fs from 'fs';
+import got from 'got';
+import sum from 'lodash/sum';
+import path from 'path';
+import tar from 'tar';
+import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import config from '../config';
-import {
-  AuthDataType,
-  AuthInfo,
-  SystemInstance,
-  SystemModel,
-  SystemModelInfo,
-} from '../data/system';
-import { NotificationInfo } from '../data/notify';
-import NotificationService from './notify';
-import ScheduleService, { TaskCallbacks } from './schedule';
-import { spawn } from 'cross-spawn';
-import SockService from './sock';
-import got from 'got';
+import { TASK_COMMAND } from '../config/const';
 import {
   getPid,
   killTask,
@@ -23,13 +17,23 @@ import {
   promiseExec,
   readDirs,
 } from '../config/util';
-import { TASK_COMMAND } from '../config/const';
+import {
+  DependenceModel,
+  DependenceStatus,
+  DependenceTypes,
+} from '../data/dependence';
+import { NotificationInfo } from '../data/notify';
+import {
+  AuthDataType,
+  AuthInfo,
+  SystemInstance,
+  SystemModel,
+  SystemModelInfo,
+} from '../data/system';
 import taskLimit from '../shared/pLimit';
-import tar from 'tar';
-import path from 'path';
-import fs from 'fs';
-import sum from 'lodash/sum';
-import { DependenceModel, DependenceStatus, DependenceTypes } from '../data/dependence';
+import NotificationService from './notify';
+import ScheduleService, { TaskCallbacks } from './schedule';
+import SockService from './sock';
 
 @Service()
 export default class SystemService {
@@ -139,7 +143,10 @@ export default class SystemService {
     }
     let command = `cd && ${cmd}`;
     const docs = await DependenceModel.findAll({
-      where: { type: DependenceTypes.nodejs, status: DependenceStatus.installed },
+      where: {
+        type: DependenceTypes.nodejs,
+        status: DependenceStatus.installed,
+      },
     });
     if (docs.length > 0) {
       command += ` && pnpm i -g`;
@@ -326,7 +333,7 @@ export default class SystemService {
     return { code: 200 };
   }
 
-  public async reloadSystem(target: 'system' | 'data') {
+  public async reloadSystem(target?: 'system' | 'data') {
     const cmd = `real_time=true ql reload ${target || ''}`;
     const cp = spawn(cmd, { shell: '/bin/bash' });
     cp.unref();
@@ -382,8 +389,13 @@ export default class SystemService {
 
   public async exportData(res: Response) {
     try {
-      await tar.create(
-        { gzip: true, file: config.dataTgzFile, cwd: config.rootPath },
+      tar.create(
+        {
+          gzip: true,
+          file: config.dataTgzFile,
+          cwd: config.rootPath,
+          sync: true,
+        },
         ['data'],
       );
       res.download(config.dataTgzFile);
@@ -395,7 +407,7 @@ export default class SystemService {
   public async importData() {
     try {
       await promiseExec(`rm -rf ${path.join(config.tmpPath, 'data')}`);
-      await tar.x({ file: config.dataTgzFile, cwd: config.tmpPath });
+      tar.x({ file: config.dataTgzFile, cwd: config.tmpPath, sync: true });
       return { code: 200 };
     } catch (error: any) {
       return { code: 400, message: error.message };

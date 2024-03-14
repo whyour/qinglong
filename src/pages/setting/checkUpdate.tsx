@@ -1,10 +1,10 @@
-import intl from 'react-intl-universal';
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Statistic, Modal, Tag, Button, Spin, message } from 'antd';
-import { request } from '@/utils/http';
 import config from '@/utils/config';
+import { request } from '@/utils/http';
 import WebSocketManager from '@/utils/websocket';
 import Ansi from 'ansi-to-react';
+import { Button, Modal, Statistic, message } from 'antd';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import intl from 'react-intl-universal';
 
 const { Countdown } = Statistic;
 
@@ -220,7 +220,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
       </Button>
       <Button
         type="primary"
-        onClick={() => reloadSystem('system')}
+        onClick={() => reloadSystem('reload')}
         style={{ marginLeft: 8 }}
       >
         {intl.get('重新启动')}

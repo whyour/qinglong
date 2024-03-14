@@ -231,6 +231,8 @@ usage() {
 }
 
 reload_qinglong() {
+  delete_pm2
+
   local reload_target="${1}"
   local primary_branch="master"
   if [[ "${QL_BRANCH}" == "develop" ]]; then
@@ -245,8 +247,8 @@ reload_qinglong() {
   fi
 
   if [[ "$reload_target" == 'data' ]]; then
-    rm -rf ${dir_root}/data
-    cp -rf ${dir_tmp}/data ${dir_root}/
+    rm -rf ${dir_root}/data/*
+    mv -f ${dir_tmp}/data/* ${dir_root}/data/
   fi
 
   reload_pm2
@@ -310,6 +312,8 @@ check_update_dep() {
     echo -e "更新包下载成功..."
 
     if [[ "$needRestart" == 'true' ]]; then
+      delete_pm2
+
       cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
       rm -rf $dir_static/*
       cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/

@@ -81,6 +81,7 @@ main() {
   check_ql
   check_nginx
   check_pm2
+  reload_update
   reload_pm2
   echo -e "\n=====> 检测结束\n"
 }
