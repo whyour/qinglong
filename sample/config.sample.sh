@@ -148,6 +148,15 @@ export AIBOTK_TYPE=""
 ## aibotk_name (必填)填写群名或用户昵称，和上面的type类型要对应
 export AIBOTK_NAME=""
 
+## 13. CHRONOCAT
+## CHRONOCAT_URL 推送 http://127.0.0.1:16530
+## CHRONOCAT_TOKEN 填写在CHRONOCAT文件生成的访问密钥
+## CHRONOCAT_QQ 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx
+## CHRONOCAT相关API https://chronocat.vercel.app/install/docker/official/
+export CHRONOCAT_URL=""
+export CHRONOCAT_QQ=""
+export CHRONOCAT_TOKEN=""
+
 ## 14. SMTP
 ## 邮箱服务名称，比如126、163、Gmail、QQ等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
 export SMTP_SERVICE=""
@@ -163,13 +172,15 @@ export SMTP_NAME=""
 ## PUSHME_KEY (必填)填写PushMe APP上获取的push_key
 export PUSHME_KEY=""
 
-## 13. CHRONOCAT
-## CHRONOCAT_URL 推送 http://127.0.0.1:16530
-## CHRONOCAT_TOKEN 填写在CHRONOCAT文件生成的访问密钥
-## CHRONOCAT_QQ 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx
-## CHRONOCAT相关API https://chronocat.vercel.app/install/docker/official/
-export CHRONOCAT_URL=""
-export CHRONOCAT_QQ=""
-export CHRONOCAT_TOKEN=""
+## 15. 自定义通知
+## 自定义通知 接收回调的URL
+export WEBHOOK_URL = "";
+## WEBHOOK_BODY 和 WEBHOOK_HEADERS 多个参数时，直接换行或者使用 $'\n' 连接多行字符串，比如 export dd="line 1"$'\n'"line 2"
+export WEBHOOK_BODY = "";
+export WEBHOOK_HEADERS = "";
+## 支持 GET/POST/PUT
+export WEBHOOK_METHOD = "";
+## 支持 text/plain、application/json、multipart/form-data、application/x-www-form-urlencoded
+export WEBHOOK_CONTENT_TYPE = "";
 
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
