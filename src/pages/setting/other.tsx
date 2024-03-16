@@ -22,6 +22,7 @@ import { UploadOutlined } from '@ant-design/icons';
 import Countdown from 'antd/lib/statistic/Countdown';
 import useProgress from './progress';
 import pick from 'lodash/pick';
+import { disableBody } from '@/utils';
 
 const dataMap = {
   'log-remove-frequency': 'logRemoveFrequency',
@@ -157,6 +158,7 @@ const Other = ({
               ),
               duration: 30,
             });
+            disableBody();
             setTimeout(() => {
               window.location.reload();
             }, 30000);

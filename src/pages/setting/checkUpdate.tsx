@@ -1,3 +1,4 @@
+import { disableBody } from '@/utils';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
 import WebSocketManager from '@/utils/websocket';
@@ -132,6 +133,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
           ),
           duration: 30,
         });
+        disableBody();
         setTimeout(() => {
           window.location.reload();
         }, 30000);

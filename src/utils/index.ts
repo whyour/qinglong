@@ -154,9 +154,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-        shell, // wechat qq uc 360 2345 sougou liebao maxthon
-        shellVs,
-      },
+          shell, // wechat qq uc 360 2345 sougou liebao maxthon
+          shellVs,
+        },
   );
 
   console.log(
@@ -335,20 +335,23 @@ export function parseCrontab(schedule: string): Date | null {
     if (time) {
       return time.next().toDate();
     }
-  } catch (error) { }
+  } catch (error) {}
 
   return null;
 }
 
-export function getCrontabsNextDate(schedule: string, extra_schedules: string[]): Date | null {
-  let date = parseCrontab(schedule)
+export function getCrontabsNextDate(
+  schedule: string,
+  extra_schedules: string[],
+): Date | null {
+  let date = parseCrontab(schedule);
   if (extra_schedules?.length) {
-    extra_schedules.forEach(x => {
-      const _date = parseCrontab(x)
+    extra_schedules.forEach((x) => {
+      const _date = parseCrontab(x);
       if (_date && (!date || _date < date)) {
         date = _date;
       }
-    })
+    });
   }
   return date;
 }
@@ -362,4 +365,23 @@ export function getExtension(filename: string) {
 export function getEditorMode(filename: string) {
   const extension = getExtension(filename) as keyof typeof LANG_MAP;
   return LANG_MAP[extension];
+}
+
+export function disableBody() {
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0px';
+  overlay.style.left = '0px';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.backgroundColor = 'transparent';
+  overlay.style.zIndex = '9999';
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', function (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  });
+
+  document.body.style.overflow = 'hidden';
 }

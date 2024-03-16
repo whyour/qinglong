@@ -235,14 +235,14 @@ reload_qinglong() {
 
   local reload_target="${1}"
   local primary_branch="master"
-  if [[ "${QL_BRANCH}" == "develop" ]]; then
-    primary_branch="develop"
+  if [[ "${QL_BRANCH}" == "develop" ]] || [[ "${QL_BRANCH}" == "debian" ]] || [[ "${QL_BRANCH}" == "debian-dev" ]]; then
+    primary_branch="${QL_BRANCH}"
   fi
 
   if [[ "$reload_target" == 'system' ]]; then
-    cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
+    mv -f ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
     rm -rf $dir_static/*
-    cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
+    mv -f ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
     cp -f $file_config_sample $dir_config/config.sample.sh
   fi
 
@@ -314,9 +314,9 @@ check_update_dep() {
     if [[ "$needRestart" == 'true' ]]; then
       delete_pm2
 
-      cp -rf ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
+      mv -f ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
       rm -rf $dir_static/*
-      cp -rf ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
+      mv -f ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
       cp -f $file_config_sample $dir_config/config.sample.sh
 
       reload_pm2
