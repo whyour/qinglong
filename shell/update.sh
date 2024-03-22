@@ -240,6 +240,7 @@ reload_qinglong() {
   fi
 
   if [[ "$reload_target" == 'system' ]]; then
+    rm -rf ${dir_root}/back ${dir_root}/cli ${dir_root}/docker ${dir_root}/sample ${dir_root}/shell ${dir_root}/src
     mv -f ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
     rm -rf $dir_static/*
     mv -f ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
@@ -260,7 +261,7 @@ update_qinglong() {
   local mirror="gitee"
   local downloadQLUrl="https://gitee.com/whyour/qinglong/repository/archive"
   local downloadStaticUrl="https://gitee.com/whyour/qinglong-static/repository/archive"
-  local githubStatus=$(curl -s -m 2 -IL "https://google.com" | grep 200)
+  local githubStatus=$(curl -s --noproxy "*" -m 2 -IL "https://google.com" | grep 200)
   if [[ ! -z $githubStatus ]]; then
     mirror="github"
     downloadQLUrl="https://github.com/whyour/qinglong/archive/refs/heads"
@@ -314,6 +315,7 @@ check_update_dep() {
     if [[ "$needRestart" == 'true' ]]; then
       delete_pm2
 
+      rm -rf ${dir_root}/back ${dir_root}/cli ${dir_root}/docker ${dir_root}/sample ${dir_root}/shell ${dir_root}/src
       mv -f ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
       rm -rf $dir_static/*
       mv -f ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
