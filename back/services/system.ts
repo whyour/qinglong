@@ -4,7 +4,6 @@ import fs from 'fs';
 import got from 'got';
 import sum from 'lodash/sum';
 import path from 'path';
-import tar from 'tar';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import config from '../config';
@@ -389,15 +388,7 @@ export default class SystemService {
 
   public async exportData(res: Response) {
     try {
-      tar.create(
-        {
-          gzip: true,
-          file: config.dataTgzFile,
-          cwd: config.rootPath,
-          sync: true,
-        },
-        ['data'],
-      );
+      await promiseExec(`cd ${config.rootPath} && tar -zcvf ${config.dataTgzFile} data/`);
       res.download(config.dataTgzFile);
     } catch (error: any) {
       return res.send({ code: 400, message: error.message });
@@ -407,8 +398,10 @@ export default class SystemService {
   public async importData() {
     try {
       await promiseExec(`rm -rf ${path.join(config.tmpPath, 'data')}`);
-      tar.x({ file: config.dataTgzFile, cwd: config.tmpPath, sync: true });
-      return { code: 200 };
+      const res = await promiseExec(
+        `cd ${config.tmpPath} && tar -zxvf data.tgz`,
+      );
+      return { code: 200, data: res };
     } catch (error: any) {
       return { code: 400, message: error.message };
     }

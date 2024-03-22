@@ -273,12 +273,18 @@ const Other = ({
           showUploadList={false}
           maxCount={1}
           action={`${config.apiPrefix}system/data/import`}
-          onChange={(e) => {
-            if (e.event?.percent) {
-              showUploadProgress(parseFloat(e.event?.percent.toFixed(1)));
-              if (e.event?.percent === 100) {
-                showReloadModal();
-              }
+          onChange={({ file, event }) => {
+            if (event?.percent) {
+              showUploadProgress(
+                Math.min(parseFloat(event?.percent.toFixed(1)), 99),
+              );
+            }
+            if (file.status === 'done') {
+              showUploadProgress(100);
+              showReloadModal();
+            }
+            if (file.status === 'error') {
+              message.error('上传失败');
             }
           }}
           name="data"
