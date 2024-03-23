@@ -525,7 +525,7 @@ export default class NotificationService {
           headers: { 'Content-Type': 'application/json' },
         })
         .json();
-      if (res.StatusCode === 0) {
+      if (res.StatusCode === 0 || res.code === 0) {
         return true;
       } else {
         throw new Error(JSON.stringify(res));
