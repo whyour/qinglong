@@ -3,11 +3,11 @@ COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
   && apk update \
   && apk add nodejs npm git \
-  && npm i -g pnpm@8.3.1 \
+  && npm i -g pnpm@8.3.1 pm2 tsx \
   && cd /tmp/build \
   && pnpm install --prod
 
-FROM python:3.10-alpine3.18
+FROM python:3.10-alpine
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -22,6 +22,13 @@ ENV PNPM_HOME=/root/.local/share/pnpm \
   PS1="\u@\h:\w \$ " \
   QL_DIR=/ql \
   QL_BRANCH=${QL_BRANCH}
+
+VOLUME /ql/data
+  
+EXPOSE 5700
+
+COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=builder /usr/local/bin/. /usr/local/bin/
 
 RUN set -x \
   && apk update -f \
@@ -49,11 +56,9 @@ RUN set -x \
   && git config --global user.email "qinglong@@users.noreply.github.com" \
   && git config --global user.name "qinglong" \
   && git config --global http.postBuffer 524288000 \
-  && npm install -g pnpm@8.3.1 pm2 tsx \
   && rm -rf /root/.pnpm-store \
   && rm -rf /root/.local/share/pnpm/store \
   && rm -rf /root/.cache \
-  && rm -rf /root/.npm \
   && ulimit -c 0
 
 ARG SOURCE_COMMIT
