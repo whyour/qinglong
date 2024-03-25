@@ -174,13 +174,13 @@ export PUSHME_KEY=""
 
 ## 15. 自定义通知
 ## 自定义通知 接收回调的URL
-export WEBHOOK_URL = "";
+export WEBHOOK_URL=""
 ## WEBHOOK_BODY 和 WEBHOOK_HEADERS 多个参数时，直接换行或者使用 $'\n' 连接多行字符串，比如 export dd="line 1"$'\n'"line 2"
-export WEBHOOK_BODY = "";
-export WEBHOOK_HEADERS = "";
+export WEBHOOK_BODY=""
+export WEBHOOK_HEADERS=""
 ## 支持 GET/POST/PUT
-export WEBHOOK_METHOD = "";
+export WEBHOOK_METHOD=""
 ## 支持 text/plain、application/json、multipart/form-data、application/x-www-form-urlencoded
-export WEBHOOK_CONTENT_TYPE = "";
+export WEBHOOK_CONTENT_TYPE=""
 
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
