@@ -293,7 +293,7 @@ git_clone_scripts() {
 
   set_proxy "$proxy"
 
-  git clone --depth=1 $part_cmd $url $dir
+  git clone -q --depth=1 $part_cmd $url $dir
   exit_status=$?
 
   unset_proxy
