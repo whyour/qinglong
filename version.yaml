@@ -1,7 +1,9 @@
-version: 2.17.2
-changeLogLink: https://t.me/jiao_long/403
-publishTime: 2024-03-02 17:00
+version: 2.17.3
+changeLogLink: https://t.me/jiao_long/404
+publishTime: 2024-03-29 23:30
 changeLog: |
-  1. 依赖管理支持队列中依赖取消安装，支持状态筛选
-  2. 修复 webhook 通知 body 拆分逻辑
-  3. 企业微信有长度限制，超长的进行分段提交 https://github.com/pharaoh2012
+  1. python 通知文件支持自定义参数，可由每个脚本控制通知参数配置
+  2. ql repo 命令复制仓库任务时，保留仓库脚本原始目录层级
+  3. 修改自定义通知 body 解析逻辑
+  4. 修改系统重启逻辑
+  5. 修改 latest 基础镜像 node 版本为 v20
