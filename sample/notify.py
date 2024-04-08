@@ -113,7 +113,6 @@ push_config = {
     'WEBHOOK_METHOD': '',               # 自定义通知 请求方法
     'WEBHOOK_CONTENT_TYPE': ''          # 自定义通知 content-type
 }
-notify_function = []
 # fmt: on
 
 # 首先读取 面板变量 或者 github action 运行变量
@@ -840,6 +839,7 @@ def one() -> str:
 
 
 def add_notify_function():
+    notify_function = []
     if push_config.get("BARK_PUSH"):
         notify_function.append(bark)
     if push_config.get("CONSOLE"):
@@ -897,6 +897,7 @@ def add_notify_function():
 
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
+    return notify_function
 
 
 def send(title: str, content: str, ignore_default_config: bool = False, **kwargs):
@@ -921,7 +922,7 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
     hitokoto = push_config.get("HITOKOTO")
     content += "\n\n" + one() if hitokoto else ""
 
-    add_notify_function()
+    notify_function = add_notify_function()
     ts = [
         threading.Thread(target=mode, args=(title, content), name=mode.__name__)
         for mode in notify_function
