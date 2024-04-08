@@ -771,10 +771,10 @@ def parse_body(body, content_type):
     if not body or content_type == "text/plain":
         return body
 
-    parsed = parse_string(input_string)
+    parsed = parse_string(body)
 
     if content_type == "application/x-www-form-urlencoded":
-        data = urlencode(parsed, doseq=True)
+        data = urllib.parse.urlencode(parsed, doseq=True)
         return data
 
     if content_type == "application/json":
