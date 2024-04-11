@@ -1121,7 +1121,7 @@ function fsBotNotify(text, desp) {
             console.log(err);
           } else {
             data = JSON.parse(data);
-            if (data.StatusCode === 0) {
+            if (data.StatusCode === 0 || data.code === 0) {
               console.log('飞书发送通知消息成功🎉\n');
             } else {
               console.log(`${data.msg}\n`);
