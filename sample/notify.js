@@ -1379,7 +1379,7 @@ function parseHeaders(headers) {
 
 function parseBody(body, contentType, valueFormatFn) {
   if (contentType === 'text/plain' || !body) {
-    return body;
+    return valueFormatFn && body ? valueFormatFn(body) : body;
   }
 
   const parsed = parseString(body, valueFormatFn);

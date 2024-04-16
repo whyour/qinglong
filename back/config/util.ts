@@ -399,7 +399,7 @@ export function parseBody(
   valueFormatFn?: (v: string) => string,
 ) {
   if (contentType === 'text/plain' || !body) {
-    return body;
+    return valueFormatFn && body ? valueFormatFn(body) : body;
   }
 
   const parsed = parseString(body, valueFormatFn);

@@ -766,7 +766,7 @@ def parse_string(input_string, value_format_fn=None):
 
 def parse_body(body, content_type, value_format_fn=None):
     if not body or content_type == "text/plain":
-        return body
+        return value_format_fn(body) if value_format_fn and body else body
 
     parsed = parse_string(body, value_format_fn)
 
