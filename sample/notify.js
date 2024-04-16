@@ -1407,6 +1407,7 @@ function formatBodyFun(contentType, body) {
     case 'multipart/form-data':
       return { form: body };
     case 'application/x-www-form-urlencoded':
+    case 'text/plain':
       return { body };
   }
   return {};
