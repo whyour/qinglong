@@ -258,7 +258,8 @@ const Script = () => {
         <>
           {intl.get('确认删除')}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
-            {select}
+            {' '}
+            {select}{' '}
           </Text>
           {intl.get('文件')}
           {currentNode.type === 'directory' ? intl.get('夹及其子文件') : ''}
