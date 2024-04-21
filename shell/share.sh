@@ -33,8 +33,12 @@ file_task_sample=$dir_sample/task.sample.sh
 file_extra_sample=$dir_sample/extra.sample.sh
 file_notify_js_sample=$dir_sample/notify.js
 file_notify_py_sample=$dir_sample/notify.py
+file_test_js_sample=$dir_sample/test.js
+file_test_py_sample=$dir_sample/test.py
 file_notify_py=$dir_scripts/notify.py
 file_notify_js=$dir_scripts/sendNotify.js
+file_test_js=$dir_scripts/test.js
+file_test_py=$dir_scripts/test.py
 nginx_app_conf=$dir_root/docker/front.conf
 nginx_conf=$dir_root/docker/nginx.conf
 dep_notify_py=$dir_dep/notify.py
@@ -231,6 +235,16 @@ fix_config() {
   if [[ ! -s $file_notify_js ]]; then
     echo -e "复制一份 $file_notify_js_sample 为 $file_notify_js\n"
     cp -fv $file_notify_js_sample $file_notify_js
+    echo
+  fi
+
+  if [[ ! -s $file_test_js ]]; then
+    cp -fv $file_test_js_sample $file_test_js
+    echo
+  fi
+
+  if [[ ! -s $file_test_py ]]; then
+    cp -fv $file_test_py_sample $file_test_py
     echo
   fi
 
