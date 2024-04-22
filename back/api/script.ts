@@ -136,7 +136,7 @@ export default (app: Router) => {
         }
 
         if (req.file) {
-          await fs.rename(req.file.path, join(path, req.file.filename));
+          await fs.rename(req.file.path, join(path, filename));
           return res.send({ code: 200 });
         }
 

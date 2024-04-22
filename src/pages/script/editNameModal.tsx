@@ -39,8 +39,8 @@ const EditScriptNameModal = ({
     setLoading(true);
     const { path = '', filename: inputFilename, directory = '' } = values;
     const formData = new FormData();
-    formData.append('file', file as any);
-    formData.append('filename', inputFilename);
+    formData.append('file', file || '');
+    formData.append('filename', file?.name || inputFilename);
     formData.append('path', path);
     formData.append('content', '');
     formData.append('directory', directory);
