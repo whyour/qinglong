@@ -1,9 +1,11 @@
-version: 2.17.3
-changeLogLink: https://t.me/jiao_long/404
-publishTime: 2024-03-29 23:30
+version: 2.17.4
+changeLogLink: https://t.me/jiao_long/405
+publishTime: 2024-04-26 22:00
 changeLog: |
-  1. python 通知文件支持自定义参数，可由每个脚本控制通知参数配置
-  2. ql repo 命令复制仓库任务时，保留仓库脚本原始目录层级
-  3. 修改自定义通知 body 解析逻辑
-  4. 修改系统重启逻辑
-  5. 修改 latest 基础镜像 node 版本为 v20
+  1. 增加示例脚本
+  2. 修复上传脚本文件名乱码
+  3. 修复飞书通知结果校验
+  4. 修复删除日志提示
+  5. 修复自定义通知 text/plain 类型
+  6. 修复脚本和日志列表软连接循环报错
+  7. 修复 python 通知文件自定义 send
