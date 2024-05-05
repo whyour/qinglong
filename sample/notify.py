@@ -33,7 +33,7 @@ def print(text, *args, **kw):
 # 通知服务
 # fmt: off
 push_config = {
-    'HITOKOTO': False,                  # 启用一言（随机句子）
+    'HITOKOTO': True,                  # 启用一言（随机句子）
 
     'BARK_PUSH': '',                    # bark IP 或设备码，例：https://api.day.app/DxHcxxxxxRxxxxxxcm/
     'BARK_ARCHIVE': '',                 # bark 推送是否存档

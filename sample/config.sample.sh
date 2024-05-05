@@ -56,6 +56,12 @@ export BARK_ICON="https://qn.whyour.cn/logo.png"
 export BARK_SOUND=""
 ## 下方填写推送消息分组，默认为"QingLong"
 export BARK_GROUP="QingLong"
+## bark 推送时效性
+export BARK_LEVEL="active"
+## bark 推送是否存档
+export BARK_ARCHIVE=""
+## bark 推送跳转 URL
+export BARK_URL=""
 
 ## 3. Telegram
 ## 下方填写自己申请@BotFather的Token，如10xxx4:AAFcqxxxxgER5uw
@@ -172,7 +178,19 @@ export SMTP_NAME=""
 ## PUSHME_KEY (必填)填写PushMe APP上获取的push_key
 export PUSHME_KEY=""
 
-## 15. 自定义通知
+## 16. 飞书机器人
+## 官方文档：https://www.feishu.cn/hc/zh-CN/articles/360024984973
+## FSKEY 飞书机器人的 FSKEY
+export FSKEY=""
+
+## 17. Qmsg酱
+## 官方文档：https://qmsg.zendee.cn/docs/api/
+## qmsg 酱的 QMSG_KEY 
+## qmsg 酱的 QMSG_TYPE send 为私聊，group 为群聊 
+export QMSG_KEY=""
+export QMSG_TYPE=""
+
+## 18. 自定义通知
 ## 自定义通知 接收回调的URL
 export WEBHOOK_URL=""
 ## WEBHOOK_BODY 和 WEBHOOK_HEADERS 多个参数时，直接换行或者使用 $'\n' 连接多行字符串，比如 export dd="line 1"$'\n'"line 2"
