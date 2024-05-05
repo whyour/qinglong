@@ -190,6 +190,10 @@ export default {
         label: 'barkUrl',
         tip: intl.get('BARK推送消息的跳转URL'),
       },
+      {
+        label: 'barkArchive',
+        tip: intl.get('BARK是否保存推送消息'),
+      },
     ],
     telegramBot: [
       {

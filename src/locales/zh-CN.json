@@ -357,6 +357,7 @@
   "BARK推送消息的分组，默认为qinglong": "BARK推送消息的分组，默认为qinglong",
   "BARK推送消息的时效性，默认为active": "BARK推送消息的时效性，默认为active",
   "BARK推送消息的跳转URL": "BARK推送消息的跳转URL",
+  "BARK是否保存推送消息": "BARK是否保存推送消息",
   "telegram机器人的token，例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw": "telegram机器人的token，例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw",
   "telegram用户的id，例如：129xxx206": "telegram用户的id，例如：129xxx206",
   "代理IP": "代理IP",

@@ -357,6 +357,7 @@
   "BARK推送消息的分组，默认为qinglong": "BARK push message grouping, default is qinglong",
   "BARK推送消息的时效性，默认为active": "BARK push message redirecting URL",
   "BARK推送消息的跳转URL": "BARK push message grouping, default is qinglong",
+  "BARK是否保存推送消息": "Does BARK save push messages",
   "telegram机器人的token，例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw": "Telegram Bot token, e.g., 1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw",
   "telegram用户的id，例如：129xxx206": "Telegram user ID, e.g., 129xxx206",
   "代理IP": "Proxy IP",

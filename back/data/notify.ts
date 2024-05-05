@@ -58,6 +58,7 @@ export class BarkNotification extends NotificationBaseInfo {
   public barkGroup = 'qinglong';
   public barkLevel = 'active';
   public barkUrl = '';
+  public barkArchive=""
 }
 
 export class TelegramBotNotification extends NotificationBaseInfo {
