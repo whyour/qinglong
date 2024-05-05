@@ -64,7 +64,7 @@ const push_config = {
 
   TG_BOT_TOKEN: '', // tg 机器人的 TG_BOT_TOKEN，例：1407203283:AAG9rt-6RDaaX0HBLZQq0laNOh898iFYaRQ
   TG_USER_ID: '', // tg 机器人的 TG_USER_ID，例：1434078534
-  TG_API_HOST: '', // tg 代理 api
+  TG_API_HOST: 'https://api.telegram.org', // tg 代理 api
   TG_PROXY_AUTH: '', // tg 代理认证参数
   TG_PROXY_HOST: '', // tg 机器人的 TG_PROXY_HOST
   TG_PROXY_PORT: '', // tg 机器人的 TG_PROXY_PORT
@@ -143,7 +143,7 @@ async function one() {
 
 function gotifyNotify(text, desp) {
   return new Promise((resolve) => {
-    const { GOTIFY_URL, GOTIFY_TOKEN } = push_config;
+    const { GOTIFY_URL, GOTIFY_TOKEN, GOTIFY_PRIORITY } = push_config;
     if (GOTIFY_URL && GOTIFY_TOKEN) {
       const options = {
         url: `${GOTIFY_URL}/message?token=${GOTIFY_TOKEN}`,
@@ -179,7 +179,7 @@ function gotifyNotify(text, desp) {
 
 function gobotNotify(text, desp) {
   return new Promise((resolve) => {
-    const { GOBOT_URL } = push_config;
+    const { GOBOT_URL, GOBOT_TOKEN, GOBOT_QQ } = push_config;
     if (GOBOT_URL) {
       const options = {
         url: `${GOBOT_URL}?access_token=${GOBOT_TOKEN}&${GOBOT_QQ}`,
@@ -199,9 +199,7 @@ function gobotNotify(text, desp) {
             } else if (data.retcode === 100) {
               console.log(`Go-cqhttp 发送通知消息异常 ${data.errmsg}\n`);
             } else {
-              console.log(
-                `Go-cqhttp 发送通知消息异常 ${JSON.stringify(data)}`,
-              );
+              console.log(`Go-cqhttp 发送通知消息异常 ${JSON.stringify(data)}`);
             }
           }
         } catch (e) {
@@ -218,14 +216,14 @@ function gobotNotify(text, desp) {
 
 function serverNotify(text, desp) {
   return new Promise((resolve) => {
-    const { SCKEY } = push_config;
-    if (SCKEY) {
+    const { PUSH_KEY } = push_config;
+    if (PUSH_KEY) {
       // 微信server酱推送通知一个\n不会换行，需要两个\n才能换行，故做此替换
       desp = desp.replace(/[\n\r]/g, '\n\n');
       const options = {
-        url: SCKEY.includes('SCT')
-          ? `https://sctapi.ftqq.com/${SCKEY}.send`
-          : `https://sc.ftqq.com/${SCKEY}.send`,
+        url: PUSH_KEY.includes('SCT')
+          ? `https://sctapi.ftqq.com/${PUSH_KEY}.send`
+          : `https://sc.ftqq.com/${PUSH_KEY}.send`,
         body: `text=${text}&desp=${desp}`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -261,13 +259,13 @@ function serverNotify(text, desp) {
 
 function pushDeerNotify(text, desp) {
   return new Promise((resolve) => {
-    const { DEER_KEY, PUSHDEER_URL } = push_config;
+    const { DEER_KEY, DEER_URL } = push_config;
     if (DEER_KEY) {
       // PushDeer 建议对消息内容进行 urlencode
       desp = encodeURI(desp);
       const options = {
-        url: PUSHDEER_URL || `https://api2.pushdeer.com/message/push`,
-        body: `pushkey=${PUSHDEER_KEY}&text=${text}&desp=${desp}&type=markdown`,
+        url: DEER_URL || `https://api2.pushdeer.com/message/push`,
+        body: `pushkey=${DEER_KEY}&text=${text}&desp=${desp}&type=markdown`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -285,7 +283,9 @@ function pushDeerNotify(text, desp) {
             ) {
               console.log('PushDeer 发送通知消息成功🎉\n');
             } else {
-              console.log(`PushDeer 发送通知消息异常😞 ${JSON.stringify(data)}`);
+              console.log(
+                `PushDeer 发送通知消息异常😞 ${JSON.stringify(data)}`,
+              );
             }
           }
         } catch (e) {
@@ -388,8 +388,14 @@ function barkNotify(text, desp, params = {}) {
 
 function tgBotNotify(text, desp) {
   return new Promise((resolve) => {
-    const { TG_BOT_TOKEN, TG_USER_ID, TG_PROXY_HOST, TG_PROXY_PORT } =
-      push_config;
+    const {
+      TG_BOT_TOKEN,
+      TG_USER_ID,
+      TG_PROXY_HOST,
+      TG_PROXY_PORT,
+      TG_API_HOST,
+      TG_PROXY_AUTH,
+    } = push_config;
     if (TG_BOT_TOKEN && TG_USER_ID) {
       const options = {
         url: `${TG_API_HOST}/bot${TG_BOT_TOKEN}/sendMessage`,
@@ -680,7 +686,9 @@ function do_qywxamNotify(text, desp) {
                     '企业微信应用消息发送通知消息成功🎉。\n',
                 );
               } else {
-                console.log(`企业微信应用消息发送通知消息异常 ${data.errmsg}\n`);
+                console.log(
+                  `企业微信应用消息发送通知消息异常 ${data.errmsg}\n`,
+                );
               }
             }
           } catch (e) {
@@ -1221,8 +1229,7 @@ async function sendNotify(text, desp, params = {}) {
     }
   }
 
-  hitokoto = push_config.HITOKOTO;
-  if (hitokoto) {
+  if (push_config.HITOKOTO) {
     desp += '\n\n' + (await one());
   }
 
