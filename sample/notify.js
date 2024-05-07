@@ -935,11 +935,11 @@ async function smtpNotify(text, desp) {
 
 function pushMeNotify(text, desp, params = {}) {
   return new Promise((resolve) => {
-    const { PUSHME_KEY } = push_config;
+    const { PUSHME_KEY, PUSHME_URL } = push_config;
     if (PUSHME_KEY) {
       const options = {
-        url: `https://push.i-i.me?push_key=${PUSHME_KEY}`,
-        json: { title: text, content: desp, ...params },
+        url: PUSHME_URL || 'https://push.i-i.me',
+        json: { push_key: PUSHME_KEY, title: text, content: desp, ...params },
         headers: {
           'Content-Type': 'application/json',
         },

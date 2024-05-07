@@ -573,13 +573,14 @@ export default class NotificationService {
   }
 
   private async pushMe() {
-    const { pushMeKey } = this.params;
+    const { pushMeKey, pushMeUrl } = this.params;
     try {
       const res: any = await got.post(
-        `https://push.i-i.me/?push_key=${pushMeKey}`,
+        pushMeUrl || 'https://push.i-i.me/',
         {
           ...this.gotOption,
           json: {
+            push_key: pushMeKey,
             title: this.title,
             content: this.content,
           },
