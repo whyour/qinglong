@@ -176,7 +176,9 @@ export SMTP_NAME=""
 ## 15. PushMe
 ## 官方说明文档：https://push.i-i.me/
 ## PUSHME_KEY (必填)填写PushMe APP上获取的push_key
+## PUSHME_URL (选填)填写自建的PushMeServer消息服务接口地址，例如：http://127.0.0.1:3010，不填则使用官方接口服务
 export PUSHME_KEY=""
+export PUSHME_URL=""
 
 ## 16. 飞书机器人
 ## 官方文档：https://www.feishu.cn/hc/zh-CN/articles/360024984973

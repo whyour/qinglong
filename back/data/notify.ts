@@ -108,6 +108,7 @@ export class EmailNotification extends NotificationBaseInfo {
 
 export class PushMeNotification extends NotificationBaseInfo {
   public pushMeKey: string = '';
+  public pushMeUrl: string = '';
 }
 
 export class ChronocatNotification extends NotificationBaseInfo {

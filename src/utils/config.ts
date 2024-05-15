@@ -338,6 +338,11 @@ export default {
         tip: intl.get('PushMe的Key，https://push.i-i.me/'),
         required: true,
       },
+      {
+        label: 'pushMeUrl',
+        tip: intl.get('自建的PushMeServer消息接口地址，例如：http://127.0.0.1:3010，不填则使用官方消息接口'),
+        required: false,
+      },
     ],
     chronocat: [
       {
