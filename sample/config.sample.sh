@@ -118,7 +118,18 @@ export PUSH_PLUS_TOKEN=""
 ## 1. 需订阅者扫描二维码 2、如果您是创建群组所属人，也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送
 export PUSH_PLUS_USER=""
 
-## 9. go-cqhttp
+## 9. 微加机器人
+## 官方网站：http://www.weplusbot.com
+## 下方填写您的Token；微信扫描登录后在"我的"->"设置"->"令牌"中获取
+export WE_PLUS_BOT_TOKEN=""
+## 消息接收人；
+## 个人版填写接收消息的群编码，不填发送给自己的微信号
+## 专业版不填默认发给机器人自己，发送给好友填写wxid，发送给微信群填写群编码
+export WE_PLUS_BOT_RECEIVER=""
+## 调用版本；分为专业版和个人版，专业版填写pro，个人版填写personal
+export WE_PLUS_BOT_VERSION="pro"
+
+## 10. go-cqhttp
 ## gobot_url 推送到个人QQ: http://127.0.0.1/send_private_msg  群：http://127.0.0.1/send_group_msg
 ## gobot_token 填写在go-cqhttp文件设置的访问密钥
 ## gobot_qq 如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群
@@ -127,7 +138,7 @@ export GOBOT_URL=""
 export GOBOT_TOKEN=""
 export GOBOT_QQ=""
 
-## 10. gotify
+## 11. gotify
 ## gotify_url 填写gotify地址,如https://push.example.de:8080
 ## gotify_token 填写gotify的消息应用token
 ## gotify_priority 填写推送消息优先级,默认为0
@@ -135,17 +146,17 @@ export GOTIFY_URL=""
 export GOTIFY_TOKEN=""
 export GOTIFY_PRIORITY=0
 
-## 11. PushDeer
+## 12. PushDeer
 ## deer_key 填写PushDeer的key
 export DEER_KEY=""
 
-## 12. Chat
+## 13. Chat
 ## chat_url 填写synology chat地址，http://IP:PORT/webapi/***token=
 ## chat_token 填写后面的token
 export CHAT_URL=""
 export CHAT_TOKEN=""
 
-## 13. aibotk
+## 14. aibotk
 ## 官方说明文档：http://wechat.aibotk.com/oapi/oapi?from=ql
 ## aibotk_key (必填)填写智能微秘书个人中心的apikey
 export AIBOTK_KEY=""
@@ -154,7 +165,7 @@ export AIBOTK_TYPE=""
 ## aibotk_name (必填)填写群名或用户昵称，和上面的type类型要对应
 export AIBOTK_NAME=""
 
-## 13. CHRONOCAT
+## 15. CHRONOCAT
 ## CHRONOCAT_URL 推送 http://127.0.0.1:16530
 ## CHRONOCAT_TOKEN 填写在CHRONOCAT文件生成的访问密钥
 ## CHRONOCAT_QQ 个人:user_id=个人QQ 群则填入group_id=QQ群 多个用英文;隔开同时支持个人和群 如：user_id=xxx;group_id=xxxx;group_id=xxxxx
@@ -163,7 +174,7 @@ export CHRONOCAT_URL=""
 export CHRONOCAT_QQ=""
 export CHRONOCAT_TOKEN=""
 
-## 14. SMTP
+## 16. SMTP
 ## 邮箱服务名称，比如126、163、Gmail、QQ等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
 export SMTP_SERVICE=""
 ## smtp_email 填写 SMTP 收发件邮箱，通知将会由自己发给自己
@@ -173,26 +184,26 @@ export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
 
-## 15. PushMe
+## 17. PushMe
 ## 官方说明文档：https://push.i-i.me/
 ## PUSHME_KEY (必填)填写PushMe APP上获取的push_key
 ## PUSHME_URL (选填)填写自建的PushMeServer消息服务接口地址，例如：http://127.0.0.1:3010，不填则使用官方接口服务
 export PUSHME_KEY=""
 export PUSHME_URL=""
 
-## 16. 飞书机器人
+## 18. 飞书机器人
 ## 官方文档：https://www.feishu.cn/hc/zh-CN/articles/360024984973
 ## FSKEY 飞书机器人的 FSKEY
 export FSKEY=""
 
-## 17. Qmsg酱
+## 19. Qmsg酱
 ## 官方文档：https://qmsg.zendee.cn/docs/api/
-## qmsg 酱的 QMSG_KEY 
-## qmsg 酱的 QMSG_TYPE send 为私聊，group 为群聊 
+## qmsg 酱的 QMSG_KEY
+## qmsg 酱的 QMSG_TYPE send 为私聊，group 为群聊
 export QMSG_KEY=""
 export QMSG_TYPE=""
 
-## 18. 自定义通知
+## 20. 自定义通知
 ## 自定义通知 接收回调的URL
 export WEBHOOK_URL=""
 ## WEBHOOK_BODY 和 WEBHOOK_HEADERS 多个参数时，直接换行或者使用 $'\n' 连接多行字符串，比如 export dd="line 1"$'\n'"line 2"

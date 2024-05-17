@@ -75,6 +75,10 @@ push_config = {
     'PUSH_PLUS_TOKEN': '',              # push+ 微信推送的用户令牌
     'PUSH_PLUS_USER': '',               # push+ 微信推送的群组编码
 
+    'WE_PLUS_BOT_TOKEN': '',            # 微加机器人的用户令牌
+    'WE_PLUS_BOT_RECEIVER': '',         # 微加机器人的消息接收者
+    'WE_PLUS_BOT_VERSION': 'pro',          # 微加机器人的调用版本
+
     'QMSG_KEY': '',                     # qmsg 酱的 QMSG_KEY
     'QMSG_TYPE': '',                    # qmsg 酱的 QMSG_TYPE
 
@@ -380,6 +384,37 @@ def pushplus_bot(title: str, content: str) -> None:
 
         else:
             print("PUSHPLUS 推送失败！")
+
+def weplus_bot(title: str, content: str) -> None:
+    """
+    通过 微加机器人 推送消息。
+    """
+    if not push_config.get("WE_PLUS_BOT_TOKEN"):
+        print("微加机器人 服务的 WE_PLUS_BOT_TOKEN 未设置!!\n取消推送")
+        return
+    print("微加机器人 服务启动")
+
+    template = "txt"
+    if len(content) > 800:
+      template = "html"
+
+    url = "https://www.weplusbot.com/send"
+    data = {
+        "token": push_config.get("WE_PLUS_BOT_TOKEN"),
+        "title": title,
+        "content": content,
+        "template": template,
+        "receiver": push_config.get("WE_PLUS_BOT_RECEIVER"),
+        "version": push_config.get("WE_PLUS_BOT_VERSION"),
+    }
+    body = json.dumps(data).encode(encoding="utf-8")
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, data=body, headers=headers).json()
+
+    if response["code"] == 200:
+        print("微加机器人 推送成功！")
+    else:
+        print("微加机器人 推送失败！")
 
 
 def qmsg_bot(title: str, content: str) -> None:
@@ -858,6 +893,8 @@ def add_notify_function():
         notify_function.append(chat)
     if push_config.get("PUSH_PLUS_TOKEN"):
         notify_function.append(pushplus_bot)
+    if push_config.get("WE_PLUS_BOT_TOKEN"):
+        notify_function.append(weplus_bot)
     if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"):
         notify_function.append(qmsg_bot)
     if push_config.get("QYWX_AM"):
