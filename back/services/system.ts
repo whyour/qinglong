@@ -348,20 +348,13 @@ export default class SystemService {
     }
   }
 
-  public async run(
-    { command, logPath }: { command: string; logPath: string },
-    callback: TaskCallbacks,
-  ) {
+  public async run({ command }: { command: string }, callback: TaskCallbacks) {
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
-    this.scheduleService.runTask(
-      `real_log_path=${logPath} real_time=true ${command}`,
-      callback,
-      {
-        command,
-      },
-    );
+    this.scheduleService.runTask(`real_time=true ${command}`, callback, {
+      command,
+    });
   }
 
   public async stop({ command, pid }: { command: string; pid: number }) {
@@ -388,7 +381,9 @@ export default class SystemService {
 
   public async exportData(res: Response) {
     try {
-      await promiseExec(`cd ${config.rootPath} && tar -zcvf ${config.dataTgzFile} data/`);
+      await promiseExec(
+        `cd ${config.rootPath} && tar -zcvf ${config.dataTgzFile} data/`,
+      );
       res.download(config.dataTgzFile);
     } catch (error: any) {
       return res.send({ code: 400, message: error.message });

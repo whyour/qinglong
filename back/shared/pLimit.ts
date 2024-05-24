@@ -15,6 +15,9 @@ class TaskLimit {
   private cronLimit = new PQueue({
     concurrency: Math.max(os.cpus().length, 4),
   });
+  private manualCronoLimit = new PQueue({
+    concurrency: Math.max(os.cpus().length, 4),
+  });
 
   get cronLimitActiveCount() {
     return this.cronLimit.pending;
@@ -71,6 +74,7 @@ class TaskLimit {
   public async setCustomLimit(limit?: number) {
     if (limit) {
       this.cronLimit.concurrency = limit;
+      this.manualCronoLimit.concurrency = limit;
       return;
     }
     await SystemModel.sync();
@@ -79,6 +83,7 @@ class TaskLimit {
     });
     if (doc?.info?.cronConcurrency) {
       this.cronLimit.concurrency = doc.info.cronConcurrency;
+      this.manualCronoLimit.concurrency = doc.info.cronConcurrency;
     }
   }
 
@@ -87,6 +92,13 @@ class TaskLimit {
     options?: Partial<QueueAddOptions>,
   ): Promise<T | void> {
     return this.cronLimit.add(fn, options);
+  }
+
+  public async manualRunWithCronLimit<T>(
+    fn: () => Promise<T>,
+    options?: Partial<QueueAddOptions>,
+  ): Promise<T | void> {
+    return this.manualCronoLimit.add(fn, options);
   }
 
   public runDependeny<T>(

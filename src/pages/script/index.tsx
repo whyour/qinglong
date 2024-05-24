@@ -643,6 +643,7 @@ const Script = () => {
                 fontSize: 12,
                 lineNumbersMinChars: 3,
                 glyphMargin: false,
+                accessibilitySupport: 'off'
               }}
               onMount={(editor) => {
                 editorRef.current = editor;

@@ -407,7 +407,7 @@ export default class CronService {
   }
 
   private async runSingle(cronId: number): Promise<number | void> {
-    return taskLimit.runWithCronLimit(() => {
+    return taskLimit.manualRunWithCronLimit(() => {
       return new Promise(async (resolve: any) => {
         const cron = await this.getDb({ id: cronId });
         const params = {
@@ -434,9 +434,8 @@ export default class CronService {
         }
         const logPath = `${uniqPath}/${logTime}.log`;
         const absolutePath = path.resolve(config.logPath, `${logPath}`);
-
         const cp = spawn(
-          `real_log_path=${logPath} no_delay=true ${this.makeCommand(cron)}`,
+          `real_log_path=${logPath} real_time=true no_delay=true ${this.makeCommand(cron)}`,
           { shell: '/bin/bash' },
         );
 
@@ -444,11 +443,14 @@ export default class CronService {
           { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
           { where: { id } },
         );
+        cp.stdout.on('data', async (data) => {
+          await fs.appendFile(absolutePath, data.toString());
+        });
         cp.stderr.on('data', async (data) => {
-          await fs.appendFile(`${absolutePath}`, `${data.toString()}`);
+          await fs.appendFile(absolutePath, data.toString());
         });
         cp.on('error', async (err) => {
-          await fs.appendFile(`${absolutePath}`, `${JSON.stringify(err)}`);
+          await fs.appendFile(absolutePath, JSON.stringify(err));
         });
 
         cp.on('exit', async (code) => {

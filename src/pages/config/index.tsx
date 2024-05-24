@@ -136,6 +136,7 @@ const Config = () => {
             lineNumbersMinChars: 3,
             folding: false,
             glyphMargin: false,
+            accessibilitySupport: 'off'
           }}
           onMount={(editor) => {
             editorRef.current = editor;

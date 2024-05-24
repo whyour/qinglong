@@ -242,6 +242,7 @@ const EditModal = ({
             minimap: { enabled: false },
             lineNumbersMinChars: 3,
             glyphMargin: false,
+            accessibilitySupport: 'off'
           }}
           onMount={(editor) => {
             editorRef.current = editor;

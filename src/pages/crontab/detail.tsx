@@ -110,6 +110,7 @@ const CronDetailModal = ({
           minimap: { enabled: false },
           lineNumbersMinChars: 3,
           glyphMargin: false,
+          accessibilitySupport: 'off'
         }}
         onMount={(editor, monaco) => {
           editorRef.current = editor;
