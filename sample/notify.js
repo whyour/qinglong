@@ -44,6 +44,11 @@ const push_config = {
   PUSH_PLUS_TOKEN: '', // push+ 微信推送的用户令牌
   PUSH_PLUS_USER: '', // push+ 微信推送的群组编码
 
+  // 微加机器人，官方网站：https://www.weplusbot.com/
+  WE_PLUS_BOT_TOKEN: '', // 微加机器人的用户令牌
+  WE_PLUS_BOT_RECEIVER: '', // 微加机器人的消息接收人
+  WE_PLUS_BOT_VERSION: 'pro', //微加机器人调用版本，pro和personal；为空默认使用pro(专业版)，个人版填写：personal
+
   QMSG_KEY: '', // qmsg 酱的 QMSG_KEY
   QMSG_TYPE: '', // qmsg 酱的 QMSG_TYPE
 
@@ -801,6 +806,61 @@ function pushPlusNotify(text, desp) {
   });
 }
 
+function wePlusBotNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { WE_PLUS_BOT_TOKEN, WE_PLUS_BOT_RECEIVER, WE_PLUS_BOT_VERSION } = push_config;
+    if (WE_PLUS_BOT_TOKEN) {
+      const template = 'txt';
+      if(desp.length>800){
+          desp = desp.replace(/[\n\r]/g, '<br>');
+          template = 'html';
+      }
+      const body = {
+        token: `${WE_PLUS_BOT_TOKEN}`,
+        title: `${text}`,
+        content: `${desp}`,
+        template: `${template}`,
+        receiver: `${WE_PLUS_BOT_RECEIVER}`,
+        version: `${WE_PLUS_BOT_VERSION}`,
+      };
+      const options = {
+        url: `https://www.weplusbot.com/send`,
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': ' application/json',
+        },
+        timeout,
+      };
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log(
+              `微加机器人 发送通知消息失败😞\n`,
+              err,
+            );
+          } else {
+            if (data.code === 200) {
+              console.log(
+                `微加机器人 发送通知消息完成🎉\n`,
+              );
+            } else {
+              console.log(
+                `微加机器人 发送通知消息异常 ${data.msg}\n`,
+              );
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
 function aibotkNotify(text, desp) {
   return new Promise((resolve) => {
     const { AIBOTK_KEY, AIBOTK_TYPE, AIBOTK_NAME } = push_config;
@@ -1236,6 +1296,7 @@ async function sendNotify(text, desp, params = {}) {
   await Promise.all([
     serverNotify(text, desp), // 微信server酱
     pushPlusNotify(text, desp), // pushplus
+    wePlusBotNotify(text, desp), // 微加机器人
     barkNotify(text, desp, params), // iOS Bark APP
     tgBotNotify(text, desp), // telegram 机器人
     ddBotNotify(text, desp), // 钉钉机器人

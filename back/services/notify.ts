@@ -27,6 +27,7 @@ export default class NotificationService {
     ['aibotk', this.aibotk],
     ['iGot', this.iGot],
     ['pushPlus', this.pushPlus],
+    ['wePlusBot',this.wePlusBot],
     ['email', this.email],
     ['pushMe', this.pushMe],
     ['webhook', this.webhook],
@@ -499,6 +500,42 @@ export default class NotificationService {
             title: `${this.title}`,
             content: `${this.content.replace(/[\n\r]/g, '<br>')}`,
             topic: `${pushPlusUser || ''}`,
+          },
+        })
+        .json();
+
+      if (res.code === 200) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  private async wePlusBot() {
+    const { wePlusBotToken, wePlusBotReceiver, wePlusBotVersion } = this.params;
+
+    let content = this.content;
+    let template = 'txt';
+    if(this.content.length>800){
+      template = 'html';
+      content = content.replace(/[\n\r]/g, '<br>');
+    }
+
+    const url = `https://www.weplusbot.com/send`;
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          json: {
+            token: `${wePlusBotToken}`,
+            title: `${this.title}`,
+            template: `${template}`,
+            content: `${content}`,
+            receiver: `${wePlusBotReceiver || ''}`,
+            version: `${wePlusBotVersion || 'pro'}`,
           },
         })
         .json();
