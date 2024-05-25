@@ -75,18 +75,16 @@ const Crontab = () => {
           style={{
             wordBreak: 'break-all',
             marginBottom: 0,
-            color: '#1890ff'
+            color: '#1890ff',
+            cursor: 'pointer'
           }}
           ellipsis={{ tooltip: text, rows: 2 }}
+          onClick={() => {
+            setDetailCron(record);
+            setIsDetailModalVisible(true);
+          }}
         >
-          <Link
-            onClick={() => {
-              setDetailCron(record);
-              setIsDetailModalVisible(true);
-            }}
-          >
-            {record.name || '-'}
-          </Link>
+          <Link>{record.name || '-'}</Link>
         </Paragraph>
       ),
       sorter: {

@@ -41,7 +41,7 @@ export default class ScriptService {
     const relativePath = path.relative(config.scriptPath, filePath);
     const command = `${TASK_COMMAND} ${relativePath} now`;
     const pid = await this.scheduleService.runTask(
-      command,
+      `real_time=true ${command}`,
       this.taskCallbacks(filePath),
       { command },
       'start',
@@ -63,7 +63,10 @@ export default class ScriptService {
   }
 
   public async getFile(filePath: string, fileName: string) {
-    const _filePath = join(config.scriptPath, filePath, fileName);
+    let _filePath = join(config.scriptPath, filePath, fileName);
+    if (filePath.startsWith(config.dataPath)) {
+      _filePath = join(filePath, fileName);
+    }
     const content = await getFileContentByName(_filePath);
     return content;
   }

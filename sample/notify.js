@@ -808,12 +808,13 @@ function pushPlusNotify(text, desp) {
 
 function wePlusBotNotify(text, desp) {
   return new Promise((resolve) => {
-    const { WE_PLUS_BOT_TOKEN, WE_PLUS_BOT_RECEIVER, WE_PLUS_BOT_VERSION } = push_config;
+    const { WE_PLUS_BOT_TOKEN, WE_PLUS_BOT_RECEIVER, WE_PLUS_BOT_VERSION } =
+      push_config;
     if (WE_PLUS_BOT_TOKEN) {
       const template = 'txt';
-      if(desp.length>800){
-          desp = desp.replace(/[\n\r]/g, '<br>');
-          template = 'html';
+      if (desp.length > 800) {
+        desp = desp.replace(/[\n\r]/g, '<br>');
+        template = 'html';
       }
       const body = {
         token: `${WE_PLUS_BOT_TOKEN}`,
@@ -834,19 +835,12 @@ function wePlusBotNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
-            console.log(
-              `微加机器人 发送通知消息失败😞\n`,
-              err,
-            );
+            console.log(`微加机器人发送通知消息失败😞\n`, err);
           } else {
             if (data.code === 200) {
-              console.log(
-                `微加机器人 发送通知消息完成🎉\n`,
-              );
+              console.log(`微加机器人发送通知消息完成🎉\n`);
             } else {
-              console.log(
-                `微加机器人 发送通知消息异常 ${data.msg}\n`,
-              );
+              console.log(`微加机器人发送通知消息异常 ${data.msg}\n`);
             }
           }
         } catch (e) {
