@@ -1,11 +1,9 @@
-version: 2.17.4
-changeLogLink: https://t.me/jiao_long/405
-publishTime: 2024-04-26 22:00
+version: 2.17.5
+changeLogLink: https://t.me/jiao_long/406
+publishTime: 2024-05-25 19:00
 changeLog: |
-  1. 增加示例脚本
-  2. 修复上传脚本文件名乱码
-  3. 修复飞书通知结果校验
-  4. 修复删除日志提示
-  5. 修复自定义通知 text/plain 类型
-  6. 修复脚本和日志列表软连接循环报错
-  7. 修复 python 通知文件自定义 send
+  1. 修复有可能手动运行任务无日志
+  2. 重构 JavaScript 脚本通知文件
+  3. PushMe 通知支持自建服务
+  4. 增加微加机器人消息通道
+  5. 修复任务详情查看脚本错误
