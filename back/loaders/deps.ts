@@ -23,18 +23,21 @@ async function linkCommand() {
     {
       src: 'update.sh',
       dest: 'ql',
+      tmp: 'ql_tmp',
     },
     {
       src: 'task.sh',
       dest: 'task',
+      tmp: 'task_tmp',
     },
   ];
 
   for (const link of linkShell) {
     const source = path.join(config.rootPath, 'shell', link.src);
     const target = path.join(commandDir, link.dest);
-    await rmPath(target);
-    await fs.symlink(source, target);
+    const tmpTarget = path.join(commandDir, link.tmp);
+    await fs.symlink(source, tmpTarget);
+    await fs.rename(tmpTarget, target);
   }
 }
 

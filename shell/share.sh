@@ -129,31 +129,6 @@ gen_random_num() {
   echo $((${RANDOM} % $divi))
 }
 
-link_shell_sub() {
-  local link_path="$1"
-  local original_path="$2"
-  if [[ ! -L $link_path ]] || [[ $(readlink -f $link_path) != $original_path ]]; then
-    rm -f $link_path 2>/dev/null
-    ln -sf $original_path $link_path
-  fi
-}
-
-link_shell() {
-  if [[ $is_termux -eq 1 ]]; then
-    local path="/data/data/com.termux/files/usr/bin/"
-  elif [[ $PATH == */usr/local/bin* ]] && [[ -d /usr/local/bin ]]; then
-    local path="/usr/local/bin/"
-  else
-    local path=""
-    echo -e "脚本功能受限，请自行添加命令的软连接...\n"
-  fi
-  if [[ $path ]]; then
-    for ((i = 0; i < ${#link_name[*]}; i++)); do
-      link_shell_sub "$path${link_name[i]}" "$dir_shell/${original_name[i]}"
-    done
-  fi
-}
-
 define_cmd() {
   local cmd_prefix cmd_suffix
   if type task &>/dev/null; then
