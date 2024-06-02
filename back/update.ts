@@ -12,7 +12,7 @@ async function startServer() {
   await require('./loaders/update').default({ app });
 
   app
-    .listen(config.updatePort, () => {
+    .listen(config.updatePort, '0.0.0.0', () => {
       Logger.debug(`✌️ 更新服务启动成功！`);
       console.debug(`✌️ 更新服务启动成功！`);
       process.send?.('ready');
