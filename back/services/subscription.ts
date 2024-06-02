@@ -91,9 +91,9 @@ export default class SubscriptionService {
           this.taskCallbacks(doc),
           runImmediately,
         ));
-    } else {
+    } else if (doc.interval_schedule) {
       this.scheduleService.cancelIntervalTask(doc as any);
-      const { type, value } = doc.interval_schedule as any;
+      const { type, value } = doc.interval_schedule;
       needCreate &&
         (await this.scheduleService.createIntervalTask(
           doc as any,
@@ -256,7 +256,7 @@ export default class SubscriptionService {
     );
   }
 
-  public async remove(ids: number[], query: any) {
+  public async remove(ids: number[], query: { force?: boolean }) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       await this.handleTask(doc, false);
@@ -279,8 +279,11 @@ export default class SubscriptionService {
   public async getDb(
     query: FindOptions<Subscription>['where'],
   ): Promise<Subscription> {
-    const doc: any = await SubscriptionModel.findOne({ where: { ...query } });
-    return doc && (doc.get({ plain: true }) as Subscription);
+    const doc = await SubscriptionModel.findOne({ where: { ...query } });
+    if (!doc) {
+      throw new Error(`${JSON.stringify(query)} not found`);
+    }
+    return doc.get({ plain: true });
   }
 
   public async run(ids: number[]) {

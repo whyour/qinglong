@@ -85,7 +85,7 @@
     "node-schedule": "^2.1.0",
     "nodemailer": "^6.7.2",
     "p-queue-cjs": "7.3.4",
-    "protobufjs": "^7.2.3",
+    "protobufjs": "^7.3.0",
     "pstree.remy": "^1.1.8",
     "reflect-metadata": "^0.1.13",
     "sequelize": "^6.25.5",

@@ -13,7 +13,7 @@ import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
 
 export interface ScheduleTaskType {
-  id: number;
+  id?: number;
   command: string;
   name?: string;
   schedule?: string;
