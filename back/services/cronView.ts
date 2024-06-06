@@ -63,7 +63,10 @@ export default class CronViewService {
     query: FindOptions<CrontabView>['where'],
   ): Promise<CrontabView> {
     const doc: any = await CrontabViewModel.findOne({ where: { ...query } });
-    return doc && (doc.get({ plain: true }) as CrontabView);
+    if (!doc) {
+      throw new Error(`${JSON.stringify(query)} not found`);
+    }
+    return doc.get({ plain: true });
   }
 
   public async disabled(ids: number[]) {

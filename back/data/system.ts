@@ -2,13 +2,13 @@ import { sequelize } from '.';
 import { DataTypes, Model, ModelDefined } from 'sequelize';
 import { NotificationInfo } from './notify';
 
-export class AuthInfo {
+export class SystemInfo {
   ip?: string;
   type: AuthDataType;
   info?: SystemModelInfo;
   id?: number;
 
-  constructor(options: AuthInfo) {
+  constructor(options: SystemInfo) {
     this.ip = options.ip;
     this.info = options.info;
     this.type = options.type;
@@ -50,7 +50,7 @@ export type SystemModelInfo = SystemConfigInfo &
   Partial<NotificationInfo> &
   LoginLogInfo;
 
-export interface SystemInstance extends Model<AuthInfo, AuthInfo>, AuthInfo { }
+export interface SystemInstance extends Model<SystemInfo, SystemInfo>, SystemInfo { }
 export const SystemModel = sequelize.define<SystemInstance>('Auth', {
   ip: DataTypes.STRING,
   type: DataTypes.STRING,

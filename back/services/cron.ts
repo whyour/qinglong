@@ -375,7 +375,10 @@ export default class CronService {
 
   public async getDb(query: FindOptions<Crontab>['where']): Promise<Crontab> {
     const doc: any = await CrontabModel.findOne({ where: { ...query } });
-    return doc && (doc.get({ plain: true }) as Crontab);
+    if (!doc) {
+      throw new Error(`${JSON.stringify(query)} not found`);
+    }
+    return doc.get({ plain: true });
   }
 
   public async run(ids: number[]) {
@@ -437,7 +440,7 @@ export default class CronService {
         const cp = spawn(
           `real_log_path=${logPath} no_delay=true ${this.makeCommand(
             cron,
-            true
+            true,
           )}`,
           { shell: '/bin/bash' },
         );

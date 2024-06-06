@@ -165,7 +165,10 @@ export default class EnvService {
 
   public async getDb(query: FindOptions<Env>['where']): Promise<Env> {
     const doc: any = await EnvModel.findOne({ where: { ...query } });
-    return doc && (doc.get({ plain: true }) as Env);
+    if (!doc) {
+      throw new Error(`${JSON.stringify(query)} not found`);
+    }
+    return doc.get({ plain: true });
   }
 
   public async disabled(ids: string[]) {

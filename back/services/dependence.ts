@@ -183,7 +183,10 @@ export default class DependenceService {
     query: FindOptions<Dependence>['where'],
   ): Promise<Dependence> {
     const doc: any = await DependenceModel.findOne({ where: { ...query } });
-    return doc && (doc.get({ plain: true }) as Dependence);
+    if (!doc) {
+      throw new Error(`${JSON.stringify(query)} not found`);
+    }
+    return doc.get({ plain: true });
   }
 
   private async updateLog(ids: number[], log: string): Promise<void> {

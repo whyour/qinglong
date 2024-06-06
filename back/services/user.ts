@@ -13,7 +13,7 @@ import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
 import {
   AuthDataType,
-  AuthInfo,
+  SystemInfo,
   SystemModel,
   SystemModelInfo,
   LoginStatus,
@@ -223,7 +223,7 @@ export default class UserService {
     return [];
   }
 
-  private async insertDb(payload: AuthInfo): Promise<AuthInfo> {
+  private async insertDb(payload: SystemInfo): Promise<SystemInfo> {
     const doc = await SystemModel.create({ ...payload }, { returning: true });
     return doc;
   }
@@ -351,10 +351,10 @@ export default class UserService {
 
   public async getNotificationMode(): Promise<NotificationInfo> {
     const doc = await this.getDb({ type: AuthDataType.notification });
-    return (doc && doc.info) || {};
+    return doc.info as NotificationInfo;
   }
 
-  private async updateAuthDb(payload: AuthInfo): Promise<any> {
+  private async updateAuthDb(payload: SystemInfo): Promise<any> {
     let doc = await SystemModel.findOne({ type: payload.type });
     if (doc) {
       const updateResult = await SystemModel.update(payload, {
@@ -368,9 +368,12 @@ export default class UserService {
     return doc;
   }
 
-  public async getDb(query: any): Promise<any> {
-    const doc: any = await SystemModel.findOne({ where: { ...query } });
-    return doc && (doc.get({ plain: true }) as any);
+  public async getDb(query: any): Promise<SystemInfo> {
+    const doc = await SystemModel.findOne({ where: { ...query } });
+    if (!doc) {
+      throw new Error(`${JSON.stringify(query)} not found`);
+    }
+    return doc.get({ plain: true });
   }
 
   public async updateNotificationMode(notificationInfo: NotificationInfo) {

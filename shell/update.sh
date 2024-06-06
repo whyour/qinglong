@@ -161,7 +161,7 @@ update_raw() {
     if [[ $url == http:* ]]; then
       proxyStr="-e \"http_proxy=${proxy}\""
     elif [[ $url == https:* ]]; then
-      proxyStr="-e \"http_proxy=${proxy};https_proxy=${proxy}\""
+      proxyStr="-e \"https_proxy=${proxy}\""
     fi
   fi
 
@@ -255,7 +255,7 @@ reload_qinglong() {
   reload_pm2
 }
 
-## 更新qinglong
+## 更新 qinglong
 update_qinglong() {
   rm -rf ${dir_tmp}/*
   local mirror="gitee"

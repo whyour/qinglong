@@ -26,7 +26,7 @@ export default class OpenService {
 
   public async insert(payload: App): Promise<App> {
     const doc = await AppModel.create(payload, { returning: true });
-    return doc.get({ plain: true }) as App;
+    return doc.get({ plain: true });
   }
 
   public async update(payload: App): Promise<App> {
@@ -45,7 +45,10 @@ export default class OpenService {
 
   public async getDb(query: any): Promise<App> {
     const doc: any = await AppModel.findOne({ where: query });
-    return doc && (doc.get({ plain: true }) as App);
+    if (!doc) {
+      throw new Error(`${JSON.stringify(query)} not found`);
+    }
+    return doc.get({ plain: true });
   }
 
   public async remove(ids: number[]) {
