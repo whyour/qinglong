@@ -137,9 +137,9 @@ def bark(title: str, content: str) -> None:
     print("bark 服务启动")
 
     if push_config.get("BARK_PUSH").startswith("http"):
-        url = f'{push_config.get("BARK_PUSH")}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
+        url = f'{push_config.get("BARK_PUSH")}'
     else:
-        url = f'https://api.day.app/{push_config.get("BARK_PUSH")}/{urllib.parse.quote_plus(title)}/{urllib.parse.quote_plus(content)}'
+        url = f'https://api.day.app/{push_config.get("BARK_PUSH")}'
 
     bark_params = {
         "BARK_ARCHIVE": "isArchive",
@@ -149,7 +149,10 @@ def bark(title: str, content: str) -> None:
         "BARK_LEVEL": "level",
         "BARK_URL": "url",
     }
-    params = ""
+    data = {
+        "title": title,
+        "body": content,
+    }
     for pair in filter(
         lambda pairs: pairs[0].startswith("BARK_")
         and pairs[0] != "BARK_PUSH"
@@ -157,10 +160,11 @@ def bark(title: str, content: str) -> None:
         and bark_params.get(pairs[0]),
         push_config.items(),
     ):
-        params += f"{bark_params.get(pair[0])}={pair[1]}&"
-    if params:
-        url = url + "?" + params.rstrip("&")
-    response = requests.get(url).json()
+        data[bark_params.get(pair[0])] = pair[1]
+    headers = {"Content-Type": "application/json;charset=utf-8"}
+    response = requests.post(
+        url=url, data=json.dumps(data), headers=headers, timeout=15
+    ).json()
 
     if response["code"] == 200:
         print("bark 推送成功！")
@@ -385,6 +389,7 @@ def pushplus_bot(title: str, content: str) -> None:
         else:
             print("PUSHPLUS 推送失败！")
 
+
 def weplus_bot(title: str, content: str) -> None:
     """
     通过 微加机器人 推送消息。
@@ -396,7 +401,7 @@ def weplus_bot(title: str, content: str) -> None:
 
     template = "txt"
     if len(content) > 800:
-      template = "html"
+        template = "html"
 
     url = "https://www.weplusbot.com/send"
     data = {
@@ -704,7 +709,11 @@ def pushme(title: str, content: str) -> None:
         return
     print("PushMe 服务启动")
 
-    url = push_config.get("PUSHME_URL") if push_config.get("PUSHME_URL") else "https://push.i-i.me/"
+    url = (
+        push_config.get("PUSHME_URL")
+        if push_config.get("PUSHME_URL")
+        else "https://push.i-i.me/"
+    )
     data = {
         "push_key": push_config.get("PUSHME_KEY"),
         "title": title,

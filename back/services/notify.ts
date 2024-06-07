@@ -27,7 +27,7 @@ export default class NotificationService {
     ['aibotk', this.aibotk],
     ['iGot', this.iGot],
     ['pushPlus', this.pushPlus],
-    ['wePlusBot',this.wePlusBot],
+    ['wePlusBot', this.wePlusBot],
     ['email', this.email],
     ['pushMe', this.pushMe],
     ['webhook', this.webhook],
@@ -209,16 +209,23 @@ export default class NotificationService {
     if (!barkPush.startsWith('http')) {
       barkPush = `https://api.day.app/${barkPush}`;
     }
-    const url = `${barkPush}/${encodeURIComponent(
-      this.title,
-    )}/${encodeURIComponent(
-      this.content,
-    )}?icon=${barkIcon}&sound=${barkSound}&group=${barkGroup}&level=${barkLevel}&url=${barkUrl}&isArchive=${barkArchive}`;
+    const url = `${barkPush}`;
+    const body = {
+      title: this.title,
+      body: this.content,
+      icon: barkIcon,
+      sound: barkSound,
+      group: barkGroup,
+      isArchive: barkArchive,
+      level: barkLevel,
+      url: barkUrl,
+    };
     try {
       const res: any = await got
-        .get(url, {
+        .post(url, {
           ...this.gotOption,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          json: body,
+          headers: { 'Content-Type': 'application/json' },
         })
         .json();
       if (res.code === 200) {
@@ -519,7 +526,7 @@ export default class NotificationService {
 
     let content = this.content;
     let template = 'txt';
-    if(this.content.length>800){
+    if (this.content.length > 800) {
       template = 'html';
       content = content.replace(/[\n\r]/g, '<br>');
     }
@@ -612,18 +619,15 @@ export default class NotificationService {
   private async pushMe() {
     const { pushMeKey, pushMeUrl } = this.params;
     try {
-      const res: any = await got.post(
-        pushMeUrl || 'https://push.i-i.me/',
-        {
-          ...this.gotOption,
-          json: {
-            push_key: pushMeKey,
-            title: this.title,
-            content: this.content,
-          },
-          headers: { 'Content-Type': 'application/json' },
+      const res: any = await got.post(pushMeUrl || 'https://push.i-i.me/', {
+        ...this.gotOption,
+        json: {
+          push_key: pushMeKey,
+          title: this.title,
+          content: this.content,
         },
-      );
+        headers: { 'Content-Type': 'application/json' },
+      });
       if (res.body === 'success') {
         return true;
       } else {

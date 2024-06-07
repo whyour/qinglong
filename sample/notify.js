@@ -358,17 +358,24 @@ function barkNotify(text, desp, params = {}) {
         BARK_PUSH = `https://api.day.app/${BARK_PUSH}`;
       }
       const options = {
-        url: `${BARK_PUSH}/${encodeURIComponent(text)}/${encodeURIComponent(
-          desp,
-        )}?icon=${BARK_ICON}&sound=${BARK_SOUND}&group=${BARK_GROUP}&isArchive=${BARK_ARCHIVE}&level=${BARK_LEVEL}&url=${BARK_URL}&${querystring.stringify(
-          params,
-        )}`,
+        url: `${BARK_PUSH}`,
+        json: {
+          title: text,
+          body: desp,
+          icon: BARK_ICON,
+          sound: BARK_SOUND,
+          group: BARK_GROUP,
+          isArchive: BARK_ARCHIVE,
+          level: BARK_LEVEL,
+          url: BARK_URL,
+          ...params,
+        },
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
         timeout,
       };
-      $.get(options, (err, resp, data) => {
+      $.post(options, (err, resp, data) => {
         try {
           if (err) {
             console.log('Bark APP 发送通知调用API失败😞\n', err);
