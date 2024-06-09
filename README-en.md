@@ -54,62 +54,6 @@ The npm version supports `debian/ubuntu/centos/alpine` systems and requires `nod
 npm i @whyour/qinglong
 ```
 
-## Built-in commands
-
-- task
-
-```bash
-# Execute in sequence, if a random delay is set, it will be randomly delayed by a certain number of seconds
-task <file_path>                                             
-# Execute in sequence, regardless of whether a random delay is set, all run immediately, 
-# and the foreground will output the day, while recorded in the log file
-task <file_path> now                                         
-# Concurrent execution, regardless of whether a random delay is set, are run immediately, 
-# the foreground does not generate the day, directly recorded in the log file, and can be specified account execution
-task <file_path> conc <env_name> <account_number>(Optional) 
-# Specify the account to execute and run immediately regardless of whether a random delay is set 
-task <file_path> desi <env_name> <account_number>       
-# Set task timeout   
-task -m <max_time> <file_path>
-# Use -- to split, -- followed by a parameter that is passed to the script, as in the following example, the script receives the parameter -u whyour -p password
-task <file_path> -- -u whyour -p password
-```
-
-- ql
-
-```bash
-# Update and restart Green Dragon
-ql update                                                    
-# Run custom scripts extra.sh
-ql extra                                                     
-# Adding a single script file
-ql raw <file_url>                                             
-# Add a specific script for a single repository
-ql repo <repo_url> <whitelist> <blacklist> <dependence> <branch>   
-# Delete old logs
-ql rmlog <days>                                              
-# Start bot
-ql bot                                                       
-# Detecting the Green Dragon environment and repairing it
-ql check                                                     
-# Reset the number of login errors
-ql resetlet                                                  
-# Disable two-step login
-ql resettfa                                                  
-```
-
-| **Parameter** | **Description** |
-|---|---|
-| file_url | Script address |
-| repo_url | Repository address |
-| whitelist | The whitelist when pulling the repository, i.e., the string contained in the path of the script to be pulled |
-| blacklist | Blacklisting when pulling repositories, i.e. strings that are not included in the path of the script to be pulled |
-| dependence | Pulling the dependencies needed for the repository will be copied directly from the repository to the repository directory under scripts, regardless of the blacklist |
-| extensions | Pull the branch of the repository |
-| branch | Number of days of logs to be kept |
-| days | File path for task execution |
-| file_path | The name of the environment variable that needs to be concurrent or specified at the time of task execution |
-
 ## Deployment
 
 ### Docker (Recommended)
@@ -183,16 +127,72 @@ export QL_DATA_DIR=""
 qinglong
 ```
 
+## Built-in commands
+
+- task
+
+```bash
+# Execute in sequence, if a random delay is set, it will be randomly delayed by a certain number of seconds
+task <file_path>                                             
+# Execute in sequence, regardless of whether a random delay is set, all run immediately, 
+# and the foreground will output the day, while recorded in the log file
+task <file_path> now                                         
+# Concurrent execution, regardless of whether a random delay is set, are run immediately, 
+# the foreground does not generate the day, directly recorded in the log file, and can be specified account execution
+task <file_path> conc <env_name> <account_number>(Optional) 
+# Specify the account to execute and run immediately regardless of whether a random delay is set 
+task <file_path> desi <env_name> <account_number>       
+# Set task timeout   
+task -m <max_time> <file_path>
+# Use -- to split, -- followed by a parameter that is passed to the script, as in the following example, the script receives the parameter -u whyour -p password
+task <file_path> -- -u whyour -p password
+```
+
+- ql
+
+```bash
+# Update and restart Green Dragon
+ql update                                                    
+# Run custom scripts extra.sh
+ql extra                                                     
+# Adding a single script file
+ql raw <file_url>                                             
+# Add a specific script for a single repository
+ql repo <repo_url> <whitelist> <blacklist> <dependence> <branch>   
+# Delete old logs
+ql rmlog <days>                                              
+# Start bot
+ql bot                                                       
+# Detecting the Green Dragon environment and repairing it
+ql check                                                     
+# Reset the number of login errors
+ql resetlet                                                  
+# Disable two-step login
+ql resettfa                                                  
+```
+
+| **Parameter** | **Description** |
+|---|---|
+| file_url | Script address |
+| repo_url | Repository address |
+| whitelist | The whitelist when pulling the repository, i.e., the string contained in the path of the script to be pulled |
+| blacklist | Blacklisting when pulling repositories, i.e. strings that are not included in the path of the script to be pulled |
+| dependence | Pulling the dependencies needed for the repository will be copied directly from the repository to the repository directory under scripts, regardless of the blacklist |
+| extensions | Pull the branch of the repository |
+| branch | Number of days of logs to be kept |
+| days | File path for task execution |
+| file_path | The name of the environment variable that needs to be concurrent or specified at the time of task execution |
+
 ## Development
 
 ```bash
-$ git clone https://github.com/whyour/qinglong.git
-$ cd qinglong
-$ cp .env.example .env
+git clone https://github.com/whyour/qinglong.git
+cd qinglong
+cp .env.example .env
 # Recommended use pnpm https://pnpm.io/zh/installation
-$ npm install -g pnpm@8.3.1
-$ pnpm install
-$ pnpm start
+npm install -g pnpm@8.3.1
+pnpm install
+pnpm start
 ```
 
 Open your browser and visit <http://127.0.0.1:5700>
