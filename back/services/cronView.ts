@@ -64,7 +64,7 @@ export default class CronViewService {
   ): Promise<CrontabView> {
     const doc: any = await CrontabViewModel.findOne({ where: { ...query } });
     if (!doc) {
-      throw new Error(`${JSON.stringify(query)} not found`);
+      throw new Error(`CronView ${JSON.stringify(query)} not found`);
     }
     return doc.get({ plain: true });
   }

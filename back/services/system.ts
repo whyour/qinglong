@@ -59,7 +59,7 @@ export default class SystemService {
   public async getDb(query: any): Promise<SystemInfo> {
     const doc = await SystemModel.findOne({ where: { ...query } });
     if (!doc) {
-      throw new Error(`${JSON.stringify(query)} not found`);
+      throw new Error(`System ${JSON.stringify(query)} not found`);
     }
     return doc.get({ plain: true });
   }

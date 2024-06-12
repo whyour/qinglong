@@ -281,7 +281,7 @@ export default class SubscriptionService {
   ): Promise<Subscription> {
     const doc = await SubscriptionModel.findOne({ where: { ...query } });
     if (!doc) {
-      throw new Error(`${JSON.stringify(query)} not found`);
+      throw new Error(`Subscription ${JSON.stringify(query)} not found`);
     }
     return doc.get({ plain: true });
   }

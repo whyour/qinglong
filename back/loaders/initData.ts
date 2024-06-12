@@ -18,6 +18,10 @@ export default async () => {
   const dependenceService = Container.get(DependenceService);
   const systemService = Container.get(SystemService);
 
+  // 初始化增加系统配置
+  await SystemModel.upsert({ type: AuthDataType.systemConfig });
+  await SystemModel.upsert({ type: AuthDataType.notification });
+
   const installDependencies = () => {
     // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
     DependenceModel.findAll({
@@ -158,7 +162,4 @@ export default async () => {
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
   await envService.set_envs();
-
-  // 初始化增加系统配置
-  await SystemModel.upsert({ type: AuthDataType.systemConfig });
 };

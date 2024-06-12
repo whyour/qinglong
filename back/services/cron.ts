@@ -376,7 +376,7 @@ export default class CronService {
   public async getDb(query: FindOptions<Crontab>['where']): Promise<Crontab> {
     const doc: any = await CrontabModel.findOne({ where: { ...query } });
     if (!doc) {
-      throw new Error(`${JSON.stringify(query)} not found`);
+      throw new Error(`Cron ${JSON.stringify(query)} not found`);
     }
     return doc.get({ plain: true });
   }

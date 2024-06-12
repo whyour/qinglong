@@ -184,7 +184,7 @@ export default class DependenceService {
   ): Promise<Dependence> {
     const doc: any = await DependenceModel.findOne({ where: { ...query } });
     if (!doc) {
-      throw new Error(`${JSON.stringify(query)} not found`);
+      throw new Error(`Dependency ${JSON.stringify(query)} not found`);
     }
     return doc.get({ plain: true });
   }

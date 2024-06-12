@@ -46,7 +46,7 @@ export default class OpenService {
   public async getDb(query: any): Promise<App> {
     const doc: any = await AppModel.findOne({ where: query });
     if (!doc) {
-      throw new Error(`${JSON.stringify(query)} not found`);
+      throw new Error(`App ${JSON.stringify(query)} not found`);
     }
     return doc.get({ plain: true });
   }
