@@ -32,7 +32,9 @@ export function formatCommand(doc: Subscription, url?: string) {
     autoDelCron,
   } = doc;
   if (type === 'file') {
-    command += `raw "${_url}"`;
+    command += `raw "${_url}" "${proxy || ''}" "${
+      isNil(autoAddCron) ? true : Boolean(autoAddCron)
+    }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
   } else {
     command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
       dependences || ''
