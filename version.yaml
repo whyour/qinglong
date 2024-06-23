@@ -1,9 +1,7 @@
-version: 2.17.5
-changeLogLink: https://t.me/jiao_long/406
-publishTime: 2024-05-25 19:00
+version: 2.17.6
+changeLogLink: https://t.me/jiao_long/407
+publishTime: 2024-06-14 23:00
 changeLog: |
-  1. 修复有可能手动运行任务无日志
-  2. 重构 JavaScript 脚本通知文件
-  3. PushMe 通知支持自建服务
-  4. 增加微加机器人消息通道
-  5. 修复任务详情查看脚本错误
+  1. bark 推送改为 post 请求，防止请求头过大
+  2. 修复单文件订阅代理无效
+  3. 修复系统设置通知和依赖数据未初始化
