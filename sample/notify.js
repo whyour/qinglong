@@ -97,7 +97,6 @@ const push_config = {
   WEBHOOK_CONTENT_TYPE: '', // 自定义通知 content-type
 };
 
-// 首先读取 面板变量 或者 github action 运行变量
 for (const key in push_config) {
   const v = process.env[key];
   if (v) {
@@ -1290,7 +1289,7 @@ async function sendNotify(text, desp, params = {}) {
     }
   }
 
-  if (push_config.HITOKOTO) {
+  if (push_config.HITOKOTO !== 'false') {
     desp += '\n\n' + (await one());
   }
 

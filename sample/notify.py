@@ -120,7 +120,6 @@ push_config = {
 }
 # fmt: on
 
-# 首先读取 面板变量 或者 github action 运行变量
 for k in push_config:
     if os.getenv(k):
         v = os.getenv(k)
@@ -962,7 +961,7 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
             return
 
     hitokoto = push_config.get("HITOKOTO")
-    content += "\n\n" + one() if hitokoto else ""
+    content += "\n\n" + one() if hitokoto != "false" else ""
 
     notify_function = add_notify_function()
     ts = [

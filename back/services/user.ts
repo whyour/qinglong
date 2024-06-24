@@ -351,7 +351,7 @@ export default class UserService {
 
   public async getNotificationMode(): Promise<NotificationInfo> {
     const doc = await this.getDb({ type: AuthDataType.notification });
-    return doc.info as NotificationInfo;
+    return (doc.info || {}) as NotificationInfo;
   }
 
   private async updateAuthDb(payload: SystemInfo): Promise<any> {
