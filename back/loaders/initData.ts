@@ -125,7 +125,7 @@ export default async () => {
         if (doc.command.includes(`${config.rootPath}/log/`)) {
           await CrontabModel.update(
             {
-              command: `${config.rootPath}/data/log/${doc.command.replace(
+              command: `${config.dataPath}/log/${doc.command.replace(
                 `${config.rootPath}/log/`,
                 '',
               )}`,
@@ -136,7 +136,7 @@ export default async () => {
         if (doc.command.includes(`${config.rootPath}/config/`)) {
           await CrontabModel.update(
             {
-              command: `${config.rootPath}/data/config/${doc.command.replace(
+              command: `${config.dataPath}/config/${doc.command.replace(
                 `${config.rootPath}/config/`,
                 '',
               )}`,
@@ -147,7 +147,7 @@ export default async () => {
         if (doc.command.includes(`${config.rootPath}/db/`)) {
           await CrontabModel.update(
             {
-              command: `${config.rootPath}/data/db/${doc.command.replace(
+              command: `${config.dataPath}/db/${doc.command.replace(
                 `${config.rootPath}/db/`,
                 '',
               )}`,

@@ -4,6 +4,11 @@
 dir_root=$QL_DIR
 dir_tmp=$dir_root/.tmp
 dir_data=$dir_root/data
+
+if [[ $QL_DATA_DIR ]]; then
+  dir_data="${QL_DATA_DIR%/}"
+fi
+
 dir_shell=$dir_root/shell
 dir_sample=$dir_root/sample
 dir_static=$dir_root/static
@@ -371,25 +376,25 @@ patch_version() {
 
   if [[ -d "$dir_root/db" ]]; then
     echo -e "检测到旧的db目录，拷贝到data目录...\n"
-    cp -rf $dir_root/config $dir_root/data
+    cp -rf $dir_root/config $dir_data
     echo
   fi
 
   if [[ -d "$dir_root/scripts" ]]; then
     echo -e "检测到旧的scripts目录，拷贝到data目录...\n"
-    cp -rf $dir_root/scripts $dir_root/data
+    cp -rf $dir_root/scripts $dir_data
     echo
   fi
 
   if [[ -d "$dir_root/log" ]]; then
     echo -e "检测到旧的log目录，拷贝到data目录...\n"
-    cp -rf $dir_root/log $dir_root/data
+    cp -rf $dir_root/log $dir_data
     echo
   fi
 
   if [[ -d "$dir_root/config" ]]; then
     echo -e "检测到旧的config目录，拷贝到data目录...\n"
-    cp -rf $dir_root/config $dir_root/data
+    cp -rf $dir_root/config $dir_data
     echo
   fi
 }

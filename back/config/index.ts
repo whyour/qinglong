@@ -19,7 +19,12 @@ const lastVersionFile = `https://qn.whyour.cn/version.yaml`;
 const rootPath = process.env.QL_DIR as string;
 const envFound = dotenv.config({ path: path.join(rootPath, '.env') });
 
-const dataPath = path.join(rootPath, 'data/');
+let dataPath = path.join(rootPath, 'data/');
+
+if (process.env.QL_DATA_DIR) {
+  dataPath = process.env.QL_DATA_DIR.replace(/\/$/g, '');
+}
+
 const shellPath = path.join(rootPath, 'shell/');
 const tmpPath = path.join(rootPath, '.tmp/');
 const samplePath = path.join(rootPath, 'sample/');
