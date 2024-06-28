@@ -114,7 +114,13 @@ export default class CronService {
     }
 
     for (const id of ids) {
-      const cron = await this.getDb({ id });
+      let cron;
+      try {
+        cron = await this.getDb({ id });
+      } catch (err) {}
+      if (!cron) {
+        continue;
+      }
       if (status === CrontabStatus.idle && log_path !== cron.log_path) {
         options = omit(options, ['status', 'log_path', 'pid']);
       }

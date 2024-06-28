@@ -1,6 +1,7 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import {
+  createFile,
   createRandomString,
   fileExist,
   getNetIp,
@@ -266,7 +267,7 @@ export default class UserService {
   public async getUserInfo(): Promise<any> {
     const authFileExist = await fileExist(config.authConfigFile);
     if (!authFileExist) {
-      await fs.writeFile(
+      await createFile(
         config.authConfigFile,
         JSON.stringify({
           username: 'admin',
