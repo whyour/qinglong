@@ -22,6 +22,8 @@ import {
 } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
+import { detectOS } from '../config/util';
+import { LINUX_DEPENDENCE_COMMAND } from '../config/const';
 
 @Service()
 export default class DependenceService {
@@ -153,8 +155,19 @@ export default class DependenceService {
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
-      const depInstallCommand = InstallDependenceCommandTypes[doc.type];
-      const depUnInstallCommand = unInstallDependenceCommandTypes[doc.type];
+      let depInstallCommand = InstallDependenceCommandTypes[doc.type];
+      let depUnInstallCommand = unInstallDependenceCommandTypes[doc.type];
+      const isLinuxDependence = doc.type === DependenceTypes.linux;
+
+      if (isLinuxDependence) {
+        const osType = await detectOS();
+        if (!osType) {
+          continue;
+        }
+        const linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
+        depInstallCommand = linuxCommand.install;
+        depUnInstallCommand = linuxCommand.uninstall;
+      }
       const installCmd = `${depInstallCommand} ${doc.name.trim()}`;
       const unInstallCmd = `${depUnInstallCommand} ${doc.name.trim()}`;
       const pids = await Promise.all([
@@ -213,7 +226,17 @@ export default class DependenceService {
         if (taskLimit.firstDependencyId !== dependency.id) {
           return resolve(null);
         }
-
+        const isNodeDependence = dependency.type === DependenceTypes.nodejs;
+        const isLinuxDependence = dependency.type === DependenceTypes.linux;
+        const isPythonDependence = dependency.type === DependenceTypes.python3;
+        const osType = await detectOS();
+        let linuxCommand = {} as typeof LINUX_DEPENDENCE_COMMAND.Alpine;
+        if (isLinuxDependence) {
+          if (!osType) {
+            return resolve(null);
+          }
+          linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
+        }
         taskLimit.removeQueuedDependency(dependency);
 
         const depIds = [dependency.id!];
@@ -226,11 +249,16 @@ export default class DependenceService {
           ? 'installDependence'
           : 'uninstallDependence';
         let depName = dependency.name.trim();
-        const depRunCommand = (
+        let depRunCommand = (
           isInstall
             ? InstallDependenceCommandTypes
             : unInstallDependenceCommandTypes
         )[dependency.type];
+        if (isLinuxDependence) {
+          depRunCommand = isInstall
+            ? linuxCommand.install
+            : linuxCommand.uninstall;
+        }
         const actionText = isInstall ? '安装' : '删除';
         const startTime = dayjs();
 
@@ -246,8 +274,12 @@ export default class DependenceService {
 
         // 判断是否已经安装过依赖
         if (isInstall && !force) {
-          const getCommandPrefix = GetDependenceCommandTypes[dependency.type];
+          let getCommandPrefix = GetDependenceCommandTypes[dependency.type];
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
+          if (isLinuxDependence) {
+            getCommandPrefix = linuxCommand.info;
+          }
+
           let depVersion = '';
           if (depName.includes(depVersionStr)) {
             const symbolRegx = new RegExp(
@@ -259,10 +291,7 @@ export default class DependenceService {
               depVersion = _depVersion;
             }
           }
-          const isNodeDependence = dependency.type === DependenceTypes.nodejs;
-          const isLinuxDependence = dependency.type === DependenceTypes.linux;
-          const isPythonDependence =
-            dependency.type === DependenceTypes.python3;
+
           const depInfo = (
             await promiseExecSuccess(
               isNodeDependence
@@ -277,7 +306,7 @@ export default class DependenceService {
             depInfo &&
             ((isNodeDependence && depInfo.split(' ')?.[0] === depName) ||
               (isLinuxDependence &&
-                depInfo.toLocaleLowerCase().includes('apt-manual-installed')) ||
+                linuxCommand.check(depInfo.toLocaleLowerCase())) ||
               isPythonDependence) &&
             (!depVersion || depInfo.includes(depVersion))
           ) {
