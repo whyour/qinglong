@@ -36,6 +36,7 @@ import ScheduleService, { TaskCallbacks } from './schedule';
 import SockService from './sock';
 import os from 'os';
 import dayjs from 'dayjs';
+import { updateLinuxMirrorFile } from '../config/util';
 
 @Service()
 export default class SystemService {
@@ -209,33 +210,11 @@ export default class SystemService {
     onEnd?: () => void,
   ) {
     const oDoc = await this.getSystemConfig();
-    await this.updateAuthDb({
-      ...oDoc,
-      info: { ...oDoc.info, ...info },
-    });
-    let defaultDomain = 'http://deb.debian.org';
-    let targetDomain = 'http://deb.debian.org';
     if (os.platform() !== 'linux') {
       return;
     }
-    const content = await fs.promises.readFile('/etc/apt/sources.list', {
-      encoding: 'utf-8',
-    });
-    const domainMatch = content.match(/(http.*)\/debian /);
-    if (domainMatch) {
-      defaultDomain = domainMatch[1];
-    }
-    if (info.linuxMirror) {
-      targetDomain = info.linuxMirror;
-    }
-    const command = `sed -i 's/${defaultDomain.replace(
-      /\//g,
-      '\\/',
-    )}/${targetDomain.replace(
-      /\//g,
-      '\\/',
-    )}/g' /etc/apt/sources.list && apt update`;
-
+    const command = await updateLinuxMirrorFile(info.linuxMirror || '');
+    let hasError = false;
     this.scheduleService.runTask(
       command,
       {
@@ -249,8 +228,15 @@ export default class SystemService {
             message: 'update linux mirror end',
           });
           onEnd?.();
+          if (!hasError) {
+            await this.updateAuthDb({
+              ...oDoc,
+              info: { ...oDoc.info, ...info },
+            });
+          }
         },
         onError: async (message: string) => {
+          hasError = true;
           this.sockService.sendMessage({ type: 'updateLinuxMirror', message });
         },
         onLog: async (message: string) => {
