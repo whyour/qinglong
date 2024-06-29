@@ -50,7 +50,7 @@ docker pull whyour/qinglong:debian
 
 ### npm
 
-npm 版本支持 `debian/ubuntu/centos/alpine` 系统，需要自行安装 `node/python3`
+npm 版本支持 `debian/ubuntu/alpine` 系统，需要自行安装 `node/npm/python3/pip3/pnpm`
 
 ```bash
 npm i @whyour/qinglong
@@ -107,15 +107,13 @@ podman run -dit \
   docker.io/whyour/qinglong:latest
 ```
 
-### 本机
+### npm
 
-建议使用纯净系统安装，避免系统原有数据丢失，需要自己安装 node/npm/python3/pip3
+建议使用纯净系统安装，避免系统原有数据丢失，需要自己安装 node/npm/python3/pip3/pnpm
 
 ```bash
 # Debian/Ubuntu
 curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-# Centos
-curl --silent --location https://rpm.nodesource.com/setup_20.x | sudo bash
 ```
 
 ```bash

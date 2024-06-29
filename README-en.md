@@ -48,7 +48,7 @@ docker pull whyour/qinglong:debian
 
 ### npm
 
-The npm version supports `debian/ubuntu/centos/alpine` systems and requires `node/python3` to be installed.
+The npm version supports `debian/ubuntu/alpine` systems and requires `node/npm/python3/pip3/pnpm` to be installed.
 
 ```bash
 npm i @whyour/qinglong
@@ -105,15 +105,13 @@ podman run -dit \
   docker.io/whyour/qinglong:latest
 ```
 
-### Local
+### Npm
 
-It is recommended to use a pure system installation to avoid losing the original system data, you need to install node/npm/python3/pip3 yourself
+It is recommended to use a pure system installation to avoid losing the original system data, you need to install node/npm/python3/pip3/pnpm yourself
 
 ```bash
 # Debian/Ubuntu
 curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-# Centos
-curl --silent --location https://rpm.nodesource.com/setup_20.x | sudo bash
 ```
 
 ```bash
