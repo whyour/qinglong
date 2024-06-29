@@ -9,7 +9,15 @@ else
 fi
 
 echo -e "\n1、安装bot依赖...\n"
-apt install -y gcc python3-dev musl-dev
+os_name=$(source /etc/os-release && echo "$ID")
+if [[ $os_name == 'alpine' ]]; then
+  apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
+elif [[ $os_name == 'debian' ]] || [[ $os_name == 'ubuntu' ]]; then
+  apt install -y gcc python3-dev musl-dev
+else
+  echo -e "暂不支持此系统 $os_name"
+  exit 1
+fi
 echo -e "\nbot依赖安装成功...\n"
 
 echo -e "2、下载bot所需文件...\n"

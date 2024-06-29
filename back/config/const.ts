@@ -25,3 +25,38 @@ export const SAMPLE_FILES = [
 ];
 
 export const PYTHON_INSTALL_DIR = process.env.PYTHON_HOME;
+
+export const LINUX_DEPENDENCE_COMMAND: Record<
+  'Debian' | 'Ubuntu' | 'Alpine',
+  {
+    install: string;
+    uninstall: string;
+    info: string;
+    check(info: string): boolean;
+  }
+> = {
+  Debian: {
+    install: 'apt install -y',
+    uninstall: 'apt remove -y',
+    info: 'apt info',
+    check(info: string) {
+      return info.includes('apt-manual-installed');
+    },
+  },
+  Ubuntu: {
+    install: 'apt install -y',
+    uninstall: 'apt remove -y',
+    info: 'apt info',
+    check(info: string) {
+      return info.includes('apt-manual-installed');
+    },
+  },
+  Alpine: {
+    install: 'apk add --no-check-certificate',
+    uninstall: 'apk del',
+    info: 'apk info -es',
+    check(info: string) {
+      return info.includes('installed');
+    },
+  },
+};
