@@ -44,7 +44,7 @@ export enum DependenceTypes {
 export enum GetDependenceCommandTypes {
   'pnpm ls -g ',
   'pip3 show --disable-pip-version-check',
-  'apt info',
+  'apt-get info',
 }
 
 export enum versionDependenceCommandTypes {
