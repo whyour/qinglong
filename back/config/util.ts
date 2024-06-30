@@ -633,7 +633,7 @@ async function _updateLinuxMirror(
           currentDomainWithScheme,
           mirrorDomainWithScheme || 'http://deb.debian.org',
         );
-        return 'apt update';
+        return 'apt-get update';
       } else {
         throw Error(`Current mirror domain not found.`);
       }
@@ -646,7 +646,7 @@ async function _updateLinuxMirror(
           currentDomainWithScheme,
           mirrorDomainWithScheme || 'http://archive.ubuntu.com',
         );
-        return 'apt update';
+        return 'apt-get update';
       } else {
         throw Error(`Current mirror domain not found.`);
       }

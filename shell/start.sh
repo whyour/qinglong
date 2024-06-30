@@ -46,8 +46,8 @@ if [[ $os_name == 'alpine' ]]; then
     procps \
     netcat-openbsd
 elif [[ $os_name == 'debian' ]] || [[ $os_name == 'ubuntu' ]]; then
-  apt update
-  apt install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
+  apt-get update
+  apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
 else
   echo -e "暂不支持此系统部署 $os_name"
   exit 1

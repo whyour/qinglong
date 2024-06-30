@@ -6,8 +6,8 @@ COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
 COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
-  apt update && \
-  apt install --no-install-recommends -y libatomic1 && \
+  apt-get update && \
+  apt-get install --no-install-recommends -y libatomic1 && \
   npm i -g pnpm@8.3.1 && \
   cd /tmp/build && \
   pnpm install --prod
@@ -34,9 +34,9 @@ COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_module
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
   ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
-  apt update && \
-  apt upgrade -y && \
-  apt install --no-install-recommends -y git \
+  apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install --no-install-recommends -y git \
   curl \
   wget \
   tzdata \
@@ -49,7 +49,7 @@ RUN set -x && \
   netcat \
   unzip \
   libatomic1 && \
-  apt clean && \
+  apt-get clean && \
   ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
   echo "Asia/Shanghai" >/etc/timezone && \
   git config --global user.email "qinglong@@users.noreply.github.com" && \
