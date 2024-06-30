@@ -34,19 +34,19 @@ export const LINUX_DEPENDENCE_COMMAND: Record<
   }
 > = {
   Debian: {
-    install: 'apt install -y',
-    uninstall: 'apt remove -y',
-    info: 'apt info',
+    install: 'apt-get install -y',
+    uninstall: 'apt-get remove -y',
+    info: 'dpkg-query -s',
     check(info: string) {
-      return info.includes('apt-manual-installed');
+      return info.includes('install ok installed');
     },
   },
   Ubuntu: {
-    install: 'apt install -y',
-    uninstall: 'apt remove -y',
-    info: 'apt info',
+    install: 'apt-get install -y',
+    uninstall: 'apt-get remove -y',
+    info: 'dpkg-query -s',
     check(info: string) {
-      return info.includes('apt-manual-installed');
+      return info.includes('install ok installed');
     },
   },
   Alpine: {
