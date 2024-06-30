@@ -48,8 +48,9 @@ const Dependence = () => {
         pick(systemConfig, dataMap[path]),
       )
       .then((res) => {})
-      .catch((error: any) => {
-        console.log(error);
+      .catch(() => {
+        setLoading(false);
+        setLog((p) => `${p}update mirror error`);
       });
   };
 
