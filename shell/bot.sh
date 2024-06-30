@@ -13,7 +13,7 @@ os_name=$(source /etc/os-release && echo "$ID")
 if [[ $os_name == 'alpine' ]]; then
   apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
 elif [[ $os_name == 'debian' ]] || [[ $os_name == 'ubuntu' ]]; then
-  apt install -y gcc python3-dev musl-dev
+  apt-get install -y gcc python3-dev musl-dev
 else
   echo -e "暂不支持此系统 $os_name"
   exit 1
