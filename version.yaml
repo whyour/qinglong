@@ -1,7 +1,8 @@
-version: 2.17.6
-changeLogLink: https://t.me/jiao_long/407
-publishTime: 2024-06-14 23:00
+version: 2.17.7
+changeLogLink: https://t.me/jiao_long/408
+publishTime: 2024-06-30 16:00
 changeLog: |
-  1. bark 推送改为 post 请求，防止请求头过大
-  2. 修复单文件订阅代理无效
-  3. 修复系统设置通知和依赖数据未初始化
+  1. 修复更新任务状态错误
+  2. 修复查询系统 health 状态错误
+  3. 修复更新 linux 镜像源错误
+  4. npm 包支持 alpine 和 debian、ubuntu，修复 linux 依赖安装命令
