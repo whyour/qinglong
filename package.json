@@ -1,6 +1,6 @@
 {
   "name": "@whyour/qinglong",
-  "version": "0.20.4",
+  "version": "0.21.2",
   "description": "Timed task management platform supporting Python3, JavaScript, Shell, Typescript",
   "repository": {
     "type": "git",
