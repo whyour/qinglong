@@ -74,7 +74,9 @@ init_env() {
 
 import_config() {
   [[ -f $file_config_user ]] && . $file_config_user
-  [[ -f $file_env ]] && . $file_env
+  if [[ $LOAD_ENV != 'false' ]] && [[ -f $file_env ]]; then
+    . $file_env
+  fi
 
   ql_base_url=${QlBaseUrl:-"/"}
   ql_port=${QlPort:-"5700"}

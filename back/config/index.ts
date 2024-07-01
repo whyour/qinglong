@@ -38,6 +38,8 @@ const sshdPath = path.join(dataPath, 'ssh.d/');
 const systemLogPath = path.join(dataPath, 'syslog/');
 
 const envFile = path.join(configPath, 'env.sh');
+const jsEnvFile = path.join(configPath, 'env.js');
+const pyEnvFile = path.join(configPath, 'env.py');
 const confFile = path.join(configPath, 'config.sh');
 const crontabFile = path.join(configPath, 'crontab.list');
 const authConfigFile = path.join(configPath, 'auth.json');
@@ -87,6 +89,8 @@ export default {
   sampleFile,
   confFile,
   envFile,
+  jsEnvFile,
+  pyEnvFile,
   dbPath,
   uploadPath,
   configPath,
@@ -99,6 +103,8 @@ export default {
     'crontab.list',
     'dependence-proxy.sh',
     'env.sh',
+    'env.js',
+    'env.py',
     'token.json',
   ],
   writePathList: [configPath, scriptPath],

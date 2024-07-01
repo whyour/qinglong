@@ -196,6 +196,8 @@ export default class EnvService {
     });
     const groups = groupBy(envs, 'name');
     let env_string = '';
+    let js_env_string = '';
+    let py_env_string = 'import os\n';
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
@@ -208,9 +210,18 @@ export default class EnvService {
             .replace(/'/g, "'\\''")
             .trim();
           env_string += `export ${key}='${value}'\n`;
+          const _env_value = `'${group
+            .map((x) => x.value)
+            .join('&')
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")}'`;
+          js_env_string += `process.env.${key}=${_env_value};\n`;
+          py_env_string += `os.environ['${key}']=${_env_value}\n`;
         }
       }
     }
     await fs.writeFile(config.envFile, env_string);
+    await fs.writeFile(config.jsEnvFile, js_env_string);
+    await fs.writeFile(config.pyEnvFile, py_env_string);
   }
 }
