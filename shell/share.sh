@@ -59,11 +59,11 @@ list_own_drop=$dir_list_tmp/own_drop.list
 
 ## 软连接及其原始文件对应关系
 link_name=(
-  task
+  # task
   ql
 )
 original_name=(
-  task.sh
+  # task.sh
   update.sh
 )
 
@@ -134,28 +134,6 @@ detect_macos() {
 gen_random_num() {
   local divi=$1
   echo $((${RANDOM} % $divi))
-}
-
-define_cmd() {
-  local cmd_prefix cmd_suffix
-  if type task &>/dev/null; then
-    cmd_suffix=""
-    if [[ -f "$dir_shell/task.sh" ]]; then
-      cmd_prefix=""
-    else
-      cmd_prefix="bash "
-    fi
-  else
-    cmd_suffix=".sh"
-    if [[ -f "$dir_shell/task.sh" ]]; then
-      cmd_prefix="$dir_shell/"
-    else
-      cmd_prefix="bash $dir_shell/"
-    fi
-  fi
-  for ((i = 0; i < ${#link_name[*]}; i++)); do
-    export cmd_${link_name[i]}="${cmd_prefix}${link_name[i]}${cmd_suffix}"
-  done
 }
 
 fix_config() {
@@ -481,6 +459,5 @@ handle_task_end() {
 init_env
 detect_termux
 detect_macos
-define_cmd
 
 import_config $1

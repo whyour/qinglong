@@ -19,26 +19,35 @@ async function linkToNodeModule(src: string, dst?: string) {
 async function linkCommand() {
   const commandPath = await promiseExec('which node');
   const commandDir = path.dirname(commandPath);
-  const linkShell = [
+  const oldLinkShell = [
     {
       src: 'update.sh',
       dest: 'ql',
       tmp: 'ql_tmp',
     },
-    {
-      src: 'task.sh',
-      dest: 'task',
-      tmp: 'task_tmp',
-    },
   ];
+  // const newLinkShell = [
+  //   {
+  //     src: 'task.mjs',
+  //     dest: 'task',
+  //     tmp: 'task_tmp',
+  //   },
+  // ];
 
-  for (const link of linkShell) {
+  for (const link of oldLinkShell) {
     const source = path.join(config.rootPath, 'shell', link.src);
     const target = path.join(commandDir, link.dest);
     const tmpTarget = path.join(commandDir, link.tmp);
     await fs.symlink(source, tmpTarget);
     await fs.rename(tmpTarget, target);
   }
+  // for (const link of newLinkShell) {
+  //   const source = path.join(config.rootPath, 'cli', link.src);
+  //   const target = path.join(commandDir, link.dest);
+  //   const tmpTarget = path.join(commandDir, link.tmp);
+  //   await fs.symlink(source, tmpTarget);
+  //   await fs.rename(tmpTarget, target);
+  // }
 }
 
 export default async (src: string = 'deps') => {
