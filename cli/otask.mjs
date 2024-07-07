@@ -144,8 +144,8 @@ async function runNormal(fileParam, scriptParams) {
 
 async function runConcurrent(fileParam, envParam, numParam, scriptParams) {
   if (!envParam || !numParam) {
-    console.log(`\n 缺少并发运行的环境变量参数 task xxx.js conc Test 1 3`);
-    process.exit(1);
+    console.log(`缺少并发运行的环境变量参数 task xxx.js conc Test 1 3`);
+    return;
   }
 
   const array = (process.env[envParam] || '').split('&');
@@ -186,8 +186,8 @@ async function runConcurrent(fileParam, envParam, numParam, scriptParams) {
 
 async function runDesignated(fileParam, envParam, numParam, scriptParams) {
   if (!envParam || !numParam) {
-    console.log(`\n 缺少单独运行的参数 task xxx.js desi Test 1 3`);
-    process.exit(1);
+    console.log(`缺少单独运行的参数 task xxx.js desi Test 1 3`);
+    return;
   }
 
   const array = (process.env[envParam] || '').split('&');
@@ -200,13 +200,11 @@ async function runDesignated(fileParam, envParam, numParam, scriptParams) {
     cd(relativePath);
     fileParam = fileParam.replace(`${relativePath}/`, '');
   }
-  
-  console.log('cookieStr', cookieStr.length, arrayRun.length)
-  // ${envParam}="${cookieStr.replace('"', '\\"')}" 
+
+  console.log('cookieStr', cookieStr.length, arrayRun.length);
+  // ${envParam}="${cookieStr.replace('"', '\\"')}"
   await runWithTimeout(
-    `${
-      globalState.whichProgram
-    } ${fileParam} ${scriptParams}`,
+    `${globalState.whichProgram} ${fileParam} ${scriptParams}`,
   );
 }
 
@@ -244,6 +242,13 @@ async function main(taskShellParams, scriptParams) {
     return await usage();
   }
   if (fileParam && /\.(js|py|pyc|sh|ts)$/.test(fileParam)) {
+    const filePath = fileParam.startsWith('/')
+      ? fileParam
+      : path.join(dirScripts, fileParam);
+    if (!(await fs.exists(filePath))) {
+      console.log(`文件不存在 ${fileParam}`);
+      return;
+    }
     switch (action) {
       case undefined:
         return await runNormal(fileParam, scriptParams);
