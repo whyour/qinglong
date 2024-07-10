@@ -3,7 +3,7 @@ COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
   && apk update \
   && apk add nodejs npm git \
-  && npm i -g pnpm@8.3.1 pm2 tsx \
+  && npm i -g pnpm@8.3.1 pm2 ts-node \
   && cd /tmp/build \
   && pnpm install --prod
 

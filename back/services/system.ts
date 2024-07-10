@@ -33,6 +33,7 @@ import taskLimit from '../shared/pLimit';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import SockService from './sock';
+import os from 'os';
 
 @Service()
 export default class SystemService {
@@ -205,6 +206,9 @@ export default class SystemService {
     });
     let defaultDomain = 'https://dl-cdn.alpinelinux.org';
     let targetDomain = 'https://dl-cdn.alpinelinux.org';
+    if (os.platform() !== 'linux') {
+      return;
+    }
     const content = await fs.promises.readFile('/etc/apk/repositories', {
       encoding: 'utf-8',
     });

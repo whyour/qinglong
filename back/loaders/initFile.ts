@@ -11,6 +11,7 @@ if (process.env.QL_DATA_DIR) {
   dataPath = process.env.QL_DATA_DIR.replace(/\/$/g, '');
 }
 
+const preloadPath = path.join(rootPath, 'shell/preload/');
 const configPath = path.join(dataPath, 'config/');
 const scriptPath = path.join(dataPath, 'scripts/');
 const logPath = path.join(dataPath, 'log/');
@@ -38,6 +39,7 @@ export default async () => {
   const authFileExist = await fileExist(authConfigFile);
   const confFileExist = await fileExist(confFile);
   const scriptDirExist = await fileExist(scriptPath);
+  const preloadDirExist = await fileExist(preloadPath);
   const logDirExist = await fileExist(logPath);
   const configDirExist = await fileExist(configPath);
   const uploadDirExist = await fileExist(uploadPath);
@@ -57,6 +59,10 @@ export default async () => {
 
   if (!scriptDirExist) {
     await fs.mkdir(scriptPath);
+  }
+
+  if (!preloadDirExist) {
+    await fs.mkdir(preloadPath);
   }
 
   if (!logDirExist) {

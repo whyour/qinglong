@@ -19,13 +19,9 @@ define_program() {
   elif [[ $file_param == *.py ]] || [[ $file_param == *.pyc ]]; then
     which_program="python3"
   elif [[ $file_param == *.sh ]]; then
-    which_program="bash"
+    which_program="."
   elif [[ $file_param == *.ts ]]; then
-    if ! type tsx &>/dev/null; then
-      which_program="ts-node-transpile-only"
-    else
-      which_program="tsx"
-    fi
+    which_program="ts-node-transpile-only"
   else
     which_program=""
   fi

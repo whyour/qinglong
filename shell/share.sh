@@ -10,6 +10,7 @@ if [[ $QL_DATA_DIR ]]; then
 fi
 
 dir_shell=$dir_root/shell
+dir_preload=$dir_shell/preload
 dir_sample=$dir_root/sample
 dir_static=$dir_root/static
 dir_config=$dir_data/config
@@ -25,7 +26,10 @@ ql_static_repo=$dir_repo/static
 
 ## 文件
 file_config_sample=$dir_sample/config.sample.sh
-file_env=$dir_config/env.sh
+file_env=$dir_preload/env.sh
+js_file_env=$dir_preload/env.js
+py_file_env=$dir_preload/env.py
+preload_js_file=$dir_preload/sitecustomize.js
 file_sharecode=$dir_config/sharecode.sh
 file_config_user=$dir_config/config.sh
 file_auth_sample=$dir_sample/auth.sample.json
@@ -74,9 +78,6 @@ init_env() {
 
 import_config() {
   [[ -f $file_config_user ]] && . $file_config_user
-  if [[ $LOAD_ENV != 'false' ]] && [[ -f $file_env ]]; then
-    . $file_env
-  fi
 
   ql_base_url=${QlBaseUrl:-"/"}
   ql_port=${QlPort:-"5700"}
@@ -437,6 +438,19 @@ init_nginx() {
   local ipv4Str="listen ${ql_port};"
   sed -i "s,IPV6_CONFIG,${ipv6Str},g" /etc/nginx/conf.d/front.conf
   sed -i "s,IPV4_CONFIG,${ipv4Str},g" /etc/nginx/conf.d/front.conf
+}
+
+get_env_array() {
+  exported_variables=()
+  while IFS= read -r line; do
+    exported_variables+=("$line")
+  done < <(grep '^export ' $file_env | awk '{print $2}' | cut -d= -f1)
+}
+
+clear_env() {
+  for var in "${exported_variables[@]}"; do
+    unset "$var"
+  done
 }
 
 handle_task_start() {

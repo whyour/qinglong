@@ -12,7 +12,7 @@ export default async () => {
   const subscriptionService = Container.get(SubscriptionService);
 
   // 生成内置token
-  let tokenCommand = `tsx ${join(config.rootPath, 'back/token.ts')}`;
+  let tokenCommand = `ts-node-transpile-only ${join(config.rootPath, 'back/token.ts')}`;
   const tokenFile = join(config.rootPath, 'static/build/token.js');
 
   if (await fileExist(tokenFile)) {

@@ -91,6 +91,12 @@ env_str_to_array() {
   read -ra array <<<"${!env_param}"
 }
 
+clear_non_sh_env() {
+  if [[ $file_param != *.sh ]]; then
+    clear_env
+  fi
+}
+
 ## 正常运行单个脚本，$1：传入参数
 run_normal() {
   local file_param=$1
@@ -105,37 +111,34 @@ run_normal() {
     file_param=${file_param/$relative_path\//}
   fi
 
-  $timeoutCmd $which_program $file_param "${script_params[@]}"
+  if [[ $isJsOrPythonFile == 'false' ]]; then
+    clear_non_sh_env
+  fi
+  configDir="${dir_config}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+}
+
+handle_env_split() {
+  if [[ ! $num_param ]]; then
+    num_param="1-max"
+  fi
+
+  env_str_to_array
+  local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+  local runArr=($(eval echo $tempArr))
+  array_run=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
 run_concurrent() {
   local file_param="$1"
   local env_param="$2"
-  local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|")
+  local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
   if [[ ! $env_param ]]; then
     echo -e "\n 缺少并发运行的环境变量参数"
     exit 1
   fi
 
-  env_str_to_array
-  local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
-  local runArr=($(eval echo $tempArr))
-  runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
-
-  local n=0
-  for i in ${runArr[@]}; do
-    array_run[n]=${array[$i - 1]}
-    let n++
-  done
-
-  local cookieStr=$(
-    IFS="&"
-    echo "${array_run[*]}"
-  )
-  [[ ! -z $cookieStr ]] && export "${env_param}=${cookieStr}"
-
-  env_str_to_array
+  handle_env_split
   single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%3N")
 
   cd $dir_scripts
@@ -144,15 +147,24 @@ run_concurrent() {
     cd ${relative_path}
     file_param=${file_param/$relative_path\//}
   fi
-  for i in "${!array[@]}"; do
-    export "${env_param}=${array[i]}"
-    single_log_path="$dir_log/$log_dir/${single_log_time}_$((i + 1)).log"
-    eval $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
+
+  local j=0
+  for i in ${array_run[@]}; do
+    single_log_path="$dir_log/$log_dir/${single_log_time}_$((j + 1)).log"
+    let j++
+
+    if [[ $isJsOrPythonFile == 'false' ]]; then
+      export "${env_param}=${array[$i - 1]}"
+      clear_non_sh_env
+    fi
+    eval configDir="${dir_config}" envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
   done
 
   wait
-  for i in "${!array[@]}"; do
-    single_log_path="$dir_log/$log_dir/${single_log_time}_$((i + 1)).log"
+  local k=0
+  for i in ${array_run[@]}; do
+    single_log_path="$dir_log/$log_dir/${single_log_time}_$((k + 1)).log"
+    let k++
     cat $single_log_path
     [[ -f $single_log_path ]] && rm -f $single_log_path
   done
@@ -161,28 +173,27 @@ run_concurrent() {
 run_designated() {
   local file_param="$1"
   local env_param="$2"
-  local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|")
-  if [[ ! $env_param ]] || [[ ! $num_param ]]; then
-    echo -e "\n 缺少单独运行的参数 task xxx.js desi Test 1 3"
+  local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
+  if [[ ! $env_param ]]; then
+    echo -e "\n 缺少单独运行的参数 task xxx.js desi Test"
     exit 1
   fi
 
-  env_str_to_array
-  local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
-  local runArr=($(eval echo $tempArr))
-  runArr=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
+  handle_env_split
 
-  local n=0
-  for i in ${runArr[@]}; do
-    array_run[n]=${array[$i - 1]}
-    let n++
-  done
-
-  local cookieStr=$(
-    IFS="&"
-    echo "${array_run[*]}"
-  )
-  [[ ! -z $cookieStr ]] && export "${env_param}=${cookieStr}"
+  if [[ $isJsOrPythonFile == 'false' ]]; then
+    local n=0
+    for i in ${array_run[@]}; do
+      array_str[n]=${array[$i - 1]}
+      let n++
+    done
+    local envStr=$(
+      IFS="&"
+      echo "${array_str[*]}"
+    )
+    [[ ! -z $envStr ]] && export "${env_param}=${envStr}"
+    clear_non_sh_env
+  fi
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"
@@ -190,7 +201,8 @@ run_designated() {
     cd ${relative_path}
     file_param=${file_param/$relative_path\//}
   fi
-  $timeoutCmd $which_program $file_param "${script_params[@]}"
+
+  configDir="${dir_config}" envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 ## 运行其他命令
@@ -206,11 +218,26 @@ run_else() {
 
   shift
 
+  clear_non_sh_env
   $timeoutCmd $which_program $file_param "$@"
 }
 
 ## 命令检测
 main() {
+  isJsOrPythonFile="false"
+  if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.ts ]]; then
+    isJsOrPythonFile="true"
+  fi
+  if [[ -f $file_env ]]; then
+    if [[ $isJsOrPythonFile == 'true' ]]; then
+      export NODE_OPTIONS="${NODE_OPTIONS} -r ${preload_js_file}"
+      export PYTHONPATH="${PYTHONPATH}:${dir_preload}"
+    else
+      get_env_array
+      . $file_env
+    fi
+  fi
+
   if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
     case $# in
     1)
@@ -245,4 +272,5 @@ handle_task_start "${task_shell_params[@]}"
 run_task_before "${task_shell_params[@]}"
 main "${task_shell_params[@]}"
 run_task_after "${task_shell_params[@]}"
+clear_env
 handle_task_end "${task_shell_params[@]}"

@@ -26,6 +26,7 @@ if (process.env.QL_DATA_DIR) {
 }
 
 const shellPath = path.join(rootPath, 'shell/');
+const preloadPath = path.join(shellPath, 'preload/');
 const tmpPath = path.join(rootPath, '.tmp/');
 const samplePath = path.join(rootPath, 'sample/');
 const configPath = path.join(dataPath, 'config/');
@@ -37,9 +38,9 @@ const uploadPath = path.join(dataPath, 'upload/');
 const sshdPath = path.join(dataPath, 'ssh.d/');
 const systemLogPath = path.join(dataPath, 'syslog/');
 
-const envFile = path.join(configPath, 'env.sh');
-const jsEnvFile = path.join(configPath, 'env.js');
-const pyEnvFile = path.join(configPath, 'env.py');
+const envFile = path.join(preloadPath, 'env.sh');
+const jsEnvFile = path.join(preloadPath, 'env.js');
+const pyEnvFile = path.join(preloadPath, 'env.py');
 const confFile = path.join(configPath, 'config.sh');
 const crontabFile = path.join(configPath, 'crontab.list');
 const authConfigFile = path.join(configPath, 'auth.json');

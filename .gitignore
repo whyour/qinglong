@@ -23,3 +23,5 @@
 .history
 .version.ts
 /.tmp
+__pycache__
+/shell/preload/env.*
