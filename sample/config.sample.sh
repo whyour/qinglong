@@ -8,7 +8,7 @@ AutoAddCron="true"
 DefaultCronRule=""
 
 ## ql repo命令拉取脚本时需要拉取的文件后缀，直接写文件后缀名即可
-RepoFileExtensions="js py"
+RepoFileExtensions="js mjs py pyc"
 
 ## 代理地址，支持HTTP/SOCK5，例如 http://127.0.0.1:7890
 ProxyUrl=""
