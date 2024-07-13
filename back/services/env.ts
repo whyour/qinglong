@@ -210,13 +210,18 @@ export default class EnvService {
             .replace(/'/g, "'\\''")
             .trim();
           env_string += `export ${key}='${value}'\n`;
-          const _env_value = `'${group
+          const _env_value = `${group
             .map((x) => x.value)
             .join('&')
-            .replace(/\\/g, '\\\\')
-            .replace(/'/g, "\\'")}'`;
-          js_env_string += `process.env.${key}=${_env_value};\n`;
-          py_env_string += `os.environ['${key}']=${_env_value}\n`;
+            .replace(/\\/g, '\\\\')}`;
+          js_env_string += `process.env.${key}=\`${_env_value.replace(
+            /\`/g,
+            '\\`',
+          )}\`;\n`;
+          py_env_string += `os.environ['${key}']='''${_env_value.replace(
+            /\'/g,
+            "\\'",
+          )}'''\n`;
         }
       }
     }

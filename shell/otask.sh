@@ -87,8 +87,11 @@ check_server() {
 }
 
 env_str_to_array() {
+  . $file_env
   local IFS="&"
   read -ra array <<<"${!env_param}"
+  array_length=${#array[@]}
+  clear_env
 }
 
 clear_non_sh_env() {
@@ -123,7 +126,7 @@ handle_env_split() {
   fi
 
   env_str_to_array
-  local tempArr=$(echo $num_param | sed "s/-max/-${#array[@]}/g" | sed "s/max-/${#array[@]}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+  local tempArr=$(echo $num_param | sed "s/-max/-${array_length}/g" | sed "s/max-/${array_length}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   array_run=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
 }
@@ -229,16 +232,20 @@ main() {
     isJsOrPythonFile="true"
   fi
   if [[ -f $file_env ]]; then
+    get_env_array
     if [[ $isJsOrPythonFile == 'true' ]]; then
       export NODE_OPTIONS="${NODE_OPTIONS} -r ${preload_js_file}"
       export PYTHONPATH="${PYTHONPATH}:${dir_preload}"
     else
-      get_env_array
       . $file_env
     fi
   fi
 
   if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
+    if [[ $1 == *.sh ]]; then
+      timeoutCmd=""
+    fi
+
     case $# in
     1)
       run_normal "$1"
