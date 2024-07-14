@@ -27,6 +27,14 @@ if [[ ! $QL_DATA_DIR ]]; then
   exit 1
 fi
 
+command="$1"
+
+if [[ $command == "reload" ]]; then
+  mkdir -p /run/nginx
+  nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
+  exit 1
+fi
+
 # 安装依赖
 os_name=$(source /etc/os-release && echo "$ID")
 
@@ -91,6 +99,9 @@ if [[ $EnableExtraShell == true ]]; then
   nohup ql extra >$dir_log/extra.log 2>&1 &
   echo -e "自定义脚本后台执行中...\n"
 fi
+
+pm2 startup
+pm2 save
 
 echo -e "############################################################\n"
 echo -e "启动完成..."
