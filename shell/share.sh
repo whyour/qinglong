@@ -459,13 +459,11 @@ handle_task_start() {
 }
 
 run_task_before() {
-  [[ $is_macos -eq 0 ]] && check_server
-
   . $file_task_before "$@"
 
   if [[ $task_before ]]; then
     echo -e "执行前置命令\n"
-    eval "$task_before"
+    eval "$task_before" "$@"
     echo -e "\n执行前置命令结束\n"
   fi
 }
@@ -475,7 +473,7 @@ run_task_after() {
 
   if [[ $task_after ]]; then
     echo -e "\n执行后置命令\n"
-    eval "$task_after"
+    eval "$task_after" "$@"
     echo -e "\n执行后置命令结束"
   fi
 }

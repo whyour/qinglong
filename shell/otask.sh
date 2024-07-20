@@ -69,23 +69,6 @@ run_nohup() {
   nohup node $file_name &>$log_path &
 }
 
-check_server() {
-  if [[ $cpu_warn ]] && [[ $mem_warn ]] && [[ $disk_warn ]]; then
-    local top_result=$(top -b -n 1)
-    cpu_use=$(echo "$top_result" | grep CPU | grep -v -E 'grep|PID' | awk '{print $2}' | cut -f 1 -d "%" | head -n 1)
-
-    mem_free=$(free -m | grep "Mem" | awk '{print $3}' | head -n 1)
-    mem_total=$(free -m | grep "Mem" | awk '{print $2}' | head -n 1)
-    mem_use=$(printf "%d%%" $((mem_free * 100 / mem_total)) | cut -f 1 -d "%" | head -n 1)
-
-    disk_use=$(df -P | grep /dev | grep -v -E '(tmp|boot|shm)' | awk '{print $5}' | cut -f 1 -d "%" | head -n 1)
-    if [[ $cpu_use -gt $cpu_warn ]] && [[ $cpu_warn ]] || [[ $mem_free -lt $mem_warn ]] || [[ $disk_use -gt $disk_warn ]]; then
-      local resource=$(echo "$top_result" | grep -v -E 'grep|Mem|idle|Load|tr' | awk '{$2="";$3="";$4="";$5="";$7="";print $0}' | head -n 10 | tr '\n' '|' | sed s/\|/\\\\n/g)
-      notify_api "服务器资源异常警告" "当前CPU占用 $cpu_use% 内存占用 $mem_use% 磁盘占用 $disk_use% \n资源占用详情 \n\n $resource"
-    fi
-  fi
-}
-
 env_str_to_array() {
   . $file_env
   local IFS="&"
@@ -117,7 +100,7 @@ run_normal() {
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
   fi
-  configDir="${dir_config}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+  fileName="${file_param}" taskBefore="${file_task_before}" configDir="${dir_config}" $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 handle_env_split() {
@@ -160,7 +143,7 @@ run_concurrent() {
       export "${env_param}=${array[$i - 1]}"
       clear_non_sh_env
     fi
-    eval configDir="${dir_config}" envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
+    eval fileName="${file_param}" taskBefore="${file_task_before}" configDir="${dir_config}" envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
   done
 
   wait
@@ -205,7 +188,7 @@ run_designated() {
     file_param=${file_param/$relative_path\//}
   fi
 
-  configDir="${dir_config}" envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+  fileName="${file_param}" taskBefore="${file_task_before}" configDir="${dir_config}" envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 ## 运行其他命令
@@ -225,8 +208,7 @@ run_else() {
   $timeoutCmd $which_program $file_param "$@"
 }
 
-## 命令检测
-main() {
+check_file() {
   isJsOrPythonFile="false"
   if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.ts ]]; then
     isJsOrPythonFile="true"
@@ -240,7 +222,9 @@ main() {
       . $file_env
     fi
   fi
+}
 
+main() {
   if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
     if [[ $1 == *.sh ]]; then
       timeoutCmd=""
@@ -276,7 +260,10 @@ main() {
 }
 
 handle_task_start "${task_shell_params[@]}"
-run_task_before "${task_shell_params[@]}"
+check_file "${task_shell_params[@]}"
+if [[ $isJsOrPythonFile == 'false' ]]; then
+  run_task_before "${task_shell_params[@]}"
+fi
 main "${task_shell_params[@]}"
 run_task_after "${task_shell_params[@]}"
 clear_env

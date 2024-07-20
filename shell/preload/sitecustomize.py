@@ -1,6 +1,8 @@
 import os
 import re
 import env
+import subprocess
+import json
 
 
 def try_parse_int(value):
@@ -30,6 +32,29 @@ def expand_range(range_str, max_value):
 
 
 def run():
+    try:
+        split_str = "__sitecustomize__"
+        command = f'bash -c "source {os.getenv("taskBefore")} {os.getenv("fileName")}'
+
+        if os.getenv("task_before"):
+            command += f" && echo -e '执行前置命令\n' && eval \"{os.getenv('task_before')}\" && echo -e '\n执行前置命令结束\n'"
+
+        python_command = "PYTHONPATH= python3 -c 'import os, json; print(json.dumps(dict(os.environ)))'"
+        command += f' && echo "{split_str}" && {python_command}"'
+
+        res = subprocess.check_output(command, shell=True, encoding="utf-8")
+        output, env_str = res.split(split_str)
+
+        env_json = json.loads(env_str.strip())
+
+        for key, value in env_json.items():
+            os.environ[key] = value
+
+        print(output)
+
+    except subprocess.CalledProcessError as error:
+        print(f"run task before error: {error}")
+
     env_param = os.getenv("envParam")
     num_param = os.getenv("numParam")
 
