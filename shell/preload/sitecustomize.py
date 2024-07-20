@@ -3,6 +3,18 @@ import re
 import env
 import subprocess
 import json
+import builtins
+from notify import send
+
+
+class BaseApi:
+    def notify(self, *args, **kwargs):
+        return send(*args, **kwargs)
+
+
+def init_global():
+    QLAPI = BaseApi()
+    builtins.QLAPI = QLAPI
 
 
 def try_parse_int(value):
@@ -66,4 +78,5 @@ def run():
         os.environ[env_param] = env_str
 
 
+init_global()
 run()

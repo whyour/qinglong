@@ -25,3 +25,4 @@
 /.tmp
 __pycache__
 /shell/preload/env.*
+/shell/preload/notify.*

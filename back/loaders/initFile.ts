@@ -28,6 +28,8 @@ const sampleNotifyJsFile = path.join(samplePath, 'notify.js');
 const sampleNotifyPyFile = path.join(samplePath, 'notify.py');
 const scriptNotifyJsFile = path.join(scriptPath, 'sendNotify.js');
 const scriptNotifyPyFile = path.join(scriptPath, 'notify.py');
+const jsNotifyFile = path.join(preloadPath, 'notify.js');
+const pyNotifyFile = path.join(preloadPath, 'notify.py');
 const TaskBeforeFile = path.join(configPath, 'task_before.sh');
 const TaskAfterFile = path.join(configPath, 'task_after.sh');
 const homedir = os.homedir();
@@ -101,6 +103,9 @@ export default async () => {
   if (!confFileExist) {
     await fs.writeFile(confFile, await fs.readFile(sampleConfigFile));
   }
+
+  await fs.writeFile(jsNotifyFile, await fs.readFile(sampleNotifyJsFile));
+  await fs.writeFile(pyNotifyFile, await fs.readFile(sampleNotifyPyFile));
 
   if (!scriptNotifyJsFileExist) {
     await fs.writeFile(

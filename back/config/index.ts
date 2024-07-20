@@ -41,6 +41,8 @@ const systemLogPath = path.join(dataPath, 'syslog/');
 const envFile = path.join(preloadPath, 'env.sh');
 const jsEnvFile = path.join(preloadPath, 'env.js');
 const pyEnvFile = path.join(preloadPath, 'env.py');
+const jsNotifyFile = path.join(preloadPath, 'notify.js');
+const pyNotifyFile = path.join(preloadPath, 'notify.py');
 const confFile = path.join(configPath, 'config.sh');
 const crontabFile = path.join(configPath, 'crontab.list');
 const authConfigFile = path.join(configPath, 'auth.json');
@@ -92,6 +94,8 @@ export default {
   envFile,
   jsEnvFile,
   pyEnvFile,
+  jsNotifyFile,
+  pyNotifyFile,
   dbPath,
   uploadPath,
   configPath,

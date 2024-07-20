@@ -4,8 +4,6 @@
  * 定时规则
  * cron: 1 9 * * *
  */
-const { sendNotify } = require('./sendNotify.js'); // commonjs
-// import { sendNotify } from './sendNotify'; // es6
-
 console.log('test scripts');
-sendNotify('test scripts', 'test desc');
+QLAPI.notify('test scripts', 'test desc');
+console.log('test desc');

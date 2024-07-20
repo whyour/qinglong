@@ -1,5 +1,12 @@
 const { execSync } = require('child_process');
+const { sendNotify } = require('./notify.js');
 require(`./env.js`);
+
+function initGlobal() {
+  global.QLAPI = {
+    notify: sendNotify,
+  };
+}
 
 function expandRange(rangeStr, max) {
   const tempRangeStr = rangeStr
@@ -19,6 +26,7 @@ function expandRange(rangeStr, max) {
 
 function run() {
   try {
+    // TODO: big size
     const splitStr = '__sitecustomize__';
     let command = `bash -c "source ${process.env.taskBefore} ${process.env.fileName}`;
     if (process.env.task_before) {
@@ -31,17 +39,17 @@ function run() {
       },
     );
     const [output, envStr] = res.split(splitStr);
-    const json = JSON.parse(envStr.trim());
-    for (const key in json) {
-      process.env[key] = json[key];
+    const newEnvObject = JSON.parse(envStr.trim());
+    for (const key in newEnvObject) {
+      process.env[key] = newEnvObject[key];
     }
     console.log(output);
   } catch (error) {
-    console.log(`run task before error `, error);
+    console.log(`run task before error: `, error.message);
   }
 
-  if (process.env.envParam && process.env.numParam) {
-    const { envParam, numParam } = process.env;
+  const { envParam, numParam } = process.env;
+  if (envParam && numParam) {
     const array = (process.env[envParam] || '').split('&');
     const runArr = expandRange(numParam, array.length);
     const arrayRun = runArr.map((i) => array[i - 1]);
@@ -50,4 +58,5 @@ function run() {
   }
 }
 
+initGlobal();
 run();

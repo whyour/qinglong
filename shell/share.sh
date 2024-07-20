@@ -27,8 +27,6 @@ ql_static_repo=$dir_repo/static
 ## 文件
 file_config_sample=$dir_sample/config.sample.sh
 file_env=$dir_preload/env.sh
-js_file_env=$dir_preload/env.js
-py_file_env=$dir_preload/env.py
 preload_js_file=$dir_preload/sitecustomize.js
 file_sharecode=$dir_config/sharecode.sh
 file_config_user=$dir_config/config.sh
