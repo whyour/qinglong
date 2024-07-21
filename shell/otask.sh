@@ -100,7 +100,7 @@ run_normal() {
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
   fi
-  fileName="${file_param}" taskBefore="${file_task_before}" configDir="${dir_config}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+  $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 handle_env_split() {
@@ -143,7 +143,7 @@ run_concurrent() {
       export "${env_param}=${array[$i - 1]}"
       clear_non_sh_env
     fi
-    eval fileName="${file_param}" taskBefore="${file_task_before}" configDir="${dir_config}" envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
+    eval envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
   done
 
   wait
@@ -188,7 +188,7 @@ run_designated() {
     file_param=${file_param/$relative_path\//}
   fi
 
-  fileName="${file_param}" taskBefore="${file_task_before}" configDir="${dir_config}" envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+  envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 ## 运行其他命令
@@ -216,8 +216,8 @@ check_file() {
   if [[ -f $file_env ]]; then
     get_env_array
     if [[ $isJsOrPythonFile == 'true' ]]; then
-      export NODE_OPTIONS="${NODE_OPTIONS} -r ${preload_js_file}"
-      export PYTHONPATH="${PYTHONPATH}:${dir_preload}"
+      export NODE_OPTIONS="${NODE_OPTIONS} -r ${file_preload_js}"
+      export PYTHONPATH="${PYTHONPATH}:${dir_preload}:${dir_config}"
     else
       . $file_env
     fi

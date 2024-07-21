@@ -1,55 +1,57 @@
 #!/usr/bin/env bash
 
 ## 目录
-dir_root=$QL_DIR
-dir_tmp=$dir_root/.tmp
-dir_data=$dir_root/data
+export dir_root=$QL_DIR
+export dir_tmp=$dir_root/.tmp
+export dir_data=$dir_root/data
 
 if [[ $QL_DATA_DIR ]]; then
-  dir_data="${QL_DATA_DIR%/}"
+  export dir_data="${QL_DATA_DIR%/}"
 fi
 
-dir_shell=$dir_root/shell
-dir_preload=$dir_shell/preload
-dir_sample=$dir_root/sample
-dir_static=$dir_root/static
-dir_config=$dir_data/config
-dir_scripts=$dir_data/scripts
-dir_repo=$dir_data/repo
-dir_raw=$dir_data/raw
-dir_log=$dir_data/log
-dir_db=$dir_data/db
-dir_dep=$dir_data/deps
-dir_list_tmp=$dir_log/.tmp
-dir_update_log=$dir_log/update
-ql_static_repo=$dir_repo/static
+export dir_shell=$dir_root/shell
+export dir_preload=$dir_shell/preload
+export dir_sample=$dir_root/sample
+export dir_static=$dir_root/static
+export dir_config=$dir_data/config
+export dir_scripts=$dir_data/scripts
+export dir_repo=$dir_data/repo
+export dir_raw=$dir_data/raw
+export dir_log=$dir_data/log
+export dir_db=$dir_data/db
+export dir_dep=$dir_data/deps
+export dir_list_tmp=$dir_log/.tmp
+export dir_update_log=$dir_log/update
+export ql_static_repo=$dir_repo/static
 
 ## 文件
-file_config_sample=$dir_sample/config.sample.sh
-file_env=$dir_preload/env.sh
-preload_js_file=$dir_preload/sitecustomize.js
-file_sharecode=$dir_config/sharecode.sh
-file_config_user=$dir_config/config.sh
-file_auth_sample=$dir_sample/auth.sample.json
-file_auth_user=$dir_config/auth.json
-file_auth_token=$dir_config/token.json
-file_extra_shell=$dir_config/extra.sh
-file_task_before=$dir_config/task_before.sh
-file_task_after=$dir_config/task_after.sh
-file_task_sample=$dir_sample/task.sample.sh
-file_extra_sample=$dir_sample/extra.sample.sh
-file_notify_js_sample=$dir_sample/notify.js
-file_notify_py_sample=$dir_sample/notify.py
-file_test_js_sample=$dir_sample/ql_sample.js
-file_test_py_sample=$dir_sample/ql_sample.py
-file_notify_py=$dir_scripts/notify.py
-file_notify_js=$dir_scripts/sendNotify.js
-file_test_js=$dir_scripts/ql_sample.js
-file_test_py=$dir_scripts/ql_sample.py
-nginx_app_conf=$dir_root/docker/front.conf
-nginx_conf=$dir_root/docker/nginx.conf
-dep_notify_py=$dir_dep/notify.py
-dep_notify_js=$dir_dep/sendNotify.js
+export file_config_sample=$dir_sample/config.sample.sh
+export file_env=$dir_preload/env.sh
+export file_preload_js=$dir_preload/sitecustomize.js
+export file_sharecode=$dir_config/sharecode.sh
+export file_config_user=$dir_config/config.sh
+export file_auth_sample=$dir_sample/auth.sample.json
+export file_auth_user=$dir_config/auth.json
+export file_auth_token=$dir_config/token.json
+export file_extra_shell=$dir_config/extra.sh
+export file_task_before=$dir_config/task_before.sh
+export file_task_before_js=$dir_config/task_before.js
+export file_task_before_py=$dir_config/task_before.py
+export file_task_after=$dir_config/task_after.sh
+export file_task_sample=$dir_sample/task.sample.sh
+export file_extra_sample=$dir_sample/extra.sample.sh
+export file_notify_js_sample=$dir_sample/notify.js
+export file_notify_py_sample=$dir_sample/notify.py
+export file_test_js_sample=$dir_sample/ql_sample.js
+export file_test_py_sample=$dir_sample/ql_sample.py
+export file_notify_py=$dir_scripts/notify.py
+export file_notify_js=$dir_scripts/sendNotify.js
+export file_test_js=$dir_scripts/ql_sample.js
+export file_test_py=$dir_scripts/ql_sample.py
+export nginx_app_conf=$dir_root/docker/front.conf
+export nginx_conf=$dir_root/docker/nginx.conf
+export dep_notify_py=$dir_dep/notify.py
+export dep_notify_js=$dir_dep/sendNotify.js
 
 ## 清单文件
 list_crontab_user=$dir_config/crontab.list
@@ -174,12 +176,6 @@ fix_config() {
   if [[ ! -s $file_config_user ]]; then
     echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
     cp -fv $file_config_sample $file_config_user
-    echo
-  fi
-
-  if [[ ! -f $file_env ]]; then
-    echo -e "检测到config配置目录下不存在env.sh，创建一个空文件用于初始化...\n"
-    touch $file_env
     echo
   fi
 

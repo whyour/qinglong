@@ -1,9 +1,10 @@
 import os
 import re
-import env
 import subprocess
 import json
 import builtins
+import sys
+import env
 from notify import send
 
 
@@ -44,12 +45,16 @@ def expand_range(range_str, max_value):
 
 
 def run():
+    import task_before
+
     try:
         split_str = "__sitecustomize__"
-        command = f'bash -c "source {os.getenv("taskBefore")} {os.getenv("fileName")}'
+        file_name = sys.argv[0].replace(f"{os.getenv('dir_scripts')}/", "")
+        command = f'bash -c "source {os.getenv("file_task_before")} {file_name}'
+        task_before = os.getenv("task_before")
 
-        if os.getenv("task_before"):
-            command += f" && echo -e '执行前置命令\n' && eval \"{os.getenv('task_before')}\" && echo -e '\n执行前置命令结束\n'"
+        if task_before:
+            command += f" && echo -e '执行前置命令\n' && eval \"{task_before}\" && echo -e '\n执行前置命令结束\n'"
 
         python_command = "PYTHONPATH= python3 -c 'import os, json; print(json.dumps(dict(os.environ)))'"
         command += f' && echo "{split_str}" && {python_command}"'
@@ -66,6 +71,12 @@ def run():
 
     except subprocess.CalledProcessError as error:
         print(f"run task before error: {error}")
+    except OSError as error:
+        error_message = str(error)
+        if "Argument list too long" not in error_message:
+            print(f"run task before error: {error}")
+    except Exception as error:
+        print(f"run task before error: {error}")
 
     env_param = os.getenv("envParam")
     num_param = os.getenv("numParam")
@@ -78,5 +89,8 @@ def run():
         os.environ[env_param] = env_str
 
 
-init_global()
-run()
+try:
+    init_global()
+    run()
+except Exception as error:
+    print(f"run builtin code error: {error}\n")

@@ -31,6 +31,8 @@ const scriptNotifyPyFile = path.join(scriptPath, 'notify.py');
 const jsNotifyFile = path.join(preloadPath, 'notify.js');
 const pyNotifyFile = path.join(preloadPath, 'notify.py');
 const TaskBeforeFile = path.join(configPath, 'task_before.sh');
+const TaskBeforeJsFile = path.join(configPath, 'task_before.js');
+const TaskBeforePyFile = path.join(configPath, 'task_before.py');
 const TaskAfterFile = path.join(configPath, 'task_after.sh');
 const homedir = os.homedir();
 const sshPath = path.resolve(homedir, '.ssh');
@@ -53,6 +55,8 @@ export default async () => {
   const scriptNotifyJsFileExist = await fileExist(scriptNotifyJsFile);
   const scriptNotifyPyFileExist = await fileExist(scriptNotifyPyFile);
   const TaskBeforeFileExist = await fileExist(TaskBeforeFile);
+  const TaskBeforeJsFileExist = await fileExist(TaskBeforeJsFile);
+  const TaskBeforePyFileExist = await fileExist(TaskBeforePyFile);
   const TaskAfterFileExist = await fileExist(TaskAfterFile);
 
   if (!configDirExist) {
@@ -123,6 +127,20 @@ export default async () => {
 
   if (!TaskBeforeFileExist) {
     await fs.writeFile(TaskBeforeFile, await fs.readFile(sampleTaskShellFile));
+  }
+
+  if (!TaskBeforeJsFileExist) {
+    await fs.writeFile(
+      TaskBeforeJsFile,
+      '// The JavaScript code that executes before the JavaScript task execution will execute.',
+    );
+  }
+
+  if (!TaskBeforePyFileExist) {
+    await fs.writeFile(
+      TaskBeforePyFile,
+      '# The Python code that executes before the Python task execution will execute.',
+    );
   }
 
   if (!TaskAfterFileExist) {

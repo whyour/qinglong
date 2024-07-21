@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 dir_shell=$QL_DIR/shell
-. $dir_shell/env.sh
 . $dir_shell/share.sh
 . $dir_shell/api.sh
+. $dir_shell/env.sh
 
 send_mark=$dir_shell/send_mark
 

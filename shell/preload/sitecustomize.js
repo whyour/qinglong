@@ -25,12 +25,23 @@ function expandRange(rangeStr, max) {
 }
 
 function run() {
+  const {
+    envParam,
+    numParam,
+    file_task_before,
+    file_task_before_js,
+    dir_scripts,
+    task_before,
+  } = process.env;
+
+  require(file_task_before_js);
+
   try {
-    // TODO: big size
     const splitStr = '__sitecustomize__';
-    let command = `bash -c "source ${process.env.taskBefore} ${process.env.fileName}`;
-    if (process.env.task_before) {
-      command = `${command} && echo -e '执行前置命令\n' && eval "${process.env.task_before}" && echo -e '\n执行前置命令结束\n'`;
+    const fileName = process.argv[1].replace(`${dir_scripts}/`, '');
+    let command = `bash -c "source ${file_task_before} ${fileName}`;
+    if (task_before) {
+      command = `${command} && echo -e '执行前置命令\n' && eval "${task_before}" && echo -e '\n执行前置命令结束\n'`;
     }
     const res = execSync(
       `${command} && echo "${splitStr}" && NODE_OPTIONS= node -p 'JSON.stringify(process.env)'"`,
@@ -45,10 +56,11 @@ function run() {
     }
     console.log(output);
   } catch (error) {
-    console.log(`run task before error: `, error.message);
+    if (!error.message.includes('spawnSync /bin/sh E2BIG')) {
+      console.log(`run task before error: `, error);
+    }
   }
 
-  const { envParam, numParam } = process.env;
   if (envParam && numParam) {
     const array = (process.env[envParam] || '').split('&');
     const runArr = expandRange(numParam, array.length);
@@ -58,5 +70,9 @@ function run() {
   }
 }
 
-initGlobal();
-run();
+try {
+  initGlobal();
+  run();
+} catch (error) {
+  console.log(`run builtin code error: `, error, '\n');
+}

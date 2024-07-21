@@ -1,8 +1,8 @@
 #!/bin/bash
 
 dir_shell=/ql/shell
-. $dir_shell/env.sh
 . $dir_shell/share.sh
+. $dir_shell/env.sh
 
 echo -e "======================1. 检测配置文件========================\n"
 make_dir /etc/nginx/conf.d
