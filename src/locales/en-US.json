@@ -349,7 +349,7 @@
   "推送到个人QQ: http://127.0.0.1/send_private_msg，群：http://127.0.0.1/send_group_msg": "Push to personal QQ: http://127.0.0.1/send_private_msg, group: http://127.0.0.1/send_group_msg",
   "访问密钥": "Access Key",
   "如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群": "If GOBOT_URL is set to /send_private_msg, enter user_id=personal QQ; if set to /send_group_msg, enter group_id=QQ group",
-  "Server酱SENDKEY": "ServerChan SENDKEY",
+  "Server酱SENDKEY": "ServerChan SENDKEY, https://sct.ftqq.com/r/13363",
   "PushDeer的Key，https://github.com/easychen/pushdeer": "PushDeer Key, https://github.com/easychen/pushdeer",
   "PushDeer的自架API endpoint，默认是 https://api2.pushdeer.com/message/push": "PushDeer's self-hosted API endpoint, default is https://api2.pushdeer.com/message/push",
   "Bark的信息IP/设备码，例如：https://api.day.app/XXXXXXXX": "Bark information IP/device code, e.g., https://api.day.app/XXXXXXXX",

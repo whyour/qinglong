@@ -43,7 +43,7 @@ BotRepoUrl=""
 
 ## 通知环境变量
 ## 1. Server酱
-## https://sct.ftqq.com
+## https://sct.ftqq.com/r/13363
 ## 下方填写 SCHKEY 值或 SendKey 值
 export PUSH_KEY=""
 
