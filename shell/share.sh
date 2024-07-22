@@ -91,10 +91,6 @@ import_config() {
   else
     default_cron="$(random_range 0 59) $(random_range 0 23) * * *"
   fi
-
-  cpu_warn=${CpuWarn}
-  mem_warn=${MemoryWarn}
-  disk_warn=${DiskWarn}
 }
 
 set_proxy() {
@@ -488,5 +484,3 @@ init_env
 detect_termux
 detect_macos
 define_cmd
-
-import_config $1

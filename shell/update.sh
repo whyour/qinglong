@@ -563,6 +563,7 @@ main() {
   fi
 }
 
+import_config "$@"
 main "$@"
 
 exit 0
