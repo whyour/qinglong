@@ -41,10 +41,10 @@ function run() {
     const fileName = process.argv[1].replace(`${dir_scripts}/`, '');
     let command = `bash -c "source ${file_task_before} ${fileName}`;
     if (task_before) {
-      command = `${command} && echo -e '执行前置命令\n' && eval "${task_before}" && echo -e '\n执行前置命令结束\n'`;
+      command = `${command} && echo -e '执行前置命令\n' && eval '${task_before}' && echo -e '\n执行前置命令结束\n'`;
     }
     const res = execSync(
-      `${command} && echo "${splitStr}" && NODE_OPTIONS= node -p 'JSON.stringify(process.env)'"`,
+      `${command} && echo -e '${splitStr}' && NODE_OPTIONS= node -p 'JSON.stringify(process.env)'"`,
       {
         encoding: 'utf-8',
       },

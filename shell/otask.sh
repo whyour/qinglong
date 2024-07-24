@@ -216,8 +216,13 @@ check_file() {
   if [[ -f $file_env ]]; then
     get_env_array
     if [[ $isJsOrPythonFile == 'true' ]]; then
-      export NODE_OPTIONS="${NODE_OPTIONS} -r ${file_preload_js}"
-      export PYTHONPATH="${PYTHONPATH}:${dir_preload}:${dir_config}"
+      PREV_NODE_OPTIONS="${NODE_OPTIONS}"
+      PREV_PYTHONPATH="${PYTHONPATH}"
+      if [[ $1 == *.js ]] || [[ $1 == *.ts ]]; then
+        export NODE_OPTIONS="${NODE_OPTIONS} -r ${file_preload_js}"
+      else
+        export PYTHONPATH="${PYTHONPATH}:${dir_preload}:${dir_config}"
+      fi
     else
       . $file_env
     fi
@@ -265,6 +270,10 @@ if [[ $isJsOrPythonFile == 'false' ]]; then
   run_task_before "${task_shell_params[@]}"
 fi
 main "${task_shell_params[@]}"
+if [[ $isJsOrPythonFile == 'true' ]]; then
+  export NODE_OPTIONS="${PREV_NODE_OPTIONS}"
+  export PYTHONPATH="${PREV_PYTHONPATH}"
+fi
 run_task_after "${task_shell_params[@]}"
 clear_env
 handle_task_end "${task_shell_params[@]}"
