@@ -18,7 +18,11 @@ function expandRange(rangeStr, max) {
     const rangeMatch = part.match(/^(\d+)([-~_])(\d+)$/);
     if (rangeMatch) {
       const [, start, , end] = rangeMatch.map(Number);
-      return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+      const step = start < end ? 1 : -1;
+      return Array.from(
+        { length: Math.abs(end - start) + 1 },
+        (_, i) => start + i * step,
+      );
     }
     return Number(part);
   });

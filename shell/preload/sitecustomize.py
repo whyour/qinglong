@@ -37,7 +37,8 @@ def expand_range(range_str, max_value):
         range_match = re.match(r"^(\d+)([-~_])(\d+)$", part)
         if range_match:
             start, _, end = map(try_parse_int, range_match.groups())
-            result.extend(range(start, end + 1))
+            step = 1 if start < end else -1
+            result.extend(range(start, end + step, step))
         else:
             result.append(int(part))
 
