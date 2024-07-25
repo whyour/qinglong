@@ -67,10 +67,11 @@ cd ${QL_DIR}
 cp -f .env.example .env
 chmod 777 ${QL_DIR}/shell/*.sh
 
-. ${QL_DIR}/shell/env.sh
 . ${QL_DIR}/shell/share.sh
+. ${QL_DIR}/shell/env.sh
 
 echo -e "======================1. 检测配置文件========================\n"
+import_config "$@"
 make_dir /etc/nginx/conf.d
 make_dir /run/nginx
 init_nginx
