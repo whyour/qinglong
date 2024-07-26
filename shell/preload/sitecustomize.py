@@ -55,7 +55,8 @@ def run():
         task_before = os.getenv("task_before")
 
         if task_before:
-            command += f" && echo -e '执行前置命令\n' && eval '{task_before}' && echo -e '\n执行前置命令结束\n'"
+            escape_task_before = task_before.replace('"', '\\"')
+            command += f" && echo -e '执行前置命令\n' && eval '{escape_task_before}' && echo -e '\n执行前置命令结束\n'"
 
         python_command = "PYTHONPATH= python3 -c 'import os, json; print(json.dumps(dict(os.environ)))'"
         command += f" && echo -e '{split_str}' && {python_command}\""
