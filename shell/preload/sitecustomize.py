@@ -5,17 +5,6 @@ import json
 import builtins
 import sys
 import env
-from notify import send
-
-
-class BaseApi:
-    def notify(self, *args, **kwargs):
-        return send(*args, **kwargs)
-
-
-def init_global():
-    QLAPI = BaseApi()
-    builtins.QLAPI = QLAPI
 
 
 def try_parse_int(value):
@@ -92,7 +81,15 @@ def run():
 
 
 try:
-    init_global()
     run()
+    
+    from notify import send
+
+    class BaseApi:
+        def notify(self, *args, **kwargs):
+            return send(*args, **kwargs)
+
+    QLAPI = BaseApi()
+    builtins.QLAPI = QLAPI
 except Exception as error:
     print(f"run builtin code error: {error}\n")

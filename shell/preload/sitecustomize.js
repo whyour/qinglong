@@ -1,13 +1,5 @@
 const { execSync } = require('child_process');
-const { sendNotify } = require('./notify.js');
 require(`./env.js`);
-
-function initGlobal() {
-  global.QLAPI = {
-    notify: sendNotify,
-  };
-}
-
 function expandRange(rangeStr, max) {
   const tempRangeStr = rangeStr
     .trim()
@@ -76,8 +68,12 @@ function run() {
 }
 
 try {
-  initGlobal();
   run();
+
+  const { sendNotify } = require('./notify.js');
+  global.QLAPI = {
+    notify: sendNotify,
+  };
 } catch (error) {
   console.log(`run builtin code error: `, error, '\n');
 }
