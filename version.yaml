@@ -1,7 +1,8 @@
-version: 2.17.8
-changeLogLink: https://t.me/jiao_long/419
-publishTime: 2024-07-13 08:00
+version: 2.17.9
+changeLogLink: https://t.me/jiao_long/420
+publishTime: 2024-07-23 23:00
 changeLog: |
-  1. 修改环境变量加载逻辑
-  2. 修复执行任务报错 Argument list too long
+  1. Javascript 和 Python 增加内置API QLAPI.notify
+  2. 配置管理增加 task_before.js 和 task_before.py 文件，在执行任务前执行，避免环境变量过大报错
+  3. 修复执行任务 JavaScript 和 Python 任务前未执行 task_before.sh
   
