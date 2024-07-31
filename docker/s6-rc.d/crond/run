@@ -1,0 +1,2 @@
+#!/command/execlineb -P
+crond -f

@@ -1,0 +1,12 @@
+#!/command/execlineb -P
+dir_shell=/ql/shell
+. $dir_shell/share.sh
+. $dir_shell/env.sh
+
+import_config "$@"
+make_dir /etc/nginx/conf.d
+make_dir /run/nginx
+init_nginx
+fix_config
+
+nginx -g "daemon off;"
