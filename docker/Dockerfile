@@ -76,23 +76,24 @@ COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
 WORKDIR ${QL_DIR}
 
-ENV S6_VERSION=v3.2.0.0
+RUN apk --no-cache add -f s6-overlay
+# ENV S6_VERSION=v3.2.0.0
 
-RUN ARCH=$(uname -m) && \
-    case "$ARCH" in \
-        x86_64) ARCH="amd64" ;; \
-        aarch64) ARCH="aarch64" ;; \
-        armv6l) ARCH="arm" ;; \
-        armv7l) ARCH="armhf" ;; \
-        i386) ARCH="x86" ;; \
-        s390x) ARCH="s390x" ;; \
-        ppc64le) ARCH="powerpc64le" ;; \
-        *) echo "unsupported architecture"; exit 1 ;; \
-    esac && \
-    S6_OVERLAY_URL=https://github.com/just-containers/s6-overlay/releases/download/${S6_VERSION}/s6-overlay-${ARCH}.tar.xz && \
-    apk add --no-cache curl && \
-    curl -L $S6_OVERLAY_URL -o /tmp/s6-overlay.tar.xz && \
-    tar -C / -Jxpf /tmp/s6-overlay.tar.xz
+# RUN ARCH=$(uname -m) && \
+#     case "$ARCH" in \
+#         x86_64) ARCH="amd64" ;; \
+#         aarch64) ARCH="aarch64" ;; \
+#         armv6l) ARCH="arm" ;; \
+#         armv7l) ARCH="armhf" ;; \
+#         i386) ARCH="x86" ;; \
+#         s390x) ARCH="s390x" ;; \
+#         ppc64le) ARCH="powerpc64le" ;; \
+#         *) echo "unsupported architecture"; exit 1 ;; \
+#     esac && \
+#     S6_OVERLAY_URL=https://github.com/just-containers/s6-overlay/releases/download/${S6_VERSION}/s6-overlay-${ARCH}.tar.xz && \
+#     apk add --no-cache curl && \
+#     curl -L $S6_OVERLAY_URL -o /tmp/s6-overlay.tar.xz && \
+#     tar -C / -Jxpf /tmp/s6-overlay.tar.xz
 
 COPY docker/s6-rc.d /etc/s6-overlay/s6-rc.d/
 
