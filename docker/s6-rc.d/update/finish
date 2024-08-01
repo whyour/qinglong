@@ -1,2 +1,2 @@
-#!/command/execlineb -P
+#!/bin/bash
 echo "finish update"
