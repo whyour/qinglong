@@ -5,7 +5,7 @@ import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import { parseBody, parseHeaders } from '../config/util';
-import { NotificationInfo } from '../data/notify';
+import { NotificationInfo, PushPlusNotification } from '../data/notify';
 import UserService from './user';
 
 @Service()
@@ -495,8 +495,8 @@ export default class NotificationService {
     }
   }
 
-  private async pushPlus() {
-    const { pushPlusToken, pushPlusUser } = this.params;
+  private async () {
+    const { pushPlusToken, pushPlusUser, pushplusWebhook, pushPlusTempalte, pushplusChannel, pushplusCallbackUrl, pushplusTo} = this.params;
     const url = `https://www.pushplus.plus/send`;
     try {
       const res: any = await got
@@ -507,6 +507,11 @@ export default class NotificationService {
             title: `${this.title}`,
             content: `${this.content.replace(/[\n\r]/g, '<br>')}`,
             topic: `${pushPlusUser || ''}`,
+            template: `${pushPlusTempalte || 'html'}`,
+            channel: `${pushplusChannel || 'wechat'}`,
+            webhook: `${pushplusWebhook}`,
+            callbackUrl: `${pushplusCallbackUrl}`,
+            to: `${pushplusTo}`
           },
         })
         .json();

@@ -40,9 +40,15 @@ const push_config = {
   CHAT_URL: '', // synology chat url
   CHAT_TOKEN: '', // synology chat token
 
-  // 官方文档：http://www.pushplus.plus/
-  PUSH_PLUS_TOKEN: '', // push+ 微信推送的用户令牌
-  PUSH_PLUS_USER: '', // push+ 微信推送的群组编码
+  // 官方文档：https://www.pushplus.plus/
+  PUSH_PLUS_TOKEN: '', // pushplus 推送的用户令牌
+  PUSH_PLUS_USER: '', // pushplus 推送的群组编码
+  PUSH_PLUS_TEMPLATE: 'html',       // pushplus 发送模板，支持html,txt,json,markdown,cloudMonitor,jenkins,route,pay
+  PUSH_PLUS_CHANNEL: 'wechat',      // pushplus 发送渠道，支持wechat,webhook,cp,mail,sms
+  PUSH_PLUS_WEBHOOK: '',            // pushplus webhook编码，可在pushplus公众号上扩展配置出更多渠道
+  PUSH_PLUS_CALLBACKURL: '',        // pushplus 发送结果回调地址，会把推送最终结果通知到这个地址上
+  PUSH_PLUS_TO: '',                // pushplus 好友令牌，微信公众号渠道填写好友令牌，企业微信渠道填写企业微信用户id
+
 
   // 微加机器人，官方网站：https://www.weplusbot.com/
   WE_PLUS_BOT_TOKEN: '', // 微加机器人的用户令牌
@@ -759,7 +765,7 @@ function iGotNotify(text, desp, params = {}) {
 
 function pushPlusNotify(text, desp) {
   return new Promise((resolve) => {
-    const { PUSH_PLUS_TOKEN, PUSH_PLUS_USER } = push_config;
+    const { PUSH_PLUS_TOKEN, PUSH_PLUS_USER, PUSH_PLUS_TEMPLATE, PUSH_PLUS_CHANNEL, PUSH_PLUS_WEBHOOK, PUSH_PLUS_CALLBACKURL, PUSH_PLUS_TO } = push_config;
     if (PUSH_PLUS_TOKEN) {
       desp = desp.replace(/[\n\r]/g, '<br>'); // 默认为html, 不支持plaintext
       const body = {
@@ -767,6 +773,12 @@ function pushPlusNotify(text, desp) {
         title: `${text}`,
         content: `${desp}`,
         topic: `${PUSH_PLUS_USER}`,
+        template: `${PUSH_PLUS_TEMPLATE}`,
+        channel: `${PUSH_PLUS_CHANNEL}`,
+        webhook: `${PUSH_PLUS_WEBHOOK}`,
+        callbackUrl: `${PUSH_PLUS_CALLBACKURL}`,
+        to: `${PUSH_PLUS_TO}`
+
       };
       const options = {
         url: `https://www.pushplus.plus/send`,
@@ -780,7 +792,7 @@ function pushPlusNotify(text, desp) {
         try {
           if (err) {
             console.log(
-              `Push+ 发送${
+              `pushplus 发送${
                 PUSH_PLUS_USER ? '一对多' : '一对一'
               }通知消息失败😞\n`,
               err,
@@ -788,13 +800,13 @@ function pushPlusNotify(text, desp) {
           } else {
             if (data.code === 200) {
               console.log(
-                `Push+ 发送${
+                `pushplus 发送${
                   PUSH_PLUS_USER ? '一对多' : '一对一'
-                }通知消息完成🎉\n`,
+                }通知请求成功🎉，可根据流水号查询推送结果：${data.data}\n`,
               );
             } else {
               console.log(
-                `Push+ 发送${
+                `pushplus 发送${
                   PUSH_PLUS_USER ? '一对多' : '一对一'
                 }通知消息异常 ${data.msg}\n`,
               );
