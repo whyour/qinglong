@@ -313,7 +313,7 @@ export default {
         ),
       },
       {
-        label: 'pushPlusTempalte',
+        label: 'pushplusTemplate',
         tip: intl.get(
           '发送模板',
         ),
