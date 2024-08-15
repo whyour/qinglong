@@ -801,7 +801,7 @@ function pushPlusNotify(text, desp) {
               console.log(
                 `pushplus 发送${
                   PUSH_PLUS_USER ? '一对多' : '一对一'
-                }通知请求成功🎉，可根据流水号查询推送结果：${data.data}\n`,
+                }通知请求成功🎉，可根据流水号查询推送结果：${data.data}\n注意：请求成功并不代表推送成功，如未收到消息，请到pushplus官网使用流水号查询推送最终结果`,
               );
             } else {
               console.log(

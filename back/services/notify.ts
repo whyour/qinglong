@@ -5,7 +5,7 @@ import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import { parseBody, parseHeaders } from '../config/util';
-import { NotificationInfo, PushPlusNotification } from '../data/notify';
+import { NotificationInfo } from '../data/notify';
 import UserService from './user';
 
 @Service()
@@ -495,25 +495,27 @@ export default class NotificationService {
     }
   }
 
-  private async () {
-    const { pushPlusToken, pushPlusUser, pushplusWebhook, pushPlusTempalte, pushplusChannel, pushplusCallbackUrl, pushplusTo} = this.params;
+  private async pushPlus() {
+    const { pushPlusToken, pushPlusUser, pushplusWebhook, pushPlusTemplate, pushplusChannel, pushplusCallbackUrl, pushplusTo} = this.params;
     const url = `https://www.pushplus.plus/send`;
     try {
+      let body = {
+        ...this.gotOption,
+        json: {
+          token: `${pushPlusToken}`,
+          title: `${this.title}`,
+          content: `${this.content.replace(/[\n\r]/g, '<br>')}`,
+          topic: `${pushPlusUser || ''}`,
+          template: `${pushPlusTemplate || 'html'}`,
+          channel: `${pushplusChannel || 'wechat'}`,
+          webhook: `${pushplusWebhook || ''}`,
+          callbackUrl: `${pushplusCallbackUrl || ''}`,
+          to: `${pushplusTo || ''}`
+        },
+      }
+
       const res: any = await got
-        .post(url, {
-          ...this.gotOption,
-          json: {
-            token: `${pushPlusToken}`,
-            title: `${this.title}`,
-            content: `${this.content.replace(/[\n\r]/g, '<br>')}`,
-            topic: `${pushPlusUser || ''}`,
-            template: `${pushPlusTempalte || 'html'}`,
-            channel: `${pushplusChannel || 'wechat'}`,
-            webhook: `${pushplusWebhook}`,
-            callbackUrl: `${pushplusCallbackUrl}`,
-            to: `${pushplusTo}`
-          },
-        })
+        .post(url, body)
         .json();
 
       if (res.code === 200) {

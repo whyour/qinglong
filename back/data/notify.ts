@@ -99,7 +99,7 @@ export class IGotNotification extends NotificationBaseInfo {
 export class PushPlusNotification extends NotificationBaseInfo {
   public pushPlusToken = '';
   public pushPlusUser = '';
-  public pushPlusTempalte = '';
+  public pushPlusTemplate = '';
   public pushplusChannel = '';
   public pushplusWebhook = '';
   public pushplusCallbackUrl = '';
