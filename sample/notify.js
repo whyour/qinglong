@@ -778,7 +778,6 @@ function pushPlusNotify(text, desp) {
         webhook: `${PUSH_PLUS_WEBHOOK}`,
         callbackUrl: `${PUSH_PLUS_CALLBACKURL}`,
         to: `${PUSH_PLUS_TO}`
-
       };
       const options = {
         url: `https://www.pushplus.plus/send`,
