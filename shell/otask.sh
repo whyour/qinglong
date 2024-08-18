@@ -100,7 +100,7 @@ run_normal() {
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
   fi
-  $timeoutCmd $which_program $file_param "${script_params[@]:-''}"
+  $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 handle_env_split() {
@@ -143,7 +143,7 @@ run_concurrent() {
       export "${env_param}=${array[$i - 1]}"
       clear_non_sh_env
     fi
-    eval envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]:-''}" &>$single_log_path &
+    eval envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
   done
 
   wait
@@ -188,7 +188,7 @@ run_designated() {
     file_param=${file_param/$relative_path\//}
   fi
 
-  envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]:-''}"
+  envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
 
 ## 运行其他命令
@@ -269,7 +269,14 @@ check_file "${task_shell_params[@]}"
 if [[ $isJsOrPythonFile == 'false' ]]; then
   run_task_before "${task_shell_params[@]}"
 fi
+if set -o | grep -q 'nounset.*on'; then
+  set_u_on="true"
+  set +u
+fi
 main "${task_shell_params[@]}"
+if [[ "$set_u_on" == 'true' ]]; then
+  set -u
+fi
 if [[ $isJsOrPythonFile == 'true' ]]; then
   export NODE_OPTIONS="${PREV_NODE_OPTIONS}"
   export PYTHONPATH="${PREV_PYTHONPATH}"

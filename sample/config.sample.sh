@@ -175,8 +175,16 @@ export CHRONOCAT_QQ=""
 export CHRONOCAT_TOKEN=""
 
 ## 16. SMTP
+## JavaScript 参数
 ## 邮箱服务名称，比如126、163、Gmail、QQ等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
 export SMTP_SERVICE=""
+
+## Python 参数
+## SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
+export SMTP_SERVER=""
+## SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
+export SMTP_SSL=""
+
 ## smtp_email 填写 SMTP 收发件邮箱，通知将会由自己发给自己
 export SMTP_EMAIL=""
 ## smtp_password 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
