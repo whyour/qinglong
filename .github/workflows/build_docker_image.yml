@@ -103,7 +103,7 @@ jobs:
           cache: "pnpm"
 
       - name: Setup timezone
-        uses: szenius/set-timezone@v1.2
+        uses: szenius/set-timezone@v2.0
         with:
           timezoneLinux: Asia/Shanghai
 
@@ -149,7 +149,7 @@ jobs:
 
       - name: Build and push
         id: docker_build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           build-args: |
             MAINTAINER=${{ github.repository_owner }}
@@ -190,7 +190,7 @@ jobs:
           cache: "pnpm"
 
       - name: Setup timezone
-        uses: szenius/set-timezone@v1.2
+        uses: szenius/set-timezone@v2.0
         with:
           timezoneLinux: Asia/Shanghai
 
@@ -215,7 +215,7 @@ jobs:
 
       - name: Build and push python3.10
         id: docker_build_310
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           build-args: |
             MAINTAINER=${{ github.repository_owner }}
