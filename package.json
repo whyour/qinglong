@@ -60,7 +60,6 @@
     "@grpc/grpc-js": "^1.8.13",
     "@otplib/preset-default": "^12.0.1",
     "@sentry/node": "^8.26.0",
-    "@sentry/profiling-node": "8.26.0",
     "body-parser": "^1.19.2",
     "celebrate": "^15.0.1",
     "chokidar": "^3.5.3",

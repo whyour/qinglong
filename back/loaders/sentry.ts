@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Logger from './logger';
 import fs from 'fs';
 import config from '../config';
@@ -19,7 +18,6 @@ Sentry.init({
     /celebrate request validation failed/i,
   ],
   dsn: 'https://8b5c84cfef3e22541bc84de0ed00497b@o1098464.ingest.sentry.io/6122819',
-  integrations: [nodeProfilingIntegration()],
   tracesSampleRate: 0.5,
   release: version,
 });

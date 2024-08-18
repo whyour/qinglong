@@ -1,4 +1,4 @@
-FROM python:3.10-alpine3.18 as builder
+FROM python:3.10-alpine3.18 AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
   && apk update \
