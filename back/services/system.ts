@@ -266,7 +266,7 @@ export default class SystemService {
             timeout: 30000,
           },
         );
-        lastVersionContent = await parseContentVersion(result.body);
+        lastVersionContent = parseContentVersion(result.body);
       } catch (error) {}
 
       if (!lastVersionContent) {

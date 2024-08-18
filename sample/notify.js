@@ -817,7 +817,7 @@ function wePlusBotNotify(text, desp) {
     const { WE_PLUS_BOT_TOKEN, WE_PLUS_BOT_RECEIVER, WE_PLUS_BOT_VERSION } =
       push_config;
     if (WE_PLUS_BOT_TOKEN) {
-      const template = 'txt';
+      let template = 'txt';
       if (desp.length > 800) {
         desp = desp.replace(/[\n\r]/g, '<br>');
         template = 'html';

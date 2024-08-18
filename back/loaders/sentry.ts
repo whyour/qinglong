@@ -1,32 +1,28 @@
-import { Application } from 'express';
 import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Logger from './logger';
-import config from '../config';
 import fs from 'fs';
-import { parseVersion } from '../config/util';
+import config from '../config';
+import { parseContentVersion } from '../config/util';
 
-export default async ({ expressApp }: { expressApp: Application }) => {
-  const { version } = await parseVersion(config.versionFile);
+let version = '1.0.0';
+try {
+  const content = fs.readFileSync(config.versionFile, 'utf-8');
+  ({ version } = parseContentVersion(content));
+} catch (error) {}
 
-  Sentry.init({
-    ignoreErrors: [
-      /SequelizeUniqueConstraintError/i,
-      /Validation error/i,
-      /UnauthorizedError/i,
-      /celebrate request validation failed/i,
-    ],
-    dsn: 'https://8b5c84cfef3e22541bc84de0ed00497b@o1098464.ingest.sentry.io/6122819',
-    integrations: [
-      new Sentry.Integrations.Http({ tracing: true }),
-      new Sentry.Integrations.Express({ app: expressApp }),
-    ],
-    tracesSampleRate: 0.8,
-    release: version,
-  });
+Sentry.init({
+  ignoreErrors: [
+    /SequelizeUniqueConstraintError/i,
+    /Validation error/i,
+    /UnauthorizedError/i,
+    /celebrate request validation failed/i,
+  ],
+  dsn: 'https://8b5c84cfef3e22541bc84de0ed00497b@o1098464.ingest.sentry.io/6122819',
+  integrations: [nodeProfilingIntegration()],
+  tracesSampleRate: 0.5,
+  release: version,
+});
 
-  expressApp.use(Sentry.Handlers.requestHandler());
-  expressApp.use(Sentry.Handlers.tracingHandler());
-
-  Logger.info('✌️ Sentry loaded');
-  console.log('✌️ Sentry loaded');
-};
+Logger.info('✌️ Sentry loaded');
+console.log('✌️ Sentry loaded');

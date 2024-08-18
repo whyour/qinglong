@@ -100,7 +100,7 @@ run_normal() {
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
   fi
-  $timeoutCmd $which_program $file_param "${script_params[@]}"
+  $timeoutCmd $which_program $file_param "${script_params[@]:-''}"
 }
 
 handle_env_split() {
@@ -143,7 +143,7 @@ run_concurrent() {
       export "${env_param}=${array[$i - 1]}"
       clear_non_sh_env
     fi
-    eval envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
+    eval envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]:-''}" &>$single_log_path &
   done
 
   wait
@@ -188,7 +188,7 @@ run_designated() {
     file_param=${file_param/$relative_path\//}
   fi
 
-  envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+  envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]:-''}"
 }
 
 ## 运行其他命令
@@ -210,15 +210,15 @@ run_else() {
 
 check_file() {
   isJsOrPythonFile="false"
-  if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.ts ]]; then
+  if [[ $1 == *.js ]] || [[ $1 == *.mjs ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.ts ]]; then
     isJsOrPythonFile="true"
   fi
   if [[ -f $file_env ]]; then
     get_env_array
     if [[ $isJsOrPythonFile == 'true' ]]; then
-      PREV_NODE_OPTIONS="${NODE_OPTIONS}"
-      PREV_PYTHONPATH="${PYTHONPATH}"
-      if [[ $1 == *.js ]] || [[ $1 == *.ts ]]; then
+      PREV_NODE_OPTIONS="${NODE_OPTIONS:=}"
+      PREV_PYTHONPATH="${PYTHONPATH:=}"
+      if [[ $1 == *.js ]] || [[ $1 == *.ts ]] || [[ $1 == *.mjs ]]; then
         export NODE_OPTIONS="${NODE_OPTIONS} -r ${file_preload_js}"
       else
         export PYTHONPATH="${PYTHONPATH}:${dir_preload}:${dir_config}"

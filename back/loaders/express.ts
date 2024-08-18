@@ -133,6 +133,8 @@ export default ({ app }: { app: Application }) => {
 
   app.use(errors());
 
+  Sentry.setupExpressErrorHandler(app);
+
   app.use(
     (
       err: Error & { status: number },
@@ -178,8 +180,6 @@ export default ({ app }: { app: Application }) => {
       res: Response,
       next: NextFunction,
     ) => {
-      Sentry.captureException(err);
-
       res.status(err.status || 500);
       res.json({
         code: err.status || 500,

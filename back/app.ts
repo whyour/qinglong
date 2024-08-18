@@ -1,3 +1,4 @@
+import './loaders/sentry'
 import 'reflect-metadata'; // We need this in order to use @Decorators
 import config from './config';
 import express from 'express';
@@ -9,8 +10,6 @@ async function startServer() {
   await require('./loaders/db').default();
 
   await require('./loaders/initFile').default();
-
-  await require('./loaders/sentry').default({ expressApp: app });
 
   await require('./loaders/app').default({ expressApp: app });
 

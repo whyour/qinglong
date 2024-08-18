@@ -461,7 +461,7 @@ export async function parseVersion(path: string): Promise<IVersion> {
   return load(await fs.readFile(path, 'utf8')) as IVersion;
 }
 
-export async function parseContentVersion(content: string): Promise<IVersion> {
+export function parseContentVersion(content: string): IVersion {
   return load(content) as IVersion;
 }
 
