@@ -37,9 +37,12 @@ function run() {
     const fileName = process.argv[1].replace(`${dir_scripts}/`, '');
     let command = `bash -c "source ${file_task_before} ${fileName}`;
     if (task_before) {
-      const escapeTaskBefore = task_before.replace(/"/g, '\\"');
-      command = `${command} && echo -e '执行前置命令\n' && eval '${escapeTaskBefore}' && echo -e '\n执行前置命令结束\n'`;
+      const escapeTaskBefore = task_before
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '\\$');
+      command = `${command} && eval '${escapeTaskBefore}'`;
     }
+    console.log('执行前置命令\n');
     const res = execSync(
       `${command} && echo -e '${splitStr}' && NODE_OPTIONS= node -p 'JSON.stringify(process.env)'"`,
       {
@@ -52,6 +55,7 @@ function run() {
       process.env[key] = newEnvObject[key];
     }
     console.log(output);
+    console.log('执行前置命令结束\n');
   } catch (error) {
     if (!error.message.includes('spawnSync /bin/sh E2BIG')) {
       console.log(`run task before error: `, error);

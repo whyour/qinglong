@@ -44,12 +44,13 @@ def run():
         task_before = os.getenv("task_before")
 
         if task_before:
-            escape_task_before = task_before.replace('"', '\\"')
-            command += f" && echo -e '执行前置命令\n' && eval '{escape_task_before}' && echo -e '\n执行前置命令结束\n'"
+            escape_task_before = task_before.replace('"', '\\"').replace("$", "\\$")
+            command += f" && eval '{escape_task_before}'"
 
         python_command = "PYTHONPATH= python3 -c 'import os, json; print(json.dumps(dict(os.environ)))'"
         command += f" && echo -e '{split_str}' && {python_command}\""
 
+        print("执行前置命令\n")
         res = subprocess.check_output(command, shell=True, encoding="utf-8")
         output, env_str = res.split(split_str)
 
@@ -59,6 +60,7 @@ def run():
             os.environ[key] = value
 
         print(output)
+        print("执行前置命令结束")
 
     except subprocess.CalledProcessError as error:
         print(f"run task before error: {error}")
@@ -82,7 +84,7 @@ def run():
 
 try:
     run()
-    
+
     from notify import send
 
     class BaseApi:
