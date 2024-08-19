@@ -59,7 +59,8 @@ RUN set -x \
   && rm -rf /root/.pnpm-store \
   && rm -rf /root/.local/share/pnpm/store \
   && rm -rf /root/.cache \
-  && ulimit -c 0
+  && ulimit -c 0 \
+  && pip3 install requests
 
 ARG SOURCE_COMMIT
 RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
