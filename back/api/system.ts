@@ -340,12 +340,41 @@ export default (app: Router) => {
     },
   );
 
-  route.get('/log', async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const systemService = Container.get(SystemService);
-      await systemService.getSystemLog(res);
-    } catch (e) {
-      return next(e);
-    }
-  });
+  route.get(
+    '/log',
+    celebrate({
+      query: {
+        startTime: Joi.string().allow('').optional(),
+        endTime: Joi.string().allow('').optional(),
+        t: Joi.string().optional(),
+      },
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        await systemService.getSystemLog(
+          res,
+          req.query as {
+            startTime?: string;
+            endTime?: string;
+          },
+        );
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/log',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        await systemService.deleteSystemLog();
+        res.send({ code: 200 });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 };

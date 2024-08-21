@@ -154,6 +154,7 @@ export default class UserService {
             status: LoginStatus.success,
           },
         });
+        this.getLoginLog();
         return {
           code: 200,
           data: { token, lastip, lastaddr, lastlogon, retries, platform },
@@ -182,6 +183,7 @@ export default class UserService {
             status: LoginStatus.fail,
           },
         });
+        this.getLoginLog();
         if (retries > 2) {
           const waitTime = Math.round(Math.pow(3, retries + 1));
           return {
@@ -215,8 +217,9 @@ export default class UserService {
         (a, b) => b.info!.timestamp! - a.info!.timestamp!,
       );
       if (result.length > 100) {
+        const ids = result.slice(0, result.length - 100).map((x) => x.id!);
         await SystemModel.destroy({
-          where: { id: result[result.length - 1].id },
+          where: { id: ids },
         });
       }
       return result.map((x) => x.info);

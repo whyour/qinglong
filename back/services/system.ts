@@ -15,6 +15,7 @@ import {
   parseVersion,
   promiseExec,
   readDirs,
+  rmPath,
 } from '../config/util';
 import {
   DependenceModel,
@@ -34,6 +35,7 @@ import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import SockService from './sock';
 import os from 'os';
+import dayjs from 'dayjs';
 
 @Service()
 export default class SystemService {
@@ -409,9 +411,25 @@ export default class SystemService {
     }
   }
 
-  public async getSystemLog(res: Response) {
+  public async getSystemLog(
+    res: Response,
+    query: {
+      startTime?: string;
+      endTime?: string;
+    },
+  ) {
+    const startTime = dayjs(query.startTime || undefined)
+      .startOf('d')
+      .valueOf();
+    const endTime = dayjs(query.endTime || undefined)
+      .endOf('d')
+      .valueOf();
     const result = await readDirs(config.systemLogPath, config.systemLogPath);
-    const logs = result.reverse().filter((x) => x.title.endsWith('.log'));
+    const logs = result
+      .reverse()
+      .filter((x) => x.title.endsWith('.log'))
+      .filter((x) => x.mtime >= startTime && x.mtime <= endTime);
+
     res.set({
       'Content-Length': sum(logs.map((x) => x.size)),
     });
@@ -432,5 +450,13 @@ export default class SystemService {
         currentFileStream.pipe(res, { end: false });
       }
     })(res, logs);
+  }
+
+  public async deleteSystemLog() {
+    const result = await readDirs(config.systemLogPath, config.systemLogPath);
+    const logs = result.reverse().filter((x) => x.title.endsWith('.log'));
+    for (const log of logs) {
+      await rmPath(path.join(config.systemLogPath, log.title));
+    }
   }
 }

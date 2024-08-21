@@ -41,8 +41,8 @@ function run() {
         .replace(/"/g, '\\"')
         .replace(/\$/g, '\\$');
       command = `${command} && eval '${escapeTaskBefore}'`;
+      console.log('执行前置命令\n');
     }
-    console.log('执行前置命令\n');
     const res = execSync(
       `${command} && echo -e '${splitStr}' && NODE_OPTIONS= node -p 'JSON.stringify(process.env)'"`,
       {
@@ -55,7 +55,9 @@ function run() {
       process.env[key] = newEnvObject[key];
     }
     console.log(output);
-    console.log('执行前置命令结束\n');
+    if (task_before) {
+      console.log('执行前置命令结束\n');
+    }
   } catch (error) {
     if (!error.message.includes('spawnSync /bin/sh E2BIG')) {
       console.log(`run task before error: `, error);

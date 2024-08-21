@@ -103,6 +103,7 @@
     "ip2region": "2.3.0"
   },
   "devDependencies": {
+    "moment": "2.30.1",
     "@ant-design/icons": "^4.7.0",
     "@ant-design/pro-layout": "6.38.22",
     "@monaco-editor/react": "4.2.1",

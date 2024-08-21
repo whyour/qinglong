@@ -124,15 +124,14 @@ const Setting = () => {
   const [editedApp, setEditedApp] = useState<any>();
   const [tabActiveKey, setTabActiveKey] = useState('security');
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
-  const [systemLogData, setSystemLogData] = useState<string>('');
   const [notificationInfo, setNotificationInfo] = useState<any>();
   const containergRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(0);
 
   useResizeObserver(containergRef, (entry) => {
     const _height = entry.target.parentElement?.parentElement?.offsetHeight;
-    if (_height && height !== _height - 66) {
-      setHeight(_height - 66);
+    if (_height && height !== _height - 110) {
+      setHeight(_height - 110);
     }
   });
 
@@ -253,19 +252,6 @@ const Setting = () => {
       });
   };
 
-  const getSystemLog = () => {
-    request
-      .get<Blob>(`${config.apiPrefix}system/log`, {
-        responseType: 'blob',
-      })
-      .then(async (res) => {
-        setSystemLogData(await res.text());
-      })
-      .catch((error: any) => {
-        console.log(error);
-      });
-  };
-
   const tabChange = (activeKey: string) => {
     setTabActiveKey(activeKey);
     if (activeKey === 'app') {
@@ -274,8 +260,6 @@ const Setting = () => {
       getLoginLog();
     } else if (activeKey === 'notification') {
       getNotification();
-    } else if (activeKey === 'syslog') {
-      getSystemLog();
     }
   };
 
@@ -315,12 +299,14 @@ const Setting = () => {
           : []
       }
     >
-      <div ref={containergRef}>
+      <div ref={containergRef} style={{ height: '100%' }}>
         <Tabs
+          style={{ height: '100%' }}
           defaultActiveKey="security"
           size="small"
           tabPosition="top"
           onChange={tabChange}
+          destroyInactiveTabPane
           items={[
             ...(!isDemoEnv
               ? [
@@ -356,9 +342,7 @@ const Setting = () => {
             {
               key: 'syslog',
               label: intl.get('系统日志'),
-              children: (
-                <SystemLog data={systemLogData} height={height} theme={theme} />
-              ),
+              children: <SystemLog height={height} theme={theme} />,
             },
             {
               key: 'login',
@@ -383,7 +367,7 @@ const Setting = () => {
               children: <About systemInfo={systemInfo} />,
             },
           ]}
-        ></Tabs>
+        />
       </div>
       <AppModal
         visible={isModalVisible}
