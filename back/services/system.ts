@@ -92,17 +92,22 @@ export default class SystemService {
       info: { ...oDoc.info, ...info },
     });
     const cron = {
-      id: result.id || NaN,
+      id: result.id as number,
       name: '删除日志',
       command: `ql rmlog ${info.logRemoveFrequency}`,
+      runOrigin: 'system' as const,
     };
     if (oDoc.info?.logRemoveFrequency) {
       await this.scheduleService.cancelIntervalTask(cron);
     }
     if (info.logRemoveFrequency && info.logRemoveFrequency > 0) {
-      this.scheduleService.createIntervalTask(cron, {
-        days: info.logRemoveFrequency,
-      });
+      this.scheduleService.createIntervalTask(
+        cron,
+        {
+          days: info.logRemoveFrequency,
+        },
+        true,
+      );
     }
     return { code: 200, data: info };
   }
@@ -179,6 +184,7 @@ export default class SystemService {
       {
         command,
         id: 'update-node-mirror',
+        runOrigin: 'system',
       },
     );
   }
@@ -254,6 +260,7 @@ export default class SystemService {
       {
         command,
         id: 'update-linux-mirror',
+        runOrigin: 'system',
       },
     );
   }
@@ -366,6 +373,7 @@ export default class SystemService {
     this.scheduleService.runTask(`real_time=true ${command}`, callback, {
       command,
       id: command.replace(/ /g, '-'),
+      runOrigin: 'system',
     });
   }
 

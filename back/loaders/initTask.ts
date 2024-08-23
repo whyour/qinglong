@@ -12,7 +12,10 @@ export default async () => {
   const subscriptionService = Container.get(SubscriptionService);
 
   // 生成内置token
-  let tokenCommand = `ts-node-transpile-only ${join(config.rootPath, 'back/token.ts')}`;
+  let tokenCommand = `ts-node-transpile-only ${join(
+    config.rootPath,
+    'back/token.ts',
+  )}`;
   const tokenFile = join(config.rootPath, 'static/build/token.js');
 
   if (await fileExist(tokenFile)) {
@@ -22,11 +25,16 @@ export default async () => {
     id: NaN,
     name: '生成token',
     command: tokenCommand,
+    runOrigin: 'system',
   } as ScheduleTaskType;
   await scheduleService.cancelIntervalTask(cron);
-  scheduleService.createIntervalTask(cron, {
-    days: 28,
-  });
+  scheduleService.createIntervalTask(
+    cron,
+    {
+      days: 28,
+    },
+    true,
+  );
 
   // 运行删除日志任务
   const data = await systemService.getSystemConfig();
@@ -35,17 +43,17 @@ export default async () => {
       id: data.id as number,
       name: '删除日志',
       command: `ql rmlog ${data.info.logRemoveFrequency}`,
+      runOrigin: 'system' as const,
     };
     await scheduleService.cancelIntervalTask(rmlogCron);
-    scheduleService.createIntervalTask(rmlogCron, {
-      days: data.info.logRemoveFrequency,
-    });
+    scheduleService.createIntervalTask(
+      rmlogCron,
+      {
+        days: data.info.logRemoveFrequency,
+      },
+      true,
+    );
   }
 
-  // 运行所有订阅
   await subscriptionService.setSshConfig();
-  const subs = await subscriptionService.list();
-  for (const sub of subs) {
-    subscriptionService.handleTask(sub, !sub.is_disabled, !sub.is_disabled);
-  }
 };

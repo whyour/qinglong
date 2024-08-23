@@ -6,22 +6,14 @@ import { Dependence } from '../data/dependence';
 import { ICron } from '../protos/cron';
 import NotificationService from '../services/notify';
 import { Inject } from 'typedi';
+import {
+  ICronFn,
+  IDependencyFn,
+  ISchedule,
+  IScheduleFn,
+  TCron,
+} from './interface';
 
-export type Override<
-  T,
-  K extends Partial<{ [P in keyof T]: any }> | string,
-> = K extends string
-  ? Omit<T, K> & { [P in keyof T]: T[P] | unknown }
-  : Omit<T, keyof K> & K;
-type TCron = Override<Partial<ICron>, { id: string }>;
-interface IDependencyFn<T> {
-  (): Promise<T>;
-  dependency?: Dependence;
-}
-interface ICronFn<T> {
-  (): Promise<T>;
-  cron?: TCron;
-}
 class TaskLimit {
   private dependenyLimit = new PQueue({ concurrency: 1 });
   private queuedDependencyIds = new Set<number>([]);
@@ -31,6 +23,15 @@ class TaskLimit {
     concurrency: Math.max(os.cpus().length, 4),
   });
   private manualCronoLimit = new PQueue({
+    concurrency: Math.max(os.cpus().length, 4),
+  });
+  private subscriptionLimit = new PQueue({
+    concurrency: Math.max(os.cpus().length, 4),
+  });
+  private scriptLimit = new PQueue({
+    concurrency: Math.max(os.cpus().length, 4),
+  });
+  private systemLimit = new PQueue({
     concurrency: Math.max(os.cpus().length, 4),
   });
   @Inject((type) => NotificationService)
@@ -141,6 +142,33 @@ class TaskLimit {
     options?: Partial<QueueAddOptions>,
   ): Promise<T | void> {
     return this.manualCronoLimit.add(fn, options);
+  }
+
+  public async runWithSubscriptionLimit<T>(
+    schedule: TCron,
+    fn: IScheduleFn<T>,
+    options?: Partial<QueueAddOptions>,
+  ): Promise<T | void> {
+    fn.schedule = schedule;
+    return this.subscriptionLimit.add(fn, options);
+  }
+
+  public async runWithSystemLimit<T>(
+    schedule: TCron,
+    fn: IScheduleFn<T>,
+    options?: Partial<QueueAddOptions>,
+  ): Promise<T | void> {
+    fn.schedule = schedule;
+    return this.systemLimit.add(fn, options);
+  }
+
+  public async runWithScriptLimit<T>(
+    schedule: ISchedule,
+    fn: IScheduleFn<T>,
+    options?: Partial<QueueAddOptions>,
+  ): Promise<T | void> {
+    fn.schedule = schedule;
+    return this.scriptLimit.add(fn, options);
   }
 
   public runDependeny<T>(

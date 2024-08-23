@@ -44,7 +44,7 @@ export default class ScriptService {
     const pid = await this.scheduleService.runTask(
       `real_time=true ${command}`,
       this.taskCallbacks(filePath),
-      { command, id: relativePath.replace(/ /g, '-') },
+      { command, id: relativePath.replace(/ /g, '-'), runOrigin: 'script' },
       'start',
     );
 

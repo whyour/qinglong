@@ -88,7 +88,7 @@ export default class SubscriptionService {
       this.scheduleService.cancelCronTask(doc as any);
       needCreate &&
         (await this.scheduleService.createCronTask(
-          doc as any,
+          { ...doc, runOrigin: 'subscription' } as any,
           this.taskCallbacks(doc),
           runImmediately,
         ));
@@ -97,7 +97,7 @@ export default class SubscriptionService {
       const { type, value } = doc.interval_schedule;
       needCreate &&
         (await this.scheduleService.createIntervalTask(
-          doc as any,
+          { ...doc, runOrigin: 'subscription' } as any,
           { [type]: value } as SimpleIntervalSchedule,
           runImmediately,
           this.taskCallbacks(doc),
@@ -329,6 +329,7 @@ export default class SubscriptionService {
       schedule: subscription.schedule,
       command,
       id: String(subscription.id),
+      runOrigin: 'subscription',
     });
   }
 

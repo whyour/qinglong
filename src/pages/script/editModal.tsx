@@ -34,7 +34,7 @@ const EditModal = ({
   handleCancel: () => void;
 }) => {
   const [value, setValue] = useState('');
-  const [language, setLanguage] = useState<string>('javascript');
+  const [language, setLanguage] = useState<string>();
   const [cNode, setCNode] = useState<any>();
   const [selectedKey, setSelectedKey] = useState<string>();
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
@@ -242,7 +242,7 @@ const EditModal = ({
             minimap: { enabled: false },
             lineNumbersMinChars: 3,
             glyphMargin: false,
-            accessibilitySupport: 'off'
+            accessibilitySupport: 'off',
           }}
           onMount={(editor) => {
             editorRef.current = editor;
