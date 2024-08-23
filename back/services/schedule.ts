@@ -42,7 +42,7 @@ export default class ScheduleService {
 
   private maxBuffer = 200 * 1024 * 1024;
 
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   async runTask(
     command: string,
@@ -51,12 +51,19 @@ export default class ScheduleService {
       schedule?: string;
       name?: string;
       command?: string;
+      id: string;
     },
     completionTime: 'start' | 'end' = 'end',
   ) {
-    return taskLimit.runWithCronLimit(() => {
+    return taskLimit.runWithCronLimit(params, () => {
       return new Promise(async (resolve, reject) => {
-        this.logger.info(`[panel][开始执行任务] 参数 ${JSON.stringify({ ...params, command })}`);
+        taskLimit.removeQueuedCron(params.id);
+        this.logger.info(
+          `[panel][开始执行任务] 参数 ${JSON.stringify({
+            ...params,
+            command,
+          })}`,
+        );
 
         try {
           const startTime = dayjs();
@@ -131,6 +138,7 @@ export default class ScheduleService {
           name,
           schedule,
           command,
+          id: _id,
         });
       }),
     );
@@ -140,6 +148,7 @@ export default class ScheduleService {
         name,
         schedule,
         command,
+        id: _id,
       });
     }
   }
@@ -148,6 +157,7 @@ export default class ScheduleService {
     const _id = this.formatId(id);
     this.logger.info('[panel][取消定时任务], 任务名: %s', name);
     if (this.scheduleStacks.has(_id)) {
+      taskLimit.removeQueuedCron(_id);
       this.scheduleStacks.get(_id)?.cancel();
       this.scheduleStacks.delete(_id);
     }
@@ -172,6 +182,7 @@ export default class ScheduleService {
         this.runTask(command, callbacks, {
           name,
           command,
+          id: _id,
         });
       },
       (err) => {
@@ -195,6 +206,7 @@ export default class ScheduleService {
       this.runTask(command, callbacks, {
         name,
         command,
+        id: _id,
       });
     }
   }
@@ -202,6 +214,7 @@ export default class ScheduleService {
   async cancelIntervalTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info('[取消interval任务], 任务ID: %s, 任务名: %s', _id, name);
+    taskLimit.removeQueuedCron(_id);
     this.intervalSchedule.removeById(_id);
   }
 

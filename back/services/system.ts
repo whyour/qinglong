@@ -178,6 +178,7 @@ export default class SystemService {
       },
       {
         command,
+        id: 'update-node-mirror',
       },
     );
   }
@@ -252,6 +253,7 @@ export default class SystemService {
       },
       {
         command,
+        id: 'update-linux-mirror',
       },
     );
   }
@@ -363,6 +365,7 @@ export default class SystemService {
     }
     this.scheduleService.runTask(`real_time=true ${command}`, callback, {
       command,
+      id: command.replace(/ /g, '-'),
     });
   }
 
@@ -371,6 +374,7 @@ export default class SystemService {
       return { code: 400, message: '参数错误' };
     }
 
+    taskLimit.removeQueuedCron(command.replace(/ /g, '-'));
     if (pid) {
       await killTask(pid);
       return { code: 200 };

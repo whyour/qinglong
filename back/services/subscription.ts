@@ -29,6 +29,7 @@ import { LOG_END_SYMBOL } from '../config/const';
 import { formatCommand, formatUrl } from '../config/subscription';
 import { CrontabModel } from '../data/cron';
 import CrontabService from './cron';
+import taskLimit from '../shared/pLimit';
 
 @Service()
 export default class SubscriptionService {
@@ -301,6 +302,7 @@ export default class SubscriptionService {
     for (const doc of docs) {
       if (doc.pid) {
         try {
+          taskLimit.removeQueuedCron(String(doc.id));
           await killTask(doc.pid);
         } catch (error) {
           this.logger.error(error);
@@ -326,6 +328,7 @@ export default class SubscriptionService {
       name: subscription.name,
       schedule: subscription.schedule,
       command,
+      id: String(subscription.id),
     });
   }
 

@@ -7,6 +7,7 @@ import ScheduleService, { TaskCallbacks } from './schedule';
 import config from '../config';
 import { TASK_COMMAND } from '../config/const';
 import { getFileContentByName, getPid, killTask, rmPath } from '../config/util';
+import taskLimit from '../shared/pLimit';
 
 @Service()
 export default class ScriptService {
@@ -43,7 +44,7 @@ export default class ScriptService {
     const pid = await this.scheduleService.runTask(
       `real_time=true ${command}`,
       this.taskCallbacks(filePath),
-      { command },
+      { command, id: relativePath.replace(/ /g, '-') },
       'start',
     );
 
@@ -53,6 +54,7 @@ export default class ScriptService {
   public async stopScript(filePath: string, pid: number) {
     if (!pid) {
       const relativePath = path.relative(config.scriptPath, filePath);
+      taskLimit.removeQueuedCron(relativePath.replace(/ /g, '-'));
       pid = (await getPid(`${TASK_COMMAND} ${relativePath} now`)) as number;
     }
     try {

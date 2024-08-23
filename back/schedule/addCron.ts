@@ -24,7 +24,7 @@ const addCron = (
     );
 
     if (extraSchedules?.length) {
-      extraSchedules.forEach(x => {
+      extraSchedules.forEach((x) => {
         Logger.info(
           '[schedule][创建定时任务], 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
           id,
@@ -32,21 +32,21 @@ const addCron = (
           x.schedule,
           command,
         );
-      })
+      });
     }
 
     scheduleStacks.set(id, [
       nodeSchedule.scheduleJob(id, schedule, async () => {
         Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
-        runCron(command, { name, schedule, extraSchedules });
+        runCron(command, item);
       }),
       ...(extraSchedules?.length
         ? extraSchedules.map((x) =>
-          nodeSchedule.scheduleJob(id, x.schedule, async () => {
-            Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
-            runCron(command, { name, schedule, extraSchedules });
-          }),
-        )
+            nodeSchedule.scheduleJob(id, x.schedule, async () => {
+              Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
+              runCron(command, item);
+            }),
+          )
         : []),
     ]);
   }
