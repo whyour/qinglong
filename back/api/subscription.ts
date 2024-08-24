@@ -15,6 +15,7 @@ export default (app: Router) => {
       const subscriptionService = Container.get(SubscriptionService);
       const data = await subscriptionService.list(
         req.query.searchValue as string,
+        req.query.ids as string,
       );
       return res.send({ code: 200, data });
     } catch (e) {
@@ -212,8 +213,8 @@ export default (app: Router) => {
       body: Joi.array().items(Joi.number().required()),
       query: Joi.object({
         force: Joi.boolean().optional(),
-        t: Joi.number()
-      })
+        t: Joi.number(),
+      }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');

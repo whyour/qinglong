@@ -267,22 +267,7 @@ const Crontab = () => {
     {
       title: intl.get('关联订阅'),
       width: 185,
-      render: (text, record: any) =>
-        record.sub_id ? (
-          <Name
-            service={() =>
-              request.get(`${config.apiPrefix}subscriptions/${record.sub_id}`, {
-                onError: noop,
-              })
-            }
-            options={{
-              ready: record?.sub_id,
-              cacheKey: record.sub_id,
-            }}
-          />
-        ) : (
-          '-'
-        ),
+      render: (text, record: any) => record?.subscription?.name || '-',
     },
     {
       title: intl.get('操作'),
@@ -392,14 +377,27 @@ const Crontab = () => {
     }
     request
       .get(url)
-      .then(({ code, data: _data }) => {
+      .then(async ({ code, data: _data }) => {
         if (code === 200) {
           const { data, total } = _data;
+          const subscriptions = await request.get(
+            `${config.apiPrefix}subscriptions?ids=${JSON.stringify([
+              ...new Set(data.map((x) => x.sub_id).filter(Boolean)),
+            ])}`,
+            {
+              onError: noop,
+            },
+          );
+          const subscriptionMap = Object.fromEntries(
+            subscriptions?.data?.map((x) => [x.id, x]),
+          );
+
           setValue(
             data.map((x) => {
               return {
                 ...x,
                 nextRunTime: getCrontabsNextDate(x.schedule, x.extra_schedules),
+                subscription: subscriptionMap?.[x.sub_id],
               };
             }),
           );

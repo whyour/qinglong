@@ -12,7 +12,7 @@ import {
   getUniqPath,
   safeJSONParse,
 } from '../config/util';
-import { Op, where, col as colFn, FindOptions, fn } from 'sequelize';
+import { Op, where, col as colFn, FindOptions, fn, Order } from 'sequelize';
 import path from 'path';
 import { TASK_PREFIX, QL_PREFIX } from '../config/const';
 import cronClient from '../schedule/client';
@@ -362,9 +362,9 @@ export default class CronService {
         order.unshift([field, type]);
       }
     }
-    let condition: any = {
+    let condition: FindOptions<Crontab> = {
       where: query,
-      order: order,
+      order: order as Order,
     };
     if (page && size) {
       condition.offset = (page - 1) * size;

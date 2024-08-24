@@ -41,8 +41,12 @@ export default class SubscriptionService {
     private crontabService: CrontabService,
   ) {}
 
-  public async list(searchText?: string): Promise<Subscription[]> {
+  public async list(
+    searchText?: string,
+    ids?: string,
+  ): Promise<Subscription[]> {
     let query = {};
+    const subIds = JSON.parse(ids || '[]');
     if (searchText) {
       const reg = {
         [Op.or]: [
@@ -63,7 +67,7 @@ export default class SubscriptionService {
     }
     try {
       const result = await SubscriptionModel.findAll({
-        where: query,
+        where: { ...query, ...(ids ? { id: subIds } : undefined) },
         order: [
           ['is_disabled', 'ASC'],
           ['createdAt', 'DESC'],
