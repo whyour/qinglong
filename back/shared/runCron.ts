@@ -6,7 +6,6 @@ import { ICron } from '../protos/cron';
 export function runCron(cmd: string, cron: ICron): Promise<number | void> {
   return taskLimit.runWithCronLimit(cron, () => {
     return new Promise(async (resolve: any) => {
-      taskLimit.removeQueuedCron(cron.id);
       Logger.info(
         `[schedule][开始执行任务] 参数 ${JSON.stringify({
           ...cron,
@@ -31,6 +30,7 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
       });
 
       cp.on('exit', async (code) => {
+        taskLimit.removeQueuedCron(cron.id);
         resolve({ ...cron, command: cmd, pid: cp.pid, code });
       });
     });

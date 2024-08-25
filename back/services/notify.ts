@@ -4,9 +4,11 @@ import { HttpProxyAgent, HttpsProxyAgent } from 'hpagent';
 import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
-import { parseBody, parseHeaders } from '../config/util';
+import { parseBody, parseHeaders, safeJSONParse } from '../config/util';
 import { NotificationInfo } from '../data/notify';
 import UserService from './user';
+import { readFile } from 'fs/promises';
+import config from '../config';
 
 @Service()
 export default class NotificationService {
@@ -43,7 +45,28 @@ export default class NotificationService {
     retry: 1,
   };
 
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor() {}
+
+  public async externalNotify(
+    title: string,
+    content: string,
+  ): Promise<boolean | undefined> {
+    const { type, ...rest } = safeJSONParse(
+      await readFile(config.systemNotifyFile, 'utf-8'),
+    );
+    if (type) {
+      this.title = title;
+      this.content = content;
+      this.params = rest;
+      const notificationModeAction = this.modeMap.get(type);
+      try {
+        return await notificationModeAction?.call(this);
+      } catch (error: any) {
+        throw error;
+      }
+    }
+    return false;
+  }
 
   public async notify(
     title: string,

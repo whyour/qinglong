@@ -306,7 +306,6 @@ export default class SubscriptionService {
     for (const doc of docs) {
       if (doc.pid) {
         try {
-          taskLimit.removeQueuedCron(String(doc.id));
           await killTask(doc.pid);
         } catch (error) {
           this.logger.error(error);

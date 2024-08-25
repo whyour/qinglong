@@ -382,7 +382,6 @@ export default class SystemService {
       return { code: 400, message: '参数错误' };
     }
 
-    taskLimit.removeQueuedCron(command.replace(/ /g, '-'));
     if (pid) {
       await killTask(pid);
       return { code: 200 };

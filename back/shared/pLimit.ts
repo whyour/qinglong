@@ -3,9 +3,7 @@ import os from 'os';
 import { AuthDataType, SystemModel } from '../data/system';
 import Logger from '../loaders/logger';
 import { Dependence } from '../data/dependence';
-import { ICron } from '../protos/cron';
 import NotificationService from '../services/notify';
-import { Inject } from 'typedi';
 import {
   ICronFn,
   IDependencyFn,
@@ -17,7 +15,8 @@ import {
 class TaskLimit {
   private dependenyLimit = new PQueue({ concurrency: 1 });
   private queuedDependencyIds = new Set<number>([]);
-  private queuedCrons = new Map<string, TCron[]>();
+  private queuedCrons = new Map<string, ICronFn<any>[]>();
+  private repeatCronNotifyMap = new Map<string, number>();
   private updateLogLimit = new PQueue({ concurrency: 1 });
   private cronLimit = new PQueue({
     concurrency: Math.max(os.cpus().length, 4),
@@ -34,8 +33,6 @@ class TaskLimit {
   private systemLimit = new PQueue({
     concurrency: Math.max(os.cpus().length, 4),
   });
-  @Inject((type) => NotificationService)
-  private notificationService!: NotificationService;
 
   get cronLimitActiveCount() {
     return this.cronLimit.pending;
@@ -48,6 +45,8 @@ class TaskLimit {
   get firstDependencyId() {
     return [...this.queuedDependencyIds.values()][0];
   }
+
+  private notificationService: NotificationService = new NotificationService();
 
   constructor() {
     this.setCustomLimit();
@@ -120,20 +119,19 @@ class TaskLimit {
     fn: ICronFn<T>,
     options?: Partial<QueueAddOptions>,
   ): Promise<T | void> {
+    fn.cron = cron;
     let runs = this.queuedCrons.get(cron.id);
-    if (!runs?.length) {
-      runs = [];
-    }
-    runs.push(cron);
-    if (runs.length >= 5) {
-      this.notificationService.notify(
+    const result = runs?.length ? [...runs, fn] : [fn];
+    const repeatTimes = this.repeatCronNotifyMap.get(cron.id) || 0;
+    if (result?.length > 5 && repeatTimes < 3) {
+      this.repeatCronNotifyMap.set(cron.id, repeatTimes + 1);
+      this.notificationService.externalNotify(
         '任务重复运行',
-        `任务 ${cron.name} ${cron.command} 处于运行中的已达 5 个，请检查系统日志`,
+        `任务：${cron.name}，命令：${cron.command}，定时：${cron.schedule}，处于运行中的超过 5 个，请检查定时设置`,
       );
       return;
     }
-    this.queuedCrons.set(cron.id, runs);
-    fn.cron = cron;
+    this.queuedCrons.set(cron.id, result);
     return this.cronLimit.add(fn, options);
   }
 
