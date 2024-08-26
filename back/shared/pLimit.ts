@@ -123,12 +123,15 @@ class TaskLimit {
     let runs = this.queuedCrons.get(cron.id);
     const result = runs?.length ? [...runs, fn] : [fn];
     const repeatTimes = this.repeatCronNotifyMap.get(cron.id) || 0;
-    if (result?.length > 5 && repeatTimes < 3) {
-      this.repeatCronNotifyMap.set(cron.id, repeatTimes + 1);
-      this.notificationService.externalNotify(
-        '任务重复运行',
-        `任务：${cron.name}，命令：${cron.command}，定时：${cron.schedule}，处于运行中的超过 5 个，请检查定时设置`,
-      );
+    if (result?.length > 5) {
+      if (repeatTimes < 3) {
+        this.repeatCronNotifyMap.set(cron.id, repeatTimes + 1);
+        this.notificationService.externalNotify(
+          '任务重复运行',
+          `任务：${cron.name}，命令：${cron.command}，定时：${cron.schedule}，处于运行中的超过 5 个，请检查定时设置`,
+        );
+      }
+      Logger.warn(`[schedule][任务重复运行] 参数 ${JSON.stringify(cron)}`);
       return;
     }
     this.queuedCrons.set(cron.id, result);
