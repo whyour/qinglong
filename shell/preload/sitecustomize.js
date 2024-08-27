@@ -74,6 +74,10 @@ function run() {
 }
 
 try {
+  if (!process.argv[1]) {
+    return;
+  }
+
   run();
 
   const { sendNotify } = require('./notify.js');
