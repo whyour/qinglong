@@ -67,7 +67,14 @@ const columns = [
   },
 ];
 
-const LoginLog = ({ data }: any) => {
+const LoginLog = ({
+  data,
+  height,
+}: {
+  data: Array<object>;
+  height: number;
+}) => {
+  console.log(height);
   return (
     <>
       <Table
@@ -76,8 +83,7 @@ const LoginLog = ({ data }: any) => {
         dataSource={data}
         rowKey="id"
         size="middle"
-        scroll={{ x: 1000 }}
-        sticky
+        scroll={{ x: 1000, y: height }}
       />
     </>
   );

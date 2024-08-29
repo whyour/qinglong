@@ -240,7 +240,7 @@ const Dependence = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
   const tableRef = useRef<HTMLDivElement>(null);
-  const tableScrollHeight = useTableScrollHeight(tableRef, 59);
+  const tableScrollHeight = useTableScrollHeight(tableRef, 162);
 
   const getDependencies = (status?: number[]) => {
     setLoading(true);
@@ -528,6 +528,56 @@ const Dependence = () => {
     setType(activeKey);
   };
 
+  const children = (
+    <div ref={tableRef}>
+      {selectedRowIds.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            style={{ marginBottom: 5, marginLeft: 8 }}
+            onClick={() => handlereInstallDependencies()}
+          >
+            {intl.get('批量安装')}
+          </Button>
+          <Button
+            type="primary"
+            style={{ marginBottom: 5, marginLeft: 8 }}
+            onClick={() => delDependencies(false)}
+          >
+            {intl.get('批量删除')}
+          </Button>
+          <Button
+            type="primary"
+            style={{ marginBottom: 5, marginLeft: 8 }}
+            onClick={() => delDependencies(true)}
+          >
+            {intl.get('批量强制删除')}
+          </Button>
+          <span style={{ marginLeft: 8 }}>
+            {intl.get('已选择')}
+            <a>{selectedRowIds?.length}</a>
+            {intl.get('项')}
+          </span>
+        </div>
+      )}
+      <DndProvider backend={HTML5Backend}>
+        <Table
+          columns={columns}
+          rowSelection={rowSelection}
+          pagination={false}
+          dataSource={value}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 768, y: tableScrollHeight }}
+          loading={loading}
+          onChange={(pagination, filters) => {
+            getDependencies(filters?.status as number[]);
+          }}
+        />
+      </DndProvider>
+    </div>
+  );
+
   return (
     <PageContainer
       className="ql-container-wrapper dependence-wrapper ql-container-wrapper-has-tab"
@@ -552,69 +602,27 @@ const Dependence = () => {
         defaultActiveKey="nodejs"
         size="small"
         tabPosition="top"
+        style={{ height: '100%' }}
+        destroyInactiveTabPane
         onChange={onTabChange}
         items={[
           {
             key: 'nodejs',
             label: 'NodeJs',
+            children,
           },
           {
             key: 'python3',
             label: 'Python3',
+            children,
           },
           {
             key: 'linux',
             label: 'Linux',
+            children,
           },
         ]}
       />
-      <div ref={tableRef}>
-        {selectedRowIds.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <Button
-              type="primary"
-              style={{ marginBottom: 5, marginLeft: 8 }}
-              onClick={() => handlereInstallDependencies()}
-            >
-              {intl.get('批量安装')}
-            </Button>
-            <Button
-              type="primary"
-              style={{ marginBottom: 5, marginLeft: 8 }}
-              onClick={() => delDependencies(false)}
-            >
-              {intl.get('批量删除')}
-            </Button>
-            <Button
-              type="primary"
-              style={{ marginBottom: 5, marginLeft: 8 }}
-              onClick={() => delDependencies(true)}
-            >
-              {intl.get('批量强制删除')}
-            </Button>
-            <span style={{ marginLeft: 8 }}>
-              {intl.get('已选择')}
-              <a>{selectedRowIds?.length}</a>
-              {intl.get('项')}
-            </span>
-          </div>
-        )}
-        <DndProvider backend={HTML5Backend}>
-          <Table
-            columns={columns}
-            rowSelection={rowSelection}
-            pagination={false}
-            dataSource={value}
-            rowKey="id"
-            size="middle"
-            scroll={{ x: 768, y: tableScrollHeight }}
-            loading={loading}
-            onChange={(pagination, filters) => {
-              getDependencies(filters?.status as number[]);
-            }}
-          />
-        </DndProvider>
-      </div>
       <DependenceModal
         visible={isModalVisible}
         handleCancel={handleCancel}

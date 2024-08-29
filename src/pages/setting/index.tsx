@@ -129,9 +129,9 @@ const Setting = () => {
   const [height, setHeight] = useState<number>(0);
 
   useResizeObserver(containergRef, (entry) => {
-    const _height = entry.target.parentElement?.parentElement?.offsetHeight;
-    if (_height && height !== _height - 110) {
-      setHeight(_height - 110);
+    const _height = (entry.target as HTMLElement)?.offsetHeight;
+    if (_height && height !== _height - 101) {
+      setHeight(_height - 101);
     }
   });
 
@@ -329,7 +329,7 @@ const Setting = () => {
                   dataSource={dataSource}
                   rowKey="id"
                   size="middle"
-                  scroll={{ x: 1000 }}
+                  scroll={{ x: 1000, y: height }}
                   loading={loading}
                 />
               ),
@@ -347,7 +347,7 @@ const Setting = () => {
             {
               key: 'login',
               label: intl.get('登录日志'),
-              children: <LoginLog data={loginLogData} />,
+              children: <LoginLog height={height} data={loginLogData} />,
             },
             {
               key: 'dependence',
