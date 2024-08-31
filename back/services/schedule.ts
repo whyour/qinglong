@@ -66,7 +66,7 @@ export default class ScheduleService {
     return taskLimit[this.taskLimitMap[runOrigin]](others, () => {
       return new Promise(async (resolve, reject) => {
         this.logger.info(
-          `[panel][开始执行任务] 参数 ${JSON.stringify({
+          `[panel][开始执行任务] 参数: ${JSON.stringify({
             ...others,
             command,
           })}`,
@@ -104,6 +104,14 @@ export default class ScheduleService {
           });
 
           cp.on('exit', async (code) => {
+            this.logger.info(
+              '[panel][执行任务结束] 参数: %s, 退出码: %j',
+              JSON.stringify({
+                ...others,
+                command,
+              }),
+              code,
+            );
             const endTime = dayjs();
             await callbacks.onEnd?.(
               cp,
@@ -196,7 +204,7 @@ export default class ScheduleService {
       },
       (err) => {
         this.logger.error(
-          '[执行任务失败] 命令: %s, 错误信息: %j',
+          '[panel][执行任务失败] 命令: %s, 错误信息: %j',
           command,
           err,
         );
@@ -223,7 +231,11 @@ export default class ScheduleService {
 
   async cancelIntervalTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
-    this.logger.info('[取消interval任务], 任务ID: %s, 任务名: %s', _id, name);
+    this.logger.info(
+      '[panel][取消interval任务], 任务ID: %s, 任务名: %s',
+      _id,
+      name,
+    );
     this.intervalSchedule.removeById(_id);
   }
 

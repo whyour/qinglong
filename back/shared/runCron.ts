@@ -31,6 +31,14 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
 
       cp.on('exit', async (code) => {
         taskLimit.removeQueuedCron(cron.id);
+        Logger.info(
+          '[schedule][执行任务结束] 参数: %s, 退出码: %j',
+          JSON.stringify({
+            ...cron,
+            command: cmd,
+          }),
+          code,
+        );
         resolve({ ...cron, command: cmd, pid: cp.pid, code });
       });
     });
