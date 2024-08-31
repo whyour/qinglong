@@ -377,7 +377,7 @@ const Script = () => {
 
   useEffect(() => {
     if (treeDom.current) {
-      setHeight(treeDom.current.clientHeight);
+      setHeight(treeDom.current.clientHeight - 6);
     }
   }, [treeDom.current, data]);
 

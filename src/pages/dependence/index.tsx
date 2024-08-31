@@ -39,6 +39,7 @@ import dayjs from 'dayjs';
 import WebSocketManager from '@/utils/websocket';
 import { DependenceStatus, Status } from './type';
 import IconFont from '@/components/iconfont';
+import useResizeObserver from '@react-hook/resize-observer';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -240,7 +241,19 @@ const Dependence = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
   const tableRef = useRef<HTMLDivElement>(null);
-  const tableScrollHeight = useTableScrollHeight(tableRef, 59);
+  const [height, setHeight] = useState<number>(0);
+
+  useResizeObserver(tableRef, (entry) => {
+    const _height =
+      entry.target?.parentElement?.parentElement?.parentElement?.offsetHeight;
+    let threshold = 113;
+    if (selectedRowIds.length) {
+      threshold += 53;
+    }
+    if (_height && height !== _height - threshold) {
+      setHeight(_height - threshold);
+    }
+  });
 
   const getDependencies = (status?: number[]) => {
     setLoading(true);
@@ -568,7 +581,7 @@ const Dependence = () => {
           dataSource={value}
           rowKey="id"
           size="middle"
-          scroll={{ x: 768, y: tableScrollHeight }}
+          scroll={{ x: 768, y: height }}
           loading={loading}
           onChange={(pagination, filters) => {
             getDependencies(filters?.status as number[]);
@@ -602,27 +615,24 @@ const Dependence = () => {
         defaultActiveKey="nodejs"
         size="small"
         tabPosition="top"
-        style={{ height: '100%' }}
         destroyInactiveTabPane
         onChange={onTabChange}
         items={[
           {
             key: 'nodejs',
             label: 'NodeJs',
-            children,
           },
           {
             key: 'python3',
             label: 'Python3',
-            children,
           },
           {
             key: 'linux',
             label: 'Linux',
-            children,
           },
         ]}
       />
+      {children}
       <DependenceModal
         visible={isModalVisible}
         handleCancel={handleCancel}
