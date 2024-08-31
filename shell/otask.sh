@@ -269,6 +269,7 @@ check_file "${task_shell_params[@]}"
 if [[ $isJsOrPythonFile == 'false' ]]; then
   run_task_before "${task_shell_params[@]}"
 fi
+set_u_on="false"
 if set -o | grep -q 'nounset.*on'; then
   set_u_on="true"
   set +u
