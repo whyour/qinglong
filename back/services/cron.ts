@@ -564,11 +564,13 @@ export default class CronService {
     if (tab.task_before) {
       commandVariable += `task_before='${tab.task_before
         .replace(/'/g, "'\\''")
+        .replace(/;? *\n/g, ';')
         .trim()}' `;
     }
     if (tab.task_after) {
       commandVariable += `task_after='${tab.task_after
         .replace(/'/g, "'\\''")
+        .replace(/;? *\n/g, ';')
         .trim()}' `;
     }
 
