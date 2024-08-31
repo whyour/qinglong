@@ -240,7 +240,7 @@ const Dependence = () => {
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
   const tableRef = useRef<HTMLDivElement>(null);
-  const tableScrollHeight = useTableScrollHeight(tableRef, 162);
+  const tableScrollHeight = useTableScrollHeight(tableRef, 59);
 
   const getDependencies = (status?: number[]) => {
     setLoading(true);

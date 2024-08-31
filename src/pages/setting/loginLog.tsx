@@ -74,7 +74,6 @@ const LoginLog = ({
   data: Array<object>;
   height: number;
 }) => {
-  console.log(height);
   return (
     <>
       <Table
