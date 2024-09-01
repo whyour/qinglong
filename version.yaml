@@ -1,8 +1,12 @@
-version: 2.17.9
-changeLogLink: https://t.me/jiao_long/420
-publishTime: 2024-07-23 23:00
+version: 2.17.10
+changeLogLink: https://t.me/jiao_long/421
+publishTime: 2024-08-30 23:00
 changeLog: |
-  1. Javascript 和 Python 增加内置API QLAPI.notify
-  2. 配置管理增加 task_before.js 和 task_before.py 文件，在执行任务前执行，避免环境变量过大报错
-  3. 修复执行任务 JavaScript 和 Python 任务前未执行 task_before.sh
+  1. 系统日志增加时间筛选和清空操作
+  2. 单个任务运行中实例限制最多 5 个，防止任务堆积过多，运行实例超过 5 个时，会发频繁通知
+  3. 修复 shell 任务无法正常结束
+  4. 修改 python 任务 smtp 参数说明，详见 config.sh
+  5. 修复任务执行前命令 (task_before) 执行报错
+  6. 修复删除日志命令可能失败
+  7. 其他样式修复
   
