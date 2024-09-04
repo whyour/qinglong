@@ -5,13 +5,13 @@ let pickedEnv: Record<string, string>;
 
 function getPickedEnv() {
   if (pickedEnv) return pickedEnv;
-  const picked = pick(process.env, ['QlBaseUrl', 'DeployEnv']);
+  const picked = pick(process.env, ['QlBaseUrl', 'DeployEnv', 'QL_DIR']);
   if (picked.QlBaseUrl) {
     if (!picked.QlBaseUrl.startsWith('/')) {
-      picked.QlBaseUrl = `/${picked.QlBaseUrl}`
+      picked.QlBaseUrl = `/${picked.QlBaseUrl}`;
     }
     if (!picked.QlBaseUrl.endsWith('/')) {
-      picked.QlBaseUrl = `${picked.QlBaseUrl}/`
+      picked.QlBaseUrl = `${picked.QlBaseUrl}/`;
     }
   }
   pickedEnv = picked as Record<string, string>;

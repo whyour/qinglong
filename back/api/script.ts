@@ -1,11 +1,4 @@
-import {
-  fileExist,
-  getFileContentByName,
-  readDirs,
-  getLastModifyFilePath,
-  readDir,
-  rmPath,
-} from '../config/util';
+import { fileExist, readDirs, readDir, rmPath } from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';

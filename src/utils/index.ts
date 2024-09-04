@@ -313,8 +313,9 @@ export function getCommandScript(
     ['.js', '.ts', '.sh', '.py'].some((y) => x.endsWith(y)),
   );
   if (!scriptsPart) return;
-  if (scriptsPart.startsWith('/ql/data/scripts')) {
-    scriptsPart = scriptsPart.replace('/ql/data/scripts/', '');
+  const scriptDir = `${window.__ENV__QL_DIR}/data/scripts`;
+  if (scriptsPart.startsWith(scriptDir)) {
+    scriptsPart = scriptsPart.replace(scriptDir, '');
   }
 
   let p: string, s: string;

@@ -1,4 +1,3 @@
-import { getFileContentByName, getLastModifyFilePath } from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';

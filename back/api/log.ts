@@ -1,10 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
-import * as fs from 'fs';
 import config from '../config';
 import { getFileContentByName, readDirs, rmPath } from '../config/util';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { celebrate, Joi } from 'celebrate';
 const route = Router();
 const blacklist = ['.tmp'];
@@ -30,15 +29,19 @@ export default (app: Router) => {
     '/detail',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        if (blacklist.includes(req.path)) {
+        const finalPath = resolve(
+          config.logPath,
+          (req.query.path as string) || '',
+          (req.query.file as string) || '',
+        );
+
+        if (
+          blacklist.includes(req.query.path as string) ||
+          !finalPath.startsWith(config.logPath)
+        ) {
           return res.send({ code: 403, message: '暂无权限' });
         }
-        const filePath = join(
-          config.logPath,
-          (req.query.path || '') as string,
-          req.query.file as string,
-        );
-        const content = await getFileContentByName(filePath);
+        const content = await getFileContentByName(finalPath);
         res.send({ code: 200, data: content });
       } catch (e) {
         return next(e);
@@ -50,15 +53,18 @@ export default (app: Router) => {
     '/:file',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        if (blacklist.includes(req.path)) {
+        const finalPath = resolve(
+          config.logPath,
+          (req.query.path as string) || '',
+          (req.params.file as string) || '',
+        );
+        if (
+          blacklist.includes(req.path) ||
+          !finalPath.startsWith(config.logPath)
+        ) {
           return res.send({ code: 403, message: '暂无权限' });
         }
-        const filePath = join(
-          config.logPath,
-          (req.query.path || '') as string,
-          req.params.file,
-        );
-        const content = await getFileContentByName(filePath);
+        const content = await getFileContentByName(finalPath);
         res.send({ code: 200, data: content });
       } catch (e) {
         return next(e);

@@ -65,11 +65,13 @@ export default class ScriptService {
   }
 
   public async getFile(filePath: string, fileName: string) {
-    let _filePath = join(config.scriptPath, filePath, fileName);
-    if (filePath.startsWith(config.dataPath)) {
-      _filePath = join(filePath, fileName);
+    const finalPath = path.resolve(config.scriptPath, filePath, fileName);
+
+    if (!finalPath.startsWith(config.scriptPath)) {
+      return '';
     }
-    const content = await getFileContentByName(_filePath);
+
+    const content = await getFileContentByName(finalPath);
     return content;
   }
 }

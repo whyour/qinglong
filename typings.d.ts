@@ -12,4 +12,5 @@ declare module '*.svg' {
 interface Window {
   __ENV__QlBaseUrl: string;
   __ENV__DeployEnv: string;
+  __ENV__QL_DIR: string;
 }

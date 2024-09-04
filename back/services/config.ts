@@ -11,9 +11,21 @@ export default class ConfigService {
 
   public async getFile(filePath: string, res: Response) {
     let content = '';
-    if (config.blackFileList.includes(filePath) || !filePath) {
-      res.send({ code: 403, message: '文件无法访问' });
+    const avaliablePath = [config.rootPath, config.configPath].map((x) =>
+      path.resolve(x, filePath),
+    );
+
+    if (
+      config.blackFileList.includes(filePath) ||
+      avaliablePath.every(
+        (x) =>
+          !x.startsWith(config.scriptPath) && !x.startsWith(config.configPath),
+      ) ||
+      !filePath
+    ) {
+      return res.send({ code: 403, message: '文件无法访问' });
     }
+
     if (filePath.startsWith('sample/')) {
       const res = await got.get(
         `https://gitlab.com/whyour/qinglong/-/raw/master/${filePath}`,
