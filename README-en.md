@@ -74,6 +74,14 @@ docker run -dit \
   whyour/qinglong:latest
 ```
 
+### BaoTa Panel one-click deployment (Recommended)
+
+1. To install Pagoda Panel, go to the official website of [BaoTa Panel](https://www.bt.cn/u/EcDAFU), select the official version of the script to download and install.
+
+2. After installation, login to Pagoda Panel, click `Docker` in the menu bar, the first time you enter, you will be prompted to install `Docker` service, click Install Now, follow the prompts to complete the installation.
+
+3. After the installation is complete, find `Qinglong Panel` in the app shop, click Install, configure the domain name and other basic information to complete the installation.
+
 ### Docker-compose (Recommended)
 
 ```bash
@@ -105,7 +113,7 @@ podman run -dit \
   docker.io/whyour/qinglong:latest
 ```
 
-### Npm
+### Npm (Local)
 
 It is recommended to use a pure system installation to avoid losing the original system data, you need to install node/npm/python3/pip3/pnpm yourself
 
