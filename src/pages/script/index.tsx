@@ -108,6 +108,7 @@ const Script = () => {
       };
       const item = findNode(_data, (c) => c.key === obj.node.key);
       if (item) {
+        obj.node = item;
         setExpandedKeys([p as string]);
         onTreeSelect([vkey], obj);
       }
@@ -643,7 +644,7 @@ const Script = () => {
                 fontSize: 12,
                 lineNumbersMinChars: 3,
                 glyphMargin: false,
-                accessibilitySupport: 'off'
+                accessibilitySupport: 'off',
               }}
               onMount={(editor) => {
                 editorRef.current = editor;
