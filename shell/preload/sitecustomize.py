@@ -35,8 +35,6 @@ def expand_range(range_str, max_value):
 
 
 def run():
-    import task_before
-
     try:
         split_str = "__sitecustomize__"
         file_name = sys.argv[0].replace(f"{os.getenv('dir_scripts')}/", "")
@@ -68,9 +66,17 @@ def run():
     except OSError as error:
         error_message = str(error)
         if "Argument list too long" not in error_message:
-            print(f"run task before error: {error}")
+            print(f"❌ run task before error: {error}")
+        else:
+            print(
+                "❌ The environment variable is too large. It is recommended to use task_before.py instead of task_before.sh\n"
+            )
+        if task_before:
+            print("执行前置命令结束")
     except Exception as error:
         print(f"run task before error: {error}")
+
+    import task_before
 
     env_param = os.getenv("envParam")
     num_param = os.getenv("numParam")
