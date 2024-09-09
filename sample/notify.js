@@ -1143,14 +1143,20 @@ function webhookNotify(text, desp) {
       WEBHOOK_CONTENT_TYPE,
       WEBHOOK_METHOD,
     } = push_config;
-    if (!WEBHOOK_URL.includes('$title') && !WEBHOOK_BODY.includes('$title')) {
+    if (
+      !WEBHOOK_METHOD ||
+      !WEBHOOK_URL ||
+      (!WEBHOOK_URL.includes('$title') && !WEBHOOK_BODY.includes('$title'))
+    ) {
       resolve();
       return;
     }
 
     const headers = parseHeaders(WEBHOOK_HEADERS);
     const body = parseBody(WEBHOOK_BODY, WEBHOOK_CONTENT_TYPE, (v) =>
-      v?.replaceAll('$title', text)?.replaceAll('$content', desp),
+      v
+        ?.replaceAll('$title', text?.replaceAll('\n', '\\n'))
+        ?.replaceAll('$content', desp?.replaceAll('\n', '\\n')),
     );
     const bodyParam = formatBodyFun(WEBHOOK_CONTENT_TYPE, body);
     const options = {
@@ -1162,27 +1168,23 @@ function webhookNotify(text, desp) {
       retry: 1,
     };
 
-    if (WEBHOOK_METHOD) {
-      const formatUrl = WEBHOOK_URL.replaceAll(
-        '$title',
-        encodeURIComponent(text),
-      ).replaceAll('$content', encodeURIComponent(desp));
-      got(formatUrl, options).then((resp) => {
-        try {
-          if (resp.statusCode !== 200) {
-            console.log(`自定义发送通知消息失败😞 ${resp.body}\n`);
-          } else {
-            console.log(`自定义发送通知消息成功🎉 ${resp.body}\n`);
-          }
-        } catch (e) {
-          $.logErr(e, resp);
-        } finally {
-          resolve(resp.body);
+    const formatUrl = WEBHOOK_URL.replaceAll(
+      '$title',
+      encodeURIComponent(text),
+    ).replaceAll('$content', encodeURIComponent(desp));
+    got(formatUrl, options).then((resp) => {
+      try {
+        if (resp.statusCode !== 200) {
+          console.log(`自定义发送通知消息失败😞 ${resp.body}\n`);
+        } else {
+          console.log(`自定义发送通知消息成功🎉 ${resp.body}\n`);
         }
-      });
-    } else {
-      resolve();
-    }
+      } catch (e) {
+        $.logErr(e, resp);
+      } finally {
+        resolve(resp.body);
+      }
+    });
   });
 }
 

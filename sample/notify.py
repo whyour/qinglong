@@ -852,7 +852,9 @@ def custom_notify(title: str, content: str) -> None:
     body = parse_body(
         WEBHOOK_BODY,
         WEBHOOK_CONTENT_TYPE,
-        lambda v: v.replace("$title", title).replace("$content", content),
+        lambda v: v.replace("$title", title.replace("\n", "\\n")).replace(
+            "$content", content.replace("\n", "\\n")
+        ),
     )
     formatted_url = WEBHOOK_URL.replace(
         "$title", urllib.parse.quote_plus(title)
