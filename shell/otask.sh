@@ -216,12 +216,12 @@ check_file() {
   if [[ -f $file_env ]]; then
     get_env_array
     if [[ $isJsOrPythonFile == 'true' ]]; then
-      PREV_NODE_OPTIONS="${NODE_OPTIONS:=}"
-      PREV_PYTHONPATH="${PYTHONPATH:=}"
+      export PREV_NODE_OPTIONS="${NODE_OPTIONS:=}"
+      export PREV_PYTHONPATH="${PYTHONPATH:=}"
       if [[ $1 == *.js ]] || [[ $1 == *.ts ]] || [[ $1 == *.mjs ]]; then
-        export NODE_OPTIONS="${NODE_OPTIONS} -r ${file_preload_js}"
+        export NODE_OPTIONS="-r ${file_preload_js} ${NODE_OPTIONS}"
       else
-        export PYTHONPATH="${PYTHONPATH}:${dir_preload}:${dir_config}"
+        export PYTHONPATH="${dir_preload}:${dir_config}:${PYTHONPATH}"
       fi
     else
       . $file_env

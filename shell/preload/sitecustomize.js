@@ -29,9 +29,12 @@ function run() {
     file_task_before_js,
     dir_scripts,
     task_before,
+    PREV_NODE_OPTIONS
   } = process.env;
 
   try {
+    process.env.NODE_OPTIONS = PREV_NODE_OPTIONS;
+
     const splitStr = '__sitecustomize__';
     const fileName = process.argv[1].replace(`${dir_scripts}/`, '');
     let command = `bash -c "source ${file_task_before} ${fileName}`;
@@ -43,7 +46,7 @@ function run() {
       console.log('执行前置命令\n');
     }
     const res = execSync(
-      `${command} && echo -e '${splitStr}' && NODE_OPTIONS= node -p 'JSON.stringify(process.env)'"`,
+      `${command} && echo -e '${splitStr}' && node -p 'JSON.stringify(process.env)'"`,
       {
         encoding: 'utf-8',
       },
