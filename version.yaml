@@ -1,12 +1,8 @@
-version: 2.17.10
-changeLogLink: https://t.me/jiao_long/421
-publishTime: 2024-08-30 23:00
+version: 2.17.11
+changeLogLink: https://t.me/jiao_long/422
+publishTime: 2024-09-13 23:00
 changeLog: |
-  1. 系统日志增加时间筛选和清空操作
-  2. 单个任务运行中实例限制最多 5 个，防止任务堆积过多，运行实例超过 5 个时，会发频繁通知
-  3. 修复 shell 任务无法正常结束
-  4. 修改 python 任务 smtp 参数说明，详见 config.sh
-  5. 修复任务执行前命令 (task_before) 执行报错
-  6. 修复删除日志命令可能失败
-  7. 其他样式修复
-  
+  1. 修复无法获取设置的环境变量 PYTHONPATH 和 NODE_OPTIONS
+  2. 修复定时任务视图过多时，无法看到视图管理
+  3. 修复自定义通知 json 解析
+  4. 修复可能产生目录遍历攻击 API
