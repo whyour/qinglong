@@ -229,6 +229,17 @@ check_file() {
   fi
 }
 
+check_nounset() {
+  local output=$(set -o)
+  while read -r line; do
+    if [[ "$line" =~ "nounset" ]] && [[ "$line" =~ "on" ]]; then
+      set_u_on="true"
+      set +u
+      break
+    fi
+  done <<<"$output"
+}
+
 main() {
   if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
     if [[ $1 == *.sh ]]; then
@@ -270,10 +281,7 @@ if [[ $isJsOrPythonFile == 'false' ]]; then
   run_task_before "${task_shell_params[@]}"
 fi
 set_u_on="false"
-if set -o | grep -q 'nounset.*on'; then
-  set_u_on="true"
-  set +u
-fi
+check_nounset
 main "${task_shell_params[@]}"
 if [[ "$set_u_on" == 'true' ]]; then
   set -u
