@@ -21,9 +21,9 @@ const CronModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const method = cron ? 'put' : 'post';
+    const method = cron?.id ? 'put' : 'post';
     const payload = { ...values };
-    if (cron) {
+    if (cron?.id) {
       payload.id = cron.id;
     }
     try {
@@ -34,7 +34,7 @@ const CronModal = ({
 
       if (code === 200) {
         message.success(
-          cron ? intl.get('更新任务成功') : intl.get('创建任务成功'),
+          cron?.id ? intl.get('更新任务成功') : intl.get('创建任务成功'),
         );
         handleCancel(data);
       }
@@ -50,7 +50,7 @@ const CronModal = ({
 
   return (
     <Modal
-      title={cron ? intl.get('编辑任务') : intl.get('创建任务')}
+      title={cron?.id ? intl.get('编辑任务') : intl.get('创建任务')}
       open={visible}
       forceRender
       centered
