@@ -124,7 +124,9 @@ export default class ScheduleService {
           });
 
           callbacks.onMessage?.((msg:string,conn:Connection)=>{
-            cp.stdin.write(JSON.parse(msg).message)
+            const { message } = JSON.parse(msg)
+            if(!message) return
+            cp.stdin.write(message + "\n")
           })
         } catch (error) {
           this.logger.error(
