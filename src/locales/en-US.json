@@ -486,5 +486,7 @@
   "NPM 镜像源": "NPM Mirror Source",
   "PyPI 镜像源": "PyPI Mirror Source",
   "alpine linux 镜像源": "Alpine Linux Mirror Source",
-  "如果恢复失败，可进入容器执行": "If recovery fails, you can enter the container and execute"
+  "如果恢复失败，可进入容器执行": "If recovery fails, you can enter the container and execute",
+  "终端输入": "terminal input",
+  "发送": "send"
 }

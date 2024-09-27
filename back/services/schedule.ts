@@ -1,5 +1,6 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
+import { Connection } from 'sockjs';
 import nodeSchedule from 'node-schedule';
 import { ChildProcessWithoutNullStreams } from 'child_process';
 import {
@@ -33,6 +34,7 @@ export interface TaskCallbacks {
   ) => Promise<void>;
   onLog?: (message: string) => Promise<void>;
   onError?: (message: string) => Promise<void>;
+  onMessage?:(cb:(msg:string,conn:Connection)=>void)=>void;
 }
 
 @Service()
@@ -120,6 +122,10 @@ export default class ScheduleService {
             );
             resolve({ ...others, pid: cp.pid, code });
           });
+
+          callbacks.onMessage?.((msg:string,conn:Connection)=>{
+            cp.stdin.write(JSON.parse(msg).message)
+          })
         } catch (error) {
           this.logger.error(
             '[panel][执行任务失败] 命令: %s, 错误信息: %j',

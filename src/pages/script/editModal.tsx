@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useReducer,
 } from 'react';
-import { Drawer, Button, Tabs, Badge, Select, TreeSelect } from 'antd';
+import { Drawer, Button, Tabs, Badge, Select, TreeSelect, Input } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import SplitPane from 'react-split-pane';
@@ -41,6 +41,7 @@ const EditModal = ({
   const [settingModalVisible, setSettingModalVisible] =
     useState<boolean>(false);
   const [log, setLog] = useState('');
+  const [raw, setRaw] = useState('')
   const { theme } = useTheme();
   const editorRef = useRef<any>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -123,6 +124,12 @@ const EditModal = ({
 
     setLog((p) => `${p}${_message}`);
   }, []);
+
+  const send=()=>{
+    const ws = WebSocketManager.getInstance();
+    ws.send({ type:'terminalInput', message:raw })
+    setRaw('')
+  }
 
   useEffect(() => {
     const ws = WebSocketManager.getInstance();
@@ -253,6 +260,12 @@ const EditModal = ({
             padding: '0 15px',
           }}
         >
+          <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap:'8px' }}>
+            <Input placeholder={intl.get('终端输入')} value={raw} onChange={(e)=>{
+              setRaw(e.target.value)
+            }}></Input>
+            <Button type="primary" onClick={send}>{intl.get('发送')}</Button>
+          </div>
           <Ansi>{log}</Ansi>
         </pre>
       </SplitPane>
