@@ -33,18 +33,18 @@ export class GotifyNotification extends NotificationBaseInfo {
 }
 
 export class GoCqHttpBotNotification extends NotificationBaseInfo {
-  public goCqHttpBotUrl = '';
-  public goCqHttpBotToken = '';
-  public goCqHttpBotQq = '';
+  public gobotUrl = '';
+  public gobotToken = '';
+  public gobotQq = '';
 }
 
 export class ServerChanNotification extends NotificationBaseInfo {
-  public serverChanKey = '';
+  public pushKey = '';
 }
 
 export class PushDeerNotification extends NotificationBaseInfo {
-  public pushDeerKey = '';
-  public pushDeerUrl = '';
+  public deerKey = '';
+  public deerUrl = '';
 }
 
 export class ChatNotification extends NotificationBaseInfo {
@@ -63,27 +63,27 @@ export class BarkNotification extends NotificationBaseInfo {
 }
 
 export class TelegramBotNotification extends NotificationBaseInfo {
-  public telegramBotToken = '';
-  public telegramBotUserId = '';
-  public telegramBotProxyHost = '';
-  public telegramBotProxyPort = '';
-  public telegramBotProxyAuth = '';
-  public telegramBotApiHost = 'https://api.telegram.org';
+  public tgBotToken = '';
+  public tgUserId = '';
+  public tgProxyHost = '';
+  public tgProxyPort = '';
+  public tgProxyAuth = '';
+  public tgApiHost = 'https://api.telegram.org';
 }
 
 export class DingtalkBotNotification extends NotificationBaseInfo {
-  public dingtalkBotToken = '';
-  public dingtalkBotSecret = '';
+  public ddBotToken = '';
+  public ddBotSecret = '';
 }
 
 export class WeWorkBotNotification extends NotificationBaseInfo {
-  public weWorkBotKey = '';
-  public weWorkOrigin = '';
+  public qywxKey = '';
+  public qywxOrigin = '';
 }
 
 export class WeWorkAppNotification extends NotificationBaseInfo {
-  public weWorkAppKey = '';
-  public weWorkOrigin = '';
+  public qywxKey = '';
+  public qywxOrigin = '';
 }
 
 export class AibotkNotification extends NotificationBaseInfo {
@@ -93,7 +93,7 @@ export class AibotkNotification extends NotificationBaseInfo {
 }
 
 export class IGotNotification extends NotificationBaseInfo {
-  public iGotPushKey = '';
+  public igotPushKey = '';
 }
 
 export class PushPlusNotification extends NotificationBaseInfo {
@@ -108,14 +108,14 @@ export class WePlusBotNotification extends NotificationBaseInfo {
 }
 
 export class EmailNotification extends NotificationBaseInfo {
-  public emailService: string = '';
-  public emailUser: string = '';
-  public emailPass: string = '';
+  public smtpService: string = '';
+  public smtpName: string = '';
+  public smtpPassword: string = '';
 }
 
 export class PushMeNotification extends NotificationBaseInfo {
-  public pushMeKey: string = '';
-  public pushMeUrl: string = '';
+  public pushmeKey: string = '';
+  public pushmeUrl: string = '';
 }
 
 export class ChronocatNotification extends NotificationBaseInfo {
@@ -136,7 +136,7 @@ export class WebhookNotification extends NotificationBaseInfo {
 }
 
 export class LarkNotification extends NotificationBaseInfo {
-  public larkKey = '';
+  public fskey = '';
 }
 
 export interface NotificationInfo

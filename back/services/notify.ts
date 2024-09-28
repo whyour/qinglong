@@ -130,13 +130,13 @@ export default class NotificationService {
   }
 
   private async goCqHttpBot() {
-    const { goCqHttpBotQq, goCqHttpBotToken, goCqHttpBotUrl } = this.params;
+    const { gobotQq, gobotToken, gobotUrl } = this.params;
     try {
       const res: any = await got
-        .post(`${goCqHttpBotUrl}?${goCqHttpBotQq}`, {
+        .post(`${gobotUrl}?${gobotQq}`, {
           ...this.gotOption,
           json: { message: `${this.title}\n${this.content}` },
-          headers: { Authorization: 'Bearer ' + goCqHttpBotToken },
+          headers: { Authorization: 'Bearer ' + gobotToken },
         })
         .json();
       if (res.retcode === 0) {
@@ -150,10 +150,10 @@ export default class NotificationService {
   }
 
   private async serverChan() {
-    const { serverChanKey } = this.params;
-    const url = serverChanKey.startsWith('SCT')
-      ? `https://sctapi.ftqq.com/${serverChanKey}.send`
-      : `https://sc.ftqq.com/${serverChanKey}.send`;
+    const { pushKey } = this.params;
+    const url = pushKey.startsWith('SCT')
+      ? `https://sctapi.ftqq.com/${pushKey}.send`
+      : `https://sc.ftqq.com/${pushKey}.send`;
     try {
       const res: any = await got
         .post(url, {
@@ -173,13 +173,13 @@ export default class NotificationService {
   }
 
   private async pushDeer() {
-    const { pushDeerKey, pushDeerUrl } = this.params;
-    const url = pushDeerUrl || `https://api2.pushdeer.com/message/push`;
+    const { deerKey, deerUrl } = this.params;
+    const url = deerUrl || `https://api2.pushdeer.com/message/push`;
     try {
       const res: any = await got
         .post(url, {
           ...this.gotOption,
-          body: `pushkey=${pushDeerKey}&text=${encodeURIComponent(
+          body: `pushkey=${deerKey}&text=${encodeURIComponent(
             this.title,
           )}&desp=${encodeURIComponent(this.content)}&type=markdown`,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -263,25 +263,25 @@ export default class NotificationService {
 
   private async telegramBot() {
     const {
-      telegramBotApiHost,
-      telegramBotProxyAuth,
-      telegramBotProxyHost,
-      telegramBotProxyPort,
-      telegramBotToken,
-      telegramBotUserId,
+      tgApiHost,
+      tgProxyAuth,
+      tgProxyHost,
+      tgProxyPort,
+      tgBotToken,
+      tgUserId,
     } = this.params;
-    const authStr = telegramBotProxyAuth ? `${telegramBotProxyAuth}@` : '';
+    const authStr = tgProxyAuth ? `${tgProxyAuth}@` : '';
     const url = `${
-      telegramBotApiHost ? telegramBotApiHost : 'https://api.telegram.org'
-    }/bot${telegramBotToken}/sendMessage`;
+      tgApiHost ? tgApiHost : 'https://api.telegram.org'
+    }/bot${tgBotToken}/sendMessage`;
     let agent;
-    if (telegramBotProxyHost && telegramBotProxyPort) {
+    if (tgProxyHost && tgProxyPort) {
       const options: any = {
         keepAlive: true,
         keepAliveMsecs: 1000,
         maxSockets: 256,
         maxFreeSockets: 256,
-        proxy: `http://${authStr}${telegramBotProxyHost}:${telegramBotProxyPort}`,
+        proxy: `http://${authStr}${tgProxyHost}:${tgProxyPort}`,
       };
       const httpAgent = new HttpProxyAgent(options);
       const httpsAgent = new HttpsProxyAgent(options);
@@ -294,7 +294,7 @@ export default class NotificationService {
       const res: any = await got
         .post(url, {
           ...this.gotOption,
-          body: `chat_id=${telegramBotUserId}&text=${this.title}\n\n${this.content}&disable_web_page_preview=true`,
+          body: `chat_id=${tgUserId}&text=${this.title}\n\n${this.content}&disable_web_page_preview=true`,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           agent,
         })
@@ -310,16 +310,16 @@ export default class NotificationService {
   }
 
   private async dingtalkBot() {
-    const { dingtalkBotSecret, dingtalkBotToken } = this.params;
+    const { ddBotSecret, ddBotToken } = this.params;
     let secretParam = '';
-    if (dingtalkBotSecret) {
+    if (ddBotSecret) {
       const dateNow = Date.now();
-      const hmac = crypto.createHmac('sha256', dingtalkBotSecret);
-      hmac.update(`${dateNow}\n${dingtalkBotSecret}`);
+      const hmac = crypto.createHmac('sha256', ddBotSecret);
+      hmac.update(`${dateNow}\n${ddBotSecret}`);
       const result = encodeURIComponent(hmac.digest('base64'));
       secretParam = `&timestamp=${dateNow}&sign=${result}`;
     }
-    const url = `https://oapi.dingtalk.com/robot/send?access_token=${dingtalkBotToken}${secretParam}`;
+    const url = `https://oapi.dingtalk.com/robot/send?access_token=${ddBotToken}${secretParam}`;
     try {
       const res: any = await got
         .post(url, {
@@ -343,9 +343,9 @@ export default class NotificationService {
   }
 
   private async weWorkBot() {
-    const { weWorkBotKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } =
+    const { qywxKey, qywxOrigin = 'https://qyapi.weixin.qq.com' } =
       this.params;
-    const url = `${weWorkOrigin}/cgi-bin/webhook/send?key=${weWorkBotKey}`;
+    const url = `${qywxOrigin}/cgi-bin/webhook/send?key=${qywxKey}`;
     try {
       const res: any = await got
         .post(url, {
@@ -369,11 +369,11 @@ export default class NotificationService {
   }
 
   private async weWorkApp() {
-    const { weWorkAppKey, weWorkOrigin = 'https://qyapi.weixin.qq.com' } =
+    const { qywxKey, qywxOrigin = 'https://qyapi.weixin.qq.com' } =
       this.params;
     const [corpid, corpsecret, touser, agentid, thumb_media_id = '1'] =
-      weWorkAppKey.split(',');
-    const url = `${weWorkOrigin}/cgi-bin/gettoken`;
+    qywxKey.split(',');
+    const url = `${qywxOrigin}/cgi-bin/gettoken`;
     const tokenRes: any = await got
       .post(url, {
         ...this.gotOption,
@@ -425,7 +425,7 @@ export default class NotificationService {
     try {
       const res: any = await got
         .post(
-          `${weWorkOrigin}/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
+          `${qywxOrigin}/cgi-bin/message/send?access_token=${tokenRes.access_token}`,
           {
             ...this.gotOption,
             json: {
@@ -497,8 +497,8 @@ export default class NotificationService {
   }
 
   private async iGot() {
-    const { iGotPushKey } = this.params;
-    const url = `https://push.hellyw.com/${iGotPushKey.toLowerCase()}`;
+    const { igotPushKey } = this.params;
+    const url = `https://push.hellyw.com/${igotPushKey.toLowerCase()}`;
     try {
       const res: any = await got
         .post(url, {
@@ -581,15 +581,15 @@ export default class NotificationService {
   }
 
   private async lark() {
-    let { larkKey } = this.params;
+    let { fskey } = this.params;
 
-    if (!larkKey.startsWith('http')) {
-      larkKey = `https://open.feishu.cn/open-apis/bot/v2/hook/${larkKey}`;
+    if (!fskey.startsWith('http')) {
+      fskey = `https://open.feishu.cn/open-apis/bot/v2/hook/${fskey}`;
     }
 
     try {
       const res: any = await got
-        .post(larkKey, {
+        .post(fskey, {
           ...this.gotOption,
           json: {
             msg_type: 'text',
@@ -609,20 +609,20 @@ export default class NotificationService {
   }
 
   private async email() {
-    const { emailPass, emailService, emailUser } = this.params;
+    const { smtpPassword, smtpService, smtpName } = this.params;
 
     try {
       const transporter = nodemailer.createTransport({
-        service: emailService,
+        service: smtpService,
         auth: {
-          user: emailUser,
-          pass: emailPass,
+          user: smtpName,
+          pass: smtpPassword,
         },
       });
 
       const info = await transporter.sendMail({
-        from: `"青龙快讯" <${emailUser}>`,
-        to: `${emailUser}`,
+        from: `"青龙快讯" <${smtpName}>`,
+        to: `${smtpName}`,
         subject: `${this.title}`,
         html: `${this.content.replace(/\n/g, '<br/>')}`,
       });
@@ -640,12 +640,12 @@ export default class NotificationService {
   }
 
   private async pushMe() {
-    const { pushMeKey, pushMeUrl } = this.params;
+    const { pushmeKey, pushmeUrl } = this.params;
     try {
-      const res: any = await got.post(pushMeUrl || 'https://push.i-i.me/', {
+      const res: any = await got.post(pushmeUrl || 'https://push.i-i.me/', {
         ...this.gotOption,
         json: {
-          push_key: pushMeKey,
+          push_key: pushmeKey,
           title: this.title,
           content: this.content,
         },
