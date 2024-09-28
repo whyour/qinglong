@@ -761,7 +761,9 @@ function pushPlusNotify(text, desp, params) {
   return new Promise((resolve) => {
     const { PUSH_PLUS_TOKEN, PUSH_PLUS_USER } = push_config;
     if (PUSH_PLUS_TOKEN) {
-      desp = desp.replace(/[\n\r]/g, '<br>'); // 默认为html, 不支持plaintext
+      if(!params.template || params.template == 'html'){
+        desp = desp.replace(/[\n\r]/g, '<br>'); // 默认为html, 不支持plaintext
+      }
       const body = {
         token: `${PUSH_PLUS_TOKEN}`,
         title: `${text}`,
