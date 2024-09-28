@@ -13,6 +13,8 @@ import {
 } from '../data/env';
 import groupBy from 'lodash/groupBy';
 import { FindOptions, Op } from 'sequelize';
+import { NotificationInfo } from '../data/notify';
+import { omit, snakeCase } from 'lodash';
 
 @Service()
 export default class EnvService {
@@ -228,5 +230,20 @@ export default class EnvService {
     await fs.writeFile(config.envFile, env_string);
     await fs.writeFile(config.jsEnvFile, js_env_string);
     await fs.writeFile(config.pyEnvFile, py_env_string);
+  }
+
+  public async updateFromNotification(notificationInfo: NotificationInfo){
+    const obj = omit(notificationInfo,['type']) as any
+    const keys = Object.keys(obj)
+    for(const key of keys){
+      const ukey=snakeCase(key).toUpperCase()
+      const raw=await EnvModel.findOne({where:{name:ukey}})
+      if(!raw){
+        await EnvModel.create({name:ukey,value:obj[key],status:EnvStatus.normal})
+      }else{
+        await EnvModel.update({value:obj[key],status:EnvStatus.normal},{where:{name:ukey}})
+      }
+    }
+    await this.set_envs()
   }
 }

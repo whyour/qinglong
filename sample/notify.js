@@ -757,7 +757,7 @@ function iGotNotify(text, desp, params = {}) {
   });
 }
 
-function pushPlusNotify(text, desp) {
+function pushPlusNotify(text, desp, params) {
   return new Promise((resolve) => {
     const { PUSH_PLUS_TOKEN, PUSH_PLUS_USER } = push_config;
     if (PUSH_PLUS_TOKEN) {
@@ -767,6 +767,7 @@ function pushPlusNotify(text, desp) {
         title: `${text}`,
         content: `${desp}`,
         topic: `${PUSH_PLUS_USER}`,
+        template: params.template || 'html',
       };
       const options = {
         url: `https://www.pushplus.plus/send`,
@@ -1297,7 +1298,7 @@ async function sendNotify(text, desp, params = {}) {
 
   await Promise.all([
     serverNotify(text, desp), // 微信server酱
-    pushPlusNotify(text, desp), // pushplus
+    pushPlusNotify(text, desp, params), // pushplus
     wePlusBotNotify(text, desp), // 微加机器人
     barkNotify(text, desp, params), // iOS Bark APP
     tgBotNotify(text, desp), // telegram 机器人
