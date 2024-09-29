@@ -469,13 +469,18 @@ export async function getUniqPath(
   command: string,
   id: string,
 ): Promise<string> {
+  let suffix = '';
   if (/^\d+$/.test(id)) {
-    id = `_${id}`;
-  } else {
-    id = '';
+    suffix = `_${id}`;
   }
 
-  const items = command.split(/ +/);
+  let items = command.split(/ +/);
+
+  const maxTimeCommandIndex = items.findIndex((x) => x === '-m');
+  if (maxTimeCommandIndex !== -1) {
+    items = items.slice(maxTimeCommandIndex + 2);
+  }
+
   let str = items[0];
   if (items[0] === TASK_COMMAND) {
     str = items[1];
@@ -499,7 +504,7 @@ export async function getUniqPath(
     str = `${tempStr}_${str.slice(slashIndex + 1)}`;
   }
 
-  return `${str}${id}`;
+  return `${str}${suffix}`;
 }
 
 export function safeJSONParse(value?: string) {
