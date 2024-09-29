@@ -125,7 +125,8 @@ run_concurrent() {
   fi
 
   handle_env_split
-  single_log_time=$(date "+%Y-%m-%d-%H-%M-%S.%3N")
+  time=$(date "+$mtime_format")
+  single_log_time=$(format_log_time "$mtime_format" "$time")
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"
