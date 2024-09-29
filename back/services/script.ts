@@ -1,4 +1,5 @@
 import { Service, Inject } from 'typedi';
+import { Connection } from 'sockjs';
 import winston from 'winston';
 import path, { join } from 'path';
 import SockService from './sock';
@@ -22,6 +23,7 @@ export default class ScriptService {
     return {
       onEnd: async (cp, endTime, diff) => {
         await rmPath(filePath);
+        this.sockService.removeAllListeners('message')
       },
       onError: async (message: string) => {
         this.sockService.sendMessage({
@@ -34,6 +36,10 @@ export default class ScriptService {
           type: 'manuallyRunScript',
           message,
         });
+      },
+      onMessage:(cb:(msg:string,conn:Connection)=>void)=>{
+        this.sockService.off('message',cb)
+        this.sockService.on('message',cb)
       },
     };
   }

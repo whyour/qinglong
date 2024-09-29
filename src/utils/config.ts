@@ -128,15 +128,15 @@ export default {
     ],
     goCqHttpBot: [
       {
-        label: 'goCqHttpBotUrl',
+        label: 'gobotUrl',
         tip: intl.get(
           '推送到个人QQ: http://127.0.0.1/send_private_msg，群：http://127.0.0.1/send_group_msg',
         ),
         required: true,
       },
-      { label: 'goCqHttpBotToken', tip: intl.get('访问密钥'), required: true },
+      { label: 'gobotToken', tip: intl.get('访问密钥'), required: true },
       {
-        label: 'goCqHttpBotQq',
+        label: 'gobotQq',
         tip: intl.get(
           '如果GOBOT_URL设置 /send_private_msg 则需要填入 user_id=个人QQ 相反如果是 /send_group_msg 则需要填入 group_id=QQ群',
         ),
@@ -145,19 +145,19 @@ export default {
     ],
     serverChan: [
       {
-        label: 'serverChanKey',
+        label: 'pushKey',
         tip: intl.get('Server酱SENDKEY'),
         required: true,
       },
     ],
     pushDeer: [
       {
-        label: 'pushDeerKey',
+        label: 'deerKey',
         tip: intl.get('PushDeer的Key，https://github.com/easychen/pushdeer'),
         required: true,
       },
       {
-        label: 'pushDeerUrl',
+        label: 'deerUrl',
         tip: intl.get(
           'PushDeer的自架API endpoint，默认是 https://api2.pushdeer.com/message/push',
         ),
@@ -198,40 +198,40 @@ export default {
     ],
     telegramBot: [
       {
-        label: 'telegramBotToken',
+        label: 'tgBotToken',
         tip: intl.get(
           'telegram机器人的token，例如：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw',
         ),
         required: true,
       },
       {
-        label: 'telegramBotUserId',
+        label: 'tgUserId',
         tip: intl.get('telegram用户的id，例如：129xxx206'),
         required: true,
       },
-      { label: 'telegramBotProxyHost', tip: intl.get('代理IP') },
-      { label: 'telegramBotProxyPort', tip: intl.get('代理端口') },
+      { label: 'tgProxyHost', tip: intl.get('代理IP') },
+      { label: 'tgProxyPort', tip: intl.get('代理端口') },
       {
-        label: 'telegramBotProxyAuth',
+        label: 'tgProxyAuth',
         tip: intl.get(
           'telegram代理配置认证参数，用户名与密码用英文冒号连接 user:password',
         ),
       },
       {
-        label: 'telegramBotApiHost',
+        label: 'tgApiHost',
         tip: intl.get('telegram api自建的反向代理地址，默认tg官方api'),
       },
     ],
     dingtalkBot: [
       {
-        label: 'dingtalkBotToken',
+        label: 'ddBotToken',
         tip: intl.get(
           '钉钉机器人webhook token，例如：5a544165465465645d0f31dca676e7bd07415asdasd',
         ),
         required: true,
       },
       {
-        label: 'dingtalkBotSecret',
+        label: 'ddBotSecret',
         tip: intl.get(
           '密钥，机器人安全设置页面，加签一栏下面显示的SEC开头的字符串',
         ),
@@ -239,27 +239,27 @@ export default {
     ],
     weWorkBot: [
       {
-        label: 'weWorkBotKey',
+        label: 'qywxKey',
         tip: intl.get(
           '企业微信机器人的webhook(详见文档 https://work.weixin.qq.com/api/doc/90000/90136/91770)，例如：693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa',
         ),
         required: true,
       },
       {
-        label: 'weWorkOrigin',
+        label: 'qywxOrigin',
         tip: intl.get('企业微信代理地址'),
       },
     ],
     weWorkApp: [
       {
-        label: 'weWorkAppKey',
+        label: 'qywxKey',
         tip: intl.get(
           'corpid、corpsecret、touser(注:多个成员ID使用|隔开)、agentid、消息类型(选填，不填默认文本消息类型) 注意用,号隔开(英文输入法的逗号)，例如：wwcfrs,B-76WERQ,qinglong,1000001,2COat',
         ),
         required: true,
       },
       {
-        label: 'weWorkOrigin',
+        label: 'qywxOrigin',
         tip: intl.get('企业微信代理地址'),
       },
     ],
@@ -291,7 +291,7 @@ export default {
     ],
     iGot: [
       {
-        label: 'iGotPushKey',
+        label: 'igotPushKey',
         tip: intl.get(
           'iGot的信息推送key，例如：https://push.hellyw.com/XXXXXXXX',
         ),
@@ -336,7 +336,7 @@ export default {
     ],
     lark: [
       {
-        label: 'larkKey',
+        label: 'fskey',
         tip: intl.get(
           '飞书群组机器人：https://www.feishu.cn/hc/zh-CN/articles/360024984973',
         ),
@@ -345,23 +345,23 @@ export default {
     ],
     email: [
       {
-        label: 'emailService',
+        label: 'smtpService',
         tip: intl.get(
           '邮箱服务名称，比如126、163、Gmail、QQ等，支持列表https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json',
         ),
         required: true,
       },
-      { label: 'emailUser', tip: intl.get('邮箱地址'), required: true },
-      { label: 'emailPass', tip: intl.get('SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定'), required: true },
+      { label: 'smtpName', tip: intl.get('邮箱地址'), required: true },
+      { label: 'smtpPassword', tip: intl.get('SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定'), required: true },
     ],
     pushMe: [
       {
-        label: 'pushMeKey',
+        label: 'pushmeKey',
         tip: intl.get('PushMe的Key，https://push.i-i.me/'),
         required: true,
       },
       {
-        label: 'pushMeUrl',
+        label: 'pushmeUrl',
         tip: intl.get('自建的PushMeServer消息接口地址，例如：http://127.0.0.1:3010，不填则使用官方消息接口'),
         required: false,
       },

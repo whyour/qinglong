@@ -28,6 +28,7 @@ import dayjs from 'dayjs';
 import IP2Region from 'ip2region';
 import requestIp from 'request-ip';
 import uniq from 'lodash/uniq';
+import EnvService from '../services/env';
 
 @Service()
 export default class UserService {
@@ -38,6 +39,7 @@ export default class UserService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
+    private envService: EnvService
   ) {}
 
   public async login(
@@ -385,9 +387,11 @@ export default class UserService {
     const isSuccess = await this.notificationService.testNotify(
       notificationInfo,
       '青龙',
-      `【蛟龙】测试通知 https://t.me/jiao_long`,
+      `【蛟龙】测试通知 https://t.me/jiao_long ${code}`,
     );
     if (isSuccess) {
+      await this.envService.updateFromNotification(notificationInfo)
+
       const result = await this.updateAuthDb({
         type: AuthDataType.notification,
         info: { ...notificationInfo },

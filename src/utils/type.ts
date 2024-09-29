@@ -7,4 +7,5 @@ export type SockMessageType =
   | 'runSubscriptionEnd'
   | 'reloadSystem'
   | 'updateNodeMirror'
-  | 'updateLinuxMirror';
+  | 'updateLinuxMirror'
+  | 'terminalInput';
