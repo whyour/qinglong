@@ -298,10 +298,10 @@ def serverJ(title: str, content: str) -> None:
     print("serverJ 服务启动")
 
     data = {"text": title, "desp": content.replace("\n", "\n\n")}
-    if push_config.get("PUSH_KEY").find("SCT") != -1:
-        url = f'https://sctapi.ftqq.com/{push_config.get("PUSH_KEY")}.send'
+    if push_config.get("PUSH_KEY").startswith("sctp"):
+        url = f'https://{push_config.get("PUSH_KEY")}.push.ft07.com/send'
     else:
-        url = f'https://sc.ftqq.com/{push_config.get("PUSH_KEY")}.send'
+        url = f'https://sctapi.ftqq.com/{push_config.get("PUSH_KEY")}.send'
     response = requests.post(url, data=data).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
