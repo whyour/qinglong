@@ -4,10 +4,10 @@ import config from '../config';
 import path from 'path';
 
 const levelMap: Record<string, string> = {
-  info: '🔵',
-  warn: '🟡',
-  error: '🔴',
-  debug: '🔶'
+  info: '\ue6f5',
+  warn: '\ue880',
+  error: '\ue602',
+  debug: '\ue67f'
 }
 
 const customFormat = winston.format.combine(

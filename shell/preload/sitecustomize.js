@@ -29,7 +29,7 @@ function run() {
     file_task_before_js,
     dir_scripts,
     task_before,
-    PREV_NODE_OPTIONS
+    PREV_NODE_OPTIONS,
   } = process.env;
 
   try {
@@ -62,10 +62,10 @@ function run() {
     }
   } catch (error) {
     if (!error.message.includes('spawnSync /bin/sh E2BIG')) {
-      console.log(`❌ run task before error: `, error);
+      console.log(`\ue926 run task before error: `, error);
     } else {
       console.log(
-        `❌ The environment variable is too large. It is recommended to use task_before.js instead of task_before.sh\n`,
+        `\ue926 The environment variable is too large. It is recommended to use task_before.js instead of task_before.sh\n`,
       );
     }
     if (task_before) {

@@ -8,6 +8,13 @@
     url('../assets/fonts/SourceCodePro-Regular.ttf') format('truetype');
 }
 
+@font-face {
+  font-family: Log;
+  src: url('../assets/fonts/log.woff2') format('woff2'),
+    url('../assets/fonts/log.woff') format('woff'),
+    url('../assets/fonts/log.ttf') format('truetype');
+}
+
 body {
   // 禁止手机页面下拉刷新
   overflow: hidden;
@@ -52,6 +59,11 @@ body {
       width: 100%;
       padding: 24px;
       overflow-y: auto;
+      code,
+      span {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo,
+          Courier, monospace, Log;
+      }
     }
   }
 
@@ -61,6 +73,10 @@ body {
     margin-bottom: 0;
     overflow: hidden;
   }
+}
+
+.ͼ1 .cm-scroller {
+  font-family: monospace, Log;
 }
 
 .monaco-editor:not(.rename-box) {
