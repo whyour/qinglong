@@ -217,7 +217,7 @@ export default class UserService {
         (a, b) => b.info!.timestamp! - a.info!.timestamp!,
       );
       if (result.length > 100) {
-        const ids = result.slice(0, result.length - 100).map((x) => x.id!);
+        const ids = result.slice(100).map((x) => x.id!);
         await SystemModel.destroy({
           where: { id: ids },
         });
