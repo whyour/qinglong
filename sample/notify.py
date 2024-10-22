@@ -302,10 +302,14 @@ def serverJ(title: str, content: str) -> None:
     print("serverJ 服务启动")
 
     data = {"text": title, "desp": content.replace("\n", "\n\n")}
-    if push_config.get("PUSH_KEY").startswith("sctp"):
-        url = f'https://{push_config.get("PUSH_KEY")}.push.ft07.com/send'
+
+    match = re.match(r'sctp(\d+)t', push_config.get("PUSH_KEY"))
+    if match:
+        num = match.group(1)
+        url = f'https://{num}.push.ft07.com/send/{push_config.get("PUSH_KEY")}.send'
     else:
         url = f'https://sctapi.ftqq.com/{push_config.get("PUSH_KEY")}.send'
+
     response = requests.post(url, data=data).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
