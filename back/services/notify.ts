@@ -35,6 +35,7 @@ export default class NotificationService {
     ['webhook', this.webhook],
     ['lark', this.lark],
     ['chronocat', this.chronocat],
+    ['ntfy', this.ntfy],
   ]);
 
   private title = '';
@@ -516,7 +517,7 @@ export default class NotificationService {
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
-  }
+ }
 
   private async pushPlus() {
     const { pushPlusToken, pushPlusUser } = this.params;
@@ -661,6 +662,26 @@ export default class NotificationService {
     }
   }
 
+  private async ntfy() {
+    const { ntfyUrl, ntfyTopic, ntfyPriority } = this.params;
+    try {
+        const res: any = await got
+          .post(`${ntfyUrl || 'https://ntfy.sh'}/${ntfyTopic}`, {
+              ...this.gotOption,
+              body: `${this.title}\n${this.content}`,
+              headers: { 'Title': 'qinglong', 'Priority': `${ntfyPriority || '3'}` },
+          });
+          if (res.statusCode === 200) {
+            return true;
+          } else {
+            throw new Error(JSON.stringify(res));
+          }
+    } catch (error: any) {
+        throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  
   private async chronocat() {
     const { chronocatURL, chronocatQQ, chronocatToken } = this.params;
     try {

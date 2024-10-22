@@ -211,7 +211,17 @@ export FSKEY=""
 export QMSG_KEY=""
 export QMSG_TYPE=""
 
-## 20. 自定义通知
+## 20.Ntfy
+## 官方文档: https://docs.ntfy.sh
+## ntfy_url 填写ntfy地址,如https://ntfy.sh
+## ntfy_topic 填写ntfy的消息应用topic
+## ntfy_priority 填写推送消息优先级,默认为3
+export NTFY_URL=""
+export NTFY_TOPIC=""
+export NTFY_PRIORITY="3"
+
+
+## 21. 自定义通知
 ## 自定义通知 接收回调的URL
 export WEBHOOK_URL=""
 ## WEBHOOK_BODY 和 WEBHOOK_HEADERS 多个参数时，直接换行或者使用 $'\n' 连接多行字符串，比如 export dd="line 1"$'\n'"line 2"

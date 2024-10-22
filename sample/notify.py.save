@@ -120,7 +120,7 @@ push_config = {
 
     'NTFY_URL': '',                     # ntfy地址,如https://ntfy.sh
     'NTFY_TOPIC': '',                   # ntfy的消息应用topic
-    'NTFY_PRIORITY':'3',                # 推送消息优先级,默认为3
+    'NTFY_PRIORITY': '3',               # 推送消息优先级,默认为3
 }
 # fmt: on
 
@@ -780,32 +780,30 @@ def chronocat(title: str, content: str) -> None:
                 else:
                     print(f"QQ群消息:{ids}推送失败！")
 
-
 def ntfy(title: str, content: str) -> None:
     """
-    通过 Ntfy 推送消息
+    使用 Ntfy 推送消息。
     """
-    if not push_config.get("NTFY_TOPIC"):
-        print("ntfy 服务的 NTFY_TOPIC 未设置!!\n取消推送")
+    if not push_config.get("Ntfy_T"):
+        print("PushMe 服务的 PUSHME_KEY 未设置!!\n取消推送")
         return
-    print("ntfy 服务启动")
-    priority = '3'
-    if not push_config.get("NTFY_PRIORITY"):
-        print("ntfy 服务的NTFY_PRIORITY 未设置!!默认设置为3")
-    else:
-        priority = push_config.get("NTFY_PRIORITY")
-    data = (title + "\n" +content).encode(encoding='utf-8')
-    headers = {
-        "Title": "qinglong",
-        "Priority": priority
-    }
-    url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
-    response = requests.post(url, data=data, headers=headers)
+    print("PushMe 服务启动")
 
-    if response["code"] == 200:
-        print("Ntfy 推送成功！")
+    url = push_config.get("PUSHME_URL") if push_config.get("PUSHME_URL") else "https://push.i-i.me/"
+    data = {
+        "push_key": push_config.get("PUSHME_KEY"),
+        "title": title,
+        "content": content,
+        "date": push_config.get("date") if push_config.get("date") else "",
+        "type": push_config.get("type") if push_config.get("type") else "",
+    }
+    response = requests.post(url, data=data)
+
+    if response.status_code == 200 and response.text == "success":
+        print("PushMe 推送成功！")
     else:
-        print("Ntfy 推送失败！错误信息：", response)
+        print(f"PushMe 推送失败！{response.status_code} {response.text}")
+
 
 def parse_headers(headers):
     if not headers:
@@ -967,8 +965,7 @@ def add_notify_function():
         notify_function.append(chronocat)
     if push_config.get("WEBHOOK_URL") and push_config.get("WEBHOOK_METHOD"):
         notify_function.append(custom_notify)
-    if push_config.get("NTFY_TOPIC"):
-        notify_function.append(ntfy)
+
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
     return notify_function
