@@ -151,9 +151,11 @@ export default class NotificationService {
 
   private async serverChan() {
     const { serverChanKey } = this.params;
-    const url = serverChanKey.startsWith('sctp')
-      ? `https://${serverChanKey}.push.ft07.com/send`
+    const matchResult = serverChanKey.match(/^sctp(\d+)t/i);
+    const url = matchResult
+      ? `https://${matchResult[1]}.push.ft07.com/send/${serverChanKey}.send`
       : `https://sctapi.ftqq.com/${serverChanKey}.send`;
+
     try {
       const res: any = await got
         .post(url, {
