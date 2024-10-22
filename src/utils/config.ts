@@ -84,6 +84,7 @@ export default {
   },
   notificationModes: [
     { value: 'gotify', label: 'Gotify' },
+    { value: 'ntfy', label: 'Ntfy' },
     { value: 'goCqHttpBot', label: 'GoCqHttpBot' },
     { value: 'serverChan', label: intl.get('Server酱') },
     { value: 'pushDeer', label: 'PushDeer' },
@@ -117,6 +118,19 @@ export default {
         required: true,
       },
       { label: 'gotifyPriority', tip: intl.get('推送消息的优先级') },
+    ],
+    ntfy: [
+      {
+        label: 'ntfyUrl',
+        tip: intl.get('ntfy的url地址，例如 https://ntfy.sh'),
+        required: true,
+      },
+      {
+        label: 'ntfyTopic',
+        tip: intl.get('ntfy的消息应用topic'),
+        required: true,
+      },
+      { label: 'ntfyPriority', tip: intl.get('推送消息的优先级') },
     ],
     chat: [
       {

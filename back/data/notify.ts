@@ -20,6 +20,7 @@ export enum NotificationMode {
   'feishu' = 'feishu',
   'webhook' = 'webhook',
   'chronocat' = 'Chronocat',
+  'ntfy' = 'ntfy',
 }
 
 abstract class NotificationBaseInfo {
@@ -139,6 +140,11 @@ export class LarkNotification extends NotificationBaseInfo {
   public larkKey = '';
 }
 
+export class NtfyNotification extends NotificationBaseInfo {
+  public ntfyUrl = '';
+  public ntfyTopic = '';
+  public ntfyPriority = '';
+}
 export interface NotificationInfo
   extends GoCqHttpBotNotification,
     GotifyNotification,
@@ -158,5 +164,6 @@ export interface NotificationInfo
     PushMeNotification,
     WebhookNotification,
     ChronocatNotification,
-    LarkNotification {}
+    LarkNotification,
+    NtfyNotification {}
 

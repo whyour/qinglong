@@ -388,6 +388,8 @@
   "SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定": "SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定",
   "PushMe的Key，https://push.i-i.me/": "PushMe的Key，https://push.i-i.me/",
   "自建的PushMeServer消息接口地址，例如：http://127.0.0.1:3010，不填则使用官方消息接口": "自建的PushMeServer消息接口地址，例如：http://127.0.0.1:3010，不填则使用官方消息接口",
+  "ntfy的url地址，例如 https://ntfy.sh": "ntfy的url地址，例如 https://ntfy.sh",
+  "ntfy的消息应用topic": "ntfy的消息应用topic",
   "请求方法": "请求方法",
   "请求头Content-Type": "请求头Content-Type",
   "请求链接以http或者https开头。url或者body中必须包含$title，$content可选，对应api内容的位置": "请求链接以http或者https开头。url或者body中必须包含$title，$content可选，对应api内容的位置",
