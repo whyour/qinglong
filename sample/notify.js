@@ -227,7 +227,7 @@ function serverNotify(text, desp) {
 
       const matchResult = PUSH_KEY.match(/^sctp(\d+)t/i);
       const options = {
-        url: matchResult
+        url: matchResult && matchResult[1]
         ? `https://${matchResult[1]}.push.ft07.com/send/${PUSH_KEY}.send`
         : `https://sctapi.ftqq.com/${PUSH_KEY}.send`,
         body: `text=${encodeURIComponent(text)}&desp=${encodeURIComponent(desp)}`,

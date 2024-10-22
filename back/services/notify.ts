@@ -152,7 +152,7 @@ export default class NotificationService {
   private async serverChan() {
     const { serverChanKey } = this.params;
     const matchResult = serverChanKey.match(/^sctp(\d+)t/i);
-    const url = matchResult
+    const url = matchResult && matchResult[1]
       ? `https://${matchResult[1]}.push.ft07.com/send/${serverChanKey}.send`
       : `https://sctapi.ftqq.com/${serverChanKey}.send`;
 
@@ -160,7 +160,7 @@ export default class NotificationService {
       const res: any = await got
         .post(url, {
           ...this.gotOption,
-          body: `title=${this.title}&desp=${this.content}`,
+          body: `title=${encodeURIComponent(this.title)}&desp=${encodeURIComponent(this.content)}`,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         .json();
