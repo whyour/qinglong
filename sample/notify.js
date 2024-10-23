@@ -228,6 +228,7 @@ function serverNotify(text, desp) {
     if (PUSH_KEY) {
       // 微信server酱推送通知一个\n不会换行，需要两个\n才能换行，故做此替换
       desp = desp.replace(/[\n\r]/g, '\n\n');
+
       const matchResult = PUSH_KEY.match(/^sctp(\d+)t/i);
       const options = {
         url: matchResult && matchResult[1]
