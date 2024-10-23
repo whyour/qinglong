@@ -156,6 +156,7 @@ export default class NotificationService {
     const url = matchResult && matchResult[1]
       ? `https://${matchResult[1]}.push.ft07.com/send/${serverChanKey}.send`
       : `https://sctapi.ftqq.com/${serverChanKey}.send`;
+    
     try {
       const res: any = await got
         .post(url, {
