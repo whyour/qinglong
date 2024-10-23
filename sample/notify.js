@@ -228,11 +228,13 @@ function serverNotify(text, desp) {
     if (PUSH_KEY) {
       // 微信server酱推送通知一个\n不会换行，需要两个\n才能换行，故做此替换
       desp = desp.replace(/[\n\r]/g, '\n\n');
+      
+      const matchResult = PUSH_KEY.match(/^sctp(\d+)t/i);
       const options = {
-        url: PUSH_KEY.startsWith('sctp')
-          ? `https://${PUSH_KEY}.push.ft07.com/send`
-          : `https://sctapi.ftqq.com/${PUSH_KEY}.send`,
-        body: `text=${text}&desp=${desp}`,
+        url: matchResult && matchResult[1]
+        ? `https://${matchResult[1]}.push.ft07.com/send/${PUSH_KEY}.send`
+        : `https://sctapi.ftqq.com/${PUSH_KEY}.send`,
+        body: `text=${encodeURIComponent(text)}&desp=${encodeURIComponent(desp)}`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -1194,7 +1196,7 @@ function webhookNotify(text, desp) {
 
 function ntfyNotify(text, desp) {
   function encodeRFC2047(text) {
-    const encodedBase64 = btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+    const encodedBase64 = Buffer.from(text).toString('base64');
     return `=?utf-8?B?${encodedBase64}?=`;
   }
 

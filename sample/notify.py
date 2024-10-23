@@ -780,10 +780,6 @@ def chronocat(title: str, content: str) -> None:
                 else:
                     print(f"QQ群消息:{ids}推送失败！")
 
-
-import base64
-import requests
-
 def ntfy(title: str, content: str) -> None:
     """
     通过 Ntfy 推送消息
