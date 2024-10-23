@@ -228,13 +228,11 @@ function serverNotify(text, desp) {
     if (PUSH_KEY) {
       // 微信server酱推送通知一个\n不会换行，需要两个\n才能换行，故做此替换
       desp = desp.replace(/[\n\r]/g, '\n\n');
-
-      const matchResult = PUSH_KEY.match(/^sctp(\d+)t/i);
       const options = {
-        url: matchResult && matchResult[1]
-        ? `https://${matchResult[1]}.push.ft07.com/send/${PUSH_KEY}.send`
-        : `https://sctapi.ftqq.com/${PUSH_KEY}.send`,
-        body: `text=${encodeURIComponent(text)}&desp=${encodeURIComponent(desp)}`,
+        url: PUSH_KEY.startsWith('sctp')
+          ? `https://${PUSH_KEY}.push.ft07.com/send`
+          : `https://sctapi.ftqq.com/${PUSH_KEY}.send`,
+        body: `text=${text}&desp=${desp}`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -1195,14 +1193,19 @@ function webhookNotify(text, desp) {
 }
 
 function ntfyNotify(text, desp) {
+  function encodeRFC2047(text) {
+    const encodedBase64 = btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+    return `=?utf-8?B?${encodedBase64}?=`;
+  }
+
   return new Promise((resolve) => {
     const { NTFY_URL, NTFY_TOPIC, NTFY_PRIORITY } = push_config;
     if (NTFY_TOPIC) {
       const options = {
-        url: NTFY_URL || `https://ntfy.sh`,
-        body: `${desp}\n${text}`,
+        url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
+        body: `${desp}`, 
         headers: {
-          'Title': 'qinglong',
+          'Title': `${encodeRFC2047(text)}`,
           'Priority': NTFY_PRIORITY || '3'
         },
         timeout,
@@ -1212,7 +1215,7 @@ function ntfyNotify(text, desp) {
           if (err) {
             console.log('Ntfy 通知调用API失败😞\n', err);
           } else {
-            if (data.success) {
+            if (data.id) {
               console.log('Ntfy 发送通知消息成功🎉\n');
             } else {
               console.log(`Ntfy 发送通知消息异常 ${JSON.stringify(data)}`);
@@ -1229,6 +1232,7 @@ function ntfyNotify(text, desp) {
     }
   });
 }
+
 
 function parseString(input, valueFormatFn) {
   const regex = /(\w+):\s*((?:(?!\n\w+:).)*)/g;

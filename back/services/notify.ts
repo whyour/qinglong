@@ -152,16 +152,14 @@ export default class NotificationService {
 
   private async serverChan() {
     const { serverChanKey } = this.params;
-    const matchResult = serverChanKey.match(/^sctp(\d+)t/i);
-    const url = matchResult && matchResult[1]
-      ? `https://${matchResult[1]}.push.ft07.com/send/${serverChanKey}.send`
+    const url = serverChanKey.startsWith('sctp')
+      ? `https://${serverChanKey}.push.ft07.com/send`
       : `https://sctapi.ftqq.com/${serverChanKey}.send`;
-
     try {
       const res: any = await got
         .post(url, {
           ...this.gotOption,
-          body: `title=${encodeURIComponent(this.title)}&desp=${encodeURIComponent(this.content)}`,
+          body: `title=${this.title}&desp=${this.content}`,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         .json();
@@ -666,12 +664,18 @@ export default class NotificationService {
 
   private async ntfy() {
     const { ntfyUrl, ntfyTopic, ntfyPriority } = this.params;
+    // 编码函数
+    const encodeRfc2047 = (text: string, charset: string = 'UTF-8'): string => {
+      const encodedText = Buffer.from(text).toString('base64');
+      return `=?${charset}?B?${encodedText}?=`;
+  };
     try {
+        const encodedTitle = encodeRfc2047(this.title);
         const res: any = await got
           .post(`${ntfyUrl || 'https://ntfy.sh'}/${ntfyTopic}`, {
               ...this.gotOption,
-              body: `${this.title}\n${this.content}`,
-              headers: { 'Title': 'qinglong', 'Priority': `${ntfyPriority || '3'}` },
+              body: `${this.content}`,
+              headers: { 'Title': encodedTitle, 'Priority': `${ntfyPriority || '3'}` },
           });
           if (res.statusCode === 200) {
             return true;

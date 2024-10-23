@@ -116,7 +116,7 @@ push_config = {
     'WEBHOOK_BODY': '',                 # 自定义通知 请求体
     'WEBHOOK_HEADERS': '',              # 自定义通知 请求头
     'WEBHOOK_METHOD': '',               # 自定义通知 请求方法
-    'WEBHOOK_CONTENT_TYPE': ''          # 自定义通知 content-type
+    'WEBHOOK_CONTENT_TYPE': '',         # 自定义通知 content-type
 
     'NTFY_URL': '',                     # ntfy地址,如https://ntfy.sh
     'NTFY_TOPIC': '',                   # ntfy的消息应用topic
@@ -302,14 +302,10 @@ def serverJ(title: str, content: str) -> None:
     print("serverJ 服务启动")
 
     data = {"text": title, "desp": content.replace("\n", "\n\n")}
-
-    match = re.match(r'sctp(\d+)t', push_config.get("PUSH_KEY"))
-    if match:
-        num = match.group(1)
-        url = f'https://{num}.push.ft07.com/send/{push_config.get("PUSH_KEY")}.send'
+    if push_config.get("PUSH_KEY").startswith("sctp"):
+        url = f'https://{push_config.get("PUSH_KEY")}.push.ft07.com/send'
     else:
         url = f'https://sctapi.ftqq.com/{push_config.get("PUSH_KEY")}.send'
-
     response = requests.post(url, data=data).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
@@ -785,10 +781,19 @@ def chronocat(title: str, content: str) -> None:
                     print(f"QQ群消息:{ids}推送失败！")
 
 
+import base64
+import requests
+
 def ntfy(title: str, content: str) -> None:
     """
     通过 Ntfy 推送消息
     """
+    def encode_rfc2047(text: str) -> str:
+        """将文本编码为符合 RFC 2047 标准的格式"""
+        encoded_bytes = base64.b64encode(text.encode('utf-8'))
+        encoded_str = encoded_bytes.decode('utf-8')
+        return f'=?utf-8?B?{encoded_str}?='
+
     if not push_config.get("NTFY_TOPIC"):
         print("ntfy 服务的 NTFY_TOPIC 未设置!!\n取消推送")
         return
@@ -798,18 +803,22 @@ def ntfy(title: str, content: str) -> None:
         print("ntfy 服务的NTFY_PRIORITY 未设置!!默认设置为3")
     else:
         priority = push_config.get("NTFY_PRIORITY")
-    data = (title + "\n" +content).encode(encoding='utf-8')
+    
+    # 使用 RFC 2047 编码 title
+    encoded_title = encode_rfc2047(title)
+
+    data = content.encode(encoding='utf-8')
     headers = {
-        "Title": "qinglong",
+        "Title": encoded_title,  # 使用编码后的 title
         "Priority": priority
     }
+    
     url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
     response = requests.post(url, data=data, headers=headers)
-
-    if response["code"] == 200:
+    if response.status_code == 200:  # 使用 response.status_code 进行检查
         print("Ntfy 推送成功！")
     else:
-        print("Ntfy 推送失败！错误信息：", response)
+        print("Ntfy 推送失败！错误信息：", response.text)
 
 def parse_headers(headers):
     if not headers:
