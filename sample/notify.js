@@ -1195,14 +1195,19 @@ function webhookNotify(text, desp) {
 }
 
 function ntfyNotify(text, desp) {
+  function encodeRFC2047(text) {
+    const encodedBase64 = Buffer.from(text).toString('base64');
+    return `=?utf-8?B?${encodedBase64}?=`;
+  }
+
   return new Promise((resolve) => {
     const { NTFY_URL, NTFY_TOPIC, NTFY_PRIORITY } = push_config;
     if (NTFY_TOPIC) {
       const options = {
-        url: NTFY_URL || `https://ntfy.sh`,
-        body: `${desp}\n${text}`,
+        url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
+        body: `${desp}`, 
         headers: {
-          'Title': 'qinglong',
+          'Title': `${encodeRFC2047(text)}`,
           'Priority': NTFY_PRIORITY || '3'
         },
         timeout,
@@ -1212,7 +1217,7 @@ function ntfyNotify(text, desp) {
           if (err) {
             console.log('Ntfy 通知调用API失败😞\n', err);
           } else {
-            if (data.success) {
+            if (data.id) {
               console.log('Ntfy 发送通知消息成功🎉\n');
             } else {
               console.log(`Ntfy 发送通知消息异常 ${JSON.stringify(data)}`);
@@ -1229,6 +1234,7 @@ function ntfyNotify(text, desp) {
     }
   });
 }
+
 
 function parseString(input, valueFormatFn) {
   const regex = /(\w+):\s*((?:(?!\n\w+:).)*)/g;
