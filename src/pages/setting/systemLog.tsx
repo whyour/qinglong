@@ -1,3 +1,4 @@
+import intl from 'react-intl-universal';
 import React, { useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { Button, DatePicker, Empty, message, Spin } from 'antd';
@@ -9,6 +10,13 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { useRequest } from 'ahooks';
 import moment from 'moment';
+import {
+  systemLogDebugHighlightPlugin,
+  systemLogErrorHighlightPlugin,
+  systemLogInfoHighlightPlugin,
+  systemLogTheme,
+  systemLogWarnHighlightPlugin,
+} from '@/utils/codemirror/systemLog';
 
 const { RangePicker } = DatePicker;
 
@@ -83,7 +91,7 @@ const SystemLog = ({ height, theme }: any) => {
             deleteLog();
           }}
         >
-          清空日志
+          {intl.get('清空日志')}
         </Button>
       </div>
       {systemLogData ? (
@@ -94,6 +102,13 @@ const SystemLog = ({ height, theme }: any) => {
             onCreateEditor={(view) => {
               editorRef.current = view;
             }}
+            extensions={[
+              systemLogDebugHighlightPlugin,
+              systemLogErrorHighlightPlugin,
+              systemLogInfoHighlightPlugin,
+              systemLogWarnHighlightPlugin,
+              systemLogTheme,
+            ]}
             readOnly={true}
             theme={theme.includes('dark') ? 'dark' : 'light'}
           />
