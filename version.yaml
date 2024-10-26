@@ -1,8 +1,11 @@
-version: 2.17.11
+version: 2.17.12
 changeLogLink: https://t.me/jiao_long/422
-publishTime: 2024-09-13 23:00
+publishTime: 2024-10-26 15:30
 changeLog: |
-  1. 修复无法获取设置的环境变量 PYTHONPATH 和 NODE_OPTIONS
-  2. 修复定时任务视图过多时，无法看到视图管理
-  3. 修复自定义通知 json 解析
-  4. 修复可能产生目录遍历攻击 API
+  1. 定时任务支持复制
+  2. 增加 ntfy 通知
+  3. 适配Server酱APP分支（Server酱³），移除已废弃的旧版api入口
+  4. 修复任务命令带有 -m 参数时，日志目录生成异常
+  5. 修复登录日志无法自动保存
+  6. 移除任务执行前后的脚本参数
+  7. 定时任务外漏视图改为 10 个
