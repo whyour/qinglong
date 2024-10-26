@@ -62,6 +62,7 @@ import { noop, omit } from 'lodash';
 
 const { Text, Paragraph, Link } = Typography;
 const { Search } = Input;
+const SHOW_TAB_COUNT = 10;
 
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
@@ -805,7 +806,7 @@ const Crontab = () => {
 
   useEffect(() => {
     if (viewConf && enabledCronViews && enabledCronViews.length > 0) {
-      const view = enabledCronViews.slice(4).find((x) => x.id === viewConf.id);
+      const view = enabledCronViews.slice(SHOW_TAB_COUNT).find((x) => x.id === viewConf.id);
       setMoreMenuActive(!!view);
     }
   }, [viewConf, enabledCronViews]);
@@ -835,7 +836,7 @@ const Crontab = () => {
       viewAction(key);
     },
     items: [
-      ...[...enabledCronViews].slice(4).map((x) => ({
+      ...[...enabledCronViews].slice(SHOW_TAB_COUNT).map((x) => ({
         label: (
           <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>{x.name}</span>
@@ -955,7 +956,7 @@ const Crontab = () => {
         }
         onTabClick={tabClick}
         items={[
-          ...[...enabledCronViews].slice(0, 4).map((x) => ({
+          ...[...enabledCronViews].slice(0, SHOW_TAB_COUNT).map((x) => ({
             key: x.id,
             label: x.name,
           })),
