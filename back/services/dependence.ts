@@ -231,13 +231,13 @@ export default class DependenceService {
         const isPythonDependence = dependency.type === DependenceTypes.python3;
         const osType = await detectOS();
         let linuxCommand = {} as typeof LINUX_DEPENDENCE_COMMAND.Alpine;
+        taskLimit.removeQueuedDependency(dependency);
         if (isLinuxDependence) {
           if (!osType) {
             return resolve(null);
           }
           linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
         }
-        taskLimit.removeQueuedDependency(dependency);
 
         const depIds = [dependency.id!];
         const status = isInstall
