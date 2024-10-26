@@ -662,7 +662,7 @@ async function _updateLinuxMirror(
   let filePath: string, currentDomainWithScheme: string | null;
   switch (osType) {
     case 'Debian':
-      filePath = '/etc/apt/sources.list';
+      filePath = '/etc/apt/sources.list.d/debian.sources';
       currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
       if (currentDomainWithScheme) {
         await replaceDomainInFile(
@@ -675,7 +675,7 @@ async function _updateLinuxMirror(
         throw Error(`Current mirror domain not found.`);
       }
     case 'Ubuntu':
-      filePath = '/etc/apt/sources.list';
+      filePath = '/etc/apt/sources.list.d/ubuntu.sources';
       currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
       if (currentDomainWithScheme) {
         await replaceDomainInFile(
