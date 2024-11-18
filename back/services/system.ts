@@ -402,7 +402,7 @@ export default class SystemService {
   public async exportData(res: Response) {
     try {
       await promiseExec(
-        `cd ${config.rootPath} && tar -zcvf ${config.dataTgzFile} data/`,
+        `cd ${config.dataPath} && cd ../ && tar -zcvf ${config.dataTgzFile} data/`,
       );
       res.download(config.dataTgzFile);
     } catch (error: any) {
