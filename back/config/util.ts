@@ -145,12 +145,14 @@ export function getPlatform(userAgent: string): 'mobile' | 'desktop' {
     system = 'android'; // android系统
   } else if (testUa(/ios|iphone|ipad|ipod|iwatch/g)) {
     system = 'ios'; // ios系统
+  } else if (testUa(/openharmony/g)) {
+    system = 'openharmony'; // openharmony系统
   }
 
   let platform = 'desktop';
   if (system === 'windows' || system === 'macos' || system === 'linux') {
     platform = 'desktop';
-  } else if (system === 'android' || system === 'ios' || testUa(/mobile/g)) {
+  } else if (system === 'android' || system === 'ios' || system === 'openharmony' || testUa(/mobile/g)) {
     platform = 'mobile';
   }
 
