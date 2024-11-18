@@ -414,7 +414,7 @@ export default class SystemService {
     try {
       await promiseExec(`rm -rf ${path.join(config.tmpPath, 'data')}`);
       const res = await promiseExec(
-        `cd ${config.tmpPath} && tar -zxvf data.tgz`,
+        `cd ${config.tmpPath} && tar -zxvf ${config.dataTgzFile}`,
       );
       return { code: 200, data: res };
     } catch (error: any) {

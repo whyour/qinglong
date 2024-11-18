@@ -126,7 +126,7 @@ curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 npm install -g node-pre-gyp pnpm@8.3.1
 npm install -g @whyour/qinglong
 qinglong
-# Add the environment variables QL_DIR and QL_DATA_DIR when prompted
+# Add the environment variables QL_DIR and QL_DATA_DIR when prompted, QL_DATA_DIR must end with /data.
 export QL_DIR=""
 export QL_DATA_DIR=""
 # Run again
