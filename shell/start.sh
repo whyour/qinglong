@@ -23,7 +23,12 @@ if [[ ! $QL_DIR ]]; then
 fi
 
 if [[ ! $QL_DATA_DIR ]]; then
-  echo -e "请先手动设置数据存储目录 export QL_DATA_DIR 环境变量，目录必须以斜杠开头的绝对路径，并手动添加到系统环境变量"
+  echo -e "请先手动设置数据存储目录 export QL_DATA_DIR 环境变量，目录必须以斜杠开头的绝对路径，并且以 /data 结尾，例如 /ql/data 并手动添加到系统环境变量"
+  exit 1
+fi
+
+if [[ $QL_DATA_DIR != */data ]]; then
+  echo -e "QL_DATA_DIR 必须以 /data 结尾，例如 /ql/data，如果有历史数据，请新建 data 目录，把历史数据放到 data 目录中"
   exit 1
 fi
 
