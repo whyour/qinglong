@@ -33,7 +33,7 @@ def print(text, *args, **kw):
 # 通知服务
 # fmt: off
 push_config = {
-    'HITOKOTO': True,                  # 启用一言（随机句子）
+    'HITOKOTO': True,                   # 启用一言（随机句子）
 
     'BARK_PUSH': '',                    # bark IP 或设备码，例：https://api.day.app/DxHcxxxxxRxxxxxxcm/
     'BARK_ARCHIVE': '',                 # bark 推送是否存档
@@ -43,7 +43,7 @@ push_config = {
     'BARK_LEVEL': '',                   # bark 推送时效性
     'BARK_URL': '',                     # bark 推送跳转URL
 
-    'CONSOLE': False,                    # 控制台输出
+    'CONSOLE': False,                   # 控制台输出
 
     'DD_BOT_SECRET': '',                # 钉钉机器人的 DD_BOT_SECRET
     'DD_BOT_TOKEN': '',                 # 钉钉机器人的 DD_BOT_TOKEN
@@ -77,7 +77,7 @@ push_config = {
 
     'WE_PLUS_BOT_TOKEN': '',            # 微加机器人的用户令牌
     'WE_PLUS_BOT_RECEIVER': '',         # 微加机器人的消息接收者
-    'WE_PLUS_BOT_VERSION': 'pro',          # 微加机器人的调用版本
+    'WE_PLUS_BOT_VERSION': 'pro',       # 微加机器人的调用版本
 
     'QMSG_KEY': '',                     # qmsg 酱的 QMSG_KEY
     'QMSG_TYPE': '',                    # qmsg 酱的 QMSG_TYPE
@@ -817,7 +817,7 @@ def ntfy(title: str, content: str) -> None:
         print("ntfy 服务的NTFY_PRIORITY 未设置!!默认设置为3")
     else:
         priority = push_config.get("NTFY_PRIORITY")
-    
+
     # 使用 RFC 2047 编码 title
     encoded_title = encode_rfc2047(title)
 
@@ -826,7 +826,7 @@ def ntfy(title: str, content: str) -> None:
         "Title": encoded_title,  # 使用编码后的 title
         "Priority": priority
     }
-    
+
     url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
     response = requests.post(url, data=data, headers=headers)
     if response.status_code == 200:  # 使用 response.status_code 进行检查
@@ -1020,7 +1020,7 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
             print(f"{title} 在SKIP_PUSH_TITLE环境变量内，跳过推送！")
             return
 
-    hitokoto = push_config.get("HITOKOTO")
+    hitokoto = push_config.get("HITOKOTO", "false")
     content += "\n\n" + one() if hitokoto != "false" else ""
 
     notify_function = add_notify_function()
