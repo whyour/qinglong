@@ -3,7 +3,7 @@ const got = require('got');
 const timeout = 15000;
 
 const push_config = {
-  HITOKOTO: true, // 启用一言（随机句子）
+  HITOKOTO: false, // 启用一言（随机句子）
 
   BARK_PUSH: '', // bark IP 或设备码，例：https://api.day.app/DxHcxxxxxRxxxxxxcm/
   BARK_ARCHIVE: '', // bark 推送是否存档
@@ -1205,7 +1205,7 @@ function ntfyNotify(text, desp) {
     if (NTFY_TOPIC) {
       const options = {
         url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
-        body: `${desp}`, 
+        body: `${desp}`,
         headers: {
           'Title': `${encodeRFC2047(text)}`,
           'Priority': NTFY_PRIORITY || '3'
@@ -1339,7 +1339,7 @@ async function sendNotify(text, desp, params = {}) {
     }
   }
 
-  if (push_config.HITOKOTO !== 'false') {
+  if (push_config.HITOKOTO && String(push_config.HITOKOTO).toLowerCase() !== 'false') {
     desp += '\n\n' + (await one());
   }
 
