@@ -964,8 +964,8 @@ function fsBotNotify(text, desp) {
 }
 
 async function smtpNotify(text, desp) {
-  const { SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVICE, SMTP_NAME } = push_config;
-  if (![SMTP_EMAIL, SMTP_PASSWORD].every(Boolean) || !SMTP_SERVICE) {
+  const { SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVICE, SMTP_NAME, SMTP_EMAIL_TO, SMTP_NAME_TO } = push_config;
+  if (!SMTP_EMAIL || !SMTP_PASSWORD || !SMTP_SERVICE) {
     return;
   }
 
@@ -979,10 +979,24 @@ async function smtpNotify(text, desp) {
       },
     });
 
-    const addr = SMTP_NAME ? `"${SMTP_NAME}" <${SMTP_EMAIL}>` : SMTP_EMAIL;
+    const fromAddr = SMTP_NAME ? `"${SMTP_NAME}" <${SMTP_EMAIL}>` : SMTP_EMAIL;
+
+    let toAddr;
+    if (SMTP_EMAIL_TO) {
+      // 处理多个收件人
+      const emailTos = SMTP_EMAIL_TO.split(',');
+      const nameTos = (SMTP_NAME_TO || "").split(',');
+      toAddr = emailTos.map((email, index) => {
+        const name = nameTos[index] || "";
+        return name ? `"${name}" <${email}>` : email;
+      });
+    } else {
+      toAddr = fromAddr;
+    }
+
     const info = await transporter.sendMail({
-      from: addr,
-      to: addr,
+      from: fromAddr,
+      to: toAddr,
       subject: text,
       html: `${desp.replace(/\n/g, '<br/>')}`,
     });
