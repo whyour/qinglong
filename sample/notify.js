@@ -79,9 +79,11 @@ const push_config = {
   AIBOTK_NAME: '', // 智能微秘书  发送群名 或者好友昵称和type要对应好
 
   SMTP_SERVICE: '', // 邮箱服务名称，比如 126、163、Gmail、QQ 等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
-  SMTP_EMAIL: '', // SMTP 收发件邮箱，通知将会由自己发给自己
+  SMTP_EMAIL: '', // SMTP 发件邮箱
   SMTP_PASSWORD: '', // SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
-  SMTP_NAME: '', // SMTP 收发件人姓名，可随意填写
+  SMTP_NAME: '', // SMTP 发件人姓名，可随意填写
+  SMTP_EMAIL_TO: '', //SMTP 收件邮箱，可选，缺省时将自己发给自己，多个收件邮箱逗号间隔
+  SMTP_NAME_TO: '', //SMTP 收件人姓名，可选，可随意填写，多个收件人逗号间隔，顺序与 SMTP_EMAIL_TO 保持一致
 
   PUSHME_KEY: '', // 官方文档：https://push.i-i.me，PushMe 酱的 PUSHME_KEY
 
