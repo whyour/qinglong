@@ -101,9 +101,11 @@ push_config = {
 
     'SMTP_SERVER': '',                  # SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
     'SMTP_SSL': 'false',                # SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
-    'SMTP_EMAIL': '',                   # SMTP 收发件邮箱，通知将会由自己发给自己
+    'SMTP_EMAIL': '',                   # SMTP 发件邮箱
     'SMTP_PASSWORD': '',                # SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
-    'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
+    'SMTP_NAME': '',                    # SMTP 发件人姓名，可随意填写
+    'SMTP_EMAIL_TO': '',                # SMTP 收件邮箱，可选，缺省时将自己发给自己，多个收件邮箱逗号间隔
+    'SMTP_NAME_TO': '',                 # SMTP 收件人姓名，可选，可随意填写，多个收件人逗号间隔，顺序与 SMTP_EMAIL_TO 保持一致
 
     'PUSHME_KEY': '',                   # PushMe 的 PUSHME_KEY
     'PUSHME_URL': '',                   # PushMe 的 PUSHME_URL
@@ -679,12 +681,23 @@ def smtp(title: str, content: str) -> None:
             push_config.get("SMTP_EMAIL"),
         )
     )
-    message["To"] = formataddr(
-        (
-            Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
-            push_config.get("SMTP_EMAIL"),
+    if  not push_config.get("SMTP_EMAIL_TO"):
+        smtp_email_to = push_config.get("SMTP_EMAIL")
+        message["To"] = formataddr(
+            (
+                Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
+                push_config.get("SMTP_EMAIL"),
+            )
         )
-    )
+    else:
+        smtp_email_to = push_config.get("SMTP_EMAIL_TO").split(",")
+        smtp_name_to = push_config.get("SMTP_NAME_TO","").split(",")
+        message["To"] = ",".join([formataddr(
+            (
+                Header(smtp_name_to[i] if len(smtp_name_to) > i else "", "utf-8").encode(),
+                email_to,
+            )
+        ) for i, email_to in enumerate(smtp_email_to)])
     message["Subject"] = Header(title, "utf-8")
 
     try:
@@ -698,7 +711,7 @@ def smtp(title: str, content: str) -> None:
         )
         smtp_server.sendmail(
             push_config.get("SMTP_EMAIL"),
-            push_config.get("SMTP_EMAIL"),
+            smtp_email_to,
             message.as_bytes(),
         )
         smtp_server.close()
