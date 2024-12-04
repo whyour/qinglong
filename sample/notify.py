@@ -72,8 +72,13 @@ push_config = {
     'CHAT_URL': '',                     # synology chat url
     'CHAT_TOKEN': '',                   # synology chat token
 
-    'PUSH_PLUS_TOKEN': '',              # push+ 微信推送的用户令牌
-    'PUSH_PLUS_USER': '',               # push+ 微信推送的群组编码
+    'PUSH_PLUS_TOKEN': '',              # pushplus 推送的用户令牌
+    'PUSH_PLUS_USER': '',               # pushplus 推送的群组编码
+    'PUSH_PLUS_TEMPLATE': 'html',       # pushplus 发送模板，支持html,txt,json,markdown,cloudMonitor,jenkins,route,pay
+    'PUSH_PLUS_CHANNEL': 'wechat',      # pushplus 发送渠道，支持wechat,webhook,cp,mail,sms
+    'PUSH_PLUS_WEBHOOK': '',            # pushplus webhook编码，可在pushplus公众号上扩展配置出更多渠道
+    'PUSH_PLUS_CALLBACKURL': '',        # pushplus 发送结果回调地址，会把推送最终结果通知到这个地址上
+    'PUSH_PLUS_TO': '',                 # pushplus 好友令牌，微信公众号渠道填写好友令牌，企业微信渠道填写企业微信用户id
 
     'WE_PLUS_BOT_TOKEN': '',            # 微加机器人的用户令牌
     'WE_PLUS_BOT_RECEIVER': '',         # 微加机器人的消息接收者
@@ -364,26 +369,35 @@ def chat(title: str, content: str) -> None:
 
 def pushplus_bot(title: str, content: str) -> None:
     """
-    通过 push+ 推送消息。
+    通过 pushplus 推送消息。
     """
     if not push_config.get("PUSH_PLUS_TOKEN"):
         print("PUSHPLUS 服务的 PUSH_PLUS_TOKEN 未设置!!\n取消推送")
         return
     print("PUSHPLUS 服务启动")
 
-    url = "http://www.pushplus.plus/send"
+    url = "https://www.pushplus.plus/send"
     data = {
         "token": push_config.get("PUSH_PLUS_TOKEN"),
         "title": title,
         "content": content,
         "topic": push_config.get("PUSH_PLUS_USER"),
+        "template": push_config.get("PUSH_PLUS_TEMPLATE"),
+        "channel": push_config.get("PUSH_PLUS_CHANNEL"),
+        "webhook": push_config.get("PUSH_PLUS_WEBHOOK"),
+        "callbackUrl": push_config.get("PUSH_PLUS_CALLBACKURL"),
+        "to": push_config.get("PUSH_PLUS_TO")
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
     response = requests.post(url=url, data=body, headers=headers).json()
 
-    if response["code"] == 200:
-        print("PUSHPLUS 推送成功！")
+    code = response["code"]
+    if code == 200:
+        print("PUSHPLUS 推送请求成功，可根据流水号查询推送结果:"+ response["data"])
+        print("注意：请求成功并不代表推送成功，如未收到消息，请到pushplus官网使用流水号查询推送最终结果")
+    elif code == 900 or code == 903 or code == 905 or code == 999 :
+        print(response["msg"])
 
     else:
         url_old = "http://pushplus.hxtrip.com/send"

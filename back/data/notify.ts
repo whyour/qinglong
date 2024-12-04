@@ -100,6 +100,11 @@ export class IGotNotification extends NotificationBaseInfo {
 export class PushPlusNotification extends NotificationBaseInfo {
   public pushPlusToken = '';
   public pushPlusUser = '';
+  public pushPlusTemplate = '';
+  public pushplusChannel = '';
+  public pushplusWebhook = '';
+  public pushplusCallbackUrl = '';
+  public pushplusTo = '';
 }
 
 export class WePlusBotNotification extends NotificationBaseInfo {
