@@ -99,6 +99,12 @@ const push_config = {
   NTFY_URL: '', // ntfy地址,如https://ntfy.sh,默认为https://ntfy.sh
   NTFY_TOPIC: '', // ntfy的消息应用topic
   NTFY_PRIORITY: '3', // 推送消息优先级,默认为3
+
+  // 官方文档: https://wxpusher.zjiecode.com/docs/
+  // 管理后台: https://wxpusher.zjiecode.com/admin/
+  WXPUSHER_APP_TOKEN: '', // wxpusher 的 appToken
+  WXPUSHER_TOPIC_IDS: '', // wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+  WXPUSHER_UIDS: '', // wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
 };
 
 for (const key in push_config) {
@@ -1235,6 +1241,71 @@ function ntfyNotify(text, desp) {
   });
 }
 
+function wxPusherNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { WXPUSHER_APP_TOKEN, WXPUSHER_TOPIC_IDS, WXPUSHER_UIDS } = push_config;
+    if (WXPUSHER_APP_TOKEN) {
+      // 处理topic_ids，将分号分隔的字符串转为数组
+      const topicIds = WXPUSHER_TOPIC_IDS ? WXPUSHER_TOPIC_IDS.split(';')
+        .map(id => id.trim())
+        .filter(id => id)
+        .map(id => parseInt(id)) : [];
+
+      // 处理uids，将分号分隔的字符串转为数组
+      const uids = WXPUSHER_UIDS ? WXPUSHER_UIDS.split(';')
+        .map(uid => uid.trim())
+        .filter(uid => uid) : [];
+
+      // topic_ids uids 至少有一个
+      if (!topicIds.length && !uids.length) {
+        console.log("wxpusher 服务的 WXPUSHER_TOPIC_IDS 和 WXPUSHER_UIDS 至少设置一个!!\n取消推送");
+        return resolve();
+      }
+
+      const body = {
+        appToken: WXPUSHER_APP_TOKEN,
+        content: `<h1>${text}</h1><br/><div style='white-space: pre-wrap;'>${desp}</div>`,
+        summary: text,
+        contentType: 2,
+        topicIds: topicIds,
+        uids: uids,
+        verifyPayType: 0
+      };
+
+      const options = {
+        url: 'https://wxpusher.zjiecode.com/api/send/message',
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout
+      };
+
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('wxpusher发送通知消息失败！\n', err);
+          } else {
+            data = JSON.parse(data);
+            if (data.code === 1000) {
+              console.log('wxpusher发送通知消息完成！');
+            } else {
+              console.log(`wxpusher发送通知消息异常：${data.msg}`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    } else {
+      console.log('wxpusher 服务的 WXPUSHER_APP_TOKEN 未设置!!\n取消推送');
+      resolve();
+    }
+  });
+}
+
 
 function parseString(input, valueFormatFn) {
   const regex = /(\w+):\s*((?:(?!\n\w+:).)*)/g;
@@ -1365,6 +1436,7 @@ async function sendNotify(text, desp, params = {}) {
     webhookNotify(text, desp), // 自定义通知
     qmsgNotify(text, desp), // 自定义通知
     ntfyNotify(text, desp), // Ntfy
+    wxPusherNotify(text, desp), // wxpusher
   ]);
 }
 
