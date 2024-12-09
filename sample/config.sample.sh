@@ -220,8 +220,17 @@ export NTFY_URL=""
 export NTFY_TOPIC=""
 export NTFY_PRIORITY="3"
 
+## 21. wxPusher
+## 官方文档: https://wxpusher.zjiecode.com/docs/
+## 管理后台: https://wxpusher.zjiecode.com/admin/
+## wxPusher 的 appToken
+export WXPUSHER_APP_TOKEN=""
+## wxPusher 的 topicIds，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+export WXPUSHER_TOPIC_IDS=""
+## wxPusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+export WXPUSHER_UIDS=""
 
-## 21. 自定义通知
+## 22. 自定义通知
 ## 自定义通知 接收回调的URL
 export WEBHOOK_URL=""
 ## WEBHOOK_BODY 和 WEBHOOK_HEADERS 多个参数时，直接换行或者使用 $'\n' 连接多行字符串，比如 export dd="line 1"$'\n'"line 2"
