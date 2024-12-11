@@ -43,19 +43,12 @@ export default defineConfig({
       }),
     );
   }) as any,
-  externals: {
-    react: 'window.React',
-    'react-dom': 'window.ReactDOM',
-  },
-  headScripts: [
-    `./api/env.js`,
-    'https://gw.alipayobjects.com/os/lib/react/18.2.0/umd/react.production.min.js',
-    'https://gw.alipayobjects.com/os/lib/react-dom/18.2.0/umd/react-dom.production.min.js',
-  ],
+  headScripts: [`./api/env.js`],
   copy: [
     {
       from: 'node_modules/monaco-editor/min/vs',
       to: 'static/dist/monaco-editor/min/vs',
     },
   ],
+  npmClient: 'pnpm',
 });

@@ -2,7 +2,7 @@ import bodyParser from 'body-parser';
 import { errors } from 'celebrate';
 import cors from 'cors';
 import { Application, NextFunction, Request, Response } from 'express';
-import jwt from 'express-jwt';
+import { expressjwt } from 'express-jwt';
 import Container from 'typedi';
 import config from '../config';
 import SystemService from '../services/system';
@@ -16,7 +16,7 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   app.use(
-    jwt({
+    expressjwt({
       secret: config.secret,
       algorithms: ['HS384'],
     }),

@@ -3,7 +3,7 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import routes from '../api';
 import config from '../config';
-import jwt, { UnauthorizedError } from 'express-jwt';
+import { UnauthorizedError, expressjwt } from 'express-jwt';
 import fs from 'fs/promises';
 import { getPlatform, getToken, safeJSONParse } from '../config/util';
 import Container from 'typedi';
@@ -29,7 +29,7 @@ export default ({ app }: { app: Application }) => {
       target: `http://0.0.0.0:${config.publicPort}/api`,
       changeOrigin: true,
       pathRewrite: { '/api/public': '' },
-      logProvider: () => Logger,
+      logger: Logger,
     }),
   );
 
@@ -37,7 +37,7 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   app.use(
-    jwt({
+    expressjwt({
       secret: config.secret,
       algorithms: ['HS384'],
     }).unless({

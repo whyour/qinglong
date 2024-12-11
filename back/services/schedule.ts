@@ -214,7 +214,7 @@ export default class ScheduleService {
     const job = new LongIntervalJob(
       { runImmediately: false, ...schedule },
       task,
-      _id,
+      { id: _id },
     );
 
     this.intervalSchedule.addIntervalJob(job);
