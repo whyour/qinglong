@@ -1286,7 +1286,6 @@ function wxPusherNotify(text, desp) {
           if (err) {
             console.log('wxpusher发送通知消息失败！\n', err);
           } else {
-            data = JSON.parse(data);
             if (data.code === 1000) {
               console.log('wxpusher发送通知消息完成！');
             } else {
