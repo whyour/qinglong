@@ -126,6 +126,10 @@ push_config = {
     'NTFY_URL': '',                     # ntfy地址,如https://ntfy.sh
     'NTFY_TOPIC': '',                   # ntfy的消息应用topic
     'NTFY_PRIORITY':'3',                # 推送消息优先级,默认为3
+
+    'WXPUSHER_APP_TOKEN': '',           # wxpusher 的 appToken 官方文档: https://wxpusher.zjiecode.com/docs/ 管理后台: https://wxpusher.zjiecode.com/admin/
+    'WXPUSHER_TOPIC_IDS': '',           # wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+    'WXPUSHER_UIDS': '',                # wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
 }
 # fmt: on
 
@@ -835,6 +839,57 @@ def ntfy(title: str, content: str) -> None:
     else:
         print("Ntfy 推送失败！错误信息：", response.text)
 
+
+def wxpusher_bot(title: str, content: str) -> None:
+    """
+    通过 wxpusher 推送消息。
+    支持的环境变量:
+    - WXPUSHER_APP_TOKEN: appToken
+    - WXPUSHER_TOPIC_IDS: 主题ID, 多个用英文分号;分隔
+    - WXPUSHER_UIDS: 用户ID, 多个用英文分号;分隔
+    """
+    if not push_config.get("WXPUSHER_APP_TOKEN"):
+        print("wxpusher 服务的 WXPUSHER_APP_TOKEN 未设置!!\n取消推送")
+        return
+    
+
+    url = "https://wxpusher.zjiecode.com/api/send/message"
+    
+    # 处理topic_ids和uids，将分号分隔的字符串转为数组
+    topic_ids = []
+    if push_config.get("WXPUSHER_TOPIC_IDS"):
+        topic_ids = [int(id.strip()) for id in push_config.get("WXPUSHER_TOPIC_IDS").split(";") if id.strip()]
+    
+    uids = []
+    if push_config.get("WXPUSHER_UIDS"):
+        uids = [uid.strip() for uid in push_config.get("WXPUSHER_UIDS").split(";") if uid.strip()]
+
+    # topic_ids uids 至少有一个
+    if not topic_ids and not uids:
+        print("wxpusher 服务的 WXPUSHER_TOPIC_IDS 和 WXPUSHER_UIDS 至少设置一个!!\n取消推送")
+        return
+
+    print("wxpusher 服务启动")
+
+    data = {
+        "appToken": push_config.get("WXPUSHER_APP_TOKEN"),
+        "content": f"<h1>{title}</h1><br/><div style='white-space: pre-wrap;'>{content}</div>",
+        "summary": title,
+        "contentType": 2,
+        "topicIds": topic_ids,
+        "uids": uids,
+        "verifyPayType": 0
+    }
+    
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, json=data, headers=headers).json()
+
+    if response.get("code") == 1000:
+        print("wxpusher 推送成功！")
+    else:
+        print(f"wxpusher 推送失败！错误信息：{response.get('msg')}")
+
+
 def parse_headers(headers):
     if not headers:
         return {}
@@ -997,6 +1052,8 @@ def add_notify_function():
         notify_function.append(custom_notify)
     if push_config.get("NTFY_TOPIC"):
         notify_function.append(ntfy)
+    if push_config.get("WXPUSHER_APP_TOKEN") and (push_config.get("WXPUSHER_TOPIC_IDS") or push_config.get("WXPUSHER_UIDS")):
+        notify_function.append(wxpusher_bot)
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
     return notify_function

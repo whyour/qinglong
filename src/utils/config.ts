@@ -97,6 +97,7 @@ export default {
     { value: 'iGot', label: 'IGot' },
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'wePlusBot', label: intl.get('微加机器人') },
+    { value: 'wxPusherBot', label: 'wxPusher' },
     { value: 'chat', label: intl.get('群晖chat') },
     { value: 'email', label: intl.get('邮箱') },
     { value: 'lark', label: intl.get('飞书机器人') },
@@ -376,6 +377,23 @@ export default {
         tip: intl.get(
           '调用版本；专业版填写pro，个人版填写personal，为空默认使用专业版',
         ),
+      },
+    ],
+    wxPusherBot: [
+      {
+        label: 'wxPusherBotAppToken',
+        tip: intl.get('wxPusherBot的appToken'),
+        required: true,
+      },
+      {
+        label: 'wxPusherBotTopicIds',
+        tip: intl.get('wxPusherBot的topicIds'),
+        required: false,
+      },
+      {
+        label: 'wxPusherBotUids',
+        tip: intl.get('wxPusherBot的uids'),
+        required: false,
       },
     ],
     lark: [

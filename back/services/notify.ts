@@ -36,6 +36,7 @@ export default class NotificationService {
     ['lark', this.lark],
     ['chronocat', this.chronocat],
     ['ntfy', this.ntfy],
+    ['wxPusherBot', this.wxPusherBot],
   ]);
 
   private title = '';
@@ -693,6 +694,51 @@ export default class NotificationService {
           }
     } catch (error: any) {
         throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  private async wxPusherBot() {
+    const { wxPusherBotAppToken, wxPusherBotTopicIds, wxPusherBotUids } = this.params;
+    // 处理 topicIds，将分号分隔的字符串转为数组
+    const topicIds = wxPusherBotTopicIds ? wxPusherBotTopicIds.split(';')
+      .map(id => id.trim())
+      .filter(id => id)
+      .map(id => parseInt(id)) : [];
+
+    // 处理 uids，将分号分隔的字符串转为数组  
+    const uids = wxPusherBotUids ? wxPusherBotUids.split(';')
+      .map(uid => uid.trim())
+      .filter(uid => uid) : [];
+
+    // topic_ids 和 uids 至少要有一个
+    if (!topicIds.length && !uids.length) {
+      throw new Error('wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行');
+    }
+
+    const url = `https://wxpusher.zjiecode.com/api/send/message`;
+    try {
+      const res: any = await got
+        .post(url, {
+          ...this.gotOption,
+          json: {
+            appToken: wxPusherBotAppToken,
+            content: `<h1>${this.title}</h1><br/><div style='white-space: pre-wrap;'>${this.content}</div>`,
+            summary: this.title,
+            contentType: 2,
+            topicIds: topicIds,
+            uids: uids,
+            verifyPayType: 0
+          },
+        })
+        .json();
+
+      if (res.code === 1000) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
     }
   }
 
