@@ -43,12 +43,11 @@ const push_config = {
   // 官方文档：https://www.pushplus.plus/
   PUSH_PLUS_TOKEN: '', // pushplus 推送的用户令牌
   PUSH_PLUS_USER: '', // pushplus 推送的群组编码
-  PUSH_PLUS_TEMPLATE: 'html',       // pushplus 发送模板，支持html,txt,json,markdown,cloudMonitor,jenkins,route,pay
-  PUSH_PLUS_CHANNEL: 'wechat',      // pushplus 发送渠道，支持wechat,webhook,cp,mail,sms
-  PUSH_PLUS_WEBHOOK: '',            // pushplus webhook编码，可在pushplus公众号上扩展配置出更多渠道
-  PUSH_PLUS_CALLBACKURL: '',        // pushplus 发送结果回调地址，会把推送最终结果通知到这个地址上
-  PUSH_PLUS_TO: '',                // pushplus 好友令牌，微信公众号渠道填写好友令牌，企业微信渠道填写企业微信用户id
-
+  PUSH_PLUS_TEMPLATE: 'html', // pushplus 发送模板，支持html,txt,json,markdown,cloudMonitor,jenkins,route,pay
+  PUSH_PLUS_CHANNEL: 'wechat', // pushplus 发送渠道，支持wechat,webhook,cp,mail,sms
+  PUSH_PLUS_WEBHOOK: '', // pushplus webhook编码，可在pushplus公众号上扩展配置出更多渠道
+  PUSH_PLUS_CALLBACKURL: '', // pushplus 发送结果回调地址，会把推送最终结果通知到这个地址上
+  PUSH_PLUS_TO: '', // pushplus 好友令牌，微信公众号渠道填写好友令牌，企业微信渠道填写企业微信用户id
 
   // 微加机器人，官方网站：https://www.weplusbot.com/
   WE_PLUS_BOT_TOKEN: '', // 微加机器人的用户令牌
@@ -243,10 +242,13 @@ function serverNotify(text, desp) {
 
       const matchResult = PUSH_KEY.match(/^sctp(\d+)t/i);
       const options = {
-        url: matchResult && matchResult[1]
-        ? `https://${matchResult[1]}.push.ft07.com/send/${PUSH_KEY}.send`
-        : `https://sctapi.ftqq.com/${PUSH_KEY}.send`,
-        body: `text=${encodeURIComponent(text)}&desp=${encodeURIComponent(desp)}`,
+        url:
+          matchResult && matchResult[1]
+            ? `https://${matchResult[1]}.push.ft07.com/send/${PUSH_KEY}.send`
+            : `https://sctapi.ftqq.com/${PUSH_KEY}.send`,
+        body: `text=${encodeURIComponent(text)}&desp=${encodeURIComponent(
+          desp,
+        )}`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -777,7 +779,15 @@ function iGotNotify(text, desp, params = {}) {
 
 function pushPlusNotify(text, desp) {
   return new Promise((resolve) => {
-    const { PUSH_PLUS_TOKEN, PUSH_PLUS_USER, PUSH_PLUS_TEMPLATE, PUSH_PLUS_CHANNEL, PUSH_PLUS_WEBHOOK, PUSH_PLUS_CALLBACKURL, PUSH_PLUS_TO } = push_config;
+    const {
+      PUSH_PLUS_TOKEN,
+      PUSH_PLUS_USER,
+      PUSH_PLUS_TEMPLATE,
+      PUSH_PLUS_CHANNEL,
+      PUSH_PLUS_WEBHOOK,
+      PUSH_PLUS_CALLBACKURL,
+      PUSH_PLUS_TO,
+    } = push_config;
     if (PUSH_PLUS_TOKEN) {
       desp = desp.replace(/[\n\r]/g, '<br>'); // 默认为html, 不支持plaintext
       const body = {
@@ -789,7 +799,7 @@ function pushPlusNotify(text, desp) {
         channel: `${PUSH_PLUS_CHANNEL}`,
         webhook: `${PUSH_PLUS_WEBHOOK}`,
         callbackUrl: `${PUSH_PLUS_CALLBACKURL}`,
-        to: `${PUSH_PLUS_TO}`
+        to: `${PUSH_PLUS_TO}`,
       };
       const options = {
         url: `https://www.pushplus.plus/send`,
@@ -813,7 +823,9 @@ function pushPlusNotify(text, desp) {
               console.log(
                 `pushplus 发送${
                   PUSH_PLUS_USER ? '一对多' : '一对一'
-                }通知请求成功🎉，可根据流水号查询推送结果：${data.data}\n注意：请求成功并不代表推送成功，如未收到消息，请到pushplus官网使用流水号查询推送最终结果`,
+                }通知请求成功🎉，可根据流水号查询推送结果：${
+                  data.data
+                }\n注意：请求成功并不代表推送成功，如未收到消息，请到pushplus官网使用流水号查询推送最终结果`,
               );
             } else {
               console.log(
@@ -1222,10 +1234,10 @@ function ntfyNotify(text, desp) {
     if (NTFY_TOPIC) {
       const options = {
         url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
-        body: `${desp}`, 
+        body: `${desp}`,
         headers: {
-          'Title': `${encodeRFC2047(text)}`,
-          'Priority': NTFY_PRIORITY || '3'
+          Title: `${encodeRFC2047(text)}`,
+          Priority: NTFY_PRIORITY || '3',
         },
         timeout,
       };
@@ -1254,22 +1266,29 @@ function ntfyNotify(text, desp) {
 
 function wxPusherNotify(text, desp) {
   return new Promise((resolve) => {
-    const { WXPUSHER_APP_TOKEN, WXPUSHER_TOPIC_IDS, WXPUSHER_UIDS } = push_config;
+    const { WXPUSHER_APP_TOKEN, WXPUSHER_TOPIC_IDS, WXPUSHER_UIDS } =
+      push_config;
     if (WXPUSHER_APP_TOKEN) {
       // 处理topic_ids，将分号分隔的字符串转为数组
-      const topicIds = WXPUSHER_TOPIC_IDS ? WXPUSHER_TOPIC_IDS.split(';')
-        .map(id => id.trim())
-        .filter(id => id)
-        .map(id => parseInt(id)) : [];
+      const topicIds = WXPUSHER_TOPIC_IDS
+        ? WXPUSHER_TOPIC_IDS.split(';')
+            .map((id) => id.trim())
+            .filter((id) => id)
+            .map((id) => parseInt(id))
+        : [];
 
       // 处理uids，将分号分隔的字符串转为数组
-      const uids = WXPUSHER_UIDS ? WXPUSHER_UIDS.split(';')
-        .map(uid => uid.trim())
-        .filter(uid => uid) : [];
+      const uids = WXPUSHER_UIDS
+        ? WXPUSHER_UIDS.split(';')
+            .map((uid) => uid.trim())
+            .filter((uid) => uid)
+        : [];
 
       // topic_ids uids 至少有一个
       if (!topicIds.length && !uids.length) {
-        console.log("wxpusher 服务的 WXPUSHER_TOPIC_IDS 和 WXPUSHER_UIDS 至少设置一个!!\n取消推送");
+        console.log(
+          'wxpusher 服务的 WXPUSHER_TOPIC_IDS 和 WXPUSHER_UIDS 至少设置一个!!',
+        );
         return resolve();
       }
 
@@ -1280,16 +1299,16 @@ function wxPusherNotify(text, desp) {
         contentType: 2,
         topicIds: topicIds,
         uids: uids,
-        verifyPayType: 0
+        verifyPayType: 0,
       };
 
       const options = {
         url: 'https://wxpusher.zjiecode.com/api/send/message',
         body: JSON.stringify(body),
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        timeout
+        timeout,
       };
 
       $.post(options, (err, resp, data) => {
@@ -1310,12 +1329,10 @@ function wxPusherNotify(text, desp) {
         }
       });
     } else {
-      console.log('wxpusher 服务的 WXPUSHER_APP_TOKEN 未设置!!\n取消推送');
       resolve();
     }
   });
 }
-
 
 function parseString(input, valueFormatFn) {
   const regex = /(\w+):\s*((?:(?!\n\w+:).)*)/g;
