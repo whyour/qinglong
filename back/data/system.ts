@@ -27,6 +27,7 @@ export enum AuthDataType {
   'notification' = 'notification',
   'removeLogFrequency' = 'removeLogFrequency',
   'systemConfig' = 'systemConfig',
+  'authConfig' = 'authConfig',
 }
 
 export interface SystemConfigInfo {
@@ -46,11 +47,31 @@ export interface LoginLogInfo {
   status?: LoginStatus;
 }
 
+export interface AuthInfo {
+  username: string;
+  password: string;
+  retries: number;
+  lastlogon: number;
+  lastip: string;
+  lastaddr: string;
+  platform: string;
+  isTwoFactorChecking: boolean;
+  token: string;
+  tokens: Record<string, string>;
+  twoFactorActivated: boolean;
+  twoFactorActived: boolean;
+  twoFactorSecret: string;
+  avatar: string;
+}
+
 export type SystemModelInfo = SystemConfigInfo &
   Partial<NotificationInfo> &
-  LoginLogInfo;
+  LoginLogInfo &
+  Partial<AuthInfo>;
 
-export interface SystemInstance extends Model<SystemInfo, SystemInfo>, SystemInfo { }
+export interface SystemInstance
+  extends Model<SystemInfo, SystemInfo>,
+    SystemInfo {}
 export const SystemModel = sequelize.define<SystemInstance>('Auth', {
   ip: DataTypes.STRING,
   type: DataTypes.STRING,

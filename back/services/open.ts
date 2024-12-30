@@ -1,19 +1,18 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { createRandomString } from '../config/util';
-import config from '../config';
 import { App, AppModel } from '../data/open';
 import { v4 as uuidV4 } from 'uuid';
 import sequelize, { Op } from 'sequelize';
+import { shareStore } from '../shared/store';
 
 @Service()
 export default class OpenService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  public async findTokenByValue(token: string): Promise<App | null> {
+  public async findApps(): Promise<App[] | null> {
     const docs = await this.find({});
-    const doc = docs.filter((x) => x.tokens?.find((y) => y.value === token));
-    return doc[0];
+    return docs;
   }
 
   public async create(payload: App): Promise<App> {
@@ -34,17 +33,19 @@ export default class OpenService {
       name: payload.name,
       scopes: payload.scopes,
       id: payload.id,
-    } as any);
+    } as App);
     return { ...newDoc, tokens: [] };
   }
 
-  private async updateDb(payload: App): Promise<App> {
+  private async updateDb(payload: Partial<App>): Promise<App> {
     await AppModel.update(payload, { where: { id: payload.id } });
-    return await this.getDb({ id: payload.id });
+    const apps = await this.find({});
+    await shareStore.updateApps(apps);
+    return apps?.find((x) => x.id === payload.id) as App;
   }
 
-  public async getDb(query: any): Promise<App> {
-    const doc: any = await AppModel.findOne({ where: query });
+  public async getDb(query: Record<string, any>): Promise<App> {
+    const doc = await AppModel.findOne({ where: query });
     if (!doc) {
       throw new Error(`App ${JSON.stringify(query)} not found`);
     }
@@ -56,7 +57,7 @@ export default class OpenService {
   }
 
   public async resetSecret(id: number): Promise<App> {
-    const tab: any = {
+    const tab: Partial<App> = {
       client_secret: createRandomString(24, 24),
       tokens: [],
       id,
@@ -74,7 +75,7 @@ export default class OpenService {
   public async list(
     searchText: string = '',
     sort: any = {},
-    query: any = {},
+    query: Record<string, any> = {},
   ): Promise<App[]> {
     let condition = { ...query };
     if (searchText) {
@@ -101,7 +102,7 @@ export default class OpenService {
     }
   }
 
-  private async find(query: any, sort?: any): Promise<App[]> {
+  private async find(query: Record<string, any>, sort?: any): Promise<App[]> {
     const docs = await AppModel.findAll({ where: { ...query } });
     return docs.map((x) => x.get({ plain: true }));
   }

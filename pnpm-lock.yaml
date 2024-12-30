@@ -1,13 +1,15 @@
 lockfileVersion: '6.0'
 
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
+overrides:
+  sqlite3: git+https://github.com/whyour/node-sqlite3.git#v1.0.3
 
 dependencies:
   '@grpc/grpc-js':
     specifier: ^1.12.3
     version: 1.12.3
+  '@keyv/sqlite':
+    specifier: ^4.0.1
+    version: 4.0.1
   '@otplib/preset-default':
     specifier: ^12.0.1
     version: 12.0.1
@@ -74,6 +76,9 @@ dependencies:
   jsonwebtoken:
     specifier: ^9.0.2
     version: 9.0.2
+  keyv:
+    specifier: ^5.2.3
+    version: 5.2.3
   lodash:
     specifier: ^4.17.21
     version: 4.17.21
@@ -2771,6 +2776,23 @@ packages:
 
   /@js-sdsl/ordered-map@4.4.2:
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
+    dev: false
+
+  /@keyv/serialize@1.0.2:
+    resolution: {integrity: sha512-+E/LyaAeuABniD/RvUezWVXKpeuvwLEA9//nE9952zBaOdBd2mQ3pPoM8cUe2X6IcMByfuSLzmYqnYshG60+HQ==}
+    dependencies:
+      buffer: 6.0.3
+    dev: false
+
+  /@keyv/sqlite@4.0.1:
+    resolution: {integrity: sha512-Ngs9jhElXN7efS9WvvCC/p6rXMbihna8eNLVBc421Zf+VcFd+pR4DOcS6yA9V22EKtAy4DEj7LtvEEIm0bb80A==}
+    engines: {node: '>= 18'}
+    dependencies:
+      sqlite3: github.com/whyour/node-sqlite3/3a00af0b5d7603b7f1b290032507320b18a6b741
+    transitivePeerDependencies:
+      - bluebird
+      - encoding
+      - supports-color
     dev: false
 
   /@lezer/common@1.2.3:
@@ -6377,7 +6399,6 @@ packages:
 
   /base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
-    dev: true
 
   /before@0.0.1:
     resolution: {integrity: sha512-1J5SWbkoVJH9DTALN8igB4p+nPKZzPrJ/HomqBDLpfUvDXCdjdBmBUcH5McZfur0lftVssVU6BZug5NYh87zTw==}
@@ -6571,6 +6592,13 @@ packages:
       ieee754: 1.2.1
       isarray: 1.0.0
     dev: true
+
+  /buffer@6.0.3:
+    resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
+    dependencies:
+      base64-js: 1.5.1
+      ieee754: 1.2.1
+    dev: false
 
   /builtin-status-codes@3.0.0:
     resolution: {integrity: sha512-HpGFw18DgFWlncDfjTa2rcQ4W88O1mC8e8yZ2AvQY5KDaktSTwo+KRf6nHK6FRI5FyRyb/5T6+TSxfP7QyGsmQ==}
@@ -9406,7 +9434,6 @@ packages:
 
   /ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
-    dev: true
 
   /ignore-by-default@1.0.1:
     resolution: {integrity: sha512-Ius2VYcGNk7T90CppJqcIkS5ooHUZyIQK+ClZfMfMNFEF9VSE73Fq+906u/CWu92x4gzZMWOwfFYckPObzdEbA==}
@@ -10160,6 +10187,12 @@ packages:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
     dependencies:
       json-buffer: 3.0.1
+
+  /keyv@5.2.3:
+    resolution: {integrity: sha512-AGKecUfzrowabUv0bH1RIR5Vf7w+l4S3xtQAypKaUpTdIR1EbrAcTxHCrpo9Q+IWeUlFE2palRtgIQcgm+PQJw==}
+    dependencies:
+      '@keyv/serialize': 1.0.2
+    dev: false
 
   /kind-of@6.0.3:
     resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
@@ -16141,3 +16174,7 @@ packages:
       - encoding
       - supports-color
     dev: false
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false

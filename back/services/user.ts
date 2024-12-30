@@ -18,6 +18,7 @@ import {
   SystemModel,
   SystemModelInfo,
   LoginStatus,
+  AuthInfo,
 } from '../data/system';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
@@ -28,6 +29,7 @@ import dayjs from 'dayjs';
 import IP2Region from 'ip2region';
 import requestIp from 'request-ip';
 import uniq from 'lodash/uniq';
+import { shareStore } from '../shared/store';
 
 @Service()
 export default class UserService {
@@ -48,161 +50,142 @@ export default class UserService {
     req: Request,
     needTwoFactor = true,
   ): Promise<any> {
-    const _exist = await fileExist(config.authConfigFile);
-    if (!_exist) {
-      return this.initAuthInfo();
-    }
-
     let { username, password } = payloads;
     const content = await this.getAuthInfo();
     const timestamp = Date.now();
-    if (content) {
-      let {
-        username: cUsername,
-        password: cPassword,
-        retries = 0,
-        lastlogon,
-        lastip,
-        lastaddr,
-        twoFactorActivated,
-        twoFactorActived,
-        tokens = {},
-        platform,
-      } = content;
-      // patch old field
-      twoFactorActivated = twoFactorActivated || twoFactorActived;
+    let {
+      username: cUsername,
+      password: cPassword,
+      retries = 0,
+      lastlogon,
+      lastip,
+      lastaddr,
+      twoFactorActivated,
+      twoFactorActived,
+      tokens = {},
+      platform,
+    } = content;
+    // patch old field
+    twoFactorActivated = twoFactorActivated || twoFactorActived;
 
-      if (
-        (cUsername === 'admin' && cPassword === 'admin') ||
-        !cUsername ||
-        !cPassword
-      ) {
-        return this.initAuthInfo();
-      }
+    const retriesTime = Math.pow(3, retries) * 1000;
+    if (retries > 2 && timestamp - lastlogon < retriesTime) {
+      const waitTime = Math.ceil(
+        (retriesTime - (timestamp - lastlogon)) / 1000,
+      );
+      return {
+        code: 410,
+        message: `失败次数过多，请${waitTime}秒后重试`,
+        data: waitTime,
+      };
+    }
 
-      const retriesTime = Math.pow(3, retries) * 1000;
-      if (retries > 2 && timestamp - lastlogon < retriesTime) {
-        const waitTime = Math.ceil(
-          (retriesTime - (timestamp - lastlogon)) / 1000,
-        );
+    if (
+      username === cUsername &&
+      password === cPassword &&
+      twoFactorActivated &&
+      needTwoFactor
+    ) {
+      await this.updateAuthInfo(content, {
+        isTwoFactorChecking: true,
+      });
+      return {
+        code: 420,
+        message: '',
+      };
+    }
+
+    const ip = requestIp.getClientIp(req) || '';
+    const query = new IP2Region();
+    const ipAddress = query.search(ip);
+    let address = '';
+    if (ipAddress) {
+      const { country, province, city, isp } = ipAddress;
+      address = uniq([country, province, city, isp]).filter(Boolean).join(' ');
+    }
+    if (username === cUsername && password === cPassword) {
+      const data = createRandomString(50, 100);
+      const expiration = twoFactorActivated ? 60 : 20;
+      let token = jwt.sign({ data }, config.secret as any, {
+        expiresIn: 60 * 60 * 24 * expiration,
+        algorithm: 'HS384',
+      });
+
+      await this.updateAuthInfo(content, {
+        token,
+        tokens: {
+          ...tokens,
+          [req.platform]: token,
+        },
+        lastlogon: timestamp,
+        retries: 0,
+        lastip: ip,
+        lastaddr: address,
+        platform: req.platform,
+        isTwoFactorChecking: false,
+      });
+      this.notificationService.notify(
+        '登录通知',
+        `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
+          req.platform
+        }端 登录成功，ip地址 ${ip}`,
+      );
+      await this.insertDb({
+        type: AuthDataType.loginLog,
+        info: {
+          timestamp,
+          address,
+          ip,
+          platform: req.platform,
+          status: LoginStatus.success,
+        },
+      });
+      this.getLoginLog();
+      return {
+        code: 200,
+        data: { token, lastip, lastaddr, lastlogon, retries, platform },
+      };
+    } else {
+      await this.updateAuthInfo(content, {
+        retries: retries + 1,
+        lastlogon: timestamp,
+        lastip: ip,
+        lastaddr: address,
+        platform: req.platform,
+      });
+      this.notificationService.notify(
+        '登录通知',
+        `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
+          req.platform
+        }端 登录失败，ip地址 ${ip}`,
+      );
+      await this.insertDb({
+        type: AuthDataType.loginLog,
+        info: {
+          timestamp,
+          address,
+          ip,
+          platform: req.platform,
+          status: LoginStatus.fail,
+        },
+      });
+      this.getLoginLog();
+      if (retries > 2) {
+        const waitTime = Math.round(Math.pow(3, retries + 1));
         return {
           code: 410,
           message: `失败次数过多，请${waitTime}秒后重试`,
           data: waitTime,
         };
-      }
-
-      if (
-        username === cUsername &&
-        password === cPassword &&
-        twoFactorActivated &&
-        needTwoFactor
-      ) {
-        this.updateAuthInfo(content, {
-          isTwoFactorChecking: true,
-        });
-        return {
-          code: 420,
-          message: '',
-        };
-      }
-
-      const ip = requestIp.getClientIp(req) || '';
-      const query = new IP2Region();
-      const ipAddress = query.search(ip);
-      let address = '';
-      if (ipAddress) {
-        const { country, province, city, isp } = ipAddress;
-        address = uniq([country, province, city, isp])
-          .filter(Boolean)
-          .join(' ');
-      }
-      if (username === cUsername && password === cPassword) {
-        const data = createRandomString(50, 100);
-        const expiration = twoFactorActivated ? 60 : 20;
-        let token = jwt.sign({ data }, config.secret as any, {
-          expiresIn: 60 * 60 * 24 * expiration,
-          algorithm: 'HS384',
-        });
-
-        this.updateAuthInfo(content, {
-          token,
-          tokens: {
-            ...tokens,
-            [req.platform]: token,
-          },
-          lastlogon: timestamp,
-          retries: 0,
-          lastip: ip,
-          lastaddr: address,
-          platform: req.platform,
-          isTwoFactorChecking: false,
-        });
-        this.notificationService.notify(
-          '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-            req.platform
-          }端 登录成功，ip地址 ${ip}`,
-        );
-        await this.insertDb({
-          type: AuthDataType.loginLog,
-          info: {
-            timestamp,
-            address,
-            ip,
-            platform: req.platform,
-            status: LoginStatus.success,
-          },
-        });
-        this.getLoginLog();
-        return {
-          code: 200,
-          data: { token, lastip, lastaddr, lastlogon, retries, platform },
-        };
       } else {
-        this.updateAuthInfo(content, {
-          retries: retries + 1,
-          lastlogon: timestamp,
-          lastip: ip,
-          lastaddr: address,
-          platform: req.platform,
-        });
-        this.notificationService.notify(
-          '登录通知',
-          `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-            req.platform
-          }端 登录失败，ip地址 ${ip}`,
-        );
-        await this.insertDb({
-          type: AuthDataType.loginLog,
-          info: {
-            timestamp,
-            address,
-            ip,
-            platform: req.platform,
-            status: LoginStatus.fail,
-          },
-        });
-        this.getLoginLog();
-        if (retries > 2) {
-          const waitTime = Math.round(Math.pow(3, retries + 1));
-          return {
-            code: 410,
-            message: `失败次数过多，请${waitTime}秒后重试`,
-            data: waitTime,
-          };
-        } else {
-          return { code: 400, message: config.authError };
-        }
+        return { code: 400, message: config.authError };
       }
-    } else {
-      return this.initAuthInfo();
     }
   }
 
   public async logout(platform: string): Promise<any> {
     const authInfo = await this.getAuthInfo();
-    this.updateAuthInfo(authInfo, {
+    await this.updateAuthInfo(authInfo, {
       token: '',
       tokens: { ...authInfo.tokens, [platform]: '' },
     });
@@ -257,35 +240,21 @@ export default class UserService {
       return { code: 400, message: '密码不能设置为admin' };
     }
     const authInfo = await this.getAuthInfo();
-    this.updateAuthInfo(authInfo, { username, password });
+    await this.updateAuthInfo(authInfo, { username, password });
     return { code: 200, message: '更新成功' };
   }
 
   public async updateAvatar(avatar: string) {
     const authInfo = await this.getAuthInfo();
-    this.updateAuthInfo(authInfo, { avatar });
+    await this.updateAuthInfo(authInfo, { avatar });
     return { code: 200, data: avatar, message: '更新成功' };
-  }
-
-  public async getUserInfo(): Promise<any> {
-    const authFileExist = await fileExist(config.authConfigFile);
-    if (!authFileExist) {
-      await createFile(
-        config.authConfigFile,
-        JSON.stringify({
-          username: 'admin',
-          password: 'admin',
-        }),
-      );
-    }
-    return await this.getAuthInfo();
   }
 
   public async initTwoFactor() {
     const secret = authenticator.generateSecret();
     const authInfo = await this.getAuthInfo();
     const otpauth = authenticator.keyuri(authInfo.username, 'qinglong', secret);
-    this.updateAuthInfo(authInfo, { twoFactorSecret: secret });
+    await this.updateAuthInfo(authInfo, { twoFactorSecret: secret });
     return { secret, url: otpauth };
   }
 
@@ -296,7 +265,7 @@ export default class UserService {
       secret: authInfo.twoFactorSecret,
     });
     if (isValid) {
-      this.updateAuthInfo(authInfo, { twoFactorActivated: true });
+      await this.updateAuthInfo(authInfo, { twoFactorActivated: true });
     }
     return isValid;
   }
@@ -322,7 +291,7 @@ export default class UserService {
       return this.login({ username, password }, req, false);
     } else {
       const { ip, address } = await getNetIp(req);
-      this.updateAuthInfo(authInfo, {
+      await this.updateAuthInfo(authInfo, {
         lastip: ip,
         lastaddr: address,
         platform: req.platform,
@@ -333,7 +302,7 @@ export default class UserService {
 
   public async deactiveTwoFactor() {
     const authInfo = await this.getAuthInfo();
-    this.updateAuthInfo(authInfo, {
+    await this.updateAuthInfo(authInfo, {
       twoFactorActivated: false,
       twoFactorActived: false,
       twoFactorSecret: '',
@@ -341,16 +310,22 @@ export default class UserService {
     return true;
   }
 
-  private async getAuthInfo() {
-    const content = await fs.readFile(config.authConfigFile, 'utf8');
-    return safeJSONParse(content);
+  public async getAuthInfo() {
+    const authInfo = await shareStore.getAuthInfo();
+    if (authInfo) {
+      return authInfo;
+    }
+    const doc = await this.getDb({ type: AuthDataType.authConfig });
+    return (doc.info || {}) as AuthInfo;
   }
 
   private async updateAuthInfo(authInfo: any, info: any) {
-    await fs.writeFile(
-      config.authConfigFile,
-      JSON.stringify({ ...authInfo, ...info }),
-    );
+    const result = { ...authInfo, ...info };
+    await shareStore.updateAuthInfo(result);
+    await this.updateAuthDb({
+      type: AuthDataType.authConfig,
+      info: result,
+    });
   }
 
   public async getNotificationMode(): Promise<NotificationInfo> {

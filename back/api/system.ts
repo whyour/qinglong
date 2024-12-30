@@ -33,7 +33,7 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     try {
       const userService = Container.get(UserService);
-      const authInfo = await userService.getUserInfo();
+      const authInfo = await userService.getAuthInfo();
       const { version, changeLog, changeLogLink, publishTime } =
         await parseVersion(config.versionFile);
 

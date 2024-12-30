@@ -12,7 +12,10 @@ import { initPosition } from '../data/env';
 import { AuthDataType, SystemModel } from '../data/system';
 import SystemService from '../services/system';
 import UserService from '../services/user';
-import { writeFile } from 'fs/promises';
+import { writeFile, readFile } from 'fs/promises';
+import { safeJSONParse } from '../config/util';
+import OpenService from '../services/open';
+import { shareStore } from '../shared/store';
 
 export default async () => {
   const cronService = Container.get(CronService);
@@ -20,10 +23,38 @@ export default async () => {
   const dependenceService = Container.get(DependenceService);
   const systemService = Container.get(SystemService);
   const userService = Container.get(UserService);
+  const openService = Container.get(OpenService);
 
   // 初始化增加系统配置
   await SystemModel.upsert({ type: AuthDataType.systemConfig });
   await SystemModel.upsert({ type: AuthDataType.notification });
+  await SystemModel.upsert({ type: AuthDataType.authConfig });
+  const authConfig = await SystemModel.findOne({
+    where: { type: AuthDataType.authConfig },
+  });
+  if (!authConfig?.info) {
+    let authInfo = {
+      username: 'admin',
+      password: 'admin',
+    };
+    try {
+      const content = await readFile(config.authConfigFile, 'utf8');
+      authInfo = safeJSONParse(content);
+    } catch (error) {}
+    if (authConfig?.id) {
+      await SystemModel.update(
+        { info: authInfo },
+        {
+          where: { id: authConfig.id },
+        },
+      );
+    } else {
+      await SystemModel.create({
+        info: authInfo,
+        type: AuthDataType.authConfig,
+      });
+    }
+  }
 
   // 初始化通知配置
   const notifyConfig = await userService.getNotificationMode();
@@ -169,4 +200,11 @@ export default async () => {
   // 初始化保存一次ck和定时任务数据
   await cronService.autosave_crontab();
   await envService.set_envs();
+
+  const authInfo = await userService.getAuthInfo();
+  const apps = await openService.findApps();
+  await shareStore.updateAuthInfo(authInfo);
+  if (apps?.length) {
+    await shareStore.updateApps(apps);
+  }
 };

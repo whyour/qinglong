@@ -193,12 +193,6 @@ fix_config() {
     echo
   fi
 
-  if [[ ! -s $file_auth_user ]]; then
-    echo -e "复制一份 $file_auth_sample 为 $file_auth_user\n"
-    cp -fv $file_auth_sample $file_auth_user
-    echo
-  fi
-
   if [[ ! -s $file_notify_py ]]; then
     echo -e "复制一份 $file_notify_py_sample 为 $file_notify_py\n"
     cp -fv $file_notify_py_sample $file_notify_py
