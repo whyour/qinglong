@@ -56,7 +56,9 @@ function run() {
     for (const key in newEnvObject) {
       process.env[key] = newEnvObject[key];
     }
-    console.log(output);
+    if (output) {
+      console.log(output);
+    }
     if (task_before) {
       console.log('执行前置命令结束\n');
     }
@@ -88,6 +90,10 @@ try {
   if (!process.argv[1]) {
     return;
   }
+
+  process.on('SIGTERM', (code) => {
+    process.exit(15);
+  });
 
   run();
 
