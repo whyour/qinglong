@@ -26,9 +26,15 @@ export default async () => {
   const openService = Container.get(OpenService);
 
   // 初始化增加系统配置
-  await SystemModel.upsert({ type: AuthDataType.systemConfig });
-  await SystemModel.upsert({ type: AuthDataType.notification });
-  await SystemModel.upsert({ type: AuthDataType.authConfig });
+  await SystemModel.findOrCreate({
+    where: { type: AuthDataType.systemConfig },
+  });
+  await SystemModel.findOrCreate({
+    where: { type: AuthDataType.notification },
+  });
+  await SystemModel.findOrCreate({
+    where: { type: AuthDataType.authConfig },
+  });
   const authConfig = await SystemModel.findOne({
     where: { type: AuthDataType.authConfig },
   });

@@ -334,7 +334,7 @@ export default class UserService {
   }
 
   private async updateAuthDb(payload: SystemInfo): Promise<any> {
-    let doc = await SystemModel.findOne({ type: payload.type });
+    let doc = await SystemModel.findOne({ where: { type: payload.type } });
     if (doc) {
       const updateResult = await SystemModel.update(payload, {
         where: { id: doc.id },

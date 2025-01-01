@@ -54,13 +54,14 @@ export default class SystemService {
   }
 
   private async updateAuthDb(payload: SystemInfo): Promise<SystemInfo> {
-    await SystemModel.upsert({ ...payload });
-    const doc = await this.getDb({ type: payload.type });
+    const { id, ...others } = payload;
+    await SystemModel.update(others, { where: { id } });
+    const doc = await this.getDb({ id });
     return doc;
   }
 
   public async getDb(query: any): Promise<SystemInfo> {
-    const doc = await SystemModel.findOne({ where: { ...query } });
+    const doc = await SystemModel.findOne({ where: query });
     if (!doc) {
       throw new Error(`System ${JSON.stringify(query)} not found`);
     }
