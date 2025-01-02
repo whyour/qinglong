@@ -377,4 +377,23 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/auth/reset',
+    celebrate({
+      body: Joi.object({
+        retries: Joi.number().optional(),
+        twoFactorActivated: Joi.boolean().optional(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userService = Container.get(UserService);
+        await userService.resetAuthInfo(req.body);
+        res.send({ code: 200, message: '更新成功' });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 };

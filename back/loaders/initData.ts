@@ -16,6 +16,7 @@ import { writeFile, readFile } from 'fs/promises';
 import { safeJSONParse } from '../config/util';
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
+import Logger from './logger';
 
 export default async () => {
   const cronService = Container.get(CronService);
@@ -26,16 +27,13 @@ export default async () => {
   const openService = Container.get(OpenService);
 
   // 初始化增加系统配置
-  await SystemModel.findOrCreate({
+  const [systemConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.systemConfig },
   });
-  await SystemModel.findOrCreate({
+  const [notifyConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.notification },
   });
-  await SystemModel.findOrCreate({
-    where: { type: AuthDataType.authConfig },
-  });
-  const authConfig = await SystemModel.findOne({
+  const [authConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.authConfig },
   });
   if (!authConfig?.info) {
@@ -46,25 +44,20 @@ export default async () => {
     try {
       const content = await readFile(config.authConfigFile, 'utf8');
       authInfo = safeJSONParse(content);
-    } catch (error) {}
-    if (authConfig?.id) {
-      await SystemModel.update(
-        { info: authInfo },
-        {
-          where: { id: authConfig.id },
-        },
-      );
-    } else {
-      await SystemModel.create({
-        info: authInfo,
-        type: AuthDataType.authConfig,
-      });
+    } catch (error) {
+      Logger.warn('Failed to read auth config file, using default credentials');
     }
+    await SystemModel.upsert({
+      id: authConfig?.id,
+      info: authInfo,
+      type: AuthDataType.authConfig,
+    });
   }
 
   // 初始化通知配置
-  const notifyConfig = await userService.getNotificationMode();
-  await writeFile(config.systemNotifyFile, JSON.stringify(notifyConfig));
+  if (notifyConfig.info) {
+    await writeFile(config.systemNotifyFile, JSON.stringify(notifyConfig.info));
+  }
 
   const installDependencies = () => {
     // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
@@ -87,7 +80,6 @@ export default async () => {
   };
 
   // 初始化更新 linux/python/nodejs 镜像源配置
-  const systemConfig = await systemService.getSystemConfig();
   if (systemConfig.info?.pythonMirror) {
     systemService.updatePythonMirror({
       pythonMirror: systemConfig.info?.pythonMirror,

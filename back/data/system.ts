@@ -59,7 +59,6 @@ export interface AuthInfo {
   token: string;
   tokens: Record<string, string>;
   twoFactorActivated: boolean;
-  twoFactorActived: boolean;
   twoFactorSecret: string;
   avatar: string;
 }

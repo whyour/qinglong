@@ -61,13 +61,9 @@ export default class UserService {
       lastip,
       lastaddr,
       twoFactorActivated,
-      twoFactorActived,
       tokens = {},
       platform,
     } = content;
-    // patch old field
-    twoFactorActivated = twoFactorActivated || twoFactorActived;
-
     const retriesTime = Math.pow(3, retries) * 1000;
     if (retries > 2 && timestamp - lastlogon < retriesTime) {
       const waitTime = Math.ceil(
@@ -215,20 +211,6 @@ export default class UserService {
     return doc;
   }
 
-  private async initAuthInfo() {
-    await fs.writeFile(
-      config.authConfigFile,
-      JSON.stringify({
-        username: 'admin',
-        password: 'admin',
-      }),
-    );
-    return {
-      code: 100,
-      message: '未找到认证文件，重新初始化',
-    };
-  }
-
   public async updateUsernameAndPassword({
     username,
     password,
@@ -304,7 +286,6 @@ export default class UserService {
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, {
       twoFactorActivated: false,
-      twoFactorActived: false,
       twoFactorSecret: '',
     });
     return true;
@@ -319,7 +300,7 @@ export default class UserService {
     return (doc.info || {}) as AuthInfo;
   }
 
-  private async updateAuthInfo(authInfo: any, info: any) {
+  private async updateAuthInfo(authInfo: AuthInfo, info: Partial<AuthInfo>) {
     const result = { ...authInfo, ...info };
     await shareStore.updateAuthInfo(result);
     await this.updateAuthDb({
@@ -371,5 +352,14 @@ export default class UserService {
     } else {
       return { code: 400, message: '通知发送失败，请检查参数' };
     }
+  }
+
+  public async resetAuthInfo(info: Partial<AuthInfo>) {
+    const { retries, twoFactorActivated } = info;
+    const authInfo = await this.getAuthInfo();
+    await this.updateAuthInfo(authInfo, {
+      retries,
+      twoFactorActivated,
+    });
   }
 }

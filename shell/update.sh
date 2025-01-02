@@ -537,14 +537,10 @@ main() {
     eval . $dir_shell/check.sh $cmd
     ;;
   resetlet)
-    auth_value=$(cat $file_auth_user | jq '.retries =0' -c)
-    echo "$auth_value" >$file_auth_user
-    eval echo -e "重置登录错误次数成功" $cmd
+    eval update_auth_config "\\\"retries\\\":0" "重置登录错误次数" $cmd
     ;;
   resettfa)
-    auth_value=$(cat $file_auth_user | jq '.twoFactorActivated =false' | jq '.twoFactorActived =false' -c)
-    echo "$auth_value" >$file_auth_user
-    eval echo -e "禁用两步验证成功" $cmd
+    eval update_auth_config "\\\"twoFactorActivated\\\":false" "禁用两步验证" $cmd
     ;;
   *)
     eval echo -e "命令输入错误...\\\n" $cmd

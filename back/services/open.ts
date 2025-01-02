@@ -20,6 +20,8 @@ export default class OpenService {
     tab.client_id = createRandomString(12, 12);
     tab.client_secret = createRandomString(24, 24);
     const doc = await this.insert(tab);
+    const apps = await this.find({});
+    await shareStore.updateApps(apps);
     return { ...doc, tokens: [] };
   }
 
@@ -54,6 +56,8 @@ export default class OpenService {
 
   public async remove(ids: number[]) {
     await AppModel.destroy({ where: { id: ids } });
+    const apps = await this.find({});
+    await shareStore.updateApps(apps);
   }
 
   public async resetSecret(id: number): Promise<App> {
@@ -136,6 +140,8 @@ export default class OpenService {
         { tokens },
         { where: { client_id, client_secret } },
       );
+      const apps = await this.find({});
+      await shareStore.updateApps(apps);
       return {
         code: 200,
         data: {
@@ -145,7 +151,7 @@ export default class OpenService {
         },
       };
     } else {
-      return { code: 400, message: 'client_id或client_seret有误' };
+      return { code: 400, message: 'client_id 或 client_seret 有误' };
     }
   }
 
@@ -153,15 +159,9 @@ export default class OpenService {
     value: string;
     expiration: number;
   }> {
-    let systemApp = (await AppModel.findOne({
-      where: { name: 'system' },
-    })) as App;
-    if (!systemApp) {
-      systemApp = await this.create({
-        name: 'system',
-        scopes: ['crons', 'system'],
-      } as App);
-    }
+    const [systemApp] = await AppModel.findOrCreate({
+      where: { name: 'system', scopes: ['crons', 'system'] },
+    });
     const { data } = await this.authToken({
       client_id: systemApp.client_id,
       client_secret: systemApp.client_secret,
