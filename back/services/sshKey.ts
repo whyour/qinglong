@@ -7,6 +7,7 @@ import { Subscription } from '../data/subscription';
 import { formatUrl } from '../config/subscription';
 import config from '../config';
 import { fileExist, rmPath } from '../config/util';
+import { writeFileWithLock } from '../shared/utils';
 
 @Service()
 export default class SshKeyService {
@@ -25,13 +26,12 @@ export default class SshKeyService {
     if (_exist) {
       config = await fs.readFile(this.sshConfigFilePath, { encoding: 'utf-8' });
     } else {
-      await fs.writeFile(this.sshConfigFilePath, '');
+      await writeFileWithLock(this.sshConfigFilePath, '');
     }
     if (!config.includes(this.sshConfigHeader)) {
-      await fs.writeFile(
+      await writeFileWithLock(
         this.sshConfigFilePath,
         `${this.sshConfigHeader}\n\n${config}`,
-        { encoding: 'utf-8' },
       );
     }
   }
@@ -41,10 +41,14 @@ export default class SshKeyService {
     key: string,
   ): Promise<void> {
     try {
-      await fs.writeFile(path.join(this.sshPath, alias), `${key}${os.EOL}`, {
-        encoding: 'utf8',
-        mode: '400',
-      });
+      await writeFileWithLock(
+        path.join(this.sshPath, alias),
+        `${key}${os.EOL}`,
+        {
+          encoding: 'utf8',
+          mode: '400',
+        },
+      );
     } catch (error) {
       this.logger.error('生成私钥文件失败', error);
     }
@@ -74,12 +78,9 @@ export default class SshKeyService {
       this.sshPath,
       alias,
     )}\n    StrictHostKeyChecking no\n${proxyStr}`;
-    await fs.writeFile(
+    await writeFileWithLock(
       `${path.join(this.sshPath, `${alias}.config`)}`,
       config,
-      {
-        encoding: 'utf8',
-      },
     );
   }
 
@@ -102,7 +103,11 @@ export default class SshKeyService {
     await this.generateSingleSshConfig(alias, host, proxy);
   }
 
-  public async removeSSHKey(alias: string, host: string, proxy?: string): Promise<void> {
+  public async removeSSHKey(
+    alias: string,
+    host: string,
+    proxy?: string,
+  ): Promise<void> {
     await this.removePrivateKeyFile(alias);
     await this.removeSshConfig(alias);
   }

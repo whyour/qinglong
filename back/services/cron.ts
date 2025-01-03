@@ -21,6 +21,7 @@ import { spawn } from 'cross-spawn';
 import dayjs from 'dayjs';
 import pickBy from 'lodash/pickBy';
 import omit from 'lodash/omit';
+import { writeFileWithLock } from '../shared/utils';
 
 @Service()
 export default class CronService {
@@ -601,7 +602,7 @@ export default class CronService {
       }
     });
 
-    await fs.writeFile(config.crontabFile, crontab_string);
+    await writeFileWithLock(config.crontabFile, crontab_string);
 
     execSync(`crontab ${config.crontabFile}`);
     await CrontabModel.update({ saved: true }, { where: {} });

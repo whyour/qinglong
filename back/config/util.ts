@@ -10,6 +10,7 @@ import { load } from 'js-yaml';
 import config from './index';
 import { TASK_COMMAND } from './const';
 import Logger from '../loaders/logger';
+import { writeFileWithLock } from '../shared/utils';
 
 export * from './share';
 
@@ -170,7 +171,7 @@ export async function fileExist(file: any) {
 
 export async function createFile(file: string, data: string = '') {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, data);
+  await writeFileWithLock(file, data);
 }
 
 export async function handleLogPath(

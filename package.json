@@ -103,7 +103,8 @@
     "request-ip": "3.3.0",
     "ip2region": "2.3.0",
     "keyv": "^5.2.3",
-    "@keyv/sqlite": "^4.0.1"
+    "@keyv/sqlite": "^4.0.1",
+    "proper-lockfile": "^4.1.2"
   },
   "devDependencies": {
     "moment": "2.30.1",
@@ -138,6 +139,7 @@
     "@types/sockjs-client": "^1.5.1",
     "@types/uuid": "^8.3.4",
     "@types/request-ip": "0.0.41",
+    "@types/proper-lockfile": "^4.1.4",
     "@uiw/codemirror-extensions-langs": "^4.21.9",
     "@uiw/react-codemirror": "^4.21.9",
     "@umijs/max": "^4.3.36",

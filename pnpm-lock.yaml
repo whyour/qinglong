@@ -1,5 +1,9 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 overrides:
   sqlite3: git+https://github.com/whyour/node-sqlite3.git#v1.0.3
 
@@ -97,6 +101,9 @@ dependencies:
   p-queue-cjs:
     specifier: 7.3.4
     version: 7.3.4
+  proper-lockfile:
+    specifier: ^4.1.2
+    version: 4.1.2
   protobufjs:
     specifier: ^7.4.0
     version: 7.4.0
@@ -201,6 +208,9 @@ devDependencies:
   '@types/nodemailer':
     specifier: ^6.4.4
     version: 6.4.17
+  '@types/proper-lockfile':
+    specifier: ^4.1.4
+    version: 4.1.4
   '@types/qrcode.react':
     specifier: ^1.0.2
     version: 1.0.5
@@ -4634,6 +4644,12 @@ packages:
     resolution: {integrity: sha512-hCZTSvwbzWGvhqxp/RqVqwU999pBf2vp7hzIjiYOsl8wqOmUxkQ6ddw1cV3l8811+kdUFus/q4d1Y3E3SyEifA==}
     dev: true
 
+  /@types/proper-lockfile@4.1.4:
+    resolution: {integrity: sha512-uo2ABllncSqg9F1D4nugVl9v93RmjxF6LJzQLMLDdPaXCUIDPeOJ21Gbqi43xNKzBi/WQ0Q0dICqufzQbMjipQ==}
+    dependencies:
+      '@types/retry': 0.12.5
+    dev: true
+
   /@types/qrcode.react@1.0.5:
     resolution: {integrity: sha512-BghPtnlwvrvq8QkGa1H25YnN+5OIgCKFuQruncGWLGJYOzeSKiix/4+B9BtfKF2wf5ja8yfyWYA3OXju995G8w==}
     dependencies:
@@ -4682,6 +4698,10 @@ packages:
     dependencies:
       '@types/node': 17.0.45
     dev: false
+
+  /@types/retry@0.12.5:
+    resolution: {integrity: sha512-3xSjTp3v03X/lSQLkczaN9UIEwJMoMCA1+Nb5HfbJEQWogdeQIyVtTvxPXDQjZ5zws8rFQfVfRdz03ARihPJgw==}
+    dev: true
 
   /@types/semver@7.5.8:
     resolution: {integrity: sha512-I8EUhyrgfLrcTkzV3TSsGyl1tSuPrEDzr0yd5m90UgNxQkyDXULk3b6MlQqTCpZpNtWe1K0hzclnZkTcLBe2UQ==}
@@ -12466,6 +12486,14 @@ packages:
       react-is: 16.13.1
     dev: true
 
+  /proper-lockfile@4.1.2:
+    resolution: {integrity: sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==}
+    dependencies:
+      graceful-fs: 4.2.11
+      retry: 0.12.0
+      signal-exit: 3.0.7
+    dev: false
+
   /protobufjs@7.4.0:
     resolution: {integrity: sha512-mRUWCc3KUU4w1jU8sGxICXH/gNS94DvI1gxqDvBzhj1JpcsimQkYiOJfwsPUykUI5ZaspFbSgmBLER8IrQ3tqw==}
     engines: {node: '>=12.0.0'}
@@ -14041,7 +14069,6 @@ packages:
     engines: {node: '>= 4'}
     requiresBuild: true
     dev: false
-    optional: true
 
   /reusify@1.0.4:
     resolution: {integrity: sha512-U9nH88a3fc/ekCF1l0/UP1IosiuIjyTh7hBvXVMHYgVcfGvt897Xguj2UOLDeI5BG2m7/uwyaLVT6fbtCwTyzw==}
@@ -16174,7 +16201,3 @@ packages:
       - encoding
       - supports-color
     dev: false
-
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false

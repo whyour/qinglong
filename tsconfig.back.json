@@ -3,9 +3,6 @@
     "target": "es2017",
     "lib": ["ESNext"],
     "typeRoots": ["./node_modules/celebrate/lib", "./node_modules/@types"],
-    "paths": {
-      "@/*": ["./back/*"]
-    },
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

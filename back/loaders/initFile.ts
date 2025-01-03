@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import Logger from './logger';
 import { fileExist } from '../config/util';
+import { writeFileWithLock } from '../shared/utils';
 
 const rootPath = process.env.QL_DIR as string;
 let dataPath = path.join(rootPath, 'data/');
@@ -99,46 +100,46 @@ export default async () => {
   // 初始化文件
 
   if (!confFileExist) {
-    await fs.writeFile(confFile, await fs.readFile(sampleConfigFile));
+    await writeFileWithLock(confFile, await fs.readFile(sampleConfigFile));
   }
 
-  await fs.writeFile(jsNotifyFile, await fs.readFile(sampleNotifyJsFile));
-  await fs.writeFile(pyNotifyFile, await fs.readFile(sampleNotifyPyFile));
+  await writeFileWithLock(jsNotifyFile, await fs.readFile(sampleNotifyJsFile));
+  await writeFileWithLock(pyNotifyFile, await fs.readFile(sampleNotifyPyFile));
 
   if (!scriptNotifyJsFileExist) {
-    await fs.writeFile(
+    await writeFileWithLock(
       scriptNotifyJsFile,
       await fs.readFile(sampleNotifyJsFile),
     );
   }
 
   if (!scriptNotifyPyFileExist) {
-    await fs.writeFile(
+    await writeFileWithLock(
       scriptNotifyPyFile,
       await fs.readFile(sampleNotifyPyFile),
     );
   }
 
   if (!TaskBeforeFileExist) {
-    await fs.writeFile(TaskBeforeFile, await fs.readFile(sampleTaskShellFile));
+    await writeFileWithLock(TaskBeforeFile, await fs.readFile(sampleTaskShellFile));
   }
 
   if (!TaskBeforeJsFileExist) {
-    await fs.writeFile(
+    await writeFileWithLock(
       TaskBeforeJsFile,
       '// The JavaScript code that executes before the JavaScript task execution will execute.',
     );
   }
 
   if (!TaskBeforePyFileExist) {
-    await fs.writeFile(
+    await writeFileWithLock(
       TaskBeforePyFile,
       '# The Python code that executes before the Python task execution will execute.',
     );
   }
 
   if (!TaskAfterFileExist) {
-    await fs.writeFile(TaskAfterFile, await fs.readFile(sampleTaskShellFile));
+    await writeFileWithLock(TaskAfterFile, await fs.readFile(sampleTaskShellFile));
   }
 
   Logger.info('✌️ Init file down');

@@ -13,6 +13,7 @@ import {
 } from '../data/env';
 import groupBy from 'lodash/groupBy';
 import { FindOptions, Op } from 'sequelize';
+import { writeFileWithLock } from '../shared/utils';
 
 @Service()
 export default class EnvService {
@@ -225,8 +226,8 @@ export default class EnvService {
         }
       }
     }
-    await fs.writeFile(config.envFile, env_string);
-    await fs.writeFile(config.jsEnvFile, js_env_string);
-    await fs.writeFile(config.pyEnvFile, py_env_string);
+    await writeFileWithLock(config.envFile, env_string);
+    await writeFileWithLock(config.jsEnvFile, js_env_string);
+    await writeFileWithLock(config.pyEnvFile, py_env_string);
   }
 }

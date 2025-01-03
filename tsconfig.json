@@ -22,10 +22,6 @@
     "allowJs": true,
     "noEmit": false
   },
-  "include": ["src/**/*", ".umirc.ts", "typings.d.ts", "back/**/*"],
-  "exclude": [
-    "node_modules",
-    "static",
-    "data",
-  ]
+  "include": ["src/**/*", ".umirc.ts", "typings.d.ts"],
+  "exclude": ["node_modules", "static", "data"]
 }
