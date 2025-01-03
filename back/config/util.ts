@@ -641,7 +641,7 @@ async function replaceDomainInFile(
     newDomainWithScheme += '/';
   }
 
-  await fs.writeFile(filePath, updatedContent, 'utf8');
+  await writeFileWithLock(filePath, updatedContent);
 }
 
 async function _updateLinuxMirror(
