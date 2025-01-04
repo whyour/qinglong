@@ -38,108 +38,87 @@ const sshPath = path.resolve(homedir, '.ssh');
 const sshdPath = path.join(dataPath, 'ssh.d');
 const systemLogPath = path.join(dataPath, 'syslog');
 
-export default async () => {
-  const confFileExist = await fileExist(confFile);
-  const scriptDirExist = await fileExist(scriptPath);
-  const preloadDirExist = await fileExist(preloadPath);
-  const logDirExist = await fileExist(logPath);
-  const configDirExist = await fileExist(configPath);
-  const uploadDirExist = await fileExist(uploadPath);
-  const sshDirExist = await fileExist(sshPath);
-  const bakDirExist = await fileExist(bakPath);
-  const sshdDirExist = await fileExist(sshdPath);
-  const systemLogDirExist = await fileExist(systemLogPath);
-  const tmpDirExist = await fileExist(tmpPath);
-  const scriptNotifyJsFileExist = await fileExist(scriptNotifyJsFile);
-  const scriptNotifyPyFileExist = await fileExist(scriptNotifyPyFile);
-  const TaskBeforeFileExist = await fileExist(TaskBeforeFile);
-  const TaskBeforeJsFileExist = await fileExist(TaskBeforeJsFile);
-  const TaskBeforePyFileExist = await fileExist(TaskBeforePyFile);
-  const TaskAfterFileExist = await fileExist(TaskAfterFile);
+const directories = [
+  configPath,
+  scriptPath,
+  preloadPath,
+  logPath,
+  tmpPath,
+  uploadPath,
+  sshPath,
+  bakPath,
+  sshdPath,
+  systemLogPath,
+];
 
-  if (!configDirExist) {
-    await fs.mkdir(configPath);
-  }
-
-  if (!scriptDirExist) {
-    await fs.mkdir(scriptPath);
-  }
-
-  if (!preloadDirExist) {
-    await fs.mkdir(preloadPath);
-  }
-
-  if (!logDirExist) {
-    await fs.mkdir(logPath);
-  }
-
-  if (!tmpDirExist) {
-    await fs.mkdir(tmpPath);
-  }
-
-  if (!uploadDirExist) {
-    await fs.mkdir(uploadPath);
-  }
-
-  if (!sshDirExist) {
-    await fs.mkdir(sshPath);
-  }
-
-  if (!bakDirExist) {
-    await fs.mkdir(bakPath);
-  }
-
-  if (!sshdDirExist) {
-    await fs.mkdir(sshdPath);
-  }
-
-  if (!systemLogDirExist) {
-    await fs.mkdir(systemLogPath);
-  }
-
-  // 初始化文件
-
-  if (!confFileExist) {
-    await writeFileWithLock(confFile, await fs.readFile(sampleConfigFile));
-  }
-
-  await writeFileWithLock(jsNotifyFile, await fs.readFile(sampleNotifyJsFile));
-  await writeFileWithLock(pyNotifyFile, await fs.readFile(sampleNotifyPyFile));
-
-  if (!scriptNotifyJsFileExist) {
-    await writeFileWithLock(
-      scriptNotifyJsFile,
-      await fs.readFile(sampleNotifyJsFile),
-    );
-  }
-
-  if (!scriptNotifyPyFileExist) {
-    await writeFileWithLock(
-      scriptNotifyPyFile,
-      await fs.readFile(sampleNotifyPyFile),
-    );
-  }
-
-  if (!TaskBeforeFileExist) {
-    await writeFileWithLock(TaskBeforeFile, await fs.readFile(sampleTaskShellFile));
-  }
-
-  if (!TaskBeforeJsFileExist) {
-    await writeFileWithLock(
-      TaskBeforeJsFile,
+const files = [
+  {
+    target: confFile,
+    source: sampleConfigFile,
+    checkExistence: true,
+  },
+  {
+    target: jsNotifyFile,
+    source: sampleNotifyJsFile,
+    checkExistence: false,
+  },
+  {
+    target: pyNotifyFile,
+    source: sampleNotifyPyFile,
+    checkExistence: false,
+  },
+  {
+    target: scriptNotifyJsFile,
+    source: sampleNotifyJsFile,
+    checkExistence: true,
+  },
+  {
+    target: scriptNotifyPyFile,
+    source: sampleNotifyPyFile,
+    checkExistence: true,
+  },
+  {
+    target: TaskBeforeFile,
+    source: sampleTaskShellFile,
+    checkExistence: true,
+  },
+  {
+    target: TaskBeforeJsFile,
+    content:
       '// The JavaScript code that executes before the JavaScript task execution will execute.',
-    );
-  }
-
-  if (!TaskBeforePyFileExist) {
-    await writeFileWithLock(
-      TaskBeforePyFile,
+    checkExistence: true,
+  },
+  {
+    target: TaskBeforePyFile,
+    content:
       '# The Python code that executes before the Python task execution will execute.',
-    );
+    checkExistence: true,
+  },
+  {
+    target: TaskAfterFile,
+    source: sampleTaskShellFile,
+    checkExistence: true,
+  },
+];
+
+export default async () => {
+  for (const dirPath of directories) {
+    if (!(await fileExist(dirPath))) {
+      await fs.mkdir(dirPath);
+    }
   }
 
-  if (!TaskAfterFileExist) {
-    await writeFileWithLock(TaskAfterFile, await fs.readFile(sampleTaskShellFile));
+  for (const item of files) {
+    const exists = await fileExist(item.target);
+    if (!item.checkExistence || !exists) {
+      if (!item.content && !item.source) {
+        throw new Error(
+          `Neither content nor source specified for ${item.target}`,
+        );
+      }
+      const content = item.content || (await fs.readFile(item.source!));
+      await writeFileWithLock(item.target, content);
+    }
   }
 
   Logger.info('✌️ Init file down');
