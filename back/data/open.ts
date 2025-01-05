@@ -24,7 +24,7 @@ export interface AppToken {
   expiration: number;
 }
 
-export type AppScope = 'envs' | 'crons' | 'configs' | 'scripts' | 'logs';
+export type AppScope = 'envs' | 'crons' | 'configs' | 'scripts' | 'logs' | 'system';
 
 export interface AppInstance extends Model<App, App>, App {}
 export const AppModel = sequelize.define<AppInstance>('App', {

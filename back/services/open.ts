@@ -159,9 +159,17 @@ export default class OpenService {
     value: string;
     expiration: number;
   }> {
-    const [systemApp] = await AppModel.findOrCreate({
-      where: { name: 'system', scopes: ['crons', 'system'] },
-    });
+    let systemApp = (
+      await AppModel.findOne({
+        where: { name: 'system' },
+      })
+    )?.get({ plain: true });
+    if (!systemApp) {
+      systemApp = await this.create({
+        name: 'system',
+        scopes: ['crons', 'system'],
+      } as App);
+    }
     const { data } = await this.authToken({
       client_id: systemApp.client_id,
       client_secret: systemApp.client_secret,
