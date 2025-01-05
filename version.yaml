@@ -1,9 +1,8 @@
-version: 2.17.13
-changeLogLink: https://t.me/jiao_long/423
-publishTime: 2024-12-21 23:30
+version: 2.18.0
+changeLogLink: https://t.me/jiao_long/424
+publishTime: 2025-01-05 13:00
 changeLog: |
-  1. 新增 wxPusher 通知
-  2. 完善 pushplus 通知
-  3. 修复任务列表下次运行时间展示
-  4. 修复本地部署设置 dataPath 后，备份目录可能错误
-  5. h5 登录增加识别鸿蒙系统
+  1. 由于安全问题，修改认证信息存储方式，不再使用 auth.json 存储
+  2. 修复初始化 SystemConfig 数据
+  3. 修改通知文件未设置时提示
+  4. 修复配置文件更新可能异常
