@@ -612,6 +612,8 @@ export async function detectOS(): Promise<
       Logger.error(`Unknown Linux Distribution: ${osReleaseInfo}`);
       console.error(`Unknown Linux Distribution: ${osReleaseInfo}`);
     }
+  } else if (platform === 'darwin') {
+    osType = undefined;
   } else {
     Logger.error(`Unsupported platform: ${platform}`);
     console.error(`Unsupported platform: ${platform}`);
