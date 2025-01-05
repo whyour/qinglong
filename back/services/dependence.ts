@@ -230,6 +230,12 @@ export default class DependenceService {
         if (taskLimit.firstDependencyId !== dependency.id) {
           return resolve(null);
         }
+        const depIds = [dependency.id!];
+        let depName = dependency.name.trim();
+        const actionText = isInstall ? '安装' : '删除';
+        const socketMessageType = isInstall
+          ? 'installDependence'
+          : 'uninstallDependence';
         const isNodeDependence = dependency.type === DependenceTypes.nodejs;
         const isLinuxDependence = dependency.type === DependenceTypes.linux;
         const isPythonDependence = dependency.type === DependenceTypes.python3;
@@ -238,21 +244,32 @@ export default class DependenceService {
         taskLimit.removeQueuedDependency(dependency);
         if (isLinuxDependence) {
           if (!osType) {
+            await DependenceModel.update(
+              { status: DependenceStatus.installFailed },
+              { where: { id: depIds } },
+            );
+            const startTime = dayjs();
+            const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
+              'YYYY-MM-DD HH:mm:ss',
+            )}\n\n当前系统不支持\n\n依赖${actionText}失败，结束时间 ${startTime.format(
+              'YYYY-MM-DD HH:mm:ss',
+            )}，耗时 ${startTime.diff(startTime, 'second')} 秒`;
+            this.sockService.sendMessage({
+              type: socketMessageType,
+              message,
+              references: depIds,
+            });
+            this.updateLog(depIds, message);
             return resolve(null);
           }
           linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
         }
 
-        const depIds = [dependency.id!];
         const status = isInstall
           ? DependenceStatus.installing
           : DependenceStatus.removing;
         await DependenceModel.update({ status }, { where: { id: depIds } });
 
-        const socketMessageType = isInstall
-          ? 'installDependence'
-          : 'uninstallDependence';
-        let depName = dependency.name.trim();
         let depRunCommand = isInstall
           ? getInstallCommand(dependency.type, depName)
           : getUninstallCommand(dependency.type, depName);
@@ -261,7 +278,6 @@ export default class DependenceService {
             ? linuxCommand.install
             : linuxCommand.uninstall;
         }
-        const actionText = isInstall ? '安装' : '删除';
         const startTime = dayjs();
 
         const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
