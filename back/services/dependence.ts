@@ -353,7 +353,7 @@ export default class DependenceService {
           });
           this.updateLog(depIds, message);
 
-          let status = null;
+          let status: number;
           if (isSucceed) {
             status = isInstall
               ? DependenceStatus.installed
