@@ -13,10 +13,11 @@ import { AuthDataType, SystemModel } from '../data/system';
 import SystemService from '../services/system';
 import UserService from '../services/user';
 import { writeFile, readFile } from 'fs/promises';
-import { safeJSONParse } from '../config/util';
+import { createRandomString, safeJSONParse } from '../config/util';
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
+import { AppModel } from '../data/open';
 
 export default async () => {
   const cronService = Container.get(CronService);
@@ -27,6 +28,19 @@ export default async () => {
   const openService = Container.get(OpenService);
 
   // 初始化增加系统配置
+  let systemApp = (
+    await AppModel.findOne({
+      where: { name: 'system' },
+    })
+  )?.get({ plain: true });
+  if (!systemApp) {
+    systemApp = await AppModel.create({
+      name: 'system',
+      scopes: ['crons', 'system'],
+      client_id: createRandomString(12, 12),
+      client_secret: createRandomString(24, 24),
+    });
+  }
   const [systemConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.systemConfig },
   });

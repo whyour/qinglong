@@ -11,6 +11,9 @@ dependencies:
   '@grpc/grpc-js':
     specifier: ^1.12.3
     version: 1.12.3
+  '@grpc/proto-loader':
+    specifier: ^0.7.13
+    version: 0.7.13
   '@keyv/sqlite':
     specifier: ^4.0.1
     version: 4.0.1

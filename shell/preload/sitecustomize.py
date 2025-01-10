@@ -6,6 +6,7 @@ import builtins
 import sys
 import env
 import signal
+from client import Client
 
 
 def try_parse_int(value):
@@ -108,7 +109,7 @@ try:
 
     from notify import send
 
-    class BaseApi:
+    class BaseApi(Client):
         def notify(self, *args, **kwargs):
             return send(*args, **kwargs)
 

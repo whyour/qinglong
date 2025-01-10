@@ -62,7 +62,7 @@ export default class EnvService {
     return await this.getDb({ id: payload.id });
   }
 
-  public async remove(ids: string[]) {
+  public async remove(ids: number[]) {
     await EnvModel.destroy({ where: { id: ids } });
     await this.set_envs();
   }
@@ -150,7 +150,7 @@ export default class EnvService {
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);
-      return result as any;
+      return result;
     } catch (error) {
       throw error;
     }
@@ -161,7 +161,7 @@ export default class EnvService {
       where: { ...query },
       order: [...sort],
     });
-    return docs;
+    return docs.map((x) => x.get({ plain: true }));
   }
 
   public async getDb(query: FindOptions<Env>['where']): Promise<Env> {
@@ -172,7 +172,7 @@ export default class EnvService {
     return doc.get({ plain: true });
   }
 
-  public async disabled(ids: string[]) {
+  public async disabled(ids: number[]) {
     await EnvModel.update(
       { status: EnvStatus.disabled },
       { where: { id: ids } },
@@ -180,12 +180,12 @@ export default class EnvService {
     await this.set_envs();
   }
 
-  public async enabled(ids: string[]) {
+  public async enabled(ids: number[]) {
     await EnvModel.update({ status: EnvStatus.normal }, { where: { id: ids } });
     await this.set_envs();
   }
 
-  public async updateNames({ ids, name }: { ids: string[]; name: string }) {
+  public async updateNames({ ids, name }: { ids: number[]; name: string }) {
     await EnvModel.update({ name }, { where: { id: ids } });
     await this.set_envs();
   }

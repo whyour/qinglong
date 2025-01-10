@@ -159,16 +159,15 @@ export default class OpenService {
     value: string;
     expiration: number;
   }> {
-    let systemApp = (
-      await AppModel.findOne({
-        where: { name: 'system' },
-      })
-    )?.get({ plain: true });
+    const apps = await shareStore.getApps();
+    const systemApp = apps?.find((x) => x.name === 'system');
     if (!systemApp) {
-      systemApp = await this.create({
-        name: 'system',
-        scopes: ['crons', 'system'],
-      } as App);
+      throw new Error('system app not found');
+    }
+    const now = Math.round(Date.now() / 1000);
+    const currentToken = systemApp.tokens?.find((x) => x.expiration > now);
+    if (currentToken) {
+      return currentToken;
     }
     const { data } = await this.authToken({
       client_id: systemApp.client_id,

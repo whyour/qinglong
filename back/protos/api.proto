@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package com.ql.api;
+
+message EnvItem {
+  optional int32 id = 1;
+  optional string name = 2;
+  optional string value = 3;
+  optional string remarks = 4;
+  optional int32 status = 5;
+  optional int32 position = 6;
+}
+
+message GetEnvsRequest { string searchValue = 1; }
+
+message CreateEnvRequest { repeated EnvItem envs = 1; }
+
+message UpdateEnvRequest { EnvItem env = 1; }
+
+message DeleteEnvsRequest { repeated int32 ids = 1; }
+
+message MoveEnvRequest {
+  int32 id = 1;
+  int32 fromIndex = 2;
+  int32 toIndex = 3;
+}
+
+message DisableEnvsRequest { repeated int32 ids = 1; }
+
+message EnableEnvsRequest { repeated int32 ids = 1; }
+
+message UpdateEnvNamesRequest {
+  repeated int32 ids = 1;
+  string name = 2;
+}
+
+message GetEnvByIdRequest { int32 id = 1; }
+
+message EnvsResponse {
+  int32 code = 1;
+  repeated EnvItem data = 2;
+  optional string message = 3;
+}
+
+message EnvResponse {
+  int32 code = 1;
+  EnvItem data = 2;
+  optional string message = 3;
+}
+
+message Response {
+  int32 code = 1;
+  optional string message = 2;
+}
+
+message SystemNotifyRequest {
+  string title = 1;
+  string content = 2;
+}
+message SystemNotifyResponse {}
+
+service Api {
+  rpc GetEnvs(GetEnvsRequest) returns (EnvsResponse) {}
+  rpc CreateEnv(CreateEnvRequest) returns (EnvsResponse) {}
+  rpc UpdateEnv(UpdateEnvRequest) returns (EnvResponse) {}
+  rpc DeleteEnvs(DeleteEnvsRequest) returns (Response) {}
+  rpc MoveEnv(MoveEnvRequest) returns (EnvResponse) {}
+  rpc DisableEnvs(DisableEnvsRequest) returns (Response) {}
+  rpc EnableEnvs(EnableEnvsRequest) returns (Response) {}
+  rpc UpdateEnvNames(UpdateEnvNamesRequest) returns (Response) {}
+  rpc GetEnvById(GetEnvByIdRequest) returns (EnvResponse) {}
+  rpc SystemNotify(SystemNotifyRequest) returns (SystemNotifyResponse) {}
+}
