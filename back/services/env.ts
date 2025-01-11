@@ -41,7 +41,7 @@ export default class EnvService {
   }
 
   public async insert(payloads: Env[]): Promise<Env[]> {
-    const result = [];
+    const result: Env[] = [];
     for (const env of payloads) {
       const doc = await EnvModel.create(env, { returning: true });
       result.push(doc);

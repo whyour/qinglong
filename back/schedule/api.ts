@@ -21,6 +21,7 @@ import {
 } from '../protos/api';
 import LoggerInstance from '../loaders/logger';
 import NotificationService from '../services/notify';
+import pick from 'lodash/pick';
 
 Container.set('logger', LoggerInstance);
 
@@ -63,7 +64,9 @@ export const updateEnv = async (
 ) => {
   try {
     const envService = Container.get(EnvService);
-    const data = await envService.update(call.request.env as EnvItem);
+    const data = await envService.update(
+      pick(call.request.env, ['id', 'name', 'value', 'remark']) as EnvItem,
+    );
     callback(null, { code: 200, data });
   } catch (e: any) {
     callback(e);
@@ -148,7 +151,10 @@ export const getEnvById = async (
   try {
     const envService = Container.get(EnvService);
     const data = await envService.getDb({ id: call.request.id });
-    callback(null, { code: 200, data });
+    callback(null, {
+      code: 200,
+      data: { ...data, remarks: data.remarks || '' },
+    });
   } catch (e: any) {
     callback(e);
   }

@@ -20,7 +20,7 @@ export class Env {
     this.timestamp = new Date().toString();
     this.position = options.position;
     this.name = options.name;
-    this.remarks = options.remarks;
+    this.remarks = options.remarks || '';
   }
 }
 
