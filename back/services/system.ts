@@ -440,7 +440,7 @@ export default class SystemService {
     const logs = result
       .reverse()
       .filter((x) => x.title.endsWith('.log'))
-      .filter((x) => x.mtime >= startTime && x.mtime <= endTime);
+      .filter((x) => x.createTime >= startTime && x.createTime <= endTime);
 
     res.set({
       'Content-Length': sum(logs.map((x) => x.size)),

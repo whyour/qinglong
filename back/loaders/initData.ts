@@ -44,7 +44,7 @@ export default async () => {
   const [systemConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.systemConfig },
   });
-  const [notifyConfig] = await SystemModel.findOrCreate({
+  await SystemModel.findOrCreate({
     where: { type: AuthDataType.notification },
   });
   const [authConfig] = await SystemModel.findOrCreate({
@@ -66,11 +66,6 @@ export default async () => {
       info: authInfo,
       type: AuthDataType.authConfig,
     });
-  }
-
-  // 初始化通知配置
-  if (notifyConfig.info) {
-    await writeFile(config.systemNotifyFile, JSON.stringify(notifyConfig.info));
   }
 
   const installDependencies = () => {

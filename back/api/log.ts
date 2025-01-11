@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
-import { getFileContentByName, readDirs, rmPath } from '../config/util';
+import { getFileContentByName, readDirs, removeAnsi, rmPath } from '../config/util';
 import { join, resolve } from 'path';
 import { celebrate, Joi } from 'celebrate';
 const route = Router();
@@ -42,7 +42,7 @@ export default (app: Router) => {
           return res.send({ code: 403, message: '暂无权限' });
         }
         const content = await getFileContentByName(finalPath);
-        res.send({ code: 200, data: content });
+        res.send({ code: 200, data: removeAnsi(content) });
       } catch (e) {
         return next(e);
       }

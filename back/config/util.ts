@@ -22,6 +22,10 @@ export async function getFileContentByName(fileName: string) {
   return '';
 }
 
+export function removeAnsi(text: string) {
+  return text.replace(/\x1b\[\d+m/g, '');
+}
+
 export async function getLastModifyFilePath(dir: string) {
   let filePath = '';
 
@@ -153,7 +157,12 @@ export function getPlatform(userAgent: string): 'mobile' | 'desktop' {
   let platform = 'desktop';
   if (system === 'windows' || system === 'macos' || system === 'linux') {
     platform = 'desktop';
-  } else if (system === 'android' || system === 'ios' || system === 'openharmony' || testUa(/mobile/g)) {
+  } else if (
+    system === 'android' ||
+    system === 'ios' ||
+    system === 'openharmony' ||
+    testUa(/mobile/g)
+  ) {
     platform = 'mobile';
   }
 
@@ -233,14 +242,14 @@ interface IFile {
   key: string;
   type: 'directory' | 'file';
   parent: string;
-  mtime: number;
+  createTime: number;
   size?: number;
   children?: IFile[];
 }
 
 export function dirSort(a: IFile, b: IFile): number {
   if (a.type === 'file' && b.type === 'file') {
-    return b.mtime - a.mtime;
+    return b.createTime - a.createTime;
   } else if (a.type === 'directory' && b.type === 'directory') {
     return a.title.localeCompare(b.title);
   } else {
@@ -274,7 +283,7 @@ export async function readDirs(
         key,
         type: 'directory',
         parent: relativePath,
-        mtime: stats.mtime.getTime(),
+        createTime: stats.birthtime.getTime(),
         children: children.sort(sort),
       });
     } else {
@@ -284,7 +293,7 @@ export async function readDirs(
         key,
         parent: relativePath,
         size: stats.size,
-        mtime: stats.mtime.getTime(),
+        createTime: stats.birthtime.getTime(),
       });
     }
   }

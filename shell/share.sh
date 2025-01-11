@@ -438,8 +438,14 @@ clear_env() {
 }
 
 handle_task_start() {
-  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
-  echo -e "## 开始执行... $begin_time\n"
+  local error_message=""
+  if [[ $ID ]]; then
+    local error=$(update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp")
+    if [[ $error ]]; then
+      error_message=", 任务状态更新失败(${error})"
+    fi
+  fi
+  echo -e "## 开始执行... ${begin_time}${error_message}\n"
 }
 
 run_task_before() {
@@ -472,8 +478,13 @@ handle_task_end() {
 
   [[ "$diff_time" == 0 ]] && diff_time=1
 
-  echo -e "\n## 执行结束$suffix... $end_time  耗时 $diff_time 秒　　　　　"
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time"
+  if [[ $ID ]]; then
+    local error=$(update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time")
+    if [[ $error ]]; then
+      error_message=", 任务状态更新失败(${error})"
+    fi
+  fi
+  echo -e "\n## 执行结束$suffix... $end_time  耗时 $diff_time 秒${error_message}　　　　　"
 }
 
 init_env

@@ -1,8 +1,8 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
-const path = require('path');
 
-const PROTO_PATH = path.resolve(__dirname, '../../back/protos/api.proto');
+console.log(process.env.QL_DIR);
+const PROTO_PATH = `${process.env.QL_DIR}/back/protos/api.proto`;
 const options = {
   keepCase: true,
   longs: String,

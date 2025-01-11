@@ -3,12 +3,9 @@ import got from 'got';
 import { HttpProxyAgent, HttpsProxyAgent } from 'hpagent';
 import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
-import winston from 'winston';
-import { parseBody, parseHeaders, safeJSONParse } from '../config/util';
+import { parseBody, parseHeaders } from '../config/util';
 import { NotificationInfo } from '../data/notify';
 import UserService from './user';
-import { readFile } from 'fs/promises';
-import config from '../config';
 
 @Service()
 export default class NotificationService {
@@ -48,27 +45,6 @@ export default class NotificationService {
   };
 
   constructor() {}
-
-  public async externalNotify(
-    title: string,
-    content: string,
-  ): Promise<boolean | undefined> {
-    const { type, ...rest } = safeJSONParse(
-      await readFile(config.systemNotifyFile, 'utf-8'),
-    );
-    if (type) {
-      this.title = title;
-      this.content = content;
-      this.params = rest;
-      const notificationModeAction = this.modeMap.get(type);
-      try {
-        return await notificationModeAction?.call(this);
-      } catch (error: any) {
-        throw error;
-      }
-    }
-    return false;
-  }
 
   public async notify(
     title: string,
@@ -154,15 +130,18 @@ export default class NotificationService {
   private async serverChan() {
     const { serverChanKey } = this.params;
     const matchResult = serverChanKey.match(/^sctp(\d+)t/i);
-    const url = matchResult && matchResult[1]
-      ? `https://${matchResult[1]}.push.ft07.com/send/${serverChanKey}.send`
-      : `https://sctapi.ftqq.com/${serverChanKey}.send`;
+    const url =
+      matchResult && matchResult[1]
+        ? `https://${matchResult[1]}.push.ft07.com/send/${serverChanKey}.send`
+        : `https://sctapi.ftqq.com/${serverChanKey}.send`;
 
     try {
       const res: any = await got
         .post(url, {
           ...this.gotOption,
-          body: `title=${encodeURIComponent(this.title)}&desp=${encodeURIComponent(this.content)}`,
+          body: `title=${encodeURIComponent(
+            this.title,
+          )}&desp=${encodeURIComponent(this.content)}`,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         .json();
@@ -520,10 +499,18 @@ export default class NotificationService {
     } catch (error: any) {
       throw new Error(error.response ? error.response.body : error);
     }
- }
+  }
 
   private async pushPlus() {
-    const { pushPlusToken, pushPlusUser, pushplusWebhook, pushPlusTemplate, pushplusChannel, pushplusCallbackUrl, pushplusTo} = this.params;
+    const {
+      pushPlusToken,
+      pushPlusUser,
+      pushplusWebhook,
+      pushPlusTemplate,
+      pushplusChannel,
+      pushplusCallbackUrl,
+      pushplusTo,
+    } = this.params;
     const url = `https://www.pushplus.plus/send`;
     try {
       let body = {
@@ -537,13 +524,11 @@ export default class NotificationService {
           channel: `${pushplusChannel || 'wechat'}`,
           webhook: `${pushplusWebhook || ''}`,
           callbackUrl: `${pushplusCallbackUrl || ''}`,
-          to: `${pushplusTo || ''}`
+          to: `${pushplusTo || ''}`,
         },
-      }
+      };
 
-      const res: any = await got
-        .post(url, body)
-        .json();
+      const res: any = await got.post(url, body).json();
 
       if (res.code === 200) {
         return true;
@@ -678,37 +663,46 @@ export default class NotificationService {
     const encodeRfc2047 = (text: string, charset: string = 'UTF-8'): string => {
       const encodedText = Buffer.from(text).toString('base64');
       return `=?${charset}?B?${encodedText}?=`;
-  };
+    };
     try {
-        const encodedTitle = encodeRfc2047(this.title);
-        const res: any = await got
-          .post(`${ntfyUrl || 'https://ntfy.sh'}/${ntfyTopic}`, {
-              ...this.gotOption,
-              body: `${this.content}`,
-              headers: { 'Title': encodedTitle, 'Priority': `${ntfyPriority || '3'}` },
-          });
-          if (res.statusCode === 200) {
-            return true;
-          } else {
-            throw new Error(JSON.stringify(res));
-          }
+      const encodedTitle = encodeRfc2047(this.title);
+      const res: any = await got.post(
+        `${ntfyUrl || 'https://ntfy.sh'}/${ntfyTopic}`,
+        {
+          ...this.gotOption,
+          body: `${this.content}`,
+          headers: { Title: encodedTitle, Priority: `${ntfyPriority || '3'}` },
+        },
+      );
+      if (res.statusCode === 200) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
     } catch (error: any) {
-        throw new Error(error.response ? error.response.body : error);
+      throw new Error(error.response ? error.response.body : error);
     }
   }
 
   private async wxPusherBot() {
-    const { wxPusherBotAppToken, wxPusherBotTopicIds, wxPusherBotUids } = this.params;
+    const { wxPusherBotAppToken, wxPusherBotTopicIds, wxPusherBotUids } =
+      this.params;
     // 处理 topicIds，将分号分隔的字符串转为数组
-    const topicIds = wxPusherBotTopicIds ? wxPusherBotTopicIds.split(';')
-      .map(id => id.trim())
-      .filter(id => id)
-      .map(id => parseInt(id)) : [];
+    const topicIds = wxPusherBotTopicIds
+      ? wxPusherBotTopicIds
+          .split(';')
+          .map((id) => id.trim())
+          .filter((id) => id)
+          .map((id) => parseInt(id))
+      : [];
 
-    // 处理 uids，将分号分隔的字符串转为数组  
-    const uids = wxPusherBotUids ? wxPusherBotUids.split(';')
-      .map(uid => uid.trim())
-      .filter(uid => uid) : [];
+    // 处理 uids，将分号分隔的字符串转为数组
+    const uids = wxPusherBotUids
+      ? wxPusherBotUids
+          .split(';')
+          .map((uid) => uid.trim())
+          .filter((uid) => uid)
+      : [];
 
     // topic_ids 和 uids 至少要有一个
     if (!topicIds.length && !uids.length) {
@@ -727,7 +721,7 @@ export default class NotificationService {
             contentType: 2,
             topicIds: topicIds,
             uids: uids,
-            verifyPayType: 0
+            verifyPayType: 0,
           },
         })
         .json();
@@ -742,7 +736,6 @@ export default class NotificationService {
     }
   }
 
-  
   private async chronocat() {
     const { chronocatURL, chronocatQQ, chronocatToken } = this.params;
     try {

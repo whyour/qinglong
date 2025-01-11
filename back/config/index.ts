@@ -51,7 +51,6 @@ const extraFile = path.join(configPath, 'extra.sh');
 const confBakDir = path.join(dataPath, 'config/bak/');
 const sampleFile = path.join(samplePath, 'config.sample.sh');
 const sqliteFile = path.join(samplePath, 'database.sqlite');
-const systemNotifyFile = path.join(preloadPath, 'system-notify.json');
 
 const authError = '错误的用户名密码，请重试';
 const loginFaild = '请先登录!';
@@ -135,5 +134,4 @@ export default {
   sqliteFile,
   sshdPath,
   systemLogPath,
-  systemNotifyFile,
 };

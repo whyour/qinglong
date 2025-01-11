@@ -489,13 +489,14 @@ main() {
   local time_format="%Y-%m-%d %H:%M:%S"
   local time=$(date "+$time_format")
   local begin_timestamp=$(format_timestamp "$time_format" "$time")
-  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
 
   local begin_time=$(format_time "$time_format" "$time")
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
   fi
+
+  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
 
   case $p1 in
   update)

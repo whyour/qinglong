@@ -11,6 +11,9 @@ import {
   IScheduleFn,
   TCron,
 } from './interface';
+import config from '../config';
+import { credentials } from '@grpc/grpc-js';
+import { ApiClient } from '../protos/api';
 
 class TaskLimit {
   private dependenyLimit = new PQueue({ concurrency: 1 });
@@ -33,6 +36,11 @@ class TaskLimit {
   private systemLimit = new PQueue({
     concurrency: Math.max(os.cpus().length, 4),
   });
+  private client = new ApiClient(
+    `0.0.0.0:${config.cronPort}`,
+    credentials.createInsecure(),
+    { 'grpc.enable_http_proxy': 0 },
+  );
 
   get cronLimitActiveCount() {
     return this.cronLimit.pending;
@@ -126,9 +134,18 @@ class TaskLimit {
     if (result?.length > 5) {
       if (repeatTimes < 3) {
         this.repeatCronNotifyMap.set(cron.id, repeatTimes + 1);
-        this.notificationService.externalNotify(
-          '任务重复运行',
-          `任务：${cron.name}，命令：${cron.command}，定时：${cron.schedule}，处于运行中的超过 5 个，请检查定时设置`,
+        this.client.systemNotify(
+          {
+            title: '任务重复运行',
+            content: `任务：${cron.name}，命令：${cron.command}，定时：${cron.schedule}，处于运行中的超过 5 个，请检查定时设置`,
+          },
+          (err, res) => {
+            if (err) {
+              Logger.error(
+                `[schedule][任务重复运行] 通知失败 ${JSON.stringify(err)}`,
+              );
+            }
+          },
         );
       }
       Logger.warn(`[schedule][任务重复运行] 参数 ${JSON.stringify(cron)}`);
