@@ -91,9 +91,6 @@ export interface SystemNotifyRequest {
   content: string;
 }
 
-export interface SystemNotifyResponse {
-}
-
 function createBaseEnvItem(): EnvItem {
   return {
     id: undefined,
@@ -1171,49 +1168,6 @@ export const SystemNotifyRequest = {
   },
 };
 
-function createBaseSystemNotifyResponse(): SystemNotifyResponse {
-  return {};
-}
-
-export const SystemNotifyResponse = {
-  encode(_: SystemNotifyResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): SystemNotifyResponse {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSystemNotifyResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(_: any): SystemNotifyResponse {
-    return {};
-  },
-
-  toJSON(_: SystemNotifyResponse): unknown {
-    const obj: any = {};
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<SystemNotifyResponse>, I>>(base?: I): SystemNotifyResponse {
-    return SystemNotifyResponse.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SystemNotifyResponse>, I>>(_: I): SystemNotifyResponse {
-    const message = createBaseSystemNotifyResponse();
-    return message;
-  },
-};
-
 export type ApiService = typeof ApiService;
 export const ApiService = {
   getEnvs: {
@@ -1303,8 +1257,8 @@ export const ApiService = {
     responseStream: false,
     requestSerialize: (value: SystemNotifyRequest) => Buffer.from(SystemNotifyRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => SystemNotifyRequest.decode(value),
-    responseSerialize: (value: SystemNotifyResponse) => Buffer.from(SystemNotifyResponse.encode(value).finish()),
-    responseDeserialize: (value: Buffer) => SystemNotifyResponse.decode(value),
+    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => Response.decode(value),
   },
 } as const;
 
@@ -1318,7 +1272,7 @@ export interface ApiServer extends UntypedServiceImplementation {
   enableEnvs: handleUnaryCall<EnableEnvsRequest, Response>;
   updateEnvNames: handleUnaryCall<UpdateEnvNamesRequest, Response>;
   getEnvById: handleUnaryCall<GetEnvByIdRequest, EnvResponse>;
-  systemNotify: handleUnaryCall<SystemNotifyRequest, SystemNotifyResponse>;
+  systemNotify: handleUnaryCall<SystemNotifyRequest, Response>;
 }
 
 export interface ApiClient extends Client {
@@ -1459,18 +1413,18 @@ export interface ApiClient extends Client {
   ): ClientUnaryCall;
   systemNotify(
     request: SystemNotifyRequest,
-    callback: (error: ServiceError | null, response: SystemNotifyResponse) => void,
+    callback: (error: ServiceError | null, response: Response) => void,
   ): ClientUnaryCall;
   systemNotify(
     request: SystemNotifyRequest,
     metadata: Metadata,
-    callback: (error: ServiceError | null, response: SystemNotifyResponse) => void,
+    callback: (error: ServiceError | null, response: Response) => void,
   ): ClientUnaryCall;
   systemNotify(
     request: SystemNotifyRequest,
     metadata: Metadata,
     options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: SystemNotifyResponse) => void,
+    callback: (error: ServiceError | null, response: Response) => void,
   ): ClientUnaryCall;
 }
 

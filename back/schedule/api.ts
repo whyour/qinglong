@@ -15,7 +15,6 @@ import {
   MoveEnvRequest,
   Response,
   SystemNotifyRequest,
-  SystemNotifyResponse,
   UpdateEnvNamesRequest,
   UpdateEnvRequest,
 } from '../protos/api';
@@ -161,13 +160,13 @@ export const getEnvById = async (
 };
 
 export const systemNotify = async (
-  call: ServerUnaryCall<SystemNotifyRequest, SystemNotifyResponse>,
-  callback: sendUnaryData<SystemNotifyResponse>,
+  call: ServerUnaryCall<SystemNotifyRequest, Response>,
+  callback: sendUnaryData<Response>,
 ) => {
   try {
     const systemService = Container.get(SystemService);
     const data = await systemService.notify(call.request);
-    callback(null, { code: 200, data });
+    callback(null, data);
   } catch (e: any) {
     callback(e);
   }
