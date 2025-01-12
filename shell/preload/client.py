@@ -85,28 +85,28 @@ class Client:
         return self._execute_node("updateEnv", data)
 
     @error_handler
-    def deleteEnvs(self, env_ids: List[str]) -> Dict:
-        return self._execute_node("deleteEnvs", {"ids": env_ids})
+    def deleteEnvs(self, data: Dict) -> Dict:
+        return self._execute_node("deleteEnvs", data)
 
     @error_handler
     def moveEnv(self, data: Dict) -> Dict:
         return self._execute_node("moveEnv", data)
 
     @error_handler
-    def disableEnvs(self, env_ids: List[str]) -> Dict:
-        return self._execute_node("disableEnvs", {"ids": env_ids})
+    def disableEnvs(self, data: Dict) -> Dict:
+        return self._execute_node("disableEnvs", data)
 
     @error_handler
-    def enableEnvs(self, env_ids: List[str]) -> Dict:
-        return self._execute_node("enableEnvs", {"ids": env_ids})
+    def enableEnvs(self, data: Dict) -> Dict:
+        return self._execute_node("enableEnvs", data)
 
     @error_handler
     def updateEnvNames(self, data: Dict) -> Dict:
         return self._execute_node("updateEnvNames", data)
 
     @error_handler
-    def getEnvById(self, env_id: str) -> Dict:
-        return self._execute_node("getEnvById", {"id": env_id})
+    def getEnvById(self, data: Dict) -> Dict:
+        return self._execute_node("getEnvById", data)
 
     @error_handler
     def systemNotify(self, data: Dict) -> Dict:
