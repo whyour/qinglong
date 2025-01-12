@@ -1,15 +1,7 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import {
-  createFile,
-  createRandomString,
-  fileExist,
-  getNetIp,
-  getPlatform,
-  safeJSONParse,
-} from '../config/util';
+import { createRandomString, getNetIp } from '../config/util';
 import config from '../config';
-import * as fs from 'fs/promises';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
 import {

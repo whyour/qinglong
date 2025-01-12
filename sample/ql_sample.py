@@ -6,7 +6,9 @@ cron: 1 9 * * *
 """
 
 print("test script")
-QLAPI.notify("test script", "test desc")
-QLAPI.systemNotify({"title": "test script", "content": "dddd"})
+print(QLAPI.notify("test script", "test desc"))
+print("test systemNotify")
+print(QLAPI.systemNotify({"title": "test script", "content": "dddd"}))
+print("test getEnvs")
 print(QLAPI.getEnvs("1"))
 print("test desc")

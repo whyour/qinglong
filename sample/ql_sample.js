@@ -6,10 +6,10 @@
  */
 console.log('test scripts');
 QLAPI.notify('test scripts', 'test desc');
-QLAPI.getEnvs({ searchValue: 'dddd' }).then(x => {
-  console.log(x)
-})
-QLAPI.systemNotify({ title: '123', content: '231' }).then(x => {
-  console.log(x)
-})
+QLAPI.getEnvs({ searchValue: 'dddd' }).then((x) => {
+  console.log('getEnvs', x);
+});
+QLAPI.systemNotify({ title: '123', content: '231' }).then((x) => {
+  console.log('systemNotify', x);
+});
 console.log('test desc');

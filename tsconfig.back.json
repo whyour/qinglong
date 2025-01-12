@@ -18,7 +18,7 @@
     "noEmit": false,
     "esModuleInterop": true
   },
-  "include": ["./back/**/*"],
+  "include": ["./back/**/*", "./back.d.ts"],
   "exclude": ["node_modules"],
   "files": ["./back/index.d.ts"]
 }

@@ -20,8 +20,8 @@ import {
   UpdateEnvRequest,
 } from '../protos/api';
 import LoggerInstance from '../loaders/logger';
-import NotificationService from '../services/notify';
 import pick from 'lodash/pick';
+import SystemService from '../services/system';
 
 Container.set('logger', LoggerInstance);
 
@@ -165,11 +165,8 @@ export const systemNotify = async (
   callback: sendUnaryData<SystemNotifyResponse>,
 ) => {
   try {
-    const notifyService = Container.get(NotificationService);
-    const data = await notifyService.notify(
-      call.request.title,
-      call.request.content,
-    );
+    const systemService = Container.get(SystemService);
+    const data = await systemService.notify(call.request);
     callback(null, { code: 200, data });
   } catch (e: any) {
     callback(e);
