@@ -58,136 +58,15 @@ npm i @whyour/qinglong
 
 ## 部署
 
-### docker (推荐)
+[查看文档](https://qinglong.online/guide/getting-started/installation-guide)
 
-```bash
-# curl -sSL get.docker.com | sh
-docker run -dit \
-  -v $PWD/ql/data:/ql/data \
-  # 冒号后面的 5700 为默认端口，如果设置了 QlPort, 需要跟 QlPort 保持一致
-  -p 5700:5700 \
-  # 部署路径非必须，比如 /test
-  -e QlBaseUrl="/" \
-  # 部署端口非必须，当使用 host 模式时，可以设置服务启动后的端口，默认 5700
-  -e QlPort="5700" \
-  --name qinglong \
-  --hostname qinglong \
-  --restart unless-stopped \
-  whyour/qinglong:latest
-```
+## 内置 API
 
-### 宝塔面板一键部署（推荐）
-
-1. 安装宝塔面板，前往 [宝塔面板](https://www.bt.cn/u/EcDAFU) 官网，选择正式版的脚本下载安装
-
-2. 安装后登录宝塔面板，在菜单栏中点击 `Docker`，首次进入会提示安装`Docker`服务，点击立即安装，按提示完成安装
-
-3. 安装完成后在应用商店中找到`青龙面板`，点击安装，配置域名等基本信息即可完成安装
-
-### docker-compose (推荐)
-
-```bash
-#  curl -L https://github.com/docker/compose/releases/download/1.16.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
-mkdir qinglong && cd $_
-wget https://raw.githubusercontent.com/whyour/qinglong/master/docker/docker-compose.yml
-
-# 启动
-docker-compose up -d
-# 停止
-docker-compose down
-```
-
-### podman (推荐)
-
-```bash
-# https://podman.io/getting-started/installation
-podman run -dit \
-  --network bridge \
-  -v $PWD/ql/data:/ql/data \
-  # 冒号后面的 5700 为默认端口，如果设置了 QlPort, 需要跟 QlPort 保持一致
-  -p 5700:5700 \
-  # 部署路径非必须，比如 /test
-  -e QlBaseUrl="/" \
-  # 部署端口非必须，当使用 host 模式时，可以设置服务启动后的端口，默认 5700
-  -e QlPort="5700" \
-  --name qinglong \
-  --hostname qinglong \
-  docker.io/whyour/qinglong:latest
-```
-
-### npm (本地)
-
-建议使用纯净系统安装，避免系统原有数据丢失，需要自己安装 node/npm/python3/pip3/pnpm
-
-```bash
-# Debian/Ubuntu
-curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-```
-
-```bash
-npm install -g node-pre-gyp pnpm@8.3.1
-npm install -g @whyour/qinglong
-qinglong
-# 根据提示增加环境变量 QL_DIR 和 QL_DATA_DIR，QL_DATA_DIR 必须以 /data 结尾
-export QL_DIR=""
-export QL_DATA_DIR=""
-# 再次执行
-qinglong
-```
+[查看文档](https://qinglong.online/guide/user-guide/built-in-api)
 
 ## 内置命令
 
-- task
-
-```bash
-# 依次执行，如果设置了随机延迟，将随机延迟一定秒数
-task <file_path>                                             
-# 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日，同时记录在日志文件中
-task <file_path> now                                         
-# 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日，直接记录在日志文件中，且可指定账号执行
-task <file_path> conc <env_name> <account_number>(可选的) 
-# 指定账号执行，无论是否设置了随机延迟，均立即运行 
-task <file_path> desi <env_name> <account_number>      
-# 设置任务超时时间   
-task -m <max_time> <file_path>
-# 使用 -- 分割，-- 后面的参数会传给脚本，下面的例子，脚本就可接收到参数 -u whyour -p password
-task <file_path> -- -u whyour -p password
-```
-
-- ql
-
-```bash
-# 更新并重启青龙
-ql update
-# 运行自定义脚本extra.sh
-ql extra
-# 添加单个脚本文件
-ql raw <file_url>
-# 添加单个仓库的指定脚本
-ql repo <repo_url> <whitelist> <blacklist> <dependence> <branch> <extensions>
-# 删除旧日志
-ql rmlog <days>
-# 启动tg-bot
-ql bot
-# 检测青龙环境并修复
-ql check
-# 重置登录错误次数
-ql resetlet                                                  
-# 禁用两步登录
-ql resettfa
-```
-
-| **参数**   | **说明**                                                                                    |
-|------------|---------------------------------------------------------------------------------------------|
-| file_url   | 脚本地址                                                                                    |
-| repo_url   | 仓库地址                                                                                    |
-| whitelist  | 拉取仓库时的白名单，即就是需要拉取的脚本的路径包含的字符串，多个竖线分割                    |
-| blacklist  | 拉取仓库时的黑名单，即就是需要拉取的脚本的路径不包含的字符串，多个竖线分割                  |
-| dependence | 拉取仓库需要的依赖文件，会直接从仓库拷贝到scripts下的仓库目录，不受黑名单影响，多个竖线分割 |
-| extensions | 拉取仓库的文件后缀，多个竖线分割                                                            |
-| branch     | 拉取仓库的分支                                                                              |
-| days       | 需要保留的日志的天数                                                                        |
-| file_path  | 任务执行时的文件路径                                                                        |
+[查看文档](https://qinglong.online/guide/user-guide/basic-explanation)
 
 ## 开发
 
