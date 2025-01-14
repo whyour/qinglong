@@ -159,8 +159,8 @@ export default ({ app }: { app: Application }) => {
           .status(500)
           .send({
             code: 400,
-            message: `${err.name} ${err.message}`,
-            validation: err.errors,
+            message: `${err.message}`,
+            errors: err.errors,
           })
           .end();
       }
