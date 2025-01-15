@@ -428,7 +428,7 @@ function tgBotNotify(text, desp) {
       TG_PROXY_AUTH,
     } = push_config;
     if (TG_BOT_TOKEN && TG_USER_ID) {
-      const options = {
+      let options = {
         url: `${TG_API_HOST}/bot${TG_BOT_TOKEN}/sendMessage`,
         json: {
           chat_id: `${TG_USER_ID}`,
@@ -442,20 +442,20 @@ function tgBotNotify(text, desp) {
       };
       if (TG_PROXY_HOST && TG_PROXY_PORT) {
         const { HttpProxyAgent, HttpsProxyAgent } = require('hpagent');
-        const options = {
+        const _options = {
           keepAlive: true,
           keepAliveMsecs: 1000,
           maxSockets: 256,
           maxFreeSockets: 256,
           proxy: `http://${TG_PROXY_AUTH}${TG_PROXY_HOST}:${TG_PROXY_PORT}`,
         };
-        const httpAgent = new HttpProxyAgent(options);
-        const httpsAgent = new HttpsProxyAgent(options);
+        const httpAgent = new HttpProxyAgent(_options);
+        const httpsAgent = new HttpsProxyAgent(_options);
         const agent = {
           http: httpAgent,
           https: httpsAgent,
         };
-        Object.assign(options, { agent });
+        options.agent = agent;
       }
       $.post(options, (err, resp, data) => {
         try {
