@@ -1,8 +1,7 @@
-version: 2.18.0
-changeLogLink: https://t.me/jiao_long/424
-publishTime: 2025-01-05 13:00
+version: 2.18.1
+changeLogLink: https://t.me/jiao_long/426
+publishTime: 2025-01-15 08:00
 changeLog: |
-  1. 由于安全问题，修改认证信息存储方式，不再使用 auth.json 存储
-  2. 修复初始化 SystemConfig 数据
-  3. 修改通知文件未设置时提示
-  4. 修复配置文件更新可能异常
+  1. 内置 QLAPI 增加环境变量和系统通知 api
+  2. 移除 nedb 和 sentry，不再支持 2.10.x 版本自动迁移
+  3. 修复多语言翻译
