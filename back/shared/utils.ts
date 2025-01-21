@@ -1,7 +1,7 @@
 import { lock } from 'proper-lockfile';
 import os from 'os';
 import path from 'path';
-import { writeFile, open } from 'fs/promises';
+import { writeFile, open, chmod } from 'fs/promises';
 import { fileExist } from '../config/util';
 
 function getUniqueLockPath(filePath: string) {
@@ -35,5 +35,8 @@ export async function writeFileWithLock(
     lockfilePath,
   });
   await writeFile(filePath, content, { encoding: 'utf8', ...options });
+  if (options?.mode) {
+    await chmod(filePath, options.mode);
+  }
   await release();
 }

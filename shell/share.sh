@@ -474,7 +474,7 @@ handle_task_end() {
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
   local suffix=""
-  [[ "$MANUAL" == "true" ]] && suffix="(手动停止)"
+  [[ "${MANUAL:=}" == "true" ]] && suffix="(手动停止)"
 
   [[ "$diff_time" == 0 ]] && diff_time=1
 
@@ -484,7 +484,7 @@ handle_task_end() {
       error_message=", 任务状态更新失败(${error})"
     fi
   fi
-  echo -e "\n## 执行结束$suffix... $end_time  耗时 $diff_time 秒${error_message}　　　　　"
+  echo -e "\n## 执行结束$suffix... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
 }
 
 init_env
