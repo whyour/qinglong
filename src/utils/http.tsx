@@ -57,18 +57,19 @@ const errorHandler = function (
         return error.config?.onError(error.response);
       }
 
-      notification.error({
-        message: msg,
-        description: (
-          <>
-            {error.response?.data?.errors?.map((item: any) => (
-              <div>
-                {item.message} ({item.value})
-              </div>
-            ))}
-          </>
-        ),
-      });
+      msg &&
+        notification.error({
+          message: msg,
+          description: error.response?.data?.errors ? (
+            <>
+              {error.response?.data?.errors?.map((item: any) => (
+                <div>
+                  {item.message} ({item.value})
+                </div>
+              ))}
+            </>
+          ) : undefined,
+        });
     }
   } else {
     console.log(error.message);
@@ -117,13 +118,13 @@ _request.interceptors.response.use(async (response) => {
         msg &&
           notification.error({
             message: msg,
-            description: (
+            description: res?.errors ? (
               <>
                 {res?.errors.map((item: any) => (
                   <div>{item.message}</div>
                 ))}
               </>
-            ),
+            ) : undefined,
           });
       }
       return res;
