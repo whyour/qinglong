@@ -46,7 +46,7 @@ export default class CronService {
           id: String(doc.id),
           schedule: doc.schedule!,
           command: this.makeCommand(doc),
-          extraSchedules: doc.extra_schedules || [],
+          extra_schedules: doc.extra_schedules || [],
         },
       ]);
     }
@@ -76,7 +76,7 @@ export default class CronService {
           id: String(newDoc.id),
           schedule: newDoc.schedule!,
           command: this.makeCommand(newDoc),
-          extraSchedules: newDoc.extra_schedules || [],
+          extra_schedules: newDoc.extra_schedules || [],
         },
       ]);
     }
@@ -320,10 +320,10 @@ export default class CronService {
     log_path,
   }: {
     log_path: string;
-  }): Promise<Crontab | null> {
+  }): Promise<Crontab | undefined> {
     try {
       const result = await CrontabModel.findOne({ where: { log_path } });
-      return result;
+      return result?.get({ plain: true });
     } catch (error) {
       throw error;
     }
@@ -424,7 +424,7 @@ export default class CronService {
           name: cron.name,
           command: cron.command,
           schedule: cron.schedule,
-          extraSchedules: cron.extra_schedules,
+          extra_schedules: cron.extra_schedules,
         };
         if (cron.status !== CrontabStatus.queued) {
           resolve(params);
@@ -508,7 +508,7 @@ export default class CronService {
         id: String(doc.id),
         schedule: doc.schedule!,
         command: this.makeCommand(doc),
-        extraSchedules: doc.extra_schedules || [],
+        extra_schedules: doc.extra_schedules || [],
       }));
     await cronClient.addCron(sixCron);
     await this.set_crontab();
@@ -653,7 +653,7 @@ export default class CronService {
         id: String(doc.id),
         schedule: doc.schedule!,
         command: this.makeCommand(doc),
-        extraSchedules: doc.extra_schedules || [],
+        extra_schedules: doc.extra_schedules || [],
       }));
     await cronClient.addCron(sixCron);
   }

@@ -8,7 +8,7 @@ message EnvItem {
   optional string value = 3;
   optional string remarks = 4;
   optional int32 status = 5;
-  optional int32 position = 6;
+  optional int64 position = 6;
 }
 
 message GetEnvsRequest { string searchValue = 1; }
@@ -58,6 +58,72 @@ message SystemNotifyRequest {
   string content = 2;
 }
 
+message ExtraScheduleItem {
+  string schedule = 1;
+}
+
+message CronItem {
+  optional int32 id = 1;
+  optional string command = 2;
+  optional string schedule = 3;
+  optional string name = 4;
+  repeated string labels = 5;
+  optional int32 sub_id = 6;
+  repeated ExtraScheduleItem extra_schedules = 7;
+  optional string task_before = 8;
+  optional string task_after = 9;
+  optional int32 status = 10;
+  optional string log_path = 11;
+  optional int32 pid = 12;
+  optional int64 last_running_time = 13;
+  optional int64 last_execution_time = 14;
+}
+
+message CreateCronRequest {
+  string command = 1;
+  string schedule = 2;
+  optional string name = 3;
+  repeated string labels = 4;
+  optional int32 sub_id = 5;
+  repeated ExtraScheduleItem extra_schedules = 6;
+  optional string task_before = 7;
+  optional string task_after = 8;
+}
+
+message UpdateCronRequest {
+  int32 id = 1;
+  string command = 2;
+  string schedule = 3;
+  optional string name = 4;
+  repeated string labels = 5;
+  optional int32 sub_id = 6;
+  repeated ExtraScheduleItem extra_schedules = 7;
+  optional string task_before = 8;
+  optional string task_after = 9;
+}
+
+message DeleteCronsRequest { repeated int32 ids = 1; }
+
+message CronsResponse {
+  int32 code = 1;
+  repeated CronItem data = 2;
+  optional string message = 3;
+}
+
+message CronResponse {
+  int32 code = 1;
+  CronItem data = 2;
+  optional string message = 3;
+}
+
+message CronDetailRequest { string log_path = 1; }
+
+message CronDetailResponse {
+  int32 code = 1;
+  CronItem data = 2;
+  optional string message = 3;
+}
+
 service Api {
   rpc GetEnvs(GetEnvsRequest) returns (EnvsResponse) {}
   rpc CreateEnv(CreateEnvRequest) returns (EnvsResponse) {}
@@ -69,4 +135,8 @@ service Api {
   rpc UpdateEnvNames(UpdateEnvNamesRequest) returns (Response) {}
   rpc GetEnvById(GetEnvByIdRequest) returns (EnvResponse) {}
   rpc SystemNotify(SystemNotifyRequest) returns (Response) {}
+  rpc GetCronDetail(CronDetailRequest) returns (CronDetailResponse) {}
+  rpc CreateCron(CreateCronRequest) returns (CronResponse) {}
+  rpc UpdateCron(UpdateCronRequest) returns (CronResponse) {}
+  rpc DeleteCrons(DeleteCronsRequest) returns (Response) {}
 }

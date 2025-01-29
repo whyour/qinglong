@@ -10,7 +10,7 @@ const addCron = (
   callback: sendUnaryData<AddCronResponse>,
 ) => {
   for (const item of call.request.crons) {
-    const { id, schedule, command, extraSchedules, name } = item;
+    const { id, schedule, command, extra_schedules, name } = item;
     if (scheduleStacks.has(id)) {
       scheduleStacks.get(id)?.forEach((x) => x.cancel());
     }
@@ -23,8 +23,8 @@ const addCron = (
       command,
     );
 
-    if (extraSchedules?.length) {
-      extraSchedules.forEach((x) => {
+    if (extra_schedules?.length) {
+      extra_schedules.forEach((x) => {
         Logger.info(
           '[schedule][创建定时任务], 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
           id,
@@ -40,8 +40,8 @@ const addCron = (
         Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
         runCron(command, item);
       }),
-      ...(extraSchedules?.length
-        ? extraSchedules.map((x) =>
+      ...(extra_schedules?.length
+        ? extra_schedules.map((x) =>
             nodeSchedule.scheduleJob(id, x.schedule, async () => {
               Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
               runCron(command, item);
