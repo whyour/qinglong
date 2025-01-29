@@ -35,7 +35,7 @@ class GrpcClient {
     'getCronDetail',
     'createCron',
     'updateCron',
-    'deleteCrons'
+    'deleteCrons',
   ];
 
   #client;
@@ -79,7 +79,7 @@ class GrpcClient {
   #promisifyMethod(methodName) {
     const capitalizedMethod =
       methodName.charAt(0).toUpperCase() + methodName.slice(1);
-    const grpcMethod = this.#client[capitalizedMethod].bind(this.#client);
+    const method = this.#client[capitalizedMethod].bind(this.#client);
 
     return async (params = {}) => {
       return new Promise((resolve, reject) => {
@@ -88,7 +88,7 @@ class GrpcClient {
           Date.now() + GrpcClient.#config.defaultTimeout,
         );
 
-        grpcMethod(params, metadata, { deadline }, (error, response) => {
+        method(params, metadata, { deadline }, (error, response) => {
           if (error) {
             return reject(error);
           }
@@ -129,6 +129,26 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   grpcClient.close();
   process.exit(0);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  if (reason instanceof Error) {
+    if (reason.stack) {
+      const relevantStack = reason.stack
+        .split('\n')
+        .filter((line) => {
+          return (
+            !line.includes('node:internal') &&
+            !line.includes('node_modules/@grpc') &&
+            !line.includes('processTicksAndRejections')
+          );
+        })
+        .join('\n');
+      console.error(relevantStack);
+    }
+  } else {
+    console.error(reason);
+  }
 });
 
 module.exports = grpcClient.getApi();

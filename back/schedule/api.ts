@@ -39,6 +39,13 @@ export const getEnvs = async (
   callback: sendUnaryData<EnvsResponse>,
 ) => {
   try {
+    if (!call.request.searchValue) {
+      return callback(null, {
+        code: 400,
+        data: [],
+        message: 'searchValue is required',
+      });
+    }
     const envService = Container.get(EnvService);
     const data = await envService.envs(call.request.searchValue);
     callback(null, {
@@ -182,17 +189,35 @@ export const systemNotify = async (
   }
 };
 
+const normalizeCronData = (data: CronItem | null): CronItem | undefined => {
+  if (!data) return undefined;
+  return {
+    ...data,
+    sub_id: data.sub_id ?? undefined,
+    extra_schedules: data.extra_schedules ?? undefined,
+    pid: data.pid ?? undefined,
+    task_before: data.task_before ?? undefined,
+    task_after: data.task_after ?? undefined,
+  };
+};
+
 export const getCronDetail = async (
   call: ServerUnaryCall<CronDetailRequest, CronDetailResponse>,
   callback: sendUnaryData<CronDetailResponse>,
 ) => {
   try {
+    if (!call.request.log_path) {
+      return callback(null, {
+        code: 400,
+        data: undefined,
+        message: 'log_path is required',
+      });
+    }
     const cronService = Container.get(CronService);
     const data = (await cronService.find({
       log_path: call.request.log_path,
     })) as CronItem;
-    console.log('data', data);
-    callback(null, { code: 200, data: data || undefined });
+    callback(null, { code: 200, data: normalizeCronData(data) });
   } catch (e: any) {
     callback(e);
   }
@@ -205,7 +230,7 @@ export const createCron = async (
   try {
     const cronService = Container.get(CronService);
     const data = (await cronService.create(call.request)) as CronItem;
-    callback(null, { code: 200, data });
+    callback(null, { code: 200, data: normalizeCronData(data) });
   } catch (e: any) {
     callback(e);
   }
@@ -217,8 +242,20 @@ export const updateCron = async (
 ) => {
   try {
     const cronService = Container.get(CronService);
-    const data = (await cronService.update(call.request)) as CronItem;
-    callback(null, { code: 200, data });
+    const { id, ...fields } = call.request;
+
+    const updateRequest = {
+      id,
+      ...Object.entries(fields).reduce((acc: any, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    } as UpdateCronRequest;
+
+    const data = (await cronService.update(updateRequest)) as CronItem;
+    callback(null, { code: 200, data: normalizeCronData(data) });
   } catch (e: any) {
     callback(e);
   }

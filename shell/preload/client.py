@@ -29,14 +29,14 @@ def error_handler(func):
                         f'"{k}": {v.__name__}' for k, v in required_fields.items()
                     )
                     raise Exception(
-                        f"unknown error: {func_name}() requires a dictionary with parameters: {{{fields_str}}}"
+                        f"{func_name}() requires a dictionary with parameters: {{{fields_str}}}"
                     ) from None
-            raise Exception(f"unknown error: {str(e)}") from None
+            raise Exception(f"{str(e)}") from None
         except Exception as e:
             error_msg = str(e)
             if "Error:" in error_msg:
                 error_msg = error_msg.split("Error:")[-1].split("\n")[0].strip()
-            raise Exception(f"unknown error: {error_msg}") from None
+            raise Exception(f"{error_msg}") from None
 
     return wrapper
 

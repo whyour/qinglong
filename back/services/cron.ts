@@ -58,7 +58,7 @@ export default class CronService {
     return await CrontabModel.create(payload, { returning: true });
   }
 
-  public async update(payload: Crontab): Promise<Crontab> {
+  public async update(payload: Partial<Crontab>): Promise<Crontab> {
     const doc = await this.getDb({ id: payload.id });
     const tab = new Crontab({ ...doc, ...payload });
     tab.saved = false;

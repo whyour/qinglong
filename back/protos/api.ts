@@ -125,8 +125,8 @@ export interface CreateCronRequest {
 
 export interface UpdateCronRequest {
   id: number;
-  command: string;
-  schedule: string;
+  command?: string | undefined;
+  schedule?: string | undefined;
   name?: string | undefined;
   labels: string[];
   sub_id?: number | undefined;
@@ -1797,8 +1797,8 @@ export const CreateCronRequest: MessageFns<CreateCronRequest> = {
 function createBaseUpdateCronRequest(): UpdateCronRequest {
   return {
     id: 0,
-    command: "",
-    schedule: "",
+    command: undefined,
+    schedule: undefined,
     name: undefined,
     labels: [],
     sub_id: undefined,
@@ -1813,10 +1813,10 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
     if (message.id !== 0) {
       writer.uint32(8).int32(message.id);
     }
-    if (message.command !== "") {
+    if (message.command !== undefined) {
       writer.uint32(18).string(message.command);
     }
-    if (message.schedule !== "") {
+    if (message.schedule !== undefined) {
       writer.uint32(26).string(message.schedule);
     }
     if (message.name !== undefined) {
@@ -1931,8 +1931,8 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
   fromJSON(object: any): UpdateCronRequest {
     return {
       id: isSet(object.id) ? globalThis.Number(object.id) : 0,
-      command: isSet(object.command) ? globalThis.String(object.command) : "",
-      schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : "",
+      command: isSet(object.command) ? globalThis.String(object.command) : undefined,
+      schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : undefined,
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
       labels: globalThis.Array.isArray(object?.labels) ? object.labels.map((e: any) => globalThis.String(e)) : [],
       sub_id: isSet(object.sub_id) ? globalThis.Number(object.sub_id) : undefined,
@@ -1949,10 +1949,10 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
     if (message.id !== 0) {
       obj.id = Math.round(message.id);
     }
-    if (message.command !== "") {
+    if (message.command !== undefined) {
       obj.command = message.command;
     }
-    if (message.schedule !== "") {
+    if (message.schedule !== undefined) {
       obj.schedule = message.schedule;
     }
     if (message.name !== undefined) {
@@ -1982,8 +1982,8 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
   fromPartial<I extends Exact<DeepPartial<UpdateCronRequest>, I>>(object: I): UpdateCronRequest {
     const message = createBaseUpdateCronRequest();
     message.id = object.id ?? 0;
-    message.command = object.command ?? "";
-    message.schedule = object.schedule ?? "";
+    message.command = object.command ?? undefined;
+    message.schedule = object.schedule ?? undefined;
     message.name = object.name ?? undefined;
     message.labels = object.labels?.map((e) => e) || [];
     message.sub_id = object.sub_id ?? undefined;

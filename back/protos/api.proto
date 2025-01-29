@@ -92,8 +92,8 @@ message CreateCronRequest {
 
 message UpdateCronRequest {
   int32 id = 1;
-  string command = 2;
-  string schedule = 3;
+  optional string command = 2;
+  optional string schedule = 3;
   optional string name = 4;
   repeated string labels = 5;
   optional int32 sub_id = 6;
