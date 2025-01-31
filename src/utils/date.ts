@@ -1,3 +1,5 @@
+import Intl from 'react-intl-universal';
+
 export function diffTime(num: number) {
   const diff = num * 1000;
 
@@ -12,15 +14,15 @@ export function diffTime(num: number) {
   const leave3 = leave2 % (60 * 1000);
   const seconds = Math.round(leave3 / 1000);
 
-  let returnStr = seconds + '秒';
+  let returnStr = `${seconds} ${Intl.get('秒')}`;
   if (minutes > 0) {
-    returnStr = minutes + '分' + returnStr;
+    returnStr = `${minutes} ${Intl.get('分')} ` + returnStr;
   }
   if (hours > 0) {
-    returnStr = hours + '小时' + returnStr;
+    returnStr = `${hours} ${Intl.get('时')} ` + returnStr;
   }
   if (days > 0) {
-    returnStr = days + '天' + returnStr;
+    returnStr = `${days} ${Intl.get('天')} ` + returnStr;
   }
   return returnStr;
 }
