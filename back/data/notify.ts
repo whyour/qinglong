@@ -49,9 +49,8 @@ export class PushDeerNotification extends NotificationBaseInfo {
   public pushDeerUrl = '';
 }
 
-export class ChatNotification extends NotificationBaseInfo {
-  public chatUrl = '';
-  public chatToken = '';
+export class synologyChatNotification extends NotificationBaseInfo {
+  public synologyChatUrl = '';
 }
 
 export class BarkNotification extends NotificationBaseInfo {
@@ -61,7 +60,7 @@ export class BarkNotification extends NotificationBaseInfo {
   public barkGroup = 'qinglong';
   public barkLevel = 'active';
   public barkUrl = '';
-  public barkArchive=""
+  public barkArchive = '';
 }
 
 export class TelegramBotNotification extends NotificationBaseInfo {
@@ -163,7 +162,7 @@ export interface NotificationInfo
     GotifyNotification,
     ServerChanNotification,
     PushDeerNotification,
-    ChatNotification,
+    synologyChatNotification,
     BarkNotification,
     TelegramBotNotification,
     DingtalkBotNotification,

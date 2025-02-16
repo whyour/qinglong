@@ -179,8 +179,8 @@ export default class CronService {
       for (const col of viewQuery.filters) {
         const { property, value, operation } = col;
         let q: any = {};
-        let operate2 = null;
-        let operate = null;
+        let operate2: any = null;
+        let operate: any = null;
         switch (operation) {
           case 'Reg':
             operate = Op.like;
@@ -203,9 +203,16 @@ export default class CronService {
           case 'Nin':
             q[Op.and] = [
               {
-                [property]: {
-                  [Op.notIn]: Array.isArray(value) ? value : [value],
-                },
+                [Op.or]: [
+                  {
+                    [property]: {
+                      [Op.notIn]: Array.isArray(value) ? value : [value],
+                    },
+                  },
+                  {
+                    [property]: { [Op.is]: null },
+                  },
+                ],
               },
               property === 'status' && value.includes(2)
                 ? { isDisabled: { [Op.ne]: 1 } }

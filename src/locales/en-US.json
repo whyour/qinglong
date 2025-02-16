@@ -344,7 +344,7 @@
   "gotify的url地址，例如 https://push.example.de:8080": "gotify URL address, e.g., https://push.example.de:8080",
   "gotify的消息应用token码": "gotify message application token code",
   "推送消息的优先级": "Priority of Push Messages",
-  "chat的url地址": "Chat URL address",
+  "synologyChat的url地址": "Synology Chat Webhook URL address",
   "chat的token码": "Chat token code",
   "推送到个人QQ: http://127.0.0.1/send_private_msg，群：http://127.0.0.1/send_group_msg": "Push to personal QQ: http://127.0.0.1/send_private_msg, group: http://127.0.0.1/send_group_msg",
   "访问密钥": "Access Key",

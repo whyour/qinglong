@@ -182,11 +182,10 @@ export default class NotificationService {
   }
 
   private async chat() {
-    const { chatUrl, chatToken } = this.params;
-    const url = `${chatUrl}${chatToken}`;
+    const { synologyChatUrl } = this.params;
     try {
       const res: any = await got
-        .post(url, {
+        .post(synologyChatUrl, {
           ...this.gotOption,
           body: `payload={"text":"${this.title}\n${this.content}"}`,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
