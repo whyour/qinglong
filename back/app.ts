@@ -17,6 +17,7 @@ async function startServer() {
       Logger.debug(`✌️ 后端服务启动成功！`);
       console.debug(`✌️ 后端服务启动成功！`);
       process.send?.('ready');
+      require('./loaders/bootAfter').default();
     })
     .on('error', (err) => {
       Logger.error(err);

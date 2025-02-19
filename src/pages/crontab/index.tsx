@@ -263,7 +263,9 @@ const Crontab = () => {
         },
       },
       render: (text, record) => {
-        return dayjs(record.nextRunTime).format('YYYY-MM-DD HH:mm:ss');
+        return record.nextRunTime 
+          ? dayjs(record.nextRunTime).format('YYYY-MM-DD HH:mm:ss')
+          : '-';
       },
     },
     {
@@ -396,9 +398,13 @@ const Crontab = () => {
 
           setValue(
             data.map((x) => {
+              const specialSchedules = ['@once', '@boot'];
+              const nextRunTime = specialSchedules.includes(x.schedule) 
+                ? null 
+                : getCrontabsNextDate(x.schedule, x.extra_schedules);
               return {
                 ...x,
-                nextRunTime: getCrontabsNextDate(x.schedule, x.extra_schedules),
+                nextRunTime,
                 subscription: subscriptionMap?.[x.sub_id],
               };
             }),

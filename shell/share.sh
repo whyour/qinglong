@@ -479,7 +479,7 @@ handle_task_end() {
   [[ "$diff_time" == 0 ]] && diff_time=1
 
   if [[ $ID ]]; then
-    local error=$(update_cron "\"$ID\"" "1" "" "$log_path" "$begin_timestamp" "$diff_time")
+    local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time")
     if [[ $error ]]; then
       error_message=", 任务状态更新失败(${error})"
     fi
