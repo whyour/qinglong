@@ -1,29 +1,13 @@
-import intl from 'react-intl-universal';
-import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form, Button, Space, Select } from 'antd';
-import { request } from '@/utils/http';
-import config from '@/utils/config';
-import cronParse from 'cron-parser';
 import EditableTagGroup from '@/components/tag';
+import config from '@/utils/config';
+import { request } from '@/utils/http';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
-
-enum ScheduleType {
-  Normal = 'normal',
-  Once = 'once',
-  Boot = 'boot',
-}
-
-const scheduleTypeMap = {
-  [ScheduleType.Normal]: '',
-  [ScheduleType.Once]: '@once',
-  [ScheduleType.Boot]: '@boot',
-};
-
-const getScheduleType = (schedule?: string): ScheduleType => {
-  if (schedule?.startsWith('@once')) return ScheduleType.Once;
-  if (schedule?.startsWith('@boot')) return ScheduleType.Boot;
-  return ScheduleType.Normal;
-};
+import { Button, Form, Input, Modal, Select, Space, message } from 'antd';
+import cronParse from 'cron-parser';
+import { useEffect, useState } from 'react';
+import intl from 'react-intl-universal';
+import { getScheduleType, scheduleTypeMap } from './const';
+import { ScheduleType } from './type';
 
 const CronModal = ({
   cron,
@@ -85,7 +69,11 @@ const CronModal = ({
   };
 
   const renderScheduleOptions = () => (
-    <Select defaultValue={scheduleType} value={scheduleType} onChange={handleScheduleTypeChange}>
+    <Select
+      defaultValue={scheduleType}
+      value={scheduleType}
+      onChange={handleScheduleTypeChange}
+    >
       <Select.Option value={ScheduleType.Normal}>
         {intl.get('常规定时')}
       </Select.Option>
@@ -336,4 +324,5 @@ const CronLabelModal = ({
   );
 };
 
-export { CronModal as default, CronLabelModal };
+export { CronLabelModal, CronModal as default };
+

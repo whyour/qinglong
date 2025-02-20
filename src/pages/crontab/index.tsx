@@ -1,64 +1,64 @@
-import intl from 'react-intl-universal';
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import useTableScrollHeight from '@/hooks/useTableScrollHeight';
+import { SharedContext } from '@/layouts';
+import { getCommandScript, getCrontabsNextDate } from '@/utils';
+import config from '@/utils/config';
+import { diffTime } from '@/utils/date';
+import { request } from '@/utils/http';
+import {
+  CheckCircleOutlined,
+  CheckOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  CopyOutlined,
+  DeleteOutlined,
+  DownOutlined,
+  EditOutlined,
+  EllipsisOutlined,
+  FieldTimeOutlined,
+  Loading3QuartersOutlined,
+  PlusOutlined,
+  PushpinOutlined,
+  SettingOutlined,
+  StopOutlined,
+  UnorderedListOutlined
+} from '@ant-design/icons';
+import { PageContainer } from '@ant-design/pro-layout';
+import { history, useOutletContext } from '@umijs/max';
 import {
   Button,
+  Dropdown,
+  Input,
+  MenuProps,
   message,
   Modal,
-  Table,
-  Tag,
   Space,
-  Tooltip,
-  Dropdown,
-  Menu,
-  Typography,
-  Input,
-  Popover,
-  Tabs,
+  Table,
   TablePaginationConfig,
-  MenuProps,
+  Tabs,
+  Tag,
+  Typography
 } from 'antd';
-import {
-  ClockCircleOutlined,
-  Loading3QuartersOutlined,
-  CloseCircleOutlined,
-  FileTextOutlined,
-  EllipsisOutlined,
-  PlayCircleOutlined,
-  CheckCircleOutlined,
-  EditOutlined,
-  StopOutlined,
-  DeleteOutlined,
-  PauseCircleOutlined,
-  FieldTimeOutlined,
-  PushpinOutlined,
-  DownOutlined,
-  SettingOutlined,
-  PlusOutlined,
-  UnorderedListOutlined,
-  CheckOutlined,
-  CopyOutlined,
-} from '@ant-design/icons';
-import config from '@/utils/config';
-import { PageContainer } from '@ant-design/pro-layout';
-import { request } from '@/utils/http';
-import CronModal, { CronLabelModal } from './modal';
-import CronLogModal from './logModal';
-import CronDetailModal from './detail';
-import { diffTime } from '@/utils/date';
-import { history, useOutletContext } from '@umijs/max';
-import './index.less';
-import ViewCreateModal from './viewCreateModal';
-import ViewManageModal from './viewManageModal';
-import { FilterValue, SorterResult } from 'antd/lib/table/interface';
-import { SharedContext } from '@/layouts';
-import useTableScrollHeight from '@/hooks/useTableScrollHeight';
-import { getCommandScript, getCrontabsNextDate, parseCrontab } from '@/utils';
 import { ColumnProps } from 'antd/lib/table';
-import { useVT } from 'virtualizedtableforantd4';
-import { ICrontab, OperationName, OperationPath, CrontabStatus } from './type';
-import Name from '@/components/name';
+import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import dayjs from 'dayjs';
 import { noop, omit } from 'lodash';
+import React, { useEffect, useRef, useState } from 'react';
+import intl from 'react-intl-universal';
+import { useVT } from 'virtualizedtableforantd4';
+import { getScheduleType } from './const';
+import CronDetailModal from './detail';
+import './index.less';
+import CronLogModal from './logModal';
+import CronModal, { CronLabelModal } from './modal';
+import {
+  CrontabStatus,
+  ICrontab,
+  OperationName,
+  OperationPath,
+  ScheduleType,
+} from './type';
+import ViewCreateModal from './viewCreateModal';
+import ViewManageModal from './viewManageModal';
 
 const { Text, Paragraph, Link } = Typography;
 const { Search } = Input;
@@ -263,7 +263,7 @@ const Crontab = () => {
         },
       },
       render: (text, record) => {
-        return record.nextRunTime 
+        return record.nextRunTime
           ? dayjs(record.nextRunTime).format('YYYY-MM-DD HH:mm:ss')
           : '-';
       },
@@ -398,10 +398,11 @@ const Crontab = () => {
 
           setValue(
             data.map((x) => {
-              const specialSchedules = ['@once', '@boot'];
-              const nextRunTime = specialSchedules.includes(x.schedule) 
-                ? null 
-                : getCrontabsNextDate(x.schedule, x.extra_schedules);
+              const scheduleType = getScheduleType(x.schedule);
+              const nextRunTime =
+                scheduleType === ScheduleType.Normal
+                  ? getCrontabsNextDate(x.schedule, x.extra_schedules)
+                  : null;
               return {
                 ...x,
                 nextRunTime,
@@ -812,7 +813,9 @@ const Crontab = () => {
 
   useEffect(() => {
     if (viewConf && enabledCronViews && enabledCronViews.length > 0) {
-      const view = enabledCronViews.slice(SHOW_TAB_COUNT).find((x) => x.id === viewConf.id);
+      const view = enabledCronViews
+        .slice(SHOW_TAB_COUNT)
+        .find((x) => x.id === viewConf.id);
       setMoreMenuActive(!!view);
     }
   }, [viewConf, enabledCronViews]);

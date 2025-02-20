@@ -22,6 +22,7 @@ import dayjs from 'dayjs';
 import pickBy from 'lodash/pickBy';
 import omit from 'lodash/omit';
 import { writeFileWithLock } from '../shared/utils';
+import { ScheduleType } from '../interface/schedule';
 
 @Service()
 export default class CronService {
@@ -36,11 +37,11 @@ export default class CronService {
   }
 
   private isOnceSchedule(schedule?: string) {
-    return schedule?.startsWith('@once');
+    return schedule?.startsWith(ScheduleType.ONCE);
   }
 
   private isBootSchedule(schedule?: string) {
-    return schedule?.startsWith('@boot');
+    return schedule?.startsWith(ScheduleType.BOOT);
   }
 
   private isSpecialSchedule(schedule?: string) {

@@ -1,8 +1,12 @@
 import { Joi } from 'celebrate';
 import cron_parser from 'cron-parser';
+import { ScheduleType } from '../interface/schedule';
 
 const validateSchedule = (value: string, helpers: any) => {
-  if (value.startsWith('@once') || value.startsWith('@boot')) {
+  if (
+    value.startsWith(ScheduleType.ONCE) ||
+    value.startsWith(ScheduleType.BOOT)
+  ) {
     return value;
   }
 

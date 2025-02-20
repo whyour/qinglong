@@ -36,5 +36,11 @@ export interface ICrontab {
   last_execution_time?: number;
   nextRunTime: Date;
   sub_id: number;
-  extra_schedules?: Array<{ schedule: string; }>;
+  extra_schedules?: Array<{ schedule: string }>;
+}
+
+export enum ScheduleType {
+  Normal = 'normal',
+  Once = 'once',
+  Boot = 'boot',
 }
