@@ -107,7 +107,7 @@ try:
 
     run()
 
-    from notify import send
+    from __ql_notify__ import send
 
     class BaseApi(Client):
         def notify(self, *args, **kwargs):

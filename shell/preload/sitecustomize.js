@@ -98,7 +98,7 @@ try {
 
   run();
 
-  const { sendNotify } = require('./notify.js');
+  const { sendNotify } = require('./__ql_notify__.js');
   global.QLAPI = {
     notify: sendNotify,
     ...client,
