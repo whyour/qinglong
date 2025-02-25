@@ -186,6 +186,7 @@
   "秒后重试": "Retry after seconds",
   "在您的设备上打开两步验证应用程序以查看您的身份验证代码并验证您的身份。": "Open the two-factor authentication application on your device to view your authentication code and verify your identity.",
   "请选择脚本文件": "Please select a script file",
+  "当前文件不支持预览": "The current file does not support preview",
   "清空日志": "Clear Logs",
   "设置": "Settings",
   "退出": "Exit",

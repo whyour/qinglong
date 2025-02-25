@@ -801,7 +801,7 @@ export default class NotificationService {
       webhookContentType,
     } = this.params;
 
-    if (!webhookUrl.includes('$title') && !webhookBody.includes('$title')) {
+    if (!webhookUrl?.includes('$title') && !webhookBody?.includes('$title')) {
       throw new Error('Url 或者 Body 中必须包含 $title');
     }
 
