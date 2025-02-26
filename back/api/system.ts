@@ -396,4 +396,22 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.put(
+    '/config/timezone',
+    celebrate({
+      body: Joi.object({
+        timezone: Joi.string().allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.updateTimezone(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
 };

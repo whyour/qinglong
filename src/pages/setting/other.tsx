@@ -23,10 +23,12 @@ import Countdown from 'antd/lib/statistic/Countdown';
 import useProgress from './progress';
 import pick from 'lodash/pick';
 import { disableBody } from '@/utils';
+import { TIMEZONES } from '@/utils/const';
 
 const dataMap = {
   'log-remove-frequency': 'logRemoveFrequency',
   'cron-concurrency': 'cronConcurrency',
+  timezone: 'timezone',
 };
 
 const Other = ({
@@ -37,6 +39,7 @@ const Other = ({
   const [systemConfig, setSystemConfig] = useState<{
     logRemoveFrequency?: number | null;
     cronConcurrency?: number | null;
+    timezone?: string | null;
   }>();
   const [form] = Form.useForm();
   const [exportLoading, setExportLoading] = useState(false);
@@ -245,6 +248,34 @@ const Other = ({
             type="primary"
             onClick={() => {
               updateSystemConfig('cron-concurrency');
+            }}
+            style={{ width: 84 }}
+          >
+            {intl.get('确认')}
+          </Button>
+        </Input.Group>
+      </Form.Item>
+      <Form.Item label={intl.get('时区')} name="timezone">
+        <Input.Group compact>
+          <Select
+            value={systemConfig?.timezone}
+            style={{ width: 180 }}
+            onChange={(value) => {
+              setSystemConfig({ ...systemConfig, timezone: value });
+            }}
+            options={TIMEZONES.map((timezone) => ({
+              value: timezone,
+              label: timezone,
+            }))}
+            showSearch
+            filterOption={(input, option) =>
+              option?.value?.toLowerCase().indexOf(input.toLowerCase()) >= 0
+            }
+          />
+          <Button
+            type="primary"
+            onClick={() => {
+              updateSystemConfig('timezone');
             }}
             style={{ width: 84 }}
           >

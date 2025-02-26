@@ -527,7 +527,7 @@ export function safeJSONParse(value?: string) {
   try {
     return JSON.parse(value);
   } catch (error) {
-    Logger.error('[JSON.parse失败]', error);
+    Logger.error('[safeJSONParse失败]', error);
     return {};
   }
 }
@@ -540,5 +540,21 @@ export async function rmPath(path: string) {
     }
   } catch (error) {
     Logger.error('[rmPath失败]', error);
+  }
+}
+
+export async function setSystemTimezone(timezone: string): Promise<boolean> {
+  try {
+    if (!(await fileExist(`/usr/share/zoneinfo/${timezone}`))) {
+      throw new Error('Invalid timezone');
+    }
+
+    await promiseExec(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`);
+    await promiseExec(`echo "${timezone}" > /etc/timezone`);
+
+    return true;
+  } catch (error) {
+    Logger.error('[setSystemTimezone失败]', error);
+    return false;
   }
 }

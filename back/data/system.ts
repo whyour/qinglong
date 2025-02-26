@@ -37,6 +37,7 @@ export interface SystemConfigInfo {
   nodeMirror?: string;
   pythonMirror?: string;
   linuxMirror?: string;
+  timezone?: string;
 }
 
 export interface LoginLogInfo {

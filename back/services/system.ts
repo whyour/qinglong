@@ -16,6 +16,7 @@ import {
   promiseExec,
   readDirs,
   rmPath,
+  setSystemTimezone,
 } from '../config/util';
 import {
   DependenceModel,
@@ -50,7 +51,10 @@ export default class SystemService {
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
-    return doc;
+    return {
+      ...doc,
+      info: { ...doc.info, timezone: doc.info?.timezone || 'Asia/Shanghai' },
+    };
   }
 
   private async updateAuthDb(payload: SystemInfo): Promise<SystemInfo> {
@@ -469,6 +473,23 @@ export default class SystemService {
     const logs = result.reverse().filter((x) => x.title.endsWith('.log'));
     for (const log of logs) {
       await rmPath(path.join(config.systemLogPath, log.title));
+    }
+  }
+
+  public async updateTimezone(info: SystemModelInfo) {
+    if (!info.timezone) {
+      info.timezone = 'Asia/Shanghai';
+    }
+    const oDoc = await this.getSystemConfig();
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, ...info },
+    });
+    const success = await setSystemTimezone(info.timezone);
+    if (success) {
+      return { code: 200, data: info };
+    } else {
+      return { code: 400, message: '设置时区失败' };
     }
   }
 }

@@ -543,6 +543,9 @@ main() {
   resettfa)
     eval update_auth_config "\\\"twoFactorActivated\\\":false" "禁用两步验证" $cmd
     ;;
+  resetpwd)
+    eval update_auth_config "\\\"password\\\":\\\"$p2\\\"" "重置密码" $cmd
+    ;;
   *)
     eval echo -e "命令输入错误...\\\n" $cmd
     eval usage $cmd
