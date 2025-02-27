@@ -38,21 +38,25 @@ export default async () => {
 
   // 运行删除日志任务
   const data = await systemService.getSystemConfig();
-  if (data && data.info && data.info.logRemoveFrequency) {
-    const rmlogCron = {
-      id: data.id as number,
-      name: '删除日志',
-      command: `ql rmlog ${data.info.logRemoveFrequency}`,
-      runOrigin: 'system' as const,
-    };
-    await scheduleService.cancelIntervalTask(rmlogCron);
-    scheduleService.createIntervalTask(
-      rmlogCron,
-      {
-        days: data.info.logRemoveFrequency,
-      },
-      true,
-    );
+  if (data && data.info) {
+    if (data.info.logRemoveFrequency) {
+      const rmlogCron = {
+        id: data.id as number,
+        name: '删除日志',
+        command: `ql rmlog ${data.info.logRemoveFrequency}`,
+        runOrigin: 'system' as const,
+      };
+      await scheduleService.cancelIntervalTask(rmlogCron);
+      scheduleService.createIntervalTask(
+        rmlogCron,
+        {
+          days: data.info.logRemoveFrequency,
+        },
+        true,
+      );
+    }
+
+    systemService.updateTimezone(data.info);
   }
 
   await subscriptionService.setSshConfig();
