@@ -1,7 +1,10 @@
-version: 2.18.1
-changeLogLink: https://t.me/jiao_long/426
-publishTime: 2025-01-15 08:00
+version: 2.18.2
+changeLogLink: https://t.me/jiao_long/427
+publishTime: 2025-02-28 00:00
 changeLog: |
-  1. 内置 QLAPI 增加环境变量和系统通知 api
-  2. 移除 nedb 和 sentry，不再支持 2.10.x 版本自动迁移
-  3. 修复多语言翻译
+  1. 定时任务支持 开机运行@boot 和 手动运行@once 任务
+  2. 脚本管理增加可预览检查，避免无法预览文件被重复保存
+  3. 系统设置增加时区设置
+  4. 修复登录失败没有提示
+  5. 增加重置密码命令 ql resetpwd
+  6. 修复群晖通知参数，任务视图不属于筛选
