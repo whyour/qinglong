@@ -347,11 +347,12 @@ export default class UserService {
   }
 
   public async resetAuthInfo(info: Partial<AuthInfo>) {
-    const { retries, twoFactorActivated } = info;
+    const { retries, twoFactorActivated, password } = info;
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, {
       retries,
       twoFactorActivated,
+      password,
     });
   }
 }

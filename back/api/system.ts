@@ -384,6 +384,7 @@ export default (app: Router) => {
       body: Joi.object({
         retries: Joi.number().optional(),
         twoFactorActivated: Joi.boolean().optional(),
+        password: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
