@@ -1,10 +1,15 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { celebrate, Joi } from 'celebrate';
+import { NextFunction, Request, Response, Router } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
-import { getFileContentByName, readDirs, removeAnsi, rmPath } from '../config/util';
-import { join, resolve } from 'path';
-import { celebrate, Joi } from 'celebrate';
+import {
+  getFileContentByName,
+  readDirs,
+  removeAnsi,
+  rmPath,
+} from '../config/util';
+import LogService from '../services/log';
 const route = Router();
 const blacklist = ['.tmp'];
 
@@ -29,17 +34,16 @@ export default (app: Router) => {
     '/detail',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const finalPath = resolve(
-          config.logPath,
+        const logService = Container.get(LogService);
+        const finalPath = logService.checkFilePath(
           (req.query.path as string) || '',
           (req.query.file as string) || '',
         );
-
-        if (
-          blacklist.includes(req.query.path as string) ||
-          !finalPath.startsWith(config.logPath)
-        ) {
-          return res.send({ code: 403, message: '暂无权限' });
+        if (!finalPath || blacklist.includes(req.query.path as string)) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
         }
         const content = await getFileContentByName(finalPath);
         res.send({ code: 200, data: removeAnsi(content) });
@@ -53,16 +57,16 @@ export default (app: Router) => {
     '/:file',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const finalPath = resolve(
-          config.logPath,
+        const logService = Container.get(LogService);
+        const finalPath = logService.checkFilePath(
           (req.query.path as string) || '',
-          (req.params.file as string) || '',
+          (req.query.file as string) || '',
         );
-        if (
-          blacklist.includes(req.path) ||
-          !finalPath.startsWith(config.logPath)
-        ) {
-          return res.send({ code: 403, message: '暂无权限' });
+        if (!finalPath || blacklist.includes(req.query.path as string)) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
         }
         const content = await getFileContentByName(finalPath);
         res.send({ code: 200, data: content });
@@ -83,14 +87,53 @@ export default (app: Router) => {
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        let { filename, path, type } = req.body as {
+        let { filename, path } = req.body as {
           filename: string;
           path: string;
-          type: string;
         };
-        const filePath = join(config.logPath, path, filename);
-        await rmPath(filePath);
+        const logService = Container.get(LogService);
+        const finalPath = logService.checkFilePath(filename, path);
+        if (!finalPath || blacklist.includes(path)) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
+        await rmPath(finalPath);
         res.send({ code: 200 });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/download',
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        path: Joi.string().allow(''),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        let { filename, path } = req.body as {
+          filename: string;
+          path: string;
+        };
+        const logService = Container.get(LogService);
+        const filePath = logService.checkFilePath(path, filename);
+        if (!filePath) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
+        return res.download(filePath, filename, (err) => {
+          if (err) {
+            return next(err);
+          }
+        });
       } catch (e) {
         return next(e);
       }

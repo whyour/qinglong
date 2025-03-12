@@ -237,7 +237,7 @@ enum FileType {
   'file',
 }
 
-interface IFile {
+export interface IFile {
   title: string;
   key: string;
   type: 'directory' | 'file';

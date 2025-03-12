@@ -1,4 +1,4 @@
-import { fileExist, readDirs, readDir, rmPath } from '../config/util';
+import { fileExist, readDirs, readDir, rmPath, IFile } from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
@@ -27,7 +27,7 @@ export default (app: Router) => {
   route.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const logger: Logger = Container.get('logger');
     try {
-      let result = [];
+      let result: IFile[] = [];
       const blacklist = [
         'node_modules',
         '.git',
@@ -102,7 +102,6 @@ export default (app: Router) => {
     '/',
     upload.single('file'),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         let { filename, path, content, originFilename, directory } =
           req.body as {
@@ -124,8 +123,8 @@ export default (app: Router) => {
         }
         if (config.writePathList.every((x) => !path.startsWith(x))) {
           return res.send({
-            code: 430,
-            message: '文件路径禁止访问',
+            code: 403,
+            message: '暂无权限',
           });
         }
 
@@ -175,14 +174,20 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         let { filename, content, path } = req.body as {
           filename: string;
           content: string;
           path: string;
         };
-        const filePath = join(config.scriptPath, path, filename);
+        const scriptService = Container.get(ScriptService);
+        const filePath = scriptService.checkFilePath(path, filename);
+        if (!filePath) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
         await writeFileWithLock(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
@@ -197,18 +202,22 @@ export default (app: Router) => {
       body: Joi.object({
         filename: Joi.string().required(),
         path: Joi.string().allow(''),
-        type: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
-        let { filename, path, type } = req.body as {
+        let { filename, path } = req.body as {
           filename: string;
           path: string;
-          type: string;
         };
-        const filePath = join(config.scriptPath, path, filename);
+        const scriptService = Container.get(ScriptService);
+        const filePath = scriptService.checkFilePath(path, filename);
+        if (!filePath) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
         await rmPath(filePath);
         res.send({ code: 200 });
       } catch (e) {
@@ -222,24 +231,27 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
+        path: Joi.string().allow(''),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
-        let { filename } = req.body as {
+        let { filename, path } = req.body as {
           filename: string;
+          path: string;
         };
-        const filePath = join(config.scriptPath, filename);
-        // const stats = fs.statSync(filePath);
-        // res.set({
-        //   'Content-Type': 'application/octet-stream', //告诉浏览器这是一个二进制文件
-        //   'Content-Disposition': 'attachment; filename=' + filename, //告诉浏览器这是一个需要下载的文件
-        //   'Content-Length': stats.size  //文件大小
-        // });
-        // fs.createReadStream(filePath).pipe(res);
+        const scriptService = Container.get(ScriptService);
+        const filePath = scriptService.checkFilePath(path, filename);
+        if (!filePath) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
         return res.download(filePath, filename, (err) => {
-          return next(err);
+          if (err) {
+            return next(err);
+          }
         });
       } catch (e) {
         return next(e);

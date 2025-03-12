@@ -1,31 +1,32 @@
-import intl from 'react-intl-universal';
-import { useState, useEffect, useCallback, Key, useRef } from 'react';
+import useFilterTreeData from '@/hooks/useFilterTreeData';
+import { SharedContext } from '@/layouts';
+import { depthFirstSearch } from '@/utils';
+import config from '@/utils/config';
+import { request } from '@/utils/http';
+import { CloudDownloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PageContainer } from '@ant-design/pro-layout';
+import Editor from '@monaco-editor/react';
+import CodeMirror from '@uiw/react-codemirror';
+import { useOutletContext } from '@umijs/max';
 import {
-  TreeSelect,
-  Tree,
-  Input,
-  Empty,
   Button,
+  Empty,
+  Input,
   message,
   Modal,
   Tooltip,
+  Tree,
+  TreeSelect,
   Typography,
 } from 'antd';
-import config from '@/utils/config';
-import { PageContainer } from '@ant-design/pro-layout';
-import Editor from '@monaco-editor/react';
-import { request } from '@/utils/http';
-import styles from './index.module.less';
-import CodeMirror from '@uiw/react-codemirror';
-import SplitPane from 'react-split-pane';
-import { useOutletContext } from '@umijs/max';
-import { SharedContext } from '@/layouts';
-import { DeleteOutlined } from '@ant-design/icons';
-import { depthFirstSearch } from '@/utils';
+import { saveAs } from 'file-saver';
 import debounce from 'lodash/debounce';
 import uniq from 'lodash/uniq';
-import useFilterTreeData from '@/hooks/useFilterTreeData';
 import prettyBytes from 'pretty-bytes';
+import { Key, useCallback, useEffect, useRef, useState } from 'react';
+import intl from 'react-intl-universal';
+import SplitPane from 'react-split-pane';
+import styles from './index.module.less';
 
 const { Text } = Typography;
 
@@ -64,6 +65,21 @@ const Log = () => {
         if (code === 200) {
           setValue(data);
         }
+      });
+  };
+
+  const downloadLog = () => {
+    request
+      .post<Blob>(
+        `${config.apiPrefix}logs/download`,
+        {
+          filename: currentNode.title,
+          path: currentNode.parent || '',
+        },
+        { responseType: 'blob' },
+      )
+      .then((res) => {
+        saveAs(res, currentNode.title);
       });
   };
 
@@ -225,10 +241,18 @@ const Log = () => {
               />,
             ]
           : [
+              <Tooltip title={intl.get('下载')}>
+                <Button
+                  disabled={!currentNode || currentNode.type === 'directory'}
+                  type="primary"
+                  onClick={downloadLog}
+                  icon={<CloudDownloadOutlined />}
+                />
+              </Tooltip>,
               <Tooltip title={intl.get('删除')}>
                 <Button
                   type="primary"
-                  disabled={!select}
+                  disabled={!currentNode}
                   onClick={deleteFile}
                   icon={<DeleteOutlined />}
                 />

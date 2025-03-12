@@ -14,9 +14,6 @@ class GrpcClient {
     },
     grpcOptions: {
       'grpc.enable_http_proxy': 0,
-      'grpc.keepalive_time_ms': 120000,
-      'grpc.keepalive_timeout_ms': 20000,
-      'grpc.max_receive_message_length': 100 * 1024 * 1024,
     },
     defaultTimeout: 30000,
   };
@@ -59,21 +56,10 @@ class GrpcClient {
         grpc.credentials.createInsecure(),
         grpcOptions,
       );
-
-      this.#checkConnection();
     } catch (error) {
       console.error('Failed to initialize gRPC client:', error);
       process.exit(1);
     }
-  }
-
-  #checkConnection() {
-    this.#client.waitForReady(Date.now() + 5000, (error) => {
-      if (error) {
-        console.error('gRPC client connection failed:', error);
-        process.exit(1);
-      }
-    });
   }
 
   #promisifyMethod(methodName) {

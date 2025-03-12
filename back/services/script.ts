@@ -64,10 +64,15 @@ export default class ScriptService {
     return { code: 200 };
   }
 
-  public async getFile(filePath: string, fileName: string) {
+  public checkFilePath(filePath: string, fileName: string) {
     const finalPath = path.resolve(config.scriptPath, filePath, fileName);
+    return finalPath.startsWith(config.scriptPath) ? finalPath : '';
+  }
 
-    if (!finalPath.startsWith(config.scriptPath)) {
+  public async getFile(filePath: string, fileName: string) {
+    const finalPath = this.checkFilePath(filePath, fileName);
+
+    if (!finalPath) {
       return '';
     }
 

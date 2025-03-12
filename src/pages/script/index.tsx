@@ -1,52 +1,48 @@
-import intl from 'react-intl-universal';
-import { useState, useEffect, useCallback, Key, useRef } from 'react';
-import {
-  TreeSelect,
-  Tree,
-  Input,
-  Button,
-  Modal,
-  message,
-  Typography,
-  Tooltip,
-  Dropdown,
-  Menu,
-  Empty,
-  MenuProps,
-} from 'antd';
+import IconFont from '@/components/iconfont';
+import useFilterTreeData from '@/hooks/useFilterTreeData';
+import { SharedContext } from '@/layouts';
+import { depthFirstSearch, findNode, getEditorMode } from '@/utils';
 import config from '@/utils/config';
-import { PageContainer } from '@ant-design/pro-layout';
-import Editor from '@monaco-editor/react';
 import { request } from '@/utils/http';
-import styles from './index.module.less';
-import EditModal from './editModal';
-import CodeMirror from '@uiw/react-codemirror';
-import SplitPane from 'react-split-pane';
+import { canPreviewInMonaco } from '@/utils/monaco';
 import {
+  CloudDownloadOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   EditOutlined,
   EllipsisOutlined,
-  FormOutlined,
   PlusOutlined,
-  PlusSquareOutlined,
-  SearchOutlined,
-  UserOutlined,
 } from '@ant-design/icons';
-import EditScriptNameModal from './editNameModal';
-import debounce from 'lodash/debounce';
-import { history, useOutletContext, useLocation } from '@umijs/max';
-import { parse } from 'query-string';
-import { depthFirstSearch, findNode, getEditorMode } from '@/utils';
-import { SharedContext } from '@/layouts';
-import useFilterTreeData from '@/hooks/useFilterTreeData';
-import uniq from 'lodash/uniq';
-import IconFont from '@/components/iconfont';
-import RenameModal from './renameModal';
+import { PageContainer } from '@ant-design/pro-layout';
+import Editor from '@monaco-editor/react';
 import { langs } from '@uiw/codemirror-extensions-langs';
-import { useHotkeys } from 'react-hotkeys-hook';
+import CodeMirror from '@uiw/react-codemirror';
+import { history, useOutletContext } from '@umijs/max';
+import {
+  Button,
+  Dropdown,
+  Empty,
+  Input,
+  MenuProps,
+  message,
+  Modal,
+  Tooltip,
+  Tree,
+  TreeSelect,
+  Typography,
+} from 'antd';
+import { saveAs } from 'file-saver';
+import debounce from 'lodash/debounce';
+import uniq from 'lodash/uniq';
 import prettyBytes from 'pretty-bytes';
-import { canPreviewInMonaco } from '@/utils/monaco';
+import { parse } from 'query-string';
+import { Key, useCallback, useEffect, useRef, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import intl from 'react-intl-universal';
+import SplitPane from 'react-split-pane';
+import EditModal from './editModal';
+import EditScriptNameModal from './editNameModal';
+import styles from './index.module.less';
+import RenameModal from './renameModal';
 const { Text } = Typography;
 
 const Script = () => {
@@ -97,6 +93,21 @@ const Script = () => {
         if (code === 200) {
           setValue(data);
         }
+      });
+  };
+
+  const downloadScript = () => {
+    request
+      .post<Blob>(
+        `${config.apiPrefix}scripts/download`,
+        {
+          filename: currentNode.title,
+          path: currentNode.parent || '',
+        },
+        { responseType: 'blob' },
+      )
+      .then((res) => {
+        saveAs(res, currentNode.title);
       });
   };
 
@@ -482,21 +493,19 @@ const Script = () => {
             label: intl.get('编辑'),
             key: 'edit',
             icon: <EditOutlined />,
-            disabled:
-              !select ||
-              (currentNode && !canPreviewInMonaco(currentNode?.title)),
+            disabled: !currentNode || !canPreviewInMonaco(currentNode?.title),
           },
           {
             label: intl.get('重命名'),
             key: 'rename',
             icon: <IconFont type="ql-icon-rename" />,
-            disabled: !select,
+            disabled: !currentNode,
           },
           {
             label: intl.get('删除'),
             key: 'delete',
             icon: <DeleteOutlined />,
-            disabled: !select,
+            disabled: !currentNode,
           },
         ],
         onClick: ({ key, domEvent }) => {
@@ -567,8 +576,7 @@ const Script = () => {
               <Tooltip title={intl.get('编辑')}>
                 <Button
                   disabled={
-                    !select ||
-                    (currentNode && !canPreviewInMonaco(currentNode?.title))
+                    !currentNode || !canPreviewInMonaco(currentNode?.title)
                   }
                   type="primary"
                   onClick={editFile}
@@ -577,16 +585,24 @@ const Script = () => {
               </Tooltip>,
               <Tooltip title={intl.get('重命名')}>
                 <Button
-                  disabled={!select}
+                  disabled={!currentNode}
                   type="primary"
                   onClick={renameFile}
                   icon={<IconFont type="ql-icon-rename" />}
                 />
               </Tooltip>,
+              <Tooltip title={intl.get('下载')}>
+                <Button
+                  disabled={!currentNode || currentNode.type === 'directory'}
+                  type="primary"
+                  onClick={downloadScript}
+                  icon={<CloudDownloadOutlined />}
+                />
+              </Tooltip>,
               <Tooltip title={intl.get('删除')}>
                 <Button
                   type="primary"
-                  disabled={!select}
+                  disabled={!currentNode}
                   onClick={deleteFile}
                   icon={<DeleteOutlined />}
                 />
