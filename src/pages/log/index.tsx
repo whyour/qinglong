@@ -175,9 +175,6 @@ const Log = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 

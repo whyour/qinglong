@@ -43,6 +43,7 @@ import EditModal from './editModal';
 import EditScriptNameModal from './editNameModal';
 import styles from './index.module.less';
 import RenameModal from './renameModal';
+import UnsupportedFilePreview from './components/UnsupportedFilePreview';
 const { Text } = Typography;
 
 const Script = () => {
@@ -63,6 +64,7 @@ const Script = () => {
     useState(false);
   const [currentNode, setCurrentNode] = useState<any>();
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
+  const [showMonaco, setShowMonaco] = useState(true);
 
   const handleIsEditing = (filename: string, value: boolean) => {
     setIsEditing(value && canPreviewInMonaco(filename));
@@ -82,7 +84,7 @@ const Script = () => {
       .finally(() => needLoading && setLoading(false));
   };
 
-  const getDetail = (node: any) => {
+  const getDetail = (node: any, options: any = {}) => {
     request
       .get(
         `${config.apiPrefix}scripts/detail?file=${encodeURIComponent(
@@ -92,6 +94,9 @@ const Script = () => {
       .then(({ code, data }) => {
         if (code === 200) {
           setValue(data);
+          if (options.callback) {
+            options.callback();
+          }
         }
       });
   };
@@ -126,7 +131,7 @@ const Script = () => {
       if (item) {
         obj.node = item;
         setExpandedKeys([p as string]);
-        onTreeSelect([vkey], obj);
+        onSelect([vkey], obj);
       }
     }
   };
@@ -141,18 +146,27 @@ const Script = () => {
 
     if (node.type === 'directory') {
       setValue(intl.get('请选择脚本文件'));
+      setShowMonaco(true);
       return;
     }
 
     if (!canPreviewInMonaco(node.title)) {
-      setValue(intl.get('当前文件不支持预览'));
+      setShowMonaco(false);
       return;
     }
 
+    setShowMonaco(true);
     const newMode = getEditorMode(value);
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setValue(intl.get('加载中...'));
-    getDetail(node);
+
+    getDetail(node, {
+      callback: () => {
+        if (isEditing) {
+          setIsEditing(true);
+        }
+      },
+    });
   };
 
   const onTreeSelect = useCallback(
@@ -161,19 +175,19 @@ const Script = () => {
       if (node.key === select && isEditing) {
         return;
       }
-      const content = editorRef.current
+
+      const currentContent = editorRef.current
         ? editorRef.current.getValue().replace(/\r\n/g, '\n')
         : value;
-      if (content !== value) {
+      const originalContent = value.replace(/\r\n/g, '\n');
+
+      if (currentContent !== originalContent && isEditing) {
         Modal.confirm({
-          title: `确认离开`,
-          content: <>{intl.get('当前修改未保存，确定离开吗')}</>,
+          title: intl.get('确认离开'),
+          content: <>{intl.get('当前文件未保存，确认离开吗')}</>,
           onOk() {
             onSelect(keys[0], e.node);
             handleIsEditing(e.node.title, false);
-          },
-          onCancel() {
-            console.log('Cancel');
           },
         });
       } else {
@@ -268,9 +282,6 @@ const Script = () => {
             .catch((e) => reject(e));
         });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -319,9 +330,6 @@ const Script = () => {
               initState();
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -493,7 +501,7 @@ const Script = () => {
             label: intl.get('编辑'),
             key: 'edit',
             icon: <EditOutlined />,
-            disabled: !currentNode || !canPreviewInMonaco(currentNode?.title),
+            disabled: !currentNode,
           },
           {
             label: intl.get('重命名'),
@@ -513,6 +521,20 @@ const Script = () => {
           menuAction(key);
         },
       };
+
+  const handleForceOpen = () => {
+    if (!currentNode) return;
+
+    setMode('plaintext');
+    setValue(intl.get('加载中...'));
+    setShowMonaco(true);
+
+    getDetail(currentNode, {
+      callback: () => {
+        setIsEditing(true);
+      },
+    });
+  };
 
   return (
     <PageContainer
@@ -575,9 +597,7 @@ const Script = () => {
               </Tooltip>,
               <Tooltip title={intl.get('编辑')}>
                 <Button
-                  disabled={
-                    !currentNode || !canPreviewInMonaco(currentNode?.title)
-                  }
+                  disabled={!currentNode}
                   type="primary"
                   onClick={editFile}
                   icon={<EditOutlined />}
@@ -666,21 +686,28 @@ const Script = () => {
                 </div>
               )}
             </div>
-            <Editor
-              language={mode}
-              value={value}
-              theme={theme}
-              options={{
-                readOnly: !isEditing,
-                fontSize: 12,
-                lineNumbersMinChars: 3,
-                glyphMargin: false,
-                accessibilitySupport: 'off',
-              }}
-              onMount={(editor) => {
-                editorRef.current = editor;
-              }}
-            />
+            {showMonaco ? (
+              <Editor
+                language={mode}
+                value={value}
+                theme={theme}
+                options={{
+                  readOnly: !isEditing,
+                  fontSize: 12,
+                  lineNumbersMinChars: 3,
+                  glyphMargin: false,
+                  accessibilitySupport: 'off',
+                }}
+                onMount={(editor) => {
+                  editorRef.current = editor;
+                }}
+              />
+            ) : (
+              <UnsupportedFilePreview
+                filename={currentNode?.title || ''}
+                onForceOpen={handleForceOpen}
+              />
+            )}
           </SplitPane>
         )}
         {isPhone && (

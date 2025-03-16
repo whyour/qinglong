@@ -266,9 +266,6 @@ const Subscription = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -301,9 +298,6 @@ const Subscription = () => {
               }
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -370,9 +364,6 @@ const Subscription = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -414,9 +405,6 @@ const Subscription = () => {
               }
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };

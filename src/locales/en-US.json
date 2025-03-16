@@ -186,7 +186,7 @@
   "秒后重试": "Retry after seconds",
   "在您的设备上打开两步验证应用程序以查看您的身份验证代码并验证您的身份。": "Open the two-factor authentication application on your device to view your authentication code and verify your identity.",
   "请选择脚本文件": "Please select a script file",
-  "当前文件不支持预览": "The current file does not support preview",
+  "当前文件不支持预览": "Current file type is not supported for preview",
   "清空日志": "Clear Logs",
   "设置": "Settings",
   "退出": "Exit",
@@ -501,5 +501,9 @@
   "常规定时": "Normal Timing",
   "手动运行": "Manual Run",
   "开机运行": "Boot Run",
-  "时区": "Timezone"
+  "时区": "Timezone",
+  "强制打开": "Force Open",
+  "强制打开可能会导致编辑器显示异常": "Force opening may cause display issues in the editor",
+  "确认离开": "Confirm Leave",
+  "当前文件未保存，确认离开吗": "Current file is not saved, are you sure to leave?"
 }

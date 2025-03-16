@@ -20,7 +20,7 @@ import {
   PushpinOutlined,
   SettingOutlined,
   StopOutlined,
-  UnorderedListOutlined
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
 import { history, useOutletContext } from '@umijs/max';
@@ -36,7 +36,7 @@ import {
   TablePaginationConfig,
   Tabs,
   Tag,
-  Typography
+  Typography,
 } from 'antd';
 import { ColumnProps } from 'antd/lib/table';
 import { FilterValue, SorterResult } from 'antd/lib/table/interface';
@@ -453,9 +453,6 @@ const Crontab = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -487,9 +484,6 @@ const Crontab = () => {
               }
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -523,9 +517,6 @@ const Crontab = () => {
               }
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -569,9 +560,6 @@ const Crontab = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -613,9 +601,6 @@ const Crontab = () => {
               }
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -738,9 +723,6 @@ const Crontab = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -765,9 +747,6 @@ const Crontab = () => {
               getCrons();
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };

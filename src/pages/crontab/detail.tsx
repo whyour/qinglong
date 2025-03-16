@@ -202,9 +202,6 @@ const CronDetailModal = ({
             .catch((e) => reject(e));
         });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -232,9 +229,6 @@ const CronDetailModal = ({
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -258,9 +252,6 @@ const CronDetailModal = ({
               setCurrentCron({ ...currentCron, status: CrontabStatus.idle });
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -298,9 +289,6 @@ const CronDetailModal = ({
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -336,9 +324,6 @@ const CronDetailModal = ({
               });
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };

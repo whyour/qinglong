@@ -315,9 +315,6 @@ const Dependence = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -342,9 +339,6 @@ const Dependence = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -366,9 +360,6 @@ const Dependence = () => {
           .then(() => {
             getDependencies();
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -419,9 +410,6 @@ const Dependence = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -438,9 +426,6 @@ const Dependence = () => {
               getDependencies();
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };

@@ -292,9 +292,6 @@ const Env = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -336,9 +333,6 @@ const Env = () => {
               setValue(result);
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
@@ -456,9 +450,6 @@ const Env = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -483,9 +474,6 @@ const Env = () => {
               getEnvs();
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };

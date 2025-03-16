@@ -181,9 +181,6 @@ const Setting = () => {
             }
           });
       },
-      onCancel() {
-        console.log('Cancel');
-      },
     });
   };
 
@@ -212,9 +209,6 @@ const Setting = () => {
               handleApp(data);
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };

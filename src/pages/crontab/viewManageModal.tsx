@@ -85,7 +85,7 @@ const ViewManageModal = ({
       title: intl.get('名称'),
       dataIndex: 'name',
       key: 'name',
-      render: (v) => (v === '全部任务' ? intl.get('全部任务') : v)
+      render: (v) => (v === '全部任务' ? intl.get('全部任务') : v),
     },
     {
       title: intl.get('类型'),
@@ -161,9 +161,6 @@ const ViewManageModal = ({
               cronViewChange();
             }
           });
-      },
-      onCancel() {
-        console.log('Cancel');
       },
     });
   };
