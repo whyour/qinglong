@@ -202,6 +202,7 @@ export default (app: Router) => {
       body: Joi.object({
         filename: Joi.string().required(),
         path: Joi.string().allow(''),
+        type: Joi.string().optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
