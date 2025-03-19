@@ -1,10 +1,7 @@
-version: 2.18.2
+version: 2.18.3
 changeLogLink: https://t.me/jiao_long/427
-publishTime: 2025-02-28 00:00
+publishTime: 2025-03-15 08:00
 changeLog: |
-  1. 定时任务支持 开机运行@boot 和 手动运行@once 任务
-  2. 脚本管理增加可预览检查，避免无法预览文件被重复保存
-  3. 系统设置增加时区设置
-  4. 修复登录失败没有提示
-  5. 增加重置密码命令 ql resetpwd
-  6. 修复群晖通知参数，任务视图不属于筛选
+  1. 脚本管理和日志管理支持下载脚本和日志
+  2. 修复 gRPC client 连接超时
+  3. 脚本管理增加强制打开文件
