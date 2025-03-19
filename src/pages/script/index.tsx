@@ -131,7 +131,7 @@ const Script = () => {
       if (item) {
         obj.node = item;
         setExpandedKeys([p as string]);
-        onSelect([vkey], obj);
+        onTreeSelect([vkey], obj);
       }
     }
   };
