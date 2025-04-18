@@ -212,16 +212,18 @@ run_extra_shell() {
 
 ## 脚本用法
 usage() {
-  echo -e "ql命令使用方法："
-  echo -e "1. $cmd_update update                                                                  # 更新并重启青龙"
-  echo -e "2. $cmd_update extra                                                                   # 运行自定义脚本"
-  echo -e "3. $cmd_update raw <fileurl>                                                            # 更新单个脚本文件"
-  echo -e "4. $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch> <extensions>    # 更新单个仓库的脚本"
-  echo -e "5. $cmd_update rmlog <days>                                                            # 删除旧日志"
-  echo -e "6. $cmd_update bot                                                                     # 启动tg-bot"
-  echo -e "7. $cmd_update check                                                                   # 检测青龙环境并修复"
-  echo -e "8. $cmd_update resetlet                                                                # 重置登录错误次数"
-  echo -e "9. $cmd_update resettfa                                                                # 禁用两步登录"
+  echo -e "$cmd_update 命令使用方法："
+  echo -e "1.  $cmd_update update                                                                  # 更新并重启青龙"
+  echo -e "2.  $cmd_update extra                                                                   # 运行自定义脚本"
+  echo -e "3.  $cmd_update raw <fileurl>                                                           # 更新单个脚本文件"
+  echo -e "4.  $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch> <extensions>    # 更新单个仓库的脚本"
+  echo -e "5.  $cmd_update rmlog <days>                                                            # 删除旧日志"
+  echo -e "6.  $cmd_update bot                                                                     # 启动tg-bot"
+  echo -e "7.  $cmd_update check                                                                   # 检测青龙环境并修复"
+  echo -e "8.  $cmd_update resetlet                                                                # 重置登录错误次数"
+  echo -e "9.  $cmd_update resettfa                                                                # 禁用两步登录"
+  echo -e "10. $cmd_update resetpwd                                                                # 修改登录密码"
+  echo -e "11. $cmd_update resetname                                                               # 修改登录用户名"
 }
 
 reload_qinglong() {
@@ -545,6 +547,9 @@ main() {
     ;;
   resetpwd)
     eval update_auth_config "\\\"password\\\":\\\"$p2\\\"" "重置密码" $cmd
+    ;;
+  resetname)
+    eval update_auth_config "\\\"username\\\":\\\"$p2\\\"" "重置用户名" $cmd
     ;;
   *)
     eval echo -e "命令输入错误...\\\n" $cmd

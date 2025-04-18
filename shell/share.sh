@@ -72,7 +72,17 @@ original_name=(
 )
 
 init_env() {
-  export NODE_PATH=/usr/local/bin:/usr/local/pnpm-global/5/node_modules:/usr/local/lib/node_modules:/root/.local/share/pnpm/global/5/node_modules
+  local pnpm_global_path=$(pnpm root -g 2>/dev/null)
+  export NODE_PATH="/usr/local/bin:/usr/local/lib/node_modules${pnpm_global_path:+:${pnpm_global_path}}"
+  
+  # 如果存在 pnpm 全局路径，创建软链接
+  if [[ -n "$pnpm_global_path" ]]; then
+    # 确保目标目录存在
+    mkdir -p "${dir_root}/node_modules"
+    # 链接全局模块到项目的 node_modules
+    ln -sf "${pnpm_global_path}/"* "${dir_root}/node_modules/" 2>/dev/null || true
+  fi
+  
   export PYTHONUNBUFFERED=1
 }
 

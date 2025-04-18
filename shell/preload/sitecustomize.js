@@ -38,25 +38,48 @@ function run() {
 
     const splitStr = '__sitecustomize__';
     const fileName = process.argv[1].replace(`${dir_scripts}/`, '');
-    let command = `bash -c "source ${file_task_before} ${fileName}`;
+    const tempFile = `/tmp/env_${process.pid}.json`;
+
+    const commands = [
+      `source ${file_task_before} ${fileName}`,
+      task_before ? `eval '${task_before.replace(/'/g, "'\\''")}'` : null,
+      `echo -e '${splitStr}'`,
+      `node -e "require('fs').writeFileSync('${tempFile}', JSON.stringify(process.env))"`,
+    ].filter(Boolean);
+
     if (task_before) {
-      const escapeTaskBefore = task_before
-        .replace(/"/g, '\\"')
-        .replace(/\$/g, '\\$');
-      command = `${command} && eval '${escapeTaskBefore}'`;
       console.log('执行前置命令\n');
     }
-    const res = execSync(
-      `${command} && echo -e '${splitStr}' && node -p 'JSON.stringify(process.env)'"`,
-      {
-        encoding: 'utf-8',
-      },
-    );
-    const [output, envStr] = res.split(splitStr);
-    const newEnvObject = JSON.parse(envStr.trim());
-    for (const key in newEnvObject) {
-      process.env[key] = newEnvObject[key];
+
+    const res = execSync(commands.join(' && '), {
+      encoding: 'utf-8',
+      maxBuffer: 50 * 1024 * 1024,
+      shell: '/bin/bash',
+    });
+
+    const [output] = res.split(splitStr);
+
+    try {
+      const envStr = require('fs').readFileSync(tempFile, 'utf-8');
+      const newEnvObject = JSON.parse(envStr);
+      if (typeof newEnvObject === 'object' && newEnvObject !== null) {
+        for (const key in newEnvObject) {
+          if (Object.prototype.hasOwnProperty.call(newEnvObject, key)) {
+            process.env[key] = newEnvObject[key];
+          }
+        }
+      }
+      require('fs').unlinkSync(tempFile);
+    } catch (jsonError) {
+      console.log(
+        '\ue926 Failed to parse environment variables:',
+        jsonError.message,
+      );
+      try {
+        require('fs').unlinkSync(tempFile);
+      } catch (e) {}
     }
+
     if (output) {
       console.log(output);
     }
