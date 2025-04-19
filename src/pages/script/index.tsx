@@ -347,18 +347,29 @@ const Script = () => {
     setIsAddFileModalVisible(true);
   };
 
-  const addFileModalClose = (
-    { filename, path, key }: { filename: string; path: string; key: string } = {
+  const addFileModalClose = async (
+    {
+      filename,
+      path,
+      key,
+      type,
+    }: { filename: string; path: string; key: string; type?: string } = {
       filename: '',
       path: '',
       key: '',
     },
   ) => {
     if (filename) {
-      let newData = [...data];
-      const _file = { title: filename, key, parent: path };
+      const res = await request.get(`${config.apiPrefix}scripts`);
+      let newData = res.data;
+      if (type === 'directory' && filename.includes('/')) {
+        const parts = filename.split('/');
+        parts.pop();
+        const parentPath = parts.join('/');
+        path = path ? `${path}/${parentPath}` : parentPath;
+      }
+      const item = findNode(newData, (c) => c.key === key);
       if (path) {
-        newData = depthFirstSearch(newData, (c) => c.key === path, _file);
         const keys = path.split('/');
         const sKeys: string[] = [];
         keys.reduce((p, c) => {
@@ -366,33 +377,12 @@ const Script = () => {
           return `${p}/${c}`;
         });
         setExpandedKeys([...expandedKeys, ...sKeys, path]);
-      } else {
-        newData.unshift(_file);
       }
       setData(newData);
-      onSelect(_file.title, _file);
-      handleIsEditing(_file.title, true);
+      onSelect(item.title, item);
+      handleIsEditing(item.title, true);
     }
     setIsAddFileModalVisible(false);
-  };
-
-  const downloadFile = () => {
-    request
-      .post(`${config.apiPrefix}scripts/download`, {
-        filename: currentNode.title,
-      })
-      .then(({ code, data }) => {
-        if (code === 200) {
-          const blob = new Blob([data], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = currentNode.title;
-          document.documentElement.appendChild(a);
-          a.click();
-          document.documentElement.removeChild(a);
-        }
-      });
   };
 
   const initState = () => {
@@ -703,10 +693,7 @@ const Script = () => {
                 }}
               />
             ) : (
-              <UnsupportedFilePreview
-                filename={currentNode?.title || ''}
-                onForceOpen={handleForceOpen}
-              />
+              <UnsupportedFilePreview onForceOpen={handleForceOpen} />
             )}
           </SplitPane>
         )}

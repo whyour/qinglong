@@ -295,7 +295,7 @@ export function findNode<T extends Record<string, any> & { children?: T[] }>(
 
   find(c);
 
-  return item;
+  return item as T | undefined;
 }
 
 export function logEnded(log: string): boolean {

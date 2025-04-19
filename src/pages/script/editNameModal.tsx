@@ -27,6 +27,7 @@ const EditScriptNameModal = ({
     filename: string;
     path: string;
     key: string;
+    type: string;
   }) => void;
 }) => {
   const [form] = Form.useForm();
@@ -52,11 +53,12 @@ const EditScriptNameModal = ({
             directory ? intl.get('创建文件夹成功') : intl.get('创建文件成功'),
           );
           const key = path ? `${path}/` : '';
-          const filename = file ? file.name : inputFilename;
+          const filename = file ? file.name : (directory || inputFilename);
           handleCancel({
             filename,
             path,
             key: `${key}${filename}`,
+            type: directory ? 'directory' : 'file',
           });
         }
         setLoading(false);
