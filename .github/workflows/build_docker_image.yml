@@ -89,9 +89,7 @@ jobs:
   build:
     needs: build-static
 
-    # 由于 ubuntu-latest 中使用 linux6.x 内核 linux/s390x npm 无法使用
-    runs-on: ubuntu-20.04
-    # runs-on: self-hosted
+    runs-on: ubuntu-22.04
 
     permissions:
       packages: write
@@ -160,8 +158,8 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
-          # platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          # linux/s390x npm 暂不可用
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
           context: .
           file: ./docker/Dockerfile
           push: true
@@ -173,12 +171,12 @@ jobs:
       - name: Image digest
         run: |
           echo ${{ steps.docker_build.outputs.digest }}
-  
+
   build310:
     if: ${{ github.ref_name == 'master' }}
     needs: build-static
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     permissions:
       packages: write
@@ -226,7 +224,8 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          # linux/s390x npm 暂不可用
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
           context: .
           file: ./docker/310.Dockerfile
           push: true
