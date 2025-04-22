@@ -41,12 +41,6 @@ export enum DependenceTypes {
   'linux',
 }
 
-export enum InstallDependenceCommandTypes {
-  'pnpm add -g',
-  'pip3 install --disable-pip-version-check --root-user-action=ignore',
-  'apk add --no-check-certificate',
-}
-
 export enum GetDependenceCommandTypes {
   'pnpm ls -g ',
   'pip3 show --disable-pip-version-check',
@@ -57,12 +51,6 @@ export enum versionDependenceCommandTypes {
   '@',
   '==',
   '=',
-}
-
-export enum unInstallDependenceCommandTypes {
-  'pnpm remove -g',
-  'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
-  'apk del',
 }
 
 export interface DependenceInstance

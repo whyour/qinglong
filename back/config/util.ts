@@ -8,9 +8,10 @@ import psTreeFun from 'pstree.remy';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
 import config from './index';
-import { TASK_COMMAND } from './const';
+import { PYTHON_INSTALL_DIR, TASK_COMMAND } from './const';
 import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
+import { DependenceTypes } from '../data/dependence';
 
 export * from './share';
 
@@ -557,4 +558,35 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
     Logger.error('[setSystemTimezone失败]', error);
     return false;
   }
+}
+
+export function getInstallCommand(type: DependenceTypes, name: string): string {
+  const baseCommands = {
+    [DependenceTypes.nodejs]: 'pnpm add -g',
+    [DependenceTypes.python3]:
+      'pip3 install --disable-pip-version-check --root-user-action=ignore',
+    [DependenceTypes.linux]: 'apk add --no-check-certificate',
+  };
+
+  let command = baseCommands[type];
+
+  if (type === DependenceTypes.python3 && PYTHON_INSTALL_DIR) {
+    command = `${command} --prefix=${PYTHON_INSTALL_DIR}`;
+  }
+
+  return `${command} ${name.trim()}`;
+}
+
+export function getUninstallCommand(
+  type: DependenceTypes,
+  name: string,
+): string {
+  const baseCommands = {
+    [DependenceTypes.nodejs]: 'pnpm remove -g',
+    [DependenceTypes.python3]:
+      'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
+    [DependenceTypes.linux]: 'apk del',
+  };
+
+  return `${baseCommands[type]} ${name.trim()}`;
 }

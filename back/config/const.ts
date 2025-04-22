@@ -23,3 +23,5 @@ export const SAMPLE_FILES = [
     target: 'data/scripts/notify.py',
   },
 ];
+
+export const PYTHON_INSTALL_DIR = process.env.PYTHON_HOME;

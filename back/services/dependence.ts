@@ -3,10 +3,8 @@ import winston from 'winston';
 import config from '../config';
 import {
   Dependence,
-  InstallDependenceCommandTypes,
   DependenceStatus,
   DependenceTypes,
-  unInstallDependenceCommandTypes,
   DependenceModel,
   GetDependenceCommandTypes,
   versionDependenceCommandTypes,
@@ -19,6 +17,8 @@ import {
   getPid,
   killTask,
   promiseExecSuccess,
+  getInstallCommand,
+  getUninstallCommand,
 } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
@@ -153,8 +153,8 @@ export default class DependenceService {
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
-      const depInstallCommand = InstallDependenceCommandTypes[doc.type];
-      const depUnInstallCommand = unInstallDependenceCommandTypes[doc.type];
+      const depInstallCommand = getInstallCommand(doc.type, doc.name);
+      const depUnInstallCommand = getUninstallCommand(doc.type, doc.name);
       const installCmd = `${depInstallCommand} ${doc.name.trim()}`;
       const unInstallCmd = `${depUnInstallCommand} ${doc.name.trim()}`;
       const pids = await Promise.all([
@@ -226,11 +226,9 @@ export default class DependenceService {
           ? 'installDependence'
           : 'uninstallDependence';
         let depName = dependency.name.trim();
-        const depRunCommand = (
-          isInstall
-            ? InstallDependenceCommandTypes
-            : unInstallDependenceCommandTypes
-        )[dependency.type];
+        const command = isInstall
+          ? getInstallCommand(dependency.type, depName)
+          : getUninstallCommand(dependency.type, depName);
         const actionText = isInstall ? '安装' : '删除';
         const startTime = dayjs();
 
@@ -304,12 +302,9 @@ export default class DependenceService {
         const proxyStr = dependenceProxyFileExist
           ? `source ${config.dependenceProxyFile} &&`
           : '';
-        const cp = spawn(
-          `${proxyStr} ${depRunCommand} ${dependency.name.trim()}`,
-          {
-            shell: '/bin/bash',
-          },
-        );
+        const cp = spawn(`${proxyStr} ${command}`, {
+          shell: '/bin/bash',
+        });
 
         cp.stdout.on('data', async (data) => {
           this.sockService.sendMessage({

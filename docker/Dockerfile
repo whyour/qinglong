@@ -14,14 +14,13 @@ LABEL maintainer="${QL_MAINTAINER}"
 ARG QL_URL=https://github.com/${QL_MAINTAINER}/qinglong.git
 ARG QL_BRANCH=develop
 
-ENV PNPM_HOME=/root/.local/share/pnpm \
-  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/share/pnpm:/root/.local/share/pnpm/global/5/node_modules \
-  NODE_PATH=/usr/local/bin:/usr/local/pnpm-global/5/node_modules:/usr/local/lib/node_modules:/root/.local/share/pnpm/global/5/node_modules \
+ENV QL_DIR=/ql \
+  QL_BRANCH=${QL_BRANCH} \
   LANG=C.UTF-8 \
   SHELL=/bin/bash \
   PS1="\u@\h:\w \$ " \
-  QL_DIR=/ql \
-  QL_BRANCH=${QL_BRANCH}
+  PYTHONPATH= \
+  PYTHON_SHORT_VERSION=
 
 VOLUME /ql/data
   
@@ -56,11 +55,9 @@ RUN set -x \
   && git config --global user.email "qinglong@@users.noreply.github.com" \
   && git config --global user.name "qinglong" \
   && git config --global http.postBuffer 524288000 \
-  && rm -rf /root/.pnpm-store \
-  && rm -rf /root/.local/share/pnpm/store \
   && rm -rf /root/.cache \
   && ulimit -c 0 \
-  && pip3 install requests
+  && PYTHON_SHORT_VERSION=$(echo ${PYTHON_VERSION} | cut -d. -f1,2)
 
 ARG SOURCE_COMMIT
 RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
@@ -72,6 +69,17 @@ RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
   && mkdir -p ${QL_DIR}/static \
   && cp -rf /static/* ${QL_DIR}/static \
   && rm -rf /static
+
+ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
+  PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \
+  PYTHONUSERBASE=${QL_DIR}/data/dep_cache/python3
+
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME} \
+  NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules \
+  PIP_CACHE_DIR=${PYTHON_HOME}/pip \
+  PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages:${PYTHONPATH}
+
+RUN pip3 install --prefix ${PYTHON_HOME} requests
 
 COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
