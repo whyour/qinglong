@@ -270,13 +270,13 @@ export default class DependenceService {
           : DependenceStatus.removing;
         await DependenceModel.update({ status }, { where: { id: depIds } });
 
-        let depRunCommand = isInstall
+        let command = isInstall
           ? getInstallCommand(dependency.type, depName)
           : getUninstallCommand(dependency.type, depName);
         if (isLinuxDependence) {
-          depRunCommand = isInstall
-            ? linuxCommand.install
-            : linuxCommand.uninstall;
+          command = isInstall
+            ? `${linuxCommand.install} ${depName.trim()}`
+            : `${linuxCommand.uninstall} ${depName.trim()}`;
         }
         const startTime = dayjs();
 
