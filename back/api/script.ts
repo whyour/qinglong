@@ -37,11 +37,11 @@ export default (app: Router) => {
         'package-lock.json',
       ];
       if (req.query.path) {
-        const targetPath = path.join(
-          config.scriptPath,
+        result = await readDir(
           req.query.path as string,
+          config.scriptPath,
+          blacklist,
         );
-        result = await readDir(targetPath, config.scriptPath, blacklist);
       } else {
         result = await readDirs(
           config.scriptPath,

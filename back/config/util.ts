@@ -306,23 +306,51 @@ export async function readDir(
   dir: string,
   baseDir: string = '',
   blacklist: string[] = [],
-) {
-  const relativePath = path.relative(baseDir, dir);
-  const files = await fs.readdir(dir);
-  const result: any = files
-    .filter((x) => !blacklist.includes(x))
-    .map(async (file: string) => {
-      const subPath = path.join(dir, file);
+): Promise<IFile[]> {
+  const absoluteDir = path.join(baseDir, dir);
+  const relativePath = path.relative(baseDir, absoluteDir);
+
+  try {
+    const files = await fs.readdir(absoluteDir);
+    const result: IFile[] = [];
+
+    for (const file of files) {
+      const subPath = path.join(absoluteDir, file);
       const stats = await fs.lstat(subPath);
       const key = path.join(relativePath, file);
-      return {
-        title: file,
-        type: stats.isDirectory() ? 'directory' : 'file',
-        key,
-        parent: relativePath,
-      };
-    });
-  return result;
+
+      if (blacklist.includes(file) || stats.isSymbolicLink()) {
+        continue;
+      }
+
+      if (stats.isDirectory()) {
+        result.push({
+          title: file,
+          type: 'directory',
+          key,
+          parent: relativePath,
+          createTime: stats.birthtime.getTime(),
+          children: [],
+        });
+      } else {
+        result.push({
+          title: file,
+          type: 'file',
+          key,
+          parent: relativePath,
+          size: stats.size,
+          createTime: stats.birthtime.getTime(),
+        });
+      }
+    }
+
+    return result;
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function promiseExec(command: string): Promise<string> {
@@ -353,9 +381,9 @@ export function parseHeaders(headers: string) {
   if (!headers) return {};
 
   const parsed: any = {};
-  let key;
-  let val;
-  let i;
+  let key: string;
+  let val: string;
+  let i: number;
 
   headers &&
     headers.split('\n').forEach(function parser(line) {
