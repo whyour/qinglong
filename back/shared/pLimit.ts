@@ -189,6 +189,19 @@ class TaskLimit {
     return this.scriptLimit.add(fn, options);
   }
 
+  public async waitDependencyQueueDone(): Promise<void> {
+    if (this.dependenyLimit.size === 0 && this.dependenyLimit.pending === 0) {
+      return;
+    }
+    return new Promise((resolve) => {
+      const onIdle = () => {
+        this.dependenyLimit.removeListener('idle', onIdle);
+        resolve();
+      };
+      this.dependenyLimit.on('idle', onIdle);
+    });
+  }
+
   public runDependeny<T>(
     dependency: Dependence,
     fn: IDependencyFn<T>,

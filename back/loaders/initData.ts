@@ -68,24 +68,26 @@ export default async () => {
     });
   }
 
-  const installDependencies = () => {
-    // 初始化时安装所有处于安装中，安装成功，安装失败的依赖
-    DependenceModel.findAll({
+  const installDependencies = async () => {
+    const docs = await DependenceModel.findAll({
       where: {},
       order: [
         ['type', 'DESC'],
         ['createdAt', 'DESC'],
       ],
       raw: true,
-    }).then(async (docs) => {
-      await DependenceModel.update(
-        { status: DependenceStatus.queued, log: [] },
-        { where: { id: docs.map((x) => x.id!) } },
-      );
-      setTimeout(() => {
-        dependenceService.installDependenceOneByOne(docs);
-      }, 5000);
     });
+
+    await DependenceModel.update(
+      { status: DependenceStatus.queued, log: [] },
+      { where: { id: docs.map((x) => x.id!) } },
+    );
+
+    setTimeout(async () => {
+      await dependenceService.installDependenceOneByOne(docs);
+
+      require('./loaders/bootAfter').default();
+    }, 5000);
   };
 
   // 初始化更新 linux/python/nodejs 镜像源配置

@@ -132,10 +132,12 @@ export default class DependenceService {
     docs: Dependence[],
     isInstall: boolean = true,
     force: boolean = false,
-  ) {
+  ): Promise<void> {
     docs.forEach((dep) => {
       this.installOrUninstallDependency(dep, isInstall, force);
     });
+
+    return taskLimit.waitDependencyQueueDone();
   }
 
   public async reInstall(ids: number[]): Promise<Dependence[]> {
