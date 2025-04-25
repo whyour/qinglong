@@ -54,6 +54,7 @@ RUN set -x && \
   npm install -g pnpm@8.3.1 pm2 ts-node && \
   rm -rf /root/.cache && \
   rm -rf /root/.npm && \
+  rm -rf /etc/apt/apt.conf.d/docker-clean && \
   ulimit -c 0
 
 ARG SOURCE_COMMIT
