@@ -86,7 +86,7 @@ export default async () => {
     setTimeout(async () => {
       await dependenceService.installDependenceOneByOne(docs);
 
-      require('./loaders/bootAfter').default();
+      require('./bootAfter').default();
     }, 5000);
   };
 
