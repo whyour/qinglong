@@ -618,3 +618,7 @@ export function getUninstallCommand(
 
   return `${baseCommands[type]} ${name.trim()}`;
 }
+
+export function isDemoEnv() {
+  return process.env.DeployEnv === 'demo';
+}

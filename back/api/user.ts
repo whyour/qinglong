@@ -8,6 +8,7 @@ import path from 'path';
 import { v4 as uuidV4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import config from '../config';
+import { isDemoEnv } from '../config/util';
 const route = Router();
 
 const storage = multer.diskStorage({
@@ -72,9 +73,8 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
-        if (process.env.DeployEnv === 'demo') {
+        if (isDemoEnv()) {
           return res.send({ code: 450, message: '未知错误' });
         }
         const userService = Container.get(UserService);
