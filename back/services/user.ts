@@ -93,9 +93,9 @@ export default class UserService {
     }
     if (username === cUsername && password === cPassword) {
       const data = createRandomString(50, 100);
-      const expiration = twoFactorActivated ? 60 : 20;
-      let token = jwt.sign({ data }, config.secret as any, {
-        expiresIn: 60 * 60 * 24 * expiration,
+      const expiration = twoFactorActivated ? '60d' : '20d';
+      let token = jwt.sign({ data }, config.jwt.secret, {
+        expiresIn: config.jwt.expiresIn || expiration,
         algorithm: 'HS384',
       });
 
@@ -131,7 +131,14 @@ export default class UserService {
       this.getLoginLog();
       return {
         code: 200,
-        data: { token, lastip, lastaddr, lastlogon, retries, platform },
+        data: {
+          token,
+          lastip,
+          lastaddr,
+          lastlogon,
+          retries,
+          platform,
+        },
       };
     } else {
       await this.updateAuthInfo(content, {

@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import OpenService from './services/open';
 import { Container } from 'typedi';
 import LoggerInstance from './loaders/logger';
-import fs from 'fs';
 import config from './config';
 import path from 'path';
 import os from 'os';

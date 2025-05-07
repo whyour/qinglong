@@ -101,9 +101,9 @@ export default function () {
 
   const getHealthStatus = () => {
     request
-      .get(`${config.apiPrefix}public/health`)
+      .get(`${config.apiPrefix}health`)
       .then((res) => {
-        if (res?.data?.status === 1) {
+        if (res?.data?.status === 'ok') {
           getSystemInfo();
         } else {
           history.push('/error');

@@ -9,6 +9,8 @@ import open from './open';
 import dependence from './dependence';
 import system from './system';
 import subscription from './subscription';
+import update from './update';
+import health from './health';
 
 export default () => {
   const app = Router();
@@ -22,6 +24,8 @@ export default () => {
   dependence(app);
   system(app);
   subscription(app);
+  update(app);
+  health(app);
 
   return app;
 };

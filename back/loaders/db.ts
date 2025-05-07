@@ -57,10 +57,8 @@ export default async () => {
       await sequelize.query('alter table Crontabs add column task_after TEXT');
     } catch (error) {}
 
-    console.log('✌️ DB loaded');
     Logger.info('✌️ DB loaded');
   } catch (error) {
-    console.error('✌️ DB load failed');
-    Logger.error(error);
+    Logger.error('✌️ DB load failed', error);
   }
 };

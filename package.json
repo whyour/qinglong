@@ -2,17 +2,11 @@
   "private": true,
   "scripts": {
     "start": "concurrently -n w: npm:start:*",
-    "start:update": "ts-node -P tsconfig.back.json ./back/update.ts",
-    "start:public": "ts-node -P tsconfig.back.json ./back/public.ts",
-    "start:rpc": "ts-node -P tsconfig.back.json ./back/schedule/index.ts",
     "start:back": "nodemon",
     "start:front": "max dev",
     "build:front": "max build",
-    "build:back": "tsc -p tsconfig.back.json",
+    "build:back": "tsc -p back/tsconfig.json",
     "panel": "npm run build:back && node static/build/app.js",
-    "schedule": "npm run build:back && node static/build/schedule/index.js",
-    "public": "npm run build:back && node static/build/public.js",
-    "update": "npm run build:back && node static/build/update.js",
     "gen:proto": "protoc --experimental_allow_proto3_optional --plugin=./node_modules/.bin/protoc-gen-ts_proto ./back/protos/*.proto --ts_proto_out=./ --ts_proto_opt=outputServices=grpc-js,env=node,esModuleInterop=true,snakeToCamel=false",
     "gen:api": "python3 -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. ./back/protos/api.proto",
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
@@ -89,7 +83,7 @@
     "nodemailer": "^6.9.16",
     "p-queue-cjs": "7.3.4",
     "@bufbuild/protobuf": "^2.2.3",
-    "pstree.remy": "^1.1.8",
+    "ps-tree": "^1.2.0",
     "reflect-metadata": "^0.2.2",
     "sequelize": "^6.37.5",
     "serve-handler": "^6.1.6",
@@ -104,7 +98,9 @@
     "ip2region": "2.3.0",
     "keyv": "^5.2.3",
     "@keyv/sqlite": "^4.0.1",
-    "proper-lockfile": "^4.1.2"
+    "proper-lockfile": "^4.1.2",
+    "compression": "^1.7.4",
+    "helmet": "^6.0.1"
   },
   "devDependencies": {
     "moment": "2.30.1",
@@ -138,6 +134,7 @@
     "@types/uuid": "^8.3.4",
     "@types/request-ip": "0.0.41",
     "@types/proper-lockfile": "^4.1.4",
+    "@types/ps-tree": "^1.1.6",
     "@uiw/codemirror-extensions-langs": "^4.21.9",
     "@uiw/react-codemirror": "^4.21.9",
     "@umijs/max": "^4.4.4",
@@ -176,6 +173,7 @@
     "typescript": "5.2.2",
     "vh-check": "^2.0.5",
     "virtualizedtableforantd4": "1.3.0",
-    "yorkie": "^2.0.0"
+    "@types/compression": "^1.7.2",
+    "@types/helmet": "^4.0.0"
   }
 }

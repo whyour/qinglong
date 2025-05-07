@@ -7,9 +7,7 @@ import { UnauthorizedError, expressjwt } from 'express-jwt';
 import { getPlatform, getToken } from '../config/util';
 import rewrite from 'express-urlrewrite';
 import { errors } from 'celebrate';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import { serveEnv } from '../config/serverEnv';
-import Logger from './logger';
 import { IKeyvStore, shareStore } from '../shared/store';
 
 export default ({ app }: { app: Application }) => {
@@ -18,22 +16,12 @@ export default ({ app }: { app: Application }) => {
   app.get(`${config.api.prefix}/env.js`, serveEnv);
   app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
 
-  app.use(
-    '/api/public',
-    createProxyMiddleware({
-      target: `http://0.0.0.0:${config.publicPort}/api`,
-      changeOrigin: true,
-      pathRewrite: { '/api/public': '' },
-      logger: Logger,
-    }),
-  );
-
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   app.use(
     expressjwt({
-      secret: config.secret,
+      secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
       path: [...config.apiWhiteList, /^\/open\//],
@@ -50,7 +38,7 @@ export default ({ app }: { app: Application }) => {
     return next();
   });
 
-  app.use(async (req, res, next) => {
+  app.use(async (req: Request, res, next) => {
     const headerToken = getToken(req);
     if (req.path.startsWith('/open/')) {
       const apps = await shareStore.getApps();

@@ -357,8 +357,15 @@ export default class SystemService {
 
   public async reloadSystem(target?: 'system' | 'data') {
     const cmd = `real_time=true ql reload ${target || ''}`;
-    const cp = spawn(cmd, { shell: '/bin/bash' });
+    const cp = spawn(cmd, {
+      shell: '/bin/bash',
+      detached: true,
+      stdio: 'ignore',
+    });
     cp.unref();
+    setTimeout(() => {
+      process.exit(0);
+    });
     return { code: 200 };
   }
 

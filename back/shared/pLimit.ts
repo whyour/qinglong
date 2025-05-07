@@ -37,7 +37,7 @@ class TaskLimit {
     concurrency: Math.max(os.cpus().length, 4),
   });
   private client = new ApiClient(
-    `0.0.0.0:${config.cronPort}`,
+    `0.0.0.0:${config.grpcPort}`,
     credentials.createInsecure(),
     { 'grpc.enable_http_proxy': 0 },
   );

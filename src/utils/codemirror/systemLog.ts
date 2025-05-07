@@ -6,10 +6,10 @@ import {
 } from '@codemirror/view';
 import { RangeSet, RangeSetBuilder } from '@codemirror/state';
 
-const infoWord = /\[\ue6f5info\]/g;
-const debugWord = /\[\ue67fdebug\]/g;
-const warnWord = /\[\ue880warn\]/g;
-const errorWord = /\[\ue602error\]/g;
+const infoWord = /\[ℹ️info/g;
+const debugWord = /\[⚠️debug/g;
+const warnWord = /\[❌warn/g;
+const errorWord = /\[🐛error/g;
 
 const customWordClassMap = {
   info: 'system-log-info',

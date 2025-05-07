@@ -1,5 +1,5 @@
 {
   "watch": ["back", ".env"],
   "ext": "js,ts,json",
-  "exec": "ts-node -P tsconfig.back.json ./back/app.ts"
+  "exec": "ts-node -P ./back/tsconfig.json ./back/app.ts"
 }

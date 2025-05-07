@@ -1,30 +1,92 @@
-import 'reflect-metadata'; // We need this in order to use @Decorators
-import config from './config';
+import 'reflect-metadata';
+import compression from 'compression';
+import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
+import { Container } from 'typedi';
+import config from './config';
 import Logger from './loaders/logger';
+import { monitoringMiddleware } from './middlewares/monitoring';
+import { GrpcServerService } from './services/grpc';
+import { HttpServerService } from './services/http';
+import { metricsService } from './services/metrics';
 
-async function startServer() {
-  const app = express();
+class Application {
+  private app: express.Application;
+  private server: any;
+  private httpServerService: HttpServerService;
+  private grpcServerService: GrpcServerService;
+  private isShuttingDown = false;
 
-  await require('./loaders/db').default();
+  constructor() {
+    this.app = express();
+    this.httpServerService = Container.get(HttpServerService);
+    this.grpcServerService = Container.get(GrpcServerService);
+  }
 
-  await require('./loaders/initFile').default();
+  async start() {
+    try {
+      await this.initializeDatabase();
+      this.setupMiddlewares();
+      await this.initializeServices();
+      this.setupGracefulShutdown();
 
-  await require('./loaders/app').default({ expressApp: app });
-
-  const server = app
-    .listen(config.port, '0.0.0.0', () => {
-      Logger.debug(`✌️ 后端服务启动成功！`);
-      console.debug(`✌️ 后端服务启动成功！`);
       process.send?.('ready');
-    })
-    .on('error', (err) => {
-      Logger.error(err);
-      console.error(err);
+    } catch (error) {
+      Logger.error('Failed to start application:', error);
       process.exit(1);
-    });
+    }
+  }
 
-  await require('./loaders/server').default({ server });
+  private async initializeDatabase() {
+    await require('./loaders/db').default();
+  }
+
+  private setupMiddlewares() {
+    this.app.use(helmet());
+    this.app.use(cors(config.cors));
+    this.app.use(compression());
+    this.app.use(monitoringMiddleware);
+  }
+
+  private async initializeServices() {
+    await this.grpcServerService.initialize();
+
+    await require('./loaders/app').default({ app: this.app });
+
+    this.server = await this.httpServerService.initialize(
+      this.app,
+      config.port,
+    );
+
+    await require('./loaders/server').default({ server: this.server });
+  }
+
+  private setupGracefulShutdown() {
+    const shutdown = async () => {
+      if (this.isShuttingDown) return;
+      this.isShuttingDown = true;
+
+      Logger.info('Shutting down services...');
+      try {
+        await Promise.all([
+          this.grpcServerService.shutdown(),
+          this.httpServerService.shutdown(),
+        ]);
+        process.exit(0);
+      } catch (error) {
+        Logger.error('Error during shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+  }
 }
 
-startServer();
+const app = new Application();
+app.start().catch((error) => {
+  Logger.error('Application failed to start:', error);
+  process.exit(1);
+});

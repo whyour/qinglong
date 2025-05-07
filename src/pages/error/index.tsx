@@ -17,9 +17,9 @@ const Error = () => {
   const getHealthStatus = (needLoading: boolean = true) => {
     needLoading && setLoading(true);
     request
-      .get(`${config.apiPrefix}public/health`)
+      .get(`${config.apiPrefix}health`)
       .then(({ error, data }) => {
-        if (data?.status === 1) {
+        if (data?.status === 'ok') {
           if (retryTimes.current > 1) {
             setTimeout(() => {
               window.location.reload();

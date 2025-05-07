@@ -4,7 +4,7 @@ import got from 'got';
 import iconv from 'iconv-lite';
 import { exec } from 'child_process';
 import FormData from 'form-data';
-import psTreeFun from 'pstree.remy';
+import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
 import config from './index';
@@ -462,11 +462,11 @@ export function parseBody(
 
 export function psTree(pid: number): Promise<number[]> {
   return new Promise((resolve, reject) => {
-    psTreeFun(pid, (err: any, pids: number[]) => {
+    psTreeFun(pid, (err: any, children) => {
       if (err) {
         reject(err);
       }
-      resolve(pids.filter((x) => !isNaN(x)));
+      resolve(children.map((x) => Number(x.PID)).filter((x) => !isNaN(x)));
     });
   });
 }

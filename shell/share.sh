@@ -308,13 +308,6 @@ reload_pm2() {
   pm2 startOrGracefulReload ecosystem.config.js
 }
 
-reload_update() {
-  cd $dir_root
-  restore_env_vars
-  pm2 flush &>/dev/null
-  pm2 startOrGracefulReload other.config.js
-}
-
 diff_time() {
   local format="$1"
   local begin_time="$2"

@@ -122,5 +122,4 @@ export default async () => {
   }
 
   Logger.info('✌️ Init file down');
-  console.log('✌️ Init file down');
 };
