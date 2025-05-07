@@ -84,7 +84,8 @@ const push_config = {
   AIBOTK_NAME: '', // 智能微秘书  发送群名 或者好友昵称和type要对应好
 
   SMTP_SERVICE: '', // 邮箱服务名称，比如 126、163、Gmail、QQ 等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
-  SMTP_EMAIL: '', // SMTP 收发件邮箱，通知将会由自己发给自己
+  SMTP_EMAIL: '', // SMTP 发件邮箱
+  SMTP_TO: '', // SMTP 收件邮箱，默认通知将会发给发件邮箱
   SMTP_PASSWORD: '', // SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
   SMTP_NAME: '', // SMTP 收发件人姓名，可随意填写
 
@@ -993,7 +994,8 @@ function fsBotNotify(text, desp) {
 }
 
 async function smtpNotify(text, desp) {
-  const { SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVICE, SMTP_NAME } = push_config;
+  const { SMTP_EMAIL, SMTP_TO, SMTP_PASSWORD, SMTP_SERVICE, SMTP_NAME } =
+    push_config;
   if (![SMTP_EMAIL, SMTP_PASSWORD].every(Boolean) || !SMTP_SERVICE) {
     return;
   }
@@ -1011,7 +1013,7 @@ async function smtpNotify(text, desp) {
     const addr = SMTP_NAME ? `"${SMTP_NAME}" <${SMTP_EMAIL}>` : SMTP_EMAIL;
     const info = await transporter.sendMail({
       from: addr,
-      to: addr,
+      to: SMTP_TO ? SMTP_TO.split(';') : addr,
       subject: text,
       html: `${desp.replace(/\n/g, '<br/>')}`,
     });

@@ -505,5 +505,6 @@
   "强制打开": "Force Open",
   "强制打开可能会导致编辑器显示异常": "Force opening may cause display issues in the editor",
   "确认离开": "Confirm Leave",
-  "当前文件未保存，确认离开吗": "Current file is not saved, are you sure to leave?"
+  "当前文件未保存，确认离开吗": "Current file is not saved, are you sure to leave?",
+  "收件邮箱地址，多个分号分隔，默认发送给发件邮箱地址": "Receiving email address, multiple semicolon separated, sent to the sending email address by default"
 }
