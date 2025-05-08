@@ -92,7 +92,7 @@ export default (app: Router) => {
           path: string;
         };
         const logService = Container.get(LogService);
-        const finalPath = logService.checkFilePath(filename, path);
+        const finalPath = logService.checkFilePath(path, filename);
         if (!finalPath || blacklist.includes(path)) {
           return res.send({
             code: 403,
