@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  to_gitlab:
+  code_gitlab:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
           source-repo: https://github.com/whyour/qinglong.git
           destination-repo: git@gitlab.com:whyour/qinglong.git
 
-  to_gitee:
+  code_gitee:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,17 +74,34 @@ jobs:
           git config --local user.email 'github-actions[bot]@users.noreply.github.com'
           git commit --allow-empty -m "copy static at $(date +'%Y-%m-%d %H:%M:%S')"
           git push --force --quiet "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" ${GITHUB_BRANCH}:${GITHUB_BRANCH}
+  
+  static_gitlab:
+    needs: build-static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wearerequired/git-mirror-action@v1
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
+        with:
+          source-repo: https://github.com/whyour/qinglong-static.git
+          destination-repo: git@gitlab.com:whyour/qinglong-static.git
 
-          mkdir -p ~/.ssh
-          echo "${PRIVATE_KEY}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          export GIT_SSH_COMMAND="ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -l git"
-          git remote add gitee "${REPO_GITEE}"
-          git remote add gitlab "${REPO_GITLAB}"
-          git gc
-          git push --force --quiet gitee ${GITHUB_BRANCH}:${GITHUB_BRANCH}
-          git push --force --quiet gitlab ${GITHUB_BRANCH}:${GITHUB_BRANCH}
+  static_gitee:
+    needs: build-static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wearerequired/git-mirror-action@v1
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
+        with:
+          source-repo: https://github.com/whyour/qinglong-static.git
+          destination-repo: git@gitee.com:whyour/qinglong-static.git
 
   build:
     needs: build-static
