@@ -74,7 +74,6 @@ check_pm2() {
 main() {
   echo -e "=====> 开始检测"
   npm i -g pnpm@8.3.1 pm2 ts-node
-  patch_version
 
   reset_env
   copy_dep

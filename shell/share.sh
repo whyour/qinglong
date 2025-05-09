@@ -74,7 +74,7 @@ original_name=(
 init_env() {
   local pnpm_global_path=$(pnpm root -g 2>/dev/null)
   export NODE_PATH="/usr/local/bin:/usr/local/lib/node_modules${pnpm_global_path:+:${pnpm_global_path}}"
-  
+
   # 如果存在 pnpm 全局路径，创建软链接
   if [[ -n "$pnpm_global_path" ]]; then
     # 确保目标目录存在
@@ -82,7 +82,7 @@ init_env() {
     # 链接全局模块到项目的 node_modules
     ln -sf "${pnpm_global_path}/"* "${dir_root}/node_modules/" 2>/dev/null || true
   fi
-  
+
   export PYTHONUNBUFFERED=1
 }
 
@@ -180,67 +180,47 @@ fix_config() {
   make_dir $dir_dep
 
   if [[ ! -s $file_config_user ]]; then
-    echo -e "复制一份 $file_config_sample 为 $file_config_user，随后请按注释编辑你的配置文件：$file_config_user\n"
-    cp -fv $file_config_sample $file_config_user
-    echo
+    cp -f $file_config_sample $file_config_user
   fi
 
   if [[ ! -f $file_task_before ]]; then
-    echo -e "复制一份 $file_task_sample 为 $file_task_before\n"
-    cp -fv $file_task_sample $file_task_before
-    echo
+    cp -f $file_task_sample $file_task_before
   fi
 
   if [[ ! -f $file_task_after ]]; then
-    echo -e "复制一份 $file_task_sample 为 $file_task_after\n"
-    cp -fv $file_task_sample $file_task_after
-    echo
+    cp -f $file_task_sample $file_task_after
   fi
 
   if [[ ! -f $file_extra_shell ]]; then
-    echo -e "复制一份 $file_extra_sample 为 $file_extra_shell\n"
-    cp -fv $file_extra_sample $file_extra_shell
-    echo
+    cp -f $file_extra_sample $file_extra_shell
   fi
 
   if [[ ! -s $file_notify_py ]]; then
-    echo -e "复制一份 $file_notify_py_sample 为 $file_notify_py\n"
-    cp -fv $file_notify_py_sample $file_notify_py
-    echo
+    cp -f $file_notify_py_sample $file_notify_py
   fi
 
   if [[ ! -s $file_notify_js ]]; then
-    echo -e "复制一份 $file_notify_js_sample 为 $file_notify_js\n"
-    cp -fv $file_notify_js_sample $file_notify_js
-    echo
+    cp -f $file_notify_js_sample $file_notify_js
   fi
 
   if [[ ! -s $file_test_js ]]; then
-    cp -fv $file_test_js_sample $file_test_js
-    echo
+    cp -f $file_test_js_sample $file_test_js
   fi
 
   if [[ ! -s $file_test_py ]]; then
-    cp -fv $file_test_py_sample $file_test_py
-    echo
+    cp -f $file_test_py_sample $file_test_py
   fi
 
   if [[ -s /etc/nginx/conf.d/default.conf ]]; then
-    echo -e "检测到默认nginx配置文件，清空...\n"
     cat /dev/null >/etc/nginx/conf.d/default.conf
-    echo
   fi
 
   if [[ ! -s $dep_notify_js ]]; then
-    echo -e "复制一份 $file_notify_js_sample 为 $dep_notify_js\n"
-    cp -fv $file_notify_js_sample $dep_notify_js
-    echo
+    cp -f $file_notify_js_sample $dep_notify_js
   fi
 
   if [[ ! -s $dep_notify_py ]]; then
-    echo -e "复制一份 $file_notify_py_sample 为 $dep_notify_py\n"
-    cp -fv $file_notify_py_sample $dep_notify_py
-    echo
+    cp -f $file_notify_py_sample $dep_notify_py
   fi
 
 }
@@ -354,44 +334,9 @@ format_timestamp() {
   fi
 }
 
-patch_version() {
-  git config --global pull.rebase false
-
-  if [[ -f "$dir_root/db/cookie.db" ]]; then
-    echo -e "检测到旧的db文件，拷贝为新db...\n"
-    mv $dir_root/db/cookie.db $dir_root/db/env.db
-    rm -rf $dir_root/db/cookie.db
-    echo
-  fi
-
-  if [[ -d "$dir_root/db" ]]; then
-    echo -e "检测到旧的db目录，拷贝到data目录...\n"
-    cp -rf $dir_root/config $dir_data
-    echo
-  fi
-
-  if [[ -d "$dir_root/scripts" ]]; then
-    echo -e "检测到旧的scripts目录，拷贝到data目录...\n"
-    cp -rf $dir_root/scripts $dir_data
-    echo
-  fi
-
-  if [[ -d "$dir_root/log" ]]; then
-    echo -e "检测到旧的log目录，拷贝到data目录...\n"
-    cp -rf $dir_root/log $dir_data
-    echo
-  fi
-
-  if [[ -d "$dir_root/config" ]]; then
-    echo -e "检测到旧的config目录，拷贝到data目录...\n"
-    cp -rf $dir_root/config $dir_data
-    echo
-  fi
-}
-
 init_nginx() {
-  cp -fv $nginx_conf /etc/nginx/nginx.conf
-  cp -fv $nginx_app_conf /etc/nginx/conf.d/front.conf
+  cp -f $nginx_conf /etc/nginx/nginx.conf
+  cp -f $nginx_app_conf /etc/nginx/conf.d/front.conf
   local location_url="/"
   local aliasStr=""
   local rootStr=""
