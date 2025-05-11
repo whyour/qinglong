@@ -54,7 +54,7 @@ def run():
         
         task_before = os.getenv("task_before")
         if task_before:
-            escaped_task_before = task_before.replace("'", "'\\''")
+            escaped_task_before = task_before.replace('"', '\\"').replace("$", "\\$")
             commands.append(f"eval '{escaped_task_before}'")
             print("执行前置命令\n")
             

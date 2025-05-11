@@ -1,6 +1,6 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { createRandomString, getNetIp } from '../config/util';
+import { createRandomString } from '../config/util';
 import config from '../config';
 import jwt from 'jsonwebtoken';
 import { authenticator } from '@otplib/preset-default';
@@ -271,7 +271,16 @@ export default class UserService {
     if (isValid) {
       return this.login({ username, password }, req, false);
     } else {
-      const { ip, address } = await getNetIp(req);
+      const ip = requestIp.getClientIp(req) || '';
+      const query = new IP2Region();
+      const ipAddress = query.search(ip);
+      let address = '';
+      if (ipAddress) {
+        const { country, province, city, isp } = ipAddress;
+        address = uniq([country, province, city, isp])
+          .filter(Boolean)
+          .join(' ');
+      }
       await this.updateAuthInfo(authInfo, {
         lastip: ip,
         lastaddr: address,

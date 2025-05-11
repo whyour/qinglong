@@ -19,7 +19,7 @@ export class HttpServerService {
           resolve(this.server);
         });
 
-        this.server.on('error', (err: Error) => {
+        this.server?.on('error', (err: Error) => {
           Logger.error('Failed to start HTTP service:', err);
           reject(err);
         });

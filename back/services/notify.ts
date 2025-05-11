@@ -59,7 +59,7 @@ export default class NotificationService {
       try {
         return await notificationModeAction?.call(this);
       } catch (error: any) {
-        throw error;
+        console.error(error);
       }
     }
     return false;
