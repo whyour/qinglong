@@ -67,6 +67,9 @@ export default class DependenceService {
 
   public async remove(ids: number[], force = false): Promise<Dependence[]> {
     const docs = await DependenceModel.findAll({ where: { id: ids } });
+    for (const doc of docs) {
+      taskLimit.removeQueuedDependency(doc);
+    }
     const unInstalledDeps = docs.filter(
       (x) => x.status !== DependenceStatus.installed,
     );
@@ -147,6 +150,9 @@ export default class DependenceService {
     );
 
     const docs = await DependenceModel.findAll({ where: { id: ids } });
+    for (const doc of docs) {
+      taskLimit.removeQueuedDependency(doc);
+    }
     this.installDependenceOneByOne(docs, true, true);
     return docs;
   }

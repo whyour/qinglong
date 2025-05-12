@@ -32,7 +32,6 @@ export default (app: Router) => {
       ),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
         const data = await dependenceService.create(req.body);
@@ -54,7 +53,6 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
         const data = await dependenceService.update(req.body);
@@ -71,7 +69,6 @@ export default (app: Router) => {
       body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
         const data = await dependenceService.remove(req.body);
@@ -88,7 +85,6 @@ export default (app: Router) => {
       body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
         const data = await dependenceService.remove(req.body, true);
@@ -107,7 +103,6 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
         const data = await dependenceService.getDb({ id: req.params.id });
@@ -124,7 +119,6 @@ export default (app: Router) => {
       body: Joi.array().items(Joi.number().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
         const data = await dependenceService.reInstall(req.body);
