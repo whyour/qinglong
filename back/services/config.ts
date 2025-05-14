@@ -3,7 +3,7 @@ import path, { join } from 'path';
 import config from '../config';
 import { getFileContentByName } from '../config/util';
 import { Response } from 'express';
-import { request } from 'Undici';
+import { request } from 'undici';
 
 @Service()
 export default class ConfigService {
