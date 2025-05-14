@@ -1,9 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import got from 'got';
-import iconv from 'iconv-lite';
 import { exec } from 'child_process';
-import FormData from 'form-data';
 import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
@@ -12,6 +9,7 @@ import { PYTHON_INSTALL_DIR, TASK_COMMAND } from './const';
 import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
+import { FormData } from 'undici';
 
 export * from './share';
 

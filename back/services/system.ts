@@ -1,7 +1,7 @@
 import { spawn } from 'cross-spawn';
 import { Response } from 'express';
 import fs from 'fs';
-import got from 'got';
+import { Agent, request } from 'Undici';
 import sum from 'lodash/sum';
 import path from 'path';
 import { Inject, Service } from 'typedi';
@@ -276,13 +276,17 @@ export default class SystemService {
 
       let lastVersionContent;
       try {
-        const result = await got.get(
+        const { body } = await request(
           `${config.lastVersionFile}?t=${Date.now()}`,
           {
-            timeout: 30000,
+            dispatcher: new Agent({
+              keepAliveTimeout: 30000,
+              keepAliveMaxTimeout: 30000,
+            }),
           },
         );
-        lastVersionContent = parseContentVersion(result.body);
+        const text = await body.text();
+        lastVersionContent = parseContentVersion(text);
       } catch (error) {}
 
       if (!lastVersionContent) {

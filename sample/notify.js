@@ -1,6 +1,41 @@
 const querystring = require('node:querystring');
-const got = require('got');
+const { request: undiciRequest, ProxyAgent, FormData } = require('undici');
 const timeout = 15000;
+
+async function request(url, options = {}) {
+  const { json, form, body, headers = {}, ...rest } = options;
+
+  const finalHeaders = { ...headers };
+  let finalBody = body;
+
+  if (json) {
+    finalHeaders['content-type'] = 'application/json';
+    finalBody = JSON.stringify(json);
+  } else if (form) {
+    finalBody = form;
+    delete finalHeaders['content-type'];
+  }
+
+  return undiciRequest(url, {
+    headers: finalHeaders,
+    body: finalBody,
+    ...rest,
+  });
+}
+
+function post(url, options = {}) {
+  return request(url, { ...options, method: 'POST' });
+}
+
+function get(url, options = {}) {
+  return request(url, { ...options, method: 'GET' });
+}
+
+const httpClient = {
+  request,
+  post,
+  get,
+};
 
 const push_config = {
   HITOKOTO: true, // 启用一言（随机句子）
@@ -123,9 +158,9 @@ for (const key in push_config) {
 const $ = {
   post: (params, callback) => {
     const { url, ...others } = params;
-    got.post(url, others).then(
-      (res) => {
-        let body = res.body;
+    httpClient.post(url, others).then(
+      async (res) => {
+        let body = await res.body.text();
         try {
           body = JSON.parse(body);
         } catch (error) {}
@@ -138,9 +173,9 @@ const $ = {
   },
   get: (params, callback) => {
     const { url, ...others } = params;
-    got.get(url, others).then(
-      (res) => {
-        let body = res.body;
+    httpClient.get(url, others).then(
+      async (res) => {
+        let body = await res.body.text();
         try {
           body = JSON.parse(body);
         } catch (error) {}
@@ -156,8 +191,8 @@ const $ = {
 
 async function one() {
   const url = 'https://v1.hitokoto.cn/';
-  const res = await got.get(url);
-  const body = JSON.parse(res.body);
+  const res = await httpClient.request(url);
+  const body = await res.body.json();
   return `${body.hitokoto}    ----${body.from}`;
 }
 
@@ -442,21 +477,11 @@ function tgBotNotify(text, desp) {
         timeout,
       };
       if (TG_PROXY_HOST && TG_PROXY_PORT) {
-        const { HttpProxyAgent, HttpsProxyAgent } = require('hpagent');
-        const _options = {
-          keepAlive: true,
-          keepAliveMsecs: 1000,
-          maxSockets: 256,
-          maxFreeSockets: 256,
-          proxy: `http://${TG_PROXY_AUTH}${TG_PROXY_HOST}:${TG_PROXY_PORT}`,
-        };
-        const httpAgent = new HttpProxyAgent(_options);
-        const httpsAgent = new HttpsProxyAgent(_options);
-        const agent = {
-          http: httpAgent,
-          https: httpsAgent,
-        };
-        options.agent = agent;
+        let agent;
+        agent = new ProxyAgent({
+          uri: `http://${TG_PROXY_AUTH}${TG_PROXY_HOST}:${TG_PROXY_PORT}`,
+        });
+        options.dispatcher = agent;
       }
       $.post(options, (err, resp, data) => {
         try {
@@ -1209,17 +1234,18 @@ function webhookNotify(text, desp) {
       '$title',
       encodeURIComponent(text),
     ).replaceAll('$content', encodeURIComponent(desp));
-    got(formatUrl, options).then((resp) => {
+    httpClient.request(formatUrl, options).then(async (resp) => {
+      const body = await resp.body.text();
       try {
         if (resp.statusCode !== 200) {
-          console.log(`自定义发送通知消息失败😞 ${resp.body}\n`);
+          console.log(`自定义发送通知消息失败😞 ${body}\n`);
         } else {
-          console.log(`自定义发送通知消息成功🎉 ${resp.body}\n`);
+          console.log(`自定义发送通知消息成功🎉 ${body}\n`);
         }
       } catch (e) {
         $.logErr(e, resp);
       } finally {
-        resolve(resp.body);
+        resolve(body);
       }
     });
   });

@@ -3,7 +3,7 @@ import path, { join } from 'path';
 import config from '../config';
 import { getFileContentByName } from '../config/util';
 import { Response } from 'express';
-import got from 'got';
+import { request } from 'Undici';
 
 @Service()
 export default class ConfigService {
@@ -27,10 +27,10 @@ export default class ConfigService {
     }
 
     if (filePath.startsWith('sample/')) {
-      const res = await got.get(
+      const res = await request(
         `https://gitlab.com/whyour/qinglong/-/raw/master/${filePath}`,
       );
-      content = res.body;
+      content = await res.body.text();
     } else if (filePath.startsWith('data/scripts/')) {
       content = await getFileContentByName(join(config.rootPath, filePath));
     } else {
