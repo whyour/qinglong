@@ -21,6 +21,8 @@ import dayjs from 'dayjs';
 import IP2Region from 'ip2region';
 import requestIp from 'request-ip';
 import uniq from 'lodash/uniq';
+import pickBy from 'lodash/pickBy';
+import isNil from 'lodash/isNil';
 import { shareStore } from '../shared/store';
 
 @Service()
@@ -365,11 +367,16 @@ export default class UserService {
   public async resetAuthInfo(info: Partial<AuthInfo>) {
     const { retries, twoFactorActivated, password, username } = info;
     const authInfo = await this.getAuthInfo();
-    await this.updateAuthInfo(authInfo, {
-      retries,
-      twoFactorActivated,
-      password,
-      username
-    });
+    const payload = pickBy(
+      {
+        retries,
+        twoFactorActivated,
+        password,
+        username,
+      },
+      (x) => !isNil(x),
+    );
+
+    await this.updateAuthInfo(authInfo, payload);
   }
 }
