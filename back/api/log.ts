@@ -60,7 +60,7 @@ export default (app: Router) => {
         const logService = Container.get(LogService);
         const finalPath = logService.checkFilePath(
           (req.query.path as string) || '',
-          (req.query.file as string) || '',
+          (req.params.file as string) || '',
         );
         if (!finalPath || blacklist.includes(req.query.path as string)) {
           return res.send({

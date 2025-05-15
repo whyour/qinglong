@@ -13,14 +13,13 @@ ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
 ARG QL_URL=https://github.com/${QL_MAINTAINER}/qinglong.git
 ARG QL_BRANCH=develop
+ARG PYTHON_SHORT_VERSION=3.10
 
 ENV QL_DIR=/ql \
   QL_BRANCH=${QL_BRANCH} \
   LANG=C.UTF-8 \
   SHELL=/bin/bash \
-  PS1="\u@\h:\w \$ " \
-  PYTHONPATH= \
-  PYTHON_SHORT_VERSION=
+  PS1="\u@\h:\w \$ "
 
 VOLUME /ql/data
   
@@ -52,12 +51,11 @@ RUN set -x \
   && apk update \
   && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
   && echo "Asia/Shanghai" > /etc/timezone \
-  && git config --global user.email "qinglong@@users.noreply.github.com" \
+  && git config --global user.email "qinglong@users.noreply.github.com" \
   && git config --global user.name "qinglong" \
   && git config --global http.postBuffer 524288000 \
   && rm -rf /root/.cache \
-  && ulimit -c 0 \
-  && PYTHON_SHORT_VERSION=$(echo ${PYTHON_VERSION} | cut -d. -f1,2)
+  && ulimit -c 0
 
 ARG SOURCE_COMMIT
 RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
@@ -77,7 +75,7 @@ ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin \
   NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules \
   PIP_CACHE_DIR=${PYTHON_HOME}/pip \
-  PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages:${PYTHONPATH}
+  PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages
 
 RUN pip3 install --prefix ${PYTHON_HOME} requests
 
