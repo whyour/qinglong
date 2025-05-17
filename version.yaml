@@ -1,7 +1,13 @@
-version: 2.18.3
-changeLogLink: https://t.me/jiao_long/427
-publishTime: 2025-03-15 08:00
+version: 2.19.0
+changeLogLink: https://t.me/jiao_long/429
+publishTime: 2025-05-11 08:00
 changeLog: |
-  1. 脚本管理和日志管理支持下载脚本和日志
-  2. 修复 gRPC client 连接超时
-  3. 脚本管理增加强制打开文件
+  1. 缓存 node 和 python 依赖，linux 依赖需要增加映射目录
+  2. 减少启动服务数，节约启动内存约 50%
+  3. 邮箱通知支持多个收件人
+  4. boot 任务改为在依赖安装完成后执行
+  5. 修复脚本管理查询子目录逻辑
+  6. 修复脚本管理增加文件夹
+  7. 修复 QLAPI 修复环境变量 remarks
+  8. 修复 mjs 依赖查不到
+  9. 修复无法删除日志文件
