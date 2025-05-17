@@ -7,26 +7,23 @@ import { Container } from 'typedi';
 import config from './config';
 import Logger from './loaders/logger';
 import { monitoringMiddleware } from './middlewares/monitoring';
-import { GrpcServerService } from './services/grpc';
-import { HttpServerService } from './services/http';
-import { metricsService } from './services/metrics';
+import { type GrpcServerService } from './services/grpc';
+import { type HttpServerService } from './services/http';
 
 class Application {
   private app: express.Application;
-  private server: any;
-  private httpServerService: HttpServerService;
-  private grpcServerService: GrpcServerService;
+  private httpServerService?: HttpServerService;
+  private grpcServerService?: GrpcServerService;
   private isShuttingDown = false;
 
   constructor() {
     this.app = express();
-    this.httpServerService = Container.get(HttpServerService);
-    this.grpcServerService = Container.get(GrpcServerService);
   }
 
   async start() {
     try {
       await this.initializeDatabase();
+      await this.initServer();
       this.setupMiddlewares();
       await this.initializeServices();
       this.setupGracefulShutdown();
@@ -36,6 +33,13 @@ class Application {
       Logger.error('Failed to start application:', error);
       process.exit(1);
     }
+  }
+
+  async initServer() {
+    const { HttpServerService } = await import('./services/http');
+    const { GrpcServerService } = await import('./services/grpc');
+    this.httpServerService = Container.get(HttpServerService);
+    this.grpcServerService = Container.get(GrpcServerService);
   }
 
   private async initializeDatabase() {
@@ -50,16 +54,16 @@ class Application {
   }
 
   private async initializeServices() {
-    await this.grpcServerService.initialize();
+    await this.grpcServerService?.initialize();
 
     await require('./loaders/app').default({ app: this.app });
 
-    this.server = await this.httpServerService.initialize(
+    const server = await this.httpServerService?.initialize(
       this.app,
       config.port,
     );
 
-    await require('./loaders/server').default({ server: this.server });
+    await require('./loaders/server').default({ server });
   }
 
   private setupGracefulShutdown() {
@@ -70,8 +74,8 @@ class Application {
       Logger.info('Shutting down services...');
       try {
         await Promise.all([
-          this.grpcServerService.shutdown(),
-          this.httpServerService.shutdown(),
+          this.grpcServerService?.shutdown(),
+          this.httpServerService?.shutdown(),
         ]);
         process.exit(0);
       } catch (error) {

@@ -13,7 +13,7 @@ import { AuthDataType, SystemModel } from '../data/system';
 import SystemService from '../services/system';
 import UserService from '../services/user';
 import { writeFile, readFile } from 'fs/promises';
-import { createRandomString, safeJSONParse } from '../config/util';
+import { createRandomString, fileExist, safeJSONParse } from '../config/util';
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
@@ -56,8 +56,11 @@ export default async () => {
       password: 'admin',
     };
     try {
-      const content = await readFile(config.authConfigFile, 'utf8');
-      authInfo = safeJSONParse(content);
+      const authFileExist = await fileExist(config.authConfigFile);
+      if (authFileExist) {
+        const content = await readFile(config.authConfigFile, 'utf8');
+        authInfo = safeJSONParse(content);
+      }
     } catch (error) {
       Logger.warn('Failed to read auth config file, using default credentials');
     }

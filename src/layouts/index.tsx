@@ -110,7 +110,10 @@ export default function () {
         }
       })
       .catch((error) => {
-        history.push('/error');
+        const responseStatus = error.response.status;
+        if (responseStatus !== 401) {
+          history.push('/error');
+        }
       })
       .finally(() => setInitLoading(false));
   };

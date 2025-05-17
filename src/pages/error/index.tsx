@@ -36,6 +36,12 @@ const Error = () => {
           getHealthStatus(false);
         }, 3000);
       })
+      .catch((error) => {
+        const responseStatus = error.response.status;
+        if (responseStatus === 401) {
+          history.push('/login');
+        }
+      })
       .finally(() => needLoading && setLoading(false));
   };
 
@@ -74,7 +80,7 @@ const Error = () => {
                 <div>{intl.get('2. 容器内执行 ql check、ql update')}</div>
                 <div>
                   {intl.get(
-                    '3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果'
+                    '3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果',
                   )}
                   <Typography.Link href="https://github.com/whyour/qinglong/issues/new?assignees=&labels=&template=bug_report.yml">
                     {intl.get('提交 issue')}
