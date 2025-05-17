@@ -2,7 +2,8 @@
 /.github/
 /.vscode/
 /.history/
-/back/
+/back/**/*.ts
+/back/**/*.json
 /cli/
 /data/
 /src/
