@@ -285,7 +285,7 @@ reload_pm2() {
   cd $dir_root
   restore_env_vars
   pm2 flush &>/dev/null
-  pm2 startOrGracefulReload ecosystem.config.js
+  pm2 startOrGracefulReload ecosystem.config.js --update-env
 }
 
 diff_time() {
