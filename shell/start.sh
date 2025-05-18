@@ -34,39 +34,35 @@ fi
 
 command="$1"
 
-if [[ $command == "reload" ]]; then
-  mkdir -p /run/nginx
-  nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-  exit 1
+if [[ $command != "reload" ]]; then
+  # 安装依赖
+  os_name=$(source /etc/os-release && echo "$ID")
+
+  if [[ $os_name == 'alpine' ]]; then
+    apk update
+    apk add -f bash \
+      coreutils \
+      git \
+      curl \
+      wget \
+      tzdata \
+      perl \
+      openssl \
+      jq \
+      nginx \
+      openssh \
+      procps \
+      netcat-openbsd
+  elif [[ $os_name == 'debian' ]] || [[ $os_name == 'ubuntu' ]]; then
+    apt-get update
+    apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
+  else
+    echo -e "暂不支持此系统部署 $os_name"
+    exit 1
+  fi
+
+  npm install -g pnpm@8.3.1 pm2 ts-node
 fi
-
-# 安装依赖
-os_name=$(source /etc/os-release && echo "$ID")
-
-if [[ $os_name == 'alpine' ]]; then
-  apk update
-  apk add -f bash \
-    coreutils \
-    git \
-    curl \
-    wget \
-    tzdata \
-    perl \
-    openssl \
-    jq \
-    nginx \
-    openssh \
-    procps \
-    netcat-openbsd
-elif [[ $os_name == 'debian' ]] || [[ $os_name == 'ubuntu' ]]; then
-  apt-get update
-  apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
-else
-  echo -e "暂不支持此系统部署 $os_name"
-  exit 1
-fi
-
-npm install -g pnpm@8.3.1 pm2 ts-node
 
 export PYTHON_SHORT_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 export PNPM_HOME=${QL_DIR}/data/dep_cache/node
@@ -78,7 +74,9 @@ export NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/
 export PIP_CACHE_DIR=${PYTHON_HOME}/pip
 export PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages
 
-pip3 install --prefix ${PYTHON_HOME} requests
+if [[ $command != "reload" ]]; then
+  pip3 install --prefix ${PYTHON_HOME} requests
+fi
 
 cd ${QL_DIR}
 cp -f .env.example .env
@@ -107,20 +105,22 @@ pm2 l &>/dev/null
 log_with_style "INFO" "🔄 2. 启动 nginx..."
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 
-log_with_style "INFO" "⚙️  3. 启动 pm2 服务...\n"
+log_with_style "INFO" "⚙️  3. 启动 pm2 服务..."
 reload_pm2
 
-if [[ $AutoStartBot == true ]]; then
-  log_with_style "INFO" "🤖 4. 启动 bot..."
-  nohup ql bot >$dir_log/bot.log 2>&1 &
+if [[ $command != "reload" ]]; then
+  if [[ $AutoStartBot == true ]]; then
+    log_with_style "INFO" "🤖 4. 启动 bot..."
+    nohup ql bot >$dir_log/bot.log 2>&1 &
+  fi
+
+  if [[ $EnableExtraShell == true ]]; then
+    log_with_style "INFO" "🛠️ 5. 执行自定义脚本..."
+    nohup ql extra >$dir_log/extra.log 2>&1 &
+  fi
+
+  pm2 startup
+  pm2 save
 fi
 
-if [[ $EnableExtraShell == true ]]; then
-  log_with_style "INFO" "🛠️ 5. 执行自定义脚本..."
-  nohup ql extra >$dir_log/extra.log 2>&1 &
-fi
-
-pm2 startup
-pm2 save
-
-log_with_style "SUCCESS" "🎉 容器启动成功!"
+log_with_style "SUCCESS" "🎉 启动成功!"
