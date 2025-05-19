@@ -56,10 +56,8 @@ enum ViewFilterRelation {
 const ViewCreateModal = ({
   view,
   handleCancel,
-  visible,
 }: {
   view?: any;
-  visible: boolean;
   handleCancel: (param?: any) => void;
 }) => {
   const [form] = Form.useForm();
@@ -100,17 +98,6 @@ const ViewCreateModal = ({
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!view) {
-      form.resetFields();
-    }
-    form.setFieldsValue(
-      view || {
-        filters: [{ property: 'command' }],
-      },
-    );
-  }, [view, visible]);
 
   const OperationElement = ({ name, ...others }: { name: number }) => {
     const property = form.getFieldValue(['filters', name, 'property']);
@@ -172,7 +159,7 @@ const ViewCreateModal = ({
   return (
     <Modal
       title={view ? intl.get('编辑视图') : intl.get('创建视图')}
-      open={visible}
+      open={true}
       forceRender
       width={580}
       centered
@@ -190,7 +177,16 @@ const ViewCreateModal = ({
       onCancel={() => handleCancel()}
       confirmLoading={loading}
     >
-      <Form form={form} layout="vertical" name="env_modal">
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={
+          view || {
+            filters: [{ property: 'command' }],
+          }
+        }
+        name="env_modal"
+      >
         <Form.Item
           name="name"
           label={intl.get('视图名称')}

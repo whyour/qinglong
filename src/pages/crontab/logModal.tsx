@@ -25,12 +25,10 @@ const { Countdown } = Statistic;
 const CronLogModal = ({
   cron,
   handleCancel,
-  visible,
   data,
   logUrl,
 }: {
   cron?: any;
-  visible: boolean;
   handleCancel: () => void;
   data?: string;
   logUrl?: string;
@@ -120,11 +118,10 @@ const CronLogModal = ({
   };
 
   useEffect(() => {
-    if (cron && cron.id && visible) {
+    if (cron && cron.id) {
       getCronLog(true);
-      scrollInfoRef.current.down = true;
     }
-  }, [cron, visible]);
+  }, [cron]);
 
   useEffect(() => {
     if (data) {
@@ -139,7 +136,7 @@ const CronLogModal = ({
   return (
     <Modal
       title={titleElement()}
-      open={visible}
+      open={true}
       centered
       className="log-modal"
       forceRender

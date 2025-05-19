@@ -7,10 +7,8 @@ import config from '@/utils/config';
 const EnvModal = ({
   env,
   handleCancel,
-  visible,
 }: {
   env?: any;
-  visible: boolean;
   handleCancel: (cks?: any[]) => void;
 }) => {
   const [form] = Form.useForm();
@@ -55,14 +53,10 @@ const EnvModal = ({
     }
   };
 
-  useEffect(() => {
-    form.resetFields();
-  }, [env, visible]);
-
   return (
     <Modal
       title={env ? intl.get('编辑变量') : intl.get('创建变量')}
-      open={visible}
+      open={true}
       forceRender
       centered
       maskClosable={false}

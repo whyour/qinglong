@@ -14,12 +14,10 @@ import Ansi from 'ansi-to-react';
 const SubscriptionLogModal = ({
   subscription,
   handleCancel,
-  visible,
   data,
   logUrl,
 }: {
   subscription?: any;
-  visible: boolean;
   handleCancel: () => void;
   data?: string;
   logUrl?: string;
@@ -79,10 +77,10 @@ const SubscriptionLogModal = ({
   };
 
   useEffect(() => {
-    if (subscription && subscription.id && visible) {
+    if (subscription && subscription.id) {
       getCronLog(true);
     }
-  }, [subscription, visible]);
+  }, [subscription]);
 
   useEffect(() => {
     if (data) {
@@ -97,7 +95,7 @@ const SubscriptionLogModal = ({
   return (
     <Modal
       title={titleElement()}
-      open={visible}
+      open={true}
       centered
       className="log-modal"
       forceRender

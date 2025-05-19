@@ -14,6 +14,17 @@ const Error = () => {
   const [data, setData] = useState(intl.get('暂无日志'));
   const retryTimes = useRef(1);
 
+  const loopStatus = (message: string) => {
+    if (retryTimes.current > 3) {
+      setData(message);
+      return;
+    }
+    retryTimes.current += 1;
+    setTimeout(() => {
+      getHealthStatus(false);
+    }, 3000);
+  };
+
   const getHealthStatus = (needLoading: boolean = true) => {
     needLoading && setLoading(true);
     request
@@ -27,19 +38,15 @@ const Error = () => {
           }
           return;
         }
-        if (retryTimes.current > 3) {
-          setData(error?.details);
-          return;
-        }
-        retryTimes.current += 1;
-        setTimeout(() => {
-          getHealthStatus(false);
-        }, 3000);
+
+        loopStatus(error?.details);
       })
       .catch((error) => {
         const responseStatus = error.response.status;
         if (responseStatus === 401) {
           history.push('/login');
+        } else {
+          loopStatus(error.response?.message || error?.message);
         }
       })
       .finally(() => needLoading && setLoading(false));

@@ -14,7 +14,7 @@ export interface IResponseData {
   code?: number;
   data?: any;
   message?: string;
-  errors?: any[];
+  error?: any;
 }
 
 export type Override<

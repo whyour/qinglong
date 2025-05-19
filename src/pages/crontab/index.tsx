@@ -1037,55 +1037,58 @@ const Crontab = () => {
           components={isPhone || pageConf.size < 50 ? undefined : vt}
         />
       </div>
-      <CronLogModal
-        visible={isLogModalVisible}
-        handleCancel={() => {
-          getCronDetail(logCron);
-          setIsLogModalVisible(false);
-        }}
-        cron={logCron}
-      />
-      <CronModal
-        visible={isModalVisible}
-        handleCancel={handleCancel}
-        cron={editedCron}
-      />
-      <CronLabelModal
-        visible={isLabelModalVisible}
-        handleCancel={(needUpdate?: boolean) => {
-          setIsLabelModalVisible(false);
-          if (needUpdate) {
-            getCrons();
-          }
-        }}
-        ids={selectedRowIds}
-      />
-      <CronDetailModal
-        visible={isDetailModalVisible}
-        handleCancel={() => {
-          setIsDetailModalVisible(false);
-        }}
-        cron={detailCron}
-        theme={theme}
-        isPhone={isPhone}
-      />
-      <ViewCreateModal
-        visible={isCreateViewModalVisible}
-        handleCancel={(data) => {
-          setIsCreateViewModalVisible(false);
-          getCronViews();
-        }}
-      />
-      <ViewManageModal
-        cronViews={cronViews}
-        visible={isViewManageModalVisible}
-        handleCancel={() => {
-          setIsViewManageModalVisible(false);
-        }}
-        cronViewChange={(data) => {
-          getCronViews();
-        }}
-      />
+      {isLogModalVisible && (
+        <CronLogModal
+          handleCancel={() => {
+            getCronDetail(logCron);
+            setIsLogModalVisible(false);
+          }}
+          cron={logCron}
+        />
+      )}
+      {isModalVisible && (
+        <CronModal handleCancel={handleCancel} cron={editedCron} />
+      )}
+      {isLabelModalVisible && (
+        <CronLabelModal
+          handleCancel={(needUpdate?: boolean) => {
+            setIsLabelModalVisible(false);
+            if (needUpdate) {
+              getCrons();
+            }
+          }}
+          ids={selectedRowIds}
+        />
+      )}
+      {isDetailModalVisible && (
+        <CronDetailModal
+          handleCancel={() => {
+            setIsDetailModalVisible(false);
+          }}
+          cron={detailCron}
+          theme={theme}
+          isPhone={isPhone}
+        />
+      )}
+      {isCreateViewModalVisible && (
+        <ViewCreateModal
+          handleCancel={(data) => {
+            setIsCreateViewModalVisible(false);
+            getCronViews();
+          }}
+        />
+      )}
+      {isViewManageModalVisible && (
+        <ViewManageModal
+          cronViews={cronViews}
+          handleCancel={() => {
+            setIsViewManageModalVisible(false);
+          }}
+          cronViewChange={(data) => {
+            getCronViews();
+          }}
+        />
+      )}
     </PageContainer>
   );
 };

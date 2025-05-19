@@ -579,18 +579,20 @@ const Subscription = () => {
         loading={loading}
         rowClassName={getRowClassName}
       />
-      <SubscriptionModal
-        visible={isModalVisible}
-        handleCancel={handleCancel}
-        subscription={editedSubscription}
-      />
-      <SubscriptionLogModal
-        visible={isLogModalVisible}
-        handleCancel={() => {
-          setIsLogModalVisible(false);
-        }}
-        subscription={logSubscription}
-      />
+      {isModalVisible && (
+        <SubscriptionModal
+          handleCancel={handleCancel}
+          subscription={editedSubscription}
+        />
+      )}
+      {isLogModalVisible && (
+        <SubscriptionLogModal
+          handleCancel={() => {
+            setIsLogModalVisible(false);
+          }}
+          subscription={logSubscription}
+        />
+      )}
     </PageContainer>
   );
 };

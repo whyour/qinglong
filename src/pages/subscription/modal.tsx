@@ -22,17 +22,19 @@ const fileUrlRegx = /([^\/\:]+\/[^\/\.]+)\.[a-z]+$/;
 const SubscriptionModal = ({
   subscription,
   handleCancel,
-  visible,
 }: {
   subscription?: any;
-  visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [type, setType] = useState('public-repo');
-  const [scheduleType, setScheduleType] = useState('crontab');
-  const [pullType, setPullType] = useState<'ssh-key' | 'user-pwd'>('ssh-key');
+  const [type, setType] = useState(subscription?.type || 'public-repo');
+  const [scheduleType, setScheduleType] = useState(
+    subscription?.schedule_type || 'crontab',
+  );
+  const [pullType, setPullType] = useState<'ssh-key' | 'user-pwd'>(
+    subscription?.pull_type || 'ssh-key',
+  );
 
   const handleOk = async (values: any) => {
     setLoading(true);
@@ -255,29 +257,17 @@ const SubscriptionModal = ({
   };
 
   useEffect(() => {
-    if (visible) {
-      window.addEventListener('paste', onPaste);
-    } else {
-      window.removeEventListener('paste', onPaste);
-    }
-  }, [visible]);
+    window.addEventListener('paste', onPaste);
 
-  useEffect(() => {
-    form.setFieldsValue(
-      { ...subscription, ...formatParams(subscription) } || {},
-    );
-    setType((subscription && subscription.type) || 'public-repo');
-    setScheduleType((subscription && subscription.schedule_type) || 'crontab');
-    setPullType((subscription && subscription.pull_type) || 'ssh-key');
-    if (!subscription) {
-      form.resetFields();
-    }
-  }, [subscription, visible]);
+    return () => {
+      window.removeEventListener('paste', onPaste);
+    };
+  }, []);
 
   return (
     <Modal
       title={subscription ? intl.get('编辑订阅') : intl.get('创建订阅')}
-      open={visible}
+      open={true}
       forceRender
       centered
       maskClosable={false}
@@ -294,7 +284,12 @@ const SubscriptionModal = ({
       onCancel={() => handleCancel()}
       confirmLoading={loading}
     >
-      <Form form={form} name="form_in_modal" layout="vertical">
+      <Form
+        form={form}
+        name="form_in_modal"
+        layout="vertical"
+        initialValues={{ ...subscription, ...formatParams(subscription) }}
+      >
         <Form.Item
           name="name"
           label={intl.get('名称')}

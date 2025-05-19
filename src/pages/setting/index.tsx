@@ -363,11 +363,9 @@ const Setting = () => {
           ]}
         />
       </div>
-      <AppModal
-        visible={isModalVisible}
-        handleCancel={handleCancel}
-        app={editedApp}
-      />
+      {isModalVisible && (
+        <AppModal handleCancel={handleCancel} app={editedApp} />
+      )}
     </PageContainer>
   );
 };

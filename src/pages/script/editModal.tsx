@@ -25,11 +25,9 @@ const EditModal = ({
   currentNode,
   content,
   handleCancel,
-  visible,
 }: {
   treeData?: any;
   content?: string;
-  visible: boolean;
   currentNode: any;
   handleCancel: () => void;
 }) => {
@@ -223,7 +221,7 @@ const EditModal = ({
       width={'100%'}
       headerStyle={{ padding: '11px 24px' }}
       onClose={cancel}
-      open={visible}
+      open={true}
     >
       {/* @ts-ignore */}
       <SplitPane
@@ -256,24 +254,26 @@ const EditModal = ({
           <Ansi>{log}</Ansi>
         </pre>
       </SplitPane>
-      <SaveModal
-        visible={saveModalVisible}
-        handleCancel={() => {
-          setSaveModalVisible(false);
-        }}
-        file={{
-          content:
-            editorRef.current &&
-            editorRef.current.getValue().replace(/\r\n/g, '\n'),
-          ...cNode,
-        }}
-      />
-      <SettingModal
-        visible={settingModalVisible}
-        handleCancel={() => {
-          setSettingModalVisible(false);
-        }}
-      />
+      {saveModalVisible && (
+        <SaveModal
+          handleCancel={() => {
+            setSaveModalVisible(false);
+          }}
+          file={{
+            content:
+              editorRef.current &&
+              editorRef.current.getValue().replace(/\r\n/g, '\n'),
+            ...cNode,
+          }}
+        />
+      )}
+      {settingModalVisible && (
+        <SettingModal
+          handleCancel={() => {
+            setSettingModalVisible(false);
+          }}
+        />
+      )}
     </Drawer>
   );
 };

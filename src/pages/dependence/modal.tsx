@@ -14,11 +14,9 @@ enum DependenceTypes {
 const DependenceModal = ({
   dependence,
   handleCancel,
-  visible,
   defaultType,
 }: {
   dependence?: any;
-  visible: boolean;
   handleCancel: (cks?: any[]) => void;
   defaultType: string;
 }) => {
@@ -61,14 +59,10 @@ const DependenceModal = ({
     }
   };
 
-  useEffect(() => {
-    form.resetFields();
-  }, [dependence, visible]);
-
   return (
     <Modal
       title={dependence ? intl.get('编辑依赖') : intl.get('创建依赖')}
-      open={visible}
+      open={true}
       forceRender
       centered
       maskClosable={false}

@@ -616,16 +616,15 @@ const Env = () => {
           />
         </DndProvider>
       </div>
-      <EnvModal
-        visible={isModalVisible}
-        handleCancel={handleCancel}
-        env={editedEnv}
-      />
-      <EditNameModal
-        visible={isEditNameModalVisible}
-        handleCancel={handleEditNameCancel}
-        ids={selectedRowIds}
-      />
+      {isModalVisible && (
+        <EnvModal handleCancel={handleCancel} env={editedEnv} />
+      )}
+      {isEditNameModalVisible && (
+        <EditNameModal
+          handleCancel={handleEditNameCancel}
+          ids={selectedRowIds}
+        />
+      )}
     </PageContainer>
   );
 };

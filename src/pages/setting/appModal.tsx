@@ -7,10 +7,8 @@ import config from '@/utils/config';
 const AppModal = ({
   app,
   handleCancel,
-  visible,
 }: {
   app?: any;
-  visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
 }) => {
   const [form] = Form.useForm();
@@ -41,14 +39,10 @@ const AppModal = ({
     }
   };
 
-  useEffect(() => {
-    form.resetFields();
-  }, [app, visible]);
-
   return (
     <Modal
       title={app ? intl.get('编辑应用') : intl.get('创建应用')}
-      open={visible}
+      open={true}
       forceRender
       centered
       maskClosable={false}

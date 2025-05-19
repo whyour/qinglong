@@ -15,10 +15,8 @@ import { Status } from './type';
 const DependenceLogModal = ({
   dependence,
   handleCancel,
-  visible,
 }: {
   dependence?: any;
-  visible: boolean;
   handleCancel: (needRemove?: boolean) => void;
 }) => {
   const [value, setValue] = useState<string>('');
@@ -128,7 +126,7 @@ const DependenceLogModal = ({
   return (
     <Modal
       title={titleElement()}
-      open={visible}
+      open={true}
       centered
       className="log-modal"
       forceRender

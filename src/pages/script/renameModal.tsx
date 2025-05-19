@@ -7,10 +7,8 @@ import config from '@/utils/config';
 const RenameModal = ({
   currentNode,
   handleCancel,
-  visible,
 }: {
   currentNode?: any;
-  visible: boolean;
   handleCancel: () => void;
 }) => {
   const [form] = Form.useForm();
@@ -38,14 +36,10 @@ const RenameModal = ({
     }
   };
 
-  useEffect(() => {
-    form.resetFields();
-  }, [currentNode, visible]);
-
   return (
     <Modal
       title={intl.get('重命名')}
-      open={visible}
+      open={true}
       forceRender
       centered
       maskClosable={false}

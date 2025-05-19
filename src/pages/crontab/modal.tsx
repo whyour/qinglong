@@ -12,10 +12,8 @@ import { ScheduleType } from './type';
 const CronModal = ({
   cron,
   handleCancel,
-  visible,
 }: {
   cron?: any;
-  visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
 }) => {
   const [form] = Form.useForm();
@@ -57,11 +55,6 @@ const CronModal = ({
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    form.resetFields();
-    setScheduleType(getScheduleType(cron?.schedule));
-  }, [cron, visible]);
 
   const handleScheduleTypeChange = (type: ScheduleType) => {
     setScheduleType(type);
@@ -146,7 +139,7 @@ const CronModal = ({
   return (
     <Modal
       title={cron?.id ? intl.get('编辑任务') : intl.get('创建任务')}
-      open={visible}
+      open={true}
       forceRender
       centered
       maskClosable={false}
@@ -251,10 +244,8 @@ const CronModal = ({
 const CronLabelModal = ({
   ids,
   handleCancel,
-  visible,
 }: {
   ids: Array<string>;
-  visible: boolean;
   handleCancel: (needUpdate?: boolean) => void;
 }) => {
   const [form] = Form.useForm();
@@ -290,10 +281,6 @@ const CronLabelModal = ({
       });
   };
 
-  useEffect(() => {
-    form.resetFields();
-  }, [ids, visible]);
-
   const buttons = [
     <Button onClick={() => handleCancel(false)}>{intl.get('取消')}</Button>,
     <Button type="primary" danger onClick={() => update('delete')}>
@@ -307,7 +294,7 @@ const CronLabelModal = ({
   return (
     <Modal
       title={intl.get('批量修改标签')}
-      open={visible}
+      open={true}
       footer={buttons}
       centered
       maskClosable={false}

@@ -618,15 +618,15 @@ const Dependence = () => {
         ]}
       />
       {children}
-      <DependenceModal
-        visible={isModalVisible}
-        handleCancel={handleCancel}
-        dependence={editedDependence}
-        defaultType={type}
-      />
-      {logDependence && (
+      {isModalVisible && (
+        <DependenceModal
+          handleCancel={handleCancel}
+          dependence={editedDependence}
+          defaultType={type}
+        />
+      )}
+      {logDependence && isLogModalVisible && (
         <DependenceLogModal
-          visible={isLogModalVisible}
           handleCancel={(needRemove?: boolean) => {
             setIsLogModalVisible(false);
             if (needRemove) {

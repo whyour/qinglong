@@ -7,10 +7,8 @@ import config from '@/utils/config';
 const SettingModal = ({
   file,
   handleCancel,
-  visible,
 }: {
   file?: any;
-  visible: boolean;
   handleCancel: (cks?: any[]) => void;
 }) => {
   const [form] = Form.useForm();
@@ -30,15 +28,10 @@ const SettingModal = ({
       });
   };
 
-  useEffect(() => {
-    form.resetFields();
-    setLoading(false);
-  }, [file, visible]);
-
   return (
     <Modal
       title={intl.get('运行设置')}
-      open={visible}
+      open={true}
       forceRender
       centered
       onCancel={() => handleCancel()}

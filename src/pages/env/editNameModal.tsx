@@ -7,10 +7,8 @@ import config from '@/utils/config';
 const EditNameModal = ({
   ids,
   handleCancel,
-  visible,
 }: {
   ids?: string[];
-  visible: boolean;
   handleCancel: () => void;
 }) => {
   const [form] = Form.useForm();
@@ -34,14 +32,10 @@ const EditNameModal = ({
     }
   };
 
-  useEffect(() => {
-    form.resetFields();
-  }, [ids, visible]);
-
   return (
     <Modal
       title={intl.get('修改环境变量名称')}
-      open={visible}
+      open={true}
       forceRender
       centered
       maskClosable={false}

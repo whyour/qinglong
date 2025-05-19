@@ -710,9 +710,8 @@ const Script = () => {
             }}
           />
         )}
-        {isLogModalVisible && (
+        {isLogModalVisible && isLogModalVisible && (
           <EditModal
-            visible={isLogModalVisible}
             treeData={data}
             currentNode={currentNode}
             content={value}
@@ -721,16 +720,18 @@ const Script = () => {
             }}
           />
         )}
-        <EditScriptNameModal
-          visible={isAddFileModalVisible}
-          treeData={data}
-          handleCancel={addFileModalClose}
-        />
-        <RenameModal
-          visible={isRenameFileModalVisible}
-          handleCancel={handleRenameFileCancel}
-          currentNode={currentNode}
-        />
+        {isAddFileModalVisible && (
+          <EditScriptNameModal
+            treeData={data}
+            handleCancel={addFileModalClose}
+          />
+        )}
+        {isRenameFileModalVisible && (
+          <RenameModal
+            handleCancel={handleRenameFileCancel}
+            currentNode={currentNode}
+          />
+        )}
       </div>
     </PageContainer>
   );

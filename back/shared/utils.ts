@@ -13,7 +13,7 @@ function getUniqueLockPath(filePath: string) {
 
 export async function writeFileWithLock(
   filePath: string,
-  content: string | Buffer,
+  content: string,
   options: Parameters<typeof writeFile>[2] = {},
 ) {
   if (typeof options === 'string') {
