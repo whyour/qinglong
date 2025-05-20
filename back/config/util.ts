@@ -553,7 +553,7 @@ except:
     spec=u.find_spec(name)
     print(name if spec else '')
 ''')"`,
-    [DependenceTypes.linux]: `apk info -es ${name}`,
+    [DependenceTypes.linux]: `apt-get info ${name}`,
   };
 
   return baseCommands[type];
