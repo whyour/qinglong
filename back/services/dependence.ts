@@ -6,7 +6,6 @@ import {
   DependenceStatus,
   DependenceTypes,
   DependenceModel,
-  GetDependenceCommandTypes,
   versionDependenceCommandTypes,
 } from '../data/dependence';
 import { spawn } from 'cross-spawn';
@@ -19,6 +18,7 @@ import {
   promiseExecSuccess,
   getInstallCommand,
   getUninstallCommand,
+  getGetCommand,
 } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
@@ -252,7 +252,7 @@ export default class DependenceService {
 
         // 判断是否已经安装过依赖
         if (isInstall && !force) {
-          const getCommandPrefix = GetDependenceCommandTypes[dependency.type];
+          const getCommand = getGetCommand(dependency.type, depName);
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
           let depVersion = '';
           if (depName.includes(depVersionStr)) {
@@ -269,13 +269,7 @@ export default class DependenceService {
           const isLinuxDependence = dependency.type === DependenceTypes.linux;
           const isPythonDependence =
             dependency.type === DependenceTypes.python3;
-          const depInfo = (
-            await promiseExecSuccess(
-              isNodeDependence
-                ? `${getCommandPrefix} | grep "${depName}" | head -1`
-                : `${getCommandPrefix} ${depName}`,
-            )
-          )
+          const depInfo = (await promiseExecSuccess(getCommand))
             .replace(/\s{2,}/, ' ')
             .replace(/\s+$/, '');
 
