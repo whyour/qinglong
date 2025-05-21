@@ -517,7 +517,7 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
 export function getGetCommand(type: DependenceTypes, name: string): string {
   const baseCommands = {
     [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${name}" | head -1`,
-    [DependenceTypes.python3]: `python3 -c "import importlib;pkg=importlib.import_module('${name}');print(getattr(pkg, '__version__', 'version not found'))"`,
+    [DependenceTypes.python3]: `python3 -c "import importlib;pkg=importlib.import_module('${name}');print(getattr(pkg, '__version__', 'inner package'))"`,
     [DependenceTypes.linux]: `apk info -es ${name}`,
   };
 

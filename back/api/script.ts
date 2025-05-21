@@ -232,7 +232,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
-        path: Joi.string().allow(''),
+        path: Joi.string().optional().allow(''),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -241,6 +241,9 @@ export default (app: Router) => {
           filename: string;
           path: string;
         };
+        if (!path) {
+          path = '';
+        }
         const scriptService = Container.get(ScriptService);
         const filePath = scriptService.checkFilePath(path, filename);
         if (!filePath) {
