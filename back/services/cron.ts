@@ -707,6 +707,7 @@ export default class CronService {
       }));
 
     if (isDemoEnv()) {
+      await writeFileWithLock(config.crontabFile, '');
       return;
     }
     await cronClient.addCron(regularCrons);
