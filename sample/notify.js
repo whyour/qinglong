@@ -143,6 +143,7 @@ const push_config = {
   NTFY_TOKEN: '', // 推送token,可选
   NTFY_USERNAME: '', // 推送用户名称,可选
   NTFY_PASSWORD: '', // 推送用户密码,可选
+  NTFY_ACTIONS: '', // 推送用户动作,可选
 
   // 官方文档: https://wxpusher.zjiecode.com/docs/
   // 管理后台: https://wxpusher.zjiecode.com/admin/
@@ -1261,7 +1262,7 @@ function ntfyNotify(text, desp) {
   }
 
   return new Promise((resolve) => {
-    const { NTFY_URL, NTFY_TOPIC, NTFY_PRIORITY, NTFY_TOKEN, NTFY_USERNAME, NTFY_PASSWORD } = push_config;
+    const { NTFY_URL, NTFY_TOPIC, NTFY_PRIORITY, NTFY_TOKEN, NTFY_USERNAME, NTFY_PASSWORD, NTFY_ACTIONS } = push_config;
     if (NTFY_TOPIC) {
       const options = {
         url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
@@ -1277,6 +1278,9 @@ function ntfyNotify(text, desp) {
         options.headers['Authorization'] = `Bearer ${NTFY_TOKEN}`;
       } else if (NTFY_USERNAME && NTFY_PASSWORD) {
         options.headers['Authorization'] = `Basic ${Buffer.from(`${NTFY_USERNAME}:${NTFY_PASSWORD}`).toString('base64')}`;
+      }
+      if (NTFY_ACTIONS) {
+        options.headers['Actions'] = NTFY_ACTIONS;
       }
 
       $.post(options, (err, resp, data) => {

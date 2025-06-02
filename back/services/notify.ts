@@ -623,29 +623,35 @@ export default class NotificationService {
   }
 
   private async ntfy() {
-    const { ntfyUrl, ntfyTopic, ntfyPriority, ntfyToken, ntfyUsername, ntfyPassword } = this.params;
+    const { ntfyUrl, ntfyTopic, ntfyPriority, ntfyToken, ntfyUsername, ntfyPassword, ntfyActions } = this.params;
     // 编码函数
     const encodeRfc2047 = (text: string, charset: string = 'UTF-8'): string => {
       const encodedText = Buffer.from(text).toString('base64');
       return `=?${charset}?B?${encodedText}?=`;
     };
     try {
-      const encodedTitle = encodeRfc2047(this.title);
+      const headers: Record<string, string> = {
+        Title: encodeRfc2047(this.title),
+        Priority: `${ntfyPriority || '3'}`,
+        Icon: 'https://qn.whyour.cn/logo.png',
+      };
+      if (ntfyToken) {
+        headers['Authorization'] = `Bearer ${ntfyToken}`;
+      } else if (ntfyUsername && ntfyPassword) {
+        headers['Authorization'] = `Basic ${Buffer.from(`${ntfyUsername}:${ntfyPassword}`).toString('base64')}`;
+      }
+      if (ntfyActions) {
+        headers['Actions'] = ntfyActions;
+      }
       const res = await httpClient.request(
         `${ntfyUrl || 'https://ntfy.sh'}/${ntfyTopic}`,
         {
           ...this.gotOption,
           body: `${this.content}`,
-          headers: { Title: encodedTitle, Priority: `${ntfyPriority || '3'}`, Icon: 'https://qn.whyour.cn/logo.png'},
+          headers: headers,
           method: 'POST',
         },
       );
-      if (ntfyToken) {
-        res.headers['Authorization'] = `Bearer ${ntfyToken}`;
-      } else if (ntfyUsername && ntfyPassword) {
-        res.headers['Authorization'] = `Basic ${Buffer.from(`${ntfyUsername}:${ntfyPassword}`).toString('base64')}`;
-      }
-
       if (res.statusCode === 200) {
         return true;
       } else {
