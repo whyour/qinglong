@@ -1280,7 +1280,7 @@ function ntfyNotify(text, desp) {
         options.headers['Authorization'] = `Basic ${Buffer.from(`${NTFY_USERNAME}:${NTFY_PASSWORD}`).toString('base64')}`;
       }
       if (NTFY_ACTIONS) {
-        options.headers['Actions'] = NTFY_ACTIONS;
+        options.headers['Actions'] = encodeRFC2047(NTFY_ACTIONS);
       }
 
       $.post(options, (err, resp, data) => {

@@ -641,7 +641,7 @@ export default class NotificationService {
         headers['Authorization'] = `Basic ${Buffer.from(`${ntfyUsername}:${ntfyPassword}`).toString('base64')}`;
       }
       if (ntfyActions) {
-        headers['Actions'] = ntfyActions;
+        headers['Actions'] = encodeRfc2047(ntfyActions);
       }
       const res = await httpClient.request(
         `${ntfyUrl || 'https://ntfy.sh'}/${ntfyTopic}`,

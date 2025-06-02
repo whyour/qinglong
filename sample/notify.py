@@ -817,7 +817,7 @@ def ntfy(title: str, content: str) -> None:
         authStr = push_config.get("NTFY_USERNAME") + ":" + push_config.get("NTFY_PASSWORD")
         headers['Authorization'] = "Basic " + base64.b64encode(authStr.encode('utf-8')).decode('utf-8')
     if push_config.get("NTFY_ACTIONS"):
-        headers['Actions'] = push_config.get("NTFY_ACTIONS")
+        headers['Actions'] = encode_rfc2047(push_config.get("NTFY_ACTIONS"))
 
     url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
     response = requests.post(url, data=data, headers=headers)
