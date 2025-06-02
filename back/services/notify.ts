@@ -623,7 +623,7 @@ export default class NotificationService {
   }
 
   private async ntfy() {
-    const { ntfyUrl, ntfyTopic, ntfyPriority } = this.params;
+    const { ntfyUrl, ntfyTopic, ntfyPriority, ntfyToken, ntfyUsername, ntfyPassword } = this.params;
     // 编码函数
     const encodeRfc2047 = (text: string, charset: string = 'UTF-8'): string => {
       const encodedText = Buffer.from(text).toString('base64');
@@ -636,10 +636,16 @@ export default class NotificationService {
         {
           ...this.gotOption,
           body: `${this.content}`,
-          headers: { Title: encodedTitle, Priority: `${ntfyPriority || '3'}` },
+          headers: { Title: encodedTitle, Priority: `${ntfyPriority || '3'}`, Icon: 'https://qn.whyour.cn/logo.png'},
           method: 'POST',
         },
       );
+      if (ntfyToken) {
+        res.headers['Authorization'] = `Bearer ${ntfyToken}`;
+      } else if (ntfyUsername && ntfyPassword) {
+        res.headers['Authorization'] = `Basic ${Buffer.from(`${ntfyUsername}:${ntfyPassword}`).toString('base64')}`;
+      }
+
       if (res.statusCode === 200) {
         return true;
       } else {

@@ -132,6 +132,9 @@ export default {
         required: true,
       },
       { label: 'ntfyPriority', tip: intl.get('推送消息的优先级') },
+      { label: 'ntfyToken', tip: intl.get('ntfy的消息应用token') },
+      { label: 'ntfyUsername', tip: intl.get('ntfy的消息应用用户名') },
+      { label: 'ntfyPassword', tip: intl.get('ntfy的消息应用密码') },
     ],
     chat: [
       {
