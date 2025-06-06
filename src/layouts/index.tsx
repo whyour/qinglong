@@ -113,6 +113,8 @@ export default function () {
         const responseStatus = error.response.status;
         if (responseStatus !== 401) {
           history.push('/error');
+        } else {
+          window.location.reload();
         }
       })
       .finally(() => setInitLoading(false));

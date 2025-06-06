@@ -41,7 +41,7 @@ const config: Config = {
     prefix: '/api',
   },
   jwt: {
-    secret: process.env.JWT_SECRET || createRandomString(16, 32),
+    secret: process.env.JWT_SECRET || 'whyour-secret',
     expiresIn: process.env.JWT_EXPIRES_IN,
   },
   cors: {
