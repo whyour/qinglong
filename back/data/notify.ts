@@ -150,6 +150,10 @@ export class NtfyNotification extends NotificationBaseInfo {
   public ntfyUrl = '';
   public ntfyTopic = '';
   public ntfyPriority = '';
+  public ntfyToken = '';
+  public ntfyUsername = '';
+  public ntfyPassword = '';
+  public ntfyActions = '';
 }
 
 export class WxPusherBotNotification extends NotificationBaseInfo {

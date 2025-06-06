@@ -226,9 +226,17 @@ export QMSG_TYPE=""
 ## ntfy_url 填写ntfy地址,如https://ntfy.sh
 ## ntfy_topic 填写ntfy的消息应用topic
 ## ntfy_priority 填写推送消息优先级,默认为3
+## ntfy_token 填写推送token,可选
+## ntfy_username 填写推送用户名称,可选
+## ntfy_password 填写推送用户密码,可选
+## ntfy_actions 填写推送用户动作,可选
 export NTFY_URL=""
 export NTFY_TOPIC=""
 export NTFY_PRIORITY="3"
+export NTFY_TOKEN=""
+export NTFY_USERNAME=""
+export NTFY_PASSWORD=""
+export NTFY_ACTIONS=""
 
 ## 21. wxPusher
 ## 官方文档: https://wxpusher.zjiecode.com/docs/

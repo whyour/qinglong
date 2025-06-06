@@ -395,7 +395,11 @@
   "PushMe的Key，https://push.i-i.me/": "PushMe的Key，https://push.i-i.me/",
   "自建的PushMeServer消息接口地址，例如：http://127.0.0.1:3010，不填则使用官方消息接口": "自建的PushMeServer消息接口地址，例如：http://127.0.0.1:3010，不填则使用官方消息接口",
   "ntfy的url地址，例如 https://ntfy.sh": "ntfy的url地址，例如 https://ntfy.sh",
-  "ntfy的消息应用topic": "ntfy的消息应用topic",
+  "ntfy应用topic": "ntfy应用topic",
+  "ntfy应用token": "ntfy应用token，参考 https://docs.ntfy.sh/config/#access-tokens",
+  "ntfy应用用户名": "ntfy应用用户名，参考 https://docs.ntfy.sh/config/#users-and-roles",
+  "ntfy应用密码": "ntfy应用密码，参考 https://docs.ntfy.sh/config/#users-and-roles",
+  "ntfy用户动作": "ntfy用户动作，最多三个动作，参考 https://docs.ntfy.sh/publish/?h=actions#action-buttons",
   "wxPusherBot的appToken": "wxPusherBot的appToken, 按照文档获取 https://wxpusher.zjiecode.com/docs/",
   "wxPusherBot的topicIds": "wxPusherBot的topicIds, topicIds 和 uids 至少配置一个才行",
   "wxPusherBot的uids": "wxPusherBot的uids, topicIds 和 uids 至少配置一个才行",
@@ -508,4 +512,3 @@
   "当前文件未保存，确认离开吗": "当前文件未保存，确认离开吗",
   "收件邮箱地址，多个分号分隔，默认发送给发件邮箱地址": "收件邮箱地址，多个分号分隔，默认发送给发件邮箱地址"
 }
-  

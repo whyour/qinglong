@@ -126,6 +126,10 @@ push_config = {
     'NTFY_URL': '',                     # ntfy地址,如https://ntfy.sh
     'NTFY_TOPIC': '',                   # ntfy的消息应用topic
     'NTFY_PRIORITY':'3',                # 推送消息优先级,默认为3
+    'NTFY_TOKEN': '',                   # 推送token,可选
+    'NTFY_USERNAME': '',                # 推送用户名称,可选
+    'NTFY_PASSWORD': '',                # 推送用户密码,可选
+    'NTFY_ACTIONS': '',                 # 推送用户动作,可选
 
     'WXPUSHER_APP_TOKEN': '',           # wxpusher 的 appToken 官方文档: https://wxpusher.zjiecode.com/docs/ 管理后台: https://wxpusher.zjiecode.com/admin/
     'WXPUSHER_TOPIC_IDS': '',           # wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
@@ -806,7 +810,14 @@ def ntfy(title: str, content: str) -> None:
     encoded_title = encode_rfc2047(title)
 
     data = content.encode(encoding="utf-8")
-    headers = {"Title": encoded_title, "Priority": priority}  # 使用编码后的 title
+    headers = {"Title": encoded_title, "Priority": priority, "Icon": "https://qn.whyour.cn/logo.png"}  # 使用编码后的 title
+    if push_config.get("NTFY_TOKEN"):
+        headers['Authorization'] = "Bearer " + push_config.get("NTFY_TOKEN")
+    elif push_config.get("NTFY_USERNAME") and push_config.get("NTFY_PASSWORD"):
+        authStr = push_config.get("NTFY_USERNAME") + ":" + push_config.get("NTFY_PASSWORD")
+        headers['Authorization'] = "Basic " + base64.b64encode(authStr.encode('utf-8')).decode('utf-8')
+    if push_config.get("NTFY_ACTIONS"):
+        headers['Actions'] = encode_rfc2047(push_config.get("NTFY_ACTIONS"))
 
     url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
     response = requests.post(url, data=data, headers=headers)
