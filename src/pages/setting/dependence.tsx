@@ -1,6 +1,6 @@
 import intl from 'react-intl-universal';
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, InputNumber, Form, message, Input, Alert } from 'antd';
+import { Button, InputNumber, Form, message, Input, Alert, Select } from 'antd';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
 import './index.less';
@@ -25,6 +25,7 @@ const Dependence = () => {
   const [form] = Form.useForm();
   const [log, setLog] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [cleanType, setCleanType] = useState<string>('node');
 
   const getSystemConfig = () => {
     request
@@ -82,6 +83,24 @@ const Dependence = () => {
     ) {
       setLoading(false);
     }
+  };
+
+  const cleanDependenceCache = (type: string) => {
+    setLoading(true);
+    setLog('');
+    request
+      .put(`${config.apiPrefix}system/config/dependence-clean`, {
+        type,
+      })
+      .then(({ code, data }) => {
+        if (code === 200) {
+          message.success(intl.get('清除成功'));
+        }
+      })
+      .catch((error: any) => {
+        console.log(error);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -215,6 +234,38 @@ const Dependence = () => {
               loading={loading}
               onClick={() => {
                 updateSystemConfigStream('linux-mirror');
+              }}
+              style={{ width: 100 }}
+            >
+              {intl.get('确认')}
+            </Button>
+          </Input.Group>
+        </Form.Item>
+        <Form.Item
+          label={intl.get('清除依赖缓存')}
+          name="clean"
+          tooltip={{
+            title: intl.get('清除依赖缓存'),
+            placement: 'topLeft',
+          }}
+        >
+          <Input.Group compact>
+            <Select
+              defaultValue={'node'}
+              style={{ width: 100 }}
+              onChange={(value) => {
+                setCleanType(value);
+              }}
+              options={[
+                { label: 'node', value: 'node' },
+                { label: 'python3', value: 'python3' },
+              ]}
+            />
+            <Button
+              type="primary"
+              loading={loading}
+              onClick={() => {
+                cleanDependenceCache(cleanType);
               }}
               style={{ width: 100 }}
             >

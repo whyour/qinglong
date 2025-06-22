@@ -415,10 +415,17 @@ export default class SystemService {
     }
   }
 
-  public async exportData(res: Response) {
+  public async exportData(res: Response, type?: string[]) {
     try {
+      let dataDirs = ['db', 'upload'];
+      if (type && type.length) {
+        dataDirs = dataDirs.concat(type.filter((x) => x !== 'base'));
+      }
+      const dataPaths = dataDirs.map((dir) => `data/${dir}`);
       await promiseExec(
-        `cd ${config.dataPath} && cd ../ && tar -zcvf ${config.dataTgzFile} data/`,
+        `cd ${config.dataPath} && cd ../ && tar -zcvf ${
+          config.dataTgzFile
+        } ${dataPaths.join(' ')}`,
       );
       res.download(config.dataTgzFile);
     } catch (error: any) {
@@ -502,5 +509,16 @@ export default class SystemService {
     } else {
       return { code: 400, message: '设置时区失败' };
     }
+  }
+
+  public async cleanDependence(type: 'node' | 'python3') {
+    if (!type || !['node', 'python3'].includes(type)) {
+      return { code: 400, message: '参数错误' };
+    }
+    try {
+      const finalPath = path.join(config.dependenceCachePath, type);
+      await fs.promises.rm(finalPath, { recursive: true });
+    } catch (error) {}
+    return { code: 200 };
   }
 }

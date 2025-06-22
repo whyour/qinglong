@@ -316,10 +316,15 @@ export default (app: Router) => {
 
   route.put(
     '/data/export',
+    celebrate({
+      body: Joi.object({
+        type: Joi.array().items(Joi.string()).optional(),
+      }),
+    }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const systemService = Container.get(SystemService);
-        await systemService.exportData(res);
+        await systemService.exportData(res, req.body.type);
       } catch (e) {
         return next(e);
       }
@@ -410,6 +415,24 @@ export default (app: Router) => {
       try {
         const systemService = Container.get(SystemService);
         const result = await systemService.updateTimezone(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/config/dependence-clean',
+    celebrate({
+      body: Joi.object({
+        type: Joi.string().allow(''),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.cleanDependence(req.body.type);
         res.send(result);
       } catch (e) {
         return next(e);

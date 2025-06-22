@@ -86,6 +86,7 @@ const dbPath = path.join(dataPath, 'db/');
 const uploadPath = path.join(dataPath, 'upload/');
 const sshdPath = path.join(dataPath, 'ssh.d/');
 const systemLogPath = path.join(dataPath, 'syslog/');
+const dependenceCachePath = path.join(dataPath, 'dep_cache/');
 
 const envFile = path.join(preloadPath, 'env.sh');
 const jsEnvFile = path.join(preloadPath, 'env.js');
@@ -174,4 +175,5 @@ export default {
   sqliteFile,
   sshdPath,
   systemLogPath,
+  dependenceCachePath,
 };

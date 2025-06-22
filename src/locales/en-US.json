@@ -510,5 +510,16 @@
   "强制打开可能会导致编辑器显示异常": "Force opening may cause display issues in the editor",
   "确认离开": "Confirm Leave",
   "当前文件未保存，确认离开吗": "Current file is not saved, are you sure to leave?",
-  "收件邮箱地址，多个分号分隔，默认发送给发件邮箱地址": "Receiving email address, multiple semicolon separated, sent to the sending email address by default"
+  "收件邮箱地址，多个分号分隔，默认发送给发件邮箱地址": "Receiving email address, multiple semicolon separated, sent to the sending email address by default",
+  "选择备份模块": "Select backup module",
+  "开始备份": "Start backup",
+  "基础数据": "Basic data",
+  "脚本文件": "Script files",
+  "日志文件": "Log files",
+  "依赖缓存": "Dependency cache",
+  "远程脚本缓存": "Remote script cache",
+  "远程仓库缓存": "Remote repository cache",
+  "SSH 文件缓存": "SSH file cache",
+  "清除依赖缓存": "Clean dependency cache",
+  "清除成功": "Clean successful"
 }
