@@ -98,10 +98,8 @@ def run():
         error_message = str(error)
         if "Argument list too long" not in error_message:
             print(f"\ue926 run task before error: {error}")
-        else:
-            print(
-                "\ue926 The environment variable is too large. It is recommended to use task_before.py instead of task_before.sh\n"
-            )
+        # else:
+            # environment variable is too large
         if task_before:
             print("执行前置命令结束\n")
     except Exception as error:

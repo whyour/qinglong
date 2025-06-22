@@ -87,12 +87,10 @@ function run() {
       console.log('执行前置命令结束\n');
     }
   } catch (error) {
-    if (!error.message.includes('spawnSync /bin/sh E2BIG')) {
+    if (!error.message.includes('spawnSync /bin/bash E2BIG')) {
       console.log(`\ue926 run task before error: `, error);
     } else {
-      console.log(
-        `\ue926 The environment variable is too large. It is recommended to use task_before.js instead of task_before.sh\n`,
-      );
+      // environment variable is too large
     }
     if (task_before) {
       console.log('执行前置命令结束\n');
