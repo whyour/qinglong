@@ -163,11 +163,9 @@ export default class DependenceService {
       taskLimit.removeQueuedDependency(doc);
       const depInstallCommand = getInstallCommand(doc.type, doc.name);
       const depUnInstallCommand = getUninstallCommand(doc.type, doc.name);
-      const installCmd = `${depInstallCommand} ${doc.name.trim()}`;
-      const unInstallCmd = `${depUnInstallCommand} ${doc.name.trim()}`;
       const pids = await Promise.all([
-        getPid(installCmd),
-        getPid(unInstallCmd),
+        getPid(depInstallCommand),
+        getPid(depUnInstallCommand),
       ]);
       for (const pid of pids) {
         pid && (await killTask(pid));
