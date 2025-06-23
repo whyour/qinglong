@@ -7,7 +7,7 @@ import path from 'path';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import config from '../config';
-import { TASK_COMMAND } from '../config/const';
+import { NotificationModeStringMap, TASK_COMMAND } from '../config/const';
 import {
   getPid,
   killTask,
@@ -373,8 +373,27 @@ export default class SystemService {
     return { code: 200 };
   }
 
-  public async notify({ title, content }: { title: string; content: string }) {
-    const isSuccess = await this.notificationService.notify(title, content);
+  public async notify({
+    title,
+    content,
+    notificationInfo,
+  }: {
+    title: string;
+    content: string;
+    notificationInfo?: NotificationInfo;
+  }) {
+    const typeString =
+      typeof notificationInfo?.type === 'number'
+        ? NotificationModeStringMap[notificationInfo.type]
+        : undefined;
+    if (notificationInfo && typeString) {
+      notificationInfo.type = typeString;
+    }
+    const isSuccess = await this.notificationService.notify(
+      title,
+      content,
+      notificationInfo,
+    );
     if (isSuccess) {
       return { code: 200, message: '通知发送成功' };
     } else {

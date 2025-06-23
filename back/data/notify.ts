@@ -1,5 +1,3 @@
-import { IncomingHttpHeaders } from 'http';
-
 export enum NotificationMode {
   'gotify' = 'gotify',
   'goCqHttpBot' = 'goCqHttpBot',

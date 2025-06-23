@@ -31,6 +31,7 @@ import {
   DeleteCronsRequest,
   CronResponse,
 } from '../protos/api';
+import { NotificationInfo } from '../data/notify';
 
 Container.set('logger', LoggerInstance);
 
@@ -227,7 +228,11 @@ export const systemNotify = async (
 ) => {
   try {
     const systemService = Container.get(SystemService);
-    const data = await systemService.notify(call.request);
+    const data = await systemService.notify({
+      title: call.request.title,
+      content: call.request.content,
+      notificationInfo: call.request.notificationInfo as unknown as NotificationInfo,
+    });
     callback(null, data);
   } catch (e: any) {
     callback(e);

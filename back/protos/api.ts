@@ -21,6 +21,153 @@ import {
 
 export const protobufPackage = "com.ql.api";
 
+export enum NotificationMode {
+  gotify = 0,
+  goCqHttpBot = 1,
+  serverChan = 2,
+  pushDeer = 3,
+  bark = 4,
+  chat = 5,
+  telegramBot = 6,
+  dingtalkBot = 7,
+  weWorkBot = 8,
+  weWorkApp = 9,
+  aibotk = 10,
+  iGot = 11,
+  pushPlus = 12,
+  wePlusBot = 13,
+  email = 14,
+  pushMe = 15,
+  feishu = 16,
+  webhook = 17,
+  chronocat = 18,
+  ntfy = 19,
+  wxPusherBot = 20,
+  UNRECOGNIZED = -1,
+}
+
+export function notificationModeFromJSON(object: any): NotificationMode {
+  switch (object) {
+    case 0:
+    case "gotify":
+      return NotificationMode.gotify;
+    case 1:
+    case "goCqHttpBot":
+      return NotificationMode.goCqHttpBot;
+    case 2:
+    case "serverChan":
+      return NotificationMode.serverChan;
+    case 3:
+    case "pushDeer":
+      return NotificationMode.pushDeer;
+    case 4:
+    case "bark":
+      return NotificationMode.bark;
+    case 5:
+    case "chat":
+      return NotificationMode.chat;
+    case 6:
+    case "telegramBot":
+      return NotificationMode.telegramBot;
+    case 7:
+    case "dingtalkBot":
+      return NotificationMode.dingtalkBot;
+    case 8:
+    case "weWorkBot":
+      return NotificationMode.weWorkBot;
+    case 9:
+    case "weWorkApp":
+      return NotificationMode.weWorkApp;
+    case 10:
+    case "aibotk":
+      return NotificationMode.aibotk;
+    case 11:
+    case "iGot":
+      return NotificationMode.iGot;
+    case 12:
+    case "pushPlus":
+      return NotificationMode.pushPlus;
+    case 13:
+    case "wePlusBot":
+      return NotificationMode.wePlusBot;
+    case 14:
+    case "email":
+      return NotificationMode.email;
+    case 15:
+    case "pushMe":
+      return NotificationMode.pushMe;
+    case 16:
+    case "feishu":
+      return NotificationMode.feishu;
+    case 17:
+    case "webhook":
+      return NotificationMode.webhook;
+    case 18:
+    case "chronocat":
+      return NotificationMode.chronocat;
+    case 19:
+    case "ntfy":
+      return NotificationMode.ntfy;
+    case 20:
+    case "wxPusherBot":
+      return NotificationMode.wxPusherBot;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return NotificationMode.UNRECOGNIZED;
+  }
+}
+
+export function notificationModeToJSON(object: NotificationMode): string {
+  switch (object) {
+    case NotificationMode.gotify:
+      return "gotify";
+    case NotificationMode.goCqHttpBot:
+      return "goCqHttpBot";
+    case NotificationMode.serverChan:
+      return "serverChan";
+    case NotificationMode.pushDeer:
+      return "pushDeer";
+    case NotificationMode.bark:
+      return "bark";
+    case NotificationMode.chat:
+      return "chat";
+    case NotificationMode.telegramBot:
+      return "telegramBot";
+    case NotificationMode.dingtalkBot:
+      return "dingtalkBot";
+    case NotificationMode.weWorkBot:
+      return "weWorkBot";
+    case NotificationMode.weWorkApp:
+      return "weWorkApp";
+    case NotificationMode.aibotk:
+      return "aibotk";
+    case NotificationMode.iGot:
+      return "iGot";
+    case NotificationMode.pushPlus:
+      return "pushPlus";
+    case NotificationMode.wePlusBot:
+      return "wePlusBot";
+    case NotificationMode.email:
+      return "email";
+    case NotificationMode.pushMe:
+      return "pushMe";
+    case NotificationMode.feishu:
+      return "feishu";
+    case NotificationMode.webhook:
+      return "webhook";
+    case NotificationMode.chronocat:
+      return "chronocat";
+    case NotificationMode.ntfy:
+      return "ntfy";
+    case NotificationMode.wxPusherBot:
+      return "wxPusherBot";
+    case NotificationMode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface EnvItem {
   id?: number | undefined;
   name?: string | undefined;
@@ -84,11 +231,6 @@ export interface EnvResponse {
 export interface Response {
   code: number;
   message?: string | undefined;
-}
-
-export interface SystemNotifyRequest {
-  title: string;
-  content: string;
 }
 
 export interface ExtraScheduleItem {
@@ -159,6 +301,83 @@ export interface CronDetailResponse {
   code: number;
   data: CronItem | undefined;
   message?: string | undefined;
+}
+
+export interface NotificationInfo {
+  type: NotificationMode;
+  gotifyUrl?: string | undefined;
+  gotifyToken?: string | undefined;
+  gotifyPriority?: number | undefined;
+  goCqHttpBotUrl?: string | undefined;
+  goCqHttpBotToken?: string | undefined;
+  goCqHttpBotQq?: string | undefined;
+  serverChanKey?: string | undefined;
+  pushDeerKey?: string | undefined;
+  pushDeerUrl?: string | undefined;
+  synologyChatUrl?: string | undefined;
+  barkPush?: string | undefined;
+  barkIcon?: string | undefined;
+  barkSound?: string | undefined;
+  barkGroup?: string | undefined;
+  barkLevel?: string | undefined;
+  barkUrl?: string | undefined;
+  barkArchive?: string | undefined;
+  telegramBotToken?: string | undefined;
+  telegramBotUserId?: string | undefined;
+  telegramBotProxyHost?: string | undefined;
+  telegramBotProxyPort?: string | undefined;
+  telegramBotProxyAuth?: string | undefined;
+  telegramBotApiHost?: string | undefined;
+  dingtalkBotToken?: string | undefined;
+  dingtalkBotSecret?: string | undefined;
+  weWorkBotKey?: string | undefined;
+  weWorkOrigin?: string | undefined;
+  weWorkAppKey?: string | undefined;
+  aibotkKey?: string | undefined;
+  aibotkType?: string | undefined;
+  aibotkName?: string | undefined;
+  iGotPushKey?: string | undefined;
+  pushPlusToken?: string | undefined;
+  pushPlusUser?: string | undefined;
+  pushPlusTemplate?: string | undefined;
+  pushplusChannel?: string | undefined;
+  pushplusWebhook?: string | undefined;
+  pushplusCallbackUrl?: string | undefined;
+  pushplusTo?: string | undefined;
+  wePlusBotToken?: string | undefined;
+  wePlusBotReceiver?: string | undefined;
+  wePlusBotVersion?: string | undefined;
+  emailService?: string | undefined;
+  emailUser?: string | undefined;
+  emailPass?: string | undefined;
+  emailTo?: string | undefined;
+  pushMeKey?: string | undefined;
+  pushMeUrl?: string | undefined;
+  chronocatURL?: string | undefined;
+  chronocatQQ?: string | undefined;
+  chronocatToken?: string | undefined;
+  webhookHeaders?: string | undefined;
+  webhookBody?: string | undefined;
+  webhookUrl?: string | undefined;
+  webhookMethod?: string | undefined;
+  webhookContentType?: string | undefined;
+  larkKey?: string | undefined;
+  ntfyUrl?: string | undefined;
+  ntfyTopic?: string | undefined;
+  ntfyPriority?: string | undefined;
+  ntfyToken?: string | undefined;
+  ntfyUsername?: string | undefined;
+  ntfyPassword?: string | undefined;
+  ntfyActions?: string | undefined;
+  wxPusherBotAppToken?: string | undefined;
+  wxPusherBotTopicIds?: string | undefined;
+  wxPusherBotUids?: string | undefined;
+}
+
+export interface SystemNotifyRequest {
+  title: string;
+  content: string;
+  notificationInfo?: NotificationInfo | undefined;
 }
 
 function createBaseEnvItem(): EnvItem {
@@ -1186,82 +1405,6 @@ export const Response: MessageFns<Response> = {
     const message = createBaseResponse();
     message.code = object.code ?? 0;
     message.message = object.message ?? undefined;
-    return message;
-  },
-};
-
-function createBaseSystemNotifyRequest(): SystemNotifyRequest {
-  return { title: "", content: "" };
-}
-
-export const SystemNotifyRequest: MessageFns<SystemNotifyRequest> = {
-  encode(message: SystemNotifyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.title !== "") {
-      writer.uint32(10).string(message.title);
-    }
-    if (message.content !== "") {
-      writer.uint32(18).string(message.content);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SystemNotifyRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSystemNotifyRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.title = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.content = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SystemNotifyRequest {
-    return {
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      content: isSet(object.content) ? globalThis.String(object.content) : "",
-    };
-  },
-
-  toJSON(message: SystemNotifyRequest): unknown {
-    const obj: any = {};
-    if (message.title !== "") {
-      obj.title = message.title;
-    }
-    if (message.content !== "") {
-      obj.content = message.content;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(base?: I): SystemNotifyRequest {
-    return SystemNotifyRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(object: I): SystemNotifyRequest {
-    const message = createBaseSystemNotifyRequest();
-    message.title = object.title ?? "";
-    message.content = object.content ?? "";
     return message;
   },
 };
@@ -2394,6 +2537,1313 @@ export const CronDetailResponse: MessageFns<CronDetailResponse> = {
     message.code = object.code ?? 0;
     message.data = (object.data !== undefined && object.data !== null) ? CronItem.fromPartial(object.data) : undefined;
     message.message = object.message ?? undefined;
+    return message;
+  },
+};
+
+function createBaseNotificationInfo(): NotificationInfo {
+  return {
+    type: 0,
+    gotifyUrl: undefined,
+    gotifyToken: undefined,
+    gotifyPriority: undefined,
+    goCqHttpBotUrl: undefined,
+    goCqHttpBotToken: undefined,
+    goCqHttpBotQq: undefined,
+    serverChanKey: undefined,
+    pushDeerKey: undefined,
+    pushDeerUrl: undefined,
+    synologyChatUrl: undefined,
+    barkPush: undefined,
+    barkIcon: undefined,
+    barkSound: undefined,
+    barkGroup: undefined,
+    barkLevel: undefined,
+    barkUrl: undefined,
+    barkArchive: undefined,
+    telegramBotToken: undefined,
+    telegramBotUserId: undefined,
+    telegramBotProxyHost: undefined,
+    telegramBotProxyPort: undefined,
+    telegramBotProxyAuth: undefined,
+    telegramBotApiHost: undefined,
+    dingtalkBotToken: undefined,
+    dingtalkBotSecret: undefined,
+    weWorkBotKey: undefined,
+    weWorkOrigin: undefined,
+    weWorkAppKey: undefined,
+    aibotkKey: undefined,
+    aibotkType: undefined,
+    aibotkName: undefined,
+    iGotPushKey: undefined,
+    pushPlusToken: undefined,
+    pushPlusUser: undefined,
+    pushPlusTemplate: undefined,
+    pushplusChannel: undefined,
+    pushplusWebhook: undefined,
+    pushplusCallbackUrl: undefined,
+    pushplusTo: undefined,
+    wePlusBotToken: undefined,
+    wePlusBotReceiver: undefined,
+    wePlusBotVersion: undefined,
+    emailService: undefined,
+    emailUser: undefined,
+    emailPass: undefined,
+    emailTo: undefined,
+    pushMeKey: undefined,
+    pushMeUrl: undefined,
+    chronocatURL: undefined,
+    chronocatQQ: undefined,
+    chronocatToken: undefined,
+    webhookHeaders: undefined,
+    webhookBody: undefined,
+    webhookUrl: undefined,
+    webhookMethod: undefined,
+    webhookContentType: undefined,
+    larkKey: undefined,
+    ntfyUrl: undefined,
+    ntfyTopic: undefined,
+    ntfyPriority: undefined,
+    ntfyToken: undefined,
+    ntfyUsername: undefined,
+    ntfyPassword: undefined,
+    ntfyActions: undefined,
+    wxPusherBotAppToken: undefined,
+    wxPusherBotTopicIds: undefined,
+    wxPusherBotUids: undefined,
+  };
+}
+
+export const NotificationInfo: MessageFns<NotificationInfo> = {
+  encode(message: NotificationInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.type !== 0) {
+      writer.uint32(8).int32(message.type);
+    }
+    if (message.gotifyUrl !== undefined) {
+      writer.uint32(18).string(message.gotifyUrl);
+    }
+    if (message.gotifyToken !== undefined) {
+      writer.uint32(26).string(message.gotifyToken);
+    }
+    if (message.gotifyPriority !== undefined) {
+      writer.uint32(32).int32(message.gotifyPriority);
+    }
+    if (message.goCqHttpBotUrl !== undefined) {
+      writer.uint32(42).string(message.goCqHttpBotUrl);
+    }
+    if (message.goCqHttpBotToken !== undefined) {
+      writer.uint32(50).string(message.goCqHttpBotToken);
+    }
+    if (message.goCqHttpBotQq !== undefined) {
+      writer.uint32(58).string(message.goCqHttpBotQq);
+    }
+    if (message.serverChanKey !== undefined) {
+      writer.uint32(66).string(message.serverChanKey);
+    }
+    if (message.pushDeerKey !== undefined) {
+      writer.uint32(74).string(message.pushDeerKey);
+    }
+    if (message.pushDeerUrl !== undefined) {
+      writer.uint32(82).string(message.pushDeerUrl);
+    }
+    if (message.synologyChatUrl !== undefined) {
+      writer.uint32(90).string(message.synologyChatUrl);
+    }
+    if (message.barkPush !== undefined) {
+      writer.uint32(98).string(message.barkPush);
+    }
+    if (message.barkIcon !== undefined) {
+      writer.uint32(106).string(message.barkIcon);
+    }
+    if (message.barkSound !== undefined) {
+      writer.uint32(114).string(message.barkSound);
+    }
+    if (message.barkGroup !== undefined) {
+      writer.uint32(122).string(message.barkGroup);
+    }
+    if (message.barkLevel !== undefined) {
+      writer.uint32(130).string(message.barkLevel);
+    }
+    if (message.barkUrl !== undefined) {
+      writer.uint32(138).string(message.barkUrl);
+    }
+    if (message.barkArchive !== undefined) {
+      writer.uint32(146).string(message.barkArchive);
+    }
+    if (message.telegramBotToken !== undefined) {
+      writer.uint32(154).string(message.telegramBotToken);
+    }
+    if (message.telegramBotUserId !== undefined) {
+      writer.uint32(162).string(message.telegramBotUserId);
+    }
+    if (message.telegramBotProxyHost !== undefined) {
+      writer.uint32(170).string(message.telegramBotProxyHost);
+    }
+    if (message.telegramBotProxyPort !== undefined) {
+      writer.uint32(178).string(message.telegramBotProxyPort);
+    }
+    if (message.telegramBotProxyAuth !== undefined) {
+      writer.uint32(186).string(message.telegramBotProxyAuth);
+    }
+    if (message.telegramBotApiHost !== undefined) {
+      writer.uint32(194).string(message.telegramBotApiHost);
+    }
+    if (message.dingtalkBotToken !== undefined) {
+      writer.uint32(202).string(message.dingtalkBotToken);
+    }
+    if (message.dingtalkBotSecret !== undefined) {
+      writer.uint32(210).string(message.dingtalkBotSecret);
+    }
+    if (message.weWorkBotKey !== undefined) {
+      writer.uint32(218).string(message.weWorkBotKey);
+    }
+    if (message.weWorkOrigin !== undefined) {
+      writer.uint32(226).string(message.weWorkOrigin);
+    }
+    if (message.weWorkAppKey !== undefined) {
+      writer.uint32(234).string(message.weWorkAppKey);
+    }
+    if (message.aibotkKey !== undefined) {
+      writer.uint32(242).string(message.aibotkKey);
+    }
+    if (message.aibotkType !== undefined) {
+      writer.uint32(250).string(message.aibotkType);
+    }
+    if (message.aibotkName !== undefined) {
+      writer.uint32(258).string(message.aibotkName);
+    }
+    if (message.iGotPushKey !== undefined) {
+      writer.uint32(266).string(message.iGotPushKey);
+    }
+    if (message.pushPlusToken !== undefined) {
+      writer.uint32(274).string(message.pushPlusToken);
+    }
+    if (message.pushPlusUser !== undefined) {
+      writer.uint32(282).string(message.pushPlusUser);
+    }
+    if (message.pushPlusTemplate !== undefined) {
+      writer.uint32(290).string(message.pushPlusTemplate);
+    }
+    if (message.pushplusChannel !== undefined) {
+      writer.uint32(298).string(message.pushplusChannel);
+    }
+    if (message.pushplusWebhook !== undefined) {
+      writer.uint32(306).string(message.pushplusWebhook);
+    }
+    if (message.pushplusCallbackUrl !== undefined) {
+      writer.uint32(314).string(message.pushplusCallbackUrl);
+    }
+    if (message.pushplusTo !== undefined) {
+      writer.uint32(322).string(message.pushplusTo);
+    }
+    if (message.wePlusBotToken !== undefined) {
+      writer.uint32(330).string(message.wePlusBotToken);
+    }
+    if (message.wePlusBotReceiver !== undefined) {
+      writer.uint32(338).string(message.wePlusBotReceiver);
+    }
+    if (message.wePlusBotVersion !== undefined) {
+      writer.uint32(346).string(message.wePlusBotVersion);
+    }
+    if (message.emailService !== undefined) {
+      writer.uint32(354).string(message.emailService);
+    }
+    if (message.emailUser !== undefined) {
+      writer.uint32(362).string(message.emailUser);
+    }
+    if (message.emailPass !== undefined) {
+      writer.uint32(370).string(message.emailPass);
+    }
+    if (message.emailTo !== undefined) {
+      writer.uint32(378).string(message.emailTo);
+    }
+    if (message.pushMeKey !== undefined) {
+      writer.uint32(386).string(message.pushMeKey);
+    }
+    if (message.pushMeUrl !== undefined) {
+      writer.uint32(394).string(message.pushMeUrl);
+    }
+    if (message.chronocatURL !== undefined) {
+      writer.uint32(402).string(message.chronocatURL);
+    }
+    if (message.chronocatQQ !== undefined) {
+      writer.uint32(410).string(message.chronocatQQ);
+    }
+    if (message.chronocatToken !== undefined) {
+      writer.uint32(418).string(message.chronocatToken);
+    }
+    if (message.webhookHeaders !== undefined) {
+      writer.uint32(426).string(message.webhookHeaders);
+    }
+    if (message.webhookBody !== undefined) {
+      writer.uint32(434).string(message.webhookBody);
+    }
+    if (message.webhookUrl !== undefined) {
+      writer.uint32(442).string(message.webhookUrl);
+    }
+    if (message.webhookMethod !== undefined) {
+      writer.uint32(450).string(message.webhookMethod);
+    }
+    if (message.webhookContentType !== undefined) {
+      writer.uint32(458).string(message.webhookContentType);
+    }
+    if (message.larkKey !== undefined) {
+      writer.uint32(466).string(message.larkKey);
+    }
+    if (message.ntfyUrl !== undefined) {
+      writer.uint32(474).string(message.ntfyUrl);
+    }
+    if (message.ntfyTopic !== undefined) {
+      writer.uint32(482).string(message.ntfyTopic);
+    }
+    if (message.ntfyPriority !== undefined) {
+      writer.uint32(490).string(message.ntfyPriority);
+    }
+    if (message.ntfyToken !== undefined) {
+      writer.uint32(498).string(message.ntfyToken);
+    }
+    if (message.ntfyUsername !== undefined) {
+      writer.uint32(506).string(message.ntfyUsername);
+    }
+    if (message.ntfyPassword !== undefined) {
+      writer.uint32(514).string(message.ntfyPassword);
+    }
+    if (message.ntfyActions !== undefined) {
+      writer.uint32(522).string(message.ntfyActions);
+    }
+    if (message.wxPusherBotAppToken !== undefined) {
+      writer.uint32(530).string(message.wxPusherBotAppToken);
+    }
+    if (message.wxPusherBotTopicIds !== undefined) {
+      writer.uint32(538).string(message.wxPusherBotTopicIds);
+    }
+    if (message.wxPusherBotUids !== undefined) {
+      writer.uint32(546).string(message.wxPusherBotUids);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): NotificationInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNotificationInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.type = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.gotifyUrl = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.gotifyToken = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.gotifyPriority = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.goCqHttpBotUrl = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.goCqHttpBotToken = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.goCqHttpBotQq = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.serverChanKey = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.pushDeerKey = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.pushDeerUrl = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.synologyChatUrl = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.barkPush = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.barkIcon = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.barkSound = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.barkGroup = reader.string();
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.barkLevel = reader.string();
+          continue;
+        }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.barkUrl = reader.string();
+          continue;
+        }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.barkArchive = reader.string();
+          continue;
+        }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.telegramBotToken = reader.string();
+          continue;
+        }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.telegramBotUserId = reader.string();
+          continue;
+        }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.telegramBotProxyHost = reader.string();
+          continue;
+        }
+        case 22: {
+          if (tag !== 178) {
+            break;
+          }
+
+          message.telegramBotProxyPort = reader.string();
+          continue;
+        }
+        case 23: {
+          if (tag !== 186) {
+            break;
+          }
+
+          message.telegramBotProxyAuth = reader.string();
+          continue;
+        }
+        case 24: {
+          if (tag !== 194) {
+            break;
+          }
+
+          message.telegramBotApiHost = reader.string();
+          continue;
+        }
+        case 25: {
+          if (tag !== 202) {
+            break;
+          }
+
+          message.dingtalkBotToken = reader.string();
+          continue;
+        }
+        case 26: {
+          if (tag !== 210) {
+            break;
+          }
+
+          message.dingtalkBotSecret = reader.string();
+          continue;
+        }
+        case 27: {
+          if (tag !== 218) {
+            break;
+          }
+
+          message.weWorkBotKey = reader.string();
+          continue;
+        }
+        case 28: {
+          if (tag !== 226) {
+            break;
+          }
+
+          message.weWorkOrigin = reader.string();
+          continue;
+        }
+        case 29: {
+          if (tag !== 234) {
+            break;
+          }
+
+          message.weWorkAppKey = reader.string();
+          continue;
+        }
+        case 30: {
+          if (tag !== 242) {
+            break;
+          }
+
+          message.aibotkKey = reader.string();
+          continue;
+        }
+        case 31: {
+          if (tag !== 250) {
+            break;
+          }
+
+          message.aibotkType = reader.string();
+          continue;
+        }
+        case 32: {
+          if (tag !== 258) {
+            break;
+          }
+
+          message.aibotkName = reader.string();
+          continue;
+        }
+        case 33: {
+          if (tag !== 266) {
+            break;
+          }
+
+          message.iGotPushKey = reader.string();
+          continue;
+        }
+        case 34: {
+          if (tag !== 274) {
+            break;
+          }
+
+          message.pushPlusToken = reader.string();
+          continue;
+        }
+        case 35: {
+          if (tag !== 282) {
+            break;
+          }
+
+          message.pushPlusUser = reader.string();
+          continue;
+        }
+        case 36: {
+          if (tag !== 290) {
+            break;
+          }
+
+          message.pushPlusTemplate = reader.string();
+          continue;
+        }
+        case 37: {
+          if (tag !== 298) {
+            break;
+          }
+
+          message.pushplusChannel = reader.string();
+          continue;
+        }
+        case 38: {
+          if (tag !== 306) {
+            break;
+          }
+
+          message.pushplusWebhook = reader.string();
+          continue;
+        }
+        case 39: {
+          if (tag !== 314) {
+            break;
+          }
+
+          message.pushplusCallbackUrl = reader.string();
+          continue;
+        }
+        case 40: {
+          if (tag !== 322) {
+            break;
+          }
+
+          message.pushplusTo = reader.string();
+          continue;
+        }
+        case 41: {
+          if (tag !== 330) {
+            break;
+          }
+
+          message.wePlusBotToken = reader.string();
+          continue;
+        }
+        case 42: {
+          if (tag !== 338) {
+            break;
+          }
+
+          message.wePlusBotReceiver = reader.string();
+          continue;
+        }
+        case 43: {
+          if (tag !== 346) {
+            break;
+          }
+
+          message.wePlusBotVersion = reader.string();
+          continue;
+        }
+        case 44: {
+          if (tag !== 354) {
+            break;
+          }
+
+          message.emailService = reader.string();
+          continue;
+        }
+        case 45: {
+          if (tag !== 362) {
+            break;
+          }
+
+          message.emailUser = reader.string();
+          continue;
+        }
+        case 46: {
+          if (tag !== 370) {
+            break;
+          }
+
+          message.emailPass = reader.string();
+          continue;
+        }
+        case 47: {
+          if (tag !== 378) {
+            break;
+          }
+
+          message.emailTo = reader.string();
+          continue;
+        }
+        case 48: {
+          if (tag !== 386) {
+            break;
+          }
+
+          message.pushMeKey = reader.string();
+          continue;
+        }
+        case 49: {
+          if (tag !== 394) {
+            break;
+          }
+
+          message.pushMeUrl = reader.string();
+          continue;
+        }
+        case 50: {
+          if (tag !== 402) {
+            break;
+          }
+
+          message.chronocatURL = reader.string();
+          continue;
+        }
+        case 51: {
+          if (tag !== 410) {
+            break;
+          }
+
+          message.chronocatQQ = reader.string();
+          continue;
+        }
+        case 52: {
+          if (tag !== 418) {
+            break;
+          }
+
+          message.chronocatToken = reader.string();
+          continue;
+        }
+        case 53: {
+          if (tag !== 426) {
+            break;
+          }
+
+          message.webhookHeaders = reader.string();
+          continue;
+        }
+        case 54: {
+          if (tag !== 434) {
+            break;
+          }
+
+          message.webhookBody = reader.string();
+          continue;
+        }
+        case 55: {
+          if (tag !== 442) {
+            break;
+          }
+
+          message.webhookUrl = reader.string();
+          continue;
+        }
+        case 56: {
+          if (tag !== 450) {
+            break;
+          }
+
+          message.webhookMethod = reader.string();
+          continue;
+        }
+        case 57: {
+          if (tag !== 458) {
+            break;
+          }
+
+          message.webhookContentType = reader.string();
+          continue;
+        }
+        case 58: {
+          if (tag !== 466) {
+            break;
+          }
+
+          message.larkKey = reader.string();
+          continue;
+        }
+        case 59: {
+          if (tag !== 474) {
+            break;
+          }
+
+          message.ntfyUrl = reader.string();
+          continue;
+        }
+        case 60: {
+          if (tag !== 482) {
+            break;
+          }
+
+          message.ntfyTopic = reader.string();
+          continue;
+        }
+        case 61: {
+          if (tag !== 490) {
+            break;
+          }
+
+          message.ntfyPriority = reader.string();
+          continue;
+        }
+        case 62: {
+          if (tag !== 498) {
+            break;
+          }
+
+          message.ntfyToken = reader.string();
+          continue;
+        }
+        case 63: {
+          if (tag !== 506) {
+            break;
+          }
+
+          message.ntfyUsername = reader.string();
+          continue;
+        }
+        case 64: {
+          if (tag !== 514) {
+            break;
+          }
+
+          message.ntfyPassword = reader.string();
+          continue;
+        }
+        case 65: {
+          if (tag !== 522) {
+            break;
+          }
+
+          message.ntfyActions = reader.string();
+          continue;
+        }
+        case 66: {
+          if (tag !== 530) {
+            break;
+          }
+
+          message.wxPusherBotAppToken = reader.string();
+          continue;
+        }
+        case 67: {
+          if (tag !== 538) {
+            break;
+          }
+
+          message.wxPusherBotTopicIds = reader.string();
+          continue;
+        }
+        case 68: {
+          if (tag !== 546) {
+            break;
+          }
+
+          message.wxPusherBotUids = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): NotificationInfo {
+    return {
+      type: isSet(object.type) ? notificationModeFromJSON(object.type) : 0,
+      gotifyUrl: isSet(object.gotifyUrl) ? globalThis.String(object.gotifyUrl) : undefined,
+      gotifyToken: isSet(object.gotifyToken) ? globalThis.String(object.gotifyToken) : undefined,
+      gotifyPriority: isSet(object.gotifyPriority) ? globalThis.Number(object.gotifyPriority) : undefined,
+      goCqHttpBotUrl: isSet(object.goCqHttpBotUrl) ? globalThis.String(object.goCqHttpBotUrl) : undefined,
+      goCqHttpBotToken: isSet(object.goCqHttpBotToken) ? globalThis.String(object.goCqHttpBotToken) : undefined,
+      goCqHttpBotQq: isSet(object.goCqHttpBotQq) ? globalThis.String(object.goCqHttpBotQq) : undefined,
+      serverChanKey: isSet(object.serverChanKey) ? globalThis.String(object.serverChanKey) : undefined,
+      pushDeerKey: isSet(object.pushDeerKey) ? globalThis.String(object.pushDeerKey) : undefined,
+      pushDeerUrl: isSet(object.pushDeerUrl) ? globalThis.String(object.pushDeerUrl) : undefined,
+      synologyChatUrl: isSet(object.synologyChatUrl) ? globalThis.String(object.synologyChatUrl) : undefined,
+      barkPush: isSet(object.barkPush) ? globalThis.String(object.barkPush) : undefined,
+      barkIcon: isSet(object.barkIcon) ? globalThis.String(object.barkIcon) : undefined,
+      barkSound: isSet(object.barkSound) ? globalThis.String(object.barkSound) : undefined,
+      barkGroup: isSet(object.barkGroup) ? globalThis.String(object.barkGroup) : undefined,
+      barkLevel: isSet(object.barkLevel) ? globalThis.String(object.barkLevel) : undefined,
+      barkUrl: isSet(object.barkUrl) ? globalThis.String(object.barkUrl) : undefined,
+      barkArchive: isSet(object.barkArchive) ? globalThis.String(object.barkArchive) : undefined,
+      telegramBotToken: isSet(object.telegramBotToken) ? globalThis.String(object.telegramBotToken) : undefined,
+      telegramBotUserId: isSet(object.telegramBotUserId) ? globalThis.String(object.telegramBotUserId) : undefined,
+      telegramBotProxyHost: isSet(object.telegramBotProxyHost)
+        ? globalThis.String(object.telegramBotProxyHost)
+        : undefined,
+      telegramBotProxyPort: isSet(object.telegramBotProxyPort)
+        ? globalThis.String(object.telegramBotProxyPort)
+        : undefined,
+      telegramBotProxyAuth: isSet(object.telegramBotProxyAuth)
+        ? globalThis.String(object.telegramBotProxyAuth)
+        : undefined,
+      telegramBotApiHost: isSet(object.telegramBotApiHost) ? globalThis.String(object.telegramBotApiHost) : undefined,
+      dingtalkBotToken: isSet(object.dingtalkBotToken) ? globalThis.String(object.dingtalkBotToken) : undefined,
+      dingtalkBotSecret: isSet(object.dingtalkBotSecret) ? globalThis.String(object.dingtalkBotSecret) : undefined,
+      weWorkBotKey: isSet(object.weWorkBotKey) ? globalThis.String(object.weWorkBotKey) : undefined,
+      weWorkOrigin: isSet(object.weWorkOrigin) ? globalThis.String(object.weWorkOrigin) : undefined,
+      weWorkAppKey: isSet(object.weWorkAppKey) ? globalThis.String(object.weWorkAppKey) : undefined,
+      aibotkKey: isSet(object.aibotkKey) ? globalThis.String(object.aibotkKey) : undefined,
+      aibotkType: isSet(object.aibotkType) ? globalThis.String(object.aibotkType) : undefined,
+      aibotkName: isSet(object.aibotkName) ? globalThis.String(object.aibotkName) : undefined,
+      iGotPushKey: isSet(object.iGotPushKey) ? globalThis.String(object.iGotPushKey) : undefined,
+      pushPlusToken: isSet(object.pushPlusToken) ? globalThis.String(object.pushPlusToken) : undefined,
+      pushPlusUser: isSet(object.pushPlusUser) ? globalThis.String(object.pushPlusUser) : undefined,
+      pushPlusTemplate: isSet(object.pushPlusTemplate) ? globalThis.String(object.pushPlusTemplate) : undefined,
+      pushplusChannel: isSet(object.pushplusChannel) ? globalThis.String(object.pushplusChannel) : undefined,
+      pushplusWebhook: isSet(object.pushplusWebhook) ? globalThis.String(object.pushplusWebhook) : undefined,
+      pushplusCallbackUrl: isSet(object.pushplusCallbackUrl)
+        ? globalThis.String(object.pushplusCallbackUrl)
+        : undefined,
+      pushplusTo: isSet(object.pushplusTo) ? globalThis.String(object.pushplusTo) : undefined,
+      wePlusBotToken: isSet(object.wePlusBotToken) ? globalThis.String(object.wePlusBotToken) : undefined,
+      wePlusBotReceiver: isSet(object.wePlusBotReceiver) ? globalThis.String(object.wePlusBotReceiver) : undefined,
+      wePlusBotVersion: isSet(object.wePlusBotVersion) ? globalThis.String(object.wePlusBotVersion) : undefined,
+      emailService: isSet(object.emailService) ? globalThis.String(object.emailService) : undefined,
+      emailUser: isSet(object.emailUser) ? globalThis.String(object.emailUser) : undefined,
+      emailPass: isSet(object.emailPass) ? globalThis.String(object.emailPass) : undefined,
+      emailTo: isSet(object.emailTo) ? globalThis.String(object.emailTo) : undefined,
+      pushMeKey: isSet(object.pushMeKey) ? globalThis.String(object.pushMeKey) : undefined,
+      pushMeUrl: isSet(object.pushMeUrl) ? globalThis.String(object.pushMeUrl) : undefined,
+      chronocatURL: isSet(object.chronocatURL) ? globalThis.String(object.chronocatURL) : undefined,
+      chronocatQQ: isSet(object.chronocatQQ) ? globalThis.String(object.chronocatQQ) : undefined,
+      chronocatToken: isSet(object.chronocatToken) ? globalThis.String(object.chronocatToken) : undefined,
+      webhookHeaders: isSet(object.webhookHeaders) ? globalThis.String(object.webhookHeaders) : undefined,
+      webhookBody: isSet(object.webhookBody) ? globalThis.String(object.webhookBody) : undefined,
+      webhookUrl: isSet(object.webhookUrl) ? globalThis.String(object.webhookUrl) : undefined,
+      webhookMethod: isSet(object.webhookMethod) ? globalThis.String(object.webhookMethod) : undefined,
+      webhookContentType: isSet(object.webhookContentType) ? globalThis.String(object.webhookContentType) : undefined,
+      larkKey: isSet(object.larkKey) ? globalThis.String(object.larkKey) : undefined,
+      ntfyUrl: isSet(object.ntfyUrl) ? globalThis.String(object.ntfyUrl) : undefined,
+      ntfyTopic: isSet(object.ntfyTopic) ? globalThis.String(object.ntfyTopic) : undefined,
+      ntfyPriority: isSet(object.ntfyPriority) ? globalThis.String(object.ntfyPriority) : undefined,
+      ntfyToken: isSet(object.ntfyToken) ? globalThis.String(object.ntfyToken) : undefined,
+      ntfyUsername: isSet(object.ntfyUsername) ? globalThis.String(object.ntfyUsername) : undefined,
+      ntfyPassword: isSet(object.ntfyPassword) ? globalThis.String(object.ntfyPassword) : undefined,
+      ntfyActions: isSet(object.ntfyActions) ? globalThis.String(object.ntfyActions) : undefined,
+      wxPusherBotAppToken: isSet(object.wxPusherBotAppToken)
+        ? globalThis.String(object.wxPusherBotAppToken)
+        : undefined,
+      wxPusherBotTopicIds: isSet(object.wxPusherBotTopicIds)
+        ? globalThis.String(object.wxPusherBotTopicIds)
+        : undefined,
+      wxPusherBotUids: isSet(object.wxPusherBotUids) ? globalThis.String(object.wxPusherBotUids) : undefined,
+    };
+  },
+
+  toJSON(message: NotificationInfo): unknown {
+    const obj: any = {};
+    if (message.type !== 0) {
+      obj.type = notificationModeToJSON(message.type);
+    }
+    if (message.gotifyUrl !== undefined) {
+      obj.gotifyUrl = message.gotifyUrl;
+    }
+    if (message.gotifyToken !== undefined) {
+      obj.gotifyToken = message.gotifyToken;
+    }
+    if (message.gotifyPriority !== undefined) {
+      obj.gotifyPriority = Math.round(message.gotifyPriority);
+    }
+    if (message.goCqHttpBotUrl !== undefined) {
+      obj.goCqHttpBotUrl = message.goCqHttpBotUrl;
+    }
+    if (message.goCqHttpBotToken !== undefined) {
+      obj.goCqHttpBotToken = message.goCqHttpBotToken;
+    }
+    if (message.goCqHttpBotQq !== undefined) {
+      obj.goCqHttpBotQq = message.goCqHttpBotQq;
+    }
+    if (message.serverChanKey !== undefined) {
+      obj.serverChanKey = message.serverChanKey;
+    }
+    if (message.pushDeerKey !== undefined) {
+      obj.pushDeerKey = message.pushDeerKey;
+    }
+    if (message.pushDeerUrl !== undefined) {
+      obj.pushDeerUrl = message.pushDeerUrl;
+    }
+    if (message.synologyChatUrl !== undefined) {
+      obj.synologyChatUrl = message.synologyChatUrl;
+    }
+    if (message.barkPush !== undefined) {
+      obj.barkPush = message.barkPush;
+    }
+    if (message.barkIcon !== undefined) {
+      obj.barkIcon = message.barkIcon;
+    }
+    if (message.barkSound !== undefined) {
+      obj.barkSound = message.barkSound;
+    }
+    if (message.barkGroup !== undefined) {
+      obj.barkGroup = message.barkGroup;
+    }
+    if (message.barkLevel !== undefined) {
+      obj.barkLevel = message.barkLevel;
+    }
+    if (message.barkUrl !== undefined) {
+      obj.barkUrl = message.barkUrl;
+    }
+    if (message.barkArchive !== undefined) {
+      obj.barkArchive = message.barkArchive;
+    }
+    if (message.telegramBotToken !== undefined) {
+      obj.telegramBotToken = message.telegramBotToken;
+    }
+    if (message.telegramBotUserId !== undefined) {
+      obj.telegramBotUserId = message.telegramBotUserId;
+    }
+    if (message.telegramBotProxyHost !== undefined) {
+      obj.telegramBotProxyHost = message.telegramBotProxyHost;
+    }
+    if (message.telegramBotProxyPort !== undefined) {
+      obj.telegramBotProxyPort = message.telegramBotProxyPort;
+    }
+    if (message.telegramBotProxyAuth !== undefined) {
+      obj.telegramBotProxyAuth = message.telegramBotProxyAuth;
+    }
+    if (message.telegramBotApiHost !== undefined) {
+      obj.telegramBotApiHost = message.telegramBotApiHost;
+    }
+    if (message.dingtalkBotToken !== undefined) {
+      obj.dingtalkBotToken = message.dingtalkBotToken;
+    }
+    if (message.dingtalkBotSecret !== undefined) {
+      obj.dingtalkBotSecret = message.dingtalkBotSecret;
+    }
+    if (message.weWorkBotKey !== undefined) {
+      obj.weWorkBotKey = message.weWorkBotKey;
+    }
+    if (message.weWorkOrigin !== undefined) {
+      obj.weWorkOrigin = message.weWorkOrigin;
+    }
+    if (message.weWorkAppKey !== undefined) {
+      obj.weWorkAppKey = message.weWorkAppKey;
+    }
+    if (message.aibotkKey !== undefined) {
+      obj.aibotkKey = message.aibotkKey;
+    }
+    if (message.aibotkType !== undefined) {
+      obj.aibotkType = message.aibotkType;
+    }
+    if (message.aibotkName !== undefined) {
+      obj.aibotkName = message.aibotkName;
+    }
+    if (message.iGotPushKey !== undefined) {
+      obj.iGotPushKey = message.iGotPushKey;
+    }
+    if (message.pushPlusToken !== undefined) {
+      obj.pushPlusToken = message.pushPlusToken;
+    }
+    if (message.pushPlusUser !== undefined) {
+      obj.pushPlusUser = message.pushPlusUser;
+    }
+    if (message.pushPlusTemplate !== undefined) {
+      obj.pushPlusTemplate = message.pushPlusTemplate;
+    }
+    if (message.pushplusChannel !== undefined) {
+      obj.pushplusChannel = message.pushplusChannel;
+    }
+    if (message.pushplusWebhook !== undefined) {
+      obj.pushplusWebhook = message.pushplusWebhook;
+    }
+    if (message.pushplusCallbackUrl !== undefined) {
+      obj.pushplusCallbackUrl = message.pushplusCallbackUrl;
+    }
+    if (message.pushplusTo !== undefined) {
+      obj.pushplusTo = message.pushplusTo;
+    }
+    if (message.wePlusBotToken !== undefined) {
+      obj.wePlusBotToken = message.wePlusBotToken;
+    }
+    if (message.wePlusBotReceiver !== undefined) {
+      obj.wePlusBotReceiver = message.wePlusBotReceiver;
+    }
+    if (message.wePlusBotVersion !== undefined) {
+      obj.wePlusBotVersion = message.wePlusBotVersion;
+    }
+    if (message.emailService !== undefined) {
+      obj.emailService = message.emailService;
+    }
+    if (message.emailUser !== undefined) {
+      obj.emailUser = message.emailUser;
+    }
+    if (message.emailPass !== undefined) {
+      obj.emailPass = message.emailPass;
+    }
+    if (message.emailTo !== undefined) {
+      obj.emailTo = message.emailTo;
+    }
+    if (message.pushMeKey !== undefined) {
+      obj.pushMeKey = message.pushMeKey;
+    }
+    if (message.pushMeUrl !== undefined) {
+      obj.pushMeUrl = message.pushMeUrl;
+    }
+    if (message.chronocatURL !== undefined) {
+      obj.chronocatURL = message.chronocatURL;
+    }
+    if (message.chronocatQQ !== undefined) {
+      obj.chronocatQQ = message.chronocatQQ;
+    }
+    if (message.chronocatToken !== undefined) {
+      obj.chronocatToken = message.chronocatToken;
+    }
+    if (message.webhookHeaders !== undefined) {
+      obj.webhookHeaders = message.webhookHeaders;
+    }
+    if (message.webhookBody !== undefined) {
+      obj.webhookBody = message.webhookBody;
+    }
+    if (message.webhookUrl !== undefined) {
+      obj.webhookUrl = message.webhookUrl;
+    }
+    if (message.webhookMethod !== undefined) {
+      obj.webhookMethod = message.webhookMethod;
+    }
+    if (message.webhookContentType !== undefined) {
+      obj.webhookContentType = message.webhookContentType;
+    }
+    if (message.larkKey !== undefined) {
+      obj.larkKey = message.larkKey;
+    }
+    if (message.ntfyUrl !== undefined) {
+      obj.ntfyUrl = message.ntfyUrl;
+    }
+    if (message.ntfyTopic !== undefined) {
+      obj.ntfyTopic = message.ntfyTopic;
+    }
+    if (message.ntfyPriority !== undefined) {
+      obj.ntfyPriority = message.ntfyPriority;
+    }
+    if (message.ntfyToken !== undefined) {
+      obj.ntfyToken = message.ntfyToken;
+    }
+    if (message.ntfyUsername !== undefined) {
+      obj.ntfyUsername = message.ntfyUsername;
+    }
+    if (message.ntfyPassword !== undefined) {
+      obj.ntfyPassword = message.ntfyPassword;
+    }
+    if (message.ntfyActions !== undefined) {
+      obj.ntfyActions = message.ntfyActions;
+    }
+    if (message.wxPusherBotAppToken !== undefined) {
+      obj.wxPusherBotAppToken = message.wxPusherBotAppToken;
+    }
+    if (message.wxPusherBotTopicIds !== undefined) {
+      obj.wxPusherBotTopicIds = message.wxPusherBotTopicIds;
+    }
+    if (message.wxPusherBotUids !== undefined) {
+      obj.wxPusherBotUids = message.wxPusherBotUids;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<NotificationInfo>, I>>(base?: I): NotificationInfo {
+    return NotificationInfo.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<NotificationInfo>, I>>(object: I): NotificationInfo {
+    const message = createBaseNotificationInfo();
+    message.type = object.type ?? 0;
+    message.gotifyUrl = object.gotifyUrl ?? undefined;
+    message.gotifyToken = object.gotifyToken ?? undefined;
+    message.gotifyPriority = object.gotifyPriority ?? undefined;
+    message.goCqHttpBotUrl = object.goCqHttpBotUrl ?? undefined;
+    message.goCqHttpBotToken = object.goCqHttpBotToken ?? undefined;
+    message.goCqHttpBotQq = object.goCqHttpBotQq ?? undefined;
+    message.serverChanKey = object.serverChanKey ?? undefined;
+    message.pushDeerKey = object.pushDeerKey ?? undefined;
+    message.pushDeerUrl = object.pushDeerUrl ?? undefined;
+    message.synologyChatUrl = object.synologyChatUrl ?? undefined;
+    message.barkPush = object.barkPush ?? undefined;
+    message.barkIcon = object.barkIcon ?? undefined;
+    message.barkSound = object.barkSound ?? undefined;
+    message.barkGroup = object.barkGroup ?? undefined;
+    message.barkLevel = object.barkLevel ?? undefined;
+    message.barkUrl = object.barkUrl ?? undefined;
+    message.barkArchive = object.barkArchive ?? undefined;
+    message.telegramBotToken = object.telegramBotToken ?? undefined;
+    message.telegramBotUserId = object.telegramBotUserId ?? undefined;
+    message.telegramBotProxyHost = object.telegramBotProxyHost ?? undefined;
+    message.telegramBotProxyPort = object.telegramBotProxyPort ?? undefined;
+    message.telegramBotProxyAuth = object.telegramBotProxyAuth ?? undefined;
+    message.telegramBotApiHost = object.telegramBotApiHost ?? undefined;
+    message.dingtalkBotToken = object.dingtalkBotToken ?? undefined;
+    message.dingtalkBotSecret = object.dingtalkBotSecret ?? undefined;
+    message.weWorkBotKey = object.weWorkBotKey ?? undefined;
+    message.weWorkOrigin = object.weWorkOrigin ?? undefined;
+    message.weWorkAppKey = object.weWorkAppKey ?? undefined;
+    message.aibotkKey = object.aibotkKey ?? undefined;
+    message.aibotkType = object.aibotkType ?? undefined;
+    message.aibotkName = object.aibotkName ?? undefined;
+    message.iGotPushKey = object.iGotPushKey ?? undefined;
+    message.pushPlusToken = object.pushPlusToken ?? undefined;
+    message.pushPlusUser = object.pushPlusUser ?? undefined;
+    message.pushPlusTemplate = object.pushPlusTemplate ?? undefined;
+    message.pushplusChannel = object.pushplusChannel ?? undefined;
+    message.pushplusWebhook = object.pushplusWebhook ?? undefined;
+    message.pushplusCallbackUrl = object.pushplusCallbackUrl ?? undefined;
+    message.pushplusTo = object.pushplusTo ?? undefined;
+    message.wePlusBotToken = object.wePlusBotToken ?? undefined;
+    message.wePlusBotReceiver = object.wePlusBotReceiver ?? undefined;
+    message.wePlusBotVersion = object.wePlusBotVersion ?? undefined;
+    message.emailService = object.emailService ?? undefined;
+    message.emailUser = object.emailUser ?? undefined;
+    message.emailPass = object.emailPass ?? undefined;
+    message.emailTo = object.emailTo ?? undefined;
+    message.pushMeKey = object.pushMeKey ?? undefined;
+    message.pushMeUrl = object.pushMeUrl ?? undefined;
+    message.chronocatURL = object.chronocatURL ?? undefined;
+    message.chronocatQQ = object.chronocatQQ ?? undefined;
+    message.chronocatToken = object.chronocatToken ?? undefined;
+    message.webhookHeaders = object.webhookHeaders ?? undefined;
+    message.webhookBody = object.webhookBody ?? undefined;
+    message.webhookUrl = object.webhookUrl ?? undefined;
+    message.webhookMethod = object.webhookMethod ?? undefined;
+    message.webhookContentType = object.webhookContentType ?? undefined;
+    message.larkKey = object.larkKey ?? undefined;
+    message.ntfyUrl = object.ntfyUrl ?? undefined;
+    message.ntfyTopic = object.ntfyTopic ?? undefined;
+    message.ntfyPriority = object.ntfyPriority ?? undefined;
+    message.ntfyToken = object.ntfyToken ?? undefined;
+    message.ntfyUsername = object.ntfyUsername ?? undefined;
+    message.ntfyPassword = object.ntfyPassword ?? undefined;
+    message.ntfyActions = object.ntfyActions ?? undefined;
+    message.wxPusherBotAppToken = object.wxPusherBotAppToken ?? undefined;
+    message.wxPusherBotTopicIds = object.wxPusherBotTopicIds ?? undefined;
+    message.wxPusherBotUids = object.wxPusherBotUids ?? undefined;
+    return message;
+  },
+};
+
+function createBaseSystemNotifyRequest(): SystemNotifyRequest {
+  return { title: "", content: "", notificationInfo: undefined };
+}
+
+export const SystemNotifyRequest: MessageFns<SystemNotifyRequest> = {
+  encode(message: SystemNotifyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.title !== "") {
+      writer.uint32(10).string(message.title);
+    }
+    if (message.content !== "") {
+      writer.uint32(18).string(message.content);
+    }
+    if (message.notificationInfo !== undefined) {
+      NotificationInfo.encode(message.notificationInfo, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SystemNotifyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSystemNotifyRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.title = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.content = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.notificationInfo = NotificationInfo.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SystemNotifyRequest {
+    return {
+      title: isSet(object.title) ? globalThis.String(object.title) : "",
+      content: isSet(object.content) ? globalThis.String(object.content) : "",
+      notificationInfo: isSet(object.notificationInfo) ? NotificationInfo.fromJSON(object.notificationInfo) : undefined,
+    };
+  },
+
+  toJSON(message: SystemNotifyRequest): unknown {
+    const obj: any = {};
+    if (message.title !== "") {
+      obj.title = message.title;
+    }
+    if (message.content !== "") {
+      obj.content = message.content;
+    }
+    if (message.notificationInfo !== undefined) {
+      obj.notificationInfo = NotificationInfo.toJSON(message.notificationInfo);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(base?: I): SystemNotifyRequest {
+    return SystemNotifyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(object: I): SystemNotifyRequest {
+    const message = createBaseSystemNotifyRequest();
+    message.title = object.title ?? "";
+    message.content = object.content ?? "";
+    message.notificationInfo = (object.notificationInfo !== undefined && object.notificationInfo !== null)
+      ? NotificationInfo.fromPartial(object.notificationInfo)
+      : undefined;
     return message;
   },
 };

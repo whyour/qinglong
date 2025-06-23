@@ -53,14 +53,7 @@ message Response {
   optional string message = 2;
 }
 
-message SystemNotifyRequest {
-  string title = 1;
-  string content = 2;
-}
-
-message ExtraScheduleItem {
-  string schedule = 1;
-}
+message ExtraScheduleItem { string schedule = 1; }
 
 message CronItem {
   optional int32 id = 1;
@@ -122,6 +115,128 @@ message CronDetailResponse {
   int32 code = 1;
   CronItem data = 2;
   optional string message = 3;
+}
+
+enum NotificationMode {
+  gotify = 0;
+  goCqHttpBot = 1;
+  serverChan = 2;
+  pushDeer = 3;
+  bark = 4;
+  chat = 5;
+  telegramBot = 6;
+  dingtalkBot = 7;
+  weWorkBot = 8;
+  weWorkApp = 9;
+  aibotk = 10;
+  iGot = 11;
+  pushPlus = 12;
+  wePlusBot = 13;
+  email = 14;
+  pushMe = 15;
+  feishu = 16;
+  webhook = 17;
+  chronocat = 18;
+  ntfy = 19;
+  wxPusherBot = 20;
+}
+
+message NotificationInfo {
+  NotificationMode type = 1;
+
+  optional string gotifyUrl = 2;
+  optional string gotifyToken = 3;
+  optional int32 gotifyPriority = 4;
+
+  optional string goCqHttpBotUrl = 5;
+  optional string goCqHttpBotToken = 6;
+  optional string goCqHttpBotQq = 7;
+
+  optional string serverChanKey = 8;
+
+  optional string pushDeerKey = 9;
+  optional string pushDeerUrl = 10;
+
+  optional string synologyChatUrl = 11;
+
+  optional string barkPush = 12;
+  optional string barkIcon = 13;
+  optional string barkSound = 14;
+  optional string barkGroup = 15;
+  optional string barkLevel = 16;
+  optional string barkUrl = 17;
+  optional string barkArchive = 18;
+
+  optional string telegramBotToken = 19;
+  optional string telegramBotUserId = 20;
+  optional string telegramBotProxyHost = 21;
+  optional string telegramBotProxyPort = 22;
+  optional string telegramBotProxyAuth = 23;
+  optional string telegramBotApiHost = 24;
+
+  optional string dingtalkBotToken = 25;
+  optional string dingtalkBotSecret = 26;
+
+  optional string weWorkBotKey = 27;
+  optional string weWorkOrigin = 28;
+
+  optional string weWorkAppKey = 29;
+
+  optional string aibotkKey = 30;
+  optional string aibotkType = 31;
+  optional string aibotkName = 32;
+
+  optional string iGotPushKey = 33;
+
+  optional string pushPlusToken = 34;
+  optional string pushPlusUser = 35;
+  optional string pushPlusTemplate = 36;
+  optional string pushplusChannel = 37;
+  optional string pushplusWebhook = 38;
+  optional string pushplusCallbackUrl = 39;
+  optional string pushplusTo = 40;
+
+  optional string wePlusBotToken = 41;
+  optional string wePlusBotReceiver = 42;
+  optional string wePlusBotVersion = 43;
+
+  optional string emailService = 44;
+  optional string emailUser = 45;
+  optional string emailPass = 46;
+  optional string emailTo = 47;
+
+  optional string pushMeKey = 48;
+  optional string pushMeUrl = 49;
+
+  optional string chronocatURL = 50;
+  optional string chronocatQQ = 51;
+  optional string chronocatToken = 52;
+
+  optional string webhookHeaders = 53;
+  optional string webhookBody = 54;
+  optional string webhookUrl = 55;
+  optional string webhookMethod = 56;
+  optional string webhookContentType = 57;
+
+  optional string larkKey = 58;
+
+  optional string ntfyUrl = 59;
+  optional string ntfyTopic = 60;
+  optional string ntfyPriority = 61;
+  optional string ntfyToken = 62;
+  optional string ntfyUsername = 63;
+  optional string ntfyPassword = 64;
+  optional string ntfyActions = 65;
+
+  optional string wxPusherBotAppToken = 66;
+  optional string wxPusherBotTopicIds = 67;
+  optional string wxPusherBotUids = 68;
+}
+
+message SystemNotifyRequest {
+  string title = 1;
+  string content = 2;
+  optional NotificationInfo notificationInfo = 3;
 }
 
 service Api {

@@ -49,12 +49,21 @@ export default class NotificationService {
   public async notify(
     title: string,
     content: string,
+    notificationInfo?: NotificationInfo,
   ): Promise<boolean | undefined> {
-    const { type, ...rest } = await this.userService.getNotificationMode();
+    let { type, ...rest } = await this.userService.getNotificationMode();
+    if (notificationInfo?.type) {
+      type = notificationInfo?.type;
+    }
     if (type) {
       this.title = title;
       this.content = content;
-      this.params = rest;
+      let params = rest;
+      if (notificationInfo) {
+        const { type: _, ...others } = notificationInfo;
+        params = { ...rest, ...others };
+      }
+      this.params = params;
       const notificationModeAction = this.modeMap.get(type);
       try {
         return await notificationModeAction?.call(this);
@@ -623,7 +632,15 @@ export default class NotificationService {
   }
 
   private async ntfy() {
-    const { ntfyUrl, ntfyTopic, ntfyPriority, ntfyToken, ntfyUsername, ntfyPassword, ntfyActions } = this.params;
+    const {
+      ntfyUrl,
+      ntfyTopic,
+      ntfyPriority,
+      ntfyToken,
+      ntfyUsername,
+      ntfyPassword,
+      ntfyActions,
+    } = this.params;
     // 编码函数
     const encodeRfc2047 = (text: string, charset: string = 'UTF-8'): string => {
       const encodedText = Buffer.from(text).toString('base64');
@@ -638,7 +655,9 @@ export default class NotificationService {
       if (ntfyToken) {
         headers['Authorization'] = `Bearer ${ntfyToken}`;
       } else if (ntfyUsername && ntfyPassword) {
-        headers['Authorization'] = `Basic ${Buffer.from(`${ntfyUsername}:${ntfyPassword}`).toString('base64')}`;
+        headers['Authorization'] = `Basic ${Buffer.from(
+          `${ntfyUsername}:${ntfyPassword}`,
+        ).toString('base64')}`;
       }
       if (ntfyActions) {
         headers['Actions'] = encodeRfc2047(ntfyActions);
