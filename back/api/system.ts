@@ -273,6 +273,7 @@ export default (app: Router) => {
           {
             onStart: async (cp, startTime) => {
               res.setHeader('QL-Task-Pid', `${cp.pid}`);
+              res.setHeader('QL-Task-Log', `${logPath}`);
             },
             onEnd: async (cp, endTime, diff) => {
               res.end();
