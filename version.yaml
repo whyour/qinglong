@@ -1,12 +1,10 @@
-version: 2.19.1
-changeLogLink: https://t.me/jiao_long/430
-publishTime: 2025-05-24 16:00
+version: 2.19.2
+changeLogLink: https://t.me/jiao_long/431
+publishTime: 2025-06-27 23:59
 changeLog: |
-  1. 修复依赖是否安装检查逻辑
-  2. 修复文件下载 path 参数
-  3. 修复 python 查询逻辑
-  4. 修复任务视图状态筛选
-  5. 修复创建脚本可能失败
-  6. 修复重置用户名失败
-  7. 修复无法识别 python 依赖安装的命令
-  8. 其他缺陷修复
+  1. 备份数据支持选择模块，支持清除依赖缓存
+  2. QLAPI 和 openapi 的 systemNotify 支持自定义通知类型和参数
+  3. ntfy 增加可选的认证与用户动作，感谢 https://github.com/liheji
+  4. 修复取消安装依赖
+  5. 修复环境变量过大解析报错
+  6. 修改服务启动方式
