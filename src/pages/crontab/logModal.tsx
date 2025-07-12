@@ -1,5 +1,5 @@
-import intl from 'react-intl-universal';
-import React, { useEffect, useRef, useState } from 'react';
+import intl from "react-intl-universal";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Modal,
   message,
@@ -8,17 +8,17 @@ import {
   Statistic,
   Button,
   Typography,
-} from 'antd';
-import { request } from '@/utils/http';
-import config from '@/utils/config';
+} from "antd";
+import { request } from "@/utils/http";
+import config from "@/utils/config";
 import {
   Loading3QuartersOutlined,
   CheckCircleOutlined,
-} from '@ant-design/icons';
-import { PageLoading } from '@ant-design/pro-layout';
-import { logEnded } from '@/utils';
-import { CrontabStatus } from './type';
-import Ansi from 'ansi-to-react';
+} from "@ant-design/icons";
+import { PageLoading } from "@ant-design/pro-layout";
+import { logEnded } from "@/utils";
+import { CrontabStatus } from "./type";
+import Ansi from "ansi-to-react";
 
 const { Countdown } = Statistic;
 
@@ -33,7 +33,7 @@ const CronLogModal = ({
   data?: string;
   logUrl?: string;
 }) => {
-  const [value, setValue] = useState<string>(intl.get('启动中...'));
+  const [value, setValue] = useState<string>(intl.get("启动中..."));
   const [loading, setLoading] = useState<any>(true);
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
@@ -49,15 +49,15 @@ const CronLogModal = ({
       .then(({ code, data }) => {
         if (
           code === 200 &&
-          localStorage.getItem('logCron') === uniqPath &&
+          localStorage.getItem("logCron") === uniqPath &&
           data !== value
         ) {
           const log = data as string;
-          setValue(log || intl.get('暂无日志'));
+          setValue(log || intl.get("暂无日志"));
           const hasNext = Boolean(
-            log && !logEnded(log) && !log.includes('任务未运行'),
+            log && !logEnded(log) && !log.includes("日志不存在"),
           );
-          if (!hasNext && !logEnded(value) && value !== intl.get('启动中...')) {
+          if (!hasNext && !logEnded(value) && value !== intl.get("启动中...")) {
             setTimeout(() => {
               autoScroll();
             });
@@ -85,13 +85,13 @@ const CronLogModal = ({
 
     setTimeout(() => {
       document
-        .querySelector('#log-flag')!
-        .scrollIntoView({ behavior: 'smooth' });
+        .querySelector("#log-flag")
+        ?.scrollIntoView({ behavior: "smooth" });
     }, 600);
   };
 
   const cancel = () => {
-    localStorage.removeItem('logCron');
+    localStorage.removeItem("logCron");
     handleCancel();
   };
 
@@ -107,7 +107,7 @@ const CronLogModal = ({
 
   const titleElement = () => {
     return (
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
         {(executing || loading) && <Loading3QuartersOutlined spin />}
         {!executing && !loading && <CheckCircleOutlined />}
         <Typography.Text ellipsis={true} style={{ marginLeft: 5 }}>
@@ -144,7 +144,7 @@ const CronLogModal = ({
       onCancel={() => cancel()}
       footer={[
         <Button type="primary" onClick={() => cancel()}>
-          {intl.get('知道了')}
+          {intl.get("知道了")}
         </Button>,
       ]}
     >
@@ -156,9 +156,9 @@ const CronLogModal = ({
             style={
               isPhone
                 ? {
-                    fontFamily: 'Source Code Pro',
-                    zoom: 0.83,
-                  }
+                  fontFamily: "Source Code Pro",
+                  zoom: 0.83,
+                }
                 : {}
             }
           >

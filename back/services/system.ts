@@ -47,7 +47,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -287,7 +287,7 @@ export default class SystemService {
         );
         const text = await body.text();
         lastVersionContent = parseContentVersion(text);
-      } catch (error) {}
+      } catch (error) { }
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -401,11 +401,12 @@ export default class SystemService {
     }
   }
 
-  public async run({ command }: { command: string }, callback: TaskCallbacks) {
+  public async run({ command, logPath }: { command: string; logPath?: string }, callback: TaskCallbacks) {
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
-    this.scheduleService.runTask(`real_time=true ${command}`, callback, {
+    const logPathPrefix = logPath ? `real_log_path=${logPath}` : ''
+    this.scheduleService.runTask(`${logPathPrefix} real_time=true ${command}`, callback, {
       command,
       id: command.replace(/ /g, '-'),
       runOrigin: 'system',
@@ -442,8 +443,7 @@ export default class SystemService {
       }
       const dataPaths = dataDirs.map((dir) => `data/${dir}`);
       await promiseExec(
-        `cd ${config.dataPath} && cd ../ && tar -zcvf ${
-          config.dataTgzFile
+        `cd ${config.dataPath} && cd ../ && tar -zcvf ${config.dataTgzFile
         } ${dataPaths.join(' ')}`,
       );
       res.download(config.dataTgzFile);
@@ -537,7 +537,7 @@ export default class SystemService {
     try {
       const finalPath = path.join(config.dependenceCachePath, type);
       await fs.promises.rm(finalPath, { recursive: true });
-    } catch (error) {}
+    } catch (error) { }
     return { code: 200 };
   }
 }

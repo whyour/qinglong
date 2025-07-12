@@ -573,7 +573,7 @@ export default class CronService {
       return typeof doc.status === 'number' &&
         [CrontabStatus.queued, CrontabStatus.running].includes(doc.status)
         ? '运行中...'
-        : '任务空闲中';
+        : '日志不存在...';
     }
   }
 

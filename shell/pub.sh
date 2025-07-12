@@ -2,13 +2,9 @@
 echo -e "开始发布"
 
 echo -e "切换master分支"
-git checkout master
-
-echo -e "合并develop代码"
-git merge origin/develop
-
-echo -e "提交master代码"
-git push
+git branch -D master
+git checkout -b master
+git push --set-upstream origin master -f
 
 echo -e "更新cdn文件"
 ts-node-transpile-only sample/tool.ts

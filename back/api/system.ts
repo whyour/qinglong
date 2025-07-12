@@ -279,14 +279,14 @@ export default (app: Router) => {
               res.end();
             },
             onError: async (message: string) => {
-              res.write(`\n${message}`);
+              res.write(message);
               const absolutePath = await handleLogPath(logPath);
-              await fs.appendFile(absolutePath, `\n${message}`);
+              await fs.appendFile(absolutePath, message);
             },
             onLog: async (message: string) => {
-              res.write(`\n${message}`);
+              res.write(message);
               const absolutePath = await handleLogPath(logPath);
-              await fs.appendFile(absolutePath, `\n${message}`);
+              await fs.appendFile(absolutePath, message);
             },
           },
         );
