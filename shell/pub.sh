@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 echo -e "开始发布"
 
-echo -e "切换master分支"
-git branch -D master
-git checkout -b master
-git push --set-upstream origin master -f
+echo -e "切换 debian 分支"
+git branch -D debian
+git checkout -b debian
+git push --set-upstream origin debian -f
 
 echo -e "更新cdn文件"
 ts-node-transpile-only sample/tool.ts
