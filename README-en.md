@@ -66,6 +66,10 @@ npm i @whyour/qinglong
 
 [View Documentation](https://qinglong.online/guide/user-guide/basic-explanation)
 
+## API Documentation
+
+[View Documentation(Official)](https://qinglong.online/api/) | [View Documentation(apifox, in Chinese)](https://qinglong-api.apifox.cn/)
+
 ## Development
 
 ```bash

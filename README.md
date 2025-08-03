@@ -68,6 +68,10 @@ npm i @whyour/qinglong
 
 [查看文档](https://qinglong.online/guide/user-guide/basic-explanation)
 
+## API 文档
+
+[查看文档(官方)](https://qinglong.online/api/) | [查看文档(apifox)](https://qinglong-api.apifox.cn/)
+
 ## 开发
 
 ```bash
