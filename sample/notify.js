@@ -1209,79 +1209,78 @@ function webhookNotify(text, desp) {
       WEBHOOK_CONTENT_TYPE,
       WEBHOOK_METHOD,
     } = push_config;
-    if (
-      !WEBHOOK_METHOD ||
-      !WEBHOOK_URL ||
-      (!WEBHOOK_URL.includes('$title') && !WEBHOOK_BODY.includes('$title'))
-    ) {
-      resolve();
-      return;
+
+    /**
+    *    // ====== 调试信息输出（方便定位问题）======
+    *    console.log('===== 调试开始 - webhookNotify =====');
+    *    console.log('标题 (text):', text);
+    *    console.log('内容 (desp):', desp);
+    *    console.log('Webhook URL:', WEBHOOK_URL);
+    *    console.log('Webhook BODY 模板:', WEBHOOK_BODY);
+    *    console.log('Webhook HEADERS:', WEBHOOK_HEADERS);
+    *    console.log('Webhook METHOD:', WEBHOOK_METHOD);
+    *    console.log('Webhook CONTENT TYPE:', WEBHOOK_CONTENT_TYPE);
+    *    console.log('===== 调试结束 =====================');
+    */
+    if (!WEBHOOK_METHOD || !WEBHOOK_URL) {
+      console.warn('Webhook 参数不足（URL 或 METHOD 缺失），跳过推送。');
+      return resolve();
     }
 
     const headers = parseHeaders(WEBHOOK_HEADERS);
-    const body = parseBody(WEBHOOK_BODY, WEBHOOK_CONTENT_TYPE, (v) =>
-      v
-        ?.replaceAll('$title', text?.replaceAll('\n', '\\n'))
-        ?.replaceAll('$content', desp?.replaceAll('\n', '\\n')),
+
+    /**
+     * 解析并替换 BODY 中的占位符：
+     * - $title / $text => 消息标题 text
+     * - $content / $desp => 消息内容 desp
+     * - 单个 $ => 向下兼容的写法，替换为 text
+     */
+    let bodyObj = parseBody(WEBHOOK_BODY, WEBHOOK_CONTENT_TYPE, (v) =>
+      v.replaceAll('$title', text || '')
+       .replaceAll('$text', text || '')
+       .replaceAll('$', text || '')
+       .replaceAll('$content', desp || '')
+       .replaceAll('$desp', desp || '')
     );
-    const bodyParam = formatBodyFun(WEBHOOK_CONTENT_TYPE, body);
+
+    if (typeof bodyObj === 'object') {
+      if (!bodyObj.title) bodyObj.title = text || '';
+      if (!bodyObj.content) bodyObj.content = desp || '';
+    }
+
+    const bodyParam = formatBodyFun(WEBHOOK_CONTENT_TYPE, bodyObj);
+
+    const formatUrl = WEBHOOK_URL
+      .replaceAll('$title', encodeURIComponent(text || ''))
+      .replaceAll('$content', encodeURIComponent(desp || ''));
+
     const options = {
       method: WEBHOOK_METHOD,
       headers,
-      allowGetBody: true,
+      allowGetBody: true, 
       ...bodyParam,
-      timeout,
-      retry: 1,
+      timeout, 
+      retry: 1, 
     };
 
-    const formatUrl = WEBHOOK_URL.replaceAll(
-      '$title',
-      encodeURIComponent(text),
-    ).replaceAll('$content', encodeURIComponent(desp));
-    httpClient.request(formatUrl, options).then(async (resp) => {
-      const body = await resp.body.text();
-      try {
+    console.log('Webhook 请求信息:', { formatUrl, options });
+
+    httpClient.request(formatUrl, options)
+      .then(async (resp) => {
+        const respBody = await resp.body.text();
         if (resp.statusCode !== 200) {
-          console.log(`自定义发送通知消息失败😞 ${body}\n`);
+          console.error(`Webhook 推送失败 😞 响应: ${respBody}`);
         } else {
-          console.log(`自定义发送通知消息成功🎉 ${body}\n`);
+          console.log(`Webhook 推送成功 🎉 响应: ${respBody}`);
         }
-      } catch (e) {
-        $.logErr(e, resp);
-      } finally {
-        resolve(body);
-      }
-    });
+        resolve(respBody);
+      })
+      .catch((err) => {
+        console.error('Webhook HTTP 请求失败:', err);
+        resolve();
+      });
   });
 }
-
-function ntfyNotify(text, desp) {
-  function encodeRFC2047(text) {
-    const encodedBase64 = Buffer.from(text).toString('base64');
-    return `=?utf-8?B?${encodedBase64}?=`;
-  }
-
-  return new Promise((resolve) => {
-    const { NTFY_URL, NTFY_TOPIC, NTFY_PRIORITY, NTFY_TOKEN, NTFY_USERNAME, NTFY_PASSWORD, NTFY_ACTIONS } = push_config;
-    if (NTFY_TOPIC) {
-      const options = {
-        url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
-        body: `${desp}`,
-        headers: {
-          Title: `${encodeRFC2047(text)}`,
-          Priority: NTFY_PRIORITY || '3',
-          Icon: 'https://qn.whyour.cn/logo.png',
-        },
-        timeout,
-      };
-      if (NTFY_TOKEN) {
-        options.headers['Authorization'] = `Bearer ${NTFY_TOKEN}`;
-      } else if (NTFY_USERNAME && NTFY_PASSWORD) {
-        options.headers['Authorization'] = `Basic ${Buffer.from(`${NTFY_USERNAME}:${NTFY_PASSWORD}`).toString('base64')}`;
-      }
-      if (NTFY_ACTIONS) {
-        options.headers['Actions'] = encodeRFC2047(NTFY_ACTIONS);
-      }
 
       $.post(options, (err, resp, data) => {
         try {
