@@ -1282,6 +1282,35 @@ function webhookNotify(text, desp) {
   });
 }
 
+
+function ntfyNotify(text, desp) {
+  function encodeRFC2047(text) {
+    const encodedBase64 = Buffer.from(text).toString('base64');
+    return `=?utf-8?B?${encodedBase64}?=`;
+  }
+
+  return new Promise((resolve) => {
+    const { NTFY_URL, NTFY_TOPIC, NTFY_PRIORITY, NTFY_TOKEN, NTFY_USERNAME, NTFY_PASSWORD, NTFY_ACTIONS } = push_config;
+    if (NTFY_TOPIC) {
+      const options = {
+        url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
+        body: `${desp}`,
+        headers: {
+          Title: `${encodeRFC2047(text)}`,
+          Priority: NTFY_PRIORITY || '3',
+          Icon: 'https://qn.whyour.cn/logo.png',
+        },
+        timeout,
+      };
+      if (NTFY_TOKEN) {
+        options.headers['Authorization'] = `Bearer ${NTFY_TOKEN}`;
+      } else if (NTFY_USERNAME && NTFY_PASSWORD) {
+        options.headers['Authorization'] = `Basic ${Buffer.from(`${NTFY_USERNAME}:${NTFY_PASSWORD}`).toString('base64')}`;
+      }
+      if (NTFY_ACTIONS) {
+        options.headers['Actions'] = encodeRFC2047(NTFY_ACTIONS);
+      }
+
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
