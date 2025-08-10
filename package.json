@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "start": "concurrently -n w: npm:start:*",
-    "start:back": "nodemon",
+    "start:back": "nodemon ./back/app.ts",
     "start:front": "max dev",
     "build:front": "max build",
     "build:back": "tsc -p back/tsconfig.json",
