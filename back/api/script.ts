@@ -32,46 +32,46 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
-    const logger: Logger = Container.get('logger');
-    try {
-      let result: IFile[] = [];
-      const blacklist = [
-        'node_modules',
-        '.git',
-        '.pnpm',
-        'pnpm-lock.yaml',
-        'yarn.lock',
-        'package-lock.json',
-      ];
-      if (req.query.path) {
-        result = await readDir(
-          req.query.path as string,
-          config.scriptPath,
-          blacklist,
-        );
-      } else {
-        result = await readDirs(
-          config.scriptPath,
-          config.scriptPath,
-          blacklist,
-          (a, b) => {
-            if (a.type === b.type) {
-              return a.title.localeCompare(b.title);
-            } else {
-              return a.type === 'directory' ? -1 : 1;
-            }
-          },
-        );
+      const logger: Logger = Container.get('logger');
+      try {
+        let result: IFile[] = [];
+        const blacklist = [
+          'node_modules',
+          '.git',
+          '.pnpm',
+          'pnpm-lock.yaml',
+          'yarn.lock',
+          'package-lock.json',
+        ];
+        if (req.query.path) {
+          result = await readDir(
+            req.query.path as string,
+            config.scriptPath,
+            blacklist,
+          );
+        } else {
+          result = await readDirs(
+            config.scriptPath,
+            config.scriptPath,
+            blacklist,
+            (a, b) => {
+              if (a.type === b.type) {
+                return a.title.localeCompare(b.title);
+              } else {
+                return a.type === 'directory' ? -1 : 1;
+              }
+            },
+          );
+        }
+        res.send({
+          code: 200,
+          data: result,
+        });
+      } catch (e) {
+        logger.error('🔥 error: %o', e);
+        return next(e);
       }
-      res.send({
-        code: 200,
-        data: result,
-      });
-    } catch (e) {
-      logger.error('🔥 error: %o', e);
-      return next(e);
-    }
-  });
+    });
 
   route.get(
     '/detail',
@@ -109,8 +109,8 @@ export default (app: Router) => {
       try {
         const scriptService = Container.get(ScriptService);
         const content = await scriptService.getFile(
-          req.query.path as string,
-          req.params?.file || '',
+          req.query?.path as string || '',
+          req.params.file,
         );
         res.send({ code: 200, data: content });
       } catch (e) {
