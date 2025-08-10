@@ -27,6 +27,13 @@ class Application {
 
   constructor() {
     this.app = express();
+    // 创建一个全局中间件，删除查询参数中的t
+    this.app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.query.t) {
+        delete req.query.t;
+      }
+      next();
+    });
   }
 
   async start() {
@@ -54,8 +61,7 @@ class Application {
       if (metadata) {
         if (!this.isShuttingDown) {
           Logger.error(
-            `${metadata.serviceType} worker ${worker.process.pid} died (${
-              signal || code
+            `${metadata.serviceType} worker ${worker.process.pid} died (${signal || code
             }). Restarting...`,
           );
           const newWorker = this.forkWorker(metadata.serviceType);
