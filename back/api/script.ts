@@ -24,7 +24,14 @@ const upload = multer({ storage: storage });
 export default (app: Router) => {
   app.use('/scripts', route);
 
-  route.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  route.get(
+    '/',
+    celebrate({
+      query: Joi.object({
+        path: Joi.string().optional().allow(''),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
     const logger: Logger = Container.get('logger');
     try {
       let result: IFile[] = [];
@@ -68,6 +75,12 @@ export default (app: Router) => {
 
   route.get(
     '/detail',
+    celebrate({
+      query: Joi.object({
+        path: Joi.string().optional().allow(''),
+        file: Joi.string().required(),
+      }),
+    }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const scriptService = Container.get(ScriptService);
@@ -84,12 +97,20 @@ export default (app: Router) => {
 
   route.get(
     '/:file',
+    celebrate({
+      params: Joi.object({
+        file: Joi.string().required(),
+      }),
+      query: Joi.object({
+        path: Joi.string().optional().allow(''),
+      }),
+    }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const scriptService = Container.get(ScriptService);
         const content = await scriptService.getFile(
           req.query.path as string,
-          req.params.file,
+          req.params?.file || '',
         );
         res.send({ code: 200, data: content });
       } catch (e) {
@@ -101,6 +122,16 @@ export default (app: Router) => {
   route.post(
     '/',
     upload.single('file'),
+    celebrate({
+      body: Joi.object({
+        filename: Joi.string().required(),
+        file: Joi.string().optional().allow(''),
+        path: Joi.string().optional().allow(''),
+        content: Joi.string().optional().allow(''),
+        originFilename: Joi.string().optional().allow(''),
+        directory: Joi.string().optional().allow(''),
+      }),
+    }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         let { filename, path, content, originFilename, directory } =
@@ -201,7 +232,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
-        path: Joi.string().allow(''),
+        path: Joi.string().optional().allow(''),
         type: Joi.string().optional(),
       }),
     }),
@@ -211,6 +242,9 @@ export default (app: Router) => {
           filename: string;
           path: string;
         };
+        if (!path) {
+          path = '';
+        }
         const scriptService = Container.get(ScriptService);
         const filePath = scriptService.checkFilePath(path, filename);
         if (!filePath) {
@@ -276,6 +310,9 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         let { filename, content, path } = req.body;
+        if (!path) {
+          path = '';
+        }
         const { name, ext } = parse(filename);
         const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
         await writeFileWithLock(filePath, content || '');
@@ -301,6 +338,9 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         let { filename, path, pid } = req.body;
+        if (!path) {
+          path = '';
+        }
         const { name, ext } = parse(filename);
         const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
         const logPath = join(config.logPath, path, `${name}.swap`);
@@ -328,12 +368,14 @@ export default (app: Router) => {
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        let { filename, path, type, newFilename } = req.body as {
+        let { filename, path, newFilename } = req.body as {
           filename: string;
           path: string;
-          type: string;
           newFilename: string;
         };
+        if (!path) {
+          path = '';
+        }
         const filePath = join(config.scriptPath, path, filename);
         const newPath = join(config.scriptPath, path, newFilename);
         await fs.rename(filePath, newPath);
