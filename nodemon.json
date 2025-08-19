@@ -1,5 +1,15 @@
 {
-  "watch": ["back", ".env"],
+  "watch": [
+    "back",
+    ".env"
+  ],
   "ext": "js,ts,json",
-  "exec": "ts-node -P ./back/tsconfig.json ./back/app.ts"
+  "env": {
+    "NODE_ENV": "development",
+    "TS_NODE_PROJECT": "./back/tsconfig.json"
+  },
+  "verbose": true,
+  "execMap": {
+    "ts": "node --require ts-node/register"
+  }
 }
