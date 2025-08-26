@@ -107,7 +107,7 @@ export default class DependenceService {
     query: any = {},
   ): Promise<Dependence[]> {
     let condition = query;
-    if (type && ['nodejs', 'python3', 'linux'].includes(type)) {
+    if (DependenceTypes[type]) {
       condition.type = DependenceTypes[type];
     } else condition.type = [0, 1, 2];
     if (status) {
