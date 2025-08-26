@@ -85,7 +85,7 @@ export default (app: Router) => {
       try {
         const scriptService = Container.get(ScriptService);
         const content = await scriptService.getFile(
-          req.query.path as string,
+          req.query?.path as string || '',
           req.query.file as string,
         );
         res.send({ code: 200, data: content });
