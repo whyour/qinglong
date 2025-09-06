@@ -11,13 +11,12 @@ export default (app: Router) => {
   route.get(
     '/',
     celebrate({
-      body: Joi.array().items(
+      query: 
         Joi.object({
           searchValue: Joi.string().optional().allow(''),
           type: Joi.string().optional().allow(''),
           status: Joi.string().optional().allow(''),
         }),
-      ),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
