@@ -109,7 +109,7 @@ export default class DependenceService {
     let condition = query;
     if (DependenceTypes[type]) {
       condition.type = DependenceTypes[type];
-    } else condition.type = [0, 1, 2];
+    }
     if (status) {
       condition.status = status.split(',').map(Number);
     }
