@@ -125,7 +125,6 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
-        file: Joi.string().optional().allow(''),
         path: Joi.string().optional().allow(''),
         content: Joi.string().optional().allow(''),
         originFilename: Joi.string().optional().allow(''),
