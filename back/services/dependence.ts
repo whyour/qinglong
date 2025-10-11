@@ -28,7 +28,7 @@ export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
@@ -98,34 +98,32 @@ export default class DependenceService {
       searchValue,
       type,
       status,
-    }: { searchValue: string; type: string; status: string },
+    }: {
+      searchValue: string;
+      type: keyof typeof DependenceTypes;
+      status: string;
+    },
     sort: any = [],
     query: any = {},
   ): Promise<Dependence[]> {
-    let condition = {
-      ...query,
-      type: DependenceTypes[type as any],
-    };
+    let condition = query;
+    if (DependenceTypes[type]) {
+      condition.type = DependenceTypes[type];
+    }
     if (status) {
       condition.status = status.split(',').map(Number);
     }
     if (searchValue) {
       const encodeText = encodeURI(searchValue);
-      const reg = {
+      condition.name = {
         [Op.or]: [
           { [Op.like]: `%${searchValue}%` },
           { [Op.like]: `%${encodeText}%` },
         ],
       };
-
-      condition = {
-        ...condition,
-        name: reg,
-      };
     }
     try {
-      const result = await this.find(condition, sort);
-      return result as any;
+      return await this.find(condition, sort);
     } catch (error) {
       throw error;
     }
