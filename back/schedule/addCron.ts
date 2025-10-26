@@ -16,7 +16,7 @@ const addCron = (
     }
 
     Logger.info(
-      '[schedule][创建定时任务], 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
+      '[schedule][创建定时任务] 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
       id,
       name,
       schedule,
@@ -26,7 +26,7 @@ const addCron = (
     if (extra_schedules?.length) {
       extra_schedules.forEach((x) => {
         Logger.info(
-          '[schedule][创建定时任务], 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
+          '[schedule][创建定时任务] 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
           id,
           name,
           x.schedule,

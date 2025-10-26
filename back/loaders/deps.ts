@@ -36,10 +36,12 @@ async function linkCommand() {
     const source = path.join(config.rootPath, 'shell', link.src);
     const target = path.join(commandDir, link.dest);
     const tmpTarget = path.join(commandDir, link.tmp);
-    const stats = await fs.lstat(tmpTarget);
-    if (stats) {
-      await fs.unlink(tmpTarget);
-    }
+    try {
+      const stats = await fs.lstat(tmpTarget);
+      if (stats) {
+        await fs.unlink(tmpTarget);
+      }
+    } catch (error) { }
     await fs.symlink(source, tmpTarget);
     await fs.rename(tmpTarget, target);
   }

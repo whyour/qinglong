@@ -593,7 +593,7 @@ export default class CronService {
           files.map(async (x) => ({
             filename: x,
             directory: relativeDir.replace(config.logPath, ''),
-            time: (await fs.lstat(`${dir}/${x}`)).mtime.getTime(),
+            time: (await fs.lstat(`${dir}/${x}`)).birthtimeMs,
           })),
         )
       ).sort((a, b) => b.time - a.time);

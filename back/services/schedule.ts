@@ -139,7 +139,7 @@ export default class ScheduleService {
   ) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[panel][创建cron任务], 任务ID: %s, cron: %s, 任务名: %s, 执行命令: %s',
+      '[panel][创建cron任务] 任务ID: %s, cron: %s, 任务名: %s, 执行命令: %s',
       _id,
       schedule,
       name,
@@ -172,7 +172,7 @@ export default class ScheduleService {
 
   async cancelCronTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
-    this.logger.info('[panel][取消定时任务], 任务名: %s', name);
+    this.logger.info('[panel][取消定时任务] 任务名: %s', name);
     if (this.scheduleStacks.has(_id)) {
       this.scheduleStacks.get(_id)?.cancel();
       this.scheduleStacks.delete(_id);
@@ -187,7 +187,7 @@ export default class ScheduleService {
   ) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[panel][创建interval任务], 任务ID: %s, 任务名: %s, 执行命令: %s',
+      '[panel][创建interval任务] 任务ID: %s, 任务名: %s, 执行命令: %s',
       _id,
       name,
       command,
@@ -232,7 +232,7 @@ export default class ScheduleService {
   async cancelIntervalTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[panel][取消interval任务], 任务ID: %s, 任务名: %s',
+      '[panel][取消interval任务] 任务ID: %s, 任务名: %s',
       _id,
       name,
     );

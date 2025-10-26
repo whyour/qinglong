@@ -91,7 +91,8 @@ class Application {
   }
 
   private async initializeDatabase() {
-    await require('./loaders/db').default();
+    const dbLoader = await import('./loaders/db');
+    await dbLoader.default();
   }
 
   private setupMiddlewares() {
@@ -181,14 +182,16 @@ class Application {
     const { HttpServerService } = await import('./services/http');
     this.httpServerService = Container.get(HttpServerService);
 
-    await require('./loaders/app').default({ app: this.app });
+    const appLoader = await import('./loaders/app');
+    await appLoader.default({ app: this.app });
 
     const server = await this.httpServerService.initialize(
       this.app,
       config.port,
     );
 
-    await require('./loaders/server').default({ server });
+    const serverLoader = await import('./loaders/server');
+    await (serverLoader.default as any)({ server });
     this.setupWorkerShutdown('http');
   }
 

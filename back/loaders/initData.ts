@@ -89,7 +89,8 @@ export default async () => {
     setTimeout(async () => {
       await dependenceService.installDependenceOneByOne(docs);
 
-      require('./bootAfter').default();
+      const bootAfterLoader = await import('./bootAfter');
+      bootAfterLoader.default();
     }, 5000);
   };
 

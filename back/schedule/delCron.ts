@@ -10,7 +10,7 @@ const delCron = (
   for (const id of call.request.ids) {
     if (scheduleStacks.has(id)) {
       Logger.info(
-        '[schedule][取消定时任务], 任务ID: %s',
+        '[schedule][取消定时任务] 任务ID: %s',
         id,
       );
       scheduleStacks.get(id)?.forEach(x => x.cancel());
