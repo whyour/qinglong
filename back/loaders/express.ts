@@ -28,8 +28,7 @@ export default ({ app }: { app: Application }) => {
       secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
-      // 使用正则表达式排除非API路径，只对/api/和/open/路径应用JWT验证
-      path: [...config.apiWhiteList, /^\/$/, /^\/(?!api\/)(?!open\/).*/]
+      path: [...config.apiWhiteList, /^\/(?!api\/).*/],
     }),
   );
 
@@ -119,7 +118,7 @@ export default ({ app }: { app: Application }) => {
   app.use(rewrite('/open/*', '/api/$1'));
   app.use(config.api.prefix, routes());
 
-  app.get('*', (req, res, next) => {
+  app.get('*', (_, res, next) => {
     const indexPath = path.join(frontendPath, 'index.html');
     res.sendFile(indexPath, (err) => {
       if (err) {
