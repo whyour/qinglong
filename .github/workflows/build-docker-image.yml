@@ -20,12 +20,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: wearerequired/git-mirror-action@v1
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
+      - uses: Yikun/hub-mirror-action@master
         with:
-          source-repo: https://github.com/whyour/qinglong.git
-          destination-repo: git@gitlab.com:whyour/qinglong.git
+          src: github/whyour
+          dst: gitlab/whyour
+          dst_key: ${{ secrets.GITLAB_SSH_PK }}
+          dst_token: ${{ secrets.GITLAB_TOKEN }}
+          static_list: "qinglong"
+          force_update: true
 
   code_gitee:
     runs-on: ubuntu-latest
@@ -33,12 +35,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: wearerequired/git-mirror-action@v1
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
+      - uses: Yikun/hub-mirror-action@master
         with:
-          source-repo: https://github.com/whyour/qinglong.git
-          destination-repo: git@gitee.com:whyour/qinglong.git
+          src: github/whyour
+          dst: gitee/whyour
+          dst_key: ${{ secrets.GITLAB_SSH_PK }}
+          dst_token: ${{ secrets.GITEE_TOKEN }}
+          static_list: "qinglong"
+          force_update: true
 
   build-static:
     runs-on: ubuntu-latest
@@ -82,12 +86,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: wearerequired/git-mirror-action@v1
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
+      - uses: Yikun/hub-mirror-action@master
         with:
-          source-repo: https://github.com/whyour/qinglong-static.git
-          destination-repo: git@gitlab.com:whyour/qinglong-static.git
+          src: github/whyour
+          dst: gitlab/whyour
+          dst_key: ${{ secrets.GITLAB_SSH_PK }}
+          dst_token: ${{ secrets.GITLAB_TOKEN }}
+          static_list: "qinglong-static"
+          force_update: true
 
   static_gitee:
     needs: build-static
@@ -96,12 +102,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: wearerequired/git-mirror-action@v1
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
+      - uses: Yikun/hub-mirror-action@master
         with:
-          source-repo: https://github.com/whyour/qinglong-static.git
-          destination-repo: git@gitee.com:whyour/qinglong-static.git
+          src: github/whyour
+          dst: gitee/whyour
+          dst_key: ${{ secrets.GITLAB_SSH_PK }}
+          dst_token: ${{ secrets.GITEE_TOKEN }}
+          static_list: "qinglong-static"
+          force_update: true
 
   build:
     needs: build-static
