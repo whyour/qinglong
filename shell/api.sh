@@ -41,7 +41,7 @@ add_cron_api() {
   fi
 
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/crons?t=$currentTimeStamp" \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \
       -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
@@ -76,7 +76,7 @@ update_cron_api() {
   fi
 
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/crons?t=$currentTimeStamp" \
       -X 'PUT' \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \
@@ -108,7 +108,7 @@ update_cron_command_api() {
   fi
 
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/crons?t=$currentTimeStamp" \
       -X 'PUT' \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \
@@ -133,7 +133,7 @@ del_cron_api() {
   local ids="$1"
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/crons?t=$currentTimeStamp" \
       -X 'DELETE' \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \
@@ -163,7 +163,7 @@ update_cron() {
   local runningTime="${6:-0}"
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons/status?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/crons/status?t=$currentTimeStamp" \
       -X 'PUT' \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \
@@ -190,7 +190,7 @@ notify_api() {
   local content="$2"
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/system/notify?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/system/notify?t=$currentTimeStamp" \
       -X 'PUT' \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \
@@ -215,7 +215,7 @@ find_cron_api() {
   local params="$1"
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/crons/detail?$params&t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/crons/detail?$params&t=$currentTimeStamp" \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \
       -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" \
@@ -239,7 +239,7 @@ update_auth_config() {
   local tip="$2"
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/open/system/auth/reset?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/open/system/auth/reset?t=$currentTimeStamp" \
       -X 'PUT' \
       -H "Accept: application/json" \
       -H "Authorization: Bearer ${__ql_token__}" \

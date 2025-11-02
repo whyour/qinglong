@@ -63,8 +63,8 @@ dependencies:
     specifier: ^2.0.3
     version: 2.0.3
   helmet:
-    specifier: ^6.0.1
-    version: 6.2.0
+    specifier: ^8.1.0
+    version: 8.1.0
   hpagent:
     specifier: ^1.2.0
     version: 1.2.0
@@ -3873,7 +3873,7 @@ packages:
     resolution: {integrity: sha512-ONIn/nSNQA57yRge3oaMQESef/6QhoeX7llWeDli0UZIfz8TQMkfNPTXA8VnnyeA1WUjG2pGqdjEIueYonMdfQ==}
     deprecated: This is a stub types definition. helmet provides its own type definitions, so you do not need this installed.
     dependencies:
-      helmet: 6.2.0
+      helmet: 8.1.0
     dev: true
 
   /@types/hoist-non-react-statics@3.3.5:
@@ -8467,9 +8467,9 @@ packages:
     hasBin: true
     dev: true
 
-  /helmet@6.2.0:
-    resolution: {integrity: sha512-DWlwuXLLqbrIOltR6tFQXShj/+7Cyp0gLi6uAb8qMdFh/YBBFbKSgQ6nbXmScYd8emMctuthmgIa7tUfo9Rtyg==}
-    engines: {node: '>=14.0.0'}
+  /helmet@8.1.0:
+    resolution: {integrity: sha512-jOiHyAZsmnr8LqoPGmCjYAaiuWwjAPLgY8ZX2XrmHawt99/u1y6RgrZMTeoPfpUbV96HOalYgz1qzkRbw54Pmg==}
+    engines: {node: '>=18.0.0'}
 
   /history@5.3.0:
     resolution: {integrity: sha512-ZqaKwjjrAYUYfLG+htGaIIZ4nioX2L70ZUMIFysS3xvBsSG4x/n1V6TXV3N8ZYNuFGlDirFg32T7B6WOUPDYcQ==}

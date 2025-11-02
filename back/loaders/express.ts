@@ -9,6 +9,7 @@ import rewrite from 'express-urlrewrite';
 import { errors } from 'celebrate';
 import { serveEnv } from '../config/serverEnv';
 import { IKeyvStore, shareStore } from '../shared/store';
+import path from 'path';
 
 export default ({ app }: { app: Application }) => {
   app.set('trust proxy', 'loopback');
@@ -19,12 +20,16 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
+  const frontendPath = path.join(config.rootPath, 'static/dist');
+  app.use(express.static(frontendPath));
+
   app.use(
     expressjwt({
       secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
-      path: [...config.apiWhiteList, /^\/open\//],
+      // 使用正则表达式排除非API路径，只对/api/和/open/路径应用JWT验证
+      path: [...config.apiWhiteList, /^\/$/, /^\/(?!api\/)(?!open\/).*/]
     }),
   );
 
@@ -39,6 +44,10 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req: Request, res, next) => {
+    if (!['/open/', '/api/'].some((x) => req.path.startsWith(x))) {
+      return next();
+    }
+
     const headerToken = getToken(req);
     if (req.path.startsWith('/open/')) {
       const apps = await shareStore.getApps();
@@ -110,10 +119,15 @@ export default ({ app }: { app: Application }) => {
   app.use(rewrite('/open/*', '/api/$1'));
   app.use(config.api.prefix, routes());
 
-  app.use((req, res, next) => {
-    const err: any = new Error('Not Found');
-    err['status'] = 404;
-    next(err);
+  app.get('*', (req, res, next) => {
+    const indexPath = path.join(frontendPath, 'index.html');
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        const err: any = new Error('Not Found');
+        err['status'] = 404;
+        next(err);
+      }
+    });
   });
 
   app.use(errors());

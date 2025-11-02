@@ -96,7 +96,9 @@ class Application {
   }
 
   private setupMiddlewares() {
-    this.app.use(helmet());
+    this.app.use(helmet({
+      contentSecurityPolicy: false,
+    }));
     this.app.use(cors(config.cors));
     this.app.use(compression());
     this.app.use(monitoringMiddleware);

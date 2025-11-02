@@ -17,7 +17,7 @@ export default defineConfig({
   publicPath: process.env.NODE_ENV === 'production' ? './' : '/',
   proxy: {
     [`${baseUrl}api`]: {
-      target: 'http://127.0.0.1:5600/',
+      target: 'http://127.0.0.1:5700/',
       changeOrigin: true,
       ws: true,
       pathRewrite: { [`^${baseUrl}api`]: '/api' },

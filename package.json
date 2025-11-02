@@ -97,7 +97,7 @@
     "@keyv/sqlite": "^4.0.1",
     "proper-lockfile": "^4.1.2",
     "compression": "^1.7.4",
-    "helmet": "^6.0.1"
+    "helmet": "^8.1.0"
   },
   "devDependencies": {
     "moment": "2.30.1",

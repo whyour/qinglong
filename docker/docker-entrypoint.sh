@@ -14,26 +14,20 @@ log_with_style() {
 
 log_with_style "INFO" "🚀 1. 检测配置文件..."
 import_config "$@"
-make_dir /etc/nginx/conf.d
-make_dir /run/nginx
-init_nginx
 fix_config
 
 pm2 l &>/dev/null
 
-log_with_style "INFO" "🔄 2. 启动 nginx..."
-nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
-
-log_with_style "INFO" "⚙️  3. 启动 pm2 服务..."
+log_with_style "INFO" "⚙️  2. 启动 pm2 服务..."
 reload_pm2
 
 if [[ $AutoStartBot == true ]]; then
-  log_with_style "INFO" "🤖 4. 启动 bot..."
+  log_with_style "INFO" "🤖 3. 启动 bot..."
   nohup ql bot >$dir_log/bot.log 2>&1 &
 fi
 
 if [[ $EnableExtraShell == true ]]; then
-  log_with_style "INFO" "🛠️ 5. 执行自定义脚本..."
+  log_with_style "INFO" "🛠️ 4. 执行自定义脚本..."
   nohup ql extra >$dir_log/extra.log 2>&1 &
 fi
 

@@ -20,10 +20,6 @@ copy_dep() {
   echo -e "---> 复制一份 $file_notify_js_sample 为 $file_notify_js\n"
   cp -fv $file_notify_js_sample $file_notify_js
   echo -e "---> 通知文件复制完成\n"
-
-  echo -e "---> 2. 复制nginx配置文件\n"
-  init_nginx
-  echo -e "---> 配置文件复制完成\n"
 }
 
 pm2_log() {
@@ -32,18 +28,6 @@ pm2_log() {
   local panelError="/root/.pm2/logs/panel-error.log"
   tail -n 300 "$panelOut"
   tail -n 300 "$panelError"
-}
-
-check_nginx() {
-  local nginxPid=$(ps -eo pid,command | grep nginx | grep -v grep)
-  echo -e "=====> 检测nginx服务\n$nginxPid"
-  if [[ $nginxPid ]]; then
-    echo -e "\n=====> nginx服务正常\n"
-    nginx -s reload
-  else
-    echo -e "\n=====> nginx服务异常，重新启动nginx\n"
-    nginx -c /etc/nginx/nginx.conf
-  fi
 }
 
 check_ql() {
@@ -58,7 +42,7 @@ check_pm2() {
   pm2_log
   local currentTimeStamp=$(date +%s)
   local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:5600/api/system?t=$currentTimeStamp" \
+    curl -s --noproxy "*" "http://0.0.0.0:5700/api/system?t=$currentTimeStamp" \
       -H 'Accept: */*' \
       -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36' \
       -H 'Referer: http://0.0.0.0:5700/crontab' \
@@ -78,7 +62,6 @@ main() {
   reset_env
   copy_dep
   check_ql
-  check_nginx
   check_pm2
   reload_pm2
   echo -e "\n=====> 检测结束\n"

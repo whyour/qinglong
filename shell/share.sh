@@ -48,8 +48,6 @@ export file_notify_py=$dir_scripts/notify.py
 export file_notify_js=$dir_scripts/sendNotify.js
 export file_test_js=$dir_scripts/ql_sample.js
 export file_test_py=$dir_scripts/ql_sample.py
-export nginx_app_conf=$dir_root/docker/front.conf
-export nginx_conf=$dir_root/docker/nginx.conf
 export dep_notify_py=$dir_dep/notify.py
 export dep_notify_js=$dir_dep/sendNotify.js
 
@@ -211,10 +209,6 @@ fix_config() {
     cp -f $file_test_py_sample $file_test_py
   fi
 
-  if [[ -s /etc/nginx/conf.d/default.conf ]]; then
-    cat /dev/null >/etc/nginx/conf.d/default.conf
-  fi
-
   if [[ ! -s $dep_notify_js ]]; then
     cp -f $file_notify_js_sample $dep_notify_js
   fi
@@ -332,44 +326,6 @@ format_timestamp() {
   else
     echo $(date -d "$time" "+%s")
   fi
-}
-
-init_nginx() {
-  cp -f $nginx_conf /etc/nginx/nginx.conf
-  cp -f $nginx_app_conf /etc/nginx/conf.d/front.conf
-  local location_url="/"
-  local aliasStr=""
-  local rootStr=""
-  if [[ $ql_base_url != "/" ]]; then
-    if [[ $ql_base_url != /* ]]; then
-      ql_base_url="/$ql_base_url"
-    fi
-    if [[ $ql_base_url != */ ]]; then
-      ql_base_url="$ql_base_url/"
-    fi
-    location_url="^~${ql_base_url%*/}"
-    aliasStr="alias ${dir_static}/dist;"
-    if ! grep -q "<base href=\"$ql_base_url\">" "${dir_static}/dist/index.html"; then
-      awk -v text="<base href=\"$ql_base_url\">" '/<link/ && !inserted {print text; inserted=1} 1' "${dir_static}/dist/index.html" >temp.html
-      mv temp.html "${dir_static}/dist/index.html"
-    fi
-  else
-    rootStr="root ${dir_static}/dist;"
-  fi
-  sed -i "s,QL_ALIAS_CONFIG,${aliasStr},g" /etc/nginx/conf.d/front.conf
-  sed -i "s,QL_ROOT_CONFIG,${rootStr},g" /etc/nginx/conf.d/front.conf
-  sed -i "s,QL_BASE_URL_LOCATION,${location_url},g" /etc/nginx/conf.d/front.conf
-  sed -i "s,QL_BASE_URL,${ql_base_url},g" /etc/nginx/conf.d/front.conf
-
-  local ipv6=$(ip a | grep inet6)
-  local ipv6Str=""
-  if [[ $ipv6 ]]; then
-    ipv6Str="listen [::]:${ql_port} ipv6only=on;"
-  fi
-
-  local ipv4Str="listen ${ql_port};"
-  sed -i "s,IPV6_CONFIG,${ipv6Str},g" /etc/nginx/conf.d/front.conf
-  sed -i "s,IPV4_CONFIG,${ipv4Str},g" /etc/nginx/conf.d/front.conf
 }
 
 get_env_array() {
