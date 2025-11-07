@@ -76,20 +76,21 @@ class Application {
             }). Restarting...`,
           );
           // If gRPC worker died, restart it and wait for it to be ready
-          // before potentially needing to restart HTTP worker
           if (metadata.serviceType === 'grpc') {
             const newGrpcWorker = this.forkWorker('grpc');
-            this.waitForWorkerReady(newGrpcWorker, 30000).catch((error) => {
-              Logger.error('Failed to restart gRPC worker:', error);
-              process.exit(1);
-            });
+            this.waitForWorkerReady(newGrpcWorker, 30000)
+              .then(() => {
+                Logger.info('gRPC worker restarted and ready');
+              })
+              .catch((error) => {
+                Logger.error('Failed to restart gRPC worker:', error);
+                process.exit(1);
+              });
           } else {
             // For HTTP worker, just restart it
-            this.forkWorker(metadata.serviceType);
+            const newWorker = this.forkWorker(metadata.serviceType);
+            Logger.info(`Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`);
           }
-          Logger.info(
-            `Restarted ${metadata.serviceType} worker`,
-          );
         }
 
         this.workerMetadataMap.delete(worker.id);
