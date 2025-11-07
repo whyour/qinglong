@@ -1,3 +1,20 @@
+"""
+Qinglong Python API Client
+
+This module provides a Python interface to the Qinglong API through a gRPC-based
+Node.js client. It enables Python scripts to interact with Qinglong's environment
+variables, scheduled tasks, and notification systems.
+
+The Client class is used as a base for the QLAPI object that is automatically
+available in Qinglong Python scripts. Users can call methods like:
+    
+    QLAPI.getEnvs({"searchValue": "USER"})
+    QLAPI.createEnv({"envs": [{"name": "VAR", "value": "val"}]})
+    QLAPI.notify("Title", "Content")
+
+For detailed documentation, see README_PYTHON_API.md
+"""
+
 import subprocess
 import json
 import tempfile
@@ -176,6 +193,23 @@ class CronResponse(TypedDict):
 
 
 class Client:
+    """
+    Qinglong API Client for Python.
+    
+    This class provides methods to interact with Qinglong's API for managing
+    environment variables, scheduled tasks (crons), and notifications.
+    
+    The client works by executing Node.js code that calls the actual gRPC API,
+    then returning the results to Python. This ensures consistency between
+    JavaScript and Python API interfaces.
+    
+    Usage:
+        client = Client()
+        envs = client.getEnvs({"searchValue": "TOKEN"})
+    
+    Note: This class is typically used through the QLAPI object which is
+    automatically available in Qinglong Python scripts.
+    """
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix="node_client_")
         self.temp_script = os.path.join(self.temp_dir, "temp_script.js")

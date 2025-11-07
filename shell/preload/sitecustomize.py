@@ -131,10 +131,14 @@ try:
 
     from __ql_notify__ import send
 
+    # BaseApi inherits all methods from Client (getEnvs, createEnv, etc.)
+    # and adds the notify method for sending notifications
     class BaseApi(Client):
         def notify(self, *args, **kwargs):
             return send(*args, **kwargs)
 
+    # Create QLAPI instance and make it globally available
+    # This allows scripts to use: QLAPI.getEnvs(), QLAPI.notify(), etc.
     QLAPI = BaseApi()
     builtins.QLAPI = QLAPI
 except Exception as error:
