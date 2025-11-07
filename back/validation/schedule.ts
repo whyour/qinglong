@@ -1,5 +1,5 @@
 import { Joi } from 'celebrate';
-import cron_parser from 'cron-parser';
+import { parseExpression } from 'cron-parser';
 import { ScheduleType } from '../interface/schedule';
 
 const validateSchedule = (value: string, helpers: any) => {
@@ -11,7 +11,7 @@ const validateSchedule = (value: string, helpers: any) => {
   }
 
   try {
-    if (cron_parser.parseExpression(value).hasNext()) {
+    if (parseExpression(value).hasNext()) {
       return value;
     }
   } catch (e) {

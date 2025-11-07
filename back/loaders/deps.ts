@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs/promises';
-import chokidar from 'chokidar';
+import chokidar, { FSWatcher } from 'chokidar';
 import config from '../config/index';
 import { fileExist, promiseExec, rmPath } from '../config/util';
 
@@ -55,9 +55,9 @@ export default async (src: string = 'deps') => {
   const watcher = chokidar.watch(source, {
     ignored: /(^|[\/\\])\../, // ignore dotfiles
     persistent: true,
-  });
+  }) as any;
 
   watcher
-    .on('add', (path) => linkToNodeModule(src))
-    .on('change', (path) => linkToNodeModule(src));
+    .on('add', (_path: string) => linkToNodeModule(src))
+    .on('change', (_path: string) => linkToNodeModule(src));
 };

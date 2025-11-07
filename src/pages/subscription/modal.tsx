@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import cron_parser from 'cron-parser';
+import { parseExpression } from 'cron-parser';
 import isNil from 'lodash/isNil';
 
 const { Option } = Select;
@@ -381,7 +381,7 @@ const SubscriptionModal = ({
                 if (
                   scheduleType === 'interval' ||
                   !value ||
-                  cron_parser.parseExpression(value).hasNext()
+                  parseExpression(value).hasNext()
                 ) {
                   return Promise.resolve();
                 } else {
