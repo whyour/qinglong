@@ -20,8 +20,10 @@ export async function writeFileWithLock(
     options = { encoding: options };
   }
   if (!(await fileExist(filePath))) {
-    const fileHandle = await open(filePath, 'w');
-    fileHandle.close();
+    // Create the file with the specified mode if provided, otherwise use default
+    const fileMode = options?.mode || 0o666;
+    const fileHandle = await open(filePath, 'w', fileMode);
+    await fileHandle.close();
   }
   const lockfilePath = getUniqueLockPath(filePath);
 
@@ -35,6 +37,7 @@ export async function writeFileWithLock(
     lockfilePath,
   });
   await writeFile(filePath, content, { encoding: 'utf8', ...options });
+  // Ensure the mode is set correctly even if the file already existed
   if (options?.mode) {
     await chmod(filePath, options.mode);
   }

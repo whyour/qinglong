@@ -26,13 +26,13 @@ export default class SshKeyService {
     if (_exist) {
       config = await fs.readFile(this.sshConfigFilePath, { encoding: 'utf-8' });
     } else {
-      await writeFileWithLock(this.sshConfigFilePath, '', { mode: '600' });
+      await writeFileWithLock(this.sshConfigFilePath, '', { mode: 0o600 });
     }
     if (!config.includes(this.sshConfigHeader)) {
       await writeFileWithLock(
         this.sshConfigFilePath,
         `${this.sshConfigHeader}\n\n${config}`,
-        { mode: '600' },
+        { mode: 0o600 },
       );
     }
   }
@@ -46,7 +46,7 @@ export default class SshKeyService {
         path.join(this.sshPath, alias),
         `${key}${os.EOL}`,
         {
-          mode: '400',
+          mode: 0o400,
         },
       );
     } catch (error) {
@@ -83,7 +83,7 @@ export default class SshKeyService {
       config,
       {
         encoding: 'utf8',
-        mode: '600',
+        mode: 0o600,
       },
     );
   }
