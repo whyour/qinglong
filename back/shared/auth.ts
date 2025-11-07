@@ -27,15 +27,20 @@ export function isValidToken(
 
   // Check platform-specific tokens (support both legacy string and new TokenInfo[] format)
   const platformTokens = tokens[platform];
-  if (platformTokens) {
-    if (typeof platformTokens === 'string') {
-      // Legacy format: single string token
-      return headerToken === platformTokens;
-    } else if (Array.isArray(platformTokens)) {
-      // New format: array of TokenInfo objects
-      return platformTokens.some((t: TokenInfo) => t.value === headerToken);
-    }
+
+  // Handle null/undefined platformTokens
+  if (platformTokens === null || platformTokens === undefined) {
+    return false;
   }
 
+  if (typeof platformTokens === 'string') {
+    // Legacy format: single string token
+    return headerToken === platformTokens;
+  } else if (Array.isArray(platformTokens)) {
+    // New format: array of TokenInfo objects
+    return platformTokens.some((t: TokenInfo) => t && t.value === headerToken);
+  }
+
+  // Unexpected type - log warning and reject
   return false;
 }

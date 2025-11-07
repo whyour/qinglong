@@ -193,6 +193,11 @@ export default class UserService {
   }
 
   public async logout(platform: string, tokenValue: string): Promise<any> {
+    if (!platform || !tokenValue) {
+      this.logger.warn('Invalid logout parameters - empty platform or token');
+      return;
+    }
+
     const authInfo = await this.getAuthInfo();
 
     // Verify the token exists before attempting to remove it
@@ -203,6 +208,9 @@ export default class UserService {
     );
     if (!tokenExists && authInfo.token !== tokenValue) {
       // Token not found, but don't throw error - user may have already logged out
+      this.logger.info(
+        `Logout attempted for non-existent token on platform: ${platform}`,
+      );
       return;
     }
 
@@ -430,6 +438,14 @@ export default class UserService {
     tokenInfo: TokenInfo,
     maxTokensPerPlatform: number = config.maxTokensPerPlatform,
   ): Record<string, TokenInfo[]> {
+    // Validate maxTokensPerPlatform parameter
+    if (!Number.isInteger(maxTokensPerPlatform) || maxTokensPerPlatform < 1) {
+      this.logger.warn(
+        `Invalid maxTokensPerPlatform value: ${maxTokensPerPlatform}, using default`,
+      );
+      maxTokensPerPlatform = config.maxTokensPerPlatform;
+    }
+
     const normalized = this.normalizeTokens(tokens);
 
     if (!normalized[platform]) {
