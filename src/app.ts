@@ -14,8 +14,9 @@ export function rootContainer(container: any) {
       cookieLocaleKey: 'lang',
       localStorageLocaleKey: 'lang',
     }).slice(0, 2);
-  } catch (e) {
+  } catch (e: unknown) {
     // Handle decodeURIComponent errors from malformed cookies
+    console.warn('Failed to determine locale from cookies:', e);
     currentLocale = '';
   }
 
