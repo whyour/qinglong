@@ -25,7 +25,7 @@ ENV QL_DIR=/ql \
   DEBIAN_FRONTEND=noninteractive
 
 VOLUME /ql/data
-  
+
 EXPOSE 5700
 
 COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
