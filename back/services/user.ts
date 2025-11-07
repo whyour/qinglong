@@ -24,11 +24,16 @@ import uniq from 'lodash/uniq';
 import pickBy from 'lodash/pickBy';
 import isNil from 'lodash/isNil';
 import { shareStore } from '../shared/store';
+import UserManagementService from './userManagement';
+import { UserRole } from '../data/user';
 
 @Service()
 export default class UserService {
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
+
+  @Inject((type) => UserManagementService)
+  private userManagementService!: UserManagementService;
 
   constructor(
     @Inject('logger') private logger: winston.Logger,
@@ -93,27 +98,57 @@ export default class UserService {
       const { country, province, city, isp } = ipAddress;
       address = uniq([country, province, city, isp]).filter(Boolean).join(' ');
     }
-    if (username === cUsername && password === cPassword) {
+    
+    // Check if this is a regular user (not admin) trying to login
+    let authenticatedUser = null;
+    let userId: number | undefined = undefined;
+    let userRole = UserRole.admin;
+    
+    // First check if it's the system admin
+    const isSystemAdmin = username === cUsername && password === cPassword;
+    
+    if (!isSystemAdmin) {
+      // Try to authenticate as a regular user
+      try {
+        authenticatedUser = await this.userManagementService.authenticate(username, password);
+        if (authenticatedUser) {
+          userId = authenticatedUser.id;
+          userRole = authenticatedUser.role;
+        }
+      } catch (e: any) {
+        // User disabled or other error
+        return { code: 400, message: e.message };
+      }
+    }
+    
+    if (isSystemAdmin || authenticatedUser) {
       const data = createRandomString(50, 100);
-      const expiration = twoFactorActivated ? '60d' : '20d';
-      let token = jwt.sign({ data }, config.jwt.secret, {
+      const expiration = (isSystemAdmin && twoFactorActivated) ? '60d' : '20d';
+      let token = jwt.sign(
+        { data, userId, role: userRole },
+        config.jwt.secret,
+        {
         expiresIn: config.jwt.expiresIn || expiration,
         algorithm: 'HS384',
       });
 
-      await this.updateAuthInfo(content, {
-        token,
-        tokens: {
-          ...tokens,
-          [req.platform]: token,
-        },
-        lastlogon: timestamp,
-        retries: 0,
-        lastip: ip,
-        lastaddr: address,
-        platform: req.platform,
-        isTwoFactorChecking: false,
-      });
+      // Only update authInfo for system admin
+      if (isSystemAdmin) {
+        await this.updateAuthInfo(content, {
+          token,
+          tokens: {
+            ...tokens,
+            [req.platform]: token,
+          },
+          lastlogon: timestamp,
+          retries: 0,
+          lastip: ip,
+          lastaddr: address,
+          platform: req.platform,
+          isTwoFactorChecking: false,
+        });
+      }
+      
       this.notificationService.notify(
         '登录通知',
         `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${

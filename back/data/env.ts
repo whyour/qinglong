@@ -9,6 +9,7 @@ export class Env {
   position?: number;
   name?: string;
   remarks?: string;
+  userId?: number;
 
   constructor(options: Env) {
     this.value = options.value;
@@ -21,6 +22,7 @@ export class Env {
     this.position = options.position;
     this.name = options.name;
     this.remarks = options.remarks || '';
+    this.userId = options.userId;
   }
 }
 
@@ -42,4 +44,5 @@ export const EnvModel = sequelize.define<EnvInstance>('Env', {
   position: DataTypes.NUMBER,
   name: { type: DataTypes.STRING, unique: 'compositeIndex' },
   remarks: DataTypes.STRING,
+  userId: { type: DataTypes.NUMBER, allowNull: true },
 });

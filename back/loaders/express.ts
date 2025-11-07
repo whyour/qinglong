@@ -42,6 +42,18 @@ export default ({ app }: { app: Application }) => {
     return next();
   });
 
+  // Extract userId and role from JWT
+  app.use((req: Request, res, next) => {
+    if (req.auth) {
+      const payload = req.auth as any;
+      req.user = {
+        userId: payload.userId,
+        role: payload.role,
+      };
+    }
+    return next();
+  });
+
   app.use(async (req: Request, res, next) => {
     if (!['/open/', '/api/'].some((x) => req.path.startsWith(x))) {
       return next();
