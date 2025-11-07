@@ -2,10 +2,6 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { createRandomString } from './share';
 
-dotenv.config({
-  path: path.join(__dirname, '../../.env'),
-});
-
 interface Config {
   port: number;
   grpcPort: number;
