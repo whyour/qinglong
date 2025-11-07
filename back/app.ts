@@ -53,8 +53,28 @@ class Application {
   }
 
   private startMasterProcess() {
-    this.forkWorker('http');
-    this.forkWorker('grpc');
+    // Fork gRPC worker first and wait for it to be ready
+    const grpcWorker = this.forkWorker('grpc');
+    
+    // Wait for gRPC worker to signal it's ready before starting HTTP worker
+    const grpcReadyPromise = new Promise<void>((resolve) => {
+      const messageHandler = (msg: any) => {
+        if (msg === 'ready') {
+          grpcWorker.removeListener('message', messageHandler);
+          resolve();
+        }
+      };
+      grpcWorker.on('message', messageHandler);
+    });
+
+    // Start HTTP worker after gRPC is ready
+    grpcReadyPromise.then(() => {
+      Logger.info('gRPC worker is ready, starting HTTP worker');
+      this.forkWorker('http');
+    }).catch((error) => {
+      Logger.error('Failed to wait for gRPC worker:', error);
+      process.exit(1);
+    });
 
     cluster.on('exit', (worker, code, signal) => {
       const metadata = this.workerMetadataMap.get(worker.id);
