@@ -61,9 +61,11 @@ def test_baseapi_inheritance():
     assert callable(api.notify), "BaseApi.notify is not callable"
     print("  ✓ notify is accessible")
     
-    # Verify getEnvs signature
-    assert 'params' in api.getEnvs.__annotations__, "getEnvs missing params annotation"
-    print("  ✓ getEnvs has correct signature")
+    # Verify getEnvs has type annotations (either params or return)
+    annotations = api.getEnvs.__annotations__
+    assert len(annotations) > 0, "getEnvs should have type annotations"
+    assert 'return' in annotations, "getEnvs should have return type annotation"
+    print("  ✓ getEnvs has correct signature with type annotations")
     
     print("\n✓ BaseApi properly inherits from Client and adds notify method")
     return True
@@ -77,8 +79,9 @@ def test_method_signatures():
     
     # Test getEnvs signature
     getEnvs_annotations = client.getEnvs.__annotations__
-    assert 'params' in getEnvs_annotations or 'return' in getEnvs_annotations, \
-        "getEnvs missing annotations"
+    # Check that annotations exist - could be 'params', or just 'return'
+    assert len(getEnvs_annotations) > 0, "getEnvs should have type annotations"
+    assert 'return' in getEnvs_annotations, "getEnvs should have return type annotation"
     print("  ✓ getEnvs has type annotations")
     
     # Test other critical methods

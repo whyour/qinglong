@@ -343,6 +343,10 @@ This architecture ensures consistency between JavaScript and Python APIs.
 
 ## See Also
 
-- [JavaScript API Documentation](./client.js)
-- [Sample Python Script](../../sample/ql_sample.py)
-- [Sample JavaScript Script](../../sample/ql_sample.js)
+For more information and examples:
+
+- [JavaScript API Client Source](./client.js) - The underlying Node.js gRPC client
+- [Python Sample Script](../../sample/ql_sample.py) - Example Python script using QLAPI
+- [JavaScript Sample Script](../../sample/ql_sample.js) - Example JavaScript script for comparison
+
+These files are located in the Qinglong repository under `shell/preload/` and `sample/` directories.
