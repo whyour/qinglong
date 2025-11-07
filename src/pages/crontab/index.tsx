@@ -66,6 +66,40 @@ const SHOW_TAB_COUNT = 10;
 
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
+
+  // State declarations
+  const [value, setValue] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isLabelModalVisible, setIsLabelModalVisible] = useState(false);
+  const [editedCron, setEditedCron] = useState();
+  const [searchText, setSearchText] = useState('');
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const [logCron, setLogCron] = useState<any>();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [pageConf, setPageConf] = useState<{
+    page: number;
+    size: number;
+    sorter: any;
+    filters: any;
+  }>({} as any);
+  const [viewConf, setViewConf] = useState<any>();
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [detailCron, setDetailCron] = useState<any>();
+  const [searchValue, setSearchValue] = useState('');
+  const [total, setTotal] = useState<number>();
+  const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
+    useState(false);
+  const [isViewManageModalVisible, setIsViewManageModalVisible] =
+    useState(false);
+  const [cronViews, setCronViews] = useState<any[]>([]);
+  const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
+  const [moreMenuActive, setMoreMenuActive] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const tableScrollHeight = useTableScrollHeight(tableRef);
+  const [activeKey, setActiveKey] = useState('');
+  const [allSubscriptions, setAllSubscriptions] = useState<any[]>([]);
+
   const columns: ColumnProps<ICrontab>[] = [
     {
       title: intl.get('名称'),
@@ -322,38 +356,6 @@ const Crontab = () => {
       },
     },
   ];
-
-  const [value, setValue] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isLabelModalVisible, setIsLabelModalVisible] = useState(false);
-  const [editedCron, setEditedCron] = useState();
-  const [searchText, setSearchText] = useState('');
-  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
-  const [logCron, setLogCron] = useState<any>();
-  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [pageConf, setPageConf] = useState<{
-    page: number;
-    size: number;
-    sorter: any;
-    filters: any;
-  }>({} as any);
-  const [viewConf, setViewConf] = useState<any>();
-  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
-  const [detailCron, setDetailCron] = useState<any>();
-  const [searchValue, setSearchValue] = useState('');
-  const [total, setTotal] = useState<number>();
-  const [isCreateViewModalVisible, setIsCreateViewModalVisible] =
-    useState(false);
-  const [isViewManageModalVisible, setIsViewManageModalVisible] =
-    useState(false);
-  const [cronViews, setCronViews] = useState<any[]>([]);
-  const [enabledCronViews, setEnabledCronViews] = useState<any[]>([]);
-  const [moreMenuActive, setMoreMenuActive] = useState(false);
-  const tableRef = useRef<HTMLDivElement>(null);
-  const tableScrollHeight = useTableScrollHeight(tableRef);
-  const [activeKey, setActiveKey] = useState('');
-  const [allSubscriptions, setAllSubscriptions] = useState<any[]>([]);
 
   const goToScriptManager = (record: any) => {
     const result = getCommandScript(record.command);
