@@ -4,14 +4,16 @@ import intl from 'react-intl-universal';
 
 export function rootContainer(container: any) {
   const locales = {
-    'en': require('./locales/en-US.json'),
-    'zh': require('./locales/zh-CN.json'),
+    en: require('./locales/en-US.json'),
+    zh: require('./locales/zh-CN.json'),
   };
-  let currentLocale = intl.determineLocale({
-    urlLocaleKey: 'lang',
-    cookieLocaleKey: 'lang',
-    localStorageLocaleKey: 'lang',
-  }).slice(0, 2);
+  let currentLocale = intl
+    .determineLocale({
+      urlLocaleKey: 'lang',
+      cookieLocaleKey: 'lang',
+      localStorageLocaleKey: 'lang',
+    })
+    .slice(0, 2);
 
   if (!currentLocale || !Object.keys(locales).includes(currentLocale)) {
     currentLocale = 'zh';

@@ -26,7 +26,9 @@ const Diff = () => {
 
   const getConfig = () => {
     request
-      .get(`${config.apiPrefix}configs/detail?path=${encodeURIComponent(current)}`)
+      .get(
+        `${config.apiPrefix}configs/detail?path=${encodeURIComponent(current)}`,
+      )
       .then(({ code, data }) => {
         if (code === 200) {
           setCurrentValue(data);
@@ -36,7 +38,9 @@ const Diff = () => {
 
   const getSample = () => {
     request
-      .get(`${config.apiPrefix}configs/detail?path=${encodeURIComponent(origin)}`)
+      .get(
+        `${config.apiPrefix}configs/detail?path=${encodeURIComponent(origin)}`,
+      )
       .then(({ code, data }) => {
         if (code === 200) {
           setOriginValue(data);

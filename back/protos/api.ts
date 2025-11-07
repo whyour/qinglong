@@ -5,7 +5,7 @@
 // source: back/protos/api.proto
 
 /* eslint-disable */
-import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { BinaryReader, BinaryWriter } from '@bufbuild/protobuf/wire';
 import {
   type CallOptions,
   ChannelCredentials,
@@ -17,9 +17,9 @@ import {
   Metadata,
   type ServiceError,
   type UntypedServiceImplementation,
-} from "@grpc/grpc-js";
+} from '@grpc/grpc-js';
 
-export const protobufPackage = "com.ql.api";
+export const protobufPackage = 'com.ql.api';
 
 export enum NotificationMode {
   gotify = 0,
@@ -49,70 +49,70 @@ export enum NotificationMode {
 export function notificationModeFromJSON(object: any): NotificationMode {
   switch (object) {
     case 0:
-    case "gotify":
+    case 'gotify':
       return NotificationMode.gotify;
     case 1:
-    case "goCqHttpBot":
+    case 'goCqHttpBot':
       return NotificationMode.goCqHttpBot;
     case 2:
-    case "serverChan":
+    case 'serverChan':
       return NotificationMode.serverChan;
     case 3:
-    case "pushDeer":
+    case 'pushDeer':
       return NotificationMode.pushDeer;
     case 4:
-    case "bark":
+    case 'bark':
       return NotificationMode.bark;
     case 5:
-    case "chat":
+    case 'chat':
       return NotificationMode.chat;
     case 6:
-    case "telegramBot":
+    case 'telegramBot':
       return NotificationMode.telegramBot;
     case 7:
-    case "dingtalkBot":
+    case 'dingtalkBot':
       return NotificationMode.dingtalkBot;
     case 8:
-    case "weWorkBot":
+    case 'weWorkBot':
       return NotificationMode.weWorkBot;
     case 9:
-    case "weWorkApp":
+    case 'weWorkApp':
       return NotificationMode.weWorkApp;
     case 10:
-    case "aibotk":
+    case 'aibotk':
       return NotificationMode.aibotk;
     case 11:
-    case "iGot":
+    case 'iGot':
       return NotificationMode.iGot;
     case 12:
-    case "pushPlus":
+    case 'pushPlus':
       return NotificationMode.pushPlus;
     case 13:
-    case "wePlusBot":
+    case 'wePlusBot':
       return NotificationMode.wePlusBot;
     case 14:
-    case "email":
+    case 'email':
       return NotificationMode.email;
     case 15:
-    case "pushMe":
+    case 'pushMe':
       return NotificationMode.pushMe;
     case 16:
-    case "feishu":
+    case 'feishu':
       return NotificationMode.feishu;
     case 17:
-    case "webhook":
+    case 'webhook':
       return NotificationMode.webhook;
     case 18:
-    case "chronocat":
+    case 'chronocat':
       return NotificationMode.chronocat;
     case 19:
-    case "ntfy":
+    case 'ntfy':
       return NotificationMode.ntfy;
     case 20:
-    case "wxPusherBot":
+    case 'wxPusherBot':
       return NotificationMode.wxPusherBot;
     case -1:
-    case "UNRECOGNIZED":
+    case 'UNRECOGNIZED':
     default:
       return NotificationMode.UNRECOGNIZED;
   }
@@ -121,50 +121,50 @@ export function notificationModeFromJSON(object: any): NotificationMode {
 export function notificationModeToJSON(object: NotificationMode): string {
   switch (object) {
     case NotificationMode.gotify:
-      return "gotify";
+      return 'gotify';
     case NotificationMode.goCqHttpBot:
-      return "goCqHttpBot";
+      return 'goCqHttpBot';
     case NotificationMode.serverChan:
-      return "serverChan";
+      return 'serverChan';
     case NotificationMode.pushDeer:
-      return "pushDeer";
+      return 'pushDeer';
     case NotificationMode.bark:
-      return "bark";
+      return 'bark';
     case NotificationMode.chat:
-      return "chat";
+      return 'chat';
     case NotificationMode.telegramBot:
-      return "telegramBot";
+      return 'telegramBot';
     case NotificationMode.dingtalkBot:
-      return "dingtalkBot";
+      return 'dingtalkBot';
     case NotificationMode.weWorkBot:
-      return "weWorkBot";
+      return 'weWorkBot';
     case NotificationMode.weWorkApp:
-      return "weWorkApp";
+      return 'weWorkApp';
     case NotificationMode.aibotk:
-      return "aibotk";
+      return 'aibotk';
     case NotificationMode.iGot:
-      return "iGot";
+      return 'iGot';
     case NotificationMode.pushPlus:
-      return "pushPlus";
+      return 'pushPlus';
     case NotificationMode.wePlusBot:
-      return "wePlusBot";
+      return 'wePlusBot';
     case NotificationMode.email:
-      return "email";
+      return 'email';
     case NotificationMode.pushMe:
-      return "pushMe";
+      return 'pushMe';
     case NotificationMode.feishu:
-      return "feishu";
+      return 'feishu';
     case NotificationMode.webhook:
-      return "webhook";
+      return 'webhook';
     case NotificationMode.chronocat:
-      return "chronocat";
+      return 'chronocat';
     case NotificationMode.ntfy:
-      return "ntfy";
+      return 'ntfy';
     case NotificationMode.wxPusherBot:
-      return "wxPusherBot";
+      return 'wxPusherBot';
     case NotificationMode.UNRECOGNIZED:
     default:
-      return "UNRECOGNIZED";
+      return 'UNRECOGNIZED';
   }
 }
 
@@ -392,7 +392,10 @@ function createBaseEnvItem(): EnvItem {
 }
 
 export const EnvItem: MessageFns<EnvItem> = {
-  encode(message: EnvItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: EnvItem,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.id !== undefined) {
       writer.uint32(8).int32(message.id);
     }
@@ -415,7 +418,8 @@ export const EnvItem: MessageFns<EnvItem> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): EnvItem {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseEnvItem();
     while (reader.pos < end) {
@@ -483,9 +487,15 @@ export const EnvItem: MessageFns<EnvItem> = {
       id: isSet(object.id) ? globalThis.Number(object.id) : undefined,
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
       value: isSet(object.value) ? globalThis.String(object.value) : undefined,
-      remarks: isSet(object.remarks) ? globalThis.String(object.remarks) : undefined,
-      status: isSet(object.status) ? globalThis.Number(object.status) : undefined,
-      position: isSet(object.position) ? globalThis.Number(object.position) : undefined,
+      remarks: isSet(object.remarks)
+        ? globalThis.String(object.remarks)
+        : undefined,
+      status: isSet(object.status)
+        ? globalThis.Number(object.status)
+        : undefined,
+      position: isSet(object.position)
+        ? globalThis.Number(object.position)
+        : undefined,
     };
   },
 
@@ -528,19 +538,23 @@ export const EnvItem: MessageFns<EnvItem> = {
 };
 
 function createBaseGetEnvsRequest(): GetEnvsRequest {
-  return { searchValue: "" };
+  return { searchValue: '' };
 }
 
 export const GetEnvsRequest: MessageFns<GetEnvsRequest> = {
-  encode(message: GetEnvsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.searchValue !== "") {
+  encode(
+    message: GetEnvsRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.searchValue !== '') {
       writer.uint32(10).string(message.searchValue);
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): GetEnvsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseGetEnvsRequest();
     while (reader.pos < end) {
@@ -564,23 +578,31 @@ export const GetEnvsRequest: MessageFns<GetEnvsRequest> = {
   },
 
   fromJSON(object: any): GetEnvsRequest {
-    return { searchValue: isSet(object.searchValue) ? globalThis.String(object.searchValue) : "" };
+    return {
+      searchValue: isSet(object.searchValue)
+        ? globalThis.String(object.searchValue)
+        : '',
+    };
   },
 
   toJSON(message: GetEnvsRequest): unknown {
     const obj: any = {};
-    if (message.searchValue !== "") {
+    if (message.searchValue !== '') {
       obj.searchValue = message.searchValue;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<GetEnvsRequest>, I>>(base?: I): GetEnvsRequest {
+  create<I extends Exact<DeepPartial<GetEnvsRequest>, I>>(
+    base?: I,
+  ): GetEnvsRequest {
     return GetEnvsRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<GetEnvsRequest>, I>>(object: I): GetEnvsRequest {
+  fromPartial<I extends Exact<DeepPartial<GetEnvsRequest>, I>>(
+    object: I,
+  ): GetEnvsRequest {
     const message = createBaseGetEnvsRequest();
-    message.searchValue = object.searchValue ?? "";
+    message.searchValue = object.searchValue ?? '';
     return message;
   },
 };
@@ -590,7 +612,10 @@ function createBaseCreateEnvRequest(): CreateEnvRequest {
 }
 
 export const CreateEnvRequest: MessageFns<CreateEnvRequest> = {
-  encode(message: CreateEnvRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CreateEnvRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     for (const v of message.envs) {
       EnvItem.encode(v!, writer.uint32(10).fork()).join();
     }
@@ -598,7 +623,8 @@ export const CreateEnvRequest: MessageFns<CreateEnvRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CreateEnvRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCreateEnvRequest();
     while (reader.pos < end) {
@@ -622,7 +648,11 @@ export const CreateEnvRequest: MessageFns<CreateEnvRequest> = {
   },
 
   fromJSON(object: any): CreateEnvRequest {
-    return { envs: globalThis.Array.isArray(object?.envs) ? object.envs.map((e: any) => EnvItem.fromJSON(e)) : [] };
+    return {
+      envs: globalThis.Array.isArray(object?.envs)
+        ? object.envs.map((e: any) => EnvItem.fromJSON(e))
+        : [],
+    };
   },
 
   toJSON(message: CreateEnvRequest): unknown {
@@ -633,10 +663,14 @@ export const CreateEnvRequest: MessageFns<CreateEnvRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CreateEnvRequest>, I>>(base?: I): CreateEnvRequest {
+  create<I extends Exact<DeepPartial<CreateEnvRequest>, I>>(
+    base?: I,
+  ): CreateEnvRequest {
     return CreateEnvRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CreateEnvRequest>, I>>(object: I): CreateEnvRequest {
+  fromPartial<I extends Exact<DeepPartial<CreateEnvRequest>, I>>(
+    object: I,
+  ): CreateEnvRequest {
     const message = createBaseCreateEnvRequest();
     message.envs = object.envs?.map((e) => EnvItem.fromPartial(e)) || [];
     return message;
@@ -648,7 +682,10 @@ function createBaseUpdateEnvRequest(): UpdateEnvRequest {
 }
 
 export const UpdateEnvRequest: MessageFns<UpdateEnvRequest> = {
-  encode(message: UpdateEnvRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: UpdateEnvRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.env !== undefined) {
       EnvItem.encode(message.env, writer.uint32(10).fork()).join();
     }
@@ -656,7 +693,8 @@ export const UpdateEnvRequest: MessageFns<UpdateEnvRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): UpdateEnvRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseUpdateEnvRequest();
     while (reader.pos < end) {
@@ -680,7 +718,9 @@ export const UpdateEnvRequest: MessageFns<UpdateEnvRequest> = {
   },
 
   fromJSON(object: any): UpdateEnvRequest {
-    return { env: isSet(object.env) ? EnvItem.fromJSON(object.env) : undefined };
+    return {
+      env: isSet(object.env) ? EnvItem.fromJSON(object.env) : undefined,
+    };
   },
 
   toJSON(message: UpdateEnvRequest): unknown {
@@ -691,12 +731,19 @@ export const UpdateEnvRequest: MessageFns<UpdateEnvRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<UpdateEnvRequest>, I>>(base?: I): UpdateEnvRequest {
+  create<I extends Exact<DeepPartial<UpdateEnvRequest>, I>>(
+    base?: I,
+  ): UpdateEnvRequest {
     return UpdateEnvRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<UpdateEnvRequest>, I>>(object: I): UpdateEnvRequest {
+  fromPartial<I extends Exact<DeepPartial<UpdateEnvRequest>, I>>(
+    object: I,
+  ): UpdateEnvRequest {
     const message = createBaseUpdateEnvRequest();
-    message.env = (object.env !== undefined && object.env !== null) ? EnvItem.fromPartial(object.env) : undefined;
+    message.env =
+      object.env !== undefined && object.env !== null
+        ? EnvItem.fromPartial(object.env)
+        : undefined;
     return message;
   },
 };
@@ -706,7 +753,10 @@ function createBaseDeleteEnvsRequest(): DeleteEnvsRequest {
 }
 
 export const DeleteEnvsRequest: MessageFns<DeleteEnvsRequest> = {
-  encode(message: DeleteEnvsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: DeleteEnvsRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     writer.uint32(10).fork();
     for (const v of message.ids) {
       writer.int32(v);
@@ -716,7 +766,8 @@ export const DeleteEnvsRequest: MessageFns<DeleteEnvsRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): DeleteEnvsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDeleteEnvsRequest();
     while (reader.pos < end) {
@@ -750,7 +801,11 @@ export const DeleteEnvsRequest: MessageFns<DeleteEnvsRequest> = {
   },
 
   fromJSON(object: any): DeleteEnvsRequest {
-    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [] };
+    return {
+      ids: globalThis.Array.isArray(object?.ids)
+        ? object.ids.map((e: any) => globalThis.Number(e))
+        : [],
+    };
   },
 
   toJSON(message: DeleteEnvsRequest): unknown {
@@ -761,10 +816,14 @@ export const DeleteEnvsRequest: MessageFns<DeleteEnvsRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<DeleteEnvsRequest>, I>>(base?: I): DeleteEnvsRequest {
+  create<I extends Exact<DeepPartial<DeleteEnvsRequest>, I>>(
+    base?: I,
+  ): DeleteEnvsRequest {
     return DeleteEnvsRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<DeleteEnvsRequest>, I>>(object: I): DeleteEnvsRequest {
+  fromPartial<I extends Exact<DeepPartial<DeleteEnvsRequest>, I>>(
+    object: I,
+  ): DeleteEnvsRequest {
     const message = createBaseDeleteEnvsRequest();
     message.ids = object.ids?.map((e) => e) || [];
     return message;
@@ -776,7 +835,10 @@ function createBaseMoveEnvRequest(): MoveEnvRequest {
 }
 
 export const MoveEnvRequest: MessageFns<MoveEnvRequest> = {
-  encode(message: MoveEnvRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: MoveEnvRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.id !== 0) {
       writer.uint32(8).int32(message.id);
     }
@@ -790,7 +852,8 @@ export const MoveEnvRequest: MessageFns<MoveEnvRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): MoveEnvRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseMoveEnvRequest();
     while (reader.pos < end) {
@@ -832,7 +895,9 @@ export const MoveEnvRequest: MessageFns<MoveEnvRequest> = {
   fromJSON(object: any): MoveEnvRequest {
     return {
       id: isSet(object.id) ? globalThis.Number(object.id) : 0,
-      fromIndex: isSet(object.fromIndex) ? globalThis.Number(object.fromIndex) : 0,
+      fromIndex: isSet(object.fromIndex)
+        ? globalThis.Number(object.fromIndex)
+        : 0,
       toIndex: isSet(object.toIndex) ? globalThis.Number(object.toIndex) : 0,
     };
   },
@@ -851,10 +916,14 @@ export const MoveEnvRequest: MessageFns<MoveEnvRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<MoveEnvRequest>, I>>(base?: I): MoveEnvRequest {
+  create<I extends Exact<DeepPartial<MoveEnvRequest>, I>>(
+    base?: I,
+  ): MoveEnvRequest {
     return MoveEnvRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<MoveEnvRequest>, I>>(object: I): MoveEnvRequest {
+  fromPartial<I extends Exact<DeepPartial<MoveEnvRequest>, I>>(
+    object: I,
+  ): MoveEnvRequest {
     const message = createBaseMoveEnvRequest();
     message.id = object.id ?? 0;
     message.fromIndex = object.fromIndex ?? 0;
@@ -868,7 +937,10 @@ function createBaseDisableEnvsRequest(): DisableEnvsRequest {
 }
 
 export const DisableEnvsRequest: MessageFns<DisableEnvsRequest> = {
-  encode(message: DisableEnvsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: DisableEnvsRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     writer.uint32(10).fork();
     for (const v of message.ids) {
       writer.int32(v);
@@ -877,8 +949,12 @@ export const DisableEnvsRequest: MessageFns<DisableEnvsRequest> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): DisableEnvsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): DisableEnvsRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDisableEnvsRequest();
     while (reader.pos < end) {
@@ -912,7 +988,11 @@ export const DisableEnvsRequest: MessageFns<DisableEnvsRequest> = {
   },
 
   fromJSON(object: any): DisableEnvsRequest {
-    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [] };
+    return {
+      ids: globalThis.Array.isArray(object?.ids)
+        ? object.ids.map((e: any) => globalThis.Number(e))
+        : [],
+    };
   },
 
   toJSON(message: DisableEnvsRequest): unknown {
@@ -923,10 +1003,14 @@ export const DisableEnvsRequest: MessageFns<DisableEnvsRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<DisableEnvsRequest>, I>>(base?: I): DisableEnvsRequest {
+  create<I extends Exact<DeepPartial<DisableEnvsRequest>, I>>(
+    base?: I,
+  ): DisableEnvsRequest {
     return DisableEnvsRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<DisableEnvsRequest>, I>>(object: I): DisableEnvsRequest {
+  fromPartial<I extends Exact<DeepPartial<DisableEnvsRequest>, I>>(
+    object: I,
+  ): DisableEnvsRequest {
     const message = createBaseDisableEnvsRequest();
     message.ids = object.ids?.map((e) => e) || [];
     return message;
@@ -938,7 +1022,10 @@ function createBaseEnableEnvsRequest(): EnableEnvsRequest {
 }
 
 export const EnableEnvsRequest: MessageFns<EnableEnvsRequest> = {
-  encode(message: EnableEnvsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: EnableEnvsRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     writer.uint32(10).fork();
     for (const v of message.ids) {
       writer.int32(v);
@@ -948,7 +1035,8 @@ export const EnableEnvsRequest: MessageFns<EnableEnvsRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): EnableEnvsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseEnableEnvsRequest();
     while (reader.pos < end) {
@@ -982,7 +1070,11 @@ export const EnableEnvsRequest: MessageFns<EnableEnvsRequest> = {
   },
 
   fromJSON(object: any): EnableEnvsRequest {
-    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [] };
+    return {
+      ids: globalThis.Array.isArray(object?.ids)
+        ? object.ids.map((e: any) => globalThis.Number(e))
+        : [],
+    };
   },
 
   toJSON(message: EnableEnvsRequest): unknown {
@@ -993,10 +1085,14 @@ export const EnableEnvsRequest: MessageFns<EnableEnvsRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<EnableEnvsRequest>, I>>(base?: I): EnableEnvsRequest {
+  create<I extends Exact<DeepPartial<EnableEnvsRequest>, I>>(
+    base?: I,
+  ): EnableEnvsRequest {
     return EnableEnvsRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<EnableEnvsRequest>, I>>(object: I): EnableEnvsRequest {
+  fromPartial<I extends Exact<DeepPartial<EnableEnvsRequest>, I>>(
+    object: I,
+  ): EnableEnvsRequest {
     const message = createBaseEnableEnvsRequest();
     message.ids = object.ids?.map((e) => e) || [];
     return message;
@@ -1004,24 +1100,31 @@ export const EnableEnvsRequest: MessageFns<EnableEnvsRequest> = {
 };
 
 function createBaseUpdateEnvNamesRequest(): UpdateEnvNamesRequest {
-  return { ids: [], name: "" };
+  return { ids: [], name: '' };
 }
 
 export const UpdateEnvNamesRequest: MessageFns<UpdateEnvNamesRequest> = {
-  encode(message: UpdateEnvNamesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: UpdateEnvNamesRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     writer.uint32(10).fork();
     for (const v of message.ids) {
       writer.int32(v);
     }
     writer.join();
-    if (message.name !== "") {
+    if (message.name !== '') {
       writer.uint32(18).string(message.name);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): UpdateEnvNamesRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): UpdateEnvNamesRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseUpdateEnvNamesRequest();
     while (reader.pos < end) {
@@ -1064,8 +1167,10 @@ export const UpdateEnvNamesRequest: MessageFns<UpdateEnvNamesRequest> = {
 
   fromJSON(object: any): UpdateEnvNamesRequest {
     return {
-      ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [],
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      ids: globalThis.Array.isArray(object?.ids)
+        ? object.ids.map((e: any) => globalThis.Number(e))
+        : [],
+      name: isSet(object.name) ? globalThis.String(object.name) : '',
     };
   },
 
@@ -1074,19 +1179,23 @@ export const UpdateEnvNamesRequest: MessageFns<UpdateEnvNamesRequest> = {
     if (message.ids?.length) {
       obj.ids = message.ids.map((e) => Math.round(e));
     }
-    if (message.name !== "") {
+    if (message.name !== '') {
       obj.name = message.name;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<UpdateEnvNamesRequest>, I>>(base?: I): UpdateEnvNamesRequest {
+  create<I extends Exact<DeepPartial<UpdateEnvNamesRequest>, I>>(
+    base?: I,
+  ): UpdateEnvNamesRequest {
     return UpdateEnvNamesRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<UpdateEnvNamesRequest>, I>>(object: I): UpdateEnvNamesRequest {
+  fromPartial<I extends Exact<DeepPartial<UpdateEnvNamesRequest>, I>>(
+    object: I,
+  ): UpdateEnvNamesRequest {
     const message = createBaseUpdateEnvNamesRequest();
     message.ids = object.ids?.map((e) => e) || [];
-    message.name = object.name ?? "";
+    message.name = object.name ?? '';
     return message;
   },
 };
@@ -1096,7 +1205,10 @@ function createBaseGetEnvByIdRequest(): GetEnvByIdRequest {
 }
 
 export const GetEnvByIdRequest: MessageFns<GetEnvByIdRequest> = {
-  encode(message: GetEnvByIdRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: GetEnvByIdRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.id !== 0) {
       writer.uint32(8).int32(message.id);
     }
@@ -1104,7 +1216,8 @@ export const GetEnvByIdRequest: MessageFns<GetEnvByIdRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): GetEnvByIdRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseGetEnvByIdRequest();
     while (reader.pos < end) {
@@ -1139,10 +1252,14 @@ export const GetEnvByIdRequest: MessageFns<GetEnvByIdRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<GetEnvByIdRequest>, I>>(base?: I): GetEnvByIdRequest {
+  create<I extends Exact<DeepPartial<GetEnvByIdRequest>, I>>(
+    base?: I,
+  ): GetEnvByIdRequest {
     return GetEnvByIdRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<GetEnvByIdRequest>, I>>(object: I): GetEnvByIdRequest {
+  fromPartial<I extends Exact<DeepPartial<GetEnvByIdRequest>, I>>(
+    object: I,
+  ): GetEnvByIdRequest {
     const message = createBaseGetEnvByIdRequest();
     message.id = object.id ?? 0;
     return message;
@@ -1154,7 +1271,10 @@ function createBaseEnvsResponse(): EnvsResponse {
 }
 
 export const EnvsResponse: MessageFns<EnvsResponse> = {
-  encode(message: EnvsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: EnvsResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.code !== 0) {
       writer.uint32(8).int32(message.code);
     }
@@ -1168,7 +1288,8 @@ export const EnvsResponse: MessageFns<EnvsResponse> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): EnvsResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseEnvsResponse();
     while (reader.pos < end) {
@@ -1210,8 +1331,12 @@ export const EnvsResponse: MessageFns<EnvsResponse> = {
   fromJSON(object: any): EnvsResponse {
     return {
       code: isSet(object.code) ? globalThis.Number(object.code) : 0,
-      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => EnvItem.fromJSON(e)) : [],
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
+      data: globalThis.Array.isArray(object?.data)
+        ? object.data.map((e: any) => EnvItem.fromJSON(e))
+        : [],
+      message: isSet(object.message)
+        ? globalThis.String(object.message)
+        : undefined,
     };
   },
 
@@ -1229,10 +1354,14 @@ export const EnvsResponse: MessageFns<EnvsResponse> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<EnvsResponse>, I>>(base?: I): EnvsResponse {
+  create<I extends Exact<DeepPartial<EnvsResponse>, I>>(
+    base?: I,
+  ): EnvsResponse {
     return EnvsResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<EnvsResponse>, I>>(object: I): EnvsResponse {
+  fromPartial<I extends Exact<DeepPartial<EnvsResponse>, I>>(
+    object: I,
+  ): EnvsResponse {
     const message = createBaseEnvsResponse();
     message.code = object.code ?? 0;
     message.data = object.data?.map((e) => EnvItem.fromPartial(e)) || [];
@@ -1246,7 +1375,10 @@ function createBaseEnvResponse(): EnvResponse {
 }
 
 export const EnvResponse: MessageFns<EnvResponse> = {
-  encode(message: EnvResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: EnvResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.code !== 0) {
       writer.uint32(8).int32(message.code);
     }
@@ -1260,7 +1392,8 @@ export const EnvResponse: MessageFns<EnvResponse> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): EnvResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseEnvResponse();
     while (reader.pos < end) {
@@ -1303,7 +1436,9 @@ export const EnvResponse: MessageFns<EnvResponse> = {
     return {
       code: isSet(object.code) ? globalThis.Number(object.code) : 0,
       data: isSet(object.data) ? EnvItem.fromJSON(object.data) : undefined,
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
+      message: isSet(object.message)
+        ? globalThis.String(object.message)
+        : undefined,
     };
   },
 
@@ -1324,10 +1459,15 @@ export const EnvResponse: MessageFns<EnvResponse> = {
   create<I extends Exact<DeepPartial<EnvResponse>, I>>(base?: I): EnvResponse {
     return EnvResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<EnvResponse>, I>>(object: I): EnvResponse {
+  fromPartial<I extends Exact<DeepPartial<EnvResponse>, I>>(
+    object: I,
+  ): EnvResponse {
     const message = createBaseEnvResponse();
     message.code = object.code ?? 0;
-    message.data = (object.data !== undefined && object.data !== null) ? EnvItem.fromPartial(object.data) : undefined;
+    message.data =
+      object.data !== undefined && object.data !== null
+        ? EnvItem.fromPartial(object.data)
+        : undefined;
     message.message = object.message ?? undefined;
     return message;
   },
@@ -1338,7 +1478,10 @@ function createBaseResponse(): Response {
 }
 
 export const Response: MessageFns<Response> = {
-  encode(message: Response, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: Response,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.code !== 0) {
       writer.uint32(8).int32(message.code);
     }
@@ -1349,7 +1492,8 @@ export const Response: MessageFns<Response> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): Response {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseResponse();
     while (reader.pos < end) {
@@ -1383,7 +1527,9 @@ export const Response: MessageFns<Response> = {
   fromJSON(object: any): Response {
     return {
       code: isSet(object.code) ? globalThis.Number(object.code) : 0,
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
+      message: isSet(object.message)
+        ? globalThis.String(object.message)
+        : undefined,
     };
   },
 
@@ -1410,19 +1556,23 @@ export const Response: MessageFns<Response> = {
 };
 
 function createBaseExtraScheduleItem(): ExtraScheduleItem {
-  return { schedule: "" };
+  return { schedule: '' };
 }
 
 export const ExtraScheduleItem: MessageFns<ExtraScheduleItem> = {
-  encode(message: ExtraScheduleItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.schedule !== "") {
+  encode(
+    message: ExtraScheduleItem,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.schedule !== '') {
       writer.uint32(10).string(message.schedule);
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): ExtraScheduleItem {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseExtraScheduleItem();
     while (reader.pos < end) {
@@ -1446,23 +1596,31 @@ export const ExtraScheduleItem: MessageFns<ExtraScheduleItem> = {
   },
 
   fromJSON(object: any): ExtraScheduleItem {
-    return { schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : "" };
+    return {
+      schedule: isSet(object.schedule)
+        ? globalThis.String(object.schedule)
+        : '',
+    };
   },
 
   toJSON(message: ExtraScheduleItem): unknown {
     const obj: any = {};
-    if (message.schedule !== "") {
+    if (message.schedule !== '') {
       obj.schedule = message.schedule;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<ExtraScheduleItem>, I>>(base?: I): ExtraScheduleItem {
+  create<I extends Exact<DeepPartial<ExtraScheduleItem>, I>>(
+    base?: I,
+  ): ExtraScheduleItem {
     return ExtraScheduleItem.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ExtraScheduleItem>, I>>(object: I): ExtraScheduleItem {
+  fromPartial<I extends Exact<DeepPartial<ExtraScheduleItem>, I>>(
+    object: I,
+  ): ExtraScheduleItem {
     const message = createBaseExtraScheduleItem();
-    message.schedule = object.schedule ?? "";
+    message.schedule = object.schedule ?? '';
     return message;
   },
 };
@@ -1487,7 +1645,10 @@ function createBaseCronItem(): CronItem {
 }
 
 export const CronItem: MessageFns<CronItem> = {
-  encode(message: CronItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CronItem,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.id !== undefined) {
       writer.uint32(8).int32(message.id);
     }
@@ -1534,7 +1695,8 @@ export const CronItem: MessageFns<CronItem> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CronItem {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCronItem();
     while (reader.pos < end) {
@@ -1593,7 +1755,9 @@ export const CronItem: MessageFns<CronItem> = {
             break;
           }
 
-          message.extra_schedules.push(ExtraScheduleItem.decode(reader, reader.uint32()));
+          message.extra_schedules.push(
+            ExtraScheduleItem.decode(reader, reader.uint32()),
+          );
           continue;
         }
         case 8: {
@@ -1664,20 +1828,38 @@ export const CronItem: MessageFns<CronItem> = {
   fromJSON(object: any): CronItem {
     return {
       id: isSet(object.id) ? globalThis.Number(object.id) : undefined,
-      command: isSet(object.command) ? globalThis.String(object.command) : undefined,
-      schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : undefined,
+      command: isSet(object.command)
+        ? globalThis.String(object.command)
+        : undefined,
+      schedule: isSet(object.schedule)
+        ? globalThis.String(object.schedule)
+        : undefined,
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
-      labels: globalThis.Array.isArray(object?.labels) ? object.labels.map((e: any) => globalThis.String(e)) : [],
-      sub_id: isSet(object.sub_id) ? globalThis.Number(object.sub_id) : undefined,
+      labels: globalThis.Array.isArray(object?.labels)
+        ? object.labels.map((e: any) => globalThis.String(e))
+        : [],
+      sub_id: isSet(object.sub_id)
+        ? globalThis.Number(object.sub_id)
+        : undefined,
       extra_schedules: globalThis.Array.isArray(object?.extra_schedules)
         ? object.extra_schedules.map((e: any) => ExtraScheduleItem.fromJSON(e))
         : [],
-      task_before: isSet(object.task_before) ? globalThis.String(object.task_before) : undefined,
-      task_after: isSet(object.task_after) ? globalThis.String(object.task_after) : undefined,
-      status: isSet(object.status) ? globalThis.Number(object.status) : undefined,
-      log_path: isSet(object.log_path) ? globalThis.String(object.log_path) : undefined,
+      task_before: isSet(object.task_before)
+        ? globalThis.String(object.task_before)
+        : undefined,
+      task_after: isSet(object.task_after)
+        ? globalThis.String(object.task_after)
+        : undefined,
+      status: isSet(object.status)
+        ? globalThis.Number(object.status)
+        : undefined,
+      log_path: isSet(object.log_path)
+        ? globalThis.String(object.log_path)
+        : undefined,
       pid: isSet(object.pid) ? globalThis.Number(object.pid) : undefined,
-      last_running_time: isSet(object.last_running_time) ? globalThis.Number(object.last_running_time) : undefined,
+      last_running_time: isSet(object.last_running_time)
+        ? globalThis.Number(object.last_running_time)
+        : undefined,
       last_execution_time: isSet(object.last_execution_time)
         ? globalThis.Number(object.last_execution_time)
         : undefined,
@@ -1705,7 +1887,9 @@ export const CronItem: MessageFns<CronItem> = {
       obj.sub_id = Math.round(message.sub_id);
     }
     if (message.extra_schedules?.length) {
-      obj.extra_schedules = message.extra_schedules.map((e) => ExtraScheduleItem.toJSON(e));
+      obj.extra_schedules = message.extra_schedules.map((e) =>
+        ExtraScheduleItem.toJSON(e),
+      );
     }
     if (message.task_before !== undefined) {
       obj.task_before = message.task_before;
@@ -1742,7 +1926,9 @@ export const CronItem: MessageFns<CronItem> = {
     message.name = object.name ?? undefined;
     message.labels = object.labels?.map((e) => e) || [];
     message.sub_id = object.sub_id ?? undefined;
-    message.extra_schedules = object.extra_schedules?.map((e) => ExtraScheduleItem.fromPartial(e)) || [];
+    message.extra_schedules =
+      object.extra_schedules?.map((e) => ExtraScheduleItem.fromPartial(e)) ||
+      [];
     message.task_before = object.task_before ?? undefined;
     message.task_after = object.task_after ?? undefined;
     message.status = object.status ?? undefined;
@@ -1756,8 +1942,8 @@ export const CronItem: MessageFns<CronItem> = {
 
 function createBaseCreateCronRequest(): CreateCronRequest {
   return {
-    command: "",
-    schedule: "",
+    command: '',
+    schedule: '',
     name: undefined,
     labels: [],
     sub_id: undefined,
@@ -1768,11 +1954,14 @@ function createBaseCreateCronRequest(): CreateCronRequest {
 }
 
 export const CreateCronRequest: MessageFns<CreateCronRequest> = {
-  encode(message: CreateCronRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.command !== "") {
+  encode(
+    message: CreateCronRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.command !== '') {
       writer.uint32(10).string(message.command);
     }
-    if (message.schedule !== "") {
+    if (message.schedule !== '') {
       writer.uint32(18).string(message.schedule);
     }
     if (message.name !== undefined) {
@@ -1797,7 +1986,8 @@ export const CreateCronRequest: MessageFns<CreateCronRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CreateCronRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCreateCronRequest();
     while (reader.pos < end) {
@@ -1848,7 +2038,9 @@ export const CreateCronRequest: MessageFns<CreateCronRequest> = {
             break;
           }
 
-          message.extra_schedules.push(ExtraScheduleItem.decode(reader, reader.uint32()));
+          message.extra_schedules.push(
+            ExtraScheduleItem.decode(reader, reader.uint32()),
+          );
           continue;
         }
         case 7: {
@@ -1878,25 +2070,35 @@ export const CreateCronRequest: MessageFns<CreateCronRequest> = {
 
   fromJSON(object: any): CreateCronRequest {
     return {
-      command: isSet(object.command) ? globalThis.String(object.command) : "",
-      schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : "",
+      command: isSet(object.command) ? globalThis.String(object.command) : '',
+      schedule: isSet(object.schedule)
+        ? globalThis.String(object.schedule)
+        : '',
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
-      labels: globalThis.Array.isArray(object?.labels) ? object.labels.map((e: any) => globalThis.String(e)) : [],
-      sub_id: isSet(object.sub_id) ? globalThis.Number(object.sub_id) : undefined,
+      labels: globalThis.Array.isArray(object?.labels)
+        ? object.labels.map((e: any) => globalThis.String(e))
+        : [],
+      sub_id: isSet(object.sub_id)
+        ? globalThis.Number(object.sub_id)
+        : undefined,
       extra_schedules: globalThis.Array.isArray(object?.extra_schedules)
         ? object.extra_schedules.map((e: any) => ExtraScheduleItem.fromJSON(e))
         : [],
-      task_before: isSet(object.task_before) ? globalThis.String(object.task_before) : undefined,
-      task_after: isSet(object.task_after) ? globalThis.String(object.task_after) : undefined,
+      task_before: isSet(object.task_before)
+        ? globalThis.String(object.task_before)
+        : undefined,
+      task_after: isSet(object.task_after)
+        ? globalThis.String(object.task_after)
+        : undefined,
     };
   },
 
   toJSON(message: CreateCronRequest): unknown {
     const obj: any = {};
-    if (message.command !== "") {
+    if (message.command !== '') {
       obj.command = message.command;
     }
-    if (message.schedule !== "") {
+    if (message.schedule !== '') {
       obj.schedule = message.schedule;
     }
     if (message.name !== undefined) {
@@ -1909,7 +2111,9 @@ export const CreateCronRequest: MessageFns<CreateCronRequest> = {
       obj.sub_id = Math.round(message.sub_id);
     }
     if (message.extra_schedules?.length) {
-      obj.extra_schedules = message.extra_schedules.map((e) => ExtraScheduleItem.toJSON(e));
+      obj.extra_schedules = message.extra_schedules.map((e) =>
+        ExtraScheduleItem.toJSON(e),
+      );
     }
     if (message.task_before !== undefined) {
       obj.task_before = message.task_before;
@@ -1920,17 +2124,23 @@ export const CreateCronRequest: MessageFns<CreateCronRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CreateCronRequest>, I>>(base?: I): CreateCronRequest {
+  create<I extends Exact<DeepPartial<CreateCronRequest>, I>>(
+    base?: I,
+  ): CreateCronRequest {
     return CreateCronRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CreateCronRequest>, I>>(object: I): CreateCronRequest {
+  fromPartial<I extends Exact<DeepPartial<CreateCronRequest>, I>>(
+    object: I,
+  ): CreateCronRequest {
     const message = createBaseCreateCronRequest();
-    message.command = object.command ?? "";
-    message.schedule = object.schedule ?? "";
+    message.command = object.command ?? '';
+    message.schedule = object.schedule ?? '';
     message.name = object.name ?? undefined;
     message.labels = object.labels?.map((e) => e) || [];
     message.sub_id = object.sub_id ?? undefined;
-    message.extra_schedules = object.extra_schedules?.map((e) => ExtraScheduleItem.fromPartial(e)) || [];
+    message.extra_schedules =
+      object.extra_schedules?.map((e) => ExtraScheduleItem.fromPartial(e)) ||
+      [];
     message.task_before = object.task_before ?? undefined;
     message.task_after = object.task_after ?? undefined;
     return message;
@@ -1952,7 +2162,10 @@ function createBaseUpdateCronRequest(): UpdateCronRequest {
 }
 
 export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
-  encode(message: UpdateCronRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: UpdateCronRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.id !== 0) {
       writer.uint32(8).int32(message.id);
     }
@@ -1984,7 +2197,8 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): UpdateCronRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseUpdateCronRequest();
     while (reader.pos < end) {
@@ -2043,7 +2257,9 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
             break;
           }
 
-          message.extra_schedules.push(ExtraScheduleItem.decode(reader, reader.uint32()));
+          message.extra_schedules.push(
+            ExtraScheduleItem.decode(reader, reader.uint32()),
+          );
           continue;
         }
         case 8: {
@@ -2074,16 +2290,28 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
   fromJSON(object: any): UpdateCronRequest {
     return {
       id: isSet(object.id) ? globalThis.Number(object.id) : 0,
-      command: isSet(object.command) ? globalThis.String(object.command) : undefined,
-      schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : undefined,
+      command: isSet(object.command)
+        ? globalThis.String(object.command)
+        : undefined,
+      schedule: isSet(object.schedule)
+        ? globalThis.String(object.schedule)
+        : undefined,
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
-      labels: globalThis.Array.isArray(object?.labels) ? object.labels.map((e: any) => globalThis.String(e)) : [],
-      sub_id: isSet(object.sub_id) ? globalThis.Number(object.sub_id) : undefined,
+      labels: globalThis.Array.isArray(object?.labels)
+        ? object.labels.map((e: any) => globalThis.String(e))
+        : [],
+      sub_id: isSet(object.sub_id)
+        ? globalThis.Number(object.sub_id)
+        : undefined,
       extra_schedules: globalThis.Array.isArray(object?.extra_schedules)
         ? object.extra_schedules.map((e: any) => ExtraScheduleItem.fromJSON(e))
         : [],
-      task_before: isSet(object.task_before) ? globalThis.String(object.task_before) : undefined,
-      task_after: isSet(object.task_after) ? globalThis.String(object.task_after) : undefined,
+      task_before: isSet(object.task_before)
+        ? globalThis.String(object.task_before)
+        : undefined,
+      task_after: isSet(object.task_after)
+        ? globalThis.String(object.task_after)
+        : undefined,
     };
   },
 
@@ -2108,7 +2336,9 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
       obj.sub_id = Math.round(message.sub_id);
     }
     if (message.extra_schedules?.length) {
-      obj.extra_schedules = message.extra_schedules.map((e) => ExtraScheduleItem.toJSON(e));
+      obj.extra_schedules = message.extra_schedules.map((e) =>
+        ExtraScheduleItem.toJSON(e),
+      );
     }
     if (message.task_before !== undefined) {
       obj.task_before = message.task_before;
@@ -2119,10 +2349,14 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<UpdateCronRequest>, I>>(base?: I): UpdateCronRequest {
+  create<I extends Exact<DeepPartial<UpdateCronRequest>, I>>(
+    base?: I,
+  ): UpdateCronRequest {
     return UpdateCronRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<UpdateCronRequest>, I>>(object: I): UpdateCronRequest {
+  fromPartial<I extends Exact<DeepPartial<UpdateCronRequest>, I>>(
+    object: I,
+  ): UpdateCronRequest {
     const message = createBaseUpdateCronRequest();
     message.id = object.id ?? 0;
     message.command = object.command ?? undefined;
@@ -2130,7 +2364,9 @@ export const UpdateCronRequest: MessageFns<UpdateCronRequest> = {
     message.name = object.name ?? undefined;
     message.labels = object.labels?.map((e) => e) || [];
     message.sub_id = object.sub_id ?? undefined;
-    message.extra_schedules = object.extra_schedules?.map((e) => ExtraScheduleItem.fromPartial(e)) || [];
+    message.extra_schedules =
+      object.extra_schedules?.map((e) => ExtraScheduleItem.fromPartial(e)) ||
+      [];
     message.task_before = object.task_before ?? undefined;
     message.task_after = object.task_after ?? undefined;
     return message;
@@ -2142,7 +2378,10 @@ function createBaseDeleteCronsRequest(): DeleteCronsRequest {
 }
 
 export const DeleteCronsRequest: MessageFns<DeleteCronsRequest> = {
-  encode(message: DeleteCronsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: DeleteCronsRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     writer.uint32(10).fork();
     for (const v of message.ids) {
       writer.int32(v);
@@ -2151,8 +2390,12 @@ export const DeleteCronsRequest: MessageFns<DeleteCronsRequest> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): DeleteCronsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): DeleteCronsRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDeleteCronsRequest();
     while (reader.pos < end) {
@@ -2186,7 +2429,11 @@ export const DeleteCronsRequest: MessageFns<DeleteCronsRequest> = {
   },
 
   fromJSON(object: any): DeleteCronsRequest {
-    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [] };
+    return {
+      ids: globalThis.Array.isArray(object?.ids)
+        ? object.ids.map((e: any) => globalThis.Number(e))
+        : [],
+    };
   },
 
   toJSON(message: DeleteCronsRequest): unknown {
@@ -2197,10 +2444,14 @@ export const DeleteCronsRequest: MessageFns<DeleteCronsRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<DeleteCronsRequest>, I>>(base?: I): DeleteCronsRequest {
+  create<I extends Exact<DeepPartial<DeleteCronsRequest>, I>>(
+    base?: I,
+  ): DeleteCronsRequest {
     return DeleteCronsRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<DeleteCronsRequest>, I>>(object: I): DeleteCronsRequest {
+  fromPartial<I extends Exact<DeepPartial<DeleteCronsRequest>, I>>(
+    object: I,
+  ): DeleteCronsRequest {
     const message = createBaseDeleteCronsRequest();
     message.ids = object.ids?.map((e) => e) || [];
     return message;
@@ -2212,7 +2463,10 @@ function createBaseCronsResponse(): CronsResponse {
 }
 
 export const CronsResponse: MessageFns<CronsResponse> = {
-  encode(message: CronsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CronsResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.code !== 0) {
       writer.uint32(8).int32(message.code);
     }
@@ -2226,7 +2480,8 @@ export const CronsResponse: MessageFns<CronsResponse> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CronsResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCronsResponse();
     while (reader.pos < end) {
@@ -2268,8 +2523,12 @@ export const CronsResponse: MessageFns<CronsResponse> = {
   fromJSON(object: any): CronsResponse {
     return {
       code: isSet(object.code) ? globalThis.Number(object.code) : 0,
-      data: globalThis.Array.isArray(object?.data) ? object.data.map((e: any) => CronItem.fromJSON(e)) : [],
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
+      data: globalThis.Array.isArray(object?.data)
+        ? object.data.map((e: any) => CronItem.fromJSON(e))
+        : [],
+      message: isSet(object.message)
+        ? globalThis.String(object.message)
+        : undefined,
     };
   },
 
@@ -2287,10 +2546,14 @@ export const CronsResponse: MessageFns<CronsResponse> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CronsResponse>, I>>(base?: I): CronsResponse {
+  create<I extends Exact<DeepPartial<CronsResponse>, I>>(
+    base?: I,
+  ): CronsResponse {
     return CronsResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CronsResponse>, I>>(object: I): CronsResponse {
+  fromPartial<I extends Exact<DeepPartial<CronsResponse>, I>>(
+    object: I,
+  ): CronsResponse {
     const message = createBaseCronsResponse();
     message.code = object.code ?? 0;
     message.data = object.data?.map((e) => CronItem.fromPartial(e)) || [];
@@ -2304,7 +2567,10 @@ function createBaseCronResponse(): CronResponse {
 }
 
 export const CronResponse: MessageFns<CronResponse> = {
-  encode(message: CronResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CronResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.code !== 0) {
       writer.uint32(8).int32(message.code);
     }
@@ -2318,7 +2584,8 @@ export const CronResponse: MessageFns<CronResponse> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CronResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCronResponse();
     while (reader.pos < end) {
@@ -2361,7 +2628,9 @@ export const CronResponse: MessageFns<CronResponse> = {
     return {
       code: isSet(object.code) ? globalThis.Number(object.code) : 0,
       data: isSet(object.data) ? CronItem.fromJSON(object.data) : undefined,
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
+      message: isSet(object.message)
+        ? globalThis.String(object.message)
+        : undefined,
     };
   },
 
@@ -2379,32 +2648,43 @@ export const CronResponse: MessageFns<CronResponse> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CronResponse>, I>>(base?: I): CronResponse {
+  create<I extends Exact<DeepPartial<CronResponse>, I>>(
+    base?: I,
+  ): CronResponse {
     return CronResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CronResponse>, I>>(object: I): CronResponse {
+  fromPartial<I extends Exact<DeepPartial<CronResponse>, I>>(
+    object: I,
+  ): CronResponse {
     const message = createBaseCronResponse();
     message.code = object.code ?? 0;
-    message.data = (object.data !== undefined && object.data !== null) ? CronItem.fromPartial(object.data) : undefined;
+    message.data =
+      object.data !== undefined && object.data !== null
+        ? CronItem.fromPartial(object.data)
+        : undefined;
     message.message = object.message ?? undefined;
     return message;
   },
 };
 
 function createBaseCronDetailRequest(): CronDetailRequest {
-  return { log_path: "" };
+  return { log_path: '' };
 }
 
 export const CronDetailRequest: MessageFns<CronDetailRequest> = {
-  encode(message: CronDetailRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.log_path !== "") {
+  encode(
+    message: CronDetailRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.log_path !== '') {
       writer.uint32(10).string(message.log_path);
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): CronDetailRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCronDetailRequest();
     while (reader.pos < end) {
@@ -2428,23 +2708,31 @@ export const CronDetailRequest: MessageFns<CronDetailRequest> = {
   },
 
   fromJSON(object: any): CronDetailRequest {
-    return { log_path: isSet(object.log_path) ? globalThis.String(object.log_path) : "" };
+    return {
+      log_path: isSet(object.log_path)
+        ? globalThis.String(object.log_path)
+        : '',
+    };
   },
 
   toJSON(message: CronDetailRequest): unknown {
     const obj: any = {};
-    if (message.log_path !== "") {
+    if (message.log_path !== '') {
       obj.log_path = message.log_path;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CronDetailRequest>, I>>(base?: I): CronDetailRequest {
+  create<I extends Exact<DeepPartial<CronDetailRequest>, I>>(
+    base?: I,
+  ): CronDetailRequest {
     return CronDetailRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CronDetailRequest>, I>>(object: I): CronDetailRequest {
+  fromPartial<I extends Exact<DeepPartial<CronDetailRequest>, I>>(
+    object: I,
+  ): CronDetailRequest {
     const message = createBaseCronDetailRequest();
-    message.log_path = object.log_path ?? "";
+    message.log_path = object.log_path ?? '';
     return message;
   },
 };
@@ -2454,7 +2742,10 @@ function createBaseCronDetailResponse(): CronDetailResponse {
 }
 
 export const CronDetailResponse: MessageFns<CronDetailResponse> = {
-  encode(message: CronDetailResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: CronDetailResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.code !== 0) {
       writer.uint32(8).int32(message.code);
     }
@@ -2467,8 +2758,12 @@ export const CronDetailResponse: MessageFns<CronDetailResponse> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CronDetailResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): CronDetailResponse {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseCronDetailResponse();
     while (reader.pos < end) {
@@ -2511,7 +2806,9 @@ export const CronDetailResponse: MessageFns<CronDetailResponse> = {
     return {
       code: isSet(object.code) ? globalThis.Number(object.code) : 0,
       data: isSet(object.data) ? CronItem.fromJSON(object.data) : undefined,
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
+      message: isSet(object.message)
+        ? globalThis.String(object.message)
+        : undefined,
     };
   },
 
@@ -2529,13 +2826,20 @@ export const CronDetailResponse: MessageFns<CronDetailResponse> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<CronDetailResponse>, I>>(base?: I): CronDetailResponse {
+  create<I extends Exact<DeepPartial<CronDetailResponse>, I>>(
+    base?: I,
+  ): CronDetailResponse {
     return CronDetailResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<CronDetailResponse>, I>>(object: I): CronDetailResponse {
+  fromPartial<I extends Exact<DeepPartial<CronDetailResponse>, I>>(
+    object: I,
+  ): CronDetailResponse {
     const message = createBaseCronDetailResponse();
     message.code = object.code ?? 0;
-    message.data = (object.data !== undefined && object.data !== null) ? CronItem.fromPartial(object.data) : undefined;
+    message.data =
+      object.data !== undefined && object.data !== null
+        ? CronItem.fromPartial(object.data)
+        : undefined;
     message.message = object.message ?? undefined;
     return message;
   },
@@ -2615,7 +2919,10 @@ function createBaseNotificationInfo(): NotificationInfo {
 }
 
 export const NotificationInfo: MessageFns<NotificationInfo> = {
-  encode(message: NotificationInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: NotificationInfo,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
@@ -2824,7 +3131,8 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): NotificationInfo {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseNotificationInfo();
     while (reader.pos < end) {
@@ -3386,25 +3694,63 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
   fromJSON(object: any): NotificationInfo {
     return {
       type: isSet(object.type) ? notificationModeFromJSON(object.type) : 0,
-      gotifyUrl: isSet(object.gotifyUrl) ? globalThis.String(object.gotifyUrl) : undefined,
-      gotifyToken: isSet(object.gotifyToken) ? globalThis.String(object.gotifyToken) : undefined,
-      gotifyPriority: isSet(object.gotifyPriority) ? globalThis.Number(object.gotifyPriority) : undefined,
-      goCqHttpBotUrl: isSet(object.goCqHttpBotUrl) ? globalThis.String(object.goCqHttpBotUrl) : undefined,
-      goCqHttpBotToken: isSet(object.goCqHttpBotToken) ? globalThis.String(object.goCqHttpBotToken) : undefined,
-      goCqHttpBotQq: isSet(object.goCqHttpBotQq) ? globalThis.String(object.goCqHttpBotQq) : undefined,
-      serverChanKey: isSet(object.serverChanKey) ? globalThis.String(object.serverChanKey) : undefined,
-      pushDeerKey: isSet(object.pushDeerKey) ? globalThis.String(object.pushDeerKey) : undefined,
-      pushDeerUrl: isSet(object.pushDeerUrl) ? globalThis.String(object.pushDeerUrl) : undefined,
-      synologyChatUrl: isSet(object.synologyChatUrl) ? globalThis.String(object.synologyChatUrl) : undefined,
-      barkPush: isSet(object.barkPush) ? globalThis.String(object.barkPush) : undefined,
-      barkIcon: isSet(object.barkIcon) ? globalThis.String(object.barkIcon) : undefined,
-      barkSound: isSet(object.barkSound) ? globalThis.String(object.barkSound) : undefined,
-      barkGroup: isSet(object.barkGroup) ? globalThis.String(object.barkGroup) : undefined,
-      barkLevel: isSet(object.barkLevel) ? globalThis.String(object.barkLevel) : undefined,
-      barkUrl: isSet(object.barkUrl) ? globalThis.String(object.barkUrl) : undefined,
-      barkArchive: isSet(object.barkArchive) ? globalThis.String(object.barkArchive) : undefined,
-      telegramBotToken: isSet(object.telegramBotToken) ? globalThis.String(object.telegramBotToken) : undefined,
-      telegramBotUserId: isSet(object.telegramBotUserId) ? globalThis.String(object.telegramBotUserId) : undefined,
+      gotifyUrl: isSet(object.gotifyUrl)
+        ? globalThis.String(object.gotifyUrl)
+        : undefined,
+      gotifyToken: isSet(object.gotifyToken)
+        ? globalThis.String(object.gotifyToken)
+        : undefined,
+      gotifyPriority: isSet(object.gotifyPriority)
+        ? globalThis.Number(object.gotifyPriority)
+        : undefined,
+      goCqHttpBotUrl: isSet(object.goCqHttpBotUrl)
+        ? globalThis.String(object.goCqHttpBotUrl)
+        : undefined,
+      goCqHttpBotToken: isSet(object.goCqHttpBotToken)
+        ? globalThis.String(object.goCqHttpBotToken)
+        : undefined,
+      goCqHttpBotQq: isSet(object.goCqHttpBotQq)
+        ? globalThis.String(object.goCqHttpBotQq)
+        : undefined,
+      serverChanKey: isSet(object.serverChanKey)
+        ? globalThis.String(object.serverChanKey)
+        : undefined,
+      pushDeerKey: isSet(object.pushDeerKey)
+        ? globalThis.String(object.pushDeerKey)
+        : undefined,
+      pushDeerUrl: isSet(object.pushDeerUrl)
+        ? globalThis.String(object.pushDeerUrl)
+        : undefined,
+      synologyChatUrl: isSet(object.synologyChatUrl)
+        ? globalThis.String(object.synologyChatUrl)
+        : undefined,
+      barkPush: isSet(object.barkPush)
+        ? globalThis.String(object.barkPush)
+        : undefined,
+      barkIcon: isSet(object.barkIcon)
+        ? globalThis.String(object.barkIcon)
+        : undefined,
+      barkSound: isSet(object.barkSound)
+        ? globalThis.String(object.barkSound)
+        : undefined,
+      barkGroup: isSet(object.barkGroup)
+        ? globalThis.String(object.barkGroup)
+        : undefined,
+      barkLevel: isSet(object.barkLevel)
+        ? globalThis.String(object.barkLevel)
+        : undefined,
+      barkUrl: isSet(object.barkUrl)
+        ? globalThis.String(object.barkUrl)
+        : undefined,
+      barkArchive: isSet(object.barkArchive)
+        ? globalThis.String(object.barkArchive)
+        : undefined,
+      telegramBotToken: isSet(object.telegramBotToken)
+        ? globalThis.String(object.telegramBotToken)
+        : undefined,
+      telegramBotUserId: isSet(object.telegramBotUserId)
+        ? globalThis.String(object.telegramBotUserId)
+        : undefined,
       telegramBotProxyHost: isSet(object.telegramBotProxyHost)
         ? globalThis.String(object.telegramBotProxyHost)
         : undefined,
@@ -3414,57 +3760,141 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
       telegramBotProxyAuth: isSet(object.telegramBotProxyAuth)
         ? globalThis.String(object.telegramBotProxyAuth)
         : undefined,
-      telegramBotApiHost: isSet(object.telegramBotApiHost) ? globalThis.String(object.telegramBotApiHost) : undefined,
-      dingtalkBotToken: isSet(object.dingtalkBotToken) ? globalThis.String(object.dingtalkBotToken) : undefined,
-      dingtalkBotSecret: isSet(object.dingtalkBotSecret) ? globalThis.String(object.dingtalkBotSecret) : undefined,
-      weWorkBotKey: isSet(object.weWorkBotKey) ? globalThis.String(object.weWorkBotKey) : undefined,
-      weWorkOrigin: isSet(object.weWorkOrigin) ? globalThis.String(object.weWorkOrigin) : undefined,
-      weWorkAppKey: isSet(object.weWorkAppKey) ? globalThis.String(object.weWorkAppKey) : undefined,
-      aibotkKey: isSet(object.aibotkKey) ? globalThis.String(object.aibotkKey) : undefined,
-      aibotkType: isSet(object.aibotkType) ? globalThis.String(object.aibotkType) : undefined,
-      aibotkName: isSet(object.aibotkName) ? globalThis.String(object.aibotkName) : undefined,
-      iGotPushKey: isSet(object.iGotPushKey) ? globalThis.String(object.iGotPushKey) : undefined,
-      pushPlusToken: isSet(object.pushPlusToken) ? globalThis.String(object.pushPlusToken) : undefined,
-      pushPlusUser: isSet(object.pushPlusUser) ? globalThis.String(object.pushPlusUser) : undefined,
-      pushPlusTemplate: isSet(object.pushPlusTemplate) ? globalThis.String(object.pushPlusTemplate) : undefined,
-      pushplusChannel: isSet(object.pushplusChannel) ? globalThis.String(object.pushplusChannel) : undefined,
-      pushplusWebhook: isSet(object.pushplusWebhook) ? globalThis.String(object.pushplusWebhook) : undefined,
+      telegramBotApiHost: isSet(object.telegramBotApiHost)
+        ? globalThis.String(object.telegramBotApiHost)
+        : undefined,
+      dingtalkBotToken: isSet(object.dingtalkBotToken)
+        ? globalThis.String(object.dingtalkBotToken)
+        : undefined,
+      dingtalkBotSecret: isSet(object.dingtalkBotSecret)
+        ? globalThis.String(object.dingtalkBotSecret)
+        : undefined,
+      weWorkBotKey: isSet(object.weWorkBotKey)
+        ? globalThis.String(object.weWorkBotKey)
+        : undefined,
+      weWorkOrigin: isSet(object.weWorkOrigin)
+        ? globalThis.String(object.weWorkOrigin)
+        : undefined,
+      weWorkAppKey: isSet(object.weWorkAppKey)
+        ? globalThis.String(object.weWorkAppKey)
+        : undefined,
+      aibotkKey: isSet(object.aibotkKey)
+        ? globalThis.String(object.aibotkKey)
+        : undefined,
+      aibotkType: isSet(object.aibotkType)
+        ? globalThis.String(object.aibotkType)
+        : undefined,
+      aibotkName: isSet(object.aibotkName)
+        ? globalThis.String(object.aibotkName)
+        : undefined,
+      iGotPushKey: isSet(object.iGotPushKey)
+        ? globalThis.String(object.iGotPushKey)
+        : undefined,
+      pushPlusToken: isSet(object.pushPlusToken)
+        ? globalThis.String(object.pushPlusToken)
+        : undefined,
+      pushPlusUser: isSet(object.pushPlusUser)
+        ? globalThis.String(object.pushPlusUser)
+        : undefined,
+      pushPlusTemplate: isSet(object.pushPlusTemplate)
+        ? globalThis.String(object.pushPlusTemplate)
+        : undefined,
+      pushplusChannel: isSet(object.pushplusChannel)
+        ? globalThis.String(object.pushplusChannel)
+        : undefined,
+      pushplusWebhook: isSet(object.pushplusWebhook)
+        ? globalThis.String(object.pushplusWebhook)
+        : undefined,
       pushplusCallbackUrl: isSet(object.pushplusCallbackUrl)
         ? globalThis.String(object.pushplusCallbackUrl)
         : undefined,
-      pushplusTo: isSet(object.pushplusTo) ? globalThis.String(object.pushplusTo) : undefined,
-      wePlusBotToken: isSet(object.wePlusBotToken) ? globalThis.String(object.wePlusBotToken) : undefined,
-      wePlusBotReceiver: isSet(object.wePlusBotReceiver) ? globalThis.String(object.wePlusBotReceiver) : undefined,
-      wePlusBotVersion: isSet(object.wePlusBotVersion) ? globalThis.String(object.wePlusBotVersion) : undefined,
-      emailService: isSet(object.emailService) ? globalThis.String(object.emailService) : undefined,
-      emailUser: isSet(object.emailUser) ? globalThis.String(object.emailUser) : undefined,
-      emailPass: isSet(object.emailPass) ? globalThis.String(object.emailPass) : undefined,
-      emailTo: isSet(object.emailTo) ? globalThis.String(object.emailTo) : undefined,
-      pushMeKey: isSet(object.pushMeKey) ? globalThis.String(object.pushMeKey) : undefined,
-      pushMeUrl: isSet(object.pushMeUrl) ? globalThis.String(object.pushMeUrl) : undefined,
-      chronocatURL: isSet(object.chronocatURL) ? globalThis.String(object.chronocatURL) : undefined,
-      chronocatQQ: isSet(object.chronocatQQ) ? globalThis.String(object.chronocatQQ) : undefined,
-      chronocatToken: isSet(object.chronocatToken) ? globalThis.String(object.chronocatToken) : undefined,
-      webhookHeaders: isSet(object.webhookHeaders) ? globalThis.String(object.webhookHeaders) : undefined,
-      webhookBody: isSet(object.webhookBody) ? globalThis.String(object.webhookBody) : undefined,
-      webhookUrl: isSet(object.webhookUrl) ? globalThis.String(object.webhookUrl) : undefined,
-      webhookMethod: isSet(object.webhookMethod) ? globalThis.String(object.webhookMethod) : undefined,
-      webhookContentType: isSet(object.webhookContentType) ? globalThis.String(object.webhookContentType) : undefined,
-      larkKey: isSet(object.larkKey) ? globalThis.String(object.larkKey) : undefined,
-      ntfyUrl: isSet(object.ntfyUrl) ? globalThis.String(object.ntfyUrl) : undefined,
-      ntfyTopic: isSet(object.ntfyTopic) ? globalThis.String(object.ntfyTopic) : undefined,
-      ntfyPriority: isSet(object.ntfyPriority) ? globalThis.String(object.ntfyPriority) : undefined,
-      ntfyToken: isSet(object.ntfyToken) ? globalThis.String(object.ntfyToken) : undefined,
-      ntfyUsername: isSet(object.ntfyUsername) ? globalThis.String(object.ntfyUsername) : undefined,
-      ntfyPassword: isSet(object.ntfyPassword) ? globalThis.String(object.ntfyPassword) : undefined,
-      ntfyActions: isSet(object.ntfyActions) ? globalThis.String(object.ntfyActions) : undefined,
+      pushplusTo: isSet(object.pushplusTo)
+        ? globalThis.String(object.pushplusTo)
+        : undefined,
+      wePlusBotToken: isSet(object.wePlusBotToken)
+        ? globalThis.String(object.wePlusBotToken)
+        : undefined,
+      wePlusBotReceiver: isSet(object.wePlusBotReceiver)
+        ? globalThis.String(object.wePlusBotReceiver)
+        : undefined,
+      wePlusBotVersion: isSet(object.wePlusBotVersion)
+        ? globalThis.String(object.wePlusBotVersion)
+        : undefined,
+      emailService: isSet(object.emailService)
+        ? globalThis.String(object.emailService)
+        : undefined,
+      emailUser: isSet(object.emailUser)
+        ? globalThis.String(object.emailUser)
+        : undefined,
+      emailPass: isSet(object.emailPass)
+        ? globalThis.String(object.emailPass)
+        : undefined,
+      emailTo: isSet(object.emailTo)
+        ? globalThis.String(object.emailTo)
+        : undefined,
+      pushMeKey: isSet(object.pushMeKey)
+        ? globalThis.String(object.pushMeKey)
+        : undefined,
+      pushMeUrl: isSet(object.pushMeUrl)
+        ? globalThis.String(object.pushMeUrl)
+        : undefined,
+      chronocatURL: isSet(object.chronocatURL)
+        ? globalThis.String(object.chronocatURL)
+        : undefined,
+      chronocatQQ: isSet(object.chronocatQQ)
+        ? globalThis.String(object.chronocatQQ)
+        : undefined,
+      chronocatToken: isSet(object.chronocatToken)
+        ? globalThis.String(object.chronocatToken)
+        : undefined,
+      webhookHeaders: isSet(object.webhookHeaders)
+        ? globalThis.String(object.webhookHeaders)
+        : undefined,
+      webhookBody: isSet(object.webhookBody)
+        ? globalThis.String(object.webhookBody)
+        : undefined,
+      webhookUrl: isSet(object.webhookUrl)
+        ? globalThis.String(object.webhookUrl)
+        : undefined,
+      webhookMethod: isSet(object.webhookMethod)
+        ? globalThis.String(object.webhookMethod)
+        : undefined,
+      webhookContentType: isSet(object.webhookContentType)
+        ? globalThis.String(object.webhookContentType)
+        : undefined,
+      larkKey: isSet(object.larkKey)
+        ? globalThis.String(object.larkKey)
+        : undefined,
+      ntfyUrl: isSet(object.ntfyUrl)
+        ? globalThis.String(object.ntfyUrl)
+        : undefined,
+      ntfyTopic: isSet(object.ntfyTopic)
+        ? globalThis.String(object.ntfyTopic)
+        : undefined,
+      ntfyPriority: isSet(object.ntfyPriority)
+        ? globalThis.String(object.ntfyPriority)
+        : undefined,
+      ntfyToken: isSet(object.ntfyToken)
+        ? globalThis.String(object.ntfyToken)
+        : undefined,
+      ntfyUsername: isSet(object.ntfyUsername)
+        ? globalThis.String(object.ntfyUsername)
+        : undefined,
+      ntfyPassword: isSet(object.ntfyPassword)
+        ? globalThis.String(object.ntfyPassword)
+        : undefined,
+      ntfyActions: isSet(object.ntfyActions)
+        ? globalThis.String(object.ntfyActions)
+        : undefined,
       wxPusherBotAppToken: isSet(object.wxPusherBotAppToken)
         ? globalThis.String(object.wxPusherBotAppToken)
         : undefined,
       wxPusherBotTopicIds: isSet(object.wxPusherBotTopicIds)
         ? globalThis.String(object.wxPusherBotTopicIds)
         : undefined,
-      wxPusherBotUids: isSet(object.wxPusherBotUids) ? globalThis.String(object.wxPusherBotUids) : undefined,
+      wxPusherBotUids: isSet(object.wxPusherBotUids)
+        ? globalThis.String(object.wxPusherBotUids)
+        : undefined,
     };
   },
 
@@ -3677,10 +4107,14 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<NotificationInfo>, I>>(base?: I): NotificationInfo {
+  create<I extends Exact<DeepPartial<NotificationInfo>, I>>(
+    base?: I,
+  ): NotificationInfo {
     return NotificationInfo.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<NotificationInfo>, I>>(object: I): NotificationInfo {
+  fromPartial<I extends Exact<DeepPartial<NotificationInfo>, I>>(
+    object: I,
+  ): NotificationInfo {
     const message = createBaseNotificationInfo();
     message.type = object.type ?? 0;
     message.gotifyUrl = object.gotifyUrl ?? undefined;
@@ -3755,25 +4189,35 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
 };
 
 function createBaseSystemNotifyRequest(): SystemNotifyRequest {
-  return { title: "", content: "", notificationInfo: undefined };
+  return { title: '', content: '', notificationInfo: undefined };
 }
 
 export const SystemNotifyRequest: MessageFns<SystemNotifyRequest> = {
-  encode(message: SystemNotifyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.title !== "") {
+  encode(
+    message: SystemNotifyRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.title !== '') {
       writer.uint32(10).string(message.title);
     }
-    if (message.content !== "") {
+    if (message.content !== '') {
       writer.uint32(18).string(message.content);
     }
     if (message.notificationInfo !== undefined) {
-      NotificationInfo.encode(message.notificationInfo, writer.uint32(26).fork()).join();
+      NotificationInfo.encode(
+        message.notificationInfo,
+        writer.uint32(26).fork(),
+      ).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): SystemNotifyRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): SystemNotifyRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseSystemNotifyRequest();
     while (reader.pos < end) {
@@ -3800,7 +4244,10 @@ export const SystemNotifyRequest: MessageFns<SystemNotifyRequest> = {
             break;
           }
 
-          message.notificationInfo = NotificationInfo.decode(reader, reader.uint32());
+          message.notificationInfo = NotificationInfo.decode(
+            reader,
+            reader.uint32(),
+          );
           continue;
         }
       }
@@ -3814,18 +4261,20 @@ export const SystemNotifyRequest: MessageFns<SystemNotifyRequest> = {
 
   fromJSON(object: any): SystemNotifyRequest {
     return {
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      content: isSet(object.content) ? globalThis.String(object.content) : "",
-      notificationInfo: isSet(object.notificationInfo) ? NotificationInfo.fromJSON(object.notificationInfo) : undefined,
+      title: isSet(object.title) ? globalThis.String(object.title) : '',
+      content: isSet(object.content) ? globalThis.String(object.content) : '',
+      notificationInfo: isSet(object.notificationInfo)
+        ? NotificationInfo.fromJSON(object.notificationInfo)
+        : undefined,
     };
   },
 
   toJSON(message: SystemNotifyRequest): unknown {
     const obj: any = {};
-    if (message.title !== "") {
+    if (message.title !== '') {
       obj.title = message.title;
     }
-    if (message.content !== "") {
+    if (message.content !== '') {
       obj.content = message.content;
     }
     if (message.notificationInfo !== undefined) {
@@ -3834,16 +4283,21 @@ export const SystemNotifyRequest: MessageFns<SystemNotifyRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(base?: I): SystemNotifyRequest {
+  create<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(
+    base?: I,
+  ): SystemNotifyRequest {
     return SystemNotifyRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(object: I): SystemNotifyRequest {
+  fromPartial<I extends Exact<DeepPartial<SystemNotifyRequest>, I>>(
+    object: I,
+  ): SystemNotifyRequest {
     const message = createBaseSystemNotifyRequest();
-    message.title = object.title ?? "";
-    message.content = object.content ?? "";
-    message.notificationInfo = (object.notificationInfo !== undefined && object.notificationInfo !== null)
-      ? NotificationInfo.fromPartial(object.notificationInfo)
-      : undefined;
+    message.title = object.title ?? '';
+    message.content = object.content ?? '';
+    message.notificationInfo =
+      object.notificationInfo !== undefined && object.notificationInfo !== null
+        ? NotificationInfo.fromPartial(object.notificationInfo)
+        : undefined;
     return message;
   },
 };
@@ -3851,129 +4305,157 @@ export const SystemNotifyRequest: MessageFns<SystemNotifyRequest> = {
 export type ApiService = typeof ApiService;
 export const ApiService = {
   getEnvs: {
-    path: "/com.ql.api.Api/GetEnvs",
+    path: '/com.ql.api.Api/GetEnvs',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: GetEnvsRequest) => Buffer.from(GetEnvsRequest.encode(value).finish()),
+    requestSerialize: (value: GetEnvsRequest) =>
+      Buffer.from(GetEnvsRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => GetEnvsRequest.decode(value),
-    responseSerialize: (value: EnvsResponse) => Buffer.from(EnvsResponse.encode(value).finish()),
+    responseSerialize: (value: EnvsResponse) =>
+      Buffer.from(EnvsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => EnvsResponse.decode(value),
   },
   createEnv: {
-    path: "/com.ql.api.Api/CreateEnv",
+    path: '/com.ql.api.Api/CreateEnv',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: CreateEnvRequest) => Buffer.from(CreateEnvRequest.encode(value).finish()),
+    requestSerialize: (value: CreateEnvRequest) =>
+      Buffer.from(CreateEnvRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => CreateEnvRequest.decode(value),
-    responseSerialize: (value: EnvsResponse) => Buffer.from(EnvsResponse.encode(value).finish()),
+    responseSerialize: (value: EnvsResponse) =>
+      Buffer.from(EnvsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => EnvsResponse.decode(value),
   },
   updateEnv: {
-    path: "/com.ql.api.Api/UpdateEnv",
+    path: '/com.ql.api.Api/UpdateEnv',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: UpdateEnvRequest) => Buffer.from(UpdateEnvRequest.encode(value).finish()),
+    requestSerialize: (value: UpdateEnvRequest) =>
+      Buffer.from(UpdateEnvRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => UpdateEnvRequest.decode(value),
-    responseSerialize: (value: EnvResponse) => Buffer.from(EnvResponse.encode(value).finish()),
+    responseSerialize: (value: EnvResponse) =>
+      Buffer.from(EnvResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => EnvResponse.decode(value),
   },
   deleteEnvs: {
-    path: "/com.ql.api.Api/DeleteEnvs",
+    path: '/com.ql.api.Api/DeleteEnvs',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: DeleteEnvsRequest) => Buffer.from(DeleteEnvsRequest.encode(value).finish()),
+    requestSerialize: (value: DeleteEnvsRequest) =>
+      Buffer.from(DeleteEnvsRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => DeleteEnvsRequest.decode(value),
-    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseSerialize: (value: Response) =>
+      Buffer.from(Response.encode(value).finish()),
     responseDeserialize: (value: Buffer) => Response.decode(value),
   },
   moveEnv: {
-    path: "/com.ql.api.Api/MoveEnv",
+    path: '/com.ql.api.Api/MoveEnv',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: MoveEnvRequest) => Buffer.from(MoveEnvRequest.encode(value).finish()),
+    requestSerialize: (value: MoveEnvRequest) =>
+      Buffer.from(MoveEnvRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => MoveEnvRequest.decode(value),
-    responseSerialize: (value: EnvResponse) => Buffer.from(EnvResponse.encode(value).finish()),
+    responseSerialize: (value: EnvResponse) =>
+      Buffer.from(EnvResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => EnvResponse.decode(value),
   },
   disableEnvs: {
-    path: "/com.ql.api.Api/DisableEnvs",
+    path: '/com.ql.api.Api/DisableEnvs',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: DisableEnvsRequest) => Buffer.from(DisableEnvsRequest.encode(value).finish()),
+    requestSerialize: (value: DisableEnvsRequest) =>
+      Buffer.from(DisableEnvsRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => DisableEnvsRequest.decode(value),
-    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseSerialize: (value: Response) =>
+      Buffer.from(Response.encode(value).finish()),
     responseDeserialize: (value: Buffer) => Response.decode(value),
   },
   enableEnvs: {
-    path: "/com.ql.api.Api/EnableEnvs",
+    path: '/com.ql.api.Api/EnableEnvs',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: EnableEnvsRequest) => Buffer.from(EnableEnvsRequest.encode(value).finish()),
+    requestSerialize: (value: EnableEnvsRequest) =>
+      Buffer.from(EnableEnvsRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => EnableEnvsRequest.decode(value),
-    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseSerialize: (value: Response) =>
+      Buffer.from(Response.encode(value).finish()),
     responseDeserialize: (value: Buffer) => Response.decode(value),
   },
   updateEnvNames: {
-    path: "/com.ql.api.Api/UpdateEnvNames",
+    path: '/com.ql.api.Api/UpdateEnvNames',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: UpdateEnvNamesRequest) => Buffer.from(UpdateEnvNamesRequest.encode(value).finish()),
+    requestSerialize: (value: UpdateEnvNamesRequest) =>
+      Buffer.from(UpdateEnvNamesRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => UpdateEnvNamesRequest.decode(value),
-    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseSerialize: (value: Response) =>
+      Buffer.from(Response.encode(value).finish()),
     responseDeserialize: (value: Buffer) => Response.decode(value),
   },
   getEnvById: {
-    path: "/com.ql.api.Api/GetEnvById",
+    path: '/com.ql.api.Api/GetEnvById',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: GetEnvByIdRequest) => Buffer.from(GetEnvByIdRequest.encode(value).finish()),
+    requestSerialize: (value: GetEnvByIdRequest) =>
+      Buffer.from(GetEnvByIdRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => GetEnvByIdRequest.decode(value),
-    responseSerialize: (value: EnvResponse) => Buffer.from(EnvResponse.encode(value).finish()),
+    responseSerialize: (value: EnvResponse) =>
+      Buffer.from(EnvResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => EnvResponse.decode(value),
   },
   systemNotify: {
-    path: "/com.ql.api.Api/SystemNotify",
+    path: '/com.ql.api.Api/SystemNotify',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: SystemNotifyRequest) => Buffer.from(SystemNotifyRequest.encode(value).finish()),
+    requestSerialize: (value: SystemNotifyRequest) =>
+      Buffer.from(SystemNotifyRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => SystemNotifyRequest.decode(value),
-    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseSerialize: (value: Response) =>
+      Buffer.from(Response.encode(value).finish()),
     responseDeserialize: (value: Buffer) => Response.decode(value),
   },
   getCronDetail: {
-    path: "/com.ql.api.Api/GetCronDetail",
+    path: '/com.ql.api.Api/GetCronDetail',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: CronDetailRequest) => Buffer.from(CronDetailRequest.encode(value).finish()),
+    requestSerialize: (value: CronDetailRequest) =>
+      Buffer.from(CronDetailRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => CronDetailRequest.decode(value),
-    responseSerialize: (value: CronDetailResponse) => Buffer.from(CronDetailResponse.encode(value).finish()),
+    responseSerialize: (value: CronDetailResponse) =>
+      Buffer.from(CronDetailResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => CronDetailResponse.decode(value),
   },
   createCron: {
-    path: "/com.ql.api.Api/CreateCron",
+    path: '/com.ql.api.Api/CreateCron',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: CreateCronRequest) => Buffer.from(CreateCronRequest.encode(value).finish()),
+    requestSerialize: (value: CreateCronRequest) =>
+      Buffer.from(CreateCronRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => CreateCronRequest.decode(value),
-    responseSerialize: (value: CronResponse) => Buffer.from(CronResponse.encode(value).finish()),
+    responseSerialize: (value: CronResponse) =>
+      Buffer.from(CronResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => CronResponse.decode(value),
   },
   updateCron: {
-    path: "/com.ql.api.Api/UpdateCron",
+    path: '/com.ql.api.Api/UpdateCron',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: UpdateCronRequest) => Buffer.from(UpdateCronRequest.encode(value).finish()),
+    requestSerialize: (value: UpdateCronRequest) =>
+      Buffer.from(UpdateCronRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => UpdateCronRequest.decode(value),
-    responseSerialize: (value: CronResponse) => Buffer.from(CronResponse.encode(value).finish()),
+    responseSerialize: (value: CronResponse) =>
+      Buffer.from(CronResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => CronResponse.decode(value),
   },
   deleteCrons: {
-    path: "/com.ql.api.Api/DeleteCrons",
+    path: '/com.ql.api.Api/DeleteCrons',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: DeleteCronsRequest) => Buffer.from(DeleteCronsRequest.encode(value).finish()),
+    requestSerialize: (value: DeleteCronsRequest) =>
+      Buffer.from(DeleteCronsRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => DeleteCronsRequest.decode(value),
-    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseSerialize: (value: Response) =>
+      Buffer.from(Response.encode(value).finish()),
     responseDeserialize: (value: Buffer) => Response.decode(value),
   },
 } as const;
@@ -4148,18 +4630,27 @@ export interface ApiClient extends Client {
   ): ClientUnaryCall;
   getCronDetail(
     request: CronDetailRequest,
-    callback: (error: ServiceError | null, response: CronDetailResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: CronDetailResponse,
+    ) => void,
   ): ClientUnaryCall;
   getCronDetail(
     request: CronDetailRequest,
     metadata: Metadata,
-    callback: (error: ServiceError | null, response: CronDetailResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: CronDetailResponse,
+    ) => void,
   ): ClientUnaryCall;
   getCronDetail(
     request: CronDetailRequest,
     metadata: Metadata,
     options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: CronDetailResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: CronDetailResponse,
+    ) => void,
   ): ClientUnaryCall;
   createCron(
     request: CreateCronRequest,
@@ -4208,31 +4699,52 @@ export interface ApiClient extends Client {
   ): ClientUnaryCall;
 }
 
-export const ApiClient = makeGenericClientConstructor(ApiService, "com.ql.api.Api") as unknown as {
-  new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): ApiClient;
+export const ApiClient = makeGenericClientConstructor(
+  ApiService,
+  'com.ql.api.Api',
+) as unknown as {
+  new (
+    address: string,
+    credentials: ChannelCredentials,
+    options?: Partial<ClientOptions>,
+  ): ApiClient;
   service: typeof ApiService;
   serviceName: string;
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+  ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U>
+  ? ReadonlyArray<DeepPartial<U>>
+  : T extends {}
+  ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function longToNumber(int64: { toString(): string }): number {
   const num = globalThis.Number(int64.toString());
   if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+    throw new globalThis.Error('Value is larger than Number.MAX_SAFE_INTEGER');
   }
   if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+    throw new globalThis.Error('Value is smaller than Number.MIN_SAFE_INTEGER');
   }
   return num;
 }

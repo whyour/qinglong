@@ -54,6 +54,10 @@ export interface TokenInfo {
   ip: string;
   address: string;
   platform: string;
+  /**
+   * Token expiration time in seconds since Unix epoch.
+   * If undefined, the token uses JWT's built-in expiration.
+   */
   expiration?: number;
 }
 

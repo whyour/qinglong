@@ -55,7 +55,7 @@ export enum CrontabStatus {
   'disabled',
 }
 
-export interface CronInstance extends Model<Crontab, Crontab>, Crontab { }
+export interface CronInstance extends Model<Crontab, Crontab>, Crontab {}
 export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   name: {
     unique: 'compositeIndex',

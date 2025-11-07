@@ -110,7 +110,11 @@ export default class UserService {
         platform: req.platform,
       };
 
-      const updatedTokens = this.addTokenToList(tokens, req.platform, tokenInfo);
+      const updatedTokens = this.addTokenToList(
+        tokens,
+        req.platform,
+        tokenInfo,
+      );
 
       await this.updateAuthInfo(content, {
         token,
@@ -190,8 +194,24 @@ export default class UserService {
 
   public async logout(platform: string, tokenValue: string): Promise<any> {
     const authInfo = await this.getAuthInfo();
-    const updatedTokens = this.removeTokenFromList(authInfo.tokens, platform, tokenValue);
-    
+
+    // Verify the token exists before attempting to remove it
+    const tokenExists = this.findTokenInList(
+      authInfo.tokens,
+      platform,
+      tokenValue,
+    );
+    if (!tokenExists && authInfo.token !== tokenValue) {
+      // Token not found, but don't throw error - user may have already logged out
+      return;
+    }
+
+    const updatedTokens = this.removeTokenFromList(
+      authInfo.tokens,
+      platform,
+      tokenValue,
+    );
+
     await this.updateAuthInfo(authInfo, {
       token: authInfo.token === tokenValue ? '' : authInfo.token,
       tokens: updatedTokens,
@@ -374,20 +394,24 @@ export default class UserService {
     }
   }
 
-  private normalizeTokens(tokens: Record<string, string | TokenInfo[]>): Record<string, TokenInfo[]> {
+  private normalizeTokens(
+    tokens: Record<string, string | TokenInfo[]>,
+  ): Record<string, TokenInfo[]> {
     const normalized: Record<string, TokenInfo[]> = {};
-    
+
     for (const [platform, value] of Object.entries(tokens)) {
       if (typeof value === 'string') {
         // Legacy format: convert string token to TokenInfo array
         if (value) {
-          normalized[platform] = [{
-            value,
-            timestamp: Date.now(),
-            ip: '',
-            address: '',
-            platform,
-          }];
+          normalized[platform] = [
+            {
+              value,
+              timestamp: Date.now(),
+              ip: '',
+              address: '',
+              platform,
+            },
+          ];
         } else {
           normalized[platform] = [];
         }
@@ -396,7 +420,7 @@ export default class UserService {
         normalized[platform] = value || [];
       }
     }
-    
+
     return normalized;
   }
 
@@ -404,52 +428,55 @@ export default class UserService {
     tokens: Record<string, string | TokenInfo[]>,
     platform: string,
     tokenInfo: TokenInfo,
-    maxTokensPerPlatform: number = 10
+    maxTokensPerPlatform: number = config.maxTokensPerPlatform,
   ): Record<string, TokenInfo[]> {
     const normalized = this.normalizeTokens(tokens);
-    
+
     if (!normalized[platform]) {
       normalized[platform] = [];
     }
-    
+
     // Add new token
     normalized[platform].unshift(tokenInfo);
-    
+
     // Limit the number of active tokens per platform
     if (normalized[platform].length > maxTokensPerPlatform) {
-      normalized[platform] = normalized[platform].slice(0, maxTokensPerPlatform);
+      normalized[platform] = normalized[platform].slice(
+        0,
+        maxTokensPerPlatform,
+      );
     }
-    
+
     return normalized;
   }
 
   private removeTokenFromList(
     tokens: Record<string, string | TokenInfo[]>,
     platform: string,
-    tokenValue: string
+    tokenValue: string,
   ): Record<string, TokenInfo[]> {
     const normalized = this.normalizeTokens(tokens);
-    
+
     if (normalized[platform]) {
       normalized[platform] = normalized[platform].filter(
-        (t) => t.value !== tokenValue
+        (t) => t.value !== tokenValue,
       );
     }
-    
+
     return normalized;
   }
 
   private findTokenInList(
     tokens: Record<string, string | TokenInfo[]>,
     platform: string,
-    tokenValue: string
+    tokenValue: string,
   ): TokenInfo | undefined {
     const normalized = this.normalizeTokens(tokens);
-    
+
     if (normalized[platform]) {
       return normalized[platform].find((t) => t.value === tokenValue);
     }
-    
+
     return undefined;
   }
 

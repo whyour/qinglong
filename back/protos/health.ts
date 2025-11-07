@@ -5,7 +5,7 @@
 // source: back/protos/health.proto
 
 /* eslint-disable */
-import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { BinaryReader, BinaryWriter } from '@bufbuild/protobuf/wire';
 import {
   type CallOptions,
   ChannelCredentials,
@@ -19,9 +19,9 @@ import {
   Metadata,
   type ServiceError,
   type UntypedServiceImplementation,
-} from "@grpc/grpc-js";
+} from '@grpc/grpc-js';
 
-export const protobufPackage = "com.ql.health";
+export const protobufPackage = 'com.ql.health';
 
 export interface HealthCheckRequest {
   service: string;
@@ -39,57 +39,68 @@ export enum HealthCheckResponse_ServingStatus {
   UNRECOGNIZED = -1,
 }
 
-export function healthCheckResponse_ServingStatusFromJSON(object: any): HealthCheckResponse_ServingStatus {
+export function healthCheckResponse_ServingStatusFromJSON(
+  object: any,
+): HealthCheckResponse_ServingStatus {
   switch (object) {
     case 0:
-    case "UNKNOWN":
+    case 'UNKNOWN':
       return HealthCheckResponse_ServingStatus.UNKNOWN;
     case 1:
-    case "SERVING":
+    case 'SERVING':
       return HealthCheckResponse_ServingStatus.SERVING;
     case 2:
-    case "NOT_SERVING":
+    case 'NOT_SERVING':
       return HealthCheckResponse_ServingStatus.NOT_SERVING;
     case 3:
-    case "SERVICE_UNKNOWN":
+    case 'SERVICE_UNKNOWN':
       return HealthCheckResponse_ServingStatus.SERVICE_UNKNOWN;
     case -1:
-    case "UNRECOGNIZED":
+    case 'UNRECOGNIZED':
     default:
       return HealthCheckResponse_ServingStatus.UNRECOGNIZED;
   }
 }
 
-export function healthCheckResponse_ServingStatusToJSON(object: HealthCheckResponse_ServingStatus): string {
+export function healthCheckResponse_ServingStatusToJSON(
+  object: HealthCheckResponse_ServingStatus,
+): string {
   switch (object) {
     case HealthCheckResponse_ServingStatus.UNKNOWN:
-      return "UNKNOWN";
+      return 'UNKNOWN';
     case HealthCheckResponse_ServingStatus.SERVING:
-      return "SERVING";
+      return 'SERVING';
     case HealthCheckResponse_ServingStatus.NOT_SERVING:
-      return "NOT_SERVING";
+      return 'NOT_SERVING';
     case HealthCheckResponse_ServingStatus.SERVICE_UNKNOWN:
-      return "SERVICE_UNKNOWN";
+      return 'SERVICE_UNKNOWN';
     case HealthCheckResponse_ServingStatus.UNRECOGNIZED:
     default:
-      return "UNRECOGNIZED";
+      return 'UNRECOGNIZED';
   }
 }
 
 function createBaseHealthCheckRequest(): HealthCheckRequest {
-  return { service: "" };
+  return { service: '' };
 }
 
 export const HealthCheckRequest: MessageFns<HealthCheckRequest> = {
-  encode(message: HealthCheckRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.service !== "") {
+  encode(
+    message: HealthCheckRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.service !== '') {
       writer.uint32(10).string(message.service);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): HealthCheckRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): HealthCheckRequest {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseHealthCheckRequest();
     while (reader.pos < end) {
@@ -113,23 +124,29 @@ export const HealthCheckRequest: MessageFns<HealthCheckRequest> = {
   },
 
   fromJSON(object: any): HealthCheckRequest {
-    return { service: isSet(object.service) ? globalThis.String(object.service) : "" };
+    return {
+      service: isSet(object.service) ? globalThis.String(object.service) : '',
+    };
   },
 
   toJSON(message: HealthCheckRequest): unknown {
     const obj: any = {};
-    if (message.service !== "") {
+    if (message.service !== '') {
       obj.service = message.service;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<HealthCheckRequest>, I>>(base?: I): HealthCheckRequest {
+  create<I extends Exact<DeepPartial<HealthCheckRequest>, I>>(
+    base?: I,
+  ): HealthCheckRequest {
     return HealthCheckRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<HealthCheckRequest>, I>>(object: I): HealthCheckRequest {
+  fromPartial<I extends Exact<DeepPartial<HealthCheckRequest>, I>>(
+    object: I,
+  ): HealthCheckRequest {
     const message = createBaseHealthCheckRequest();
-    message.service = object.service ?? "";
+    message.service = object.service ?? '';
     return message;
   },
 };
@@ -139,15 +156,22 @@ function createBaseHealthCheckResponse(): HealthCheckResponse {
 }
 
 export const HealthCheckResponse: MessageFns<HealthCheckResponse> = {
-  encode(message: HealthCheckResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: HealthCheckResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     if (message.status !== 0) {
       writer.uint32(8).int32(message.status);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): HealthCheckResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): HealthCheckResponse {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseHealthCheckResponse();
     while (reader.pos < end) {
@@ -171,7 +195,11 @@ export const HealthCheckResponse: MessageFns<HealthCheckResponse> = {
   },
 
   fromJSON(object: any): HealthCheckResponse {
-    return { status: isSet(object.status) ? healthCheckResponse_ServingStatusFromJSON(object.status) : 0 };
+    return {
+      status: isSet(object.status)
+        ? healthCheckResponse_ServingStatusFromJSON(object.status)
+        : 0,
+    };
   },
 
   toJSON(message: HealthCheckResponse): unknown {
@@ -182,10 +210,14 @@ export const HealthCheckResponse: MessageFns<HealthCheckResponse> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<HealthCheckResponse>, I>>(base?: I): HealthCheckResponse {
+  create<I extends Exact<DeepPartial<HealthCheckResponse>, I>>(
+    base?: I,
+  ): HealthCheckResponse {
     return HealthCheckResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<HealthCheckResponse>, I>>(object: I): HealthCheckResponse {
+  fromPartial<I extends Exact<DeepPartial<HealthCheckResponse>, I>>(
+    object: I,
+  ): HealthCheckResponse {
     const message = createBaseHealthCheckResponse();
     message.status = object.status ?? 0;
     return message;
@@ -195,21 +227,25 @@ export const HealthCheckResponse: MessageFns<HealthCheckResponse> = {
 export type HealthService = typeof HealthService;
 export const HealthService = {
   check: {
-    path: "/com.ql.health.Health/Check",
+    path: '/com.ql.health.Health/Check',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: HealthCheckRequest) => Buffer.from(HealthCheckRequest.encode(value).finish()),
+    requestSerialize: (value: HealthCheckRequest) =>
+      Buffer.from(HealthCheckRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => HealthCheckRequest.decode(value),
-    responseSerialize: (value: HealthCheckResponse) => Buffer.from(HealthCheckResponse.encode(value).finish()),
+    responseSerialize: (value: HealthCheckResponse) =>
+      Buffer.from(HealthCheckResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => HealthCheckResponse.decode(value),
   },
   watch: {
-    path: "/com.ql.health.Health/Watch",
+    path: '/com.ql.health.Health/Watch',
     requestStream: false,
     responseStream: true,
-    requestSerialize: (value: HealthCheckRequest) => Buffer.from(HealthCheckRequest.encode(value).finish()),
+    requestSerialize: (value: HealthCheckRequest) =>
+      Buffer.from(HealthCheckRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => HealthCheckRequest.decode(value),
-    responseSerialize: (value: HealthCheckResponse) => Buffer.from(HealthCheckResponse.encode(value).finish()),
+    responseSerialize: (value: HealthCheckResponse) =>
+      Buffer.from(HealthCheckResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => HealthCheckResponse.decode(value),
   },
 } as const;
@@ -222,20 +258,32 @@ export interface HealthServer extends UntypedServiceImplementation {
 export interface HealthClient extends Client {
   check(
     request: HealthCheckRequest,
-    callback: (error: ServiceError | null, response: HealthCheckResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: HealthCheckResponse,
+    ) => void,
   ): ClientUnaryCall;
   check(
     request: HealthCheckRequest,
     metadata: Metadata,
-    callback: (error: ServiceError | null, response: HealthCheckResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: HealthCheckResponse,
+    ) => void,
   ): ClientUnaryCall;
   check(
     request: HealthCheckRequest,
     metadata: Metadata,
     options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: HealthCheckResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: HealthCheckResponse,
+    ) => void,
   ): ClientUnaryCall;
-  watch(request: HealthCheckRequest, options?: Partial<CallOptions>): ClientReadableStream<HealthCheckResponse>;
+  watch(
+    request: HealthCheckRequest,
+    options?: Partial<CallOptions>,
+  ): ClientReadableStream<HealthCheckResponse>;
   watch(
     request: HealthCheckRequest,
     metadata?: Metadata,
@@ -243,23 +291,44 @@ export interface HealthClient extends Client {
   ): ClientReadableStream<HealthCheckResponse>;
 }
 
-export const HealthClient = makeGenericClientConstructor(HealthService, "com.ql.health.Health") as unknown as {
-  new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): HealthClient;
+export const HealthClient = makeGenericClientConstructor(
+  HealthService,
+  'com.ql.health.Health',
+) as unknown as {
+  new (
+    address: string,
+    credentials: ChannelCredentials,
+    options?: Partial<ClientOptions>,
+  ): HealthClient;
   service: typeof HealthService;
   serviceName: string;
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+  ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U>
+  ? ReadonlyArray<DeepPartial<U>>
+  : T extends {}
+  ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

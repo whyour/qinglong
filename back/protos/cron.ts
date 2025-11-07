@@ -5,7 +5,7 @@
 // source: back/protos/cron.proto
 
 /* eslint-disable */
-import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { BinaryReader, BinaryWriter } from '@bufbuild/protobuf/wire';
 import {
   type CallOptions,
   ChannelCredentials,
@@ -17,9 +17,9 @@ import {
   Metadata,
   type ServiceError,
   type UntypedServiceImplementation,
-} from "@grpc/grpc-js";
+} from '@grpc/grpc-js';
 
-export const protobufPackage = "com.ql.cron";
+export const protobufPackage = 'com.ql.cron';
 
 export interface ISchedule {
   schedule: string;
@@ -37,30 +37,32 @@ export interface AddCronRequest {
   crons: ICron[];
 }
 
-export interface AddCronResponse {
-}
+export interface AddCronResponse {}
 
 export interface DeleteCronRequest {
   ids: string[];
 }
 
-export interface DeleteCronResponse {
-}
+export interface DeleteCronResponse {}
 
 function createBaseISchedule(): ISchedule {
-  return { schedule: "" };
+  return { schedule: '' };
 }
 
 export const ISchedule: MessageFns<ISchedule> = {
-  encode(message: ISchedule, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.schedule !== "") {
+  encode(
+    message: ISchedule,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.schedule !== '') {
       writer.uint32(10).string(message.schedule);
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): ISchedule {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseISchedule();
     while (reader.pos < end) {
@@ -84,12 +86,16 @@ export const ISchedule: MessageFns<ISchedule> = {
   },
 
   fromJSON(object: any): ISchedule {
-    return { schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : "" };
+    return {
+      schedule: isSet(object.schedule)
+        ? globalThis.String(object.schedule)
+        : '',
+    };
   },
 
   toJSON(message: ISchedule): unknown {
     const obj: any = {};
-    if (message.schedule !== "") {
+    if (message.schedule !== '') {
       obj.schedule = message.schedule;
     }
     return obj;
@@ -98,39 +104,45 @@ export const ISchedule: MessageFns<ISchedule> = {
   create<I extends Exact<DeepPartial<ISchedule>, I>>(base?: I): ISchedule {
     return ISchedule.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<ISchedule>, I>>(object: I): ISchedule {
+  fromPartial<I extends Exact<DeepPartial<ISchedule>, I>>(
+    object: I,
+  ): ISchedule {
     const message = createBaseISchedule();
-    message.schedule = object.schedule ?? "";
+    message.schedule = object.schedule ?? '';
     return message;
   },
 };
 
 function createBaseICron(): ICron {
-  return { id: "", schedule: "", command: "", extra_schedules: [], name: "" };
+  return { id: '', schedule: '', command: '', extra_schedules: [], name: '' };
 }
 
 export const ICron: MessageFns<ICron> = {
-  encode(message: ICron, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.id !== "") {
+  encode(
+    message: ICron,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.id !== '') {
       writer.uint32(10).string(message.id);
     }
-    if (message.schedule !== "") {
+    if (message.schedule !== '') {
       writer.uint32(18).string(message.schedule);
     }
-    if (message.command !== "") {
+    if (message.command !== '') {
       writer.uint32(26).string(message.command);
     }
     for (const v of message.extra_schedules) {
       ISchedule.encode(v!, writer.uint32(34).fork()).join();
     }
-    if (message.name !== "") {
+    if (message.name !== '') {
       writer.uint32(42).string(message.name);
     }
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): ICron {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseICron();
     while (reader.pos < end) {
@@ -165,7 +177,9 @@ export const ICron: MessageFns<ICron> = {
             break;
           }
 
-          message.extra_schedules.push(ISchedule.decode(reader, reader.uint32()));
+          message.extra_schedules.push(
+            ISchedule.decode(reader, reader.uint32()),
+          );
           continue;
         }
         case 5: {
@@ -187,31 +201,35 @@ export const ICron: MessageFns<ICron> = {
 
   fromJSON(object: any): ICron {
     return {
-      id: isSet(object.id) ? globalThis.String(object.id) : "",
-      schedule: isSet(object.schedule) ? globalThis.String(object.schedule) : "",
-      command: isSet(object.command) ? globalThis.String(object.command) : "",
+      id: isSet(object.id) ? globalThis.String(object.id) : '',
+      schedule: isSet(object.schedule)
+        ? globalThis.String(object.schedule)
+        : '',
+      command: isSet(object.command) ? globalThis.String(object.command) : '',
       extra_schedules: globalThis.Array.isArray(object?.extra_schedules)
         ? object.extra_schedules.map((e: any) => ISchedule.fromJSON(e))
         : [],
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : '',
     };
   },
 
   toJSON(message: ICron): unknown {
     const obj: any = {};
-    if (message.id !== "") {
+    if (message.id !== '') {
       obj.id = message.id;
     }
-    if (message.schedule !== "") {
+    if (message.schedule !== '') {
       obj.schedule = message.schedule;
     }
-    if (message.command !== "") {
+    if (message.command !== '') {
       obj.command = message.command;
     }
     if (message.extra_schedules?.length) {
-      obj.extra_schedules = message.extra_schedules.map((e) => ISchedule.toJSON(e));
+      obj.extra_schedules = message.extra_schedules.map((e) =>
+        ISchedule.toJSON(e),
+      );
     }
-    if (message.name !== "") {
+    if (message.name !== '') {
       obj.name = message.name;
     }
     return obj;
@@ -222,11 +240,12 @@ export const ICron: MessageFns<ICron> = {
   },
   fromPartial<I extends Exact<DeepPartial<ICron>, I>>(object: I): ICron {
     const message = createBaseICron();
-    message.id = object.id ?? "";
-    message.schedule = object.schedule ?? "";
-    message.command = object.command ?? "";
-    message.extra_schedules = object.extra_schedules?.map((e) => ISchedule.fromPartial(e)) || [];
-    message.name = object.name ?? "";
+    message.id = object.id ?? '';
+    message.schedule = object.schedule ?? '';
+    message.command = object.command ?? '';
+    message.extra_schedules =
+      object.extra_schedules?.map((e) => ISchedule.fromPartial(e)) || [];
+    message.name = object.name ?? '';
     return message;
   },
 };
@@ -236,7 +255,10 @@ function createBaseAddCronRequest(): AddCronRequest {
 }
 
 export const AddCronRequest: MessageFns<AddCronRequest> = {
-  encode(message: AddCronRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: AddCronRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     for (const v of message.crons) {
       ICron.encode(v!, writer.uint32(10).fork()).join();
     }
@@ -244,7 +266,8 @@ export const AddCronRequest: MessageFns<AddCronRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): AddCronRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseAddCronRequest();
     while (reader.pos < end) {
@@ -268,7 +291,11 @@ export const AddCronRequest: MessageFns<AddCronRequest> = {
   },
 
   fromJSON(object: any): AddCronRequest {
-    return { crons: globalThis.Array.isArray(object?.crons) ? object.crons.map((e: any) => ICron.fromJSON(e)) : [] };
+    return {
+      crons: globalThis.Array.isArray(object?.crons)
+        ? object.crons.map((e: any) => ICron.fromJSON(e))
+        : [],
+    };
   },
 
   toJSON(message: AddCronRequest): unknown {
@@ -279,10 +306,14 @@ export const AddCronRequest: MessageFns<AddCronRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<AddCronRequest>, I>>(base?: I): AddCronRequest {
+  create<I extends Exact<DeepPartial<AddCronRequest>, I>>(
+    base?: I,
+  ): AddCronRequest {
     return AddCronRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<AddCronRequest>, I>>(object: I): AddCronRequest {
+  fromPartial<I extends Exact<DeepPartial<AddCronRequest>, I>>(
+    object: I,
+  ): AddCronRequest {
     const message = createBaseAddCronRequest();
     message.crons = object.crons?.map((e) => ICron.fromPartial(e)) || [];
     return message;
@@ -294,12 +325,16 @@ function createBaseAddCronResponse(): AddCronResponse {
 }
 
 export const AddCronResponse: MessageFns<AddCronResponse> = {
-  encode(_: AddCronResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    _: AddCronResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     return writer;
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): AddCronResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseAddCronResponse();
     while (reader.pos < end) {
@@ -323,10 +358,14 @@ export const AddCronResponse: MessageFns<AddCronResponse> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<AddCronResponse>, I>>(base?: I): AddCronResponse {
+  create<I extends Exact<DeepPartial<AddCronResponse>, I>>(
+    base?: I,
+  ): AddCronResponse {
     return AddCronResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<AddCronResponse>, I>>(_: I): AddCronResponse {
+  fromPartial<I extends Exact<DeepPartial<AddCronResponse>, I>>(
+    _: I,
+  ): AddCronResponse {
     const message = createBaseAddCronResponse();
     return message;
   },
@@ -337,7 +376,10 @@ function createBaseDeleteCronRequest(): DeleteCronRequest {
 }
 
 export const DeleteCronRequest: MessageFns<DeleteCronRequest> = {
-  encode(message: DeleteCronRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    message: DeleteCronRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     for (const v of message.ids) {
       writer.uint32(10).string(v!);
     }
@@ -345,7 +387,8 @@ export const DeleteCronRequest: MessageFns<DeleteCronRequest> = {
   },
 
   decode(input: BinaryReader | Uint8Array, length?: number): DeleteCronRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDeleteCronRequest();
     while (reader.pos < end) {
@@ -369,7 +412,11 @@ export const DeleteCronRequest: MessageFns<DeleteCronRequest> = {
   },
 
   fromJSON(object: any): DeleteCronRequest {
-    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.String(e)) : [] };
+    return {
+      ids: globalThis.Array.isArray(object?.ids)
+        ? object.ids.map((e: any) => globalThis.String(e))
+        : [],
+    };
   },
 
   toJSON(message: DeleteCronRequest): unknown {
@@ -380,10 +427,14 @@ export const DeleteCronRequest: MessageFns<DeleteCronRequest> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<DeleteCronRequest>, I>>(base?: I): DeleteCronRequest {
+  create<I extends Exact<DeepPartial<DeleteCronRequest>, I>>(
+    base?: I,
+  ): DeleteCronRequest {
     return DeleteCronRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<DeleteCronRequest>, I>>(object: I): DeleteCronRequest {
+  fromPartial<I extends Exact<DeepPartial<DeleteCronRequest>, I>>(
+    object: I,
+  ): DeleteCronRequest {
     const message = createBaseDeleteCronRequest();
     message.ids = object.ids?.map((e) => e) || [];
     return message;
@@ -395,12 +446,19 @@ function createBaseDeleteCronResponse(): DeleteCronResponse {
 }
 
 export const DeleteCronResponse: MessageFns<DeleteCronResponse> = {
-  encode(_: DeleteCronResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(
+    _: DeleteCronResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): DeleteCronResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+  decode(
+    input: BinaryReader | Uint8Array,
+    length?: number,
+  ): DeleteCronResponse {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseDeleteCronResponse();
     while (reader.pos < end) {
@@ -424,10 +482,14 @@ export const DeleteCronResponse: MessageFns<DeleteCronResponse> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<DeleteCronResponse>, I>>(base?: I): DeleteCronResponse {
+  create<I extends Exact<DeepPartial<DeleteCronResponse>, I>>(
+    base?: I,
+  ): DeleteCronResponse {
     return DeleteCronResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<DeleteCronResponse>, I>>(_: I): DeleteCronResponse {
+  fromPartial<I extends Exact<DeepPartial<DeleteCronResponse>, I>>(
+    _: I,
+  ): DeleteCronResponse {
     const message = createBaseDeleteCronResponse();
     return message;
   },
@@ -436,21 +498,25 @@ export const DeleteCronResponse: MessageFns<DeleteCronResponse> = {
 export type CronService = typeof CronService;
 export const CronService = {
   addCron: {
-    path: "/com.ql.cron.Cron/addCron",
+    path: '/com.ql.cron.Cron/addCron',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: AddCronRequest) => Buffer.from(AddCronRequest.encode(value).finish()),
+    requestSerialize: (value: AddCronRequest) =>
+      Buffer.from(AddCronRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => AddCronRequest.decode(value),
-    responseSerialize: (value: AddCronResponse) => Buffer.from(AddCronResponse.encode(value).finish()),
+    responseSerialize: (value: AddCronResponse) =>
+      Buffer.from(AddCronResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => AddCronResponse.decode(value),
   },
   delCron: {
-    path: "/com.ql.cron.Cron/delCron",
+    path: '/com.ql.cron.Cron/delCron',
     requestStream: false,
     responseStream: false,
-    requestSerialize: (value: DeleteCronRequest) => Buffer.from(DeleteCronRequest.encode(value).finish()),
+    requestSerialize: (value: DeleteCronRequest) =>
+      Buffer.from(DeleteCronRequest.encode(value).finish()),
     requestDeserialize: (value: Buffer) => DeleteCronRequest.decode(value),
-    responseSerialize: (value: DeleteCronResponse) => Buffer.from(DeleteCronResponse.encode(value).finish()),
+    responseSerialize: (value: DeleteCronResponse) =>
+      Buffer.from(DeleteCronResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => DeleteCronResponse.decode(value),
   },
 } as const;
@@ -478,38 +544,68 @@ export interface CronClient extends Client {
   ): ClientUnaryCall;
   delCron(
     request: DeleteCronRequest,
-    callback: (error: ServiceError | null, response: DeleteCronResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: DeleteCronResponse,
+    ) => void,
   ): ClientUnaryCall;
   delCron(
     request: DeleteCronRequest,
     metadata: Metadata,
-    callback: (error: ServiceError | null, response: DeleteCronResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: DeleteCronResponse,
+    ) => void,
   ): ClientUnaryCall;
   delCron(
     request: DeleteCronRequest,
     metadata: Metadata,
     options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: DeleteCronResponse) => void,
+    callback: (
+      error: ServiceError | null,
+      response: DeleteCronResponse,
+    ) => void,
   ): ClientUnaryCall;
 }
 
-export const CronClient = makeGenericClientConstructor(CronService, "com.ql.cron.Cron") as unknown as {
-  new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): CronClient;
+export const CronClient = makeGenericClientConstructor(
+  CronService,
+  'com.ql.cron.Cron',
+) as unknown as {
+  new (
+    address: string,
+    credentials: ChannelCredentials,
+    options?: Partial<ClientOptions>,
+  ): CronClient;
   service: typeof CronService;
   serviceName: string;
 };
 
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type Builtin =
+  | Date
+  | Function
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+  ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U>
+  ? ReadonlyArray<DeepPartial<U>>
+  : T extends {}
+  ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+  ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
+      [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
+    };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

@@ -4,6 +4,7 @@ import { Container } from 'typedi';
 import SockService from '../services/sock';
 import { getPlatform } from '../config/util';
 import { shareStore } from '../shared/store';
+import { isValidToken } from '../shared/auth';
 
 export default async ({ server }: { server: Server }) => {
   const echo = sockJs.createServer({ prefix: '/api/ws', log: () => {} });
@@ -17,51 +18,19 @@ export default async ({ server }: { server: Server }) => {
     const authInfo = await shareStore.getAuthInfo();
     const platform = getPlatform(conn.headers['user-agent'] || '') || 'desktop';
     const headerToken = conn.url.replace(`${conn.pathname}?token=`, '');
-    if (authInfo) {
-      const { token = '', tokens = {} } = authInfo;
-      
-      // Check legacy token field
-      if (headerToken === token) {
-        sockService.addClient(conn);
 
-        conn.on('data', (message) => {
-          conn.write(message);
-        });
+    if (isValidToken(authInfo, headerToken, platform)) {
+      sockService.addClient(conn);
 
-        conn.on('close', function () {
-          sockService.removeClient(conn);
-        });
+      conn.on('data', (message) => {
+        conn.write(message);
+      });
 
-        return;
-      }
-      
-      // Check platform-specific tokens (support both legacy string and new TokenInfo[] format)
-      const platformTokens = tokens[platform];
-      if (platformTokens) {
-        let isValidToken = false;
-        
-        if (typeof platformTokens === 'string') {
-          // Legacy format: single string token
-          isValidToken = headerToken === platformTokens;
-        } else if (Array.isArray(platformTokens)) {
-          // New format: array of TokenInfo objects
-          isValidToken = platformTokens.some((t) => t.value === headerToken);
-        }
-        
-        if (isValidToken) {
-          sockService.addClient(conn);
+      conn.on('close', function () {
+        sockService.removeClient(conn);
+      });
 
-          conn.on('data', (message) => {
-            conn.write(message);
-          });
-
-          conn.on('close', function () {
-            sockService.removeClient(conn);
-          });
-
-          return;
-        }
-      }
+      return;
     }
 
     conn.close('404');

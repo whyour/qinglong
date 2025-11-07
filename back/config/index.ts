@@ -176,4 +176,5 @@ export default {
   sshdPath,
   systemLogPath,
   dependenceCachePath,
+  maxTokensPerPlatform: 10, // Maximum number of concurrent sessions per platform
 };

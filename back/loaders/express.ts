@@ -9,6 +9,7 @@ import rewrite from 'express-urlrewrite';
 import { errors } from 'celebrate';
 import { serveEnv } from '../config/serverEnv';
 import { IKeyvStore, shareStore } from '../shared/store';
+import { isValidToken } from '../shared/auth';
 import path from 'path';
 
 export default ({ app }: { app: Application }) => {
@@ -77,30 +78,8 @@ export default ({ app }: { app: Application }) => {
     }
 
     const authInfo = await shareStore.getAuthInfo();
-    if (authInfo && headerToken) {
-      const { token = '', tokens = {} } = authInfo;
-      
-      // Check legacy token field
-      if (headerToken === token) {
-        return next();
-      }
-      
-      // Check platform-specific tokens (support both legacy string and new TokenInfo[] format)
-      const platformTokens = tokens[req.platform];
-      if (platformTokens) {
-        if (typeof platformTokens === 'string') {
-          // Legacy format: single string token
-          if (headerToken === platformTokens) {
-            return next();
-          }
-        } else if (Array.isArray(platformTokens)) {
-          // New format: array of TokenInfo objects
-          const tokenExists = platformTokens.some((t) => t.value === headerToken);
-          if (tokenExists) {
-            return next();
-          }
-        }
-      }
+    if (isValidToken(authInfo, headerToken, req.platform)) {
+      return next();
     }
 
     const errorCode = headerToken ? 'invalid_token' : 'credentials_required';
