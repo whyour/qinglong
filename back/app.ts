@@ -57,14 +57,21 @@ class Application {
     const grpcWorker = this.forkWorker('grpc');
     
     // Wait for gRPC worker to signal it's ready before starting HTTP worker
-    const grpcReadyPromise = new Promise<void>((resolve) => {
+    const grpcReadyPromise = new Promise<void>((resolve, reject) => {
       const messageHandler = (msg: any) => {
         if (msg === 'ready') {
           grpcWorker.removeListener('message', messageHandler);
+          clearTimeout(timeoutId);
           resolve();
         }
       };
       grpcWorker.on('message', messageHandler);
+      
+      // Timeout after 30 seconds
+      const timeoutId = setTimeout(() => {
+        grpcWorker.removeListener('message', messageHandler);
+        reject(new Error('gRPC worker failed to start within 30 seconds'));
+      }, 30000);
     });
 
     // Start HTTP worker after gRPC is ready
