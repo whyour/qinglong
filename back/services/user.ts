@@ -11,6 +11,7 @@ import {
   SystemModelInfo,
   LoginStatus,
   AuthInfo,
+  TokenInfo,
 } from '../data/system';
 import { NotificationInfo } from '../data/notify';
 import NotificationService from './notify';
@@ -101,12 +102,19 @@ export default class UserService {
         algorithm: 'HS384',
       });
 
+      const tokenInfo: TokenInfo = {
+        value: token,
+        timestamp,
+        ip,
+        address,
+        platform: req.platform,
+      };
+
+      const updatedTokens = this.addTokenToList(tokens, req.platform, tokenInfo);
+
       await this.updateAuthInfo(content, {
         token,
-        tokens: {
-          ...tokens,
-          [req.platform]: token,
-        },
+        tokens: updatedTokens,
         lastlogon: timestamp,
         retries: 0,
         lastip: ip,
@@ -180,11 +188,13 @@ export default class UserService {
     }
   }
 
-  public async logout(platform: string): Promise<any> {
+  public async logout(platform: string, tokenValue: string): Promise<any> {
     const authInfo = await this.getAuthInfo();
+    const updatedTokens = this.removeTokenFromList(authInfo.tokens, platform, tokenValue);
+    
     await this.updateAuthInfo(authInfo, {
-      token: '',
-      tokens: { ...authInfo.tokens, [platform]: '' },
+      token: authInfo.token === tokenValue ? '' : authInfo.token,
+      tokens: updatedTokens,
     });
   }
 
@@ -362,6 +372,85 @@ export default class UserService {
     } else {
       return { code: 400, message: '通知发送失败，请检查参数' };
     }
+  }
+
+  private normalizeTokens(tokens: Record<string, string | TokenInfo[]>): Record<string, TokenInfo[]> {
+    const normalized: Record<string, TokenInfo[]> = {};
+    
+    for (const [platform, value] of Object.entries(tokens)) {
+      if (typeof value === 'string') {
+        // Legacy format: convert string token to TokenInfo array
+        if (value) {
+          normalized[platform] = [{
+            value,
+            timestamp: Date.now(),
+            ip: '',
+            address: '',
+            platform,
+          }];
+        } else {
+          normalized[platform] = [];
+        }
+      } else {
+        // Already in new format
+        normalized[platform] = value || [];
+      }
+    }
+    
+    return normalized;
+  }
+
+  private addTokenToList(
+    tokens: Record<string, string | TokenInfo[]>,
+    platform: string,
+    tokenInfo: TokenInfo,
+    maxTokensPerPlatform: number = 10
+  ): Record<string, TokenInfo[]> {
+    const normalized = this.normalizeTokens(tokens);
+    
+    if (!normalized[platform]) {
+      normalized[platform] = [];
+    }
+    
+    // Add new token
+    normalized[platform].unshift(tokenInfo);
+    
+    // Limit the number of active tokens per platform
+    if (normalized[platform].length > maxTokensPerPlatform) {
+      normalized[platform] = normalized[platform].slice(0, maxTokensPerPlatform);
+    }
+    
+    return normalized;
+  }
+
+  private removeTokenFromList(
+    tokens: Record<string, string | TokenInfo[]>,
+    platform: string,
+    tokenValue: string
+  ): Record<string, TokenInfo[]> {
+    const normalized = this.normalizeTokens(tokens);
+    
+    if (normalized[platform]) {
+      normalized[platform] = normalized[platform].filter(
+        (t) => t.value !== tokenValue
+      );
+    }
+    
+    return normalized;
+  }
+
+  private findTokenInList(
+    tokens: Record<string, string | TokenInfo[]>,
+    platform: string,
+    tokenValue: string
+  ): TokenInfo | undefined {
+    const normalized = this.normalizeTokens(tokens);
+    
+    if (normalized[platform]) {
+      return normalized[platform].find((t) => t.value === tokenValue);
+    }
+    
+    return undefined;
   }
 
   public async resetAuthInfo(info: Partial<AuthInfo>) {

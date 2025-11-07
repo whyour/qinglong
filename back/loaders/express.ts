@@ -79,8 +79,27 @@ export default ({ app }: { app: Application }) => {
     const authInfo = await shareStore.getAuthInfo();
     if (authInfo && headerToken) {
       const { token = '', tokens = {} } = authInfo;
-      if (headerToken === token || tokens[req.platform] === headerToken) {
+      
+      // Check legacy token field
+      if (headerToken === token) {
         return next();
+      }
+      
+      // Check platform-specific tokens (support both legacy string and new TokenInfo[] format)
+      const platformTokens = tokens[req.platform];
+      if (platformTokens) {
+        if (typeof platformTokens === 'string') {
+          // Legacy format: single string token
+          if (headerToken === platformTokens) {
+            return next();
+          }
+        } else if (Array.isArray(platformTokens)) {
+          // New format: array of TokenInfo objects
+          const tokenExists = platformTokens.some((t) => t.value === headerToken);
+          if (tokenExists) {
+            return next();
+          }
+        }
       }
     }
 

@@ -48,6 +48,15 @@ export interface LoginLogInfo {
   status?: LoginStatus;
 }
 
+export interface TokenInfo {
+  value: string;
+  timestamp: number;
+  ip: string;
+  address: string;
+  platform: string;
+  expiration?: number;
+}
+
 export interface AuthInfo {
   username: string;
   password: string;
@@ -58,7 +67,7 @@ export interface AuthInfo {
   platform: string;
   isTwoFactorChecking: boolean;
   token: string;
-  tokens: Record<string, string>;
+  tokens: Record<string, string | TokenInfo[]>;
   twoFactorActivated: boolean;
   twoFactorSecret: string;
   avatar: string;

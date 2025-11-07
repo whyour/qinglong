@@ -19,7 +19,9 @@ export default async ({ server }: { server: Server }) => {
     const headerToken = conn.url.replace(`${conn.pathname}?token=`, '');
     if (authInfo) {
       const { token = '', tokens = {} } = authInfo;
-      if (headerToken === token || tokens[platform] === headerToken) {
+      
+      // Check legacy token field
+      if (headerToken === token) {
         sockService.addClient(conn);
 
         conn.on('data', (message) => {
@@ -31,6 +33,34 @@ export default async ({ server }: { server: Server }) => {
         });
 
         return;
+      }
+      
+      // Check platform-specific tokens (support both legacy string and new TokenInfo[] format)
+      const platformTokens = tokens[platform];
+      if (platformTokens) {
+        let isValidToken = false;
+        
+        if (typeof platformTokens === 'string') {
+          // Legacy format: single string token
+          isValidToken = headerToken === platformTokens;
+        } else if (Array.isArray(platformTokens)) {
+          // New format: array of TokenInfo objects
+          isValidToken = platformTokens.some((t) => t.value === headerToken);
+        }
+        
+        if (isValidToken) {
+          sockService.addClient(conn);
+
+          conn.on('data', (message) => {
+            conn.write(message);
+          });
+
+          conn.on('close', function () {
+            sockService.removeClient(conn);
+          });
+
+          return;
+        }
       }
     }
 
