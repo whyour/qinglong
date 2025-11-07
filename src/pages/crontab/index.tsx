@@ -270,7 +270,13 @@ const Crontab = () => {
     },
     {
       title: intl.get('关联订阅'),
+      key: 'sub_id',
+      dataIndex: 'sub_id',
       width: 185,
+      filters: allSubscriptions.map((sub) => ({
+        text: sub.name || sub.alias,
+        value: sub.id,
+      })),
       render: (text, record: any) => record?.subscription?.name || '-',
     },
     {
@@ -347,6 +353,7 @@ const Crontab = () => {
   const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
   const [activeKey, setActiveKey] = useState('');
+  const [allSubscriptions, setAllSubscriptions] = useState<any[]>([]);
 
   const goToScriptManager = (record: any) => {
     const result = getCommandScript(record.command);
@@ -801,6 +808,7 @@ const Crontab = () => {
 
   useEffect(() => {
     getCronViews();
+    getAllSubscriptions();
   }, []);
 
   const viewAction = (key: string) => {
@@ -883,6 +891,19 @@ const Crontab = () => {
       })
       .finally(() => {
         setLoading(false);
+      });
+  };
+
+  const getAllSubscriptions = () => {
+    request
+      .get(`${config.apiPrefix}subscriptions`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setAllSubscriptions(data || []);
+        }
+      })
+      .catch(() => {
+        // Silently fail if subscriptions can't be loaded
       });
   };
 
