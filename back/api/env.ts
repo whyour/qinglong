@@ -26,7 +26,7 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     try {
       const envService = Container.get(EnvService);
-      const data = await envService.envs(req.query.searchValue as string);
+      const data = await envService.envs(req.query.searchValue as string, {}, req.user?.userId);
       return res.send({ code: 200, data });
     } catch (e) {
       logger.error('🔥 error: %o', e);
@@ -54,7 +54,7 @@ export default (app: Router) => {
         if (!req.body?.length) {
           return res.send({ code: 400, message: '参数不正确' });
         }
-        const data = await envService.create(req.body);
+        const data = await envService.create(req.body, req.user?.userId);
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -93,10 +93,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.remove(req.body);
+        const data = await envService.remove(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -132,10 +132,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.disabled(req.body);
+        const data = await envService.disabled(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -149,10 +149,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.enabled(req.body);
+        const data = await envService.enabled(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -169,10 +169,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.updateNames(req.body);
+        const data = await envService.updateNames(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
