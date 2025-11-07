@@ -7,11 +7,17 @@ export function rootContainer(container: any) {
     'en': require('./locales/en-US.json'),
     'zh': require('./locales/zh-CN.json'),
   };
-  let currentLocale = intl.determineLocale({
-    urlLocaleKey: 'lang',
-    cookieLocaleKey: 'lang',
-    localStorageLocaleKey: 'lang',
-  }).slice(0, 2);
+  let currentLocale: string;
+  try {
+    currentLocale = intl.determineLocale({
+      urlLocaleKey: 'lang',
+      cookieLocaleKey: 'lang',
+      localStorageLocaleKey: 'lang',
+    }).slice(0, 2);
+  } catch (e) {
+    // Handle decodeURIComponent errors from malformed cookies
+    currentLocale = '';
+  }
 
   if (!currentLocale || !Object.keys(locales).includes(currentLocale)) {
     currentLocale = 'zh';
