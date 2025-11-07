@@ -46,7 +46,7 @@ export default class CronService {
       attributes: ['id', 'userId'],
     });
     const unauthorized = crons.filter(
-      (cron) => cron.userId !== userId && cron.userId !== undefined
+      (cron) => cron.userId !== undefined && cron.userId !== userId
     );
     if (unauthorized.length > 0) {
       throw new Error('无权限操作该定时任务');

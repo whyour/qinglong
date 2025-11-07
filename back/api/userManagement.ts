@@ -8,7 +8,7 @@ const route = Router();
 
 // Middleware to check if user is admin
 const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (req.user && (req.user as any).role === UserRole.admin) {
+  if (req.user && req.user.role === UserRole.admin) {
     return next();
   }
   return res.status(403).send({ code: 403, message: '需要管理员权限' });

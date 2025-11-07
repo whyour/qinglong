@@ -36,7 +36,7 @@ export default class EnvService {
       attributes: ['id', 'userId'],
     });
     const unauthorized = envs.filter(
-      (env) => env.userId !== userId && env.userId !== undefined
+      (env) => env.userId !== undefined && env.userId !== userId
     );
     if (unauthorized.length > 0) {
       throw new Error('无权限操作该环境变量');

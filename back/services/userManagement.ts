@@ -2,10 +2,20 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { User, UserModel, UserRole, UserStatus } from '../data/user';
 import { Op } from 'sequelize';
+import bcrypt from 'bcrypt';
 
 @Service()
 export default class UserManagementService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
+
+  private async hashPassword(password: string): Promise<string> {
+    const saltRounds = 10;
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  private async verifyPassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
 
   public async list(searchText?: string): Promise<User[]> {
     let query: any = {};
@@ -40,11 +50,15 @@ export default class UserManagementService {
       throw new Error('用户名已存在');
     }
     
-    if (payload.password === 'admin') {
-      throw new Error('密码不能设置为admin');
+    if (payload.password.length < 6) {
+      throw new Error('密码长度至少为6位');
     }
 
-    const doc = await UserModel.create(payload);
+    // Hash the password before storing
+    const hashedPassword = await this.hashPassword(payload.password);
+    const userWithHashedPassword = { ...payload, password: hashedPassword };
+    
+    const doc = await UserModel.create(userWithHashedPassword);
     return doc.get({ plain: true });
   }
 
@@ -58,8 +72,8 @@ export default class UserManagementService {
       throw new Error('用户不存在');
     }
 
-    if (payload.password === 'admin') {
-      throw new Error('密码不能设置为admin');
+    if (payload.password && payload.password.length < 6) {
+      throw new Error('密码长度至少为6位');
     }
 
     // Check if username is being changed and if new username already exists
@@ -70,7 +84,13 @@ export default class UserManagementService {
       }
     }
 
-    const [, [updated]] = await UserModel.update(payload, {
+    // Hash the password if it's being updated
+    const updatePayload = { ...payload };
+    if (payload.password) {
+      updatePayload.password = await this.hashPassword(payload.password);
+    }
+
+    const [, [updated]] = await UserModel.update(updatePayload, {
       where: { id: payload.id },
       returning: true,
     });
@@ -91,7 +111,8 @@ export default class UserManagementService {
       return null;
     }
 
-    if (user.password !== password) {
+    const isPasswordValid = await this.verifyPassword(password, user.password);
+    if (!isPasswordValid) {
       return null;
     }
 
