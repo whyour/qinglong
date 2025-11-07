@@ -29,6 +29,30 @@ import { ScheduleType } from '../interface/schedule';
 export default class CronService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
+  private addUserIdFilter(query: any, userId?: number) {
+    if (userId !== undefined) {
+      query.userId = userId;
+    }
+    return query;
+  }
+
+  private async checkOwnership(ids: number[], userId?: number): Promise<void> {
+    if (userId === undefined) {
+      // Admin can access all crons
+      return;
+    }
+    const crons = await CrontabModel.findAll({
+      where: { id: ids },
+      attributes: ['id', 'userId'],
+    });
+    const unauthorized = crons.filter(
+      (cron) => cron.userId !== userId && cron.userId !== undefined
+    );
+    if (unauthorized.length > 0) {
+      throw new Error('无权限操作该定时任务');
+    }
+  }
+
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
     if (Number(schedule?.split(/ +/).length) > 5 || extra_schedules?.length) {
@@ -156,21 +180,26 @@ export default class CronService {
     }
   }
 
-  public async remove(ids: number[]) {
+  public async remove(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await CrontabModel.destroy({ where: { id: ids } });
     await cronClient.delCron(ids.map(String));
     await this.setCrontab();
   }
 
-  public async pin(ids: number[]) {
+  public async pin(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await CrontabModel.update({ isPinned: 1 }, { where: { id: ids } });
   }
 
-  public async unPin(ids: number[]) {
+  public async unPin(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await CrontabModel.update({ isPinned: 0 }, { where: { id: ids } });
   }
 
-  public async addLabels(ids: string[], labels: string[]) {
+  public async addLabels(ids: string[], labels: string[], userId?: number) {
+    const numIds = ids.map(Number);
+    await this.checkOwnership(numIds, userId);
     const docs = await CrontabModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       await CrontabModel.update(
@@ -182,7 +211,9 @@ export default class CronService {
     }
   }
 
-  public async removeLabels(ids: string[], labels: string[]) {
+  public async removeLabels(ids: string[], labels: string[], userId?: number) {
+    const numIds = ids.map(Number);
+    await this.checkOwnership(numIds, userId);
     const docs = await CrontabModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       await CrontabModel.update(
@@ -377,6 +408,7 @@ export default class CronService {
     sorter: string;
     filters: string;
     queryString: string;
+    userId?: number;
   }): Promise<{ data: Crontab[]; total: number }> {
     const searchText = params?.searchValue;
     const page = Number(params?.page || '0');
@@ -397,6 +429,7 @@ export default class CronService {
     this.formatSearchText(query, searchText);
     this.formatFilterQuery(query, filterQuery);
     this.formatViewSort(order, viewQuery);
+    this.addUserIdFilter(query, params?.userId);
 
     if (sorterQuery) {
       const { field, type } = sorterQuery;
@@ -429,7 +462,8 @@ export default class CronService {
     return doc.get({ plain: true });
   }
 
-  public async run(ids: number[]) {
+  public async run(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await CrontabModel.update(
       { status: CrontabStatus.queued },
       { where: { id: ids } },
@@ -439,7 +473,8 @@ export default class CronService {
     });
   }
 
-  public async stop(ids: number[]) {
+  public async stop(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     const docs = await CrontabModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       if (doc.pid) {
@@ -533,13 +568,15 @@ export default class CronService {
     });
   }
 
-  public async disabled(ids: number[]) {
+  public async disabled(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await CrontabModel.update({ isDisabled: 1 }, { where: { id: ids } });
     await cronClient.delCron(ids.map(String));
     await this.setCrontab();
   }
 
-  public async enabled(ids: number[]) {
+  public async enabled(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
     const docs = await CrontabModel.findAll({ where: { id: ids } });
     const sixCron = docs
