@@ -196,6 +196,40 @@ export default (app: Router) => {
     },
   );
 
+  route.put(
+    '/pin',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.pin(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/unpin',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.unPin(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
   route.post(
     '/upload',
     upload.single('env'),

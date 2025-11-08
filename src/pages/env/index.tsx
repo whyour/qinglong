@@ -26,6 +26,8 @@ import {
   CheckCircleOutlined,
   StopOutlined,
   UploadOutlined,
+  PushpinOutlined,
+  PushpinFilled,
 } from '@ant-design/icons';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -59,11 +61,15 @@ enum StatusColor {
 enum OperationName {
   '启用',
   '禁用',
+  '置顶',
+  '取消置顶',
 }
 
 enum OperationPath {
   'enable',
   'disable',
+  'pin',
+  'unpin',
 }
 
 const type = 'DragableBodyRow';
@@ -181,7 +187,7 @@ const Env = () => {
     {
       title: intl.get('操作'),
       key: 'action',
-      width: 120,
+      width: 160,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
         return (
@@ -205,6 +211,23 @@ const Env = () => {
                   <CheckCircleOutlined />
                 ) : (
                   <StopOutlined />
+                )}
+              </a>
+            </Tooltip>
+            <Tooltip
+              title={
+                isPc
+                  ? record.isPinned === 1
+                    ? intl.get('取消置顶')
+                    : intl.get('置顶')
+                  : ''
+              }
+            >
+              <a onClick={() => pinOrUnpinEnv(record, index)}>
+                {record.isPinned === 1 ? (
+                  <PushpinFilled />
+                ) : (
+                  <PushpinOutlined />
                 )}
               </a>
             </Tooltip>
@@ -303,6 +326,51 @@ const Env = () => {
   const editEnv = (record: any, index: number) => {
     setEditedEnv(record);
     setIsModalVisible(true);
+  };
+
+  const pinOrUnpinEnv = (record: any, index: number) => {
+    Modal.confirm({
+      title: `确认${
+        record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
+      }`,
+      content: (
+        <>
+          {intl.get('确认')}
+          {record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')}
+          Env{' '}
+          <Paragraph
+            style={{ wordBreak: 'break-all', display: 'inline' }}
+            ellipsis={{ rows: 6, expandable: true }}
+            type="warning"
+            copyable
+          >
+            {record.name}: {record.value}
+          </Paragraph>{' '}
+          {intl.get('吗')}
+        </>
+      ),
+      onOk() {
+        request
+          .put(
+            `${config.apiPrefix}envs/${
+              record.isPinned === 1 ? 'unpin' : 'pin'
+            }`,
+            [record.id],
+          )
+          .then(({ code, data }) => {
+            if (code === 200) {
+              message.success(
+                `${
+                  record.isPinned === 1
+                    ? intl.get('取消置顶')
+                    : intl.get('置顶')
+                }${intl.get('成功')}`,
+              );
+              getEnvs();
+            }
+          });
+      },
+    });
   };
 
   const deleteEnv = (record: any, index: number) => {
@@ -588,6 +656,20 @@ const Env = () => {
               style={{ marginLeft: 8, marginRight: 8 }}
             >
               {intl.get('批量禁用')}
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(2)}
+              style={{ marginLeft: 8, marginBottom: 5 }}
+            >
+              {intl.get('批量置顶')}
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => operateEnvs(3)}
+              style={{ marginLeft: 8, marginRight: 8 }}
+            >
+              {intl.get('批量取消置顶')}
             </Button>
             <span style={{ marginLeft: 8 }}>
               {intl.get('已选择')}
