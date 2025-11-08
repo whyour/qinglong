@@ -67,6 +67,12 @@ export default {
         component: '@/pages/log/index',
       },
       {
+        path: '/scenario',
+        name: intl.get('场景模式'),
+        icon: <IconFont type="ql-icon-scenario" />,
+        component: '@/pages/scenario/index',
+      },
+      {
         path: '/diff',
         name: intl.get('对比工具'),
         icon: <IconFont type="ql-icon-diff" />,
