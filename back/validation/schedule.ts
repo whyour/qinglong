@@ -37,5 +37,14 @@ export const commonCronSchema = {
   extra_schedules: Joi.array().optional().allow(null),
   task_before: Joi.string().optional().allow('').allow(null),
   task_after: Joi.string().optional().allow('').allow(null),
-  log_name: Joi.string().optional().allow('').allow(null),
+  log_name: Joi.string()
+    .optional()
+    .allow('')
+    .allow(null)
+    .pattern(/^[a-zA-Z0-9_-]+$/)
+    .max(100)
+    .messages({
+      'string.pattern.base': '日志名称只能包含字母、数字、下划线和连字符',
+      'string.max': '日志名称不能超过100个字符',
+    }),
 };

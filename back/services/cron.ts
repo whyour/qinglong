@@ -477,7 +477,11 @@ export default class CronService {
         );
 
         let { id, command, log_path, log_name } = cron;
-        const uniqPath = log_name || (await getUniqPath(command, `${id}`));
+        // Sanitize log_name to prevent path traversal
+        const sanitizedLogName = log_name
+          ? log_name.replace(/[\/\\\.]/g, '_').replace(/^_+|_+$/g, '')
+          : '';
+        const uniqPath = sanitizedLogName || (await getUniqPath(command, `${id}`));
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
         if (log_path?.split('/')?.every((x) => x !== uniqPath)) {

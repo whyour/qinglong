@@ -186,8 +186,21 @@ const CronModal = ({
           tooltip={intl.get(
             '自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成',
           )}
+          rules={[
+            {
+              pattern: /^[a-zA-Z0-9_-]*$/,
+              message: intl.get('日志名称只能包含字母、数字、下划线和连字符'),
+            },
+            {
+              max: 100,
+              message: intl.get('日志名称不能超过100个字符'),
+            },
+          ]}
         >
-          <Input placeholder={intl.get('请输入自定义日志文件夹名称')} />
+          <Input
+            placeholder={intl.get('请输入自定义日志文件夹名称')}
+            maxLength={100}
+          />
         </Form.Item>
         <Form.Item
           name="task_before"
