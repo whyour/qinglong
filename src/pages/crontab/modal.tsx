@@ -181,6 +181,15 @@ const CronModal = ({
           <EditableTagGroup />
         </Form.Item>
         <Form.Item
+          name="log_name"
+          label={intl.get('日志名称')}
+          tooltip={intl.get(
+            '自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成',
+          )}
+        >
+          <Input placeholder={intl.get('请输入自定义日志文件夹名称')} />
+        </Form.Item>
+        <Form.Item
           name="task_before"
           label={intl.get('执行前')}
           tooltip={intl.get(

@@ -37,4 +37,5 @@ export const commonCronSchema = {
   extra_schedules: Joi.array().optional().allow(null),
   task_before: Joi.string().optional().allow('').allow(null),
   task_after: Joi.string().optional().allow('').allow(null),
+  log_name: Joi.string().optional().allow('').allow(null),
 };

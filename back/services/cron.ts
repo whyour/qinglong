@@ -476,8 +476,8 @@ export default class CronService {
           `[panel][开始执行任务] 参数: ${JSON.stringify(params)}`,
         );
 
-        let { id, command, log_path } = cron;
-        const uniqPath = await getUniqPath(command, `${id}`);
+        let { id, command, log_path, log_name } = cron;
+        const uniqPath = log_name || (await getUniqPath(command, `${id}`));
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
         if (log_path?.split('/')?.every((x) => x !== uniqPath)) {

@@ -521,5 +521,8 @@
   "远程仓库缓存": "Remote repository cache",
   "SSH 文件缓存": "SSH file cache",
   "清除依赖缓存": "Clean dependency cache",
-  "清除成功": "Clean successful"
+  "清除成功": "Clean successful",
+  "日志名称": "Log Name",
+  "自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成": "Custom log folder name to distinguish logs from different tasks. Leave blank to auto-generate",
+  "请输入自定义日志文件夹名称": "Please enter a custom log folder name"
 }
