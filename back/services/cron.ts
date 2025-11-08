@@ -481,7 +481,8 @@ export default class CronService {
         const sanitizedLogName = log_name
           ? log_name.replace(/[\/\\\.]/g, '_').replace(/^_+|_+$/g, '')
           : '';
-        const uniqPath = sanitizedLogName || (await getUniqPath(command, `${id}`));
+        const uniqPath =
+          sanitizedLogName || (await getUniqPath(command, `${id}`));
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
         if (log_path?.split('/')?.every((x) => x !== uniqPath)) {
