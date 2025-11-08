@@ -1,12 +1,12 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { Container } from 'typedi';
-import EnvService from '../services/env';
-import { Logger } from 'winston';
-import { celebrate, Joi } from 'celebrate';
-import multer from 'multer';
-import config from '../config';
+import { Joi, celebrate } from 'celebrate';
+import { NextFunction, Request, Response, Router } from 'express';
 import fs from 'fs';
+import multer from 'multer';
+import { Container } from 'typedi';
+import { Logger } from 'winston';
+import config from '../config';
 import { safeJSONParse } from '../config/util';
+import EnvService from '../services/env';
 const route = Router();
 
 const storage = multer.diskStorage({

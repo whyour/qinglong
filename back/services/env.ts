@@ -1,7 +1,8 @@
-import { Service, Inject } from 'typedi';
+import groupBy from 'lodash/groupBy';
+import { FindOptions, Op } from 'sequelize';
+import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import config from '../config';
-import * as fs from 'fs/promises';
 import {
   Env,
   EnvModel,
@@ -11,8 +12,6 @@ import {
   minPosition,
   stepPosition,
 } from '../data/env';
-import groupBy from 'lodash/groupBy';
-import { FindOptions, Op } from 'sequelize';
 import { writeFileWithLock } from '../shared/utils';
 
 @Service()

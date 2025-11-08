@@ -1,49 +1,42 @@
-import intl from 'react-intl-universal';
-import React, {
-  useCallback,
-  useRef,
-  useState,
-  useEffect,
-  useMemo,
-} from 'react';
+import useTableScrollHeight from '@/hooks/useTableScrollHeight';
+import { SharedContext } from '@/layouts';
+import config from '@/utils/config';
+import { request } from '@/utils/http';
+import { exportJson } from '@/utils/index';
 import {
-  Button,
-  message,
-  Modal,
-  Table,
-  Tag,
-  Space,
-  Typography,
-  Tooltip,
-  Input,
-  UploadProps,
-  Upload,
-} from 'antd';
-import {
-  EditOutlined,
-  DeleteOutlined,
-  SyncOutlined,
   CheckCircleOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PushpinFilled,
+  PushpinOutlined,
   StopOutlined,
   UploadOutlined,
-  PushpinOutlined,
-  PushpinFilled,
 } from '@ant-design/icons';
-import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
-import { request } from '@/utils/http';
-import EnvModal from './modal';
-import EditNameModal from './editNameModal';
+import { useOutletContext } from '@umijs/max';
+import {
+  Button,
+  Input,
+  Modal,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  Upload,
+  UploadProps,
+  message,
+} from 'antd';
+import dayjs from 'dayjs';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import './index.less';
-import { exportJson } from '@/utils/index';
-import { useOutletContext } from '@umijs/max';
-import { SharedContext } from '@/layouts';
-import useTableScrollHeight from '@/hooks/useTableScrollHeight';
-import Copy from '../../components/copy';
+import intl from 'react-intl-universal';
 import { useVT } from 'virtualizedtableforantd4';
-import dayjs from 'dayjs';
+import Copy from '../../components/copy';
+import EditNameModal from './editNameModal';
+import './index.less';
+import EnvModal from './modal';
 
 const { Paragraph } = Typography;
 const { Search } = Input;
