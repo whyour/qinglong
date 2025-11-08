@@ -151,9 +151,9 @@ export default class ScenarioService {
     const watcher = chokidar.watch(watchPath, {
       persistent: true,
       ignoreInitial: true,
-    });
+    }) as any;
 
-    watcher.on('change', async (filePath) => {
+    watcher.on('change', async (filePath: string) => {
       this.logger.info(
         `Variable change detected for scenario ${scenario.name}: ${filePath}`,
       );
@@ -473,7 +473,7 @@ export default class ScenarioService {
   }
 
   private async createLog(log: Partial<ScenarioLog>): Promise<void> {
-    await ScenarioLogModel.create(log);
+    await ScenarioLogModel.create(log as any);
   }
 
   public async getLogs(scenarioId?: number, limit: number = 100): Promise<ScenarioLog[]> {
