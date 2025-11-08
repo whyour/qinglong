@@ -6,6 +6,8 @@ import { AppModel } from '../data/open';
 import { SystemModel } from '../data/system';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
+import { ScenarioModel } from '../data/scenario';
+import { ScenarioLogModel } from '../data/scenarioLog';
 import { sequelize } from '../data';
 
 export default async () => {
@@ -17,6 +19,8 @@ export default async () => {
     await EnvModel.sync();
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
+    await ScenarioModel.sync();
+    await ScenarioLogModel.sync();
 
     // 初始化新增字段
     try {
