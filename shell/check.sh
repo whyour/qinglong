@@ -24,10 +24,18 @@ copy_dep() {
 
 pm2_log() {
   echo -e "---> pm2日志"
-  local panelOut="/root/.pm2/logs/panel-out.log"
-  local panelError="/root/.pm2/logs/panel-error.log"
-  tail -n 300 "$panelOut"
-  tail -n 300 "$panelError"
+  local panelOut="/root/.pm2/logs/qinglong-out.log"
+  local panelError="/root/.pm2/logs/qinglong-error.log"
+  if [[ -f "$panelOut" ]]; then
+    tail -n 300 "$panelOut"
+  else
+    echo "日志文件不存在: $panelOut"
+  fi
+  if [[ -f "$panelError" ]]; then
+    tail -n 300 "$panelError"
+  else
+    echo "日志文件不存在: $panelError"
+  fi
 }
 
 check_ql() {
