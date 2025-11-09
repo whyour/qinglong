@@ -55,7 +55,7 @@ const CronLogModal = ({
           const log = data as string;
           setValue(log || intl.get("暂无日志"));
           const hasNext = Boolean(
-            log && !logEnded(log) && !log.includes("日志不存在"),
+            log && !logEnded(log) && !log.includes("日志不存在") && !log.includes("日志设置为忽略"),
           );
           if (!hasNext && !logEnded(value) && value !== intl.get("启动中...")) {
             setTimeout(() => {

@@ -45,27 +45,26 @@ export const commonCronSchema = {
     .allow(null)
     .custom((value, helpers) => {
       if (!value) return value;
-      
+
       // Check if it's an absolute path
       if (value.startsWith('/')) {
         // Allow /dev/null as special case
         if (value === '/dev/null') {
           return value;
         }
-        
+
         // For other absolute paths, ensure they are within the safe log directory
         const normalizedValue = path.normalize(value);
         const normalizedLogPath = path.normalize(config.logPath);
-        
+
         if (!normalizedValue.startsWith(normalizedLogPath)) {
           return helpers.error('string.unsafePath');
         }
-        
+
         return value;
       }
-      
-      // For relative names, enforce strict pattern
-      if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+
+      if (!/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w.-]+\/)*[\w.-]+\/?$/.test(value)) {
         return helpers.error('string.pattern.base');
       }
       if (value.length > 100) {
