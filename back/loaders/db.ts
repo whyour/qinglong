@@ -60,6 +60,9 @@ export default async () => {
     try {
       await sequelize.query('alter table Crontabs add column task_after TEXT');
     } catch (error) {}
+    try {
+      await sequelize.query('alter table Scenarios add column workflowGraph JSON');
+    } catch (error) {}
 
     Logger.info('✌️ DB loaded');
   } catch (error) {

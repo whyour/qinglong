@@ -6,11 +6,12 @@ export class Scenario {
   name: string;
   description?: string;
   isEnabled?: 1 | 0;
-  triggerType?: string; // 'variable' | 'webhook' | 'task_status' | 'time' | 'system_event'
-  triggerConfig?: any; // JSON configuration for the trigger
-  conditionLogic?: 'AND' | 'OR';
-  conditions?: any[]; // Array of condition objects
-  actions?: any[]; // Array of actions to execute
+  workflowGraph?: any; // Flowgram workflow graph structure
+  triggerType?: string; // Deprecated: kept for backward compatibility
+  triggerConfig?: any; // Deprecated: kept for backward compatibility
+  conditionLogic?: 'AND' | 'OR'; // Deprecated: kept for backward compatibility
+  conditions?: any[]; // Deprecated: kept for backward compatibility
+  actions?: any[]; // Deprecated: kept for backward compatibility
   retryStrategy?: {
     maxRetries: number;
     retryDelay: number; // in seconds
@@ -33,6 +34,7 @@ export class Scenario {
     this.name = options.name;
     this.description = options.description;
     this.isEnabled = options.isEnabled ?? 1;
+    this.workflowGraph = options.workflowGraph || null;
     this.triggerType = options.triggerType;
     this.triggerConfig = options.triggerConfig;
     this.conditionLogic = options.conditionLogic || 'AND';
@@ -64,9 +66,13 @@ export const ScenarioModel = sequelize.define<ScenarioInstance>('Scenario', {
     type: DataTypes.NUMBER,
     defaultValue: 1,
   },
+  workflowGraph: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   triggerType: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   triggerConfig: {
     type: DataTypes.JSON,

@@ -30,13 +30,14 @@ export default (app: Router) => {
       body: Joi.object({
         name: Joi.string().required(),
         description: Joi.string().optional().allow(''),
+        workflowGraph: Joi.object().optional(),
         triggerType: Joi.string()
           .valid('variable', 'webhook', 'task_status', 'time', 'system_event')
-          .required(),
+          .optional(),
         triggerConfig: Joi.object().optional(),
         conditionLogic: Joi.string().valid('AND', 'OR').default('AND'),
         conditions: Joi.array().optional().default([]),
-        actions: Joi.array().required(),
+        actions: Joi.array().optional(),
         retryStrategy: Joi.object({
           maxRetries: Joi.number().min(0).max(10),
           retryDelay: Joi.number().min(1),
@@ -67,6 +68,7 @@ export default (app: Router) => {
         id: Joi.number().required(),
         name: Joi.string().optional(),
         description: Joi.string().optional().allow(''),
+        workflowGraph: Joi.object().optional(),
         triggerType: Joi.string()
           .valid('variable', 'webhook', 'task_status', 'time', 'system_event')
           .optional(),

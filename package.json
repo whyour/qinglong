@@ -100,6 +100,9 @@
     "helmet": "^8.1.0"
   },
   "devDependencies": {
+    "@flowgram.ai/free-layout-editor": "^1.0.2",
+    "@flowgram.ai/core": "^1.0.2",
+    "@flowgram.ai/reactive": "^1.0.2",
     "moment": "2.30.1",
     "@ant-design/icons": "^5.0.1",
     "@ant-design/pro-layout": "6.38.22",
