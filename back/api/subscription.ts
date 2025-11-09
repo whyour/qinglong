@@ -16,6 +16,7 @@ export default (app: Router) => {
       const data = await subscriptionService.list(
         req.query.searchValue as string,
         req.query.ids as string,
+        req.user?.userId,
       );
       return res.send({ code: 200, data });
     } catch (e) {
@@ -63,7 +64,10 @@ export default (app: Router) => {
           cron_parser.parseExpression(req.body.schedule).hasNext()
         ) {
           const subscriptionService = Container.get(SubscriptionService);
-          const data = await subscriptionService.create(req.body);
+          const data = await subscriptionService.create({
+            ...req.body,
+            userId: req.user?.userId,
+          });
           return res.send({ code: 200, data });
         } else {
           return res.send({ code: 400, message: 'param schedule error' });
@@ -83,10 +87,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const subscriptionService = Container.get(SubscriptionService);
-        const data = await subscriptionService.run(req.body);
+        const data = await subscriptionService.run(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -100,10 +104,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const subscriptionService = Container.get(SubscriptionService);
-        const data = await subscriptionService.stop(req.body);
+        const data = await subscriptionService.stop(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -117,10 +121,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const subscriptionService = Container.get(SubscriptionService);
-        const data = await subscriptionService.disabled(req.body);
+        const data = await subscriptionService.disabled(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -134,10 +138,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const subscriptionService = Container.get(SubscriptionService);
-        const data = await subscriptionService.enabled(req.body);
+        const data = await subscriptionService.enabled(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -220,10 +224,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const subscriptionService = Container.get(SubscriptionService);
-        const data = await subscriptionService.remove(req.body, req.query);
+        const data = await subscriptionService.remove(req.body, req.query, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );

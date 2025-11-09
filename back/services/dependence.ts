@@ -30,9 +30,33 @@ export default class DependenceService {
     private sockService: SockService,
   ) { }
 
-  public async create(payloads: Dependence[]): Promise<Dependence[]> {
+  private addUserIdFilter(query: any, userId?: number) {
+    if (userId !== undefined) {
+      query.userId = userId;
+    }
+    return query;
+  }
+
+  private async checkOwnership(ids: number[], userId?: number): Promise<void> {
+    if (userId === undefined) {
+      // Admin can access all dependencies
+      return;
+    }
+    const dependencies = await DependenceModel.findAll({
+      where: { id: ids },
+      attributes: ['id', 'userId'],
+    });
+    const unauthorized = dependencies.filter(
+      (dep) => dep.userId !== undefined && dep.userId !== userId
+    );
+    if (unauthorized.length > 0) {
+      throw new Error('无权限操作该依赖');
+    }
+  }
+
+  public async create(payloads: Dependence[], userId?: number): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
-      const tab = new Dependence({ ...x, status: DependenceStatus.queued });
+      const tab = new Dependence({ ...x, status: DependenceStatus.queued, userId });
       return tab;
     });
     const docs = await this.insert(tabs);
@@ -65,7 +89,8 @@ export default class DependenceService {
     return await this.getDb({ id: payload.id });
   }
 
-  public async remove(ids: number[], force = false): Promise<Dependence[]> {
+  public async remove(ids: number[], force = false, userId?: number): Promise<Dependence[]> {
+    await this.checkOwnership(ids, userId);
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
@@ -105,8 +130,10 @@ export default class DependenceService {
     },
     sort: any = [],
     query: any = {},
+    userId?: number,
   ): Promise<Dependence[]> {
     let condition = query;
+    this.addUserIdFilter(condition, userId);
     if (DependenceTypes[type]) {
       condition.type = DependenceTypes[type];
     }
@@ -141,7 +168,8 @@ export default class DependenceService {
     return taskLimit.waitDependencyQueueDone();
   }
 
-  public async reInstall(ids: number[]): Promise<Dependence[]> {
+  public async reInstall(ids: number[], userId?: number): Promise<Dependence[]> {
+    await this.checkOwnership(ids, userId);
     await DependenceModel.update(
       { status: DependenceStatus.queued, log: [] },
       { where: { id: ids } },
@@ -155,7 +183,8 @@ export default class DependenceService {
     return docs;
   }
 
-  public async cancel(ids: number[]) {
+  public async cancel(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
