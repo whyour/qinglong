@@ -57,7 +57,7 @@ export default async () => {
       await sequelize.query('alter table Crontabs add column task_after TEXT');
     } catch (error) {}
     try {
-      await sequelize.query('alter table Envs add column isPinned NUMBER');
+      await sequelize.query('alter table Envs add column is_pinned NUMBER');
     } catch (error) {}
 
     Logger.info('✌️ DB loaded');

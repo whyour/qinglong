@@ -44,5 +44,5 @@ export const EnvModel = sequelize.define<EnvInstance>('Env', {
   position: DataTypes.NUMBER,
   name: { type: DataTypes.STRING, unique: 'compositeIndex' },
   remarks: DataTypes.STRING,
-  isPinned: DataTypes.NUMBER,
+  isPinned: { type: DataTypes.NUMBER, field: 'is_pinned' },
 });
