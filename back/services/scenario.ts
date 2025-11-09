@@ -12,6 +12,7 @@ import config from '../config';
 import fs from 'fs/promises';
 import path from 'path';
 import chokidar from 'chokidar';
+import { GraphExecutor } from './graphExecutor';
 
 const execAsync = promisify(exec);
 
@@ -19,12 +20,14 @@ const execAsync = promisify(exec);
 export default class ScenarioService {
   private watchers: Map<number, any> = new Map();
   private webhookTokens: Map<number, string> = new Map();
+  private graphExecutor: GraphExecutor;
 
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private cronService: CronService,
     private envService: EnvService,
   ) {
+    this.graphExecutor = new GraphExecutor(logger);
     this.initializeWatchers();
   }
 
@@ -284,28 +287,48 @@ export default class ScenarioService {
     };
 
     try {
-      // Evaluate conditions
-      const conditionsMatched = await this.evaluateConditions(
-        scenario.conditions || [],
-        scenario.conditionLogic || 'AND',
-        triggerData,
-      );
-      
-      log.conditionsMatched = conditionsMatched;
+      // Check if this is a graph-based workflow
+      if (scenario.workflowGraph && scenario.workflowGraph.nodes && scenario.workflowGraph.nodes.length > 0) {
+        // Execute using graph executor
+        const result = await this.graphExecutor.executeGraph(
+          scenario.workflowGraph,
+          triggerData,
+          this,
+        );
 
-      if (!conditionsMatched) {
+        log.conditionsMatched = true; // Graph execution handles conditions internally
+        log.executionStatus = result.success ? 'success' : 'failure';
+        log.executionDetails = result.results;
+        log.executionTime = Date.now() - startTime;
+
+        if (!result.success) {
+          throw new Error(JSON.stringify(result.results));
+        }
+      } else {
+        // Legacy execution path for form-based scenarios
+        // Evaluate conditions
+        const conditionsMatched = await this.evaluateConditions(
+          scenario.conditions || [],
+          scenario.conditionLogic || 'AND',
+          triggerData,
+        );
+        
+        log.conditionsMatched = conditionsMatched;
+
+        if (!conditionsMatched) {
+          log.executionStatus = 'success';
+          log.executionDetails = { message: 'Conditions not matched, skipped' };
+          await this.createLog(log);
+          return;
+        }
+
+        // Execute actions
+        const actionResults = await this.executeActions(scenario.actions || []);
+        
         log.executionStatus = 'success';
-        log.executionDetails = { message: 'Conditions not matched, skipped' };
-        await this.createLog(log);
-        return;
+        log.executionDetails = actionResults;
+        log.executionTime = Date.now() - startTime;
       }
-
-      // Execute actions
-      const actionResults = await this.executeActions(scenario.actions || []);
-      
-      log.executionStatus = 'success';
-      log.executionDetails = actionResults;
-      log.executionTime = Date.now() - startTime;
 
       // Update scenario stats
       await ScenarioModel.update(
@@ -497,5 +520,38 @@ export default class ScenarioService {
       }
     }
     return null;
+  }
+
+  // Public methods for graph executor
+  public async executeRunTask(data: any): Promise<any> {
+    if (data.cronId) {
+      return await this.cronService.run([data.cronId]);
+    }
+    throw new Error('cronId is required for run_task action');
+  }
+
+  public async executeSetVariable(data: any): Promise<any> {
+    if (data.name && data.value !== undefined) {
+      return await this.envService.create([{
+        name: data.name,
+        value: data.value,
+        remarks: `Set by scenario workflow`,
+      }]);
+    }
+    throw new Error('name and value are required for set_variable action');
+  }
+
+  public async executeCommand(data: any): Promise<any> {
+    if (data.command) {
+      const { stdout, stderr } = await execAsync(data.command);
+      return { stdout, stderr };
+    }
+    throw new Error('command is required for execute_command action');
+  }
+
+  public async executeSendNotification(data: any): Promise<any> {
+    // Log notification for now - can be extended to integrate with notification service
+    this.logger.info(`Notification: ${data.message || 'No message'}`);
+    return { sent: true, message: data.message };
   }
 }
