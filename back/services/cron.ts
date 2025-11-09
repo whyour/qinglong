@@ -477,19 +477,33 @@ export default class CronService {
         );
 
         let { id, command, log_path, log_name } = cron;
-        // Sanitize log_name to prevent path traversal
-        const sanitizedLogName = log_name
-          ? log_name.replace(/[\/\\\.]/g, '_').replace(/^_+|_+$/g, '')
-          : '';
-        const uniqPath =
-          sanitizedLogName || (await getUniqPath(command, `${id}`));
-        const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
-        const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
-        if (log_path?.split('/')?.every((x) => x !== uniqPath)) {
-          await fs.mkdir(logDirPath, { recursive: true });
+        
+        // Check if log_name is an absolute path (e.g., /dev/null)
+        const isAbsolutePath = log_name && log_name.startsWith('/');
+        
+        let uniqPath: string;
+        let absolutePath: string;
+        let logPath: string;
+        
+        if (isAbsolutePath) {
+          // Use absolute path directly for special files like /dev/null
+          uniqPath = log_name!;
+          absolutePath = log_name!;
+          logPath = log_name!;
+        } else {
+          // Sanitize log_name to prevent path traversal for relative paths
+          const sanitizedLogName = log_name
+            ? log_name.replace(/[\/\\\.]/g, '_').replace(/^_+|_+$/g, '')
+            : '';
+          uniqPath = sanitizedLogName || (await getUniqPath(command, `${id}`));
+          const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
+          const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
+          if (log_path?.split('/')?.every((x) => x !== uniqPath)) {
+            await fs.mkdir(logDirPath, { recursive: true });
+          }
+          logPath = `${uniqPath}/${logTime}.log`;
+          absolutePath = path.resolve(config.logPath, `${logPath}`);
         }
-        const logPath = `${uniqPath}/${logTime}.log`;
-        const absolutePath = path.resolve(config.logPath, `${logPath}`);
         const cp = spawn(
           `real_log_path=${logPath} no_delay=true ${this.makeCommand(
             cron,

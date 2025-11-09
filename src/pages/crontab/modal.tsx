@@ -184,22 +184,31 @@ const CronModal = ({
           name="log_name"
           label={intl.get('日志名称')}
           tooltip={intl.get(
-            '自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成',
+            '自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成。支持绝对路径如 /dev/null',
           )}
           rules={[
             {
-              pattern: /^[a-zA-Z0-9_-]*$/,
-              message: intl.get('日志名称只能包含字母、数字、下划线和连字符'),
-            },
-            {
-              max: 100,
-              message: intl.get('日志名称不能超过100个字符'),
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                // Allow absolute paths
+                if (value.startsWith('/')) return Promise.resolve();
+                // For relative names, enforce strict pattern
+                if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+                  return Promise.reject(
+                    intl.get('日志名称只能包含字母、数字、下划线和连字符'),
+                  );
+                }
+                if (value.length > 100) {
+                  return Promise.reject(intl.get('日志名称不能超过100个字符'));
+                }
+                return Promise.resolve();
+              },
             },
           ]}
         >
           <Input
-            placeholder={intl.get('请输入自定义日志文件夹名称')}
-            maxLength={100}
+            placeholder={intl.get('请输入自定义日志文件夹名称或绝对路径')}
+            maxLength={200}
           />
         </Form.Item>
         <Form.Item

@@ -524,7 +524,9 @@
   "清除成功": "Clean successful",
   "日志名称": "Log Name",
   "自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成": "Custom log folder name to distinguish logs from different tasks. Leave blank to auto-generate",
+  "自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成。支持绝对路径如 /dev/null": "Custom log folder name to distinguish logs from different tasks. Leave blank to auto-generate. Supports absolute paths like /dev/null",
   "请输入自定义日志文件夹名称": "Please enter a custom log folder name",
+  "请输入自定义日志文件夹名称或绝对路径": "Please enter a custom log folder name or absolute path",
   "日志名称只能包含字母、数字、下划线和连字符": "Log name can only contain letters, numbers, underscores and hyphens",
   "日志名称不能超过100个字符": "Log name cannot exceed 100 characters"
 }

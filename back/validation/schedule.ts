@@ -41,8 +41,21 @@ export const commonCronSchema = {
     .optional()
     .allow('')
     .allow(null)
-    .pattern(/^[a-zA-Z0-9_-]+$/)
-    .max(100)
+    .custom((value, helpers) => {
+      if (!value) return value;
+      // Allow absolute paths like /dev/null
+      if (value.startsWith('/')) {
+        return value;
+      }
+      // For relative names, enforce strict pattern
+      if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+        return helpers.error('string.pattern.base');
+      }
+      if (value.length > 100) {
+        return helpers.error('string.max');
+      }
+      return value;
+    })
     .messages({
       'string.pattern.base': '日志名称只能包含字母、数字、下划线和连字符',
       'string.max': '日志名称不能超过100个字符',
