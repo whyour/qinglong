@@ -1,12 +1,12 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { Container } from 'typedi';
-import EnvService from '../services/env';
-import { Logger } from 'winston';
-import { celebrate, Joi } from 'celebrate';
-import multer from 'multer';
-import config from '../config';
+import { Joi, celebrate } from 'celebrate';
+import { NextFunction, Request, Response, Router } from 'express';
 import fs from 'fs';
+import multer from 'multer';
+import { Container } from 'typedi';
+import { Logger } from 'winston';
+import config from '../config';
 import { safeJSONParse } from '../config/util';
+import EnvService from '../services/env';
 const route = Router();
 
 const storage = multer.diskStorage({
@@ -189,6 +189,40 @@ export default (app: Router) => {
       try {
         const envService = Container.get(EnvService);
         const data = await envService.getDb({ id: req.params.id });
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/pin',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.pin(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/unpin',
+    celebrate({
+      body: Joi.array().items(Joi.number().required()),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.unPin(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
