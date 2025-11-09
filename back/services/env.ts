@@ -1,7 +1,8 @@
-import { Service, Inject } from 'typedi';
+import groupBy from 'lodash/groupBy';
+import { FindOptions, Op } from 'sequelize';
+import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import config from '../config';
-import * as fs from 'fs/promises';
 import {
   Env,
   EnvModel,
@@ -11,8 +12,6 @@ import {
   minPosition,
   stepPosition,
 } from '../data/env';
-import groupBy from 'lodash/groupBy';
-import { FindOptions, Op } from 'sequelize';
 import { writeFileWithLock } from '../shared/utils';
 
 @Service()
@@ -147,6 +146,7 @@ export default class EnvService {
     }
     try {
       const result = await this.find(condition, [
+        ['isPinned', 'DESC'],
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);
@@ -188,6 +188,14 @@ export default class EnvService {
   public async updateNames({ ids, name }: { ids: number[]; name: string }) {
     await EnvModel.update({ name }, { where: { id: ids } });
     await this.set_envs();
+  }
+
+  public async pin(ids: number[]) {
+    await EnvModel.update({ isPinned: 1 }, { where: { id: ids } });
+  }
+
+  public async unPin(ids: number[]) {
+    await EnvModel.update({ isPinned: 0 }, { where: { id: ids } });
   }
 
   public async set_envs() {

@@ -61,6 +61,9 @@ export default async () => {
         'alter table Crontabs add column log_name VARCHAR(255)',
       );
     } catch (error) {}
+    try {
+      await sequelize.query('alter table Envs add column is_pinned NUMBER');
+    } catch (error) {}
 
     Logger.info('✌️ DB loaded');
   } catch (error) {
