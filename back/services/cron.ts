@@ -511,15 +511,61 @@ export default class CronService {
           `[panel][开始执行任务] 参数: ${JSON.stringify(params)}`,
         );
 
-        let { id, command, log_path } = cron;
-        const uniqPath = await getUniqPath(command, `${id}`);
-        const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
-        const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
-        if (log_path?.split('/')?.every((x) => x !== uniqPath)) {
-          await fs.mkdir(logDirPath, { recursive: true });
+        let { id, command, log_path, log_name } = cron;
+        
+        // Check if log_name is an absolute path
+        const isAbsolutePath = log_name && log_name.startsWith('/');
+        
+        let uniqPath: string;
+        let absolutePath: string;
+        let logPath: string;
+        
+        if (isAbsolutePath) {
+          // Special case: /dev/null is allowed as-is to discard logs
+          if (log_name === '/dev/null') {
+            uniqPath = log_name;
+            absolutePath = log_name;
+            logPath = log_name;
+          } else {
+            // For other absolute paths, ensure they are within the safe log directory
+            const normalizedLogName = path.normalize(log_name!);
+            const normalizedLogPath = path.normalize(config.logPath);
+            
+            if (!normalizedLogName.startsWith(normalizedLogPath)) {
+              this.logger.error(
+                `[panel][日志路径安全检查失败] 绝对路径必须在日志目录内: ${log_name}`,
+              );
+              // Fallback to auto-generated path for security
+              const fallbackUniqPath = await getUniqPath(command, `${id}`);
+              const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
+              const logDirPath = path.resolve(config.logPath, `${fallbackUniqPath}`);
+              if (log_path?.split('/')?.every((x) => x !== fallbackUniqPath)) {
+                await fs.mkdir(logDirPath, { recursive: true });
+              }
+              logPath = `${fallbackUniqPath}/${logTime}.log`;
+              absolutePath = path.resolve(config.logPath, `${logPath}`);
+              uniqPath = fallbackUniqPath;
+            } else {
+              // Absolute path is safe, use it
+              uniqPath = log_name!;
+              absolutePath = log_name!;
+              logPath = log_name!;
+            }
+          }
+        } else {
+          // Sanitize log_name to prevent path traversal for relative paths
+          const sanitizedLogName = log_name
+            ? log_name.replace(/[\/\\\.]/g, '_').replace(/^_+|_+$/g, '')
+            : '';
+          uniqPath = sanitizedLogName || (await getUniqPath(command, `${id}`));
+          const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
+          const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
+          if (log_path?.split('/')?.every((x) => x !== uniqPath)) {
+            await fs.mkdir(logDirPath, { recursive: true });
+          }
+          logPath = `${uniqPath}/${logTime}.log`;
+          absolutePath = path.resolve(config.logPath, `${logPath}`);
         }
-        const logPath = `${uniqPath}/${logTime}.log`;
-        const absolutePath = path.resolve(config.logPath, `${logPath}`);
         const cp = spawn(
           `real_log_path=${logPath} no_delay=true ${this.makeCommand(
             cron,

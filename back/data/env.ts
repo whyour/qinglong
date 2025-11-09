@@ -1,5 +1,5 @@
+import { DataTypes, Model } from 'sequelize';
 import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
 
 export class Env {
   value?: string;
@@ -10,6 +10,7 @@ export class Env {
   name?: string;
   remarks?: string;
   userId?: number;
+  isPinned?: 1 | 0;
 
   constructor(options: Env) {
     this.value = options.value;
@@ -23,6 +24,7 @@ export class Env {
     this.name = options.name;
     this.remarks = options.remarks || '';
     this.userId = options.userId;
+    this.isPinned = options.isPinned || 0;
   }
 }
 
@@ -45,4 +47,5 @@ export const EnvModel = sequelize.define<EnvInstance>('Env', {
   name: { type: DataTypes.STRING, unique: 'compositeIndex' },
   remarks: DataTypes.STRING,
   userId: { type: DataTypes.NUMBER, allowNull: true },
+  isPinned: { type: DataTypes.NUMBER, field: 'is_pinned' },
 });

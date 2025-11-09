@@ -181,6 +181,42 @@ const CronModal = ({
           <EditableTagGroup />
         </Form.Item>
         <Form.Item
+          name="log_name"
+          label={intl.get('日志名称')}
+          tooltip={intl.get(
+            '自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成。支持 /dev/null 丢弃日志，其他绝对路径必须在日志目录内',
+          )}
+          rules={[
+            {
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                // Allow /dev/null specifically
+                if (value === '/dev/null') return Promise.resolve();
+                // Warn about other absolute paths (server will validate)
+                if (value.startsWith('/')) {
+                  // We can't validate the exact path on frontend, but inform user
+                  return Promise.resolve();
+                }
+                // For relative names, enforce strict pattern
+                if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+                  return Promise.reject(
+                    intl.get('日志名称只能包含字母、数字、下划线和连字符'),
+                  );
+                }
+                if (value.length > 100) {
+                  return Promise.reject(intl.get('日志名称不能超过100个字符'));
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
+        >
+          <Input
+            placeholder={intl.get('请输入自定义日志文件夹名称或 /dev/null')}
+            maxLength={200}
+          />
+        </Form.Item>
+        <Form.Item
           name="task_before"
           label={intl.get('执行前')}
           tooltip={intl.get(
@@ -312,4 +348,3 @@ const CronLabelModal = ({
 };
 
 export { CronLabelModal, CronModal as default };
-

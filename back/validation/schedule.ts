@@ -1,6 +1,8 @@
 import { Joi } from 'celebrate';
 import cron_parser from 'cron-parser';
 import { ScheduleType } from '../interface/schedule';
+import path from 'path';
+import config from '../config';
 
 const validateSchedule = (value: string, helpers: any) => {
   if (
@@ -37,4 +39,43 @@ export const commonCronSchema = {
   extra_schedules: Joi.array().optional().allow(null),
   task_before: Joi.string().optional().allow('').allow(null),
   task_after: Joi.string().optional().allow('').allow(null),
+  log_name: Joi.string()
+    .optional()
+    .allow('')
+    .allow(null)
+    .custom((value, helpers) => {
+      if (!value) return value;
+      
+      // Check if it's an absolute path
+      if (value.startsWith('/')) {
+        // Allow /dev/null as special case
+        if (value === '/dev/null') {
+          return value;
+        }
+        
+        // For other absolute paths, ensure they are within the safe log directory
+        const normalizedValue = path.normalize(value);
+        const normalizedLogPath = path.normalize(config.logPath);
+        
+        if (!normalizedValue.startsWith(normalizedLogPath)) {
+          return helpers.error('string.unsafePath');
+        }
+        
+        return value;
+      }
+      
+      // For relative names, enforce strict pattern
+      if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+        return helpers.error('string.pattern.base');
+      }
+      if (value.length > 100) {
+        return helpers.error('string.max');
+      }
+      return value;
+    })
+    .messages({
+      'string.pattern.base': '日志名称只能包含字母、数字、下划线和连字符',
+      'string.max': '日志名称不能超过100个字符',
+      'string.unsafePath': '绝对路径必须在日志目录内或使用 /dev/null',
+    }),
 };

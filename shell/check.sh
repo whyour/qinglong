@@ -24,8 +24,8 @@ copy_dep() {
 
 pm2_log() {
   echo -e "---> pm2日志"
-  local panelOut="/root/.pm2/logs/panel-out.log"
-  local panelError="/root/.pm2/logs/panel-error.log"
+  local panelOut="/root/.pm2/logs/qinglong-out.log"
+  local panelError="/root/.pm2/logs/qinglong-error.log"
   tail -n 300 "$panelOut"
   tail -n 300 "$panelError"
 }
