@@ -184,14 +184,19 @@ const CronModal = ({
           name="log_name"
           label={intl.get('日志名称')}
           tooltip={intl.get(
-            '自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成。支持绝对路径如 /dev/null',
+            '自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成。支持 /dev/null 丢弃日志，其他绝对路径必须在日志目录内',
           )}
           rules={[
             {
               validator: (_, value) => {
                 if (!value) return Promise.resolve();
-                // Allow absolute paths
-                if (value.startsWith('/')) return Promise.resolve();
+                // Allow /dev/null specifically
+                if (value === '/dev/null') return Promise.resolve();
+                // Warn about other absolute paths (server will validate)
+                if (value.startsWith('/')) {
+                  // We can't validate the exact path on frontend, but inform user
+                  return Promise.resolve();
+                }
                 // For relative names, enforce strict pattern
                 if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
                   return Promise.reject(
@@ -207,7 +212,7 @@ const CronModal = ({
           ]}
         >
           <Input
-            placeholder={intl.get('请输入自定义日志文件夹名称或绝对路径')}
+            placeholder={intl.get('请输入自定义日志文件夹名称或 /dev/null')}
             maxLength={200}
           />
         </Form.Item>
