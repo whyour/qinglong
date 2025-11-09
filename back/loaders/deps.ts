@@ -58,6 +58,6 @@ export default async (src: string = 'deps') => {
   });
 
   watcher
-    .on('add', (path) => linkToNodeModule(src))
-    .on('change', (path) => linkToNodeModule(src));
+    .on('add', () => linkToNodeModule(src))
+    .on('change', () => linkToNodeModule(src));
 };
