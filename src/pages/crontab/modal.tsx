@@ -190,21 +190,14 @@ const CronModal = ({
             {
               validator: (_, value) => {
                 if (!value) return Promise.resolve();
-                // Allow /dev/null specifically
                 if (value === '/dev/null') return Promise.resolve();
-                // Warn about other absolute paths (server will validate)
-                if (value.startsWith('/')) {
-                  // We can't validate the exact path on frontend, but inform user
-                  return Promise.resolve();
+                if (value.length > 100) {
+                  return Promise.reject(intl.get('日志名称不能超过100个字符'));
                 }
-                // For relative names, enforce strict pattern
-                if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+                if (!/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w.-]+\/)*[\w.-]+\/?$/.test(value)) {
                   return Promise.reject(
                     intl.get('日志名称只能包含字母、数字、下划线和连字符'),
                   );
-                }
-                if (value.length > 100) {
-                  return Promise.reject(intl.get('日志名称不能超过100个字符'));
                 }
                 return Promise.resolve();
               },

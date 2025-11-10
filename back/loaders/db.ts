@@ -62,7 +62,7 @@ export default async () => {
       );
     } catch (error) {}
     try {
-      await sequelize.query('alter table Envs add column is_pinned NUMBER');
+      await sequelize.query('alter table Envs add column isPinned NUMBER');
     } catch (error) {}
 
     Logger.info('✌️ DB loaded');

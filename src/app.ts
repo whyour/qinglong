@@ -7,11 +7,18 @@ export function rootContainer(container: any) {
     'en': require('./locales/en-US.json'),
     'zh': require('./locales/zh-CN.json'),
   };
-  let currentLocale = intl.determineLocale({
-    urlLocaleKey: 'lang',
-    cookieLocaleKey: 'lang',
-    localStorageLocaleKey: 'lang',
-  }).slice(0, 2);
+  let currentLocale: string;
+  try {
+    currentLocale = intl.determineLocale({
+      urlLocaleKey: 'lang',
+      cookieLocaleKey: 'lang',
+      localStorageLocaleKey: 'lang',
+    }).slice(0, 2);
+  } catch (e: unknown) {
+    // Handle decodeURIComponent errors from malformed cookies
+    console.warn('Failed to determine locale from cookies:', e);
+    currentLocale = '';
+  }
 
   if (!currentLocale || !Object.keys(locales).includes(currentLocale)) {
     currentLocale = 'zh';

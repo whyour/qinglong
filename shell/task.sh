@@ -46,18 +46,22 @@ handle_log_path() {
 
   time=$(date "+$mtime_format")
   log_time=$(format_log_time "$mtime_format" "$time")
-  log_dir_tmp="${file_param##*/}"
-  if [[ $file_param =~ "/" ]]; then
-    if [[ $file_param == /* ]]; then
-      log_dir_tmp_path="${file_param:1}"
-    else
-      log_dir_tmp_path="${file_param}"
+  if [[ -z $log_name ]]; then
+    log_dir_tmp="${file_param##*/}"
+    if [[ $file_param =~ "/" ]]; then
+      if [[ $file_param == /* ]]; then
+        log_dir_tmp_path="${file_param:1}"
+      else
+        log_dir_tmp_path="${file_param}"
+      fi
     fi
+    log_dir_tmp_path="${log_dir_tmp_path%/*}"
+    log_dir_tmp_path="${log_dir_tmp_path##*/}"
+    [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
+    log_dir="${log_dir_tmp%.*}${suffix}"
+  else
+    log_dir="$log_name"
   fi
-  log_dir_tmp_path="${log_dir_tmp_path%/*}"
-  log_dir_tmp_path="${log_dir_tmp_path##*/}"
-  [[ $log_dir_tmp_path ]] && log_dir_tmp="${log_dir_tmp_path}_${log_dir_tmp}"
-  log_dir="${log_dir_tmp%.*}${suffix}"
   log_path="$log_dir/$log_time.log"
 
   if [[ ${real_log_path:=} ]]; then
@@ -72,6 +76,11 @@ handle_log_path() {
 
   if [[ "${real_time:=}" == "true" ]]; then
     cmd=""
+  fi
+
+  if [[ "${log_dir:=}" == "/dev/null" ]]; then
+    cmd=">> /dev/null"
+    log_path="/dev/null"
   fi
 }
 
