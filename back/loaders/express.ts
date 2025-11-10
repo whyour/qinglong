@@ -88,6 +88,13 @@ export default ({ app }: { app: Application }) => {
       return next();
     }
 
+    // If JWT has been successfully verified by expressjwt middleware, allow the request
+    // This handles regular users whose tokens are not stored in authInfo
+    if (req.auth) {
+      return next();
+    }
+
+    // For system admin, also check against stored token
     const authInfo = await shareStore.getAuthInfo();
     if (authInfo && headerToken) {
       const { token = '', tokens = {} } = authInfo;
