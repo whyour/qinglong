@@ -4,7 +4,7 @@ import config from '../config';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import { exec, execSync } from 'child_process';
 import fs from 'fs/promises';
-import cron_parser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 import {
   getFileContentByName,
   fileExist,
@@ -688,7 +688,7 @@ export default class CronService {
         if (
           command &&
           schedule &&
-          cron_parser.parseExpression(schedule).hasNext()
+          CronExpressionParser.parse(schedule).hasNext()
         ) {
           const name = namePrefix + '_' + index;
 

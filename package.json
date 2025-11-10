@@ -61,7 +61,7 @@
     "celebrate": "^15.0.3",
     "chokidar": "^4.0.1",
     "cors": "^2.8.5",
-    "cron-parser": "^4.9.0",
+    "cron-parser": "^5.4.0",
     "cross-spawn": "^7.0.6",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.6",

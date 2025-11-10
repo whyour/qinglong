@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import cron_parser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 import isNil from 'lodash/isNil';
 
 const { Option } = Select;
@@ -224,8 +224,8 @@ const SubscriptionModal = ({
         type === 'raw'
           ? 'file'
           : url.startsWith('http')
-          ? 'public-repo'
-          : 'private-repo';
+            ? 'public-repo'
+            : 'private-repo';
 
       form.setFieldsValue({
         type: _type,
@@ -381,7 +381,7 @@ const SubscriptionModal = ({
                 if (
                   scheduleType === 'interval' ||
                   !value ||
-                  cron_parser.parseExpression(value).hasNext()
+                  CronExpressionParser.parse(value).hasNext()
                 ) {
                   return Promise.resolve();
                 } else {

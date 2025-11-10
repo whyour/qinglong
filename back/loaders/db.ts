@@ -60,7 +60,7 @@ export default async () => {
       await sequelize.query(
         'alter table Crontabs add column log_name VARCHAR(255)',
       );
-    } catch (error) {}
+    } catch (error) { }
     try {
       await sequelize.query('alter table Envs add column isPinned NUMBER');
     } catch (error) {}
