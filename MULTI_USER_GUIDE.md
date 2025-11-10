@@ -90,6 +90,48 @@ DELETE /api/user-management
 - Minimum password length is 6 characters
 - Strong passwords are recommended
 
+## 数据迁移 (Data Migration)
+
+### 迁移工具 (Migration Tool)
+
+项目提供了数据迁移脚本，可以将现有数据分配给特定用户。
+
+A migration script is provided to assign existing data to specific users.
+
+#### 使用方法 (Usage)
+
+1. **列出所有用户 (List all users)**
+```bash
+node migrate-to-multiuser.js --list-users
+```
+
+2. **预览迁移（不实际执行）(Dry run)**
+```bash
+node migrate-to-multiuser.js --userId=1 --dry-run
+```
+
+3. **将数据迁移到指定用户ID (Migrate to user ID)**
+```bash
+node migrate-to-multiuser.js --userId=1
+```
+
+4. **将数据迁移到指定用户名 (Migrate to username)**
+```bash
+node migrate-to-multiuser.js --username=admin
+```
+
+#### 注意事项 (Important Notes)
+
+- 迁移脚本只会处理 `userId` 为空的数据（遗留数据）
+- 已分配给用户的数据不会被修改
+- 建议先使用 `--dry-run` 预览变更
+- 迁移过程中如果出错会自动回滚
+
+- The script only migrates data where `userId` is NULL (legacy data)
+- Data already assigned to users will not be changed
+- It's recommended to use `--dry-run` first to preview changes
+- Changes are automatically rolled back if an error occurs
+
 ## 向后兼容 (Backward Compatibility)
 
 - 原有的单用户系统管理员账号继续有效
@@ -103,10 +145,10 @@ DELETE /api/user-management
 
 1. **首次使用**：首次使用多用户功能时，建议先创建一个管理员账号作为备份
 2. **密码管理**：请妥善保管用户密码，忘记密码需要管理员重置
-3. **数据迁移**：如需将现有数据分配给特定用户，请联系管理员手动更新数据库
+3. **数据迁移**：使用提供的 `migrate-to-multiuser.js` 脚本将现有数据分配给特定用户
 4. **权限控制**：删除用户不会删除该用户的数据，数据会变为遗留数据
 
 1. **First Use**: When first using multi-user functionality, it's recommended to create an admin account as a backup
 2. **Password Management**: Please keep user passwords safe; forgotten passwords need admin reset
-3. **Data Migration**: To assign existing data to specific users, contact admin for manual database update
+3. **Data Migration**: Use the provided `migrate-to-multiuser.js` script to assign existing data to specific users
 4. **Permission Control**: Deleting a user doesn't delete their data; the data becomes legacy data
