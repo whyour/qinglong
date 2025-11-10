@@ -66,6 +66,7 @@ const SHOW_TAB_COUNT = 10;
 
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
+  const [allSubscriptions, setAllSubscriptions] = useState<any[]>([]);
   const columns: ColumnProps<ICrontab>[] = [
     {
       title: intl.get('名称'),
@@ -272,6 +273,12 @@ const Crontab = () => {
       title: intl.get('关联订阅'),
       width: 185,
       render: (text, record: any) => record?.subscription?.name || '-',
+      key: 'sub_id',
+      dataIndex: 'sub_id',
+      filters: allSubscriptions.map((sub) => ({
+        text: sub.name || sub.alias,
+        value: sub.id,
+      })),
     },
     {
       title: intl.get('操作'),
@@ -794,8 +801,20 @@ const Crontab = () => {
     }
   }, [viewConf, enabledCronViews]);
 
+  const getAllSubscriptions = () => {
+    request
+      .get(`${config.apiPrefix}subscriptions`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setAllSubscriptions(data || []);
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     getCronViews();
+    getAllSubscriptions();
   }, []);
 
   const viewAction = (key: string) => {
