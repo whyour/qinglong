@@ -23,7 +23,7 @@ import {
 } from '@ant-design/icons';
 import { request } from '@/utils/http';
 import intl from 'react-intl-universal';
-import ScenarioModal from './visualWorkflowModal';
+import ScenarioModal from './flowgramWorkflowModal';
 import ScenarioLogModal from './logModal';
 import dayjs from 'dayjs';
 
