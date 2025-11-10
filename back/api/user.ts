@@ -97,6 +97,7 @@ export default (app: Router) => {
           username: authInfo.username,
           avatar: authInfo.avatar,
           twoFactorActivated: authInfo.twoFactorActivated,
+          role: req.user?.role,
         },
       });
     } catch (e) {
