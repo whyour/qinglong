@@ -4,7 +4,7 @@ import config from '../config';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import { exec, execSync } from 'child_process';
 import fs from 'fs/promises';
-import cron_parser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 import {
   getFileContentByName,
   fileExist,
@@ -27,7 +27,7 @@ import { ScheduleType } from '../interface/schedule';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
@@ -49,9 +49,27 @@ export default class CronService {
     return this.isOnceSchedule(schedule) || this.isBootSchedule(schedule);
   }
 
+  private async getLogName(cron: Crontab) {
+    const { log_name, command, id } = cron;
+    if (log_name === '/dev/null') {
+      return log_name;
+    }
+    let uniqPath = await getUniqPath(command, `${id}`);
+    if (log_name) {
+      const normalizedLogName = log_name.startsWith('/') ? log_name : path.join(config.logPath, log_name);
+      if (normalizedLogName.startsWith(config.logPath)) {
+        uniqPath = log_name;
+      }
+    }
+    const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
+    await fs.mkdir(logDirPath, { recursive: true });
+    return uniqPath;
+  }
+
   public async create(payload: Crontab): Promise<Crontab> {
     const tab = new Crontab(payload);
     tab.saved = false;
+    tab.log_name = await this.getLogName(tab);
     const doc = await this.insert(tab);
 
     if (isDemoEnv()) {
@@ -82,6 +100,7 @@ export default class CronService {
     const doc = await this.getDb({ id: payload.id });
     const tab = new Crontab({ ...doc, ...payload });
     tab.saved = false;
+    tab.log_name = await this.getLogName(tab);
     const newDoc = await this.updateDb(tab);
 
     if (doc.isDisabled === 1 || isDemoEnv()) {
@@ -142,7 +161,7 @@ export default class CronService {
       let cron;
       try {
         cron = await this.getDb({ id });
-      } catch (err) {}
+      } catch (err) { }
       if (!cron) {
         continue;
       }
@@ -476,61 +495,14 @@ export default class CronService {
           `[panel][开始执行任务] 参数: ${JSON.stringify(params)}`,
         );
 
-        let { id, command, log_path, log_name } = cron;
-        
-        // Check if log_name is an absolute path
-        const isAbsolutePath = log_name && log_name.startsWith('/');
-        
-        let uniqPath: string;
-        let absolutePath: string;
-        let logPath: string;
-        
-        if (isAbsolutePath) {
-          // Special case: /dev/null is allowed as-is to discard logs
-          if (log_name === '/dev/null') {
-            uniqPath = log_name;
-            absolutePath = log_name;
-            logPath = log_name;
-          } else {
-            // For other absolute paths, ensure they are within the safe log directory
-            const normalizedLogName = path.normalize(log_name!);
-            const normalizedLogPath = path.normalize(config.logPath);
-            
-            if (!normalizedLogName.startsWith(normalizedLogPath)) {
-              this.logger.error(
-                `[panel][日志路径安全检查失败] 绝对路径必须在日志目录内: ${log_name}`,
-              );
-              // Fallback to auto-generated path for security
-              const fallbackUniqPath = await getUniqPath(command, `${id}`);
-              const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
-              const logDirPath = path.resolve(config.logPath, `${fallbackUniqPath}`);
-              if (log_path?.split('/')?.every((x) => x !== fallbackUniqPath)) {
-                await fs.mkdir(logDirPath, { recursive: true });
-              }
-              logPath = `${fallbackUniqPath}/${logTime}.log`;
-              absolutePath = path.resolve(config.logPath, `${logPath}`);
-              uniqPath = fallbackUniqPath;
-            } else {
-              // Absolute path is safe, use it
-              uniqPath = log_name!;
-              absolutePath = log_name!;
-              logPath = log_name!;
-            }
-          }
-        } else {
-          // Sanitize log_name to prevent path traversal for relative paths
-          const sanitizedLogName = log_name
-            ? log_name.replace(/[\/\\\.]/g, '_').replace(/^_+|_+$/g, '')
-            : '';
-          uniqPath = sanitizedLogName || (await getUniqPath(command, `${id}`));
-          const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
-          const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
-          if (log_path?.split('/')?.every((x) => x !== uniqPath)) {
-            await fs.mkdir(logDirPath, { recursive: true });
-          }
-          logPath = `${uniqPath}/${logTime}.log`;
-          absolutePath = path.resolve(config.logPath, `${logPath}`);
-        }
+        let { id, command, log_name } = cron;
+
+        const uniqPath = log_name === '/dev/null' ? (await getUniqPath(command, `${id}`)) : log_name;
+        const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
+        const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
+        await fs.mkdir(logDirPath, { recursive: true });
+        const logPath = `${uniqPath}/${logTime}.log`;
+        const absolutePath = path.resolve(config.logPath, `${logPath}`);
         const cp = spawn(
           `real_log_path=${logPath} no_delay=true ${this.makeCommand(
             cron,
@@ -610,7 +582,9 @@ export default class CronService {
     if (!doc) {
       return '';
     }
-
+    if (doc.log_name === '/dev/null') {
+      return '日志设置为忽略';
+    }
     const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
     const logFileExist = doc.log_path && (await fileExist(absolutePath));
     if (logFileExist) {
@@ -653,9 +627,7 @@ export default class CronService {
     if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
       command = `${TASK_PREFIX}${tab.command}`;
     }
-    let commandVariable = `real_time=${Boolean(realTime)} no_tee=true ID=${
-      tab.id
-    } `;
+    let commandVariable = `real_time=${Boolean(realTime)} log_name=${tab.log_name} no_tee=true ID=${tab.id} `;
     if (tab.task_before) {
       commandVariable += `task_before='${tab.task_before
         .replace(/'/g, "'\\''")
@@ -716,7 +688,7 @@ export default class CronService {
         if (
           command &&
           schedule &&
-          cron_parser.parseExpression(schedule).hasNext()
+          CronExpressionParser.parse(schedule).hasNext()
         ) {
           const name = namePrefix + '_' + index;
 

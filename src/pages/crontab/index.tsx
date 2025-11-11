@@ -66,6 +66,7 @@ const SHOW_TAB_COUNT = 10;
 
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
+  const [allSubscriptions, setAllSubscriptions] = useState<any[]>([]);
   const columns: ColumnProps<ICrontab>[] = [
     {
       title: intl.get('名称'),
@@ -247,8 +248,8 @@ const Crontab = () => {
           >
             {record.last_execution_time
               ? dayjs(record.last_execution_time * 1000).format(
-                  'YYYY-MM-DD HH:mm:ss',
-                )
+                'YYYY-MM-DD HH:mm:ss',
+              )
               : '-'}
           </span>
         );
@@ -272,6 +273,12 @@ const Crontab = () => {
       title: intl.get('关联订阅'),
       width: 185,
       render: (text, record: any) => record?.subscription?.name || '-',
+      key: 'sub_id',
+      dataIndex: 'sub_id',
+      filters: allSubscriptions.map((sub) => ({
+        text: sub.name || sub.alias,
+        value: sub.id,
+      })),
     },
     {
       title: intl.get('操作'),
@@ -361,11 +368,10 @@ const Crontab = () => {
   const getCrons = () => {
     setLoading(true);
     const { page, size, sorter, filters } = pageConf;
-    let url = `${
-      config.apiPrefix
-    }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
-      filters,
-    )}`;
+    let url = `${config.apiPrefix
+      }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
+        filters,
+      )}`;
     if (sorter && sorter.column && sorter.order) {
       url += `&sorter=${JSON.stringify({
         field: sorter.column.key,
@@ -523,9 +529,8 @@ const Crontab = () => {
 
   const enabledOrDisabledCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${
-        record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
-      }`,
+      title: `确认${record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
+        }`,
       content: (
         <>
           {intl.get('确认')}
@@ -540,8 +545,7 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              record.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             [record.id],
           )
@@ -565,9 +569,8 @@ const Crontab = () => {
 
   const pinOrUnPinCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${
-        record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
-      }`,
+      title: `确认${record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
+        }`,
       content: (
         <>
           {intl.get('确认')}
@@ -582,8 +585,7 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              record.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             [record.id],
           )
@@ -799,8 +801,20 @@ const Crontab = () => {
     }
   }, [viewConf, enabledCronViews]);
 
+  const getAllSubscriptions = () => {
+    request
+      .get(`${config.apiPrefix}subscriptions`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setAllSubscriptions(data || []);
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     getCronViews();
+    getAllSubscriptions();
   }, []);
 
   const viewAction = (key: string) => {
@@ -1014,6 +1028,7 @@ const Crontab = () => {
         )}
         <Table
           columns={columns}
+          sortDirections={['descend', 'ascend']}
           pagination={{
             current: pageConf.page,
             pageSize: pageConf.size,

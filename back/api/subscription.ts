@@ -3,7 +3,7 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import SubscriptionService from '../services/subscription';
 import { celebrate, Joi } from 'celebrate';
-import cron_parser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 const route = Router();
 
 export default (app: Router) => {
@@ -60,7 +60,7 @@ export default (app: Router) => {
       try {
         if (
           !req.body.schedule ||
-          cron_parser.parseExpression(req.body.schedule).hasNext()
+          CronExpressionParser.parse(req.body.schedule).hasNext()
         ) {
           const subscriptionService = Container.get(SubscriptionService);
           const data = await subscriptionService.create(req.body);
@@ -193,7 +193,7 @@ export default (app: Router) => {
         if (
           !req.body.schedule ||
           typeof req.body.schedule === 'object' ||
-          cron_parser.parseExpression(req.body.schedule).hasNext()
+          CronExpressionParser.parse(req.body.schedule).hasNext()
         ) {
           const subscriptionService = Container.get(SubscriptionService);
           const data = await subscriptionService.update(req.body);
