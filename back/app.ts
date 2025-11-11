@@ -24,6 +24,7 @@ class Application {
   private grpcServerService?: GrpcServerService;
   private isShuttingDown = false;
   private workerMetadataMap = new Map<number, WorkerMetadata>();
+  private httpWorker?: Worker;
 
   constructor() {
     this.app = express();
@@ -60,7 +61,7 @@ class Application {
     this.waitForWorkerReady(grpcWorker, 30000)
       .then(() => {
         Logger.info('gRPC worker is ready, starting HTTP worker');
-        this.forkWorker('http');
+        this.httpWorker = this.forkWorker('http');
       })
       .catch((error) => {
         Logger.error('Failed to wait for gRPC worker:', error);
@@ -81,6 +82,15 @@ class Application {
             this.waitForWorkerReady(newGrpcWorker, 30000)
               .then(() => {
                 Logger.info('gRPC worker restarted and ready');
+                // Re-register cron jobs by notifying the HTTP worker
+                if (this.httpWorker) {
+                  try {
+                    this.httpWorker.send('reregister-crons');
+                    Logger.info('Sent reregister-crons message to HTTP worker');
+                  } catch (error) {
+                    Logger.error('Failed to send reregister-crons message:', error);
+                  }
+                }
               })
               .catch((error) => {
                 Logger.error('Failed to restart gRPC worker:', error);
@@ -89,6 +99,7 @@ class Application {
           } else {
             // For HTTP worker, just restart it
             const newWorker = this.forkWorker(metadata.serviceType);
+            this.httpWorker = newWorker;
             Logger.info(`Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`);
           }
         }
@@ -248,9 +259,20 @@ class Application {
   }
 
   private setupWorkerShutdown(serviceType: string) {
-    process.on('message', (msg) => {
+    process.on('message', async (msg) => {
       if (msg === 'shutdown') {
         this.gracefulShutdown(serviceType);
+      } else if (msg === 'reregister-crons' && serviceType === 'http') {
+        // Re-register cron jobs when gRPC worker restarts
+        try {
+          Logger.info('Received reregister-crons message, re-registering cron jobs...');
+          const CronService = (await import('./services/cron')).default;
+          const cronService = Container.get(CronService);
+          await cronService.autosave_crontab();
+          Logger.info('Cron jobs re-registered successfully');
+        } catch (error) {
+          Logger.error('Failed to re-register cron jobs:', error);
+        }
       }
     });
 
