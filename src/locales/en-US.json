@@ -591,7 +591,7 @@
   "是": "Yes",
   "否": "No",
   "共": "Total",
-  "项": "items"
+  "项": "items",
   "日志名称": "Log Name",
   "自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成": "Custom log folder name to distinguish logs from different tasks. Leave blank to auto-generate",
   "自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成。支持绝对路径如 /dev/null": "Custom log folder name to distinguish logs from different tasks. Leave blank to auto-generate. Supports absolute paths like /dev/null",

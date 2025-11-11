@@ -252,7 +252,7 @@ const Scenario = () => {
       title: intl.get('操作'),
       key: 'action',
       width: 100,
-      fixed: 'right',
+      fixed: 'right' as const,
       render: (_: any, record: any) => (
         <Dropdown menu={getActionsMenu(record)} trigger={['click']}>
           <Button type="link" icon={<EllipsisOutlined />} />
@@ -296,7 +296,7 @@ const Scenario = () => {
           setIsModalVisible(false);
           setSelectedScenario(null);
         }}
-        onSuccess={() => {
+        onOk={() => {
           setIsModalVisible(false);
           setSelectedScenario(null);
           fetchScenarios();

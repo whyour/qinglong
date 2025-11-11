@@ -3,7 +3,7 @@ import { Modal, Form, Input, message } from 'antd';
 import { request } from '@/utils/http';
 import intl from 'react-intl-universal';
 import { FreeLayoutEditor } from '@flowgram.ai/free-layout-editor';
-import '@flowgram.ai/free-layout-editor/dist/index.css';
+import '@flowgram.ai/free-layout-editor/index.css';
 
 const { TextArea } = Input;
 
