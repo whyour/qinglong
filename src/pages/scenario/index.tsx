@@ -108,6 +108,31 @@ const Scenario = () => {
     }
   };
 
+  const handleModalOk = async (values: any) => {
+    try {
+      if (selectedScenario) {
+        const { code } = await request.put('/api/scenarios', values);
+        if (code === 200) {
+          message.success(intl.get('更新成功'));
+          setIsModalVisible(false);
+          setSelectedScenario(null);
+          fetchScenarios();
+        }
+      } else {
+        const { code } = await request.post('/api/scenarios', values);
+        if (code === 200) {
+          message.success(intl.get('创建成功'));
+          setIsModalVisible(false);
+          setSelectedScenario(null);
+          fetchScenarios();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save scenario:', error);
+      message.error(intl.get('操作失败'));
+    }
+  };
+
   const handleViewLogs = (record: any) => {
     setSelectedScenario(record);
     setIsLogModalVisible(true);
@@ -263,19 +288,17 @@ const Scenario = () => {
 
   return (
     <PageContainer
-      header={{
-        title: intl.get('场景模式'),
-        extra: [
-          <Button
-            key="create"
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreate}
-          >
-            {intl.get('新建场景')}
-          </Button>,
-        ],
-      }}
+      title={intl.get('场景模式')}
+      extra={[
+        <Button
+          key="create"
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleCreate}
+        >
+          {intl.get('新建场景')}
+        </Button>,
+      ]}
     >
       <Table
         columns={columns}
@@ -296,11 +319,7 @@ const Scenario = () => {
           setIsModalVisible(false);
           setSelectedScenario(null);
         }}
-        onOk={() => {
-          setIsModalVisible(false);
-          setSelectedScenario(null);
-          fetchScenarios();
-        }}
+        onOk={handleModalOk}
       />
 
       <ScenarioLogModal

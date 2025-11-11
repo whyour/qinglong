@@ -80,7 +80,9 @@ const FlowgramWorkflowModal: React.FC<FlowgramWorkflowModalProps> = ({
       onOk={handleOk}
       onCancel={handleCancel}
       confirmLoading={loading}
-      width={1000}
+      width={1400}
+      style={{ top: 20 }}
+      bodyStyle={{ height: '80vh', overflow: 'auto' }}
       maskClosable={false}
     >
       <Form form={form} layout="vertical">

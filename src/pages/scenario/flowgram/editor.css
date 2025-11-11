@@ -1,10 +1,56 @@
 .flowgram-editor-container {
-  display: flex;
-  flex-direction: column;
-  height: 600px;
   border: 1px solid #d9d9d9;
   border-radius: 4px;
+  padding: 16px;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.flowgram-editor-toolbar {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.flowgram-editor-canvas {
+  flex: 1;
+  min-height: 500px;
+  border: 1px dashed #d9d9d9;
+  border-radius: 4px;
+  padding: 16px;
   background: #fafafa;
+  overflow-y: auto;
+  max-height: calc(80vh - 300px);
+}
+
+.flowgram-node-card {
+  padding: 12px;
+  background: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  cursor: move;
+  user-select: none;
+  position: relative;
+}
+
+.flowgram-node-card:hover {
+  border-color: #40a9ff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.flowgram-node-card-dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.flowgram-node-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .flowgram-toolbar {

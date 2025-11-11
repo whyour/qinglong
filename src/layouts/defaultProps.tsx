@@ -69,7 +69,7 @@ export default {
       {
         path: '/scenario',
         name: intl.get('场景模式'),
-        icon: <IconFont type="ql-icon-scenario" />,
+        icon: <IconFont type="ql-icon-script" />,
         component: '@/pages/scenario/index',
       },
       {

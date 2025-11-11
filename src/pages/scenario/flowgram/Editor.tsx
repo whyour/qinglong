@@ -25,6 +25,7 @@ export const FlowgramEditor: React.FC<FlowgramEditorProps> = ({ value, onChange 
   const [graph, setGraph] = useState<FlowgramGraph>(value || { nodes: [], edges: [] });
   const [selectedNode, setSelectedNode] = useState<FlowgramNode | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [draggedNode, setDraggedNode] = useState<FlowgramNode | null>(null);
   const [form] = Form.useForm();
 
   // Initialize editor
@@ -119,6 +120,42 @@ export const FlowgramEditor: React.FC<FlowgramEditorProps> = ({ value, onChange 
 
     notifyChange(newGraph);
   }, [graph, notifyChange]);
+
+  // Handle node drag start
+  const handleDragStart = useCallback((e: React.DragEvent, node: FlowgramNode) => {
+    setDraggedNode(node);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  // Handle node drag over
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Handle node drop
+  const handleDrop = useCallback((e: React.DragEvent, targetNode: FlowgramNode) => {
+    e.preventDefault();
+    if (!draggedNode || draggedNode.id === targetNode.id) return;
+
+    // Reorder nodes
+    const draggedIndex = graph.nodes.findIndex(n => n.id === draggedNode.id);
+    const targetIndex = graph.nodes.findIndex(n => n.id === targetNode.id);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newNodes = [...graph.nodes];
+    const [removed] = newNodes.splice(draggedIndex, 1);
+    newNodes.splice(targetIndex, 0, removed);
+
+    const newGraph = {
+      ...graph,
+      nodes: newNodes,
+    };
+
+    notifyChange(newGraph);
+    setDraggedNode(null);
+  }, [draggedNode, graph, notifyChange]);
 
   // Validate workflow
   const handleValidate = useCallback(() => {
@@ -367,18 +404,18 @@ export const FlowgramEditor: React.FC<FlowgramEditorProps> = ({ value, onChange 
       <div className="flowgram-canvas">
         <div style={{ padding: '20px' }}>
           <h3>工作流节点 ({graph.nodes.length})</h3>
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <Space direction="vertical" style={{ width: '100%' }} className="flowgram-node-list">
             {graph.nodes.map((node) => (
               <div
                 key={node.id}
-                className="node-card"
+                className={`flowgram-node-card ${draggedNode?.id === node.id ? 'flowgram-node-card-dragging' : ''}`}
                 onClick={() => handleNodeClick(node)}
+                draggable
+                onDragStart={(e) => handleDragStart(e, node)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, node)}
                 style={{
-                  padding: '10px',
-                  border: '1px solid #d9d9d9',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  background: '#fff',
+                  background: draggedNode?.id === node.id ? '#f0f0f0' : '#fff',
                 }}
               >
                 <div><strong>{node.data.label}</strong></div>
