@@ -14,6 +14,7 @@ import {
 } from '../config/util';
 import dayjs from 'dayjs';
 import multer from 'multer';
+import { UserRole } from '../data/user';
 
 const route = Router();
 const storage = multer.diskStorage({
@@ -357,6 +358,14 @@ export default (app: Router) => {
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
+        // Only admin can view system logs
+        if (req.user?.role !== UserRole.admin) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
+        
         const systemService = Container.get(SystemService);
         await systemService.getSystemLog(
           res,
@@ -375,6 +384,14 @@ export default (app: Router) => {
     '/log',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
+        // Only admin can delete system logs
+        if (req.user?.role !== UserRole.admin) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
+        
         const systemService = Container.get(SystemService);
         await systemService.deleteSystemLog();
         res.send({ code: 200 });
