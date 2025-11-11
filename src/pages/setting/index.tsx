@@ -334,16 +334,20 @@ const Setting = () => {
               label: intl.get('通知设置'),
               children: <NotificationSetting data={notificationInfo} />,
             },
-            {
-              key: 'syslog',
-              label: intl.get('系统日志'),
-              children: <SystemLog height={height} theme={theme} />,
-            },
-            {
-              key: 'login',
-              label: intl.get('登录日志'),
-              children: <LoginLog height={height} data={loginLogData} />,
-            },
+            ...(user?.role === 0
+              ? [
+                  {
+                    key: 'syslog',
+                    label: intl.get('系统日志'),
+                    children: <SystemLog height={height} theme={theme} />,
+                  },
+                  {
+                    key: 'login',
+                    label: intl.get('登录日志'),
+                    children: <LoginLog height={height} data={loginLogData} />,
+                  },
+                ]
+              : []),
             ...(user?.role === 0 && !isDemoEnv
               ? [
                   {
