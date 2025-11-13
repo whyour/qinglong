@@ -12,6 +12,16 @@ log_with_style() {
   printf "\n[%s] [%7s]  %s\n" "${timestamp}" "${level}" "${message}"
 }
 
+# Fix DNS resolution issues in Alpine Linux
+# Alpine uses musl libc which has known DNS resolver issues with certain domains
+# Adding ndots:0 prevents unnecessary search domain appending
+if [ -f /etc/alpine-release ]; then
+  if ! grep -q "^options ndots:0" /etc/resolv.conf 2>/dev/null; then
+    echo "options ndots:0" >> /etc/resolv.conf
+    log_with_style "INFO" "🔧 已配置 DNS 解析优化 (ndots:0)"
+  fi
+fi
+
 log_with_style "INFO" "🚀 1. 检测配置文件..."
 import_config "$@"
 fix_config
