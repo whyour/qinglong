@@ -43,6 +43,8 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 
 `latest` 镜像是基于 `alpine` 构建，`debian` 镜像是基于 `debian-slim` 构建。如果需要使用 `alpine` 不支持的依赖，建议使用 `debian` 镜像
 
+**⚠️ 重要提示**: 如果您需要以**非 root 用户**运行 Docker，请使用 `debian` 镜像。Alpine 的 `crond` 需要 root 权限，而 Debian 支持用户级 crontab。详见 [非root用户运行指南](./NON-ROOT-GUIDE.md)。
+
 ```bash
 docker pull whyour/qinglong:latest
 docker pull whyour/qinglong:debian
