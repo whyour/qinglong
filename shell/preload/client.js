@@ -33,6 +33,11 @@ class GrpcClient {
     'createCron',
     'updateCron',
     'deleteCrons',
+    'getCrons',
+    'getCronById',
+    'enableCrons',
+    'disableCrons',
+    'runCrons',
   ];
 
   #client;
