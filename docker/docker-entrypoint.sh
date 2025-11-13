@@ -14,6 +14,8 @@ log_with_style() {
 
 log_with_style "INFO" "🚀 1. 检测配置文件..."
 import_config "$@"
+# Export BACK_PORT from QlPort for backend server to use
+export BACK_PORT="${ql_port}"
 fix_config
 
 pm2 l &>/dev/null
