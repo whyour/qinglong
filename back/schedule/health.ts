@@ -17,14 +17,11 @@ const check = async (
         return callback(null, { status: 1 });
       }
 
-      const panelErrLog = await promiseExec(
-        `tail -n 300 ~/.pm2/logs/panel-error.log`,
-      );
-      const scheduleErrLog = await promiseExec(
-        `tail -n 300 ~/.pm2/logs/schedule-error.log`,
+      const qinglongErrLog = await promiseExec(
+        `tail -n 300 ~/.pm2/logs/qinglong-error.log`,
       );
       return callback(
-        new Error(`${scheduleErrLog || ''}\n${panelErrLog || ''}\n${res}`.trim()),
+        new Error(`${qinglongErrLog || ''}\n${res}`.trim()),
       );
 
     default:
