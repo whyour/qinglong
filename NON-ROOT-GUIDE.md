@@ -79,6 +79,13 @@ services:
    - 任务不会被定时执行（`crontab` 命令失败）
    - 可能看到 "Operation not permitted" 相关错误
 
+### 非 root 用户运行的已知限制
+
+使用 Debian 镜像以非 root 用户运行时，有以下已知限制：
+
+1. **无法创建全局命令快捷方式**: 应用会尝试在 `/usr/local/bin/` 创建 `ql` 和 `task` 命令的符号链接，但非 root 用户无权限。这不影响核心功能，只是需要使用完整路径调用命令。
+2. **需要正确配置 PM2_HOME**: 必须设置为容器本地文件系统（如 `/tmp/.pm2`），详见上面的配置示例。
+
 ### 故障排查
 
 #### 如何确认当前使用的镜像版本？
@@ -113,6 +120,25 @@ docker run -d \
 environment:
   - PM2_HOME=/tmp/.pm2
 ```
+
+#### Symlink 权限错误（/usr/local/bin）
+
+如果看到以下错误：
+```
+EACCES: permission denied, symlink '/ql/shell/update.sh' -> '/usr/local/bin/ql_tmp'
+```
+
+**原因**: 应用尝试在 `/usr/local/bin/` 创建 `ql` 和 `task` 命令的符号链接，非 root 用户无权限在系统目录创建。
+
+**影响**: 这是一个警告，不影响核心功能。只是无法在命令行直接使用 `ql` 和 `task` 命令。
+
+**解决方案**:
+1. **忽略此错误**（推荐）- 核心功能不受影响，Web 界面和定时任务正常工作
+2. 如果需要命令行工具，使用完整路径：
+   ```bash
+   /ql/shell/update.sh  # 代替 ql update
+   /ql/shell/task.sh    # 代替 task
+   ```
 
 #### PM2 Socket 错误（ENOTSUP）
 
@@ -272,6 +298,13 @@ If you must use the Alpine image (`whyour/qinglong:latest`), please note:
    - Tasks won't execute on schedule (`crontab` command fails)
    - May see "Operation not permitted" related errors
 
+### Known Limitations for Non-Root Users
+
+When running Debian images as a non-root user, there are the following known limitations:
+
+1. **Cannot create global command shortcuts**: The application attempts to create symbolic links for `ql` and `task` commands in `/usr/local/bin/`, but non-root users lack permissions. This doesn't affect core functionality; you just need to use full paths to call commands.
+2. **PM2_HOME must be configured correctly**: Must be set to the container's local filesystem (e.g., `/tmp/.pm2`), see configuration examples above.
+
 ### Troubleshooting
 
 #### How to check current image version?
@@ -306,6 +339,25 @@ docker run -d \
 environment:
   - PM2_HOME=/tmp/.pm2
 ```
+
+#### Symlink Permission Errors (/usr/local/bin)
+
+If you see this error:
+```
+EACCES: permission denied, symlink '/ql/shell/update.sh' -> '/usr/local/bin/ql_tmp'
+```
+
+**Cause**: The application attempts to create symbolic links for `ql` and `task` commands in `/usr/local/bin/`, which requires root permissions.
+
+**Impact**: This is a warning and does not affect core functionality. Only the global command-line shortcuts are unavailable.
+
+**Solution**:
+1. **Ignore this error** (recommended) - Core functionality is unaffected, web interface and scheduled tasks work normally
+2. If you need CLI tools, use full paths:
+   ```bash
+   /ql/shell/update.sh  # Instead of: ql update
+   /ql/shell/task.sh    # Instead of: task
+   ```
 
 #### PM2 Socket Errors (ENOTSUP)
 
