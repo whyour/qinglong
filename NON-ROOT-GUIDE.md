@@ -31,6 +31,8 @@ docker pull whyour/qinglong:debian
 
 ⚠️ **重要提示**: 当前 Debian 镜像默认以 root 用户运行。如果需要以非 root 用户运行，需要设置 `PM2_HOME` 环境变量以避免 PM2 权限错误。
 
+**注意**: PM2_HOME 必须设置在容器本地文件系统（如 `/tmp`），不能在挂载的卷上，因为 PM2 的 Unix socket 在某些文件系统上不受支持。
+
 #### 方式一：使用 docker run
 
 ```bash
@@ -42,7 +44,7 @@ chown -R 1000:1000 /your/data/path  # 1000 是容器内默认用户 ID
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
-  -e PM2_HOME=/ql/data/.pm2 \
+  -e PM2_HOME=/tmp/.pm2 \
   -v /your/data/path:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
@@ -58,7 +60,7 @@ services:
     container_name: qinglong
     user: "1000:1000"  # 指定用户 ID 和组 ID
     environment:
-      - PM2_HOME=/ql/data/.pm2  # 必需：设置 PM2 工作目录
+      - PM2_HOME=/tmp/.pm2  # 必需：设置 PM2 工作目录到本地文件系统
     volumes:
       - ./data:/ql/data
     ports:
@@ -95,21 +97,40 @@ Error: EACCES: permission denied, mkdir '/.pm2/pids'
 
 **原因**: PM2 默认使用 `~/.pm2` 作为工作目录，非 root 用户可能没有权限。
 
-**解决方案**: 设置 `PM2_HOME` 环境变量到有写权限的目录：
+**解决方案**: 设置 `PM2_HOME` 环境变量到容器本地文件系统的可写目录：
 
 ```bash
 # 使用 docker run
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
-  -e PM2_HOME=/ql/data/.pm2 \
+  -e PM2_HOME=/tmp/.pm2 \
   -v /your/data/path:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
 
 # 或在 docker-compose.yml 中添加
 environment:
-  - PM2_HOME=/ql/data/.pm2
+  - PM2_HOME=/tmp/.pm2
+```
+
+#### PM2 Socket 错误（ENOTSUP）
+
+如果看到以下错误：
+```
+Error: connect ENOTSUP /ql/data/.pm2/rpc.sock
+```
+
+**原因**: PM2 使用 Unix domain sockets 进行进程间通信，某些文件系统（如网络挂载、Windows 卷、某些 NFS）不支持 Unix sockets。
+
+**解决方案**: 将 `PM2_HOME` 设置到容器的本地文件系统（如 `/tmp`），而不是挂载的卷：
+
+```bash
+# 正确：使用容器本地文件系统
+-e PM2_HOME=/tmp/.pm2
+
+# 错误：使用挂载的卷（可能不支持 Unix sockets）
+-e PM2_HOME=/ql/data/.pm2
 ```
 
 #### 如何测试 crontab 权限？
@@ -140,7 +161,7 @@ docker rm qinglong
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
-  -e PM2_HOME=/ql/data/.pm2 \
+  -e PM2_HOME=/tmp/.pm2 \
   -v ./data_backup:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
@@ -203,6 +224,8 @@ docker pull whyour/qinglong:debian
 
 ⚠️ **Important**: The current Debian image runs as root by default. If you need to run as a non-root user, you must set the `PM2_HOME` environment variable to avoid PM2 permission errors.
 
+**Note**: PM2_HOME must be set on the container's local filesystem (e.g., `/tmp`), not on a mounted volume, because PM2's Unix sockets may not be supported on certain filesystems.
+
 #### Method 1: Using docker run
 
 ```bash
@@ -214,7 +237,7 @@ chown -R 1000:1000 /your/data/path  # 1000 is the default user ID in container
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
-  -e PM2_HOME=/ql/data/.pm2 \
+  -e PM2_HOME=/tmp/.pm2 \
   -v /your/data/path:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
@@ -230,7 +253,7 @@ services:
     container_name: qinglong
     user: "1000:1000"  # Specify user ID and group ID
     environment:
-      - PM2_HOME=/ql/data/.pm2  # Required: Set PM2 working directory
+      - PM2_HOME=/tmp/.pm2  # Required: Set PM2 working directory to local filesystem
     volumes:
       - ./data:/ql/data
     ports:
@@ -267,21 +290,40 @@ Error: EACCES: permission denied, mkdir '/.pm2/pids'
 
 **Cause**: PM2 uses `~/.pm2` as its default working directory, which non-root users may not have permission to write to.
 
-**Solution**: Set the `PM2_HOME` environment variable to a writable directory:
+**Solution**: Set the `PM2_HOME` environment variable to a writable directory on the container's local filesystem:
 
 ```bash
 # Using docker run
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
-  -e PM2_HOME=/ql/data/.pm2 \
+  -e PM2_HOME=/tmp/.pm2 \
   -v /your/data/path:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
 
 # Or add to docker-compose.yml
 environment:
-  - PM2_HOME=/ql/data/.pm2
+  - PM2_HOME=/tmp/.pm2
+```
+
+#### PM2 Socket Errors (ENOTSUP)
+
+If you see this error:
+```
+Error: connect ENOTSUP /ql/data/.pm2/rpc.sock
+```
+
+**Cause**: PM2 uses Unix domain sockets for inter-process communication. Some filesystems (network mounts, Windows volumes, certain NFS configurations) do not support Unix sockets.
+
+**Solution**: Set `PM2_HOME` to the container's local filesystem (e.g., `/tmp`) instead of a mounted volume:
+
+```bash
+# Correct: Use container's local filesystem
+-e PM2_HOME=/tmp/.pm2
+
+# Incorrect: Using mounted volume (may not support Unix sockets)
+-e PM2_HOME=/ql/data/.pm2
 ```
 
 #### How to test crontab permissions?
@@ -310,9 +352,11 @@ docker rm qinglong
 
 # 3. Create new container with Debian image (set PM2_HOME)
 docker run -d \
+# 3. Create new container with Debian image (set PM2_HOME)
+docker run -d \
   --name qinglong \
   --user 1000:1000 \
-  -e PM2_HOME=/ql/data/.pm2 \
+  -e PM2_HOME=/tmp/.pm2 \
   -v ./data_backup:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
