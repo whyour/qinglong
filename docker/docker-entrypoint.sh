@@ -18,10 +18,10 @@ export BACK_PORT="${ql_port}"
 # Export GRPC_PORT from QlGrpcPort for gRPC server to use
 export GRPC_PORT="${ql_grpc_port}"
 
-# Source env.sh after exporting BACK_PORT and GRPC_PORT so they are captured
-. $dir_shell/env.sh
-
 fix_config
+
+# Source env.sh after all config is complete to capture all environment variables
+. $dir_shell/env.sh
 
 pm2 l &>/dev/null
 
