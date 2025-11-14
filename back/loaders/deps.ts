@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs/promises';
+import os from 'os';
 import chokidar from 'chokidar';
 import config from '../config/index';
 import { fileExist, promiseExec, rmPath } from '../config/util';
@@ -17,8 +18,24 @@ async function linkToNodeModule(src: string, dst?: string) {
 }
 
 async function linkCommand() {
-  const commandPath = await promiseExec('which node');
-  const commandDir = path.dirname(commandPath);
+  const homeDir = os.homedir();
+  const userBinDir = path.join(homeDir, 'bin');
+  
+  // Create ~/bin directory if it doesn't exist
+  try {
+    await fs.mkdir(userBinDir, { recursive: true });
+  } catch (error) {
+    // If we can't create ~/bin, fall back to system directory
+    const commandPath = await promiseExec('which node');
+    const commandDir = path.dirname(commandPath);
+    await linkCommandToDir(commandDir);
+    return;
+  }
+
+  await linkCommandToDir(userBinDir);
+}
+
+async function linkCommandToDir(commandDir: string) {
   const linkShell = [
     {
       src: 'update.sh',
