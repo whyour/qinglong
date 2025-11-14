@@ -83,7 +83,7 @@ services:
 
 使用 Debian 镜像以非 root 用户运行时，有以下已知限制：
 
-1. **无法创建全局命令快捷方式**: 应用会尝试在 `/usr/local/bin/` 创建 `ql` 和 `task` 命令的符号链接，但非 root 用户无权限。这不影响核心功能，只是需要使用完整路径调用命令。
+1. **无法创建全局命令快捷方式**: 应用会尝试在 `/usr/local/bin/` 创建 `ql` 和 `task` 命令的符号链接，但非 root 用户无权限。**这不影响任何功能**，应用会自动使用完整路径，定时任务和所有功能正常工作。
 2. **需要正确配置 PM2_HOME**: 必须设置为容器本地文件系统（如 `/tmp/.pm2`），详见上面的配置示例。
 
 ### 故障排查
@@ -130,11 +130,17 @@ EACCES: permission denied, symlink '/ql/shell/update.sh' -> '/usr/local/bin/ql_t
 
 **原因**: 应用尝试在 `/usr/local/bin/` 创建 `ql` 和 `task` 命令的符号链接，非 root 用户无权限在系统目录创建。
 
-**影响**: 这是一个警告，不影响核心功能。只是无法在命令行直接使用 `ql` 和 `task` 命令。
+**影响**: 这是一个警告，**不影响任何功能**。应用会自动检测符号链接是否可用，并在不可用时使用完整路径。
+
+**定时任务自动适配**:
+- ✅ 定时任务自动使用完整路径（如 `/ql/shell/task.sh`）
+- ✅ Web 界面完全正常工作
+- ✅ 所有核心功能不受影响
+- ℹ️ 手动在命令行使用时需要完整路径
 
 **解决方案**:
-1. **忽略此错误**（推荐）- 核心功能不受影响，Web 界面和定时任务正常工作
-2. 如果需要命令行工具，使用完整路径：
+1. **忽略此错误**（推荐）- 应用已自动处理，功能完全正常
+2. 如果需要手动在命令行使用工具：
    ```bash
    /ql/shell/update.sh  # 代替 ql update
    /ql/shell/task.sh    # 代替 task
@@ -302,7 +308,7 @@ If you must use the Alpine image (`whyour/qinglong:latest`), please note:
 
 When running Debian images as a non-root user, there are the following known limitations:
 
-1. **Cannot create global command shortcuts**: The application attempts to create symbolic links for `ql` and `task` commands in `/usr/local/bin/`, but non-root users lack permissions. This doesn't affect core functionality; you just need to use full paths to call commands.
+1. **Cannot create global command shortcuts**: The application attempts to create symbolic links for `ql` and `task` commands in `/usr/local/bin/`, but non-root users lack permissions. **This doesn't affect any functionality** - the application automatically uses full paths, and scheduled tasks and all features work normally.
 2. **PM2_HOME must be configured correctly**: Must be set to the container's local filesystem (e.g., `/tmp/.pm2`), see configuration examples above.
 
 ### Troubleshooting
@@ -349,11 +355,17 @@ EACCES: permission denied, symlink '/ql/shell/update.sh' -> '/usr/local/bin/ql_t
 
 **Cause**: The application attempts to create symbolic links for `ql` and `task` commands in `/usr/local/bin/`, which requires root permissions.
 
-**Impact**: This is a warning and does not affect core functionality. Only the global command-line shortcuts are unavailable.
+**Impact**: This is a warning and **does not affect any functionality**. The application automatically detects if symlinks are available and uses full paths when they're not.
+
+**Scheduled Tasks Auto-Adapt**:
+- ✅ Scheduled tasks automatically use full paths (e.g., `/ql/shell/task.sh`)
+- ✅ Web interface works completely normally
+- ✅ All core functionality is unaffected
+- ℹ️ Manual command-line usage requires full paths
 
 **Solution**:
-1. **Ignore this error** (recommended) - Core functionality is unaffected, web interface and scheduled tasks work normally
-2. If you need CLI tools, use full paths:
+1. **Ignore this error** (recommended) - The application handles this automatically, everything works normally
+2. If you need to manually use CLI tools:
    ```bash
    /ql/shell/update.sh  # Instead of: ql update
    /ql/shell/task.sh    # Instead of: task
