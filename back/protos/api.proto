@@ -97,6 +97,18 @@ message UpdateCronRequest {
 
 message DeleteCronsRequest { repeated int32 ids = 1; }
 
+message GetCronsRequest {
+  optional string searchValue = 1;
+}
+
+message GetCronByIdRequest { int32 id = 1; }
+
+message EnableCronsRequest { repeated int32 ids = 1; }
+
+message DisableCronsRequest { repeated int32 ids = 1; }
+
+message RunCronsRequest { repeated int32 ids = 1; }
+
 message CronsResponse {
   int32 code = 1;
   repeated CronItem data = 2;
@@ -254,4 +266,9 @@ service Api {
   rpc CreateCron(CreateCronRequest) returns (CronResponse) {}
   rpc UpdateCron(UpdateCronRequest) returns (CronResponse) {}
   rpc DeleteCrons(DeleteCronsRequest) returns (Response) {}
+  rpc GetCrons(GetCronsRequest) returns (CronsResponse) {}
+  rpc GetCronById(GetCronByIdRequest) returns (CronResponse) {}
+  rpc EnableCrons(EnableCronsRequest) returns (Response) {}
+  rpc DisableCrons(DisableCronsRequest) returns (Response) {}
+  rpc RunCrons(RunCronsRequest) returns (Response) {}
 }
