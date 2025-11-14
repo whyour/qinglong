@@ -19,9 +19,10 @@ log_with_style() {
 }
 
 log_with_style "INFO" "🚀 1. 检测配置文件..."
-import_config "$@"
+load_ql_envs
 export_ql_envs
 . $dir_shell/env.sh
+import_config "$@"
 fix_config
 
 pm2 l &>/dev/null

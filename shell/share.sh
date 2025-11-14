@@ -84,16 +84,20 @@ init_env() {
   export PYTHONUNBUFFERED=1
 }
 
-import_config() {
-  [[ -f $file_config_user ]] && . $file_config_user
-
+load_ql_envs() {
   ql_base_url=${QlBaseUrl:-"/"}
   ql_port=${QlPort:-"5700"}
   ql_grpc_port=${QlGrpcPort:-"5500"}
+  current_branch=${QL_BRANCH:-""}
+}
+
+import_config() {
+  [[ -f $file_config_user ]] && . $file_config_user
+
+  load_ql_envs
   command_timeout_time=${CommandTimeoutTime:-""}
   file_extensions=${RepoFileExtensions:-"js py"}
   proxy_url=${ProxyUrl:-""}
-  current_branch=${QL_BRANCH:-""}
 
   if [[ -n "${DefaultCronRule}" ]]; then
     default_cron="${DefaultCronRule}"
