@@ -42,8 +42,14 @@ async function linkCommand() {
         await fs.unlink(tmpTarget);
       }
     } catch (error) { }
-    await fs.symlink(source, tmpTarget);
-    await fs.rename(tmpTarget, target);
+    
+    try {
+      await fs.symlink(source, tmpTarget);
+      await fs.rename(tmpTarget, target);
+    } catch (error) {
+      // Silently ignore symlink errors (e.g., when running as non-root user)
+      // The application will automatically use full paths via shell/share.sh:define_cmd()
+    }
   }
 }
 
