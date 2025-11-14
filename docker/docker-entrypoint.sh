@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Add ~/bin to PATH for non-root users
+export PATH="$HOME/bin:$PATH"
+
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 

@@ -669,12 +669,23 @@ export default class CronService {
 
     await writeFileWithLock(config.crontabFile, crontab_string);
 
-    execSync(`crontab ${config.crontabFile}`);
+    try {
+      execSync(`crontab ${config.crontabFile}`);
+    } catch (error: any) {
+      const errorMsg = error.message || String(error);
+      this.logger.error('[crontab] Failed to update system crontab:', errorMsg);
+    }
+
     await CrontabModel.update({ saved: true }, { where: {} });
   }
 
   public importCrontab() {
-    exec('crontab -l', (error, stdout, stderr) => {
+    exec('crontab -l', (error, stdout) => {
+      if (error) {
+        const errorMsg = error.message || String(error);
+        this.logger.error('[crontab] Failed to read system crontab:', errorMsg);
+      }
+
       const lines = stdout.split('\n');
       const namePrefix = new Date().getTime();
 

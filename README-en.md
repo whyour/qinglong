@@ -41,6 +41,8 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 
 The `latest` image is built on `alpine` and the `debian` image is built on `debian-slim`. If you need to use a dependency that is not supported by `alpine`, it is recommended that you use the `debian` image.
 
+**⚠️ Important**: If you need to run Docker as a **non-root user**, please use the `debian` image. Alpine's `crond` requires root privileges.
+
 ```bash
 docker pull whyour/qinglong:latest
 docker pull whyour/qinglong:debian

@@ -1,8 +1,9 @@
 import path from 'path';
 import fs from 'fs/promises';
+import os from 'os';
 import chokidar from 'chokidar';
 import config from '../config/index';
-import { fileExist, promiseExec, rmPath } from '../config/util';
+import { promiseExec } from '../config/util';
 
 async function linkToNodeModule(src: string, dst?: string) {
   const target = path.join(config.rootPath, 'node_modules', dst || src);
@@ -17,8 +18,21 @@ async function linkToNodeModule(src: string, dst?: string) {
 }
 
 async function linkCommand() {
-  const commandPath = await promiseExec('which node');
-  const commandDir = path.dirname(commandPath);
+  const homeDir = os.homedir();
+  const userBinDir = path.join(homeDir, 'bin');
+
+  try {
+    await fs.mkdir(userBinDir, { recursive: true });
+  } catch (error) {
+    const commandPath = await promiseExec('which node');
+    const commandDir = path.dirname(commandPath);
+    return await linkCommandToDir(commandDir);
+  }
+
+  await linkCommandToDir(userBinDir);
+}
+
+async function linkCommandToDir(commandDir: string) {
   const linkShell = [
     {
       src: 'update.sh',
@@ -42,6 +56,7 @@ async function linkCommand() {
         await fs.unlink(tmpTarget);
       }
     } catch (error) { }
+
     await fs.symlink(source, tmpTarget);
     await fs.rename(tmpTarget, target);
   }
