@@ -5,7 +5,7 @@ const { join } = require('path');
 class GrpcClient {
   static #config = {
     protoPath: join(process.env.QL_DIR, 'back/protos/api.proto'),
-    serverAddress: '0.0.0.0:5500',
+    serverAddress: `0.0.0.0:${process.env.GRPC_PORT || '5500'}`,
     protoOptions: {
       keepCase: true,
       longs: String,

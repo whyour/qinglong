@@ -3,6 +3,7 @@
 dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
+load_ql_envs
 . $dir_shell/env.sh
 
 send_mark=$dir_shell/send_mark
