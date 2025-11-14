@@ -2,7 +2,6 @@
 
 dir_shell=/ql/shell
 . $dir_shell/share.sh
-. $dir_shell/env.sh
 
 log_with_style() {
   local level="$1"
@@ -18,6 +17,10 @@ import_config "$@"
 export BACK_PORT="${ql_port}"
 # Export GRPC_PORT from QlGrpcPort for gRPC server to use
 export GRPC_PORT="${ql_grpc_port}"
+
+# Source env.sh after exporting BACK_PORT and GRPC_PORT so they are captured
+. $dir_shell/env.sh
+
 fix_config
 
 pm2 l &>/dev/null
