@@ -29,6 +29,8 @@ docker pull whyour/qinglong:debian
 
 ### 使用 Debian 镜像运行（非 root 用户）
 
+⚠️ **重要提示**: 当前 Debian 镜像默认以 root 用户运行。如果需要以非 root 用户运行，需要设置 `PM2_HOME` 环境变量以避免 PM2 权限错误。
+
 #### 方式一：使用 docker run
 
 ```bash
@@ -36,10 +38,11 @@ docker pull whyour/qinglong:debian
 mkdir -p /your/data/path
 chown -R 1000:1000 /your/data/path  # 1000 是容器内默认用户 ID
 
-# 以非 root 用户运行
+# 以非 root 用户运行（需要设置 PM2_HOME）
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
+  -e PM2_HOME=/ql/data/.pm2 \
   -v /your/data/path:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
@@ -54,6 +57,8 @@ services:
     image: whyour/qinglong:debian
     container_name: qinglong
     user: "1000:1000"  # 指定用户 ID 和组 ID
+    environment:
+      - PM2_HOME=/ql/data/.pm2  # 必需：设置 PM2 工作目录
     volumes:
       - ./data:/ql/data
     ports:
@@ -80,6 +85,33 @@ services:
 docker inspect qinglong | grep Image
 ```
 
+#### PM2 权限错误（EACCES: permission denied）
+
+如果看到类似以下错误：
+```
+Error: EACCES: permission denied, mkdir '/.pm2/logs'
+Error: EACCES: permission denied, mkdir '/.pm2/pids'
+```
+
+**原因**: PM2 默认使用 `~/.pm2` 作为工作目录，非 root 用户可能没有权限。
+
+**解决方案**: 设置 `PM2_HOME` 环境变量到有写权限的目录：
+
+```bash
+# 使用 docker run
+docker run -d \
+  --name qinglong \
+  --user 1000:1000 \
+  -e PM2_HOME=/ql/data/.pm2 \
+  -v /your/data/path:/ql/data \
+  -p 5700:5700 \
+  whyour/qinglong:debian
+
+# 或在 docker-compose.yml 中添加
+environment:
+  - PM2_HOME=/ql/data/.pm2
+```
+
 #### 如何测试 crontab 权限？
 
 在容器内执行：
@@ -104,10 +136,11 @@ docker cp qinglong:/ql/data ./data_backup
 # 2. 删除旧容器
 docker rm qinglong
 
-# 3. 使用 Debian 镜像创建新容器
+# 3. 使用 Debian 镜像创建新容器（设置 PM2_HOME）
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
+  -e PM2_HOME=/ql/data/.pm2 \
   -v ./data_backup:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
@@ -168,6 +201,8 @@ docker pull whyour/qinglong:debian
 
 ### Running with Debian Image (Non-Root User)
 
+⚠️ **Important**: The current Debian image runs as root by default. If you need to run as a non-root user, you must set the `PM2_HOME` environment variable to avoid PM2 permission errors.
+
 #### Method 1: Using docker run
 
 ```bash
@@ -175,10 +210,11 @@ docker pull whyour/qinglong:debian
 mkdir -p /your/data/path
 chown -R 1000:1000 /your/data/path  # 1000 is the default user ID in container
 
-# Run as non-root user
+# Run as non-root user (PM2_HOME must be set)
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
+  -e PM2_HOME=/ql/data/.pm2 \
   -v /your/data/path:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
@@ -193,6 +229,8 @@ services:
     image: whyour/qinglong:debian
     container_name: qinglong
     user: "1000:1000"  # Specify user ID and group ID
+    environment:
+      - PM2_HOME=/ql/data/.pm2  # Required: Set PM2 working directory
     volumes:
       - ./data:/ql/data
     ports:
@@ -219,6 +257,33 @@ If you must use the Alpine image (`whyour/qinglong:latest`), please note:
 docker inspect qinglong | grep Image
 ```
 
+#### PM2 Permission Errors (EACCES: permission denied)
+
+If you see errors like:
+```
+Error: EACCES: permission denied, mkdir '/.pm2/logs'
+Error: EACCES: permission denied, mkdir '/.pm2/pids'
+```
+
+**Cause**: PM2 uses `~/.pm2` as its default working directory, which non-root users may not have permission to write to.
+
+**Solution**: Set the `PM2_HOME` environment variable to a writable directory:
+
+```bash
+# Using docker run
+docker run -d \
+  --name qinglong \
+  --user 1000:1000 \
+  -e PM2_HOME=/ql/data/.pm2 \
+  -v /your/data/path:/ql/data \
+  -p 5700:5700 \
+  whyour/qinglong:debian
+
+# Or add to docker-compose.yml
+environment:
+  - PM2_HOME=/ql/data/.pm2
+```
+
 #### How to test crontab permissions?
 
 Execute inside the container:
@@ -243,10 +308,11 @@ docker cp qinglong:/ql/data ./data_backup
 # 2. Remove old container
 docker rm qinglong
 
-# 3. Create new container with Debian image
+# 3. Create new container with Debian image (set PM2_HOME)
 docker run -d \
   --name qinglong \
   --user 1000:1000 \
+  -e PM2_HOME=/ql/data/.pm2 \
   -v ./data_backup:/ql/data \
   -p 5700:5700 \
   whyour/qinglong:debian
