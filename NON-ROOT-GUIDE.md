@@ -140,7 +140,45 @@ EACCES: permission denied, symlink '/ql/shell/update.sh' -> '/usr/local/bin/ql_t
 
 **解决方案**:
 1. **忽略此错误**（推荐）- 应用已自动处理，功能完全正常
-2. 如果需要手动在命令行使用工具：
+2. **如果需要在命令行使用 `ql` 和 `task` 命令**（非 root 用户）：
+
+   **方式一：使用 Shell 别名**（推荐）
+   ```bash
+   # 在容器内执行
+   docker exec -it qinglong bash
+   
+   # 添加别名到 ~/.bashrc
+   echo 'alias ql="/ql/shell/update.sh"' >> ~/.bashrc
+   echo 'alias task="/ql/shell/task.sh"' >> ~/.bashrc
+   source ~/.bashrc
+   
+   # 现在可以直接使用命令
+   ql update
+   task script.js
+   ```
+
+   **方式二：添加到用户 PATH**
+   ```bash
+   # 在容器内执行
+   docker exec -it qinglong bash
+   
+   # 创建用户 bin 目录
+   mkdir -p ~/bin
+   
+   # 创建符号链接
+   ln -sf /ql/shell/update.sh ~/bin/ql
+   ln -sf /ql/shell/task.sh ~/bin/task
+   
+   # 添加到 PATH
+   echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   
+   # 现在可以直接使用命令
+   ql update
+   task script.js
+   ```
+
+   **方式三：使用完整路径**
    ```bash
    /ql/shell/update.sh  # 代替 ql update
    /ql/shell/task.sh    # 代替 task
@@ -365,7 +403,45 @@ EACCES: permission denied, symlink '/ql/shell/update.sh' -> '/usr/local/bin/ql_t
 
 **Solution**:
 1. **Ignore this error** (recommended) - The application handles this automatically, everything works normally
-2. If you need to manually use CLI tools:
+2. **If you need to use `ql` and `task` commands in CLI** (for non-root users):
+
+   **Method 1: Use Shell Aliases** (Recommended)
+   ```bash
+   # Execute inside container
+   docker exec -it qinglong bash
+   
+   # Add aliases to ~/.bashrc
+   echo 'alias ql="/ql/shell/update.sh"' >> ~/.bashrc
+   echo 'alias task="/ql/shell/task.sh"' >> ~/.bashrc
+   source ~/.bashrc
+   
+   # Now you can use commands directly
+   ql update
+   task script.js
+   ```
+
+   **Method 2: Add to User PATH**
+   ```bash
+   # Execute inside container
+   docker exec -it qinglong bash
+   
+   # Create user bin directory
+   mkdir -p ~/bin
+   
+   # Create symbolic links
+   ln -sf /ql/shell/update.sh ~/bin/ql
+   ln -sf /ql/shell/task.sh ~/bin/task
+   
+   # Add to PATH
+   echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   
+   # Now you can use commands directly
+   ql update
+   task script.js
+   ```
+
+   **Method 3: Use Full Paths**
    ```bash
    /ql/shell/update.sh  # Instead of: ql update
    /ql/shell/task.sh    # Instead of: task
