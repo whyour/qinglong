@@ -89,6 +89,7 @@ import_config() {
 
   ql_base_url=${QlBaseUrl:-"/"}
   ql_port=${QlPort:-"5700"}
+  ql_grpc_port=${QlGrpcPort:-"5500"}
   command_timeout_time=${CommandTimeoutTime:-""}
   file_extensions=${RepoFileExtensions:-"js py"}
   proxy_url=${ProxyUrl:-""}
