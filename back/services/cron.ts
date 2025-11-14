@@ -671,43 +671,19 @@ export default class CronService {
 
     try {
       execSync(`crontab ${config.crontabFile}`);
-      await CrontabModel.update({ saved: true }, { where: {} });
     } catch (error: any) {
       const errorMsg = error.message || String(error);
       this.logger.error('[crontab] Failed to update system crontab:', errorMsg);
-      
-      // Provide helpful error message for permission issues
-      if (errorMsg.includes('must be suid') || 
-          errorMsg.includes('Operation not permitted') ||
-          errorMsg.includes('Permission denied')) {
-        this.logger.error(
-          '[crontab] ⚠️  Crontab permission error detected. ' +
-          'If running as non-root user on Alpine Linux, please use the Debian image instead. ' +
-          'See NON-ROOT-GUIDE.md for details.'
-        );
-      }
-      
-      throw error;
     }
+
+    await CrontabModel.update({ saved: true }, { where: {} });
   }
 
   public importCrontab() {
-    exec('crontab -l', (error, stdout, stderr) => {
+    exec('crontab -l', (error, stdout) => {
       if (error) {
         const errorMsg = error.message || String(error);
         this.logger.error('[crontab] Failed to read system crontab:', errorMsg);
-        
-        // Provide helpful error message for permission issues
-        if (errorMsg.includes('must be suid') || 
-            errorMsg.includes('Operation not permitted') ||
-            errorMsg.includes('Permission denied')) {
-          this.logger.error(
-            '[crontab] ⚠️  Crontab permission error detected. ' +
-            'If running as non-root user on Alpine Linux, please use the Debian image instead. ' +
-            'See NON-ROOT-GUIDE.md for details.'
-          );
-        }
-        return;
       }
 
       const lines = stdout.split('\n');

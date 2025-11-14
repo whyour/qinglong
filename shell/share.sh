@@ -59,14 +59,9 @@ list_own_user=$dir_list_tmp/own_user.list
 list_own_add=$dir_list_tmp/own_add.list
 list_own_drop=$dir_list_tmp/own_drop.list
 
-## 软连接及其原始文件对应关系
 link_name=(
   task
   ql
-)
-original_name=(
-  task.sh
-  update.sh
 )
 
 init_env() {

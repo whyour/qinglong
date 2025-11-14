@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import chokidar from 'chokidar';
 import config from '../config/index';
-import { fileExist, promiseExec, rmPath } from '../config/util';
+import { promiseExec } from '../config/util';
 
 async function linkToNodeModule(src: string, dst?: string) {
   const target = path.join(config.rootPath, 'node_modules', dst || src);
@@ -20,16 +20,13 @@ async function linkToNodeModule(src: string, dst?: string) {
 async function linkCommand() {
   const homeDir = os.homedir();
   const userBinDir = path.join(homeDir, 'bin');
-  
-  // Create ~/bin directory if it doesn't exist
+
   try {
     await fs.mkdir(userBinDir, { recursive: true });
   } catch (error) {
-    // If we can't create ~/bin, fall back to system directory
     const commandPath = await promiseExec('which node');
     const commandDir = path.dirname(commandPath);
-    await linkCommandToDir(commandDir);
-    return;
+    return await linkCommandToDir(commandDir);
   }
 
   await linkCommandToDir(userBinDir);
@@ -59,14 +56,9 @@ async function linkCommandToDir(commandDir: string) {
         await fs.unlink(tmpTarget);
       }
     } catch (error) { }
-    
-    try {
-      await fs.symlink(source, tmpTarget);
-      await fs.rename(tmpTarget, target);
-    } catch (error) {
-      // Silently ignore symlink errors (e.g., when running as non-root user)
-      // The application will automatically use full paths via shell/share.sh:define_cmd()
-    }
+
+    await fs.symlink(source, tmpTarget);
+    await fs.rename(tmpTarget, target);
   }
 }
 
