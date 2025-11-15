@@ -3,7 +3,7 @@ import config from '@/utils/config';
 import { request } from '@/utils/http';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Form, Input, Modal, Select, Space, message } from 'antd';
-import cronParse from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 import { useEffect, useState } from 'react';
 import intl from 'react-intl-universal';
 import { getScheduleType, scheduleTypeMap } from './const';
@@ -91,7 +91,7 @@ const CronModal = ({
             { required: true },
             {
               validator: (_, value) => {
-                if (!value || cronParse.parseExpression(value).hasNext()) {
+                if (!value || CronExpressionParser.parse(value).hasNext()) {
                   return Promise.resolve();
                 }
                 return Promise.reject(intl.get('Cron表达式格式有误'));
