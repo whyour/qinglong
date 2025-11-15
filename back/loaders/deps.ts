@@ -3,8 +3,6 @@ import fs from 'fs/promises';
 import os from 'os';
 import chokidar from 'chokidar';
 import config from '../config/index';
-import { promiseExec } from '../config/util';
-import { W_OK } from 'constants';
 import Logger from './logger';
 
 async function linkToNodeModule(src: string, dst?: string) {
@@ -19,24 +17,11 @@ async function linkToNodeModule(src: string, dst?: string) {
   } catch (error) { }
 }
 
-async function ensureDirWritable(dir: string) {
-  try {
-    await fs.access(dir, W_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function linkCommand() {
   const homeDir = os.homedir();
   let userBinDir = path.join(homeDir, 'bin');
 
   try {
-    if (!(await ensureDirWritable(homeDir))) {
-      const commandPath = await promiseExec('which node');
-      userBinDir = path.dirname(commandPath);
-    }
     await fs.mkdir(userBinDir, { recursive: true });
     await linkCommandToDir(userBinDir);
   } catch (error) {

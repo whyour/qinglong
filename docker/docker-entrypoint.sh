@@ -1,15 +1,12 @@
 #!/bin/bash
 
-# Add ~/bin to PATH for non-root users
 export PATH="$HOME/bin:$PATH"
 
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 
 export_ql_envs() {
-  # Export BACK_PORT from QlPort for backend server to use
   export BACK_PORT="${ql_port}"
-  # Export GRPC_PORT from QlGrpcPort for gRPC server to use
   export GRPC_PORT="${ql_grpc_port}"
 }
 
@@ -17,7 +14,6 @@ log_with_style() {
   local level="$1"
   local message="$2"
   local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-
   printf "\n[%s] [%7s]  %s\n" "${timestamp}" "${level}" "${message}"
 }
 
