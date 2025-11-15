@@ -26,6 +26,17 @@ ENV QL_DIR=/ql \
   SHELL=/bin/bash \
   PS1="\u@\h:\w \$ "
 
+ARG QL_UID=5432
+ARG QL_GID=5432
+RUN groupadd -g ${QL_GID} qinglong && \
+    useradd -m -u ${QL_UID} -g ${QL_GID} -s /bin/bash qinglong && \
+    mkdir -p /home/qinglong/bin /home/qinglong/.ssh && \
+    chmod 700 /home/qinglong/.ssh && \
+    chown -R ${QL_UID}:${QL_GID} /home/qinglong
+
+ENV QL_USER=qinglong
+ENV QL_HOME=/home/$QL_USER
+
 COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
 COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
 
@@ -57,16 +68,21 @@ RUN set -x && \
   rm -rf /etc/apt/apt.conf.d/docker-clean && \
   ulimit -c 0
 
+RUN mkdir -p ${QL_DIR} && \
+  chown -R ${QL_UID}:${QL_GID} ${QL_DIR}
+
+USER qinglong
+
 ARG SOURCE_COMMIT
 RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} && \
   cd ${QL_DIR} && \
   cp -f .env.example .env && \
   chmod 777 ${QL_DIR}/shell/*.sh && \
   chmod 777 ${QL_DIR}/docker/*.sh && \
-  git clone --depth=1 -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static && \
+  git clone --depth=1 -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /tmp/static && \
   mkdir -p ${QL_DIR}/static && \
-  cp -rf /static/* ${QL_DIR}/static && \
-  rm -rf /static
+  cp -rf /tmp/static/* ${QL_DIR}/static && \
+  rm -rf /tmp/static
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \
@@ -79,7 +95,9 @@ ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOM
 
 RUN pip3 install --prefix ${PYTHON_HOME} requests
 
-COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
+COPY --chown=qinglong:qinglong --from=builder /tmp/build/node_modules/. /ql/node_modules/
+
+USER root
 
 WORKDIR ${QL_DIR}
 
