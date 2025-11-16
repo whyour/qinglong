@@ -145,7 +145,10 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     try {
       const cronService = Container.get(CronService);
-      const data = await cronService.crontabs(req.query as any);
+      const data = await cronService.crontabs({ 
+        ...req.query as any,
+        userId: req.user?.userId 
+      });
       return res.send({ code: 200, data });
     } catch (e) {
       logger.error('🔥 error: %o', e);
@@ -177,7 +180,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.create(req.body);
+        const data = await cronService.create({
+          ...req.body,
+          userId: req.user?.userId
+        });
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -194,10 +200,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.run(req.body);
+        const data = await cronService.run(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -211,10 +217,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.stop(req.body);
+        const data = await cronService.stop(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -234,10 +240,11 @@ export default (app: Router) => {
         const data = await cronService.removeLabels(
           req.body.ids,
           req.body.labels,
+          req.user?.userId,
         );
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -254,10 +261,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.addLabels(req.body.ids, req.body.labels);
+        const data = await cronService.addLabels(req.body.ids, req.body.labels, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -271,10 +278,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.disabled(req.body);
+        const data = await cronService.disabled(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -288,10 +295,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.enabled(req.body);
+        const data = await cronService.enabled(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -344,10 +351,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.remove(req.body);
+        const data = await cronService.remove(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -361,10 +368,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.pin(req.body);
+        const data = await cronService.pin(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -378,10 +385,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.unPin(req.body);
+        const data = await cronService.unPin(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );

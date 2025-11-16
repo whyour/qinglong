@@ -530,5 +530,20 @@
   "请输入自定义日志文件夹名称或绝对路径": "Please enter a custom log folder name or absolute path",
   "请输入自定义日志文件夹名称或 /dev/null": "Please enter a custom log folder name or /dev/null",
   "日志名称只能包含字母、数字、下划线和连字符": "Log name can only contain letters, numbers, underscores and hyphens",
-  "日志名称不能超过100个字符": "Log name cannot exceed 100 characters"
+  "日志名称不能超过100个字符": "Log name cannot exceed 100 characters",
+  "用户管理": "User Management",
+  "用户名": "Username",
+  "密码": "Password",
+  "角色": "Role",
+  "管理员": "Admin",
+  "普通用户": "User",
+  "启用": "Enabled",
+  "禁用": "Disabled",
+  "创建时间": "Created At",
+  "确认删除选中的用户吗": "Are you sure to delete selected users?",
+  "请输入用户名": "Please enter username",
+  "请输入密码": "Please enter password",
+  "密码长度至少为6位": "Password must be at least 6 characters",
+  "新增用户": "Add User",
+  "编辑用户": "Edit User"
 }

@@ -42,11 +42,37 @@ export default class SubscriptionService {
     private crontabService: CrontabService,
   ) {}
 
+  private addUserIdFilter(query: any, userId?: number) {
+    if (userId !== undefined) {
+      query.userId = userId;
+    }
+    return query;
+  }
+
+  private async checkOwnership(ids: number[], userId?: number): Promise<void> {
+    if (userId === undefined) {
+      // Admin can access all subscriptions
+      return;
+    }
+    const subscriptions = await SubscriptionModel.findAll({
+      where: { id: ids },
+      attributes: ['id', 'userId'],
+    });
+    const unauthorized = subscriptions.filter(
+      (sub) => sub.userId !== undefined && sub.userId !== userId
+    );
+    if (unauthorized.length > 0) {
+      throw new Error('无权限操作该订阅');
+    }
+  }
+
   public async list(
     searchText?: string,
     ids?: string,
+    userId?: number,
   ): Promise<SubscriptionInstance[]> {
-    let query = {};
+    let query: any = {};
+    this.addUserIdFilter(query, userId);
     const subIds = JSON.parse(ids || '[]');
     if (searchText) {
       const reg = {
@@ -262,7 +288,8 @@ export default class SubscriptionService {
     );
   }
 
-  public async remove(ids: number[], query: { force?: boolean }) {
+  public async remove(ids: number[], query: { force?: boolean }, userId?: number) {
+    await this.checkOwnership(ids, userId);
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       await this.handleTask(doc.get({ plain: true }), false);
@@ -273,7 +300,7 @@ export default class SubscriptionService {
     if (query?.force === true) {
       const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
       if (crons?.length) {
-        await this.crontabService.remove(crons.map((x) => x.id!));
+        await this.crontabService.remove(crons.map((x) => x.id!), userId);
       }
       for (const doc of docs) {
         const filePath = join(config.scriptPath, doc.alias);
@@ -294,7 +321,8 @@ export default class SubscriptionService {
     return doc.get({ plain: true });
   }
 
-  public async run(ids: number[]) {
+  public async run(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await SubscriptionModel.update(
       { status: SubscriptionStatus.queued },
       { where: { id: ids } },
@@ -304,7 +332,8 @@ export default class SubscriptionService {
     });
   }
 
-  public async stop(ids: number[]) {
+  public async stop(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       if (doc.pid) {
@@ -339,7 +368,8 @@ export default class SubscriptionService {
     });
   }
 
-  public async disabled(ids: number[]) {
+  public async disabled(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     await this.setSshConfig();
@@ -348,7 +378,8 @@ export default class SubscriptionService {
     }
   }
 
-  public async enabled(ids: number[]) {
+  public async enabled(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await SubscriptionModel.update({ is_disabled: 0 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     await this.setSshConfig();

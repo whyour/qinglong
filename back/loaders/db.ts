@@ -6,6 +6,7 @@ import { AppModel } from '../data/open';
 import { SystemModel } from '../data/system';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
+import { UserModel } from '../data/user';
 import { sequelize } from '../data';
 
 export default async () => {
@@ -17,6 +18,7 @@ export default async () => {
     await EnvModel.sync();
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
+    await UserModel.sync();
 
     // 初始化新增字段
     try {
@@ -63,6 +65,20 @@ export default async () => {
     } catch (error) { }
     try {
       await sequelize.query('alter table Envs add column isPinned NUMBER');
+    } catch (error) {}
+    
+    // Multi-user support: Add userId columns
+    try {
+      await sequelize.query('alter table Crontabs add column userId NUMBER');
+    } catch (error) {}
+    try {
+      await sequelize.query('alter table Envs add column userId NUMBER');
+    } catch (error) {}
+    try {
+      await sequelize.query('alter table Subscriptions add column userId NUMBER');
+    } catch (error) {}
+    try {
+      await sequelize.query('alter table Dependences add column userId NUMBER');
     } catch (error) {}
 
     Logger.info('✌️ DB loaded');

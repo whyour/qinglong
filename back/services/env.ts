@@ -18,8 +18,32 @@ import { writeFileWithLock } from '../shared/utils';
 export default class EnvService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  public async create(payloads: Env[]): Promise<Env[]> {
-    const envs = await this.envs();
+  private addUserIdFilter(query: any, userId?: number) {
+    if (userId !== undefined) {
+      query.userId = userId;
+    }
+    return query;
+  }
+
+  private async checkOwnership(ids: number[], userId?: number): Promise<void> {
+    if (userId === undefined) {
+      // Admin can access all envs
+      return;
+    }
+    const envs = await EnvModel.findAll({
+      where: { id: ids },
+      attributes: ['id', 'userId'],
+    });
+    const unauthorized = envs.filter(
+      (env) => env.userId !== undefined && env.userId !== userId
+    );
+    if (unauthorized.length > 0) {
+      throw new Error('无权限操作该环境变量');
+    }
+  }
+
+  public async create(payloads: Env[], userId?: number): Promise<Env[]> {
+    const envs = await this.envs('', {}, userId);
     let position = initPosition;
     if (
       envs &&
@@ -30,7 +54,7 @@ export default class EnvService {
     }
     const tabs = payloads.map((x) => {
       position = position - stepPosition;
-      const tab = new Env({ ...x, position });
+      const tab = new Env({ ...x, position, userId });
       return tab;
     });
     const docs = await this.insert(tabs);
@@ -61,7 +85,8 @@ export default class EnvService {
     return await this.getDb({ id: payload.id });
   }
 
-  public async remove(ids: number[]) {
+  public async remove(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await EnvModel.destroy({ where: { id: ids } });
     await this.set_envs();
   }
@@ -118,8 +143,9 @@ export default class EnvService {
     return parseFloat(position.toPrecision(16));
   }
 
-  public async envs(searchText: string = '', query: any = {}): Promise<Env[]> {
+  public async envs(searchText: string = '', query: any = {}, userId?: number): Promise<Env[]> {
     let condition = { ...query };
+    this.addUserIdFilter(condition, userId);
     if (searchText) {
       const encodeText = encodeURI(searchText);
       const reg = {
@@ -172,7 +198,8 @@ export default class EnvService {
     return doc.get({ plain: true });
   }
 
-  public async disabled(ids: number[]) {
+  public async disabled(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await EnvModel.update(
       { status: EnvStatus.disabled },
       { where: { id: ids } },
@@ -180,12 +207,14 @@ export default class EnvService {
     await this.set_envs();
   }
 
-  public async enabled(ids: number[]) {
+  public async enabled(ids: number[], userId?: number) {
+    await this.checkOwnership(ids, userId);
     await EnvModel.update({ status: EnvStatus.normal }, { where: { id: ids } });
     await this.set_envs();
   }
 
-  public async updateNames({ ids, name }: { ids: number[]; name: string }) {
+  public async updateNames({ ids, name }: { ids: number[]; name: string }, userId?: number) {
+    await this.checkOwnership(ids, userId);
     await EnvModel.update({ name }, { where: { id: ids } });
     await this.set_envs();
   }

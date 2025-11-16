@@ -35,6 +35,7 @@ import './index.less';
 import useResizeObserver from '@react-hook/resize-observer';
 import SystemLog from './systemLog';
 import Dependence from './dependence';
+import UserManagement from './userManagement';
 
 const { Text } = Typography;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
@@ -334,16 +335,29 @@ const Setting = () => {
               label: intl.get('通知设置'),
               children: <NotificationSetting data={notificationInfo} />,
             },
-            {
-              key: 'syslog',
-              label: intl.get('系统日志'),
-              children: <SystemLog height={height} theme={theme} />,
-            },
-            {
-              key: 'login',
-              label: intl.get('登录日志'),
-              children: <LoginLog height={height} data={loginLogData} />,
-            },
+            ...(user?.role === 0
+              ? [
+                  {
+                    key: 'syslog',
+                    label: intl.get('系统日志'),
+                    children: <SystemLog height={height} theme={theme} />,
+                  },
+                  {
+                    key: 'login',
+                    label: intl.get('登录日志'),
+                    children: <LoginLog height={height} data={loginLogData} />,
+                  },
+                ]
+              : []),
+            ...(user?.role === 0 && !isDemoEnv
+              ? [
+                  {
+                    key: 'user-management',
+                    label: intl.get('用户管理'),
+                    children: <UserManagement height={height} />,
+                  },
+                ]
+              : []),
             {
               key: 'dependence',
               label: intl.get('依赖设置'),

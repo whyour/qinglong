@@ -22,7 +22,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.dependencies(req.query as any);
+        const data = await dependenceService.dependencies(req.query as any, [], {}, req.user?.userId);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -45,7 +45,7 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.create(req.body);
+        const data = await dependenceService.create(req.body, req.user?.userId);
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -82,10 +82,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.remove(req.body);
+        const data = await dependenceService.remove(req.body, false, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -98,10 +98,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.remove(req.body, true);
+        const data = await dependenceService.remove(req.body, true, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -132,10 +132,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.reInstall(req.body);
+        const data = await dependenceService.reInstall(req.body, req.user?.userId);
         return res.send({ code: 200, data });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );
@@ -148,10 +148,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        await dependenceService.cancel(req.body);
+        await dependenceService.cancel(req.body, req.user?.userId);
         return res.send({ code: 200 });
-      } catch (e) {
-        return next(e);
+      } catch (e: any) {
+        return res.send({ code: 400, message: e.message });
       }
     },
   );

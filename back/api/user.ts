@@ -9,6 +9,7 @@ import { v4 as uuidV4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import config from '../config';
 import { isDemoEnv } from '../config/util';
+import { UserRole } from '../data/user';
 const route = Router();
 
 const storage = multer.diskStorage({
@@ -97,6 +98,7 @@ export default (app: Router) => {
           username: authInfo.username,
           avatar: authInfo.avatar,
           twoFactorActivated: authInfo.twoFactorActivated,
+          role: req.user?.role,
         },
       });
     } catch (e) {
@@ -178,6 +180,14 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
+        // Only admin can view login logs
+        if (req.user?.role !== UserRole.admin) {
+          return res.send({
+            code: 403,
+            message: '暂无权限',
+          });
+        }
+        
         const userService = Container.get(UserService);
         const data = await userService.getLoginLog();
         res.send({ code: 200, data });

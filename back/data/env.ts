@@ -9,6 +9,7 @@ export class Env {
   position?: number;
   name?: string;
   remarks?: string;
+  userId?: number;
   isPinned?: 1 | 0;
 
   constructor(options: Env) {
@@ -22,6 +23,7 @@ export class Env {
     this.position = options.position;
     this.name = options.name;
     this.remarks = options.remarks || '';
+    this.userId = options.userId;
     this.isPinned = options.isPinned || 0;
   }
 }
@@ -44,5 +46,6 @@ export const EnvModel = sequelize.define<EnvInstance>('Env', {
   position: DataTypes.NUMBER,
   name: { type: DataTypes.STRING, unique: 'compositeIndex' },
   remarks: DataTypes.STRING,
+  userId: { type: DataTypes.NUMBER, allowNull: true },
   isPinned: DataTypes.NUMBER,
 });
