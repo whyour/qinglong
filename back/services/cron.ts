@@ -24,6 +24,7 @@ import pickBy from 'lodash/pickBy';
 import omit from 'lodash/omit';
 import { writeFileWithLock } from '../shared/utils';
 import { ScheduleType } from '../interface/schedule';
+import { logStreamManager } from '../shared/logStreamManager';
 
 @Service()
 export default class CronService {
@@ -516,7 +517,7 @@ export default class CronService {
           { where: { id } },
         );
         cp.stdout.on('data', async (data) => {
-          await fs.appendFile(absolutePath, data.toString());
+          await logStreamManager.write(absolutePath, data.toString());
         });
         cp.stderr.on('data', async (data) => {
           this.logger.info(
@@ -524,7 +525,7 @@ export default class CronService {
             command,
             data.toString(),
           );
-          await fs.appendFile(absolutePath, data.toString());
+          await logStreamManager.write(absolutePath, data.toString());
         });
         cp.on('error', async (err) => {
           this.logger.error(
@@ -532,7 +533,7 @@ export default class CronService {
             command,
             err,
           );
-          await fs.appendFile(absolutePath, JSON.stringify(err));
+          await logStreamManager.write(absolutePath, JSON.stringify(err));
         });
 
         cp.on('exit', async (code) => {
@@ -541,6 +542,8 @@ export default class CronService {
             JSON.stringify(params),
             code,
           );
+          // Close the stream after task completion
+          await logStreamManager.closeStream(absolutePath);
           await CrontabModel.update(
             { status: CrontabStatus.idle, pid: undefined },
             { where: { id } },
