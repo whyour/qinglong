@@ -32,7 +32,8 @@ export class LogStreamManager extends EventEmitter {
         // Handle stream errors
         stream.on('error', (error) => {
           this.emit('error', { filePath, error });
-          this.closeStream(filePath);
+          // Remove the stream from the map on error
+          this.streams.delete(filePath);
           reject(error);
         });
       }
