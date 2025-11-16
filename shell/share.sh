@@ -272,14 +272,35 @@ random_range() {
 
 delete_pm2() {
   cd $dir_root
-  pm2 delete ecosystem.config.js
+  # Try to delete PM2 processes, but don't fail if PM2 is not available
+  pm2 delete ecosystem.config.js 2>/dev/null || true
+  # Also try to kill any directly spawned node processes
+  pkill -f "node.*static/build/app.js" 2>/dev/null || true
 }
 
 reload_pm2() {
   cd $dir_root
   restore_env_vars
-  pm2 flush &>/dev/null
-  pm2 startOrGracefulReload ecosystem.config.js --update-env
+  
+  # Try to start PM2, but handle failures gracefully
+  if pm2 flush &>/dev/null && pm2 startOrGracefulReload ecosystem.config.js --update-env; then
+    return 0
+  else
+    local exit_code=$?
+    echo "警告: PM2 启动失败 (退出码: $exit_code)，可能是由于硬件不兼容"
+    echo "正在尝试直接使用 Node.js 启动服务..."
+    
+    # Kill any existing node processes for qinglong
+    pkill -f "node.*static/build/app.js" 2>/dev/null || true
+    
+    # Start node directly in the background
+    nohup node static/build/app.js > $dir_log/qinglong.log 2>&1 &
+    local node_pid=$!
+    
+    echo "已使用 Node.js 直接启动服务 (PID: $node_pid)"
+    echo "注意: 使用此模式时，部分 PM2 管理功能将不可用"
+    return 0
+  fi
 }
 
 diff_time() {

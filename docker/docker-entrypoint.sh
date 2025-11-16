@@ -34,7 +34,8 @@ export_ql_envs
 import_config "$@"
 fix_config
 
-pm2 l &>/dev/null
+# Try to initialize PM2, but don't fail if it doesn't work
+pm2 l &>/dev/null || log_with_style "WARN" "PM2 初始化可能失败，将在启动时尝试使用备用方案"
 
 log_with_style "INFO" "⚙️  2. 启动 pm2 服务..."
 reload_pm2
