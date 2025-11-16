@@ -14,6 +14,7 @@ import {
 } from '../config/util';
 import dayjs from 'dayjs';
 import multer from 'multer';
+import { logStreamManager } from '../shared/logStreamManager';
 
 const route = Router();
 const storage = multer.diskStorage({
@@ -276,17 +277,19 @@ export default (app: Router) => {
               res.setHeader('QL-Task-Log', `${logPath}`);
             },
             onEnd: async (cp, endTime, diff) => {
+              // Close the stream after task completion
+              await logStreamManager.closeStream(await handleLogPath(logPath));
               res.end();
             },
             onError: async (message: string) => {
               res.write(message);
               const absolutePath = await handleLogPath(logPath);
-              await fs.appendFile(absolutePath, message);
+              await logStreamManager.write(absolutePath, message);
             },
             onLog: async (message: string) => {
               res.write(message);
               const absolutePath = await handleLogPath(logPath);
-              await fs.appendFile(absolutePath, message);
+              await logStreamManager.write(absolutePath, message);
             },
           },
         );

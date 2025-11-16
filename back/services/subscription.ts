@@ -31,6 +31,7 @@ import { formatCommand, formatUrl } from '../config/subscription';
 import { CrontabModel } from '../data/cron';
 import CrontabService from './cron';
 import taskLimit from '../shared/pLimit';
+import { logStreamManager } from '../shared/logStreamManager';
 
 @Service()
 export default class SubscriptionService {
@@ -136,7 +137,7 @@ export default class SubscriptionService {
         let beforeStr = '';
         try {
           if (doc.sub_before) {
-            await fs.appendFile(absolutePath, `\n## 执行before命令...\n\n`);
+            await logStreamManager.write(absolutePath, `\n## 执行before命令...\n\n`);
             beforeStr = await promiseExec(doc.sub_before);
           }
         } catch (error: any) {
@@ -144,7 +145,7 @@ export default class SubscriptionService {
             (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (beforeStr) {
-          await fs.appendFile(absolutePath, `${beforeStr}\n`);
+          await logStreamManager.write(absolutePath, `${beforeStr}\n`);
         }
       },
       onStart: async (cp: ChildProcessWithoutNullStreams, startTime) => {
@@ -163,7 +164,7 @@ export default class SubscriptionService {
         let afterStr = '';
         try {
           if (sub.sub_after) {
-            await fs.appendFile(absolutePath, `\n\n## 执行after命令...\n\n`);
+            await logStreamManager.write(absolutePath, `\n\n## 执行after命令...\n\n`);
             afterStr = await promiseExec(sub.sub_after);
           }
         } catch (error: any) {
@@ -171,15 +172,18 @@ export default class SubscriptionService {
             (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (afterStr) {
-          await fs.appendFile(absolutePath, `${afterStr}\n`);
+          await logStreamManager.write(absolutePath, `${afterStr}\n`);
         }
 
-        await fs.appendFile(
+        await logStreamManager.write(
           absolutePath,
           `\n## 执行结束... ${endTime.format(
             'YYYY-MM-DD HH:mm:ss',
           )}  耗时 ${diff} 秒${LOG_END_SYMBOL}`,
         );
+
+        // Close the stream after task completion
+        await logStreamManager.closeStream(absolutePath);
 
         await SubscriptionModel.update(
           { status: SubscriptionStatus.idle, pid: undefined },
@@ -195,12 +199,12 @@ export default class SubscriptionService {
       onError: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await handleLogPath(sub.log_path as string);
-        await fs.appendFile(absolutePath, `\n${message}`);
+        await logStreamManager.write(absolutePath, `\n${message}`);
       },
       onLog: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await handleLogPath(sub.log_path as string);
-        await fs.appendFile(absolutePath, `\n${message}`);
+        await logStreamManager.write(absolutePath, `\n${message}`);
       },
     };
   }
