@@ -530,5 +530,8 @@
   "请输入自定义日志文件夹名称或绝对路径": "Please enter a custom log folder name or absolute path",
   "请输入自定义日志文件夹名称或 /dev/null": "Please enter a custom log folder name or /dev/null",
   "日志名称只能包含字母、数字、下划线和连字符": "Log name can only contain letters, numbers, underscores and hyphens",
-  "日志名称不能超过100个字符": "Log name cannot exceed 100 characters"
+  "日志名称不能超过100个字符": "Log name cannot exceed 100 characters",
+  "未启用": "Not enabled",
+  "默认为 CPU 个数": "Default is the number of CPUs",
+  "Minimum is 4": "Minimum is 4"
 }

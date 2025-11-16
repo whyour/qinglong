@@ -32,7 +32,7 @@ const Copy = ({ text }: { text: string }) => {
   };
 
   return (
-    <Link onClick={handleClick} style={{ marginLeft: 1 }}>
+    <Link onClick={handleClick} style={{ marginLeft: 4 }}>
       <CopyToClipboard text={text} onCopy={handleCopy}>
         <Tooltip
           key="copy"

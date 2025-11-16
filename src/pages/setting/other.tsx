@@ -240,6 +240,7 @@ const Other = ({
               addonBefore={intl.get('每')}
               addonAfter={intl.get('天')}
               style={{ width: 180 }}
+              placeholder={intl.get('未启用')}
               min={0}
               value={systemConfig?.logRemoveFrequency}
               onChange={(value) => {
@@ -261,8 +262,9 @@ const Other = ({
           <Input.Group compact>
             <InputNumber
               style={{ width: 180 }}
-              min={1}
+              min={4}
               value={systemConfig?.cronConcurrency}
+              placeholder={intl.get('默认为 CPU 个数')}
               onChange={(value) => {
                 setSystemConfig({ ...systemConfig, cronConcurrency: value });
               }}
