@@ -28,3 +28,6 @@ __pycache__
 /shell/preload/notify.*
 /shell/preload/*-notify.json
 /shell/preload/__ql_notify__.*
+test_sandbox_integration.sh
+data/scripts/test_*.js
+data/scripts/test_*.py
