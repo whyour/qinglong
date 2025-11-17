@@ -212,7 +212,112 @@ if (sandboxEnabled) {
   }
 }
 
-// Prevent requiring the original fs module to bypass sandbox
+// Wrap child_process to prevent sandbox bypass via subprocesses
+let childProcessWrapped = false;
+if (sandboxEnabled) {
+  // We need to get child_process before wrapping Module.prototype.require
+  const childProcess = require('child_process');
+  const originalSpawn = childProcess.spawn;
+  const originalExec = childProcess.exec;
+  const originalExecSync = childProcess.execSync;
+  const originalExecFile = childProcess.execFile;
+  const originalExecFileSync = childProcess.execFileSync;
+  const originalFork = childProcess.fork;
+
+  // Helper to ensure NODE_OPTIONS and PYTHONPATH are set for subprocesses
+  function ensureSandboxEnv(options = {}) {
+    const env = { ...process.env, ...options.env };
+    
+    // Ensure NODE_OPTIONS includes the sandbox
+    const sandboxPreload = path.join(__dirname, 'sandbox.js');
+    if (!env.NODE_OPTIONS) {
+      env.NODE_OPTIONS = '';
+    }
+    if (!env.NODE_OPTIONS.includes(sandboxPreload)) {
+      env.NODE_OPTIONS = `-r ${sandboxPreload} ${env.NODE_OPTIONS}`.trim();
+    }
+    
+    // Ensure PYTHONPATH includes the sandbox directory
+    if (!env.PYTHONPATH) {
+      env.PYTHONPATH = '';
+    }
+    if (!env.PYTHONPATH.includes(__dirname)) {
+      env.PYTHONPATH = `${__dirname}:${env.PYTHONPATH}`;
+    }
+    
+    return { ...options, env };
+  }
+
+  // Wrap spawn
+  childProcess.spawn = function(...args) {
+    if (args[2]) {
+      args[2] = ensureSandboxEnv(args[2]);
+    } else if (args.length >= 3) {
+      args[2] = ensureSandboxEnv({});
+    }
+    return originalSpawn.apply(childProcess, args);
+  };
+
+  // Wrap exec
+  childProcess.exec = function(...args) {
+    const callback = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : undefined;
+    const optionsIndex = callback ? args.length - 2 : args.length - 1;
+    
+    if (args[optionsIndex] && typeof args[optionsIndex] === 'object') {
+      args[optionsIndex] = ensureSandboxEnv(args[optionsIndex]);
+    } else if (optionsIndex > 0) {
+      args.splice(optionsIndex, 0, ensureSandboxEnv({}));
+    }
+    return originalExec.apply(childProcess, args);
+  };
+
+  // Wrap execSync
+  childProcess.execSync = function(...args) {
+    if (args[1]) {
+      args[1] = ensureSandboxEnv(args[1]);
+    } else {
+      args[1] = ensureSandboxEnv({});
+    }
+    return originalExecSync.apply(childProcess, args);
+  };
+
+  // Wrap execFile
+  childProcess.execFile = function(...args) {
+    const callback = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : undefined;
+    const optionsIndex = callback ? args.length - 2 : args.length - 1;
+    
+    if (args[optionsIndex] && typeof args[optionsIndex] === 'object') {
+      args[optionsIndex] = ensureSandboxEnv(args[optionsIndex]);
+    } else if (optionsIndex > 1) {
+      args.splice(optionsIndex, 0, ensureSandboxEnv({}));
+    }
+    return originalExecFile.apply(childProcess, args);
+  };
+
+  // Wrap execFileSync
+  childProcess.execFileSync = function(...args) {
+    if (args[2]) {
+      args[2] = ensureSandboxEnv(args[2]);
+    } else if (args.length >= 3) {
+      args[2] = ensureSandboxEnv({});
+    }
+    return originalExecFileSync.apply(childProcess, args);
+  };
+
+  // Wrap fork
+  childProcess.fork = function(...args) {
+    if (args[2]) {
+      args[2] = ensureSandboxEnv(args[2]);
+    } else if (args.length >= 3) {
+      args[2] = ensureSandboxEnv({});
+    }
+    return originalFork.apply(childProcess, args);
+  };
+  
+  childProcessWrapped = true;
+}
+
+// Prevent requiring the original fs or child_process modules to bypass sandbox
 const originalRequire = Module.prototype.require;
 Module.prototype.require = function(id) {
   const module = originalRequire.apply(this, arguments);
@@ -221,6 +326,9 @@ Module.prototype.require = function(id) {
   if (id === 'fs' || id === 'node:fs') {
     return fs;
   }
+  
+  // For child_process, we already wrapped it above, so just return it
+  // (no need to re-require as that would cause recursion)
   
   return module;
 };

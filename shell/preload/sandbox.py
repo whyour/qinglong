@@ -324,3 +324,85 @@ if sandbox_enabled:
         Path.chmod = sandboxed_path_chmod
     except:
         pass
+
+    # Wrap subprocess to prevent sandbox bypass via subprocesses
+    try:
+        import subprocess
+        
+        # Helper to ensure PYTHONPATH is set for subprocesses
+        def ensure_sandbox_env(env=None):
+            if env is None:
+                env = os.environ.copy()
+            else:
+                env = env.copy()
+            
+            # Ensure PYTHONPATH includes the sandbox directory
+            sandbox_dir = os.path.dirname(__file__)
+            if 'PYTHONPATH' not in env:
+                env['PYTHONPATH'] = ''
+            if sandbox_dir not in env['PYTHONPATH']:
+                env['PYTHONPATH'] = f"{sandbox_dir}:{env['PYTHONPATH']}"
+            
+            return env
+        
+        # Store original functions
+        original_popen = subprocess.Popen
+        original_run = subprocess.run
+        original_call = subprocess.call
+        original_check_call = subprocess.check_call
+        original_check_output = subprocess.check_output
+        
+        # Wrap Popen
+        class SandboxedPopen(subprocess.Popen):
+            def __init__(self, *args, **kwargs):
+                if 'env' in kwargs:
+                    kwargs['env'] = ensure_sandbox_env(kwargs['env'])
+                else:
+                    kwargs['env'] = ensure_sandbox_env()
+                original_popen.__init__(self, *args, **kwargs)
+        
+        subprocess.Popen = SandboxedPopen
+        
+        # Wrap run
+        def sandboxed_run(*args, **kwargs):
+            if 'env' in kwargs:
+                kwargs['env'] = ensure_sandbox_env(kwargs['env'])
+            else:
+                kwargs['env'] = ensure_sandbox_env()
+            return original_run(*args, **kwargs)
+        
+        subprocess.run = sandboxed_run
+        
+        # Wrap call
+        def sandboxed_call(*args, **kwargs):
+            if 'env' in kwargs:
+                kwargs['env'] = ensure_sandbox_env(kwargs['env'])
+            else:
+                kwargs['env'] = ensure_sandbox_env()
+            return original_call(*args, **kwargs)
+        
+        subprocess.call = sandboxed_call
+        
+        # Wrap check_call
+        def sandboxed_check_call(*args, **kwargs):
+            if 'env' in kwargs:
+                kwargs['env'] = ensure_sandbox_env(kwargs['env'])
+            else:
+                kwargs['env'] = ensure_sandbox_env()
+            return original_check_call(*args, **kwargs)
+        
+        subprocess.check_call = sandboxed_check_call
+        
+        # Wrap check_output
+        def sandboxed_check_output(*args, **kwargs):
+            if 'env' in kwargs:
+                kwargs['env'] = ensure_sandbox_env(kwargs['env'])
+            else:
+                kwargs['env'] = ensure_sandbox_env()
+            return original_check_output(*args, **kwargs)
+        
+        subprocess.check_output = sandboxed_check_output
+        
+    except ImportError:
+        pass
+
