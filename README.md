@@ -36,6 +36,18 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 - 支持系统级通知
 - 支持暗黑模式
 - 支持手机端操作
+- 内置脚本沙箱，防止恶意脚本修改系统文件
+
+## 安全特性
+
+Qinglong 内置了脚本沙箱机制，保护系统关键文件不被用户脚本修改：
+
+- ✅ 自动拦截对配置文件（如 `task_after.sh`、`config.sh`）的写入操作
+- ✅ 保护系统目录（shell、back、src等）不被篡改
+- ✅ 支持 Node.js 和 Python 脚本
+- ✅ 默认启用，无需额外配置
+
+详细信息请查看 [SECURITY.md](./SECURITY.md)
 
 ## 版本
 

@@ -34,6 +34,18 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 - Support system level notification
 - Support dark mode
 - Support cell phone operation
+- Built-in script sandbox to prevent malicious scripts from modifying system files
+
+## Security Features
+
+Qinglong includes a built-in script sandbox mechanism that protects critical system files from being modified by user scripts:
+
+- ✅ Automatically blocks write operations to configuration files (e.g., `task_after.sh`, `config.sh`)
+- ✅ Protects system directories (shell, back, src, etc.) from tampering
+- ✅ Supports Node.js and Python scripts
+- ✅ Enabled by default, no additional configuration required
+
+For more details, see [SECURITY.md](./SECURITY.md)
 
 ## Version
 
