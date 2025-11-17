@@ -23,6 +23,8 @@ Implemented a filesystem sandbox that intercepts file operations and blocks unau
 - Wraps all fs module write methods (writeFile, appendFile, mkdir, unlink, etc.)
 - Wraps fs.promises API
 - Wraps fs.createWriteStream
+- **Wraps child_process module** (spawn, exec, execSync, fork, etc.) to prevent subprocess bypass
+- Automatically injects NODE_OPTIONS into subprocess environments
 - Prevents module require bypass by wrapping Module.prototype.require
 - Returns EACCES error with security message for blocked operations
 
@@ -31,12 +33,19 @@ Implemented a filesystem sandbox that intercepts file operations and blocks unau
 - Wraps os module functions (remove, mkdir, rename, chmod, etc.)
 - Wraps shutil operations (rmtree, copy, move, etc.)
 - Wraps pathlib.Path methods (write_text, mkdir, unlink, etc.)
+- **Wraps subprocess module** (Popen, run, call, check_call, etc.) to prevent subprocess bypass
+- Automatically injects PYTHONPATH into subprocess environments
 - Raises PermissionError with security message for blocked operations
 
 #### 3. Integration
 - Updated `shell/preload/sitecustomize.js` to load Node.js sandbox first
 - Updated `shell/preload/sitecustomize.py` to load Python sandbox first
 - Sandboxes are loaded before any user code executes
+
+#### 4. Subprocess Protection
+- Scripts cannot bypass the sandbox by spawning `node` or `python3` subprocesses
+- All child processes automatically inherit the sandbox through environment variables
+- Prevents common bypass attempts like `execSync('node malicious.js')`
 
 ### Protected Directories
 Scripts CANNOT write to:

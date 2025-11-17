@@ -41,9 +41,17 @@ QL_DISABLE_SANDBOX=true
 
 ### How It Works
 
-The sandbox works by intercepting filesystem operations in Node.js and Python scripts:
+The sandbox works by intercepting filesystem operations and subprocess executions in Node.js and Python scripts:
 
-- **Node.js**: The sandbox wraps the `fs` module and its methods (`writeFile`, `appendFile`, `mkdir`, `rmdir`, `unlink`, etc.)
-- **Python**: The sandbox wraps `builtins.open()`, `os` module functions, `shutil` operations, and `pathlib.Path` methods
+- **Node.js**: 
+  - Wraps the `fs` module and its methods (`writeFile`, `appendFile`, `mkdir`, `rmdir`, `unlink`, etc.)
+  - Wraps the `child_process` module (spawn, exec, execSync, etc.) to prevent sandbox bypass via subprocesses
+  - Automatically injects NODE_OPTIONS into all spawned subprocesses
+- **Python**: 
+  - Wraps `builtins.open()`, `os` module functions, `shutil` operations, and `pathlib.Path` methods
+  - Wraps `subprocess` module functions (Popen, run, call, etc.) to prevent sandbox bypass
+  - Automatically injects PYTHONPATH into all spawned subprocesses
 
 When a script attempts to write to a protected path, the operation is blocked with a `PermissionError` (Python) or `EACCES` error (Node.js).
+
+**Subprocess Protection**: The sandbox also prevents scripts from bypassing restrictions by spawning `node` or `python3` subprocesses. All spawned subprocesses automatically inherit the sandbox, ensuring consistent protection.
