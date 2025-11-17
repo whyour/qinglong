@@ -8,12 +8,18 @@ import { killTask } from '../config/util';
 export function runCron(cmd: string, cron: ICron): Promise<number | void> {
   return taskLimit.runWithCronLimit(cron, () => {
     return new Promise(async (resolve: any) => {
-      // Check if the cron is already running and stop it
+      // Check if the cron is already running and stop it (only if multiple instances are not allowed)
       try {
         const existingCron = await CrontabModel.findOne({
           where: { id: Number(cron.id) },
         });
+
+        // Default to single instance mode (0) for backward compatibility
+        const allowMultipleInstances =
+          existingCron?.allow_multiple_instances === 1;
+
         if (
+          !allowMultipleInstances &&
           existingCron &&
           existingCron.pid &&
           (existingCron.status === CrontabStatus.running ||

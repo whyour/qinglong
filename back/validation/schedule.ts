@@ -64,7 +64,11 @@ export const commonCronSchema = {
         return value;
       }
 
-      if (!/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w.-]+\/)*[\w.-]+\/?$/.test(value)) {
+      if (
+        !/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w.-]+\/)*[\w.-]+\/?$/.test(
+          value,
+        )
+      ) {
         return helpers.error('string.pattern.base');
       }
       if (value.length > 100) {
@@ -77,4 +81,5 @@ export const commonCronSchema = {
       'string.max': '日志名称不能超过100个字符',
       'string.unsafePath': '绝对路径必须在日志目录内或使用 /dev/null',
     }),
+  allow_multiple_instances: Joi.number().optional().valid(0, 1),
 };

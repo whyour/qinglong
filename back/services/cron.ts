@@ -9,6 +9,7 @@ import {
   getFileContentByName,
   fileExist,
   killTask,
+  killAllTasks,
   getUniqPath,
   safeJSONParse,
   isDemoEnv,
@@ -28,7 +29,7 @@ import { logStreamManager } from '../shared/logStreamManager';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
@@ -57,7 +58,9 @@ export default class CronService {
     }
     let uniqPath = await getUniqPath(command, `${id}`);
     if (log_name) {
-      const normalizedLogName = log_name.startsWith('/') ? log_name : path.join(config.logPath, log_name);
+      const normalizedLogName = log_name.startsWith('/')
+        ? log_name
+        : path.join(config.logPath, log_name);
       if (normalizedLogName.startsWith(config.logPath)) {
         uniqPath = log_name;
       }
@@ -162,7 +165,7 @@ export default class CronService {
       let cron;
       try {
         cron = await this.getDb({ id });
-      } catch (err) { }
+      } catch (err) {}
       if (!cron) {
         continue;
       }
@@ -462,12 +465,17 @@ export default class CronService {
   public async stop(ids: number[]) {
     const docs = await CrontabModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
-      if (doc.pid) {
-        try {
-          await killTask(doc.pid);
-        } catch (error) {
-          this.logger.error(error);
-        }
+      // Kill all running instances of this task
+      try {
+        const command = this.makeCommand(doc);
+        await killAllTasks(command);
+        this.logger.info(
+          `[panel][停止所有运行中的任务实例] 任务ID: ${doc.id}, 命令: ${command}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `[panel][停止任务失败] 任务ID: ${doc.id}, 错误: ${error}`,
+        );
       }
     }
 
@@ -498,7 +506,10 @@ export default class CronService {
 
         let { id, command, log_name } = cron;
 
-        const uniqPath = log_name === '/dev/null' ? (await getUniqPath(command, `${id}`)) : log_name;
+        const uniqPath =
+          log_name === '/dev/null'
+            ? await getUniqPath(command, `${id}`)
+            : log_name;
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
         await fs.mkdir(logDirPath, { recursive: true });
