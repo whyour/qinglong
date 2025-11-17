@@ -1,3 +1,6 @@
+// Load sandbox first to protect filesystem
+require('./sandbox.js');
+
 const { execSync } = require('child_process');
 const client = require('./client.js');
 require(`./env.js`);

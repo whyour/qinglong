@@ -1,3 +1,6 @@
+# Load sandbox first to protect filesystem
+import sandbox
+
 import os
 import re
 import subprocess
