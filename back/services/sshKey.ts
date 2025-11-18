@@ -131,4 +131,12 @@ export default class SshKeyService {
       }
     }
   }
+
+  public async addGlobalSSHKey(key: string, alias: string): Promise<void> {
+    await this.generatePrivateKeyFile(`global_${alias}`, key);
+  }
+
+  public async removeGlobalSSHKey(alias: string): Promise<void> {
+    await this.removePrivateKeyFile(`global_${alias}`);
+  }
 }

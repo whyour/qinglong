@@ -11,6 +11,7 @@ import system from './system';
 import subscription from './subscription';
 import update from './update';
 import health from './health';
+import sshKey from './sshKey';
 
 export default () => {
   const app = Router();
@@ -26,6 +27,7 @@ export default () => {
   subscription(app);
   update(app);
   health(app);
+  sshKey(app);
 
   return app;
 };
