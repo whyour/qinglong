@@ -19,51 +19,38 @@ export default async () => {
     await CrontabViewModel.sync();
 
     // 初始化新增字段
-    try {
-      await sequelize.query(
-        'alter table CrontabViews add column filterRelation VARCHAR(255)',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Subscriptions add column proxy VARCHAR(255)',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table CrontabViews add column type NUMBER');
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Subscriptions add column autoAddCron NUMBER',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Subscriptions add column autoDelCron NUMBER',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Crontabs add column sub_id NUMBER');
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Crontabs add column extra_schedules JSON',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Crontabs add column task_before TEXT');
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Crontabs add column task_after TEXT');
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Crontabs add column log_name VARCHAR(255)',
-      );
-    } catch (error) { }
-    try {
-      await sequelize.query('alter table Envs add column isPinned NUMBER');
-    } catch (error) {}
+    const migrations = [
+      {
+        table: 'CrontabViews',
+        column: 'filterRelation',
+        type: 'VARCHAR(255)',
+      },
+      { table: 'Subscriptions', column: 'proxy', type: 'VARCHAR(255)' },
+      { table: 'CrontabViews', column: 'type', type: 'NUMBER' },
+      { table: 'Subscriptions', column: 'autoAddCron', type: 'NUMBER' },
+      { table: 'Subscriptions', column: 'autoDelCron', type: 'NUMBER' },
+      { table: 'Crontabs', column: 'sub_id', type: 'NUMBER' },
+      { table: 'Crontabs', column: 'extra_schedules', type: 'JSON' },
+      { table: 'Crontabs', column: 'task_before', type: 'TEXT' },
+      { table: 'Crontabs', column: 'task_after', type: 'TEXT' },
+      { table: 'Crontabs', column: 'log_name', type: 'VARCHAR(255)' },
+      {
+        table: 'Crontabs',
+        column: 'allow_multiple_instances',
+        type: 'NUMBER',
+      },
+      { table: 'Envs', column: 'isPinned', type: 'NUMBER' },
+    ];
+
+    for (const migration of migrations) {
+      try {
+        await sequelize.query(
+          `alter table ${migration.table} add column ${migration.column} ${migration.type}`,
+        );
+      } catch (error) {
+        // Column already exists or other error, continue
+      }
+    }
 
     Logger.info('✌️ DB loaded');
   } catch (error) {
