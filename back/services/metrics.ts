@@ -16,7 +16,7 @@ class MetricsService {
     // 定期清理旧数据
     setInterval(() => {
       const oneHourAgo = Date.now() - 3600000;
-      this.metrics = this.metrics.filter((m) => m.timestamp > oneHourAgo);
+      this.metrics = this.metrics.filter(m => m.timestamp > oneHourAgo);
     }, 60000);
   }
 
@@ -46,11 +46,7 @@ class MetricsService {
     }
   }
 
-  async measureAsync(
-    name: string,
-    fn: () => Promise<void>,
-    tags?: Record<string, string>,
-  ) {
+  async measureAsync(name: string, fn: () => Promise<void>, tags?: Record<string, string>) {
     const start = performance.now();
     try {
       await fn();
@@ -62,26 +58,23 @@ class MetricsService {
 
   getMetrics(name?: string, tags?: Record<string, string>) {
     let filtered = this.metrics;
-
+    
     if (name) {
-      filtered = filtered.filter((m) => m.name === name);
+      filtered = filtered.filter(m => m.name === name);
     }
-
+    
     if (tags) {
-      filtered = filtered.filter((m) => {
+      filtered = filtered.filter(m => {
         if (!m.tags) return false;
-        return Object.entries(tags).every(
-          ([key, value]) => m.tags![key] === value,
-        );
+        return Object.entries(tags).every(([key, value]) => m.tags![key] === value);
       });
     }
 
     return {
       count: filtered.length,
-      average:
-        filtered.reduce((acc, curr) => acc + curr.value, 0) / filtered.length,
-      min: Math.min(...filtered.map((m) => m.value)),
-      max: Math.max(...filtered.map((m) => m.value)),
+      average: filtered.reduce((acc, curr) => acc + curr.value, 0) / filtered.length,
+      min: Math.min(...filtered.map(m => m.value)),
+      max: Math.max(...filtered.map(m => m.value)),
       metrics: filtered,
     };
   }
@@ -96,4 +89,4 @@ class MetricsService {
   }
 }
 
-export const metricsService = MetricsService.getInstance();
+export const metricsService = MetricsService.getInstance(); 

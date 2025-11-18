@@ -24,9 +24,7 @@ const check = async (
         `tail -n 300 ~/.pm2/logs/schedule-error.log`,
       );
       return callback(
-        new Error(
-          `${scheduleErrLog || ''}\n${panelErrLog || ''}\n${res}`.trim(),
-        ),
+        new Error(`${scheduleErrLog || ''}\n${panelErrLog || ''}\n${res}`.trim()),
       );
 
     default:

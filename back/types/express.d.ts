@@ -8,4 +8,4 @@ declare global {
       platform: 'desktop' | 'mobile';
     }
   }
-}
+} 

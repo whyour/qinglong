@@ -28,7 +28,7 @@ export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) {}
+  ) { }
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {

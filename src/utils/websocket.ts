@@ -5,8 +5,7 @@ class WebSocketManager {
   private static instance: WebSocketManager | null = null;
   private url: string;
   private socket: WebSocket | null = null;
-  private subscriptions: Map<SockMessageType, Set<(p: any) => void>> =
-    new Map();
+  private subscriptions: Map<SockMessageType, Set<(p: any) => void>> = new Map();
   private options: {
     maxReconnectAttempts: number;
     reconnectInterval: number;
@@ -16,10 +15,7 @@ class WebSocketManager {
   private heartbeatTimeout: NodeJS.Timeout | null = null;
   private state: 'closed' | 'connecting' | 'open' = 'closed';
 
-  constructor(
-    url: string,
-    options: Partial<typeof WebSocketManager.prototype.options> = {},
-  ) {
+  constructor(url: string, options: Partial<typeof WebSocketManager.prototype.options> = {}) {
     this.url = url;
     this.options = {
       maxReconnectAttempts: options.maxReconnectAttempts || 5,
@@ -30,10 +26,7 @@ class WebSocketManager {
     this.init();
   }
 
-  public static getInstance(
-    url: string = '',
-    options?: Partial<typeof WebSocketManager.prototype.options>,
-  ): WebSocketManager {
+  public static getInstance(url: string = '', options?: Partial<typeof WebSocketManager.prototype.options>): WebSocketManager {
     if (!WebSocketManager.instance) {
       WebSocketManager.instance = new WebSocketManager(url, options);
     }
@@ -54,9 +47,7 @@ class WebSocketManager {
         this.socket = null;
         this.reconnectAttempts++;
 
-        await new Promise((resolve) =>
-          setTimeout(resolve, this.options.reconnectInterval),
-        );
+        await new Promise((resolve) => setTimeout(resolve, this.options.reconnectInterval));
       }
     } catch (error) {
       this.handleError(error);

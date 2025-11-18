@@ -17,10 +17,12 @@ const UnsupportedFilePreview: React.FC<UnsupportedFilePreviewProps> = ({
         <div className={styles.iconWrapper}>
           <FileUnknownOutlined className={styles.icon} />
         </div>
-        <div className={styles.message}>{intl.get('当前文件不支持预览')}</div>
+        <div className={styles.message}>
+          {intl.get('当前文件不支持预览')}
+        </div>
         <Space direction="vertical" size={8} className={styles.actionArea}>
-          <Button
-            type="primary"
+          <Button 
+            type="primary" 
             onClick={onForceOpen}
             className={styles.button}
           >
@@ -36,4 +38,4 @@ const UnsupportedFilePreview: React.FC<UnsupportedFilePreviewProps> = ({
   );
 };
 
-export default UnsupportedFilePreview;
+export default UnsupportedFilePreview; 

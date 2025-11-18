@@ -7,7 +7,7 @@ import { SockMessage } from '../data/sock';
 export default class SockService {
   private clients: Connection[] = [];
 
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   public getClients() {
     return this.clients;

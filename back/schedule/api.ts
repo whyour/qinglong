@@ -231,8 +231,7 @@ export const systemNotify = async (
     const data = await systemService.notify({
       title: call.request.title,
       content: call.request.content,
-      notificationInfo: call.request
-        .notificationInfo as unknown as NotificationInfo,
+      notificationInfo: call.request.notificationInfo as unknown as NotificationInfo,
     });
     callback(null, data);
   } catch (e: any) {

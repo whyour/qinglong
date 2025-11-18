@@ -1,5 +1,8 @@
 {
-  "watch": ["back", ".env"],
+  "watch": [
+    "back",
+    ".env"
+  ],
   "ext": "js,ts,json",
   "env": {
     "NODE_ENV": "development",

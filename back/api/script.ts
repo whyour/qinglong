@@ -71,8 +71,7 @@ export default (app: Router) => {
         logger.error('🔥 error: %o', e);
         return next(e);
       }
-    },
-  );
+    });
 
   route.get(
     '/detail',
@@ -86,7 +85,7 @@ export default (app: Router) => {
       try {
         const scriptService = Container.get(ScriptService);
         const content = await scriptService.getFile(
-          (req.query?.path as string) || '',
+          req.query?.path as string || '',
           req.query.file as string,
         );
         res.send({ code: 200, data: content });
@@ -110,7 +109,7 @@ export default (app: Router) => {
       try {
         const scriptService = Container.get(ScriptService);
         const content = await scriptService.getFile(
-          (req.query?.path as string) || '',
+          req.query?.path as string || '',
           req.params.file,
         );
         res.send({ code: 200, data: content });
