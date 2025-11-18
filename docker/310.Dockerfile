@@ -1,13 +1,18 @@
-FROM python:3.10-alpine3.18 AS builder
-COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
-RUN set -x \
-  && apk update \
-  && apk add nodejs npm git \
-  && npm i -g pnpm@8.3.1 pm2 ts-node \
-  && cd /tmp/build \
-  && pnpm install --prod
+FROM node:22-slim AS nodebuilder
 
-FROM python:3.10-alpine
+FROM python:3.10-slim-bookworm AS builder
+COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
+COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
+RUN set -x && \
+  ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+  apt-get update && \
+  apt-get install --no-install-recommends -y libatomic1 && \
+  npm i -g pnpm@8.3.1 && \
+  cd /tmp/build && \
+  pnpm install --prod
+
+FROM python:3.10-slim-bookworm
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -21,51 +26,63 @@ ENV QL_DIR=/ql \
   SHELL=/bin/bash \
   PS1="\u@\h:\w \$ "
 
-VOLUME /ql/data
-  
-EXPOSE 5700
+ARG QL_UID=5432
+ARG QL_GID=5432
+RUN groupadd -g ${QL_GID} qinglong && \
+    useradd -m -u ${QL_UID} -g ${QL_GID} -s /bin/bash qinglong && \
+    mkdir -p /home/qinglong/bin /home/qinglong/.ssh && \
+    chmod 700 /home/qinglong/.ssh && \
+    chown -R ${QL_UID}:${QL_GID} /home/qinglong
 
-COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
-COPY --from=builder /usr/local/bin/. /usr/local/bin/
+ENV QL_USER=qinglong
+ENV QL_HOME=/home/$QL_USER
 
-RUN set -x \
-  && apk update -f \
-  && apk upgrade \
-  && apk --no-cache add -f bash \
-  coreutils \
-  git \
+COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
+COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
+
+RUN set -x && \
+  ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+  apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install --no-install-recommends -y git \
   curl \
   wget \
   tzdata \
   perl \
   openssl \
-  nodejs \
+  openssh-client \
   jq \
-  openssh \
   procps \
   netcat-openbsd \
   unzip \
-  npm \
-  && rm -rf /var/cache/apk/* \
-  && apk update \
-  && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-  && echo "Asia/Shanghai" > /etc/timezone \
-  && git config --global user.email "qinglong@users.noreply.github.com" \
-  && git config --global user.name "qinglong" \
-  && git config --global http.postBuffer 524288000 \
-  && rm -rf /root/.cache \
-  && ulimit -c 0
+  libatomic1 && \
+  apt-get clean && \
+  ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+  echo "Asia/Shanghai" >/etc/timezone && \
+  git config --global user.email "qinglong@users.noreply.github.com" && \
+  git config --global user.name "qinglong" && \
+  git config --global http.postBuffer 524288000 && \
+  npm install -g pnpm@8.3.1 pm2 ts-node && \
+  rm -rf /root/.cache && \
+  rm -rf /root/.npm && \
+  rm -rf /etc/apt/apt.conf.d/docker-clean && \
+  ulimit -c 0
+
+RUN mkdir -p ${QL_DIR} && \
+  chown -R ${QL_UID}:${QL_GID} ${QL_DIR}
+
+USER qinglong
 
 ARG SOURCE_COMMIT
-RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
-  && cd ${QL_DIR} \
-  && cp -f .env.example .env \
-  && chmod 777 ${QL_DIR}/shell/*.sh \
-  && chmod 777 ${QL_DIR}/docker/*.sh \
-  && git clone --depth=1 -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
-  && mkdir -p ${QL_DIR}/static \
-  && cp -rf /static/* ${QL_DIR}/static \
-  && rm -rf /static
+RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} && \
+  cd ${QL_DIR} && \
+  cp -f .env.example .env && \
+  chmod 777 ${QL_DIR}/shell/*.sh && \
+  chmod 777 ${QL_DIR}/docker/*.sh && \
+  git clone --depth=1 -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /tmp/static && \
+  mkdir -p ${QL_DIR}/static && \
+  cp -rf /tmp/static/* ${QL_DIR}/static && \
+  rm -rf /tmp/static
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \
@@ -78,7 +95,9 @@ ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOM
 
 RUN pip3 install --prefix ${PYTHON_HOME} requests
 
-COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
+COPY --chown=qinglong:qinglong --from=builder /tmp/build/node_modules/. /ql/node_modules/
+
+USER root
 
 WORKDIR ${QL_DIR}
 
@@ -86,3 +105,7 @@ HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
   CMD curl -sf --noproxy '*' http://127.0.0.1:5700/api/health || exit 1
 
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
+
+VOLUME /ql/data
+  
+EXPOSE 5700

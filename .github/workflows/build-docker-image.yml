@@ -7,6 +7,8 @@ on:
     branches:
       - "master"
       - "develop"
+      - "debian"
+      - "debian-dev"
     tags:
       - "v*"
   schedule:
@@ -129,6 +131,13 @@ jobs:
         with:
           cache: "pnpm"
 
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
       - name: Setup timezone
         uses: szenius/set-timezone@v2.0
         with:
@@ -164,6 +173,7 @@ jobs:
             type=ref,event=pr
             type=ref,event=branch,enable=${{ github.ref != format('refs/heads/{0}', 'master') }}
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=${{ steps.version.outputs.version }}-debian,enable=${{ github.ref == format('refs/heads/{0}', 'debian') || github.ref == format('refs/heads/{0}', 'debian-dev') }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
@@ -183,22 +193,21 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          # linux/s390x npm 暂不可用
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
           context: .
           file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=whyour/qinglong:cache
-          cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian,mode=max
 
       - name: Image digest
         run: |
           echo ${{ steps.docker_build.outputs.digest }}
 
   build310:
-    if: ${{ github.ref_name == 'master' }}
+    if: ${{ github.ref_name == 'debian' }}
     needs: build-static
 
     runs-on: ubuntu-22.04
@@ -215,6 +224,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           cache: "pnpm"
+
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
       - name: Setup timezone
         uses: szenius/set-timezone@v2.0
@@ -249,15 +265,42 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          # linux/s390x npm 暂不可用
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
           context: .
           file: ./docker/310.Dockerfile
           push: true
-          tags: whyour/qinglong:python3.10
-          cache-from: type=registry,ref=whyour/qinglong:cache-python3.10
-          cache-to: type=registry,ref=whyour/qinglong:cache-python3.10,mode=max
+          tags: |
+            whyour/qinglong:debian-python3.10
+            whyour/qinglong:${{ steps.version.outputs.version }}-debian-python3.10
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian-python3.10
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian-python3.10,mode=max
 
       - name: Image digest
         run: |
           echo ${{ steps.docker_build_310.outputs.digest }}
+
+  publish:
+    if: ${{ github.ref_name == 'debian' }}
+    needs: build
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: "8.3.1"
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: "pnpm"
+
+      - name: build front and back
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:front
+          pnpm build:back
+
+      - name: publich npm package
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+          npm publish
