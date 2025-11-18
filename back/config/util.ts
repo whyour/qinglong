@@ -417,6 +417,27 @@ export async function getPid(cmd: string) {
   return pid ? Number(pid) : undefined;
 }
 
+export async function getAllPids(cmd: string): Promise<number[]> {
+  const taskCommand = `ps -eo pid,command | grep "${cmd}" | grep -v grep | awk '{print $1}'`;
+  const pidsStr = await promiseExec(taskCommand);
+  if (!pidsStr) return [];
+  return pidsStr
+    .split('\n')
+    .map((p) => Number(p.trim()))
+    .filter((p) => !isNaN(p) && p > 0);
+}
+
+export async function killAllTasks(cmd: string): Promise<void> {
+  const pids = await getAllPids(cmd);
+  for (const pid of pids) {
+    try {
+      await killTask(pid);
+    } catch (error) {
+      // Ignore errors if process already terminated
+    }
+  }
+}
+
 interface IVersion {
   version: string;
   changeLogLink: string;

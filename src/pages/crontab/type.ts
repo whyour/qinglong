@@ -37,6 +37,7 @@ export interface ICrontab {
   nextRunTime: Date;
   sub_id: number;
   extra_schedules?: Array<{ schedule: string }>;
+  allow_multiple_instances?: 1 | 0;
 }
 
 export enum ScheduleType {
