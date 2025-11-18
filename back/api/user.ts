@@ -8,7 +8,7 @@ import path from 'path';
 import { v4 as uuidV4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import config from '../config';
-import { isDemoEnv } from '../config/util';
+import { isDemoEnv, getToken } from '../config/util';
 const route = Router();
 
 const storage = multer.diskStorage({
@@ -56,7 +56,8 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
-        await userService.logout(req.platform);
+        const token = getToken(req);
+        await userService.logout(req.platform, token);
         res.send({ code: 200 });
       } catch (e) {
         return next(e);

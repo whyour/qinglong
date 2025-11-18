@@ -48,6 +48,19 @@ export interface LoginLogInfo {
   status?: LoginStatus;
 }
 
+export interface TokenInfo {
+  value: string;
+  timestamp: number;
+  ip: string;
+  address: string;
+  platform: string;
+  /**
+   * Token expiration time in seconds since Unix epoch.
+   * If undefined, the token uses JWT's built-in expiration.
+   */
+  expiration?: number;
+}
+
 export interface AuthInfo {
   username: string;
   password: string;
@@ -58,7 +71,7 @@ export interface AuthInfo {
   platform: string;
   isTwoFactorChecking: boolean;
   token: string;
-  tokens: Record<string, string>;
+  tokens: Record<string, string | TokenInfo[]>;
   twoFactorActivated: boolean;
   twoFactorSecret: string;
   avatar: string;
