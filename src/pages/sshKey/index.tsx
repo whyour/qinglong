@@ -55,14 +55,14 @@ const SshKey = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const columns: any = [
     {
-      title: '序号',
+      title: intl.get('序号'),
       width: 80,
       render: (text: string, record: any, index: number) => {
         return <span style={{ cursor: 'text' }}>{index + 1} </span>;
       },
     },
     {
-      title: '别名',
+      title: intl.get('别名'),
       dataIndex: 'alias',
       key: 'alias',
       sorter: (a: any, b: any) => a.alias.localeCompare(b.alias),
@@ -78,7 +78,7 @@ const SshKey = () => {
       },
     },
     {
-      title: '备注',
+      title: intl.get('备注'),
       dataIndex: 'remarks',
       key: 'remarks',
       width: '35%',
@@ -92,17 +92,17 @@ const SshKey = () => {
       },
     },
     {
-      title: '状态',
+      title: intl.get('状态'),
       key: 'status',
       dataIndex: 'status',
       width: 90,
       filters: [
         {
-          text: '已启用',
+          text: intl.get('已启用'),
           value: 0,
         },
         {
-          text: '已禁用',
+          text: intl.get('已禁用'),
           value: 1,
         },
       ],
@@ -112,7 +112,7 @@ const SshKey = () => {
       },
     },
     {
-      title: '创建时间',
+      title: intl.get('创建时间'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 185,
@@ -127,7 +127,7 @@ const SshKey = () => {
       },
     },
     {
-      title: '操作',
+      title: intl.get('操作'),
       key: 'action',
       width: 120,
       render: (text: string, record: any, index: number) => {
@@ -145,7 +145,7 @@ const SshKey = () => {
                 {OperationName[record.status]}
               </a>
             </Tooltip>
-            <Tooltip title="编辑">
+            <Tooltip title={intl.get('编辑')}>
               <a
                 onClick={() => {
                   editSSHKey(record);
@@ -154,7 +154,7 @@ const SshKey = () => {
                 <EditOutlined />
               </a>
             </Tooltip>
-            <Tooltip title="删除">
+            <Tooltip title={intl.get('删除')}>
               <a
                 onClick={() => {
                   deleteSSHKey(record);
@@ -199,14 +199,14 @@ const SshKey = () => {
 
   const deleteSSHKey = (record: any) => {
     Modal.confirm({
-      title: '确认删除',
+      title: intl.get('确认删除'),
       content: (
         <>
-          确认删除SSH密钥
+          {intl.get('确认删除SSH密钥')}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.alias}
           </Text>
-          吗
+          {intl.get('吗')}
         </>
       ),
       onOk() {
@@ -214,7 +214,7 @@ const SshKey = () => {
           .delete(`${config.apiPrefix}sshKeys`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
-              message.success('删除成功');
+              message.success(intl.get('删除成功'));
               getSSHKeys();
             }
           });
@@ -230,7 +230,7 @@ const SshKey = () => {
       .put(`${config.apiPrefix}sshKeys/${operationPath}`, ids)
       .then(({ code, data }) => {
         if (code === 200) {
-          message.success(`批量${OperationName[OperationPath[operationPath]]}成功`);
+          message.success(`${intl.get('批量')}${OperationName[OperationPath[operationPath]]}${intl.get('成功')}`);
           getSSHKeys(false);
         }
       });
@@ -266,10 +266,10 @@ const SshKey = () => {
   return (
     <PageContainer
       className="ql-container-wrapper"
-      title="SSH密钥"
+      title={intl.get('SSH密钥')}
       extra={[
         <Button key="1" type="primary" onClick={addSSHKey}>
-          新建
+          {intl.get('新建')}
         </Button>,
       ]}
       header={{

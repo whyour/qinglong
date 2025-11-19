@@ -44,7 +44,7 @@ export default {
       },
       {
         path: '/sshKey',
-        name: 'SSH密钥',
+        name: intl.get('SSH密钥'),
         icon: <IconFont type="ql-icon-key" />,
         component: '@/pages/sshKey/index',
       },

@@ -26,7 +26,7 @@ const SshKeyModal = ({
 
       if (code === 200) {
         message.success(
-          sshKey ? '更新SSH密钥成功' : '创建SSH密钥成功',
+          sshKey ? intl.get('更新SSH密钥成功') : intl.get('创建SSH密钥成功'),
         );
         handleCancel(data);
       }
@@ -38,7 +38,7 @@ const SshKeyModal = ({
 
   return (
     <Modal
-      title={sshKey ? '编辑SSH密钥' : '创建SSH密钥'}
+      title={sshKey ? intl.get('编辑SSH密钥') : intl.get('创建SSH密钥')}
       open={true}
       forceRender
       centered
@@ -59,35 +59,35 @@ const SshKeyModal = ({
       <Form form={form} layout="vertical" name="ssh_key_modal" initialValues={sshKey}>
         <Form.Item
           name="alias"
-          label="别名"
+          label={intl.get('别名')}
           rules={[
             {
               required: true,
-              message: '请输入SSH密钥别名',
+              message: intl.get('请输入SSH密钥别名'),
               whitespace: true,
             },
           ]}
         >
-          <Input placeholder="请输入SSH密钥别名" disabled={!!sshKey} />
+          <Input placeholder={intl.get('请输入SSH密钥别名')} disabled={!!sshKey} />
         </Form.Item>
         <Form.Item
           name="private_key"
-          label="私钥"
+          label={intl.get('私钥')}
           rules={[
             {
               required: true,
-              message: '请输入SSH私钥',
+              message: intl.get('请输入SSH私钥'),
               whitespace: true,
             },
           ]}
         >
           <Input.TextArea
             autoSize={{ minRows: 4, maxRows: 12 }}
-            placeholder="请输入SSH私钥内容（以 -----BEGIN 开头）"
+            placeholder={intl.get('请输入SSH私钥内容（以 -----BEGIN 开头）')}
           />
         </Form.Item>
-        <Form.Item name="remarks" label="备注">
-          <Input placeholder="请输入备注" />
+        <Form.Item name="remarks" label={intl.get('备注')}>
+          <Input placeholder={intl.get('请输入备注')} />
         </Form.Item>
       </Form>
     </Modal>
