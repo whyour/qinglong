@@ -38,6 +38,7 @@ export interface SystemConfigInfo {
   pythonMirror?: string;
   linuxMirror?: string;
   timezone?: string;
+  globalSshKey?: string;
 }
 
 export interface LoginLogInfo {

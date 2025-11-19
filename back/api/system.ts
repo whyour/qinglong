@@ -427,6 +427,24 @@ export default (app: Router) => {
   );
 
   route.put(
+    '/config/global-ssh-key',
+    celebrate({
+      body: Joi.object({
+        globalSshKey: Joi.string().allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.updateGlobalSshKey(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
     '/config/dependence-clean',
     celebrate({
       body: Joi.object({

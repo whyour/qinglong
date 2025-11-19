@@ -43,12 +43,6 @@ export default {
         component: '@/pages/env/index',
       },
       {
-        path: '/sshKey',
-        name: intl.get('SSH密钥'),
-        icon: <IconFont type="ql-icon-key" />,
-        component: '@/pages/sshKey/index',
-      },
-      {
         path: '/config',
         name: intl.get('配置文件'),
         icon: <IconFont type="ql-icon-config" />,

@@ -549,5 +549,8 @@
   "请输入SSH私钥": "Please enter SSH private key",
   "请输入SSH私钥内容（以 -----BEGIN 开头）": "Please enter SSH private key content (starts with -----BEGIN)",
   "确认删除SSH密钥": "Confirm to delete SSH key",
-  "批量": "Batch"
+  "批量": "Batch",
+  "全局SSH私钥": "Global SSH Private Key",
+  "用于访问所有私有仓库的全局SSH私钥": "Global SSH private key for accessing all private repositories",
+  "请输入完整的SSH私钥内容": "Please enter the complete SSH private key content"
 }
