@@ -530,6 +530,27 @@ export default class SystemService {
     }
   }
 
+  public async updateGlobalSshKey(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    const result = await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, ...info },
+    });
+    
+    // Apply the global SSH key
+    const SshKeyService = require('./sshKey').default;
+    const Container = require('typedi').Container;
+    const sshKeyService = Container.get(SshKeyService);
+    
+    if (info.globalSshKey) {
+      await sshKeyService.addGlobalSSHKey(info.globalSshKey, 'global');
+    } else {
+      await sshKeyService.removeGlobalSSHKey('global');
+    }
+    
+    return { code: 200, data: result };
+  }
+
   public async cleanDependence(type: 'node' | 'python3') {
     if (!type || !['node', 'python3'].includes(type)) {
       return { code: 400, message: '参数错误' };

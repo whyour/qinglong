@@ -131,4 +131,32 @@ export default class SshKeyService {
       }
     }
   }
+
+  public async addGlobalSSHKey(key: string, alias: string): Promise<void> {
+    await this.generatePrivateKeyFile(`global_${alias}`, key);
+    // Create a global SSH config entry that matches all hosts
+    // This allows the key to be used for any Git repository
+    await this.generateGlobalSshConfig(`global_${alias}`);
+  }
+
+  public async removeGlobalSSHKey(alias: string): Promise<void> {
+    await this.removePrivateKeyFile(`global_${alias}`);
+    await this.removeSshConfig(`global_${alias}`);
+  }
+
+  private async generateGlobalSshConfig(alias: string) {
+    // Create a config that matches all hosts, making this key globally available
+    const config = `Host *\n    IdentityFile ${path.join(
+      this.sshPath,
+      alias,
+    )}\n    StrictHostKeyChecking no\n`;
+    await writeFileWithLock(
+      `${path.join(this.sshPath, `${alias}.config`)}`,
+      config,
+      {
+        encoding: 'utf8',
+        mode: '600',
+      },
+    );
+  }
 }
