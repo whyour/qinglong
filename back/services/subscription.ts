@@ -112,9 +112,7 @@ export default class SubscriptionService {
   }
 
   public async setSshConfig() {
-    const docs = await SubscriptionModel.findAll({
-      where: { is_disabled: 0 },
-    });
+    const docs = await SubscriptionModel.findAll();
     await this.sshKeyService.setSshConfig(docs);
   }
 
@@ -348,17 +346,14 @@ export default class SubscriptionService {
   public async disabled(ids: number[]) {
     await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
-    // Remove SSH keys for disabled subscriptions
-    for (const doc of docs) {
-      if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
-        const { alias } = doc;
-        const { host } = formatUrl(doc);
-        await this.sshKeyService.removeSSHKey(alias, host, doc.proxy);
-      }
-    }
     await this.setSshConfig();
     for (const doc of docs) {
       await this.handleTask(doc.get({ plain: true }), false);
+    }
+    // Disable associated cron tasks
+    const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
+    if (crons?.length) {
+      await this.crontabService.disabled(crons.map((x) => x.id!));
     }
   }
 
@@ -368,6 +363,11 @@ export default class SubscriptionService {
     await this.setSshConfig();
     for (const doc of docs) {
       await this.handleTask(doc.get({ plain: true }));
+    }
+    // Enable associated cron tasks
+    const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
+    if (crons?.length) {
+      await this.crontabService.enabled(crons.map((x) => x.id!));
     }
   }
 
