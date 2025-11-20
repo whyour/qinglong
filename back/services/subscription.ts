@@ -112,7 +112,9 @@ export default class SubscriptionService {
   }
 
   public async setSshConfig() {
-    const docs = await SubscriptionModel.findAll();
+    const docs = await SubscriptionModel.findAll({
+      where: { is_disabled: 0 },
+    });
     await this.sshKeyService.setSshConfig(docs);
   }
 
@@ -346,6 +348,14 @@ export default class SubscriptionService {
   public async disabled(ids: number[]) {
     await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    // Remove SSH keys for disabled subscriptions
+    for (const doc of docs) {
+      if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
+        const { alias } = doc;
+        const { host } = formatUrl(doc);
+        await this.sshKeyService.removeSSHKey(alias, host, doc.proxy);
+      }
+    }
     await this.setSshConfig();
     for (const doc of docs) {
       await this.handleTask(doc.get({ plain: true }), false);
