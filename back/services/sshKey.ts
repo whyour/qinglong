@@ -133,15 +133,15 @@ export default class SshKeyService {
   }
 
   public async addGlobalSSHKey(key: string, alias: string): Promise<void> {
-    await this.generatePrivateKeyFile(`global_${alias}`, key);
+    await this.generatePrivateKeyFile(`~global_${alias}`, key);
     // Create a global SSH config entry that matches all hosts
     // This allows the key to be used for any Git repository
-    await this.generateGlobalSshConfig(`global_${alias}`);
+    await this.generateGlobalSshConfig(`~global_${alias}`);
   }
 
   public async removeGlobalSSHKey(alias: string): Promise<void> {
-    await this.removePrivateKeyFile(`global_${alias}`);
-    await this.removeSshConfig(`global_${alias}`);
+    await this.removePrivateKeyFile(`~global_${alias}`);
+    await this.removeSshConfig(`~global_${alias}`);
   }
 
   private async generateGlobalSshConfig(alias: string) {
