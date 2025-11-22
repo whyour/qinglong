@@ -509,11 +509,7 @@ export default class CronService {
         const uniqPath =
           log_name === '/dev/null'
             ? await getUniqPath(command, `${id}`)
-            : log_name || (await getUniqPath(command, `${id}`));
-        
-        // Update cron.log_name with the calculated uniqPath to avoid passing null to shell
-        cron.log_name = uniqPath;
-        
+            : log_name;
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
         await fs.mkdir(logDirPath, { recursive: true });
@@ -645,7 +641,12 @@ export default class CronService {
     if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
       command = `${TASK_PREFIX}${tab.command}`;
     }
-    let commandVariable = `real_time=${Boolean(realTime)} log_name=${tab.log_name} no_tee=true ID=${tab.id} `;
+    let commandVariable = `real_time=${Boolean(realTime)} `;
+    // Only include log_name if it has a value, shell will handle empty case automatically
+    if (tab.log_name) {
+      commandVariable += `log_name=${tab.log_name} `;
+    }
+    commandVariable += `no_tee=true ID=${tab.id} `;
     if (tab.task_before) {
       commandVariable += `task_before='${tab.task_before
         .replace(/'/g, "'\\''")
