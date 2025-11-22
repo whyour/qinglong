@@ -642,7 +642,7 @@ export default class CronService {
       command = `${TASK_PREFIX}${tab.command}`;
     }
     let commandVariable = `real_time=${Boolean(realTime)} `;
-    // Only include log_name if it has a value, shell will handle empty case automatically
+    // Only include log_name if it has a truthy value to avoid passing null/undefined to shell
     if (tab.log_name) {
       commandVariable += `log_name=${tab.log_name} `;
     }
