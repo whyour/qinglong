@@ -4,6 +4,35 @@
  * 定时规则
  * cron: 1 9 * * *
  */
+
+// Initialize QLAPI if not already loaded (for direct node execution)
+if (typeof QLAPI === 'undefined') {
+  const path = require('path');
+  const qlDir = process.env.QL_DIR || '/ql';
+  const preloadDir = path.join(qlDir, 'shell/preload');
+  
+  try {
+    // Load the notify function
+    const notifyPath = path.join(preloadDir, '__ql_notify__.js');
+    const { sendNotify } = require(notifyPath);
+    
+    // Load the gRPC client
+    const clientPath = path.join(preloadDir, 'client.js');
+    const client = require(clientPath);
+    
+    // Create global QLAPI object
+    global.QLAPI = {
+      notify: sendNotify,
+      ...client,
+    };
+  } catch (error) {
+    console.error('Failed to initialize QLAPI. Please run this script using the "task" command or add it as a scheduled task.');
+    console.error('Example: task ql_sample.js');
+    console.error('Error details:', error.message);
+    process.exit(1);
+  }
+}
+
 console.log('test scripts');
 QLAPI.notify('test scripts', 'test desc');
 QLAPI.getEnvs({ searchValue: 'dddd' }).then((x) => {
