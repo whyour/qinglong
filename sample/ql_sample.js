@@ -27,9 +27,15 @@ if (typeof QLAPI === 'undefined') {
     };
   } catch (error) {
     console.error(
-      'Failed to initialize QLAPI. Please run this script using the "task" command or add it as a scheduled task.',
+      '\n❌ Failed to initialize QLAPI. This usually happens because:',
     );
-    console.error('Example: task ql_sample.js');
+    console.error('   1. The Qinglong backend is not running');
+    console.error('   2. Required files are not yet generated\n');
+    console.error(
+      'Solution: Use the "task" command instead of running directly:',
+    );
+    console.error('   Example: task ql_sample.js');
+    console.error('   Or add this script as a scheduled task in the panel\n');
     console.error('Error details:', error.message);
     process.exit(1);
   }

@@ -29,8 +29,12 @@ except NameError:
         
         QLAPI = BaseApi()
     except Exception as error:
-        print('Failed to initialize QLAPI. Please run this script using the "task" command or add it as a scheduled task.')
-        print('Example: task ql_sample.py')
+        print('\n❌ Failed to initialize QLAPI. This usually happens because:')
+        print('   1. The Qinglong backend is not running')
+        print('   2. Required files are not yet generated\n')
+        print('Solution: Use the "task" command instead of running directly:')
+        print('   Example: task ql_sample.py')
+        print('   Or add this script as a scheduled task in the panel\n')
         print(f'Error details: {error}')
         sys.exit(1)
 
