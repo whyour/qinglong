@@ -28,6 +28,7 @@ function run() {
     numParam,
     file_task_before,
     file_task_before_js,
+    file_preload_js,
     dir_scripts,
     task_before,
     PREV_NODE_OPTIONS,
@@ -40,7 +41,13 @@ function run() {
     const fileName = process.argv[1].replace(`${dir_scripts}/`, '');
     const tempFile = `/tmp/env_${process.pid}.json`;
 
+    // Export NODE_OPTIONS so task_before can use it for any node commands
+    const nodeOptionsForBash = file_preload_js
+      ? `-r ${file_preload_js} ${PREV_NODE_OPTIONS || ''}`
+      : PREV_NODE_OPTIONS || '';
+
     const commands = [
+      `export NODE_OPTIONS="${nodeOptionsForBash}"`,
       `source ${file_task_before} ${fileName}`,
       task_before ? `eval '${task_before.replace(/'/g, "'\\''")}'` : null,
       `echo -e '${splitStr}'`,

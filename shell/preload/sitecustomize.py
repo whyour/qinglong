@@ -44,11 +44,19 @@ def run():
         split_str = "__sitecustomize__"
         file_name = sys.argv[0].replace(f"{os.getenv('dir_scripts')}/", "")
         
+        # Get environment variables needed for PYTHONPATH
+        dir_preload = os.getenv("dir_preload", "")
+        dir_config = os.getenv("dir_config", "")
+        
         # 创建临时文件路径
         temp_file = f"/tmp/env_{os.getpid()}.json"
         
+        # Export PYTHONPATH so task_before can use it for any python commands
+        pythonpath_for_bash = f"{dir_preload}:{dir_config}:{prev_pythonpath}" if dir_preload else prev_pythonpath
+        
         # 构建命令数组
         commands = [
+            f'export PYTHONPATH="{pythonpath_for_bash}"',
             f'source {os.getenv("file_task_before")} {file_name}'
         ]
         
