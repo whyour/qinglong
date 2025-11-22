@@ -641,12 +641,11 @@ export default class CronService {
     if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
       command = `${TASK_PREFIX}${tab.command}`;
     }
-    let commandVariable = `real_time=${Boolean(realTime)} `;
+    let commandVariable = `real_time=${Boolean(realTime)} no_tee=true ID=${tab.id} `;
     // Only include log_name if it has a truthy value to avoid passing null/undefined to shell
     if (tab.log_name) {
       commandVariable += `log_name=${tab.log_name} `;
     }
-    commandVariable += `no_tee=true ID=${tab.id} `;
     if (tab.task_before) {
       commandVariable += `task_before='${tab.task_before
         .replace(/'/g, "'\\''")
