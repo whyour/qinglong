@@ -43,7 +43,7 @@ function run() {
 
     // Export NODE_OPTIONS so task_before can use it for any node commands
     const nodeOptionsForBash = file_preload_js
-      ? `-r ${file_preload_js} ${PREV_NODE_OPTIONS || ''}`
+      ? ['-r', file_preload_js, PREV_NODE_OPTIONS].filter(Boolean).join(' ')
       : PREV_NODE_OPTIONS || '';
 
     const commands = [

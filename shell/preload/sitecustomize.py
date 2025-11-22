@@ -52,7 +52,7 @@ def run():
         temp_file = f"/tmp/env_{os.getpid()}.json"
         
         # Export PYTHONPATH so task_before can use it for any python commands
-        pythonpath_for_bash = f"{dir_preload}:{dir_config}:{prev_pythonpath}" if dir_preload else prev_pythonpath
+        pythonpath_for_bash = ':'.join(filter(None, [dir_preload, dir_config, prev_pythonpath]))
         
         # 构建命令数组
         commands = [
