@@ -4,43 +4,6 @@
  * 定时规则
  * cron: 1 9 * * *
  */
-
-// Initialize QLAPI if not already loaded (for direct node execution)
-if (typeof QLAPI === 'undefined') {
-  const path = require('path');
-  const qlDir = process.env.QL_DIR || '/ql';
-  const preloadDir = path.join(qlDir, 'shell/preload');
-
-  try {
-    // Load the notify function
-    const notifyPath = path.join(preloadDir, '__ql_notify__.js');
-    const { sendNotify } = require(notifyPath);
-
-    // Load the gRPC client
-    const clientPath = path.join(preloadDir, 'client.js');
-    const client = require(clientPath);
-
-    // Create global QLAPI object
-    global.QLAPI = {
-      notify: sendNotify,
-      ...client,
-    };
-  } catch (error) {
-    console.error(
-      '\n❌ Failed to initialize QLAPI. This usually happens because:',
-    );
-    console.error('   1. The Qinglong backend is not running');
-    console.error('   2. Required files are not yet generated\n');
-    console.error(
-      'Solution: Use the "task" command instead of running directly:',
-    );
-    console.error('   Example: task ql_sample.js');
-    console.error('   Or add this script as a scheduled task in the panel\n');
-    console.error('Error details:', error.message);
-    process.exit(1);
-  }
-}
-
 console.log('test scripts');
 QLAPI.notify('test scripts', 'test desc');
 QLAPI.getEnvs({ searchValue: 'dddd' }).then((x) => {
@@ -56,13 +19,11 @@ QLAPI.getCrons({ searchValue: 'test' }).then((x) => {
 });
 
 // 通过ID查询定时任务 (Get cron by ID)
-QLAPI.getCronById({ id: 1 })
-  .then((x) => {
-    console.log('getCronById', x);
-  })
-  .catch((err) => {
-    console.log('getCronById error', err);
-  });
+QLAPI.getCronById({ id: 1 }).then((x) => {
+  console.log('getCronById', x);
+}).catch((err) => {
+  console.log('getCronById error', err);
+});
 
 // 启用定时任务 (Enable cron tasks)
 QLAPI.enableCrons({ ids: [1, 2] }).then((x) => {
