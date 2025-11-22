@@ -509,7 +509,7 @@ export default class CronService {
         const uniqPath =
           log_name === '/dev/null'
             ? await getUniqPath(command, `${id}`)
-            : log_name;
+            : log_name || (await getUniqPath(command, `${id}`));
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
         await fs.mkdir(logDirPath, { recursive: true });
