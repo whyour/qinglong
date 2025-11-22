@@ -10,23 +10,25 @@ if (typeof QLAPI === 'undefined') {
   const path = require('path');
   const qlDir = process.env.QL_DIR || '/ql';
   const preloadDir = path.join(qlDir, 'shell/preload');
-  
+
   try {
     // Load the notify function
     const notifyPath = path.join(preloadDir, '__ql_notify__.js');
     const { sendNotify } = require(notifyPath);
-    
+
     // Load the gRPC client
     const clientPath = path.join(preloadDir, 'client.js');
     const client = require(clientPath);
-    
+
     // Create global QLAPI object
     global.QLAPI = {
       notify: sendNotify,
       ...client,
     };
   } catch (error) {
-    console.error('Failed to initialize QLAPI. Please run this script using the "task" command or add it as a scheduled task.');
+    console.error(
+      'Failed to initialize QLAPI. Please run this script using the "task" command or add it as a scheduled task.',
+    );
     console.error('Example: task ql_sample.js');
     console.error('Error details:', error.message);
     process.exit(1);
@@ -48,11 +50,13 @@ QLAPI.getCrons({ searchValue: 'test' }).then((x) => {
 });
 
 // 通过ID查询定时任务 (Get cron by ID)
-QLAPI.getCronById({ id: 1 }).then((x) => {
-  console.log('getCronById', x);
-}).catch((err) => {
-  console.log('getCronById error', err);
-});
+QLAPI.getCronById({ id: 1 })
+  .then((x) => {
+    console.log('getCronById', x);
+  })
+  .catch((err) => {
+    console.log('getCronById error', err);
+  });
 
 // 启用定时任务 (Enable cron tasks)
 QLAPI.enableCrons({ ids: [1, 2] }).then((x) => {
