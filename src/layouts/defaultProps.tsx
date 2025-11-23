@@ -1,5 +1,5 @@
 import intl from 'react-intl-universal';
-import { SettingOutlined } from '@ant-design/icons';
+import { SettingOutlined, ApartmentOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
 import { BasicLayoutProps } from '@ant-design/pro-layout';
 
@@ -35,6 +35,12 @@ export default {
         name: intl.get('订阅管理'),
         icon: <IconFont type="ql-icon-subs" />,
         component: '@/pages/subscription/index',
+      },
+      {
+        path: '/scenario',
+        name: intl.get('场景管理'),
+        icon: <ApartmentOutlined />,
+        component: '@/pages/scenario/index',
       },
       {
         path: '/env',
