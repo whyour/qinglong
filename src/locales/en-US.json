@@ -577,7 +577,6 @@
   "延迟": "Delay",
   "循环": "Loop",
   "请求URL": "Request URL",
-  "请求方法": "Request Method",
   "请求头": "Request Headers",
   "请求体": "Request Body",
   "脚本ID": "Script ID",
@@ -612,5 +611,11 @@
   "节点": "Nodes",
   "确认删除节点吗": "Are you sure you want to delete this node?",
   "开始": "Start",
-  "结束": "End"
+  "结束": "End",
+  "新建节点": "Add Node",
+  "视图": "View",
+  "放大": "Zoom In",
+  "缩小": "Zoom Out",
+  "适应画布": "Fit to Canvas",
+  "条件": "Condition"
 }
