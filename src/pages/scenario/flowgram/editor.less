@@ -1,0 +1,24 @@
+.flowgram-editor-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.flowgram-editor-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.flowgram-editor {
+  width: 100%;
+  height: 100%;
+}
+
+/* Dark theme support */
+[data-theme='dark'] {
+  .flowgram-editor-container {
+    background: #141414;
+  }
+}
