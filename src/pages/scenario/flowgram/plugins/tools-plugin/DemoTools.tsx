@@ -22,7 +22,7 @@ import { Dropdown, Menu, Button, Tooltip } from 'antd';
 import intl from 'react-intl-universal';
 import { Minimap } from '../../components/minimap';
 import { useAddNode } from '../../hooks/use-add-node';
-import { NODE_TYPES } from '../../nodes/constants';
+import { WorkflowNodeType } from '../../nodes/constants';
 import './styles.less';
 
 export const DemoTools: React.FC = () => {
