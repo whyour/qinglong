@@ -3,11 +3,11 @@ import { FreeLayoutProps } from '@flowgram.ai/free-layout-editor';
 import { createFreeSnapPlugin } from '@flowgram.ai/free-snap-plugin';
 import { createFreeLinesPlugin } from '@flowgram.ai/free-lines-plugin';
 import { createFreeNodePanelPlugin } from '@flowgram.ai/free-node-panel-plugin';
-import { createMinimapPlugin } from '@flowgram.ai/minimap-plugin';
 import { createPanelManagerPlugin } from '@flowgram.ai/panel-manager-plugin';
 import { createHistoryNodePlugin } from '@flowgram.ai/history-node-plugin';
 import { FlowNodeRegistry } from '../nodes/http';
 import { createToolsPlugin } from '../plugins/tools-plugin';
+import { NodePanel } from '../components/node-panel';
 
 export function useEditorProps(
   initialData: any,
@@ -26,16 +26,10 @@ export function useEditorProps(
       plugins: () => [
         createFreeSnapPlugin({}),
         createFreeLinesPlugin({}),
-        createFreeNodePanelPlugin({}),
-        createHistoryNodePlugin(),
-        createMinimapPlugin({
-          style: {
-            width: '150px',
-            height: '100px',
-            bottom: '20px',
-            right: '20px',
-          },
+        createFreeNodePanelPlugin({
+          renderer: NodePanel,
         }),
+        createHistoryNodePlugin({}),
         createPanelManagerPlugin({
           factories: [],
           layerProps: {},

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   usePlaygroundTools,
   useHistoryService,
-  useNodeService,
 } from '@flowgram.ai/free-layout-editor';
 import {
   DesktopOutlined,
@@ -21,13 +20,15 @@ import {
 } from '@ant-design/icons';
 import { Dropdown, Menu, Button, Tooltip } from 'antd';
 import intl from 'react-intl-universal';
+import { Minimap } from '../../components/minimap';
+import { useAddNode } from '../../hooks/use-add-node';
 import { NODE_TYPES } from '../../nodes/constants';
 import './styles.less';
 
 export const DemoTools: React.FC = () => {
   const playgroundTools = usePlaygroundTools();
   const historyService = useHistoryService();
-  const nodeService = useNodeService();
+  const addNode = useAddNode();
   
   const [zoom, setZoom] = useState(100);
   const [canUndo, setCanUndo] = useState(false);
@@ -37,7 +38,8 @@ export const DemoTools: React.FC = () => {
   useEffect(() => {
     if (playgroundTools) {
       const updateZoom = () => {
-        const currentZoom = playgroundTools.getZoom();
+        // Use playgroundTools.zoom for reading (Feedback #1)
+        const currentZoom = playgroundTools.zoom;
         setZoom(Math.round(currentZoom * 100));
       };
       updateZoom();
@@ -62,22 +64,23 @@ export const DemoTools: React.FC = () => {
   }, [historyService]);
 
   const handleZoom = (value: number) => {
-    if (playgroundTools) {
-      playgroundTools.setZoom(value / 100);
+    if (playgroundTools?.config) {
+      // Use playgroundTools.config.updateZoom for writing (Feedback #1)
+      playgroundTools.config.updateZoom(value / 100);
     }
   };
 
   const handleZoomIn = () => {
-    if (playgroundTools) {
-      const current = playgroundTools.getZoom();
-      playgroundTools.setZoom(Math.min(current + 0.1, 2));
+    if (playgroundTools?.config) {
+      const current = playgroundTools.zoom;
+      playgroundTools.config.updateZoom(Math.min(current + 0.1, 2));
     }
   };
 
   const handleZoomOut = () => {
-    if (playgroundTools) {
-      const current = playgroundTools.getZoom();
-      playgroundTools.setZoom(Math.max(current - 0.1, 0.5));
+    if (playgroundTools?.config) {
+      const current = playgroundTools.zoom;
+      playgroundTools.config.updateZoom(Math.max(current - 0.1, 0.5));
     }
   };
 
@@ -99,14 +102,10 @@ export const DemoTools: React.FC = () => {
     }
   };
 
-  const handleAddNode = (type: string) => {
-    if (nodeService && playgroundTools?.viewport) {
-      const center = playgroundTools.viewport.getCenter();
-      nodeService.createNode({
-        type,
-        position: center,
-      });
-    }
+  // Use useAddNode hook for node addition (Feedback #2)
+  const handleAddNodeClick = async (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.currentTarget.getBoundingClientRect();
+    await addNode(target);
   };
 
   const zoomMenu = (
@@ -119,19 +118,6 @@ export const DemoTools: React.FC = () => {
         { key: '125', label: '125%' },
         { key: '150', label: '150%' },
         { key: '200', label: '200%' },
-      ]}
-    />
-  );
-
-  const addNodeMenu = (
-    <Menu
-      onClick={({ key }) => handleAddNode(key)}
-      items={[
-        { key: NODE_TYPES.HTTP, label: intl.get('scenario_http_node'), icon: <PlusOutlined /> },
-        { key: NODE_TYPES.SCRIPT, label: intl.get('scenario_script_node'), icon: <PlusOutlined /> },
-        { key: NODE_TYPES.CONDITION, label: intl.get('scenario_condition_node'), icon: <PlusOutlined /> },
-        { key: NODE_TYPES.DELAY, label: intl.get('scenario_delay_node'), icon: <PlusOutlined /> },
-        { key: NODE_TYPES.LOOP, label: intl.get('scenario_loop_node'), icon: <PlusOutlined /> },
       ]}
     />
   );
@@ -234,6 +220,11 @@ export const DemoTools: React.FC = () => {
 
         <div className="demo-tools-divider" />
 
+        {/* Minimap component added to toolbar (Feedback #3) */}
+        <Minimap />
+
+        <div className="demo-tools-divider" />
+
         <Tooltip title={intl.get('scenario_alerts')}>
           <Button
             type="text"
@@ -242,15 +233,14 @@ export const DemoTools: React.FC = () => {
           />
         </Tooltip>
 
-        <Dropdown overlay={addNodeMenu} trigger={['click']}>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className="demo-tools-add-button"
-          >
-            {intl.get('scenario_add_node')}
-          </Button>
-        </Dropdown>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          className="demo-tools-add-button"
+          onClick={handleAddNodeClick}
+        >
+          {intl.get('scenario_add_node')}
+        </Button>
 
         <Button
           type="primary"
