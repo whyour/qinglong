@@ -21,12 +21,12 @@ export function useEditorProps(
       twoWayConnection: true,
       initialData,
       nodeRegistries,
-      plugins: [
-        createFreeSnapPlugin(),
-        createFreeLinesPlugin(),
-        createFreeNodePanelPlugin(),
-        createMinimapPlugin(),
-        createPanelManagerPlugin(),
+      plugins: () => [
+        createFreeSnapPlugin({}),
+        createFreeLinesPlugin({}),
+        createFreeNodePanelPlugin({}),
+        createMinimapPlugin({}),
+        createPanelManagerPlugin({}),
       ],
       onChange: (data) => {
         console.log('Workflow changed:', data);
