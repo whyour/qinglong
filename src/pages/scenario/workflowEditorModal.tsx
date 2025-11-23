@@ -88,11 +88,11 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
 
   const getNodeTypeName = (type: NodeType): string => {
     const typeMap: Record<NodeType, string> = {
-      http: 'HTTP请求',
-      script: '脚本执行',
-      condition: '条件判断',
-      delay: '延迟',
-      loop: '循环',
+      http: intl.get('HTTP请求'),
+      script: intl.get('脚本执行'),
+      condition: intl.get('条件判断'),
+      delay: intl.get('延迟'),
+      loop: intl.get('循环'),
     };
     return typeMap[type];
   };
@@ -105,7 +105,7 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
 
     Modal.confirm({
       title: intl.get('确认删除节点'),
-      content: `${intl.get('确认')}${intl.get('删除节点')}${intl.get('吗')}？`,
+      content: intl.get('确认删除节点吗'),
       onOk: () => {
         setLocalGraph({
           ...localGraph,
