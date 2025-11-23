@@ -1,66 +1,57 @@
-/**
- * Flowgram Tools Component
- * Based on: https://github.com/bytedance/flowgram.ai/tree/main/apps/demo-free-layout/src/components/tools
- */
+import { useState, useEffect } from 'react';
 
-import React, { useState, useEffect } from 'react';
-import { Button, Tooltip, Divider } from 'antd';
-import {
-  UndoOutlined,
-  RedoOutlined,
-  PlusOutlined,
-  ZoomInOutlined,
-  ZoomOutOutlined,
-  FullscreenOutlined,
-} from '@ant-design/icons';
-import { useClientContext } from '@flowgram.ai/free-layout-editor';
+import { usePlayground, usePlaygroundTools, useRefresh } from '@flowgram.ai/fixed-layout-editor';
+import { Tooltip, Button } from 'antd';
+
 import { ZoomSelect } from './zoom-select';
-import { AddNodeDropdown } from './add-node-dropdown';
+import { SwitchVertical } from './switch-vertical';
 import { ToolContainer, ToolSection } from './styles';
+import { Save } from './save';
+import { Run } from './run';
+import { Readonly } from './readonly';
+import { MinimapSwitch } from './minimap-switch';
+import { Minimap } from './minimap';
+import { Interactive } from './interactive';
+import { FitView } from './fit-view';
+import { RedoOutlined, UndoOutlined } from '@ant-design/icons';
 
-export const FlowgramTools: React.FC = () => {
-  const { history, playground } = useClientContext();
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
+export const DemoTools = () => {
+  const tools = usePlaygroundTools();
+  const [minimapVisible, setMinimapVisible] = useState(false);
+  const playground = usePlayground();
+  const refresh = useRefresh();
 
   useEffect(() => {
-    const disposable = history.undoRedoService.onChange(() => {
-      setCanUndo(history.canUndo());
-      setCanRedo(history.canRedo());
-    });
+    const disposable = playground.config.onReadonlyOrDisabledChange(() => refresh());
     return () => disposable.dispose();
-  }, [history]);
+  }, [playground]);
 
   return (
-    <ToolContainer className="flowgram-tools">
+    <ToolContainer className="fixed-demo-tools">
       <ToolSection>
+        <Interactive />
+        <SwitchVertical />
         <ZoomSelect />
-        <Tooltip title="Fit View">
-          <Button
-            type="text"
-            icon={<FullscreenOutlined />}
-            onClick={() => playground.viewport.fitView()}
-          />
-        </Tooltip>
-        <Divider type="vertical" style={{ height: '20px', margin: '0 4px' }} />
+        <FitView fitView={tools.fitView} />
+        <MinimapSwitch minimapVisible={minimapVisible} setMinimapVisible={setMinimapVisible} />
+        <Minimap visible={minimapVisible} />
+        <Readonly />
         <Tooltip title="Undo">
           <Button
-            type="text"
             icon={<UndoOutlined />}
-            disabled={!canUndo}
-            onClick={() => history.undo()}
+            disabled={!tools.canUndo || playground.config.readonly}
+            onClick={() => tools.undo()}
           />
         </Tooltip>
         <Tooltip title="Redo">
           <Button
-            type="text"
             icon={<RedoOutlined />}
-            disabled={!canRedo}
-            onClick={() => history.redo()}
+            disabled={!tools.canRedo || playground.config.readonly}
+            onClick={() => tools.redo()}
           />
         </Tooltip>
-        <Divider type="vertical" style={{ height: '20px', margin: '0 4px' }} />
-        <AddNodeDropdown />
+        <Save disabled={playground.config.readonly} />
+        <Run />
       </ToolSection>
     </ToolContainer>
   );

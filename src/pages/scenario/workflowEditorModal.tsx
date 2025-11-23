@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Modal, message } from 'antd';
 import intl from 'react-intl-universal';
 import { WorkflowGraph } from './type';
-import FlowgramEditor, { FlowgramEditorRef } from './flowgram/FlowgramEditor';
+import { Editor } from './flowgram/editor';
 import './workflowEditor.less';
 
 interface WorkflowEditorModalProps {
@@ -18,7 +18,6 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
   onOk,
   onCancel,
 }) => {
-  const editorRef = useRef<FlowgramEditorRef>(null);
   const [editorData, setEditorData] = useState<any>(null);
 
   useEffect(() => {
@@ -51,13 +50,13 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
   }, [visible, workflowGraph]);
 
   const handleOk = () => {
-    if (!editorRef.current) {
-      message.warning(intl.get('工作流至少需要一个节点'));
-      return;
-    }
+    // if (!editorRef.current) {
+    //   message.warning(intl.get('工作流至少需要一个节点'));
+    //   return;
+    // }
 
-    const data = editorRef.current.getData();
-    
+    const data = [];
+
     // Convert Flowgram format back to our WorkflowGraph format
     const workflowGraph: WorkflowGraph = {
       nodes: data.nodes?.map((node: any) => ({
@@ -99,13 +98,11 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
       cancelText={intl.get('取消')}
       destroyOnClose
     >
-      {visible && editorData && (
-        <FlowgramEditor
-          ref={editorRef}
-          initialData={editorData}
-          onChange={handleChange}
-        />
-      )}
+      <Editor
+      // ref={editorRef}
+      // initialData={editorData}
+      // onChange={handleChange}
+      />
     </Modal>
   );
 };

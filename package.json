@@ -51,7 +51,10 @@
       }
     },
     "overrides": {
-      "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.0.3"
+      "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.0.3",
+      "@codemirror/state": "^6",
+      "@codemirror/view": "^6",
+      "@codemirror/language": "^6"
     }
   },
   "dependencies": {
@@ -105,17 +108,12 @@
     "@ant-design/pro-layout": "6.38.22",
     "@codemirror/state": "^6.4.1",
     "@codemirror/view": "^6.34.1",
-    "@flowgram.ai/free-container-plugin": "1.0.2",
-    "@flowgram.ai/free-group-plugin": "1.0.2",
-    "@flowgram.ai/free-layout-editor": "1.0.2",
-    "@flowgram.ai/free-lines-plugin": "1.0.2",
-    "@flowgram.ai/free-node-panel-plugin": "1.0.2",
-    "@flowgram.ai/free-snap-plugin": "1.0.2",
-    "@flowgram.ai/free-stack-plugin": "1.0.2",
-    "@flowgram.ai/history-node-plugin": "1.0.2",
+    "@flowgram.ai/fixed-layout-editor": "1.0.2",
+    "@flowgram.ai/form-materials": "1.0.2",
+    "@flowgram.ai/fixed-semi-materials": "1.0.2",
+    "@flowgram.ai/group-plugin": "1.0.2",
     "@flowgram.ai/minimap-plugin": "1.0.2",
     "@flowgram.ai/panel-manager-plugin": "1.0.2",
-    "@flowgram.ai/runtime-interface": "1.0.2",
     "@monaco-editor/react": "4.2.1",
     "@react-hook/resize-observer": "^2.0.2",
     "@types/body-parser": "^1.19.2",
@@ -156,6 +154,7 @@
     "axios": "^1.4.0",
     "compression-webpack-plugin": "9.2.0",
     "concurrently": "^7.0.0",
+    "classnames": "^2.5.1",
     "file-saver": "2.0.2",
     "lint-staged": "^13.0.3",
     "lodash-es": "^4.17.21",
@@ -181,6 +180,7 @@
     "react-router-dom": "6.26.1",
     "react-split-pane": "^0.1.92",
     "sockjs-client": "^1.6.0",
+    "styled-components": "^5.3.10",
     "ts-node": "^10.9.2",
     "ts-proto": "^2.6.1",
     "tslib": "^2.4.0",

@@ -1,18 +1,14 @@
-/**
- * Styled components for Flowgram tools
- */
-
 import styled from 'styled-components';
 
 export const ToolContainer = styled.div`
   position: absolute;
   bottom: 16px;
-  left: 16px;
   display: flex;
   justify-content: left;
   min-width: 360px;
   pointer-events: none;
   gap: 8px;
+
   z-index: 20;
 `;
 
@@ -27,28 +23,18 @@ export const ToolSection = styled.div`
   height: 40px;
   padding: 0 4px;
   pointer-events: auto;
-
-  .ant-btn {
-    border: none;
-    box-shadow: none;
-    
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.04);
-    }
-  }
 `;
 
 export const SelectZoom = styled.span`
-  padding: 4px 8px;
+  padding: 2px;
   border-radius: 8px;
   border: 1px solid rgba(68, 83, 130, 0.25);
   font-size: 12px;
-  min-width: 60px;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
-  
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.04);
-  }
+  width: 40px;
+`;
+
+export const MinimapContainer = styled.div`
+  position: absolute;
+  bottom: 60px;
+  width: 198px;
 `;
