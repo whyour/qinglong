@@ -617,5 +617,11 @@
   "放大": "放大",
   "缩小": "缩小",
   "适应画布": "适应画布",
-  "条件": "条件"
+  "条件": "条件",
+  "scenario_add_node": "添加节点",
+  "scenario_http_node": "HTTP 请求",
+  "scenario_script_node": "脚本执行",
+  "scenario_condition_node": "条件判断",
+  "scenario_delay_node": "延迟",
+  "scenario_loop_node": "循环"
 }

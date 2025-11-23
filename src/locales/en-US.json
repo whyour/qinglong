@@ -617,5 +617,11 @@
   "放大": "Zoom In",
   "缩小": "Zoom Out",
   "适应画布": "Fit to Canvas",
-  "条件": "Condition"
+  "条件": "Condition",
+  "scenario_add_node": "Add Node",
+  "scenario_http_node": "HTTP Request",
+  "scenario_script_node": "Script Execution",
+  "scenario_condition_node": "Condition",
+  "scenario_delay_node": "Delay",
+  "scenario_loop_node": "Loop"
 }

@@ -6,33 +6,6 @@
   position: relative;
 }
 
-.flowgram-editor-toolbar {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #d9d9d9;
-  background: #fff;
-  flex-wrap: wrap;
-  align-items: center;
-
-  .toolbar-group {
-    display: flex;
-    gap: 8px;
-    padding-right: 12px;
-    border-right: 1px solid #d9d9d9;
-
-    &:last-child {
-      border-right: none;
-    }
-  }
-
-  .toolbar-label {
-    font-size: 12px;
-    color: #666;
-    align-self: center;
-  }
-}
-
 .flowgram-editor-wrapper {
   flex: 1;
   position: relative;
@@ -57,18 +30,5 @@
 [data-theme='dark'] {
   .flowgram-editor-container {
     background: #141414;
-  }
-  
-  .flowgram-editor-toolbar {
-    background: #1f1f1f;
-    border-bottom-color: #434343;
-
-    .toolbar-group {
-      border-right-color: #434343;
-    }
-
-    .toolbar-label {
-      color: #999;
-    }
   }
 }
