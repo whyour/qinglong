@@ -12,6 +12,7 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import { EditorRenderer, FreeLayoutEditorProvider } from '@flowgram.ai/free-layout-editor';
+import { DockedPanelLayer } from '@flowgram.ai/panel-manager-plugin';
 import '@flowgram.ai/free-layout-editor/index.css';
 import intl from 'react-intl-universal';
 import { nodeRegistries } from './nodes';
@@ -141,6 +142,7 @@ const FlowgramEditor = forwardRef<FlowgramEditorRef, FlowgramEditorProps>(
           </div>
           <div className="flowgram-editor-wrapper">
             <EditorRenderer className="flowgram-editor" />
+            <DockedPanelLayer />
           </div>
         </FreeLayoutEditorProvider>
       </div>
