@@ -15,11 +15,11 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
         });
 
         // Default to single instance mode (0) for backward compatibility
-        const allowMultipleInstances =
-          existingCron?.allow_multiple_instances === 1;
+        const allowSingleInstances =
+          existingCron?.allow_multiple_instances === 0;
 
         if (
-          !allowMultipleInstances &&
+          allowSingleInstances &&
           existingCron &&
           existingCron.pid &&
           (existingCron.status === CrontabStatus.running ||

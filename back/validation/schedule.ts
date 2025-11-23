@@ -81,5 +81,5 @@ export const commonCronSchema = {
       'string.max': '日志名称不能超过100个字符',
       'string.unsafePath': '绝对路径必须在日志目录内或使用 /dev/null',
     }),
-  allow_multiple_instances: Joi.number().optional().valid(0, 1),
+  allow_multiple_instances: Joi.number().optional().valid(0, 1).allow(null),
 };
