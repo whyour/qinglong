@@ -28,11 +28,14 @@ import { Scenario, WorkflowGraph } from './type';
 import ScenarioModal from './modal';
 import WorkflowEditorModal from './workflowEditorModal';
 import './index.less';
+import { useOutletContext } from '@umijs/max';
+import { SharedContext } from '@/layouts';
 
 const { Search } = Input;
 const { Text } = Typography;
 
 const ScenarioPage: React.FC = () => {
+  const { headerStyle } = useOutletContext<SharedContext>();
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -218,9 +221,9 @@ const ScenarioPage: React.FC = () => {
       title: intl.get('状态'),
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 120,
       render: (status: number) => (
-        <Tag color={status === 1 ? 'success' : 'default'}>
+        <Tag color={status === 1 ? 'success' : 'error'}>
           {status === 1 ? intl.get('已启用') : intl.get('已禁用')}
         </Tag>
       ),
@@ -229,7 +232,7 @@ const ScenarioPage: React.FC = () => {
       title: intl.get('工作流'),
       dataIndex: 'workflowGraph',
       key: 'workflowGraph',
-      width: 120,
+      width: 150,
       render: (graph: WorkflowGraph) => (
         <Text type="secondary">
           {graph?.nodes?.length || 0} {intl.get('节点')}
@@ -240,14 +243,14 @@ const ScenarioPage: React.FC = () => {
       title: intl.get('创建时间'),
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 180,
+      width: 200,
       render: (date: string) =>
         date ? new Date(date).toLocaleString() : '-',
     },
     {
       title: intl.get('操作'),
       key: 'action',
-      width: 180,
+      width: 200,
       render: (_: any, record: Scenario) => (
         <Space>
           <Button
@@ -273,58 +276,58 @@ const ScenarioPage: React.FC = () => {
 
   return (
     <PageContainer
+      className="ql-container-wrapper scenario-wrapper"
+      title={intl.get('场景管理')}
       header={{
-        title: intl.get('场景管理'),
+        style: headerStyle,
       }}
+      extra={[
+        <Search
+          placeholder={intl.get('搜索场景')}
+          style={{ width: 300 }}
+          onSearch={(value) => {
+            setSearchValue(value);
+            fetchScenarios(value);
+          }}
+          allowClear
+        />,
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleCreate}
+        >
+          {intl.get('新建场景')}
+        </Button>,
+      ]}
     >
       <div className="scenario-page">
-        <div className="scenario-toolbar">
-          <Space>
+        {selectedRowKeys.length > 0 && (
+          <div className="scenario-toolbar">
             <Button
               type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleCreate}
+              onClick={() =>
+                handleStatusChange(selectedRowKeys as number[], 1)
+              }
             >
-              {intl.get('新建场景')}
+              {intl.get('批量启用')}
             </Button>
-            {selectedRowKeys.length > 0 && (
-              <>
-                <Button
-                  icon={<CheckCircleOutlined />}
-                  onClick={() =>
-                    handleStatusChange(selectedRowKeys as number[], 1)
-                  }
-                >
-                  {intl.get('启用场景')}
-                </Button>
-                <Button
-                  icon={<CloseCircleOutlined />}
-                  onClick={() =>
-                    handleStatusChange(selectedRowKeys as number[], 0)
-                  }
-                >
-                  {intl.get('禁用场景')}
-                </Button>
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(selectedRowKeys as number[])}
-                >
-                  {intl.get('删除')}
-                </Button>
-              </>
-            )}
-          </Space>
-          <Search
-            placeholder={intl.get('搜索场景')}
-            style={{ width: 300 }}
-            onSearch={(value) => {
-              setSearchValue(value);
-              fetchScenarios(value);
-            }}
-            allowClear
-          />
-        </div>
+            <Button
+              type="primary"
+              onClick={() =>
+                handleStatusChange(selectedRowKeys as number[], 0)
+              }
+            >
+              {intl.get('批量禁用')}
+            </Button>
+            <Button
+              danger
+              type="primary"
+              onClick={() => handleDelete(selectedRowKeys as number[])}
+            >
+              {intl.get('批量删除')}
+            </Button>
+          </div>
+        )}
 
         <Table
           rowKey="id"
