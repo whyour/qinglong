@@ -7,6 +7,7 @@ import { createMinimapPlugin } from '@flowgram.ai/minimap-plugin';
 import { createPanelManagerPlugin } from '@flowgram.ai/panel-manager-plugin';
 import { createHistoryNodePlugin } from '@flowgram.ai/history-node-plugin';
 import { FlowNodeRegistry } from '../nodes/http';
+import { createToolsPlugin } from '../plugins/tools-plugin';
 
 export function useEditorProps(
   initialData: any,
@@ -39,6 +40,7 @@ export function useEditorProps(
           factories: [],
           layerProps: {},
         }),
+        createToolsPlugin(),
       ],
       onChange: (data) => {
         console.log('Workflow changed:', data);

@@ -623,5 +623,17 @@
   "scenario_script_node": "脚本执行",
   "scenario_condition_node": "条件判断",
   "scenario_delay_node": "延迟",
-  "scenario_loop_node": "循环"
+  "scenario_loop_node": "循环",
+  "scenario_fit_view": "适应视图",
+  "scenario_grid_view": "网格视图",
+  "scenario_zoom_in": "放大",
+  "scenario_zoom_out": "缩小",
+  "scenario_fit_canvas": "适应画布",
+  "scenario_lock": "锁定",
+  "scenario_unlock": "解锁",
+  "scenario_comments": "注释",
+  "scenario_undo": "撤销",
+  "scenario_redo": "重做",
+  "scenario_alerts": "提醒",
+  "scenario_test_run": "测试运行"
 }

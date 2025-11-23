@@ -623,5 +623,17 @@
   "scenario_script_node": "Script Execution",
   "scenario_condition_node": "Condition",
   "scenario_delay_node": "Delay",
-  "scenario_loop_node": "Loop"
+  "scenario_loop_node": "Loop",
+  "scenario_fit_view": "Fit View",
+  "scenario_grid_view": "Grid View",
+  "scenario_zoom_in": "Zoom In",
+  "scenario_zoom_out": "Zoom Out",
+  "scenario_fit_canvas": "Fit Canvas",
+  "scenario_lock": "Lock",
+  "scenario_unlock": "Unlock",
+  "scenario_comments": "Comments",
+  "scenario_undo": "Undo",
+  "scenario_redo": "Redo",
+  "scenario_alerts": "Alerts",
+  "scenario_test_run": "Test Run"
 }

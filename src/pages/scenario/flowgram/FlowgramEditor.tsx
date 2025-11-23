@@ -4,7 +4,6 @@ import { DockedPanelLayer } from '@flowgram.ai/panel-manager-plugin';
 import '@flowgram.ai/free-layout-editor/index.css';
 import { nodeRegistries } from './nodes';
 import { useEditorProps } from './hooks/use-editor-props';
-import { FlowgramTools } from './components/tools';
 import './editor.less';
 
 export interface FlowgramEditorProps {
@@ -47,7 +46,6 @@ const FlowgramEditor = forwardRef<FlowgramEditorRef, FlowgramEditorProps>(
           <div className="flowgram-editor-wrapper">
             <EditorRenderer className="flowgram-editor" />
             <DockedPanelLayer />
-            <FlowgramTools />
           </div>
         </FreeLayoutEditorProvider>
       </div>
