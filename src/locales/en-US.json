@@ -600,5 +600,14 @@
   "启用场景": "Enable Scenario",
   "禁用场景": "Disable Scenario",
   "确认启用场景": "Confirm to enable scenario",
-  "确认禁用场景": "Confirm to disable scenario"
+  "确认禁用场景": "Confirm to disable scenario",
+  "工作流至少需要一个节点": "Workflow requires at least one node",
+  "工作流验证通过": "Workflow validation passed",
+  "请输入URL": "Please enter URL",
+  "请输入条件表达式": "Please enter condition expression",
+  "请输入延迟时间": "Please enter delay time",
+  "请输入迭代次数": "Please enter iterations",
+  "获取场景列表失败": "Failed to fetch scenario list",
+  "搜索场景": "Search scenarios",
+  "节点": "Nodes"
 }

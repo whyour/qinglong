@@ -147,10 +147,10 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
 
   const validateWorkflow = () => {
     if (localGraph.nodes.length === 0) {
-      message.warning('工作流至少需要一个节点');
+      message.warning(intl.get('工作流至少需要一个节点'));
       return false;
     }
-    message.success('工作流验证通过');
+    message.success(intl.get('工作流验证通过'));
     return true;
   };
 
@@ -201,7 +201,7 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
             <Form.Item
               name="url"
               label={intl.get('请求URL')}
-              rules={[{ required: true, message: '请输入URL' }]}
+              rules={[{ required: true, message: intl.get('请输入URL') }]}
             >
               <Input placeholder="https://api.example.com/endpoint" />
             </Form.Item>
@@ -243,7 +243,7 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
           <Form.Item
             name="condition"
             label={intl.get('条件表达式')}
-            rules={[{ required: true, message: '请输入条件表达式' }]}
+            rules={[{ required: true, message: intl.get('请输入条件表达式') }]}
           >
             <TextArea
               rows={4}
@@ -256,7 +256,7 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
           <Form.Item
             name="delayMs"
             label={`${intl.get('延迟时间')} (毫秒)`}
-            rules={[{ required: true, message: '请输入延迟时间' }]}
+            rules={[{ required: true, message: intl.get('请输入延迟时间') }]}
           >
             <InputNumber
               min={0}
@@ -270,7 +270,7 @@ const WorkflowEditorModal: React.FC<WorkflowEditorModalProps> = ({
           <Form.Item
             name="iterations"
             label={intl.get('迭代次数')}
-            rules={[{ required: true, message: '请输入迭代次数' }]}
+            rules={[{ required: true, message: intl.get('请输入迭代次数') }]}
           >
             <InputNumber
               min={1}

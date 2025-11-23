@@ -60,7 +60,7 @@ const ScenarioPage: React.FC = () => {
         setScenarios(data?.data || []);
       }
     } catch (error) {
-      message.error('获取场景列表失败');
+      message.error(intl.get('获取场景列表失败'));
     } finally {
       setLoading(false);
     }
