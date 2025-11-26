@@ -562,6 +562,8 @@ export default class NotificationService {
     };
 
     // Add signature if secret is provided
+    // Note: Feishu's signature algorithm uses timestamp+"\n"+secret as the HMAC key
+    // and signs an empty message, which differs from typical HMAC usage
     if (larkSecret) {
       const timestamp = Math.floor(Date.now() / 1000).toString();
       const stringToSign = `${timestamp}\n${larkSecret}`;

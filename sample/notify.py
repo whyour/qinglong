@@ -236,6 +236,8 @@ def feishu_bot(title: str, content: str) -> None:
     data = {"msg_type": "text", "content": {"text": f"{title}\n\n{content}"}}
 
     # Add signature if secret is provided
+    # Note: Feishu's signature algorithm uses timestamp+"\n"+secret as the HMAC key
+    # and signs an empty message, which differs from typical HMAC usage
     if push_config.get("FSSECRET"):
         timestamp = str(int(time.time()))
         string_to_sign = f'{timestamp}\n{push_config.get("FSSECRET")}'

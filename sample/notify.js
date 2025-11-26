@@ -995,6 +995,8 @@ function fsBotNotify(text, desp) {
       const body = { msg_type: 'text', content: { text: `${text}\n\n${desp}` } };
 
       // Add signature if secret is provided
+      // Note: Feishu's signature algorithm uses timestamp+"\n"+secret as the HMAC key
+      // and signs an empty message, which differs from typical HMAC usage
       if (FSSECRET) {
         const crypto = require('crypto');
         const timestamp = Math.floor(Date.now() / 1000).toString();
