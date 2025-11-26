@@ -550,19 +550,33 @@ export default class NotificationService {
   }
 
   private async lark() {
-    let { larkKey } = this.params;
+    let { larkKey, larkSecret } = this.params;
 
     if (!larkKey.startsWith('http')) {
       larkKey = `https://open.feishu.cn/open-apis/bot/v2/hook/${larkKey}`;
     }
 
+    const body: Record<string, any> = {
+      msg_type: 'text',
+      content: { text: `${this.title}\n\n${this.content}` },
+    };
+
+    // Add signature if secret is provided
+    // Note: Feishu's signature algorithm uses timestamp+"\n"+secret as the HMAC key
+    // and signs an empty message, which differs from typical HMAC usage
+    if (larkSecret) {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const stringToSign = `${timestamp}\n${larkSecret}`;
+      const hmac = crypto.createHmac('sha256', stringToSign);
+      const sign = hmac.digest('base64');
+      body.timestamp = timestamp;
+      body.sign = sign;
+    }
+
     try {
       const res = await httpClient.post(larkKey, {
         ...this.gotOption,
-        json: {
-          msg_type: 'text',
-          content: { text: `${this.title}\n\n${this.content}` },
-        },
+        json: body,
         headers: { 'Content-Type': 'application/json' },
       });
       if (res.StatusCode === 0 || res.code === 0) {

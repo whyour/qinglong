@@ -52,6 +52,7 @@ const push_config = {
   DD_BOT_TOKEN: '', // 钉钉机器人的 DD_BOT_TOKEN
 
   FSKEY: '', // 飞书机器人的 FSKEY
+  FSSECRET: '', // 飞书机器人的 FSSECRET，对应安全设置里的签名校验密钥
 
   // 推送到个人QQ：http://127.0.0.1/send_private_msg
   // 群：http://127.0.0.1/send_group_msg
@@ -989,11 +990,26 @@ function aibotkNotify(text, desp) {
 
 function fsBotNotify(text, desp) {
   return new Promise((resolve) => {
-    const { FSKEY } = push_config;
+    const { FSKEY, FSSECRET } = push_config;
     if (FSKEY) {
+      const body = { msg_type: 'text', content: { text: `${text}\n\n${desp}` } };
+
+      // Add signature if secret is provided
+      // Note: Feishu's signature algorithm uses timestamp+"\n"+secret as the HMAC key
+      // and signs an empty message, which differs from typical HMAC usage
+      if (FSSECRET) {
+        const crypto = require('crypto');
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const stringToSign = `${timestamp}\n${FSSECRET}`;
+        const hmac = crypto.createHmac('sha256', stringToSign);
+        const sign = hmac.digest('base64');
+        body.timestamp = timestamp;
+        body.sign = sign;
+      }
+
       const options = {
         url: `https://open.feishu.cn/open-apis/bot/v2/hook/${FSKEY}`,
-        json: { msg_type: 'text', content: { text: `${text}\n\n${desp}` } },
+        json: body,
         headers: {
           'Content-Type': 'application/json',
         },

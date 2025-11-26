@@ -49,6 +49,7 @@ push_config = {
     'DD_BOT_TOKEN': '',                 # 钉钉机器人的 DD_BOT_TOKEN
 
     'FSKEY': '',                        # 飞书机器人的 FSKEY
+    'FSSECRET': '',                     # 飞书机器人的 FSSECRET，对应安全设置里的签名校验密钥
 
     'GOBOT_URL': '',                    # go-cqhttp
                                         # 推送到个人QQ：http://127.0.0.1/send_private_msg
@@ -233,6 +234,20 @@ def feishu_bot(title: str, content: str) -> None:
 
     url = f'https://open.feishu.cn/open-apis/bot/v2/hook/{push_config.get("FSKEY")}'
     data = {"msg_type": "text", "content": {"text": f"{title}\n\n{content}"}}
+
+    # Add signature if secret is provided
+    # Note: Feishu's signature algorithm uses timestamp+"\n"+secret as the HMAC key
+    # and signs an empty message, which differs from typical HMAC usage
+    if push_config.get("FSSECRET"):
+        timestamp = str(int(time.time()))
+        string_to_sign = f'{timestamp}\n{push_config.get("FSSECRET")}'
+        hmac_code = hmac.new(
+            string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
+        ).digest()
+        sign = base64.b64encode(hmac_code).decode("utf-8")
+        data["timestamp"] = timestamp
+        data["sign"] = sign
+
     response = requests.post(url, data=json.dumps(data)).json()
 
     if response.get("StatusCode") == 0 or response.get("code") == 0:

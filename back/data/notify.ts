@@ -142,6 +142,7 @@ export class WebhookNotification extends NotificationBaseInfo {
 
 export class LarkNotification extends NotificationBaseInfo {
   public larkKey = '';
+  public larkSecret = '';
 }
 
 export class NtfyNotification extends NotificationBaseInfo {

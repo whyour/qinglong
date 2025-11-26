@@ -395,6 +395,12 @@ export default {
         ),
         required: true,
       },
+      {
+        label: 'larkSecret',
+        tip: intl.get(
+          '飞书群组机器人加签密钥，安全设置中开启签名校验后获得',
+        ),
+      },
     ],
     email: [
       {
