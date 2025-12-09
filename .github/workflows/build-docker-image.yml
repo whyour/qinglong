@@ -129,6 +129,13 @@ jobs:
         with:
           cache: "pnpm"
 
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
       - name: Setup timezone
         uses: szenius/set-timezone@v2.0
         with:
@@ -154,19 +161,13 @@ jobs:
           images: |
             ${{ github.repository }}
             ghcr.io/${{ github.repository }}
-          # generate Docker tags based on the following events/attributes
-          #   nightly, master, pr-2, 1.2.3, 1.2, 1
           flavor: |
             latest=false
           tags: |
-            type=schedule,pattern=nightly
-            type=edge
-            type=ref,event=pr
             type=ref,event=branch,enable=${{ github.ref != format('refs/heads/{0}', 'master') }}
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -216,6 +217,13 @@ jobs:
         with:
           cache: "pnpm"
 
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
       - name: Setup timezone
         uses: szenius/set-timezone@v2.0
         with:
@@ -254,7 +262,9 @@ jobs:
           context: .
           file: ./docker/310.Dockerfile
           push: true
-          tags: whyour/qinglong:python3.10
+          tags: |
+            whyour/qinglong:python3.10
+            whyour/qinglong:${{ steps.version.outputs.version }}-python3.10
           cache-from: type=registry,ref=whyour/qinglong:cache-python3.10
           cache-to: type=registry,ref=whyour/qinglong:cache-python3.10,mode=max
 
