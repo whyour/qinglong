@@ -167,7 +167,7 @@ jobs:
           tags: |
             type=ref,event=branch,enable=${{ github.ref == format('refs/heads/{0}', 'develop') }}
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
-            type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=${{ steps.version.outputs.version }}-debian,enable=${{ github.ref == format('refs/heads/{0}', 'debian') }}
             type=semver,pattern={{version}}
 
       - name: Set up QEMU
