@@ -93,16 +93,15 @@ log_with_style() {
   printf "\n[%s] [%7s]  %s\n" "${timestamp}" "${level}" "${message}"
 }
 
-log_with_style "INFO" "🚀 1. 检测配置文件..."
+log_with_style "INFO" "🚀  1. 检测配置文件..."
 import_config "$@"
 make_dir /etc/nginx/conf.d
 make_dir /run/nginx
-init_nginx
 fix_config
 
 pm2 l &>/dev/null
 
-log_with_style "INFO" "🔄 2. 启动 nginx..."
+log_with_style "INFO" "🔄  2. 启动 nginx..."
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 
 log_with_style "INFO" "⚙️  3. 启动 pm2 服务..."
