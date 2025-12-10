@@ -176,6 +176,7 @@ export default (app: Router) => {
           path,
           `${originFilename.replace(/\//g, '')}`,
         );
+        await fs.mkdir(path, { recursive: true });
         const filePath = join(path, `${filename.replace(/\//g, '')}`);
         const fileExists = await fileExist(filePath);
         if (fileExists) {

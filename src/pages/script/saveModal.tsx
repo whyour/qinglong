@@ -16,7 +16,7 @@ const SaveModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const payload = { ...file, ...values, originFilename: file.title };
+    const payload = { ...values, originFilename: file.title, content: file.content };
     request
       .post(`${config.apiPrefix}scripts`, payload)
       .then(({ code, data }) => {
