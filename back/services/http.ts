@@ -19,6 +19,17 @@ export class HttpServerService {
           resolve(this.server);
         });
 
+        // Configure server timeouts for better compatibility with reverse proxies
+        // Set keepAliveTimeout to 65 seconds (longer than Apache's default KeepAliveTimeout of 5s)
+        // This prevents "Connection reset by peer" errors with Apache reverse proxy
+        if (this.server) {
+          this.server.keepAliveTimeout = 65000; // 65 seconds
+          // headersTimeout should be slightly longer than keepAliveTimeout
+          this.server.headersTimeout = 66000; // 66 seconds
+          // Set a reasonable request timeout
+          this.server.requestTimeout = 120000; // 120 seconds
+        }
+
         this.server?.on('error', (err: Error) => {
           Logger.error('Failed to start HTTP service:', err);
           reject(err);
