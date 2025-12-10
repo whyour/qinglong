@@ -1,10 +1,47 @@
-version: 2.19.2
-changeLogLink: https://t.me/jiao_long/431
-publishTime: 2025-06-27 23:59
+version: 2.20.0
+changeLogLink: https://t.me/jiao_long/432
+publishTime: 2025-12-10 01:05
 changeLog: |
-  1. 备份数据支持选择模块，支持清除依赖缓存
-  2. QLAPI 和 openapi 的 systemNotify 支持自定义通知类型和参数
-  3. ntfy 增加可选的认证与用户动作，感谢 https://github.com/liheji
-  4. 修复取消安装依赖
-  5. 修复环境变量过大解析报错
-  6. 修改服务启动方式
+  1. 定时任务（cron / task）相关的大量修复 & 增强
+
+  修复 cron 解析错误（修复 parse cron / 升级 cron-parser）
+  修复集群模式下定时任务可能不执行（race condition）
+  定时任务支持订阅筛选
+  定时任务支持排序调整
+  定时任务支持自定义日志文件或无日志
+  修复任务实例默认值
+  任务支持单实例 / 多实例模式
+  修复 task 命令软链可能失败问题
+
+  2. 日志系统相关的大更新
+
+  修复日志目录逻辑
+  修复 pm2 日志目录
+  优化日志写入（stream pooling）
+
+  3. 环境变量（env）系统的改进与修复
+
+  修复环境变量复制到剪贴板时可能失败
+  添加环境变量“置顶”功能
+  修复 QlPort 与 QlGrpcPort 环境变量在 host network 模式下被忽略
+  增加全局 SSH 私钥配置
+
+  4. Docker / 非 root 用户 / Alpine 兼容性增强
+
+  新增非 root Docker 用户支持，自动初始化命令
+  修复 Alpine 容器 DNS 解析失败（设置 ndots:0）
+  修复 PM2 在 ARM 路由器（Node.js 不兼容）上的启动失败
+  移除 nginx（可能是考虑更轻量的镜像运行）
+
+  5. API 安全与校验增强
+
+  Dependencies GET endpoint 增加校验
+  Script API routes 增加输入校验
+  修复 JWT 认证问题
+  Feishu 机器人通知增加签名校验
+  QLAPI 增加 cron task 管理功能
+  修复 URIError（错误 cookie 导致白屏）
+
+  6. 系统设置
+
+  新增多终端/多平台的并发登录会话支持
