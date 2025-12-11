@@ -130,7 +130,7 @@ export default (app: Router) => {
         originFilename: Joi.string().optional().allow(''),
         directory: Joi.string().optional().allow(''),
         file: Joi.string().optional().allow(''),
-      }),
+      }).unknown(true),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
