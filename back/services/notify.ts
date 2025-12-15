@@ -259,7 +259,7 @@ export default class NotificationService {
     let agent;
     if (telegramBotProxyHost && telegramBotProxyPort) {
       agent = new ProxyAgent({
-        uri: `http://${authStr}${telegramBotProxyHost}:${telegramBotProxyPort}`,
+        uri: `http://${authStr}@${telegramBotProxyHost}:${telegramBotProxyPort}`,
       });
     }
     try {

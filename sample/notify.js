@@ -484,7 +484,7 @@ function tgBotNotify(text, desp) {
       if (TG_PROXY_HOST && TG_PROXY_PORT) {
         let agent;
         agent = new ProxyAgent({
-          uri: `http://${TG_PROXY_AUTH}${TG_PROXY_HOST}:${TG_PROXY_PORT}`,
+          uri: `http://${TG_PROXY_AUTH}@${TG_PROXY_HOST}:${TG_PROXY_PORT}`,
         });
         options.dispatcher = agent;
       }
