@@ -107,7 +107,7 @@ export default class DependenceService {
     query: any = {},
   ): Promise<Dependence[]> {
     let condition = query;
-    if (DependenceTypes[type]) {
+    if (type && DependenceTypes[type] !== undefined) {
       condition.type = DependenceTypes[type];
     }
     if (status) {
