@@ -482,9 +482,13 @@ function tgBotNotify(text, desp) {
         timeout,
       };
       if (TG_PROXY_HOST && TG_PROXY_PORT) {
+        let proxyHost = TG_PROXY_HOST;
+        if (TG_PROXY_AUTH && !TG_PROXY_HOST.includes('@')) {
+          proxyHost = `${TG_PROXY_AUTH}@${TG_PROXY_HOST}`;
+        }
         let agent;
         agent = new ProxyAgent({
-          uri: `http://${TG_PROXY_AUTH}${TG_PROXY_HOST}:${TG_PROXY_PORT}`,
+          uri: `http://${proxyHost}:${TG_PROXY_PORT}`,
         });
         options.dispatcher = agent;
       }
