@@ -30,8 +30,13 @@ export default ({ app }: { app: Application }) => {
 
   // Create base-URL-aware whitelist for JWT
   const jwtWhitelist = config.apiWhiteList.map(path => `${config.baseUrl}${path}`);
-  // Allow all paths that don't contain /api/ or /open/ to skip JWT
-  const jwtExcludeRegex = /^\/(?!.*\/(api|open)\/)/;
+  // Exclude non-API/non-open paths from JWT requirement
+  // When baseUrl is set: exclude paths that don't start with baseUrl/api/ or baseUrl/open/
+  // When baseUrl is empty: exclude paths that don't start with /api/ or /open/
+  const jwtExcludePattern = config.baseUrl
+    ? `^(?!${config.baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(api|open)/)`
+    : '^(?!/(api|open)/)';
+  const jwtExcludeRegex = new RegExp(jwtExcludePattern);
 
   app.use(
     expressjwt({
@@ -79,7 +84,7 @@ export default ({ app }: { app: Application }) => {
       }
     }
 
-    const originPath = `${req.baseUrl}${req.path === '/' ? '' : req.path}`;
+    const originPath = `${config.baseUrl}${req.path === '/' ? '' : req.path}`;
     if (
       !headerToken &&
       originPath &&

@@ -92,7 +92,10 @@ const apiWhiteListBase = [
   '/api/user/notification/init',
 ];
 
-const apiWhiteList = apiWhiteListBase.map(path => `${config.baseUrl}${path.replace(/^\//, '')}`);
+const apiWhiteList = config.baseUrl 
+  ? apiWhiteListBase.map(path => `${config.baseUrl}${path.replace(/^\//, '')}`)
+  : apiWhiteListBase;
+
 
 _request.interceptors.request.use((_config) => {
   const token = localStorage.getItem(config.authKey);
