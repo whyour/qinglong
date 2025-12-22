@@ -231,6 +231,7 @@ message NotificationInfo {
   optional string webhookContentType = 57;
 
   optional string larkKey = 58;
+  optional string larkSecret = 69;
 
   optional string ntfyUrl = 59;
   optional string ntfyTopic = 60;
