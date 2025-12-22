@@ -22,21 +22,22 @@ export default ({ app }: { app: Application }) => {
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   const frontendPath = path.join(config.rootPath, 'static/dist');
-  if (config.baseUrl) {
-    app.use(config.baseUrl, express.static(frontendPath));
-  } else {
-    app.use(express.static(frontendPath));
-  }
+  // Serve frontend static files at baseUrl (or root if baseUrl is empty)
+  app.use(config.baseUrl || '/', express.static(frontendPath));
 
   // Create base-URL-aware whitelist for JWT
   // When baseUrl is empty, paths remain as-is (e.g., '/api/user/login')
   // When baseUrl is set, paths are prefixed (e.g., '/qinglong/api/user/login')
   const jwtWhitelist = config.apiWhiteList.map(path => `${config.baseUrl}${path}`);
+  
+  // Helper to escape special regex characters
+  const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
   // Exclude non-API/non-open paths from JWT requirement
   // When baseUrl is set: exclude paths that don't start with baseUrl/api/ or baseUrl/open/
   // When baseUrl is empty: exclude paths that don't start with /api/ or /open/
   const jwtExcludePattern = config.baseUrl
-    ? `^(?!${config.baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(api|open)/)`
+    ? `^(?!${escapeRegex(config.baseUrl)}/(api|open)/)`
     : '^(?!/(api|open)/)';
   const jwtExcludeRegex = new RegExp(jwtExcludePattern);
 
@@ -87,7 +88,9 @@ export default ({ app }: { app: Application }) => {
     }
 
     // req.path already includes the full path with baseUrl
-    // e.g., when baseUrl=/qinglong and request is /qinglong/api/user/login, req.path=/qinglong/api/user/login
+    // Previous logic used req.baseUrl (Express mount path) which is empty in our case
+    // since middleware is not mounted on a sub-router
+    // e.g., when request is /qinglong/api/user/login, req.path=/qinglong/api/user/login
     const originPath = req.path;
     if (
       !headerToken &&
