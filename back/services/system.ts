@@ -280,9 +280,6 @@ export default class SystemService {
             type: 'updateLinuxMirror',
             message: 'Warning: Unable to detect current mirror. Please manually configure /etc/apt/sources.list',
           });
-        } else if (targetDomain) {
-          // Fallback: just update package lists
-          command = `apt-get update`;
         }
       } catch (error) {
         this.logger.error('Failed to read /etc/apt/sources.list', error);
@@ -307,7 +304,8 @@ export default class SystemService {
         // Escape backslashes first, then other special characters
         command = `sed -i 's/${defaultDomain
           .replace(/\\/g, '\\\\')  // Escape backslashes first
-          .replace(/\//g, '\\/')}/${targetDomain
+          .replace(/\//g, '\\/')   // Escape forward slashes
+          .replace(/\./g, '\\.')}/${targetDomain
           .replace(/\\/g, '\\\\')  // Escape backslashes first
           .replace(/\//g, '\\/')}/g' /etc/apk/repositories && apk update -f`;
       } catch (error) {
