@@ -133,7 +133,10 @@ export default async () => {
 
   // 初始化更新所有任务状态为空闲
   // 但保留仍在运行的任务的状态
-  const allCrons = await CrontabModel.findAll({ raw: true });
+  const allCrons = await CrontabModel.findAll({
+    attributes: ['id', 'pid'],
+    raw: true,
+  });
   const idsToReset: number[] = [];
   
   for (const cron of allCrons) {
