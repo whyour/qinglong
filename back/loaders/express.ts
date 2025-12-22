@@ -83,7 +83,7 @@ export default ({ app }: { app: Application }) => {
     if (
       !headerToken &&
       originPath &&
-      config.apiWhiteList.includes(originPath)
+      jwtWhitelist.includes(originPath)
     ) {
       return next();
     }
