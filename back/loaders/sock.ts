@@ -5,9 +5,10 @@ import SockService from '../services/sock';
 import { getPlatform } from '../config/util';
 import { shareStore } from '../shared/store';
 import { isValidToken } from '../shared/auth';
+import config from '../config';
 
 export default async ({ server }: { server: Server }) => {
-  const echo = sockJs.createServer({ prefix: '/api/ws', log: () => {} });
+  const echo = sockJs.createServer({ prefix: `${config.baseUrl}/api/ws`, log: () => {} });
   const sockService = Container.get(SockService);
 
   echo.on('connection', async (conn) => {

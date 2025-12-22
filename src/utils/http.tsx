@@ -83,7 +83,7 @@ let _request = axios.create({
   params: { t: time },
 });
 
-const apiWhiteList = [
+const apiWhiteListBase = [
   '/api/user/login',
   '/open/auth/token',
   '/api/user/two-factor/login',
@@ -91,6 +91,8 @@ const apiWhiteList = [
   '/api/user/init',
   '/api/user/notification/init',
 ];
+
+const apiWhiteList = apiWhiteListBase.map(path => `${config.baseUrl}${path.replace(/^\//, '')}`);
 
 _request.interceptors.request.use((_config) => {
   const token = localStorage.getItem(config.authKey);
