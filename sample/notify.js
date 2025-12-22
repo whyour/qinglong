@@ -996,7 +996,10 @@ function fsBotNotify(text, desp) {
   return new Promise((resolve) => {
     const { FSKEY, FSSECRET } = push_config;
     if (FSKEY) {
-      const body = { msg_type: 'text', content: { text: `${text}\n\n${desp}` } };
+      const body = {
+        msg_type: 'text',
+        content: { text: `${text}\n\n${desp}` },
+      };
 
       // Add signature if secret is provided
       // Note: Feishu's signature algorithm uses timestamp+"\n"+secret as the HMAC key
@@ -1282,7 +1285,15 @@ function ntfyNotify(text, desp) {
   }
 
   return new Promise((resolve) => {
-    const { NTFY_URL, NTFY_TOPIC, NTFY_PRIORITY, NTFY_TOKEN, NTFY_USERNAME, NTFY_PASSWORD, NTFY_ACTIONS } = push_config;
+    const {
+      NTFY_URL,
+      NTFY_TOPIC,
+      NTFY_PRIORITY,
+      NTFY_TOKEN,
+      NTFY_USERNAME,
+      NTFY_PASSWORD,
+      NTFY_ACTIONS,
+    } = push_config;
     if (NTFY_TOPIC) {
       const options = {
         url: `${NTFY_URL || 'https://ntfy.sh'}/${NTFY_TOPIC}`,
@@ -1297,7 +1308,8 @@ function ntfyNotify(text, desp) {
       if (NTFY_TOKEN) {
         options.headers['Authorization'] = `Bearer ${NTFY_TOKEN}`;
       } else if (NTFY_USERNAME && NTFY_PASSWORD) {
-        options.headers['Authorization'] = `Basic ${Buffer.from(`${NTFY_USERNAME}:${NTFY_PASSWORD}`).toString('base64')}`;
+        options.headers['Authorization'] =
+          `Basic ${Buffer.from(`${NTFY_USERNAME}:${NTFY_PASSWORD}`).toString('base64')}`;
       }
       if (NTFY_ACTIONS) {
         options.headers['Actions'] = encodeRFC2047(NTFY_ACTIONS);
