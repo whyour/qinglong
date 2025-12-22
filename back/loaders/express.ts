@@ -84,7 +84,7 @@ export default ({ app }: { app: Application }) => {
       }
     }
 
-    const originPath = `${config.baseUrl}${req.path === '/' ? '' : req.path}`;
+    const originPath = req.path;
     if (
       !headerToken &&
       originPath &&

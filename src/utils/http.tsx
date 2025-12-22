@@ -92,7 +92,8 @@ const apiWhiteListBase = [
   '/api/user/notification/init',
 ];
 
-const apiWhiteList = config.baseUrl 
+// Only modify paths if baseUrl is set and not the default '/'
+const apiWhiteList = config.baseUrl && config.baseUrl !== '/'
   ? apiWhiteListBase.map(path => `${config.baseUrl}${path.replace(/^\//, '')}`)
   : apiWhiteListBase;
 
