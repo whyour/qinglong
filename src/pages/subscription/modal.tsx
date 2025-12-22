@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import { CronExpressionParser } from 'cron-parser';
+import cronParser from 'cron-parser';
 import isNil from 'lodash/isNil';
 
 const { Option } = Select;
@@ -378,13 +378,17 @@ const SubscriptionModal = ({
             { required: true },
             {
               validator: (rule, value) => {
-                if (
-                  scheduleType === 'interval' ||
-                  !value ||
-                  CronExpressionParser.parse(value).hasNext()
-                ) {
-                  return Promise.resolve();
-                } else {
+                try {
+                  if (
+                    scheduleType === 'interval' ||
+                    !value ||
+                    cronParser.CronExpressionParser.parse(value).hasNext()
+                  ) {
+                    return Promise.resolve();
+                  } else {
+                    return Promise.reject(intl.get('Subscription表达式格式有误'));
+                  }
+                } catch (e) {
                   return Promise.reject(intl.get('Subscription表达式格式有误'));
                 }
               },

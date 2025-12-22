@@ -1,6 +1,6 @@
 import intl from 'react-intl-universal';
 import { LANG_MAP, LOG_END_SYMBOL } from './const';
-import { CronExpressionParser } from 'cron-parser';
+import cronParser from 'cron-parser';
 import { ICrontab } from '@/pages/crontab/type';
 
 export default function browserType() {
@@ -333,7 +333,7 @@ export function getCommandScript(
 
 export function parseCrontab(schedule: string): Date | null {
   try {
-    const time = CronExpressionParser.parse(schedule);
+    const time = cronParser.CronExpressionParser.parse(schedule);
     if (time) {
       return time.next().toDate();
     }
