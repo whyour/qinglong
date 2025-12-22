@@ -398,8 +398,8 @@ export function psTree(pid: number): Promise<number[]> {
 }
 
 export function isPidRunning(pid: number): boolean {
-  // Validate PID is a positive integer
-  if (!pid || pid <= 0 || !Number.isInteger(pid)) {
+  // Validate PID: must be a positive integer
+  if (pid == null || pid <= 0 || !Number.isInteger(pid)) {
     return false;
   }
   

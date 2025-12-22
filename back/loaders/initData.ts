@@ -143,7 +143,9 @@ export default async () => {
       continue;
     }
     // 收集需要重置的任务 ID
-    idsToReset.push(cron.id!);
+    if (cron.id) {
+      idsToReset.push(cron.id);
+    }
   }
   
   // 批量更新所有需要重置的任务
