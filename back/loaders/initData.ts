@@ -134,16 +134,23 @@ export default async () => {
   // 初始化更新所有任务状态为空闲
   // 但保留仍在运行的任务的状态
   const allCrons = await CrontabModel.findAll({ raw: true });
+  const idsToReset: number[] = [];
+  
   for (const cron of allCrons) {
     // 如果任务有 PID 且进程仍在运行，则保持其状态
     if (cron.pid && isPidRunning(cron.pid)) {
       // 保留当前状态（running 或 queued）
       continue;
     }
-    // 否则将状态重置为 idle，并清除 PID
+    // 收集需要重置的任务 ID
+    idsToReset.push(cron.id!);
+  }
+  
+  // 批量更新所有需要重置的任务
+  if (idsToReset.length > 0) {
     await CrontabModel.update(
       { status: CrontabStatus.idle, pid: undefined },
-      { where: { id: cron.id } }
+      { where: { id: { [Op.in]: idsToReset } } }
     );
   }
 

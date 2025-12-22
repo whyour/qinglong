@@ -398,6 +398,11 @@ export function psTree(pid: number): Promise<number[]> {
 }
 
 export function isPidRunning(pid: number): boolean {
+  // Validate PID is a positive integer
+  if (!pid || pid <= 0 || !Number.isInteger(pid)) {
+    return false;
+  }
+  
   try {
     // Signal 0 doesn't kill the process, just checks if it exists
     process.kill(pid, 0);
