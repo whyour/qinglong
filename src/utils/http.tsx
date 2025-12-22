@@ -83,7 +83,7 @@ let _request = axios.create({
   params: { t: time },
 });
 
-const apiWhiteListBase = [
+const apiWhiteList = [
   '/api/user/login',
   '/open/auth/token',
   '/api/user/two-factor/login',
@@ -91,14 +91,6 @@ const apiWhiteListBase = [
   '/api/user/init',
   '/api/user/notification/init',
 ];
-
-// Only modify paths if baseUrl is set and not the default '/'
-// Note: Frontend baseUrl always ends with '/' (from serverEnv.ts normalization)
-// so we remove the leading '/' from paths before concatenation
-const apiWhiteList = config.baseUrl && config.baseUrl !== '/'
-  ? apiWhiteListBase.map(path => `${config.baseUrl}${path.substring(1)}`)
-  : apiWhiteListBase;
-
 
 _request.interceptors.request.use((_config) => {
   const token = localStorage.getItem(config.authKey);

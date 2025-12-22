@@ -15,38 +15,28 @@ import path from 'path';
 export default ({ app }: { app: Application }) => {
   app.set('trust proxy', 'loopback');
   app.use(cors());
-  app.get(`${config.baseUrl}${config.api.prefix}/env.js`, serveEnv);
-  app.use(`${config.baseUrl}${config.api.prefix}/static`, express.static(config.uploadPath));
+  
+  // Rewrite URLs to strip baseUrl prefix if configured
+  // This allows the rest of the app to work without baseUrl awareness
+  if (config.baseUrl) {
+    app.use(rewrite(`${config.baseUrl}/*`, '/$1'));
+  }
+  
+  app.get(`${config.api.prefix}/env.js`, serveEnv);
+  app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
 
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   const frontendPath = path.join(config.rootPath, 'static/dist');
-  // Serve frontend static files at baseUrl (or root if baseUrl is empty)
-  app.use(config.baseUrl || '/', express.static(frontendPath));
-
-  // Create base-URL-aware whitelist for JWT
-  // When baseUrl is empty, paths remain as-is (e.g., '/api/user/login')
-  // When baseUrl is set, paths are prefixed (e.g., '/qinglong/api/user/login')
-  const jwtWhitelist = config.apiWhiteList.map(path => `${config.baseUrl}${path}`);
-  
-  // Helper to escape special regex characters
-  const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
-  // Exclude non-API/non-open paths from JWT requirement
-  // When baseUrl is set: exclude paths that don't start with baseUrl/api/ or baseUrl/open/
-  // When baseUrl is empty: exclude paths that don't start with /api/ or /open/
-  const jwtExcludePattern = config.baseUrl
-    ? `^(?!${escapeRegex(config.baseUrl)}/(api|open)/)`
-    : '^(?!/(api|open)/)';
-  const jwtExcludeRegex = new RegExp(jwtExcludePattern);
+  app.use(express.static(frontendPath));
 
   app.use(
     expressjwt({
       secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
-      path: [...jwtWhitelist, jwtExcludeRegex],
+      path: [...config.apiWhiteList, /^\/(?!api\/).*/],
     }),
   );
 
@@ -61,14 +51,12 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req: Request, res, next) => {
-    const apiPath = `${config.baseUrl}/api/`;
-    const openPath = `${config.baseUrl}/open/`;
-    if (![openPath, apiPath].some((x) => req.path.startsWith(x))) {
+    if (!['/open/', '/api/'].some((x) => req.path.startsWith(x))) {
       return next();
     }
 
     const headerToken = getToken(req);
-    if (req.path.startsWith(openPath)) {
+    if (req.path.startsWith('/open/')) {
       const apps = await shareStore.getApps();
       const doc = apps?.filter((x) =>
         x.tokens?.find((y) => y.value === headerToken),
@@ -87,15 +75,11 @@ export default ({ app }: { app: Application }) => {
       }
     }
 
-    // req.path already includes the full path with baseUrl
-    // Previous logic used req.baseUrl (Express mount path) which is empty in our case
-    // since middleware is not mounted on a sub-router
-    // e.g., when request is /qinglong/api/user/login, req.path=/qinglong/api/user/login
-    const originPath = req.path;
+    const originPath = `${req.baseUrl}${req.path === '/' ? '' : req.path}`;
     if (
       !headerToken &&
       originPath &&
-      jwtWhitelist.includes(originPath)
+      config.apiWhiteList.includes(originPath)
     ) {
       return next();
     }
@@ -114,8 +98,7 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req, res, next) => {
-    const initPaths = [`${config.baseUrl}/api/user/init`, `${config.baseUrl}/api/user/notification/init`];
-    if (!initPaths.includes(req.path)) {
+    if (!['/api/user/init', '/api/user/notification/init'].includes(req.path)) {
       return next();
     }
     const authInfo =
@@ -137,10 +120,10 @@ export default ({ app }: { app: Application }) => {
     }
   });
 
-  app.use(rewrite(`${config.baseUrl}/open/*`, `${config.baseUrl}/api/$1`));
-  app.use(`${config.baseUrl}${config.api.prefix}`, routes());
+  app.use(rewrite('/open/*', '/api/$1'));
+  app.use(config.api.prefix, routes());
 
-  app.get('*', (req, res, next) => {
+  app.get('*', (_, res, next) => {
     const indexPath = path.join(frontendPath, 'index.html');
     res.sendFile(indexPath, (err) => {
       if (err) {
