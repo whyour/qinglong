@@ -93,8 +93,9 @@ const apiWhiteListBase = [
 ];
 
 // Only modify paths if baseUrl is set and not the default '/'
+// Frontend baseUrl always ends with '/', so we remove leading '/' from paths
 const apiWhiteList = config.baseUrl && config.baseUrl !== '/'
-  ? apiWhiteListBase.map(path => `${config.baseUrl}${path.replace(/^\//, '')}`)
+  ? apiWhiteListBase.map(path => `${config.baseUrl}${path.substring(1)}`)
   : apiWhiteListBase;
 
 

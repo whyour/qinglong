@@ -29,6 +29,8 @@ export default ({ app }: { app: Application }) => {
   }
 
   // Create base-URL-aware whitelist for JWT
+  // When baseUrl is empty, paths remain as-is (e.g., '/api/user/login')
+  // When baseUrl is set, paths are prefixed (e.g., '/qinglong/api/user/login')
   const jwtWhitelist = config.apiWhiteList.map(path => `${config.baseUrl}${path}`);
   // Exclude non-API/non-open paths from JWT requirement
   // When baseUrl is set: exclude paths that don't start with baseUrl/api/ or baseUrl/open/
@@ -84,6 +86,8 @@ export default ({ app }: { app: Application }) => {
       }
     }
 
+    // req.path already includes the full path with baseUrl
+    // e.g., when baseUrl=/qinglong and request is /qinglong/api/user/login, req.path=/qinglong/api/user/login
     const originPath = req.path;
     if (
       !headerToken &&
