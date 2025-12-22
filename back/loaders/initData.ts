@@ -138,7 +138,7 @@ export default async () => {
   
   for (const cron of allCrons) {
     // 如果任务有 PID 且进程仍在运行，则保持其状态
-    if (cron.pid && isPidRunning(cron.pid)) {
+    if (cron.pid != null && isPidRunning(cron.pid)) {
       // 保留当前状态（running 或 queued）
       continue;
     }
