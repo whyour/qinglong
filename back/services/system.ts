@@ -226,9 +226,14 @@ export default class SystemService {
     let command = '';
     
     // Check if this is a Debian-based system (including Armbian)
-    const isDebianBased = await fs.promises.access('/etc/apt/sources.list')
+    // Check for both sources.list and debian_version for more reliable detection
+    const hasAptSourcesList = await fs.promises.access('/etc/apt/sources.list')
       .then(() => true)
       .catch(() => false);
+    const hasDebianVersion = await fs.promises.access('/etc/debian_version')
+      .then(() => true)
+      .catch(() => false);
+    const isDebianBased = hasAptSourcesList || hasDebianVersion;
     
     if (isDebianBased) {
       // Handle Debian/Ubuntu/Armbian systems
@@ -242,6 +247,8 @@ export default class SystemService {
         });
         
         // Match the first deb line to extract the current mirror
+        // Note: This assumes all mirrors in sources.list use the same base URL
+        // If multiple different mirrors are configured, only the first one will be replaced
         const debMatch = content.match(/^deb\s+(https?:\/\/[^\s]+)/m);
         if (debMatch) {
           defaultDomain = debMatch[1];
@@ -252,13 +259,23 @@ export default class SystemService {
           const escapedDefault = defaultDomain.replace(/\//g, '\\/').replace(/\./g, '\\.');
           const escapedTarget = targetDomain.replace(/\//g, '\\/');
           
+          // Replace mirror URL in main sources.list
           command = `sed -i 's/${escapedDefault}/${escapedTarget}/g' /etc/apt/sources.list`;
           
           // Also update sources.list.d if it exists
-          command += ` && if [ -d /etc/apt/sources.list.d ]; then find /etc/apt/sources.list.d -type f -name "*.list" -o -name "*.sources" | xargs -r sed -i 's/${escapedDefault}/${escapedTarget}/g'; fi`;
+          command += ` && if [ -d /etc/apt/sources.list.d ]; then find /etc/apt/sources.list.d -type f \\( -name "*.list" -o -name "*.sources" \\) -exec sed -i 's/${escapedDefault}/${escapedTarget}/g' {} \\;; fi`;
+          
+          // Update package lists
           command += ` && apt-get update`;
+        } else if (!defaultDomain && targetDomain) {
+          // Cannot detect current mirror, log warning
+          this.logger.warn('Unable to detect current mirror from /etc/apt/sources.list. Mirror update skipped.');
+          this.sockService.sendMessage({
+            type: 'updateLinuxMirror',
+            message: 'Warning: Unable to detect current mirror. Please manually configure /etc/apt/sources.list',
+          });
         } else if (targetDomain) {
-          // If we can't detect the current domain, just update
+          // Fallback: just update package lists
           command = `apt-get update`;
         }
       } catch (error) {
