@@ -255,9 +255,15 @@ export default class SystemService {
         }
         
         if (defaultDomain && targetDomain) {
-          // Escape special characters for sed
-          const escapedDefault = defaultDomain.replace(/\//g, '\\/').replace(/\./g, '\\.');
-          const escapedTarget = targetDomain.replace(/\//g, '\\/');
+          // Sanitize and escape special characters for sed
+          // Escape backslashes first, then other special characters
+          const escapedDefault = defaultDomain
+            .replace(/\\/g, '\\\\')  // Escape backslashes first
+            .replace(/\//g, '\\/')   // Escape forward slashes
+            .replace(/\./g, '\\.');  // Escape dots
+          const escapedTarget = targetDomain
+            .replace(/\\/g, '\\\\')  // Escape backslashes first
+            .replace(/\//g, '\\/');  // Escape forward slashes
           
           // Replace mirror URL in main sources.list
           command = `sed -i 's/${escapedDefault}/${escapedTarget}/g' /etc/apt/sources.list`;
@@ -297,13 +303,13 @@ export default class SystemService {
         if (info.linuxMirror) {
           targetDomain = info.linuxMirror;
         }
-        command = `sed -i 's/${defaultDomain.replace(
-          /\//g,
-          '\\/',
-        )}/${targetDomain.replace(
-          /\//g,
-          '\\/',
-        )}/g' /etc/apk/repositories && apk update -f`;
+        // Sanitize and escape special characters for sed
+        // Escape backslashes first, then other special characters
+        command = `sed -i 's/${defaultDomain
+          .replace(/\\/g, '\\\\')  // Escape backslashes first
+          .replace(/\//g, '\\/')}/${targetDomain
+          .replace(/\\/g, '\\\\')  // Escape backslashes first
+          .replace(/\//g, '\\/')}/g' /etc/apk/repositories && apk update -f`;
       } catch (error) {
         this.logger.error('Failed to read /etc/apk/repositories', error);
       }
