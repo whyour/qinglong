@@ -64,6 +64,19 @@ if (!process.env.QL_DIR) {
 
 const lastVersionFile = `https://qn.whyour.cn/version.yaml`;
 
+// Get and normalize QlBaseUrl
+let baseUrl = process.env.QlBaseUrl || '';
+if (baseUrl) {
+  // Ensure it starts with /
+  if (!baseUrl.startsWith('/')) {
+    baseUrl = `/${baseUrl}`;
+  }
+  // Remove trailing slash for consistency in route definitions
+  if (baseUrl.endsWith('/')) {
+    baseUrl = baseUrl.slice(0, -1);
+  }
+}
+
 const rootPath = process.env.QL_DIR as string;
 const envFound = dotenv.config({ path: path.join(rootPath, '.env') });
 
@@ -116,6 +129,7 @@ if (envFound.error) {
 export default {
   ...config,
   jwt: config.jwt,
+  baseUrl,
   rootPath,
   tmpPath,
   dataPath,

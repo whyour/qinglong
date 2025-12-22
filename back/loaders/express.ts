@@ -15,21 +15,30 @@ import path from 'path';
 export default ({ app }: { app: Application }) => {
   app.set('trust proxy', 'loopback');
   app.use(cors());
-  app.get(`${config.api.prefix}/env.js`, serveEnv);
-  app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
+  app.get(`${config.baseUrl}${config.api.prefix}/env.js`, serveEnv);
+  app.use(`${config.baseUrl}${config.api.prefix}/static`, express.static(config.uploadPath));
 
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
   const frontendPath = path.join(config.rootPath, 'static/dist');
-  app.use(express.static(frontendPath));
+  if (config.baseUrl) {
+    app.use(config.baseUrl, express.static(frontendPath));
+  } else {
+    app.use(express.static(frontendPath));
+  }
+
+  // Create base-URL-aware whitelist for JWT
+  const jwtWhitelist = config.apiWhiteList.map(path => `${config.baseUrl}${path}`);
+  // Allow all paths that don't contain /api/ or /open/ to skip JWT
+  const jwtExcludeRegex = /^\/(?!.*\/(api|open)\/)/;
 
   app.use(
     expressjwt({
       secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
-      path: [...config.apiWhiteList, /^\/(?!api\/).*/],
+      path: [...jwtWhitelist, jwtExcludeRegex],
     }),
   );
 
@@ -44,12 +53,14 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req: Request, res, next) => {
-    if (!['/open/', '/api/'].some((x) => req.path.startsWith(x))) {
+    const apiPath = `${config.baseUrl}/api/`;
+    const openPath = `${config.baseUrl}/open/`;
+    if (![openPath, apiPath].some((x) => req.path.startsWith(x))) {
       return next();
     }
 
     const headerToken = getToken(req);
-    if (req.path.startsWith('/open/')) {
+    if (req.path.startsWith(openPath)) {
       const apps = await shareStore.getApps();
       const doc = apps?.filter((x) =>
         x.tokens?.find((y) => y.value === headerToken),
@@ -91,7 +102,8 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req, res, next) => {
-    if (!['/api/user/init', '/api/user/notification/init'].includes(req.path)) {
+    const initPaths = [`${config.baseUrl}/api/user/init`, `${config.baseUrl}/api/user/notification/init`];
+    if (!initPaths.includes(req.path)) {
       return next();
     }
     const authInfo =
@@ -113,10 +125,10 @@ export default ({ app }: { app: Application }) => {
     }
   });
 
-  app.use(rewrite('/open/*', '/api/$1'));
-  app.use(config.api.prefix, routes());
+  app.use(rewrite(`${config.baseUrl}/open/*`, `${config.baseUrl}/api/$1`));
+  app.use(`${config.baseUrl}${config.api.prefix}`, routes());
 
-  app.get('*', (_, res, next) => {
+  app.get('*', (req, res, next) => {
     const indexPath = path.join(frontendPath, 'index.html');
     res.sendFile(indexPath, (err) => {
       if (err) {
