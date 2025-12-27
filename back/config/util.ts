@@ -536,11 +536,26 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
 }
 
 export function getGetCommand(type: DependenceTypes, name: string): string {
+  const trimmedName = name.trim();
+  
+  // For Python dependencies installed from GitHub or requirements files,
+  // we can't reliably check if they're installed, so skip the check
+  if (type === DependenceTypes.python3) {
+    if (trimmedName.match(/^(https?:\/\/|git\+)/i) || 
+        trimmedName.match(/\.(txt|in)$/i) || 
+        trimmedName.includes('requirements') ||
+        trimmedName.endsWith('pyproject.toml')) {
+      // Return a command that will always indicate not installed
+      // This ensures GitHub URLs and requirements files are always installed
+      return 'echo ""';
+    }
+  }
+  
   const baseCommands = {
-    [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${name}" | head -1`,
+    [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${trimmedName}" | head -1`,
     [DependenceTypes.python3]: `
     python3 -c "exec('''
-name='${name}'
+name='${trimmedName}'
 try:
     from importlib.metadata import version
     print(version(name))
@@ -550,7 +565,7 @@ except:
     spec=u.find_spec(name)
     print(name if spec else '')
 ''')"`,
-    [DependenceTypes.linux]: `apk info -es ${name}`,
+    [DependenceTypes.linux]: `apk info -es ${trimmedName}`,
   };
 
   return baseCommands[type];
@@ -570,7 +585,27 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
     command = `${command} --prefix=${PYTHON_INSTALL_DIR}`;
   }
 
-  return `${command} ${name.trim()}`;
+  const trimmedName = name.trim();
+  
+  // Handle different installation methods for Python
+  if (type === DependenceTypes.python3) {
+    // Check if it's a GitHub URL (support both git+ and direct URLs)
+    if (trimmedName.match(/^(https?:\/\/|git\+)/i)) {
+      return `${command} ${trimmedName}`;
+    }
+    // Check if it's a requirements file path
+    if (trimmedName.match(/\.(txt|in)$/i) || trimmedName.includes('requirements')) {
+      return `${command} -r ${trimmedName}`;
+    }
+    // Check if it's a pyproject.toml file
+    if (trimmedName.endsWith('pyproject.toml')) {
+      // For pyproject.toml, install from the directory containing it
+      const dir = trimmedName.replace(/\/pyproject\.toml$/, '') || '.';
+      return `${command} ${dir}`;
+    }
+  }
+
+  return `${command} ${trimmedName}`;
 }
 
 export function getUninstallCommand(

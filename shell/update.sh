@@ -111,6 +111,56 @@ add_cron() {
   notify_api "$path 新增任务" "$detail"
 }
 
+## 自动安装订阅仓库中的Python依赖
+auto_install_python_deps() {
+  local repo_path="$1"
+  local uniq_path="$2"
+  
+  echo -e "\n检测订阅仓库中的Python依赖文件...\n"
+  
+  get_token
+  
+  # 检查 requirements.txt
+  if [[ -f "${repo_path}/requirements.txt" ]]; then
+    echo -e "发现 requirements.txt，开始自动安装依赖...\n"
+    local req_file="${dir_scripts}/${uniq_path}/requirements.txt"
+    cp -f "${repo_path}/requirements.txt" "${req_file}"
+    
+    # 调用API添加依赖安装任务
+    local dep_name="${uniq_path}/requirements.txt"
+    local currentTimeStamp=$(date +%s)
+    local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
+      -X POST \
+      -H "Content-Type: application/json;charset=UTF-8" \
+      -H "Authorization: Bearer ${__ql_token__}" \
+      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" | jq -r '.code')
+    
+    if [[ "$result" == "200" ]]; then
+      echo -e "已添加 requirements.txt 依赖安装任务\n"
+    fi
+  fi
+  
+  # 检查 pyproject.toml
+  if [[ -f "${repo_path}/pyproject.toml" ]]; then
+    echo -e "发现 pyproject.toml，开始自动安装依赖...\n"
+    local pyproject_file="${dir_scripts}/${uniq_path}/pyproject.toml"
+    cp -f "${repo_path}/pyproject.toml" "${pyproject_file}"
+    
+    # 调用API添加依赖安装任务
+    local dep_name="${uniq_path}/pyproject.toml"
+    local currentTimeStamp=$(date +%s)
+    local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
+      -X POST \
+      -H "Content-Type: application/json;charset=UTF-8" \
+      -H "Authorization: Bearer ${__ql_token__}" \
+      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" | jq -r '.code')
+    
+    if [[ "$result" == "200" ]]; then
+      echo -e "已添加 pyproject.toml 依赖安装任务\n"
+    fi
+  fi
+}
+
 ## 更新仓库
 update_repo() {
   local url="$1"
@@ -137,6 +187,10 @@ update_repo() {
 
   if [[ $exit_status -eq 0 ]]; then
     echo -e "拉取 ${uniq_path} 成功...\n"
+    
+    # 自动检测并安装Python依赖
+    auto_install_python_deps "${repo_path}" "${uniq_path}"
+    
     diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
   else
     echo -e "拉取 ${uniq_path} 失败，请检查日志...\n"
