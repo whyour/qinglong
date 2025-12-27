@@ -31,7 +31,12 @@ export async function writeFileWithLock(
       throw new Error(`Failed to create file ${filePath}: ${errorMessage}`);
     } finally {
       if (fileHandle) {
-        await fileHandle.close();
+        try {
+          await fileHandle.close();
+        } catch (closeError) {
+          // Log close error but don't throw to avoid masking the original error
+          Logger.error(`Failed to close file handle for ${filePath}:`, closeError);
+        }
       }
     }
   }
