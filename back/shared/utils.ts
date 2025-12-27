@@ -1,7 +1,7 @@
 import { lock } from 'proper-lockfile';
 import os from 'os';
 import path from 'path';
-import { writeFile, open, chmod } from 'fs/promises';
+import { writeFile, open, chmod, FileHandle } from 'fs/promises';
 import { fileExist } from '../config/util';
 import Logger from '../loaders/logger';
 
@@ -23,14 +23,14 @@ export async function writeFileWithLock(
   
   // Ensure file exists before locking
   if (!(await fileExist(filePath))) {
-    let fileHandle;
+    let fileHandle: FileHandle | undefined;
     try {
       fileHandle = await open(filePath, 'w');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to create file ${filePath}: ${errorMessage}`);
     } finally {
-      if (fileHandle) {
+      if (fileHandle !== undefined) {
         try {
           await fileHandle.close();
         } catch (closeError) {
@@ -42,7 +42,7 @@ export async function writeFileWithLock(
   }
   
   const lockfilePath = getUniqueLockPath(filePath);
-  let release: (() => Promise<void>) | null = null;
+  let release: (() => Promise<void>) | undefined;
 
   try {
     release = await lock(filePath, {
