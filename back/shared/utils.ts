@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { writeFile, open, chmod } from 'fs/promises';
 import { fileExist } from '../config/util';
+import Logger from '../loaders/logger';
 
 function getUniqueLockPath(filePath: string) {
   const sanitizedPath = filePath
@@ -19,24 +20,48 @@ export async function writeFileWithLock(
   if (typeof options === 'string') {
     options = { encoding: options };
   }
-  if (!(await fileExist(filePath))) {
-    const fileHandle = await open(filePath, 'w');
-    fileHandle.close();
+  
+  try {
+    if (!(await fileExist(filePath))) {
+      const fileHandle = await open(filePath, 'w');
+      await fileHandle.close();
+    }
+  } catch (error) {
+    throw new Error(`Failed to create file ${filePath}: ${error}`);
   }
+  
   const lockfilePath = getUniqueLockPath(filePath);
+  let release: (() => Promise<void>) | null = null;
 
-  const release = await lock(filePath, {
-    retries: {
-      retries: 10,
-      factor: 2,
-      minTimeout: 100,
-      maxTimeout: 3000,
-    },
-    lockfilePath,
-  });
-  await writeFile(filePath, content, { encoding: 'utf8', ...options });
-  if (options?.mode) {
-    await chmod(filePath, options.mode);
+  try {
+    release = await lock(filePath, {
+      retries: {
+        retries: 10,
+        factor: 2,
+        minTimeout: 100,
+        maxTimeout: 3000,
+      },
+      lockfilePath,
+    });
+  } catch (error) {
+    throw new Error(`Failed to acquire lock for ${filePath}: ${error}`);
   }
-  await release();
+
+  try {
+    await writeFile(filePath, content, { encoding: 'utf8', ...options });
+    if (options?.mode) {
+      await chmod(filePath, options.mode);
+    }
+  } catch (error) {
+    throw new Error(`Failed to write to file ${filePath}: ${error}`);
+  } finally {
+    if (release) {
+      try {
+        await release();
+      } catch (error) {
+        // Log but don't throw on release failure
+        Logger.error(`Failed to release lock for ${filePath}:`, error);
+      }
+    }
+  }
 }

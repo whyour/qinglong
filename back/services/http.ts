@@ -16,6 +16,17 @@ export class HttpServerService {
           metricsService.record('http_service_start', 1, {
             port: port.toString(),
           });
+          
+          // Set server timeouts to prevent premature connection drops
+          if (this.server) {
+            // Timeout for receiving the entire request (including body) - 5 minutes
+            this.server.requestTimeout = 300000;
+            // Timeout for headers - 2 minutes  
+            this.server.headersTimeout = 120000;
+            // Keep-alive timeout - 65 seconds (slightly more than typical load balancer timeout)
+            this.server.keepAliveTimeout = 65000;
+          }
+          
           resolve(this.server);
         });
 
