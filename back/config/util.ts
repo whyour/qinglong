@@ -535,16 +535,30 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
   }
 }
 
+// Helper function to check if a name is a GitHub URL
+function isGitHubUrl(name: string): boolean {
+  return !!name.match(/^(https?:\/\/|git\+)/i);
+}
+
+// Helper function to check if a name is a requirements file
+function isRequirementsFile(name: string): boolean {
+  return !!name.match(/requirements.*\.(txt|in)$/i) || name === 'requirements.txt';
+}
+
+// Helper function to check if a name is a pyproject.toml file
+function isPyprojectToml(name: string): boolean {
+  return name.endsWith('pyproject.toml');
+}
+
 export function getGetCommand(type: DependenceTypes, name: string): string {
   const trimmedName = name.trim();
   
   // For Python dependencies installed from GitHub or requirements files,
   // we can't reliably check if they're installed, so skip the check
   if (type === DependenceTypes.python3) {
-    if (trimmedName.match(/^(https?:\/\/|git\+)/i) || 
-        trimmedName.match(/\.(txt|in)$/i) || 
-        trimmedName.includes('requirements') ||
-        trimmedName.endsWith('pyproject.toml')) {
+    if (isGitHubUrl(trimmedName) || 
+        isRequirementsFile(trimmedName) || 
+        isPyprojectToml(trimmedName)) {
       // Return a command that will always indicate not installed
       // This ensures GitHub URLs and requirements files are always installed
       return 'echo ""';
@@ -590,18 +604,24 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
   // Handle different installation methods for Python
   if (type === DependenceTypes.python3) {
     // Check if it's a GitHub URL (support both git+ and direct URLs)
-    if (trimmedName.match(/^(https?:\/\/|git\+)/i)) {
+    if (isGitHubUrl(trimmedName)) {
       return `${command} ${trimmedName}`;
     }
     // Check if it's a requirements file path
-    if (trimmedName.match(/\.(txt|in)$/i) || trimmedName.includes('requirements')) {
+    if (isRequirementsFile(trimmedName)) {
       return `${command} -r ${trimmedName}`;
     }
     // Check if it's a pyproject.toml file
-    if (trimmedName.endsWith('pyproject.toml')) {
+    if (isPyprojectToml(trimmedName)) {
       // For pyproject.toml, install from the directory containing it
-      const dir = trimmedName.replace(/\/pyproject\.toml$/, '');
-      return dir && dir !== 'pyproject.toml' ? `${command} ${dir}` : `${command} .`;
+      const pathMatch = trimmedName.match(/^(.+)\/pyproject\.toml$/);
+      if (pathMatch) {
+        // Has a path prefix, use the directory
+        return `${command} ${pathMatch[1]}`;
+      } else {
+        // Just "pyproject.toml", install current directory
+        return `${command} .`;
+      }
     }
   }
 

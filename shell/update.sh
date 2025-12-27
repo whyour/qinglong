@@ -124,22 +124,29 @@ auto_install_python_deps() {
   if [[ -f "${repo_path}/requirements.txt" ]]; then
     echo -e "发现 requirements.txt，开始自动安装依赖...\n"
     local req_file="${dir_scripts}/${uniq_path}/requirements.txt"
-    cp -f "${repo_path}/requirements.txt" "${req_file}"
     
-    # 调用API添加依赖安装任务
-    local dep_name="${uniq_path}/requirements.txt"
-    local currentTimeStamp=$(date +%s)
-    local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
-      -X POST \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
+    # 确保目标目录存在
+    make_dir "${dir_scripts}/${uniq_path}"
     
-    local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
-    if [[ "$code" == "200" ]]; then
-      echo -e "已添加 requirements.txt 依赖安装任务\n"
+    # 复制文件并检查结果
+    if cp -f "${repo_path}/requirements.txt" "${req_file}" 2>/dev/null; then
+      # 调用API添加依赖安装任务
+      local dep_name="${uniq_path}/requirements.txt"
+      local currentTimeStamp=$(date +%s)
+      local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
+        -X POST \
+        -H "Content-Type: application/json;charset=UTF-8" \
+        -H "Authorization: Bearer ${__ql_token__}" \
+        --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
+      
+      local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
+      if [[ "$code" == "200" ]]; then
+        echo -e "已添加 requirements.txt 依赖安装任务\n"
+      else
+        echo -e "添加 requirements.txt 依赖失败，请手动添加\n"
+      fi
     else
-      echo -e "添加 requirements.txt 依赖失败，请手动添加\n"
+      echo -e "复制 requirements.txt 失败，跳过自动安装\n"
     fi
   fi
   
@@ -147,22 +154,29 @@ auto_install_python_deps() {
   if [[ -f "${repo_path}/pyproject.toml" ]]; then
     echo -e "发现 pyproject.toml，开始自动安装依赖...\n"
     local pyproject_file="${dir_scripts}/${uniq_path}/pyproject.toml"
-    cp -f "${repo_path}/pyproject.toml" "${pyproject_file}"
     
-    # 调用API添加依赖安装任务
-    local dep_name="${uniq_path}/pyproject.toml"
-    local currentTimeStamp=$(date +%s)
-    local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
-      -X POST \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
+    # 确保目标目录存在
+    make_dir "${dir_scripts}/${uniq_path}"
     
-    local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
-    if [[ "$code" == "200" ]]; then
-      echo -e "已添加 pyproject.toml 依赖安装任务\n"
+    # 复制文件并检查结果
+    if cp -f "${repo_path}/pyproject.toml" "${pyproject_file}" 2>/dev/null; then
+      # 调用API添加依赖安装任务
+      local dep_name="${uniq_path}/pyproject.toml"
+      local currentTimeStamp=$(date +%s)
+      local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
+        -X POST \
+        -H "Content-Type: application/json;charset=UTF-8" \
+        -H "Authorization: Bearer ${__ql_token__}" \
+        --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
+      
+      local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
+      if [[ "$code" == "200" ]]; then
+        echo -e "已添加 pyproject.toml 依赖安装任务\n"
+      else
+        echo -e "添加 pyproject.toml 依赖失败，请手动添加\n"
+      fi
     else
-      echo -e "添加 pyproject.toml 依赖失败，请手动添加\n"
+      echo -e "复制 pyproject.toml 失败，跳过自动安装\n"
     fi
   fi
 }
