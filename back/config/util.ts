@@ -537,12 +537,14 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
 
 // Helper function to check if a name is a GitHub URL
 function isGitHubUrl(name: string): boolean {
-  return !!name.match(/^(https?:\/\/|git\+)/i);
+  // Support git+https://, git+http://, https://, and http:// URLs
+  // This covers GitHub URLs and other git-compatible repositories
+  return !!name.match(/^(git\+https?:\/\/|https?:\/\/)/i);
 }
 
 // Helper function to check if a name is a requirements file
 function isRequirementsFile(name: string): boolean {
-  return !!name.match(/requirements.*\.(txt|in)$/i) || name === 'requirements.txt';
+  return !!name.match(/requirements.*\.(txt|in)$/i);
 }
 
 // Helper function to check if a name is a pyproject.toml file
