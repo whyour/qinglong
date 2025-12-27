@@ -133,10 +133,13 @@ auto_install_python_deps() {
       -X POST \
       -H "Content-Type: application/json;charset=UTF-8" \
       -H "Authorization: Bearer ${__ql_token__}" \
-      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" | jq -r '.code')
+      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
     
-    if [[ "$result" == "200" ]]; then
+    local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
+    if [[ "$code" == "200" ]]; then
       echo -e "已添加 requirements.txt 依赖安装任务\n"
+    else
+      echo -e "添加 requirements.txt 依赖失败，请手动添加\n"
     fi
   fi
   
@@ -153,10 +156,13 @@ auto_install_python_deps() {
       -X POST \
       -H "Content-Type: application/json;charset=UTF-8" \
       -H "Authorization: Bearer ${__ql_token__}" \
-      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" | jq -r '.code')
+      --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
     
-    if [[ "$result" == "200" ]]; then
+    local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
+    if [[ "$code" == "200" ]]; then
       echo -e "已添加 pyproject.toml 依赖安装任务\n"
+    else
+      echo -e "添加 pyproject.toml 依赖失败，请手动添加\n"
     fi
   fi
 }

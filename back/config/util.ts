@@ -600,8 +600,8 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
     // Check if it's a pyproject.toml file
     if (trimmedName.endsWith('pyproject.toml')) {
       // For pyproject.toml, install from the directory containing it
-      const dir = trimmedName.replace(/\/pyproject\.toml$/, '') || '.';
-      return `${command} ${dir}`;
+      const dir = trimmedName.replace(/\/pyproject\.toml$/, '');
+      return dir && dir !== 'pyproject.toml' ? `${command} ${dir}` : `${command} .`;
     }
   }
 
