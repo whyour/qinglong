@@ -21,13 +21,19 @@ export async function writeFileWithLock(
     options = { encoding: options };
   }
   
-  try {
-    if (!(await fileExist(filePath))) {
-      const fileHandle = await open(filePath, 'w');
-      await fileHandle.close();
+  // Ensure file exists before locking
+  if (!(await fileExist(filePath))) {
+    let fileHandle;
+    try {
+      fileHandle = await open(filePath, 'w');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create file ${filePath}: ${errorMessage}`);
+    } finally {
+      if (fileHandle) {
+        await fileHandle.close();
+      }
     }
-  } catch (error) {
-    throw new Error(`Failed to create file ${filePath}: ${error}`);
   }
   
   const lockfilePath = getUniqueLockPath(filePath);
@@ -44,7 +50,8 @@ export async function writeFileWithLock(
       lockfilePath,
     });
   } catch (error) {
-    throw new Error(`Failed to acquire lock for ${filePath}: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to acquire lock for ${filePath}: ${errorMessage}`);
   }
 
   try {
@@ -53,7 +60,8 @@ export async function writeFileWithLock(
       await chmod(filePath, options.mode);
     }
   } catch (error) {
-    throw new Error(`Failed to write to file ${filePath}: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to write to file ${filePath}: ${errorMessage}`);
   } finally {
     if (release) {
       try {
