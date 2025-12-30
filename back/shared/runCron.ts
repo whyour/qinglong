@@ -51,10 +51,16 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
       const cp = spawn(cmd, { shell: '/bin/bash' });
 
       // Update status to running after spawning the process
-      await CrontabModel.update(
-        { status: CrontabStatus.running, pid: cp.pid },
-        { where: { id: Number(cron.id) } },
-      );
+      try {
+        await CrontabModel.update(
+          { status: CrontabStatus.running, pid: cp.pid },
+          { where: { id: Number(cron.id) } },
+        );
+      } catch (error) {
+        Logger.error(
+          `[schedule][更新任务状态失败] 任务ID: ${cron.id}, 错误: ${error}`,
+        );
+      }
 
       cp.stderr.on('data', (data) => {
         Logger.info(
@@ -74,10 +80,16 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
       cp.on('exit', async (code) => {
         taskLimit.removeQueuedCron(cron.id);
         // Update status to idle after task completes
-        await CrontabModel.update(
-          { status: CrontabStatus.idle, pid: undefined },
-          { where: { id: Number(cron.id) } },
-        );
+        try {
+          await CrontabModel.update(
+            { status: CrontabStatus.idle, pid: undefined },
+            { where: { id: Number(cron.id) } },
+          );
+        } catch (error) {
+          Logger.error(
+            `[schedule][更新任务状态失败] 任务ID: ${cron.id}, 错误: ${error}`,
+          );
+        }
         Logger.info(
           '[schedule][执行任务结束] 参数: %s, 退出码: %j',
           JSON.stringify({

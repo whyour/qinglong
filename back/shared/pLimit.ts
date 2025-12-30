@@ -14,6 +14,7 @@ import {
 import config from '../config';
 import { credentials } from '@grpc/grpc-js';
 import { ApiClient } from '../protos/api';
+import { CrontabModel } from '../data/cron';
 
 class TaskLimit {
   private dependenyLimit = new PQueue({ concurrency: 1 });
@@ -136,7 +137,6 @@ class TaskLimit {
     let maxQueueSize = 10; // Default for multi-instance mode (increased from 5)
     let isSingleInstanceMode = false;
     try {
-      const { CrontabModel } = await import('../data/cron');
       const cronRecord = await CrontabModel.findOne({
         where: { id: Number(cron.id) },
       });
