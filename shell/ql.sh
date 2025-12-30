@@ -5,5 +5,5 @@ if [[ -z "$QL_DIR" ]]; then
   exit 1
 fi
 
-dir_shell=$QL_DIR/shell
-. $dir_shell/update.sh "$@"
+dir_shell="$QL_DIR/shell"
+. "$dir_shell/update.sh" "$@"
