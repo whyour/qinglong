@@ -2,6 +2,11 @@
 
 export PATH="$HOME/bin:$PATH"
 
+# Create bin directory and symlinks for ql and task commands
+mkdir -p "$HOME/bin"
+ln -sf /ql/shell/ql.sh "$HOME/bin/ql"
+ln -sf /ql/shell/task.sh "$HOME/bin/task"
+
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 
