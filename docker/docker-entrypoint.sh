@@ -34,6 +34,7 @@ fi
 ln -sf "$dir_shell/update.sh" "$HOME/bin/ql"
 ln -sf "$dir_shell/task.sh" "$HOME/bin/task"
 
+log_with_style "INFO" "🚀 1. 检测配置文件..."
 load_ql_envs
 export_ql_envs
 . $dir_shell/env.sh
