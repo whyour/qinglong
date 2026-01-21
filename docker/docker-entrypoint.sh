@@ -27,7 +27,13 @@ if [ -f /etc/alpine-release ]; then
   fi
 fi
 
-log_with_style "INFO" "🚀  1. 检测配置文件..."
+log_with_style "INFO" "预先创建软连接..."
+if [[ ! -d "$HOME/bin" ]]; then
+  mkdir -p "$HOME/bin"
+fi
+ln -sf "$dir_shell/update.sh" "$HOME/bin/ql"
+ln -sf "$dir_shell/task.sh" "$HOME/bin/task"
+
 load_ql_envs
 export_ql_envs
 . $dir_shell/env.sh
