@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import CronExpressionParser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 import isNil from 'lodash/isNil';
 
 const { Option } = Select;
