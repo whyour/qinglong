@@ -1511,7 +1511,7 @@ async function sendNotify(text, desp, params = {}) {
     }
   }
 
-  if (push_config.HITOKOTO !== 'false') {
+  if (push_config.HITOKOTO !== 'false' && push_config.HITOKOTO !== false) {
     desp += '\n\n' + (await one());
   }
 
