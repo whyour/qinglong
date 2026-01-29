@@ -596,8 +596,13 @@ export function isDemoEnv() {
 let osType: 'Debian' | 'Ubuntu' | 'Alpine' | undefined;
 
 async function getOSReleaseInfo(): Promise<string> {
-  const osRelease = await fs.readFile('/etc/os-release', 'utf8');
-  return osRelease;
+  try {
+    const osRelease = await fs.readFile('/etc/os-release', 'utf8');
+    return osRelease;
+  } catch (error) {
+    Logger.error(`Failed to read /etc/os-release: ${error}`);
+    return '';
+  }
 }
 
 function isDebian(osReleaseInfo: string): boolean {
@@ -620,10 +625,11 @@ export async function detectOS(): Promise<
 
   if (platform === 'linux') {
     const osReleaseInfo = await getOSReleaseInfo();
-    if (isDebian(osReleaseInfo)) {
-      osType = 'Debian';
-    } else if (isUbuntu(osReleaseInfo)) {
+    // Check Ubuntu before Debian since Ubuntu is based on Debian
+    if (isUbuntu(osReleaseInfo)) {
       osType = 'Ubuntu';
+    } else if (isDebian(osReleaseInfo)) {
+      osType = 'Debian';
     } else if (isAlpine(osReleaseInfo)) {
       osType = 'Alpine';
     } else {
@@ -643,18 +649,27 @@ export async function detectOS(): Promise<
 async function getCurrentMirrorDomain(
   filePath: string,
 ): Promise<string | null> {
-  const fileContent = await fs.readFile(filePath, 'utf8');
-  const lines = fileContent.split('\n');
-  for (const line of lines) {
-    if (line.trim().startsWith('#')) {
-      continue;
+  try {
+    const fileContent = await fs.readFile(filePath, 'utf8');
+    const lines = fileContent.split('\n');
+    for (const line of lines) {
+      if (line.trim().startsWith('#')) {
+        continue;
+      }
+      const match = line.match(/https?:\/\/[^\/]+/);
+      if (match) {
+        return match[0];
+      }
     }
-    const match = line.match(/https?:\/\/[^\/]+/);
-    if (match) {
-      return match[0];
-    }
+    return null;
+  } catch (error) {
+    Logger.error(`Failed to read mirror configuration file ${filePath}: ${error}`);
+    return null;
   }
-  return null;
+}
+
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 async function replaceDomainInFile(
@@ -662,15 +677,18 @@ async function replaceDomainInFile(
   oldDomainWithScheme: string,
   newDomainWithScheme: string,
 ): Promise<void> {
-  let fileContent = await fs.readFile(filePath, 'utf8');
-  let updatedContent = fileContent.replace(
-    new RegExp(oldDomainWithScheme, 'g'),
-    newDomainWithScheme,
-  );
-
+  // Ensure the new domain has a trailing slash before replacement
   if (!newDomainWithScheme.endsWith('/')) {
     newDomainWithScheme += '/';
   }
+
+  let fileContent = await fs.readFile(filePath, 'utf8');
+  // Escape special regex characters in the old domain
+  const escapedOldDomain = escapeRegExp(oldDomainWithScheme);
+  let updatedContent = fileContent.replace(
+    new RegExp(escapedOldDomain, 'g'),
+    newDomainWithScheme,
+  );
 
   await writeFileWithLock(filePath, updatedContent);
 }
