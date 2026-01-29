@@ -67,8 +67,8 @@ export default async (src: string = 'deps') => {
   const watcher = chokidar.watch(source, {
     ignored: [
       /(^|[\/\\])\../, // ignore dotfiles
-      '**/node_modules/**', // ignore node_modules
-      '**/.git/**', // ignore .git
+      /node_modules/, // ignore node_modules
+      /\.git/, // ignore .git
     ],
     persistent: true,
   });
