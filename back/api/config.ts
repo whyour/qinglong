@@ -64,7 +64,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),
-        content: Joi.string().allow('').optional().custom((value, helpers) => {
+        content: Joi.string().allow('').optional().custom((value: any, helpers: any) => {
           if (!value) return value;
 
           // Security validation for configuration file content

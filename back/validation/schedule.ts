@@ -7,7 +7,7 @@ import config from '../config';
 /**
  * Security validation function to detect potentially malicious shell code patterns
  */
-const validateShellSecurity = (value: string, helpers: any, fieldName: string) => {
+const validateShellSecurity = (value: any, helpers: any, fieldName: string): any => {
   if (!value) return value;
 
   // Define dangerous patterns that should be blocked
@@ -22,20 +22,20 @@ const validateShellSecurity = (value: string, helpers: any, fieldName: string) =
     // Suspicious domains or external URLs
     /https?:\/\/[^\s]+/i,
     
-    // Hidden files starting with dot (common in malware)
-    /\s*\.\w+\s*$/,
+    // Hidden executable files (files starting with . in a path context)
+    /\/\.\w+(\s|$|;|&|\||>)/,
     
     // Background process spawning with suspicious names
-    /nohup\s+[^\s]*\.\w+/,
+    /nohup\s+["']?[^\s"']*\/\.\w+/,
     
-    // Redirect to dev null (hiding output)
+    // Redirect to dev null (hiding output) combined with background execution
     />.*\/dev\/null.*&/,
     
     // Base64 decode patterns (often used to obfuscate malicious code)
     /\b(base64|decode|eval)\s+/i,
     
-    // File execution from temp or hidden directories
-    /\/(tmp|\.)\//,
+    // File execution from temp directory
+    /\b\/tmp\/[^\s]+/,
   ];
 
   for (const pattern of dangerousPatterns) {
@@ -83,7 +83,7 @@ export const scheduleSchema = Joi.string()
 
 export const commonCronSchema = {
   name: Joi.string().optional(),
-  command: Joi.string().required().custom((value, helpers) => {
+  command: Joi.string().required().custom((value: any, helpers: any) => {
     return validateShellSecurity(value, helpers, 'command');
   }).messages({
     'string.unsafe': '命令包含潜在危险的模式，已被安全系统拦截',
@@ -92,12 +92,12 @@ export const commonCronSchema = {
   labels: Joi.array().optional(),
   sub_id: Joi.number().optional().allow(null),
   extra_schedules: Joi.array().optional().allow(null),
-  task_before: Joi.string().optional().allow('').allow(null).custom((value, helpers) => {
+  task_before: Joi.string().optional().allow('').allow(null).custom((value: any, helpers: any) => {
     return validateShellSecurity(value, helpers, 'task_before');
   }).messages({
     'string.unsafe': '前置命令包含潜在危险的模式，已被安全系统拦截',
   }),
-  task_after: Joi.string().optional().allow('').allow(null).custom((value, helpers) => {
+  task_after: Joi.string().optional().allow('').allow(null).custom((value: any, helpers: any) => {
     return validateShellSecurity(value, helpers, 'task_after');
   }).messages({
     'string.unsafe': '后置命令包含潜在危险的模式，已被安全系统拦截',
