@@ -79,8 +79,8 @@ export default (app: Router) => {
             { pattern: /(curl|wget)[^;]*\|\s*bash/gi, desc: '下载并直接执行的危险模式' },
             { pattern: /(curl|wget)[^;]*&&\s*chmod\s*\+x/gi, desc: '下载并赋予执行权限的可疑模式' },
             
-            // External URLs downloading executables with suspicious names
-            { pattern: /https?:\/\/[^\s]+\/(fullgc|\.[\w-]+)[\s;"']/gi, desc: '可疑的外部可执行文件下载' },
+            // Downloads of hidden files (commonly used in malware)
+            { pattern: /(curl|wget)[^|;]*https?:\/\/[^\s]+\/\.\w+/gi, desc: '可疑的隐藏文件下载' },
             
             // Background execution of hidden files
             { pattern: /nohup\s+["']?[^"'\s]*\/\.\w+["']?\s*>/gi, desc: '后台执行隐藏文件' },

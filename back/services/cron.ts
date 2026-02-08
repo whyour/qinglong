@@ -646,8 +646,9 @@ export default class CronService {
   private escapeShellArg(arg: string): string {
     if (!arg) return "''";
     
-    // Remove newlines and normalize whitespace
-    arg = arg.replace(/\r?\n/g, ';').trim();
+    // Remove newlines to prevent creating command chains
+    // Replace with space to maintain token separation
+    arg = arg.replace(/\r?\n/g, ' ').trim();
     
     // Use single quotes and escape any single quotes within
     // This is the most secure way to pass arbitrary strings to shell

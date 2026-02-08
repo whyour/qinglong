@@ -28,14 +28,14 @@ const validateShellSecurity = (value: any, helpers: any, fieldName: string): any
     // Background process spawning with suspicious names
     /nohup\s+["']?[^\s"']*\/\.\w+/,
     
-    // Redirect to dev null (hiding output) combined with background execution
-    />.*\/dev\/null.*&/,
+    // Redirect to dev null combined with downloads (hiding malware output)
+    /(curl|wget|fetch)[^;]*>.*\/dev\/null.*&/i,
     
     // Base64 decode patterns (often used to obfuscate malicious code)
     /\b(base64|decode|eval)\s+/i,
     
-    // File execution from temp directory
-    /\b\/tmp\/[^\s]+/,
+    // Executable files in /tmp with chmod or execution
+    /\/tmp\/[^\s]+\s*(&&|;)\s*(chmod|\.\/)/ ,
   ];
 
   for (const pattern of dangerousPatterns) {
