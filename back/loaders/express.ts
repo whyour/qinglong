@@ -36,7 +36,8 @@ export default ({ app }: { app: Application }) => {
       secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
-      path: [...config.apiWhiteList, /^\/(?!api\/).*/],
+      // Use case-insensitive regex to prevent bypassing JWT via uppercase paths like /Api/
+      path: [...config.apiWhiteList, /^\/(?!api\/)/i],
     }),
   );
 
@@ -51,22 +52,25 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req: Request, res, next) => {
-    if (!['/open/', '/api/'].some((x) => req.path.startsWith(x))) {
+    // Normalize path to lowercase to prevent case-sensitivity bypass (e.g. /Open/, /API/)
+    const normalizedPath = req.path.toLowerCase();
+    if (!['/open/', '/api/'].some((x) => normalizedPath.startsWith(x))) {
       return next();
     }
 
     const headerToken = getToken(req);
-    if (req.path.startsWith('/open/')) {
+    if (normalizedPath.startsWith('/open/')) {
       const apps = await shareStore.getApps();
       const doc = apps?.filter((x) =>
         x.tokens?.find((y) => y.value === headerToken),
       )?.[0];
       if (doc && doc.tokens && doc.tokens.length > 0) {
         const currentToken = doc.tokens.find((x) => x.value === headerToken);
-        const keyMatch = req.path.match(/\/open\/([a-z]+)\/*/);
-        const key = keyMatch && keyMatch[1];
+        // Use case-insensitive match and normalize key to prevent scope bypass via uppercase paths
+        const keyMatch = req.path.match(/\/open\/([a-zA-Z]+)\/*/);
+        const key = keyMatch && keyMatch[1]?.toLowerCase();
         if (
-          doc.scopes.includes(key as any) &&
+          key && doc.scopes.includes(key as any) &&
           currentToken &&
           currentToken.expiration >= Math.round(Date.now() / 1000)
         ) {
