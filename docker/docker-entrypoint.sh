@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export PATH="$HOME/bin:$PATH"
-
 dir_shell=/ql/shell
 . $dir_shell/share.sh
 
