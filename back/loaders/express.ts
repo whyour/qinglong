@@ -98,7 +98,14 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req, res, next) => {
-    if (!['/api/user/init', '/api/user/notification/init'].includes(req.path)) {
+    if (
+      ![
+        '/api/user/init',
+        '/api/user/notification/init',
+        '/open/user/init',
+        '/open/user/notification/init',
+      ].includes(req.path)
+    ) {
       return next();
     }
     const authInfo =
