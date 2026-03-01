@@ -22,6 +22,14 @@ export default ({ app }: { app: Application }) => {
     app.use(rewrite(`${config.baseUrl}/*`, '/$1'));
   }
   
+  // Normalize URL path to lowercase to prevent authentication bypass via mixed-case paths
+  // e.g. /API/system/command-run should not bypass JWT checks designed for /api/...
+  // The regex only matches the path portion (stops at ? or #), preserving query strings.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    req.url = req.url.replace(/^[^?#]*/, (p) => p.toLowerCase());
+    next();
+  });
+
   app.get(`${config.api.prefix}/env.js`, serveEnv);
   app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
 
