@@ -1,11 +1,6 @@
-version: 2.20.1
-changeLogLink: https://t.me/jiao_long/433
-publishTime: 2025-12-26 22:00
+version: 2.20.2
+changeLogLink: https://t.me/jiao_long/434
+publishTime: 2026-03-01 1800
 changeLog: |
-  1. 修复获取依赖管理列表
-  2. notify.js 修复 TG_PROXY_AUTH 参数拼接
-  3. QLAPI.notify larkSecret 参数
-  4. 修复 cron parser 定时规则校验
-  5. 修复设置 baseUrl 后无法访问
-  6. 修复环境变量排序
-  7. 修复定时任务无法停止
+  1. 修复 path 安全漏洞（重要）
+  
