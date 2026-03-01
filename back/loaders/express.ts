@@ -152,7 +152,11 @@ export default ({ app }: { app: Application }) => {
   app.use(rewrite('/open/*', '/api/$1'));
   app.use(config.api.prefix, routes());
 
-  app.get('*', (_, res, next) => {
+  app.get('*', (req, res, next) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
     const indexPath = path.join(frontendPath, 'index.html');
     res.sendFile(indexPath, (err) => {
       if (err) {
