@@ -13,7 +13,7 @@ import { AuthDataType, SystemModel } from '../data/system';
 import SystemService from '../services/system';
 import UserService from '../services/user';
 import { writeFile, readFile } from 'fs/promises';
-import { createRandomString, fileExist, safeJSONParse } from '../config/util';
+import { createRandomString, fileExist, safeJSONParse, isPidRunning } from '../config/util';
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
@@ -132,7 +132,32 @@ export default async () => {
   });
 
   // 初始化更新所有任务状态为空闲
-  await CrontabModel.update({ status: CrontabStatus.idle }, { where: {} });
+  // 但保留仍在运行的任务的状态
+  const allCrons = await CrontabModel.findAll({
+    attributes: ['id', 'pid'],
+    raw: true,
+  });
+  const idsToReset: number[] = [];
+  
+  for (const cron of allCrons) {
+    // 如果任务有 PID 且进程仍在运行，则保持其状态
+    if (cron.pid != null && isPidRunning(cron.pid)) {
+      // 保留当前状态（running 或 queued）
+      continue;
+    }
+    // 收集需要重置的任务 ID
+    if (cron.id) {
+      idsToReset.push(cron.id);
+    }
+  }
+  
+  // 批量更新所有需要重置的任务
+  if (idsToReset.length > 0) {
+    await CrontabModel.update(
+      { status: CrontabStatus.idle, pid: undefined },
+      { where: { id: { [Op.in]: idsToReset } } }
+    );
+  }
 
   // 初始化时执行一次所有的 ql repo 任务
   CrontabModel.findAll({

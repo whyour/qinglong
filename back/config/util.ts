@@ -397,6 +397,21 @@ export function psTree(pid: number): Promise<number[]> {
   });
 }
 
+export function isPidRunning(pid: number): boolean {
+  // Validate PID: must be a positive integer
+  if (pid == null || pid <= 0 || !Number.isInteger(pid)) {
+    return false;
+  }
+  
+  try {
+    // Signal 0 doesn't kill the process, just checks if it exists
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 export async function killTask(pid: number) {
   const pids = await psTree(pid);
 
