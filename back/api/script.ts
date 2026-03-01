@@ -206,6 +206,7 @@ export default (app: Router) => {
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
       try {
         let { filename, content, path } = req.body as {
           filename: string;
@@ -223,6 +224,7 @@ export default (app: Router) => {
         await writeFileWithLock(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
+        logger.error('🔥 error saving script: %o', e);
         return next(e);
       }
     },
