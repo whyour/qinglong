@@ -1,0 +1,13 @@
+export
+.node-description {
+  color: var(--semi-color-text-2);
+  font-size: 12px;
+  line-height: 20px;
+  padding: 2px 9px;
+  word-break: break-all;
+  white-space: break-spaces;
+}
+
+.base-textarea {
+  word-break: break-all;
+}

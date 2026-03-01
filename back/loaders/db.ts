@@ -6,6 +6,7 @@ import { AppModel } from '../data/open';
 import { SystemModel } from '../data/system';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
+import { ScenarioModel } from '../data/scenario';
 import { sequelize } from '../data';
 
 export default async () => {
@@ -17,6 +18,7 @@ export default async () => {
     await EnvModel.sync();
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
+    await ScenarioModel.sync();
 
     // 初始化新增字段
     const migrations = [
@@ -40,6 +42,7 @@ export default async () => {
         type: 'NUMBER',
       },
       { table: 'Envs', column: 'isPinned', type: 'NUMBER' },
+      { table: 'Scenarios', column: 'status', type: 'INTEGER DEFAULT 0' },
     ];
 
     for (const migration of migrations) {

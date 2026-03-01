@@ -11,6 +11,7 @@ import system from './system';
 import subscription from './subscription';
 import update from './update';
 import health from './health';
+import scenario from './scenario';
 
 export default () => {
   const app = Router();
@@ -26,6 +27,7 @@ export default () => {
   subscription(app);
   update(app);
   health(app);
+  scenario(app);
 
   return app;
 };
