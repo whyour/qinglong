@@ -79,7 +79,7 @@
     "lodash": "^4.17.21",
     "multer": "2.1.1",
     "node-schedule": "^2.1.0",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^8.0.1",
     "p-queue-cjs": "7.3.4",
     "@bufbuild/protobuf": "^2.10.0",
     "ps-tree": "^1.2.0",
