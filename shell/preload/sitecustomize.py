@@ -42,7 +42,7 @@ def run():
         os.environ["PYTHONPATH"] = prev_pythonpath
 
         split_str = "__sitecustomize__"
-        file_name = sys.argv[0].replace(f"{os.getenv('dir_scripts')}/", "")
+        file_name = os.path.abspath(sys.argv[0]).replace(f"{os.getenv('dir_scripts')}/", "")
         
         # 创建临时文件路径
         temp_file = f"/tmp/env_{os.getpid()}.json"
