@@ -92,7 +92,7 @@ run_normal() {
 
   cd $dir_scripts
   local relative_path="${file_param%/*}"
-  if [[ ${file_param} != /* ]] && [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
+  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
     cd ${relative_path}
     file_param=${file_param/$relative_path\//}
   fi
