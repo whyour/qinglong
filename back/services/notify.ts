@@ -590,16 +590,44 @@ export default class NotificationService {
   }
 
   private async email() {
-    const { emailPass, emailService, emailUser, emailTo } = this.params;
+    const {
+      emailPass,
+      emailService,
+      emailUser,
+      emailTo,
+      emailHost,
+      emailPort,
+      emailSecure,
+    } = this.params;
 
     try {
-      const transporter = nodemailer.createTransport({
-        service: emailService,
+      const transportConfig: {
+        service?: string;
+        host?: string;
+        port?: number;
+        secure?: boolean;
+        auth: { user: string; pass: string };
+      } = {
         auth: {
           user: emailUser,
           pass: emailPass,
         },
-      });
+      };
+
+      if (emailHost) {
+        transportConfig.host = emailHost;
+        transportConfig.port = emailPort
+          ? Math.max(1, Math.min(65535, parseInt(emailPort, 10) || 465))
+          : 465;
+        transportConfig.secure =
+          emailSecure !== undefined && emailSecure !== ''
+            ? emailSecure === 'true'
+            : transportConfig.port === 465;
+      } else {
+        transportConfig.service = emailService;
+      }
+
+      const transporter = nodemailer.createTransport(transportConfig);
 
       const info = await transporter.sendMail({
         from: `"青龙快讯" <${emailUser}>`,

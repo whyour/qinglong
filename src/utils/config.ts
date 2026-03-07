@@ -406,9 +406,26 @@ export default {
       {
         label: 'emailService',
         tip: intl.get(
-          '邮箱服务名称，比如126、163、Gmail、QQ等，支持列表https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json',
+          '邮箱服务名称，比如126、163、Gmail、QQ等，支持列表https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json，设置emailHost后此项可不填',
         ),
-        required: true,
+      },
+      {
+        label: 'emailHost',
+        tip: intl.get(
+          '自定义SMTP服务器地址，设置后将忽略emailService中的服务器配置，如smtp.qiye.aliyun.com',
+        ),
+      },
+      {
+        label: 'emailPort',
+        tip: intl.get('自定义SMTP端口号，默认465'),
+      },
+      {
+        label: 'emailSecure',
+        tip: intl.get('是否使用SSL/TLS，端口为465时默认为true，否则默认为false'),
+        items: [
+          { value: 'true', label: 'true' },
+          { value: 'false', label: 'false' },
+        ],
       },
       { label: 'emailUser', tip: intl.get('邮箱认证地址'), required: true },
       {

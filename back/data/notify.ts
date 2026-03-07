@@ -116,6 +116,9 @@ export class EmailNotification extends NotificationBaseInfo {
   public emailUser: string = '';
   public emailPass: string = '';
   public emailTo: string = '';
+  public emailHost: string = '';
+  public emailPort: string = '';
+  public emailSecure: string = '';
 }
 
 export class PushMeNotification extends NotificationBaseInfo {
