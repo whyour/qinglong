@@ -616,9 +616,11 @@ export default class NotificationService {
 
       if (emailHost) {
         transportConfig.host = emailHost;
-        transportConfig.port = emailPort
-          ? Math.max(1, Math.min(65535, parseInt(emailPort, 10) || 465))
-          : 465;
+        const parsedPort = emailPort ? parseInt(emailPort, 10) : NaN;
+        transportConfig.port =
+          !isNaN(parsedPort) && parsedPort >= 1 && parsedPort <= 65535
+            ? parsedPort
+            : 465;
         transportConfig.secure =
           emailSecure !== undefined && emailSecure !== ''
             ? emailSecure === 'true'
