@@ -84,6 +84,6 @@ COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 WORKDIR ${QL_DIR}
 
 HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
-  CMD curl -sf --noproxy '*' http://127.0.0.1:5700/api/health || exit 1
+  CMD curl -sf --noproxy '*' http://127.0.0.1:${QlPort:-5700}/api/health || exit 1
 
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
