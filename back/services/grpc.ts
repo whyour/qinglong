@@ -25,7 +25,7 @@ export class GrpcServerService {
       const grpcPort = config.grpcPort;
       const bindAsync = promisify(this.server.bindAsync).bind(this.server);
       await bindAsync(
-        `0.0.0.0:${grpcPort}`,
+        `[::]:${grpcPort}`,
         ServerCredentials.createInsecure(),
       );
       Logger.debug(`✌️ gRPC service started successfully`);
