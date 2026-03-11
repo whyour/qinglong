@@ -639,6 +639,22 @@ export default class CronService {
     }
   }
 
+  /**
+   * Properly escape shell arguments to prevent command injection
+   * This function uses a more robust escaping mechanism than simple quote replacement
+   */
+  private escapeShellArg(arg: string): string {
+    if (!arg) return "''";
+    
+    // Remove newlines to prevent creating command chains
+    // Replace with space to maintain token separation
+    arg = arg.replace(/\r?\n/g, ' ').trim();
+    
+    // Use single quotes and escape any single quotes within
+    // This is the most secure way to pass arbitrary strings to shell
+    return `'${arg.replace(/'/g, "'\\''")}'`;
+  }
+
   private makeCommand(tab: Crontab, realTime?: boolean) {
     let command = tab.command.trim();
     if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
@@ -650,16 +666,10 @@ export default class CronService {
       commandVariable += `log_name=${tab.log_name} `;
     }
     if (tab.task_before) {
-      commandVariable += `task_before='${tab.task_before
-        .replace(/'/g, "'\\''")
-        .replace(/;? *\n/g, ';')
-        .trim()}' `;
+      commandVariable += `task_before=${this.escapeShellArg(tab.task_before)} `;
     }
     if (tab.task_after) {
-      commandVariable += `task_after='${tab.task_after
-        .replace(/'/g, "'\\''")
-        .replace(/;? *\n/g, ';')
-        .trim()}' `;
+      commandVariable += `task_after=${this.escapeShellArg(tab.task_after)} `;
     }
 
     const crontab_job_string = `${commandVariable}${command}`;

@@ -4,6 +4,57 @@ import { ScheduleType } from '../interface/schedule';
 import path from 'path';
 import config from '../config';
 
+/**
+ * Security validation function to detect potentially malicious shell code patterns
+ */
+const validateShellSecurity = (value: any, helpers: any, fieldName: string): any => {
+  if (!value) return value;
+
+  // Define dangerous patterns that should be blocked
+  const dangerousPatterns = [
+    // Command substitution
+    /\$\([^)]*\)/,
+    /`[^`]*`/,
+    
+    // File downloads
+    /\b(curl|wget|fetch)\s+/i,
+    
+    // Suspicious domains or external URLs
+    /https?:\/\/[^\s]+/i,
+    
+    // Hidden executable files (files starting with . in a path context)
+    /\/\.\w+(\s|$|;|&|\||>)/,
+    
+    // Background process spawning with suspicious names
+    /nohup\s+["']?[^\s"']*\/\.\w+/,
+    
+    // Redirect to dev null combined with downloads (hiding malware output)
+    /(curl|wget|fetch)[^;]*>.*\/dev\/null.*&/i,
+    
+    // Base64 decode patterns (often used to obfuscate malicious code)
+    /\b(base64|decode|eval)\s+/i,
+    
+    // Executable files in /tmp with chmod or execution
+    /\/tmp\/[^\s]+\s*(&&|;)\s*(chmod|\.\/)/ ,
+  ];
+
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(value)) {
+      return helpers.error('string.unsafe', { 
+        pattern: pattern.source,
+        field: fieldName 
+      });
+    }
+  }
+
+  // Check for excessive length (potential buffer overflow or obfuscation)
+  if (value.length > 10000) {
+    return helpers.error('string.max', { limit: 10000 });
+  }
+
+  return value;
+};
+
 const validateSchedule = (value: string, helpers: any) => {
   if (
     value.startsWith(ScheduleType.ONCE) ||
@@ -32,13 +83,25 @@ export const scheduleSchema = Joi.string()
 
 export const commonCronSchema = {
   name: Joi.string().optional(),
-  command: Joi.string().required(),
+  command: Joi.string().required().custom((value: any, helpers: any) => {
+    return validateShellSecurity(value, helpers, 'command');
+  }).messages({
+    'string.unsafe': '命令包含潜在危险的模式，已被安全系统拦截',
+  }),
   schedule: scheduleSchema,
   labels: Joi.array().optional(),
   sub_id: Joi.number().optional().allow(null),
   extra_schedules: Joi.array().optional().allow(null),
-  task_before: Joi.string().optional().allow('').allow(null),
-  task_after: Joi.string().optional().allow('').allow(null),
+  task_before: Joi.string().optional().allow('').allow(null).custom((value: any, helpers: any) => {
+    return validateShellSecurity(value, helpers, 'task_before');
+  }).messages({
+    'string.unsafe': '前置命令包含潜在危险的模式，已被安全系统拦截',
+  }),
+  task_after: Joi.string().optional().allow('').allow(null).custom((value: any, helpers: any) => {
+    return validateShellSecurity(value, helpers, 'task_after');
+  }).messages({
+    'string.unsafe': '后置命令包含潜在危险的模式，已被安全系统拦截',
+  }),
   log_name: Joi.string()
     .optional()
     .allow('')
