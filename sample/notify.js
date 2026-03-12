@@ -301,7 +301,7 @@ function serverNotify(text, desp) {
             console.log('Server 酱发送通知调用API失败😞\n', err);
           } else {
             // server酱和Server酱·Turbo版的返回json格式不太一样
-            if (data.errno === 0 || data.data.errno === 0) {
+            if (data.errno === 0 || data.code === 0) {
               console.log('Server 酱发送通知消息成功🎉\n');
             } else if (data.errno === 1024) {
               // 一分钟内发送相同的内容会触发
