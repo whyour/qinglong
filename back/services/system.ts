@@ -218,28 +218,108 @@ export default class SystemService {
       ...oDoc,
       info: { ...oDoc.info, ...info },
     });
-    let defaultDomain = 'https://dl-cdn.alpinelinux.org';
-    let targetDomain = 'https://dl-cdn.alpinelinux.org';
+    
     if (os.platform() !== 'linux') {
       return;
     }
-    const content = await fs.promises.readFile('/etc/apk/repositories', {
-      encoding: 'utf-8',
-    });
-    const domainMatch = content.match(/(http.*)\/alpine\/.*/);
-    if (domainMatch) {
-      defaultDomain = domainMatch[1];
+
+    let command = '';
+    
+    // Check if this is a Debian-based system (including Armbian)
+    // Check for both sources.list and debian_version for more reliable detection
+    const hasAptSourcesList = await fs.promises.access('/etc/apt/sources.list')
+      .then(() => true)
+      .catch(() => false);
+    const hasDebianVersion = await fs.promises.access('/etc/debian_version')
+      .then(() => true)
+      .catch(() => false);
+    const isDebianBased = hasAptSourcesList || hasDebianVersion;
+    
+    if (isDebianBased) {
+      // Handle Debian/Ubuntu/Armbian systems
+      let defaultDomain = '';
+      let targetDomain = info.linuxMirror || '';
+      
+      try {
+        // Read the current sources.list
+        const content = await fs.promises.readFile('/etc/apt/sources.list', {
+          encoding: 'utf-8',
+        });
+        
+        // Match the first deb line to extract the current mirror
+        // Note: This assumes all mirrors in sources.list use the same base URL
+        // If multiple different mirrors are configured, only the first one will be replaced
+        const debMatch = content.match(/^deb\s+(https?:\/\/[^\s]+)/m);
+        if (debMatch) {
+          defaultDomain = debMatch[1];
+        }
+        
+        if (defaultDomain && targetDomain) {
+          // Sanitize and escape special characters for sed
+          // Escape backslashes first, then other special characters
+          const escapedDefault = defaultDomain
+            .replace(/\\/g, '\\\\')  // Escape backslashes first
+            .replace(/\//g, '\\/')   // Escape forward slashes
+            .replace(/\./g, '\\.');  // Escape dots
+          const escapedTarget = targetDomain
+            .replace(/\\/g, '\\\\')  // Escape backslashes first
+            .replace(/\//g, '\\/');  // Escape forward slashes
+          
+          // Replace mirror URL in main sources.list
+          command = `sed -i 's/${escapedDefault}/${escapedTarget}/g' /etc/apt/sources.list`;
+          
+          // Also update sources.list.d if it exists
+          command += ` && if [ -d /etc/apt/sources.list.d ]; then find /etc/apt/sources.list.d -type f \\( -name "*.list" -o -name "*.sources" \\) -exec sed -i 's/${escapedDefault}/${escapedTarget}/g' {} \\;; fi`;
+          
+          // Update package lists
+          command += ` && apt-get update`;
+        } else if (!defaultDomain && targetDomain) {
+          // Cannot detect current mirror, log warning
+          this.logger.warn('Unable to detect current mirror from /etc/apt/sources.list. Mirror update skipped.');
+          this.sockService.sendMessage({
+            type: 'updateLinuxMirror',
+            message: 'Warning: Unable to detect current mirror. Please manually configure /etc/apt/sources.list',
+          });
+        }
+      } catch (error) {
+        this.logger.error('Failed to read /etc/apt/sources.list', error);
+      }
+    } else {
+      // Handle Alpine Linux systems
+      let defaultDomain = 'https://dl-cdn.alpinelinux.org';
+      let targetDomain = 'https://dl-cdn.alpinelinux.org';
+      
+      try {
+        const content = await fs.promises.readFile('/etc/apk/repositories', {
+          encoding: 'utf-8',
+        });
+        const domainMatch = content.match(/(http.*)\/alpine\/.*/);
+        if (domainMatch) {
+          defaultDomain = domainMatch[1];
+        }
+        if (info.linuxMirror) {
+          targetDomain = info.linuxMirror;
+        }
+        // Sanitize and escape special characters for sed
+        // Escape backslashes first, then other special characters
+        command = `sed -i 's/${defaultDomain
+          .replace(/\\/g, '\\\\')  // Escape backslashes first
+          .replace(/\//g, '\\/')   // Escape forward slashes
+          .replace(/\./g, '\\.')}/${targetDomain
+          .replace(/\\/g, '\\\\')  // Escape backslashes first
+          .replace(/\//g, '\\/')}/g' /etc/apk/repositories && apk update -f`;
+      } catch (error) {
+        this.logger.error('Failed to read /etc/apk/repositories', error);
+      }
     }
-    if (info.linuxMirror) {
-      targetDomain = info.linuxMirror;
+
+    if (!command) {
+      this.sockService.sendMessage({
+        type: 'updateLinuxMirror',
+        message: 'No supported package manager found or mirror not configured',
+      });
+      return;
     }
-    const command = `sed -i 's/${defaultDomain.replace(
-      /\//g,
-      '\\/',
-    )}/${targetDomain.replace(
-      /\//g,
-      '\\/',
-    )}/g' /etc/apk/repositories && apk update -f`;
 
     this.scheduleService.runTask(
       command,
