@@ -15,11 +15,12 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
         });
 
         // Default to single instance mode (0) for backward compatibility
-        const allowSingleInstances =
-          existingCron?.allow_multiple_instances === 0;
+        // allow_multiple_instances is 1 for multi-instance, 0 or null/undefined for single instance
+        const isSingleInstanceMode =
+          existingCron?.allow_multiple_instances !== 1;
 
         if (
-          allowSingleInstances &&
+          isSingleInstanceMode &&
           existingCron &&
           existingCron.pid &&
           (existingCron.status === CrontabStatus.running ||
@@ -49,6 +50,18 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
       );
       const cp = spawn(cmd, { shell: '/bin/bash' });
 
+      // Update status to running after spawning the process
+      try {
+        await CrontabModel.update(
+          { status: CrontabStatus.running, pid: cp.pid },
+          { where: { id: Number(cron.id) } },
+        );
+      } catch (error) {
+        Logger.error(
+          `[schedule][更新任务状态失败] 任务ID: ${cron.id}, 错误: ${error}`,
+        );
+      }
+
       cp.stderr.on('data', (data) => {
         Logger.info(
           '[schedule][执行任务失败] 命令: %s, 错误信息: %j',
@@ -66,6 +79,17 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
 
       cp.on('exit', async (code) => {
         taskLimit.removeQueuedCron(cron.id);
+        // Update status to idle after task completes
+        try {
+          await CrontabModel.update(
+            { status: CrontabStatus.idle, pid: undefined },
+            { where: { id: Number(cron.id) } },
+          );
+        } catch (error) {
+          Logger.error(
+            `[schedule][更新任务状态失败] 任务ID: ${cron.id}, 错误: ${error}`,
+          );
+        }
         Logger.info(
           '[schedule][执行任务结束] 参数: %s, 退出码: %j',
           JSON.stringify({
