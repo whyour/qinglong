@@ -17,6 +17,7 @@ import {
   readDirs,
   rmPath,
   setSystemTimezone,
+  updateLinuxMirrorFile,
 } from '../config/util';
 import {
   DependenceModel,
@@ -214,33 +215,11 @@ export default class SystemService {
     onEnd?: () => void,
   ) {
     const oDoc = await this.getSystemConfig();
-    await this.updateAuthDb({
-      ...oDoc,
-      info: { ...oDoc.info, ...info },
-    });
-    let defaultDomain = 'https://dl-cdn.alpinelinux.org';
-    let targetDomain = 'https://dl-cdn.alpinelinux.org';
     if (os.platform() !== 'linux') {
       return;
     }
-    const content = await fs.promises.readFile('/etc/apk/repositories', {
-      encoding: 'utf-8',
-    });
-    const domainMatch = content.match(/(http.*)\/alpine\/.*/);
-    if (domainMatch) {
-      defaultDomain = domainMatch[1];
-    }
-    if (info.linuxMirror) {
-      targetDomain = info.linuxMirror;
-    }
-    const command = `sed -i 's/${defaultDomain.replace(
-      /\//g,
-      '\\/',
-    )}/${targetDomain.replace(
-      /\//g,
-      '\\/',
-    )}/g' /etc/apk/repositories && apk update -f`;
-
+    const command = await updateLinuxMirrorFile(info.linuxMirror || '');
+    let hasError = false;
     this.scheduleService.runTask(
       command,
       {
@@ -254,8 +233,15 @@ export default class SystemService {
             message: 'update linux mirror end',
           });
           onEnd?.();
+          if (!hasError) {
+            await this.updateAuthDb({
+              ...oDoc,
+              info: { ...oDoc.info, ...info },
+            });
+          }
         },
         onError: async (message: string) => {
+          hasError = true;
           this.sockService.sendMessage({ type: 'updateLinuxMirror', message });
         },
         onLog: async (message: string) => {
