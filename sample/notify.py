@@ -1088,7 +1088,7 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
             return
 
     hitokoto = push_config.get("HITOKOTO")
-    content += "\n\n" + one() if hitokoto != "false" else ""
+    content += "\n\n" + one() if hitokoto not in [False, "false"] else ""
 
     notify_function = add_notify_function()
     ts = [
