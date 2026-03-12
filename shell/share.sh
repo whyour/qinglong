@@ -258,8 +258,16 @@ git_clone_scripts() {
 
   set_proxy "$proxy"
 
+  # Set TMPDIR to /tmp to avoid "unable to get random bytes" error in some Docker environments
+  local original_tmpdir="${TMPDIR:-}"
+  export TMPDIR=/tmp
   git clone -q --depth=1 $part_cmd $url $dir
   exit_status=$?
+  if [[ -n "$original_tmpdir" ]]; then
+    export TMPDIR="$original_tmpdir"
+  else
+    unset TMPDIR
+  fi
 
   unset_proxy
 }
