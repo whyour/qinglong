@@ -11,7 +11,7 @@ export class HttpServerService {
   async initialize(expressApp: express.Application, port: number) {
     try {
       return new Promise((resolve, reject) => {
-        this.server = expressApp.listen(port, '0.0.0.0', () => {
+        this.server = expressApp.listen(port, '::', () => {
           Logger.debug(`✌️ HTTP service started successfully`);
           metricsService.record('http_service_start', 1, {
             port: port.toString(),
