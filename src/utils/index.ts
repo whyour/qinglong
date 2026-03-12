@@ -1,6 +1,6 @@
 import intl from 'react-intl-universal';
 import { LANG_MAP, LOG_END_SYMBOL } from './const';
-import CronExpressionParser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 import { ICrontab } from '@/pages/crontab/type';
 
 export default function browserType() {
