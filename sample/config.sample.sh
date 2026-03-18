@@ -201,6 +201,8 @@ export SMTP_EMAIL=""
 export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
+## smtp_email_to 填写 SMTP 收件邮箱，可选
+export SMTP_EMAIL_TO=""
 
 ## 17. PushMe
 ## 官方说明文档：https://push.i-i.me/
