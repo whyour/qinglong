@@ -397,6 +397,10 @@ gen_list_repo() {
   if [[ $blackword ]]; then
     files=$(echo "$files" | egrep -v "$blackword")
   fi
+# Filter out dependency files from the scripts list
+if [[ $dependence ]]; then
+  files=$(echo "$files" | egrep -v "$dependence")
+fi
 
   cp -f $file_notify_js "${dir_scripts}/${uniq_path}"
   cp -f $file_notify_py "${dir_scripts}/${uniq_path}"
