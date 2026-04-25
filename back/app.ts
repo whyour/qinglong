@@ -151,6 +151,8 @@ class Application {
   private setupMiddlewares() {
     this.app.use(helmet({
       contentSecurityPolicy: false,
+      crossOriginOpenerPolicy: false,
+      originAgentCluster: false,
     }));
     this.app.use(cors(config.cors));
     this.app.use(compression());
