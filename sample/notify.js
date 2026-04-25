@@ -151,6 +151,9 @@ const push_config = {
   WXPUSHER_APP_TOKEN: '', // wxpusher 的 appToken
   WXPUSHER_TOPIC_IDS: '', // wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
   WXPUSHER_UIDS: '', // wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+
+  // 官方文档: https://openilink.com/docs/hub/apps
+  OPENILINK_APP_TOKEN: '', // OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取
 };
 
 for (const key in push_config) {
@@ -1408,6 +1411,46 @@ function wxPusherNotify(text, desp) {
   });
 }
 
+function openiLinkNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { OPENILINK_APP_TOKEN } = push_config;
+    if (OPENILINK_APP_TOKEN) {
+      const options = {
+        url: 'https://hub.openilink.com/bot/v1/message/send',
+        body: JSON.stringify({
+          type: 'text',
+          content: `${text}\n\n${desp}`,
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENILINK_APP_TOKEN}`,
+        },
+        timeout,
+      };
+
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('OpeniLink 发送通知消息失败！\n', err);
+          } else {
+            if (data.ok) {
+              console.log('OpeniLink 发送通知消息成功！');
+            } else {
+              console.log(`OpeniLink 发送通知消息异常：${data.error}`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
 function parseString(input, valueFormatFn) {
   const regex = /(\w+):\s*((?:(?!\n\w+:).)*)/g;
   const matches = {};
@@ -1538,6 +1581,7 @@ async function sendNotify(text, desp, params = {}) {
     qmsgNotify(text, desp), // 自定义通知
     ntfyNotify(text, desp), // Ntfy
     wxPusherNotify(text, desp), // wxpusher
+    openiLinkNotify(text, desp), // OpeniLink
   ]);
 }
 

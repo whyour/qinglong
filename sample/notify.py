@@ -135,6 +135,8 @@ push_config = {
     'WXPUSHER_APP_TOKEN': '',           # wxpusher 的 appToken 官方文档: https://wxpusher.zjiecode.com/docs/ 管理后台: https://wxpusher.zjiecode.com/admin/
     'WXPUSHER_TOPIC_IDS': '',           # wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
     'WXPUSHER_UIDS': '',                # wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+
+    'OPENILINK_APP_TOKEN': '',          # OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取 官方文档: https://openilink.com/docs/hub/apps
 }
 # fmt: on
 
@@ -898,6 +900,35 @@ def wxpusher_bot(title: str, content: str) -> None:
         print(f"wxpusher 推送失败！错误信息：{response.get('msg')}")
 
 
+def openilink(title: str, content: str) -> None:
+    """
+    通过 OpeniLink 推送消息。
+    支持的环境变量:
+    - OPENILINK_APP_TOKEN: 在 OpeniLink Hub 后台安装 App 后获取的 app_token
+    """
+    if not push_config.get("OPENILINK_APP_TOKEN"):
+        return
+
+    print("OpeniLink 服务启动")
+
+    url = "https://hub.openilink.com/bot/v1/message/send"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f'Bearer {push_config.get("OPENILINK_APP_TOKEN")}',
+    }
+    data = {
+        "type": "text",
+        "content": f"{title}\n\n{content}",
+    }
+
+    response = requests.post(url=url, json=data, headers=headers).json()
+
+    if response.get("ok"):
+        print("OpeniLink 推送成功！")
+    else:
+        print(f'OpeniLink 推送失败！错误信息：{response.get("error")}')
+
+
 def parse_headers(headers):
     if not headers:
         return {}
@@ -1063,6 +1094,8 @@ def add_notify_function():
         push_config.get("WXPUSHER_TOPIC_IDS") or push_config.get("WXPUSHER_UIDS")
     ):
         notify_function.append(wxpusher_bot)
+    if push_config.get("OPENILINK_APP_TOKEN"):
+        notify_function.append(openilink)
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
     return notify_function

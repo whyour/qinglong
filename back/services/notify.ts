@@ -34,6 +34,7 @@ export default class NotificationService {
     ['chronocat', this.chronocat],
     ['ntfy', this.ntfy],
     ['wxPusherBot', this.wxPusherBot],
+    ['openiLink', this.openiLink],
   ]);
 
   private title = '';
@@ -857,5 +858,30 @@ export default class NotificationService {
         return { body };
     }
     return {};
+  }
+
+  private async openiLink() {
+    const { openiLinkAppToken } = this.params;
+    const url = 'https://hub.openilink.com/bot/v1/message/send';
+    try {
+      const res = await httpClient.post(url, {
+        ...this.gotOption,
+        json: {
+          type: 'text',
+          content: `${this.title}\n\n${this.content}`,
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openiLinkAppToken}`,
+        },
+      });
+      if (res.ok) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 }

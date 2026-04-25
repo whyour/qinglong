@@ -20,6 +20,7 @@ export enum NotificationMode {
   'chronocat' = 'Chronocat',
   'ntfy' = 'ntfy',
   'wxPusherBot' = 'wxPusherBot',
+  'openiLink' = 'openiLink',
 }
 
 abstract class NotificationBaseInfo {
@@ -161,6 +162,10 @@ export class WxPusherBotNotification extends NotificationBaseInfo {
   public wxPusherBotUids = '';
 }
 
+export class OpeniLinkNotification extends NotificationBaseInfo {
+  public openiLinkAppToken = '';
+}
+
 export interface NotificationInfo
   extends GoCqHttpBotNotification,
     GotifyNotification,
@@ -182,4 +187,5 @@ export interface NotificationInfo
     ChronocatNotification,
     LarkNotification,
     NtfyNotification,
-    WxPusherBotNotification {}
+    WxPusherBotNotification,
+    OpeniLinkNotification {}
