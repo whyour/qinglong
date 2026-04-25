@@ -30,6 +30,8 @@ import {
   SystemInstance,
   SystemModel,
   SystemModelInfo,
+  NotifyStatus,
+  NotifyLogInfo,
 } from '../data/system';
 import taskLimit from '../shared/pLimit';
 import NotificationService from './notify';
@@ -389,16 +391,50 @@ export default class SystemService {
     if (notificationInfo && typeString) {
       notificationInfo.type = typeString;
     }
+
+    let notifyType: string | undefined;
+    try {
+      const notifConfig = await this.getDb({ type: AuthDataType.notification });
+      notifyType = notifConfig.info?.type as string | undefined;
+    } catch (e) {}
+    if (notificationInfo?.type) {
+      notifyType = typeString || (notificationInfo.type as string);
+    }
+
     const isSuccess = await this.notificationService.notify(
       title,
       content,
       notificationInfo,
     );
+
+    await SystemModel.create({
+      type: AuthDataType.notifyLog,
+      info: {
+        timestamp: Date.now(),
+        title,
+        content,
+        status: isSuccess ? NotifyStatus.success : NotifyStatus.fail,
+        notifyType,
+      },
+    });
+
     if (isSuccess) {
       return { code: 200, message: '通知发送成功' };
     } else {
       return { code: 400, message: '通知发送失败，请检查系统设置/通知配置' };
     }
+  }
+
+  public async getNotifyLog(): Promise<Array<NotifyLogInfo>> {
+    const docs = await SystemModel.findAll({
+      where: { type: AuthDataType.notifyLog },
+      order: [['id', 'DESC']],
+    });
+    if (docs.length > 200) {
+      const ids = docs.slice(200).map((x) => x.id!);
+      await SystemModel.destroy({ where: { id: ids } });
+    }
+    return docs.slice(0, 200).map((x) => ({ ...x.info, id: x.id }));
   }
 
   public async run({ command, logPath }: { command: string; logPath?: string }, callback: TaskCallbacks) {
