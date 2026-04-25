@@ -36,7 +36,7 @@ import { useVT } from 'virtualizedtableforantd4';
 import Copy from '../../components/copy';
 import EditNameModal from './editNameModal';
 import './index.less';
-import EnvModal from './modal';
+import EnvModal, { EnvLabelModal } from './modal';
 
 const { Paragraph } = Typography;
 const { Search } = Input;
@@ -118,6 +118,22 @@ const Env = () => {
           <Tooltip title={text} placement="topLeft">
             <div className="text-ellipsis">{text}</div>
           </Tooltip>
+        );
+      },
+    },
+    {
+      title: intl.get('标签'),
+      dataIndex: 'labels',
+      key: 'labels',
+      render: (labels: string[], record: any) => {
+        return (
+          <Space size={[0, 4]} wrap>
+            {labels?.filter((l) => l).map((label) => (
+              <Tag key={label} color="blue">
+                {label}
+              </Tag>
+            ))}
+          </Space>
         );
       },
     },
@@ -238,6 +254,7 @@ const Env = () => {
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditNameModalVisible, setIsEditNameModalVisible] = useState(false);
+  const [isLabelModalVisible, setIsLabelModalVisible] = useState(false);
   const [editedEnv, setEditedEnv] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -625,6 +642,13 @@ const Env = () => {
             <Button
               type="primary"
               style={{ marginBottom: 5, marginLeft: 8 }}
+              onClick={() => setIsLabelModalVisible(true)}
+            >
+              {intl.get('批量修改标签')}
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginBottom: 5, marginLeft: 8 }}
               onClick={delEnvs}
             >
               {intl.get('批量删除')}
@@ -697,6 +721,15 @@ const Env = () => {
       {isEditNameModalVisible && (
         <EditNameModal
           handleCancel={handleEditNameCancel}
+          ids={selectedRowIds}
+        />
+      )}
+      {isLabelModalVisible && (
+        <EnvLabelModal
+          handleCancel={(needUpdate) => {
+            setIsLabelModalVisible(false);
+            if (needUpdate) getEnvs();
+          }}
           ids={selectedRowIds}
         />
       )}
