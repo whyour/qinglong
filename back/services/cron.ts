@@ -2,6 +2,7 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
+import { CronLog, CronLogModel } from '../data/cronLog';
 import { exec, execSync } from 'child_process';
 import fs from 'fs/promises';
 import CronExpressionParser from 'cron-parser';
@@ -176,6 +177,17 @@ export default class CronService {
         { ...pickBy(options, (v) => v === 0 || !!v) },
         { where: { id } },
       );
+
+      if (status === CrontabStatus.idle && last_running_time > 0) {
+        await CronLogModel.create(
+          new CronLog({
+            cron_id: id,
+            cron_name: cron.name || cron.command || '',
+            start_time: last_execution_time,
+            duration: last_running_time,
+          }),
+        );
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import CronService from '../services/cron';
 import CronViewService from '../services/cronView';
+import CronStatsService from '../services/cronStats';
 import { celebrate, Joi } from 'celebrate';
 import { commonCronSchema } from '../validation/schedule';
 
@@ -134,6 +135,58 @@ export default (app: Router) => {
       try {
         const cronViewService = Container.get(CronViewService);
         const data = await cronViewService.enabled(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/stats',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronStatsService = Container.get(CronStatsService);
+        const data = await cronStatsService.stats();
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/stats/trend',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronStatsService = Container.get(CronStatsService);
+        const data = await cronStatsService.trend();
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/stats/top-duration',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronStatsService = Container.get(CronStatsService);
+        const data = await cronStatsService.topDuration();
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/stats/top-count',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const cronStatsService = Container.get(CronStatsService);
+        const data = await cronStatsService.topCount();
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);

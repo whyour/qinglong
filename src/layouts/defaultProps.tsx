@@ -1,5 +1,5 @@
 import intl from 'react-intl-universal';
-import { SettingOutlined } from '@ant-design/icons';
+import { BarChartOutlined, SettingOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
 import { BasicLayoutProps } from '@ant-design/pro-layout';
 
@@ -29,6 +29,12 @@ export default {
         name: intl.get('定时任务'),
         icon: <IconFont type="ql-icon-crontab" />,
         component: '@/pages/crontab/index',
+      },
+      {
+        path: '/statistics',
+        name: intl.get('统计面板'),
+        icon: <BarChartOutlined />,
+        component: '@/pages/statistics/index',
       },
       {
         path: '/subscription',

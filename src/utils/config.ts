@@ -504,6 +504,7 @@ export default {
     '/login': intl.get('登录'),
     '/initialization': intl.get('初始化'),
     '/crontab': intl.get('定时任务'),
+    '/statistics': intl.get('统计面板'),
     '/env': intl.get('环境变量'),
     '/subscription': intl.get('订阅管理'),
     '/config': intl.get('配置文件'),
