@@ -195,13 +195,13 @@ export SMTP_SERVER=""
 ## SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
 export SMTP_SSL=""
 
-## smtp_email 填写 SMTP 收发件邮箱，通知将会由自己发给自己
+## smtp_email 填写 SMTP 发件邮箱
 export SMTP_EMAIL=""
 ## smtp_password 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
 export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
-## smtp_email_to 填写 SMTP 收件邮箱，可选
+## smtp_email_to 填写 SMTP 收件邮箱，多个用英文;分隔，不填默认发给发件邮箱
 export SMTP_EMAIL_TO=""
 
 ## 17. PushMe

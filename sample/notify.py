@@ -107,8 +107,8 @@ push_config = {
 
     'SMTP_SERVER': '',                  # SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
     'SMTP_SSL': 'false',                # SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
-    'SMTP_EMAIL': '',                   # SMTP 收发件邮箱，通知将会由自己发给自己
-    'SMTP_EMAIL_TO': '',                # SMTP 收件邮箱，填了则会发送到这个邮箱
+    'SMTP_EMAIL': '',                   # SMTP 发件邮箱
+    'SMTP_EMAIL_TO': '',                # SMTP 收件邮箱，多个分号分隔，默认发给发件邮箱
     'SMTP_PASSWORD': '',                # SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
     'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
 
@@ -692,6 +692,9 @@ def smtp(title: str, content: str) -> None:
     print("SMTP 邮件 服务启动")
 
     email_to = push_config.get("SMTP_EMAIL_TO") or push_config.get("SMTP_EMAIL")
+    email_to_list = [
+        item.strip() for item in re.split(r"[;；]", email_to) if item.strip()
+    ]
     message = MIMEText(content, "plain", "utf-8")
     message["From"] = formataddr(
         (
@@ -699,12 +702,7 @@ def smtp(title: str, content: str) -> None:
             push_config.get("SMTP_EMAIL"),
         )
     )
-    message["To"] = formataddr(
-        (
-            Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
-            email_to,
-        )
-    )
+    message["To"] = ",".join(email_to_list)
     message["Subject"] = Header(title, "utf-8")
 
     try:
@@ -718,7 +716,7 @@ def smtp(title: str, content: str) -> None:
         )
         smtp_server.sendmail(
             push_config.get("SMTP_EMAIL"),
-            email_to,
+            email_to_list,
             message.as_bytes(),
         )
         smtp_server.close()

@@ -121,7 +121,8 @@ const push_config = {
 
   SMTP_SERVICE: '', // 邮箱服务名称，比如 126、163、Gmail、QQ 等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
   SMTP_EMAIL: '', // SMTP 发件邮箱
-  SMTP_TO: '', // SMTP 收件邮箱，默认通知将会发给发件邮箱
+  SMTP_TO: '', // SMTP 收件邮箱，兼容旧参数名，默认通知将会发给发件邮箱
+  SMTP_EMAIL_TO: '', // SMTP 收件邮箱，多个分号分隔，默认发给发件邮箱
   SMTP_PASSWORD: '', // SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
   SMTP_NAME: '', // SMTP 收发件人姓名，可随意填写
 
@@ -1046,8 +1047,14 @@ function fsBotNotify(text, desp) {
 }
 
 async function smtpNotify(text, desp) {
-  const { SMTP_EMAIL, SMTP_TO, SMTP_PASSWORD, SMTP_SERVICE, SMTP_NAME } =
-    push_config;
+  const {
+    SMTP_EMAIL,
+    SMTP_TO,
+    SMTP_EMAIL_TO,
+    SMTP_PASSWORD,
+    SMTP_SERVICE,
+    SMTP_NAME,
+  } = push_config;
   if (![SMTP_EMAIL, SMTP_PASSWORD].every(Boolean) || !SMTP_SERVICE) {
     return;
   }
@@ -1063,9 +1070,20 @@ async function smtpNotify(text, desp) {
     });
 
     const addr = SMTP_NAME ? `"${SMTP_NAME}" <${SMTP_EMAIL}>` : SMTP_EMAIL;
+    const recipients = [SMTP_EMAIL_TO, SMTP_TO].reduce((list, value) => {
+      if (!value) {
+        return list;
+      }
+      return list.concat(
+        value
+          .split(/[;；]/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+      );
+    }, []);
     const info = await transporter.sendMail({
       from: addr,
-      to: SMTP_TO ? SMTP_TO.split(';') : addr,
+      to: recipients.length ? recipients : SMTP_EMAIL,
       subject: text,
       html: `${desp.replace(/\n/g, '<br/>')}`,
     });
