@@ -73,7 +73,7 @@ const TrendChart = ({ data }: { data: TrendItem[] }) => {
   const maxCount = Math.max(...data.map((d) => d.count), 1);
 
   const points = data.map((d, i) => ({
-    x: paddingLeft + (i / (data.length - 1)) * chartWidth,
+    x: paddingLeft + (i / Math.max(data.length - 1, 1)) * chartWidth,
     y: paddingTop + chartHeight - (d.count / maxCount) * chartHeight,
     ...d,
   }));

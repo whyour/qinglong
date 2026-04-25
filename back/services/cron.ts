@@ -179,10 +179,11 @@ export default class CronService {
       );
 
       if (status === CrontabStatus.idle && last_running_time > 0) {
+        const cronName = (cron.name || cron.command || '').substring(0, 255);
         await CronLogModel.create(
           new CronLog({
             cron_id: id,
-            cron_name: cron.name || cron.command || '',
+            cron_name: cronName,
             start_time: last_execution_time,
             duration: last_running_time,
           }),
