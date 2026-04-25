@@ -128,7 +128,7 @@ const Env = () => {
       render: (labels: string[], record: any) => {
         return (
           <Space size={[0, 4]} wrap>
-            {labels?.filter((l) => l).map((label) => (
+            {labels?.filter((label) => label).map((label) => (
               <Tag key={label} color="blue">
                 {label}
               </Tag>

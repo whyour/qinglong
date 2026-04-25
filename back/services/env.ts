@@ -201,25 +201,29 @@ export default class EnvService {
 
   public async addLabels(ids: number[], labels: string[]) {
     const docs = await EnvModel.findAll({ where: { id: ids } });
-    for (const doc of docs) {
-      const env = doc.get({ plain: true });
-      await EnvModel.update(
-        { labels: Array.from(new Set((env.labels || []).concat(labels))) },
-        { where: { id: env.id } },
-      );
-    }
+    await sequelize.transaction(async (t) => {
+      for (const doc of docs) {
+        const env = doc.get({ plain: true });
+        await EnvModel.update(
+          { labels: Array.from(new Set((env.labels || []).concat(labels))) },
+          { where: { id: env.id }, transaction: t },
+        );
+      }
+    });
     return await EnvModel.findAll({ where: { id: ids } });
   }
 
   public async removeLabels(ids: number[], labels: string[]) {
     const docs = await EnvModel.findAll({ where: { id: ids } });
-    for (const doc of docs) {
-      const env = doc.get({ plain: true });
-      await EnvModel.update(
-        { labels: (env.labels || []).filter((label: string) => !labels.includes(label)) },
-        { where: { id: env.id } },
-      );
-    }
+    await sequelize.transaction(async (t) => {
+      for (const doc of docs) {
+        const env = doc.get({ plain: true });
+        await EnvModel.update(
+          { labels: (env.labels || []).filter((label: string) => !labels.includes(label)) },
+          { where: { id: env.id }, transaction: t },
+        );
+      }
+    });
     return await EnvModel.findAll({ where: { id: ids } });
   }
 
