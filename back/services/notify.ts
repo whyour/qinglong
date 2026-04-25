@@ -861,15 +861,21 @@ export default class NotificationService {
   }
 
   private async openiLink() {
-    const { openiLinkAppToken } = this.params;
-    const url = 'https://hub.openilink.com/bot/v1/message/send';
+    const { openiLinkAppToken, openiLinkHubUrl, openiLinkContextToken } =
+      this.params;
+    const baseUrl = openiLinkHubUrl?.replace(/\/$/, '') || 'https://hub.openilink.com';
+    const url = `${baseUrl}/bot/v1/message/send`;
+    const body: Record<string, string> = {
+      type: 'text',
+      content: `${this.title}\n\n${this.content}`,
+    };
+    if (openiLinkContextToken) {
+      body.context_token = openiLinkContextToken;
+    }
     try {
       const res = await httpClient.post(url, {
         ...this.gotOption,
-        json: {
-          type: 'text',
-          content: `${this.title}\n\n${this.content}`,
-        },
+        json: body,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${openiLinkAppToken}`,

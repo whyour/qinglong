@@ -263,5 +263,9 @@ export WEBHOOK_CONTENT_TYPE=""
 ## 官方文档: https://openilink.com/docs/hub/apps
 ## 在 OpeniLink Hub 后台安装 App 后获取 app_token
 export OPENILINK_APP_TOKEN=""
+## OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
+export OPENILINK_HUB_URL=""
+## OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
+export OPENILINK_CONTEXT_TOKEN=""
 
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

@@ -396,6 +396,18 @@ export default {
         ),
         required: true,
       },
+      {
+        label: 'openiLinkHubUrl',
+        tip: intl.get(
+          'OpeniLink Hub地址，默认为 https://hub.openilink.com，自建Hub时填写自己的地址',
+        ),
+      },
+      {
+        label: 'openiLinkContextToken',
+        tip: intl.get(
+          'OpeniLink的context_token，用于标识消息会话上下文，可从消息事件中获取',
+        ),
+      },
     ],
     lark: [
       {

@@ -154,6 +154,8 @@ const push_config = {
 
   // 官方文档: https://openilink.com/docs/hub/apps
   OPENILINK_APP_TOKEN: '', // OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取
+  OPENILINK_HUB_URL: '', // OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
+  OPENILINK_CONTEXT_TOKEN: '', // OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
 };
 
 for (const key in push_config) {
@@ -1413,14 +1415,22 @@ function wxPusherNotify(text, desp) {
 
 function openiLinkNotify(text, desp) {
   return new Promise((resolve) => {
-    const { OPENILINK_APP_TOKEN } = push_config;
+    const { OPENILINK_APP_TOKEN, OPENILINK_HUB_URL, OPENILINK_CONTEXT_TOKEN } =
+      push_config;
     if (OPENILINK_APP_TOKEN) {
+      const baseUrl = OPENILINK_HUB_URL
+        ? OPENILINK_HUB_URL.replace(/\/$/, '')
+        : 'https://hub.openilink.com';
+      const body = {
+        type: 'text',
+        content: `${text}\n\n${desp}`,
+      };
+      if (OPENILINK_CONTEXT_TOKEN) {
+        body.context_token = OPENILINK_CONTEXT_TOKEN;
+      }
       const options = {
-        url: 'https://hub.openilink.com/bot/v1/message/send',
-        body: JSON.stringify({
-          type: 'text',
-          content: `${text}\n\n${desp}`,
-        }),
+        url: `${baseUrl}/bot/v1/message/send`,
+        body: JSON.stringify(body),
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${OPENILINK_APP_TOKEN}`,

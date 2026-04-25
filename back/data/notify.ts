@@ -164,6 +164,8 @@ export class WxPusherBotNotification extends NotificationBaseInfo {
 
 export class OpeniLinkNotification extends NotificationBaseInfo {
   public openiLinkAppToken = '';
+  public openiLinkHubUrl = '';
+  public openiLinkContextToken = '';
 }
 
 export interface NotificationInfo

@@ -137,6 +137,8 @@ push_config = {
     'WXPUSHER_UIDS': '',                # wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
 
     'OPENILINK_APP_TOKEN': '',          # OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取 官方文档: https://openilink.com/docs/hub/apps
+    'OPENILINK_HUB_URL': '',            # OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
+    'OPENILINK_CONTEXT_TOKEN': '',      # OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
 }
 # fmt: on
 
@@ -905,13 +907,19 @@ def openilink(title: str, content: str) -> None:
     通过 OpeniLink 推送消息。
     支持的环境变量:
     - OPENILINK_APP_TOKEN: 在 OpeniLink Hub 后台安装 App 后获取的 app_token
+    - OPENILINK_HUB_URL: OpeniLink Hub 地址，默认为 https://hub.openilink.com
+    - OPENILINK_CONTEXT_TOKEN: 消息会话上下文 token，可从消息事件中获取
     """
     if not push_config.get("OPENILINK_APP_TOKEN"):
         return
 
     print("OpeniLink 服务启动")
 
-    url = "https://hub.openilink.com/bot/v1/message/send"
+    base_url = (
+        push_config.get("OPENILINK_HUB_URL", "").rstrip("/")
+        or "https://hub.openilink.com"
+    )
+    url = f"{base_url}/bot/v1/message/send"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f'Bearer {push_config.get("OPENILINK_APP_TOKEN")}',
@@ -920,6 +928,8 @@ def openilink(title: str, content: str) -> None:
         "type": "text",
         "content": f"{title}\n\n{content}",
     }
+    if push_config.get("OPENILINK_CONTEXT_TOKEN"):
+        data["context_token"] = push_config.get("OPENILINK_CONTEXT_TOKEN")
 
     response = requests.post(url=url, json=data, headers=headers).json()
 
