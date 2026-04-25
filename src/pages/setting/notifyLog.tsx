@@ -3,15 +3,24 @@ import React from 'react';
 import { Table, Tag } from 'antd';
 import dayjs from 'dayjs';
 
-enum NotifyStatus {
-  '成功',
-  '失败',
+interface NotifyLogItem {
+  id?: number;
+  timestamp?: number;
+  title?: string;
+  content?: string;
+  status?: number;
+  notifyType?: string;
 }
 
-enum NotifyStatusColor {
-  'success',
-  'error',
-}
+const NotifyStatusLabel: Record<number, string> = {
+  0: '成功',
+  1: '失败',
+};
+
+const NotifyStatusColor: Record<number, string> = {
+  0: 'success',
+  1: 'error',
+};
 
 const columns = [
   {
@@ -56,13 +65,14 @@ const columns = [
     dataIndex: 'status',
     key: 'status',
     width: 90,
-    render: (text: string, record: any) => {
+    render: (text: string, record: NotifyLogItem) => {
+      const statusKey = record.status ?? 1;
       return (
         <Tag
-          color={NotifyStatusColor[record.status]}
+          color={NotifyStatusColor[statusKey]}
           style={{ marginRight: 0 }}
         >
-          {intl.get(NotifyStatus[record.status])}
+          {intl.get(NotifyStatusLabel[statusKey])}
         </Tag>
       );
     },
@@ -73,7 +83,7 @@ const NotifyLog = ({
   data,
   height,
 }: {
-  data: Array<object>;
+  data: Array<NotifyLogItem>;
   height: number;
 }) => {
   return (

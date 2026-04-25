@@ -393,12 +393,13 @@ export default class SystemService {
     }
 
     let notifyType: string | undefined;
-    try {
-      const notifConfig = await this.getDb({ type: AuthDataType.notification });
-      notifyType = notifConfig.info?.type as string | undefined;
-    } catch (e) {}
     if (notificationInfo?.type) {
       notifyType = typeString || (notificationInfo.type as string);
+    } else {
+      try {
+        const notifConfig = await this.getDb({ type: AuthDataType.notification });
+        notifyType = notifConfig.info?.type as string | undefined;
+      } catch (e) {}
     }
 
     const isSuccess = await this.notificationService.notify(
