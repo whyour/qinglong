@@ -34,6 +34,7 @@ export default class NotificationService {
     ['chronocat', this.chronocat],
     ['ntfy', this.ntfy],
     ['wxPusherBot', this.wxPusherBot],
+    ['openiLink', this.openiLink],
   ]);
 
   private title = '';
@@ -857,5 +858,36 @@ export default class NotificationService {
         return { body };
     }
     return {};
+  }
+
+  private async openiLink() {
+    const { openiLinkAppToken, openiLinkHubUrl, openiLinkContextToken } =
+      this.params;
+    const baseUrl = openiLinkHubUrl?.replace(/\/$/, '') || 'https://hub.openilink.com';
+    const url = `${baseUrl}/bot/v1/message/send`;
+    const body: Record<string, string> = {
+      type: 'text',
+      content: `${this.title}\n\n${this.content}`,
+    };
+    if (openiLinkContextToken) {
+      body.context_token = openiLinkContextToken;
+    }
+    try {
+      const res = await httpClient.post(url, {
+        ...this.gotOption,
+        json: body,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openiLinkAppToken}`,
+        },
+      });
+      if (res.ok) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 }
