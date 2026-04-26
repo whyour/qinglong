@@ -44,6 +44,7 @@ export default (app: Router) => {
             .required()
             .pattern(/^[a-zA-Z_][0-9a-zA-Z_]*$/),
           remarks: Joi.string().optional().allow(''),
+          labels: Joi.array().items(Joi.string()).optional(),
         }),
       ),
     }),
@@ -70,6 +71,7 @@ export default (app: Router) => {
         name: Joi.string().required(),
         remarks: Joi.string().optional().allow('').allow(null),
         id: Joi.number().required(),
+        labels: Joi.array().items(Joi.string()).optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -223,6 +225,46 @@ export default (app: Router) => {
       try {
         const envService = Container.get(EnvService);
         const data = await envService.unPin(req.body);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/labels',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.number().required()),
+        labels: Joi.array().items(Joi.string().required()),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.addLabels(req.body.ids, req.body.labels);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/labels',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.number().required()),
+        labels: Joi.array().items(Joi.string().required()),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      const logger: Logger = Container.get('logger');
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.removeLabels(req.body.ids, req.body.labels);
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);

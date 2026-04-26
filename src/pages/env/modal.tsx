@@ -1,8 +1,9 @@
 import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
-import { Modal, message, Input, Form, Radio } from 'antd';
+import { Modal, message, Input, Form, Radio, Button } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
+import EditableTagGroup from '@/components/tag';
 
 const EnvModal = ({
   env,
@@ -16,7 +17,7 @@ const EnvModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const { value, split, name, remarks } = values;
+    const { value, split, name, remarks, labels } = values;
     const method = env ? 'put' : 'post';
     let payload;
     if (!env) {
@@ -27,10 +28,11 @@ const EnvModal = ({
             name: name,
             value: x,
             remarks: remarks,
+            labels: labels || [],
           };
         });
       } else {
-        payload = [{ value, name, remarks }];
+        payload = [{ value, name, remarks, labels: labels || [] }];
       }
     } else {
       payload = { ...values, id: env.id };
@@ -123,9 +125,81 @@ const EnvModal = ({
         <Form.Item name="remarks" label={intl.get('备注')}>
           <Input placeholder={intl.get('请输入备注')} />
         </Form.Item>
+        <Form.Item name="labels" label={intl.get('标签')}>
+          <EditableTagGroup />
+        </Form.Item>
       </Form>
     </Modal>
   );
 };
 
-export default EnvModal;
+export { EnvModal as default };
+export const EnvLabelModal = ({
+  ids,
+  handleCancel,
+}: {
+  ids: Array<string>;
+  handleCancel: (needUpdate?: boolean) => void;
+}) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const update = async (action: 'delete' | 'post') => {
+    form
+      .validateFields()
+      .then(async (values) => {
+        setLoading(true);
+        const payload = { ids, labels: values.labels };
+        try {
+          const { code, data } = await request[action](
+            `${config.apiPrefix}envs/labels`,
+            payload,
+          );
+
+          if (code === 200) {
+            message.success(
+              action === 'post'
+                ? intl.get('添加Labels成功')
+                : intl.get('删除Labels成功'),
+            );
+            handleCancel(true);
+          }
+          setLoading(false);
+        } catch (error) {
+          setLoading(false);
+        }
+      })
+      .catch((info) => {
+        console.log('Validate Failed:', info);
+      });
+  };
+
+  const buttons = [
+    <Button key="cancel" onClick={() => handleCancel(false)}>{intl.get('取消')}</Button>,
+    <Button key="delete" type="primary" danger onClick={() => update('delete')}>
+      {intl.get('删除')}
+    </Button>,
+    <Button key="add" type="primary" onClick={() => update('post')}>
+      {intl.get('添加')}
+    </Button>,
+  ];
+
+  return (
+    <Modal
+      title={intl.get('批量修改标签')}
+      open={true}
+      footer={buttons}
+      centered
+      maskClosable={false}
+      forceRender
+      onCancel={() => handleCancel(false)}
+      confirmLoading={loading}
+    >
+      <Form form={form} layout="vertical" name="form_in_env_label_modal">
+        <Form.Item name="labels" label={intl.get('标签')}>
+          <EditableTagGroup />
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+};
