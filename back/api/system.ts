@@ -374,6 +374,19 @@ export default (app: Router) => {
     },
   );
 
+  route.get(
+    '/notify-log',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const data = await systemService.getNotifyLog();
+        res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
   route.delete(
     '/log',
     async (req: Request, res: Response, next: NextFunction) => {
