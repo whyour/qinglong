@@ -91,6 +91,14 @@ export default class NotificationService {
     return true;
   }
 
+  private parseMailRecipients(value?: string) {
+    const recipients = (value || '')
+      .split(/[;；]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return recipients.length > 0 ? recipients : undefined;
+  }
+
   private async gotify() {
     const { gotifyUrl, gotifyToken, gotifyPriority = 1 } = this.params;
     try {
@@ -592,6 +600,7 @@ export default class NotificationService {
 
   private async email() {
     const { emailPass, emailService, emailUser, emailTo } = this.params;
+    const recipients = this.parseMailRecipients(emailTo) || emailUser;
 
     try {
       const transporter = nodemailer.createTransport({
@@ -604,7 +613,7 @@ export default class NotificationService {
 
       const info = await transporter.sendMail({
         from: `"青龙快讯" <${emailUser}>`,
-        to: emailTo ? emailTo.split(';') : emailUser,
+        to: recipients,
         subject: `${this.title}`,
         html: `${this.content.replace(/\n/g, '<br/>')}`,
       });
