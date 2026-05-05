@@ -3,31 +3,51 @@ import Logger from '../loaders/logger';
 import { metricsService } from './metrics';
 import { Service } from 'typedi';
 import { Server } from 'http';
+import config from '../config';
 
 @Service()
 export class HttpServerService {
   private server?: Server = undefined;
 
   async initialize(expressApp: express.Application, port: number) {
-    try {
-      return new Promise((resolve, reject) => {
-        this.server = expressApp.listen(port, '0.0.0.0', () => {
-          Logger.debug(`✌️ HTTP service started successfully`);
-          metricsService.record('http_service_start', 1, {
-            port: port.toString(),
-          });
-          resolve(this.server);
-        });
+    const hostsToTry = [
+      config.bindHost,
+      ...(config.bindHost !== '0.0.0.0' ? ['0.0.0.0'] : [])
+    ];
 
-        this.server?.on('error', (err: Error) => {
-          Logger.error('Failed to start HTTP service:', err);
-          reject(err);
+    let lastError: Error | null = null;
+
+    for (const host of hostsToTry) {
+      try {
+        const server = await this.tryListen(expressApp, port, host);
+        Logger.debug(`✌️ HTTP service started successfully on ${host}:${port}`);
+        metricsService.record('http_service_start', 1, {
+          port: port.toString(),
+          host
         });
-      });
-    } catch (err) {
-      Logger.error('Failed to start HTTP service:', err);
-      throw err;
+        this.server = server;
+        return server;
+      } catch (err) {
+        lastError = err as Error;
+        Logger.warn(`Failed to bind HTTP on ${host}:${port}, trying next...`, err);
+      }
     }
+
+    Logger.error('Failed to start HTTP service on all hosts');
+    throw lastError || new Error('Failed to start HTTP service');
+  }
+
+  private async tryListen(expressApp: express.Application, port: number, host: string): Promise<Server> {
+    return new Promise((resolve, reject) => {
+      const server = expressApp.listen(port, host, () => {
+        resolve(server);
+      });
+
+      server.on('error', (err: Error) => {
+        server.close();
+        reject(err);
+      });
+    });
   }
 
   async shutdown() {
