@@ -33,14 +33,38 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: Yikun/hub-mirror-action@master
-        with:
-          src: github/whyour
-          dst: gitee/whyour
-          dst_key: ${{ secrets.GITLAB_SSH_PK }}
-          dst_token: ${{ secrets.GITEE_TOKEN }}
-          static_list: "qinglong"
-          force_update: true
+      - name: Setup SSH and push to Gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          set +e
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.GITLAB_SSH_PK }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -T 10 gitee.com >> ~/.ssh/known_hosts 2>/dev/null
+          git remote add gitee git@gitee.com:whyour/qinglong.git 2>/dev/null
+
+          if git push --force --all gitee 2>&1; then
+            echo "::notice::Gitee push --all succeeded"
+          else
+            echo "::warning::Push --all failed, trying to create repo via API..."
+            curl -sS --connect-timeout 30 --max-time 60 \
+              -X POST "https://gitee.com/api/v5/user/repos" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"qinglong","private":"false"}' \
+              "?access_token=$GITEE_TOKEN" 2>/dev/null
+            if git push --force --all gitee 2>&1; then
+              echo "::notice::Gitee push --all succeeded after repo creation"
+            else
+              echo "::warning::Gitee push --all failed after retry"
+            fi
+          fi
+
+          if git push --force --tags gitee 2>&1; then
+            echo "::notice::Gitee push --tags succeeded"
+          else
+            echo "::warning::Gitee push --tags failed"
+          fi
 
   build-static:
     runs-on: ubuntu-latest
@@ -98,17 +122,18 @@ jobs:
     needs: build-static
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - uses: Yikun/hub-mirror-action@master
-        with:
-          src: github/whyour
-          dst: gitee/whyour
-          dst_key: ${{ secrets.GITLAB_SSH_PK }}
-          dst_token: ${{ secrets.GITEE_TOKEN }}
-          static_list: "qinglong-static"
-          force_update: true
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITLAB_SSH_PK }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com gitee.com >> ~/.ssh/known_hosts
+      - name: Mirror qinglong-static to Gitee
+        run: |
+          git clone --mirror https://github.com/whyour/qinglong-static.git static-mirror
+          cd static-mirror
+          git remote set-url origin git@gitee.com:whyour/qinglong-static.git
+          git push --force --mirror
 
   build:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
