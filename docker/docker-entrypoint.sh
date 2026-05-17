@@ -25,6 +25,16 @@ if [ -f /etc/alpine-release ]; then
   fi
 fi
 
+# 确保 /etc/hosts 包含 localhost 解析（应对精简镜像或仅 IPv4/IPv6 环境）
+if ! grep -qE '^127\.0\.0\.1[[:space:]]+.*localhost' /etc/hosts 2>/dev/null; then
+  echo "127.0.0.1 localhost" >> /etc/hosts
+  log_with_style "INFO" "🔧  0. 已添加 IPv4 localhost 解析"
+fi
+if ! grep -qE '^::1[[:space:]]+.*localhost' /etc/hosts 2>/dev/null; then
+  echo "::1 localhost ip6-localhost ip6-loopback" >> /etc/hosts
+  log_with_style "INFO" "🔧  0. 已添加 IPv6 localhost 解析"
+fi
+
 log_with_style "INFO" "🚀  1. 检测配置文件..."
 load_ql_envs
 export_ql_envs
