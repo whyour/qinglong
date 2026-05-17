@@ -27,10 +27,10 @@ export default class EnvService {
       envs.length > 0 &&
       typeof envs[envs.length - 1].position === 'number'
     ) {
-      position = envs[envs.length - 1].position!;
+      position = this.getPrecisionPosition(envs[envs.length - 1].position!);
     }
     const tabs = payloads.map((x) => {
-      position = position - stepPosition;
+      position = this.getPrecisionPosition(position - stepPosition);
       const tab = new Env({ ...x, position });
       return tab;
     });
@@ -116,7 +116,7 @@ export default class EnvService {
   }
 
   private getPrecisionPosition(position: number): number {
-    return parseFloat(position.toPrecision(16));
+    return Math.trunc(parseFloat(position.toPrecision(16)));
   }
 
   public async envs(searchText: string = '', query: any = {}): Promise<Env[]> {
