@@ -8,7 +8,7 @@ import { getPlatform, getToken } from '../config/util';
 import rewrite from 'express-urlrewrite';
 import { errors } from 'celebrate';
 import { serveEnv } from '../config/serverEnv';
-import { IKeyvStore, shareStore } from '../shared/store';
+import { shareStore } from '../shared/store';
 import { isValidToken } from '../shared/auth';
 import path from 'path';
 
@@ -129,15 +129,18 @@ export default ({ app }: { app: Application }) => {
     ) {
       return next();
     }
-    const authInfo =
-      (await shareStore.getAuthInfo()) || ({} as IKeyvStore['authInfo']);
+    const authInfo = await shareStore.getAuthInfo();
 
     let isInitialized = true;
-    if (
+    if (!authInfo) {
+      // No authInfo in cache → fresh install, allow initialization
+      isInitialized = false;
+    } else if (
       Object.keys(authInfo).length === 2 &&
       authInfo.username === 'admin' &&
       authInfo.password === 'admin'
     ) {
+      // Default credentials still in use → system not yet initialized
       isInitialized = false;
     }
 
