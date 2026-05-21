@@ -21,18 +21,17 @@ export default ({ app }: { app: Application }) => {
   
   // Security: Path normalization middleware to prevent case variation attacks
   app.use((req, res, next) => {
-    const originalPath = req.path;
-    const normalizedPath = originalPath.toLowerCase();
-    
-    // Block requests with case variations on protected paths
-    if (originalPath !== normalizedPath && 
-        (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/open/'))) {
+    // Only check the API/OPEN prefix for case variations, not the entire path.
+    // This blocks /API/..., /Api/..., /OPEN/..., /Open/... bypass attempts
+    // while allowing legitimate mixed-case paths like /api/scripts/MyScript.js
+    const pathLower = req.path.toLowerCase();
+    if ((pathLower.startsWith('/api/') && !req.path.startsWith('/api/')) ||
+        (pathLower.startsWith('/open/') && !req.path.startsWith('/open/'))) {
       return res.status(400).json({
         code: 400,
-        message: 'Invalid path format'
+        message: 'Invalid path format',
       });
     }
-    
     next();
   });
   
@@ -126,7 +125,7 @@ export default ({ app }: { app: Application }) => {
         '/api/user/notification/init',
         '/open/user/init',
         '/open/user/notification/init',
-      ].includes(req.path)
+      ].includes(pathLower)
     ) {
       return next();
     }
