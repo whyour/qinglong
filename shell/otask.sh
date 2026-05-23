@@ -83,6 +83,16 @@ clear_non_sh_env() {
   fi
 }
 
+append_node_dependency_path() {
+  export PREV_NODE_PATH="${NODE_PATH:=}"
+
+  local pnpm_global_path=$(pnpm root -g 2>/dev/null)
+  if [[ -n "$pnpm_global_path" ]]; then
+    export QL_NODE_GLOBAL_PATH="$pnpm_global_path"
+    export NODE_PATH="${NODE_PATH:+${NODE_PATH}:}${pnpm_global_path}"
+  fi
+}
+
 enter_script_workdir() {
   local use_dot_prefix="$1"
 
@@ -241,7 +251,7 @@ check_nounset() {
 }
 
 main() {
-  if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
+  if [[ $1 == *.js ]] || [[ $1 == *.mjs ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
     if [[ $1 == *.sh ]]; then
       timeoutCmd=""
     fi
@@ -277,6 +287,7 @@ main() {
 
 handle_task_start "${task_shell_params[@]}"
 check_file "${task_shell_params[@]}"
+append_node_dependency_path
 if [[ $isJsOrPythonFile == 'false' ]]; then
   run_task_before "${task_shell_params[@]}"
 fi
@@ -286,6 +297,8 @@ main "${task_shell_params[@]}"
 if [[ "$set_u_on" == 'true' ]]; then
   set -u
 fi
+export NODE_PATH="${PREV_NODE_PATH}"
+unset QL_NODE_GLOBAL_PATH
 if [[ $isJsOrPythonFile == 'true' ]]; then
   export NODE_OPTIONS="${PREV_NODE_OPTIONS}"
   export PYTHONPATH="${PREV_PYTHONPATH}"
