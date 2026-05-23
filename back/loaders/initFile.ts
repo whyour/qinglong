@@ -18,13 +18,8 @@ const scriptPath = path.join(dataPath, 'scripts/');
 const logPath = path.join(dataPath, 'log/');
 const uploadPath = path.join(dataPath, 'upload/');
 const bakPath = path.join(dataPath, 'bak/');
-const dbPath = path.join(dataPath, 'db/');
-const repoPath = path.join(dataPath, 'repo/');
-const rawPath = path.join(dataPath, 'raw/');
-const dependenceCachePath = path.join(dataPath, 'dep_cache/');
 const samplePath = path.join(rootPath, 'sample/');
 const tmpPath = path.join(logPath, '.tmp/');
-const updateLogPath = path.join(logPath, 'update/');
 const confFile = path.join(configPath, 'config.sh');
 const sampleConfigFile = path.join(samplePath, 'config.sample.sh');
 const sampleTaskShellFile = path.join(samplePath, 'task.sample.sh');
@@ -49,16 +44,11 @@ const directories = [
   preloadPath,
   logPath,
   tmpPath,
-  updateLogPath,
   uploadPath,
   sshPath,
   bakPath,
   sshdPath,
   systemLogPath,
-  dbPath,
-  repoPath,
-  rawPath,
-  dependenceCachePath,
 ];
 
 const files = [
@@ -114,7 +104,7 @@ const files = [
 export default async () => {
   for (const dirPath of directories) {
     if (!(await fileExist(dirPath))) {
-      await fs.mkdir(dirPath, { recursive: true });
+      await fs.mkdir(dirPath);
     }
   }
 

@@ -95,6 +95,8 @@ run_normal() {
   if [[ ${file_param} != /* ]] && [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
     cd ${relative_path}
     file_param=${file_param/$relative_path\//}
+  elif [[ ${file_param} == /* ]] && [[ ! -z ${relative_path} ]]; then
+    cd ${relative_path}
   fi
 
   if [[ $isJsOrPythonFile == 'false' ]]; then
