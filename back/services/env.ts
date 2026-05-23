@@ -199,6 +199,44 @@ export default class EnvService {
     await EnvModel.update({ isPinned: 0 }, { where: { id: ids } });
   }
 
+  public async addLabels(ids: number[], labels: string[]) {
+    await sequelize.transaction(async (transaction) => {
+      const docs = await EnvModel.findAll({
+        where: { id: ids },
+        transaction,
+      });
+      for (const doc of docs) {
+        const env = doc.get({ plain: true });
+        await EnvModel.update(
+          { labels: Array.from(new Set([...(env.labels || []), ...labels])) },
+          { where: { id: env.id }, transaction },
+        );
+      }
+    });
+    return await this.find({ id: ids });
+  }
+
+  public async removeLabels(ids: number[], labels: string[]) {
+    await sequelize.transaction(async (transaction) => {
+      const docs = await EnvModel.findAll({
+        where: { id: ids },
+        transaction,
+      });
+      for (const doc of docs) {
+        const env = doc.get({ plain: true });
+        await EnvModel.update(
+          {
+            labels: (env.labels || []).filter(
+              (label: string) => !labels.includes(label),
+            ),
+          },
+          { where: { id: env.id }, transaction },
+        );
+      }
+    });
+    return await this.find({ id: ids });
+  }
+
   public async set_envs() {
     const envs = await this.envs('', {
       name: { [Op.not]: null },

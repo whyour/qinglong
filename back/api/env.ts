@@ -18,6 +18,10 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage: storage });
+const labelSchema = Joi.array()
+  .items(Joi.string().trim().required())
+  .min(1)
+  .required();
 
 export default (app: Router) => {
   app.use('/envs', route);
@@ -44,6 +48,7 @@ export default (app: Router) => {
             .required()
             .pattern(/^[a-zA-Z_][0-9a-zA-Z_]*$/),
           remarks: Joi.string().optional().allow(''),
+          labels: Joi.array().items(Joi.string().trim()).optional(),
         }),
       ),
     }),
@@ -70,6 +75,7 @@ export default (app: Router) => {
         name: Joi.string().required(),
         remarks: Joi.string().optional().allow('').allow(null),
         id: Joi.number().required(),
+        labels: Joi.array().items(Joi.string().trim()).optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -231,6 +237,44 @@ export default (app: Router) => {
   );
 
   route.post(
+    '/labels',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.number().required()).min(1).required(),
+        labels: labelSchema,
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.addLabels(req.body.ids, req.body.labels);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/labels',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.number().required()).min(1).required(),
+        labels: labelSchema,
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.removeLabels(req.body.ids, req.body.labels);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
     '/upload',
     upload.single('env'),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -248,6 +292,7 @@ export default (app: Router) => {
               name: x.name,
               value: x.value,
               remarks: x.remarks,
+              labels: x.labels,
             })),
           );
           return res.send({ code: 200, data: result });
