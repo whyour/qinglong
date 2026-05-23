@@ -51,7 +51,9 @@
       }
     },
     "overrides": {
-      "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.0.3"
+      "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.0.3",
+      "@codemirror/state": "6.5.4",
+      "@codemirror/view": "6.39.16"
     }
   },
   "dependencies": {
@@ -104,8 +106,8 @@
     "moment": "2.30.1",
     "@ant-design/icons": "^5.0.1",
     "@ant-design/pro-layout": "6.38.22",
-    "@codemirror/view": "^6.34.1",
-    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "6.39.16",
+    "@codemirror/state": "6.5.4",
     "@monaco-editor/react": "4.2.1",
     "@react-hook/resize-observer": "^2.0.2",
     "react-router-dom": "6.26.1",
