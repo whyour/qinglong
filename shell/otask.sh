@@ -83,6 +83,25 @@ clear_non_sh_env() {
   fi
 }
 
+enter_script_workdir() {
+  local use_dot_prefix="$1"
+
+  cd $dir_scripts
+  if [[ ${file_param} =~ "/" ]]; then
+    local script_dir="${file_param%/*}"
+    local script_name="${file_param##*/}"
+
+    if [[ -d ${script_dir} ]]; then
+      cd ${script_dir}
+      if [[ "${use_dot_prefix}" == "true" ]]; then
+        file_param="./${script_name}"
+      else
+        file_param="${script_name}"
+      fi
+    fi
+  fi
+}
+
 ## 正常运行单个脚本，$1：传入参数
 run_normal() {
   local file_param=$1
@@ -90,12 +109,7 @@ run_normal() {
     random_delay "$file_param"
   fi
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ${file_param} != /* ]] && [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//}
-  fi
+  enter_script_workdir
 
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
@@ -128,12 +142,7 @@ run_concurrent() {
   time=$(date "+$mtime_format")
   single_log_time=$(format_log_time "$mtime_format" "$time")
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//}
-  fi
+  enter_script_workdir
 
   local j=0
   for i in ${array_run[@]}; do
@@ -182,12 +191,7 @@ run_designated() {
     clear_non_sh_env
   fi
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//}
-  fi
+  enter_script_workdir
 
   envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
 }
@@ -196,12 +200,7 @@ run_designated() {
 run_else() {
   local file_param="$1"
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//.\/}
-  fi
+  enter_script_workdir true
 
   shift
 
