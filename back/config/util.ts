@@ -10,6 +10,7 @@ import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
+import os from 'os';
 
 export * from './share';
 
@@ -589,4 +590,163 @@ export function getUninstallCommand(
 
 export function isDemoEnv() {
   return process.env.DeployEnv === 'demo';
+}
+
+// OS detection for Linux mirror configuration
+let osType: 'Debian' | 'Ubuntu' | 'Alpine' | undefined;
+
+async function getOSReleaseInfo(): Promise<string> {
+  try {
+    const osRelease = await fs.readFile('/etc/os-release', 'utf8');
+    return osRelease;
+  } catch (error) {
+    Logger.error(`Failed to read /etc/os-release: ${error}`);
+    return '';
+  }
+}
+
+function isDebian(osReleaseInfo: string): boolean {
+  return osReleaseInfo.includes('Debian');
+}
+
+function isUbuntu(osReleaseInfo: string): boolean {
+  return osReleaseInfo.includes('Ubuntu');
+}
+
+function isAlpine(osReleaseInfo: string): boolean {
+  return osReleaseInfo.includes('Alpine');
+}
+
+export async function detectOS(): Promise<
+  'Debian' | 'Ubuntu' | 'Alpine' | undefined
+> {
+  if (osType) return osType;
+  const platform = os.platform();
+
+  if (platform === 'linux') {
+    const osReleaseInfo = await getOSReleaseInfo();
+    // Check Ubuntu before Debian since Ubuntu is based on Debian
+    if (isUbuntu(osReleaseInfo)) {
+      osType = 'Ubuntu';
+    } else if (isDebian(osReleaseInfo)) {
+      osType = 'Debian';
+    } else if (isAlpine(osReleaseInfo)) {
+      osType = 'Alpine';
+    } else {
+      Logger.error(`Unknown Linux Distribution: ${osReleaseInfo}`);
+      console.error(`Unknown Linux Distribution: ${osReleaseInfo}`);
+    }
+  } else if (platform === 'darwin') {
+    osType = undefined;
+  } else {
+    Logger.error(`Unsupported platform: ${platform}`);
+    console.error(`Unsupported platform: ${platform}`);
+  }
+
+  return osType;
+}
+
+async function getCurrentMirrorDomain(
+  filePath: string,
+): Promise<string | null> {
+  try {
+    const fileContent = await fs.readFile(filePath, 'utf8');
+    const lines = fileContent.split('\n');
+    for (const line of lines) {
+      if (line.trim().startsWith('#')) {
+        continue;
+      }
+      const match = line.match(/https?:\/\/[^\/]+/);
+      if (match) {
+        return match[0];
+      }
+    }
+    return null;
+  } catch (error) {
+    Logger.error(`Failed to read mirror configuration file ${filePath}: ${error}`);
+    return null;
+  }
+}
+
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function replaceDomainInFile(
+  filePath: string,
+  oldDomainWithScheme: string,
+  newDomainWithScheme: string,
+): Promise<void> {
+  // Ensure the new domain has a trailing slash before replacement
+  if (!newDomainWithScheme.endsWith('/')) {
+    newDomainWithScheme += '/';
+  }
+
+  let fileContent = await fs.readFile(filePath, 'utf8');
+  // Escape special regex characters in the old domain
+  const escapedOldDomain = escapeRegExp(oldDomainWithScheme);
+  let updatedContent = fileContent.replace(
+    new RegExp(escapedOldDomain, 'g'),
+    newDomainWithScheme,
+  );
+
+  await writeFileWithLock(filePath, updatedContent);
+}
+
+async function _updateLinuxMirror(
+  osType: string,
+  mirrorDomainWithScheme: string,
+): Promise<string> {
+  let filePath: string, currentDomainWithScheme: string | null;
+  switch (osType) {
+    case 'Debian':
+      filePath = '/etc/apt/sources.list.d/debian.sources';
+      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
+      if (currentDomainWithScheme) {
+        await replaceDomainInFile(
+          filePath,
+          currentDomainWithScheme,
+          mirrorDomainWithScheme || 'http://deb.debian.org',
+        );
+        return 'apt-get update';
+      } else {
+        throw Error(`Current mirror domain not found.`);
+      }
+    case 'Ubuntu':
+      filePath = '/etc/apt/sources.list.d/ubuntu.sources';
+      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
+      if (currentDomainWithScheme) {
+        await replaceDomainInFile(
+          filePath,
+          currentDomainWithScheme,
+          mirrorDomainWithScheme || 'http://archive.ubuntu.com',
+        );
+        return 'apt-get update';
+      } else {
+        throw Error(`Current mirror domain not found.`);
+      }
+    case 'Alpine':
+      filePath = '/etc/apk/repositories';
+      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
+      if (currentDomainWithScheme) {
+        await replaceDomainInFile(
+          filePath,
+          currentDomainWithScheme,
+          mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org',
+        );
+        return 'apk update';
+      } else {
+        throw Error(`Current mirror domain not found.`);
+      }
+    default:
+      throw Error('Unsupported OS type for updating mirrors.');
+  }
+}
+
+export async function updateLinuxMirrorFile(mirror: string): Promise<string> {
+  const detectedOS = await detectOS();
+  if (!detectedOS) {
+    throw Error(`Unknown Linux Distribution`);
+  }
+  return await _updateLinuxMirror(detectedOS, mirror);
 }
