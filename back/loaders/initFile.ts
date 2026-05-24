@@ -104,7 +104,11 @@ const files = [
 export default async () => {
   for (const dirPath of directories) {
     if (!(await fileExist(dirPath))) {
-      await fs.mkdir(dirPath);
+      try {
+        await fs.mkdir(dirPath, { recursive: true });
+      } catch (err: any) {
+        Logger.warn(`Unable to create directory ${dirPath}: ${err.message}`);
+      }
     }
   }
 

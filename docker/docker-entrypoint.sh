@@ -15,10 +15,10 @@ log_with_style() {
   printf "\n[%s] [%7s]  %s\n" "${timestamp}" "${level}" "${message}"
 }
 
-# Fix DNS resolution issues in Alpine Linux
+# Fix DNS resolution issues in Alpine Linux (requires root)
 # Alpine uses musl libc which has known DNS resolver issues with certain domains
 # Adding ndots:0 prevents unnecessary search domain appending
-if [ -f /etc/alpine-release ]; then
+if [ "$(id -u)" = "0" ] && [ -f /etc/alpine-release ]; then
   if ! grep -q "^options ndots:0" /etc/resolv.conf 2>/dev/null; then
     echo "options ndots:0" >> /etc/resolv.conf
     log_with_style "INFO" "🔧  0. 已配置 DNS 解析优化 (ndots:0)"
@@ -50,6 +50,11 @@ fi
 
 log_with_style "SUCCESS" "🎉  容器启动成功!"
 
-crond -f >/dev/null
+if [ "$(id -u)" = "0" ]; then
+  crond -f >/dev/null
+else
+  # crond requires root in Alpine; keep container alive without it
+  exec tail -f /dev/null
+fi
 
 exec "$@"

@@ -65,11 +65,14 @@ RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
   && git clone --depth=1 -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
   && mkdir -p ${QL_DIR}/static \
   && cp -rf /static/* ${QL_DIR}/static \
-  && rm -rf /static
+  && rm -rf /static \
+  && mkdir -p ${QL_DIR}/.tmp ${QL_DIR}/shell/preload \
+  && chmod -R a+w ${QL_DIR}/.tmp ${QL_DIR}/shell/preload ${QL_DIR}/static
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \
   PYTHONUSERBASE=${QL_DIR}/data/dep_cache/python3 \
+  PM2_HOME=${QL_DIR}/data/.pm2 \
   HOME=/root
 
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin:${HOME}/bin \
