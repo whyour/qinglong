@@ -22,6 +22,9 @@ const DependenceModal = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [selectedType, setSelectedType] = useState(
+    DependenceTypes[defaultType as any],
+  );
 
   const handleOk = async (values: any) => {
     setLoading(true);
@@ -90,7 +93,7 @@ const DependenceModal = ({
           label={intl.get('依赖类型')}
           initialValue={DependenceTypes[defaultType as any]}
         >
-          <Select>
+          <Select onChange={(value) => setSelectedType(value)}>
             {config.dependenceTypes.map((x, i) => (
               <Option key={i} value={i}>
                 {x}
@@ -121,11 +124,24 @@ const DependenceModal = ({
               whitespace: true,
             },
           ]}
+          tooltip={
+            selectedType === DependenceTypes.python3
+              ? intl.get(
+                  'Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径',
+                )
+              : undefined
+          }
         >
           <Input.TextArea
             rows={4}
             autoSize={{ minRows: 1, maxRows: 5 }}
-            placeholder={intl.get('请输入依赖名称')}
+            placeholder={
+              selectedType === DependenceTypes.python3
+                ? intl.get(
+                    '支持包名、GitHub链接、requirements.txt或pyproject.toml路径',
+                  )
+                : intl.get('请输入依赖名称')
+            }
           />
         </Form.Item>
         <Form.Item name="remark" label={intl.get('备注')}>
