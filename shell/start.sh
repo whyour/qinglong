@@ -36,30 +36,37 @@ command="$1"
 
 if [[ $command != "reload" ]]; then
   # 安装依赖
-  os_name=$(source /etc/os-release && echo "$ID")
-
-  if [[ $os_name == 'alpine' ]]; then
-    apk update
-    apk add -f bash \
-      coreutils \
-      git \
-      curl \
-      wget \
-      tzdata \
-      perl \
-      openssl \
-      jq \
-      nginx \
-      openssh \
-      procps \
-      netcat-openbsd
-  elif [[ $os_name == 'debian' ]] || [[ $os_name == 'ubuntu' ]]; then
-    apt-get update
-    apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
-  else
-    echo -e "暂不支持此系统部署 $os_name"
-    exit 1
+  os_name="${QL_OS_TYPE:-}"
+  if [ -z "$os_name" ]; then
+    os_name=$(source /etc/os-release && echo "$ID")
   fi
+
+  case "$os_name" in
+    alpine)
+      apk update
+      apk add -f bash \
+        coreutils \
+        git \
+        curl \
+        wget \
+        tzdata \
+        perl \
+        openssl \
+        jq \
+        nginx \
+        openssh \
+        procps \
+        netcat-openbsd
+      ;;
+    debian|ubuntu)
+      apt-get update
+      apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
+      ;;
+    *)
+      echo -e "暂不支持此系统部署 $os_name"
+      exit 1
+      ;;
+  esac
 
   npm install -g pnpm@8.3.1 pm2 ts-node
 fi

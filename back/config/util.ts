@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
@@ -15,6 +15,32 @@ import os from 'os';
 export * from './share';
 
 let osType: 'Debian' | 'Ubuntu' | 'Alpine' | undefined;
+
+function getOsTypeSync(): 'Debian' | 'Ubuntu' | 'Alpine' | undefined {
+  // 1. 环境变量覆盖
+  const envOs = process.env.QL_OS_TYPE?.toLowerCase();
+  if (envOs === 'alpine') return 'Alpine';
+  if (envOs === 'debian') return 'Debian';
+  if (envOs === 'ubuntu') return 'Ubuntu';
+
+  // 2. 模块缓存（由 detectOS 设置）
+  if (osType) return osType;
+
+  // 3. 能力检测：检查包管理器二进制
+  try {
+    execSync('which apt-get', { stdio: 'ignore' });
+    return 'Debian';
+  } catch {
+    try {
+      execSync('which apk', { stdio: 'ignore' });
+      return 'Alpine';
+    } catch {
+      // macOS / 未知系统
+    }
+  }
+
+  return undefined;
+}
 
 export async function getFileContentByName(fileName: string) {
   const _exsit = await fileExist(fileName);
@@ -553,7 +579,9 @@ except:
     spec=u.find_spec(name)
     print(name if spec else '')
 ''')"`,
-    [DependenceTypes.linux]: `apt-get info ${name}`,
+    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
+      ? `apk info -es ${name}`
+      : `dpkg-query -s ${name}`,
   };
 
   return baseCommands[type];
@@ -564,7 +592,9 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
     [DependenceTypes.nodejs]: 'pnpm add -g',
     [DependenceTypes.python3]:
       'pip3 install --disable-pip-version-check --root-user-action=ignore',
-    [DependenceTypes.linux]: 'apt install -y',
+    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
+      ? 'apk add --no-check-certificate'
+      : 'apt-get install -y',
   };
 
   let command = baseCommands[type];
@@ -584,7 +614,9 @@ export function getUninstallCommand(
     [DependenceTypes.nodejs]: 'pnpm remove -g',
     [DependenceTypes.python3]:
       'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
-    [DependenceTypes.linux]: 'apt remove -y',
+    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
+      ? 'apk del'
+      : 'apt-get remove -y',
   };
 
   return `${baseCommands[type]} ${name.trim()}`;
@@ -619,6 +651,21 @@ export async function detectOS(): Promise<
   'Debian' | 'Ubuntu' | 'Alpine' | undefined
 > {
   if (osType) return osType;
+
+  const envOs = process.env.QL_OS_TYPE?.toLowerCase();
+  if (envOs === 'alpine') {
+    osType = 'Alpine';
+    return osType;
+  }
+  if (envOs === 'debian') {
+    osType = 'Debian';
+    return osType;
+  }
+  if (envOs === 'ubuntu') {
+    osType = 'Ubuntu';
+    return osType;
+  }
+
   const platform = os.platform();
 
   if (platform === 'linux') {

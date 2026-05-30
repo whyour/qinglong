@@ -39,6 +39,25 @@ export default class CronService {
     return false;
   }
 
+  private get schedulerMode(): 'system' | 'node' {
+    const env = process.env.QL_SCHEDULER;
+    if (env === 'system') return 'system';
+    if (env === 'node') return 'node';
+    try {
+      execSync('which crond', { stdio: 'ignore' });
+      return 'system';
+    } catch {
+      return 'node';
+    }
+  }
+
+  private shouldUseCronClient(cron: Crontab): boolean {
+    if (this.schedulerMode === 'node') {
+      return !this.isSpecialSchedule(cron.schedule);
+    }
+    return this.isNodeCron(cron) && !this.isSpecialSchedule(cron.schedule);
+  }
+
   private isOnceSchedule(schedule?: string) {
     return schedule?.startsWith(ScheduleType.ONCE);
   }
@@ -80,7 +99,7 @@ export default class CronService {
       return doc;
     }
 
-    if (!this.isSpecialSchedule(doc.schedule)) {
+    if (this.shouldUseCronClient(doc)) {
       await cronClient.addCron([
         {
           name: doc.name || '',
@@ -113,7 +132,7 @@ export default class CronService {
 
     await cronClient.delCron([String(newDoc.id)]);
 
-    if (!this.isSpecialSchedule(newDoc.schedule)) {
+    if (this.shouldUseCronClient(newDoc)) {
       await cronClient.addCron([
         {
           name: doc.name || '',
@@ -575,18 +594,20 @@ export default class CronService {
   public async enabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 0 }, { where: { id: ids } });
     const docs = await CrontabModel.findAll({ where: { id: ids } });
-    const crons = docs.map((doc) => ({
-      name: doc.name || '',
-      id: String(doc.id),
-      schedule: doc.schedule!,
-      command: this.makeCommand(doc),
-      extra_schedules: doc.extra_schedules || [],
-    }));
+    const crons = docs
+      .filter((x) => this.shouldUseCronClient(x))
+      .map((doc) => ({
+        name: doc.name || '',
+        id: String(doc.id),
+        schedule: doc.schedule!,
+        command: this.makeCommand(doc),
+        extra_schedules: doc.extra_schedules || [],
+      }));
 
     if (isDemoEnv()) {
       return;
     }
-    
+
     await cronClient.addCron(crons);
     await this.setCrontab();
   }
@@ -687,6 +708,15 @@ export default class CronService {
 
     await writeFileWithLock(config.crontabFile, crontab_string);
 
+    if (this.schedulerMode === 'system') {
+      try {
+        execSync(`crontab ${config.crontabFile}`);
+      } catch (error: any) {
+        const errorMsg = error.message || String(error);
+        this.logger.error('[crontab] Failed to update system crontab:', errorMsg);
+      }
+    }
+
     await CrontabModel.update({ saved: true }, { where: {} });
   }
 
@@ -732,7 +762,11 @@ export default class CronService {
   public async autosave_crontab() {
     const tabs = await this.crontabs();
     const regularCrons = tabs.data
-      .filter((x) => x.isDisabled !== 1 && !this.isSpecialSchedule(x.schedule))
+      .filter(
+        (x) =>
+          x.isDisabled !== 1 &&
+          this.shouldUseCronClient(x),
+      )
       .map((doc) => ({
         name: doc.name || '',
         id: String(doc.id),

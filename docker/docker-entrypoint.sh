@@ -128,6 +128,19 @@ fi
 
 log_with_style "SUCCESS" "🎉  容器启动成功!"
 
-tail -f /dev/null
+# 自动检测调度模式：有 crond 二进制 → system 模式，否则 node 模式
+if [ -z "$QL_SCHEDULER" ]; then
+  if command -v crond &>/dev/null; then
+    export QL_SCHEDULER="system"
+  else
+    export QL_SCHEDULER="node"
+  fi
+fi
+
+if [ "$QL_SCHEDULER" = "system" ]; then
+  crond -f > /dev/null
+else
+  tail -f /dev/null
+fi
 
 exec "$@"

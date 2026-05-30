@@ -9,15 +9,22 @@ else
 fi
 
 echo -e "\n1、安装bot依赖...\n"
-os_name=$(source /etc/os-release && echo "$ID")
-if [[ $os_name == 'alpine' ]]; then
-  apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
-elif [[ $os_name == 'debian' ]] || [[ $os_name == 'ubuntu' ]]; then
-  apt-get install -y gcc python3-dev musl-dev
-else
-  echo -e "暂不支持此系统 $os_name"
-  exit 1
+os_name="${QL_OS_TYPE:-}"
+if [ -z "$os_name" ]; then
+  os_name=$(source /etc/os-release && echo "$ID")
 fi
+case "$os_name" in
+  alpine)
+    apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
+    ;;
+  debian|ubuntu)
+    apt-get install -y gcc python3-dev musl-dev zlib1g-dev libjpeg-dev libfreetype-dev
+    ;;
+  *)
+    echo -e "暂不支持此系统 $os_name"
+    exit 1
+    ;;
+esac
 echo -e "\nbot依赖安装成功...\n"
 
 echo -e "2、下载bot所需文件...\n"
