@@ -22,7 +22,7 @@ ENV QL_DIR=/ql \
   PS1="\u@\h:\w \$ "
 
 VOLUME /ql/data
-  
+
 EXPOSE 5700
 
 COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/

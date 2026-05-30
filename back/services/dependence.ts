@@ -22,6 +22,8 @@ import {
 } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
+import { detectOS } from '../config/util';
+import { LINUX_DEPENDENCE_COMMAND } from '../config/const';
 
 @Service()
 export default class DependenceService {
@@ -159,8 +161,19 @@ export default class DependenceService {
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
-      const depInstallCommand = getInstallCommand(doc.type, doc.name);
-      const depUnInstallCommand = getUninstallCommand(doc.type, doc.name);
+      let depInstallCommand = getInstallCommand(doc.type, doc.name);
+      let depUnInstallCommand = getUninstallCommand(doc.type, doc.name);
+      const isLinuxDependence = doc.type === DependenceTypes.linux;
+
+      if (isLinuxDependence) {
+        const osType = await detectOS();
+        if (!osType) {
+          continue;
+        }
+        const linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
+        depInstallCommand = `${linuxCommand.install} ${doc.name.trim()}`;
+        depUnInstallCommand = `${linuxCommand.uninstall} ${doc.name.trim()}`;
+      }
       const pids = await Promise.all([
         getPid(depInstallCommand),
         getPid(depUnInstallCommand),
@@ -217,23 +230,54 @@ export default class DependenceService {
         if (taskLimit.firstDependencyId !== dependency.id) {
           return resolve(null);
         }
-
-        taskLimit.removeQueuedDependency(dependency);
-
         const depIds = [dependency.id!];
+        let depName = dependency.name.trim();
+        const actionText = isInstall ? '安装' : '删除';
+        const socketMessageType = isInstall
+          ? 'installDependence'
+          : 'uninstallDependence';
+        const isNodeDependence = dependency.type === DependenceTypes.nodejs;
+        const isLinuxDependence = dependency.type === DependenceTypes.linux;
+        const isPythonDependence = dependency.type === DependenceTypes.python3;
+        const osType = await detectOS();
+        let linuxCommand = {} as typeof LINUX_DEPENDENCE_COMMAND.Alpine;
+        taskLimit.removeQueuedDependency(dependency);
+        if (isLinuxDependence) {
+          if (!osType) {
+            await DependenceModel.update(
+              { status: DependenceStatus.installFailed },
+              { where: { id: depIds } },
+            );
+            const startTime = dayjs();
+            const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
+              'YYYY-MM-DD HH:mm:ss',
+            )}\n\n当前系统不支持\n\n依赖${actionText}失败，结束时间 ${startTime.format(
+              'YYYY-MM-DD HH:mm:ss',
+            )}，耗时 ${startTime.diff(startTime, 'second')} 秒`;
+            this.sockService.sendMessage({
+              type: socketMessageType,
+              message,
+              references: depIds,
+            });
+            this.updateLog(depIds, message);
+            return resolve(null);
+          }
+          linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
+        }
+
         const status = isInstall
           ? DependenceStatus.installing
           : DependenceStatus.removing;
         await DependenceModel.update({ status }, { where: { id: depIds } });
 
-        const socketMessageType = isInstall
-          ? 'installDependence'
-          : 'uninstallDependence';
-        let depName = dependency.name.trim();
-        const command = isInstall
+        let command = isInstall
           ? getInstallCommand(dependency.type, depName)
           : getUninstallCommand(dependency.type, depName);
-        const actionText = isInstall ? '安装' : '删除';
+        if (isLinuxDependence) {
+          command = isInstall
+            ? `${linuxCommand.install} ${depName.trim()}`
+            : `${linuxCommand.uninstall} ${depName.trim()}`;
+        }
         const startTime = dayjs();
 
         const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
@@ -248,8 +292,12 @@ export default class DependenceService {
 
         // 判断是否已经安装过依赖
         if (isInstall && !force) {
-          const getCommand = getGetCommand(dependency.type, depName);
+          let getCommand = getGetCommand(dependency.type, depName);
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
+          if (isLinuxDependence) {
+            getCommand = `${linuxCommand.info} ${depName}`;
+          }
+
           let depVersion = '';
           if (depName.includes(depVersionStr)) {
             const symbolRegx = new RegExp(
@@ -261,10 +309,6 @@ export default class DependenceService {
               depVersion = _depVersion;
             }
           }
-          const isNodeDependence = dependency.type === DependenceTypes.nodejs;
-          const isLinuxDependence = dependency.type === DependenceTypes.linux;
-          const isPythonDependence =
-            dependency.type === DependenceTypes.python3;
           const depInfo = (await promiseExecSuccess(getCommand))
             .replace(/\s{2,}/, ' ')
             .replace(/\s+$/, '');
@@ -273,7 +317,7 @@ export default class DependenceService {
             depInfo &&
             ((isNodeDependence && depInfo.split(' ')?.[0] === depName) ||
               (isLinuxDependence &&
-                depInfo.toLocaleLowerCase().includes('installed')) ||
+                linuxCommand.check(depInfo.toLocaleLowerCase())) ||
               isPythonDependence) &&
             (!depVersion || depInfo.includes(depVersion))
           ) {

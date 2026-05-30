@@ -89,9 +89,6 @@ jobs:
         env:
           GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
           GITHUB_BRANCH: ${{ github.ref_name }}
-          REPO_GITEE: git@gitee.com:whyour/qinglong-static.git
-          REPO_GITLAB: git@gitlab.com:whyour/qinglong-static.git
-          PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
         run: |
           mkdir -p tmp
           cd ./tmp
@@ -135,16 +132,13 @@ jobs:
           git remote set-url origin git@gitee.com:whyour/qinglong-static.git
           git push --force --mirror
 
-  build:
+  build-alpine:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: build-static
-
     runs-on: ubuntu-22.04
-
     permissions:
       packages: write
       contents: read
-
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -160,11 +154,9 @@ jobs:
         run: |
           VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
 
       - name: Setup timezone
-        run: |
-          sudo timedatectl set-timezone Asia/Shanghai
+        run: sudo timedatectl set-timezone Asia/Shanghai
 
       - name: Login to DockerHub
         uses: docker/login-action@v4
@@ -190,7 +182,7 @@ jobs:
             latest=false
           tags: |
             type=ref,event=branch,enable=${{ github.ref == format('refs/heads/{0}', 'develop') }}
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=ref,event=branch,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=semver,pattern={{version}}
 
@@ -200,8 +192,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build and push
-        id: docker_build
+      - name: Build and push (Alpine)
         uses: docker/build-push-action@v7
         with:
           build-args: |
@@ -209,30 +200,22 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          # linux/s390x npm 暂不可用
           platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
           context: .
           file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=whyour/qinglong:cache
-          cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
+          cache-from: type=registry,ref=whyour/qinglong:cache-alpine
+          cache-to: type=registry,ref=whyour/qinglong:cache-alpine,mode=max
 
-      - name: Image digest
-        run: |
-          echo ${{ steps.docker_build.outputs.digest }}
-
-  build310:
-    if: ${{ github.ref_name == 'master' }}
+  build-debian:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: build-static
-
     runs-on: ubuntu-22.04
-
     permissions:
       packages: write
       contents: read
-
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -248,11 +231,85 @@ jobs:
         run: |
           VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
 
       - name: Setup timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=debian-dev,enable=${{ github.ref == format('refs/heads/{0}', 'develop') }}
+            type=raw,value=debian,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=${{ steps.version.outputs.version }}-debian,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push (Debian)
+        uses: docker/build-push-action@v7
+        with:
+          build-args: |
+            MAINTAINER=${{ github.repository_owner }}
+            QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+          network: host
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+          context: .
+          file: ./docker/Dockerfile.debian
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian,mode=max
+
+  build-alpine310:
+    if: ${{ github.ref_name == 'master' }}
+    needs: build-static
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "8.3.1"
+      - uses: actions/setup-node@v6
+        with:
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Read version from version.yaml
+        id: version
         run: |
-          sudo timedatectl set-timezone Asia/Shanghai
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
 
       - name: Login to DockerHub
         uses: docker/login-action@v4
@@ -273,8 +330,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build and push python3.10
-        id: docker_build_310
+      - name: Build and push (Alpine Python 3.10)
         uses: docker/build-push-action@v7
         with:
           build-args: |
@@ -282,7 +338,6 @@ jobs:
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
-          # linux/s390x npm 暂不可用
           platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
           context: .
           file: ./docker/310.Dockerfile
@@ -290,9 +345,93 @@ jobs:
           tags: |
             whyour/qinglong:python3.10
             whyour/qinglong:${{ steps.version.outputs.version }}-python3.10
-          cache-from: type=registry,ref=whyour/qinglong:cache-python3.10
-          cache-to: type=registry,ref=whyour/qinglong:cache-python3.10,mode=max
+          cache-from: type=registry,ref=whyour/qinglong:cache-alpine-python3.10
+          cache-to: type=registry,ref=whyour/qinglong:cache-alpine-python3.10,mode=max
 
-      - name: Image digest
+  build-debian310:
+    if: ${{ github.ref_name == 'master' }}
+    needs: build-static
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "8.3.1"
+      - uses: actions/setup-node@v6
+        with:
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Read version from version.yaml
+        id: version
         run: |
-          echo ${{ steps.docker_build_310.outputs.digest }}
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push (Debian Python 3.10)
+        uses: docker/build-push-action@v7
+        with:
+          build-args: |
+            MAINTAINER=${{ github.repository_owner }}
+            QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+          network: host
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+          context: .
+          file: ./docker/310.Dockerfile.debian
+          push: true
+          tags: |
+            whyour/qinglong:debian-python3.10
+            whyour/qinglong:${{ steps.version.outputs.version }}-debian-python3.10
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian-python3.10
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian-python3.10,mode=max
+
+  publish:
+    if: ${{ github.ref_name == 'master' }}
+    needs: [build-alpine, build-debian]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: "8.3.1"
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: "pnpm"
+
+      - name: build front and back
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:front
+          pnpm build:back
+
+      - name: publish npm package
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+          npm publish
