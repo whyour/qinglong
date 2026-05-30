@@ -179,7 +179,7 @@ export default function browserType() {
 /**
  * 获取第一个表格的可视化高度
  * @param {*} extraHeight 额外的高度(表格底部的内容高度 Number类型,默认为74)
- * @param {*} id 当前页面中有多个table时需要制定table的id
+ * @param {*} id 当前页面中有多个table时需要指定table的id
  */
 export function getTableScroll({
   extraHeight,
@@ -208,7 +208,7 @@ export function getTableScroll({
 }
 
 // 自动触发点击事件
-function automaticClick(elment: HTMLElement) {
+function automaticClick(element: HTMLElement) {
   const ev = document.createEvent('MouseEvents');
   ev.initMouseEvent(
     'click',
@@ -227,7 +227,7 @@ function automaticClick(elment: HTMLElement) {
     0,
     null,
   );
-  elment.dispatchEvent(ev);
+  element.dispatchEvent(ev);
 }
 
 // 导出文件

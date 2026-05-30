@@ -18,7 +18,7 @@ export default {
 
   /* I18n configuration, `languages` and `defaultLanguage` are required currently. */
   i18n: {
-    /* Countrys flags: https://www.flaticon.com/packs/countrys-flags */
+    /* Countries flags: https://www.flaticon.com/packs/countries-flags */
     languages: [
       {
         key: 'pt-br',
