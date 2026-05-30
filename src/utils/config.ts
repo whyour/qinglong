@@ -15,29 +15,6 @@ export default {
       exclude: [/(\/(en|zh))*\/login/],
     },
   ],
-
-  /* I18n configuration, `languages` and `defaultLanguage` are required currently. */
-  i18n: {
-    /* Countries flags: https://www.flaticon.com/packs/countries-flags */
-    languages: [
-      {
-        key: 'pt-br',
-        title: 'Português',
-        flag: '/portugal.svg',
-      },
-      {
-        key: 'en',
-        title: 'English',
-        flag: '/america.svg',
-      },
-      {
-        key: 'zh',
-        title: intl.get('中文'),
-        flag: '/china.svg',
-      },
-    ],
-    defaultLanguage: 'en',
-  },
   scopes: [
     {
       name: intl.get('定时任务'),

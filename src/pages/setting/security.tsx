@@ -230,7 +230,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
       <Button
         type="primary"
         danger={twoFactorActivated}
-        onClick={activeOrDeactiveTwoFactor}
+        onClick={activeOrDeactivateTwoFactor}
       >
         {twoFactorActivated ? intl.get('禁用') : intl.get('启用')}
       </Button>
