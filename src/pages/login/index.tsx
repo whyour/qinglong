@@ -50,7 +50,7 @@ const Login = () => {
       });
   };
 
-  const completeTowFactor = (values: any) => {
+  const completeTwoFactor = (values: any) => {
     setVerifying(true);
     request
       .put(`${config.apiPrefix}user/two-factor/login`, {
@@ -129,7 +129,7 @@ const Login = () => {
     const { value } = e.target as any;
     const regx = /^[0-9]{6}$/;
     if (regx.test(value)) {
-      completeTowFactor({ code: value });
+      completeTwoFactor({ code: value });
     }
   };
 
@@ -156,7 +156,7 @@ const Login = () => {
       </div>
       <div className={styles.main}>
         {twoFactor ? (
-          <Form layout="vertical" onFinish={completeTowFactor}>
+          <Form layout="vertical" onFinish={completeTwoFactor}>
             <FormItem
               name="code"
               label={intl.get('验证码')}

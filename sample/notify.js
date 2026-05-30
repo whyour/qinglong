@@ -1598,7 +1598,7 @@ async function sendNotify(text, desp, params = {}) {
     iGotNotify(text, desp, params), // iGot
     gobotNotify(text, desp), // go-cqhttp
     gotifyNotify(text, desp), // gotify
-    chatNotify(text, desp), // synolog chat
+    chatNotify(text, desp), // synology chat
     pushDeerNotify(text, desp), // PushDeer
     aibotkNotify(text, desp), // 智能微秘书
     fsBotNotify(text, desp), // 飞书机器人
