@@ -81,6 +81,10 @@ RUN pip3 install --prefix ${PYTHON_HOME} requests
 
 COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
+RUN ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
+  && ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/ql \
+  && chmod +x /usr/local/bin/task /usr/local/bin/ql
+
 WORKDIR ${QL_DIR}
 
 HEALTHCHECK --interval=5s --timeout=2s --retries=20 \

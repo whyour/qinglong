@@ -11,6 +11,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   code_gitlab:
     runs-on: ubuntu-latest
@@ -340,7 +343,7 @@ jobs:
           network: host
           platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
           context: .
-          file: ./docker/310.Dockerfile
+          file: ./docker/Dockerfile.310
           push: true
           tags: |
             whyour/qinglong:python3.10
@@ -403,7 +406,7 @@ jobs:
           network: host
           platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
           context: .
-          file: ./docker/310.Dockerfile.debian
+          file: ./docker/Dockerfile.debian310
           push: true
           tags: |
             whyour/qinglong:debian-python3.10

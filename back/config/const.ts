@@ -60,17 +60,17 @@ export const LINUX_DEPENDENCE_COMMAND: Record<
   }
 > = {
   Debian: {
-    install: 'apt-get install -y',
-    uninstall: 'apt-get remove -y',
-    info: 'dpkg-query -s',
+    install: 'sudo apt-get install -y',
+    uninstall: 'sudo apt-get remove -y',
+    info: 'sudo dpkg-query -s',
     check(info: string) {
       return info.includes('install ok installed');
     },
   },
   Ubuntu: {
-    install: 'apt-get install -y',
-    uninstall: 'apt-get remove -y',
-    info: 'dpkg-query -s',
+    install: 'sudo apt-get install -y',
+    uninstall: 'sudo apt-get remove -y',
+    info: 'sudo dpkg-query -s',
     check(info: string) {
       return info.includes('install ok installed');
     },

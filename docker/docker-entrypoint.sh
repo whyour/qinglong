@@ -94,14 +94,15 @@ if ! grep -qE '^::1[[:space:]]+.*localhost' /etc/hosts 2>/dev/null; then
   log_with_style "INFO" "🔧  0. 已添加 IPv6 localhost 解析"
 fi
 
-# 在一切操作之前检查目录权限
-ensure_ql_permissions
-
-# Dockerfile 中 HOME=/root，非 root 用户无法写入
-# 将 HOME 修正为临时目录，PM2/npm/pip 等工具的运行时数据无需持久化
+# 自定义用户（非 qinglong/root）可能 HOME 为空或不可写
+# 修正 HOME 确保 npm/pip/pm2 等工具有可用的缓存目录
 if [ ! -w "$HOME" ]; then
+  mkdir -p "$QL_DIR/.tmp"
   export HOME="$QL_DIR/.tmp"
 fi
+
+# 在一切操作之前检查目录权限
+ensure_ql_permissions
 
 log_with_style "INFO" "🚀  1. 检测配置文件..."
 load_ql_envs

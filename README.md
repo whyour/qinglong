@@ -50,6 +50,17 @@ docker pull whyour/qinglong:latest
 docker pull whyour/qinglong:debian
 ```
 
+使用 `debian` 镜像以非 root 用户运行时，需指定 `--user qinglong`：
+
+```bash
+docker run -d \
+  -v /path/to/ql/data:/ql/data \
+  -p 5700:5700 \
+  --user qinglong \
+  --name qinglong \
+  whyour/qinglong:debian
+```
+
 ### npm
 
 npm 版本支持 `debian/ubuntu/alpine` 系统，需要自行安装 `node/npm/python3/pip3/pnpm`

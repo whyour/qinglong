@@ -13,12 +13,19 @@ os_name="${QL_OS_TYPE:-}"
 if [ -z "$os_name" ]; then
   os_name=$(source /etc/os-release && echo "$ID")
 fi
+
+# 非 root 用户使用 sudo
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+  SUDO="sudo"
+fi
+
 case "$os_name" in
   alpine)
-    apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
+    $SUDO apk --no-cache add -f zlib-dev gcc jpeg-dev python3-dev musl-dev freetype-dev
     ;;
   debian|ubuntu)
-    apt-get install -y gcc python3-dev musl-dev zlib1g-dev libjpeg-dev libfreetype-dev
+    $SUDO apt-get install -y gcc python3-dev musl-dev zlib1g-dev libjpeg-dev libfreetype-dev
     ;;
   *)
     echo -e "暂不支持此系统 $os_name"

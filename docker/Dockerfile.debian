@@ -32,7 +32,9 @@ RUN groupadd -g ${QL_GID} qinglong && \
     useradd -m -u ${QL_UID} -g ${QL_GID} -s /bin/bash qinglong && \
     mkdir -p /home/qinglong/bin /home/qinglong/.ssh && \
     chmod 700 /home/qinglong/.ssh && \
-    chown -R ${QL_UID}:${QL_GID} /home/qinglong
+    chown -R ${QL_UID}:${QL_GID} /home/qinglong && \
+    mkdir -p /etc/sudoers.d && \
+    echo 'qinglong ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/qinglong
 
 ENV QL_USER=qinglong
 ENV QL_HOME=/home/$QL_USER
@@ -55,6 +57,7 @@ RUN set -x && \
   jq \
   procps \
   netcat-openbsd \
+  sudo \
   unzip \
   libatomic1 && \
   apt-get clean && \
@@ -69,7 +72,7 @@ RUN set -x && \
   rm -rf /etc/apt/apt.conf.d/docker-clean && \
   ulimit -c 0
 
-RUN mkdir -p ${QL_DIR} ${QL_DIR}/data && \
+RUN mkdir -p ${QL_DIR} && \
   chown -R ${QL_UID}:${QL_GID} ${QL_DIR}
 
 USER qinglong
@@ -87,7 +90,7 @@ RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} && \
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \
   PYTHONUSERBASE=${QL_DIR}/data/dep_cache/python3 \
-  HOME=/root
+  HOME=/home/qinglong
 
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin:${HOME}/bin \
   NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules \
@@ -100,6 +103,10 @@ COPY --chown=qinglong:qinglong --from=builder /tmp/build/node_modules/. /ql/node
 
 USER root
 
+RUN ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
+  && ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/ql \
+  && chmod +x /usr/local/bin/task /usr/local/bin/ql
+
 WORKDIR ${QL_DIR}
 
 HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
@@ -108,5 +115,5 @@ HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
 
 VOLUME /ql/data
-  
+
 EXPOSE 5700

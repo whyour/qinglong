@@ -581,7 +581,7 @@ except:
 ''')"`,
     [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
       ? `apk info -es ${name}`
-      : `dpkg-query -s ${name}`,
+      : `sudo dpkg-query -s ${name}`,
   };
 
   return baseCommands[type];
@@ -594,7 +594,7 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
       'pip3 install --disable-pip-version-check --root-user-action=ignore',
     [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
       ? 'apk add --no-check-certificate'
-      : 'apt-get install -y',
+      : 'sudo apt-get install -y',
   };
 
   let command = baseCommands[type];
@@ -616,7 +616,7 @@ export function getUninstallCommand(
       'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
     [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
       ? 'apk del'
-      : 'apt-get remove -y',
+      : 'sudo apt-get remove -y',
   };
 
   return `${baseCommands[type]} ${name.trim()}`;
@@ -740,7 +740,7 @@ async function _updateLinuxMirror(
           currentDomainWithScheme,
           mirrorDomainWithScheme || 'http://deb.debian.org',
         );
-        return 'apt-get update';
+        return 'sudo apt-get update';
       } else {
         throw Error(`Current mirror domain not found.`);
       }
@@ -753,7 +753,7 @@ async function _updateLinuxMirror(
           currentDomainWithScheme,
           mirrorDomainWithScheme || 'http://archive.ubuntu.com',
         );
-        return 'apt-get update';
+        return 'sudo apt-get update';
       } else {
         throw Error(`Current mirror domain not found.`);
       }

@@ -41,10 +41,16 @@ if [[ $command != "reload" ]]; then
     os_name=$(source /etc/os-release && echo "$ID")
   fi
 
+  # 非 root 用户使用 sudo
+  SUDO=""
+  if [ "$(id -u)" -ne 0 ]; then
+    SUDO="sudo"
+  fi
+
   case "$os_name" in
     alpine)
-      apk update
-      apk add -f bash \
+      $SUDO apk update
+      $SUDO apk add -f bash \
         coreutils \
         git \
         curl \
@@ -59,8 +65,8 @@ if [[ $command != "reload" ]]; then
         netcat-openbsd
       ;;
     debian|ubuntu)
-      apt-get update
-      apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
+      $SUDO apt-get update
+      $SUDO apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
       ;;
     *)
       echo -e "暂不支持此系统部署 $os_name"
