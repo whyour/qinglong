@@ -34,6 +34,7 @@ export default class NotificationService {
     ['chronocat', this.chronocat],
     ['ntfy', this.ntfy],
     ['wxPusherBot', this.wxPusherBot],
+    ['openiLink', this.openiLink],
   ]);
 
   private title = '';
@@ -88,6 +89,14 @@ export default class NotificationService {
       return await notificationModeAction?.call(this);
     }
     return true;
+  }
+
+  private parseMailRecipients(value?: string) {
+    const recipients = (value || '')
+      .split(/[;；]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return recipients.length > 0 ? recipients : undefined;
   }
 
   private async gotify() {
@@ -591,6 +600,7 @@ export default class NotificationService {
 
   private async email() {
     const { emailPass, emailService, emailUser, emailTo } = this.params;
+    const recipients = this.parseMailRecipients(emailTo) || emailUser;
 
     try {
       const transporter = nodemailer.createTransport({
@@ -603,7 +613,7 @@ export default class NotificationService {
 
       const info = await transporter.sendMail({
         from: `"青龙快讯" <${emailUser}>`,
-        to: emailTo ? emailTo.split(';') : emailUser,
+        to: recipients,
         subject: `${this.title}`,
         html: `${this.content.replace(/\n/g, '<br/>')}`,
       });
@@ -857,5 +867,36 @@ export default class NotificationService {
         return { body };
     }
     return {};
+  }
+
+  private async openiLink() {
+    const { openiLinkAppToken, openiLinkHubUrl, openiLinkContextToken } =
+      this.params;
+    const baseUrl = openiLinkHubUrl?.replace(/\/$/, '') || 'https://hub.openilink.com';
+    const url = `${baseUrl}/bot/v1/message/send`;
+    const body: Record<string, string> = {
+      type: 'text',
+      content: `${this.title}\n\n${this.content}`,
+    };
+    if (openiLinkContextToken) {
+      body.context_token = openiLinkContextToken;
+    }
+    try {
+      const res = await httpClient.post(url, {
+        ...this.gotOption,
+        json: body,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openiLinkAppToken}`,
+        },
+      });
+      if (res.ok) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
   }
 }

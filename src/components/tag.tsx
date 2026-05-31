@@ -66,9 +66,7 @@ const EditableTagGroup = ({
   }, [inputVisible]);
 
   useEffect(() => {
-    if (value) {
-      setTags(value);
-    }
+    setTags(value || []);
   }, [value]);
 
   return (

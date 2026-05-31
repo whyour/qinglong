@@ -37,18 +37,18 @@ const SecuritySettings = ({ user, userChange }: any) => {
       });
   };
 
-  const activeOrDeactiveTwoFactor = () => {
+  const activeOrDeactivateTwoFactor = () => {
     if (twoFactorActivated) {
-      deactiveTowFactor();
+      deactivateTwoFactor();
     } else {
       getTwoFactorInfo();
       setTwoFactoring(true);
     }
   };
 
-  const deactiveTowFactor = () => {
+  const deactivateTwoFactor = () => {
     request
-      .put(`${config.apiPrefix}user/two-factor/deactive`)
+      .put(`${config.apiPrefix}user/two-factor/deactivate`)
       .then(({ code, data }) => {
         if (code === 200 && data) {
           setTwoFactorActivated(false);
@@ -60,7 +60,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
       });
   };
 
-  const completeTowFactor = () => {
+  const completeTwoFactor = () => {
     setLoading(true);
     request
       .put(`${config.apiPrefix}user/two-factor/active`, { code })
@@ -162,7 +162,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
             onChange={(e) => setCode(e.target.value)}
             placeholder="123456"
           />
-          <Button type="primary" loading={loading} onClick={completeTowFactor}>
+          <Button type="primary" loading={loading} onClick={completeTwoFactor}>
             {intl.get('完成设置')}
           </Button>
         </div>
@@ -230,7 +230,7 @@ const SecuritySettings = ({ user, userChange }: any) => {
       <Button
         type="primary"
         danger={twoFactorActivated}
-        onClick={activeOrDeactiveTwoFactor}
+        onClick={activeOrDeactivateTwoFactor}
       >
         {twoFactorActivated ? intl.get('禁用') : intl.get('启用')}
       </Button>

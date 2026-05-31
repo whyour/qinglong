@@ -48,6 +48,17 @@ docker pull whyour/qinglong:latest
 docker pull whyour/qinglong:debian
 ```
 
+When running the `debian` image as a non-root user, specify `--user qinglong`:
+
+```bash
+docker run -d \
+  -v /path/to/ql/data:/ql/data \
+  -p 5700:5700 \
+  --user qinglong \
+  --name qinglong \
+  whyour/qinglong:debian
+```
+
 ### npm
 
 The npm version supports `debian/ubuntu/alpine` systems and requires `node/npm/python3/pip3/pnpm` to be installed.

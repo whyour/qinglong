@@ -40,6 +40,7 @@ export default async () => {
         type: 'NUMBER',
       },
       { table: 'Envs', column: 'isPinned', type: 'NUMBER' },
+      { table: 'Envs', column: 'labels', type: 'JSON' },
     ];
 
     for (const migration of migrations) {

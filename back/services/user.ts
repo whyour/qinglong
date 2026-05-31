@@ -330,7 +330,7 @@ export default class UserService {
     }
   }
 
-  public async deactiveTwoFactor() {
+  public async deactivateTwoFactor() {
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, {
       twoFactorActivated: false,

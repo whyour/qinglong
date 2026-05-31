@@ -108,8 +108,8 @@ const push_config = {
 
   QYWX_KEY: '', // 企业微信机器人的 webhook(详见文档 https://work.weixin.qq.com/api/doc/90000/90136/91770)，例如：693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa
 
-  TG_BOT_TOKEN: '', // tg 机器人的 TG_BOT_TOKEN，例：1407203283:AAG9rt-6RDaaX0HBLZQq0laNOh898iFYaRQ
-  TG_USER_ID: '', // tg 机器人的 TG_USER_ID，例：1434078534
+  TG_BOT_TOKEN: '', // tg 机器人的 TG_BOT_TOKEN，例：1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+  TG_USER_ID: '', // tg 机器人的 TG_USER_ID，例：1234567890
   TG_API_HOST: 'https://api.telegram.org', // tg 代理 api
   TG_PROXY_AUTH: '', // tg 代理认证参数
   TG_PROXY_HOST: '', // tg 机器人的 TG_PROXY_HOST
@@ -121,7 +121,8 @@ const push_config = {
 
   SMTP_SERVICE: '', // 邮箱服务名称，比如 126、163、Gmail、QQ 等，支持列表 https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json
   SMTP_EMAIL: '', // SMTP 发件邮箱
-  SMTP_TO: '', // SMTP 收件邮箱，默认通知将会发给发件邮箱
+  SMTP_TO: '', // SMTP 收件邮箱，兼容旧参数名，默认通知将会发给发件邮箱
+  SMTP_EMAIL_TO: '', // SMTP 收件邮箱，多个分号分隔，默认发给发件邮箱
   SMTP_PASSWORD: '', // SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
   SMTP_NAME: '', // SMTP 收发件人姓名，可随意填写
 
@@ -151,6 +152,11 @@ const push_config = {
   WXPUSHER_APP_TOKEN: '', // wxpusher 的 appToken
   WXPUSHER_TOPIC_IDS: '', // wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
   WXPUSHER_UIDS: '', // wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+
+  // 官方文档: https://openilink.com/docs/hub/apps
+  OPENILINK_APP_TOKEN: '', // OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取
+  OPENILINK_HUB_URL: '', // OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
+  OPENILINK_CONTEXT_TOKEN: '', // OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
 };
 
 for (const key in push_config) {
@@ -1046,8 +1052,14 @@ function fsBotNotify(text, desp) {
 }
 
 async function smtpNotify(text, desp) {
-  const { SMTP_EMAIL, SMTP_TO, SMTP_PASSWORD, SMTP_SERVICE, SMTP_NAME } =
-    push_config;
+  const {
+    SMTP_EMAIL,
+    SMTP_TO,
+    SMTP_EMAIL_TO,
+    SMTP_PASSWORD,
+    SMTP_SERVICE,
+    SMTP_NAME,
+  } = push_config;
   if (![SMTP_EMAIL, SMTP_PASSWORD].every(Boolean) || !SMTP_SERVICE) {
     return;
   }
@@ -1063,9 +1075,20 @@ async function smtpNotify(text, desp) {
     });
 
     const addr = SMTP_NAME ? `"${SMTP_NAME}" <${SMTP_EMAIL}>` : SMTP_EMAIL;
+    const recipients = [SMTP_EMAIL_TO, SMTP_TO].reduce((list, value) => {
+      if (!value) {
+        return list;
+      }
+      return list.concat(
+        value
+          .split(/[;；]/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+      );
+    }, []);
     const info = await transporter.sendMail({
       from: addr,
-      to: SMTP_TO ? SMTP_TO.split(';') : addr,
+      to: recipients.length ? recipients : SMTP_EMAIL,
       subject: text,
       html: `${desp.replace(/\n/g, '<br/>')}`,
     });
@@ -1408,6 +1431,54 @@ function wxPusherNotify(text, desp) {
   });
 }
 
+function openiLinkNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { OPENILINK_APP_TOKEN, OPENILINK_HUB_URL, OPENILINK_CONTEXT_TOKEN } =
+      push_config;
+    if (OPENILINK_APP_TOKEN) {
+      const baseUrl = OPENILINK_HUB_URL
+        ? OPENILINK_HUB_URL.replace(/\/$/, '')
+        : 'https://hub.openilink.com';
+      const body = {
+        type: 'text',
+        content: `${text}\n\n${desp}`,
+      };
+      if (OPENILINK_CONTEXT_TOKEN) {
+        body.context_token = OPENILINK_CONTEXT_TOKEN;
+      }
+      const options = {
+        url: `${baseUrl}/bot/v1/message/send`,
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENILINK_APP_TOKEN}`,
+        },
+        timeout,
+      };
+
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('OpeniLink 发送通知消息失败！\n', err);
+          } else {
+            if (data.ok) {
+              console.log('OpeniLink 发送通知消息成功！');
+            } else {
+              console.log(`OpeniLink 发送通知消息异常：${data.error}`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
 function parseString(input, valueFormatFn) {
   const regex = /(\w+):\s*((?:(?!\n\w+:).)*)/g;
   const matches = {};
@@ -1527,7 +1598,7 @@ async function sendNotify(text, desp, params = {}) {
     iGotNotify(text, desp, params), // iGot
     gobotNotify(text, desp), // go-cqhttp
     gotifyNotify(text, desp), // gotify
-    chatNotify(text, desp), // synolog chat
+    chatNotify(text, desp), // synology chat
     pushDeerNotify(text, desp), // PushDeer
     aibotkNotify(text, desp), // 智能微秘书
     fsBotNotify(text, desp), // 飞书机器人
@@ -1538,6 +1609,7 @@ async function sendNotify(text, desp, params = {}) {
     qmsgNotify(text, desp), // 自定义通知
     ntfyNotify(text, desp), // Ntfy
     wxPusherNotify(text, desp), // wxpusher
+    openiLinkNotify(text, desp), // OpeniLink
   ]);
 }
 

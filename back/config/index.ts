@@ -9,6 +9,8 @@ dotenv.config({
 interface Config {
   port: number;
   grpcPort: number;
+  bindHost: string;
+  bindHostGrpc: string;
   nodeEnv: string;
   isDevelopment: boolean;
   isProduction: boolean;
@@ -31,6 +33,8 @@ interface Config {
 const config: Config = {
   port: parseInt(process.env.BACK_PORT || '5700', 10),
   grpcPort: parseInt(process.env.GRPC_PORT || '5500', 10),
+  bindHost: process.env.BIND_HOST || '::',
+  bindHostGrpc: process.env.BIND_HOST_GRPC || '::',
   nodeEnv: process.env.NODE_ENV || 'development',
   isDevelopment: process.env.NODE_ENV === 'development',
   isProduction: process.env.NODE_ENV === 'production',

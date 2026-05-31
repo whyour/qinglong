@@ -20,6 +20,7 @@ const uploadPath = path.join(dataPath, 'upload/');
 const bakPath = path.join(dataPath, 'bak/');
 const samplePath = path.join(rootPath, 'sample/');
 const tmpPath = path.join(logPath, '.tmp/');
+const rootTmpPath = path.join(rootPath, '.tmp/');
 const confFile = path.join(configPath, 'config.sh');
 const sampleConfigFile = path.join(samplePath, 'config.sample.sh');
 const sampleTaskShellFile = path.join(samplePath, 'task.sample.sh');
@@ -44,6 +45,7 @@ const directories = [
   preloadPath,
   logPath,
   tmpPath,
+  rootTmpPath,
   uploadPath,
   sshPath,
   bakPath,

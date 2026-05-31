@@ -13,7 +13,7 @@ import { AuthDataType, SystemModel } from '../data/system';
 import SystemService from '../services/system';
 import UserService from '../services/user';
 import { writeFile, readFile } from 'fs/promises';
-import { createRandomString, fileExist, safeJSONParse } from '../config/util';
+import { createRandomString, fileExist, isDemoEnv, safeJSONParse } from '../config/util';
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
@@ -50,7 +50,7 @@ export default async () => {
   const [authConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.authConfig },
   });
-  if (!authConfig?.info) {
+  if (!authConfig?.info || isDemoEnv()) {
     let authInfo = {
       username: 'admin',
       password: 'admin',

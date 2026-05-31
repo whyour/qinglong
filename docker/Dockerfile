@@ -22,7 +22,7 @@ ENV QL_DIR=/ql \
   PS1="\u@\h:\w \$ "
 
 VOLUME /ql/data
-  
+
 EXPOSE 5700
 
 COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
@@ -69,10 +69,11 @@ RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \
-  PYTHONUSERBASE=${QL_DIR}/data/dep_cache/python3
+  PYTHONUSERBASE=${QL_DIR}/data/dep_cache/python3 \
+  HOME=/root
 
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin \
-  NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules \
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin:${HOME}/bin \
+  NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules \
   PIP_CACHE_DIR=${PYTHON_HOME}/pip \
   PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages
 
@@ -80,9 +81,13 @@ RUN pip3 install --prefix ${PYTHON_HOME} requests
 
 COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
+RUN ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
+  && ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/ql \
+  && chmod +x /usr/local/bin/task /usr/local/bin/ql
+
 WORKDIR ${QL_DIR}
 
 HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
-  CMD curl -sf --noproxy '*' http://127.0.0.1:5700/api/health || exit 1
+  CMD curl -sf --noproxy '*' http://localhost:${QlPort:-5700}/api/health || exit 1
 
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]

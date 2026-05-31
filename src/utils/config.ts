@@ -15,29 +15,6 @@ export default {
       exclude: [/(\/(en|zh))*\/login/],
     },
   ],
-
-  /* I18n configuration, `languages` and `defaultLanguage` are required currently. */
-  i18n: {
-    /* Countrys flags: https://www.flaticon.com/packs/countrys-flags */
-    languages: [
-      {
-        key: 'pt-br',
-        title: 'Português',
-        flag: '/portugal.svg',
-      },
-      {
-        key: 'en',
-        title: 'English',
-        flag: '/america.svg',
-      },
-      {
-        key: 'zh',
-        title: intl.get('中文'),
-        flag: '/china.svg',
-      },
-    ],
-    defaultLanguage: 'en',
-  },
   scopes: [
     {
       name: intl.get('定时任务'),
@@ -98,6 +75,7 @@ export default {
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'wePlusBot', label: intl.get('微加机器人') },
     { value: 'wxPusherBot', label: 'wxPusher' },
+    { value: 'openiLink', label: 'OpeniLink' },
     { value: 'chat', label: intl.get('群晖chat') },
     { value: 'email', label: intl.get('邮箱') },
     { value: 'lark', label: intl.get('飞书机器人') },
@@ -385,6 +363,27 @@ export default {
         label: 'wxPusherBotUids',
         tip: intl.get('wxPusherBot的uids'),
         required: false,
+      },
+    ],
+    openiLink: [
+      {
+        label: 'openiLinkAppToken',
+        tip: intl.get(
+          'OpeniLink的app_token，在OpeniLink Hub后台安装App后获取，参考 https://openilink.com/docs/hub/apps',
+        ),
+        required: true,
+      },
+      {
+        label: 'openiLinkHubUrl',
+        tip: intl.get(
+          'OpeniLink Hub地址，默认为 https://hub.openilink.com，自建Hub时填写自己的地址',
+        ),
+      },
+      {
+        label: 'openiLinkContextToken',
+        tip: intl.get(
+          'OpeniLink的context_token，用于标识消息会话上下文，可从消息事件中获取',
+        ),
       },
     ],
     lark: [

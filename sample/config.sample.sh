@@ -195,12 +195,14 @@ export SMTP_SERVER=""
 ## SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
 export SMTP_SSL=""
 
-## smtp_email 填写 SMTP 收发件邮箱，通知将会由自己发给自己
+## smtp_email 填写 SMTP 发件邮箱
 export SMTP_EMAIL=""
 ## smtp_password 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
 export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
+## smtp_email_to 填写 SMTP 收件邮箱，多个用英文;分隔，不填默认发给发件邮箱
+export SMTP_EMAIL_TO=""
 
 ## 17. PushMe
 ## 官方说明文档：https://push.i-i.me/
@@ -258,5 +260,14 @@ export WEBHOOK_HEADERS=""
 export WEBHOOK_METHOD=""
 ## 支持 text/plain、application/json、multipart/form-data、application/x-www-form-urlencoded
 export WEBHOOK_CONTENT_TYPE=""
+
+## 23. OpeniLink
+## 官方文档: https://openilink.com/docs/hub/apps
+## 在 OpeniLink Hub 后台安装 App 后获取 app_token
+export OPENILINK_APP_TOKEN=""
+## OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
+export OPENILINK_HUB_URL=""
+## OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
+export OPENILINK_CONTEXT_TOKEN=""
 
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可

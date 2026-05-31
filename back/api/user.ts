@@ -140,12 +140,12 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/two-factor/deactive',
+    '/two-factor/deactivate',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
-        const data = await userService.deactiveTwoFactor();
+        const data = await userService.deactivateTwoFactor();
         res.send({ code: 200, data });
       } catch (e) {
         return next(e);

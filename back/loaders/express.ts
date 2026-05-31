@@ -13,8 +13,28 @@ import { isValidToken } from '../shared/auth';
 import path from 'path';
 
 export default ({ app }: { app: Application }) => {
+  // Security: Enable strict routing to prevent case-insensitive path bypass
+  app.set('case sensitive routing', true);
+  app.set('strict routing', true);
   app.set('trust proxy', 'loopback');
   app.use(cors());
+  
+  // Security: Path normalization middleware to prevent case variation attacks
+  app.use((req, res, next) => {
+    const originalPath = req.path;
+    const normalizedPath = originalPath.toLowerCase();
+    
+    // Block requests with case variations on protected paths
+    if (originalPath !== normalizedPath && 
+        (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/open/'))) {
+      return res.status(400).json({
+        code: 400,
+        message: 'Invalid path format'
+      });
+    }
+    
+    next();
+  });
   
   // Rewrite URLs to strip baseUrl prefix if configured
   // This allows the rest of the app to work without baseUrl awareness
@@ -36,7 +56,7 @@ export default ({ app }: { app: Application }) => {
       secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
-      path: [...config.apiWhiteList, /^\/(?!api\/).*/],
+      path: [...config.apiWhiteList, /^(\/(?!api\/).*)$/i],
     }),
   );
 
@@ -51,19 +71,20 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req: Request, res, next) => {
-    if (!['/open/', '/api/'].some((x) => req.path.startsWith(x))) {
+    const pathLower = req.path.toLowerCase();
+    if (!['/open/', '/api/'].some((x) => pathLower.startsWith(x))) {
       return next();
     }
 
     const headerToken = getToken(req);
-    if (req.path.startsWith('/open/')) {
+    if (pathLower.startsWith('/open/')) {
       const apps = await shareStore.getApps();
       const doc = apps?.filter((x) =>
         x.tokens?.find((y) => y.value === headerToken),
       )?.[0];
       if (doc && doc.tokens && doc.tokens.length > 0) {
         const currentToken = doc.tokens.find((x) => x.value === headerToken);
-        const keyMatch = req.path.match(/\/open\/([a-z]+)\/*/);
+        const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
         const key = keyMatch && keyMatch[1];
         if (
           doc.scopes.includes(key as any) &&
@@ -98,7 +119,15 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(async (req, res, next) => {
-    if (!['/api/user/init', '/api/user/notification/init'].includes(req.path)) {
+    const pathLower = req.path.toLowerCase();
+    if (
+      ![
+        '/api/user/init',
+        '/api/user/notification/init',
+        '/open/user/init',
+        '/open/user/notification/init',
+      ].includes(req.path)
+    ) {
       return next();
     }
     const authInfo =
