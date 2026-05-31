@@ -1,8 +1,8 @@
 export enum CrontabStatus {
   'running' = 0,
-  'queued' = 0.5,
   'idle' = 1,
-  'disabled',
+  'disabled' = 2,
+  'queued' = 3,
 }
 
 export enum OperationName {

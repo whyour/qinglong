@@ -76,6 +76,7 @@ const ViewCreateModal = ({
       { name: intl.get('运行中'), value: CrontabStatus.running },
       { name: intl.get('空闲中'), value: CrontabStatus.idle },
       { name: intl.get('已禁用'), value: CrontabStatus.disabled },
+      { name: intl.get('排队中'), value: CrontabStatus.queued },
     ],
     sub_id: data?.data.map((x) => ({ name: x.name, value: x.id })),
   };
