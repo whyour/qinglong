@@ -554,8 +554,8 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
       throw new Error('Invalid timezone');
     }
 
-    await promiseExec(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`);
-    await promiseExec(`echo "${timezone}" > /etc/timezone`);
+    await promiseExec(`sudo ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`);
+    await promiseExec(`echo "${timezone}" | sudo tee /etc/timezone`);
 
     return true;
   } catch (error) {
@@ -735,40 +735,25 @@ async function _updateLinuxMirror(
       filePath = '/etc/apt/sources.list.d/debian.sources';
       currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
       if (currentDomainWithScheme) {
-        await replaceDomainInFile(
-          filePath,
-          currentDomainWithScheme,
-          mirrorDomainWithScheme || 'http://deb.debian.org',
-        );
-        return 'sudo apt-get update';
+        return `sudo sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://deb.debian.org'}|g' ${filePath} || (sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee ${filePath}) && sudo apt-get update`;
       } else {
-        throw Error(`Current mirror domain not found.`);
+        return `sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee ${filePath} && sudo apt-get update`;
       }
     case 'Ubuntu':
       filePath = '/etc/apt/sources.list.d/ubuntu.sources';
       currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
       if (currentDomainWithScheme) {
-        await replaceDomainInFile(
-          filePath,
-          currentDomainWithScheme,
-          mirrorDomainWithScheme || 'http://archive.ubuntu.com',
-        );
-        return 'sudo apt-get update';
+        return `sudo sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}|g' ${filePath} || (sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | sudo tee ${filePath}) && sudo apt-get update`;
       } else {
-        throw Error(`Current mirror domain not found.`);
+        return `sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | sudo tee ${filePath} && sudo apt-get update`;
       }
     case 'Alpine':
       filePath = '/etc/apk/repositories';
       currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
       if (currentDomainWithScheme) {
-        await replaceDomainInFile(
-          filePath,
-          currentDomainWithScheme,
-          mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org',
-        );
-        return 'apk update';
+        return `sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}|g' ${filePath} || (mkdir -p /etc/apk && echo -e "\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/main\\n\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/community" | sed "s|^|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}/alpine/v|" | tee ${filePath}) && apk update`;
       } else {
-        throw Error(`Current mirror domain not found.`);
+        return `mkdir -p /etc/apk && echo -e "\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/main\\n\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/community" | sed "s|^|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}/alpine/v|" | tee ${filePath} && apk update`;
       }
     default:
       throw Error('Unsupported OS type for updating mirrors.');
