@@ -36,10 +36,15 @@ export default async () => {
   if (!systemApp) {
     systemApp = await AppModel.create({
       name: 'system',
-      scopes: ['crons', 'system'],
+      scopes: ['crons', 'system', 'dashboard'],
       client_id: createRandomString(12, 12),
       client_secret: createRandomString(24, 24),
     });
+  } else if (!systemApp.scopes.includes('dashboard')) {
+    await AppModel.update(
+      { scopes: [...systemApp.scopes, 'dashboard'] },
+      { where: { name: 'system' } },
+    );
   }
   const [systemConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.systemConfig },

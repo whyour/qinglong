@@ -294,6 +294,7 @@ fi
 set_u_on="false"
 check_nounset
 main "${task_shell_params[@]}"
+_task_exit_code=$?
 if [[ "$set_u_on" == 'true' ]]; then
   set -u
 fi
@@ -305,4 +306,4 @@ if [[ $isJsOrPythonFile == 'true' ]]; then
 fi
 run_task_after "${task_shell_params[@]}"
 clear_env
-handle_task_end "${task_shell_params[@]}"
+handle_task_end "${task_shell_params[@]}" "$_task_exit_code"

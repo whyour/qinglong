@@ -388,18 +388,25 @@ handle_task_end() {
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
-  local suffix=""
-  [[ "${MANUAL:=}" == "true" ]] && suffix="(手动停止)"
-
+  local exit_code="${@: -1}"
   [[ "$diff_time" == 0 ]] && diff_time=1
 
   if [[ $ID ]]; then
     local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time")
     if [[ $error ]]; then
-      error_message=", 任务状态更新失败(${error})"
+      error_message=", 状态更新失败(${error})"
     fi
   fi
-  echo -e "\n## 执行结束$suffix... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
+
+  record_cron_stat "$ID" "${exit_code:-0}" "$diff_time"
+
+  if [[ "${MANUAL:=}" == "true" ]]; then
+    echo -e "\n## 已停止 ⏹... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
+  elif [[ $exit_code -eq 0 ]]; then
+    echo -e "\n## 完成 ✅... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
+  else
+    echo -e "\n## 失败 ❌ (退出码 ${exit_code})... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
+  fi
 }
 
 init_env

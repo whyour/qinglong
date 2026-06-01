@@ -6,6 +6,7 @@ import { AppModel } from '../data/open';
 import { SystemModel } from '../data/system';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
+import { CrontabStatModel } from '../data/cronStats';
 import { sequelize } from '../data';
 
 export default async () => {
@@ -17,6 +18,7 @@ export default async () => {
     await EnvModel.sync();
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
+    await CrontabStatModel.sync();
 
     // 初始化新增字段
     const migrations = [

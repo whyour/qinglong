@@ -10,6 +10,7 @@ import dependence from './dependence';
 import system from './system';
 import subscription from './subscription';
 import update from './update';
+import dashboard from './dashboard';
 import health from './health';
 
 export default () => {
@@ -25,6 +26,7 @@ export default () => {
   system(app);
   subscription(app);
   update(app);
+  dashboard(app);
   health(app);
 
   return app;

@@ -573,7 +573,6 @@ export default class CronService {
             JSON.stringify(params),
             code,
           );
-          // Close the stream after task completion
           await logStreamManager.closeStream(absolutePath);
           await CrontabModel.update(
             { status: CrontabStatus.idle, pid: undefined },

@@ -109,7 +109,7 @@ const Login = () => {
         ),
       });
       reloadUser(true);
-      history.push('/crontab');
+      history.push('/dashboard');
     } else if (code === 410) {
       setWaitTime(data);
     } else if (code === 420) {
@@ -136,7 +136,7 @@ const Login = () => {
   useEffect(() => {
     const isAuth = localStorage.getItem(config.authKey);
     if (isAuth) {
-      history.push('/crontab');
+      history.push('/dashboard');
     }
   }, []);
 

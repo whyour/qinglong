@@ -220,4 +220,18 @@ update_auth_config() {
   fi
 }
 
+record_cron_stat() {
+  local ref_id="$1"
+  local exit_code="${2:-0}"
+  local elapsed="${3:-0}"
+  [[ $ref_id ]] && [[ $ref_id -gt 0 ]] 2>/dev/null || return
+
+  curl -s --noproxy "*" "http://0.0.0.0:${ql_port:-5700}/open/dashboard/record" \
+    -X POST \
+    -H "Authorization: Bearer ${__ql_token__}" \
+    -H "Content-Type: application/json;charset=UTF-8" \
+    --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed}" \
+    --compressed
+}
+
 get_token
