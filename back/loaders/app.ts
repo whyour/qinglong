@@ -14,7 +14,7 @@ export default async ({ app }: { app: Application }) => {
   await linkDeps();
   Logger.info('✌️ Link deps loaded');
 
-  initFile();
+  await initFile();
   Logger.info('✌️ Init file loaded');
 
   await initData();
