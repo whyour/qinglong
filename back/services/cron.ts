@@ -793,7 +793,7 @@ export default class CronService {
         { where: { id: bootTasks.map((t) => t.id!) } },
       );
       for (const task of bootTasks) {
-        await this.runSingle(task.id!);
+        this.runSingle(task.id!);
       }
     }
   }
