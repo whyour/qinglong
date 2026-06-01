@@ -262,7 +262,10 @@ export async function readDir(
   baseDir: string = '',
   blacklist: string[] = [],
 ): Promise<IFile[]> {
-  const absoluteDir = path.join(baseDir, dir);
+  const absoluteDir = path.resolve(baseDir, dir);
+  if (!absoluteDir.startsWith(path.resolve(baseDir))) {
+    return [];
+  }
   const relativePath = path.relative(baseDir, absoluteDir);
 
   try {
