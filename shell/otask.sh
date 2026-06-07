@@ -104,31 +104,22 @@ enter_script_workdir() {
     else
       _target_dir="${dir_scripts}/${work_dir}"
     fi
-    if [[ ! -d "${_target_dir}" ]]; then
-      echo -e "错误：工作目录不存在 ${_target_dir}"
-      exit 1
-    fi
-    cd "${_target_dir}" || {
-      echo -e "错误：无法进入工作目录 ${_target_dir}"
-      exit 1
-    }
-    # 仍然处理 file_param 中的路径前缀，确保命令路径正确
-    if [[ ${file_param} =~ "/" ]]; then
-      local script_name="${file_param##*/}"
-      if [[ "${use_dot_prefix}" == "true" ]]; then
-        file_param="./${script_name}"
-      else
-        file_param="${script_name}"
+    if [[ -d "${_target_dir}" ]]; then
+      cd "${_target_dir}"
+      if [[ ${file_param} =~ "/" ]]; then
+        local script_name="${file_param##*/}"
+        if [[ "${use_dot_prefix}" == "true" ]]; then
+          file_param="./${script_name}"
+        else
+          file_param="${script_name}"
+        fi
       fi
+      return
     fi
-    return
+    echo -e "警告：工作目录不存在 ${_target_dir}"
   fi
 
-  # 自动检测：从 file_param 中提取脚本所在目录
-  cd $dir_scripts || {
-    echo -e "错误：无法进入 scripts 目录 ${dir_scripts}"
-    exit 1
-  }
+  cd $dir_scripts
   if [[ ${file_param} =~ "/" ]]; then
     local script_dir="${file_param%/*}"
     local script_name="${file_param##*/}"
