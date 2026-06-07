@@ -678,6 +678,9 @@ export default class CronService {
         .replace(/;? *\n/g, ';')
         .trim()}' `;
     }
+    if (tab.work_dir) {
+      commandVariable += `work_dir='${tab.work_dir.replace(/'/g, "'\\''")}' `;
+    }
 
     const crontab_job_string = `${commandVariable}${command}`;
     return crontab_job_string;

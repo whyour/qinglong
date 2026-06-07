@@ -96,6 +96,26 @@ append_node_dependency_path() {
 enter_script_workdir() {
   local use_dot_prefix="$1"
 
+  # 如果定时任务显式指定了工作目录，优先使用
+  if [[ -n "${work_dir:=}" ]]; then
+    if [[ "${work_dir}" == /* ]]; then
+      cd "${work_dir}"
+    else
+      cd "${dir_scripts}/${work_dir}"
+    fi
+    # 仍然处理 file_param 中的路径前缀，确保命令路径正确
+    if [[ ${file_param} =~ "/" ]]; then
+      local script_name="${file_param##*/}"
+      if [[ "${use_dot_prefix}" == "true" ]]; then
+        file_param="./${script_name}"
+      else
+        file_param="${script_name}"
+      fi
+    fi
+    return
+  fi
+
+  # 自动检测：从 file_param 中提取脚本所在目录
   cd $dir_scripts
   if [[ ${file_param} =~ "/" ]]; then
     local script_dir="${file_param%/*}"
@@ -210,9 +230,53 @@ run_designated() {
 run_else() {
   local file_param="$1"
 
-  enter_script_workdir true
+  # 判断 file_param 本身是否是脚本文件
+  local is_file_script="false"
+  if [[ "$file_param" == *.js || "$file_param" == *.mjs ||
+        "$file_param" == *.py || "$file_param" == *.pyc ||
+        "$file_param" == *.sh || "$file_param" == *.ts ]]; then
+    is_file_script="true"
+  fi
 
-  shift
+  if [[ "$is_file_script" != "true" ]]; then
+    # file_param 不是脚本，从后续参数中查找脚本路径来确定工作目录
+    local script_for_dir=""
+    for arg in "$@"; do
+      if [[ "$arg" == *.js || "$arg" == *.mjs ||
+            "$arg" == *.py || "$arg" == *.pyc ||
+            "$arg" == *.sh || "$arg" == *.ts ]]; then
+        script_for_dir="$arg"
+        break
+      fi
+    done
+
+    if [[ -n "$script_for_dir" ]]; then
+      local saved_file_param="$file_param"
+      file_param="$script_for_dir"
+      enter_script_workdir true
+      local adjusted_script="$file_param"
+      file_param="$saved_file_param"
+
+      shift
+      local new_args=()
+      for arg in "$@"; do
+        if [[ "$arg" == "$script_for_dir" ]]; then
+          new_args+=("$adjusted_script")
+        else
+          new_args+=("$arg")
+        fi
+      done
+      set -- "${new_args[@]}"
+    else
+      # 没有找到脚本参数，只 cd 到 scripts 目录
+      enter_script_workdir true
+      shift
+    fi
+  else
+    # file_param 本身就是脚本，直接用 enter_script_workdir 处理
+    enter_script_workdir true
+    shift
+  fi
 
   clear_non_sh_env
   $timeoutCmd $which_program $file_param "$@"

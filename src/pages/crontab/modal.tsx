@@ -230,6 +230,15 @@ const CronModal = ({
           />
         </Form.Item>
         <Form.Item
+          name="work_dir"
+          label={intl.get('工作目录')}
+          tooltip={intl.get(
+            '脚本执行时的工作目录，留空则自动检测。相对路径基于 scripts 目录，也支持绝对路径',
+          )}
+        >
+          <Input placeholder={intl.get('留空自动检测，或输入相对/绝对路径')} />
+        </Form.Item>
+        <Form.Item
           name="task_before"
           label={intl.get('执行前')}
           tooltip={intl.get(

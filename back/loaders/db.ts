@@ -41,6 +41,7 @@ export default async () => {
         column: 'allow_multiple_instances',
         type: 'NUMBER',
       },
+      { table: 'Crontabs', column: 'work_dir', type: 'VARCHAR(255)' },
       { table: 'Envs', column: 'isPinned', type: 'NUMBER' },
       { table: 'Envs', column: 'labels', type: 'JSON' },
     ];
