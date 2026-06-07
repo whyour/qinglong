@@ -98,11 +98,20 @@ enter_script_workdir() {
 
   # 如果定时任务显式指定了工作目录，优先使用
   if [[ -n "${work_dir:=}" ]]; then
+    local _target_dir
     if [[ "${work_dir}" == /* ]]; then
-      cd "${work_dir}"
+      _target_dir="${work_dir}"
     else
-      cd "${dir_scripts}/${work_dir}"
+      _target_dir="${dir_scripts}/${work_dir}"
     fi
+    if [[ ! -d "${_target_dir}" ]]; then
+      echo -e "错误：工作目录不存在 ${_target_dir}"
+      exit 1
+    fi
+    cd "${_target_dir}" || {
+      echo -e "错误：无法进入工作目录 ${_target_dir}"
+      exit 1
+    }
     # 仍然处理 file_param 中的路径前缀，确保命令路径正确
     if [[ ${file_param} =~ "/" ]]; then
       local script_name="${file_param##*/}"
@@ -116,7 +125,10 @@ enter_script_workdir() {
   fi
 
   # 自动检测：从 file_param 中提取脚本所在目录
-  cd $dir_scripts
+  cd $dir_scripts || {
+    echo -e "错误：无法进入 scripts 目录 ${dir_scripts}"
+    exit 1
+  }
   if [[ ${file_param} =~ "/" ]]; then
     local script_dir="${file_param%/*}"
     local script_name="${file_param##*/}"

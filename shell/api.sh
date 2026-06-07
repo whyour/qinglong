@@ -226,12 +226,22 @@ record_cron_stat() {
   local elapsed="${3:-0}"
   [[ $ref_id ]] && [[ $ref_id -gt 0 ]] 2>/dev/null || return
 
-  curl -s --noproxy "*" "http://localhost:${ql_port:-5700}/open/dashboard/record" \
+  local api=$(
+    curl -s --noproxy "*" "http://localhost:${ql_port:-5700}/open/dashboard/record" \
     -X POST \
     -H "Authorization: Bearer ${__ql_token__}" \
     -H "Content-Type: application/json;charset=UTF-8" \
     --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed}" \
     --compressed
+  )
+  code=$(echo "$api" | jq -r .code)
+  message=$(echo "$api" | jq -r .message)
+  if [[ $code != 200 ]]; then
+    if [[ ! $message ]]; then
+      message="$api"
+    fi
+    echo -e "${message}"
+  fi
 }
 
 get_token
