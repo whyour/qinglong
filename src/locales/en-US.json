@@ -560,7 +560,7 @@
   "全局SSH私钥": "Global SSH Private Key",
   "用于访问所有私有仓库的全局SSH私钥": "Global SSH private key for accessing all private repositories",
   "请输入完整的SSH私钥内容": "Please enter the complete SSH private key content",
-  "统计面板": "Dashboard",
+  "仪表盘": "Dashboard",
   "总任务": "Total Tasks",
   "今日执行": "Today Runs",
   "今日成功": "Success",

@@ -171,7 +171,7 @@ const Dashboard = () => {
 
   return (
     <PageContainer
-      title={intl.get('统计面板')}
+      title={intl.get('仪表盘')}
       header={{ style: headerStyle }}
       className={'ql-container-wrapper dashboard-wrapper'}
     >

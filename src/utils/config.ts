@@ -512,6 +512,7 @@ export default {
     '/setting': intl.get('系统设置'),
     '/error': intl.get('错误日志'),
     '/dependence': intl.get('依赖管理'),
+    '/dashboard': intl.get('仪表盘'),
   },
   dependenceTypes: ['nodejs', 'python3', 'linux'],
 };
