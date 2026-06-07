@@ -373,4 +373,4 @@ if [[ $isJsOrPythonFile == 'true' ]]; then
 fi
 run_task_after "${task_shell_params[@]}"
 clear_env
-handle_task_end "${task_shell_params[@]}" "$_task_exit_code"
+handle_task_end "${task_shell_params[@]}"

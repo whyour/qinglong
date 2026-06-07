@@ -388,7 +388,7 @@ handle_task_end() {
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
-  local exit_code="${@: -1}"
+  local exit_code="${_task_exit_code:-0}"
   [[ "$diff_time" == 0 ]] && diff_time=1
 
   if [[ $ID ]]; then
