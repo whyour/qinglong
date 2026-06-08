@@ -401,11 +401,11 @@ handle_task_end() {
   record_cron_stat "$ID" "${exit_code:-0}" "$diff_time"
 
   if [[ "${MANUAL:=}" == "true" ]]; then
-    echo -e "\n## 已停止 ⏹... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
+    echo -e "\n## 已停止 🛑... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
   elif [[ $exit_code -eq 0 ]]; then
     echo -e "\n## 完成 ✅... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
   else
-    echo -e "\n## 失败 ❌ (退出码 ${exit_code})... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
+    echo -e "\n## 失败 ❌(退出码 ${exit_code})... $end_time  耗时 $diff_time 秒${error_message:=}　　　　　"
   fi
 }
 
