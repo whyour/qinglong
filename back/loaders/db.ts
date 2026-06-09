@@ -7,6 +7,7 @@ import { SystemModel } from '../data/system';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
 import { CrontabStatModel } from '../data/cronStats';
+import { RunningInstanceModel } from '../data/runningInstance';
 import { sequelize } from '../data';
 
 export default async () => {
@@ -19,6 +20,7 @@ export default async () => {
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
     await CrontabStatModel.sync();
+    await RunningInstanceModel.sync();
 
     // 初始化新增字段
     const migrations = [

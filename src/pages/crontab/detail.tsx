@@ -22,6 +22,7 @@ import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   FullscreenOutlined,
+  StopOutlined,
 } from '@ant-design/icons';
 import { CrontabStatus } from './type';
 import { diffTime } from '@/utils/date';
@@ -45,6 +46,10 @@ const tabList = [
   {
     key: 'script',
     tab: intl.get('脚本'),
+  },
+  {
+    key: 'runningInstance',
+    tab: intl.get('运行实例'),
   },
 ];
 
@@ -77,6 +82,36 @@ const CronDetailModal = ({
   const [currentCron, setCurrentCron] = useState<any>({});
   const listRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useScrollHeight(listRef);
+  const [runningInstances, setRunningInstances] = useState<any[]>([]);
+  const needRefreshRef = useRef(false);
+
+  const fetchRunningInstances = async () => {
+    if (!cron.id) return Promise.resolve();
+    return request
+      .get(`${config.apiPrefix}crons/${cron.id}/instances`)
+      .then(({ code, data }) => {
+        if (code === 200 && data) {
+          setRunningInstances(data);
+        }
+      })
+      .catch(() => { });
+  };
+
+  useEffect(() => {
+    fetchRunningInstances();
+    let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+    const poll = async () => {
+      await fetchRunningInstances();
+      if (cancelled) return;
+      timer = setTimeout(poll, 10000);
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [cron.id]);
 
   const contentList: any = {
     log: (
@@ -115,12 +150,107 @@ const CronDetailModal = ({
         }}
       />
     ),
+    runningInstance: (
+      <div ref={listRef}>
+        <List>
+          <VirtualList
+            data={runningInstances}
+            height={tableScrollHeight}
+            itemHeight={47}
+            itemKey="id"
+          >
+            {(item) => (
+              <List.Item
+                className="log-item"
+                actions={[
+                  <Tooltip title={intl.get('查看日志')} key="log">
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<FileOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        viewInstanceLog(item);
+                      }}
+                    />
+                  </Tooltip>,
+                  <Tooltip title={intl.get('停止')} key="stop">
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<StopOutlined />}
+                      danger
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        stopRunningInstance(item);
+                      }}
+                    />
+                  </Tooltip>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <span>
+                      PID: <Tag color="processing">{item.pid}</Tag>
+                    </span>
+                  }
+                  description={
+                    <span style={{ color: '#999' }}>
+                      {intl.get('启动')}: {dayjs.unix(item.started_at).format('YYYY-MM-DD HH:mm:ss')}
+                    </span>
+                  }
+                />
+              </List.Item>
+            )}
+          </VirtualList>
+        </List>
+      </div>
+    ),
+  };
+
+  const stopRunningInstance = (instance: any) => {
+    Modal.confirm({
+      title: intl.get('确认停止实例'),
+      content: (
+        <>
+          {intl.get('确认停止运行实例')} PID: {instance.pid}{' '}
+          {intl.get('吗')}
+        </>
+      ),
+      onOk() {
+        request
+          .post(`${config.apiPrefix}crons/${cron.id}/instances/${instance.id}/stop`)
+          .then(({ code }) => {
+            if (code === 200) {
+              message.success(intl.get('实例已停止'));
+              needRefreshRef.current = true;
+              fetchRunningInstances();
+              setTimeout(() => getLogs(), 1000);
+            }
+          });
+      },
+    });
+  };
+
+  const viewInstanceLog = (instance: any) => {
+    if (!instance.log_path) return;
+    const parts = instance.log_path.split('/');
+    const filename = parts.pop() || '';
+    const directory = parts.join('/');
+    const url = `${config.apiPrefix}logs/detail?file=${filename}&path=${directory}`;
+    localStorage.setItem('logCron', url);
+    setLogUrl(url);
+    request.get(url).then(({ code, data }) => {
+      if (code === 200) {
+        setLog(data);
+        setIsLogModalVisible(true);
+      }
+    });
   };
 
   const onClickItem = (item: LogItem) => {
-    const url = `${config.apiPrefix}logs/detail?file=${item.filename}&path=${
-      item.directory || ''
-    }`;
+    const url = `${config.apiPrefix}logs/detail?file=${item.filename}&path=${item.directory || ''
+      }`;
     localStorage.setItem('logCron', url);
     setLogUrl(url);
     request.get(url).then(({ code, data }) => {
@@ -256,9 +386,8 @@ const CronDetailModal = ({
 
   const enabledOrDisabledCron = () => {
     Modal.confirm({
-      title: `确认${
-        currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
-      }`,
+      title: `确认${currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
+        }`,
       content: (
         <>
           {intl.get('确认')}
@@ -273,8 +402,7 @@ const CronDetailModal = ({
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              currentCron.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${currentCron.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             [currentCron.id],
           )
@@ -292,9 +420,8 @@ const CronDetailModal = ({
 
   const pinOrUnPinCron = () => {
     Modal.confirm({
-      title: `确认${
-        currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
-      }`,
+      title: `确认${currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
+        }`,
       content: (
         <>
           {intl.get('确认')}
@@ -309,8 +436,7 @@ const CronDetailModal = ({
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${
-              currentCron.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${currentCron.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             [currentCron.id],
           )
@@ -441,7 +567,7 @@ const CronDetailModal = ({
       open={true}
       forceRender
       footer={false}
-      onCancel={() => handleCancel()}
+      onCancel={() => handleCancel(needRefreshRef.current)}
       wrapClassName="crontab-detail"
       width={!isPhone ? '80vw' : ''}
     >
@@ -458,27 +584,27 @@ const CronDetailModal = ({
             <div className="cron-detail-info-value">
               {(!currentCron.isDisabled ||
                 currentCron.status !== CrontabStatus.idle) && (
-                <>
-                  {currentCron.status === CrontabStatus.idle && (
-                    <Tag icon={<ClockCircleOutlined />} color="default">
-                      {intl.get('空闲中')}
-                    </Tag>
-                  )}
-                  {currentCron.status === CrontabStatus.running && (
-                    <Tag
-                      icon={<Loading3QuartersOutlined spin />}
-                      color="processing"
-                    >
-                      {intl.get('运行中')}
-                    </Tag>
-                  )}
-                  {currentCron.status === CrontabStatus.queued && (
-                    <Tag icon={<FieldTimeOutlined />} color="default">
-                      {intl.get('队列中')}
-                    </Tag>
-                  )}
-                </>
-              )}
+                  <>
+                    {currentCron.status === CrontabStatus.idle && (
+                      <Tag icon={<ClockCircleOutlined />} color="default">
+                        {intl.get('空闲中')}
+                      </Tag>
+                    )}
+                    {currentCron.status === CrontabStatus.running && (
+                      <Tag
+                        icon={<Loading3QuartersOutlined spin />}
+                        color="processing"
+                      >
+                        {intl.get('运行中')}
+                      </Tag>
+                    )}
+                    {currentCron.status === CrontabStatus.queued && (
+                      <Tag icon={<FieldTimeOutlined />} color="default">
+                        {intl.get('队列中')}
+                      </Tag>
+                    )}
+                  </>
+                )}
               {currentCron.isDisabled === 1 &&
                 currentCron.status === CrontabStatus.idle && (
                   <Tag icon={<CloseCircleOutlined />} color="error">
@@ -503,8 +629,8 @@ const CronDetailModal = ({
             <div className="cron-detail-info-value">
               {currentCron.last_execution_time
                 ? dayjs(currentCron.last_execution_time * 1000).format(
-                    'YYYY-MM-DD HH:mm:ss',
-                  )
+                  'YYYY-MM-DD HH:mm:ss',
+                )
                 : '-'}
             </div>
           </div>

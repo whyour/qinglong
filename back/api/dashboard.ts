@@ -3,6 +3,10 @@ import { Container } from 'typedi';
 import { fn, col, where, Op } from 'sequelize';
 import { CrontabModel } from '../data/cron';
 import { CrontabStatModel } from '../data/cronStats';
+import {
+  RunningInstanceModel,
+  InstanceStatus,
+} from '../data/runningInstance';
 import dayjs from 'dayjs';
 import os from 'os';
 
@@ -239,9 +243,9 @@ export default (app: Router) => {
     '/runtime',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const runningCrons = await CrontabModel.findAll({
+        const runningInstances = await RunningInstanceModel.findAll({
           where: {
-            status: 0, // running
+            status: InstanceStatus.running,
           },
           raw: true,
         });
@@ -253,15 +257,31 @@ export default (app: Router) => {
           raw: true,
         });
 
-        const running = runningCrons.map((c: any) => ({
-          id: c.id,
-          name: c.name || c.command || `任务#${c.id}`,
-          pid: c.pid,
-          elapsed: c.last_execution_time
-            ? Math.floor((Date.now() / 1000) - c.last_execution_time)
-            : 0,
-          logPath: c.log_path,
-        }));
+        // Fetch cron names for running instances
+        const cronIds = [
+          ...new Set(runningInstances.map((i: any) => i.cron_id)),
+        ];
+        const crons =
+          cronIds.length > 0
+            ? await CrontabModel.findAll({
+                where: { id: cronIds },
+                raw: true,
+              })
+            : [];
+        const cronMap = new Map(crons.map((c: any) => [c.id, c]));
+
+        const now = dayjs().unix();
+        const running = runningInstances.map((inst: any) => {
+          const cron = cronMap.get(inst.cron_id);
+          return {
+            instanceId: inst.id,
+            id: inst.cron_id,
+            name: cron?.name || cron?.command || `任务#${inst.cron_id}`,
+            pid: inst.pid,
+            elapsed: inst.started_at ? now - inst.started_at : 0,
+            logPath: inst.log_path,
+          };
+        });
 
         const dayAgo = dayjs().subtract(24, 'hour').unix();
         const idleTasks = await CrontabModel.findAll({

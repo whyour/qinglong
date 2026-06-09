@@ -46,7 +46,7 @@ interface TopItem {
 interface Runtime {
   runningCount: number;
   queuedCount: number;
-  running: Array<{ id: number; name: string; pid: number; elapsed: number; logPath: string }>;
+  running: Array<{ instanceId: number; id: number; name: string; pid: number; elapsed: number; logPath: string }>;
   idleTasks: Array<{ id: number; name: string; lastRun: string }>;
 }
 
@@ -282,12 +282,15 @@ const Dashboard = () => {
           >
             <Table
               dataSource={runtime?.running || []}
-              rowKey="id"
+              rowKey="instanceId"
               pagination={runtime && runtime.running.length > 5 ? runtimePagination : false}
               size="small"
               locale={{ emptyText: <Empty description={intl.get('暂无运行中任务')} /> }}
               columns={[
-                { title: intl.get('定时任务'), dataIndex: 'name', ellipsis: true },
+                { title: intl.get('定时任务'), dataIndex: 'name', ellipsis: true, render: (name: string, record) => {
+                  const sameTaskCount = (runtime?.running || []).filter(r => r.id === record.id).length;
+                  return sameTaskCount > 1 ? <span>{name} <Tag color="processing" style={{ fontSize: 10, lineHeight: '16px' }}>×{sameTaskCount}</Tag></span> : name;
+                } },
                 { title: 'PID', dataIndex: 'pid', width: 80 },
                 { title: intl.get('已运行'), dataIndex: 'elapsed', width: 100, render: (v: number) => v ? formatSeconds(v) : '-' },
                 { title: intl.get('日志'), dataIndex: 'id', width: 60, render: (id, record) => <a onClick={() => { localStorage.setItem('logCron', String(id)); setLogCron({ id, name: record.name }); }}>{intl.get('查看')}</a> },

@@ -2,6 +2,10 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
+import {
+  RunningInstanceModel,
+  InstanceStatus,
+} from '../data/runningInstance';
 import { exec, execSync } from 'child_process';
 import fs from 'fs/promises';
 import CronExpressionParser from 'cron-parser';
@@ -189,6 +193,35 @@ export default class CronService {
       if (status === CrontabStatus.idle && log_path !== cron.log_path) {
         options = omit(options, ['status', 'log_path', 'pid']);
       }
+
+      // Manage RunningInstance records for status transitions from shell scripts
+      if (status === CrontabStatus.running) {
+        // Create a new running instance record
+        await RunningInstanceModel.create({
+          cron_id: id,
+          pid: pid || undefined,
+          log_path: log_path || undefined,
+          started_at: last_execution_time || dayjs().unix(),
+          status: InstanceStatus.running,
+        });
+      } else if (status === CrontabStatus.idle) {
+        // Mark the matching running instance as finished
+        const finishedAt = dayjs().unix();
+        await RunningInstanceModel.update(
+          {
+            finished_at: finishedAt,
+            status: InstanceStatus.finished,
+          },
+          {
+            where: {
+              cron_id: id,
+              pid: pid || undefined,
+              status: InstanceStatus.running,
+            },
+          },
+        );
+      }
+
       await CrontabModel.update(
         { ...pickBy(options, (v) => v === 0 || !!v) },
         { where: { id } },
@@ -499,10 +532,51 @@ export default class CronService {
       }
     }
 
+    // Mark all running instances as stopped
+    const finishedAt = dayjs().unix();
+    await RunningInstanceModel.update(
+      { status: InstanceStatus.stopped, finished_at: finishedAt },
+      { where: { cron_id: ids, status: InstanceStatus.running } },
+    );
+
     await CrontabModel.update(
       { status: CrontabStatus.idle, pid: undefined },
       { where: { id: ids } },
     );
+  }
+
+  public async stopInstance(instanceId: number) {
+    const instance = await RunningInstanceModel.findOne({
+      where: { id: instanceId, status: InstanceStatus.running },
+    });
+    if (!instance) {
+      return { code: 400, message: '实例不存在或已停止' };
+    }
+    if (instance.pid) {
+      try {
+        await killTask(instance.pid);
+      } catch (error) {
+        this.logger.error(
+          `[panel][停止实例失败] 实例ID: ${instanceId}, PID: ${instance.pid}, 错误: ${error}`,
+        );
+      }
+    }
+    await RunningInstanceModel.update(
+      { status: InstanceStatus.stopped, finished_at: dayjs().unix() },
+      { where: { id: instanceId } },
+    );
+
+    // Check if there are still other running instances for this cron
+    const otherRunning = await RunningInstanceModel.count({
+      where: { cron_id: instance.cron_id, status: InstanceStatus.running },
+    });
+    if (otherRunning === 0) {
+      await CrontabModel.update(
+        { status: CrontabStatus.idle, pid: undefined },
+        { where: { id: instance.cron_id } },
+      );
+    }
+    return { code: 200, message: '实例已停止' };
   }
 
   private async runSingle(cronId: number): Promise<number | void> {
@@ -543,6 +617,15 @@ export default class CronService {
           { shell: '/bin/bash' },
         );
 
+        const startedAt = dayjs().unix();
+        const instance = await RunningInstanceModel.create({
+          cron_id: id!,
+          pid: cp.pid,
+          log_path: logPath,
+          started_at: startedAt,
+          status: InstanceStatus.running,
+        });
+
         await CrontabModel.update(
           { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
           { where: { id } },
@@ -574,10 +657,26 @@ export default class CronService {
             code,
           );
           await logStreamManager.closeStream(absolutePath);
-          await CrontabModel.update(
-            { status: CrontabStatus.idle, pid: undefined },
-            { where: { id } },
+          const finishedAt = dayjs().unix();
+          await RunningInstanceModel.update(
+            {
+              finished_at: finishedAt,
+              status: code === 0 ? InstanceStatus.finished : InstanceStatus.error,
+              exit_code: code ?? undefined,
+            },
+            { where: { id: instance.id } },
           );
+
+          // Only set cron to idle if no other running instances exist
+          const otherRunning = await RunningInstanceModel.count({
+            where: { cron_id: id!, status: InstanceStatus.running },
+          });
+          if (otherRunning === 0) {
+            await CrontabModel.update(
+              { status: CrontabStatus.idle, pid: undefined },
+              { where: { id } },
+            );
+          }
           resolve({ ...params, pid: cp.pid, code });
         });
       });

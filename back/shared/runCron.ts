@@ -4,6 +4,11 @@ import Logger from '../loaders/logger';
 import { ICron } from '../protos/cron';
 import { CrontabModel, CrontabStatus } from '../data/cron';
 import { killTask } from '../config/util';
+import {
+  RunningInstanceModel,
+  InstanceStatus,
+} from '../data/runningInstance';
+import dayjs from 'dayjs';
 
 export function runCron(cmd: string, cron: ICron): Promise<number | void> {
   return taskLimit.runWithCronLimit(cron, () => {
@@ -29,6 +34,12 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
             `[schedule][停止已运行任务] 任务ID: ${cron.id}, PID: ${existingCron.pid}`,
           );
           await killTask(existingCron.pid);
+          // Mark old running instances as stopped
+          const stoppedAt = dayjs().unix();
+          await RunningInstanceModel.update(
+            { status: InstanceStatus.stopped, finished_at: stoppedAt },
+            { where: { cron_id: Number(cron.id), status: InstanceStatus.running } },
+          );
           // Update the status to idle after killing
           await CrontabModel.update(
             { status: CrontabStatus.idle, pid: undefined },

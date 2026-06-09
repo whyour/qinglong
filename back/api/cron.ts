@@ -5,6 +5,10 @@ import CronService from '../services/cron';
 import CronViewService from '../services/cronView';
 import { celebrate, Joi } from 'celebrate';
 import { commonCronSchema } from '../validation/schedule';
+import {
+  RunningInstanceModel,
+  InstanceStatus,
+} from '../data/runningInstance';
 
 const route = Router();
 
@@ -440,6 +444,49 @@ export default (app: Router) => {
           pid: req.body.pid ? parseInt(req.body.pid) : undefined,
         });
         return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/:id/instances',
+    celebrate({
+      params: Joi.object({
+        id: Joi.number().required(),
+      }),
+    }),
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
+      try {
+        const instances = await RunningInstanceModel.findAll({
+          where: {
+            cron_id: req.params.id,
+            status: InstanceStatus.running,
+          },
+          order: [['started_at', 'DESC']],
+          raw: true,
+        });
+        return res.send({ code: 200, data: instances });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/:id/instances/:instanceId/stop',
+    celebrate({
+      params: Joi.object({
+        id: Joi.number().required(),
+        instanceId: Joi.number().required(),
+      }),
+    }),
+    async (req: Request<{ id: number; instanceId: number }>, res: Response, next: NextFunction) => {
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.stopInstance(req.params.instanceId);
+        return res.send(data);
       } catch (e) {
         return next(e);
       }
