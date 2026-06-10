@@ -7,6 +7,7 @@ import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
 import path, { join, parse } from 'path';
 import ScriptService from '../services/script';
+import { t } from '../shared/i18n';
 import multer from 'multer';
 import { writeFileWithLock } from '../shared/utils';
 const route = Router();
@@ -155,7 +156,7 @@ export default (app: Router) => {
         if (config.writePathList.every((x) => !path.startsWith(x))) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
 
@@ -217,7 +218,7 @@ export default (app: Router) => {
         if (!filePath) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
         await writeFileWithLock(filePath, content);
@@ -251,7 +252,7 @@ export default (app: Router) => {
         if (!filePath) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
         await rmPath(filePath);
@@ -284,7 +285,7 @@ export default (app: Router) => {
         if (!filePath) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
         return res.download(filePath, filename, (err) => {

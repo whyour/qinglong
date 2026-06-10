@@ -135,6 +135,23 @@ export default function () {
   }, []);
 
   useEffect(() => {
+    request
+      .get(`${config.apiPrefix}system/config`)
+      .then(({ data }: any) => {
+        if (!data?.info?.lang) {
+          const browserLang =
+            localStorage.getItem('lang') ||
+            navigator.language?.slice(0, 2) ||
+            'zh';
+          request
+            .put(`${config.apiPrefix}system/config/lang`, { lang: browserLang })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (theme === 'vs-dark') {
       document.body.setAttribute('data-dark', 'true');
     } else {

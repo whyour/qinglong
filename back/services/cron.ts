@@ -28,6 +28,7 @@ import dayjs from 'dayjs';
 import pickBy from 'lodash/pickBy';
 import omit from 'lodash/omit';
 import { writeFileWithLock } from '../shared/utils';
+import { t } from '../shared/i18n';
 import { ScheduleType } from '../interface/schedule';
 import { logStreamManager } from '../shared/logStreamManager';
 
@@ -550,7 +551,7 @@ export default class CronService {
       where: { id: instanceId, status: InstanceStatus.running },
     });
     if (!instance) {
-      return { code: 400, message: '实例不存在或已停止' };
+      return { code: 400, message: t('实例不存在或已停止') };
     }
     if (instance.pid) {
       try {

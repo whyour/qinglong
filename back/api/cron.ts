@@ -9,6 +9,7 @@ import {
   RunningInstanceModel,
   InstanceStatus,
 } from '../data/runningInstance';
+import { t } from '../shared/i18n';
 
 const route = Router();
 
@@ -64,7 +65,7 @@ export default (app: Router) => {
       try {
         const cronViewService = Container.get(CronViewService);
         if (req.body.type === 1) {
-          return res.send({ code: 400, message: '参数错误' });
+          return res.send({ code: 400, message: t('参数错误') });
         } else {
           const data = await cronViewService.update(req.body);
           return res.send({ code: 200, data });

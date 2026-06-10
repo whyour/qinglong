@@ -89,6 +89,10 @@ const Other = ({
 
   const handleLangChange = (v: string) => {
     localStorage.setItem('lang', v);
+    const backendLang = v || navigator.language?.slice(0, 2) || 'zh';
+    request
+      .put(`${config.apiPrefix}system/config/lang`, { lang: backendLang })
+      .catch(() => {});
     setTimeout(() => {
       window.location.reload();
     }, 500);

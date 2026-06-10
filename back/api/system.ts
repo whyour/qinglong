@@ -427,6 +427,24 @@ export default (app: Router) => {
   );
 
   route.put(
+    '/config/lang',
+    celebrate({
+      body: Joi.object({
+        lang: Joi.string().allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.updateLanguage(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
     '/config/global-ssh-key',
     celebrate({
       body: Joi.object({

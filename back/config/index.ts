@@ -110,6 +110,7 @@ const jsEnvFile = path.join(preloadPath, 'env.js');
 const pyEnvFile = path.join(preloadPath, 'env.py');
 const jsNotifyFile = path.join(preloadPath, '__ql_notify__.js');
 const pyNotifyFile = path.join(preloadPath, '__ql_notify__.py');
+const langEnvFile = path.join(preloadPath, 'lang_env.sh');
 const confFile = path.join(configPath, 'config.sh');
 const crontabFile = path.join(configPath, 'crontab.list');
 const authConfigFile = path.join(configPath, 'auth.json');
@@ -155,6 +156,7 @@ export default {
   pyEnvFile,
   jsNotifyFile,
   pyNotifyFile,
+  langEnvFile,
   dbPath,
   uploadPath,
   configPath,

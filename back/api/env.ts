@@ -6,6 +6,7 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
 import { safeJSONParse } from '../config/util';
+import { t } from '../shared/i18n';
 import EnvService from '../services/env';
 const route = Router();
 
@@ -57,7 +58,7 @@ export default (app: Router) => {
       try {
         const envService = Container.get(EnvService);
         if (!req.body?.length) {
-          return res.send({ code: 400, message: '参数不正确' });
+          return res.send({ code: 400, message: t('参数不正确') });
         }
         const data = await envService.create(req.body);
         return res.send({ code: 200, data });
@@ -299,7 +300,7 @@ export default (app: Router) => {
         } else {
           return res.send({
             code: 400,
-            message: '每条数据 name 或者 value 字段不能为空，参考导出文件格式',
+            message: t('每条数据 name 或者 value 字段不能为空，参考导出文件格式'),
           });
         }
       } catch (e) {

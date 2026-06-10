@@ -3,6 +3,7 @@ import { NextFunction, Request, Response, Router } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
+import { t } from '../shared/i18n';
 import {
   getFileContentByName,
   readDirs,
@@ -42,7 +43,7 @@ export default (app: Router) => {
         if (!finalPath || blacklist.includes(req.query.path as string)) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
         const content = await getFileContentByName(finalPath);
@@ -65,7 +66,7 @@ export default (app: Router) => {
         if (!finalPath || blacklist.includes(req.query.path as string)) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
         const content = await getFileContentByName(finalPath);
@@ -96,7 +97,7 @@ export default (app: Router) => {
         if (!finalPath || blacklist.includes(path)) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
         await rmPath(finalPath);
@@ -126,7 +127,7 @@ export default (app: Router) => {
         if (!filePath) {
           return res.send({
             code: 403,
-            message: '暂无权限',
+            message: t('暂无权限'),
           });
         }
         return res.download(filePath, filename, (err) => {

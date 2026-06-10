@@ -6,6 +6,7 @@ import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
 import { join } from 'path';
 import { SAMPLE_FILES } from '../config/const';
+import { t } from '../shared/i18n';
 import ConfigService from '../services/config';
 import { writeFileWithLock } from '../shared/utils';
 const route = Router();
@@ -72,7 +73,7 @@ export default (app: Router) => {
       try {
         const { name, content } = req.body;
         if (config.blackFileList.includes(name)) {
-          res.send({ code: 403, message: '文件无法访问' });
+          res.send({ code: 403, message: t('文件无法访问') });
         }
         let path = join(config.configPath, name);
         if (name.startsWith('data/scripts/')) {

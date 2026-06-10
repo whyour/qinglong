@@ -78,6 +78,7 @@ load_ql_envs() {
 
 import_config() {
   [[ -f $file_config_user ]] && . $file_config_user
+  [[ -f $dir_preload/lang_env.sh ]] && . $dir_preload/lang_env.sh
 
   load_ql_envs
   command_timeout_time=${CommandTimeoutTime:-""}

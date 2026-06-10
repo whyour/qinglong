@@ -25,6 +25,7 @@ import uniq from 'lodash/uniq';
 import pickBy from 'lodash/pickBy';
 import isNil from 'lodash/isNil';
 import { shareStore } from '../shared/store';
+import { t } from '../shared/i18n';
 
 @Service()
 export default class UserService {
@@ -258,17 +259,17 @@ export default class UserService {
     password: string;
   }) {
     if (password === 'admin') {
-      return { code: 400, message: '密码不能设置为admin' };
+      return { code: 400, message: t('密码不能设置为admin') };
     }
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, { username, password });
-    return { code: 200, message: '更新成功' };
+    return { code: 200, message: t('更新成功') };
   }
 
   public async updateAvatar(avatar: string) {
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, { avatar });
-    return { code: 200, data: avatar, message: '更新成功' };
+    return { code: 200, data: avatar, message: t('更新成功') };
   }
 
   public async initTwoFactor() {
@@ -302,7 +303,7 @@ export default class UserService {
     const authInfo = await this.getAuthInfo();
     const { isTwoFactorChecking, twoFactorSecret } = authInfo;
     if (!isTwoFactorChecking) {
-      return { code: 450, message: '未知错误' };
+      return { code: 450, message: t('未知错误') };
     }
     const isValid = authenticator.verify({
       token: code,
@@ -326,7 +327,7 @@ export default class UserService {
         lastaddr: address,
         platform: req.platform,
       });
-      return { code: 430, message: '验证失败' };
+      return { code: 430, message: t('验证失败') };
     }
   }
 
@@ -398,7 +399,7 @@ export default class UserService {
       });
       return { code: 200, data: { ...result, code } };
     } else {
-      return { code: 400, message: '通知发送失败，请检查参数' };
+      return { code: 400, message: t('通知发送失败，请检查参数') };
     }
   }
 
