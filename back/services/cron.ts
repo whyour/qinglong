@@ -577,7 +577,7 @@ export default class CronService {
         { where: { id: instance.cron_id } },
       );
     }
-    return { code: 200, message: '实例已停止' };
+    return { code: 200, message: t('实例已停止') };
   }
 
   private async runSingle(cronId: number): Promise<number | void> {

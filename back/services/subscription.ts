@@ -24,6 +24,7 @@ import path, { join } from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
+import { t } from '../shared/i18n';
 import SshKeyService from './sshKey';
 import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
@@ -192,7 +193,7 @@ export default class SubscriptionService {
 
         this.sockService.sendMessage({
           type: 'runSubscriptionEnd',
-          message: '订阅执行完成',
+          message: t('订阅执行完成'),
           references: [doc.id as number],
         });
       },

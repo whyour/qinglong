@@ -74,6 +74,12 @@ const messages: Record<string, Record<string, string>> = {
     '用户名不能为admin': 'Username cannot be admin',
     '不能删除自己': 'Cannot delete yourself',
     '不能禁用自己': 'Cannot disable yourself',
+    '文件路径无效': 'Invalid file path',
+    '保存成功': 'Saved successfully',
+    'client_id 或 client_seret 有误': 'Invalid client_id or client_secret',
+    '订阅执行完成': 'Subscription completed',
+    'wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行': 'wxPusher requires at least one of TopicIds or Uids',
+    'Url 或者 Body 中必须包含 $title': 'Url or Body must contain $title',
   },
 };
 

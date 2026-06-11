@@ -6,6 +6,7 @@ import config from '../config';
 import SystemService from '../services/system';
 import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
+import { t } from '../shared/i18n';
 import {
   getUniqPath,
   handleLogPath,
@@ -401,7 +402,7 @@ export default (app: Router) => {
       try {
         const userService = Container.get(UserService);
         await userService.resetAuthInfo(req.body);
-        res.send({ code: 200, message: '更新成功' });
+        res.send({ code: 200, message: t('更新成功') });
       } catch (e) {
         return next(e);
       }

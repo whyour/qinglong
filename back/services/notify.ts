@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
 import { parseBody, parseHeaders } from '../config/util';
 import { NotificationInfo } from '../data/notify';
+import { t } from '../shared/i18n';
 import UserService from './user';
 import { httpClient } from '../config/http';
 import { ProxyAgent } from 'undici';
@@ -727,7 +728,7 @@ export default class NotificationService {
 
     // topic_ids 和 uids 至少要有一个
     if (!topicIds.length && !uids.length) {
-      throw new Error('wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行');
+      throw new Error(t('wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行'));
     }
 
     const url = `https://wxpusher.zjiecode.com/api/send/message`;
@@ -823,7 +824,7 @@ export default class NotificationService {
     } = this.params;
 
     if (!webhookUrl?.includes('$title') && !webhookBody?.includes('$title')) {
-      throw new Error('Url 或者 Body 中必须包含 $title');
+      throw new Error(t('Url 或者 Body 中必须包含 $title'));
     }
 
     const headers = parseHeaders(webhookHeaders);

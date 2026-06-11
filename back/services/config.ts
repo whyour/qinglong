@@ -2,6 +2,7 @@ import { Service, Inject } from 'typedi';
 import path, { join } from 'path';
 import config from '../config';
 import { getFileContentByName } from '../config/util';
+import { t } from '../shared/i18n';
 import { Response } from 'express';
 import { request } from 'undici';
 
@@ -23,7 +24,7 @@ export default class ConfigService {
       ) ||
       !filePath
     ) {
-      return res.send({ code: 403, message: '文件无法访问' });
+      return res.send({ code: 403, message: t('文件无法访问') });
     }
 
     if (filePath.startsWith('sample/')) {

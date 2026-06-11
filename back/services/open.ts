@@ -5,6 +5,7 @@ import { App, AppModel } from '../data/open';
 import { v4 as uuidV4 } from 'uuid';
 import sequelize, { Op } from 'sequelize';
 import { shareStore } from '../shared/store';
+import { t } from '../shared/i18n';
 
 @Service()
 export default class OpenService {
@@ -151,7 +152,7 @@ export default class OpenService {
         },
       };
     } else {
-      return { code: 400, message: 'client_id 或 client_seret 有误' };
+      return { code: 400, message: t('client_id 或 client_seret 有误') };
     }
   }
 

@@ -83,10 +83,10 @@ export default (app: Router) => {
           !path.startsWith(config.configPath) &&
           !path.startsWith(config.scriptPath)
         ) {
-          return res.send({ code: 403, message: '文件路径无效' });
+          return res.send({ code: 403, message: t('文件路径无效') });
         }
         await writeFileWithLock(path, content);
-        res.send({ code: 200, message: '保存成功' });
+        res.send({ code: 200, message: t('保存成功') });
       } catch (e) {
         return next(e);
       }

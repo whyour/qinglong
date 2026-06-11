@@ -8,6 +8,7 @@ import path from 'path';
 import { v4 as uuidV4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import config from '../config';
+import { t } from '../shared/i18n';
 import { isDemoEnv, getToken } from '../config/util';
 const route = Router();
 
@@ -76,11 +77,11 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (isDemoEnv()) {
-          return res.send({ code: 450, message: '未知错误' });
+          return res.send({ code: 450, message: t('未知错误') });
         }
         const userService = Container.get(UserService);
         await userService.updateUsernameAndPassword(req.body);
-        res.send({ code: 200, message: '更新成功' });
+        res.send({ code: 200, message: t('更新成功') });
       } catch (e) {
         return next(e);
       }
@@ -229,7 +230,7 @@ export default (app: Router) => {
       try {
         const userService = Container.get(UserService);
         await userService.updateUsernameAndPassword(req.body);
-        res.send({ code: 200, message: '更新成功' });
+        res.send({ code: 200, message: t('更新成功') });
       } catch (e) {
         return next(e);
       }

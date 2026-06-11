@@ -11,6 +11,7 @@ import { serveEnv } from '../config/serverEnv';
 import { IKeyvStore, shareStore } from '../shared/store';
 import { isValidToken } from '../shared/auth';
 import path from 'path';
+import { t } from '../shared/i18n';
 
 export default ({ app }: { app: Application }) => {
   // Security: Enable strict routing to prevent case-insensitive path bypass
@@ -143,7 +144,7 @@ export default ({ app }: { app: Application }) => {
     }
 
     if (isInitialized) {
-      return res.send({ code: 450, message: '未知错误' });
+      return res.send({ code: 450, message: t('未知错误') });
     } else {
       return next();
     }
