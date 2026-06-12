@@ -367,7 +367,7 @@ const Crontab = () => {
 
   const getCrons = async (silent?: boolean) => {
     if (!silent) setLoading(true);
-    const { page, size, sorter, filters } = pageConf;
+    const { page = 1, size = 10, sorter, filters = '{}' } = pageConf;
     let url = `${config.apiPrefix
       }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
         filters,

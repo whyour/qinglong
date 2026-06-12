@@ -233,7 +233,7 @@ export default async () => {
       const lang = systemConfig.info?.lang || 'zh';
       await writeFile(config.langEnvFile, `export QL_LANG='${lang}'\n`);
     }
-  } catch {}
+  } catch { }
   setLang(systemConfig.info?.lang || 'zh');
 
   await envService.set_envs();

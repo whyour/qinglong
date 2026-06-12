@@ -437,7 +437,7 @@ export async function killTask(pid: number) {
       [pid, ...pids].reverse().forEach((x) => {
         process.kill(x, 15);
       });
-    } catch (error) {}
+    } catch (error) { }
   } else {
     process.kill(pid, 2);
   }

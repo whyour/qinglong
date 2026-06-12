@@ -42,13 +42,11 @@ export default class SshKeyService {
     key: string,
   ): Promise<void> {
     try {
-      await writeFileWithLock(
-        path.join(this.sshPath, alias),
-        `${key}${os.EOL}`,
-        {
-          mode: '400',
-        },
-      );
+      const filePath = path.join(this.sshPath, alias);
+      try {
+        await rmPath(filePath);
+      } catch { }
+      await writeFileWithLock(filePath, `${key}${os.EOL}`, { mode: '400' });
     } catch (error) {
       this.logger.error('生成私钥文件失败', error);
     }
