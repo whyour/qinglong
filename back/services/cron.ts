@@ -31,6 +31,7 @@ import { writeFileWithLock } from '../shared/utils';
 import { t } from '../shared/i18n';
 import { ScheduleType } from '../interface/schedule';
 import { logStreamManager } from '../shared/logStreamManager';
+import { isEmpty } from 'lodash';
 
 @Service()
 export default class CronService {
@@ -401,7 +402,7 @@ export default class CronService {
   }
 
   private formatFilterQuery(query: any, filterQuery: any) {
-    if (filterQuery) {
+    if (!isEmpty(filterQuery)) {
       if (!query[Op.and]) {
         query[Op.and] = [];
       }

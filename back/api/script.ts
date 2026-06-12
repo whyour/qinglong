@@ -12,6 +12,11 @@ import multer from 'multer';
 import { writeFileWithLock } from '../shared/utils';
 const route = Router();
 
+function isPathAllowed(targetPath: string): boolean {
+  const resolved = path.resolve(targetPath);
+  return config.writePathList.some((x) => resolved.startsWith(x));
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, config.scriptPath);
@@ -161,24 +166,32 @@ export default (app: Router) => {
         }
 
         if (req.file) {
-          await fs.rename(req.file.path, join(path, filename));
+          const uploadPath = join(path, filename);
+          if (!isPathAllowed(uploadPath)) {
+            return res.send({ code: 403, message: t('暂无权限') });
+          }
+          await fs.rename(req.file.path, uploadPath);
           return res.send({ code: 200 });
         }
 
         if (directory) {
-          await fs.mkdir(join(path, directory), { recursive: true });
+          const dirPath = join(path, directory);
+          if (!isPathAllowed(dirPath)) {
+            return res.send({ code: 403, message: t('暂无权限') });
+          }
+          await fs.mkdir(dirPath, { recursive: true });
           return res.send({ code: 200 });
         }
 
         if (!originFilename) {
           originFilename = filename;
         }
-        const originFilePath = join(
-          path,
-          `${originFilename.replace(/\//g, '')}`,
-        );
+        const originFilePath = join(path, originFilename);
+        const filePath = join(path, filename);
+        if (!isPathAllowed(filePath) || !isPathAllowed(originFilePath)) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
         await fs.mkdir(path, { recursive: true });
-        const filePath = join(path, `${filename.replace(/\//g, '')}`);
         const fileExists = await fileExist(filePath);
         if (fileExists) {
           await fs.copyFile(
@@ -317,6 +330,9 @@ export default (app: Router) => {
         }
         const { name, ext } = parse(filename);
         const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
+        if (!isPathAllowed(filePath)) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
         await writeFileWithLock(filePath, content || '');
 
         const scriptService = Container.get(ScriptService);
@@ -345,6 +361,9 @@ export default (app: Router) => {
         }
         const { name, ext } = parse(filename);
         const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
+        if (!isPathAllowed(filePath)) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
         const logPath = join(config.logPath, path, `${name}.swap`);
 
         const scriptService = Container.get(ScriptService);
@@ -380,6 +399,9 @@ export default (app: Router) => {
         }
         const filePath = join(config.scriptPath, path, filename);
         const newPath = join(config.scriptPath, path, newFilename);
+        if (!isPathAllowed(filePath) || !isPathAllowed(newPath)) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
         await fs.rename(filePath, newPath);
         res.send({ code: 200 });
       } catch (e) {

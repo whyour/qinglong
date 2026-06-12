@@ -11,6 +11,7 @@ import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
 import os from 'os';
+import { maybeSudo, isInContainer } from './container';
 
 export * from './share';
 
@@ -557,8 +558,8 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
       throw new Error('Invalid timezone');
     }
 
-    await promiseExec(`sudo ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`);
-    await promiseExec(`echo "${timezone}" | sudo tee /etc/timezone`);
+    await promiseExec(maybeSudo(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`));
+    await promiseExec(`echo "${timezone}" | ${maybeSudo('tee /etc/timezone')}`);
 
     return true;
   } catch (error) {
@@ -584,7 +585,7 @@ except:
 ''')"`,
     [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
       ? `apk info -es ${name}`
-      : `sudo dpkg-query -s ${name}`,
+      : maybeSudo(`dpkg-query -s ${name}`),
   };
 
   return baseCommands[type];
@@ -597,7 +598,7 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
       'pip3 install --disable-pip-version-check --root-user-action=ignore',
     [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
       ? 'apk add --no-check-certificate'
-      : 'sudo apt-get install -y',
+      : maybeSudo('apt-get install -y'),
   };
 
   let command = baseCommands[type];
@@ -619,7 +620,7 @@ export function getUninstallCommand(
       'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
     [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
       ? 'apk del'
-      : 'sudo apt-get remove -y',
+      : maybeSudo('apt-get remove -y'),
   };
 
   return `${baseCommands[type]} ${name.trim()}`;
@@ -732,23 +733,24 @@ async function _updateLinuxMirror(
   osType: string,
   mirrorDomainWithScheme: string,
 ): Promise<string> {
+  const S = isInContainer() ? 'sudo ' : '';
   let filePath: string, currentDomainWithScheme: string | null;
   switch (osType) {
     case 'Debian':
       filePath = '/etc/apt/sources.list.d/debian.sources';
       currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
       if (currentDomainWithScheme) {
-        return `sudo sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://deb.debian.org'}|g' ${filePath} || (sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee ${filePath}) && sudo apt-get update`;
+        return `${S}sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://deb.debian.org'}|g' ${filePath} || (${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | ${S}tee ${filePath}) && ${S}apt-get update`;
       } else {
-        return `sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | sudo tee ${filePath} && sudo apt-get update`;
+        return `${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | ${S}tee ${filePath} && ${S}apt-get update`;
       }
     case 'Ubuntu':
       filePath = '/etc/apt/sources.list.d/ubuntu.sources';
       currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
       if (currentDomainWithScheme) {
-        return `sudo sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}|g' ${filePath} || (sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | sudo tee ${filePath}) && sudo apt-get update`;
+        return `${S}sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}|g' ${filePath} || (${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | ${S}tee ${filePath}) && ${S}apt-get update`;
       } else {
-        return `sudo mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | sudo tee ${filePath} && sudo apt-get update`;
+        return `${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | ${S}tee ${filePath} && ${S}apt-get update`;
       }
     case 'Alpine':
       filePath = '/etc/apk/repositories';
