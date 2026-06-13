@@ -4,6 +4,11 @@ const path = require('path');
 const client = require('./client.js');
 require(`./env.js`);
 
+// 注册 ESM loader，使全局安装的包也可通过 import 导入
+try {
+  Module.register(new URL('esm-loader.mjs', `file://${__dirname}/`).href);
+} catch (_) {}
+
 function preferGlobalNodeModules() {
   const { QL_NODE_GLOBAL_PATH } = process.env;
   if (!QL_NODE_GLOBAL_PATH || Module._qlGlobalPathPatched) {
