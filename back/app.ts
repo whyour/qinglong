@@ -232,6 +232,10 @@ class Application {
   }
 
   private async startHttpService() {
+    // 在导入任何 gRPC 客户端模块之前初始化 mTLS 证书
+    const { initGrpcCerts } = await import('./config/grpcCerts');
+    await initGrpcCerts();
+
     this.setupMiddlewares();
 
     const { HttpServerService } = await import('./services/http');

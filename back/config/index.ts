@@ -173,6 +173,8 @@ export default {
     'env.js',
     'env.py',
     'token.json',
+    'grpc',
+    '__pycache__',
   ],
   writePathList: [configPath, scriptPath],
   bakPath,

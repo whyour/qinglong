@@ -14,6 +14,7 @@ import {
 import config from '../config';
 import { credentials } from '@grpc/grpc-js';
 import { ApiClient } from '../protos/api';
+import { getGrpcCerts } from '../config/grpcCerts';
 
 class TaskLimit {
   private dependenyLimit = new PQueue({ concurrency: 1 });
@@ -36,11 +37,26 @@ class TaskLimit {
   private systemLimit = new PQueue({
     concurrency: Math.max(os.cpus().length, 4),
   });
-  private client = new ApiClient(
-    `localhost:${config.grpcPort}`,
-    credentials.createInsecure(),
-    { 'grpc.enable_http_proxy': 0 },
-  );
+  private _client: ApiClient | null = null;
+
+  private get client(): ApiClient {
+    if (!this._client) {
+      const tlsConfig = getGrpcCerts();
+      const creds = tlsConfig
+        ? credentials.createSsl(
+            Buffer.from(tlsConfig.caCert),
+            Buffer.from(tlsConfig.clientKey),
+            Buffer.from(tlsConfig.clientCert),
+          )
+        : credentials.createInsecure();
+      this._client = new ApiClient(
+        `localhost:${config.grpcPort}`,
+        creds,
+        { 'grpc.enable_http_proxy': 0 },
+      );
+    }
+    return this._client;
+  }
 
   get cronLimitActiveCount() {
     return this.cronLimit.pending;

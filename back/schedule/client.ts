@@ -7,13 +7,26 @@ import {
   DeleteCronResponse,
 } from '../protos/cron';
 import config from '../config';
+import { getGrpcCerts } from '../config/grpcCerts';
 
 class Client {
-  private client = new CronClient(
-    `localhost:${config.grpcPort}`,
-    credentials.createInsecure(),
-    { 'grpc.enable_http_proxy': 0 },
-  );
+  private _client: CronClient | null = null;
+
+  private get client(): CronClient {
+    if (!this._client) {
+      const tlsConfig = getGrpcCerts()!;
+      this._client = new CronClient(
+        `localhost:${config.grpcPort}`,
+        credentials.createSsl(
+          Buffer.from(tlsConfig.caCert),
+          Buffer.from(tlsConfig.clientKey),
+          Buffer.from(tlsConfig.clientCert),
+        ),
+        { 'grpc.enable_http_proxy': 0 },
+      );
+    }
+    return this._client;
+  }
 
   addCron(request: AddCronRequest['crons']): Promise<AddCronResponse> {
     return new Promise((resolve, reject) => {
