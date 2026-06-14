@@ -50,9 +50,9 @@ add_cron_api() {
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "$name -> 添加成功"
+    t '%s -> 添加成功' "$name"
   else
-    echo -e "$name -> 添加失败(${message})"
+    t '%s -> 添加失败(%s)' "$name" "$message"
   fi
 }
 
@@ -81,9 +81,9 @@ update_cron_api() {
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "$name -> 更新成功"
+    t '%s -> 更新成功' "$name"
   else
-    echo -e "$name -> 更新失败(${message})"
+    t '%s -> 更新失败(%s)' "$name" "$message"
   fi
 }
 
@@ -108,9 +108,9 @@ update_cron_command_api() {
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "$command -> 更新成功"
+    t '%s -> 更新成功' "$command"
   else
-    echo -e "$command -> 更新失败(${message})"
+    t '%s -> 更新失败(%s)' "$command" "$message"
   fi
 }
 
@@ -128,9 +128,9 @@ del_cron_api() {
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "成功"
+    t '成功'
   else
-    echo -e "失败(${message})"
+    t '失败(%s)' "$message"
   fi
 }
 
@@ -175,9 +175,9 @@ notify_api() {
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "通知发送成功🎉"
+    t '通知发送成功🎉'
   else
-    echo -e "通知失败(${message})"
+    t '通知失败(%s)' "$message"
   fi
 }
 
@@ -214,9 +214,9 @@ update_auth_config() {
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "${tip}成功🎉"
+    t '%s成功🎉' "$tip"
   else
-    echo -e "${tip}失败(${message})"
+    t '%s失败(%s)' "$tip" "$message"
   fi
 }
 

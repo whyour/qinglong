@@ -30,7 +30,7 @@ random_delay() {
     else
       start_time=$(date -d "+${delay_second} seconds" "+%Y-%m-%d %H:%M:%S")
     fi
-    echo -e "任务随机延迟 $delay_second 秒，将于 $start_time 开始，配置文件参数 RandomDelay 置空可取消延迟 \n"
+    t '任务随机延迟 %s 秒，将于 %s 开始，配置文件参数 RandomDelay 置空可取消延迟\n' "$delay_second" "$start_time"
     sleep $delay_second
   fi
 }
@@ -122,7 +122,7 @@ enter_script_workdir() {
       fi
       return
     fi
-    echo -e "警告：工作目录不存在 ${_target_dir}"
+    t '警告：工作目录不存在 %s' "${_target_dir}"
   fi
 
   cd $dir_scripts
@@ -173,7 +173,7 @@ run_concurrent() {
   local env_param="$2"
   local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
   if [[ ! $env_param ]]; then
-    echo -e "\n 缺少并发运行的环境变量参数"
+    t '\n缺少并发运行的环境变量参数'
     exit 1
   fi
 
@@ -210,7 +210,7 @@ run_designated() {
   local env_param="$2"
   local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
   if [[ ! $env_param ]]; then
-    echo -e "\n 缺少单独运行的参数 task xxx.js desi Test"
+    t '\n缺少单独运行的参数 task xxx.js desi Test'
     exit 1
   fi
 

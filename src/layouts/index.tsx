@@ -89,7 +89,7 @@ export default function () {
         if (code === 200 && data.username) {
           setUser(data);
           if (location.pathname === '/') {
-            history.push('/crontab');
+            history.push('/dashboard');
           }
         }
         needLoading && setLoading(false);
@@ -218,7 +218,7 @@ export default function () {
 
   if (['/login', '/initialization', '/error'].includes(location.pathname)) {
     if (systemInfo?.isInitialized && location.pathname === '/initialization') {
-      history.push('/crontab');
+      history.push('/dashboard');
     }
 
     if (systemInfo || location.pathname === '/error') {

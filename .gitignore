@@ -31,3 +31,4 @@ __pycache__
 /shell/preload/lang_env.sh
 
 .deepseek/
+.claude/

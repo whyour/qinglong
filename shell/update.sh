@@ -33,7 +33,7 @@ output_list_add_drop() {
   local list=$1
   local type=$2
   if [[ -s $list ]]; then
-    echo -e "检测到有${type}的定时任务:"
+    t '检测到有%s的定时任务:' "$type"
     cat $list
   fi
 }
@@ -45,7 +45,7 @@ del_cron() {
   local path=$2
   local detail=""
   local ids=""
-  echo -e "\n开始尝试自动删除失效的定时任务..."
+  t '\n开始尝试自动删除失效的定时任务...'
   for cron in $(cat $list_drop); do
     local id=$(cat $list_crontab_user | grep -E "$cmd_task.* $cron" | perl -pe "s|.*ID=(.*) $cmd_task.* $cron\.*|\1|" | head -1 | awk -F " " '{print $1}')
     if [[ $ids ]]; then
@@ -76,7 +76,7 @@ del_cron() {
 add_cron() {
   local list_add=$1
   local path=$2
-  echo -e "\n开始尝试自动添加定时任务..."
+  t '\n开始尝试自动添加定时任务...'
   local detail=""
   cd $dir_scripts
   for file in $(cat $list_add); do
@@ -136,10 +136,10 @@ update_repo() {
   git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "拉取 ${uniq_path} 成功...\n"
+    t '拉取 %s 成功...\n' "${uniq_path}"
     diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
   else
-    echo -e "拉取 ${uniq_path} 失败，请检查日志...\n"
+    t '拉取 %s 失败，请检查日志...\n' "${uniq_path}"
   fi
 }
 
@@ -160,7 +160,7 @@ update_raw() {
   local raw_url="$url"
   local suffix="${raw_url##*.}"
   local raw_file_name="${uniq_path}.${suffix}"
-  echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
+  t '开始下载：%s 保存路径：%s\n' "${raw_url}" "$dir_raw/${raw_file_name}"
 
   set_proxy "$proxy"
   wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
@@ -169,7 +169,7 @@ update_raw() {
 
   if [[ $? -eq 0 ]]; then
     mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
-    echo -e "下载 ${raw_file_name} 成功...\n"
+    t '下载 %s 成功...\n' "${raw_file_name}"
     cd $dir_raw
     local filename="raw_${raw_file_name}"
     local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
@@ -196,7 +196,7 @@ update_raw() {
       # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
     fi
   else
-    echo -e "下载 ${raw_file_name} 失败，保留之前正常下载的版本...\n"
+    t '下载 %s 失败，保留之前正常下载的版本...\n' "${raw_file_name}"
     [[ -f "$dir_raw/${raw_file_name}.new" ]] && rm -f "$dir_raw/${raw_file_name}.new"
   fi
 
@@ -207,13 +207,13 @@ run_extra_shell() {
   if [[ -f $file_extra_shell ]]; then
     . $file_extra_shell
   else
-    echo -e "$file_extra_shell文件不存在，跳过执行...\n"
+    t '%s文件不存在，跳过执行...\n' "$file_extra_shell"
   fi
 }
 
 ## 脚本用法
 usage() {
-  echo -e "$cmd_update 命令使用方法："
+  t "$cmd_update 命令使用方法："
   echo -e "1.  $cmd_update update                                                                  # 更新并重启青龙"
   echo -e "2.  $cmd_update extra                                                                   # 运行自定义脚本"
   echo -e "3.  $cmd_update raw <fileurl>                                                           # 更新单个脚本文件"
@@ -268,7 +268,7 @@ update_qinglong() {
     downloadQLUrl="https://github.com/whyour/qinglong/archive/refs/heads"
     downloadStaticUrl="https://github.com/whyour/qinglong-static/archive/refs/heads"
   fi
-  echo -e "使用 ${mirror} 源更新...\n"
+  t '使用 %s 源更新...\n' "${mirror}"
 
   local primary_branch="master"
   if [[ "${QL_BRANCH}" == "develop" ]] || [[ "${QL_BRANCH}" == "debian" ]] || [[ "${QL_BRANCH}" == "debian-dev" ]]; then
@@ -279,13 +279,13 @@ update_qinglong() {
   exit_status=$?
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "更新青龙源文件成功...\n"
+    t '更新青龙源文件成功...\n'
 
     unzip -oq ${dir_tmp}/ql.zip -d ${dir_tmp}
 
     update_qinglong_static
   else
-    echo -e "更新青龙源文件失败，请检查网络...\n"
+    t '更新青龙源文件失败，请检查网络...\n'
   fi
 }
 
@@ -294,30 +294,30 @@ update_qinglong_static() {
   exit_status=$?
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "更新青龙静态资源成功...\n"
+    t '更新青龙静态资源成功...\n'
     unzip -oq ${dir_tmp}/static.zip -d ${dir_tmp}
 
     check_update_dep
   else
-    echo -e "更新青龙静态资源失败，请检查网络...\n"
+    t '更新青龙静态资源失败，请检查网络...\n'
   fi
 }
 
 check_update_dep() {
-  echo -e "\n开始检测依赖...\n"
+  t '\n开始检测依赖...\n'
   if [[ $(diff $dir_root/package.json ${dir_tmp}/qinglong-${primary_branch}/package.json) ]]; then
     npm_install_2 "${dir_tmp}/qinglong-${primary_branch}"
   fi
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "\n依赖检测安装成功...\n"
-    echo -e "更新包下载成功..."
+    t '\n依赖检测安装成功...\n'
+    t '更新包下载成功...\n'
 
     if [[ "$needRestart" == 'true' ]]; then
       reload_qinglong "system"
     fi
   else
-    echo -e "\n依赖检测安装失败，请检查网络...\n"
+    t '\n依赖检测安装失败，请检查网络...\n'
   fi
 }
 
@@ -514,7 +514,7 @@ main() {
     if [[ -n $p2 ]]; then
       update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7" "$p8" "$p9" "$p10"
     else
-      eval echo -e "命令输入错误...\\\n" $cmd
+      t '命令输入错误...\n'
       eval usage $cmd
     fi
     ;;
@@ -523,7 +523,7 @@ main() {
     if [[ -n $p2 ]]; then
       update_raw "$p2" "$p3" "$p4" "$p5"
     else
-      eval echo -e "命令输入错误...\\\n" $cmd
+      t '命令输入错误...\n'
       eval usage $cmd
     fi
     ;;
@@ -549,7 +549,7 @@ main() {
     eval update_auth_config "\\\"username\\\":\\\"$p2\\\"" "重置用户名" $cmd
     ;;
   *)
-    eval echo -e "命令输入错误...\\\n" $cmd
+    t '命令输入错误...\n'
     eval usage $cmd
     ;;
   esac

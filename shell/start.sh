@@ -12,23 +12,23 @@ if [[ ! $QL_DIR ]]; then
   elif [[ -d "$pnpm_dir/@whyour/qinglong" ]]; then
     QL_DIR="$pnpm_dir/@whyour/qinglong"
   else
-    echo -e "未找到 qinglong 模块，请先执行 npm i -g @whyour/qinglong 安装"
+    t '未找到 qinglong 模块，请先执行 npm i -g @whyour/qinglong 安装'
   fi
 
   if [[ $QL_DIR ]]; then
-    echo -e "请先手动设置 export QL_DIR=$QL_DIR，环境变量，并手动添加到系统环境变量，然后再次执行命令 qinglong 启动服务"
+    t '请先手动设置 export QL_DIR=%s，环境变量，并手动添加到系统环境变量，然后再次执行命令 qinglong 启动服务' "$QL_DIR"
   fi
 
   exit 1
 fi
 
 if [[ ! $QL_DATA_DIR ]]; then
-  echo -e "请先手动设置数据存储目录 export QL_DATA_DIR 环境变量，目录必须以斜杠开头的绝对路径，并且以 /data 结尾，例如 /ql/data 并手动添加到系统环境变量"
+  t '请先手动设置数据存储目录 export QL_DATA_DIR 环境变量，目录必须以斜杠开头的绝对路径，并且以 /data 结尾，例如 /ql/data 并手动添加到系统环境变量'
   exit 1
 fi
 
 if [[ $QL_DATA_DIR != */data ]]; then
-  echo -e "QL_DATA_DIR 必须以 /data 结尾，例如 /ql/data，如果有历史数据，请新建 data 目录，把历史数据放到 data 目录中"
+  t 'QL_DATA_DIR 必须以 /data 结尾，例如 /ql/data，如果有历史数据，请新建 data 目录，把历史数据放到 data 目录中'
   exit 1
 fi
 
@@ -69,7 +69,7 @@ if [[ $command != "reload" ]]; then
       $SUDO apt-get install -y git curl wget tzdata perl openssl jq nginx procps netcat-openbsd openssh-client
       ;;
     *)
-      echo -e "暂不支持此系统部署 $os_name"
+      t '暂不支持此系统部署 %s' "$os_name"
       exit 1
       ;;
   esac

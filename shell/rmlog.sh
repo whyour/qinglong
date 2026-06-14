@@ -22,12 +22,12 @@ remove_js_log() {
     if [[ $diff_time -gt $((${days} * 86400)) ]]; then
       local log_path=$(echo "$log" | sed "s,${dir_log}/,,g")
       local result=$(find_cron_api "log_path=$log_path")
-      echo -e "查询文件 $log_path"
+      t '查询文件 %s' "$log_path"
       if [[ -z $result ]]; then
-        echo -e "删除中~"
+        t '删除中~'
         rm -vf $log
       else
-        echo -e "正在被 $result 使用，跳过~"
+        t '正在被 %s 使用，跳过~' "$result"
       fi
     fi
   done
@@ -43,8 +43,8 @@ remove_empty_dir() {
 }
 
 if [[ ${days} ]]; then
-  echo -e "查找旧日志文件中...\n"
+  t '查找旧日志文件中...\n'
   remove_js_log
   remove_empty_dir
-  echo -e "删除旧日志执行完毕\n"
+  t '删除旧日志执行完毕\n'
 fi

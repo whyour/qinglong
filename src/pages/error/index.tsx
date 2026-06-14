@@ -54,7 +54,7 @@ const Error = () => {
 
   useEffect(() => {
     if (user && user.username) {
-      history.push('/crontab');
+      history.push('/dashboard');
     }
   }, [user]);
 
