@@ -24,7 +24,13 @@ random_delay() {
     done
 
     local delay_second=$(($(gen_random_num "$random_delay_max") + 1))
-    echo -e "任务随机延迟 $delay_second 秒，配置文件参数 RandomDelay 置空可取消延迟 \n"
+    local start_time
+    if [[ $is_macos -eq 1 ]]; then
+      start_time=$(date -v "+${delay_second}S" "+%Y-%m-%d %H:%M:%S")
+    else
+      start_time=$(date -d "+${delay_second} seconds" "+%Y-%m-%d %H:%M:%S")
+    fi
+    echo -e "任务随机延迟 $delay_second 秒，将于 $start_time 开始，配置文件参数 RandomDelay 置空可取消延迟 \n"
     sleep $delay_second
   fi
 }
