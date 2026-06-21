@@ -192,7 +192,7 @@ jobs:
             latest=false
           tags: |
             type=ref,event=branch,enable=${{ github.ref == format('refs/heads/{0}', 'develop') }}
-            type=ref,event=branch,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=semver,pattern={{version}}
 

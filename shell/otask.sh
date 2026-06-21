@@ -92,6 +92,9 @@ clear_non_sh_env() {
 append_node_dependency_path() {
   export PREV_NODE_PATH="${NODE_PATH:=}"
 
+  # 用户依赖目录加入 NODE_PATH，替代 symlink 到 node_modules 的方式
+  export NODE_PATH="${NODE_PATH:+${NODE_PATH}:}${dir_dep}"
+
   local pnpm_global_path=$(pnpm root -g 2>/dev/null)
   if [[ -n "$pnpm_global_path" ]]; then
     export QL_NODE_GLOBAL_PATH="$pnpm_global_path"

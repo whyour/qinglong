@@ -1,21 +1,8 @@
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import chokidar from 'chokidar';
 import config from '../config/index';
 import Logger from './logger';
-
-async function linkToNodeModule(src: string, dst?: string) {
-  const target = path.join(config.rootPath, 'node_modules', dst || src);
-  const source = path.join(config.rootPath, src);
-
-  try {
-    const stats = await fs.lstat(target);
-    if (!stats) {
-      await fs.symlink(source, target, 'dir');
-    }
-  } catch (error) { }
-}
 
 async function linkCommand() {
   const homeDir = os.homedir();
@@ -59,17 +46,6 @@ async function linkCommandToDir(commandDir: string) {
   }
 }
 
-export default async (src: string = 'deps') => {
+export default async () => {
   await linkCommand();
-  await linkToNodeModule(src);
-
-  const source = path.join(config.rootPath, src);
-  const watcher = chokidar.watch(source, {
-    ignored: /(^|[\/\\])\../, // ignore dotfiles
-    persistent: true,
-  });
-
-  watcher
-    .on('add', () => linkToNodeModule(src))
-    .on('change', () => linkToNodeModule(src));
 };
