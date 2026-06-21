@@ -465,49 +465,33 @@ const Dependence = () => {
   }, [logDependence]);
 
   const handleMessage = useCallback((payload: any) => {
-    const { message, references } = payload;
-    let status: number | undefined = undefined;
-    if (message.includes('开始时间') && references.length > 0) {
-      status = message.includes('安装') ? Status.安装中 : Status.删除中;
-    }
-    if (message.includes('结束时间') && references.length > 0) {
-      if (message.includes('安装')) {
-        status = message.includes('成功') ? Status.已安装 : Status.安装失败;
-      } else {
-        status = message.includes('成功') ? Status.已删除 : Status.删除失败;
-      }
+    const { references, status } = payload;
+    if (typeof status !== 'number' || !references?.length) return;
 
-      if (status === Status.已删除) {
-        setTimeout(() => {
-          setValue((p) => {
-            const _result = [...p];
-            for (let i = 0; i < references.length; i++) {
-              const index = p.findIndex((x) => x.id === references[i]);
-              if (index !== -1) {
-                _result.splice(index, 1);
-              }
-            }
-            return _result;
-          });
-        }, 300);
-        return;
-      }
-    }
-    if (typeof status === 'number') {
-      setValue((p) => {
-        const result = [...p];
-        for (let i = 0; i < references.length; i++) {
-          const index = p.findIndex((x) => x.id === references[i]);
-          if (index !== -1) {
-            result.splice(index, 1, {
-              ...p[index],
-              status,
-            });
+    if (status === Status.已删除) {
+      setTimeout(() => {
+        setValue((p) => {
+          const _result = [...p];
+          for (const refId of references) {
+            const index = p.findIndex((x) => x.id === refId);
+            if (index !== -1) _result.splice(index, 1);
           }
-        }
-        return result;
-      });
+          return _result;
+        });
+      }, 300);
+      return;
     }
+
+    setValue((p) => {
+      const result = [...p];
+      for (const refId of references) {
+        const index = p.findIndex((x) => x.id === refId);
+        if (index !== -1) {
+          result.splice(index, 1, { ...p[index], status });
+        }
+      }
+      return result;
+    });
   }, []);
 
   useEffect(() => {

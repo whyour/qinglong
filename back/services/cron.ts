@@ -712,23 +712,27 @@ export default class CronService {
     await this.setCrontab();
   }
 
-  public async log(id: number) {
+  public async log(id: number): Promise<{ content: string; status: string }> {
     const doc = await this.getDb({ id });
     if (!doc) {
-      return '';
+      return { content: '', status: 'empty' };
     }
     if (doc.log_name === '/dev/null') {
-      return '日志设置为忽略';
+      return { content: t('日志设置为忽略'), status: 'ignored' };
     }
     const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
     const logFileExist = doc.log_path && (await fileExist(absolutePath));
     if (logFileExist) {
-      return await getFileContentByName(`${absolutePath}`);
+      const content = await getFileContentByName(`${absolutePath}`);
+      const isRunning =
+        typeof doc.status === 'number' &&
+        [CrontabStatus.running, CrontabStatus.queued].includes(doc.status);
+      return { content, status: isRunning ? 'running' : 'completed' };
     } else {
       return typeof doc.status === 'number' &&
         [CrontabStatus.queued, CrontabStatus.running].includes(doc.status)
-        ? '运行中...'
-        : '日志不存在...';
+        ? { content: t('运行中...'), status: 'running' }
+        : { content: t('日志不存在...'), status: 'notFound' };
     }
   }
 

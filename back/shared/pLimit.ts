@@ -4,6 +4,7 @@ import { AuthDataType, SystemModel } from '../data/system';
 import Logger from '../loaders/logger';
 import { Dependence } from '../data/dependence';
 import NotificationService from '../services/notify';
+import { t, tf } from '../shared/i18n';
 import {
   ICronFn,
   IDependencyFn,
@@ -152,8 +153,14 @@ class TaskLimit {
         this.repeatCronNotifyMap.set(cron.id, repeatTimes + 1);
         this.client.systemNotify(
           {
-            title: '任务重复运行',
-            content: `任务：${cron.name}，命令：${cron.command}，定时：${cron.schedule}，处于运行中的超过 5 个，请检查定时设置`,
+            title: t('任务重复运行'),
+            content: tf(
+              '任务：%s，命令：%s，定时：%s，处于运行中的超过 %d 个，请检查定时设置',
+              cron.name || '',
+              cron.command || '',
+              cron.schedule || '',
+              5,
+            ),
           },
           (err, res) => {
             if (err) {

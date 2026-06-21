@@ -54,8 +54,11 @@ const DependenceLogModal = ({
         ) {
           const log = (data?.log || []).join('') as string;
           setValue(log);
-          setExecuting(!log.includes('结束时间'));
-          setIsRemoveFailed(log.includes('删除失败'));
+          const dbStatus = data?.status as number | undefined;
+          setExecuting(
+            dbStatus === Status.安装中 || dbStatus === Status.删除中,
+          );
+          setIsRemoveFailed(dbStatus === Status.删除失败);
         }
       })
       .finally(() => {
@@ -94,16 +97,17 @@ const DependenceLogModal = ({
   }, [dependence]);
 
   const handleMessage = (payload: any) => {
-    const { message, references } = payload;
+    const { message, references, status } = payload;
     if (
-      references.length > 0 &&
-      references.includes(dependence.id) &&
-      [Status.删除中, Status.安装中].includes(dependence.status)
-    ) {
-      if (message.includes('结束时间')) {
-        setExecuting(false);
-        setIsRemoveFailed(message.includes('删除失败'));
-      }
+      !references?.length ||
+      !references.includes(dependence.id)
+    ) return;
+
+    if (typeof status === 'number') {
+      setExecuting(status === Status.安装中 || status === Status.删除中);
+      setIsRemoveFailed(status === Status.删除失败);
+    }
+    if (message) {
       setValue((p) => `${p}${message}`);
     }
   };

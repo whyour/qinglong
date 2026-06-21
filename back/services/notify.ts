@@ -365,7 +365,7 @@ export default class NotificationService {
           {
             title: `${this.title}`,
             thumb_media_id,
-            author: `智能助手`,
+            author: t('智能助手'),
             content_source_url: ``,
             content: `${this.content.replace(/\n/g, '<br/>')}`,
             digest: `${this.content}`,
@@ -381,7 +381,7 @@ export default class NotificationService {
             title: `${this.title}`,
             description: `${this.content}`,
             url: 'https://github.com/whyour/qinglong',
-            btntxt: '更多',
+            btntxt: t('更多'),
           },
         };
         break;
@@ -432,7 +432,7 @@ export default class NotificationService {
           roomName: `${aibotkName}`,
           message: {
             type: 1,
-            content: `【青龙快讯】\n\n${this.title}\n${this.content}`,
+            content: `【${t('青龙快讯')}】\n\n${this.title}\n${this.content}`,
           },
         };
         break;
@@ -443,7 +443,7 @@ export default class NotificationService {
           name: `${aibotkName}`,
           message: {
             type: 1,
-            content: `【青龙快讯】\n\n${this.title}\n${this.content}`,
+            content: `【${t('青龙快讯')}】\n\n${this.title}\n${this.content}`,
           },
         };
         break;
@@ -613,7 +613,7 @@ export default class NotificationService {
       });
 
       const info = await transporter.sendMail({
-        from: `"青龙快讯" <${emailUser}>`,
+        from: `"${t('青龙快讯')}" <${emailUser}>`,
         to: recipients,
         subject: `${this.title}`,
         html: `${this.content.replace(/\n/g, '<br/>')}`,

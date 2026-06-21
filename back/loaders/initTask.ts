@@ -6,6 +6,7 @@ import SshKeyService from '../services/sshKey';
 import config from '../config';
 import { fileExist } from '../config/util';
 import { join } from 'path';
+import { t } from '../shared/i18n';
 
 export default async () => {
   const systemService = Container.get(SystemService);
@@ -25,7 +26,7 @@ export default async () => {
   }
   const cron = {
     id: NaN,
-    name: '生成token',
+    name: t('生成token'),
     command: tokenCommand,
     runOrigin: 'system',
   } as ScheduleTaskType;
@@ -44,7 +45,7 @@ export default async () => {
     if (data.info.logRemoveFrequency) {
       const rmlogCron = {
         id: data.id as number,
-        name: '删除日志',
+        name: t('删除日志'),
         command: `ql rmlog ${data.info.logRemoveFrequency}`,
         runOrigin: 'system' as const,
       };

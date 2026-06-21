@@ -536,7 +536,7 @@ export function safeJSONParse(value?: string) {
   try {
     return JSON.parse(value);
   } catch (error) {
-    Logger.error('[safeJSONParse失败]', error);
+    Logger.error('[safeJSONParse error]', error);
     return {};
   }
 }
@@ -548,7 +548,7 @@ export async function rmPath(path: string) {
       await fs.rm(path, { force: true, recursive: true, maxRetries: 5 });
     }
   } catch (error) {
-    Logger.error('[rmPath失败]', error);
+    Logger.error('[rmPath error]', error);
   }
 }
 
@@ -563,7 +563,7 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    Logger.error('[setSystemTimezone失败]', error);
+    Logger.error('[setSystemTimezone error]', error);
     return false;
   }
 }

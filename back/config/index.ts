@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { createRandomString } from './share';
 
 dotenv.config({
   path: path.join(__dirname, '../../.env'),
@@ -119,8 +118,6 @@ const confBakDir = path.join(dataPath, 'config/bak/');
 const sampleFile = path.join(samplePath, 'config.sample.sh');
 const sqliteFile = path.join(samplePath, 'database.sqlite');
 
-const authError = '错误的用户名密码，请重试';
-const loginFaild = '请先登录!';
 const configString = 'config sample crontab shareCode diy';
 const versionFile = path.join(rootPath, 'version.yaml');
 const dataTgzFile = path.join(tmpPath, 'data.tgz');
@@ -142,8 +139,6 @@ export default {
   shareShellFile,
   dependenceProxyFile,
   configString,
-  loginFaild,
-  authError,
   logPath,
   extraFile,
   authConfigFile,

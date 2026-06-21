@@ -594,5 +594,11 @@
   "黑名单": "Blacklist",
   "默认为 CPU 个数": "Default is the number of CPUs",
   "，保存后不可恢复": ", it can't be recovered after saving.",
-  "，删除后不可恢复": ", it can't be recovered after deletion"
+  "，删除后不可恢复": ", it can't be recovered after deletion",
+  "日志不存在": "Log does not exist",
+  "日志设置为忽略": "Log set to ignore",
+  "确认保存": "Confirm to save",
+  "上传失败": "Upload failed",
+  "成功上传": "Successfully uploaded",
+  "个环境变量": " environment variables"
 }

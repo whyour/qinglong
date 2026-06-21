@@ -24,7 +24,7 @@ import path, { join } from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
-import { t } from '../shared/i18n';
+import { t, tf } from '../shared/i18n';
 import SshKeyService from './sshKey';
 import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
@@ -131,14 +131,14 @@ export default class SubscriptionService {
         );
         const absolutePath = await handleLogPath(
           logPath as string,
-          `## 开始执行... ${startTime.format('YYYY-MM-DD HH:mm:ss')}\n`,
+          tf('## 开始执行... %s\n', startTime.format('YYYY-MM-DD HH:mm:ss')),
         );
 
         // 执行sub_before
         let beforeStr = '';
         try {
           if (doc.sub_before) {
-            await logStreamManager.write(absolutePath, `\n## 执行before命令...\n\n`);
+            await logStreamManager.write(absolutePath, `\n## ${t('执行before命令...')}\n\n`);
             beforeStr = await promiseExec(doc.sub_before);
           }
         } catch (error: any) {
@@ -165,7 +165,7 @@ export default class SubscriptionService {
         let afterStr = '';
         try {
           if (sub.sub_after) {
-            await logStreamManager.write(absolutePath, `\n\n## 执行after命令...\n\n`);
+            await logStreamManager.write(absolutePath, `\n\n## ${t('执行after命令...')}\n\n`);
             afterStr = await promiseExec(sub.sub_after);
           }
         } catch (error: any) {
@@ -178,9 +178,13 @@ export default class SubscriptionService {
 
         await logStreamManager.write(
           absolutePath,
-          `\n## 执行结束... ${endTime.format(
-            'YYYY-MM-DD HH:mm:ss',
-          )}  耗时 ${diff} 秒${LOG_END_SYMBOL}`,
+          '\n' +
+            tf(
+              '## 执行结束... %s  耗时 %s 秒',
+              endTime.format('YYYY-MM-DD HH:mm:ss'),
+              String(diff),
+            ) +
+            LOG_END_SYMBOL,
         );
 
         // Close the stream after task completion

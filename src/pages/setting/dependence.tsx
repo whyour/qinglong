@@ -75,12 +75,9 @@ const Dependence = () => {
   };
 
   const handleMessage = (payload: any) => {
-    const { message } = payload;
-    setLog((p) => `${p}${message}`);
-    if (
-      message.includes('update node mirror end') ||
-      message.includes('update linux mirror end')
-    ) {
+    const { message, status } = payload;
+    if (message) setLog((p) => `${p}${message}`);
+    if (status === 'completed') {
       setLoading(false);
     }
   };
@@ -109,7 +106,7 @@ const Dependence = () => {
     ws.subscribe('updateLinuxMirror', handleMessage);
 
     return () => {
-      ws.subscribe('updateNodeMirror', handleMessage);
+      ws.unsubscribe('updateNodeMirror', handleMessage);
       ws.unsubscribe('updateLinuxMirror', handleMessage);
     };
   }, []);

@@ -312,8 +312,8 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.log(req.params.id);
-        return res.send({ code: 200, data });
+        const result = await cronService.log(req.params.id);
+        return res.send({ code: 200, data: result.content, logStatus: result.status });
       } catch (e) {
         return next(e);
       }

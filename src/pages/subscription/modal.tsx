@@ -205,21 +205,47 @@ const SubscriptionModal = ({
     );
   };
 
+  const parseArgs = (text: string): string[] => {
+    const args: string[] = [];
+    let current = '';
+    let inDouble = false;
+    let inSingle = false;
+    let justClosed = false;
+    for (const ch of text) {
+      if (inDouble) {
+        if (ch === '"') { inDouble = false; justClosed = true; continue; }
+        current += ch;
+      } else if (inSingle) {
+        if (ch === "'") { inSingle = false; justClosed = true; continue; }
+        current += ch;
+      } else if (ch === '"') {
+        inDouble = true;
+        justClosed = false;
+      } else if (ch === "'") {
+        inSingle = true;
+        justClosed = false;
+      } else if (ch === ' ' || ch === '\t') {
+        if (current || justClosed) { args.push(current); current = ''; justClosed = false; }
+      } else {
+        current += ch;
+        justClosed = false;
+      }
+    }
+    if (current || justClosed) args.push(current);
+    return args;
+  };
+
   const onPaste = useCallback((e: any) => {
     const text = e.clipboardData.getData('text') as string;
     if (text.startsWith('ql ')) {
-      const [
-        ,
-        type,
-        url,
-        whitelist,
-        blacklist,
-        dependences,
-        branch,
-        extensions,
-      ] = text
-        .split(' ')
-        .map((x) => x.trim().replace(/\"/g, '').replace(/\'/, ''));
+      const args = parseArgs(text);
+      const type = args[1];
+      const url = args[2] || '';
+      const whitelist = args[3] || '';
+      const blacklist = args[4] || '';
+      const dependences = args[5] || '';
+      const branch = args[6] || '';
+      const extensions = args[7] || '';
       const _type =
         type === 'raw'
           ? 'file'

@@ -46,17 +46,15 @@ const CronLogModal = ({
     }
     request
       .get(logUrl ? logUrl : `${config.apiPrefix}crons/${cron.id}/log`)
-      .then(({ code, data }) => {
+      .then(({ code, data, logStatus }) => {
         if (
           code === 200 &&
           localStorage.getItem("logCron") === uniqPath &&
           data !== value
         ) {
-          const log = data as string;
-          setValue(log || intl.get("暂无日志"));
-          const hasNext = Boolean(
-            log && !logEnded(log) && !log.includes("日志不存在") && !log.includes("日志设置为忽略"),
-          );
+          const log = (data as string) || intl.get("暂无日志");
+          setValue(log);
+          const hasNext = logStatus === 'running';
           if (!hasNext && !logEnded(value) && value !== intl.get("启动中...")) {
             setTimeout(() => {
               autoScroll();

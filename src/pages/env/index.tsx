@@ -603,7 +603,7 @@ const Env = () => {
         );
 
         if (code === 200) {
-          message.success(`成功上传${data.length}个环境变量`);
+          message.success(`${intl.get('成功上传')}${data.length}${intl.get('个环境变量')}`);
           getEnvs();
         }
         setImportLoading(false);

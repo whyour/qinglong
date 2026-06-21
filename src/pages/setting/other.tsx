@@ -379,7 +379,7 @@ const Other = ({
                 showReloadModal();
               }
               if (file.status === 'error') {
-                message.error('上传失败');
+                message.error(intl.get('上传失败'));
               }
             }}
             name="data"

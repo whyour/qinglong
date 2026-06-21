@@ -298,7 +298,7 @@ const CronDetailModal = ({
 
   const saveFile = () => {
     Modal.confirm({
-      title: `确认保存`,
+      title: intl.get('确认保存'),
       content: (
         <>
           {intl.get('确认保存文件')}
@@ -323,7 +323,7 @@ const CronDetailModal = ({
             .then(({ code, data }) => {
               if (code === 200) {
                 setValue(content);
-                message.success(`保存成功`);
+                message.success(intl.get('保存成功'));
               }
               resolve(null);
             })

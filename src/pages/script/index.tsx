@@ -249,7 +249,7 @@ const Script = () => {
 
   const saveFile = () => {
     Modal.confirm({
-      title: `确认保存`,
+      title: intl.get('确认保存'),
       content: (
         <>
           {intl.get('确认保存文件')}
@@ -273,7 +273,7 @@ const Script = () => {
             })
             .then(({ code, data }) => {
               if (code === 200) {
-                message.success(`保存成功`);
+                message.success(intl.get('保存成功'));
                 setValue(content);
                 handleIsEditing(currentNode.title, false);
               }
@@ -287,7 +287,7 @@ const Script = () => {
 
   const deleteFile = () => {
     Modal.confirm({
-      title: `确认删除`,
+      title: intl.get('确认删除'),
       content: (
         <>
           {intl.get('确认删除')}
@@ -311,7 +311,7 @@ const Script = () => {
           })
           .then(({ code }) => {
             if (code === 200) {
-              message.success(`删除成功`);
+              message.success(intl.get('删除成功'));
               let newData = [...data];
               if (currentNode.parent) {
                 newData = depthFirstSearch(

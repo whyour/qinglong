@@ -78,8 +78,8 @@ export default class SystemService {
     const code = Math.random().toString().slice(-6);
     const isSuccess = await this.notificationService.testNotify(
       notificationInfo,
-      '青龙',
-      `【蛟龙】测试通知 https://t.me/jiao_long`,
+      t('青龙'),
+      t('【蛟龙】测试通知 https://t.me/jiao_long'),
     );
     if (isSuccess) {
       const result = await this.updateAuthDb({
@@ -100,7 +100,7 @@ export default class SystemService {
     });
     const cron = {
       id: result.id as number,
-      name: '删除日志',
+      name: t('删除日志'),
       command: `ql rmlog ${info.logRemoveFrequency}`,
       runOrigin: 'system' as const,
     };
@@ -179,6 +179,7 @@ export default class SystemService {
           this.sockService.sendMessage({
             type: 'updateNodeMirror',
             message: 'update node mirror end',
+            status: 'completed',
           });
         },
         onError: async (message: string) => {
@@ -232,6 +233,7 @@ export default class SystemService {
           this.sockService.sendMessage({
             type: 'updateLinuxMirror',
             message: 'update linux mirror end',
+            status: 'completed',
           });
           onEnd?.();
           if (!hasError) {
@@ -340,6 +342,15 @@ export default class SystemService {
       this.sockService.sendMessage({
         type: 'updateSystemVersion',
         message: JSON.stringify(err),
+        status: 'failed',
+      });
+    });
+
+    cp.on('exit', (code) => {
+      this.sockService.sendMessage({
+        type: 'updateSystemVersion',
+        message: '',
+        status: code === 0 ? 'success' : 'failed',
       });
     });
 

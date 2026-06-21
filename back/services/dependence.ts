@@ -24,6 +24,7 @@ import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 import { detectOS } from '../config/util';
 import { LINUX_DEPENDENCE_COMMAND } from '../config/const';
+import { t, tf } from '../shared/i18n';
 
 @Service()
 export default class DependenceService {
@@ -232,7 +233,7 @@ export default class DependenceService {
         }
         const depIds = [dependency.id!];
         let depName = dependency.name.trim();
-        const actionText = isInstall ? '安装' : '删除';
+        const actionText = isInstall ? t('安装') : t('删除');
         const socketMessageType = isInstall
           ? 'installDependence'
           : 'uninstallDependence';
@@ -249,15 +250,20 @@ export default class DependenceService {
               { where: { id: depIds } },
             );
             const startTime = dayjs();
-            const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
-              'YYYY-MM-DD HH:mm:ss',
-            )}\n\n当前系统不支持\n\n依赖${actionText}失败，结束时间 ${startTime.format(
-              'YYYY-MM-DD HH:mm:ss',
-            )}，耗时 ${startTime.diff(startTime, 'second')} 秒`;
+            const message = tf(
+              '开始%s依赖 %s，开始时间 %s\n\n当前系统不支持\n\n依赖%s失败，结束时间 %s，耗时 %s 秒',
+              actionText,
+              depName,
+              startTime.format('YYYY-MM-DD HH:mm:ss'),
+              actionText,
+              startTime.format('YYYY-MM-DD HH:mm:ss'),
+              String(startTime.diff(startTime, 'second')),
+            );
             this.sockService.sendMessage({
               type: socketMessageType,
               message,
               references: depIds,
+              status: DependenceStatus.installFailed,
             });
             this.updateLog(depIds, message);
             return resolve(null);
@@ -280,13 +286,17 @@ export default class DependenceService {
         }
         const startTime = dayjs();
 
-        const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
-          'YYYY-MM-DD HH:mm:ss',
-        )}\n\n`;
+        const message = tf(
+          '开始%s依赖 %s，开始时间 %s\n\n',
+          actionText,
+          depName,
+          startTime.format('YYYY-MM-DD HH:mm:ss'),
+        );
         this.sockService.sendMessage({
           type: socketMessageType,
           message,
           references: depIds,
+          status,
         });
         this.updateLog(depIds, message);
 
@@ -322,13 +332,19 @@ export default class DependenceService {
             (!depVersion || depInfo.includes(depVersion))
           ) {
             const endTime = dayjs();
-            const _message = `检测到已经安装 ${depName}\n\n${depInfo}\n\n跳过安装\n\n依赖${actionText}成功，结束时间 ${endTime.format(
-              'YYYY-MM-DD HH:mm:ss',
-            )}，耗时 ${endTime.diff(startTime, 'second')} 秒`;
+            const _message = tf(
+              '检测到已经安装 %s\n\n%s\n\n跳过安装\n\n依赖%s成功，结束时间 %s，耗时 %s 秒',
+              depName,
+              depInfo,
+              actionText,
+              endTime.format('YYYY-MM-DD HH:mm:ss'),
+              String(endTime.diff(startTime, 'second')),
+            );
             this.sockService.sendMessage({
               type: socketMessageType,
               message: _message,
               references: depIds,
+              status: DependenceStatus.installed,
             });
             this.updateLog(depIds, _message);
             await DependenceModel.update(
@@ -353,6 +369,7 @@ export default class DependenceService {
             type: socketMessageType,
             message: data.toString(),
             references: depIds,
+            status,
           });
           this.updateLog(depIds, data.toString());
         });
@@ -362,6 +379,7 @@ export default class DependenceService {
             type: socketMessageType,
             message: data.toString(),
             references: depIds,
+            status,
           });
           this.updateLog(depIds, data.toString());
         });
@@ -371,6 +389,7 @@ export default class DependenceService {
             type: socketMessageType,
             message: JSON.stringify(err),
             references: depIds,
+            status,
           });
           this.updateLog(depIds, JSON.stringify(err));
         });
@@ -378,28 +397,27 @@ export default class DependenceService {
         cp.on('exit', async (code) => {
           const endTime = dayjs();
           const isSucceed = code === 0;
-          const resultText = isSucceed ? '成功' : '失败';
+          const resultText = isSucceed ? t('成功') : t('失败');
 
-          const message = `\n依赖${actionText}${resultText}，结束时间 ${endTime.format(
-            'YYYY-MM-DD HH:mm:ss',
-          )}，耗时 ${endTime.diff(startTime, 'second')} 秒`;
+          const message =
+            '\n' +
+            tf('依赖%s%s，结束时间 %s，耗时 %s 秒',
+            actionText,
+            resultText,
+            endTime.format('YYYY-MM-DD HH:mm:ss'),
+            String(endTime.diff(startTime, 'second')),
+          );
+          const exitStatus = isSucceed
+            ? (isInstall ? DependenceStatus.installed : DependenceStatus.removed)
+            : (isInstall ? DependenceStatus.installFailed : DependenceStatus.removeFailed);
           this.sockService.sendMessage({
             type: socketMessageType,
             message,
             references: depIds,
+            status: exitStatus,
           });
           this.updateLog(depIds, message);
 
-          let status: number;
-          if (isSucceed) {
-            status = isInstall
-              ? DependenceStatus.installed
-              : DependenceStatus.removed;
-          } else {
-            status = isInstall
-              ? DependenceStatus.installFailed
-              : DependenceStatus.removeFailed;
-          }
           const docs = await DependenceModel.findAll({ where: { id: depIds } });
           const _docIds = docs
             .filter((x) => x.status !== DependenceStatus.cancelled)
@@ -407,7 +425,7 @@ export default class DependenceService {
 
           if (_docIds.length > 0) {
             await DependenceModel.update(
-              { status },
+              { status: exitStatus },
               { where: { id: _docIds } },
             );
           }

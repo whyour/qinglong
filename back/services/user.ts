@@ -25,7 +25,7 @@ import uniq from 'lodash/uniq';
 import pickBy from 'lodash/pickBy';
 import isNil from 'lodash/isNil';
 import { shareStore } from '../shared/store';
-import { t } from '../shared/i18n';
+import { t, tf } from '../shared/i18n';
 
 @Service()
 export default class UserService {
@@ -67,7 +67,7 @@ export default class UserService {
       );
       return {
         code: 410,
-        message: `失败次数过多，请${waitTime}秒后重试`,
+        message: tf('失败次数过多，请%s秒后重试', waitTime),
         data: waitTime,
       };
     }
@@ -128,10 +128,19 @@ export default class UserService {
         isTwoFactorChecking: false,
       });
       this.notificationService.notify(
-        '登录通知',
-        `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-          req.platform
-        }端 登录成功，ip地址 ${ip}`,
+        t('登录通知'),
+        t('你于') +
+          dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss') +
+          t('在') +
+          address +
+          ' ' +
+          req.platform +
+          t('端') +
+          ' ' +
+          t('登录成功') +
+          t('，ip地址') +
+          ' ' +
+          ip,
       );
       await this.insertDb({
         type: AuthDataType.loginLog,
@@ -164,10 +173,19 @@ export default class UserService {
         platform: req.platform,
       });
       this.notificationService.notify(
-        '登录通知',
-        `你于${dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}在 ${address} ${
-          req.platform
-        }端 登录失败，ip地址 ${ip}`,
+        t('登录通知'),
+        t('你于') +
+          dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss') +
+          t('在') +
+          address +
+          ' ' +
+          req.platform +
+          t('端') +
+          ' ' +
+          t('登录失败') +
+          t('，ip地址') +
+          ' ' +
+          ip,
       );
       await this.insertDb({
         type: AuthDataType.loginLog,
@@ -184,11 +202,11 @@ export default class UserService {
         const waitTime = Math.round(Math.pow(3, retries + 1));
         return {
           code: 410,
-          message: `失败次数过多，请${waitTime}秒后重试`,
+          message: tf('失败次数过多，请%s秒后重试', waitTime),
           data: waitTime,
         };
       } else {
-        return { code: 400, message: config.authError };
+        return { code: 400, message: t('错误的用户名密码，请重试') };
       }
     }
   }
@@ -389,8 +407,8 @@ export default class UserService {
     const code = Math.random().toString().slice(-6);
     const isSuccess = await this.notificationService.testNotify(
       notificationInfo,
-      '青龙',
-      `【蛟龙】测试通知 https://t.me/jiao_long`,
+      t('青龙'),
+      t('【蛟龙】测试通知 https://t.me/jiao_long'),
     );
     if (isSuccess) {
       const result = await this.updateAuthDb({

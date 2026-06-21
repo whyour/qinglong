@@ -80,6 +80,55 @@ const messages: Record<string, Record<string, string>> = {
     '订阅执行完成': 'Subscription completed',
     'wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行': 'wxPusher requires at least one of TopicIds or Uids',
     'Url 或者 Body 中必须包含 $title': 'Url or Body must contain $title',
+    '绝对路径必须在日志目录内或使用 /dev/null':
+      'Absolute path must be within log directory or use /dev/null',
+    '请先登录!': 'Please login first!',
+    '运行中...': 'Running...',
+    '日志不存在...': 'Log does not exist...',
+    '未分类': 'Uncategorized',
+    '任务重复运行': 'Duplicate task execution',
+    '日志设置为忽略': 'Log set to ignore',
+    '定时规则不能为空': 'Schedule rule cannot be empty',
+    '无效的定时规则': 'Invalid schedule rule',
+    '日志名称只能包含字母、数字、下划线和连字符':
+      'Log name can only contain letters, numbers, underscores, and hyphens',
+    '日志名称不能超过100个字符': 'Log name cannot exceed 100 characters',
+    '错误的用户名密码，请重试': 'Incorrect username or password, please try again',
+    '青龙快讯': 'QingLong',
+    '登录通知': 'Login Notification',
+    '你于': 'You at ',
+    '在': ' in ',
+    端: '',
+    登录失败: 'login failed',
+    '，ip地址': ', IP: ',
+    '任务#%s': 'Task#%s',
+    安装: 'Install',
+    删除: 'Uninstall',
+    成功: 'Succeeded',
+    失败: 'Failed',
+    '失败次数过多，请%s秒后重试':
+      'Too many failed attempts, please retry in %s seconds',
+    智能助手: 'Smart Assistant',
+    更多: 'More',
+    '开始%s依赖 %s，开始时间 %s\n\n当前系统不支持\n\n依赖%s失败，结束时间 %s，耗时 %s 秒':
+      'Start %s dependency %s, start time %s\n\nCurrent system not supported\n\nDependency %s failed, end time %s, elapsed %s seconds',
+    '检测到已经安装 %s\n\n%s\n\n跳过安装\n\n依赖%s成功，结束时间 %s，耗时 %s 秒':
+      'Already installed %s\n\n%s\n\nSkipping install\n\nDependency %s succeeded, end time %s, elapsed %s seconds',
+    '开始%s依赖 %s，开始时间 %s\n\n':
+      'Start %s dependency %s, start time %s\n\n',
+    '依赖%s%s，结束时间 %s，耗时 %s 秒':
+      'Dependency %s%s, end time %s, elapsed %s seconds',
+    '任务：%s，命令：%s，定时：%s，处于运行中的超过 %d 个，请检查定时设置':
+      'Task: %s, command: %s, schedule: %s, more than %d instances running, please check schedule settings',
+    青龙: 'QingLong',
+    '【蛟龙】测试通知 https://t.me/jiao_long':
+      '[JiaoLong] Test notification https://t.me/jiao_long',
+    '生成token': 'Generate token',
+    '删除日志': 'Delete logs',
+    '## 开始执行... %s\n': '## Start executing... %s\n',
+    '执行before命令...': 'Execute before command...',
+    '执行after命令...': 'Execute after command...',
+    '## 执行结束... %s  耗时 %s 秒': '## Execution finished... %s  elapsed %s seconds',
   },
 };
 
@@ -99,4 +148,11 @@ export function t(key: string, lang?: string): string {
     return messages.en[key];
   }
   return key;
+}
+
+export function tf(key: string, ...args: (string | number)[]): string {
+  return args.reduce<string>(
+    (str, arg) => str.replace(/%s|%d/, String(arg)),
+    t(key),
+  );
 }
