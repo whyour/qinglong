@@ -1,4 +1,5 @@
 import { AuthInfo, TokenInfo } from '../data/system';
+import { safeCompare } from './security';
 
 /**
  * Validates if a token exists in the authentication info.
@@ -20,8 +21,8 @@ export function isValidToken(
 
   const { token = '', tokens = {} } = authInfo;
 
-  // Check legacy token field
-  if (headerToken === token) {
+  // Check legacy token field (constant-time)
+  if (token && safeCompare(headerToken, token)) {
     return true;
   }
 
@@ -35,10 +36,12 @@ export function isValidToken(
 
   if (typeof platformTokens === 'string') {
     // Legacy format: single string token
-    return headerToken === platformTokens;
+    return safeCompare(headerToken, platformTokens);
   } else if (Array.isArray(platformTokens)) {
-    // New format: array of TokenInfo objects
-    return platformTokens.some((t: TokenInfo) => t && t.value === headerToken);
+    // New format: array of TokenInfo objects (constant-time per entry)
+    return platformTokens.some(
+      (t: TokenInfo) => t && safeCompare(headerToken, t.value),
+    );
   }
 
   // Unexpected type - log warning and reject

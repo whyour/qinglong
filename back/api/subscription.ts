@@ -4,7 +4,32 @@ import { Logger } from 'winston';
 import SubscriptionService from '../services/subscription';
 import { celebrate, Joi } from 'celebrate';
 import CronExpressionParser from 'cron-parser';
+import { SUBSCRIPTION_PATTERNS } from '../shared/security';
 const route = Router();
+
+// Shared validation for fields that are interpolated into shell commands /
+// ssh config files. Blocks shell metacharacters / newlines at the boundary.
+const urlField = Joi.string().pattern(SUBSCRIPTION_PATTERNS.url);
+const branchField = Joi.string()
+  .pattern(SUBSCRIPTION_PATTERNS.branch)
+  .optional()
+  .allow('')
+  .allow(null);
+const extensionsField = Joi.string()
+  .pattern(SUBSCRIPTION_PATTERNS.extensions)
+  .optional()
+  .allow('')
+  .allow(null);
+const proxyField = Joi.string()
+  .pattern(SUBSCRIPTION_PATTERNS.proxy)
+  .optional()
+  .allow('')
+  .allow(null);
+const filterField = Joi.string()
+  .pattern(SUBSCRIPTION_PATTERNS.filter)
+  .optional()
+  .allow('')
+  .allow(null);
 
 export default (app: Router) => {
   app.use('/subscriptions', route);
@@ -38,19 +63,19 @@ export default (app: Router) => {
           .allow('')
           .allow(null),
         name: Joi.string().optional().allow('').allow(null),
-        url: Joi.string().required(),
-        whitelist: Joi.string().optional().allow('').allow(null),
-        blacklist: Joi.string().optional().allow('').allow(null),
-        branch: Joi.string().optional().allow('').allow(null),
-        dependences: Joi.string().optional().allow('').allow(null),
+        url: urlField.required(),
+        whitelist: filterField,
+        blacklist: filterField,
+        branch: branchField,
+        dependences: filterField,
         pull_type: Joi.string().optional().allow('').allow(null),
         pull_option: Joi.object().optional().allow('').allow(null),
-        extensions: Joi.string().optional().allow('').allow(null),
+        extensions: extensionsField,
         sub_before: Joi.string().optional().allow('').allow(null),
         sub_after: Joi.string().optional().allow('').allow(null),
         schedule_type: Joi.string().required(),
         alias: Joi.string().required(),
-        proxy: Joi.string().optional().allow('').allow(null),
+        proxy: proxyField,
         autoAddCron: Joi.boolean().optional().allow('').allow(null),
         autoDelCron: Joi.boolean().optional().allow('').allow(null),
       }),
@@ -169,19 +194,19 @@ export default (app: Router) => {
         schedule: Joi.string().optional().allow('').allow(null),
         interval_schedule: Joi.object().optional().allow('').allow(null),
         name: Joi.string().optional().allow('').allow(null),
-        url: Joi.string().required(),
-        whitelist: Joi.string().optional().allow('').allow(null),
-        blacklist: Joi.string().optional().allow('').allow(null),
-        branch: Joi.string().optional().allow('').allow(null),
-        dependences: Joi.string().optional().allow('').allow(null),
+        url: urlField.required(),
+        whitelist: filterField,
+        blacklist: filterField,
+        branch: branchField,
+        dependences: filterField,
         pull_type: Joi.string().optional().allow('').allow(null),
         pull_option: Joi.object().optional().allow('').allow(null),
         schedule_type: Joi.string().optional().allow('').allow(null),
-        extensions: Joi.string().optional().allow('').allow(null),
+        extensions: extensionsField,
         sub_before: Joi.string().optional().allow('').allow(null),
         sub_after: Joi.string().optional().allow('').allow(null),
         alias: Joi.string().required(),
-        proxy: Joi.string().optional().allow('').allow(null),
+        proxy: proxyField,
         autoAddCron: Joi.boolean().optional().allow('').allow(null),
         autoDelCron: Joi.boolean().optional().allow('').allow(null),
         id: Joi.number().required(),

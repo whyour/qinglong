@@ -1,5 +1,6 @@
 import { Subscription } from '../data/subscription';
 import isNil from 'lodash/isNil';
+import { shellEscape } from '../shared/security';
 
 export function formatUrl(doc: Subscription) {
   let url = doc.url;
@@ -31,16 +32,22 @@ export function formatCommand(doc: Subscription, url?: string) {
     autoAddCron,
     autoDelCron,
   } = doc;
+  const addCron = isNil(autoAddCron) ? true : Boolean(autoAddCron);
+  const delCron = isNil(autoDelCron) ? true : Boolean(autoDelCron);
+  // Every user-controlled value is single-quote escaped so it can never break
+  // out of the shell command passed to spawn(command, { shell: '/bin/bash' }).
   if (type === 'file') {
-    command += `raw "${_url}" "${proxy || ''}" "${
-      isNil(autoAddCron) ? true : Boolean(autoAddCron)
-    }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
+    command += `raw ${shellEscape(_url)} ${shellEscape(
+      proxy || '',
+    )} "${addCron}" "${delCron}"`;
   } else {
-    command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
-      dependences || ''
-    }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${
-      isNil(autoAddCron) ? true : Boolean(autoAddCron)
-    }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
+    command += `repo ${shellEscape(_url)} ${shellEscape(
+      whitelist || '',
+    )} ${shellEscape(blacklist || '')} ${shellEscape(
+      dependences || '',
+    )} ${shellEscape(branch || '')} ${shellEscape(extensions || '')} ${shellEscape(
+      proxy || '',
+    )} "${addCron}" "${delCron}"`;
   }
   return command;
 }

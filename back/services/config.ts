@@ -1,5 +1,5 @@
 import { Service, Inject } from 'typedi';
-import path, { join } from 'path';
+import path from 'path';
 import config from '../config';
 import { getFileContentByName } from '../config/util';
 import { t } from '../shared/i18n';
@@ -19,31 +19,30 @@ export default class ConfigService {
     if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
       return res.send({ code: 403, message: t('文件无法访问') });
     }
-    const resolvedRoot = path.resolve(config.rootPath, normalized);
-    const resolvedConfig = path.resolve(config.configPath, normalized);
-    const isValidPath =
-      resolvedRoot.startsWith(config.scriptPath) ||
-      resolvedRoot.startsWith(config.configPath) ||
-      resolvedConfig.startsWith(config.scriptPath) ||
-      resolvedConfig.startsWith(config.configPath);
-    if (!isValidPath) {
-      return res.send({ code: 403, message: t('文件无法访问') });
-    }
-    if (config.blackFileList.includes(path.basename(normalized))) {
-      return res.send({ code: 403, message: t('文件无法访问') });
-    }
 
+    // Remote sample files are fetched (and path-checked) separately.
     if (filePath.startsWith('sample/')) {
-      const res = await request(
-        `https://gitlab.com/whyour/qinglong/-/raw/master/${filePath}`,
+      const sampleRes = await request(
+        `https://gitlab.com/whyour/qinglong/-/raw/master/${normalized}`,
       );
-      content = await res.body.text();
-    } else if (filePath.startsWith('data/scripts/')) {
-      content = await getFileContentByName(join(config.rootPath, filePath));
-    } else {
-      content = await getFileContentByName(join(config.configPath, filePath));
+      return res.send({ code: 200, data: await sampleRes.body.text() });
     }
 
+    // Resolve the ACTUAL file path first, then validate that it stays within
+    // its allowed base. Validating a different path than the one read is what
+    // previously allowed `data/scripts/../db/database.sqlite` style traversal.
+    const isScripts = filePath.startsWith('data/scripts/');
+    const base = path.resolve(isScripts ? config.scriptPath : config.configPath);
+    const rel = isScripts ? filePath.slice('data/scripts/'.length) : filePath;
+    const finalPath = path.resolve(base, rel);
+    if (finalPath !== base && !finalPath.startsWith(base + path.sep)) {
+      return res.send({ code: 403, message: t('文件无法访问') });
+    }
+    if (config.blackFileList.includes(path.basename(finalPath))) {
+      return res.send({ code: 403, message: t('文件无法访问') });
+    }
+
+    content = await getFileContentByName(finalPath);
     res.send({ code: 200, data: content });
   }
 }

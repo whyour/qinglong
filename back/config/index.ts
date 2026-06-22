@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'crypto';
+import fs from 'fs';
 
 dotenv.config({
   path: path.join(__dirname, '../../.env'),
@@ -128,9 +130,47 @@ if (envFound.error) {
   throw new Error("⚠️  Couldn't find .env file  ⚠️");
 }
 
+/**
+ * Resolve the JWT signing secret. A shared, source-code-public default secret
+ * lets anyone forge admin tokens, so:
+ *  - honor an explicitly configured JWT_SECRET (must not be the old default);
+ *  - otherwise generate a strong random secret once and persist it under the
+ *    data dir so it stays stable across restarts and cluster workers;
+ *  - never fall back to the public default in production.
+ */
+function resolveJwtSecret(): string {
+  const envSecret = process.env.JWT_SECRET;
+  if (envSecret && envSecret !== 'whyour-secret') {
+    return envSecret;
+  }
+
+  const secretFile = path.join(dbPath, 'jwt_secret.key');
+  try {
+    if (fs.existsSync(secretFile)) {
+      const existing = fs.readFileSync(secretFile, 'utf-8').trim();
+      if (existing) {
+        return existing;
+      }
+    }
+    const generated = crypto.randomBytes(48).toString('hex');
+    fs.mkdirSync(path.dirname(secretFile), { recursive: true });
+    fs.writeFileSync(secretFile, generated, { mode: 0o600 });
+    return generated;
+  } catch (error) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Refusing to start: unable to provision a secure JWT secret. Set JWT_SECRET.',
+      );
+    }
+    return 'whyour-secret';
+  }
+}
+
+const jwtConfig = { ...config.jwt, secret: resolveJwtSecret() };
+
 export default {
   ...config,
-  jwt: config.jwt,
+  jwt: jwtConfig,
   baseUrl,
   rootPath,
   tmpPath,
