@@ -1,6 +1,7 @@
 import { Joi, celebrate } from 'celebrate';
 import { NextFunction, Request, Response, Router } from 'express';
 import fs from 'fs';
+import path from 'path';
 import multer from 'multer';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
@@ -15,7 +16,13 @@ const storage = multer.diskStorage({
     cb(null, config.scriptPath);
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname);
+    // Never trust the client-supplied name: strip any directory components so
+    // the upload cannot be written outside config.scriptPath (path traversal).
+    const safeName = path.basename(file.originalname || '');
+    if (!safeName || safeName === '.' || safeName === '..') {
+      return cb(new Error('Invalid filename'), '');
+    }
+    cb(null, safeName);
   },
 });
 const upload = multer({ storage: storage });

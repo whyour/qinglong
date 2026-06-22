@@ -8,6 +8,7 @@ import { formatUrl } from '../config/subscription';
 import config from '../config';
 import { fileExist, rmPath } from '../config/util';
 import { writeFileWithLock } from '../shared/utils';
+import { isSafeSshConfigValue, SUBSCRIPTION_PATTERNS } from '../shared/security';
 
 @Service()
 export default class SshKeyService {
@@ -66,6 +67,14 @@ export default class SshKeyService {
     host: string,
     proxy?: string,
   ) {
+    // Prevent newline / shell-metacharacter injection into the ssh config file
+    // (e.g. an injected ProxyCommand directive executed by ssh on git pull).
+    if (!isSafeSshConfigValue(host)) {
+      throw new Error('Invalid ssh host');
+    }
+    if (proxy && !SUBSCRIPTION_PATTERNS.proxy.test(proxy)) {
+      throw new Error('Invalid ssh proxy');
+    }
     if (host === 'github.com') {
       host = `ssh.github.com\n    Port 443\n    HostkeyAlgorithms +ssh-rsa`;
     }

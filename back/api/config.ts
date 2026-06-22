@@ -4,7 +4,7 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
-import { join, basename } from 'path';
+import path, { basename } from 'path';
 import { SAMPLE_FILES } from '../config/const';
 import { t } from '../shared/i18n';
 import ConfigService from '../services/config';
@@ -72,16 +72,16 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const { name, content } = req.body;
-        // Resolve path first to prevent traversal attacks
-        let basePath = config.configPath;
-        if (name.startsWith('data/scripts/')) {
-          basePath = join(config.rootPath, 'data/scripts');
-        }
+        // Resolve the final path first, then verify containment with a path
+        // separator so sibling dirs (e.g. data/scripts-evil) cannot be reached.
+        const isScripts = name.startsWith('data/scripts/');
+        const basePath = path.resolve(
+          isScripts ? config.scriptPath : config.configPath,
+        );
         const cleanName = name.replace(/^data\/scripts\//, '');
-        const resolvedPath = join(basePath, cleanName);
-        const normalized = join(resolvedPath);
-        // Verify the resolved path stays within allowed directory
-        if (!normalized.startsWith(basePath)) {
+        const normalized = path.resolve(basePath, cleanName);
+        // Verify the resolved path stays within the allowed directory
+        if (normalized !== basePath && !normalized.startsWith(basePath + path.sep)) {
           return res.send({ code: 403, message: t('文件路径无效') });
         }
         // Check blacklist on actual filename (not user input)

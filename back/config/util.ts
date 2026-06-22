@@ -12,6 +12,7 @@ import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
 import os from 'os';
 import { maybeSudo, isInContainer } from './container';
+import { assertSafeDependenceName } from '../shared/security';
 
 export * from './share';
 
@@ -569,6 +570,7 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
 }
 
 export function getGetCommand(type: DependenceTypes, name: string): string {
+  name = assertSafeDependenceName(name);
   const baseCommands = {
     [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${name}" | head -1`,
     [DependenceTypes.python3]: `
@@ -592,6 +594,7 @@ except:
 }
 
 export function getInstallCommand(type: DependenceTypes, name: string): string {
+  name = assertSafeDependenceName(name);
   const baseCommands = {
     [DependenceTypes.nodejs]: 'pnpm add -g',
     [DependenceTypes.python3]:
@@ -614,6 +617,7 @@ export function getUninstallCommand(
   type: DependenceTypes,
   name: string,
 ): string {
+  name = assertSafeDependenceName(name);
   const baseCommands = {
     [DependenceTypes.nodejs]: 'pnpm remove -g',
     [DependenceTypes.python3]:
