@@ -12,6 +12,7 @@ import { IKeyvStore, shareStore } from '../shared/store';
 import { isValidToken } from '../shared/auth';
 import path from 'path';
 import { t } from '../shared/i18n';
+import { AppScope } from '../data/open';
 
 export default ({ app }: { app: Application }) => {
   // Security: Enable strict routing to prevent case-insensitive path bypass
@@ -19,30 +20,30 @@ export default ({ app }: { app: Application }) => {
   app.set('strict routing', true);
   app.set('trust proxy', 'loopback');
   app.use(cors());
-  
+
   // Security: Path normalization middleware to prevent case variation attacks
   app.use((req, res, next) => {
     const originalPath = req.path;
     const normalizedPath = originalPath.toLowerCase();
-    
+
     // Block requests with case variations on protected paths
-    if (originalPath !== normalizedPath && 
-        (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/open/'))) {
+    if (originalPath !== normalizedPath &&
+      (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/open/'))) {
       return res.status(400).json({
         code: 400,
         message: 'Invalid path format'
       });
     }
-    
+
     next();
   });
-  
+
   // Rewrite URLs to strip baseUrl prefix if configured
   // This allows the rest of the app to work without baseUrl awareness
   if (config.baseUrl) {
     app.use(rewrite(`${config.baseUrl}/*`, '/$1'));
   }
-  
+
   app.get(`${config.api.prefix}/env.js`, serveEnv);
   app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
 
@@ -87,17 +88,26 @@ export default ({ app }: { app: Application }) => {
         const currentToken = doc.tokens.find((x) => x.value === headerToken);
         const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
         const key = keyMatch && keyMatch[1];
-        if (
-          doc.scopes.includes(key as any) &&
-          currentToken &&
-          currentToken.expiration >= Math.round(Date.now() / 1000)
-        ) {
-          return next();
+
+        if (!doc.scopes.includes(key as AppScope)) {
+          const err = new UnauthorizedError('credentials_bad_scheme', {
+            message: t('暂无权限'),
+          });
+          return next(err);
         }
+
+        if (!currentToken || currentToken.expiration < Math.round(Date.now() / 1000)) {
+          const err = new UnauthorizedError('invalid_token', {
+            message: t('Token 已失效'),
+          });
+          return next(err);
+        }
+
+        return next();
       }
     }
 
-    const originPath = `${req.baseUrl}${req.path === '/' ? '' : req.path}`;
+    const originPath = `${req.baseUrl}${pathLower === '/' ? '' : pathLower}`;
     if (
       !headerToken &&
       originPath &&
@@ -113,8 +123,8 @@ export default ({ app }: { app: Application }) => {
 
     const errorCode = headerToken ? 'invalid_token' : 'credentials_required';
     const errorMessage = headerToken
-      ? 'jwt malformed'
-      : 'No authorization token was found';
+      ? t('Token 已失效')
+      : t('请先登录');
     const err = new UnauthorizedError(errorCode, { message: errorMessage });
     next(err);
   });
@@ -127,7 +137,7 @@ export default ({ app }: { app: Application }) => {
         '/api/user/notification/init',
         '/open/user/init',
         '/open/user/notification/init',
-      ].includes(req.path)
+      ].includes(pathLower)
     ) {
       return next();
     }

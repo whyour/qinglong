@@ -82,7 +82,7 @@ const messages: Record<string, Record<string, string>> = {
     'Url 或者 Body 中必须包含 $title': 'Url or Body must contain $title',
     '绝对路径必须在日志目录内或使用 /dev/null':
       'Absolute path must be within log directory or use /dev/null',
-    '请先登录!': 'Please login first!',
+    '请先登录': 'Please login first',
     '运行中...': 'Running...',
     '日志不存在...': 'Log does not exist...',
     '未分类': 'Uncategorized',
