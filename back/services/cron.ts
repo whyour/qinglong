@@ -106,15 +106,24 @@ export default class CronService {
     }
 
     if (this.shouldUseCronClient(doc)) {
-      await cronClient.addCron([
-        {
-          name: doc.name || '',
-          id: String(doc.id),
-          schedule: doc.schedule!,
-          command: this.makeCommand(doc),
-          extra_schedules: doc.extra_schedules || [],
-        },
-      ]);
+      try {
+        await cronClient.addCron([
+          {
+            name: doc.name || '',
+            id: String(doc.id),
+            schedule: doc.schedule!,
+            command: this.makeCommand(doc),
+            extra_schedules: doc.extra_schedules || [],
+          },
+        ]);
+      } catch (error: any) {
+        // 调度器注册为尽力而为，失败时不阻断 crontab.list 与系统 crontab 的同步，
+        // 调度器重启后会重新注册（见 autosave_crontab）
+        this.logger.warn(
+          '[crontab] Failed to register cron job in scheduler:',
+          error?.message || error,
+        );
+      }
     }
 
     await this.setCrontab();
@@ -136,18 +145,32 @@ export default class CronService {
       return newDoc;
     }
 
-    await cronClient.delCron([String(newDoc.id)]);
+    try {
+      await cronClient.delCron([String(newDoc.id)]);
+    } catch (error: any) {
+      this.logger.warn(
+        '[crontab] Failed to unregister cron job in scheduler:',
+        error?.message || error,
+      );
+    }
 
     if (this.shouldUseCronClient(newDoc)) {
-      await cronClient.addCron([
-        {
-          name: doc.name || '',
-          id: String(newDoc.id),
-          schedule: newDoc.schedule!,
-          command: this.makeCommand(newDoc),
-          extra_schedules: newDoc.extra_schedules || [],
-        },
-      ]);
+      try {
+        await cronClient.addCron([
+          {
+            name: doc.name || '',
+            id: String(newDoc.id),
+            schedule: newDoc.schedule!,
+            command: this.makeCommand(newDoc),
+            extra_schedules: newDoc.extra_schedules || [],
+          },
+        ]);
+      } catch (error: any) {
+        this.logger.warn(
+          '[crontab] Failed to register cron job in scheduler:',
+          error?.message || error,
+        );
+      }
     }
 
     await this.setCrontab();
@@ -240,7 +263,14 @@ export default class CronService {
 
   public async remove(ids: number[]) {
     await CrontabModel.destroy({ where: { id: ids } });
-    await cronClient.delCron(ids.map(String));
+    try {
+      await cronClient.delCron(ids.map(String));
+    } catch (error: any) {
+      this.logger.warn(
+        '[crontab] Failed to unregister cron job in scheduler:',
+        error?.message || error,
+      );
+    }
     await this.setCrontab();
   }
 
@@ -665,7 +695,14 @@ export default class CronService {
 
   public async disabled(ids: number[]) {
     await CrontabModel.update({ isDisabled: 1 }, { where: { id: ids } });
-    await cronClient.delCron(ids.map(String));
+    try {
+      await cronClient.delCron(ids.map(String));
+    } catch (error: any) {
+      this.logger.warn(
+        '[crontab] Failed to unregister cron job in scheduler:',
+        error?.message || error,
+      );
+    }
     await this.setCrontab();
   }
 
@@ -686,7 +723,14 @@ export default class CronService {
       return;
     }
 
-    await cronClient.addCron(crons);
+    try {
+      await cronClient.addCron(crons);
+    } catch (error: any) {
+      this.logger.warn(
+        '[crontab] Failed to register cron job in scheduler:',
+        error?.message || error,
+      );
+    }
     await this.setCrontab();
   }
 
@@ -864,8 +908,19 @@ export default class CronService {
       await writeFileWithLock(config.crontabFile, '');
       return;
     }
-    await cronClient.addCron(regularCrons);
-    this.setCrontab(tabs);
+
+    // 先同步 crontab.list 与系统 crontab，确保其始终反映数据库真实状态。
+    // gRPC 调度注册为尽力而为：失败时不阻断文件同步，调度器重启后会重新注册。
+    // 这避免了因调度器短暂不可用导致 crontab.list 与数据库脱节（订阅更新误判任务已存在）。
+    await this.setCrontab(tabs);
+    try {
+      await cronClient.addCron(regularCrons);
+    } catch (error: any) {
+      this.logger.warn(
+        '[crontab] Failed to register cron job in scheduler:',
+        error?.message || error,
+      );
+    }
   }
 
   public async bootTask() {
