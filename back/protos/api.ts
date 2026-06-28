@@ -3180,7 +3180,7 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
       writer.uint32(546).string(message.wxPusherBotUids);
     }
     if (message.wxPusherSptList !== undefined) {
-      writer.uint32(554).string(message.wxPusherSptList);
+      writer.uint32(562).string(message.wxPusherSptList);
     }
     return writer;
   },
@@ -3744,8 +3744,8 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
           message.wxPusherBotUids = reader.string();
           continue;
         }
-        case 69: {
-          if (tag !== 554) {
+        case 70: {
+          if (tag !== 562) {
             break;
           }
 

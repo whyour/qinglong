@@ -246,7 +246,7 @@ message NotificationInfo {
   optional string wxPusherBotTopicIds = 67;
   optional string wxPusherBotUids = 68;
 
-  optional string wxPusherSptList = 69;
+  optional string wxPusherSptList = 70;
 }
 
 message SystemNotifyRequest {
