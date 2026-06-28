@@ -133,9 +133,16 @@ push_config = {
     'NTFY_PASSWORD': '',                # 推送用户密码,可选
     'NTFY_ACTIONS': '',                 # 推送用户动作,可选
 
+    ### 方式一：标准发送（更强大）
+    #### 官方文档: https://wxpusher.zjiecode.com/docs/
+    #### 管理后台: https://wxpusher.zjiecode.com/admin/
     'WXPUSHER_APP_TOKEN': '',           # wxpusher 的 appToken 官方文档: https://wxpusher.zjiecode.com/docs/ 管理后台: https://wxpusher.zjiecode.com/admin/
     'WXPUSHER_TOPIC_IDS': '',           # wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
     'WXPUSHER_UIDS': '',                # wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+    ### 方式二：极简发送（最简单，简单好用，一键配置，更推荐） 
+    #### wxPusher 的 SPT（极简推送），扫码获取 https://wxpusher.zjiecode.com/docs/#/?id=spt
+    #### 多个用英文逗号,分隔，最多10个；与上面的 appToken 方式二选一即可
+    'WXPUSHER_SPT_LIST': '',            # wxpusher 的 SPT（极简推送），多个用英文逗号,分隔，最多10个 官方文档: https://wxpusher.zjiecode.com/docs/#/?id=spt
 
     'OPENILINK_APP_TOKEN': '',          # OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取 官方文档: https://openilink.com/docs/hub/apps
     'OPENILINK_HUB_URL': '',            # OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
@@ -902,6 +909,53 @@ def wxpusher_bot(title: str, content: str) -> None:
         print(f"wxpusher 推送失败！错误信息：{response.get('msg')}")
 
 
+def wxpusher_spt(title: str, content: str) -> None:
+    """
+    通过 wxpusher 极简推送（SPT）推送消息。
+    支持的环境变量:
+    - WXPUSHER_SPT_LIST: SPT, 多个用英文逗号,分隔, 最多10个
+    """
+    if not push_config.get("WXPUSHER_SPT_LIST"):
+        return
+
+    # 处理 SPT，将逗号分隔的字符串转为数组
+    spts = [
+        spt.strip()
+        for spt in push_config.get("WXPUSHER_SPT_LIST").split(",")
+        if spt.strip()
+    ]
+
+    if not spts:
+        print("wxpusher 服务的 WXPUSHER_SPT_LIST 不能为空!!")
+        return
+    if len(spts) > 10:
+        print("wxpusher 服务的 WXPUSHER_SPT_LIST 最多支持 10 个!!")
+        return
+
+    print("wxpusher SPT 服务启动")
+
+    url = "https://wxpusher.zjiecode.com/api/send/message/simple-push"
+
+    data = {
+        "content": f"<h1>{title}</h1><br/><div style='white-space: pre-wrap;'>{content}</div>",
+        "summary": title,
+        "contentType": 2,
+    }
+    # 单个 SPT 用 spt，多个用 sptList
+    if len(spts) == 1:
+        data["spt"] = spts[0]
+    else:
+        data["sptList"] = spts
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, json=data, headers=headers).json()
+
+    if response.get("code") == 1000:
+        print("wxpusher SPT 推送成功！")
+    else:
+        print(f"wxpusher SPT 推送失败！错误信息：{response.get('msg')}")
+
+
 def openilink(title: str, content: str) -> None:
     """
     通过 OpeniLink 推送消息。
@@ -1104,6 +1158,8 @@ def add_notify_function():
         push_config.get("WXPUSHER_TOPIC_IDS") or push_config.get("WXPUSHER_UIDS")
     ):
         notify_function.append(wxpusher_bot)
+    if push_config.get("WXPUSHER_SPT_LIST"):
+        notify_function.append(wxpusher_spt)
     if push_config.get("OPENILINK_APP_TOKEN"):
         notify_function.append(openilink)
     if not notify_function:
