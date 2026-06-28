@@ -75,6 +75,7 @@ export default {
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'wePlusBot', label: intl.get('微加机器人') },
     { value: 'wxPusherBot', label: 'wxPusher' },
+    { value: 'wxPusherSpt', label: 'WxPusher(极简推送SPT-推荐)' },
     { value: 'openiLink', label: 'OpeniLink' },
     { value: 'chat', label: intl.get('群晖chat') },
     { value: 'email', label: intl.get('邮箱') },
@@ -363,6 +364,13 @@ export default {
         label: 'wxPusherBotUids',
         tip: intl.get('wxPusherBot的uids'),
         required: false,
+      },
+    ],
+    wxPusherSpt: [
+      {
+        label: 'wxPusherSptList',
+        tip: intl.get('wxPusherSpt的SPT'),
+        required: true,
       },
     ],
     openiLink: [
