@@ -3,8 +3,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   message,
-  Input,
-  Form,
   Button,
   Card,
   Tag,
@@ -40,23 +38,14 @@ const { Text } = Typography;
 
 const tabList = [
   {
-    key: 'log',
-    tab: intl.get('日志'),
+    key: 'runningHistory',
+    tab: intl.get('运行历史'),
   },
   {
     key: 'script',
     tab: intl.get('脚本'),
   },
-  {
-    key: 'runningInstance',
-    tab: intl.get('运行实例'),
-  },
 ];
-
-interface LogItem {
-  directory: string;
-  filename: string;
-}
 
 const CronDetailModal = ({
   cron = {},
@@ -69,21 +58,19 @@ const CronDetailModal = ({
   theme: string;
   isPhone: boolean;
 }) => {
-  const [activeTabKey, setActiveTabKey] = useState('log');
-  const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState<LogItem[]>([]);
-  const [log, setLog] = useState('');
+  const [activeTabKey, setActiveTabKey] = useState('runningHistory');
   const [value, setValue] = useState('');
-  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const editorRef = useRef<any>(null);
   const [scriptInfo, setScriptInfo] = useState<any>({});
-  const [logUrl, setLogUrl] = useState('');
   const [validTabs, setValidTabs] = useState(tabList);
   const [currentCron, setCurrentCron] = useState<any>({});
   const listRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useScrollHeight(listRef);
   const [runningInstances, setRunningInstances] = useState<any[]>([]);
   const needRefreshRef = useRef(false);
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const [logData, setLogData] = useState('');
+  const [logUrl, setLogUrl] = useState('');
 
   const fetchRunningInstances = async () => {
     if (!cron.id) return Promise.resolve();
@@ -114,25 +101,6 @@ const CronDetailModal = ({
   }, [cron.id]);
 
   const contentList: any = {
-    log: (
-      <div ref={listRef}>
-        <List>
-          <VirtualList
-            data={logs}
-            height={tableScrollHeight}
-            itemHeight={47}
-            itemKey="filename"
-          >
-            {(item) => (
-              <List.Item className="log-item" onClick={() => onClickItem(item)}>
-                <FileOutlined style={{ marginRight: 10 }} />
-                {item.directory}/{item.filename}
-              </List.Item>
-            )}
-          </VirtualList>
-        </List>
-      </div>
-    ),
     script: scriptInfo.filename && (
       <Editor
         language={getEditorMode(scriptInfo.filename)}
@@ -150,7 +118,7 @@ const CronDetailModal = ({
         }}
       />
     ),
-    runningInstance: (
+    runningHistory: (
       <div ref={listRef}>
         <List>
           <VirtualList
@@ -163,40 +131,77 @@ const CronDetailModal = ({
               <List.Item
                 className="log-item"
                 actions={[
-                  <Tooltip title={intl.get('查看日志')} key="log">
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<FileOutlined />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        viewInstanceLog(item);
-                      }}
-                    />
-                  </Tooltip>,
-                  <Tooltip title={intl.get('停止')} key="stop">
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<StopOutlined />}
-                      danger
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        stopRunningInstance(item);
-                      }}
-                    />
-                  </Tooltip>,
-                ]}
+                  item.log_path && (
+                    <Tooltip title={intl.get('查看日志')} key="log">
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<FileOutlined />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          viewInstanceLog(item);
+                        }}
+                      />
+                    </Tooltip>
+                  ),
+                  item.status === 0 && (
+                    <Tooltip title={intl.get('停止')} key="stop">
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<StopOutlined />}
+                        danger
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          stopRunningInstance(item);
+                        }}
+                      />
+                    </Tooltip>
+                  ),
+                ].filter(Boolean)}
               >
                 <List.Item.Meta
                   title={
                     <span>
-                      PID: <Tag color="processing">{item.pid}</Tag>
+                      {item.log_path && (
+                        <span style={{ marginRight: 8 }}>
+                          {item.log_path.split('/').pop()}
+                        </span>
+                      )}
+                      {item.status === 0 && (
+                        <Tag icon={<Loading3QuartersOutlined spin />} color="processing">
+                          {intl.get('运行中')}
+                        </Tag>
+                      )}
+                      {item.status === 1 && (
+                        <Tag color="success">{intl.get('已完成')}</Tag>
+                      )}
+                      {item.status === 2 && (
+                        <Tag color="default">{intl.get('已停止')}</Tag>
+                      )}
+                      {item.status === 3 && (
+                        <Tag color="error">{intl.get('错误')}</Tag>
+                      )}
                     </span>
                   }
                   description={
                     <span style={{ color: '#999' }}>
+                      {item.status === 0 && item.pid && (
+                        <span>
+                          PID: {item.pid}{' | '}
+                        </span>
+                      )}
                       {intl.get('启动')}: {dayjs.unix(item.started_at).format('YYYY-MM-DD HH:mm:ss')}
+                      {item.finished_at && (
+                        <span>
+                          {' | '}{intl.get('结束')}: {dayjs.unix(item.finished_at).format('YYYY-MM-DD HH:mm:ss')}
+                        </span>
+                      )}
+                      {item.exit_code !== undefined && item.exit_code !== null && (
+                        <span>
+                          {' | '}{intl.get('退出码')}: {item.exit_code}
+                        </span>
+                      )}
                     </span>
                   }
                 />
@@ -225,7 +230,6 @@ const CronDetailModal = ({
               message.success(intl.get('实例已停止'));
               needRefreshRef.current = true;
               fetchRunningInstances();
-              setTimeout(() => getLogs(), 1000);
             }
           });
       },
@@ -242,20 +246,7 @@ const CronDetailModal = ({
     setLogUrl(url);
     request.get(url).then(({ code, data }) => {
       if (code === 200) {
-        setLog(data);
-        setIsLogModalVisible(true);
-      }
-    });
-  };
-
-  const onClickItem = (item: LogItem) => {
-    const url = `${config.apiPrefix}logs/detail?file=${item.filename}&path=${item.directory || ''
-      }`;
-    localStorage.setItem('logCron', url);
-    setLogUrl(url);
-    request.get(url).then(({ code, data }) => {
-      if (code === 200) {
-        setLog(data);
+        setLogData(data);
         setIsLogModalVisible(true);
       }
     });
@@ -265,22 +256,9 @@ const CronDetailModal = ({
     setActiveTabKey(key);
   };
 
-  const getLogs = () => {
-    setLoading(true);
-    request
-      .get(`${config.apiPrefix}crons/${cron.id}/logs`)
-      .then(({ code, data }) => {
-        if (code === 200) {
-          setLogs(data);
-        }
-      })
-      .finally(() => setLoading(false));
-  };
-
   const getScript = () => {
     const result = getCommandScript(cron.command);
     if (Array.isArray(result)) {
-      setValidTabs(validTabs);
       const [s, p] = result;
       setScriptInfo({ parent: p, filename: s });
       request
@@ -291,8 +269,8 @@ const CronDetailModal = ({
           }
         });
     } else {
-      setValidTabs([validTabs[0]]);
-      setActiveTabKey('log');
+      setValidTabs([{ key: 'runningHistory', tab: intl.get('运行历史') }]);
+      setActiveTabKey('runningHistory');
     }
   };
 
@@ -351,9 +329,7 @@ const CronDetailModal = ({
           .then(({ code, data }) => {
             if (code === 200) {
               setCurrentCron({ ...currentCron, status: CrontabStatus.running });
-              setTimeout(() => {
-                getLogs();
-              }, 1000);
+              fetchRunningInstances();
             }
           });
       },
@@ -460,7 +436,6 @@ const CronDetailModal = ({
   useEffect(() => {
     if (cron && cron.id) {
       setCurrentCron(cron);
-      getLogs();
       getScript();
     }
   }, [cron]);
@@ -687,9 +662,10 @@ const CronDetailModal = ({
         <CronLogModal
           handleCancel={() => {
             setIsLogModalVisible(false);
+            fetchRunningInstances();
           }}
           cron={cron}
-          data={log}
+          data={logData}
           logUrl={logUrl}
         />
       )}

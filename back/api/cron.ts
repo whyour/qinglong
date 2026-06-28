@@ -434,6 +434,7 @@ export default (app: Router) => {
         log_path: Joi.string().optional().allow(null),
         last_running_time: Joi.number().optional().allow(null),
         last_execution_time: Joi.number().optional().allow(null),
+        exit_code: Joi.number().optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -463,7 +464,6 @@ export default (app: Router) => {
         const instances = await RunningInstanceModel.findAll({
           where: {
             cron_id: req.params.id,
-            status: InstanceStatus.running,
           },
           order: [['started_at', 'DESC']],
           raw: true,

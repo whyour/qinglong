@@ -166,6 +166,7 @@ export default class CronService {
     log_path,
     last_running_time = 0,
     last_execution_time = 0,
+    exit_code,
   }: {
     ids: number[];
     status: CrontabStatus;
@@ -173,6 +174,7 @@ export default class CronService {
     log_path: string;
     last_running_time: number;
     last_execution_time: number;
+    exit_code?: number;
   }) {
     let options: any = {
       status,
@@ -209,10 +211,15 @@ export default class CronService {
       } else if (status === CrontabStatus.idle) {
         // Mark the matching running instance as finished
         const finishedAt = dayjs().unix();
+        const instanceStatus =
+          exit_code !== undefined && exit_code !== null && exit_code !== 0
+            ? InstanceStatus.error
+            : InstanceStatus.finished;
         await RunningInstanceModel.update(
           {
             finished_at: finishedAt,
-            status: InstanceStatus.finished,
+            status: instanceStatus,
+            exit_code: exit_code ?? undefined,
           },
           {
             where: {
@@ -564,7 +571,7 @@ export default class CronService {
       }
     }
     await RunningInstanceModel.update(
-      { status: InstanceStatus.stopped, finished_at: dayjs().unix() },
+      { status: InstanceStatus.stopped, finished_at: dayjs().unix(), exit_code: 143 },
       { where: { id: instanceId } },
     );
 
@@ -619,15 +626,6 @@ export default class CronService {
           { shell: '/bin/bash' },
         );
 
-        const startedAt = dayjs().unix();
-        const instance = await RunningInstanceModel.create({
-          cron_id: id!,
-          pid: cp.pid,
-          log_path: logPath,
-          started_at: startedAt,
-          status: InstanceStatus.running,
-        });
-
         await CrontabModel.update(
           { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
           { where: { id } },
@@ -659,26 +657,6 @@ export default class CronService {
             code,
           );
           await logStreamManager.closeStream(absolutePath);
-          const finishedAt = dayjs().unix();
-          await RunningInstanceModel.update(
-            {
-              finished_at: finishedAt,
-              status: code === 0 ? InstanceStatus.finished : InstanceStatus.error,
-              exit_code: code ?? undefined,
-            },
-            { where: { id: instance.id } },
-          );
-
-          // Only set cron to idle if no other running instances exist
-          const otherRunning = await RunningInstanceModel.count({
-            where: { cron_id: id!, status: InstanceStatus.running },
-          });
-          if (otherRunning === 0) {
-            await CrontabModel.update(
-              { status: CrontabStatus.idle, pid: undefined },
-              { where: { id } },
-            );
-          }
           resolve({ ...params, pid: cp.pid, code });
         });
       });

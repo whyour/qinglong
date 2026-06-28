@@ -600,5 +600,10 @@
   "确认保存": "Confirm to save",
   "上传失败": "Upload failed",
   "成功上传": "Successfully uploaded",
-  "个环境变量": " environment variables"
+  "个环境变量": " environment variables",
+  "运行历史": "Run History",
+  "已完成": "Completed",
+  "已停止": "Stopped",
+  "退出码": "Exit Code",
+  "结束": "End"
 }

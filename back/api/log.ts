@@ -11,6 +11,7 @@ import {
   rmPath,
 } from '../config/util';
 import LogService from '../services/log';
+import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
 const route = Router();
 const blacklist = ['.tmp'];
 
@@ -46,8 +47,17 @@ export default (app: Router) => {
             message: t('暂无权限'),
           });
         }
+        const logPath = `${req.query.path as string}/${req.query.file as string}`;
+        const runningInstance = await RunningInstanceModel.findOne({
+          where: { log_path: logPath, status: InstanceStatus.running },
+        });
+
         const content = await getFileContentByName(finalPath);
-        res.send({ code: 200, data: removeAnsi(content) });
+        res.send({
+          code: 200,
+          data: removeAnsi(content),
+          logStatus: runningInstance ? 'running' : undefined,
+        });
       } catch (e) {
         return next(e);
       }

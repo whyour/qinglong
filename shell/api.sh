@@ -141,13 +141,19 @@ update_cron() {
   local logPath="$4"
   local lastExecutingTime="${5:-0}"
   local runningTime="${6:-0}"
+  local exitCode="${7:-}"
   local currentTimeStamp=$(date +%s)
+  local dataRaw="{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime"
+  if [[ -n $exitCode ]]; then
+    dataRaw="${dataRaw},\"exit_code\":$exitCode"
+  fi
+  dataRaw="${dataRaw}}"
   local api=$(
     curl -s --noproxy "*" "http://localhost:${ql_port}/open/crons/status?t=$currentTimeStamp" \
       -X 'PUT' \
       -H "Authorization: Bearer ${__ql_token__}" \
       -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime}" \
+      --data-raw "$dataRaw" \
       --compressed
   )
   code=$(echo "$api" | jq -r .code)
