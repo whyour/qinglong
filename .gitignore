@@ -32,3 +32,6 @@ __pycache__
 
 .deepseek/
 .claude/
+
+# local Kubernetes overlays
+/deploy/kubernetes/overlays/local/
