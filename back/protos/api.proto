@@ -151,6 +151,7 @@ enum NotificationMode {
   chronocat = 18;
   ntfy = 19;
   wxPusherBot = 20;
+  wxPusherSpt = 21;
 }
 
 message NotificationInfo {
@@ -244,6 +245,8 @@ message NotificationInfo {
   optional string wxPusherBotAppToken = 66;
   optional string wxPusherBotTopicIds = 67;
   optional string wxPusherBotUids = 68;
+
+  optional string wxPusherSptList = 70;
 }
 
 message SystemNotifyRequest {

@@ -79,6 +79,8 @@ const messages: Record<string, Record<string, string>> = {
     'client_id 或 client_seret 有误': 'Invalid client_id or client_secret',
     '订阅执行完成': 'Subscription completed',
     'wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行': 'wxPusher requires at least one of TopicIds or Uids',
+    'wxPusher SPT 不能为空': 'wxPusher SPT cannot be empty',
+    'wxPusher SPT 最多支持 10 个': 'wxPusher SPT supports at most 10 tokens',
     'Url 或者 Body 中必须包含 $title': 'Url or Body must contain $title',
     '绝对路径必须在日志目录内或使用 /dev/null':
       'Absolute path must be within log directory or use /dev/null',

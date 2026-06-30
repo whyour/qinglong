@@ -162,6 +162,10 @@ export class WxPusherBotNotification extends NotificationBaseInfo {
   public wxPusherBotUids = '';
 }
 
+export class WxPusherSptNotification extends NotificationBaseInfo {
+  public wxPusherSptList = '';
+}
+
 export class OpeniLinkNotification extends NotificationBaseInfo {
   public openiLinkAppToken = '';
   public openiLinkHubUrl = '';
@@ -190,4 +194,5 @@ export interface NotificationInfo
     LarkNotification,
     NtfyNotification,
     WxPusherBotNotification,
+    WxPusherSptNotification,
     OpeniLinkNotification {}

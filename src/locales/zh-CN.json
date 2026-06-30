@@ -53,6 +53,7 @@
   "wxPusherBot的appToken": "wxPusherBot的appToken, 按照文档获取 https://wxpusher.zjiecode.com/docs/",
   "wxPusherBot的topicIds": "wxPusherBot的topicIds, topicIds 和 uids 至少配置一个才行",
   "wxPusherBot的uids": "wxPusherBot的uids, topicIds 和 uids 至少配置一个才行",
+  "wxPusherSpt的SPT": "WxPusher 极简推送，独立 APP，支持 Android、iOS、Harmony、Window、MacOS、Linux 等 6 大平台（<a href='https://wxpusher.zjiecode.com/download/' target='_blank' rel='noopener noreferrer'>点击下载 APP</a>）。扫描下方二维码获取 SPT，就能发消息。多个 SPT 用英文逗号(,)分隔，最多 10 个，更多请参考<a href='https://wxpusher.zjiecode.com/docs/#/?id=spt' target='_blank' rel='noopener noreferrer'>官方说明</a>。<br/><img src='https://wxpusher.zjiecode.com/api/qrcode/RwjGLMOPTYp35zSYQr0HxbCPrV9eU0wKVBXU1D5VVtya0cQXEJWPjqBdW3gKLifS.jpg' alt='扫码获取 SPT' style='width:160px;height:160px;margin-top:8px;display:block;' />",
   "一对多推送的“群组编码”（一对多推送下面->您的群组(如无则创建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）": "一对多推送的“群组编码”（一对多推送下面->您的群组(如无则创建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）",
   "一对多推送的“群组编码”（一对多推送下面->您的群组(如无则新建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）": "一对多推送的“群组编码”（一对多推送下面->您的群组(如无则新建)->群组编码，如果您是创建群组人。也需点击“查看二维码”扫描绑定，否则不能接受群组消息推送）",
   "上传": "上传",

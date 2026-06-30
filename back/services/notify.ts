@@ -35,6 +35,7 @@ export default class NotificationService {
     ['chronocat', this.chronocat],
     ['ntfy', this.ntfy],
     ['wxPusherBot', this.wxPusherBot],
+    ['wxPusherSpt', this.wxPusherSpt],
     ['openiLink', this.openiLink],
   ]);
 
@@ -744,6 +745,52 @@ export default class NotificationService {
           uids: uids,
           verifyPayType: 0,
         },
+      });
+
+      if (res.code === 1000) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  private async wxPusherSpt() {
+    const { wxPusherSptList } = this.params;
+    // 处理 SPT，将逗号分隔的字符串转为数组
+    const spts = wxPusherSptList
+      ? wxPusherSptList
+          .split(',')
+          .map((spt) => spt.trim())
+          .filter((spt) => spt)
+      : [];
+
+    if (!spts.length) {
+      throw new Error(t('wxPusher SPT 不能为空'));
+    }
+    if (spts.length > 10) {
+      throw new Error(t('wxPusher SPT 最多支持 10 个'));
+    }
+
+    const url = `https://wxpusher.zjiecode.com/api/send/message/simple-push`;
+    const json: any = {
+      content: `<h1>${this.title}</h1><br/><div style='white-space: pre-wrap;'>${this.content}</div>`,
+      summary: this.title,
+      contentType: 2,
+    };
+    // 单个 SPT 用 spt，多个用 sptList
+    if (spts.length === 1) {
+      json.spt = spts[0];
+    } else {
+      json.sptList = spts;
+    }
+
+    try {
+      const res = await httpClient.post(url, {
+        ...this.gotOption,
+        json,
       });
 
       if (res.code === 1000) {

@@ -43,6 +43,7 @@ export enum NotificationMode {
   chronocat = 18,
   ntfy = 19,
   wxPusherBot = 20,
+  wxPusherSpt = 21,
   UNRECOGNIZED = -1,
 }
 
@@ -111,6 +112,9 @@ export function notificationModeFromJSON(object: any): NotificationMode {
     case 20:
     case "wxPusherBot":
       return NotificationMode.wxPusherBot;
+    case 21:
+    case "wxPusherSpt":
+      return NotificationMode.wxPusherSpt;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -162,6 +166,8 @@ export function notificationModeToJSON(object: NotificationMode): string {
       return "ntfy";
     case NotificationMode.wxPusherBot:
       return "wxPusherBot";
+    case NotificationMode.wxPusherSpt:
+      return "wxPusherSpt";
     case NotificationMode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -393,6 +399,7 @@ export interface NotificationInfo {
   wxPusherBotAppToken?: string | undefined;
   wxPusherBotTopicIds?: string | undefined;
   wxPusherBotUids?: string | undefined;
+  wxPusherSptList?: string | undefined;
 }
 
 export interface SystemNotifyRequest {
@@ -2959,6 +2966,7 @@ function createBaseNotificationInfo(): NotificationInfo {
     wxPusherBotAppToken: undefined,
     wxPusherBotTopicIds: undefined,
     wxPusherBotUids: undefined,
+    wxPusherSptList: undefined,
   };
 }
 
@@ -3170,6 +3178,9 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     }
     if (message.wxPusherBotUids !== undefined) {
       writer.uint32(546).string(message.wxPusherBotUids);
+    }
+    if (message.wxPusherSptList !== undefined) {
+      writer.uint32(562).string(message.wxPusherSptList);
     }
     return writer;
   },
@@ -3733,6 +3744,14 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
           message.wxPusherBotUids = reader.string();
           continue;
         }
+        case 70: {
+          if (tag !== 562) {
+            break;
+          }
+
+          message.wxPusherSptList = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3825,6 +3844,7 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
         ? globalThis.String(object.wxPusherBotTopicIds)
         : undefined,
       wxPusherBotUids: isSet(object.wxPusherBotUids) ? globalThis.String(object.wxPusherBotUids) : undefined,
+      wxPusherSptList: isSet(object.wxPusherSptList) ? globalThis.String(object.wxPusherSptList) : undefined,
     };
   },
 
@@ -4037,6 +4057,9 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     if (message.wxPusherBotUids !== undefined) {
       obj.wxPusherBotUids = message.wxPusherBotUids;
     }
+    if (message.wxPusherSptList !== undefined) {
+      obj.wxPusherSptList = message.wxPusherSptList;
+    }
     return obj;
   },
 
@@ -4114,6 +4137,7 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     message.wxPusherBotAppToken = object.wxPusherBotAppToken ?? undefined;
     message.wxPusherBotTopicIds = object.wxPusherBotTopicIds ?? undefined;
     message.wxPusherBotUids = object.wxPusherBotUids ?? undefined;
+    message.wxPusherSptList = object.wxPusherSptList ?? undefined;
     return message;
   },
 };

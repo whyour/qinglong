@@ -241,14 +241,19 @@ export NTFY_PASSWORD=""
 export NTFY_ACTIONS=""
 
 ## 21. wxPusher
-## 官方文档: https://wxpusher.zjiecode.com/docs/
-## 管理后台: https://wxpusher.zjiecode.com/admin/
+### 方式一：标准发送（更强大）
+#### 官方文档: https://wxpusher.zjiecode.com/docs/
+#### 管理后台: https://wxpusher.zjiecode.com/admin/
 ## wxPusher 的 appToken
 export WXPUSHER_APP_TOKEN=""
 ## wxPusher 的 topicIds，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
 export WXPUSHER_TOPIC_IDS=""
 ## wxPusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
 export WXPUSHER_UIDS=""
+### 方式二：极简发送（最简单，简单好用，一键配置，更推荐） 
+#### wxPusher 的 SPT（极简推送），扫码获取 https://wxpusher.zjiecode.com/docs/#/?id=spt
+#### 多个用英文逗号,分隔，最多10个；与上面的 appToken 方式二选一即可
+export WXPUSHER_SPT_LIST=""
 
 ## 22. 自定义通知
 ## 自定义通知 接收回调的URL
