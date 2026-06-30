@@ -49,7 +49,7 @@ export default (app: Router) => {
             .required()
             .pattern(/^[a-zA-Z_][0-9a-zA-Z_]*$/),
           remarks: Joi.string().optional().allow(''),
-          labels: Joi.array().items(Joi.string().trim()).optional(),
+          labels: Joi.array().items(Joi.string().trim()).optional().allow(null),
         }),
       ),
     }),
@@ -76,7 +76,7 @@ export default (app: Router) => {
         name: Joi.string().required(),
         remarks: Joi.string().optional().allow('').allow(null),
         id: Joi.number().required(),
-        labels: Joi.array().items(Joi.string().trim()).optional(),
+        labels: Joi.array().items(Joi.string().trim()).optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
