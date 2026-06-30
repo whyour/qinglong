@@ -60,11 +60,11 @@ class Application {
     // Wait for gRPC worker to signal it's ready before starting HTTP worker
     this.waitForWorkerReady(grpcWorker, 30000)
       .then(() => {
-        Logger.info('✌️ gRPC worker is ready, starting HTTP worker');
+        Logger.info('[boot] gRPC worker is ready, starting HTTP worker');
         this.httpWorker = this.forkWorker('http');
       })
       .catch((error) => {
-        Logger.error('✌️ Failed to wait for gRPC worker:', error);
+        Logger.error('[boot] Failed to wait for gRPC worker:', error);
         process.exit(1);
       });
 
@@ -73,7 +73,7 @@ class Application {
       if (metadata) {
         if (!this.isShuttingDown) {
           Logger.error(
-            `✌️ ${metadata.serviceType} worker ${worker.process.pid} died (${signal || code
+            `${metadata.serviceType} worker ${worker.process.pid} died (${signal || code
             }). Restarting...`,
           );
           // If gRPC worker died, restart it and wait for it to be ready
@@ -81,26 +81,26 @@ class Application {
             const newGrpcWorker = this.forkWorker('grpc');
             this.waitForWorkerReady(newGrpcWorker, 30000)
               .then(() => {
-                Logger.info('✌️ gRPC worker restarted and ready');
+                Logger.info('gRPC worker restarted and ready');
                 // Re-register cron jobs by notifying the HTTP worker
                 if (this.httpWorker) {
                   try {
                     this.httpWorker.send('reregister-crons');
-                    Logger.info('✌️ Sent reregister-crons message to HTTP worker');
+                    Logger.info('Sent reregister-crons message to HTTP worker');
                   } catch (error) {
-                    Logger.error('✌️ Failed to send reregister-crons message:', error);
+                    Logger.error('Failed to send reregister-crons message:', error);
                   }
                 }
               })
               .catch((error) => {
-                Logger.error('✌️ Failed to restart gRPC worker:', error);
+                Logger.error('Failed to restart gRPC worker:', error);
                 process.exit(1);
               });
           } else {
             // For HTTP worker, just restart it
             const newWorker = this.forkWorker(metadata.serviceType);
             this.httpWorker = newWorker;
-            Logger.info(`✌️ Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`);
+            Logger.info(`Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`);
           }
         }
 
@@ -169,7 +169,7 @@ class Application {
         if (worker) {
           const exitPromise = new Promise<void>((resolve) => {
             worker.once('exit', () => {
-              Logger.info(`✌️ Worker ${worker.process.pid} exited`);
+              Logger.info(`Worker ${worker.process.pid} exited`);
               resolve();
             });
 
@@ -177,7 +177,7 @@ class Application {
               worker.send('shutdown');
             } catch (error) {
               Logger.warn(
-                `✌️ Failed to send shutdown to worker ${worker.process.pid}:`,
+                `Failed to send shutdown to worker ${worker.process.pid}:`,
                 error,
               );
             }
@@ -192,14 +192,14 @@ class Application {
           Promise.all(workerPromises),
           new Promise<void>((resolve) => {
             setTimeout(() => {
-              Logger.warn('✌️ Worker shutdown timeout reached');
+              Logger.warn('Worker shutdown timeout reached');
               resolve();
             }, 10000);
           }),
         ]);
         process.exit(0);
       } catch (error) {
-        Logger.error('✌️ Error during worker shutdown:', error);
+        Logger.error('Error during worker shutdown:', error);
         process.exit(1);
       }
     };
@@ -211,11 +211,11 @@ class Application {
   private async startWorkerProcess() {
     const serviceType = process.env.SERVICE_TYPE;
     if (!serviceType || !['http', 'grpc'].includes(serviceType)) {
-      Logger.error('✌️ Invalid SERVICE_TYPE:', serviceType);
+      Logger.error('[boot] Invalid SERVICE_TYPE:', serviceType);
       process.exit(1);
     }
 
-    Logger.info(`✌️ ${serviceType} worker started (PID: ${process.pid})`);
+    Logger.info(`[boot] ${serviceType} worker started (PID: ${process.pid})`);
 
     try {
       if (serviceType === 'http') {
@@ -226,7 +226,7 @@ class Application {
 
       process.send?.('ready');
     } catch (error) {
-      Logger.error(`✌️ ${serviceType} worker failed:`, error);
+      Logger.error(`[boot] ${serviceType} worker failed:`, error);
       process.exit(1);
     }
   }
@@ -269,13 +269,13 @@ class Application {
       } else if (msg === 'reregister-crons' && serviceType === 'http') {
         // Re-register cron jobs when gRPC worker restarts
         try {
-          Logger.info('✌️ Received reregister-crons message, re-registering cron jobs...');
+          Logger.info('[boot] Received reregister-crons message, re-registering cron jobs...');
           const CronService = (await import('./services/cron')).default;
           const cronService = Container.get(CronService);
           await cronService.autosave_crontab();
-          Logger.info('✌️ Cron jobs re-registered successfully');
+          Logger.info('[boot] Cron jobs re-registered successfully');
         } catch (error) {
-          Logger.error('✌️ Failed to re-register cron jobs:', error);
+          Logger.error('[boot] Failed to re-register cron jobs:', error);
         }
       }
     });
@@ -297,7 +297,7 @@ class Application {
       }
       process.exit(0);
     } catch (error) {
-      Logger.error(`✌️ [${serviceType}] Error during shutdown:`, error);
+      Logger.error(`[${serviceType}] Error during shutdown:`, error);
       process.exit(1);
     }
   }

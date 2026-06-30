@@ -125,5 +125,5 @@ export default async () => {
     }
   }
 
-  Logger.info('✌️ Init file down');
+  Logger.info('[boot] Init file down');
 };

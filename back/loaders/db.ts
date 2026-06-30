@@ -58,8 +58,8 @@ export default async () => {
       }
     }
 
-    Logger.info('✌️ DB loaded');
+    Logger.info('[boot] DB loaded');
   } catch (error) {
-    Logger.error('✌️ DB load failed', error);
+    Logger.error('[boot] DB load failed', error);
   }
 };

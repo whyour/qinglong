@@ -20,7 +20,7 @@ export class HttpServerService {
     for (const host of hostsToTry) {
       try {
         const server = await this.tryListen(expressApp, port, host);
-        Logger.debug(`✌️ HTTP service started successfully on ${host}:${port}`);
+        Logger.debug(`[boot] HTTP service started successfully on ${host}:${port}`);
         metricsService.record('http_service_start', 1, {
           port: port.toString(),
           host

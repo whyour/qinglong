@@ -131,6 +131,16 @@ const messages: Record<string, Record<string, string>> = {
     '执行before命令...': 'Execute before command...',
     '执行after命令...': 'Execute after command...',
     '## 执行结束... %s  耗时 %s 秒': '## Execution finished... %s  elapsed %s seconds',
+    '调度器注册失败，任务创建已回滚':
+      'Scheduler registration failed, task creation rolled back',
+    '调度器注册失败，任务更新已回滚':
+      'Scheduler registration failed, task update rolled back',
+    '调度器注册失败，任务启用已回滚':
+      'Scheduler registration failed, task enable rolled back',
+    '任务ID %s: 无效的 cron 表达式 "%s"（不支持裸 /N 步长和 ? 字符）':
+      'Task ID %s: invalid cron expression "%s" (bare /N steps and ? character not supported)',
+    '任务ID %s (extra_schedule): 无效的 cron 表达式 "%s"（不支持裸 /N 步长和 ? 字符）':
+      'Task ID %s (extra_schedule): invalid cron expression "%s" (bare /N steps and ? character not supported)',
   },
 };
 

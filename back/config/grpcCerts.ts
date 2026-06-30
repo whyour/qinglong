@@ -36,7 +36,7 @@ async function tmpFile(prefix: string): Promise<string> {
 }
 
 async function generateAllCerts(): Promise<GrpcTlsConfig> {
-  Logger.info('Generating gRPC mTLS certificates...');
+  Logger.info('[boot] Generating gRPC mTLS certificates...');
 
   const caKeyTmp = await tmpFile('ca_key');
   const caCertTmp = await tmpFile('ca_cert');
@@ -83,7 +83,7 @@ async function generateAllCerts(): Promise<GrpcTlsConfig> {
     const clientKey = await fs.readFile(clientKeyTmp, 'utf-8');
 
     await cleanup();
-    Logger.info('gRPC mTLS certificates generated successfully');
+    Logger.info('[boot] gRPC mTLS certificates generated successfully');
 
     return { caCert, serverCert, serverKey, clientCert, clientKey };
   } catch (e) {
@@ -101,7 +101,7 @@ async function saveCerts(tlsConfig: GrpcTlsConfig): Promise<void> {
   await fs.writeFile(clientCertPath, tlsConfig.clientCert, { mode: 0o644 });
   await fs.writeFile(clientKeyPath, tlsConfig.clientKey, { mode: 0o600 });
 
-  Logger.info(`gRPC mTLS certificates saved to ${certDir}`);
+  Logger.info(`[boot] gRPC mTLS certificates saved to ${certDir}`);
 }
 
 async function loadExistingCerts(): Promise<GrpcTlsConfig | null> {
@@ -125,7 +125,7 @@ async function loadExistingCerts(): Promise<GrpcTlsConfig | null> {
     fs.readFile(clientKeyPath, 'utf-8'),
   ]);
 
-  Logger.info('Loaded existing gRPC mTLS certificates from disk');
+  Logger.info('[boot] Loaded existing gRPC mTLS certificates from disk');
   return { caCert, serverCert, serverKey, clientCert, clientKey };
 }
 

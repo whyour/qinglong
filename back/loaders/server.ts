@@ -4,7 +4,7 @@ import Sock from './sock';
 
 export default async ({ server }: { server: Server }) => {
   await Sock({ server });
-  Logger.info('✌️ Sock loaded');
+  Logger.info('[boot] Sock loaded');
 
   process.on('uncaughtException', (error) => {
     Logger.error('Uncaught exception:', error);

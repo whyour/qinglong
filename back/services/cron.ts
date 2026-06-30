@@ -117,11 +117,15 @@ export default class CronService {
           },
         ]);
       } catch (error: any) {
-        // 调度器注册为尽力而为，失败时不阻断 crontab.list 与系统 crontab 的同步，
-        // 调度器重启后会重新注册（见 autosave_crontab）
-        this.logger.warn(
-          '[crontab] Failed to register cron job in scheduler:',
+        // gRPC 注册失败时回滚 DB 记录，避免产生"僵尸任务"
+        // （DB 和 crontab.list 有记录但调度器永远不会执行）
+        await CrontabModel.destroy({ where: { id: doc.id } });
+        this.logger.error(
+          '[crontab] Failed to register cron job in scheduler, task creation rolled back:',
           error?.message || error,
+        );
+        throw new Error(
+          `${t('调度器注册失败，任务创建已回滚')}: ${(error as any)?.details || error?.message}`,
         );
       }
     }
@@ -166,9 +170,32 @@ export default class CronService {
           },
         ]);
       } catch (error: any) {
-        this.logger.warn(
-          '[crontab] Failed to register cron job in scheduler:',
+        // gRPC 注册新任务失败 → 回滚 DB 到旧数据，并尝试恢复旧调度注册
+        await CrontabModel.update(doc, { where: { id: doc.id } });
+        if (this.shouldUseCronClient(doc)) {
+          try {
+            await cronClient.addCron([
+              {
+                name: doc.name || '',
+                id: String(doc.id),
+                schedule: doc.schedule!,
+                command: this.makeCommand(doc),
+                extra_schedules: doc.extra_schedules || [],
+              },
+            ]);
+          } catch (_recoveryError: any) {
+            this.logger.warn(
+              '[crontab] Failed to restore old cron job in scheduler after rollback:',
+              _recoveryError?.message || _recoveryError,
+            );
+          }
+        }
+        this.logger.error(
+          '[crontab] Failed to register updated cron job in scheduler, update rolled back:',
           error?.message || error,
+        );
+        throw new Error(
+          `${t('调度器注册失败，任务更新已回滚')}: ${(error as any)?.details || error?.message}`,
         );
       }
     }
@@ -726,9 +753,14 @@ export default class CronService {
     try {
       await cronClient.addCron(crons);
     } catch (error: any) {
-      this.logger.warn(
-        '[crontab] Failed to register cron job in scheduler:',
+      // gRPC 注册失败 → 回滚启用状态，避免 DB 显示已启用但调度器未注册
+      await CrontabModel.update({ isDisabled: 1 }, { where: { id: ids } });
+      this.logger.error(
+        '[crontab] Failed to register cron job in scheduler, enable rolled back:',
         error?.message || error,
+      );
+      throw new Error(
+        `${t('调度器注册失败，任务启用已回滚')}: ${(error as any)?.details || error?.message}`,
       );
     }
     await this.setCrontab();

@@ -50,7 +50,7 @@ export class GrpcServerService {
         try {
           const address = this.formatGrpcAddress(host, grpcPort);
           await bindAsync(address, credentials);
-          Logger.debug(`✌️ gRPC service started successfully on ${address}`);
+          Logger.debug(`[boot] gRPC service started successfully on ${address}`);
           metricsService.record('grpc_service_start', 1, {
             port: grpcPort.toString(),
             host

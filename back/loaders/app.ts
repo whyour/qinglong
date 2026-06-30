@@ -9,20 +9,20 @@ import initFile from './initFile';
 
 export default async ({ app }: { app: Application }) => {
   depInjectorLoader();
-  Logger.info('✌️ Dependency loaded');
+  Logger.info('[boot] Dependency loaded');
 
   await linkDeps();
-  Logger.info('✌️ Link deps loaded');
+  Logger.info('[boot] Link deps loaded');
 
   await initFile();
-  Logger.info('✌️ Init file loaded');
+  Logger.info('[boot] Init file loaded');
 
   await initData();
-  Logger.info('✌️ Init data loaded');
+  Logger.info('[boot] Init data loaded');
 
   initTask();
-  Logger.info('✌️ Init task loaded');
+  Logger.info('[boot] Init task loaded');
 
   expressLoader({ app });
-  Logger.info('✌️ Express loaded');
+  Logger.info('[boot] Express loaded');
 };
