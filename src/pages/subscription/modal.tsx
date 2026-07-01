@@ -17,7 +17,7 @@ import isNil from 'lodash/isNil';
 
 const { Option } = Select;
 const repoUrlRegx = /([^\/\:]+\/[^\/]+)(?=\.git)/;
-const fileUrlRegx = /([^\/\:]+\/[^\/\.]+)\.[a-z]+$/;
+const fileUrlRegx = /([^\/\:]+\/[^\/\.]+)\.[a-z]+(\?[^\s]*)?(#.*)?$/;
 
 const SubscriptionModal = ({
   subscription,

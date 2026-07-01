@@ -7,6 +7,7 @@ import SystemService from '../services/system';
 import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
 import { t } from '../shared/i18n';
+import { isDefaultAuthInfo } from '../shared/auth';
 import {
   getUniqPath,
   handleLogPath,
@@ -39,14 +40,7 @@ export default (app: Router) => {
       const { version, changeLog, changeLogLink, publishTime } =
         await parseVersion(config.versionFile);
 
-      let isInitialized = true;
-      if (
-        Object.keys(authInfo).length === 2 &&
-        authInfo.username === 'admin' &&
-        authInfo.password === 'admin'
-      ) {
-        isInitialized = false;
-      }
+      const isInitialized = !isDefaultAuthInfo(authInfo);
       res.send({
         code: 200,
         data: {
@@ -401,7 +395,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const userService = Container.get(UserService);
-        await userService.resetAuthInfo(req.body);
+        const result = await userService.resetAuthInfo(req.body);
+        if (result) {
+          return res.send(result);
+        }
         res.send({ code: 200, message: t('更新成功') });
       } catch (e) {
         return next(e);

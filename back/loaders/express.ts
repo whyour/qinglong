@@ -8,8 +8,9 @@ import { getPlatform, getToken } from '../config/util';
 import rewrite from 'express-urlrewrite';
 import { errors } from 'celebrate';
 import { serveEnv } from '../config/serverEnv';
-import { IKeyvStore, shareStore } from '../shared/store';
-import { isValidToken } from '../shared/auth';
+import { shareStore } from '../shared/store';
+import { isValidToken, isDefaultAuthInfo } from '../shared/auth';
+import { AuthInfo } from '../data/system';
 import path from 'path';
 import { t } from '../shared/i18n';
 import { AppScope } from '../data/open';
@@ -142,16 +143,9 @@ export default ({ app }: { app: Application }) => {
       return next();
     }
     const authInfo =
-      (await shareStore.getAuthInfo()) || ({} as IKeyvStore['authInfo']);
+      (await shareStore.getAuthInfo()) || ({} as AuthInfo);
 
-    let isInitialized = true;
-    if (
-      Object.keys(authInfo).length === 2 &&
-      authInfo.username === 'admin' &&
-      authInfo.password === 'admin'
-    ) {
-      isInitialized = false;
-    }
+    let isInitialized = !isDefaultAuthInfo(authInfo);
 
     if (isInitialized) {
       return res.send({ code: 450, message: t('未知错误') });

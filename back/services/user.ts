@@ -517,6 +517,9 @@ export default class UserService {
 
   public async resetAuthInfo(info: Partial<AuthInfo>) {
     const { retries, twoFactorActivated, password, username } = info;
+    if (password === 'admin') {
+      return { code: 400, message: t('密码不能设置为admin') };
+    }
     const authInfo = await this.getAuthInfo();
     const payload = pickBy(
       {

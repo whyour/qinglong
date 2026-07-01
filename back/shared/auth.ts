@@ -1,5 +1,13 @@
 import { AuthInfo, TokenInfo } from '../data/system';
 
+export function isDefaultAuthInfo(authInfo: AuthInfo): boolean {
+  return (
+    Object.keys(authInfo).length === 2 &&
+    authInfo.username === 'admin' &&
+    authInfo.password === 'admin'
+  );
+}
+
 /**
  * Validates if a token exists in the authentication info.
  * Supports both legacy string tokens and new TokenInfo array format.
