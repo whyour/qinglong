@@ -28,6 +28,12 @@ export enum AuthDataType {
   'removeLogFrequency' = 'removeLogFrequency',
   'systemConfig' = 'systemConfig',
   'authConfig' = 'authConfig',
+  'notifyLog' = 'notifyLog',
+}
+
+export enum NotifyStatus {
+  'success',
+  'fail',
 }
 
 export interface SystemConfigInfo {
@@ -48,6 +54,14 @@ export interface LoginLogInfo {
   ip?: string;
   platform?: string;
   status?: LoginStatus;
+}
+
+export interface NotifyLogInfo {
+  timestamp?: number;
+  title?: string;
+  content?: string;
+  status?: NotifyStatus;
+  notifyType?: string;
 }
 
 export interface TokenInfo {
@@ -82,6 +96,7 @@ export interface AuthInfo {
 export type SystemModelInfo = SystemConfigInfo &
   Partial<NotificationInfo> &
   LoginLogInfo &
+  Partial<NotifyLogInfo> &
   Partial<AuthInfo>;
 
 export interface SystemInstance
