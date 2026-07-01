@@ -5,7 +5,7 @@ import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
 import config from './index';
-import { PYTHON_INSTALL_DIR, TASK_COMMAND } from './const';
+import { PYTHON_INSTALL_DIR, PYTHON_VENV_DIR, TASK_COMMAND } from './const';
 import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
@@ -603,7 +603,7 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
 
   let command = baseCommands[type];
 
-  if (type === DependenceTypes.python3 && PYTHON_INSTALL_DIR) {
+  if (type === DependenceTypes.python3 && PYTHON_INSTALL_DIR && !PYTHON_VENV_DIR) {
     command = `${command} --prefix=${PYTHON_INSTALL_DIR}`;
   }
 

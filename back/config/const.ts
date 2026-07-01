@@ -27,6 +27,7 @@ export const SAMPLE_FILES = [
 ];
 
 export const PYTHON_INSTALL_DIR = process.env.PYTHON_HOME;
+export const PYTHON_VENV_DIR = process.env.PYTHON_VENV_DIR;
 
 export const NotificationModeStringMap = {
   0: 'gotify',
