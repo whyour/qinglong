@@ -1,3 +1,5 @@
+import { shareStore } from './store';
+
 const messages: Record<string, Record<string, string>> = {
   zh: {},
   en: {
@@ -148,10 +150,13 @@ let currentLang: string = 'zh';
 
 export function setLang(lang: string) {
   currentLang = lang || 'zh';
+  shareStore.setLang(currentLang);
 }
 
-export function getLang(): string {
-  return currentLang;
+/** 系统默认语言：Intl 检测 → 'zh'（仅返回 zh/en） */
+export function systemLang(): string {
+  const prefix = Intl.DateTimeFormat().resolvedOptions().locale.split('-')[0];
+  return prefix === 'en' ? 'en' : 'zh';
 }
 
 export function t(key: string, lang?: string): string {

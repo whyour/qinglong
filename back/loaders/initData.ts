@@ -19,7 +19,7 @@ import { shareStore } from '../shared/store';
 import Logger from './logger';
 import { AppModel } from '../data/open';
 import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
-import { setLang } from '../shared/i18n';
+import { setLang, systemLang } from '../shared/i18n';
 
 export default async () => {
   const cronService = Container.get(CronService);
@@ -223,18 +223,20 @@ export default async () => {
     }
   });
 
-  // 初始化保存一次ck和定时任务数据
-  await cronService.autosave_crontab();
+  // 初始化语言（必须在 autosave_crontab 之前）
+  const lang = systemConfig.info?.lang || systemLang();
+  setLang(lang);
 
-  // 确保 lang_env.sh 存在，提供默认 QL_LANG
+  // 确保 lang_env.sh 存在
   try {
     const langEnvExist = await fileExist(config.langEnvFile);
     if (!langEnvExist) {
-      const lang = systemConfig.info?.lang || 'zh';
       await writeFile(config.langEnvFile, `export QL_LANG='${lang}'\n`);
     }
   } catch { }
-  setLang(systemConfig.info?.lang || 'zh');
+
+  // 初始化保存一次ck和定时任务数据
+  await cronService.autosave_crontab();
 
   await envService.set_envs();
 

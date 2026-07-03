@@ -8,11 +8,13 @@ import path from 'path';
 export enum EKeyv {
   'apps' = 'apps',
   'authInfo' = 'authInfo',
+  'lang' = 'lang',
 }
 
 export interface IKeyvStore {
   apps: App[];
   authInfo: AuthInfo;
+  lang: string;
 }
 
 const keyvSqlite = new KeyvSqlite(path.join(config.dbPath, 'keyv.sqlite'));
@@ -30,5 +32,11 @@ export const shareStore = {
   },
   updateApps(apps: App[]) {
     return keyvStore.set<IKeyvStore['apps']>(EKeyv.apps, apps);
+  },
+  getLang() {
+    return keyvStore.get<IKeyvStore['lang']>(EKeyv.lang);
+  },
+  setLang(value: IKeyvStore['lang']) {
+    return keyvStore.set<IKeyvStore['lang']>(EKeyv.lang, value);
   },
 };
