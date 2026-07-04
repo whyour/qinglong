@@ -8,6 +8,7 @@ import { Container } from 'typedi';
 import config from './config';
 import Logger from './loaders/logger';
 import { monitoringMiddleware } from './middlewares/monitoring';
+import { errStack } from './config/util';
 import { type GrpcServerService } from './services/grpc';
 import { type HttpServerService } from './services/http';
 
@@ -48,7 +49,7 @@ class Application {
         await this.startWorkerProcess();
       }
     } catch (error) {
-      Logger.error('Failed to start application:', error);
+      Logger.error(`Failed to start application:\n${errStack(error)}`);
       process.exit(1);
     }
   }
@@ -64,7 +65,7 @@ class Application {
         this.httpWorker = this.forkWorker('http');
       })
       .catch((error) => {
-        Logger.error('[boot] Failed to wait for gRPC worker:', error);
+        Logger.error(`[boot] Failed to wait for gRPC worker:\n${errStack(error)}`);
         process.exit(1);
       });
 
@@ -88,12 +89,12 @@ class Application {
                     this.httpWorker.send('reregister-crons');
                     Logger.info('Sent reregister-crons message to HTTP worker');
                   } catch (error) {
-                    Logger.error('Failed to send reregister-crons message:', error);
+                    Logger.error(`Failed to send reregister-crons message:\n${errStack(error)}`);
                   }
                 }
               })
               .catch((error) => {
-                Logger.error('Failed to restart gRPC worker:', error);
+                Logger.error(`Failed to restart gRPC worker:\n${errStack(error)}`);
                 process.exit(1);
               });
           } else {
@@ -176,10 +177,7 @@ class Application {
             try {
               worker.send('shutdown');
             } catch (error) {
-              Logger.warn(
-                `Failed to send shutdown to worker ${worker.process.pid}:`,
-                error,
-              );
+              Logger.warn(`Failed to send shutdown to worker ${worker.process.pid}:\n${errStack(error)}`);
             }
           });
 
@@ -199,7 +197,7 @@ class Application {
         ]);
         process.exit(0);
       } catch (error) {
-        Logger.error('Error during worker shutdown:', error);
+        Logger.error(`Error during worker shutdown:\n${errStack(error)}`);
         process.exit(1);
       }
     };
@@ -226,7 +224,7 @@ class Application {
 
       process.send?.('ready');
     } catch (error) {
-      Logger.error(`[boot] ${serviceType} worker failed:`, error);
+      Logger.error(`[boot] ${serviceType} worker failed:\n${errStack(error)}`);
       process.exit(1);
     }
   }
@@ -275,7 +273,7 @@ class Application {
           await cronService.autosave_crontab();
           Logger.info('[boot] Cron jobs re-registered successfully');
         } catch (error) {
-          Logger.error('[boot] Failed to re-register cron jobs:', error);
+          Logger.error(`[boot] Failed to re-register cron jobs:\n${errStack(error)}`);
         }
       }
     });
@@ -297,7 +295,7 @@ class Application {
       }
       process.exit(0);
     } catch (error) {
-      Logger.error(`[${serviceType}] Error during shutdown:`, error);
+      Logger.error(`[${serviceType}] Error during shutdown:\n${errStack(error)}`);
       process.exit(1);
     }
   }
@@ -305,6 +303,6 @@ class Application {
 
 const app = new Application();
 app.start().catch((error) => {
-  Logger.error('🙅‍♀️ Application failed to start:', error);
+  Logger.error(`🙅‍♀️ Application failed to start:\n${errStack(error)}`);
   process.exit(1);
 });

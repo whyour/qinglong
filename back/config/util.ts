@@ -541,6 +541,12 @@ export function safeJSONParse(value?: string) {
   }
 }
 
+export function errStack(error: unknown): string {
+  return error instanceof Error && error.stack
+    ? error.stack
+    : String(error);
+}
+
 export async function rmPath(path: string) {
   try {
     const _exsit = await fileExist(path);
