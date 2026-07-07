@@ -14,6 +14,7 @@ import { Area, Gauge } from '@ant-design/plots';
 import intl from 'react-intl-universal';
 import { SharedContext } from '@/layouts';
 import { request } from '@/utils/http';
+import config from '@/utils/config';
 import CronLogModal from '../crontab/logModal';
 
 interface Overview {
@@ -97,13 +98,13 @@ const Dashboard = () => {
     try {
       const [overviewRes, trendRes, topTimeRes, topCountRes, runtimeRes, systemRes, labelsRes] =
         await Promise.allSettled([
-          request.get('/api/dashboard/overview'),
-          request.get('/api/dashboard/trend'),
-          request.get('/api/dashboard/top-time'),
-          request.get('/api/dashboard/top-count'),
-          request.get('/api/dashboard/runtime'),
-          request.get('/api/dashboard/system'),
-          request.get('/api/dashboard/labels'),
+          request.get(`${config.apiPrefix}dashboard/overview`),
+          request.get(`${config.apiPrefix}dashboard/trend`),
+          request.get(`${config.apiPrefix}dashboard/top-time`),
+          request.get(`${config.apiPrefix}dashboard/top-count`),
+          request.get(`${config.apiPrefix}dashboard/runtime`),
+          request.get(`${config.apiPrefix}dashboard/system`),
+          request.get(`${config.apiPrefix}dashboard/labels`),
         ]);
 
       if (overviewRes.status === 'fulfilled' && overviewRes.value.code === 200)
