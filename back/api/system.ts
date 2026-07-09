@@ -443,6 +443,24 @@ export default (app: Router) => {
   );
 
   route.put(
+    '/config/panel-title',
+    celebrate({
+      body: Joi.object({
+        panelTitle: Joi.string().max(100).allow('').allow(null),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const systemService = Container.get(SystemService);
+        const result = await systemService.updatePanelTitle(req.body);
+        res.send(result);
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
     '/config/global-ssh-key',
     celebrate({
       body: Joi.object({

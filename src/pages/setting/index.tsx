@@ -46,10 +46,11 @@ const Setting = () => {
     user,
     theme,
     reloadUser,
+    reloadSystemConfig,
     reloadTheme,
     systemInfo,
   } = useOutletContext<SharedContext>();
-  console.log('user',user)
+  console.log('user', user);
   const columns = [
     {
       title: intl.get('名称'),
@@ -353,7 +354,11 @@ const Setting = () => {
               key: 'other',
               label: intl.get('其他设置'),
               children: (
-                <Other reloadTheme={reloadTheme} systemInfo={systemInfo} />
+                <Other
+                  reloadSystemConfig={reloadSystemConfig}
+                  reloadTheme={reloadTheme}
+                  systemInfo={systemInfo}
+                />
               ),
             },
             {

@@ -1,8 +1,11 @@
 import intl from 'react-intl-universal';
 const baseUrl = window.__ENV__QlBaseUrl || '/';
+const defaultSiteName = intl.get('青龙');
+const siteName =
+  localStorage.getItem('qinglong_panel_title')?.trim() || defaultSiteName;
 
 export default {
-  siteName: intl.get('青龙'),
+  siteName,
   baseUrl,
   apiPrefix: `${baseUrl}api/`,
   authKey: 'token',
@@ -404,9 +407,7 @@ export default {
       },
       {
         label: 'larkSecret',
-        tip: intl.get(
-          '飞书群组机器人加签密钥，安全设置中开启签名校验后获得',
-        ),
+        tip: intl.get('飞书群组机器人加签密钥，安全设置中开启签名校验后获得'),
       },
     ],
     email: [

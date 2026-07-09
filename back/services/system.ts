@@ -49,7 +49,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -276,7 +276,7 @@ export default class SystemService {
         );
         const text = await body.text();
         lastVersionContent = parseContentVersion(text);
-      } catch (error) { }
+      } catch (error) {}
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -399,16 +399,23 @@ export default class SystemService {
     }
   }
 
-  public async run({ command, logPath }: { command: string; logPath?: string }, callback: TaskCallbacks) {
+  public async run(
+    { command, logPath }: { command: string; logPath?: string },
+    callback: TaskCallbacks,
+  ) {
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
-    const logPathPrefix = logPath ? `real_log_path=${logPath}` : ''
-    this.scheduleService.runTask(`${logPathPrefix} real_time=true ${command}`, callback, {
-      command,
-      id: command.replace(/ /g, '-'),
-      runOrigin: 'system',
-    });
+    const logPathPrefix = logPath ? `real_log_path=${logPath}` : '';
+    this.scheduleService.runTask(
+      `${logPathPrefix} real_time=true ${command}`,
+      callback,
+      {
+        command,
+        id: command.replace(/ /g, '-'),
+        runOrigin: 'system',
+      },
+    );
   }
 
   public async stop({ command, pid }: { command: string; pid: number }) {
@@ -441,7 +448,8 @@ export default class SystemService {
       }
       const dataPaths = dataDirs.map((dir) => `data/${dir}`);
       await promiseExec(
-        `cd ${config.dataPath} && cd ../ && tar -zcvf ${config.dataTgzFile
+        `cd ${config.dataPath} && cd ../ && tar -zcvf ${
+          config.dataTgzFile
         } ${dataPaths.join(' ')}`,
       );
       res.download(config.dataTgzFile);
@@ -548,24 +556,34 @@ export default class SystemService {
     return { code: 200, data: { lang } };
   }
 
+  public async updatePanelTitle(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    const panelTitle = info.panelTitle?.trim() || '';
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, panelTitle },
+    });
+    return { code: 200, data: { panelTitle } };
+  }
+
   public async updateGlobalSshKey(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const result = await this.updateAuthDb({
       ...oDoc,
       info: { ...oDoc.info, ...info },
     });
-    
+
     // Apply the global SSH key
     const SshKeyService = require('./sshKey').default;
     const Container = require('typedi').Container;
     const sshKeyService = Container.get(SshKeyService);
-    
+
     if (info.globalSshKey) {
       await sshKeyService.addGlobalSSHKey(info.globalSshKey, 'global');
     } else {
       await sshKeyService.removeGlobalSSHKey('global');
     }
-    
+
     return { code: 200, data: result };
   }
 
@@ -576,7 +594,7 @@ export default class SystemService {
     try {
       const finalPath = path.join(config.dependenceCachePath, type);
       await fs.promises.rm(finalPath, { recursive: true });
-    } catch (error) { }
+    } catch (error) {}
     return { code: 200 };
   }
 }
