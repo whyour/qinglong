@@ -74,7 +74,7 @@ if [[ $command != "reload" ]]; then
       ;;
   esac
 
-  npm install -g pnpm@8.3.1 pm2 ts-node
+  npm install -g pnpm@8.3.1 pm2 ts-node typescript@5
 fi
 
 export PYTHON_SHORT_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
