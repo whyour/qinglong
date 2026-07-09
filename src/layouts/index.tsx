@@ -47,7 +47,9 @@ export default function () {
   const [user, setUser] = useState<any>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<TSystemInfo>();
-  const [siteTitle, setSiteTitle] = useState(config.siteName);
+  const [siteTitle, setSiteTitle] = useState(
+    () => localStorage.getItem('qinglong_panel_title')?.trim() || intl.get('青龙'),
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [initLoading, setInitLoading] = useState<boolean>(true);
   const {
@@ -167,6 +169,15 @@ export default function () {
   }, []);
 
   useEffect(() => {
+    if (!['/login', '/initialization', '/error'].includes(location.pathname)) {
+      return;
+    }
+    const title =
+      (config.documentTitleMap as any)[location.pathname] || intl.get('未找到');
+    document.title = `${title} - ${siteTitle}`;
+  }, [location.pathname, siteTitle]);
+
+  useEffect(() => {
     if (theme === 'vs-dark') {
       document.body.setAttribute('data-dark', 'true');
     } else {
@@ -281,7 +292,7 @@ export default function () {
         <>
           <Image preview={false} src="https://qn.whyour.cn/logo.png" />
           <div className="title">
-            <span className="title">{siteTitle}</span>
+            <span className="title">{intl.get('青龙')}</span>
             <span
               onClick={(e) => {
                 e.stopPropagation();

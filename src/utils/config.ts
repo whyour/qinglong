@@ -1,11 +1,8 @@
 import intl from 'react-intl-universal';
 const baseUrl = window.__ENV__QlBaseUrl || '/';
-const defaultSiteName = intl.get('青龙');
-const siteName =
-  localStorage.getItem('qinglong_panel_title')?.trim() || defaultSiteName;
 
 export default {
-  siteName,
+  siteName: intl.get('青龙'),
   baseUrl,
   apiPrefix: `${baseUrl}api/`,
   authKey: 'token',
