@@ -59,7 +59,7 @@ check_pm2() {
 
 main() {
   t '=====> 开始检测'
-  npm i -g pnpm@8.3.1 pm2 ts-node
+  npm i -g pnpm@8.3.1 pm2 ts-node typescript@5
 
   reset_env
   copy_dep
