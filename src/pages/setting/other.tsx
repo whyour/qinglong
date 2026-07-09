@@ -352,8 +352,8 @@ const Other = ({
             </Button>
           </Input.Group>
         </Form.Item>
-        <Form.Item
-          label={intl.get('全局SSH私钥')}
+        <Form.Item 
+          label={intl.get('全局SSH私钥')} 
           name="globalSshKey"
           tooltip={intl.get('用于访问所有私有仓库的全局SSH私钥')}
         >
@@ -364,10 +364,7 @@ const Other = ({
               autoSize={{ minRows: 3, maxRows: 8 }}
               placeholder={intl.get('请输入完整的SSH私钥内容')}
               onChange={(e) => {
-                setSystemConfig({
-                  ...systemConfig,
-                  globalSshKey: e.target.value,
-                });
+                setSystemConfig({ ...systemConfig, globalSshKey: e.target.value });
               }}
             />
           </Input.Group>
