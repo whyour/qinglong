@@ -32,6 +32,7 @@ export enum AuthDataType {
 
 export interface SystemConfigInfo {
   lang?: string;
+  panelTitle?: string;
   logRemoveFrequency?: number;
   cronConcurrency?: number;
   dependenceProxy?: string;

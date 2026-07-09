@@ -27,6 +27,7 @@ import { disableBody } from '@/utils';
 import { TIMEZONES } from '@/utils/const';
 
 const dataMap = {
+  'panel-title': 'panelTitle',
   'log-remove-frequency': 'logRemoveFrequency',
   'cron-concurrency': 'cronConcurrency',
   timezone: 'timezone',
@@ -48,10 +49,15 @@ const exportModules = [
 
 const Other = ({
   systemInfo,
+  reloadSystemConfig,
   reloadTheme,
-}: Pick<SharedContext, 'reloadTheme' | 'systemInfo'>) => {
+}: Pick<
+  SharedContext,
+  'reloadSystemConfig' | 'reloadTheme' | 'systemInfo'
+>) => {
   const defaultTheme = localStorage.getItem('qinglong_dark_theme') || 'auto';
   const [systemConfig, setSystemConfig] = useState<{
+    panelTitle?: string | null;
     logRemoveFrequency?: number | null;
     cronConcurrency?: number | null;
     timezone?: string | null;
@@ -120,6 +126,9 @@ const Other = ({
       .then(({ code, data }) => {
         if (code === 200) {
           message.success(intl.get('更新成功'));
+          if (path === 'panel-title') {
+            reloadSystemConfig();
+          }
         }
       })
       .catch((error: any) => {
@@ -235,6 +244,35 @@ const Other = ({
               {intl.get('跟随系统')}
             </Radio.Button>
           </Radio.Group>
+        </Form.Item>
+        <Form.Item
+          label={intl.get('面板标题')}
+          name="panelTitle"
+          tooltip={intl.get('自定义面板的站点标题，留空使用默认值“青龙”')}
+        >
+          <Input.Group compact>
+            <Input
+              style={{ width: 180 }}
+              maxLength={100}
+              value={systemConfig?.panelTitle || ''}
+              placeholder={intl.get('留空使用默认值“青龙”')}
+              onChange={(e) => {
+                setSystemConfig({
+                  ...systemConfig,
+                  panelTitle: e.target.value,
+                });
+              }}
+            />
+            <Button
+              type="primary"
+              onClick={() => {
+                updateSystemConfig('panel-title');
+              }}
+              style={{ width: 84 }}
+            >
+              {intl.get('确认')}
+            </Button>
+          </Input.Group>
         </Form.Item>
         <Form.Item
           label={intl.get('日志删除频率')}

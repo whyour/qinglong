@@ -548,24 +548,34 @@ export default class SystemService {
     return { code: 200, data: { lang } };
   }
 
+  public async updatePanelTitle(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    const panelTitle = info.panelTitle?.trim() || '';
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, panelTitle },
+    });
+    return { code: 200, data: { panelTitle } };
+  }
+
   public async updateGlobalSshKey(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const result = await this.updateAuthDb({
       ...oDoc,
       info: { ...oDoc.info, ...info },
     });
-    
+
     // Apply the global SSH key
     const SshKeyService = require('./sshKey').default;
     const Container = require('typedi').Container;
     const sshKeyService = Container.get(SshKeyService);
-    
+
     if (info.globalSshKey) {
       await sshKeyService.addGlobalSSHKey(info.globalSshKey, 'global');
     } else {
       await sshKeyService.removeGlobalSSHKey('global');
     }
-    
+
     return { code: 200, data: result };
   }
 
