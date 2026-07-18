@@ -1,11 +1,7 @@
 lockfileVersion: '6.0'
 
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
-
 overrides:
-  sqlite3: git+https://github.com/whyour/node-sqlite3.git#v1.1.0
+  sqlite3: npm:@whyour/sqlite3@1.1.0
   '@codemirror/state': 6.5.4
   '@codemirror/view': 6.39.16
 
@@ -125,8 +121,8 @@ dependencies:
     specifier: ^0.3.24
     version: 0.3.24
   sqlite3:
-    specifier: git+https://github.com/whyour/node-sqlite3.git#v1.1.0
-    version: github.com/whyour/node-sqlite3/4d29681eee3557890502d3859ec0fd6b6d13ccce
+    specifier: npm:@whyour/sqlite3@1.1.0
+    version: /@whyour/sqlite3@1.1.0
   toad-scheduler:
     specifier: ^3.0.1
     version: 3.0.1
@@ -1630,8 +1626,8 @@ packages:
     resolution: {integrity: sha512-1dNIOmiM0z4BIBwxmxEfA1yoxh1MF/6KPBbh20a5vphGV0ictKlgQsbJs6D6SkR6iJpGbpwRsa6PFMNlg9T9pQ==}
     peerDependencies:
       '@codemirror/language': ^6.0.0
-      '@codemirror/state': 6.5.4
-      '@codemirror/view': 6.39.16
+      '@codemirror/state': ^6.0.0
+      '@codemirror/view': ^6.0.0
       '@lezer/common': ^1.0.0
     dependencies:
       '@codemirror/language': 6.10.6
@@ -3194,7 +3190,7 @@ packages:
     resolution: {integrity: sha512-Ngs9jhElXN7efS9WvvCC/p6rXMbihna8eNLVBc421Zf+VcFd+pR4DOcS6yA9V22EKtAy4DEj7LtvEEIm0bb80A==}
     engines: {node: '>= 18'}
     dependencies:
-      sqlite3: github.com/whyour/node-sqlite3/4d29681eee3557890502d3859ec0fd6b6d13ccce
+      sqlite3: /@whyour/sqlite3@1.1.0
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -3869,8 +3865,8 @@ packages:
     peerDependencies:
       '@codemirror/autocomplete': ^6.0.0
       '@codemirror/language': ^6.0.0
-      '@codemirror/state': 6.5.4
-      '@codemirror/view': 6.39.16
+      '@codemirror/state': ^6.0.0
+      '@codemirror/view': ^6.0.0
       '@lezer/common': ^1.0.0
       '@lezer/highlight': ^1.0.0
       '@lezer/lr': ^1.0.0
@@ -3889,8 +3885,8 @@ packages:
     peerDependencies:
       '@codemirror/autocomplete': ^6.0.0
       '@codemirror/language': ^6.0.0
-      '@codemirror/state': 6.5.4
-      '@codemirror/view': 6.39.16
+      '@codemirror/state': ^6.0.0
+      '@codemirror/view': ^6.0.0
       '@lezer/common': ^1.0.0
       '@lezer/highlight': ^1.0.0
       '@lezer/lr': ^1.0.0
@@ -3921,8 +3917,8 @@ packages:
       '@codemirror/lang-html': ^6.2.0
       '@codemirror/lang-javascript': ^6.1.1
       '@codemirror/language': ^6.0.0
-      '@codemirror/state': 6.5.4
-      '@codemirror/view': 6.39.16
+      '@codemirror/state': ^6.0.0
+      '@codemirror/view': ^6.0.0
       '@lezer/common': ^1.0.0
       '@lezer/highlight': ^1.0.0
       '@lezer/javascript': ^1.2.0
@@ -4825,8 +4821,8 @@ packages:
       '@codemirror/language': '>=6.0.0'
       '@codemirror/lint': '>=6.0.0'
       '@codemirror/search': '>=6.0.0'
-      '@codemirror/state': 6.5.4
-      '@codemirror/view': 6.39.16
+      '@codemirror/state': '>=6.0.0'
+      '@codemirror/view': '>=6.0.0'
     dependencies:
       '@codemirror/autocomplete': 6.20.1
       '@codemirror/commands': 6.7.1
@@ -4885,9 +4881,9 @@ packages:
     resolution: {integrity: sha512-caYKGV6TfGLRV1HHD3p0G3FiVzKL1go7wes5XT2nWjB0+dTdyzyb81MKRSacptgZcotujfNO6QXn65uhETRAMw==}
     peerDependencies:
       '@babel/runtime': '>=7.11.0'
-      '@codemirror/state': 6.5.4
+      '@codemirror/state': '>=6.0.0'
       '@codemirror/theme-one-dark': '>=6.0.0'
-      '@codemirror/view': 6.39.16
+      '@codemirror/view': '>=6.0.0'
       codemirror: '>=6.0.0'
       react: '>=16.8.0 || 18'
       react-dom: '>=16.8.0 || 18'
@@ -5617,6 +5613,23 @@ packages:
     transitivePeerDependencies:
       - supports-color
     dev: true
+
+  /@whyour/sqlite3@1.1.0:
+    resolution: {integrity: sha512-5g9xsjkv9sUepCvBBKmev6JSKSKjp0ebpW25uSsuV5kurIYrd7AnkbffNMNIswxwsQJSLPewVEX5ROsQfETfnA==}
+    requiresBuild: true
+    peerDependenciesMeta:
+      node-gyp:
+        optional: true
+    dependencies:
+      '@mapbox/node-pre-gyp': 1.0.11
+      node-addon-api: 4.3.0
+      tar: 6.2.1
+    optionalDependencies:
+      node-gyp: 12.4.0
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+    dev: false
 
   /abbrev@1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
@@ -13971,7 +13984,7 @@ packages:
       retry-as-promised: 7.0.4
       semver: 7.6.3
       sequelize-pool: 7.1.0
-      sqlite3: github.com/whyour/node-sqlite3/4d29681eee3557890502d3859ec0fd6b6d13ccce
+      sqlite3: /@whyour/sqlite3@1.1.0
       toposort-class: 1.0.1
       uuid: 8.3.2
       validator: 13.12.0
@@ -15810,21 +15823,6 @@ packages:
     resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
     dev: true
 
-  github.com/whyour/node-sqlite3/4d29681eee3557890502d3859ec0fd6b6d13ccce:
-    resolution: {tarball: https://codeload.github.com/whyour/node-sqlite3/tar.gz/4d29681eee3557890502d3859ec0fd6b6d13ccce}
-    name: '@whyour/sqlite3'
-    version: 1.1.0
-    requiresBuild: true
-    peerDependenciesMeta:
-      node-gyp:
-        optional: true
-    dependencies:
-      '@mapbox/node-pre-gyp': 1.0.11
-      node-addon-api: 4.3.0
-      tar: 6.2.1
-    optionalDependencies:
-      node-gyp: 12.4.0
-    transitivePeerDependencies:
-      - encoding
-      - supports-color
-    dev: false
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false

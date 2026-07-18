@@ -67,7 +67,7 @@
       }
     },
     "overrides": {
-      "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.1.0",
+      "sqlite3": "npm:@whyour/sqlite3@1.1.0",
       "@codemirror/state": "6.5.4",
       "@codemirror/view": "6.39.16"
     }
@@ -111,7 +111,7 @@
     "request-ip": "3.3.0",
     "sequelize": "^6.37.5",
     "sockjs": "^0.3.24",
-    "sqlite3": "git+https://github.com/whyour/node-sqlite3.git#v1.1.0",
+    "sqlite3": "npm:@whyour/sqlite3@1.1.0",
     "toad-scheduler": "^3.0.1",
     "typedi": "^0.10.0",
     "undici": "^7.9.0",
