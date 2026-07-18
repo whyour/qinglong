@@ -1,11 +1,26 @@
-FROM python:3.11-alpine3.18 AS builder
+# Run Node package installation natively on the builder. Node/npm can spin at
+# 100% CPU when Alpine s390x is emulated through QEMU.
+FROM --platform=$BUILDPLATFORM node:18-alpine3.18 AS builder
+
+ARG TARGETARCH
+ENV NPM_CONFIG_PREFIX=/opt/node-global
+ENV PATH=/opt/node-global/bin:${PATH}
+
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
-  && apk update \
-  && apk add nodejs npm git \
+  && apk add --no-cache git \
   && npm i -g pnpm@8.3.1 pm2 ts-node typescript@5 \
   && cd /tmp/build \
-  && pnpm install --prod
+  && case "${TARGETARCH}" in \
+    amd64) NODE_ARCH=x64 ;; \
+    386) NODE_ARCH=ia32 ;; \
+    ppc64le) NODE_ARCH=ppc64 ;; \
+    *) NODE_ARCH="${TARGETARCH}" ;; \
+  esac \
+  && npm_config_target_platform=linux \
+    npm_config_target_arch="${NODE_ARCH}" \
+    npm_config_target_libc=musl \
+    pnpm install --prod
 
 FROM python:3.11-alpine
 
@@ -26,8 +41,8 @@ VOLUME /ql/data
 
 EXPOSE 5700
 
-COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
-COPY --from=builder /usr/local/bin/. /usr/local/bin/
+COPY --from=builder /opt/node-global/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=builder /opt/node-global/bin/. /usr/local/bin/
 
 RUN set -x \
   && apk update -f \

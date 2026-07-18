@@ -1,4 +1,6 @@
-FROM node:22-slim AS nodebuilder
+# Node 20 Bookworm is the latest official Node image variant that covers the
+# full Debian build matrix, including arm/v7, ppc64le, and s390x.
+FROM node:20-bookworm-slim AS nodebuilder
 
 FROM python:3.11-slim-bookworm AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
