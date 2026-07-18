@@ -1,6 +1,35 @@
-version: 2.20.2
-changeLogLink: https://t.me/jiao_long/434
-publishTime: 2026-03-01 1800
+version: 2.21.0
+changeLogLink: https://t.me/jiao_long/436
+publishTime: 2026-06-18 2300
 changeLog: |
-  1. 修复 path 安全漏洞（重要）
+  1. shell 增加国际化支持
+  2. 接口提示信息国际化，更新国际化文案
+  3. 统一 Alpine/Debian 分支，QL_SCHEDULER 参数化调度
+  4. grpc 服务增加证书校验
+  5. 定时任务增加 work_dir 设置
+  6. 增加任务统计功能
+  7. 新增 OpeniLink 通知渠道
+  8. 支持自定义接收邮箱地址
+  9. 增加运行实例功能
+  10. 增加 sudo 命令判断
+  11. 延迟增加运行时间提示
+  12. 开机运行任务支持同时开始运行
+  13. 增加 localhost 检测
+  14. 增加环境变量标签功能
+  15. 修复路径穿越安全漏洞
+  16. 修复配置文件路径可能越权
+  17. 修复 work_dir 验证和目录判断
+  18. 修复多个 API 问题（getCronById、定时任务参数、任务退出码等）
+  19. 修复 ESM 依赖查询路径
+  20. 修复 CodeMirror 页面切换多实例崩溃
+  21. 修复 IPv6 网络连接问题
+  22. 修复内部服务 IP 地址
+  23. 修复 gRPC extra_schedules 为空时序列化报错
+  24. 修复 HITOKOTO 参数布尔/字符串类型处理
+  25. 修复 Server酱 返回错误时 undefined 异常
+  26. 修复环境变量 position 数据类型异常
+  27. 修复 Docker 健康检查 QlPort 环境变量读取
+  28. 修复任务统计日志
+  29. 升级 multer 解决 CVE 漏洞
+  30. 升级 nodemailer
   
