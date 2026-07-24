@@ -26,6 +26,7 @@ import {
 } from '@ant-design/icons';
 import SecuritySettings from './security';
 import LoginLog from './loginLog';
+import NotifyLog from './notifyLog';
 import NotificationSetting from './notification';
 import Other from './other';
 import About from './about';
@@ -126,6 +127,7 @@ const Setting = () => {
   const [editedApp, setEditedApp] = useState<any>();
   const [tabActiveKey, setTabActiveKey] = useState('security');
   const [loginLogData, setLoginLogData] = useState<any[]>([]);
+  const [notifyLogData, setNotifyLogData] = useState<any[]>([]);
   const [notificationInfo, setNotificationInfo] = useState<any>();
   const containergRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>(0);
@@ -254,6 +256,8 @@ const Setting = () => {
       getApps();
     } else if (activeKey === 'login') {
       getLoginLog();
+    } else if (activeKey === 'notifylog') {
+      getNotifyLog();
     } else if (activeKey === 'notification') {
       getNotification();
     }
@@ -265,6 +269,19 @@ const Setting = () => {
       .then(({ code, data }) => {
         if (code === 200) {
           setNotificationInfo(data);
+        }
+      })
+      .catch((error: any) => {
+        console.log(error);
+      });
+  };
+
+  const getNotifyLog = () => {
+    request
+      .get(`${config.apiPrefix}system/notify-log`)
+      .then(({ code, data }) => {
+        if (code === 200) {
+          setNotifyLogData(data);
         }
       })
       .catch((error: any) => {
@@ -344,6 +361,11 @@ const Setting = () => {
               key: 'login',
               label: intl.get('登录日志'),
               children: <LoginLog height={height} data={loginLogData} />,
+            },
+            {
+              key: 'notifylog',
+              label: intl.get('通知日志'),
+              children: <NotifyLog height={height} data={notifyLogData} />,
             },
             {
               key: 'dependence',
