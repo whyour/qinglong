@@ -98,7 +98,11 @@ function run() {
       const newEnvObject = JSON.parse(envStr);
       if (typeof newEnvObject === 'object' && newEnvObject !== null) {
         for (const key in newEnvObject) {
-          if (Object.prototype.hasOwnProperty.call(newEnvObject, key)) {
+          if (
+            Object.prototype.hasOwnProperty.call(newEnvObject, key) &&
+            key !== 'NODE_PATH' &&
+            key !== 'QL_NODE_GLOBAL_PATH'
+          ) {
             process.env[key] = newEnvObject[key];
           }
         }
