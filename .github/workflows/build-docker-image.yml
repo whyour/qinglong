@@ -216,6 +216,8 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
+          provenance: mode=max
+          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=whyour/qinglong:cache-alpine
@@ -295,6 +297,8 @@ jobs:
           context: .
           file: ./docker/Dockerfile.debian
           push: true
+          provenance: mode=max
+          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=whyour/qinglong:cache-debian
@@ -359,6 +363,8 @@ jobs:
           context: .
           file: ./docker/Dockerfile.310
           push: true
+          provenance: mode=max
+          sbom: true
           tags: |
             whyour/qinglong:python3.10
             whyour/qinglong:${{ steps.version.outputs.version }}-python3.10
@@ -425,6 +431,8 @@ jobs:
           context: .
           file: ./docker/Dockerfile.debian310
           push: true
+          provenance: mode=max
+          sbom: true
           tags: |
             whyour/qinglong:debian-python3.10
             whyour/qinglong:${{ steps.version.outputs.version }}-debian-python3.10
