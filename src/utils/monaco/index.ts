@@ -10,6 +10,12 @@ interface FileTypeConfig {
 
 // 文件类型分类配置（只包含特殊文件类型）
 const fileTypeConfigs: Record<string, FileTypeConfig> = {
+  config: {
+    // Keep common text configuration files previewable even when a Monaco
+    // build has not registered its optional INI language contribution yet.
+    extensions: ['.ini'],
+  },
+
   // 前端特殊文件
   frontend: {
     extensions: [

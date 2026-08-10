@@ -130,6 +130,8 @@ const CronDetailModal = ({
             {(item) => (
               <List.Item
                 className="log-item"
+                onClick={() => item.log_path && viewInstanceLog(item)}
+                style={{ cursor: item.log_path ? 'pointer' : 'default' }}
                 actions={[
                   item.log_path && (
                     <Tooltip title={intl.get('查看日志')} key="log">

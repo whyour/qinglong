@@ -48,6 +48,10 @@ export default {
       name: intl.get('系统信息'),
       value: 'system',
     },
+    {
+      name: intl.get('仪表盘'),
+      value: 'dashboard',
+    },
   ],
   scopesMap: {
     crons: intl.get('定时任务'),
@@ -58,6 +62,7 @@ export default {
     logs: intl.get('日志管理'),
     dependencies: intl.get('依赖管理'),
     system: intl.get('系统信息'),
+    dashboard: intl.get('仪表盘'),
   },
   notificationModes: [
     { value: 'gotify', label: 'Gotify' },
