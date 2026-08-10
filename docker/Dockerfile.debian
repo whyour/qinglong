@@ -2,7 +2,7 @@
 # full Debian build matrix, including arm/v7, ppc64le, and s390x.
 FROM node:20-bookworm-slim AS nodebuilder
 
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.11.14-slim-bookworm AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
 COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
@@ -14,7 +14,7 @@ RUN set -x && \
   cd /tmp/build && \
   pnpm install --prod
 
-FROM python:3.11-slim-bookworm
+FROM python:3.11.14-slim-bookworm
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
