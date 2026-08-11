@@ -1,0 +1,204 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ql3-prompt-output-key-rotation
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-prompt-output-key-rotation
+    app.kubernetes.io/component: ai-maintenance
+    app.kubernetes.io/part-of: qinglong3
+    qinglong.io/execution-model: caller-driven
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 180
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-prompt-output-key-rotation
+        app.kubernetes.io/component: ai-maintenance
+        app.kubernetes.io/part-of: qinglong3
+        qinglong.io/execution-model: caller-driven
+    spec:
+      serviceAccountName: ql3-prompt-output-key-rotation
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: network-policy-ready
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - -e
+            - |
+              const dns = require('node:dns').promises;
+              const fs = require('node:fs');
+              const net = require('node:net');
+              const apiHost = process.env.KUBERNETES_SERVICE_HOST;
+              const apiPort = Number(process.env.KUBERNETES_SERVICE_PORT_HTTPS);
+              const canaryHost = process.env.QL3_NETWORK_POLICY_DENY_CANARY_HOST;
+              const canaryPort = Number(process.env.QL3_NETWORK_POLICY_DENY_CANARY_PORT);
+              const validPort = (value) => Number.isInteger(value) && value >= 1 && value <= 65535;
+              const connect = (host, port, timeout) => new Promise((resolve) => {
+                let settled = false;
+                const socket = net.createConnection({ host, port });
+                const finish = (connected) => {
+                  if (settled) return;
+                  settled = true;
+                  socket.destroy();
+                  resolve(connected);
+                };
+                socket.setTimeout(timeout);
+                socket.once('connect', () => finish(true));
+                socket.once('timeout', () => finish(false));
+                socket.once('error', () => finish(false));
+              });
+              const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+              const finish = (ready, code) => {
+                fs.writeFileSync('/dev/termination-log', JSON.stringify({ schemaVersion: 1, ready, code }), { encoding: 'utf8', mode: 0o600 });
+                process.exitCode = ready ? 0 : 1;
+              };
+              (async () => {
+                if (!apiHost || !validPort(apiPort) || !canaryHost || canaryHost.startsWith('replace-with-') || !validPort(canaryPort)) {
+                  finish(false, 'CONFIG_INVALID');
+                  return;
+                }
+                try {
+                  await dns.lookup(canaryHost);
+                } catch {
+                  finish(false, 'CANARY_UNRESOLVED');
+                  return;
+                }
+                const deadline = Date.now() + 30000;
+                while (Date.now() < deadline) {
+                  const apiAllowed = await connect(apiHost, apiPort, 500);
+                  const canaryAllowed = await connect(canaryHost, canaryPort, 250);
+                  if (apiAllowed && !canaryAllowed) {
+                    finish(true, 'POLICY_READY');
+                    return;
+                  }
+                  await sleep(50);
+                }
+                finish(false, 'POLICY_NOT_READY');
+              })().catch(() => finish(false, 'PROBE_FAILED'));
+          env:
+            - name: QL3_NETWORK_POLICY_DENY_CANARY_HOST
+              value: replace-with-reachable-deny-canary
+            - name: QL3_NETWORK_POLICY_DENY_CANARY_PORT
+              value: '443'
+          terminationMessagePolicy: File
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      containers:
+        - name: rotation
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - /opt/qinglong/node_modules/@qinglong/cluster-admin/dist/prompt-output/key-management/promptOutputKeyRotationCli.js
+          args:
+            - run
+            - --command-file
+            - /var/run/qinglong3/prompt-output-key-rotation/command.json
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: QL3_POSTGRES_TLS_MODE
+              value: verify-full
+            - name: QL3_POSTGRES_TLS_CA_FILE
+              value: /var/run/secrets/qinglong3/postgres-ai-maintenance/ca.crt
+            - name: QL3_POSTGRES_AI_MAINTENANCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-ai-maintenance
+                  key: postgres-ai-maintenance-url
+            - name: QL3_POSTGRES_TLS_SERVERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-ai-maintenance
+                  key: postgres-tls-servername
+          resources:
+            requests:
+              cpu: 25m
+              memory: 48Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts:
+            - name: command
+              mountPath: /var/run/qinglong3/prompt-output-key-rotation/command.json
+              subPath: command.json
+              readOnly: true
+            - name: staged-material
+              mountPath: /var/run/secrets/qinglong3/prompt-output-key-rotation/material.bin
+              subPath: material.bin
+              readOnly: true
+            - name: postgres-ca
+              mountPath: /var/run/secrets/qinglong3/postgres-ai-maintenance
+              readOnly: true
+            - name: kubernetes-api-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+      volumes:
+        - name: command
+          configMap:
+            name: ql3-prompt-output-key-rotation-command
+            defaultMode: 292
+            items:
+              - key: command.json
+                path: command.json
+        - name: staged-material
+          secret:
+            secretName: ql3-prompt-output-key-rotation-material
+            defaultMode: 288
+            items:
+              - key: material.bin
+                path: material.bin
+        - name: postgres-ca
+          secret:
+            secretName: ql3-cluster-ai-maintenance
+            defaultMode: 292
+            items:
+              - key: postgres-ca.crt
+                path: ca.crt
+        - name: kubernetes-api-token
+          projected:
+            defaultMode: 256
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace

@@ -1,0 +1,66 @@
+{
+  "name": "@qinglong/local-owner-console",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 short-lived POSIX local Owner console and internal ceremonies",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/application-runtime/localOwnerConsole.js",
+  "types": "dist/application-runtime/localOwnerConsole.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/application-runtime/localOwnerConsole.d.ts",
+      "require": "./dist/application-runtime/localOwnerConsole.js",
+      "default": "./dist/application-runtime/localOwnerConsole.js"
+    },
+    "./secret-delivery": {
+      "types": "./dist/delivery/secretDelivery.d.ts",
+      "require": "./dist/delivery/secretDelivery.js",
+      "default": "./dist/delivery/secretDelivery.js"
+    },
+    "./authenticated-command": {
+      "types": "./dist/authentication/authenticatedCommand.d.ts",
+      "require": "./dist/authentication/authenticatedCommand.js",
+      "default": "./dist/authentication/authenticatedCommand.js"
+    },
+    "./credential-administration-delivery": {
+      "types": "./dist/delivery/credentialAdministrationDelivery.d.ts",
+      "require": "./dist/delivery/credentialAdministrationDelivery.js",
+      "default": "./dist/delivery/credentialAdministrationDelivery.js"
+    },
+    "./identity-authentication": {
+      "types": "./dist/authentication/identityAuthentication.d.ts",
+      "require": "./dist/authentication/identityAuthentication.js",
+      "default": "./dist/authentication/identityAuthentication.js"
+    },
+    "./pepper-custody": {
+      "types": "./dist/pepper-custody/index.d.ts",
+      "require": "./dist/pepper-custody/index.js",
+      "default": "./dist/pepper-custody/index.js"
+    },
+    "./pepper-custody/destructive": {
+      "types": "./dist/pepper-custody/destructive.d.ts",
+      "require": "./dist/pepper-custody/destructive.js",
+      "default": "./dist/pepper-custody/destructive.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/local-sqlite": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-cluster-control
+spec:
+  template:
+    spec:
+      containers:
+        - name: cluster-control
+          env:
+            - name: QL3_CLUSTER_AI_PROMPT_OUTPUT_ENABLED
+              value: 'true'
+            - name: QL3_CLUSTER_AI_PROMPT_OUTPUT_KEYRING_ROOT
+              value: /var/run/secrets/qinglong3/ai/prompt-output-keyring
+          volumeMounts:
+            - name: cluster-ai-prompt-output-keyring
+              mountPath: /var/run/secrets/qinglong3/ai/prompt-output-keyring
+              readOnly: true
+      volumes:
+        - name: cluster-ai-prompt-output-keyring
+          secret:
+            secretName: ql3-prompt-output-keyring
+            defaultMode: 288
+            items:
+              - key: keyring.json
+                path: keyring.json

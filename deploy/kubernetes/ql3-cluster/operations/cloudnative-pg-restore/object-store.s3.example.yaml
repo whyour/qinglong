@@ -1,0 +1,27 @@
+# Example only. Recovery credentials should be read-only wherever the provider
+# supports separate read/list and write/delete authorities. This resource is
+# intentionally excluded from Kustomize.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: ql3-postgres-recovery-source
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-postgres-restore
+    app.kubernetes.io/component: database-restore-source
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  configuration:
+    destinationPath: s3://REPLACE_WITH_VERSIONED_LOCKED_BUCKET/qinglong3/ql3-postgres
+    endpointURL: https://REPLACE_WITH_OBJECT_STORE_ENDPOINT
+    s3Credentials:
+      accessKeyId:
+        name: ql3-postgres-restore-object-store
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: ql3-postgres-restore-object-store
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: lz4
+      encryption: AES256
+      maxParallel: 4

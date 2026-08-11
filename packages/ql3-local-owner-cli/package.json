@@ -1,0 +1,161 @@
+{
+  "name": "@qinglong/local-owner-cli",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 short-lived Local Owner product command-file CLI",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/application-command/localOwnerCommand.js",
+  "types": "dist/application-command/localOwnerCommand.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/application-command/localOwnerCommand.d.ts",
+      "require": "./dist/application-command/localOwnerCommand.js",
+      "default": "./dist/application-command/localOwnerCommand.js"
+    },
+    "./approval-command": {
+      "types": "./dist/approval-management/approvalCommand.d.ts",
+      "require": "./dist/approval-management/approvalCommand.js",
+      "default": "./dist/approval-management/approvalCommand.js"
+    },
+    "./adoption": {
+      "types": "./dist/lifecycle/adoption.d.ts",
+      "require": "./dist/lifecycle/adoption.js",
+      "default": "./dist/lifecycle/adoption.js"
+    },
+    "./package-command": {
+      "types": "./dist/plugin-package/pluginPackageCommand.d.ts",
+      "require": "./dist/plugin-package/pluginPackageCommand.js",
+      "default": "./dist/plugin-package/pluginPackageCommand.js"
+    },
+    "./model-price-command": {
+      "types": "./dist/ai-management/modelPriceCatalogCommand.d.ts",
+      "require": "./dist/ai-management/modelPriceCatalogCommand.js",
+      "default": "./dist/ai-management/modelPriceCatalogCommand.js"
+    },
+    "./model-provider-credential-command": {
+      "types": "./dist/ai-management/modelProviderCredentialCommand.d.ts",
+      "require": "./dist/ai-management/modelProviderCredentialCommand.js",
+      "default": "./dist/ai-management/modelProviderCredentialCommand.js"
+    },
+    "./plugin-package-prompt-command": {
+      "types": "./dist/plugin-package/pluginPackagePromptCommand.d.ts",
+      "require": "./dist/plugin-package/pluginPackagePromptCommand.js",
+      "default": "./dist/plugin-package/pluginPackagePromptCommand.js"
+    },
+    "./ai-feature-command": {
+      "types": "./dist/ai-management/aiFeatureCommand.d.ts",
+      "require": "./dist/ai-management/aiFeatureCommand.js",
+      "default": "./dist/ai-management/aiFeatureCommand.js"
+    },
+    "./secret-command": {
+      "types": "./dist/security-management/secretCommand.d.ts",
+      "require": "./dist/security-management/secretCommand.js",
+      "default": "./dist/security-management/secretCommand.js"
+    },
+    "./task-definition-command": {
+      "types": "./dist/automation-management/taskDefinitionCommand.d.ts",
+      "require": "./dist/automation-management/taskDefinitionCommand.js",
+      "default": "./dist/automation-management/taskDefinitionCommand.js"
+    },
+    "./plugin-package-workflow-command": {
+      "types": "./dist/plugin-package/pluginPackageWorkflowCommand.d.ts",
+      "require": "./dist/plugin-package/pluginPackageWorkflowCommand.js",
+      "default": "./dist/plugin-package/pluginPackageWorkflowCommand.js"
+    },
+    "./trigger-command": {
+      "types": "./dist/automation-management/triggerCommand.d.ts",
+      "require": "./dist/automation-management/triggerCommand.js",
+      "default": "./dist/automation-management/triggerCommand.js"
+    },
+    "./project-policy-command": {
+      "types": "./dist/security-management/projectPolicyCommand.d.ts",
+      "require": "./dist/security-management/projectPolicyCommand.js",
+      "default": "./dist/security-management/projectPolicyCommand.js"
+    },
+    "./security-audit-query-command": {
+      "types": "./dist/security-management/securityAuditQueryCommand.d.ts",
+      "require": "./dist/security-management/securityAuditQueryCommand.js",
+      "default": "./dist/security-management/securityAuditQueryCommand.js"
+    },
+    "./identity-credential-command": {
+      "types": "./dist/security-management/identityCredentialCommand.d.ts",
+      "require": "./dist/security-management/identityCredentialCommand.js",
+      "default": "./dist/security-management/identityCredentialCommand.js"
+    },
+    "./package-catalog-command": {
+      "types": "./dist/plugin-package/pluginPackageCatalogCommand.d.ts",
+      "require": "./dist/plugin-package/pluginPackageCatalogCommand.js",
+      "default": "./dist/plugin-package/pluginPackageCatalogCommand.js"
+    },
+    "./package-publisher-trust-command": {
+      "types": "./dist/plugin-package/pluginPackagePublisherTrustCommand.d.ts",
+      "require": "./dist/plugin-package/pluginPackagePublisherTrustCommand.js",
+      "default": "./dist/plugin-package/pluginPackagePublisherTrustCommand.js"
+    },
+    "./local-setup": {
+      "types": "./dist/lifecycle/localSetup.d.ts",
+      "require": "./dist/lifecycle/localSetup.js",
+      "default": "./dist/lifecycle/localSetup.js"
+    },
+    "./local-readiness": {
+      "types": "./dist/lifecycle/localReadiness.d.ts",
+      "require": "./dist/lifecycle/localReadiness.js",
+      "default": "./dist/lifecycle/localReadiness.js"
+    },
+    "./local-deployment": {
+      "types": "./dist/deployment/localDeployment.d.ts",
+      "require": "./dist/deployment/localDeployment.js",
+      "default": "./dist/deployment/localDeployment.js"
+    }
+  },
+  "bin": {
+    "ql3": "dist/product-cli/cli.js",
+    "ql3-approval": "dist/approval-management/approvalCli.js",
+    "ql3-owner": "dist/cli.js",
+    "ql3-adoption": "dist/lifecycle/adoptionCli.js",
+    "ql3-package": "dist/plugin-package/pluginPackageCli.js",
+    "ql3-package-catalog": "dist/plugin-package/pluginPackageCatalogCli.js",
+    "ql3-package-trust": "dist/plugin-package/pluginPackagePublisherTrustCli.js",
+    "ql3-model-price": "dist/ai-management/modelPriceCatalogCli.js",
+    "ql3-model-credential": "dist/ai-management/modelProviderCredentialCli.js",
+    "ql3-prompt": "dist/plugin-package/pluginPackagePromptCli.js",
+    "ql3-ai-feature": "dist/ai-management/aiFeatureCli.js",
+    "ql3-secret": "dist/security-management/secretCli.js",
+    "ql3-task": "dist/automation-management/taskDefinitionCli.js",
+    "ql3-workflow": "dist/plugin-package/pluginPackageWorkflowCli.js",
+    "ql3-trigger": "dist/automation-management/triggerCli.js",
+    "ql3-policy": "dist/security-management/projectPolicyCli.js",
+    "ql3-audit": "dist/security-management/securityAuditQueryCli.js",
+    "ql3-identity": "dist/security-management/identityCredentialCli.js",
+    "ql3-local-setup": "dist/lifecycle/localSetupCli.js",
+    "ql3-local-readiness": "dist/lifecycle/localReadinessCli.js",
+    "ql3-local-deploy": "dist/deployment/localDeploymentCli.js",
+    "ql3-service-bridge": "dist/deployment/service-manager/serviceBridgeCli.js"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "readiness": "node ../../scripts/ql3-build-package-closure.cjs && node dist/lifecycle/localReadinessCli.js",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/ai": "workspace:*",
+    "@qinglong/local-admin": "workspace:*",
+    "@qinglong/local-command-file": "workspace:*",
+    "@qinglong/local-secret": "workspace:*",
+    "@qinglong/local-sqlite": "workspace:*",
+    "@qinglong/local-owner-console": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

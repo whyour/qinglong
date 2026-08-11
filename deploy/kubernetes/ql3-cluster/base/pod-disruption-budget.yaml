@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ql3-cluster-control
+  labels:
+    app.kubernetes.io/name: ql3-cluster-control
+    app.kubernetes.io/component: control-plane
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-cluster-control
+      app.kubernetes.io/component: control-plane

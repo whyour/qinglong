@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ql3-prompt-output-external-recovery-verifier-deny-all
+  namespace: qinglong3-recovery
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-prompt-output-external-recovery-verifier
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []

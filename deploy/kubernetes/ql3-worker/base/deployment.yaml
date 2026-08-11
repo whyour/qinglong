@@ -1,0 +1,176 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-worker
+  labels:
+    app.kubernetes.io/name: ql3-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  replicas: 1
+  minReadySeconds: 10
+  revisionHistoryLimit: 2
+  progressDeadlineSeconds: 600
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-worker
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-worker
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: qinglong3
+      annotations:
+        # A private overlay advances this value with every CA/key/cert
+        # generation. Credential delivery owns separate qinglong.io/*
+        # annotations and advances them with resourceVersion CAS.
+        qinglong.io/worker-identity-generation: replace-in-private-overlay
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 360
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: materialize-worker-authority
+          image: qinglong3-worker:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              umask 077
+              mkdir -p /authority/private /state/journal /state/logs /state/receipts /state/identity
+              chmod 0700 /authority/private /state/journal /state/logs /state/receipts /state/identity
+              cp /projected/ca.crt /authority/private/ca.crt
+              cp /projected/tls.key /authority/private/tls.key
+              cp /projected/tls.crt /authority/private/tls.crt
+              cp /projected/credential-token /authority/private/credential-token
+              cp /projected/capabilities.json /authority/private/capabilities.json
+              chmod 0400 /authority/private/ca.crt /authority/private/tls.key /authority/private/tls.crt
+              chmod 0400 /authority/private/credential-token /authority/private/capabilities.json
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: projected-authority
+              mountPath: /projected
+              readOnly: true
+            - name: materialized-authority
+              mountPath: /authority
+            - name: worker-state
+              mountPath: /state
+      containers:
+        - name: worker
+          image: qinglong3-worker:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: QL_DEPLOYMENT_PROFILE
+              value: worker
+            - name: QL3_WORKER_RUNTIME_ENABLED
+              value: "true"
+            - name: QL3_WORKER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: ql3-worker-config
+                  key: worker-id
+            - name: QL3_WORKER_CONTROL_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: ql3-worker-config
+                  key: control-origin
+            - name: QL3_WORKER_CAPACITY_PROFILE
+              value: edge
+            - name: QL3_WORKER_CAPABILITIES_FILE
+              value: /var/run/qinglong3-worker/private/capabilities.json
+            - name: QL3_WORKER_JOURNAL_ROOT
+              value: /var/lib/qinglong3-worker/journal
+            - name: QL3_WORKER_LOG_ROOT
+              value: /var/lib/qinglong3-worker/logs
+            - name: QL3_WORKER_RECEIPT_ROOT
+              value: /var/lib/qinglong3-worker/receipts
+            - name: QL3_WORKER_CERTIFICATE_STORE_ROOT
+              value: /var/lib/qinglong3-worker/identity
+            - name: QL3_WORKER_TRUST_ANCHOR_FILE
+              value: /var/run/qinglong3-worker/private/ca.crt
+            - name: QL3_WORKER_CREDENTIAL_TOKEN_FILE
+              value: /var/run/qinglong3-worker/private/credential-token
+            - name: QL3_WORKER_IDENTITY_BOOTSTRAP_PRIVATE_KEY_FILE
+              value: /var/run/qinglong3-worker/private/tls.key
+            - name: QL3_WORKER_IDENTITY_BOOTSTRAP_CERTIFICATE_FILE
+              value: /var/run/qinglong3-worker/private/tls.crt
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: materialized-authority
+              mountPath: /var/run/qinglong3-worker
+              readOnly: true
+            - name: worker-state
+              mountPath: /var/lib/qinglong3-worker
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: projected-authority
+          projected:
+            defaultMode: 288
+            sources:
+              - secret:
+                  name: ql3-worker-identity
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                    - key: tls.key
+                      path: tls.key
+                    - key: tls.crt
+                      path: tls.crt
+              - secret:
+                  name: ql3-worker-credential
+                  items:
+                    - key: credential-token
+                      path: credential-token
+              - configMap:
+                  name: ql3-worker-config
+                  items:
+                    - key: capabilities.json
+                      path: capabilities.json
+        - name: materialized-authority
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Mi
+        - name: worker-state
+          persistentVolumeClaim:
+            claimName: ql3-worker-state
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi

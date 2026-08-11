@@ -1,0 +1,32 @@
+{
+  "name": "@qinglong/local-command-file",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 bounded private durable command-file protocol",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

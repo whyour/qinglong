@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-03",
+  "releaseReady": false,
+  "releaseBlockers": [
+    "live-object-store-backup-wal-latest-restore-pitr-evidence"
+  ],
+  "compatibility": {
+    "cloudNativePg": ">=1.26.0",
+    "reviewedCloudNativePg": "1.30.0"
+  },
+  "plugin": {
+    "name": "barman-cloud.cloudnative-pg.io",
+    "version": "0.13.0",
+    "releaseManifest": "https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.13.0/manifest.yaml",
+    "releaseManifestSha256": "d2e71e7b06822448f1a421f05781846cfdb9cc621e7ef32eef5e20c5133213b0",
+    "controller": {
+      "manifestReference": "ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.13.0",
+      "image": "ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.13.0@sha256:71589dbac582333442812b07b31f7ea4d00324a8358aac7ca507dabf9f4b6c96",
+      "platforms": {
+        "linux/amd64": "sha256:417449fe4f6f0a56acdeb30e4131930815f2b46b9afeb808059b57aa8b4c2ef5",
+        "linux/arm64": "sha256:de612e3ad8633a198b91ffbea53848407424155daf2183d656490d843a83b100"
+      }
+    },
+    "sidecar": {
+      "manifestReference": "ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.13.0",
+      "image": "ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.13.0@sha256:990361af3319f9e23aafa0f6d7981f99bf1f69b4e6a85cf1bc7d71d6f09bb288",
+      "platforms": {
+        "linux/amd64": "sha256:15cb1a01e7c5235eedac2061cab8208e5f7c39dbda292f9c2d4ddaa0c1f211e6",
+        "linux/arm64": "sha256:f53e168e341661cd76334215ead9dfd69f06117685d3232206192cf25218da71"
+      }
+    }
+  },
+  "certificateAuthority": {
+    "mode": "cert-manager",
+    "version": "1.20.3",
+    "selectionLock": "deploy/kubernetes/ql3-cluster/operators/cert-manager/selection-lock.json",
+    "releaseManifestUses": "cert-manager.io/v1",
+    "requiredSecrets": ["barman-cloud-client-tls", "barman-cloud-server-tls"],
+    "status": "supply-chain-verified"
+  }
+}

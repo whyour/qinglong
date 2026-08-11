@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-cluster-control
+spec:
+  template:
+    spec:
+      containers:
+        - name: cluster-control
+          image: qinglong3-cluster-control-ai:3.0.0-alpha.0
+          env:
+            - name: QL3_CLUSTER_AI_ENABLED
+              value: "true"
+            - name: QL3_CLUSTER_AI_PROVIDER_AUTHORITY_FILE
+              value: /var/run/qinglong3/ai/provider-authority/authority.json
+            - name: QL3_CLUSTER_AI_SECRET_ROOT
+              value: /var/run/secrets/qinglong3/ai/provider-secrets
+            - name: QL3_CLUSTER_AI_MAX_CONCURRENT
+              value: "4"
+            - name: QL3_CLUSTER_AI_RECOVERY_LIMIT
+              value: "32"
+            - name: QL3_CLUSTER_AI_DATABASE_MAX_CONNECTIONS
+              value: "4"
+          volumeMounts:
+            - name: cluster-ai-provider-authority
+              mountPath: /var/run/qinglong3/ai/provider-authority
+              readOnly: true
+            - name: cluster-ai-provider-secrets
+              mountPath: /var/run/secrets/qinglong3/ai/provider-secrets
+              readOnly: true
+      volumes:
+        - name: cluster-ai-provider-authority
+          configMap:
+            name: ql3-cluster-ai-provider-authority
+            defaultMode: 288
+            items:
+              - key: authority.json
+                path: authority.json
+        - name: cluster-ai-provider-secrets
+          secret:
+            secretName: ql3-cluster-ai-provider-secrets
+            defaultMode: 288

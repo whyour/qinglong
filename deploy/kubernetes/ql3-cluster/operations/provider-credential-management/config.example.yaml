@@ -1,0 +1,81 @@
+# Example only. Copy into a private overlay and replace every placeholder.
+# Assertions must use this exact dedicated trust domain:
+# aud=qinglong3-model-provider-credential-management,
+# typ=ql3-model-provider-credential-management+jwt, and
+# ql3_purpose=model-provider-credential-management.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-provider-credential-test-allowlist
+  namespace: qinglong3-system
+data:
+  allowlist.json: |
+    {"schema":"qinglong/model-provider-credential-test-allowlist@v1","revision":"catalog-v1","providers":[{"provider":"openai-compatible","adapter":"openai-compatible","baseUrl":"https://provider.example.test/v1/","revision":"endpoint-v1","deadlineMs":5000,"maxResponseBytes":65536,"maxModels":64,"maxCostMicrousd":0,"retryLimit":0,"configDigest":"10ba6d6a33126ce623d63123b20994d177ed1da7720b4ebe335ca0e5dfc33db6"}],"catalogDigest":"86553a3cbcd8ea3e3d0b73fc310997c1060f6e39d5fe1deb8593b1b8fd098582"}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-provider-credential-management-identity
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  keyset.json: |
+    {
+      "schemaVersion": 1,
+      "generation": 1,
+      "issuer": "https://identity.example.test/",
+      "audience": "qinglong3-model-provider-credential-management",
+      "keys": [
+        {
+          "alg": "EdDSA",
+          "crv": "Ed25519",
+          "kid": "REPLACE_WITH_KEY_ID",
+          "kty": "OKP",
+          "use": "sig",
+          "x": "REPLACE_WITH_ED25519_PUBLIC_JWK_X"
+        }
+      ],
+      "revokedKids": [],
+      "assuranceMappings": [
+        {
+          "acr": "urn:example:mfa",
+          "assurance": "multi_factor",
+          "requiredAmr": ["pwd", "otp"]
+        },
+        {
+          "acr": "urn:example:hardware",
+          "assurance": "hardware",
+          "requiredAmr": ["hwk"]
+        }
+      ],
+      "constraints": {
+        "maxAssertionBytes": 8192,
+        "maxLifetimeMs": 300000,
+        "maxAuthenticationAgeMs": 300000,
+        "clockSkewMs": 5000
+      }
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-provider-credential-management-tls
+  namespace: qinglong3-system
+type: kubernetes.io/tls
+stringData:
+  tls.crt: REPLACE_WITH_SERVER_CERTIFICATE_CHAIN
+  tls.key: REPLACE_WITH_SERVER_PRIVATE_KEY
+  ca.crt: REPLACE_WITH_1_TO_16_CLIENT_CERTIFICATE_AUTHORITIES
+  client.crl: REPLACE_WITH_1_TO_16_CLIENT_CERTIFICATE_REVOCATION_LISTS
+---
+# Non-CloudNativePG deployments only.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-cluster-provider-credential-management-database
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  postgres-ai-credential-manager-url: REPLACE_WITH_AI_CREDENTIAL_MANAGER_DSN
+  postgres-tls-servername: REPLACE_WITH_POSTGRES_DNS_NAME
+  postgres-ca.crt: REPLACE_WITH_POSTGRES_CA_CERTIFICATE

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "operation": "cluster.prompt-output-key.verify-recovery",
+  "authorizationFile": "/var/run/qinglong3/prompt-output-external-recovery/authorization.json",
+  "custodyBundleFile": "/var/run/qinglong3/prompt-output-external-recovery/custody-bundle.json",
+  "recoveredMaterialFile": "/var/run/qinglong3/prompt-output-external-recovery/recovered-material.bin",
+  "durableKeyFactFile": "/var/run/qinglong3/prompt-output-external-recovery/durable-key-fact.json",
+  "artifactFile": "/var/run/qinglong3/prompt-output-external-recovery/artifact.json",
+  "custodyPublicKeyFile": "/var/run/qinglong3/prompt-output-external-recovery/custody-public-key.pem",
+  "approverPublicKeyFiles": [
+    {
+      "userId": "replace-with-first-reviewer-user-id",
+      "filePath": "/var/run/qinglong3/prompt-output-external-recovery/first-reviewer-public-key.pem"
+    },
+    {
+      "userId": "replace-with-second-reviewer-user-id",
+      "filePath": "/var/run/qinglong3/prompt-output-external-recovery/second-reviewer-public-key.pem"
+    }
+  ]
+}

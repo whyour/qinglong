@@ -1,0 +1,20 @@
+# Example only. Copy into a private overlay and bind the exact architecture,
+# runtime inventory and control-plane origin of this one Worker identity.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-worker-config
+  namespace: qinglong3-worker
+data:
+  worker-id: REPLACE_WITH_UNIQUE_WORKER_ID
+  control-origin: https://ql3-cluster-control.qinglong3-system.svc:5801
+  capabilities.json: |
+    {
+      "architecture": "arm64",
+      "operatingSystem": "linux",
+      "executors": ["local_process"],
+      "runtimes": [{"name": "node", "version": "24.18.0"}],
+      "labels": {"site": "REPLACE_WITH_SITE"},
+      "capacity": {"cpuCores": 1, "memoryBytes": 268435456},
+      "features": []
+    }

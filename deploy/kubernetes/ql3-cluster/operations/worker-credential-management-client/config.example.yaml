@@ -1,0 +1,44 @@
+# Example only. Copy these objects into a private, per-command overlay.
+# Replace every placeholder. Never commit a real assertion or apply this file.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-worker-credential-management-request
+  namespace: qinglong3-system
+immutable: true
+data:
+  client.json: |
+    {"schemaVersion":1,"endpoint":"https://ql3-worker-credential-management.qinglong3-system.svc:8444/api/v3/worker-credentials/management","servername":"ql3-worker-credential-management.qinglong3-system.svc","caFile":"/tmp/ca.crt","clientCertificateFile":"/tmp/client.crt","clientPrivateKeyFile":"/tmp/client.key","requestTimeoutMs":15000}
+  command.json: |
+    {"schemaVersion":1,"operation":"worker-credential.inspect","request":{"actionRef":"REPLACE_WITH_ACTION_REF","authorityProjectId":"REPLACE_WITH_AUTHORITY_PROJECT_ID","approvalRequestId":"REPLACE_WITH_APPROVAL_REQUEST_ID","inspectionId":"REPLACE_WITH_UNIQUE_INSPECTION_ID"}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-worker-credential-management-client-trust
+  namespace: qinglong3-system
+immutable: true
+data:
+  ca.crt: |
+    REPLACE_WITH_REVIEWED_MANAGER_CA_CERTIFICATE
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-worker-credential-management-assertion
+  namespace: qinglong3-system
+immutable: true
+type: Opaque
+stringData:
+  assertion.jwt: REPLACE_WITH_SHORT_LIVED_STRONG_USER_ASSERTION
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-worker-credential-management-client-identity
+  namespace: qinglong3-system
+immutable: true
+type: kubernetes.io/tls
+stringData:
+  tls.crt: REPLACE_WITH_SHORT_LIVED_CLIENT_CERTIFICATE_CHAIN
+  tls.key: REPLACE_WITH_CLIENT_PRIVATE_KEY

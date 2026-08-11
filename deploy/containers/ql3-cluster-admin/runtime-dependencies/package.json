@@ -1,0 +1,16 @@
+{
+  "name": "@qinglong/cluster-admin-image-dependencies",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "Production-only external dependency root for the QingLong 3.0 short-lived cluster admin image",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "dependencies": {
+    "@kubernetes/client-node": "1.4.0",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.22.0",
+    "semver": "7.7.4"
+  }
+}

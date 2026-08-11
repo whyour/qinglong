@@ -1,0 +1,351 @@
+{
+  "name": "@qinglong/cluster-admin",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 short-lived cluster administration authority",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/application-runtime/clusterAdminRuntime.js",
+  "types": "dist/application-runtime/clusterAdminRuntime.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/application-runtime/clusterAdminRuntime.d.ts",
+      "require": "./dist/application-runtime/clusterAdminRuntime.js",
+      "default": "./dist/application-runtime/clusterAdminRuntime.js"
+    },
+    "./approval-decision-management": {
+      "types": "./dist/approval-management/approvalDecisionManagement.d.ts",
+      "require": "./dist/approval-management/approvalDecisionManagement.js",
+      "default": "./dist/approval-management/approvalDecisionManagement.js"
+    },
+    "./approval-management": {
+      "types": "./dist/approval-management/approvalManagement.d.ts",
+      "require": "./dist/approval-management/approvalManagement.js",
+      "default": "./dist/approval-management/approvalManagement.js"
+    },
+    "./approval-management-transport": {
+      "types": "./dist/approval-management/approvalManagementTransport.d.ts",
+      "require": "./dist/approval-management/approvalManagementTransport.js",
+      "default": "./dist/approval-management/approvalManagementTransport.js"
+    },
+    "./approval-management-http": {
+      "types": "./dist/approval-management/approvalManagementHttp.d.ts",
+      "require": "./dist/approval-management/approvalManagementHttp.js",
+      "default": "./dist/approval-management/approvalManagementHttp.js"
+    },
+    "./approval-management-process": {
+      "types": "./dist/approval-management/approvalManagementProcess.d.ts",
+      "require": "./dist/approval-management/approvalManagementProcess.js",
+      "default": "./dist/approval-management/approvalManagementProcess.js"
+    },
+    "./approval-management-client": {
+      "types": "./dist/approval-management/approvalManagementClient.d.ts",
+      "require": "./dist/approval-management/approvalManagementClient.js",
+      "default": "./dist/approval-management/approvalManagementClient.js"
+    },
+    "./administration": {
+      "types": "./dist/security-administration/clusterAdministration.d.ts",
+      "require": "./dist/security-administration/clusterAdministration.js",
+      "default": "./dist/security-administration/clusterAdministration.js"
+    },
+    "./automation-management": {
+      "types": "./dist/automation-management/automationManagement.d.ts",
+      "require": "./dist/automation-management/automationManagement.js",
+      "default": "./dist/automation-management/automationManagement.js"
+    },
+    "./model-provider-credential-management": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialManagement.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialManagement.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialManagement.js"
+    },
+    "./model-provider-credential-management-transport": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialManagementTransport.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialManagementTransport.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialManagementTransport.js"
+    },
+    "./model-provider-credential-management-http": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialManagementHttp.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialManagementHttp.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialManagementHttp.js"
+    },
+    "./model-provider-credential-management-process": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialManagementProcess.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialManagementProcess.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialManagementProcess.js"
+    },
+    "./model-provider-credential-management-client": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialManagementClient.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialManagementClient.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialManagementClient.js"
+    },
+    "./model-provider-credential-test-executor": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialTestExecutor.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialTestExecutor.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialTestExecutor.js"
+    },
+    "./model-provider-credential-test-executor-process": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialTestExecutorProcess.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialTestExecutorProcess.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialTestExecutorProcess.js"
+    },
+    "./automation-management-transport": {
+      "types": "./dist/automation-management/automationManagementTransport.d.ts",
+      "require": "./dist/automation-management/automationManagementTransport.js",
+      "default": "./dist/automation-management/automationManagementTransport.js"
+    },
+    "./automation-management-http": {
+      "types": "./dist/automation-management/automationManagementHttp.d.ts",
+      "require": "./dist/automation-management/automationManagementHttp.js",
+      "default": "./dist/automation-management/automationManagementHttp.js"
+    },
+    "./automation-management-process": {
+      "types": "./dist/automation-management/automationManagementProcess.d.ts",
+      "require": "./dist/automation-management/automationManagementProcess.js",
+      "default": "./dist/automation-management/automationManagementProcess.js"
+    },
+    "./automation-management-client": {
+      "types": "./dist/automation-management/automationManagementClient.d.ts",
+      "require": "./dist/automation-management/automationManagementClient.js",
+      "default": "./dist/automation-management/automationManagementClient.js"
+    },
+    "./worker-credential-delivery": {
+      "types": "./dist/worker-credential/workerCredentialDelivery.d.ts",
+      "require": "./dist/worker-credential/workerCredentialDelivery.js",
+      "default": "./dist/worker-credential/workerCredentialDelivery.js"
+    },
+    "./worker-credential-file-delivery": {
+      "types": "./dist/worker-credential/workerCredentialFileDelivery.d.ts",
+      "require": "./dist/worker-credential/workerCredentialFileDelivery.js",
+      "default": "./dist/worker-credential/workerCredentialFileDelivery.js"
+    },
+    "./worker-credential-kubernetes-delivery": {
+      "types": "./dist/worker-credential/workerCredentialKubernetesDelivery.d.ts",
+      "require": "./dist/worker-credential/workerCredentialKubernetesDelivery.js",
+      "default": "./dist/worker-credential/workerCredentialKubernetesDelivery.js"
+    },
+    "./worker-credential-kubernetes-token-request": {
+      "types": "./dist/worker-credential/workerCredentialKubernetesTokenRequest.d.ts",
+      "require": "./dist/worker-credential/workerCredentialKubernetesTokenRequest.js",
+      "default": "./dist/worker-credential/workerCredentialKubernetesTokenRequest.js"
+    },
+    "./worker-credential-management": {
+      "types": "./dist/worker-credential/management-server/workerCredentialManagement.d.ts",
+      "require": "./dist/worker-credential/management-server/workerCredentialManagement.js",
+      "default": "./dist/worker-credential/management-server/workerCredentialManagement.js"
+    },
+    "./worker-credential-management-transport": {
+      "types": "./dist/worker-credential/management-server/workerCredentialManagementTransport.d.ts",
+      "require": "./dist/worker-credential/management-server/workerCredentialManagementTransport.js",
+      "default": "./dist/worker-credential/management-server/workerCredentialManagementTransport.js"
+    },
+    "./worker-credential-management-http": {
+      "types": "./dist/worker-credential/management-server/workerCredentialManagementHttp.d.ts",
+      "require": "./dist/worker-credential/management-server/workerCredentialManagementHttp.js",
+      "default": "./dist/worker-credential/management-server/workerCredentialManagementHttp.js"
+    },
+    "./worker-credential-management-process": {
+      "types": "./dist/worker-credential/management-server/workerCredentialManagementProcess.d.ts",
+      "require": "./dist/worker-credential/management-server/workerCredentialManagementProcess.js",
+      "default": "./dist/worker-credential/management-server/workerCredentialManagementProcess.js"
+    },
+    "./worker-credential-management-client": {
+      "types": "./dist/worker-credential/workerCredentialManagementClient.d.ts",
+      "require": "./dist/worker-credential/workerCredentialManagementClient.js",
+      "default": "./dist/worker-credential/workerCredentialManagementClient.js"
+    },
+    "./worker-credential-management-executor": {
+      "types": "./dist/worker-credential/workerCredentialManagementExecutor.d.ts",
+      "require": "./dist/worker-credential/workerCredentialManagementExecutor.js",
+      "default": "./dist/worker-credential/workerCredentialManagementExecutor.js"
+    },
+    "./worker-credential-executor-process": {
+      "types": "./dist/worker-credential/workerCredentialExecutorProcess.d.ts",
+      "require": "./dist/worker-credential/workerCredentialExecutorProcess.js",
+      "default": "./dist/worker-credential/workerCredentialExecutorProcess.js"
+    },
+    "./plugin-package-kubernetes-activation": {
+      "types": "./dist/plugin-package/recovery/pluginPackageKubernetesActivation.d.ts",
+      "require": "./dist/plugin-package/recovery/pluginPackageKubernetesActivation.js",
+      "default": "./dist/plugin-package/recovery/pluginPackageKubernetesActivation.js"
+    },
+    "./plugin-package-recovery": {
+      "types": "./dist/plugin-package/recovery/pluginPackageRecovery.d.ts",
+      "require": "./dist/plugin-package/recovery/pluginPackageRecovery.js",
+      "default": "./dist/plugin-package/recovery/pluginPackageRecovery.js"
+    },
+    "./plugin-package-oci-stage": {
+      "types": "./dist/plugin-package/recovery/pluginPackageOciStage.d.ts",
+      "require": "./dist/plugin-package/recovery/pluginPackageOciStage.js",
+      "default": "./dist/plugin-package/recovery/pluginPackageOciStage.js"
+    },
+    "./plugin-package-recovery-process": {
+      "types": "./dist/plugin-package/recovery/pluginPackageRecoveryProcess.d.ts",
+      "require": "./dist/plugin-package/recovery/pluginPackageRecoveryProcess.js",
+      "default": "./dist/plugin-package/recovery/pluginPackageRecoveryProcess.js"
+    },
+    "./plugin-package-approved-action": {
+      "types": "./dist/plugin-package/executor/pluginPackageApprovedAction.d.ts",
+      "require": "./dist/plugin-package/executor/pluginPackageApprovedAction.js",
+      "default": "./dist/plugin-package/executor/pluginPackageApprovedAction.js"
+    },
+    "./plugin-package-executor-process": {
+      "types": "./dist/plugin-package/executor/pluginPackageExecutorProcess.d.ts",
+      "require": "./dist/plugin-package/executor/pluginPackageExecutorProcess.js",
+      "default": "./dist/plugin-package/executor/pluginPackageExecutorProcess.js"
+    },
+    "./prompt-output-gc-process": {
+      "types": "./dist/prompt-output/retention/promptOutputGcProcess.d.ts",
+      "require": "./dist/prompt-output/retention/promptOutputGcProcess.js",
+      "default": "./dist/prompt-output/retention/promptOutputGcProcess.js"
+    },
+    "./prompt-output-key-retirement-process": {
+      "types": "./dist/prompt-output/key-management/promptOutputKeyRetirementProcess.d.ts",
+      "require": "./dist/prompt-output/key-management/promptOutputKeyRetirementProcess.js",
+      "default": "./dist/prompt-output/key-management/promptOutputKeyRetirementProcess.js"
+    },
+    "./prompt-output-key-rotation-process": {
+      "types": "./dist/prompt-output/key-management/promptOutputKeyRotationProcess.d.ts",
+      "require": "./dist/prompt-output/key-management/promptOutputKeyRotationProcess.js",
+      "default": "./dist/prompt-output/key-management/promptOutputKeyRotationProcess.js"
+    },
+    "./prompt-output-external-recovery-verifier": {
+      "types": "./dist/prompt-output/external-recovery/promptOutputExternalRecoveryVerifier.d.ts",
+      "require": "./dist/prompt-output/external-recovery/promptOutputExternalRecoveryVerifier.js",
+      "default": "./dist/prompt-output/external-recovery/promptOutputExternalRecoveryVerifier.js"
+    },
+    "./prompt-output-kubernetes-secret-keyring": {
+      "types": "./dist/prompt-output/key-management/promptOutputKubernetesSecretKeyring.d.ts",
+      "require": "./dist/prompt-output/key-management/promptOutputKubernetesSecretKeyring.js",
+      "default": "./dist/prompt-output/key-management/promptOutputKubernetesSecretKeyring.js"
+    },
+    "./plugin-package-management": {
+      "types": "./dist/plugin-package/management/pluginPackageManagement.d.ts",
+      "require": "./dist/plugin-package/management/pluginPackageManagement.js",
+      "default": "./dist/plugin-package/management/pluginPackageManagement.js"
+    },
+    "./plugin-package-lifecycle-management": {
+      "types": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.d.ts",
+      "require": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.js",
+      "default": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.js"
+    },
+    "./plugin-package-lifecycle-executor": {
+      "types": "./dist/plugin-package/lifecycle/pluginPackageLifecycleExecutor.d.ts",
+      "require": "./dist/plugin-package/lifecycle/pluginPackageLifecycleExecutor.js",
+      "default": "./dist/plugin-package/lifecycle/pluginPackageLifecycleExecutor.js"
+    },
+    "./plugin-package-management-transport": {
+      "types": "./dist/plugin-package/management/pluginPackageManagementTransport.d.ts",
+      "require": "./dist/plugin-package/management/pluginPackageManagementTransport.js",
+      "default": "./dist/plugin-package/management/pluginPackageManagementTransport.js"
+    },
+    "./plugin-package-identity-assertion": {
+      "types": "./dist/management-support/pluginPackageIdentityAssertion.d.ts",
+      "require": "./dist/management-support/pluginPackageIdentityAssertion.js",
+      "default": "./dist/management-support/pluginPackageIdentityAssertion.js"
+    },
+    "./plugin-package-identity-keyset": {
+      "types": "./dist/management-support/pluginPackageIdentityKeyset.d.ts",
+      "require": "./dist/management-support/pluginPackageIdentityKeyset.js",
+      "default": "./dist/management-support/pluginPackageIdentityKeyset.js"
+    },
+    "./plugin-package-management-http": {
+      "types": "./dist/management-support/pluginPackageManagementHttp.d.ts",
+      "require": "./dist/management-support/pluginPackageManagementHttp.js",
+      "default": "./dist/management-support/pluginPackageManagementHttp.js"
+    },
+    "./plugin-package-management-process": {
+      "types": "./dist/plugin-package/management/pluginPackageManagementProcess.d.ts",
+      "require": "./dist/plugin-package/management/pluginPackageManagementProcess.js",
+      "default": "./dist/plugin-package/management/pluginPackageManagementProcess.js"
+    },
+    "./plugin-package-management-client": {
+      "types": "./dist/management-support/pluginPackageManagementClient.d.ts",
+      "require": "./dist/management-support/pluginPackageManagementClient.js",
+      "default": "./dist/management-support/pluginPackageManagementClient.js"
+    },
+    "./plugin-package-management-kubernetes-client": {
+      "types": "./dist/plugin-package/management/pluginPackageManagementKubernetesClient.d.ts",
+      "require": "./dist/plugin-package/management/pluginPackageManagementKubernetesClient.js",
+      "default": "./dist/plugin-package/management/pluginPackageManagementKubernetesClient.js"
+    },
+    "./plugin-package-quarantine": {
+      "types": "./dist/plugin-package/lifecycle/pluginPackageQuarantine.d.ts",
+      "require": "./dist/plugin-package/lifecycle/pluginPackageQuarantine.js",
+      "default": "./dist/plugin-package/lifecycle/pluginPackageQuarantine.js"
+    },
+    "./plugin-package-publisher-revocation": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherRevocation.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherRevocation.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherRevocation.js"
+    },
+    "./plugin-package-publisher-revocation-approved-action": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationApprovedAction.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationApprovedAction.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationApprovedAction.js"
+    },
+    "./plugin-package-publisher-revocation-approval-consumer": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationApprovalConsumer.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationApprovalConsumer.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationApprovalConsumer.js"
+    },
+    "./plugin-package-publisher-trust-transition-approved-action": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionApprovedAction.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionApprovedAction.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionApprovedAction.js"
+    },
+    "./plugin-package-publisher-trust-transition-approval-consumer": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionApprovalConsumer.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionApprovalConsumer.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionApprovalConsumer.js"
+    },
+    "./plugin-package-publisher-trust-management": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherTrustManagement.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherTrustManagement.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherTrustManagement.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs",
+    "test:automation-integration": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/automationManagementPostgres.integration.test.cjs"
+  },
+  "bin": {
+    "ql3-plugin-package-recover": "dist/plugin-package/recovery/pluginPackageRecoveryCli.js",
+    "ql3-plugin-package-manage": "dist/plugin-package/management/pluginPackageManagementCli.js",
+    "ql3-plugin-package-client": "dist/plugin-package/management/pluginPackageManagementClientCli.js",
+    "ql3-plugin-package-client-kubernetes": "dist/plugin-package/management/pluginPackageManagementKubernetesClientCli.js",
+    "ql3-plugin-package-execute": "dist/plugin-package/executor/pluginPackageExecutorCli.js",
+    "ql3-prompt-output-gc": "dist/prompt-output/retention/promptOutputGcCli.js",
+    "ql3-prompt-output-key-retire": "dist/prompt-output/key-management/promptOutputKeyRetirementCli.js",
+    "ql3-prompt-output-key-rotate": "dist/prompt-output/key-management/promptOutputKeyRotationCli.js",
+    "ql3-prompt-output-key-recovery-verify": "dist/prompt-output/external-recovery/promptOutputExternalRecoveryCli.js",
+    "ql3-worker-credential-manage": "dist/worker-credential/management-server/workerCredentialManagementCli.js",
+    "ql3-worker-credential-execute": "dist/worker-credential/workerCredentialExecutorCli.js",
+    "ql3-worker-credential-client": "dist/worker-credential/workerCredentialManagementClientCli.js",
+    "ql3-approval-manage": "dist/approval-management/approvalManagementCli.js",
+    "ql3-approval-client": "dist/approval-management/approvalManagementClientCli.js",
+    "ql3-automation-manage": "dist/automation-management/automationManagementCli.js",
+    "ql3-automation-client": "dist/automation-management/automationManagementClientCli.js",
+    "ql3-provider-credential-manage": "dist/model-provider-credential/modelProviderCredentialManagementCli.js",
+    "ql3-provider-credential-client": "dist/model-provider-credential/modelProviderCredentialManagementClientCli.js",
+    "ql3-provider-credential-test-execute": "dist/model-provider-credential/modelProviderCredentialTestExecutorCli.js",
+    "ql3-ai-feature-migrate": "dist/modelInvocationMigrationCli.js"
+  },
+  "dependencies": {
+    "@kubernetes/client-node": "1.4.0",
+    "@qinglong/ai": "workspace:*",
+    "@qinglong/cluster-postgres": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

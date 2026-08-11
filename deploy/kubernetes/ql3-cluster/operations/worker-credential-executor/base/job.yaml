@@ -1,0 +1,169 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ql3-worker-credential-executor
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-worker-credential-executor
+    app.kubernetes.io/component: worker-credential-executor
+    app.kubernetes.io/part-of: qinglong3
+    qinglong.io/execution-model: caller-driven
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-worker-credential-executor
+        app.kubernetes.io/component: worker-credential-executor
+        app.kubernetes.io/part-of: qinglong3
+        qinglong.io/execution-model: caller-driven
+    spec:
+      serviceAccountName: ql3-worker-credential-executor
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: executor
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - /opt/qinglong/node_modules/@qinglong/cluster-admin/dist/worker-credential/workerCredentialExecutorCli.js
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: QL3_PROFILE
+              value: cluster-admin
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_ENABLED
+              value: 'true'
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_COMMAND_FILE
+              value: /var/run/qinglong3/worker-credential-command/command.json
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_PEPPER_FILE
+              value: /var/run/secrets/qinglong3/worker-credential-executor/pepper
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_CLUSTER_IDENTITY
+              valueFrom:
+                configMapKeyRef:
+                  name: ql3-worker-credential-executor-config
+                  key: cluster-identity
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_STAGE_NAMESPACE
+              value: qinglong3-worker-credential-staging
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_TARGET_NAMESPACE
+              valueFrom:
+                configMapKeyRef:
+                  name: ql3-worker-credential-executor-config
+                  key: target-namespace
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_TARGET_SECRET
+              valueFrom:
+                configMapKeyRef:
+                  name: ql3-worker-credential-executor-config
+                  key: target-secret
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_TARGET_DEPLOYMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: ql3-worker-credential-executor-config
+                  key: target-deployment
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_TARGET_DATA_KEY
+              value: credential-token
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_DELIVERY_SERVICE_ACCOUNT
+              value: ql3-worker-credential-admin
+            - name: QL3_WORKER_CREDENTIAL_EXECUTOR_IDENTITY_SECRET
+              valueFrom:
+                configMapKeyRef:
+                  name: ql3-worker-credential-executor-config
+                  key: identity-secret
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_EXECUTOR_TLS_MODE
+              value: verify-full
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_EXECUTOR_TLS_CA_FILE
+              value: /var/run/secrets/qinglong3/postgres-worker-credential-executor/ca.crt
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_EXECUTOR_APPLICATION_NAME
+              value: qinglong3-worker-credential-executor
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_EXECUTOR_MAX_CONNECTIONS
+              value: '1'
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_EXECUTOR_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-credential-executor-database
+                  key: postgres-worker-credential-executor-url
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_EXECUTOR_TLS_SERVERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-credential-executor-database
+                  key: postgres-tls-servername
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: kube-api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: command
+              mountPath: /var/run/qinglong3/worker-credential-command
+              readOnly: true
+            - name: pepper
+              mountPath: /var/run/secrets/qinglong3/worker-credential-executor
+              readOnly: true
+            - name: postgres-worker-credential-executor-ca
+              mountPath: /var/run/secrets/qinglong3/postgres-worker-credential-executor
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Mi
+        - name: kube-api-access
+          projected:
+            defaultMode: 288
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+        - name: command
+          configMap:
+            name: ql3-worker-credential-execution-command
+            defaultMode: 292
+            items:
+              - key: command.json
+                path: command.json
+        - name: pepper
+          secret:
+            secretName: ql3-worker-credential-executor-pepper
+            defaultMode: 288
+            items:
+              - key: worker-credential-pepper
+                path: pepper
+        - name: postgres-worker-credential-executor-ca
+          secret:
+            secretName: ql3-cluster-worker-credential-executor-database
+            defaultMode: 292
+            items:
+              - key: postgres-ca.crt
+                path: ca.crt

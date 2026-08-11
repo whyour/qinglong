@@ -1,0 +1,135 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ql3-provider-credential-test-executor
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-provider-credential-test-executor
+    app.kubernetes.io/component: provider-credential-test-executor
+    app.kubernetes.io/part-of: qinglong3
+    qinglong.io/execution-model: caller-driven
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 60
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-provider-credential-test-executor
+        app.kubernetes.io/component: provider-credential-test-executor
+        app.kubernetes.io/part-of: qinglong3
+        qinglong.io/execution-model: caller-driven
+    spec:
+      serviceAccountName: ql3-provider-credential-test-executor
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: executor
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - /opt/qinglong/node_modules/@qinglong/cluster-admin/dist/model-provider-credential/modelProviderCredentialTestExecutorCli.js
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: QL3_PROFILE
+              value: cluster-admin
+            - name: QL3_MODEL_PROVIDER_CREDENTIAL_TEST_EXECUTOR_ENABLED
+              value: 'true'
+            - name: QL3_MODEL_PROVIDER_CREDENTIAL_TEST_WRITE_TERMINATION_MESSAGE
+              value: 'true'
+            - name: QL3_MODEL_PROVIDER_CREDENTIAL_TEST_COMMAND_FILE
+              value: /var/run/qinglong3/provider-credential-test/command.json
+            - name: QL3_MODEL_PROVIDER_CREDENTIAL_TEST_ALLOWLIST_FILE
+              value: /var/run/qinglong3/provider-credential-test/allowlist.json
+            - name: QL3_MODEL_PROVIDER_CREDENTIAL_TEST_SECRET_ROOT
+              value: /var/run/secrets/qinglong3/provider-credential-test
+            - name: QL3_MODEL_PROVIDER_CREDENTIAL_TEST_DENY_CANARY_HOST
+              value: kubernetes.default.svc
+            - name: QL3_MODEL_PROVIDER_CREDENTIAL_TEST_DENY_CANARY_PORT
+              value: '443'
+            - name: QL3_POSTGRES_AI_CREDENTIAL_TESTER_TLS_MODE
+              value: verify-full
+            - name: QL3_POSTGRES_AI_CREDENTIAL_TESTER_TLS_CA_FILE
+              value: /var/run/secrets/qinglong3/postgres-ai-credential-tester/ca.crt
+            - name: QL3_POSTGRES_AI_CREDENTIAL_TESTER_APPLICATION_NAME
+              value: qinglong3-ai-credential-tester
+            - name: QL3_POSTGRES_AI_CREDENTIAL_TESTER_POOL_MAX
+              value: '1'
+            - name: QL3_POSTGRES_AI_CREDENTIAL_TESTER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-provider-credential-test-database
+                  key: postgres-ai-credential-tester-url
+            - name: QL3_POSTGRES_AI_CREDENTIAL_TESTER_TLS_SERVERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-provider-credential-test-database
+                  key: postgres-tls-servername
+          resources:
+            requests:
+              cpu: 25m
+              memory: 48Mi
+            limits:
+              cpu: 500m
+              memory: 192Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: command
+              mountPath: /var/run/qinglong3/provider-credential-test
+              readOnly: true
+            - name: provider-secret
+              mountPath: /var/run/secrets/qinglong3/provider-credential-test
+              readOnly: true
+            - name: postgres-ai-credential-tester-ca
+              mountPath: /var/run/secrets/qinglong3/postgres-ai-credential-tester
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Mi
+        - name: command
+          projected:
+            defaultMode: 292
+            sources:
+              - configMap:
+                  name: ql3-provider-credential-test-command
+                  items:
+                    - key: command.json
+                      path: command.json
+              - configMap:
+                  name: ql3-provider-credential-test-allowlist
+                  items:
+                    - key: allowlist.json
+                      path: allowlist.json
+        - name: provider-secret
+          secret:
+            secretName: ql3-provider-credential-test-material
+            defaultMode: 288
+            items:
+              # SHA-256 of the canonical qlsecret:v1 SecretRef selected by the
+              # durable binding. Replace both the key and path together.
+              - key: 31cf30a7b013bd31aa88867b1a8c48e35e7b88b5b49fb37eedd6222354679d02
+                path: 31cf30a7b013bd31aa88867b1a8c48e35e7b88b5b49fb37eedd6222354679d02
+        - name: postgres-ai-credential-tester-ca
+          secret:
+            secretName: ql3-cluster-provider-credential-test-database
+            defaultMode: 292
+            items:
+              - key: postgres-ca.crt
+                path: ca.crt

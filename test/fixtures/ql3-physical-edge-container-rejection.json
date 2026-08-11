@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "physical_edge_candidate",
+  "profile": "edge",
+  "deviceId": "negative-container-fixture",
+  "deviceModel": "Container rejection fixture",
+  "soc": "Not physical hardware",
+  "storageMedium": "usb",
+  "expectedArchitecture": "arm64",
+  "memoryBytes": {
+    "minimum": 134217728,
+    "maximum": 68719476736
+  },
+  "expectedFilesystem": "tmpfs"
+}

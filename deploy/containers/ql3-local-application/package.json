@@ -1,0 +1,19 @@
+{
+  "name": "@qinglong/local-application-image",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "Locked build dependencies for the QingLong 3.0 AI-excluded local application image",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "dependencies": {
+    "croner": "7.0.8",
+    "drizzle-orm": "1.0.0-rc.4",
+    "semver": "7.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,816 @@
+{
+  "name": "@qinglong/runtime-core",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 profile-neutral runtime contracts",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "local-dispatch": [
+        "dist/local-runtime/localDispatch.d.ts"
+      ],
+      "remote-dispatch": [
+        "dist/remote-execution/remoteDispatch.d.ts"
+      ],
+      "remote-offer-delivery": [
+        "dist/remote-execution/remoteOfferDelivery.d.ts"
+      ],
+      "remote-activation": [
+        "dist/remote-execution/remoteRunActivation.d.ts"
+      ],
+      "remote-activation-delivery": [
+        "dist/remote-execution/remoteRunActivationDelivery.d.ts"
+      ],
+      "remote-secret-delivery": [
+        "dist/remote-execution/remoteSecretDelivery.d.ts"
+      ],
+      "remote-worker-completion": [
+        "dist/remote-execution/remoteWorkerCompletion.d.ts"
+      ],
+      "remote-worker-lease-control": [
+        "dist/remote-execution/remoteWorkerLeaseControl.d.ts"
+      ],
+      "cluster-run-cancellation": [
+        "dist/run/clusterRunCancellation.d.ts"
+      ],
+      "run-cancellation": [
+        "dist/run/clusterRunCancellation.d.ts"
+      ],
+      "task-start": [
+        "dist/task-start/taskStart.d.ts"
+      ],
+      "cluster-run-cancellation-convergence": [
+        "dist/run/clusterRunCancellationConvergence.d.ts"
+      ],
+      "run-dispatch-lease": [
+        "dist/run/runDispatchLease.d.ts"
+      ],
+      "worker-session": [
+        "dist/worker/workerSession.d.ts"
+      ],
+      "worker-session-transport": [
+        "dist/worker/workerSessionTransport.d.ts"
+      ],
+      "worker-credential": [
+        "dist/worker/workerCredential.d.ts"
+      ],
+      "worker-credential-delivery": [
+        "dist/worker/workerCredentialDelivery.d.ts"
+      ],
+      "worker-credential-token": [
+        "dist/worker/workerCredentialToken.d.ts"
+      ],
+      "worker-credential-management-plan": [
+        "dist/worker/workerCredentialManagementPlan.d.ts"
+      ],
+      "plugin-package": [
+        "dist/plugin-package/pluginPackage.d.ts"
+      ],
+      "plugin-package-install": [
+        "dist/plugin-package/installation/pluginPackageInstall.d.ts"
+      ],
+      "plugin-package-activation": [
+        "dist/plugin-package/installation/pluginPackageActivation.d.ts"
+      ],
+      "plugin-package-resource-generation": [
+        "dist/plugin-package/pluginPackageResourceGeneration.d.ts"
+      ],
+      "plugin-package-resource-materialization": [
+        "dist/plugin-package/pluginPackageResourceMaterialization.d.ts"
+      ],
+      "plugin-package-task-reconciliation": [
+        "dist/plugin-package/pluginPackageTaskReconciliation.d.ts"
+      ],
+      "plugin-package-task-publication": [
+        "dist/plugin-package/pluginPackageTaskPublication.d.ts"
+      ],
+      "plugin-package-automation-publication": [
+        "dist/plugin-package/pluginPackageAutomationPublication.d.ts"
+      ],
+      "plugin-package-workflow-execution-plan": [
+        "dist/plugin-package/workflow/pluginPackageWorkflowExecutionPlan.d.ts"
+      ],
+      "plugin-package-workflow-administration": [
+        "dist/plugin-package/workflow/pluginPackageWorkflowAdministration.d.ts"
+      ],
+      "plugin-package-workflow-frontier": [
+        "dist/plugin-package/workflow/pluginPackageWorkflowFrontier.d.ts"
+      ],
+      "plugin-package-workflow-cancellation-convergence": [
+        "dist/plugin-package/workflow/pluginPackageWorkflowCancellationConvergence.d.ts"
+      ],
+      "plugin-package-workflow-task-attempt-admission": [
+        "dist/plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmission.d.ts"
+      ],
+      "plugin-package-quarantine": [
+        "dist/plugin-package/lifecycle/pluginPackageQuarantine.d.ts"
+      ],
+      "plugin-package-lifecycle": [
+        "dist/plugin-package/lifecycle/pluginPackageLifecycle.d.ts"
+      ],
+      "plugin-package-lifecycle-plan": [
+        "dist/plugin-package/lifecycle/pluginPackageLifecyclePlan.d.ts"
+      ],
+      "plugin-package-publisher-provenance": [
+        "dist/plugin-package/publisher/pluginPackagePublisherProvenance.d.ts"
+      ],
+      "plugin-package-publisher-trust": [
+        "dist/plugin-package/publisher/pluginPackagePublisherTrust.d.ts"
+      ],
+      "plugin-package-publisher-revocation-proposal": [
+        "dist/plugin-package/publisher/pluginPackagePublisherRevocationProposal.d.ts"
+      ],
+      "plugin-package-publisher-trust-transition-proposal": [
+        "dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionProposal.d.ts"
+      ],
+      "project-tool-definition-snapshot": [
+        "dist/tool-execution/tool-registry/projectToolDefinitionSnapshot.d.ts"
+      ],
+      "plugin-package-installation": [
+        "dist/plugin-package/installation/pluginPackageInstallation.d.ts"
+      ],
+      "plugin-package-admission": [
+        "dist/plugin-package/installation/pluginPackageAdmission.d.ts"
+      ],
+      "plugin-package-recovery": [
+        "dist/plugin-package/installation/pluginPackageRecovery.d.ts"
+      ],
+      "plugin-package-bundle": [
+        "dist/plugin-package/pluginPackageBundle.d.ts"
+      ],
+      "approved-action": [
+        "dist/approved-action/approvedAction.d.ts"
+      ],
+      "approval-discovery": [
+        "dist/approved-action/approvalDiscovery.d.ts"
+      ],
+      "approval-decision": [
+        "dist/approved-action/approvalDecision.d.ts"
+      ],
+      "approval-inspection": [
+        "dist/approved-action/approvalInspection.d.ts"
+      ],
+      "approved-action-execution": [
+        "dist/approved-action/approvedActionExecution.d.ts"
+      ],
+      "approved-action-dispatcher": [
+        "dist/approved-action/approvedActionDispatcher.d.ts"
+      ],
+      "plugin-package-approved-action": [
+        "dist/plugin-package/pluginPackageApprovedActionHandler.d.ts"
+      ],
+      "plugin-package-proposal": [
+        "dist/plugin-package/pluginPackageProposal.d.ts"
+      ],
+      "plugin-package-management": [
+        "dist/plugin-package/pluginPackageManagement.d.ts"
+      ],
+      "tool-registry": [
+        "dist/tool-execution/tool-registry/toolRegistry.d.ts"
+      ],
+      "tool-invocation-artifact": [
+        "dist/tool-execution/toolInvocationArtifact.d.ts"
+      ],
+      "trusted-tool-invocation": [
+        "dist/tool-execution/trustedToolInvocation.d.ts"
+      ],
+      "step-run": [
+        "dist/run/stepRun.d.ts"
+      ],
+      "tool-execution-evidence": [
+        "dist/tool-execution/toolExecutionEvidence.d.ts"
+      ],
+      "tool-execution-start-barrier": [
+        "dist/tool-execution/toolExecutionStartBarrier.d.ts"
+      ],
+      "trusted-tool-execution": [
+        "dist/tool-execution/trustedToolExecution.d.ts"
+      ],
+      "tool-execution-completion": [
+        "dist/tool-execution/toolExecutionCompletion.d.ts"
+      ],
+      "trusted-tool-success-completion": [
+        "dist/tool-execution/trustedToolSuccessCompletion.d.ts"
+      ],
+      "trusted-tool-completion": [
+        "dist/tool-execution/trustedToolCompletion.d.ts"
+      ],
+      "tool-execution-failure-completion": [
+        "dist/tool-execution/toolExecutionFailureCompletion.d.ts"
+      ],
+      "tool-result-key-catalog": [
+        "dist/tool-execution/toolResultKeyCatalog.d.ts"
+      ],
+      "tool-result-rekey": [
+        "dist/tool-execution/toolResultRekey.d.ts"
+      ],
+      "builtin-run-read-tool": [
+        "dist/tool-execution/builtin-run-read/builtInRunReadTool.d.ts"
+      ],
+      "builtin-run-read-projection": [
+        "dist/tool-execution/builtin-run-read/builtInRunReadProjection.d.ts"
+      ],
+      "run": [
+        "dist/run/run.d.ts"
+      ],
+      "project-run-list": [
+        "dist/run/projectRunList.d.ts"
+      ],
+      "bounded-run-read-projection": [
+        "dist/run/projection/boundedRunReadProjection.d.ts"
+      ],
+      "bounded-run-list-projection": [
+        "dist/run/projection/boundedRunListProjection.d.ts"
+      ],
+      "bounded-run-event-list-projection": [
+        "dist/run/projection/boundedRunEventListProjection.d.ts"
+      ],
+      "bounded-run-step-list-projection": [
+        "dist/run/projection/boundedRunStepListProjection.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./migration-stream": {
+      "types": "./dist/migration/migrationStream.d.ts",
+      "require": "./dist/migration/migrationStream.js",
+      "default": "./dist/migration/migrationStream.js"
+    },
+    "./run": {
+      "types": "./dist/run/run.d.ts",
+      "require": "./dist/run/run.js",
+      "default": "./dist/run/run.js"
+    },
+    "./run-repository": {
+      "types": "./dist/run/runRepositoryContract.d.ts",
+      "require": "./dist/run/runRepositoryContract.js",
+      "default": "./dist/run/runRepositoryContract.js"
+    },
+    "./project-run-list": {
+      "types": "./dist/run/projectRunList.d.ts",
+      "require": "./dist/run/projectRunList.js",
+      "default": "./dist/run/projectRunList.js"
+    },
+    "./bounded-run-read-projection": {
+      "types": "./dist/run/projection/boundedRunReadProjection.d.ts",
+      "require": "./dist/run/projection/boundedRunReadProjection.js",
+      "default": "./dist/run/projection/boundedRunReadProjection.js"
+    },
+    "./bounded-run-list-projection": {
+      "types": "./dist/run/projection/boundedRunListProjection.d.ts",
+      "require": "./dist/run/projection/boundedRunListProjection.js",
+      "default": "./dist/run/projection/boundedRunListProjection.js"
+    },
+    "./bounded-run-event-list-projection": {
+      "types": "./dist/run/projection/boundedRunEventListProjection.d.ts",
+      "require": "./dist/run/projection/boundedRunEventListProjection.js",
+      "default": "./dist/run/projection/boundedRunEventListProjection.js"
+    },
+    "./bounded-run-step-list-projection": {
+      "types": "./dist/run/projection/boundedRunStepListProjection.d.ts",
+      "require": "./dist/run/projection/boundedRunStepListProjection.js",
+      "default": "./dist/run/projection/boundedRunStepListProjection.js"
+    },
+    "./task-definition": {
+      "types": "./dist/task-definition/taskDefinition.d.ts",
+      "require": "./dist/task-definition/taskDefinition.js",
+      "default": "./dist/task-definition/taskDefinition.js"
+    },
+    "./bounded-task-list-projection": {
+      "types": "./dist/task-definition/projection/boundedTaskListProjection.d.ts",
+      "require": "./dist/task-definition/projection/boundedTaskListProjection.js",
+      "default": "./dist/task-definition/projection/boundedTaskListProjection.js"
+    },
+    "./bounded-task-read-projection": {
+      "types": "./dist/task-definition/projection/boundedTaskReadProjection.d.ts",
+      "require": "./dist/task-definition/projection/boundedTaskReadProjection.js",
+      "default": "./dist/task-definition/projection/boundedTaskReadProjection.js"
+    },
+    "./task-definition-administration": {
+      "types": "./dist/task-definition/taskDefinitionAdministration.d.ts",
+      "require": "./dist/task-definition/taskDefinitionAdministration.js",
+      "default": "./dist/task-definition/taskDefinitionAdministration.js"
+    },
+    "./plugin-package": {
+      "types": "./dist/plugin-package/pluginPackage.d.ts",
+      "require": "./dist/plugin-package/pluginPackage.js",
+      "default": "./dist/plugin-package/pluginPackage.js"
+    },
+    "./plugin-package-install": {
+      "types": "./dist/plugin-package/installation/pluginPackageInstall.d.ts",
+      "require": "./dist/plugin-package/installation/pluginPackageInstall.js",
+      "default": "./dist/plugin-package/installation/pluginPackageInstall.js"
+    },
+    "./plugin-package-activation": {
+      "types": "./dist/plugin-package/installation/pluginPackageActivation.d.ts",
+      "require": "./dist/plugin-package/installation/pluginPackageActivation.js",
+      "default": "./dist/plugin-package/installation/pluginPackageActivation.js"
+    },
+    "./plugin-package-resource-generation": {
+      "types": "./dist/plugin-package/pluginPackageResourceGeneration.d.ts",
+      "require": "./dist/plugin-package/pluginPackageResourceGeneration.js",
+      "default": "./dist/plugin-package/pluginPackageResourceGeneration.js"
+    },
+    "./plugin-package-resource-materialization": {
+      "types": "./dist/plugin-package/pluginPackageResourceMaterialization.d.ts",
+      "require": "./dist/plugin-package/pluginPackageResourceMaterialization.js",
+      "default": "./dist/plugin-package/pluginPackageResourceMaterialization.js"
+    },
+    "./plugin-package-task-reconciliation": {
+      "types": "./dist/plugin-package/pluginPackageTaskReconciliation.d.ts",
+      "require": "./dist/plugin-package/pluginPackageTaskReconciliation.js",
+      "default": "./dist/plugin-package/pluginPackageTaskReconciliation.js"
+    },
+    "./plugin-package-task-publication": {
+      "types": "./dist/plugin-package/pluginPackageTaskPublication.d.ts",
+      "require": "./dist/plugin-package/pluginPackageTaskPublication.js",
+      "default": "./dist/plugin-package/pluginPackageTaskPublication.js"
+    },
+    "./plugin-package-automation-publication": {
+      "types": "./dist/plugin-package/pluginPackageAutomationPublication.d.ts",
+      "require": "./dist/plugin-package/pluginPackageAutomationPublication.js",
+      "default": "./dist/plugin-package/pluginPackageAutomationPublication.js"
+    },
+    "./plugin-package-workflow-execution-plan": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowExecutionPlan.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowExecutionPlan.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowExecutionPlan.js"
+    },
+    "./plugin-package-workflow-administration": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowAdministration.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowAdministration.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowAdministration.js"
+    },
+    "./plugin-package-workflow-frontier": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowFrontier.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowFrontier.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowFrontier.js"
+    },
+    "./plugin-package-workflow-cancellation-convergence": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowCancellationConvergence.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowCancellationConvergence.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowCancellationConvergence.js"
+    },
+    "./plugin-package-workflow-task-attempt-admission": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmission.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmission.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmission.js"
+    },
+    "./plugin-package-quarantine": {
+      "types": "./dist/plugin-package/lifecycle/pluginPackageQuarantine.d.ts",
+      "require": "./dist/plugin-package/lifecycle/pluginPackageQuarantine.js",
+      "default": "./dist/plugin-package/lifecycle/pluginPackageQuarantine.js"
+    },
+    "./plugin-package-lifecycle": {
+      "types": "./dist/plugin-package/lifecycle/pluginPackageLifecycle.d.ts",
+      "require": "./dist/plugin-package/lifecycle/pluginPackageLifecycle.js",
+      "default": "./dist/plugin-package/lifecycle/pluginPackageLifecycle.js"
+    },
+    "./plugin-package-lifecycle-plan": {
+      "types": "./dist/plugin-package/lifecycle/pluginPackageLifecyclePlan.d.ts",
+      "require": "./dist/plugin-package/lifecycle/pluginPackageLifecyclePlan.js",
+      "default": "./dist/plugin-package/lifecycle/pluginPackageLifecyclePlan.js"
+    },
+    "./plugin-package-publisher-provenance": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherProvenance.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherProvenance.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherProvenance.js"
+    },
+    "./plugin-package-publisher-trust": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherTrust.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherTrust.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherTrust.js"
+    },
+    "./plugin-package-publisher-revocation-proposal": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationProposal.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationProposal.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherRevocationProposal.js"
+    },
+    "./plugin-package-publisher-trust-transition-proposal": {
+      "types": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionProposal.d.ts",
+      "require": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionProposal.js",
+      "default": "./dist/plugin-package/publisher/pluginPackagePublisherTrustTransitionProposal.js"
+    },
+    "./project-tool-definition-snapshot": {
+      "types": "./dist/tool-execution/tool-registry/projectToolDefinitionSnapshot.d.ts",
+      "require": "./dist/tool-execution/tool-registry/projectToolDefinitionSnapshot.js",
+      "default": "./dist/tool-execution/tool-registry/projectToolDefinitionSnapshot.js"
+    },
+    "./plugin-package-installation": {
+      "types": "./dist/plugin-package/installation/pluginPackageInstallation.d.ts",
+      "require": "./dist/plugin-package/installation/pluginPackageInstallation.js",
+      "default": "./dist/plugin-package/installation/pluginPackageInstallation.js"
+    },
+    "./plugin-package-admission": {
+      "types": "./dist/plugin-package/installation/pluginPackageAdmission.d.ts",
+      "require": "./dist/plugin-package/installation/pluginPackageAdmission.js",
+      "default": "./dist/plugin-package/installation/pluginPackageAdmission.js"
+    },
+    "./plugin-package-recovery": {
+      "types": "./dist/plugin-package/installation/pluginPackageRecovery.d.ts",
+      "require": "./dist/plugin-package/installation/pluginPackageRecovery.js",
+      "default": "./dist/plugin-package/installation/pluginPackageRecovery.js"
+    },
+    "./plugin-package-bundle": {
+      "types": "./dist/plugin-package/pluginPackageBundle.d.ts",
+      "require": "./dist/plugin-package/pluginPackageBundle.js",
+      "default": "./dist/plugin-package/pluginPackageBundle.js"
+    },
+    "./approved-action": {
+      "types": "./dist/approved-action/approvedAction.d.ts",
+      "require": "./dist/approved-action/approvedAction.js",
+      "default": "./dist/approved-action/approvedAction.js"
+    },
+    "./approval-discovery": {
+      "types": "./dist/approved-action/approvalDiscovery.d.ts",
+      "require": "./dist/approved-action/approvalDiscovery.js",
+      "default": "./dist/approved-action/approvalDiscovery.js"
+    },
+    "./approval-decision": {
+      "types": "./dist/approved-action/approvalDecision.d.ts",
+      "require": "./dist/approved-action/approvalDecision.js",
+      "default": "./dist/approved-action/approvalDecision.js"
+    },
+    "./approval-inspection": {
+      "types": "./dist/approved-action/approvalInspection.d.ts",
+      "require": "./dist/approved-action/approvalInspection.js",
+      "default": "./dist/approved-action/approvalInspection.js"
+    },
+    "./approved-action-execution": {
+      "types": "./dist/approved-action/approvedActionExecution.d.ts",
+      "require": "./dist/approved-action/approvedActionExecution.js",
+      "default": "./dist/approved-action/approvedActionExecution.js"
+    },
+    "./approved-action-dispatcher": {
+      "types": "./dist/approved-action/approvedActionDispatcher.d.ts",
+      "require": "./dist/approved-action/approvedActionDispatcher.js",
+      "default": "./dist/approved-action/approvedActionDispatcher.js"
+    },
+    "./plugin-package-approved-action": {
+      "types": "./dist/plugin-package/pluginPackageApprovedActionHandler.d.ts",
+      "require": "./dist/plugin-package/pluginPackageApprovedActionHandler.js",
+      "default": "./dist/plugin-package/pluginPackageApprovedActionHandler.js"
+    },
+    "./plugin-package-proposal": {
+      "types": "./dist/plugin-package/pluginPackageProposal.d.ts",
+      "require": "./dist/plugin-package/pluginPackageProposal.js",
+      "default": "./dist/plugin-package/pluginPackageProposal.js"
+    },
+    "./plugin-package-management": {
+      "types": "./dist/plugin-package/pluginPackageManagement.d.ts",
+      "require": "./dist/plugin-package/pluginPackageManagement.js",
+      "default": "./dist/plugin-package/pluginPackageManagement.js"
+    },
+    "./tool-registry": {
+      "types": "./dist/tool-execution/tool-registry/toolRegistry.d.ts",
+      "require": "./dist/tool-execution/tool-registry/toolRegistry.js",
+      "default": "./dist/tool-execution/tool-registry/toolRegistry.js"
+    },
+    "./tool-invocation-artifact": {
+      "types": "./dist/tool-execution/toolInvocationArtifact.d.ts",
+      "require": "./dist/tool-execution/toolInvocationArtifact.js",
+      "default": "./dist/tool-execution/toolInvocationArtifact.js"
+    },
+    "./trusted-tool-invocation": {
+      "types": "./dist/tool-execution/trustedToolInvocation.d.ts",
+      "require": "./dist/tool-execution/trustedToolInvocation.js",
+      "default": "./dist/tool-execution/trustedToolInvocation.js"
+    },
+    "./step-run": {
+      "types": "./dist/run/stepRun.d.ts",
+      "require": "./dist/run/stepRun.js",
+      "default": "./dist/run/stepRun.js"
+    },
+    "./tool-execution-evidence": {
+      "types": "./dist/tool-execution/toolExecutionEvidence.d.ts",
+      "require": "./dist/tool-execution/toolExecutionEvidence.js",
+      "default": "./dist/tool-execution/toolExecutionEvidence.js"
+    },
+    "./tool-execution-start-barrier": {
+      "types": "./dist/tool-execution/toolExecutionStartBarrier.d.ts",
+      "require": "./dist/tool-execution/toolExecutionStartBarrier.js",
+      "default": "./dist/tool-execution/toolExecutionStartBarrier.js"
+    },
+    "./trusted-tool-execution": {
+      "types": "./dist/tool-execution/trustedToolExecution.d.ts",
+      "require": "./dist/tool-execution/trustedToolExecution.js",
+      "default": "./dist/tool-execution/trustedToolExecution.js"
+    },
+    "./tool-execution-completion": {
+      "types": "./dist/tool-execution/toolExecutionCompletion.d.ts",
+      "require": "./dist/tool-execution/toolExecutionCompletion.js",
+      "default": "./dist/tool-execution/toolExecutionCompletion.js"
+    },
+    "./trusted-tool-success-completion": {
+      "types": "./dist/tool-execution/trustedToolSuccessCompletion.d.ts",
+      "require": "./dist/tool-execution/trustedToolSuccessCompletion.js",
+      "default": "./dist/tool-execution/trustedToolSuccessCompletion.js"
+    },
+    "./trusted-tool-completion": {
+      "types": "./dist/tool-execution/trustedToolCompletion.d.ts",
+      "require": "./dist/tool-execution/trustedToolCompletion.js",
+      "default": "./dist/tool-execution/trustedToolCompletion.js"
+    },
+    "./tool-execution-failure-completion": {
+      "types": "./dist/tool-execution/toolExecutionFailureCompletion.d.ts",
+      "require": "./dist/tool-execution/toolExecutionFailureCompletion.js",
+      "default": "./dist/tool-execution/toolExecutionFailureCompletion.js"
+    },
+    "./tool-result-key-catalog": {
+      "types": "./dist/tool-execution/toolResultKeyCatalog.d.ts",
+      "require": "./dist/tool-execution/toolResultKeyCatalog.js",
+      "default": "./dist/tool-execution/toolResultKeyCatalog.js"
+    },
+    "./tool-result-rekey": {
+      "types": "./dist/tool-execution/toolResultRekey.d.ts",
+      "require": "./dist/tool-execution/toolResultRekey.js",
+      "default": "./dist/tool-execution/toolResultRekey.js"
+    },
+    "./builtin-run-read-tool": {
+      "types": "./dist/tool-execution/builtin-run-read/builtInRunReadTool.d.ts",
+      "require": "./dist/tool-execution/builtin-run-read/builtInRunReadTool.js",
+      "default": "./dist/tool-execution/builtin-run-read/builtInRunReadTool.js"
+    },
+    "./builtin-run-read-projection": {
+      "types": "./dist/tool-execution/builtin-run-read/builtInRunReadProjection.d.ts",
+      "require": "./dist/tool-execution/builtin-run-read/builtInRunReadProjection.js",
+      "default": "./dist/tool-execution/builtin-run-read/builtInRunReadProjection.js"
+    },
+    "./secret-reference": {
+      "types": "./dist/secret/secretReference.d.ts",
+      "require": "./dist/secret/secretReference.js",
+      "default": "./dist/secret/secretReference.js"
+    },
+    "./cluster-execution-revision": {
+      "types": "./dist/task-definition/clusterExecutionRevision.d.ts",
+      "require": "./dist/task-definition/clusterExecutionRevision.js",
+      "default": "./dist/task-definition/clusterExecutionRevision.js"
+    },
+    "./cluster-scheduler": {
+      "types": "./dist/scheduler/clusterScheduler.d.ts",
+      "require": "./dist/scheduler/clusterScheduler.js",
+      "default": "./dist/scheduler/clusterScheduler.js"
+    },
+    "./remote-dispatch": {
+      "types": "./dist/remote-execution/remoteDispatch.d.ts",
+      "require": "./dist/remote-execution/remoteDispatch.js",
+      "default": "./dist/remote-execution/remoteDispatch.js"
+    },
+    "./remote-offer-delivery": {
+      "types": "./dist/remote-execution/remoteOfferDelivery.d.ts",
+      "require": "./dist/remote-execution/remoteOfferDelivery.js",
+      "default": "./dist/remote-execution/remoteOfferDelivery.js"
+    },
+    "./remote-activation": {
+      "types": "./dist/remote-execution/remoteRunActivation.d.ts",
+      "require": "./dist/remote-execution/remoteRunActivation.js",
+      "default": "./dist/remote-execution/remoteRunActivation.js"
+    },
+    "./remote-activation-delivery": {
+      "types": "./dist/remote-execution/remoteRunActivationDelivery.d.ts",
+      "require": "./dist/remote-execution/remoteRunActivationDelivery.js",
+      "default": "./dist/remote-execution/remoteRunActivationDelivery.js"
+    },
+    "./remote-secret-delivery": {
+      "types": "./dist/remote-execution/remoteSecretDelivery.d.ts",
+      "require": "./dist/remote-execution/remoteSecretDelivery.js",
+      "default": "./dist/remote-execution/remoteSecretDelivery.js"
+    },
+    "./remote-worker-completion": {
+      "types": "./dist/remote-execution/remoteWorkerCompletion.d.ts",
+      "require": "./dist/remote-execution/remoteWorkerCompletion.js",
+      "default": "./dist/remote-execution/remoteWorkerCompletion.js"
+    },
+    "./remote-worker-lease-control": {
+      "types": "./dist/remote-execution/remoteWorkerLeaseControl.d.ts",
+      "require": "./dist/remote-execution/remoteWorkerLeaseControl.js",
+      "default": "./dist/remote-execution/remoteWorkerLeaseControl.js"
+    },
+    "./cluster-run-cancellation": {
+      "types": "./dist/run/clusterRunCancellation.d.ts",
+      "require": "./dist/run/clusterRunCancellation.js",
+      "default": "./dist/run/clusterRunCancellation.js"
+    },
+    "./run-cancellation": {
+      "types": "./dist/run/clusterRunCancellation.d.ts",
+      "require": "./dist/run/clusterRunCancellation.js",
+      "default": "./dist/run/clusterRunCancellation.js"
+    },
+    "./task-start": {
+      "types": "./dist/task-start/taskStart.d.ts",
+      "require": "./dist/task-start/taskStart.js",
+      "default": "./dist/task-start/taskStart.js"
+    },
+    "./cluster-run-cancellation-convergence": {
+      "types": "./dist/run/clusterRunCancellationConvergence.d.ts",
+      "require": "./dist/run/clusterRunCancellationConvergence.js",
+      "default": "./dist/run/clusterRunCancellationConvergence.js"
+    },
+    "./run-dispatch-lease": {
+      "types": "./dist/run/runDispatchLease.d.ts",
+      "require": "./dist/run/runDispatchLease.js",
+      "default": "./dist/run/runDispatchLease.js"
+    },
+    "./worker-session": {
+      "types": "./dist/worker/workerSession.d.ts",
+      "require": "./dist/worker/workerSession.js",
+      "default": "./dist/worker/workerSession.js"
+    },
+    "./worker-session-transport": {
+      "types": "./dist/worker/workerSessionTransport.d.ts",
+      "require": "./dist/worker/workerSessionTransport.js",
+      "default": "./dist/worker/workerSessionTransport.js"
+    },
+    "./trigger": {
+      "types": "./dist/scheduler/trigger.d.ts",
+      "require": "./dist/scheduler/trigger.js",
+      "default": "./dist/scheduler/trigger.js"
+    },
+    "./trigger-administration": {
+      "types": "./dist/scheduler/triggerAdministration.d.ts",
+      "require": "./dist/scheduler/triggerAdministration.js",
+      "default": "./dist/scheduler/triggerAdministration.js"
+    },
+    "./task-spec-semantic": {
+      "types": "./dist/task-definition/taskSpecSemantic.d.ts",
+      "require": "./dist/task-definition/taskSpecSemantic.js",
+      "default": "./dist/task-definition/taskSpecSemantic.js"
+    },
+    "./task-definition-execution-compiler": {
+      "types": "./dist/task-definition/taskDefinitionExecutionCompiler.d.ts",
+      "require": "./dist/task-definition/taskDefinitionExecutionCompiler.js",
+      "default": "./dist/task-definition/taskDefinitionExecutionCompiler.js"
+    },
+    "./local-startup-recovery": {
+      "types": "./dist/local-runtime/localStartupRecovery.d.ts",
+      "require": "./dist/local-runtime/localStartupRecovery.js",
+      "default": "./dist/local-runtime/localStartupRecovery.js"
+    },
+    "./local-completion-receipt-journal": {
+      "types": "./dist/local-runtime/localCompletionReceiptJournal.d.ts",
+      "require": "./dist/local-runtime/localCompletionReceiptJournal.js",
+      "default": "./dist/local-runtime/localCompletionReceiptJournal.js"
+    },
+    "./local-dispatch": {
+      "types": "./dist/local-runtime/localDispatch.d.ts",
+      "require": "./dist/local-runtime/localDispatch.js",
+      "default": "./dist/local-runtime/localDispatch.js"
+    },
+    "./local-execution-control": {
+      "types": "./dist/local-runtime/localExecutionControl.d.ts",
+      "require": "./dist/local-runtime/localExecutionControl.js",
+      "default": "./dist/local-runtime/localExecutionControl.js"
+    },
+    "./local-scheduler": {
+      "types": "./dist/scheduler/localScheduler.d.ts",
+      "require": "./dist/scheduler/localScheduler.js",
+      "default": "./dist/scheduler/localScheduler.js"
+    },
+    "./local-secret": {
+      "types": "./dist/secret/localSecret.d.ts",
+      "require": "./dist/secret/localSecret.js",
+      "default": "./dist/secret/localSecret.js"
+    },
+    "./local-secret-administration": {
+      "types": "./dist/secret/localSecretAdministration.d.ts",
+      "require": "./dist/secret/localSecretAdministration.js",
+      "default": "./dist/secret/localSecretAdministration.js"
+    },
+    "./local-project-policy-administration": {
+      "types": "./dist/security/project-policy/localProjectPolicyAdministration.d.ts",
+      "require": "./dist/security/project-policy/localProjectPolicyAdministration.js",
+      "default": "./dist/security/project-policy/localProjectPolicyAdministration.js"
+    },
+    "./local-security-audit-query": {
+      "types": "./dist/security/audit/localSecurityAuditQuery.d.ts",
+      "require": "./dist/security/audit/localSecurityAuditQuery.js",
+      "default": "./dist/security/audit/localSecurityAuditQuery.js"
+    },
+    "./local-security-audit-retention": {
+      "types": "./dist/security/audit/localSecurityAuditRetention.d.ts",
+      "require": "./dist/security/audit/localSecurityAuditRetention.js",
+      "default": "./dist/security/audit/localSecurityAuditRetention.js"
+    },
+    "./local-identity-credential-administration": {
+      "types": "./dist/security/identity-credential/localIdentityCredentialAdministration.d.ts",
+      "require": "./dist/security/identity-credential/localIdentityCredentialAdministration.js",
+      "default": "./dist/security/identity-credential/localIdentityCredentialAdministration.js"
+    },
+    "./local-owner-bootstrap": {
+      "types": "./dist/local-owner/localOwnerBootstrap.d.ts",
+      "require": "./dist/local-owner/localOwnerBootstrap.js",
+      "default": "./dist/local-owner/localOwnerBootstrap.js"
+    },
+    "./local-owner-pepper": {
+      "types": "./dist/local-owner/localOwnerPepper.d.ts",
+      "require": "./dist/local-owner/localOwnerPepper.js",
+      "default": "./dist/local-owner/localOwnerPepper.js"
+    },
+    "./local-owner-credential-recovery": {
+      "types": "./dist/local-owner/localOwnerCredentialRecovery.d.ts",
+      "require": "./dist/local-owner/localOwnerCredentialRecovery.js",
+      "default": "./dist/local-owner/localOwnerCredentialRecovery.js"
+    },
+    "./local-owner-delivery-acknowledgement-gc": {
+      "types": "./dist/local-owner/localOwnerDeliveryAcknowledgementGc.d.ts",
+      "require": "./dist/local-owner/localOwnerDeliveryAcknowledgementGc.js",
+      "default": "./dist/local-owner/localOwnerDeliveryAcknowledgementGc.js"
+    },
+    "./local-owner-pepper-material-gc": {
+      "types": "./dist/local-owner/localOwnerPepperMaterialGc.d.ts",
+      "require": "./dist/local-owner/localOwnerPepperMaterialGc.js",
+      "default": "./dist/local-owner/localOwnerPepperMaterialGc.js"
+    },
+    "./security": {
+      "types": "./dist/security/security.d.ts",
+      "require": "./dist/security/security.js",
+      "default": "./dist/security/security.js"
+    },
+    "./api-credential": {
+      "types": "./dist/security/identity-credential/apiCredential.d.ts",
+      "require": "./dist/security/identity-credential/apiCredential.js",
+      "default": "./dist/security/identity-credential/apiCredential.js"
+    },
+    "./api-credential-administration": {
+      "types": "./dist/security/identity-credential/apiCredentialAdministration.d.ts",
+      "require": "./dist/security/identity-credential/apiCredentialAdministration.js",
+      "default": "./dist/security/identity-credential/apiCredentialAdministration.js"
+    },
+    "./api-credential-token": {
+      "types": "./dist/security/identity-credential/apiCredentialToken.d.ts",
+      "require": "./dist/security/identity-credential/apiCredentialToken.js",
+      "default": "./dist/security/identity-credential/apiCredentialToken.js"
+    },
+    "./identity-administration": {
+      "types": "./dist/security/identity-credential/identityAdministration.d.ts",
+      "require": "./dist/security/identity-credential/identityAdministration.js",
+      "default": "./dist/security/identity-credential/identityAdministration.js"
+    },
+    "./security-audit": {
+      "types": "./dist/security/audit/securityAudit.d.ts",
+      "require": "./dist/security/audit/securityAudit.js",
+      "default": "./dist/security/audit/securityAudit.js"
+    },
+    "./security-audit-query": {
+      "types": "./dist/security/audit/securityAuditQuery.d.ts",
+      "require": "./dist/security/audit/securityAuditQuery.js",
+      "default": "./dist/security/audit/securityAuditQuery.js"
+    },
+    "./project-policy": {
+      "types": "./dist/security/project-policy/projectPolicy.d.ts",
+      "require": "./dist/security/project-policy/projectPolicy.js",
+      "default": "./dist/security/project-policy/projectPolicy.js"
+    },
+    "./worker-credential": {
+      "types": "./dist/worker/workerCredential.d.ts",
+      "require": "./dist/worker/workerCredential.js",
+      "default": "./dist/worker/workerCredential.js"
+    },
+    "./worker-credential-delivery": {
+      "types": "./dist/worker/workerCredentialDelivery.d.ts",
+      "require": "./dist/worker/workerCredentialDelivery.js",
+      "default": "./dist/worker/workerCredentialDelivery.js"
+    },
+    "./worker-credential-token": {
+      "types": "./dist/worker/workerCredentialToken.d.ts",
+      "require": "./dist/worker/workerCredentialToken.js",
+      "default": "./dist/worker/workerCredentialToken.js"
+    },
+    "./worker-credential-management-plan": {
+      "types": "./dist/worker/workerCredentialManagementPlan.d.ts",
+      "require": "./dist/worker/workerCredentialManagementPlan.js",
+      "default": "./dist/worker/workerCredentialManagementPlan.js"
+    },
+    "./worker-attestation": {
+      "types": "./dist/worker/workerExecutionAttestation.d.ts",
+      "require": "./dist/worker/workerExecutionAttestation.js",
+      "default": "./dist/worker/workerExecutionAttestation.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "semver": "7.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

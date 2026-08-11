@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ql3-worker-state
+  labels:
+    app.kubernetes.io/name: ql3-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-worker
+spec:
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: QL3_WORKER_CAPACITY_PROFILE
+              value: node
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi

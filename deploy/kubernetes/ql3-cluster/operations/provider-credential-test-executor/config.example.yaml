@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-provider-credential-test-command
+  namespace: qinglong3-system
+data:
+  command.json: |
+    {"schemaVersion":1,"executionId":"REPLACE_WITH_UUID_V4","testId":"REPLACE_WITH_PLAN_TEST_ID"}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-provider-credential-test-allowlist
+  namespace: qinglong3-system
+data:
+  allowlist.json: |
+    {"schema":"qinglong/model-provider-credential-test-allowlist@v1","revision":"catalog-v1","providers":[{"provider":"openai-compatible","adapter":"openai-compatible","baseUrl":"https://provider.example.test/v1/","revision":"endpoint-v1","deadlineMs":5000,"maxResponseBytes":65536,"maxModels":64,"maxCostMicrousd":0,"retryLimit":0,"configDigest":"10ba6d6a33126ce623d63123b20994d177ed1da7720b4ebe335ca0e5dfc33db6"}],"catalogDigest":"86553a3cbcd8ea3e3d0b73fc310997c1060f6e39d5fe1deb8593b1b8fd098582"}
+---
+# Example only. Populate through a Secret manager and never commit a real token.
+# The key is SHA-256(canonical SecretRef) and must match the durable binding.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-provider-credential-test-material
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  31cf30a7b013bd31aa88867b1a8c48e35e7b88b5b49fb37eedd6222354679d02: REPLACE_WITH_PROVIDER_TOKEN
+---
+# Non-CloudNativePG example. The CloudNativePG overlay uses its operator-owned
+# role Secret plus ql3-postgres-ca instead.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-cluster-provider-credential-test-database
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  postgres-ai-credential-tester-url: REPLACE_WITH_TESTER_DSN
+  postgres-tls-servername: REPLACE_WITH_POSTGRES_DNS_NAME
+  postgres-ca.crt: REPLACE_WITH_POSTGRES_CA_PEM

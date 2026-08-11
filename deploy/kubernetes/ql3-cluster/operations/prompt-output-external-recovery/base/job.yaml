@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ql3-prompt-output-external-recovery-verifier
+  namespace: qinglong3-recovery
+  labels:
+    app.kubernetes.io/name: ql3-prompt-output-external-recovery-verifier
+    app.kubernetes.io/component: ai-recovery-verifier
+    app.kubernetes.io/part-of: qinglong3
+    qinglong.io/execution-model: caller-driven
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-prompt-output-external-recovery-verifier
+        app.kubernetes.io/component: ai-recovery-verifier
+        app.kubernetes.io/part-of: qinglong3
+        qinglong.io/execution-model: caller-driven
+    spec:
+      serviceAccountName: ql3-prompt-output-external-recovery-verifier
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: verifier
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - /opt/qinglong/node_modules/@qinglong/cluster-admin/dist/prompt-output/external-recovery/promptOutputExternalRecoveryCli.js
+          args:
+            - run
+            - --command-file
+            - /var/run/qinglong3/prompt-output-external-recovery/command.json
+          terminationMessagePolicy: File
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: recovery-workspace
+              mountPath: /var/run/qinglong3/prompt-output-external-recovery
+              readOnly: true
+      volumes:
+        - name: recovery-workspace
+          persistentVolumeClaim:
+            claimName: ql3-prompt-output-external-recovery-workspace
+            readOnly: true

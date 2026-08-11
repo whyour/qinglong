@@ -1,0 +1,16 @@
+# Example only. Copy into a private overlay, provision the Secret out of band,
+# and replace the digest with the independently verified runtime-ai image digest.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/cluster-ai
+  - ../../components/cluster-ai-prompt-output
+
+images:
+  - name: qinglong3-cluster-control-ai
+    newName: registry.example.com/qinglong/qinglong3-cluster-control-ai
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

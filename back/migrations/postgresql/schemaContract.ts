@@ -1,0 +1,206 @@
+export interface PostgresSchemaContractTable {
+  readonly name: string;
+  readonly columns: readonly string[];
+}
+
+export interface PostgresSchemaContract {
+  readonly schema: 'ql3';
+  readonly contractName: 'control-core';
+  readonly contractVersion: 2;
+  readonly migrationId: 'pg-0003-run-retry-policy';
+  readonly minimumServerMajor: 16;
+  readonly maximumServerMajor: 18;
+  readonly capabilities: Readonly<{
+    run_core: 1;
+    run_retry_policy: 1;
+  }>;
+  readonly tables: readonly PostgresSchemaContractTable[];
+  readonly indexes: readonly string[];
+  readonly checks: readonly string[];
+  readonly foreignKeys: readonly string[];
+}
+
+function table(
+  name: string,
+  columns: readonly string[],
+): PostgresSchemaContractTable {
+  return Object.freeze({ name, columns: Object.freeze([...columns]) });
+}
+
+export const postgresqlControlSchemaContract: PostgresSchemaContract =
+  Object.freeze({
+    schema: 'ql3',
+    contractName: 'control-core',
+    contractVersion: 2,
+    migrationId: 'pg-0003-run-retry-policy',
+    minimumServerMajor: 16,
+    maximumServerMajor: 18,
+    capabilities: Object.freeze({ run_core: 1, run_retry_policy: 1 }),
+    tables: Object.freeze([
+      table('schema_migrations', [
+        'migration_id',
+        'stream_id',
+        'dialect',
+        'checksum',
+        'applied_at_ms',
+      ]),
+      table('schema_capabilities', [
+        'contract_name',
+        'contract_version',
+        'migration_id',
+        'capabilities',
+        'updated_at_ms',
+      ]),
+      table('runs', [
+        'id',
+        'project_id',
+        'task_id',
+        'task_revision',
+        'task_name',
+        'task_snapshot_ref',
+        'legacy_cron_id',
+        'parent_run_id',
+        'retry_of_run_id',
+        'trigger_id',
+        'trigger_type',
+        'execution_origin',
+        'execution_owner',
+        'triggered_by',
+        'request_id',
+        'scheduled_for_ms',
+        'status',
+        'version',
+        'event_sequence',
+        'priority',
+        'idempotency_key',
+        'input_ref',
+        'output_ref',
+        'created_at_ms',
+        'queued_at_ms',
+        'started_at_ms',
+        'finished_at_ms',
+        'cancel_requested_at_ms',
+        'cancel_reason',
+        'error_code',
+        'error_summary',
+      ]),
+      table('run_attempts', [
+        'id',
+        'run_id',
+        'step_run_id',
+        'attempt',
+        'status',
+        'executor_type',
+        'worker_id',
+        'executor_handle',
+        'pid',
+        'log_artifact_id',
+        'lease_token',
+        'lease_expires_at_ms',
+        'deadline_at_ms',
+        'callback_token_hash',
+        'callback_sequence',
+        'created_at_ms',
+        'started_at_ms',
+        'finished_at_ms',
+        'exit_code',
+        'error_code',
+        'error_summary',
+      ]),
+      table('run_events', [
+        'id',
+        'run_id',
+        'sequence',
+        'type',
+        'dedupe_key',
+        'actor_type',
+        'actor_id',
+        'attempt_id',
+        'step_run_id',
+        'payload',
+        'created_at_ms',
+      ]),
+      table('run_retry_policies', [
+        'run_id',
+        'max_attempts',
+        'retry_on_lost',
+        'safety',
+        'backoff_base_ms',
+        'backoff_max_ms',
+        'next_attempt_at_ms',
+        'version',
+        'created_at_ms',
+        'updated_at_ms',
+      ]),
+    ]),
+    indexes: Object.freeze([
+      'schema_migrations_pkey',
+      'schema_capabilities_pkey',
+      'runs_pkey',
+      'ql3_runs_project_idempotency_uidx',
+      'ql3_runs_project_created_idx',
+      'ql3_runs_task_created_idx',
+      'ql3_runs_dispatch_candidates_idx',
+      'run_attempts_pkey',
+      'ql3_run_attempts_run_attempt_uidx',
+      'ql3_run_attempts_dispatch_candidates_idx',
+      'ql3_run_attempts_lease_idx',
+      'run_events_pkey',
+      'ql3_run_events_run_sequence_uidx',
+      'ql3_run_events_run_dedupe_uidx',
+      'ql3_run_events_run_created_idx',
+      'run_retry_policies_pkey',
+      'ql3_run_retry_policies_due_idx',
+      'ql3_runs_lost_retry_idx',
+    ]),
+    checks: Object.freeze([
+      'ql3_schema_migrations_dialect_check',
+      'ql3_schema_migrations_checksum_check',
+      'ql3_schema_migrations_applied_at_check',
+      'ql3_schema_capabilities_version_check',
+      'ql3_schema_capabilities_payload_check',
+      'ql3_schema_capabilities_updated_at_check',
+      'ql3_runs_legacy_cron_id_check',
+      'ql3_runs_execution_owner_check',
+      'ql3_runs_scheduled_for_check',
+      'ql3_runs_status_check',
+      'ql3_runs_version_check',
+      'ql3_runs_event_sequence_check',
+      'ql3_runs_created_at_check',
+      'ql3_runs_queued_at_check',
+      'ql3_runs_started_at_check',
+      'ql3_runs_finished_at_check',
+      'ql3_runs_cancel_requested_at_check',
+      'ql3_runs_cancel_reason_check',
+      'ql3_run_attempts_attempt_check',
+      'ql3_run_attempts_status_check',
+      'ql3_run_attempts_pid_check',
+      'ql3_run_attempts_lease_expiry_check',
+      'ql3_run_attempts_deadline_check',
+      'ql3_run_attempts_callback_sequence_check',
+      'ql3_run_attempts_created_at_check',
+      'ql3_run_attempts_started_at_check',
+      'ql3_run_attempts_finished_at_check',
+      'ql3_run_events_sequence_check',
+      'ql3_run_events_actor_type_check',
+      'ql3_run_events_payload_check',
+      'ql3_run_events_created_at_check',
+      'ql3_run_retry_policies_max_attempts_check',
+      'ql3_run_retry_policies_safety_check',
+      'ql3_run_retry_policies_backoff_base_check',
+      'ql3_run_retry_policies_backoff_max_check',
+      'ql3_run_retry_policies_next_attempt_check',
+      'ql3_run_retry_policies_version_check',
+      'ql3_run_retry_policies_created_at_check',
+      'ql3_run_retry_policies_updated_at_check',
+    ]),
+    foreignKeys: Object.freeze([
+      'ql3_schema_capabilities_migration_fk',
+      'ql3_runs_parent_fk',
+      'ql3_runs_retry_of_fk',
+      'ql3_run_attempts_run_fk',
+      'ql3_run_events_run_fk',
+      'ql3_run_events_attempt_fk',
+      'ql3_run_retry_policies_run_fk',
+    ]),
+  });

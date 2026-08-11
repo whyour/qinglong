@@ -1,0 +1,369 @@
+// Deployment composition lives with its concrete deployment capabilities.
+import path from 'node:path';
+
+import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
+
+import {
+  currentIdentity,
+  normalizeLocalDeploymentPrepareCommand,
+  type LocalDeploymentPrepareResult,
+} from './foundation/contract';
+import {
+  initialComposeImageSelection,
+  preflightActiveComposeImageSelection,
+  switchLocalDeploymentComposeRevision,
+  switchLocalDeploymentComposeRevisionCommandFile,
+} from './compose/composeRevision';
+import {
+  preflightLocalDeploymentCompose,
+  preflightLocalDeploymentComposeCommandFile,
+} from './compose/composePreflight';
+import {
+  applyLocalDeploymentCompose,
+  applyLocalDeploymentComposeCommandFile,
+} from './compose/composeApply';
+import {
+  restoreLocalDeploymentCompose,
+  restoreLocalDeploymentComposeCommitCommandFile,
+  restoreLocalDeploymentComposeCommandFile,
+  restoreLocalDeploymentComposePrepareCommandFile,
+} from './compose/composeRestore';
+import {
+  collectLocalDeploymentComposeEvidence,
+  collectLocalDeploymentComposeEvidenceCommitCommandFile,
+  collectLocalDeploymentComposeEvidencePrepareCommandFile,
+} from './compose/composeEvidenceCollection';
+import {
+  ensurePrivateDirectory,
+  preflightPublishedFile,
+  publishExactFile,
+} from './foundation/files';
+import {
+  applicationConfiguration,
+  deploymentPaths,
+  descriptor,
+  setupCommand,
+} from './foundation/render';
+import { executeLocalSetup } from '../lifecycle/localSetup';
+import {
+  inspectLocalDeploymentStatus,
+  inspectLocalDeploymentStatusCommandFile,
+} from './localDeploymentStatus';
+import {
+  stopLegacyDockerForLocalDeployment,
+  stopLegacyDockerForLocalDeploymentCommandFile,
+} from './cutover/legacyStop';
+import {
+  runLocalDeploymentDockerTarget,
+  runLocalDeploymentDockerTargetCommandFile,
+} from './cutover/target-run/targetRun';
+import {
+  runLocalDeploymentCutoverManualCommand,
+  runLocalDeploymentCutoverManualCommandFile,
+} from './cutover/manual-resolution/manualResolution';
+import {
+  stopLocalDeploymentDockerTarget,
+  stopLocalDeploymentDockerTargetCommandFile,
+} from './cutover/targetStop';
+import {
+  runLocalDeploymentLegacyRollback,
+  runLocalDeploymentLegacyRollbackCommandFile,
+} from './cutover/legacyRollback';
+import {
+  consumeLocalServiceManagerOutcome,
+  consumeLocalServiceManagerOutcomeCommandFile,
+  prepareLocalServiceManagerIntent,
+  prepareLocalServiceManagerIntentCommandFile,
+} from './service-manager/serviceManagerIntent';
+import {
+  consumeLocalServiceManagerCutoverOutcome,
+  consumeLocalServiceManagerCutoverOutcomeCommandFile,
+} from './service-manager/serviceCutoverConsumer';
+
+export {
+  LocalDeploymentConfigurationError,
+  normalizeLocalDeploymentComposeApplyCommand,
+  normalizeLocalDeploymentComposeEvidenceCollectionCommand,
+  normalizeLocalDeploymentComposePreflightCommand,
+  normalizeLocalDeploymentComposeRestoreCommand,
+  normalizeLocalDeploymentComposeRevisionCommand,
+  normalizeLocalDeploymentPrepareCommand,
+  normalizeLocalDeploymentStatusCommand,
+  type LocalDeploymentComposeApplyCommand,
+  type LocalDeploymentComposeApplyResult,
+  type LocalDeploymentComposeEvidenceCollectionCommand,
+  type LocalDeploymentComposeEvidenceCollectionCommitCommand,
+  type LocalDeploymentComposeEvidenceCollectionPrepareCommand,
+  type LocalDeploymentComposeEvidenceCollectionResult,
+  type LocalDeploymentComposePreflightCommand,
+  type LocalDeploymentComposePreflightResult,
+  type LocalDeploymentComposeRestoreCommand,
+  type LocalDeploymentComposeRestoreCommitCommand,
+  type LocalDeploymentComposeRestorePrepareCommand,
+  type LocalDeploymentComposeRestoreResult,
+  type LocalDeploymentComposeRevisionCommand,
+  type LocalDeploymentComposeRevisionResult,
+  type LocalDeploymentPrepareCommand,
+  type LocalDeploymentPrepareResult,
+  type LocalDeploymentStatusCommand,
+  type LocalDeploymentStatusResult,
+} from './foundation/contract';
+export {
+  normalizeLocalDeploymentLegacyStopCommand,
+  type LocalDeploymentLegacyStopCommand,
+  type LocalDeploymentLegacyStopResult,
+} from './cutover/contract';
+export {
+  normalizeLocalDeploymentTargetRunCommand,
+  type LocalDeploymentTargetRunCommand,
+  type LocalDeploymentTargetRunOperation,
+  type LocalDeploymentTargetRunResult,
+} from './cutover/target-run/targetRunContract';
+export {
+  normalizeLocalDeploymentTargetStopCommand,
+  type LocalDeploymentTargetReconciliationDisposition,
+  type LocalDeploymentTargetStopCommand,
+  type LocalDeploymentTargetStopResult,
+} from './cutover/targetStopContract';
+export { type LocalDeploymentTargetStopDependencies } from './cutover/targetStop';
+export {
+  EMPTY_ROLLBACK_PREPARATION_DIGEST,
+  normalizeLocalDeploymentLegacyRollbackCommand,
+  type LocalDeploymentLegacyRollbackCommand,
+  type LocalDeploymentLegacyRollbackOperation,
+  type LocalDeploymentLegacyRollbackResult,
+} from './cutover/legacyRollbackContract';
+export { type LocalDeploymentLegacyRollbackDependencies } from './cutover/legacyRollback';
+export {
+  EMPTY_RESOLUTION_DIGEST,
+  normalizeLocalDeploymentCutoverManualCommand,
+  type LocalDeploymentCutoverManualCommand,
+  type LocalDeploymentCutoverManualOperation,
+} from './cutover/manual-resolution/manualResolutionContract';
+export {
+  type LocalDeploymentCutoverManualDependencies,
+  type LocalDeploymentCutoverManualResult,
+  type LocalDeploymentCutoverObservationState,
+} from './cutover/manual-resolution/manualResolution';
+export {
+  applyLocalDeploymentCompose,
+  applyLocalDeploymentComposeCommandFile,
+  collectLocalDeploymentComposeEvidence,
+  collectLocalDeploymentComposeEvidenceCommitCommandFile,
+  collectLocalDeploymentComposeEvidencePrepareCommandFile,
+  inspectLocalDeploymentStatus,
+  inspectLocalDeploymentStatusCommandFile,
+  preflightLocalDeploymentCompose,
+  preflightLocalDeploymentComposeCommandFile,
+  restoreLocalDeploymentCompose,
+  restoreLocalDeploymentComposeCommitCommandFile,
+  restoreLocalDeploymentComposeCommandFile,
+  restoreLocalDeploymentComposePrepareCommandFile,
+  runLocalDeploymentCutoverManualCommand,
+  runLocalDeploymentCutoverManualCommandFile,
+  runLocalDeploymentLegacyRollback,
+  runLocalDeploymentLegacyRollbackCommandFile,
+  runLocalDeploymentDockerTarget,
+  runLocalDeploymentDockerTargetCommandFile,
+  switchLocalDeploymentComposeRevision,
+  switchLocalDeploymentComposeRevisionCommandFile,
+  stopLegacyDockerForLocalDeployment,
+  stopLegacyDockerForLocalDeploymentCommandFile,
+  stopLocalDeploymentDockerTarget,
+  stopLocalDeploymentDockerTargetCommandFile,
+  consumeLocalServiceManagerOutcome,
+  consumeLocalServiceManagerOutcomeCommandFile,
+  consumeLocalServiceManagerCutoverOutcome,
+  consumeLocalServiceManagerCutoverOutcomeCommandFile,
+  prepareLocalServiceManagerIntent,
+  prepareLocalServiceManagerIntentCommandFile,
+};
+export {
+  localServiceManagerIntentDigest,
+  normalizeLocalServiceBridgeCommand,
+  normalizeLocalServiceManagerIntent,
+  type LocalServiceBridgeCommand,
+  type LocalServiceManagerIntent,
+} from './service-manager/serviceBridgeContract';
+export {
+  normalizeLocalServiceManagerOutcome,
+  type LocalServiceManagerOutcome,
+} from './service-manager/serviceOutcomeContract';
+export {
+  type LocalServiceManagerIntentPrepareCommand,
+  type LocalServiceManagerIntentPrepareResult,
+  type LocalServiceManagerOutcomeConsumeCommand,
+  type LocalServiceManagerOutcomeConsumeResult,
+} from './service-manager/serviceManagerIntent';
+export {
+  type LocalServiceManagerCutoverConsumeCommand,
+  type LocalServiceManagerCutoverConsumeResult,
+  type LocalServiceManagerCutoverDependencies,
+} from './service-manager/serviceCutoverConsumer';
+export {
+  type LocalServiceManagerCutoverEvidence,
+  type LocalServiceManagerCutoverRecord,
+  type LocalServiceManagerCutoverState,
+} from './service-manager/serviceCutoverJournal';
+
+export async function prepareLocalDeployment(
+  input: unknown,
+): Promise<Readonly<LocalDeploymentPrepareResult>> {
+  const command = normalizeLocalDeploymentPrepareCommand(input);
+  const identity = currentIdentity();
+  const paths = deploymentPaths(command.options.deploymentRoot);
+  const directories = [
+    [command.options.deploymentRoot, 'deploymentRoot'],
+    [paths.ownerPepperKeyring, 'ownerPepperKeyringDirectory'],
+    [paths.ownerPepperBackup, 'ownerPepperBackupDirectory'],
+    [paths.receipts, 'receiptRoot'],
+    [paths.artifacts, 'artifactRoot'],
+    [paths.pluginStaging, 'pluginStagingRoot'],
+    [paths.pluginActivation, 'pluginActivationRoot'],
+    [paths.service, 'serviceDescriptorRoot'],
+    ...(command.options.service.kind === 'compose'
+      ? ([
+          [paths.composeRevisions, 'composeRevisionRoot'],
+          [paths.composeRollouts, 'composeRolloutRoot'],
+          [paths.composeRolloutBackups, 'composeRolloutBackupRoot'],
+          [paths.composeRestores, 'composeRestoreRoot'],
+          [paths.composeRestoreSafeguards, 'composeRestoreSafeguardRoot'],
+          [paths.composeEvidenceCollections, 'composeEvidenceCollectionRoot'],
+          [paths.composeCollectedEvidence, 'composeCollectedEvidenceRoot'],
+          [
+            paths.composeCollectedRolloutBackups,
+            'composeCollectedRolloutBackupRoot',
+          ],
+          [
+            paths.composeCollectedRestoreSafeguards,
+            'composeCollectedRestoreSafeguardRoot',
+          ],
+        ] as const)
+      : []),
+  ] as const;
+  const directoryStatuses = directories.map(([directory, label]) =>
+    ensurePrivateDirectory(directory, identity.uid, label),
+  );
+  const applicationConfig = applicationConfiguration(command, paths);
+  const serviceDescriptor = descriptor(
+    command,
+    paths.applicationConfig,
+    identity.uid,
+    identity.gid,
+  );
+  const descriptorPath = path.join(paths.service, serviceDescriptor.fileName);
+  const composeSelection =
+    command.options.service.kind === 'compose'
+      ? initialComposeImageSelection(command)
+      : undefined;
+
+  preflightPublishedFile(
+    paths.applicationConfig,
+    applicationConfig,
+    0o600,
+    identity.uid,
+    'application configuration',
+  );
+  preflightPublishedFile(
+    descriptorPath,
+    serviceDescriptor.contents,
+    serviceDescriptor.mode,
+    identity.uid,
+    'service descriptor',
+  );
+  if (composeSelection !== undefined) {
+    preflightPublishedFile(
+      path.join(paths.composeRevisions, '1.yaml'),
+      composeSelection,
+      0o600,
+      identity.uid,
+      'initial compose revision',
+    );
+    preflightActiveComposeImageSelection(
+      paths.composeSelection,
+      paths.composeRevisions,
+      composeSelection,
+      identity.uid,
+    );
+  }
+
+  const setup = await executeLocalSetup(setupCommand(command, paths));
+  const applicationStatus = publishExactFile(
+    paths.applicationConfig,
+    applicationConfig,
+    0o600,
+    identity.uid,
+    'application configuration',
+  );
+  const serviceStatus = publishExactFile(
+    descriptorPath,
+    serviceDescriptor.contents,
+    serviceDescriptor.mode,
+    identity.uid,
+    'service descriptor',
+  );
+  const composeRevisionStatus =
+    composeSelection === undefined
+      ? 'existing'
+      : publishExactFile(
+          path.join(paths.composeRevisions, '1.yaml'),
+          composeSelection,
+          0o600,
+          identity.uid,
+          'initial compose revision',
+        );
+  const composeSelectionStatus =
+    composeSelection === undefined
+      ? 'existing'
+      : preflightActiveComposeImageSelection(
+          paths.composeSelection,
+          paths.composeRevisions,
+          composeSelection,
+          identity.uid,
+        ) === 'existing'
+      ? 'existing'
+      : publishExactFile(
+          paths.composeSelection,
+          composeSelection,
+          0o600,
+          identity.uid,
+          'active compose selection',
+        );
+  const createdDirectories = directoryStatuses.filter(
+    (status) => status === 'prepared',
+  ).length;
+  const prepared =
+    createdDirectories > 0 ||
+    setup.status === 'prepared' ||
+    applicationStatus === 'prepared' ||
+    serviceStatus === 'prepared';
+  const deploymentPrepared =
+    prepared ||
+    composeSelectionStatus === 'prepared' ||
+    composeRevisionStatus === 'prepared';
+
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    status: deploymentPrepared ? ('prepared' as const) : ('existing' as const),
+    profile: command.options.profile,
+    service: Object.freeze({
+      kind: command.options.service.kind,
+      status: serviceStatus,
+    }),
+    applicationConfiguration: Object.freeze({
+      schema: 'qinglong/local-application-process@v2' as const,
+      status: applicationStatus,
+    }),
+    directories: Object.freeze({
+      created: createdDirectories,
+      existing: directoryStatuses.length - createdDirectories,
+    }),
+    setup,
+  });
+}
+
+export function prepareLocalDeploymentCommandFile(
+  filePath: string,
+): Promise<Readonly<LocalDeploymentPrepareResult>> {
+  return prepareLocalDeployment(readPrivateLocalCommandFile(filePath));
+}

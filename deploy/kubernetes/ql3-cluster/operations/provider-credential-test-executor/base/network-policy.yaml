@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ql3-provider-credential-test-executor
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-provider-credential-test-executor
+    app.kubernetes.io/component: provider-credential-test-executor
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-provider-credential-test-executor
+      app.kubernetes.io/component: provider-credential-test-executor
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  # Base is deliberately non-functional: DNS only. A reviewed PostgreSQL
+  # overlay and an exact private provider CIDR overlay are both required.
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

@@ -1,0 +1,11 @@
+# Example only. Save as kustomization.yaml in a private overlay beside a
+# populated object-store.yaml. Do not apply this file directly.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../operators/cloudnative-pg
+  - object-store.yaml
+
+components:
+  - ../../components/barman-cloud-backup

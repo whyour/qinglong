@@ -1,0 +1,52 @@
+{
+  "name": "@qinglong/local-api",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 optional single-process authenticated Local HTTP API",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/application-runtime/localApiProductSurface.js",
+  "types": "dist/application-runtime/localApiProductSurface.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/application-runtime/localApiProductSurface.d.ts",
+      "require": "./dist/application-runtime/localApiProductSurface.js",
+      "default": "./dist/application-runtime/localApiProductSurface.js"
+    },
+    "./config": {
+      "types": "./dist/production-process/config.d.ts",
+      "require": "./dist/production-process/config.js",
+      "default": "./dist/production-process/config.js"
+    },
+    "./process": {
+      "types": "./dist/production-process/processApplication.d.ts",
+      "require": "./dist/production-process/processApplication.js",
+      "default": "./dist/production-process/processApplication.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "bin": {
+    "ql3-local-api": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/local-application": "workspace:*",
+    "@qinglong/local-command-file": "workspace:*",
+    "@qinglong/local-owner-console": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@qinglong/local-sqlite": "workspace:*",
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

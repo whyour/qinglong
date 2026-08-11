@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ql3-prompt-output-key-retirement-access-review
+  labels:
+    app.kubernetes.io/name: ql3-prompt-output-key-retirement
+    app.kubernetes.io/component: ai-maintenance
+    app.kubernetes.io/part-of: qinglong3
+rules:
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - selfsubjectaccessreviews
+    verbs:
+      - create

@@ -1,0 +1,22 @@
+{
+  "name": "@qinglong/cluster-control-image-dependencies",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "Locked external runtime dependencies for the QingLong 3.0 cluster-control image",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1093.0",
+    "croner": "7.0.8",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.22.0",
+    "semver": "7.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "@types/pg": "8.20.0",
+    "typescript": "5.9.3"
+  }
+}

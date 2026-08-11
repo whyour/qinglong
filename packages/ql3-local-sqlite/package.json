@@ -1,0 +1,300 @@
+{
+  "name": "@qinglong/local-sqlite",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 Node 24 SQLite storage adapter for local Profiles",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/runtimeDatabase.d.ts",
+      "require": "./dist/runtime/runtimeDatabase.js",
+      "default": "./dist/runtime/runtimeDatabase.js"
+    },
+    "./profile": {
+      "types": "./dist/profile/localProfile.d.ts",
+      "require": "./dist/profile/localProfile.js",
+      "default": "./dist/profile/localProfile.js"
+    },
+    "./profile/edge": {
+      "types": "./dist/profile/edge.d.ts",
+      "require": "./dist/profile/edge.js",
+      "default": "./dist/profile/edge.js"
+    },
+    "./profile/standalone": {
+      "types": "./dist/profile/standalone.d.ts",
+      "require": "./dist/profile/standalone.js",
+      "default": "./dist/profile/standalone.js"
+    },
+    "./bootstrap": {
+      "types": "./dist/storage/bootstrap.d.ts",
+      "require": "./dist/storage/bootstrap.js",
+      "default": "./dist/storage/bootstrap.js"
+    },
+    "./acknowledgement-gc": {
+      "types": "./dist/maintenance/acknowledgementGc.d.ts",
+      "require": "./dist/maintenance/acknowledgementGc.js",
+      "default": "./dist/maintenance/acknowledgementGc.js"
+    },
+    "./pepper-gc": {
+      "types": "./dist/maintenance/pepperGc.d.ts",
+      "require": "./dist/maintenance/pepperGc.js",
+      "default": "./dist/maintenance/pepperGc.js"
+    },
+    "./readiness": {
+      "types": "./dist/readiness/readiness.d.ts",
+      "require": "./dist/readiness/readiness.js",
+      "default": "./dist/readiness/readiness.js"
+    },
+    "./readiness-inspection": {
+      "types": "./dist/readiness/readinessInspection.d.ts",
+      "require": "./dist/readiness/readinessInspection.js",
+      "default": "./dist/readiness/readinessInspection.js"
+    },
+    "./rollout-safety": {
+      "types": "./dist/readiness/rolloutSafety.d.ts",
+      "require": "./dist/readiness/rolloutSafety.js",
+      "default": "./dist/readiness/rolloutSafety.js"
+    },
+    "./migration": {
+      "types": "./dist/migration/migration.d.ts",
+      "require": "./dist/migration/migration.js",
+      "default": "./dist/migration/migration.js"
+    },
+    "./adoption": {
+      "types": "./dist/adoption/legacyAdoptionDatabase.d.ts",
+      "require": "./dist/adoption/legacyAdoptionDatabase.js",
+      "default": "./dist/adoption/legacyAdoptionDatabase.js"
+    },
+    "./plugin-package-install": {
+      "types": "./dist/plugin-package/pluginPackageInstallRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageInstallRepository.js",
+      "default": "./dist/plugin-package/pluginPackageInstallRepository.js"
+    },
+    "./plugin-package-materialized-revision": {
+      "types": "./dist/plugin-package/pluginPackageMaterializedRevisionRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageMaterializedRevisionRepository.js",
+      "default": "./dist/plugin-package/pluginPackageMaterializedRevisionRepository.js"
+    },
+    "./plugin-package-task-reconciliation": {
+      "types": "./dist/plugin-package/pluginPackageTaskReconciliationRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageTaskReconciliationRepository.js",
+      "default": "./dist/plugin-package/pluginPackageTaskReconciliationRepository.js"
+    },
+    "./plugin-package-automation-publication": {
+      "types": "./dist/plugin-package/pluginPackageAutomationPublicationRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageAutomationPublicationRepository.js",
+      "default": "./dist/plugin-package/pluginPackageAutomationPublicationRepository.js"
+    },
+    "./plugin-package-workflow-admission": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowAdmissionRepository.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowAdmissionRepository.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowAdmissionRepository.js"
+    },
+    "./plugin-package-workflow-administration": {
+      "types": "./dist/administration/pluginPackageWorkflowAdministration.d.ts",
+      "require": "./dist/administration/pluginPackageWorkflowAdministration.js",
+      "default": "./dist/administration/pluginPackageWorkflowAdministration.js"
+    },
+    "./plugin-package-workflow-frontier": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowFrontierRepository.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowFrontierRepository.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowFrontierRepository.js"
+    },
+    "./plugin-package-workflow-cancellation-convergence": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowCancellationConvergenceRepository.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowCancellationConvergenceRepository.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowCancellationConvergenceRepository.js"
+    },
+    "./plugin-package-workflow-task-attempt-admission": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmissionRepository.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmissionRepository.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmissionRepository.js"
+    },
+    "./workflow-task-execution": {
+      "types": "./dist/plugin-package/workflow/workflowTaskExecutionRepository.d.ts",
+      "require": "./dist/plugin-package/workflow/workflowTaskExecutionRepository.js",
+      "default": "./dist/plugin-package/workflow/workflowTaskExecutionRepository.js"
+    },
+    "./plugin-package-quarantine": {
+      "types": "./dist/plugin-package/pluginPackageQuarantineRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageQuarantineRepository.js",
+      "default": "./dist/plugin-package/pluginPackageQuarantineRepository.js"
+    },
+    "./plugin-package-lifecycle": {
+      "types": "./dist/plugin-package/pluginPackageLifecycleRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageLifecycleRepository.js",
+      "default": "./dist/plugin-package/pluginPackageLifecycleRepository.js"
+    },
+    "./project-tool-definition-snapshot": {
+      "types": "./dist/tool-execution/projectToolDefinitionSnapshotRepository.d.ts",
+      "require": "./dist/tool-execution/projectToolDefinitionSnapshotRepository.js",
+      "default": "./dist/tool-execution/projectToolDefinitionSnapshotRepository.js"
+    },
+    "./step-run": {
+      "types": "./dist/run/stepRunRepository.d.ts",
+      "require": "./dist/run/stepRunRepository.js",
+      "default": "./dist/run/stepRunRepository.js"
+    },
+    "./tool-execution-evidence": {
+      "types": "./dist/tool-execution/toolExecutionEvidenceRepository.d.ts",
+      "require": "./dist/tool-execution/toolExecutionEvidenceRepository.js",
+      "default": "./dist/tool-execution/toolExecutionEvidenceRepository.js"
+    },
+    "./tool-execution-start-barrier": {
+      "types": "./dist/tool-execution/toolExecutionStartBarrierRepository.d.ts",
+      "require": "./dist/tool-execution/toolExecutionStartBarrierRepository.js",
+      "default": "./dist/tool-execution/toolExecutionStartBarrierRepository.js"
+    },
+    "./tool-execution-completion": {
+      "types": "./dist/tool-execution/toolExecutionCompletionRepository.d.ts",
+      "require": "./dist/tool-execution/toolExecutionCompletionRepository.js",
+      "default": "./dist/tool-execution/toolExecutionCompletionRepository.js"
+    },
+    "./tool-execution-failure-completion": {
+      "types": "./dist/tool-execution/toolExecutionFailureCompletionRepository.d.ts",
+      "require": "./dist/tool-execution/toolExecutionFailureCompletionRepository.js",
+      "default": "./dist/tool-execution/toolExecutionFailureCompletionRepository.js"
+    },
+    "./tool-result-key-catalog": {
+      "types": "./dist/tool-execution/toolResultKeyCatalogRepository.d.ts",
+      "require": "./dist/tool-execution/toolResultKeyCatalogRepository.js",
+      "default": "./dist/tool-execution/toolResultKeyCatalogRepository.js"
+    },
+    "./tool-result-rekey": {
+      "types": "./dist/tool-execution/toolResultRekeyRepository.d.ts",
+      "require": "./dist/tool-execution/toolResultRekeyRepository.js",
+      "default": "./dist/tool-execution/toolResultRekeyRepository.js"
+    },
+    "./tool-invocation-artifact": {
+      "types": "./dist/tool-execution/toolInvocationArtifactRepository.d.ts",
+      "require": "./dist/tool-execution/toolInvocationArtifactRepository.js",
+      "default": "./dist/tool-execution/toolInvocationArtifactRepository.js"
+    },
+    "./mcp-read-database": {
+      "types": "./dist/tool-execution/localMcpReadDatabase.d.ts",
+      "require": "./dist/tool-execution/localMcpReadDatabase.js",
+      "default": "./dist/tool-execution/localMcpReadDatabase.js"
+    },
+    "./approved-action": {
+      "types": "./dist/approved-action/approvalRequestRepository.d.ts",
+      "require": "./dist/approved-action/approvalRequestRepository.js",
+      "default": "./dist/approved-action/approvalRequestRepository.js"
+    },
+    "./approval-discovery": {
+      "types": "./dist/approved-action/approvalRequestSource.d.ts",
+      "require": "./dist/approved-action/approvalRequestSource.js",
+      "default": "./dist/approved-action/approvalRequestSource.js"
+    },
+    "./approval-decision-database": {
+      "types": "./dist/approved-action/approvalDecisionDatabase.d.ts",
+      "require": "./dist/approved-action/approvalDecisionDatabase.js",
+      "default": "./dist/approved-action/approvalDecisionDatabase.js"
+    },
+    "./approved-action-execution": {
+      "types": "./dist/approved-action/approvedActionExecutionRepository.d.ts",
+      "require": "./dist/approved-action/approvedActionExecutionRepository.js",
+      "default": "./dist/approved-action/approvedActionExecutionRepository.js"
+    },
+    "./plugin-package-proposal": {
+      "types": "./dist/plugin-package/pluginPackageProposalRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageProposalRepository.js",
+      "default": "./dist/plugin-package/pluginPackageProposalRepository.js"
+    },
+    "./operation-authority": {
+      "types": "./dist/authority/operationAuthority.d.ts",
+      "require": "./dist/authority/operationAuthority.js",
+      "default": "./dist/authority/operationAuthority.js"
+    },
+    "./project-policy": {
+      "types": "./dist/security/projectPolicyRepository.d.ts",
+      "require": "./dist/security/projectPolicyRepository.js",
+      "default": "./dist/security/projectPolicyRepository.js"
+    },
+    "./package-management": {
+      "types": "./dist/administration/packageManagement.d.ts",
+      "require": "./dist/administration/packageManagement.js",
+      "default": "./dist/administration/packageManagement.js"
+    },
+    "./authenticated-management": {
+      "types": "./dist/administration/packageManagement.d.ts",
+      "require": "./dist/administration/packageManagement.js",
+      "default": "./dist/administration/packageManagement.js"
+    },
+    "./secret-administration": {
+      "types": "./dist/administration/secretAdministration.d.ts",
+      "require": "./dist/administration/secretAdministration.js",
+      "default": "./dist/administration/secretAdministration.js"
+    },
+    "./task-definition-administration": {
+      "types": "./dist/task-definition/taskDefinitionAdministration.d.ts",
+      "require": "./dist/task-definition/taskDefinitionAdministration.js",
+      "default": "./dist/task-definition/taskDefinitionAdministration.js"
+    },
+    "./task-start": {
+      "types": "./dist/task-start/taskStartRepository.d.ts",
+      "require": "./dist/task-start/taskStartRepository.js",
+      "default": "./dist/task-start/taskStartRepository.js"
+    },
+    "./trigger-administration": {
+      "types": "./dist/scheduling/triggerAdministration.d.ts",
+      "require": "./dist/scheduling/triggerAdministration.js",
+      "default": "./dist/scheduling/triggerAdministration.js"
+    },
+    "./project-policy-administration": {
+      "types": "./dist/security/projectPolicyAdministration.d.ts",
+      "require": "./dist/security/projectPolicyAdministration.js",
+      "default": "./dist/security/projectPolicyAdministration.js"
+    },
+    "./security-audit-query": {
+      "types": "./dist/security/securityAuditQuery.d.ts",
+      "require": "./dist/security/securityAuditQuery.js",
+      "default": "./dist/security/securityAuditQuery.js"
+    },
+    "./security-audit-retention": {
+      "types": "./dist/security/securityAuditRetention.d.ts",
+      "require": "./dist/security/securityAuditRetention.js",
+      "default": "./dist/security/securityAuditRetention.js"
+    },
+    "./identity-credential-administration": {
+      "types": "./dist/security/identityCredentialAdministration.d.ts",
+      "require": "./dist/security/identityCredentialAdministration.js",
+      "default": "./dist/security/identityCredentialAdministration.js"
+    },
+    "./optional-feature-runtime": {
+      "types": "./dist/administration/packageManagement.d.ts",
+      "require": "./dist/administration/packageManagement.js",
+      "default": "./dist/administration/packageManagement.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "drizzle"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs",
+    "schema:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "schema:check": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/schema.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "drizzle-kit": "1.0.0-rc.4",
+    "drizzle-orm": "1.0.0-rc.4",
+    "typescript": "5.9.3"
+  }
+}

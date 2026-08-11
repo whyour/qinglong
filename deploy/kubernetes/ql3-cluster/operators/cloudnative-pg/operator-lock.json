@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-07-24",
+  "operator": {
+    "name": "cloudnative-pg",
+    "version": "1.30.0",
+    "image": "ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0@sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb",
+    "platforms": {
+      "linux/amd64": "sha256:091d306935cfdf646debfe78010d59ebfb572150eb6eb922b0203873c0c68841",
+      "linux/arm64": "sha256:6c7926147fd23a053dea6605d61c013d43bfd411be3532e7500ef2d2b68bb98c"
+    },
+    "releaseManifest": "https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml",
+    "releaseManifestSha256": "sha256:f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88",
+    "signatureBundle": "https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.sigstore.json",
+    "certificateIdentityRegexp": "^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v1\\.30\\.0$"
+  },
+  "operand": {
+    "postgresqlVersion": "18.4",
+    "image": "ghcr.io/cloudnative-pg/postgresql:18.4-minimal-trixie@sha256:24d229d801663f95b584416f8ebdfad4849b1a3fa4cfcf95a7f026df7aa6e22d",
+    "platforms": {
+      "linux/amd64": "sha256:67e56bcbe50a58e60509815dd89e58effc5f331ab844f66331d945cd42131e8d",
+      "linux/arm64": "sha256:2adbb634a1c0af8cb036e81200aaa7c8b62517bf5e501699926b337bd9f863f1"
+    }
+  }
+}

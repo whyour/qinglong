@@ -1,0 +1,122 @@
+name: QingLong 3.0 Worker Kubernetes rollout live evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ql3-worker-kubernetes-rollout-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  worker-kubernetes-rollout-live:
+    name: Production Worker, Recreate, mTLS, PVC and Session drain
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Require isolated fixture capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          available_kib="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          minimum_kib="$((15 * 1024 * 1024))"
+          if (( available_kib < minimum_kib )); then
+            echo "Worker rollout live gate requires at least 15 GiB free; found ${available_kib} KiB" >&2
+            exit 1
+          fi
+          docker volume ls --quiet --filter dangling=true | sort > \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.before"
+          docker system df
+
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install verified kubectl v1.34.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl" \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl.sha256" \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl.sha256
+          test "$(cat "${RUNNER_TEMP}/kubectl.sha256")" = \
+            "$(sha256sum "${RUNNER_TEMP}/kubectl" | cut -d ' ' -f 1)"
+          chmod 0755 "${RUNNER_TEMP}/kubectl"
+
+      - name: Recheck Worker runtime and evidence contracts
+        run: |
+          pnpm --filter @qinglong/worker-runtime test
+          node --test test/back/ql3WorkerKubernetesRolloutLiveAudit.test.cjs
+          pnpm audit:worker-deployment:ql3
+
+      - name: Preload digest-bound fixture images
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull \
+            rancher/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c
+          docker tag \
+            rancher/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c \
+            rancher/k3s:v1.34.3-k3s1
+          docker pull \
+            postgres@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
+          docker tag \
+            postgres@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296 \
+            postgres:18.4-bookworm
+
+      - name: Prove production Worker Kubernetes lifecycle
+        env:
+          QL3_WORKER_KUBERNETES_ROLLOUT_LIVE: '1'
+          QL3_KUBECTL_BIN: ${{ runner.temp }}/kubectl
+          QL3_WORKER_KUBERNETES_REPORT: ${{ runner.temp }}/ql3-worker/report.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -m 0700 "$(dirname "${QL3_WORKER_KUBERNETES_REPORT}")"
+          pnpm test:worker-kubernetes-rollout-live:ql3 \
+            "--report=${QL3_WORKER_KUBERNETES_REPORT}"
+
+      - name: Re-audit private report and isolated cleanup
+        env:
+          QL3_WORKER_KUBERNETES_REPORT: ${{ runner.temp }}/ql3-worker/report.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(stat -c '%a' "${QL3_WORKER_KUBERNETES_REPORT}")" = '600'
+          pnpm audit:worker-kubernetes-rollout-live:ql3 \
+            "--report=${QL3_WORKER_KUBERNETES_REPORT}"
+          sha256sum "${QL3_WORKER_KUBERNETES_REPORT}"
+          test -z "$(docker ps -aq --filter name=ql3-worker-rollout-live-)"
+          test -z "$(docker ps -aq --filter name=ql3-worker-rollout-postgres-live-)"
+          docker volume ls --quiet --filter dangling=true | sort > \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.after"
+          diff --unified \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.before" \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.after"
+          docker system df
+
+      - name: Upload audited content-free Worker evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-worker-kubernetes-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-worker/report.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false

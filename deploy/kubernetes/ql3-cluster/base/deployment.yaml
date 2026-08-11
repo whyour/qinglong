@@ -1,0 +1,275 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-cluster-control
+  labels:
+    app.kubernetes.io/name: ql3-cluster-control
+    app.kubernetes.io/component: control-plane
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  replicas: 2
+  minReadySeconds: 10
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-cluster-control
+      app.kubernetes.io/component: control-plane
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-cluster-control
+        app.kubernetes.io/component: control-plane
+        app.kubernetes.io/part-of: qinglong3
+    spec:
+      serviceAccountName: ql3-cluster-control
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ql3-cluster-control
+                  app.kubernetes.io/component: control-plane
+      containers:
+        - name: cluster-control
+          image: qinglong3-cluster-control:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: QL_DEPLOYMENT_PROFILE
+              value: cluster-control
+            - name: QL3_CLUSTER_CONTROL_ENABLED
+              value: "true"
+            - name: QL3_CLUSTER_HTTP_HOST
+              value: 0.0.0.0
+            - name: QL3_CLUSTER_HTTP_PORT
+              value: "5800"
+            - name: QL3_CLUSTER_HTTP_DRAIN_TIMEOUT_MS
+              value: "10000"
+            - name: QL3_WORKER_INGRESS_ENABLED
+              value: "true"
+            - name: QL3_WORKER_INGRESS_HOST
+              value: 0.0.0.0
+            - name: QL3_WORKER_INGRESS_PORT
+              value: "5801"
+            - name: QL3_WORKER_INGRESS_POSTGRES_TLS_MODE
+              value: verify-full
+            - name: QL3_WORKER_INGRESS_POSTGRES_TLS_CA_FILE
+              value: /var/run/secrets/qinglong3/postgres-worker-ingress/ca.crt
+            - name: QL3_WORKER_INGRESS_POSTGRES_MAX_CONNECTIONS
+              value: "4"
+            - name: QL3_WORKER_INGRESS_POSTGRES_APPLICATION_NAME
+              value: qinglong3-worker-ingress
+            - name: QL3_WORKER_INGRESS_TLS_PRIVATE_KEY_FILE
+              value: /var/run/secrets/qinglong3/worker-ingress-tls/tls.key
+            - name: QL3_WORKER_INGRESS_TLS_CERTIFICATE_FILE
+              value: /var/run/secrets/qinglong3/worker-ingress-tls/tls.crt
+            - name: QL3_WORKER_INGRESS_TLS_CLIENT_CA_FILE
+              value: /var/run/secrets/qinglong3/worker-ingress-tls/client-ca.crt
+            - name: QL3_WORKER_SECRET_PROVIDER
+              value: mounted-files
+            - name: QL3_WORKER_SECRET_ROOT_DIRECTORY
+              value: /var/run/secrets/qinglong3/worker-values
+            - name: QL3_POSTGRES_TLS_MODE
+              value: verify-full
+            - name: QL3_POSTGRES_TLS_CA_FILE
+              value: /var/run/secrets/qinglong3/postgres-runtime/ca.crt
+            - name: QL3_POSTGRES_MAX_CONNECTIONS
+              value: "8"
+            - name: QL3_POSTGRES_APPLICATION_NAME
+              value: qinglong3-cluster-control
+            - name: QL3_CLUSTER_REPLICA_ID
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: QL3_POSTGRES_RUNTIME_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-control-runtime
+                  key: postgres-runtime-url
+            - name: QL3_POSTGRES_TLS_SERVERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-control-runtime
+                  key: postgres-tls-servername
+            - name: QL3_API_CREDENTIAL_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-control-runtime
+                  key: api-credential-pepper
+            - name: QL3_POSTGRES_WORKER_INGRESS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: postgres-worker-ingress-url
+            - name: QL3_WORKER_INGRESS_POSTGRES_TLS_SERVERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: postgres-tls-servername
+            - name: QL3_WORKER_CREDENTIAL_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: worker-credential-pepper
+            - name: QL3_WORKER_ARTIFACT_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-bucket
+            - name: QL3_WORKER_ARTIFACT_S3_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-region
+            - name: QL3_WORKER_ARTIFACT_S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-endpoint
+                  optional: true
+            - name: QL3_WORKER_ARTIFACT_S3_ALLOW_INSECURE
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-allow-insecure
+                  optional: true
+            - name: QL3_WORKER_ARTIFACT_S3_FORCE_PATH_STYLE
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-force-path-style
+                  optional: true
+            - name: QL3_WORKER_ARTIFACT_S3_ENCRYPTION
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-encryption
+                  optional: true
+            - name: QL3_WORKER_ARTIFACT_S3_KMS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-kms-key-id
+                  optional: true
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-ingress
+                  key: artifact-s3-secret-access-key
+                  optional: true
+          ports:
+            - name: http
+              containerPort: 5800
+              protocol: TCP
+            - name: worker-mtls
+              containerPort: 5801
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+              scheme: HTTP
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: postgres-runtime-ca
+              mountPath: /var/run/secrets/qinglong3/postgres-runtime
+              readOnly: true
+            - name: postgres-worker-ingress-ca
+              mountPath: /var/run/secrets/qinglong3/postgres-worker-ingress
+              readOnly: true
+            - name: worker-ingress-tls
+              mountPath: /var/run/secrets/qinglong3/worker-ingress-tls
+              readOnly: true
+            - name: worker-secret-values
+              mountPath: /var/run/secrets/qinglong3/worker-values
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: postgres-runtime-ca
+          secret:
+            secretName: ql3-cluster-control-runtime
+            defaultMode: 292
+            items:
+              - key: postgres-ca.crt
+                path: ca.crt
+        - name: postgres-worker-ingress-ca
+          secret:
+            secretName: ql3-cluster-worker-ingress
+            defaultMode: 288
+            items:
+              - key: postgres-ca.crt
+                path: ca.crt
+        - name: worker-ingress-tls
+          secret:
+            secretName: ql3-cluster-worker-ingress
+            defaultMode: 288
+            items:
+              - key: tls.key
+                path: tls.key
+              - key: tls.crt
+                path: tls.crt
+              - key: client-ca.crt
+                path: client-ca.crt
+        - name: worker-secret-values
+          secret:
+            secretName: ql3-cluster-worker-values
+            optional: true
+            defaultMode: 288

@@ -1,0 +1,15 @@
+# Example only. Save as kustomization.yaml in a private overlay and replace the
+# digest with the independently verified runtime-ai image digest.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/cluster-ai
+
+images:
+  - name: qinglong3-cluster-control-ai
+    newName: registry.example.com/qinglong/qinglong3-cluster-control-ai
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

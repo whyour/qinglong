@@ -1,0 +1,20 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: ql3-postgres-daily
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-backup
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  schedule: '0 0 0 * * *'
+  backupOwnerReference: self
+  immediate: false
+  suspend: false
+  target: prefer-standby
+  cluster:
+    name: ql3-postgres
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

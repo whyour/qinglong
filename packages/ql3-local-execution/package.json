@@ -1,0 +1,56 @@
+{
+  "name": "@qinglong/local-execution",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 local execution, control, recovery and dispatch runtime",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "exports": {
+    "./execution": {
+      "types": "./dist/execution/index.d.ts",
+      "require": "./dist/execution/index.js",
+      "default": "./dist/execution/index.js"
+    },
+    "./control": {
+      "types": "./dist/control/index.d.ts",
+      "require": "./dist/control/index.js",
+      "default": "./dist/control/index.js"
+    },
+    "./recovery": {
+      "types": "./dist/recovery/index.d.ts",
+      "require": "./dist/recovery/index.js",
+      "default": "./dist/recovery/index.js"
+    },
+    "./dispatch": {
+      "types": "./dist/dispatch/index.d.ts",
+      "require": "./dist/dispatch/index.js",
+      "default": "./dist/dispatch/index.js"
+    },
+    "./scheduler": {
+      "types": "./dist/scheduler/index.d.ts",
+      "require": "./dist/scheduler/index.js",
+      "default": "./dist/scheduler/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/local-process": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*",
+    "croner": "7.0.8"
+  },
+  "devDependencies": {
+    "@qinglong/local-sqlite": "workspace:*",
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,85 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ql3-cluster-migration
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-cluster-migration
+    app.kubernetes.io/component: database-migration
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-cluster-migration
+        app.kubernetes.io/component: database-migration
+        app.kubernetes.io/part-of: qinglong3
+    spec:
+      serviceAccountName: ql3-cluster-control
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migration
+          image: qinglong3-cluster-control:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - /opt/qinglong/node_modules/@qinglong/cluster-postgres/dist/migration/migrationCli.js
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: QL3_POSTGRES_TLS_MODE
+              value: verify-full
+            - name: QL3_POSTGRES_TLS_CA_FILE
+              value: /var/run/secrets/qinglong3/postgres-migration/ca.crt
+            - name: QL3_POSTGRES_APPLICATION_NAME
+              value: qinglong3-cluster-migration
+            - name: QL3_POSTGRES_MIGRATION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-migration
+                  key: postgres-migration-url
+            - name: QL3_POSTGRES_TLS_SERVERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-migration
+                  key: postgres-tls-servername
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: '1'
+              memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: postgres-migration-ca
+              mountPath: /var/run/secrets/qinglong3/postgres-migration
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: postgres-migration-ca
+          secret:
+            secretName: ql3-cluster-migration
+            defaultMode: 292
+            items:
+              - key: postgres-ca.crt
+                path: ca.crt

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+patches:
+  - path: postgres-runtime-patch.yaml
+
+images:
+  - name: qinglong3-cluster-control
+    newName: registry.example.com/qinglong/qinglong3-cluster-control
+    # Fail closed until the independently verified release digest is supplied.
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

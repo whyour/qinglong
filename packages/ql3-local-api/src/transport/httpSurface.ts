@@ -1,0 +1,701 @@
+import { randomUUID } from 'node:crypto';
+import http, { type IncomingMessage, type ServerResponse } from 'node:http';
+import type { Socket } from 'node:net';
+
+import type { LocalApplicationProfile } from '@qinglong/local-application';
+
+import type {
+  LocalApiAdmission,
+  LocalApiAdmissionOperation,
+  LocalApiAdmissionRequest,
+} from '../admission/localApiAdmission';
+import type { BoundedRunListInput } from '@qinglong/runtime-core/bounded-run-list-projection';
+import type { BoundedRunEventListInput } from '@qinglong/runtime-core/bounded-run-event-list-projection';
+import type { BoundedRunStepListInput } from '@qinglong/runtime-core/bounded-run-step-list-projection';
+import type { BoundedTaskListInput } from '@qinglong/runtime-core/bounded-task-list-projection';
+import type { LocalApiResponse } from './contract';
+
+const MAX_HEADER_BYTES = 8 * 1_024;
+const MAX_URL_BYTES = 512;
+const MAX_RESPONSE_BYTES = 64 * 1_024;
+const RUN_READ_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/;
+const RUN_LIST_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs$/;
+const RUN_EVENT_LIST_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/events$/;
+const RUN_STEP_LIST_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/steps$/;
+const RUN_CANCELLATION_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/cancellation$/;
+const TASK_LIST_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks$/;
+const TASK_READ_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/;
+const TASK_START_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs$/;
+const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+type LocalApiRouteResolution =
+  | LocalApiAdmissionOperation
+  | Readonly<{
+      errorCode:
+        | 'invalid_run_list_query'
+        | 'invalid_run_event_list_query'
+        | 'invalid_run_step_list_query'
+        | 'invalid_task_list_query';
+    }>;
+
+export interface LocalApiHttpSurfaceOptions {
+  readonly profile: LocalApplicationProfile;
+  readonly host: '127.0.0.1' | '::1';
+  readonly port: number;
+  readonly admission: LocalApiAdmission;
+  readonly randomUuid?: () => string;
+}
+
+export interface ActiveLocalApiHttpSurface {
+  readonly host: '127.0.0.1' | '::1';
+  readonly port: number;
+  stopAndDrain(): Promise<'stopped' | 'timed_out'>;
+}
+
+function rawHeaderValues(
+  request: IncomingMessage,
+  name: string,
+): readonly string[] {
+  const values: string[] = [];
+  for (let index = 0; index < request.rawHeaders.length; index += 2) {
+    if (request.rawHeaders[index]?.toLowerCase() === name) {
+      values.push(request.rawHeaders[index + 1] ?? '');
+    }
+  }
+  return values;
+}
+
+function authorization(request: IncomingMessage): string | null {
+  const values = rawHeaderValues(request, 'authorization');
+  return values.length === 1 ? values[0]! : null;
+}
+
+function hasRequestBody(request: IncomingMessage): boolean {
+  const transferEncoding = rawHeaderValues(request, 'transfer-encoding');
+  const contentLength = rawHeaderValues(request, 'content-length');
+  return (
+    transferEncoding.length !== 0 ||
+    contentLength.length > 1 ||
+    (contentLength.length === 1 && contentLength[0] !== '0')
+  );
+}
+
+function jsonContentLength(
+  request: IncomingMessage,
+  maximumBodyBytes: number,
+): number {
+  const transferEncoding = rawHeaderValues(request, 'transfer-encoding');
+  const contentLength = rawHeaderValues(request, 'content-length');
+  const contentType = rawHeaderValues(request, 'content-type');
+  if (
+    transferEncoding.length !== 0 ||
+    contentLength.length !== 1 ||
+    contentType.length !== 1 ||
+    contentType[0]!.trim().toLowerCase() !== 'application/json' ||
+    !/^[1-9]\d*$/.test(contentLength[0]!)
+  ) {
+    throw new TypeError('invalid_request_body');
+  }
+  const length = Number(contentLength[0]);
+  if (!Number.isSafeInteger(length) || length > maximumBodyBytes) {
+    throw new RangeError('request_body_too_large');
+  }
+  return length;
+}
+
+function readJsonBody(
+  request: IncomingMessage,
+  expectedBytes: number,
+  signal: AbortSignal,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let received = 0;
+    const fail = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    const aborted = () => fail(new Error('request_unavailable'));
+    const cleanup = () => {
+      signal.removeEventListener('abort', aborted);
+      request.removeListener('data', data);
+      request.removeListener('end', end);
+      request.removeListener('error', fail);
+    };
+    const data = (chunk: Buffer) => {
+      received += chunk.byteLength;
+      if (received > expectedBytes) {
+        fail(new TypeError('invalid_request_body'));
+        return;
+      }
+      chunks.push(chunk);
+    };
+    const end = () => {
+      cleanup();
+      if (received !== expectedBytes) {
+        reject(new TypeError('invalid_request_body'));
+        return;
+      }
+      try {
+        const text = new TextDecoder('utf-8', { fatal: true }).decode(
+          Buffer.concat(chunks, received),
+        );
+        resolve(JSON.parse(text));
+      } catch {
+        reject(new TypeError('invalid_request_body'));
+      }
+    };
+    signal.addEventListener('abort', aborted, { once: true });
+    request.on('data', data);
+    request.once('end', end);
+    request.once('error', fail);
+    if (signal.aborted) aborted();
+  });
+}
+
+function parseRunListQuery(rawQuery: string | undefined): BoundedRunListInput {
+  if (rawQuery === undefined) return Object.freeze({});
+  if (rawQuery.length === 0) throw new TypeError();
+  const values = new Map<string, string>();
+  for (const field of rawQuery.split('&')) {
+    const separator = field.indexOf('=');
+    if (
+      separator < 1 ||
+      separator !== field.lastIndexOf('=') ||
+      separator === field.length - 1
+    ) {
+      throw new TypeError();
+    }
+    const name = field.slice(0, separator);
+    const value = field.slice(separator + 1);
+    if (
+      values.has(name) ||
+      (name !== 'limit' &&
+        name !== 'after_created_at_ms' &&
+        name !== 'after_run_id')
+    ) {
+      throw new TypeError();
+    }
+    values.set(name, value);
+  }
+  const rawLimit = values.get('limit');
+  const limit = rawLimit === undefined ? undefined : Number(rawLimit);
+  if (
+    rawLimit !== undefined &&
+    (!Number.isSafeInteger(limit) ||
+      Number(limit) < 1 ||
+      Number(limit) > 64 ||
+      String(limit) !== rawLimit)
+  ) {
+    throw new TypeError();
+  }
+  const rawCreatedAtMs = values.get('after_created_at_ms');
+  const runId = values.get('after_run_id');
+  if ((rawCreatedAtMs === undefined) !== (runId === undefined)) {
+    throw new TypeError();
+  }
+  if (rawCreatedAtMs === undefined || runId === undefined) {
+    return Object.freeze({ ...(limit === undefined ? {} : { limit }) });
+  }
+  const createdAtMs = Number(rawCreatedAtMs);
+  if (
+    !Number.isSafeInteger(createdAtMs) ||
+    createdAtMs < 0 ||
+    String(createdAtMs) !== rawCreatedAtMs ||
+    !RUN_ID_PATTERN.test(runId)
+  ) {
+    throw new TypeError();
+  }
+  return Object.freeze({
+    ...(limit === undefined ? {} : { limit }),
+    after: Object.freeze({ createdAtMs, runId }),
+  });
+}
+
+function parseRunEventListQuery(
+  rawQuery: string | undefined,
+): BoundedRunEventListInput {
+  if (rawQuery === undefined) return Object.freeze({});
+  if (rawQuery.length === 0) throw new TypeError();
+  const values = new Map<string, string>();
+  for (const field of rawQuery.split('&')) {
+    const separator = field.indexOf('=');
+    if (
+      separator < 1 ||
+      separator !== field.lastIndexOf('=') ||
+      separator === field.length - 1
+    ) {
+      throw new TypeError();
+    }
+    const name = field.slice(0, separator);
+    const value = field.slice(separator + 1);
+    if (values.has(name) || (name !== 'limit' && name !== 'after_sequence')) {
+      throw new TypeError();
+    }
+    values.set(name, value);
+  }
+  const rawLimit = values.get('limit');
+  const limit = rawLimit === undefined ? undefined : Number(rawLimit);
+  const rawAfterSequence = values.get('after_sequence');
+  const afterSequence =
+    rawAfterSequence === undefined ? undefined : Number(rawAfterSequence);
+  if (
+    (rawLimit !== undefined &&
+      (!Number.isSafeInteger(limit) ||
+        Number(limit) < 1 ||
+        Number(limit) > 64 ||
+        String(limit) !== rawLimit)) ||
+    (rawAfterSequence !== undefined &&
+      (!Number.isSafeInteger(afterSequence) ||
+        Number(afterSequence) < 0 ||
+        Number(afterSequence) > 2_147_483_647 ||
+        String(afterSequence) !== rawAfterSequence))
+  ) {
+    throw new TypeError();
+  }
+  return Object.freeze({
+    ...(afterSequence === undefined ? {} : { afterSequence }),
+    ...(limit === undefined ? {} : { limit }),
+  });
+}
+
+function parseRunStepListQuery(
+  rawQuery: string | undefined,
+): BoundedRunStepListInput {
+  if (rawQuery === undefined) return Object.freeze({});
+  if (rawQuery.length === 0) throw new TypeError();
+  const values = new Map<string, string>();
+  for (const field of rawQuery.split('&')) {
+    const separator = field.indexOf('=');
+    if (
+      separator < 1 ||
+      separator !== field.lastIndexOf('=') ||
+      separator === field.length - 1
+    ) {
+      throw new TypeError();
+    }
+    const name = field.slice(0, separator);
+    const value = field.slice(separator + 1);
+    if (
+      values.has(name) ||
+      (name !== 'limit' &&
+        name !== 'after_step_key' &&
+        name !== 'after_step_run_id')
+    ) {
+      throw new TypeError();
+    }
+    values.set(name, value);
+  }
+  const rawLimit = values.get('limit');
+  const limit = rawLimit === undefined ? undefined : Number(rawLimit);
+  if (
+    rawLimit !== undefined &&
+    (!Number.isSafeInteger(limit) ||
+      Number(limit) < 1 ||
+      Number(limit) > 64 ||
+      String(limit) !== rawLimit)
+  ) {
+    throw new TypeError();
+  }
+  const stepKey = values.get('after_step_key');
+  const stepRunId = values.get('after_step_run_id');
+  if ((stepKey === undefined) !== (stepRunId === undefined)) {
+    throw new TypeError();
+  }
+  if (stepKey === undefined || stepRunId === undefined) {
+    return Object.freeze({ ...(limit === undefined ? {} : { limit }) });
+  }
+  if (!RUN_ID_PATTERN.test(stepKey) || !RUN_ID_PATTERN.test(stepRunId)) {
+    throw new TypeError();
+  }
+  return Object.freeze({
+    ...(limit === undefined ? {} : { limit }),
+    after: Object.freeze({ stepKey, stepRunId }),
+  });
+}
+
+function parseTaskListQuery(
+  rawQuery: string | undefined,
+): BoundedTaskListInput {
+  if (rawQuery === undefined) return Object.freeze({});
+  if (rawQuery.length === 0) throw new TypeError();
+  const values = new Map<string, string>();
+  for (const field of rawQuery.split('&')) {
+    const separator = field.indexOf('=');
+    if (
+      separator < 1 ||
+      separator !== field.lastIndexOf('=') ||
+      separator === field.length - 1
+    ) {
+      throw new TypeError();
+    }
+    const name = field.slice(0, separator);
+    const value = field.slice(separator + 1);
+    if (
+      values.has(name) ||
+      (name !== 'limit' && name !== 'after_task_id')
+    ) {
+      throw new TypeError();
+    }
+    values.set(name, value);
+  }
+  const rawLimit = values.get('limit');
+  const limit = rawLimit === undefined ? undefined : Number(rawLimit);
+  const taskId = values.get('after_task_id');
+  if (
+    (rawLimit !== undefined &&
+      (!Number.isSafeInteger(limit) ||
+        Number(limit) < 1 ||
+        Number(limit) > 64 ||
+        String(limit) !== rawLimit)) ||
+    (taskId !== undefined && !TASK_ID_PATTERN.test(taskId))
+  ) {
+    throw new TypeError();
+  }
+  return Object.freeze({
+    ...(limit === undefined ? {} : { limit }),
+    ...(taskId === undefined
+      ? {}
+      : { after: Object.freeze({ taskId }) }),
+  });
+}
+
+function route(request: IncomingMessage): LocalApiRouteResolution | null {
+  const rawUrl = request.url;
+  if (
+    typeof rawUrl !== 'string' ||
+    rawUrl.length < 1 ||
+    Buffer.byteLength(rawUrl, 'utf8') > MAX_URL_BYTES ||
+    rawUrl.includes('%') ||
+    rawUrl.includes('#')
+  ) {
+    return null;
+  }
+  const separator = rawUrl.indexOf('?');
+  if (separator !== rawUrl.lastIndexOf('?')) return null;
+  const path = separator < 0 ? rawUrl : rawUrl.slice(0, separator);
+  const rawQuery = separator < 0 ? undefined : rawUrl.slice(separator + 1);
+  if (request.method === 'POST') {
+    const taskStartMatch = TASK_START_ROUTE_PATTERN.exec(path);
+    if (taskStartMatch && rawQuery === undefined) {
+      return Object.freeze({
+        operationId: 'task.start',
+        projectId: taskStartMatch[1]!,
+        taskId: taskStartMatch[2]!,
+      });
+    }
+    const cancellationMatch = RUN_CANCELLATION_ROUTE_PATTERN.exec(path);
+    return cancellationMatch && rawQuery === undefined
+      ? Object.freeze({
+          operationId: 'run.cancel',
+          projectId: cancellationMatch[1]!,
+          runId: cancellationMatch[2]!,
+        })
+      : null;
+  }
+  if (request.method !== 'GET') return null;
+  const taskReadMatch = TASK_READ_ROUTE_PATTERN.exec(path);
+  if (taskReadMatch) {
+    return rawQuery === undefined
+      ? Object.freeze({
+          operationId: 'task.get',
+          projectId: taskReadMatch[1]!,
+          taskId: taskReadMatch[2]!,
+        })
+      : null;
+  }
+  const taskListMatch = TASK_LIST_ROUTE_PATTERN.exec(path);
+  if (taskListMatch) {
+    try {
+      return Object.freeze({
+        operationId: 'task.list',
+        projectId: taskListMatch[1]!,
+        input: parseTaskListQuery(rawQuery),
+      });
+    } catch {
+      return Object.freeze({ errorCode: 'invalid_task_list_query' });
+    }
+  }
+  const eventListMatch = RUN_EVENT_LIST_ROUTE_PATTERN.exec(path);
+  if (eventListMatch) {
+    try {
+      return Object.freeze({
+        operationId: 'run.events.list',
+        projectId: eventListMatch[1]!,
+        runId: eventListMatch[2]!,
+        input: parseRunEventListQuery(rawQuery),
+      });
+    } catch {
+      return Object.freeze({ errorCode: 'invalid_run_event_list_query' });
+    }
+  }
+  const stepListMatch = RUN_STEP_LIST_ROUTE_PATTERN.exec(path);
+  if (stepListMatch) {
+    try {
+      return Object.freeze({
+        operationId: 'run.steps.list',
+        projectId: stepListMatch[1]!,
+        runId: stepListMatch[2]!,
+        input: parseRunStepListQuery(rawQuery),
+      });
+    } catch {
+      return Object.freeze({ errorCode: 'invalid_run_step_list_query' });
+    }
+  }
+  const readMatch = RUN_READ_ROUTE_PATTERN.exec(path);
+  if (readMatch) {
+    return rawQuery === undefined
+      ? Object.freeze({
+          operationId: 'run.get',
+          projectId: readMatch[1]!,
+          runId: readMatch[2]!,
+        })
+      : null;
+  }
+  const listMatch = RUN_LIST_ROUTE_PATTERN.exec(path);
+  if (!listMatch) return null;
+  try {
+    return Object.freeze({
+      operationId: 'run.list',
+      projectId: listMatch[1]!,
+      input: parseRunListQuery(rawQuery),
+    });
+  } catch {
+    return Object.freeze({ errorCode: 'invalid_run_list_query' });
+  }
+}
+
+function send(
+  response: ServerResponse,
+  requestId: string,
+  value: Readonly<LocalApiResponse>,
+): void {
+  if (response.destroyed || response.headersSent) return;
+  let body: string;
+  try {
+    body = JSON.stringify(value.body);
+  } catch {
+    body = JSON.stringify({ code: 'response_unavailable' });
+    value = Object.freeze({ statusCode: 503, body: Object.freeze({}) });
+  }
+  if (Buffer.byteLength(body, 'utf8') > MAX_RESPONSE_BYTES) {
+    body = JSON.stringify({ code: 'response_unavailable' });
+    value = Object.freeze({ statusCode: 503, body: Object.freeze({}) });
+  }
+  response.statusCode = value.statusCode;
+  response.setHeader('content-type', 'application/json; charset=utf-8');
+  response.setHeader('cache-control', 'no-store');
+  response.setHeader('x-content-type-options', 'nosniff');
+  response.setHeader('x-request-id', requestId);
+  response.setHeader('content-length', Buffer.byteLength(body, 'utf8'));
+  response.end(body);
+}
+
+function errorResponse(statusCode: number, code: string): LocalApiResponse {
+  return Object.freeze({
+    statusCode,
+    body: Object.freeze({ code }),
+  });
+}
+
+function validateOptions(options: LocalApiHttpSurfaceOptions): void {
+  if (
+    !options ||
+    typeof options !== 'object' ||
+    Array.isArray(options) ||
+    (options.profile !== 'edge' && options.profile !== 'standalone') ||
+    (options.host !== '127.0.0.1' && options.host !== '::1') ||
+    !Number.isSafeInteger(options.port) ||
+    options.port < 1_024 ||
+    options.port > 65_535 ||
+    typeof options.admission?.prepare !== 'function' ||
+    (options.randomUuid !== undefined &&
+      typeof options.randomUuid !== 'function')
+  ) {
+    throw new TypeError('Local API HTTP surface options are invalid');
+  }
+}
+
+export async function startLocalApiHttpSurface(
+  options: LocalApiHttpSurfaceOptions,
+): Promise<Readonly<ActiveLocalApiHttpSurface>> {
+  validateOptions(options);
+  const uuid = options.randomUuid ?? randomUUID;
+  const maxConcurrentRequests = options.profile === 'edge' ? 4 : 32;
+  const drainTimeoutMs = options.profile === 'edge' ? 5_000 : 10_000;
+  let accepting = true;
+  const inFlight = new Set<Promise<void>>();
+  const sockets = new Set<Socket>();
+
+  const server = http.createServer(
+    {
+      maxHeaderSize: MAX_HEADER_BYTES,
+      requestTimeout: 5_000,
+      keepAlive: true,
+    },
+    (request, response) => {
+      const requestId = `local:${uuid()}`;
+      if (!accepting) {
+        send(response, requestId, errorResponse(503, 'server_draining'));
+        return;
+      }
+      if (inFlight.size >= maxConcurrentRequests) {
+        send(response, requestId, errorResponse(503, 'server_overloaded'));
+        return;
+      }
+      const resolvedRoute = route(request);
+      if (!resolvedRoute) {
+        send(response, requestId, errorResponse(404, 'route_not_found'));
+        return;
+      }
+      if ('errorCode' in resolvedRoute) {
+        send(response, requestId, errorResponse(400, resolvedRoute.errorCode));
+        return;
+      }
+      const abort = new AbortController();
+      request.once('aborted', () => abort.abort());
+      response.once('close', () => {
+        if (!response.writableFinished) abort.abort();
+      });
+      const admissionRequest: LocalApiAdmissionRequest = Object.freeze({
+        requestId,
+        operation: resolvedRoute,
+        authorization: authorization(request),
+        signal: abort.signal,
+      });
+      let operation: Promise<void>;
+      operation = options.admission
+        .prepare(admissionRequest)
+        .then(async (prepared) => {
+          if (!('handle' in prepared)) {
+            if (hasRequestBody(request)) {
+              response.setHeader('connection', 'close');
+            }
+            send(response, requestId, prepared);
+            return;
+          }
+          if (prepared.bodyMode === 'none') {
+            if (hasRequestBody(request)) {
+              send(
+                response,
+                requestId,
+                errorResponse(400, 'invalid_request_body'),
+              );
+              request.resume();
+              return;
+            }
+            send(response, requestId, await prepared.handle(null));
+            return;
+          }
+          let body: unknown;
+          try {
+            const expectedBytes = jsonContentLength(
+              request,
+              prepared.maximumBodyBytes,
+            );
+            body = await readJsonBody(request, expectedBytes, abort.signal);
+          } catch (error) {
+            const code =
+              error instanceof RangeError
+                ? 'request_body_too_large'
+                : error instanceof Error &&
+                    error.message === 'request_unavailable'
+                  ? 'request_unavailable'
+                  : 'invalid_request_body';
+            send(
+              response,
+              requestId,
+              errorResponse(
+                code === 'request_body_too_large'
+                  ? 413
+                  : code === 'request_unavailable'
+                    ? 503
+                    : 400,
+                code,
+              ),
+            );
+            return;
+          }
+          send(response, requestId, await prepared.handle(body));
+        })
+        .catch(() =>
+          send(response, requestId, errorResponse(503, 'request_unavailable')),
+        )
+        .finally(() => {
+          inFlight.delete(operation);
+        });
+      inFlight.add(operation);
+    },
+  );
+  server.headersTimeout = 5_000;
+  server.keepAliveTimeout = 5_000;
+  server.maxRequestsPerSocket = 100;
+  server.maxConnections = maxConcurrentRequests * 2;
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.once('close', () => sockets.delete(socket));
+  });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const onError = (error: Error) => {
+        server.off('listening', onListening);
+        reject(error);
+      };
+      const onListening = () => {
+        server.off('error', onError);
+        resolve();
+      };
+      server.once('error', onError);
+      server.once('listening', onListening);
+      server.listen(options.port, options.host);
+    });
+  } catch (error) {
+    accepting = false;
+    for (const socket of sockets) socket.destroy();
+    throw error;
+  }
+
+  let stopPromise: Promise<'stopped' | 'timed_out'> | undefined;
+  return Object.freeze({
+    host: options.host,
+    port: options.port,
+    stopAndDrain() {
+      if (stopPromise) return stopPromise;
+      accepting = false;
+      stopPromise = (async () => {
+        const closed = new Promise<void>((resolve, reject) => {
+          server.close((error?: Error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+          server.closeIdleConnections();
+        });
+        let timer: NodeJS.Timeout | undefined;
+        const timeout = new Promise<'timed_out'>((resolve) => {
+          timer = setTimeout(() => resolve('timed_out'), drainTimeoutMs);
+        });
+        const drained = Promise.allSettled([...inFlight]).then(
+          () => 'stopped' as const,
+        );
+        const result = await Promise.race([drained, timeout]);
+        if (timer) clearTimeout(timer);
+        if (result === 'timed_out') {
+          for (const socket of sockets) socket.destroy();
+        }
+        await closed;
+        return result;
+      })();
+      return stopPromise;
+    },
+  });
+}

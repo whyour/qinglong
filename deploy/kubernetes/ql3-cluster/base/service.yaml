@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ql3-cluster-control
+  labels:
+    app.kubernetes.io/name: ql3-cluster-control
+    app.kubernetes.io/component: control-plane
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ql3-cluster-control
+    app.kubernetes.io/component: control-plane
+  ports:
+    - name: http
+      port: 5800
+      targetPort: http
+      protocol: TCP
+    - name: worker-mtls
+      port: 5801
+      targetPort: worker-mtls
+      protocol: TCP

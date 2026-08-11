@@ -1,0 +1,19 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ql3-prompt-output-key-rotation
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-prompt-output-key-rotation
+    app.kubernetes.io/component: ai-maintenance
+    app.kubernetes.io/part-of: qinglong3
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - secrets
+    resourceNames:
+      - ql3-prompt-output-keyring
+    verbs:
+      - get
+      - update

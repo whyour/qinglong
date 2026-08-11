@@ -1,0 +1,45 @@
+# Example only. Copy these objects into a private, per-command overlay.
+# Replace every placeholder. Never commit an assertion, private key or review detail.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-approval-management-request
+  namespace: qinglong3-system
+immutable: true
+type: Opaque
+stringData:
+  client.json: |
+    {"schemaVersion":1,"endpoint":"https://ql3-approval-management.qinglong3-system.svc:8447/api/v3/approvals/management","servername":"ql3-approval-management.qinglong3-system.svc","caFile":"/tmp/ca.crt","clientCertificateFile":"/tmp/client.crt","clientPrivateKeyFile":"/tmp/client.key","requestTimeoutMs":15000}
+  command.json: |
+    {"schemaVersion":1,"operation":"approval.inspect","request":{"projectId":"REPLACE_WITH_PROJECT_ID","approvalRequestId":"REPLACE_WITH_APPROVAL_REQUEST_ID","requestId":"REPLACE_WITH_UNIQUE_REQUEST_ID","auditEventId":"REPLACE_WITH_UUID_V4","failureAuditEventId":"REPLACE_WITH_DIFFERENT_UUID_V4"}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-approval-management-client-trust
+  namespace: qinglong3-system
+immutable: true
+data:
+  ca.crt: |
+    REPLACE_WITH_REVIEWED_MANAGER_CA_CERTIFICATE
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-approval-management-assertion
+  namespace: qinglong3-system
+immutable: true
+type: Opaque
+stringData:
+  assertion.jwt: REPLACE_WITH_SHORT_LIVED_STRONG_USER_ASSERTION
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-approval-management-client-identity
+  namespace: qinglong3-system
+immutable: true
+type: kubernetes.io/tls
+stringData:
+  tls.crt: REPLACE_WITH_SHORT_LIVED_CLIENT_CERTIFICATE_CHAIN
+  tls.key: REPLACE_WITH_CLIENT_PRIVATE_KEY

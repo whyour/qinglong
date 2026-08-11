@@ -1,0 +1,408 @@
+{
+  "schemaVersion": 6,
+  "workspacePackageHardCap": 18,
+  "internalSourceLayout": {
+    "directSourceFileReviewThreshold": 12,
+    "reviewedDenseDirectories": [
+      {
+        "kind": "ordered_ledger",
+        "maxDirectSourceFiles": 57,
+        "path": "packages/ql3-cluster-postgres/src/migrations",
+        "rationale": "PostgreSQL migrations are an append-only version ledger whose ordering and discoverability are safer in one reviewed directory."
+      },
+      {
+        "kind": "ordered_ledger",
+        "maxDirectSourceFiles": 87,
+        "path": "packages/ql3-local-sqlite/src/migrations",
+        "rationale": "SQLite migrations are an append-only version ledger whose ordering and discoverability are safer in one reviewed directory."
+      }
+    ]
+  },
+  "packages": [
+    {
+      "path": "packages/ql3-ai",
+      "name": "@qinglong/ai",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 16,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": ["shared_leaf"],
+      "profiles": [
+        "edge-ai",
+        "standalone-ai",
+        "cluster-control",
+        "cluster-admin"
+      ],
+      "consumers": [
+        "@qinglong/cluster-admin",
+        "@qinglong/cluster-control",
+        "@qinglong/local-owner-cli"
+      ],
+      "rationale": "共享 Model Gateway、ModelInvocation 与 Prompt contract，同时保持非 AI 本机制品不加载该能力。"
+    },
+    {
+      "path": "packages/ql3-cluster-admin",
+      "name": "@qinglong/cluster-admin",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 61,
+      "rootSourceFileRoles": {
+        "modelInvocationMigrationCli.ts": "binary_entry"
+      },
+      "criteria": ["deployable", "authority"],
+      "profiles": ["cluster-admin", "cluster-maintenance"],
+      "consumers": [],
+      "authorities": [
+        "Kubernetes mutation",
+        "PostgreSQL management",
+        "optional mTLS/OIDC human Approval management",
+        "caller-driven Approval management client",
+        "one-shot maintenance"
+      ],
+      "rationale": "独立管理进程与一次性高权限命令必须排除在常驻 cluster-control 之外；Approval 的 service/transport/process/client 属于同一 Cluster Admin 制品与强人类认证 authority，使用包内 approval-management 领域目录而不是新增微包。"
+    },
+    {
+      "path": "packages/ql3-cluster-control",
+      "name": "@qinglong/cluster-control",
+      "rootSourceFileHardCap": 2,
+      "rootSourceLineHardCap": 195,
+      "rootSourceFileRoles": {
+        "aiCli.ts": "binary_entry",
+        "cli.ts": "binary_entry"
+      },
+      "criteria": ["deployable", "authority"],
+      "profiles": ["cluster-control"],
+      "consumers": [],
+      "authorities": [
+        "HTTP admission",
+        "runtime PostgreSQL",
+        "scheduler lifecycle"
+      ],
+      "rationale": "常驻 Cluster 产品进程拥有独立部署、身份、数据库角色和故障域。"
+    },
+    {
+      "path": "packages/ql3-cluster-postgres",
+      "name": "@qinglong/cluster-postgres",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 125,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": [
+        "deployable",
+        "authority",
+        "dependency_isolation",
+        "replaceable_adapter",
+        "shared_leaf"
+      ],
+      "profiles": ["cluster-control", "cluster-admin", "cluster-migration"],
+      "consumers": ["@qinglong/cluster-admin", "@qinglong/cluster-control"],
+      "authorities": [
+        "PostgreSQL migration",
+        "role-scoped repositories",
+        "Project-scoped Approval discovery and verified preview projection",
+        "least-privilege Approval management role and identity ledger"
+      ],
+      "isolatedDependencies": ["drizzle-orm", "pg"],
+      "adapterContract": "PostgreSQL implementation of runtime-core storage ports",
+      "rationale": "隔离 PostgreSQL 驱动、迁移和分角色 authority，避免进入 Local/Worker 制品。"
+    },
+    {
+      "path": "packages/ql3-local-admin",
+      "name": "@qinglong/local-admin",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 9,
+      "rootSourceFileRoles": {
+        "runtime.ts": "public_export"
+      },
+      "criteria": ["authority", "shared_leaf"],
+      "profiles": ["local-owner", "edge-adopted", "standalone-adopted"],
+      "consumers": ["@qinglong/local-application", "@qinglong/local-owner-cli"],
+      "authorities": [
+        "short-lived SQLite administration",
+        "legacy adoption fence",
+        "reviewed adopted Profile activation"
+      ],
+      "rationale": "短生命周期写 authority 与 adopted Profile activation 共享完全相同的部署闭包；后者通过 adopted-profile 子路径与惰性 runtime import 隔离，不再用三文件微型 workspace package 表达。"
+    },
+    {
+      "path": "packages/ql3-local-api",
+      "name": "@qinglong/local-api",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 84,
+      "rootSourceFileRoles": {
+        "cli.ts": "binary_entry"
+      },
+      "criteria": ["authority", "deployable"],
+      "profiles": ["edge-application-api", "standalone-application-api"],
+      "consumers": [],
+      "authorities": [
+        "loopback HTTP listener",
+        "API credential authentication and post-audit fence",
+        "Project Policy admission",
+        "durable security audit"
+      ],
+      "rationale": "可选 Local HTTP 产品入口具有独立监听、认证、授权、审计和停机边界，因此保留为可裁剪制品包；它不是第二个 sidecar，而是把 Product Surface 注入同一个 Local Application Node 进程并复用唯一 SQLite authority。六个包内领域目录承载十二个源文件，Run point-read/discovery/StepRun observation、取消命令、transport contract 与 canonical query 都留在 owning domain，避免按 route 或 transport 继续拆分微包。"
+    },
+    {
+      "path": "packages/ql3-local-application",
+      "name": "@qinglong/local-application",
+      "rootSourceFileHardCap": 2,
+      "rootSourceLineHardCap": 98,
+      "rootSourceFileRoles": {
+        "cli.ts": "binary_entry",
+        "index.ts": "public_export"
+      },
+      "criteria": ["deployable"],
+      "profiles": [
+        "edge-application",
+        "standalone-application",
+        "edge-application-ai",
+        "standalone-application-ai"
+      ],
+      "consumers": ["@qinglong/local-api"],
+      "rationale": "完整本机应用的独立 binary 与按 Profile 裁剪的最终交付边界。"
+    },
+    {
+      "path": "packages/ql3-local-command-file",
+      "name": "@qinglong/local-command-file",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 8,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": ["shared_leaf"],
+      "profiles": [
+        "local-application",
+        "local-mcp",
+        "local-owner",
+        "local-maintenance"
+      ],
+      "consumers": [
+        "@qinglong/local-api",
+        "@qinglong/local-application",
+        "@qinglong/local-mcp-server",
+        "@qinglong/local-owner-cli",
+        "@qinglong/local-owner-maintenance"
+      ],
+      "rationale": "零生产依赖的私有 durable command-file 协议被 API、Application、MCP、Owner CLI、Maintenance 五个不同生命周期闭包复用；根层只保留公开入口，实现归入 protocol domain。"
+    },
+    {
+      "path": "packages/ql3-local-execution",
+      "name": "@qinglong/local-execution",
+      "rootSourceFileHardCap": 0,
+      "rootSourceLineHardCap": 0,
+      "rootSourceFileRoles": {},
+      "criteria": ["authority", "dependency_isolation", "replaceable_adapter"],
+      "profiles": ["edge-application", "standalone-application"],
+      "consumers": ["@qinglong/local-application"],
+      "authorities": ["local dispatch", "execution control", "run recovery"],
+      "isolatedDependencies": ["croner"],
+      "adapterContract": "Local scheduler and execution implementation of runtime-core ports",
+      "rationale": "本机执行和调度 authority 隔离 croner，并通过 subpath 而非更多 workspace 包管理内聚。"
+    },
+    {
+      "path": "packages/ql3-local-mcp-server",
+      "name": "@qinglong/local-mcp-server",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 96,
+      "rootSourceFileRoles": {
+        "cli.ts": "binary_entry"
+      },
+      "criteria": ["deployable", "authority", "dependency_isolation"],
+      "profiles": ["local-mcp"],
+      "consumers": [],
+      "authorities": [
+        "stdio MCP Tool admission",
+        "authenticated Project-scoped Run read",
+        "authenticated Project-scoped Trigger discovery",
+        "authenticated Project-scoped Approval observation",
+        "dual-authorized redacted Approval preview read",
+        "bounded MCP-only Tool projection",
+        "durable security audit"
+      ],
+      "isolatedDependencies": ["@modelcontextprotocol/server"],
+      "rationale": "可选 MCP stdio 进程具有独立协议、依赖、生命周期和安全入口；MCP 单一消费者的 Task/Trigger/Run/Approval 展示适配归入包内 tool-projection domain，避免污染默认 Edge/Standalone application 加载闭包；跨 HTTP/MCP 复用的 run.get、RunEvent 与 StepRun 低敏投影由 Runtime Core 持有，完整 Artifact 与 StepRun mutation authority 只留在 storage adapter。"
+    },
+    {
+      "path": "packages/ql3-local-owner-cli",
+      "name": "@qinglong/local-owner-cli",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 50,
+      "rootSourceFileRoles": {
+        "cli.ts": "binary_entry"
+      },
+      "criteria": ["deployable", "authority"],
+      "profiles": ["local-owner"],
+      "consumers": [],
+      "authorities": [
+        "POSIX owner ceremony",
+        "authenticated local management",
+        "strongly authenticated human Approval inspection and decision",
+        "one-shot authenticated Prompt execution",
+        "short-lived local deployment and Docker cutover start/restart supervision",
+        "short-lived root systemd/OpenRC descriptor install and service-manager bridge"
+      ],
+      "rationale": "面向部署 User/Owner 的短生命周期产品命令，与常驻 application 隔离；ql3 只以同制品静态白名单和无 shell/PATH 的惰性子进程路由现有命令，ql3-approval、ql3-prompt、ql3-local-deploy 与独立 ql3-service-bridge entry 继续复用该制品而不新增 workspace package。root bridge 不进入 ql3 子命令，静态闭包只允许 private command-file、service-manager domain 与无外部依赖的 deployment contract，不加载 SQLite、Owner Console、AI、Docker cutover 或 application；Approval decision、Docker socket、Legacy 静默复核、target start/restart barrier 与 manual-required journal authority 均不进入常驻 Profile。"
+    },
+    {
+      "path": "packages/ql3-local-owner-console",
+      "name": "@qinglong/local-owner-console",
+      "rootSourceFileHardCap": 0,
+      "rootSourceLineHardCap": 0,
+      "rootSourceFileRoles": {},
+      "criteria": ["authority", "shared_leaf"],
+      "profiles": ["local-mcp", "local-owner", "local-maintenance"],
+      "consumers": [
+        "@qinglong/local-api",
+        "@qinglong/local-mcp-server",
+        "@qinglong/local-owner-cli",
+        "@qinglong/local-owner-maintenance"
+      ],
+      "authorities": [
+        "local identity authentication",
+        "staged secret delivery",
+        "POSIX pepper material",
+        "destructive key lifecycle"
+      ],
+      "rationale": "Owner 认证、交付与 Pepper custody 由同一组短生命周期 Owner 闭包消费；Pepper 普通与 destructive authority 通过独立 subpath 和 import gate 隔离，不再用无制品裁剪收益的微型 workspace package 表达。"
+    },
+    {
+      "path": "packages/ql3-local-owner-maintenance",
+      "name": "@qinglong/local-owner-maintenance",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 50,
+      "rootSourceFileRoles": {
+        "cli.ts": "binary_entry"
+      },
+      "criteria": ["deployable", "authority"],
+      "profiles": ["local-maintenance"],
+      "consumers": [],
+      "authorities": ["bounded destructive GC", "key retirement"],
+      "rationale": "独立 maintenance binary 承载高权限、短生命周期且不可进入常驻 Profile 的操作。"
+    },
+    {
+      "path": "packages/ql3-local-process",
+      "name": "@qinglong/local-process",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 8,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": ["replaceable_adapter", "shared_leaf"],
+      "profiles": ["edge-application", "standalone-application", "worker"],
+      "consumers": [
+        "@qinglong/local-application",
+        "@qinglong/local-execution",
+        "@qinglong/worker-runtime"
+      ],
+      "adapterContract": "Durable POSIX process launcher, identity and completion receipt lifecycle",
+      "rationale": "本机 executor 与 Remote Worker 共同复用的窄进程隔离层。"
+    },
+    {
+      "path": "packages/ql3-local-secret",
+      "name": "@qinglong/local-secret",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 17,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": ["authority", "shared_leaf"],
+      "profiles": ["edge-application", "standalone-application", "local-owner"],
+      "consumers": [
+        "@qinglong/local-admin",
+        "@qinglong/local-application",
+        "@qinglong/local-owner-cli"
+      ],
+      "authorities": [
+        "encrypted local Secret envelopes",
+        "private keyring material"
+      ],
+      "rationale": "密文服务和 keyring contract 被管理与运行闭包共享，同时与 SQLite adapter 解耦。"
+    },
+    {
+      "path": "packages/ql3-local-sqlite",
+      "name": "@qinglong/local-sqlite",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 31,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": ["authority", "replaceable_adapter", "shared_leaf"],
+      "profiles": [
+        "edge",
+        "standalone",
+        "local-mcp",
+        "local-owner",
+        "local-maintenance"
+      ],
+      "consumers": [
+        "@qinglong/local-admin",
+        "@qinglong/local-application",
+        "@qinglong/local-mcp-server",
+        "@qinglong/local-owner-cli",
+        "@qinglong/local-owner-console",
+        "@qinglong/local-owner-maintenance"
+      ],
+      "authorities": [
+        "single local SQLite operation authority",
+        "reviewed migration stream",
+        "Project-scoped Approval discovery and verified preview projection",
+        "storage-only Edge and Standalone composition"
+      ],
+      "adapterContract": "SQLite implementation of runtime-core storage ports",
+      "rationale": "本机单连接数据库 authority、方言实现与 storage-only Profile 共享完全相同的最小部署闭包；Profile 通过 profile 子路径暴露，避免单独维护三文件 workspace package，同时仍不安装 local-admin。"
+    },
+    {
+      "path": "packages/ql3-runtime-core",
+      "name": "@qinglong/runtime-core",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 160,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": ["shared_leaf"],
+      "profiles": [
+        "edge",
+        "standalone",
+        "local-mcp",
+        "cluster",
+        "worker",
+        "management"
+      ],
+      "consumers": [
+        "@qinglong/ai",
+        "@qinglong/cluster-admin",
+        "@qinglong/cluster-control",
+        "@qinglong/cluster-postgres",
+        "@qinglong/local-admin",
+        "@qinglong/local-api",
+        "@qinglong/local-application",
+        "@qinglong/local-execution",
+        "@qinglong/local-mcp-server",
+        "@qinglong/local-owner-cli",
+        "@qinglong/local-owner-console",
+        "@qinglong/local-owner-maintenance",
+        "@qinglong/local-process",
+        "@qinglong/local-secret",
+        "@qinglong/local-sqlite",
+        "@qinglong/worker-runtime"
+      ],
+      "rationale": "Profile-neutral contract kernel 被所有 adapter 和产品组合复用，包含有界 Approval discovery 与 document-only detail port，但不持有 Artifact、解密或平台 authority。"
+    },
+    {
+      "path": "packages/ql3-worker-runtime",
+      "name": "@qinglong/worker-runtime",
+      "rootSourceFileHardCap": 1,
+      "rootSourceLineHardCap": 8,
+      "rootSourceFileRoles": {
+        "index.ts": "public_export"
+      },
+      "criteria": ["deployable", "authority"],
+      "profiles": ["worker"],
+      "consumers": [],
+      "authorities": ["remote execution", "worker credential and session"],
+      "rationale": "独立 Worker binary、身份、资源预算与执行故障域。"
+    }
+  ]
+}

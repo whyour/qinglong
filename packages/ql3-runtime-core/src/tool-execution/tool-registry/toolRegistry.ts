@@ -1,0 +1,37 @@
+// Stable Tool Registry facade.
+export {
+  InvalidToolDefinitionError,
+  InvalidToolJsonValueError,
+  MAX_TOOL_ARRAY_ITEMS,
+  MAX_TOOL_DEFINITIONS,
+  MAX_TOOL_INPUT_BYTES,
+  MAX_TOOL_OUTPUT_BYTES,
+  MAX_TOOL_REQUIRED_PERMISSIONS,
+  MAX_TOOL_SCHEMA_DEPTH,
+  MAX_TOOL_SCHEMA_ENUM_VALUES,
+  MAX_TOOL_SCHEMA_NODES,
+  MAX_TOOL_SCHEMA_PROPERTIES,
+  MAX_TOOL_TIMEOUT_SECONDS,
+  TOOL_EFFECTS,
+  TOOL_INVOCATION_SCHEMA,
+  TOOL_JSON_SCHEMA_TYPES,
+  TOOL_RISKS,
+  ToolPolicySnapshotConflictError,
+  ToolPolicyUnavailableError,
+  UnsupportedToolError,
+  type DeniedToolInvocation,
+  type PreparedToolInvocation,
+  type ToolDefinition,
+  type ToolEffect,
+  type ToolInvocationPlan,
+  type ToolInvocationRequest,
+  type ToolInvocationStatus,
+  type ToolJsonSchema,
+  type ToolJsonSchemaType,
+  type ToolJsonValue,
+  type ToolPolicyAuthorizer,
+  type ToolRisk,
+} from './contracts';
+export { normalizeToolDefinition } from './definitionProtocol';
+export { prepareToolInvocation } from './invocationAdmission';
+export { ToolDefinitionRegistry } from './registryProtocol';

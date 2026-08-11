@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ql3-plugin-package-recovery
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-plugin-package-recovery
+    app.kubernetes.io/component: plugin-package-recovery
+    app.kubernetes.io/part-of: qinglong3
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ql3-plugin-package-recovery
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-plugin-package-recovery
+    app.kubernetes.io/component: plugin-package-recovery
+    app.kubernetes.io/part-of: qinglong3
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - create
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ql3-plugin-package-recovery
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-plugin-package-recovery
+    app.kubernetes.io/component: plugin-package-recovery
+    app.kubernetes.io/part-of: qinglong3
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ql3-plugin-package-recovery
+subjects:
+  - kind: ServiceAccount
+    name: ql3-plugin-package-recovery
+    namespace: qinglong3-system

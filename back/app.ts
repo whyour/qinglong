@@ -23,6 +23,9 @@ class Application {
   private app: express.Application;
   private httpServerService?: HttpServerService;
   private grpcServerService?: GrpcServerService;
+  private manualPrimaryRuntime?: {
+    stop(): Promise<'drained' | 'timed_out'>;
+  };
   private isShuttingDown = false;
   private workerMetadataMap = new Map<number, WorkerMetadata>();
   private httpWorker?: Worker;
@@ -242,10 +245,18 @@ class Application {
     const appLoader = await import('./loaders/app');
     await appLoader.default({ app: this.app });
 
-    const server = await this.httpServerService.initialize(
-      this.app,
-      config.port,
+    const { bootstrapDefaultManualPrimaryRuntime } = await import(
+      './runtime/adapters/legacy/bootstrapDefaultManualPrimaryRuntime'
     );
+    this.manualPrimaryRuntime = await bootstrapDefaultManualPrimaryRuntime();
+
+    let server;
+    try {
+      server = await this.httpServerService.initialize(this.app, config.port);
+    } catch (error) {
+      await this.stopManualPrimaryRuntime();
+      throw error;
+    }
 
     const serverLoader = await import('./loaders/server');
     await (serverLoader.default as any)({ server });
@@ -289,6 +300,7 @@ class Application {
 
     try {
       if (serviceType === 'http') {
+        await this.stopManualPrimaryRuntime();
         await this.httpServerService?.shutdown();
       } else {
         await this.grpcServerService?.shutdown();
@@ -297,6 +309,20 @@ class Application {
     } catch (error) {
       Logger.error(`[${serviceType}] Error during shutdown:\n${errStack(error)}`);
       process.exit(1);
+    }
+  }
+
+  private async stopManualPrimaryRuntime(): Promise<void> {
+    const runtime = this.manualPrimaryRuntime;
+    this.manualPrimaryRuntime = undefined;
+    if (!runtime) return;
+    try {
+      const result = await runtime.stop();
+      if (result === 'timed_out') {
+        Logger.warn('[runtime-activation] shutdown timed out');
+      }
+    } catch {
+      Logger.error('[runtime-activation] shutdown failed');
     }
   }
 }

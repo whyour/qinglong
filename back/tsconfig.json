@@ -15,6 +15,10 @@
     "skipLibCheck": true,
     "moduleResolution": "node",
     "module": "commonjs",
+    "baseUrl": "..",
+    "paths": {
+      "@qinglong/runtime-core": ["packages/ql3-runtime-core/src/index.ts"]
+    },
     "pretty": true,
     "sourceMap": true,
     "outDir": "../static/build",

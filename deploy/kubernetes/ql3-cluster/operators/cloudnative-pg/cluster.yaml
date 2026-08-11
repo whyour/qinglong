@@ -1,0 +1,49 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ql3-postgres
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: qinglong3
+    app.kubernetes.io/managed-by: cloudnative-pg
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-minimal-trixie@sha256:24d229d801663f95b584416f8ebdfad4849b1a3fa4cfcf95a7f026df7aa6e22d
+  enableSuperuserAccess: false
+  primaryUpdateMethod: switchover
+  failoverDelay: 0
+  switchoverDelay: 60
+  smartShutdownTimeout: 60
+  stopDelay: 300
+  postgresql:
+    parameters:
+      max_connections: '100'
+      password_encryption: scram-sha-256
+      shared_buffers: 128MB
+      synchronous_commit: remote_apply
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: required
+      failoverQuorum: true
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+  managed:
+    services:
+      disabledDefaultServices:
+        - r
+        - ro
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: '2'
+      memory: 1Gi
+  storage:
+    size: 20Gi
+  walStorage:
+    size: 5Gi

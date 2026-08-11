@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - service-account.yaml
+  - role.yaml
+  - role-binding.yaml
+  - access-review-cluster-role.yaml
+  - access-review-cluster-role-binding.yaml
+  - job.yaml
+  - network-policy.yaml

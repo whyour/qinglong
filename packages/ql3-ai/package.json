@@ -1,0 +1,331 @@
+{
+  "name": "@qinglong/ai",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 optional bounded model gateway and remote providers",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./model": {
+      "types": "./dist/model-gateway/model.d.ts",
+      "require": "./dist/model-gateway/model.js",
+      "default": "./dist/model-gateway/model.js"
+    },
+    "./gateway": {
+      "types": "./dist/model-gateway/gateway.d.ts",
+      "require": "./dist/model-gateway/gateway.js",
+      "default": "./dist/model-gateway/gateway.js"
+    },
+    "./model-invocation": {
+      "types": "./dist/model-invocation/modelInvocation.d.ts",
+      "require": "./dist/model-invocation/modelInvocation.js",
+      "default": "./dist/model-invocation/modelInvocation.js"
+    },
+    "./model-invocation-resolution": {
+      "types": "./dist/model-invocation/modelInvocationResolution.d.ts",
+      "require": "./dist/model-invocation/modelInvocationResolution.js",
+      "default": "./dist/model-invocation/modelInvocationResolution.js"
+    },
+    "./durable-model-invocation": {
+      "types": "./dist/model-invocation/durableModelInvocationCoordinator.d.ts",
+      "require": "./dist/model-invocation/durableModelInvocationCoordinator.js",
+      "default": "./dist/model-invocation/durableModelInvocationCoordinator.js"
+    },
+    "./profile": {
+      "types": "./dist/profile/profileComposition.d.ts",
+      "require": "./dist/profile/profileComposition.js",
+      "default": "./dist/profile/profileComposition.js"
+    },
+    "./provider-credential": {
+      "types": "./dist/model-provider-credential/providerCredential.d.ts",
+      "require": "./dist/model-provider-credential/providerCredential.js",
+      "default": "./dist/model-provider-credential/providerCredential.js"
+    },
+    "./model-provider-credential-administration": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialAdministration.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialAdministration.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialAdministration.js"
+    },
+    "./model-provider-credential-catalog": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialCatalog.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialCatalog.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialCatalog.js"
+    },
+    "./postgres-model-provider-credential-storage": {
+      "types": "./dist/model-provider-credential/postgresModelProviderCredentialRepository.d.ts",
+      "require": "./dist/model-provider-credential/postgresModelProviderCredentialRepository.js",
+      "default": "./dist/model-provider-credential/postgresModelProviderCredentialRepository.js"
+    },
+    "./postgres-model-provider-credential-management-identity-ledger": {
+      "types": "./dist/model-provider-credential/postgresModelProviderCredentialManagementIdentityLedger.d.ts",
+      "require": "./dist/model-provider-credential/postgresModelProviderCredentialManagementIdentityLedger.js",
+      "default": "./dist/model-provider-credential/postgresModelProviderCredentialManagementIdentityLedger.js"
+    },
+    "./postgres-model-provider-credential-management-audit-query": {
+      "types": "./dist/model-provider-credential/postgresModelProviderCredentialManagementAuditQuery.d.ts",
+      "require": "./dist/model-provider-credential/postgresModelProviderCredentialManagementAuditQuery.js",
+      "default": "./dist/model-provider-credential/postgresModelProviderCredentialManagementAuditQuery.js"
+    },
+    "./model-provider-credential-test-connection": {
+      "types": "./dist/model-provider-credential/modelProviderCredentialTestConnection.d.ts",
+      "require": "./dist/model-provider-credential/modelProviderCredentialTestConnection.js",
+      "default": "./dist/model-provider-credential/modelProviderCredentialTestConnection.js"
+    },
+    "./postgres-model-provider-credential-test-connection": {
+      "types": "./dist/model-provider-credential/postgresModelProviderCredentialTestConnection.d.ts",
+      "require": "./dist/model-provider-credential/postgresModelProviderCredentialTestConnection.js",
+      "default": "./dist/model-provider-credential/postgresModelProviderCredentialTestConnection.js"
+    },
+    "./projected-model-provider-secret-material": {
+      "types": "./dist/model-provider-credential/projectedModelProviderSecretMaterial.d.ts",
+      "require": "./dist/model-provider-credential/projectedModelProviderSecretMaterial.js",
+      "default": "./dist/model-provider-credential/projectedModelProviderSecretMaterial.js"
+    },
+    "./projected-model-gateway-authority": {
+      "types": "./dist/model-gateway/projectedModelGatewayAuthority.d.ts",
+      "require": "./dist/model-gateway/projectedModelGatewayAuthority.js",
+      "default": "./dist/model-gateway/projectedModelGatewayAuthority.js"
+    },
+    "./usage-ledger": {
+      "types": "./dist/usage/usageLedger.d.ts",
+      "require": "./dist/usage/usageLedger.js",
+      "default": "./dist/usage/usageLedger.js"
+    },
+    "./usage-quota": {
+      "types": "./dist/usage/usageQuota.d.ts",
+      "require": "./dist/usage/usageQuota.js",
+      "default": "./dist/usage/usageQuota.js"
+    },
+    "./pricing": {
+      "types": "./dist/pricing/pricing.d.ts",
+      "require": "./dist/pricing/pricing.js",
+      "default": "./dist/pricing/pricing.js"
+    },
+    "./plugin-package-prompt-execution": {
+      "types": "./dist/prompt/pluginPackagePromptExecution.d.ts",
+      "require": "./dist/prompt/pluginPackagePromptExecution.js",
+      "default": "./dist/prompt/pluginPackagePromptExecution.js"
+    },
+    "./plugin-package-prompt-catalog": {
+      "types": "./dist/prompt/pluginPackagePromptCatalog.d.ts",
+      "require": "./dist/prompt/pluginPackagePromptCatalog.js",
+      "default": "./dist/prompt/pluginPackagePromptCatalog.js"
+    },
+    "./plugin-package-prompt-execution-inspection": {
+      "types": "./dist/prompt/pluginPackagePromptExecutionInspection.d.ts",
+      "require": "./dist/prompt/pluginPackagePromptExecutionInspection.js",
+      "default": "./dist/prompt/pluginPackagePromptExecutionInspection.js"
+    },
+    "./local-plugin-package-prompt-execution-inspection": {
+      "types": "./dist/prompt/localPluginPackagePromptExecutionInspectionRepository.d.ts",
+      "require": "./dist/prompt/localPluginPackagePromptExecutionInspectionRepository.js",
+      "default": "./dist/prompt/localPluginPackagePromptExecutionInspectionRepository.js"
+    },
+    "./plugin-package-prompt-executor": {
+      "types": "./dist/prompt/pluginPackagePromptExecutor.d.ts",
+      "require": "./dist/prompt/pluginPackagePromptExecutor.js",
+      "default": "./dist/prompt/pluginPackagePromptExecutor.js"
+    },
+    "./plugin-package-prompt-output-artifact": {
+      "types": "./dist/prompt-output/pluginPackagePromptOutputArtifact.d.ts",
+      "require": "./dist/prompt-output/pluginPackagePromptOutputArtifact.js",
+      "default": "./dist/prompt-output/pluginPackagePromptOutputArtifact.js"
+    },
+    "./plugin-package-prompt-output-completion": {
+      "types": "./dist/prompt-output/pluginPackagePromptOutputCompletion.d.ts",
+      "require": "./dist/prompt-output/pluginPackagePromptOutputCompletion.js",
+      "default": "./dist/prompt-output/pluginPackagePromptOutputCompletion.js"
+    },
+    "./plugin-package-prompt-output-read": {
+      "types": "./dist/prompt-output/pluginPackagePromptOutputRead.d.ts",
+      "require": "./dist/prompt-output/pluginPackagePromptOutputRead.js",
+      "default": "./dist/prompt-output/pluginPackagePromptOutputRead.js"
+    },
+    "./plugin-package-prompt-execution-output-read": {
+      "types": "./dist/prompt-output/pluginPackagePromptExecutionOutputRead.d.ts",
+      "require": "./dist/prompt-output/pluginPackagePromptExecutionOutputRead.js",
+      "default": "./dist/prompt-output/pluginPackagePromptExecutionOutputRead.js"
+    },
+    "./plugin-package-prompt-output-retention": {
+      "types": "./dist/prompt-output/pluginPackagePromptOutputRetention.d.ts",
+      "require": "./dist/prompt-output/pluginPackagePromptOutputRetention.js",
+      "default": "./dist/prompt-output/pluginPackagePromptOutputRetention.js"
+    },
+    "./plugin-package-prompt-output-key-retirement": {
+      "types": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyRetirement.d.ts",
+      "require": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyRetirement.js",
+      "default": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyRetirement.js"
+    },
+    "./plugin-package-prompt-output-key-rotation": {
+      "types": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyRotation.d.ts",
+      "require": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyRotation.js",
+      "default": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyRotation.js"
+    },
+    "./plugin-package-prompt-output-file-keyring": {
+      "types": "./dist/prompt-output/key-management/pluginPackagePromptOutputFileKeyring.d.ts",
+      "require": "./dist/prompt-output/key-management/pluginPackagePromptOutputFileKeyring.js",
+      "default": "./dist/prompt-output/key-management/pluginPackagePromptOutputFileKeyring.js"
+    },
+    "./plugin-package-prompt-output-keyring-manifest": {
+      "types": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyringManifest.d.ts",
+      "require": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyringManifest.js",
+      "default": "./dist/prompt-output/key-management/pluginPackagePromptOutputKeyringManifest.js"
+    },
+    "./plugin-package-prompt-output-external-custody": {
+      "types": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalCustody.d.ts",
+      "require": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalCustody.js",
+      "default": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalCustody.js"
+    },
+    "./plugin-package-prompt-output-external-custody-bundle": {
+      "types": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalCustodyBundle.d.ts",
+      "require": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalCustodyBundle.js",
+      "default": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalCustodyBundle.js"
+    },
+    "./plugin-package-prompt-output-external-recovery-authorization": {
+      "types": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalRecoveryAuthorization.d.ts",
+      "require": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalRecoveryAuthorization.js",
+      "default": "./dist/prompt-output/custody/pluginPackagePromptOutputExternalRecoveryAuthorization.js"
+    },
+    "./plugin-package-prompt-output-projected-keyring": {
+      "types": "./dist/prompt-output/key-management/pluginPackagePromptOutputProjectedKeyring.d.ts",
+      "require": "./dist/prompt-output/key-management/pluginPackagePromptOutputProjectedKeyring.js",
+      "default": "./dist/prompt-output/key-management/pluginPackagePromptOutputProjectedKeyring.js"
+    },
+    "./price-catalog": {
+      "types": "./dist/pricing/modelPriceCatalog.d.ts",
+      "require": "./dist/pricing/modelPriceCatalog.js",
+      "default": "./dist/pricing/modelPriceCatalog.js"
+    },
+    "./price-catalog-management": {
+      "types": "./dist/pricing/modelPriceCatalogManagement.d.ts",
+      "require": "./dist/pricing/modelPriceCatalogManagement.js",
+      "default": "./dist/pricing/modelPriceCatalogManagement.js"
+    },
+    "./local-price-catalog-storage": {
+      "types": "./dist/pricing/storage/localModelPriceCatalogRepository.d.ts",
+      "require": "./dist/pricing/storage/localModelPriceCatalogRepository.js",
+      "default": "./dist/pricing/storage/localModelPriceCatalogRepository.js"
+    },
+    "./postgres-price-catalog-storage": {
+      "types": "./dist/pricing/storage/postgresModelPriceCatalogRepository.d.ts",
+      "require": "./dist/pricing/storage/postgresModelPriceCatalogRepository.js",
+      "default": "./dist/pricing/storage/postgresModelPriceCatalogRepository.js"
+    },
+    "./model-invocation-migration": {
+      "types": "./dist/migration/modelInvocationMigration.d.ts",
+      "require": "./dist/migration/modelInvocationMigration.js",
+      "default": "./dist/migration/modelInvocationMigration.js"
+    },
+    "./local-feature-activation": {
+      "types": "./dist/feature-activation/localModelInvocationFeatureActivation.d.ts",
+      "require": "./dist/feature-activation/localModelInvocationFeatureActivation.js",
+      "default": "./dist/feature-activation/localModelInvocationFeatureActivation.js"
+    },
+    "./local-model-invocation-storage": {
+      "types": "./dist/model-invocation/localModelInvocationRepository.d.ts",
+      "require": "./dist/model-invocation/localModelInvocationRepository.js",
+      "default": "./dist/model-invocation/localModelInvocationRepository.js"
+    },
+    "./local-model-provider-credential-storage": {
+      "types": "./dist/model-provider-credential/localModelProviderCredentialRepository.d.ts",
+      "require": "./dist/model-provider-credential/localModelProviderCredentialRepository.js",
+      "default": "./dist/model-provider-credential/localModelProviderCredentialRepository.js"
+    },
+    "./local-plugin-package-prompt-admission-storage": {
+      "types": "./dist/prompt/localPluginPackagePromptAdmissionRepository.d.ts",
+      "require": "./dist/prompt/localPluginPackagePromptAdmissionRepository.js",
+      "default": "./dist/prompt/localPluginPackagePromptAdmissionRepository.js"
+    },
+    "./local-plugin-package-prompt-output-artifact-storage": {
+      "types": "./dist/prompt-output/storage/localPluginPackagePromptOutputArtifactRepository.d.ts",
+      "require": "./dist/prompt-output/storage/localPluginPackagePromptOutputArtifactRepository.js",
+      "default": "./dist/prompt-output/storage/localPluginPackagePromptOutputArtifactRepository.js"
+    },
+    "./local-plugin-package-prompt-execution-output-reference-storage": {
+      "types": "./dist/prompt-output/storage/localPluginPackagePromptExecutionOutputReferenceRepository.d.ts",
+      "require": "./dist/prompt-output/storage/localPluginPackagePromptExecutionOutputReferenceRepository.js",
+      "default": "./dist/prompt-output/storage/localPluginPackagePromptExecutionOutputReferenceRepository.js"
+    },
+    "./local-plugin-package-prompt-output-retention-storage": {
+      "types": "./dist/prompt-output/storage/localPluginPackagePromptOutputRetentionRepository.d.ts",
+      "require": "./dist/prompt-output/storage/localPluginPackagePromptOutputRetentionRepository.js",
+      "default": "./dist/prompt-output/storage/localPluginPackagePromptOutputRetentionRepository.js"
+    },
+    "./local-plugin-package-prompt-output-key-retirement-storage": {
+      "types": "./dist/prompt-output/storage/localPluginPackagePromptOutputKeyRetirementRepository.d.ts",
+      "require": "./dist/prompt-output/storage/localPluginPackagePromptOutputKeyRetirementRepository.js",
+      "default": "./dist/prompt-output/storage/localPluginPackagePromptOutputKeyRetirementRepository.js"
+    },
+    "./postgres-model-invocation-storage": {
+      "types": "./dist/model-invocation/postgresModelInvocationRepository.d.ts",
+      "require": "./dist/model-invocation/postgresModelInvocationRepository.js",
+      "default": "./dist/model-invocation/postgresModelInvocationRepository.js"
+    },
+    "./postgres-plugin-package-prompt-admission-storage": {
+      "types": "./dist/prompt/postgresPluginPackagePromptAdmissionRepository.d.ts",
+      "require": "./dist/prompt/postgresPluginPackagePromptAdmissionRepository.js",
+      "default": "./dist/prompt/postgresPluginPackagePromptAdmissionRepository.js"
+    },
+    "./postgres-plugin-package-prompt-output-artifact-storage": {
+      "types": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputArtifactRepository.d.ts",
+      "require": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputArtifactRepository.js",
+      "default": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputArtifactRepository.js"
+    },
+    "./postgres-plugin-package-prompt-execution-output-reference-storage": {
+      "types": "./dist/prompt-output/storage/postgresPluginPackagePromptExecutionOutputReferenceRepository.d.ts",
+      "require": "./dist/prompt-output/storage/postgresPluginPackagePromptExecutionOutputReferenceRepository.js",
+      "default": "./dist/prompt-output/storage/postgresPluginPackagePromptExecutionOutputReferenceRepository.js"
+    },
+    "./postgres-plugin-package-prompt-output-retention-storage": {
+      "types": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputRetentionRepository.d.ts",
+      "require": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputRetentionRepository.js",
+      "default": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputRetentionRepository.js"
+    },
+    "./postgres-plugin-package-prompt-output-key-retirement-storage": {
+      "types": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputKeyRetirementRepository.d.ts",
+      "require": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputKeyRetirementRepository.js",
+      "default": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputKeyRetirementRepository.js"
+    },
+    "./postgres-plugin-package-prompt-output-key-rotation-storage": {
+      "types": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputKeyRotationRepository.d.ts",
+      "require": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputKeyRotationRepository.js",
+      "default": "./dist/prompt-output/storage/postgresPluginPackagePromptOutputKeyRotationRepository.js"
+    },
+    "./postgres-plugin-package-prompt-application": {
+      "types": "./dist/prompt/postgresPluginPackagePromptApplication.d.ts",
+      "require": "./dist/prompt/postgresPluginPackagePromptApplication.js",
+      "default": "./dist/prompt/postgresPluginPackagePromptApplication.js"
+    },
+    "./openai-compatible": {
+      "types": "./dist/model-gateway/openAiCompatibleProvider.d.ts",
+      "require": "./dist/model-gateway/openAiCompatibleProvider.js",
+      "default": "./dist/model-gateway/openAiCompatibleProvider.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@qinglong/local-sqlite": "workspace:*",
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

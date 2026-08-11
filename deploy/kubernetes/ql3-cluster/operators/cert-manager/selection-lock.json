@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-03",
+  "releaseReady": false,
+  "releaseBlockers": [
+    "live-cert-manager-api-and-plugin-mtls-rotation-evidence"
+  ],
+  "certManager": {
+    "version": "1.20.3",
+    "releaseManifest": "https://github.com/cert-manager/cert-manager/releases/download/v1.20.3/cert-manager.yaml",
+    "releaseManifestSha256": "7ee74ba06845213e96d8ceaff3d20dd51e682765c1418eddda4e8780ba082261",
+    "images": [
+      {
+        "name": "controller",
+        "manifestReference": "quay.io/jetstack/cert-manager-controller:v1.20.3",
+        "image": "quay.io/jetstack/cert-manager-controller:v1.20.3@sha256:6c13d61e0348a5bc3477f8ea9a928624300b30d19b1c72a7d2b90372fc713db4",
+        "platforms": {
+          "linux/amd64": "sha256:1e4af57beb469cc3bb0fb48b9201caea2723819b9ffd3c3ea98568f55b4dd38b",
+          "linux/arm64": "sha256:af62a025ae4f8fd03209b5e0760868296bad5a9370aab0c91ad3b5476bcb282d"
+        }
+      },
+      {
+        "name": "cainjector",
+        "manifestReference": "quay.io/jetstack/cert-manager-cainjector:v1.20.3",
+        "image": "quay.io/jetstack/cert-manager-cainjector:v1.20.3@sha256:06ad347fe0dc2eb84cc355c26f6752e05e87dceb6447f5cd29b963dd66dfd8bd",
+        "platforms": {
+          "linux/amd64": "sha256:a2b12d27950d1603d2c8168c3ccd95d07b93ce6ec4b530316196a31db592a9c0",
+          "linux/arm64": "sha256:3c052c134ad1b93122b957f4d214aaa9d85a37b5ff15acc5b4d86f50e3ed822e"
+        }
+      },
+      {
+        "name": "webhook",
+        "manifestReference": "quay.io/jetstack/cert-manager-webhook:v1.20.3",
+        "image": "quay.io/jetstack/cert-manager-webhook:v1.20.3@sha256:a61e817632cebed3bb59a189327e786fa3fdd7597167d994a1848d98fd55848f",
+        "platforms": {
+          "linux/amd64": "sha256:953a97df613f7da7eda8ce4b1c8d8e6b50963db0800fab595d040db6eb5cb060",
+          "linux/arm64": "sha256:7c510875e038f79f7fba707b5f86d8736777a4dfefcd42179b08844ee75e685b"
+        }
+      }
+    ],
+    "status": "supply-chain-verified"
+  },
+  "compatibility": {
+    "reviewedKubernetes": "1.32.8",
+    "supportedKubernetesMin": "1.32",
+    "supportedKubernetesMax": "1.35",
+    "newerMinorRejected": "1.21.0 requires Kubernetes 1.33 or newer"
+  },
+  "scope": {
+    "profile": "cluster-only",
+    "installNamespace": "cert-manager",
+    "consumerNamespace": "cnpg-system",
+    "requiredBy": "barman-cloud.cloudnative-pg.io@0.13.0"
+  },
+  "pluginTls": {
+    "issuer": {
+      "apiVersion": "cert-manager.io/v1",
+      "kind": "Issuer",
+      "name": "selfsigned-issuer",
+      "namespace": "cnpg-system",
+      "type": "SelfSigned"
+    },
+    "certificates": [
+      {
+        "name": "barman-cloud-client",
+        "secretName": "barman-cloud-client-tls",
+        "commonName": "barman-cloud-client",
+        "usages": ["client auth"],
+        "duration": "2160h",
+        "renewBefore": "360h"
+      },
+      {
+        "name": "barman-cloud-server",
+        "secretName": "barman-cloud-server-tls",
+        "commonName": "barman-cloud",
+        "dnsNames": ["barman-cloud"],
+        "usages": ["server auth"],
+        "duration": "2160h",
+        "renewBefore": "360h"
+      }
+    ]
+  }
+}

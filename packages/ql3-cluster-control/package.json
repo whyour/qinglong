@@ -1,0 +1,187 @@
+{
+  "name": "@qinglong/cluster-control",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 cluster-control composition root",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/application-runtime/clusterControlRuntime.js",
+  "types": "dist/application-runtime/clusterControlRuntime.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/application-runtime/clusterControlRuntime.d.ts",
+      "require": "./dist/application-runtime/clusterControlRuntime.js",
+      "default": "./dist/application-runtime/clusterControlRuntime.js"
+    },
+    "./application": {
+      "types": "./dist/application-runtime/application.d.ts",
+      "require": "./dist/application-runtime/application.js",
+      "default": "./dist/application-runtime/application.js"
+    },
+    "./availability": {
+      "types": "./dist/database/availability.d.ts",
+      "require": "./dist/database/availability.js",
+      "default": "./dist/database/availability.js"
+    },
+    "./production": {
+      "types": "./dist/application-runtime/productionApplication.d.ts",
+      "require": "./dist/application-runtime/productionApplication.js",
+      "default": "./dist/application-runtime/productionApplication.js"
+    },
+    "./ai-production": {
+      "types": "./dist/application-runtime/aiProductionApplication.d.ts",
+      "require": "./dist/application-runtime/aiProductionApplication.js",
+      "default": "./dist/application-runtime/aiProductionApplication.js"
+    },
+    "./http": {
+      "types": "./dist/transport/httpSurface.d.ts",
+      "require": "./dist/transport/httpSurface.js",
+      "default": "./dist/transport/httpSurface.js"
+    },
+    "./config": {
+      "types": "./dist/production-process/config.d.ts",
+      "require": "./dist/production-process/config.js",
+      "default": "./dist/production-process/config.js"
+    },
+    "./process": {
+      "types": "./dist/production-process/processApplication.d.ts",
+      "require": "./dist/production-process/processApplication.js",
+      "default": "./dist/production-process/processApplication.js"
+    },
+    "./admission": {
+      "types": "./dist/transport/admissionPipeline.d.ts",
+      "require": "./dist/transport/admissionPipeline.js",
+      "default": "./dist/transport/admissionPipeline.js"
+    },
+    "./routes": {
+      "types": "./dist/transport/routeRegistry.d.ts",
+      "require": "./dist/transport/routeRegistry.js",
+      "default": "./dist/transport/routeRegistry.js"
+    },
+    "./run-routes": {
+      "types": "./dist/run/runReadRoute.d.ts",
+      "require": "./dist/run/runReadRoute.js",
+      "default": "./dist/run/runReadRoute.js"
+    },
+    "./task-routes": {
+      "types": "./dist/task/taskListRoute.d.ts",
+      "require": "./dist/task/taskListRoute.js",
+      "default": "./dist/task/taskListRoute.js"
+    },
+    "./prompt-routes": {
+      "types": "./dist/plugin-package/prompt/pluginPackagePromptRoutes.d.ts",
+      "require": "./dist/plugin-package/prompt/pluginPackagePromptRoutes.js",
+      "default": "./dist/plugin-package/prompt/pluginPackagePromptRoutes.js"
+    },
+    "./api-credential": {
+      "types": "./dist/authentication/apiCredentialAuthenticator.d.ts",
+      "require": "./dist/authentication/apiCredentialAuthenticator.js",
+      "default": "./dist/authentication/apiCredentialAuthenticator.js"
+    },
+    "./worker-ingress": {
+      "types": "./dist/worker-ingress/workerIngressApplication.d.ts",
+      "require": "./dist/worker-ingress/workerIngressApplication.js",
+      "default": "./dist/worker-ingress/workerIngressApplication.js"
+    },
+    "./worker-ingress-config": {
+      "types": "./dist/worker-ingress/workerIngressConfig.d.ts",
+      "require": "./dist/worker-ingress/workerIngressConfig.js",
+      "default": "./dist/worker-ingress/workerIngressConfig.js"
+    },
+    "./worker-ingress-production": {
+      "types": "./dist/worker-ingress/productionWorkerIngress.d.ts",
+      "require": "./dist/worker-ingress/productionWorkerIngress.js",
+      "default": "./dist/worker-ingress/productionWorkerIngress.js"
+    },
+    "./worker-runtime-port": {
+      "types": "./dist/remote-execution/workerRuntimePort.d.ts",
+      "require": "./dist/remote-execution/workerRuntimePort.js",
+      "default": "./dist/remote-execution/workerRuntimePort.js"
+    },
+    "./remote-dispatch": {
+      "types": "./dist/remote-execution/remoteWorkerDispatcher.d.ts",
+      "require": "./dist/remote-execution/remoteWorkerDispatcher.js",
+      "default": "./dist/remote-execution/remoteWorkerDispatcher.js"
+    },
+    "./remote-activation": {
+      "types": "./dist/remote-execution/remoteRunActivationService.d.ts",
+      "require": "./dist/remote-execution/remoteRunActivationService.js",
+      "default": "./dist/remote-execution/remoteRunActivationService.js"
+    },
+    "./remote-secret-delivery": {
+      "types": "./dist/remote-execution/remoteWorkerSecretDeliveryService.d.ts",
+      "require": "./dist/remote-execution/remoteWorkerSecretDeliveryService.js",
+      "default": "./dist/remote-execution/remoteWorkerSecretDeliveryService.js"
+    },
+    "./mounted-secret-provider": {
+      "types": "./dist/remote-execution/mountedSecretProvider.d.ts",
+      "require": "./dist/remote-execution/mountedSecretProvider.js",
+      "default": "./dist/remote-execution/mountedSecretProvider.js"
+    },
+    "./remote-completion": {
+      "types": "./dist/remote-execution/remoteWorkerCompletionService.d.ts",
+      "require": "./dist/remote-execution/remoteWorkerCompletionService.js",
+      "default": "./dist/remote-execution/remoteWorkerCompletionService.js"
+    },
+    "./s3-artifact-store": {
+      "types": "./dist/artifact/s3ArtifactStore.d.ts",
+      "require": "./dist/artifact/s3ArtifactStore.js",
+      "default": "./dist/artifact/s3ArtifactStore.js"
+    },
+    "./lease-control": {
+      "types": "./dist/remote-execution/remoteWorkerLeaseControlService.d.ts",
+      "require": "./dist/remote-execution/remoteWorkerLeaseControlService.js",
+      "default": "./dist/remote-execution/remoteWorkerLeaseControlService.js"
+    },
+    "./workflow-scheduler": {
+      "types": "./dist/scheduling/workflowScheduler.d.ts",
+      "require": "./dist/scheduling/workflowScheduler.js",
+      "default": "./dist/scheduling/workflowScheduler.js"
+    },
+    "./workflow-administration": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowAdministration.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowAdministration.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowAdministration.js"
+    },
+    "./workflow-routes": {
+      "types": "./dist/plugin-package/workflow/pluginPackageWorkflowRoute.d.ts",
+      "require": "./dist/plugin-package/workflow/pluginPackageWorkflowRoute.js",
+      "default": "./dist/plugin-package/workflow/pluginPackageWorkflowRoute.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "bin": {
+    "ql3-cluster-control": "dist/cli.js",
+    "ql3-cluster-control-ai": "dist/aiCli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs",
+    "test:integration": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/postgres.integration.test.cjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1093.0",
+    "@qinglong/cluster-postgres": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*",
+    "croner": "7.0.8"
+  },
+  "devDependencies": {
+    "@qinglong/ai": "workspace:*",
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  },
+  "peerDependencies": {
+    "@qinglong/ai": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@qinglong/ai": {
+      "optional": true
+    }
+  }
+}

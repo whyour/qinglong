@@ -1,0 +1,10 @@
+- op: add
+  path: /spec/egress/-
+  value:
+    to:
+      - podSelector:
+          matchLabels:
+            cnpg.io/cluster: ql3-postgres
+    ports:
+      - protocol: TCP
+        port: 5432

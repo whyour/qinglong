@@ -1,0 +1,311 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-migration
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_migration
+  comment: QingLong reviewed schema migration authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 2
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-migration-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-ai-maintenance
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_ai_maintenance
+  comment: QingLong bounded AI Prompt output retention authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-ai-maintenance-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-ai-credential-manager
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_ai_credential_manager
+  comment: QingLong human AI Provider credential binding authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-ai-credential-manager-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-ai-credential-tester
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_ai_credential_tester
+  comment: QingLong one-shot AI Provider credential connectivity tester
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 2
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-ai-credential-tester-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-runtime
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_runtime
+  comment: QingLong cluster-control runtime authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 32
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-runtime-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-admin
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_admin
+  comment: QingLong short-lived administration authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-admin-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-package-manager
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_package_manager
+  comment: QingLong human Plugin Package management authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-package-manager-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-package-executor
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_package_executor
+  comment: QingLong system Plugin Package execution and recovery authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-package-executor-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-automation-manager
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_automation_manager
+  comment: QingLong human Task and Trigger management authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-automation-manager-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-approval-manager
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_approval_manager
+  comment: QingLong strongly authenticated human Approval inspection and decision authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-approval-manager-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-worker-credential-manager
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_worker_credential_manager
+  comment: QingLong human Worker credential planning and approval authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-worker-credential-manager-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-worker-credential-executor
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_worker_credential_executor
+  comment: QingLong system Worker credential delivery execution authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-worker-credential-executor-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: ql3-postgres-worker-ingress
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_worker_ingress
+  comment: QingLong authenticated Worker ingress authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 32
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-worker-ingress-auth

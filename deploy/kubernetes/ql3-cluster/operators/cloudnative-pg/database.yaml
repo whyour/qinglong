@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: ql3-postgres-qinglong
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  name: qinglong
+  owner: ql3_migration
+  cluster:
+    name: ql3-postgres

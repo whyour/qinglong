@@ -1,5 +1,10 @@
 # Kubernetes deployment
 
+This directory is the QingLong 2.x single-replica SQLite deployment. The
+QingLong 3.0 PostgreSQL-backed multi-replica incubation baseline lives at
+[`ql3-cluster`](./ql3-cluster/README.md). The two profiles are intentionally
+separate and must not share storage or scaling instructions.
+
 This deploys Qinglong as a single-replica `StatefulSet` with persistent data at `/ql/data`.
 
 ```bash

@@ -1,0 +1,45 @@
+# Example only. Copy these objects into a private, per-command overlay.
+# SecretRef is a reference name, never provider token material.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-provider-credential-management-request
+  namespace: qinglong3-system
+immutable: true
+type: Opaque
+stringData:
+  client.json: |
+    {"schemaVersion":1,"endpoint":"https://ql3-provider-credential-management.qinglong3-system.svc:8446/api/v3/provider-credentials/management","servername":"ql3-provider-credential-management.qinglong3-system.svc","caFile":"/tmp/ca.crt","clientCertificateFile":"/tmp/client.crt","clientPrivateKeyFile":"/tmp/client.key","requestTimeoutMs":15000}
+  command.json: |
+    {"schemaVersion":1,"operation":"provider-credential.bind","request":{"requestId":"REPLACE_WITH_UNIQUE_REQUEST_ID","mutationId":"REPLACE_WITH_UUID_V4","projectId":"REPLACE_WITH_PROJECT_ID","provider":"openai-compatible","expectedGeneration":0,"revision":"REPLACE_WITH_CREDENTIAL_REVISION","secretRef":"project/REPLACE_WITH_PROJECT_ID/REPLACE_WITH_SECRET_NAME"}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-provider-credential-management-client-trust
+  namespace: qinglong3-system
+immutable: true
+data:
+  ca.crt: |
+    REPLACE_WITH_REVIEWED_MANAGER_CA_CERTIFICATE
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-provider-credential-management-assertion
+  namespace: qinglong3-system
+immutable: true
+type: Opaque
+stringData:
+  assertion.jwt: REPLACE_WITH_SHORT_LIVED_STRONG_USER_ASSERTION
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-provider-credential-management-client-identity
+  namespace: qinglong3-system
+immutable: true
+type: kubernetes.io/tls
+stringData:
+  tls.crt: REPLACE_WITH_SHORT_LIVED_CLIENT_CERTIFICATE_CHAIN
+  tls.key: REPLACE_WITH_CLIENT_PRIVATE_KEY

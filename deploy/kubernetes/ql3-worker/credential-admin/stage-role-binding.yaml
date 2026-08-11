@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ql3-worker-credential-stage-admin
+  namespace: qinglong3-worker-credential-staging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ql3-worker-credential-stage-admin
+subjects:
+  - kind: ServiceAccount
+    name: ql3-worker-credential-admin
+    namespace: qinglong3-worker-credential-staging

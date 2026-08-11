@@ -1,0 +1,216 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-worker-credential-management
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-worker-credential-management
+    app.kubernetes.io/component: worker-credential-management
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  replicas: 2
+  minReadySeconds: 10
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-worker-credential-management
+      app.kubernetes.io/component: worker-credential-management
+  template:
+    metadata:
+      annotations:
+        # A private production overlay must replace this with the SHA-256 of
+        # the exact CA bundle before changing a trust generation.
+        qinglong.io/worker-credential-management-client-ca-sha256: sha256:0000000000000000000000000000000000000000000000000000000000000000
+        # A private production overlay must replace this with the SHA-256 of
+        # the exact CRL bundle before collecting PKI rotation evidence.
+        qinglong.io/worker-credential-management-client-crl-sha256: sha256:0000000000000000000000000000000000000000000000000000000000000000
+      labels:
+        app.kubernetes.io/name: ql3-worker-credential-management
+        app.kubernetes.io/component: worker-credential-management
+        app.kubernetes.io/part-of: qinglong3
+    spec:
+      serviceAccountName: ql3-worker-credential-management
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ql3-worker-credential-management
+                  app.kubernetes.io/component: worker-credential-management
+      containers:
+        - name: management
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - /opt/qinglong/node_modules/@qinglong/cluster-admin/dist/worker-credential/management-server/workerCredentialManagementCli.js
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: QL3_PROFILE
+              value: cluster-admin
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_ENABLED
+              value: 'true'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_HOST
+              value: 0.0.0.0
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_PORT
+              value: '8444'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_TLS_CERT_FILE
+              value: /var/run/secrets/qinglong3/worker-credential-management-tls/tls.crt
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_TLS_KEY_FILE
+              value: /var/run/secrets/qinglong3/worker-credential-management-tls/tls.key
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_CLIENT_CA_FILE
+              value: /var/run/secrets/qinglong3/worker-credential-management-tls/ca.crt
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_CLIENT_CRL_FILE
+              value: /var/run/secrets/qinglong3/worker-credential-management-tls/client.crl
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_IDENTITY_KEYSET_FILE
+              value: /var/run/qinglong3/worker-credential-management-identity/keyset.json
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_PLAN_LIFETIME_MS
+              value: '900000'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_APPROVAL_LIFETIME_MS
+              value: '900000'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_QUOTA_WINDOW_MS
+              value: '60000'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_PLAN_QUOTA
+              value: '30'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_PROPOSE_QUOTA
+              value: '30'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_DECIDE_QUOTA
+              value: '60'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_INSPECT_QUOTA
+              value: '600'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_MAX_BODY_BYTES
+              value: '65536'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_MAX_CONNECTIONS
+              value: '32'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_MAX_CONCURRENT_REQUESTS
+              value: '16'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_REQUEST_TIMEOUT_MS
+              value: '10000'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_DRAIN_TIMEOUT_MS
+              value: '10000'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_RATE_WINDOW_MS
+              value: '60000'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_PEER_REQUEST_LIMIT
+              value: '60'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_GLOBAL_REQUEST_LIMIT
+              value: '600'
+            - name: QL3_WORKER_CREDENTIAL_MANAGEMENT_MAX_RATE_LIMIT_PEERS
+              value: '512'
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_MANAGER_TLS_MODE
+              value: verify-full
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_MANAGER_TLS_CA_FILE
+              value: /var/run/secrets/qinglong3/postgres-worker-credential-manager/ca.crt
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_MANAGER_APPLICATION_NAME
+              value: qinglong3-worker-credential-manager
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_MANAGER_MAX_CONNECTIONS
+              value: '2'
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_MANAGER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-credential-management-database
+                  key: postgres-worker-credential-manager-url
+            - name: QL3_POSTGRES_WORKER_CREDENTIAL_MANAGER_TLS_SERVERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-cluster-worker-credential-management-database
+                  key: postgres-tls-servername
+          ports:
+            - name: https
+              containerPort: 8444
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: https
+              scheme: HTTPS
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTPS
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: '1'
+              memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: management-tls
+              mountPath: /var/run/secrets/qinglong3/worker-credential-management-tls
+              readOnly: true
+            - name: management-identity
+              mountPath: /var/run/qinglong3/worker-credential-management-identity
+              readOnly: true
+            - name: postgres-worker-credential-manager-ca
+              mountPath: /var/run/secrets/qinglong3/postgres-worker-credential-manager
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: management-tls
+          secret:
+            secretName: ql3-worker-credential-management-tls
+            defaultMode: 288
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+              - key: client.crl
+                path: client.crl
+        - name: management-identity
+          secret:
+            secretName: ql3-worker-credential-management-identity
+            defaultMode: 292
+            items:
+              - key: keyset.json
+                path: keyset.json
+        - name: postgres-worker-credential-manager-ca
+          secret:
+            secretName: ql3-cluster-worker-credential-management-database
+            defaultMode: 292
+            items:
+              - key: postgres-ca.crt
+                path: ca.crt

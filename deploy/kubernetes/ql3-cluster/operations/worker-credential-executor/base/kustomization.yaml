@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - service-account.yaml
+  - token-issuer-role-binding.yaml
+  - job.yaml
+  - network-policy.yaml

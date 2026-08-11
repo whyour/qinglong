@@ -1,0 +1,22 @@
+# Example only. Populate through a Secret manager and never commit a real
+# Worker private key. The ql3w credential is delivered into the separate
+# ql3-worker-credential Secret by the short-lived cluster-admin adapter.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-worker-identity
+  namespace: qinglong3-worker
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    REPLACE_WITH_WORKER_INGRESS_CLIENT_CA
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    REPLACE_WITH_THIS_WORKER_PRIVATE_KEY
+    -----END PRIVATE KEY-----
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    REPLACE_WITH_THIS_WORKER_CERTIFICATE_CHAIN
+    -----END CERTIFICATE-----

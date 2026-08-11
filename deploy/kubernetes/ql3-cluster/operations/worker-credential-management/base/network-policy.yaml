@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ql3-worker-credential-management
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-worker-credential-management
+    app.kubernetes.io/component: worker-credential-management
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-worker-credential-management
+      app.kubernetes.io/component: worker-credential-management
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              qinglong.io/worker-credential-management-client: 'true'
+      ports:
+        - protocol: TCP
+          port: 8444
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

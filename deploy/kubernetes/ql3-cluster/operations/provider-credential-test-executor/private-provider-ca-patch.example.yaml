@@ -1,0 +1,23 @@
+# When the private HTTPS provider uses a private CA, project only its public
+# trust anchor. This patch never mounts provider credentials or a client key.
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: NODE_EXTRA_CA_CERTS
+    value: /var/run/secrets/qinglong3/provider-ca/ca.crt
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts/-
+  value:
+    name: provider-ca
+    mountPath: /var/run/secrets/qinglong3/provider-ca
+    readOnly: true
+- op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    name: provider-ca
+    secret:
+      secretName: ql3-provider-credential-test-provider-ca
+      defaultMode: 292
+      items:
+        - key: ca.crt
+          path: ca.crt

@@ -1,0 +1,133 @@
+{
+  "name": "@qinglong/worker-runtime",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 headless Worker profile runtime",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./certificate-enrollment": {
+      "types": "./dist/credential/workerCertificateEnrollment.d.ts",
+      "require": "./dist/credential/workerCertificateEnrollment.js",
+      "default": "./dist/credential/workerCertificateEnrollment.js"
+    },
+    "./certificate-store": {
+      "types": "./dist/credential/workerCertificateStore.d.ts",
+      "require": "./dist/credential/workerCertificateStore.js",
+      "default": "./dist/credential/workerCertificateStore.js"
+    },
+    "./renewal": {
+      "types": "./dist/credential/workerCertificateRenewal.d.ts",
+      "require": "./dist/credential/workerCertificateRenewal.js",
+      "default": "./dist/credential/workerCertificateRenewal.js"
+    },
+    "./remote-offer-delivery": {
+      "types": "./dist/remote-execution/remoteOfferDeliveryEntrypoint.d.ts",
+      "require": "./dist/remote-execution/remoteOfferDeliveryEntrypoint.js",
+      "default": "./dist/remote-execution/remoteOfferDeliveryEntrypoint.js"
+    },
+    "./remote-log-artifact": {
+      "types": "./dist/execution/workerFileLogArtifactAllocator.d.ts",
+      "require": "./dist/execution/workerFileLogArtifactAllocator.js",
+      "default": "./dist/execution/workerFileLogArtifactAllocator.js"
+    },
+    "./posix-executor": {
+      "types": "./dist/execution/workerPosixExecutionExecutor.d.ts",
+      "require": "./dist/execution/workerPosixExecutionExecutor.js",
+      "default": "./dist/execution/workerPosixExecutionExecutor.js"
+    },
+    "./completion-coordinator": {
+      "types": "./dist/execution/workerCompletionCoordinator.d.ts",
+      "require": "./dist/execution/workerCompletionCoordinator.js",
+      "default": "./dist/execution/workerCompletionCoordinator.js"
+    },
+    "./completion-transport": {
+      "types": "./dist/remote-execution/transport/remoteWorkerCompletionHttpsClient.d.ts",
+      "require": "./dist/remote-execution/transport/remoteWorkerCompletionHttpsClient.js",
+      "default": "./dist/remote-execution/transport/remoteWorkerCompletionHttpsClient.js"
+    },
+    "./lease-control": {
+      "types": "./dist/remote-execution/transport/remoteWorkerLeaseControlHttpsClient.d.ts",
+      "require": "./dist/remote-execution/transport/remoteWorkerLeaseControlHttpsClient.js",
+      "default": "./dist/remote-execution/transport/remoteWorkerLeaseControlHttpsClient.js"
+    },
+    "./execution-control": {
+      "types": "./dist/execution/workerExecutionControlCoordinator.d.ts",
+      "require": "./dist/execution/workerExecutionControlCoordinator.js",
+      "default": "./dist/execution/workerExecutionControlCoordinator.js"
+    },
+    "./session-transport": {
+      "types": "./dist/session/workerSessionHttpsClient.d.ts",
+      "require": "./dist/session/workerSessionHttpsClient.js",
+      "default": "./dist/session/workerSessionHttpsClient.js"
+    },
+    "./session-lifecycle": {
+      "types": "./dist/session/workerSessionCoordinator.d.ts",
+      "require": "./dist/session/workerSessionCoordinator.js",
+      "default": "./dist/session/workerSessionCoordinator.js"
+    },
+    "./production": {
+      "types": "./dist/application-runtime/productionHeadlessApplication.d.ts",
+      "require": "./dist/application-runtime/productionHeadlessApplication.js",
+      "default": "./dist/application-runtime/productionHeadlessApplication.js"
+    },
+    "./product": {
+      "types": "./dist/application-runtime/productionWorkerApplication.d.ts",
+      "require": "./dist/application-runtime/productionWorkerApplication.js",
+      "default": "./dist/application-runtime/productionWorkerApplication.js"
+    },
+    "./production-credentials": {
+      "types": "./dist/credential/workerProductionCredentialProvider.d.ts",
+      "require": "./dist/credential/workerProductionCredentialProvider.js",
+      "default": "./dist/credential/workerProductionCredentialProvider.js"
+    },
+    "./process-config": {
+      "types": "./dist/process/workerProcessConfig.d.ts",
+      "require": "./dist/process/workerProcessConfig.js",
+      "default": "./dist/process/workerProcessConfig.js"
+    },
+    "./process-identity": {
+      "types": "./dist/process/workerProcessIdentity.d.ts",
+      "require": "./dist/process/workerProcessIdentity.js",
+      "default": "./dist/process/workerProcessIdentity.js"
+    },
+    "./process": {
+      "types": "./dist/process/workerProcessApplication.d.ts",
+      "require": "./dist/process/workerProcessApplication.js",
+      "default": "./dist/process/workerProcessApplication.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "bin": {
+    "ql3-worker": "dist/process/workerProcessCli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/local-process": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*",
+    "@peculiar/x509": "2.0.0",
+    "proper-lockfile": "4.1.2",
+    "reflect-metadata": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "@types/proper-lockfile": "4.1.4",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,30 @@
+# Example only. Copy into a private overlay and replace every placeholder.
+# This resource is intentionally excluded from the Component.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: ql3-postgres-backup
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-backup
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  retentionPolicy: 30d
+  configuration:
+    destinationPath: s3://REPLACE_WITH_VERSIONED_LOCKED_BUCKET/qinglong3/ql3-postgres
+    endpointURL: https://REPLACE_WITH_OBJECT_STORE_ENDPOINT
+    s3Credentials:
+      accessKeyId:
+        name: ql3-postgres-backup-object-store
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: ql3-postgres-backup-object-store
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: lz4
+      encryption: AES256
+      maxParallel: 2
+    data:
+      compression: lz4
+      encryption: AES256

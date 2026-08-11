@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ql3-plugin-package-recovery
+  namespace: qinglong3-system
+spec:
+  template:
+    spec:
+      containers:
+        - name: recovery
+          env:
+            - name: QL3_PLUGIN_PACKAGE_REGISTRY_CREDENTIAL_FILE
+              value: /var/run/secrets/qinglong3/plugin-package-registry/credentials.json
+          volumeMounts:
+            - name: plugin-package-registry-credentials
+              mountPath: /var/run/secrets/qinglong3/plugin-package-registry
+              readOnly: true
+      volumes:
+        - name: plugin-package-registry-credentials
+          secret:
+            secretName: ql3-plugin-package-registry-credentials
+            defaultMode: 288
+            items:
+              - key: credentials.json
+                path: credentials.json

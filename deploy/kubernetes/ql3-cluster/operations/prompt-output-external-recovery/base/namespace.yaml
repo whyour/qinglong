@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qinglong3-recovery
+  labels:
+    app.kubernetes.io/part-of: qinglong3
+    qinglong.io/security-domain: isolated-recovery

@@ -1,0 +1,12 @@
+# Example only. Copy into a private overlay and replace every placeholder.
+# The executor must receive only the package-executor database credential.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-cluster-plugin-package-executor
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  postgres-package-executor-url: REPLACE_WITH_PACKAGE_EXECUTOR_DSN
+  postgres-tls-servername: REPLACE_WITH_POSTGRES_DNS_NAME
+  postgres-ca.crt: REPLACE_WITH_POSTGRES_CA_CERTIFICATE

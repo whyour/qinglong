@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ql3-approval-management
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-approval-management
+    app.kubernetes.io/component: approval-management
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-approval-management
+      app.kubernetes.io/component: approval-management
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              qinglong.io/approval-management-client: 'true'
+      ports:
+        - protocol: TCP
+          port: 8447
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

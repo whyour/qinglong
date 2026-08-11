@@ -1,0 +1,31 @@
+# Example only. Copy into a private deployment overlay and replace all values.
+# Publisher public keys are not credentials, but they are release authority and
+# must be reviewed independently from the package registry.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-plugin-package-recovery-config
+  namespace: qinglong3-system
+data:
+  cluster-identity: REPLACE_WITH_STABLE_CLUSTER_IDENTITY
+  oci-registries: ghcr.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-plugin-publisher-trust
+  namespace: qinglong3-system
+data:
+  publishers.json: |
+    {
+      "schema": "qinglong/plugin-package-publisher-trust@v1",
+      "keys": [
+        {
+          "publisher": "REPLACE_WITH_PUBLISHER",
+          "keyId": "REPLACE_WITH_KEY_ID",
+          "publicKeyPem": "REPLACE_WITH_ED25519_PUBLIC_KEY_PEM",
+          "notBeforeMs": 0,
+          "notAfterMs": 1
+        }
+      ]
+    }

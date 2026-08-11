@@ -1,0 +1,45 @@
+# Example only. Copy these objects into a private, per-command overlay.
+# Replace every placeholder. Never commit a Task body, assertion or private key.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-automation-management-request
+  namespace: qinglong3-system
+immutable: true
+type: Opaque
+stringData:
+  client.json: |
+    {"schemaVersion":1,"endpoint":"https://ql3-automation-management.qinglong3-system.svc:8445/api/v3/automations/management","servername":"ql3-automation-management.qinglong3-system.svc","caFile":"/tmp/ca.crt","clientCertificateFile":"/tmp/client.crt","clientPrivateKeyFile":"/tmp/client.key","requestTimeoutMs":15000}
+  command.json: |
+    {"schemaVersion":1,"operation":"task.publish","request":{"requestId":"REPLACE_WITH_UNIQUE_REQUEST_ID","command":{"projectId":"REPLACE_WITH_PROJECT_ID","taskId":"REPLACE_WITH_TASK_ID","expectedRevision":null,"mutationId":"REPLACE_WITH_UUID_V4","name":"REPLACE_WITH_TASK_NAME","kind":"script","spec":{"schema":"qinglong/script@v1","config":{"source":"REPLACE_WITH_REVIEWED_TASK_SOURCE"}},"labels":{},"enabled":true,"occurredAtMs":0}}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-automation-management-client-trust
+  namespace: qinglong3-system
+immutable: true
+data:
+  ca.crt: |
+    REPLACE_WITH_REVIEWED_MANAGER_CA_CERTIFICATE
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-automation-management-assertion
+  namespace: qinglong3-system
+immutable: true
+type: Opaque
+stringData:
+  assertion.jwt: REPLACE_WITH_SHORT_LIVED_STRONG_USER_ASSERTION
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-automation-management-client-identity
+  namespace: qinglong3-system
+immutable: true
+type: kubernetes.io/tls
+stringData:
+  tls.crt: REPLACE_WITH_SHORT_LIVED_CLIENT_CERTIFICATE_CHAIN
+  tls.key: REPLACE_WITH_CLIENT_PRIVATE_KEY

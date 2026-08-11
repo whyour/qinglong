@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "operation": "external.prompt-output-key.vault-transit.wrap",
+  "vault": {
+    "transport": "https",
+    "endpoint": "https://vault.example.invalid:8200",
+    "caFile": "/owner-private/vault/ca.pem",
+    "tokenFile": "/owner-private/vault/wrap-token",
+    "transitMount": "prompt-output-transit",
+    "keyName": "prompt-output-custody"
+  },
+  "materialFile": "/owner-private/prompt-output/material.bin",
+  "bundleOutputFile": "/owner-private/prompt-output/custody-bundle.json",
+  "custody": {
+    "custodyId": "replace-custody-id",
+    "keyId": "replace-key-id",
+    "sourceGeneration": 1,
+    "sourceCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "receiptSigningPrivateKeyFile": "/owner-private/prompt-output/custody-signing-private.pem",
+    "receiptSigningPublicKeyFile": "/owner-private/prompt-output/custody-signing-public.pem"
+  }
+}

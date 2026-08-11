@@ -1,0 +1,79 @@
+{
+  "name": "@qinglong/local-owner-maintenance",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 short-lived Local Owner maintenance authorities and GC command adapter",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "exports": {
+    "./pepper-gc": {
+      "types": "./dist/security-maintenance/pepperGc.d.ts",
+      "require": "./dist/security-maintenance/pepperGc.js",
+      "default": "./dist/security-maintenance/pepperGc.js"
+    },
+    "./acknowledgement-gc": {
+      "types": "./dist/security-maintenance/acknowledgementGc.d.ts",
+      "require": "./dist/security-maintenance/acknowledgementGc.js",
+      "default": "./dist/security-maintenance/acknowledgementGc.js"
+    },
+    "./prompt-output-gc": {
+      "types": "./dist/prompt-output-maintenance/promptOutputGc.d.ts",
+      "require": "./dist/prompt-output-maintenance/promptOutputGc.js",
+      "default": "./dist/prompt-output-maintenance/promptOutputGc.js"
+    },
+    "./prompt-output-key-retirement": {
+      "types": "./dist/prompt-output-maintenance/promptOutputKeyRetirement.d.ts",
+      "require": "./dist/prompt-output-maintenance/promptOutputKeyRetirement.js",
+      "default": "./dist/prompt-output-maintenance/promptOutputKeyRetirement.js"
+    },
+    "./command": {
+      "types": "./dist/application-command/localOwnerMaintenanceCommand.d.ts",
+      "require": "./dist/application-command/localOwnerMaintenanceCommand.js",
+      "default": "./dist/application-command/localOwnerMaintenanceCommand.js"
+    }
+  },
+  "bin": {
+    "ql3-owner-gc": "dist/cli.js"
+  },
+  "typesVersions": {
+    "*": {
+      "pepper-gc": [
+        "dist/security-maintenance/pepperGc.d.ts"
+      ],
+      "acknowledgement-gc": [
+        "dist/security-maintenance/acknowledgementGc.d.ts"
+      ],
+      "prompt-output-gc": [
+        "dist/prompt-output-maintenance/promptOutputGc.d.ts"
+      ],
+      "prompt-output-key-retirement": [
+        "dist/prompt-output-maintenance/promptOutputKeyRetirement.d.ts"
+      ],
+      "command": [
+        "dist/application-command/localOwnerMaintenanceCommand.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/local-command-file": "workspace:*",
+    "@qinglong/local-owner-console": "workspace:*",
+    "@qinglong/local-sqlite": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@qinglong/ai": "workspace:*",
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-prompt-output-retention-policies
+  namespace: qinglong3-system
+immutable: true
+data:
+  retention-policies.json: |
+    {"schemaVersion":1,"policies":[{"projectId":"replace-with-project-id","policy":{"revision":"default-v1","retentionMs":86400000},"policyDigest":"ff00e296187bf31f0ff82c4f68e422c101416443e651cf7d624833d59f5b583c"}]}

@@ -1,0 +1,389 @@
+# QingLong Architecture Decision Records
+
+本目录记录 QingLong 3.x 的关键架构决策。总体方向见 [QingLong 3.0 Architecture RFC](../QINGLONG_3_0_ARCHITECTURE_RFC.md)。
+
+## 状态
+
+- `Proposed`：等待 Maintainers 评审。
+- `Accepted`：已接受，实施必须遵循。
+- `Superseded`：已被后续 ADR 替代。
+- `Rejected`：已讨论但不采用。
+- `Deprecated`：曾经采用，正在退出。
+
+## 索引
+
+| ADR                                                                                                   | 标题                                                                        | 状态       |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------- |
+| [ADR-0001](./ADR-0001-run-state-and-transaction-boundaries.md)                                        | Run 状态模型与事务边界                                                      | Proposed   |
+| [ADR-0002](./ADR-0002-legacy-crontab-compatibility-and-shadow-write.md)                               | Legacy Crontab 兼容、影子写入与切换策略                                     | Proposed   |
+| [ADR-0003](./ADR-0003-executor-port-and-local-process-executor.md)                                    | Executor 端口与 LocalProcessExecutor                                        | Proposed   |
+| [ADR-0004](./ADR-0004-database-repository-drivers-and-migrations.md)                                  | SQLite/PostgreSQL Repository、驱动与 Migration 策略                         | Proposed   |
+| [ADR-0005](./ADR-0005-durable-cancellation-dispatch.md)                                               | Durable Cancellation Dispatch、Lease 与 Fencing                             | Proposed   |
+| [ADR-0006](./ADR-0006-node24-and-multi-architecture-support.md)                                       | Node.js 24 与多架构支持分层                                                 | Proposed   |
+| [ADR-0007](./ADR-0007-local-process-completion-receipt-and-log-survival.md)                           | LocalProcess completion receipt 与日志存活                                  | Proposed   |
+| [ADR-0012](./ADR-0012-remote-worker-session-placement-and-fencing.md)                                 | Remote Worker Session、能力放置与 Fencing                                   | Proposed   |
+| [ADR-0013](./ADR-0013-remote-run-activation-and-start-failure.md)                                     | Remote Run 启动确认、Lease Fencing 与启动失败                               | Proposed   |
+| [ADR-0014](./ADR-0014-bounded-dispatcher-and-claimed-execution-offer.md)                              | 有界 Dispatcher 与 Claimed Execution Offer                                  | Proposed   |
+| [ADR-0021](./ADR-0021-worker-execution-offer-inbox-and-crash-recovery.md)                             | Worker Execution Offer Inbox 与启动崩溃恢复                                 | Proposed   |
+| [ADR-0022](./ADR-0022-pinned-task-execution-plan-materialization.md)                                  | Pinned Task Revision 与本地执行计划物化                                     | Proposed   |
+| [ADR-0023](./ADR-0023-immutable-task-execution-revision-storage.md)                                   | 不可变 Task Execution Revision 存储                                         | Proposed   |
+| [ADR-0024](./ADR-0024-local-context-secret-and-artifact-boundary.md)                                  | Local Context、Secret 与 Artifact 边界                                      | Proposed   |
+| [ADR-0025](./ADR-0025-encrypted-local-secret-store.md)                                                | 加密本地 SecretStore 与版本化密文                                           | Superseded |
+| [ADR-0026](./ADR-0026-local-artifact-quota-and-retention.md)                                          | 本地 Artifact 硬配额、磁盘水位与可恢复 Retention                            | Proposed   |
+| [ADR-0027](./ADR-0027-artifact-read-authorization-and-local-range-contract.md)                        | Artifact 读取授权与本地有界 Range Contract                                  | Proposed   |
+| [ADR-0028](./ADR-0028-project-identity-rbac-and-policy-core.md)                                       | Project Identity、版本化 RBAC 与默认拒绝 Policy Core                        | Proposed   |
+| [ADR-0029](./ADR-0029-first-owner-bootstrap-and-authenticated-principal.md)                           | 首 Owner 一次性 Bootstrap 与认证主体边界                                    | Proposed   |
+| [ADR-0030](./ADR-0030-legacy-panel-authentication-and-stable-user-identity.md)                        | Legacy Panel 认证与稳定 User Identity                                       | Proposed   |
+| [ADR-0031](./ADR-0031-approval-request-and-durable-action-dispatch.md)                                | ApprovalRequest 与 Durable Action Dispatch                                  | Proposed   |
+| [ADR-0032](./ADR-0032-approved-action-dispatch-execution-and-start-barrier.md)                        | Approved Action Dispatch 执行租约与 Start Barrier                           | Proposed   |
+| [ADR-0033](./ADR-0033-approved-action-recovery-evidence-and-resolution.md)                            | Approved Action 恢复证据与人工裁决                                          | Proposed   |
+| [ADR-0034](./ADR-0034-approved-run-action-atomic-receipt.md)                                          | Approved Run Action 原子回执                                                | Proposed   |
+| [ADR-0035](./ADR-0035-approved-action-manual-recovery-authorization.md)                               | Approved Action 人工恢复授权                                                | Proposed   |
+| [ADR-0036](./ADR-0036-approved-action-profile-aware-runtime-lifecycle.md)                             | Approved Action Profile-aware Runtime Lifecycle                             | Proposed   |
+| [ADR-0037](./ADR-0037-postgresql-cluster-control-storage-incubation.md)                               | PostgreSQL Cluster-control 存储孵化与跨方言契约                             | Proposed   |
+| [ADR-0038](./ADR-0038-cluster-driver-package-and-dependency-baseline.md)                              | Cluster Driver 独立交付与 PostgreSQL 依赖基线                               | Proposed   |
+| [ADR-0039](./ADR-0039-postgresql-schema-capability-and-runtime-readiness.md)                          | PostgreSQL Schema Capability 与 Runtime Readiness                           | Proposed   |
+| [ADR-0040](./ADR-0040-profile-activation-and-edge-import-isolation.md)                                | Profile 激活顺序与 Edge 导入隔离                                            | Proposed   |
+| [ADR-0041](./ADR-0041-postgresql-run-repository-contract-parity.md)                                   | PostgreSQL Run Repository 契约对等                                          | Proposed   |
+| [ADR-0042](./ADR-0042-profile-artifacts-and-package-dependency-direction.md)                          | Profile 专属产物与 Package 依赖方向                                         | Proposed   |
+| [ADR-0043](./ADR-0043-postgresql-migration-typed-schema-and-catalog-authority.md)                     | PostgreSQL Migration、Typed Schema 与 Catalog 权威边界                      | Proposed   |
+| [ADR-0044](./ADR-0044-runtime-core-extraction-and-legacy-compatibility-exit.md)                       | Runtime Core 抽离与 Legacy 兼容副本退出                                     | Proposed   |
+| [ADR-0045](./ADR-0045-cluster-http-readiness-admission-and-drain.md)                                  | Cluster HTTP Readiness、Admission 与 Drain                                  | Proposed   |
+| [ADR-0046](./ADR-0046-cluster-two-phase-security-admission.md)                                        | Cluster 两阶段安全 Admission                                                | Proposed   |
+| [ADR-0047](./ADR-0047-postgresql-project-policy-and-role-binding-fence.md)                            | PostgreSQL Project Policy 与 RoleBinding Fence                              | Proposed   |
+| [ADR-0048](./ADR-0048-reviewed-cluster-route-registry.md)                                             | Cluster 受审 Route Registry 与授权输入边界                                  | Proposed   |
+| [ADR-0049](./ADR-0049-cluster-api-credential-and-durable-security-audit.md)                           | Cluster API Credential 与 Durable Security Audit                            | Proposed   |
+| [ADR-0050](./ADR-0050-cluster-administration-authority-and-mutation-ledgers.md)                       | Cluster Administration Authority 与 Mutation Ledgers                        | Proposed   |
+| [ADR-0051](./ADR-0051-cluster-authentication-overload-shield.md)                                      | Cluster Authentication Overload Shield                                      | Proposed   |
+| [ADR-0052](./ADR-0052-cluster-run-read-api-contract.md)                                               | Cluster Run Read API Contract                                               | Proposed   |
+| [ADR-0053](./ADR-0053-cluster-startup-recovery-convergence-gate.md)                                   | Cluster Startup Recovery Source 与 Convergence Gate                         | Proposed   |
+| [ADR-0054](./ADR-0054-cluster-recovery-claim-fencing-and-bounded-supervisor.md)                       | Cluster Recovery Claim、Fencing 与有界 Supervisor                           | Proposed   |
+| [ADR-0055](./ADR-0055-cluster-recovery-evidence-and-fenced-lost-transition.md)                        | Cluster Recovery Evidence 与 Fenced Lost Transition                         | Proposed   |
+| [ADR-0056](./ADR-0056-cluster-recovery-provider-registry-and-bootstrap-owned-convergence.md)          | Cluster Recovery Provider Registry 与 Bootstrap-Owned Convergence           | Proposed   |
+| [ADR-0057](./ADR-0057-postgresql-worker-session-and-run-lease-authority.md)                           | PostgreSQL Worker Session 与 Run Lease Authority                            | Proposed   |
+| [ADR-0058](./ADR-0058-authenticated-worker-ingress-and-execution-attestation.md)                      | Authenticated Worker Ingress 与 Execution Attestation                       | Proposed   |
+| [ADR-0059](./ADR-0059-worker-ingress-mutual-tls-and-deployment-boundary.md)                           | Worker Ingress Mutual TLS 与部署边界                                        | Proposed   |
+| [ADR-0060](./ADR-0060-worker-certificate-lifecycle-and-atomic-trust-reload.md)                        | Worker Certificate Lifecycle 与原子信任重载                                 | Proposed   |
+| [ADR-0061](./ADR-0061-worker-local-certificate-identity-and-renewal.md)                               | Worker 本地证书身份与显式续期                                               | Proposed   |
+| [ADR-0062](./ADR-0062-profile-vulnerability-ownership-and-legacy-dependency-remediation.md)           | Profile 漏洞归属与 Legacy 依赖树治理                                        | Proposed   |
+| [ADR-0063](./ADR-0063-local-sqlite-storage-and-profile-artifact-boundary.md)                          | 本机 SQLite 存储权威与 Profile 产物边界                                     | Proposed   |
+| [ADR-0064](./ADR-0064-side-by-side-legacy-sqlite-adoption.md)                                         | 2.x SQLite 旁路孵化、恢复点与显式切换                                       | Proposed   |
+| [ADR-0065](./ADR-0065-durable-local-application-cutover-supervisor.md)                                | 持久化本机应用切换 Supervisor 与未知结果收敛                                | Proposed   |
+| [ADR-0066](./ADR-0066-local-application-activation-and-reverse-shutdown.md)                           | 本机 Application 激活门与反向停止顺序                                       | Proposed   |
+| [ADR-0067](./ADR-0067-sqlite-fact-driven-local-run-startup-recovery-preflight.md)                     | SQLite 事实驱动的本机 Run 启动恢复预检                                      | Superseded |
+| [ADR-0068](./ADR-0068-receipt-first-local-run-startup-reconciliation.md)                              | 回执优先、进程身份感知的本机 Run 启动恢复                                   | Proposed   |
+| [ADR-0069](./ADR-0069-durable-local-process-launch-and-receipt-cleanup-journal.md)                    | 持久化本机进程启动屏障与数据库索引回执清理                                  | Proposed   |
+| [ADR-0070](./ADR-0070-atomic-local-run-execution-coordination.md)                                     | 本机 Run 原子启动协调与耐久身份补偿                                         | Proposed   |
+| [ADR-0071](./ADR-0071-bounded-local-dispatch-and-artifact-admission.md)                               | 有界本机调度、执行计划物化与 Artifact Admission                             | Proposed   |
+| [ADR-0072](./ADR-0072-unified-local-execution-completion-and-control-lifecycle.md)                    | 统一的本机执行完成、取消、超时与停机生命周期                                | Proposed   |
+| [ADR-0073](./ADR-0073-node-sqlite-encrypted-local-secret-store-and-keyring-lifecycle.md)              | Node SQLite 加密本机 SecretStore 与 Keyring 生命周期                        | Proposed   |
+| [ADR-0074](./ADR-0074-authorized-local-secret-administration-and-atomic-audit.md)                     | 授权的本机 Secret 管理与原子安全审计                                        | Proposed   |
+| [ADR-0075](./ADR-0075-local-identity-first-owner-bootstrap-ceremony.md)                               | 本机稳定 Identity 与首 Owner Bootstrap Ceremony                             | Proposed   |
+| [ADR-0076](./ADR-0076-shared-local-sqlite-authority-and-stable-identity-authentication.md)            | 共享本机 SQLite 操作权与稳定 Identity Credential 认证                       | Proposed   |
+| [ADR-0077](./ADR-0077-short-lived-local-identity-provisioning-and-owner-claim.md)                     | 短生命周期本机 Identity Provisioning 与首 Owner 原子建权                    | Proposed   |
+| [ADR-0078](./ADR-0078-posix-local-owner-console-proof-and-secret-delivery-gate.md)                    | POSIX 本机 Owner Console 证明与 Secret 交付门禁                             | Proposed   |
+| [ADR-0079](./ADR-0079-staged-local-owner-secret-delivery-and-recovery.md)                             | 本机 Owner Secret 分阶段交付与崩溃恢复                                      | Proposed   |
+| [ADR-0080](./ADR-0080-local-owner-pepper-provision-backup-and-rotation-boundary.md)                   | 本机 Owner Pepper Provision、备份与轮换边界                                 | Proposed   |
+| [ADR-0081](./ADR-0081-digest-bound-owner-secret-acknowledgement.md)                                   | 摘要绑定的 Owner Secret 确认与无密钥重放                                    | Superseded |
+| [ADR-0082](./ADR-0082-sqlite-owner-delivery-acknowledgement-ledger.md)                                | SQLite Owner Delivery 确认账本与瞬时文件桥梁                                | Proposed   |
+| [ADR-0083](./ADR-0083-versioned-local-owner-pepper-keyring-and-credential-recovery.md)                | 版本化 Owner Pepper Keyring 与 Credential Recovery                          | Proposed   |
+| [ADR-0084](./ADR-0084-versioned-owner-delivery-acknowledgement-compaction.md)                         | 版本化 Owner Delivery Acknowledgement 压缩与重放 Tombstone                  | Proposed   |
+| [ADR-0085](./ADR-0085-private-command-file-local-owner-gc-cli.md)                                     | 私有持久命令文件驱动的 Local Owner GC CLI                                   | Proposed   |
+| [ADR-0086](./ADR-0086-private-command-file-local-owner-product-cli.md)                                | 私有命令文件驱动的 Local Owner 产品 CLI                                     | Proposed   |
+| [ADR-0087](./ADR-0087-package-granularity-and-topological-build-boundary.md)                          | Package 粒度与拓扑构建边界                                                  | Proposed   |
+| [ADR-0088](./ADR-0088-linux-resource-envelopes-and-physical-device-evidence.md)                       | Linux 资源档位与物理设备证据边界                                            | Accepted   |
+| [ADR-0089](./ADR-0089-versioned-task-definition-storage-and-physical-scale-evidence.md)               | 版本化 TaskDefinition 存储与物理规模证据                                    | Accepted   |
+| [ADR-0090](./ADR-0090-production-package-packlist-and-map-exclusion.md)                               | Production Package Packlist 与开发 Map 排除                                 | Accepted   |
+| [ADR-0091](./ADR-0091-immutable-task-spec-semantic-registry-and-command-v1.md)                        | 不可变 TaskSpec 语义注册表与 Command v1                                     | Accepted   |
+| [ADR-0092](./ADR-0092-pinned-command-task-definition-execution-compilation.md)                        | Pinned Command TaskDefinition 执行编译                                      | Accepted   |
+| [ADR-0093](./ADR-0093-local-execution-revision-digest-and-atomic-publication.md)                      | 本机 Execution Revision 摘要与原子发布                                      | Accepted   |
+| [ADR-0094](./ADR-0094-versioned-trigger-definition-and-pinned-task-binding.md)                        | 版本化 Trigger 与固定任务修订绑定                                           | Accepted   |
+| [ADR-0095](./ADR-0095-bounded-legacy-crontab-adoption-classification.md)                              | 有界 Legacy Crontab adoption 分类与内容绑定计划                             | Accepted   |
+| [ADR-0096](./ADR-0096-strong-bounded-legacy-adoption-decision-receipt.md)                             | 强认证且有界的 Legacy adoption 决策回执                                     | Accepted   |
+| [ADR-0097](./ADR-0097-private-authenticated-legacy-adoption-decision-file.md)                         | 私有且可认证的 Legacy adoption 决策文件                                     | Accepted   |
+| [ADR-0098](./ADR-0098-policy-fenced-atomic-legacy-task-adoption.md)                                   | Policy 围栏下的原子 Legacy Task adoption                                    | Accepted   |
+| [ADR-0099](./ADR-0099-dedicated-legacy-adoption-decision-issuer-keyring.md)                           | 专用 Legacy adoption decision issuer keyring                                | Accepted   |
+| [ADR-0100](./ADR-0100-private-streaming-legacy-adoption-review-cli.md)                                | 私有流式 Legacy adoption review-file 与签发 CLI                             | Accepted   |
+| [ADR-0101](./ADR-0101-reauthenticated-policy-fenced-legacy-adoption-commit-cli.md)                    | 重新认证且受 Policy 围栏约束的 adoption commit CLI                          | Accepted   |
+| [ADR-0102](./ADR-0102-physical-edge-legacy-adoption-scale-evidence.md)                                | 物理 Edge Legacy adoption 规模证据协议                                      | Accepted   |
+| [ADR-0103](./ADR-0103-bounded-local-cron-scheduler-run-admission.md)                                  | 有界本机 Cron 调度与 Run 原子准入                                           | Accepted   |
+| [ADR-0104](./ADR-0104-postgresql-immutable-task-trigger-and-execution-revisions.md)                   | PostgreSQL 不可变 Task、Trigger 与远端执行修订                              | Accepted   |
+| [ADR-0105](./ADR-0105-postgresql-row-lease-cluster-scheduler-admission.md)                            | PostgreSQL 行租约 Cluster Scheduler 与 Run 原子准入                         | Accepted   |
+| [ADR-0106](./ADR-0106-profile-entrypoint-subpath-consolidation.md)                                    | Profile 构建入口 Subpath 收敛                                               | Accepted   |
+| [ADR-0107](./ADR-0107-postgresql-authoritative-cluster-scheduler-clock.md)                            | PostgreSQL 权威 Cluster Scheduler 时钟                                      | Accepted   |
+| [ADR-0108](./ADR-0108-worker-pull-placement-and-digest-only-offer.md)                                 | Worker Pull Placement 与摘要化 Execution Offer                              | Accepted   |
+| [ADR-0109](./ADR-0109-postgresql-remote-run-activation-ack.md)                                        | PostgreSQL Remote Run 原子启动 ACK                                          | Accepted   |
+| [ADR-0110](./ADR-0110-authenticated-worker-offer-delivery-and-durable-admission.md)                   | 认证 Worker Offer 传输与耐久准入                                            | Accepted   |
+| [ADR-0111](./ADR-0111-single-authority-worker-execution-inbox-and-spawn-barrier.md)                   | 单一 Worker 执行 Inbox 与可判定 Spawn Barrier                               | Accepted   |
+| [ADR-0112](./ADR-0112-versioned-worker-activation-transport-and-explicit-headless-lifecycle.md)       | 版本化 Worker Activation Transport 与显式 Headless Lifecycle                | Accepted   |
+| [ADR-0113](./ADR-0113-bounded-worker-secret-and-log-materialization.md)                               | 有界 Worker Secret 与 Log Materialization                                   | Accepted   |
+| [ADR-0114](./ADR-0114-fenced-batch-remote-worker-secret-delivery.md)                                  | 围栏化 Remote Worker 批量 Secret 交付                                       | Accepted   |
+| [ADR-0115](./ADR-0115-bounded-worker-file-log-artifact-and-output-ownership.md)                       | 有界 Worker 文件 Log Artifact 与 Output Ownership                           | Accepted   |
+| [ADR-0116](./ADR-0116-reviewed-worker-posix-executor-and-upload-before-completion.md)                 | 受审 Worker POSIX Executor 与 Upload-before-completion                      | Accepted   |
+| [ADR-0117](./ADR-0117-streamed-remote-worker-artifact-and-atomic-completion.md)                       | 流式 Remote Worker Artifact 与原子 Completion                               | Accepted   |
+| [ADR-0118](./ADR-0118-remote-worker-lease-control-and-durable-timeout.md)                             | Remote Worker Lease Control 与耐久 Timeout                                  | Accepted   |
+| [ADR-0119](./ADR-0119-reviewed-production-cluster-control-route-composition.md)                       | 受审 Production Cluster Control Route Composition                           | Accepted   |
+| [ADR-0120](./ADR-0120-s3-compatible-immutable-remote-worker-artifact-store.md)                        | S3-Compatible Immutable Remote Worker Artifact Store                        | Accepted   |
+| [ADR-0121](./ADR-0121-production-worker-headless-execution-composition.md)                            | Production Worker Headless Execution Composition                            | Accepted   |
+| [ADR-0122](./ADR-0122-single-cadence-worker-session-product-lifecycle.md)                             | 单 Cadence Worker Session Product Lifecycle                                 | Accepted   |
+| [ADR-0123](./ADR-0123-worker-production-credential-material-boundary.md)                              | Worker Production Credential Material Boundary                              | Accepted   |
+| [ADR-0124](./ADR-0124-recoverable-worker-credential-delivery-and-overlap-rotation.md)                 | 可恢复的 Worker Credential 交付确认与重叠轮换                               | Proposed   |
+| [ADR-0125](./ADR-0125-postgresql-failover-admission-and-ambiguous-commit-boundary.md)                 | PostgreSQL Failover Admission 与不确定提交边界                              | Proposed   |
+| [ADR-0126](./ADR-0126-locked-cluster-process-image-and-kubernetes-baseline.md)                        | 锁定的 Cluster 进程、镜像与 Kubernetes 部署基线                             | Accepted   |
+| [ADR-0127](./ADR-0127-bounded-postgresql-private-ca-file-binding.md)                                  | 有界 PostgreSQL 私有 CA 文件绑定                                            | Accepted   |
+| [ADR-0128](./ADR-0128-exact-cluster-image-sbom-and-attested-multiarch-release.md)                     | 精确 Cluster 镜像 SBOM 与证明化多架构发布                                   | Accepted   |
+| [ADR-0129](./ADR-0129-cloudnativepg-operator-and-database-role-authority.md)                          | CloudNativePG Operator 与数据库角色权威                                     | Accepted   |
+| [ADR-0130](./ADR-0130-cloudnativepg-barman-backup-and-isolated-restore.md)                            | CloudNativePG Barman 备份与隔离恢复                                         | Proposed   |
+| [ADR-0131](./ADR-0131-barman-plugin-cert-manager-authority.md)                                        | Barman Plugin cert-manager 证书 Authority                                   | Proposed   |
+| [ADR-0132](./ADR-0132-bounded-plugin-package-manifest-and-install-plan.md)                            | 有界 Plugin Package Manifest 与安装计划                                     | Accepted   |
+| [ADR-0133](./ADR-0133-immutable-tool-registry-and-policy-fenced-invocation-plan.md)                   | 不可变 Tool Registry 与 Policy-fenced Invocation Plan                       | Accepted   |
+| [ADR-0134](./ADR-0134-content-addressed-package-lock-and-recoverable-install-state.md)                | 内容寻址 PackageLock 与可恢复安装状态                                       | Accepted   |
+| [ADR-0135](./ADR-0135-deterministic-signed-plugin-bundle-and-private-local-staging.md)                | 确定性签名 Plugin Bundle 与私有本地 Staging                                 | Accepted   |
+| [ADR-0136](./ADR-0136-sqlite-plugin-package-install-repository-and-head-cas.md)                       | SQLite Plugin Package 安装仓库与 Head CAS                                   | Accepted   |
+| [ADR-0137](./ADR-0137-postgresql-plugin-package-install-repository-and-project-lock-authority.md)     | PostgreSQL Plugin Package 安装仓库与 Project Lock Authority                 | Accepted   |
+| [ADR-0138](./ADR-0138-durable-plugin-package-lock-and-exact-local-activation.md)                      | 耐久 Plugin Package Lock 与精确本地激活                                     | Accepted   |
+| [ADR-0139](./ADR-0139-kubernetes-plugin-package-active-pointer-cas.md)                                | Kubernetes Plugin Package Active Pointer CAS                                | Accepted   |
+| [ADR-0140](./ADR-0140-bounded-plugin-package-startup-recovery-and-admission.md)                       | 有界 Plugin Package 启动恢复与准入门禁                                      | Accepted   |
+| [ADR-0141](./ADR-0141-profile-neutral-approved-action-and-package-admission-boundary.md)              | Profile-neutral Approved Action 与 Package 准入边界                         | Accepted   |
+| [ADR-0142](./ADR-0142-authenticated-plugin-package-management-facade.md)                              | 认证后 Plugin Package 管理 Facade 与 Profile Ceremony                       | Accepted   |
+| [ADR-0143](./ADR-0143-private-authenticated-local-plugin-package-cli.md)                              | 私有认证 Local Plugin Package CLI                                           | Accepted   |
+| [ADR-0144](./ADR-0144-cluster-plugin-package-management-transport-boundary.md)                        | Cluster Plugin Package 管理 Transport 与双 Authority 边界                   | Proposed   |
+| [ADR-0145](./ADR-0145-bounded-cluster-plugin-package-management-host.md)                              | 有界 Cluster Plugin Package 管理 Host 与可选部署                            | Accepted   |
+| [ADR-0146](./ADR-0146-postgresql-durable-plugin-package-management-quota.md)                          | PostgreSQL Durable Plugin Package 管理配额                                  | Accepted   |
+| [ADR-0147](./ADR-0147-postgresql-durable-plugin-package-identity-keyset-ledger.md)                    | PostgreSQL 持久 Plugin Package 身份 keyset ledger                           | Accepted   |
+| [ADR-0148](./ADR-0148-plugin-package-management-live-evidence-and-default-deny-egress.md)             | Plugin Package 管理 Live Evidence 与默认拒绝 Egress                         | Accepted   |
+| [ADR-0149](./ADR-0149-atomic-plugin-package-resource-generation-identity.md)                          | 原子 Plugin Package Resource Generation Identity                            | Accepted   |
+| [ADR-0150](./ADR-0150-bounded-plugin-package-semantic-materialization.md)                             | 有界 Plugin Package 语义物化                                                | Accepted   |
+| [ADR-0151](./ADR-0151-sqlite-postgresql-immutable-plugin-package-materialized-revision-repository.md) | SQLite/PostgreSQL 不可变 Plugin Package 物化修订仓库                        | Accepted   |
+| [ADR-0152](./ADR-0152-generation-bound-atomic-plugin-package-task-reconciliation.md)                  | Generation 绑定的原子 Plugin Package Task Reconciliation                    | Accepted   |
+| [ADR-0153](./ADR-0153-bounded-production-plugin-package-task-publication.md)                          | 有界的生产 Plugin Package Task 发布与启动恢复                               | Accepted   |
+| [ADR-0154](./ADR-0154-project-scoped-immutable-tool-definition-snapshot.md)                           | Project-scoped 不可变 Tool Definition Snapshot                              | Accepted   |
+| [ADR-0155](./ADR-0155-snapshot-bound-trusted-tool-handler-and-execution-admission.md)                 | Snapshot-bound Trusted Tool Handler 与执行准入                              | Accepted   |
+| [ADR-0156](./ADR-0156-durable-step-run-aggregate-and-run-fence.md)                                    | 耐久 StepRun Aggregate 与 Run Fence                                         | Accepted   |
+| [ADR-0157](./ADR-0157-bounded-tool-execution-trace-and-audit-evidence.md)                             | 有界 Tool Execution Trace 与 Audit Evidence                                 | Accepted   |
+| [ADR-0158](./ADR-0158-atomic-tool-execution-start-barrier.md)                                         | 同事务 Tool Execution Start Barrier                                         | Accepted   |
+| [ADR-0159](./ADR-0159-opaque-tool-invocation-and-redacted-preview-artifacts.md)                       | 不透明 Tool Invocation 与脱敏 Preview Artifact                              | Accepted   |
+| [ADR-0160](./ADR-0160-sqlite-postgresql-immutable-tool-invocation-artifact-repository.md)             | SQLite/PostgreSQL 不可变 Tool Invocation Artifact 仓库                      | Accepted   |
+| [ADR-0161](./ADR-0161-tool-execution-start-artifact-binding.md)                                       | Tool Execution Start 与 Artifact 的不可变绑定                               | Accepted   |
+| [ADR-0162](./ADR-0162-first-trusted-built-in-run-read-tool-adapter.md)                                | 首个 Trusted Built-in Run Read Tool Adapter                                 | Accepted   |
+| [ADR-0163](./ADR-0163-atomic-encrypted-tool-success-completion.md)                                    | 原子加密 Tool 成功完成协议                                                  | Accepted   |
+| [ADR-0164](./ADR-0164-trusted-tool-success-coordinator-and-profile-storage-assembly.md)               | Trusted Tool 成功协调器与 Profile 存储装配                                  | Accepted   |
+| [ADR-0165](./ADR-0165-trusted-tool-terminal-failure-completion.md)                                    | Trusted Tool 失败与超时终态完成协议                                         | Accepted   |
+| [ADR-0166](./ADR-0166-trusted-tool-result-key-catalog-and-completion-fence.md)                        | Trusted Tool Result Key Catalog 与 Completion Fence                         | Accepted   |
+| [ADR-0167](./ADR-0167-optional-bounded-ai-model-gateway.md)                                           | 可选、受预算约束的 AI Model Gateway                                         | Accepted   |
+| [ADR-0168](./ADR-0168-durable-model-invocation-step-run-fence.md)                                     | Durable ModelInvocation 与 StepRun Fence                                    | Accepted   |
+| [ADR-0169](./ADR-0169-project-bound-ai-provider-credential-binding.md)                                | Project-bound AI Provider Credential Binding 与可清零 Secret Material       | Accepted   |
+| [ADR-0170](./ADR-0170-durable-model-usage-ledger-and-bounded-project-accounting.md)                   | Durable Model Usage Ledger 与有界 Project Accounting                        | Accepted   |
+| [ADR-0171](./ADR-0171-atomic-project-model-quota-reservation-and-settlement.md)                       | 原子 Project Model Quota Reservation 与 Settlement                          | Accepted   |
+| [ADR-0172](./ADR-0172-immutable-model-price-quote-and-canonical-cost-settlement.md)                   | 不可变 Model Price Quote 与 Canonical Cost Settlement                       | Accepted   |
+| [ADR-0173](./ADR-0173-durable-model-price-catalog-publication-and-activation.md)                      | 耐久 Model Price Catalog 发布、激活与撤销                                   | Accepted   |
+| [ADR-0174](./ADR-0174-authorized-model-price-catalog-management-facade.md)                            | 授权型 Model Price Catalog 管理 facade                                      | Accepted   |
+| [ADR-0175](./ADR-0175-private-authenticated-local-model-price-catalog-cli.md)                         | 私有认证 Local Model Price Catalog CLI                                      | Accepted   |
+| [ADR-0176](./ADR-0176-explicit-local-ai-feature-activation-and-deactivation.md)                       | 显式 Local AI Feature 启用与非破坏性停用                                    | Accepted   |
+| [ADR-0177](./ADR-0177-active-head-driven-local-ai-application-composition.md)                         | Active Head 驱动的本机 AI Application Composition                           | Accepted   |
+| [ADR-0178](./ADR-0178-concrete-local-headless-application-process.md)                                 | Concrete Local Headless Application Process                                 | Accepted   |
+| [ADR-0179](./ADR-0179-materialized-local-plugin-package-recovery-catalog.md)                          | Materialized Local Plugin Package Recovery Catalog                          | Accepted   |
+| [ADR-0180](./ADR-0180-authenticated-local-plugin-package-recovery-catalog-publication.md)             | Authenticated Local Plugin Package Recovery Catalog Publication             | Accepted   |
+| [ADR-0181](./ADR-0181-immutable-package-signature-time-and-local-publisher-trust-overlap-rotation.md) | Immutable Package Signature Time and Local Publisher Trust Overlap Rotation | Accepted   |
+| [ADR-0182](./ADR-0182-safe-local-plugin-package-publisher-key-retirement.md)                          | Safe Local Plugin Package Publisher Key Retirement                          | Accepted   |
+| [ADR-0183](./ADR-0183-emergency-local-plugin-package-publisher-key-revocation.md)                     | Emergency Local Plugin Package Publisher Key Revocation                     | Accepted   |
+| [ADR-0184](./ADR-0184-offline-local-plugin-package-quarantine-withdrawal.md)                          | 本机 Plugin Package 离线隔离与能力撤出                                      | Accepted   |
+| [ADR-0185](./ADR-0185-workspace-package-boundary-consolidation.md)                                    | Workspace Package 边界审计与最小 Profile 交付梯度                           | Accepted   |
+| [ADR-0186](./ADR-0186-cluster-postgresql-plugin-package-quarantine.md)                                | Cluster PostgreSQL Plugin Package 隔离与能力撤出                            | Accepted   |
+| [ADR-0187](./ADR-0187-cluster-plugin-package-publisher-provenance-and-revocation-impact.md)           | Cluster Plugin Package 发布者 Provenance 与撤销影响集                       | Accepted   |
+| [ADR-0188](./ADR-0188-cluster-durable-publisher-trust-authority-and-approved-revocation.md)           | Cluster 持久发布者 Trust Authority 与受批撤销                               | Accepted   |
+| [ADR-0189](./ADR-0189-cluster-effective-publisher-trust-material-binding.md)                          | Cluster Effective Publisher Trust Material Binding                          | Accepted   |
+| [ADR-0190](./ADR-0190-cluster-approved-publisher-trust-overlap-add-and-safe-retire.md)                | Cluster Approved Publisher Trust Overlap Add 与 Safe Retire                 | Proposed   |
+| [ADR-0191](./ADR-0191-private-cluster-plugin-package-management-client.md)                            | 私有 Cluster Plugin Package 管理 Client                                     | Accepted   |
+| [ADR-0192](./ADR-0192-kubernetes-private-management-tunnel-client.md)                                 | Kubernetes 私有管理 Tunnel Client                                           | Accepted   |
+| [ADR-0193](./ADR-0193-fresh-local-profile-setup-and-application.md)                                   | Fresh Local Profile Setup 与 Application                                    | Accepted   |
+| [ADR-0194](./ADR-0194-replay-safe-local-deployment-preparation.md)                                    | 可重放的本机部署准备                                                        | Accepted   |
+| [ADR-0195](./ADR-0195-ai-excluded-local-application-image.md)                                         | AI-excluded 本机 Application 镜像                                           | Accepted   |
+| [ADR-0196](./ADR-0196-local-image-attested-multiarch-release-contract.md)                             | 本机镜像证明化多架构发布契约                                                | Accepted   |
+| [ADR-0197](./ADR-0197-generation-cas-local-compose-image-selection.md)                                | Generation CAS 本机 Compose 镜像选择                                        | Accepted   |
+| [ADR-0198](./ADR-0198-digest-bound-local-compose-rollout-preflight.md)                                | Digest-bound 本机 Compose Rollout Preflight                                 | Accepted   |
+| [ADR-0199](./ADR-0199-generation-fenced-local-compose-rollout.md)                                     | Generation-fenced 本机 Compose Rollout                                      | Accepted   |
+| [ADR-0200](./ADR-0200-local-sqlite-rollout-write-contract-and-snapshot.md)                            | 本机 SQLite Rollout 写契约与升级前快照                                      | Accepted   |
+| [ADR-0201](./ADR-0201-explicit-fenced-local-sqlite-restore.md)                                        | 显式、围栏化的本机 SQLite 恢复                                              | Accepted   |
+| [ADR-0202](./ADR-0202-explicit-compose-evidence-collection.md)                                        | 显式、可重放的 Compose 恢复证据收集                                         | Accepted   |
+| [ADR-0203](./ADR-0203-physical-edge-compose-storage-recovery-evidence.md)                             | 物理 Edge Compose 存储恢复候选证据                                          | Accepted   |
+| [ADR-0204](./ADR-0204-physical-edge-native-application-start-evidence.md)                             | 物理 Edge Native Application 首次 Active 候选证据                           | Accepted   |
+| [ADR-0205](./ADR-0205-physical-edge-init-managed-service-start-evidence.md)                           | 物理 Edge Init-managed Service 首次 Active 候选证据                         | Accepted   |
+| [ADR-0206](./ADR-0206-direct-init-managed-release-startup-receipt.md)                                 | 直连 Init-managed Release 与有界启动凭据                                    | Accepted   |
+| [ADR-0207](./ADR-0207-authenticated-local-secret-product-cli.md)                                      | 强认证 Local Secret 产品 CLI 与事务内 Credential Fence                      | Accepted   |
+| [ADR-0208](./ADR-0208-authenticated-local-project-role-policy-cli.md)                                 | 强认证 Local Project Role Policy CLI 与防锁死交接                           | Accepted   |
+| [ADR-0209](./ADR-0209-owner-fenced-local-identity-credential-administration.md)                       | Owner 围栏化 Local Identity/Credential 管理与私有交付                       | Accepted   |
+| [ADR-0210](./ADR-0210-owner-fenced-local-identity-credential-inspection.md)                           | Owner 围栏化 Local Identity/Credential 查询                                 | Accepted   |
+| [ADR-0211](./ADR-0211-instance-authority-project-for-local-identity-credential.md)                    | Local Identity/Credential 的实例 Authority Project                          | Accepted   |
+| [ADR-0212](./ADR-0212-owner-fenced-local-project-lifecycle.md)                                       | Owner 围栏化 Local Project 生命周期                                         | Accepted   |
+| [ADR-0213](./ADR-0213-owner-fenced-bounded-local-project-query.md)                                  | Owner 围栏化、有界的 Local Project 查询                                     | Accepted   |
+| [ADR-0214](./ADR-0214-owner-fenced-bounded-local-role-binding-query.md)                             | Owner 围栏化、有界的 Local RoleBinding 查询                                 | Accepted   |
+| [ADR-0215](./ADR-0215-instance-owner-fenced-bounded-local-security-audit-query.md)                  | 实例 Owner 围栏化、有界的 Local Security Audit 查询                         | Accepted   |
+| [ADR-0216](./ADR-0216-owner-fenced-bounded-local-security-audit-compaction.md)                     | 实例 Owner 围栏化、有界的 Local Security Audit 诊断压缩                     | Accepted   |
+| [ADR-0217](./ADR-0217-workspace-package-boundary-convergence.md)                                  | QingLong 3.0 workspace package 边界收敛                                     | Accepted                    |
+| [ADR-0218](./ADR-0218-deployment-owned-croner-provider-boundary.md)                               | 部署 Owner 持有的 Croner Provider 边界                                      | Accepted                    |
+| [ADR-0219](./ADR-0219-pinned-semver-runtime-adapter-boundary.md)                                | 固定 SemVer 运行时适配器边界                                                 | Accepted                    |
+| [ADR-0220](./ADR-0220-plugin-package-installation-inventory-query.md)                         | Plugin Package 当前安装清单查询                                              | Accepted                    |
+| [ADR-0221](./ADR-0221-atomic-plugin-package-lifecycle-overlay.md)                             | 原子、可重放的 Plugin Package 生命周期 Overlay                               | Proposed                    |
+| [ADR-0222](./ADR-0222-generation-bound-plugin-package-automation-publication.md)              | 按 generation 绑定的 Plugin Package 自动化发布账本                           | Proposed                    |
+| [ADR-0223](./ADR-0223-generation-bound-plugin-package-workflow-execution-plan.md)             | 按 generation 绑定的 Plugin Package Workflow 执行计划                        | Proposed                    |
+| [ADR-0224](./ADR-0224-sqlite-atomic-plugin-package-workflow-admission.md)                     | SQLite Plugin Package Workflow 原子准入                                      | Proposed                    |
+| [ADR-0225](./ADR-0225-postgresql-serializable-plugin-package-workflow-admission.md)           | PostgreSQL Serializable Plugin Package Workflow 准入                         | Proposed                    |
+| [ADR-0226](./ADR-0226-bounded-plugin-package-workflow-frontier.md)                            | 有界 Plugin Package Workflow Frontier                                        | Proposed                    |
+| [ADR-0227](./ADR-0227-generation-bound-workflow-task-attempt-admission.md)                    | Generation-bound Workflow Task Attempt 准入                                  | Proposed                    |
+| [ADR-0228](./ADR-0228-bounded-plugin-package-workflow-cancellation-convergence.md)             | 有界 Plugin Package Workflow 整体取消收敛                                     | Proposed                    |
+| [ADR-0229](./ADR-0229-local-workflow-task-runtime-lifecycle.md)                                | Local Workflow Task 单 cadence 运行生命周期                                  | Proposed                    |
+| [ADR-0230](./ADR-0230-cluster-workflow-single-scheduler-cadence.md)                            | Cluster Workflow 复用单一 Scheduler cadence                                  | Accepted                    |
+| [ADR-0231](./ADR-0231-in-process-worker-ingress-runtime-capability-port.md)                    | Worker ingress 复用 control 进程并注入 runtime capability port               | Accepted                    |
+| [ADR-0232](./ADR-0232-cluster-runtime-recovery-and-lost-retry-single-cadence.md)               | Cluster runtime recovery 与 lost retry 复用单一 Scheduler cadence            | Accepted                    |
+| [ADR-0233](./ADR-0233-authority-gated-mounted-cluster-secret-provider.md)                      | Cluster Secret 使用 authority-gated mounted-files provider                   | Accepted                    |
+| [ADR-0234](./ADR-0234-single-identity-production-worker-process-and-deployment.md)             | 单身份 Production Worker 进程与部署边界                                      | Accepted                    |
+| [ADR-0235](./ADR-0235-production-worker-postgresql-live-contract-and-transition-typing.md)   | Production Worker PostgreSQL 真实合约与 Session Transition 类型边界          | Accepted                    |
+| [ADR-0236](./ADR-0236-production-worker-run-contract-and-authentication-attempt-budget.md)    | Production Worker Run 纵切面与认证尝试预算                                   | Accepted                    |
+| [ADR-0237](./ADR-0237-capability-oriented-dependency-boundary-reconciliation.md)             | 面向能力的依赖边界对账                                                        | Accepted                    |
+| [ADR-0238](./ADR-0238-production-worker-certificate-renewal-single-cadence.md)               | Production Worker 证书续期单 Cadence 装配                                    | Accepted                    |
+| [ADR-0239](./ADR-0239-kubernetes-worker-generation-rollout-and-pvc-recovery.md)              | Kubernetes Worker Generation Rollout 与 PVC 恢复边界                         | Accepted                    |
+| [ADR-0240](./ADR-0240-kubernetes-worker-credential-staging-and-short-lived-rbac.md)           | Kubernetes Worker Credential Staging 与短期最小 RBAC                         | Accepted                    |
+| [ADR-0241](./ADR-0241-kubernetes-worker-credential-tokenrequest-session.md)                   | Kubernetes Worker Credential TokenRequest Session                            | Accepted                    |
+| [ADR-0242](./ADR-0242-approved-worker-credential-management-and-execution.md)                 | 受批 Worker Credential 管理与一次性执行边界                                  | Proposed                    |
+| [ADR-0243](./ADR-0243-remove-unconsumed-local-cutover-package.md)                             | 删除无产品消费者的 Local Cutover 孵化包                                      | Accepted                    |
+| [ADR-0244](./ADR-0244-purpose-bound-management-identity-assertions.md)                        | 按管理能力绑定身份断言用途                                                    | Accepted                    |
+| [ADR-0245](./ADR-0245-worker-management-external-oidc-ceremony-evidence.md)                   | Worker 管理外部 OIDC 双用户 Ceremony 证据                                    | Accepted                    |
+| [ADR-0246](./ADR-0246-worker-management-durable-audit-evidence.md)                            | Worker 管理持久审计的独立只读证据                                             | Accepted                    |
+| [ADR-0247](./ADR-0247-worker-management-mutual-tls-client-boundary.md)                        | Worker 管理业务路由的客户端证书边界                                          | Accepted                    |
+| [ADR-0248](./ADR-0248-worker-management-pki-rotation-evidence.md)                             | Worker 管理 PKI 吊销与滚动替换证据                                           | Accepted                    |
+| [ADR-0249](./ADR-0249-bounded-worker-management-client-ca-rollover.md)                        | Worker 管理客户端 CA 有界重叠与安全退休                                      | Accepted                    |
+| [ADR-0250](./ADR-0250-worker-management-client-ca-rollover-evidence.md)                        | Worker 管理客户端 CA 三阶段生产证据                                           | Accepted                    |
+| [ADR-0251](./ADR-0251-worker-management-revocation-trust-domain-separation.md)                 | Worker 管理吊销证据的双 PKI 信任域分离                                        | Accepted                    |
+| [ADR-0252](./ADR-0252-worker-management-unified-release-evidence.md)                           | Worker 管理统一 Release Evidence                                               | Accepted                    |
+| [ADR-0253](./ADR-0253-private-worker-management-evidence-image-release-gate.md)                 | 私密 Worker 管理证据的镜像发布门                                                | Accepted                    |
+| [ADR-0254](./ADR-0254-digest-pinned-cross-architecture-os-vulnerability-release-gate.md)        | Digest 固定的跨架构 OS 漏洞发布门                                               | Accepted                    |
+| [ADR-0255](./ADR-0255-build-once-scanned-oci-digest-promotion.md)                                | Build-once Scanned OCI Digest Promotion                                      | Accepted                    |
+| [ADR-0256](./ADR-0256-owner-authenticated-local-task-definition-management.md)                    | Owner-authenticated Local TaskDefinition Management                          | Accepted                    |
+| [ADR-0257](./ADR-0257-profile-runtime-artifact-pruning-and-tiered-import-budget.md)                | Profile 运行制品裁剪与分层 Import RSS 预算                                    | Accepted                    |
+| [ADR-0258](./ADR-0258-owner-authenticated-local-trigger-management-and-current-task-fence.md)      | Owner-authenticated Local Trigger 管理与 Current Task 围栏                     | Accepted                    |
+| [ADR-0259](./ADR-0259-purpose-bound-cluster-automation-management-process.md)                        | 用途隔离的 Cluster Automation Management 进程                                 | Accepted                    |
+| [ADR-0260](./ADR-0260-generation-bound-content-free-plugin-package-prompt-execution.md)              | Generation-bound、Content-free 的 Plugin Package Prompt 执行                  | Proposed                    |
+| [ADR-0261](./ADR-0261-explicit-encrypted-durable-plugin-package-prompt-output-artifact.md)            | 显式加密的 Durable Plugin Package Prompt 输出 Artifact                        | Proposed                    |
+| [ADR-0262](./ADR-0262-kubernetes-secret-backed-cluster-prompt-output-key-retirement.md)               | Kubernetes Secret-backed Cluster Prompt 输出 Key Retirement                  | Accepted                    |
+| [ADR-0263](./ADR-0263-explicit-cluster-ai-composition-and-provider-credential-authority.md)             | 显式 Cluster AI 组合与 Provider Credential Authority                          | Accepted                    |
+| [ADR-0264](./ADR-0264-dedicated-cluster-model-provider-credential-management-boundary.md)                | 独立 Cluster Model Provider Credential 管理边界                               | Accepted                    |
+| [ADR-0265](./ADR-0265-bounded-one-shot-model-provider-credential-test-connection.md)                     | 有预算的一次性 Model Provider Credential Test Connection                     | Accepted                    |
+| [ADR-0266](./ADR-0266-externally-staged-cluster-prompt-output-active-key-rotation.md)                    | Externally staged、resourceVersion-fenced 的 Cluster Prompt Output Active Key Rotation | Accepted                    |
+| [ADR-0267](./ADR-0267-machine-verifiable-workspace-package-boundary-ledger.md)                           | 机器可验证的 Workspace Package 边界账本                                      | Accepted                    |
+| [ADR-0268](./ADR-0268-signed-external-prompt-output-key-custody-and-recovery-proof.md)                   | 签名的外部 Prompt 输出密钥托管与恢复证明                                      | Proposed                    |
+| [ADR-0269](./ADR-0269-profile-aware-local-sqlite-readiness-diagnostic.md)                                 | Profile-aware Local SQLite Readiness 诊断边界                                 | Accepted                    |
+| [ADR-0270](./ADR-0270-authenticated-local-plugin-package-workflow-product-entry.md)                         | 受认证的本机 Plugin Package Workflow 产品入口                                | Accepted                    |
+| [ADR-0271](./ADR-0271-authenticated-cluster-plugin-package-workflow-product-entry.md)                       | 受认证的 Cluster Plugin Package Workflow 产品入口                             | Accepted                    |
+| [ADR-0272](./ADR-0272-bounded-authorized-cluster-automation-inspection.md)                                  | 有界且授权原子的 Cluster Automation Inspection                                | Accepted                    |
+| [ADR-0273](./ADR-0273-local-ai-provider-credential-product-authority.md)                                   | 本机 AI Provider Credential 产品 Authority                                     | Accepted                    |
+| [ADR-0274](./ADR-0274-authenticated-local-plugin-package-prompt-product-entry.md)                          | 受认证的本机 Plugin Package Prompt 产品入口                                     | Accepted                    |
+| [ADR-0275](./ADR-0275-authenticated-cluster-plugin-package-prompt-product-entry.md)                        | 受认证的 Cluster Plugin Package Prompt 产品入口                                  | Accepted                    |
+| [ADR-0276](./ADR-0276-domain-oriented-package-source-layout.md)                                           | Package 内部领域目录与兼容 export 布局                                            | Accepted                    |
+| [ADR-0277](./ADR-0277-local-plugin-package-workflow-cancellation-product-entry.md)                        | 本机 Plugin Package Workflow 取消产品入口                                          | Accepted                    |
+| [ADR-0278](./ADR-0278-profile-separated-linux-workflow-cancellation-resource-gate.md)                    | Profile 分层的 Linux Workflow 取消资源发布门                                       | Accepted                    |
+| [ADR-0279](./ADR-0279-authenticated-cluster-plugin-package-workflow-cancellation-product-entry.md)       | 受认证的 Cluster Plugin Package Workflow 取消产品入口                              | Accepted                    |
+| [ADR-0280](./ADR-0280-local-sqlite-storage-and-administration-composition-layout.md)                      | Local SQLite Storage 与 Administration Composition 布局                            | Accepted                    |
+| [ADR-0281](./ADR-0281-source-bound-cross-architecture-linux-resource-release-evidence.md)                | 同源绑定的跨架构 Linux 资源发布证据                                                 | Accepted                    |
+| [ADR-0282](./ADR-0282-authenticated-local-plugin-package-workflow-run-inspection.md)                     | 受认证的本机 Plugin Package Workflow Run 查询                                      | Accepted                    |
+| [ADR-0283](./ADR-0283-authenticated-cluster-plugin-package-workflow-run-inspection.md)                   | 受认证的 Cluster Plugin Package Workflow Run 查询                                   | Accepted                    |
+| [ADR-0284](./ADR-0284-bounded-authenticated-package-bound-workflow-step-run-list.md)                     | 有界且受认证的 Package-bound Workflow StepRun 列表                                   | Accepted                    |
+| [ADR-0285](./ADR-0285-bounded-authenticated-package-bound-workflow-run-event-list.md)                    | 有界且受认证的 Package-bound Workflow RunEvent 时间线                                 | Accepted                    |
+| [ADR-0286](./ADR-0286-bounded-authenticated-package-bound-workflow-run-history.md)                       | 有界且受认证的 Package-bound Workflow Run 历史列表                                    | Accepted                    |
+| [ADR-0287](./ADR-0287-content-free-package-prompt-catalog.md)                                            | Content-free 的 Package Prompt 目录读取                                                | Accepted                    |
+| [ADR-0288](./ADR-0288-content-free-package-prompt-execution-inspection.md)                               | 按调用方 Request ID 精确读取 Content-free Package Prompt 执行状态                      | Accepted                    |
+| [ADR-0289](./ADR-0289-request-keyed-durable-package-prompt-output-recovery.md)                           | 按执行 Request ID 恢复并读取 Durable Package Prompt 输出                               | Accepted                    |
+| [ADR-0290](./ADR-0290-local-sqlite-completion-receipt-journal-collaborator.md)                           | Local SQLite Completion Receipt Journal 内部 Collaborator                              | Accepted                    |
+| [ADR-0291](./ADR-0291-local-sqlite-run-reader-internal-module.md)                                        | Local SQLite Run Reader 内部模块                                                        | Accepted                    |
+| [ADR-0292](./ADR-0292-local-sqlite-run-persistence-support-module.md)                                   | Local SQLite Run Persistence Support 内部模块                                           | Accepted                    |
+| [ADR-0293](./ADR-0293-local-sqlite-security-authority-store.md)                                        | Local SQLite Security Authority Store 与 Run Facade 解耦                                 | Accepted                    |
+| [ADR-0294](./ADR-0294-local-sqlite-domain-neutral-persistence-primitives.md)                            | Local SQLite 领域中立 Persistence Primitives                                             | Accepted                    |
+| [ADR-0295](./ADR-0295-shallow-profile-package-dependency-firewall-proof.md)                            | 浅层 Profile Package 的依赖防火墙证明                                                     | Accepted                    |
+| [ADR-0296](./ADR-0296-root-entrypoint-line-ratchet-and-local-admin-domain-entry.md)                    | 根入口行数棘轮与 Local Admin 领域入口                                                       | Accepted                    |
+| [ADR-0297](./ADR-0297-ai-root-implementation-domain-ownership.md)                                     | AI 根实现的领域归属与公开 Subpath 稳定性                                                     | Accepted                    |
+| [ADR-0298](./ADR-0298-local-sqlite-root-runtime-and-adoption-ownership.md)                            | Local SQLite 根 Runtime 与 Adoption 实现归属                                                  | Accepted                    |
+| [ADR-0299](./ADR-0299-cluster-control-root-composition-ownership.md)                                 | Cluster Control 根 Composition 实现归属                                                        | Accepted                    |
+| [ADR-0300](./ADR-0300-worker-runtime-application-composition-ownership.md)                         | Worker Runtime Application Composition 实现归属                                                  | Accepted                    |
+| [ADR-0301](./ADR-0301-cluster-admin-runtime-and-security-administration-ownership.md)             | Cluster Admin Runtime 与 Security Administration 实现归属                                         | Accepted                    |
+| [ADR-0302](./ADR-0302-local-owner-console-application-runtime-ownership.md)                       | Local Owner Console Application Runtime 实现归属                                                    | Accepted                    |
+| [ADR-0303](./ADR-0303-runtime-core-domain-infrastructure-layout.md)                               | Runtime Core 领域实现与基础设施端口归属                                                              | Accepted                    |
+| [ADR-0304](./ADR-0304-root-public-export-proof-and-owner-command-ownership.md)                    | 根 Public Export 纯转发证明与 Owner Command 实现归属                                                  | Accepted                    |
+| [ADR-0305](./ADR-0305-local-sqlite-run-facade-security-authority-retirement.md)                  | Local SQLite Run Facade 安全 Authority 兼容面退役                                                     | Accepted                    |
+| [ADR-0306](./ADR-0306-local-sqlite-run-runtime-capability-projection.md)                         | Local SQLite Run Runtime 最小能力投影                                                                 | Accepted                    |
+| [ADR-0307](./ADR-0307-bounded-durable-local-deployment-status.md)                               | 有界且诚实的本机部署持久状态                                                                           | Accepted                    |
+| [ADR-0308](./ADR-0308-local-application-startup-module-cohesion.md)                            | Local Application 启动模块内聚与 Profile 制品防火墙                                                     | Accepted                    |
+| [ADR-0309](./ADR-0309-deployment-owned-legacy-silence-commitment.md)                           | 部署侧 Legacy Silence Commitment 与 adopted v3 启动门                                                  | Accepted                    |
+| [ADR-0310](./ADR-0310-docker-target-start-restart-barrier.md)                                  | Docker Target 启动/重启屏障与人工终态                                                                  | Accepted                    |
+| [ADR-0311](./ADR-0311-local-owner-pepper-custody-package-consolidation.md)                     | Local Owner Pepper Custody 的 Package 收敛                                                             | Accepted                    |
+| [ADR-0312](./ADR-0312-profile-composition-subpath-consolidation.md)                            | Local Profile Composition 的 Subpath 收敛                                                              | Accepted                    |
+| [ADR-0313](./ADR-0313-instance-lineage-and-two-phase-cutover-manual-resolution.md)             | 实例 Cutover Lineage 与双阶段人工恢复                                                                  | Accepted                    |
+| [ADR-0314](./ADR-0314-docker-target-stop-and-reconciliation-evidence.md)                       | Docker Target Stop 与写后 Reconciliation 证据                                                        | Accepted                    |
+| [ADR-0315](./ADR-0315-two-phase-legacy-rollback-ceremony.md)                                  | 双阶段 Legacy Rollback Ceremony                                                                       | Accepted                    |
+| [ADR-0316](./ADR-0316-ai-migration-dialect-ownership.md)                                      | AI Migration 方言归属与包内拆分                                                                        | Accepted                    |
+| [ADR-0317](./ADR-0317-ai-migration-schema-group-ownership.md)                                 | AI Migration Schema Group 归属                                                                          | Accepted                    |
+| [ADR-0318](./ADR-0318-local-publisher-trust-contract-seam.md)                                 | Local Publisher Trust Contract Seam                                                                      | Accepted                    |
+| [ADR-0319](./ADR-0319-local-publisher-trust-codec-and-private-store.md)                        | Local Publisher Trust Codec 与 Private Filesystem Store                                                   | Accepted                    |
+| [ADR-0320](./ADR-0320-local-publisher-trust-lifecycle-ownership.md)                            | Local Publisher Trust Lifecycle Ownership                                                                 | Accepted                    |
+| [ADR-0321](./ADR-0321-plugin-package-install-domain-ownership.md)                              | Plugin Package Install 领域归属与 Package/Module 粒度                                                       | Accepted                    |
+| [ADR-0322](./ADR-0322-trusted-tool-invocation-domain-ownership.md)                             | Trusted Tool Invocation 领域归属                                                                            | Accepted                    |
+| [ADR-0323](./ADR-0323-local-sqlite-adoption-domain-ownership.md)                              | Local SQLite Adoption 领域归属                                                                               | Accepted                    |
+| [ADR-0324](./ADR-0324-local-owner-secret-delivery-domain-ownership.md)                        | Local Owner Secret Delivery 领域归属                                                                         | Accepted                    |
+| [ADR-0325](./ADR-0325-local-identity-credential-command-domain-ownership.md)                 | Local Identity Credential Command 领域归属                                                                    | Accepted                    |
+| [ADR-0326](./ADR-0326-local-plugin-package-prompt-command-domain-ownership.md)               | Local Plugin Package Prompt Command 领域归属                                                                   | Accepted                    |
+| [ADR-0327](./ADR-0327-local-plugin-package-workflow-command-domain-ownership.md)             | Local Plugin Package Workflow Command 领域归属                                                                 | Accepted                    |
+| [ADR-0328](./ADR-0328-runtime-core-workflow-administration-domain-ownership.md)              | Runtime Core Workflow Administration 领域归属                                                                   | Accepted                    |
+| [ADR-0329](./ADR-0329-local-sqlite-identity-credential-administration-domain-ownership.md)   | Local SQLite Identity Credential Administration 领域归属                                                        | Accepted                    |
+| [ADR-0330](./ADR-0330-local-model-invocation-repository-domain-ownership.md)                  | Local Model Invocation Repository 领域归属                                                                     | Accepted                    |
+| [ADR-0331](./ADR-0331-postgresql-model-invocation-repository-domain-ownership.md)             | PostgreSQL Model Invocation Repository 领域归属                                                                | Accepted                    |
+| [ADR-0332](./ADR-0332-local-plugin-package-prompt-admission-repository-domain-ownership.md)    | Local Plugin Package Prompt Admission Repository 领域归属                                                      | Accepted                    |
+| [ADR-0333](./ADR-0333-postgresql-plugin-package-prompt-admission-repository-domain-ownership.md) | PostgreSQL Plugin Package Prompt Admission Repository 领域归属                                                 | Accepted                    |
+| [ADR-0334](./ADR-0334-local-model-price-catalog-repository-domain-ownership.md)                 | Local Model Price Catalog Repository 领域归属                                                                 | Accepted                    |
+| [ADR-0335](./ADR-0335-postgresql-model-price-catalog-repository-domain-ownership.md)            | PostgreSQL Model Price Catalog Repository 领域归属                                                            | Accepted                    |
+| [ADR-0336](./ADR-0336-model-price-catalog-management-domain-ownership.md)                        | Model Price Catalog Management 领域归属                                                                        | Accepted                    |
+| [ADR-0337](./ADR-0337-plugin-package-prompt-execution-domain-ownership.md)                       | Plugin Package Prompt Execution 领域归属                                                                       | Accepted                    |
+| [ADR-0338](./ADR-0338-postgresql-model-provider-credential-test-connection-ownership.md)         | PostgreSQL Model Provider Credential Test Connection 领域归属                                                  | Accepted                    |
+| [ADR-0339](./ADR-0339-postgresql-plugin-package-prompt-application-ownership.md)                  | PostgreSQL Plugin Package Prompt Application 领域归属                                                         | Accepted                    |
+| [ADR-0340](./ADR-0340-model-invocation-protocol-ownership.md)                                    | Model Invocation Protocol 领域归属                                                                             | Accepted                    |
+| [ADR-0341](./ADR-0341-ai-profile-composition-ownership.md)                                       | AI Profile Composition 领域归属                                                                                | Accepted                    |
+| [ADR-0342](./ADR-0342-postgresql-model-provider-credential-repository-ownership.md)               | PostgreSQL Model Provider Credential Repository 领域归属                                                       | Accepted                    |
+| [ADR-0343](./ADR-0343-plugin-package-prompt-output-artifact-protocol-ownership.md)                  | Plugin Package Prompt Output Artifact 协议归属                                                                | Accepted                    |
+| [ADR-0344](./ADR-0344-model-provider-credential-test-connection-protocol-ownership.md)              | Model Provider Credential Test Connection 协议归属                                                           | Accepted                    |
+| [ADR-0345](./ADR-0345-tool-registry-protocol-ownership.md)                                           | Tool Registry 协议归属                                                                                       | Accepted                    |
+| [ADR-0346](./ADR-0346-bounded-local-runtime-artifact-pruning.md)                                     | 有界本机 Runtime Artifact 裁剪                                                                               | Accepted                    |
+| [ADR-0347](./ADR-0347-optional-authenticated-local-mcp-run-read.md)                                   | 可选、受认证的本机 MCP Run 读取入口                                                                         | Accepted                    |
+| [ADR-0348](./ADR-0348-bounded-local-mcp-run-event-list.md)                                             | 有界、低敏的本机 MCP Run 事件诊断                                                                           | Accepted                    |
+| [ADR-0349](./ADR-0349-bounded-local-mcp-project-run-discovery.md)                                      | 有界、Project-scoped 的本机 MCP Run 发现                                                                    | Accepted                    |
+| [ADR-0350](./ADR-0350-bounded-local-mcp-task-discovery.md)                                              | 有界、低敏的本机 MCP Task 发现                                                                               | Accepted                    |
+| [ADR-0351](./ADR-0351-mcp-only-tool-projection-ownership.md)                                            | MCP 单一消费者 Tool Projection 的包内归属                                                                    | Accepted                    |
+| [ADR-0352](./ADR-0352-bounded-local-mcp-trigger-discovery.md)                                           | 有界、低敏的本机 MCP Trigger 发现                                                                            | Accepted                    |
+| [ADR-0353](./ADR-0353-bounded-local-mcp-approval-observation.md)                                        | 有界、低敏的本机 MCP Approval 观察                                                                           | Accepted                    |
+| [ADR-0354](./ADR-0354-exact-local-mcp-approval-preview.md)                                               | 精确、双授权的本机 MCP Approval 预览                                                                          | Accepted                    |
+| [ADR-0355](./ADR-0355-human-approval-decision-product-gate.md)                                           | 强人类认证、摘要绑定的 Approval 决策产品门                                                                     | Accepted                    |
+| [ADR-0356](./ADR-0356-optional-authenticated-cluster-approval-management.md)                              | 可选、受认证且独立授权的 Cluster Approval 管理面                                                               | Accepted                    |
+| [ADR-0357](./ADR-0357-thin-package-root-and-stable-export-map.md)                                          | 薄 Package 根目录与稳定 Export Map                                                                              | Accepted                    |
+| [ADR-0358](./ADR-0358-runtime-package-manifest-projection.md)                                              | 最终运行制品的 Package Manifest 投影                                                                             | Accepted                    |
+| [ADR-0359](./ADR-0359-approval-management-kubernetes-live-evidence.md)                                     | Approval Management Kubernetes 多节点实证门                                                                      | Accepted                    |
+| [ADR-0360](./ADR-0360-production-worker-kubernetes-session-lifecycle-evidence.md)                           | Production Worker Kubernetes Session 生命周期实证门                                                              | Accepted                    |
+| [ADR-0361](./ADR-0361-durable-postgresql-ha-evidence-publication.md)                                         | PostgreSQL HA 证据的私有持久发布与离线审计                                                                         | Accepted                    |
+| [ADR-0362](./ADR-0362-dual-authority-system-service-bridge.md)                                                | systemd/OpenRC 双 Authority Service Bridge                                                                        | Proposed                    |
+| [ADR-0363](./ADR-0363-bounded-application-shutdown-receipt-and-physical-stop-evidence.md)                    | 有界 Application Shutdown Receipt 与物理 Service Stop 证据                                                        | Proposed                    |
+| [ADR-0364](./ADR-0364-package-internal-source-layout-ratchet.md)                                              | Package 内部源码布局 Ratchet                                                                                        | Accepted                    |
+| [ADR-0365](./ADR-0365-bounded-unified-local-product-cli.md)                                                   | 有界统一 Local 产品 CLI                                                                                              | Accepted                    |
+| [ADR-0366](./ADR-0366-thin-package-boundary-ratchet.md)                                                        | 薄 Package 边界 Ratchet                                                                                              | Accepted                    |
+| [ADR-0367](./ADR-0367-single-process-authenticated-local-run-http-api.md)                                      | 单进程、受认证的 Local Run HTTP API                                                                                   | Proposed（实现完成，固定实机门待补） |
+| [ADR-0368](./ADR-0368-bounded-project-run-discovery-http-api.md)                                               | 有界、Project-scoped 的 Run Discovery HTTP API                                                                         | Proposed                    |
+| [ADR-0369](./ADR-0369-profile-exact-runtime-export-projection.md)                                              | Profile 精确 Runtime Export 投影                                                                                        | Accepted                    |
+| [ADR-0370](./ADR-0370-bounded-project-run-event-timeline-http-api.md)                                          | 有界、Project-scoped 的 RunEvent 时间线 HTTP API                                                                         | Accepted                    |
+| [ADR-0371](./ADR-0371-bounded-project-run-step-list-http-and-mcp-api.md)                                       | 有界、Project-scoped 的 Run StepRun HTTP 与 MCP API                                                                       | Accepted                    |
+| [ADR-0372](./ADR-0372-two-phase-authenticated-local-run-cancellation-api.md)                                   | 两阶段认证的 Local Run Cancellation API                                                                                   | Proposed（实现完成，固定实机 API/进程 stop 门待补） |
+| [ADR-0373](./ADR-0373-profile-reachable-runtime-javascript-projection.md)                                      | Profile 可达的 Runtime JavaScript 投影                                                                                     | Accepted                     |
+| [ADR-0374](./ADR-0374-shared-bounded-task-discovery-http-api.md)                                               | 共享、有界的 Task Discovery HTTP API                                                                                       | Accepted |
+| [ADR-0375](./ADR-0375-shared-current-task-point-read-api.md)                                                   | 共享的 current Task point-read API                                                                                         | Proposed（设计冻结，实现中） |
+
+## 规则
+
+1. ADR 只决定一个边界清晰的问题。
+2. ADR 必须说明上下文、决策、替代方案、影响和验证方式。
+3. Accepted ADR 不直接改写历史；改变决策时新增 ADR 并标记 supersedes。
+4. ADR 不能静默违反主 RFC 的核心决策和架构不变量。
+5. 业务实现 PR 应链接对应 ADR，并用测试证明关键约束。

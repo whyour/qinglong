@@ -1,0 +1,196 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ql3-automation-management-client
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-automation-management-client
+    app.kubernetes.io/component: automation-management-client
+    app.kubernetes.io/part-of: qinglong3
+    qinglong.io/execution-model: caller-driven
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ql3-automation-management-client
+        app.kubernetes.io/component: automation-management-client
+        app.kubernetes.io/part-of: qinglong3
+        qinglong.io/execution-model: caller-driven
+        qinglong.io/automation-management-client: 'true'
+    spec:
+      serviceAccountName: ql3-automation-management-client
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-manager
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - -e
+          args:
+            - |
+              const fs = require('node:fs');
+              const https = require('node:https');
+              const host = 'ql3-automation-management.qinglong3-system.svc';
+              const ca = fs.readFileSync('/var/run/qinglong3/automation-management-trust/ca.crt');
+              const cert = fs.readFileSync('/var/run/secrets/qinglong3/automation-management-client-identity/tls.crt');
+              const key = fs.readFileSync('/var/run/secrets/qinglong3/automation-management-client-identity/tls.key');
+              const probe = () => new Promise((resolve, reject) => {
+                const request = https.request({
+                  host,
+                  port: 8445,
+                  path: '/readyz',
+                  method: 'GET',
+                  servername: host,
+                  ca,
+                  cert,
+                  key,
+                  minVersion: 'TLSv1.3',
+                  maxVersion: 'TLSv1.3',
+                  rejectUnauthorized: true,
+                  agent: false,
+                  headers: { connection: 'close' },
+                }, (response) => {
+                  response.resume();
+                  response.once('end', () =>
+                    response.statusCode === 200
+                      ? resolve()
+                      : reject(new Error('manager not ready')));
+                });
+                request.setTimeout(3000, () => request.destroy(new Error('timeout')));
+                request.once('error', reject);
+                request.end();
+              });
+              (async () => {
+                for (let attempt = 1; attempt <= 30; attempt += 1) {
+                  try {
+                    await probe();
+                    return;
+                  } catch {
+                    if (attempt === 30) throw new Error('manager readiness unavailable');
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                  }
+                }
+              })().catch((error) => {
+                process.stderr.write(`${error.message}\n`);
+                process.exitCode = 1;
+              });
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: trust
+              mountPath: /var/run/qinglong3/automation-management-trust
+              readOnly: true
+            - name: client-identity
+              mountPath: /var/run/secrets/qinglong3/automation-management-client-identity
+              readOnly: true
+      containers:
+        - name: client
+          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -eu
+              umask 077
+              cp /var/run/secrets/qinglong3/automation-management-request/client.json /tmp/client.json
+              cp /var/run/secrets/qinglong3/automation-management-request/command.json /tmp/command.json
+              cp /var/run/secrets/qinglong3/automation-management-assertion/assertion.jwt /tmp/assertion.jwt
+              cp /var/run/qinglong3/automation-management-trust/ca.crt /tmp/ca.crt
+              cp /var/run/secrets/qinglong3/automation-management-client-identity/tls.crt /tmp/client.crt
+              cp /var/run/secrets/qinglong3/automation-management-client-identity/tls.key /tmp/client.key
+              chmod 600 /tmp/client.json /tmp/command.json /tmp/assertion.jwt /tmp/ca.crt /tmp/client.crt /tmp/client.key
+              exec node /opt/qinglong/node_modules/@qinglong/cluster-admin/dist/automation-management/automationManagementClientCli.js \
+                --config=/tmp/client.json \
+                --command=/tmp/command.json \
+                --assertion=/tmp/assertion.jwt
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 48Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: request
+              mountPath: /var/run/secrets/qinglong3/automation-management-request
+              readOnly: true
+            - name: assertion
+              mountPath: /var/run/secrets/qinglong3/automation-management-assertion
+              readOnly: true
+            - name: trust
+              mountPath: /var/run/qinglong3/automation-management-trust
+              readOnly: true
+            - name: client-identity
+              mountPath: /var/run/secrets/qinglong3/automation-management-client-identity
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Mi
+        - name: request
+          secret:
+            secretName: ql3-automation-management-request
+            defaultMode: 288
+            items:
+              - key: client.json
+                path: client.json
+              - key: command.json
+                path: command.json
+        - name: assertion
+          secret:
+            secretName: ql3-automation-management-assertion
+            defaultMode: 288
+            items:
+              - key: assertion.jwt
+                path: assertion.jwt
+        - name: trust
+          configMap:
+            name: ql3-automation-management-client-trust
+            defaultMode: 292
+            items:
+              - key: ca.crt
+                path: ca.crt
+        - name: client-identity
+          secret:
+            secretName: ql3-automation-management-client-identity
+            defaultMode: 288
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key

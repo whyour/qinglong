@@ -11,6 +11,8 @@ export enum InstanceStatus {
 export interface RunningInstanceAttributes {
   id?: number;
   cron_id: number;
+  run_id?: string | null;
+  attempt_id?: string | null;
   pid?: number;
   log_path?: string;
   started_at: number;
@@ -22,6 +24,8 @@ export interface RunningInstanceAttributes {
 export class RunningInstance {
   id?: number;
   cron_id!: number;
+  run_id?: string | null;
+  attempt_id?: string | null;
   pid?: number;
   log_path?: string;
   started_at!: number;
@@ -32,6 +36,8 @@ export class RunningInstance {
   constructor(options: RunningInstanceAttributes) {
     this.id = options.id;
     this.cron_id = options.cron_id;
+    this.run_id = options.run_id;
+    this.attempt_id = options.attempt_id;
     this.pid = options.pid;
     this.log_path = options.log_path;
     this.started_at = options.started_at;
@@ -51,6 +57,15 @@ export const RunningInstanceModel = sequelize.define<RunningInstanceModel>(
     cron_id: {
       type: DataTypes.NUMBER,
       allowNull: false,
+    },
+    run_id: {
+      type: DataTypes.STRING(36),
+      allowNull: true,
+    },
+    attempt_id: {
+      type: DataTypes.STRING(36),
+      allowNull: true,
+      unique: 'running_instances_attempt_uidx',
     },
     pid: {
       type: DataTypes.NUMBER,

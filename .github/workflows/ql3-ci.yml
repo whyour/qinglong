@@ -1,0 +1,1046 @@
+name: QingLong 3.0 CI
+
+on:
+  push:
+    branches:
+      - next
+  pull_request:
+    branches:
+      - next
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ql3-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (${{ matrix.arch }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+            node: '20'
+          - runner: ubuntu-24.04
+            arch: x64
+            node: '24'
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            node: '20'
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            node: '24'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test backend migrations
+        run: pnpm test:back
+      - name: Build backend
+        run: pnpm build:back
+      - name: Audit edge dependency and import isolation
+        run: |
+          pnpm audit:edge-imports:ql3
+          pnpm audit:cluster-dependencies:ql3
+          pnpm audit:cluster-deployment:ql3
+      - name: Smoke benchmark edge executor
+        run: pnpm benchmark:edge -- --json
+      - name: Prove disabled AI Profile has zero storage or credential reachability
+        if: matrix.node == '24'
+        run: >-
+          pnpm benchmark:ai-profile --
+          --json
+          --max-rss-delta-mb=8
+          --max-disabled-activation-ms=50
+      - name: Benchmark Node SQLite transaction boundary
+        if: matrix.node == '24'
+        run: >-
+          pnpm benchmark:db:node-sqlite --
+          --json
+          --iterations=250
+          --batch-size=10
+          --max-transaction-p95-ms=250
+          --max-batch-stall-ms=2500
+          --max-rss-delta-mb=64
+      - name: Enforce bounded receipt maintenance under edge budget
+        run: >-
+          docker run --rm
+          --memory=256m
+          --memory-swap=256m
+          --cpus=1
+          --pids-limit=128
+          --volume "${{ github.workspace }}:/workspace:ro"
+          --workdir /workspace
+          node:${{ matrix.node }}-bookworm-slim
+          node --test test/back/completionReceiptOrphanAuditor.test.cjs
+
+  service-manager-bridge:
+    name: systemd/OpenRC dual-authority bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build and test Local Owner product closure
+        run: pnpm --filter @qinglong/local-owner-cli test
+      - name: Audit root bridge static import closure
+        run: pnpm audit:service-manager-bridge-imports:ql3
+      - name: Run real systemd/OpenRC root and non-root bridge gate
+        run: pnpm test:service-manager-bridge:ql3
+
+  linux-resource-envelopes:
+    name: Linux resource envelopes (${{ matrix.arch }}, Node 24)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build benchmark targets once
+        run: |
+          pnpm build:back
+          pnpm run build:packages:ql3
+      - name: Test fail-closed Linux resource gate
+        run: node --test test/back/ql3LinuxResourceGate.test.cjs test/back/ql3LinuxResourceWorkflow.test.cjs test/back/ql3PhysicalEdgeEvidence.test.cjs test/back/ql3PhysicalEdgeIdleSampler.test.cjs test/back/ql3PhysicalEdgeFaultProbe.test.cjs test/back/ql3PhysicalEdgeTaskScale.test.cjs
+      - name: Prepare architecture evidence directory
+        run: mkdir -p "${RUNNER_TEMP}/ql3-linux-resource-evidence"
+      - name: Stress router headroom without claiming a supported minimum
+        run: >-
+          docker run --rm --read-only
+          --security-opt no-new-privileges
+          --user 65532:65532
+          --memory=128m
+          --memory-swap=128m
+          --cpus=0.5
+          --pids-limit=64
+          --tmpfs /tmp:rw,nosuid,nodev,noexec,mode=1777,size=64m
+          --volume "${{ github.workspace }}:/workspace:ro"
+          --workdir /workspace
+          node:24.18.0-bookworm-slim
+          node scripts/ql3-linux-resource-gate.cjs
+          --tier=router-stress-ci
+          --expected-arch=${{ matrix.arch }}
+          --json
+          > "${RUNNER_TEMP}/ql3-linux-resource-evidence/router-stress-ci.json"
+      - name: Enforce the emulated edge release envelope
+        run: >-
+          docker run --rm --read-only
+          --security-opt no-new-privileges
+          --user 65532:65532
+          --memory=256m
+          --memory-swap=256m
+          --cpus=1
+          --pids-limit=128
+          --tmpfs /tmp:rw,nosuid,nodev,noexec,mode=1777,size=64m
+          --volume "${{ github.workspace }}:/workspace:ro"
+          --workdir /workspace
+          node:24.18.0-bookworm-slim
+          node scripts/ql3-linux-resource-gate.cjs
+          --tier=edge-release-ci
+          --expected-arch=${{ matrix.arch }}
+          --json
+          > "${RUNNER_TEMP}/ql3-linux-resource-evidence/edge-release-ci.json"
+      - name: Enforce the cluster control-plane guard independently
+        run: >-
+          docker run --rm --read-only
+          --security-opt no-new-privileges
+          --user 65532:65532
+          --memory=512m
+          --memory-swap=512m
+          --cpus=2
+          --pids-limit=256
+          --tmpfs /tmp:rw,nosuid,nodev,noexec,mode=1777,size=32m
+          --volume "${{ github.workspace }}:/workspace:ro"
+          --workdir /workspace
+          node:24.18.0-bookworm-slim
+          node scripts/ql3-linux-resource-gate.cjs
+          --tier=cluster-control-ci
+          --expected-arch=${{ matrix.arch }}
+          --json
+          > "${RUNNER_TEMP}/ql3-linux-resource-evidence/cluster-control-ci.json"
+      - name: Bind native resource evidence to this workflow run
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_REVISION: ${{ github.sha }}
+          SOURCE_WORKFLOW: ${{ github.workflow }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: >-
+          node scripts/ql3-linux-resource-release-evidence.cjs
+          --mode=bundle
+          --repository="${SOURCE_REPOSITORY}"
+          --revision="${SOURCE_REVISION}"
+          --workflow="${SOURCE_WORKFLOW}"
+          --run-id="${SOURCE_RUN_ID}"
+          --run-attempt="${SOURCE_RUN_ATTEMPT}"
+          --architecture="${{ matrix.arch }}"
+          --router-stress-ci="${RUNNER_TEMP}/ql3-linux-resource-evidence/router-stress-ci.json"
+          --edge-release-ci="${RUNNER_TEMP}/ql3-linux-resource-evidence/edge-release-ci.json"
+          --cluster-control-ci="${RUNNER_TEMP}/ql3-linux-resource-evidence/cluster-control-ci.json"
+          --output="${RUNNER_TEMP}/ql3-linux-resource-evidence/${{ matrix.arch }}.json"
+      - name: Upload native resource evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-linux-resource-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/ql3-linux-resource-evidence/${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+
+  linux-resource-release-evidence:
+    name: Cross-architecture Linux resource release evidence
+    needs: linux-resource-envelopes
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download native x64 resource evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-linux-resource-${{ github.run_id }}-${{ github.run_attempt }}-x64
+          path: ${{ runner.temp }}/ql3-linux-resource-evidence/x64
+      - name: Download native arm64 resource evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-linux-resource-${{ github.run_id }}-${{ github.run_attempt }}-arm64
+          path: ${{ runner.temp }}/ql3-linux-resource-evidence/arm64
+      - name: Merge source-bound cross-architecture evidence
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_REVISION: ${{ github.sha }}
+          SOURCE_WORKFLOW: ${{ github.workflow }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: >-
+          node scripts/ql3-linux-resource-release-evidence.cjs
+          --mode=merge
+          --repository="${SOURCE_REPOSITORY}"
+          --revision="${SOURCE_REVISION}"
+          --workflow="${SOURCE_WORKFLOW}"
+          --run-id="${SOURCE_RUN_ID}"
+          --run-attempt="${SOURCE_RUN_ATTEMPT}"
+          --x64="${RUNNER_TEMP}/ql3-linux-resource-evidence/x64/x64.json"
+          --arm64="${RUNNER_TEMP}/ql3-linux-resource-evidence/arm64/arm64.json"
+          --output="${RUNNER_TEMP}/ql3-linux-resource-evidence/cross-architecture.json"
+      - name: Upload cross-architecture resource release evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-linux-resource-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-linux-resource-evidence/cross-architecture.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+
+  supply-chain:
+    name: Profile supply-chain gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Test bounded fail-closed audit classifier
+        run: >-
+          node --test
+          test/back/ql3ProfileVulnerabilityAudit.test.cjs
+          test/back/ql3ClusterImageSbom.test.cjs
+          test/back/ql3ClusterImageReleaseAudit.test.cjs
+          test/back/ql3ImageOsVulnerabilityPolicy.test.cjs
+          test/back/ql3LocalImageAudit.test.cjs
+      - name: Audit cluster image release contract
+        run: |
+          pnpm audit:image-release:ql3
+          pnpm audit:local-image:ql3
+      - name: Reject high or critical advisories in 3.0 Profile importers
+        run: pnpm audit:profiles:ql3
+
+  local-image:
+    name: Local application image (${{ matrix.image_arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            node_arch: x64
+            image_arch: amd64
+          - runner: ubuntu-24.04-arm
+            node_arch: arm64
+            image_arch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.node_arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit immutable local image inputs
+        run: |
+          node --test test/back/ql3LocalImageAudit.test.cjs
+          pnpm audit:local-image:ql3
+      - name: Build the native AI-excluded image
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+        run: >-
+          docker build
+          --file deploy/containers/ql3-local-application/Dockerfile
+          --build-arg SOURCE_REVISION=${{ github.sha }}
+          --tag "${IMAGE}"
+          .
+      - name: Materialize the reviewed local OS vulnerability exceptions
+        run: >-
+          node scripts/ql3-image-os-vulnerability-policy.cjs
+          --image=local
+          --output=${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml
+      - name: Reject unexcepted high or critical local OS vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: qinglong3-local-application:ci-${{ matrix.image_arch }}
+          scanners: 'vuln'
+          vuln-type: 'os'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: 'false'
+          exit-code: '1'
+          format: 'table'
+          hide-progress: 'true'
+          timeout: '10m0s'
+          cache: 'false'
+          trivyignores: ${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml
+      - name: Verify non-root identity and architecture
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+          EXPECTED: ${{ matrix.image_arch }} 65532:65532 2 37 37 37 1
+        run: |
+          set -euo pipefail
+          actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.local.application-config"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-min"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-max"}} {{index .Config.Labels "io.qinglong.local.sqlite-write-contract"}} {{index .Config.Labels "io.qinglong.local.compose-selection"}}' "${IMAGE}")"
+          if [[ "${actual}" != "${EXPECTED}" ]]; then
+            echo "unexpected image contract: ${actual}" >&2
+            exit 1
+          fi
+      - name: Reconcile the exact production package inventory
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+        run: >-
+          docker run --rm --read-only
+          --network none
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --volume "${{ github.workspace }}:/audit:ro"
+          --workdir /audit
+          --entrypoint node
+          "${IMAGE}"
+          scripts/ql3-local-image-inventory.cjs
+          --inventory-root=/opt/qinglong/node_modules
+      - name: Generate and reconcile the reviewed CycloneDX SBOM
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+        run: |
+          node scripts/ql3-cluster-image-sbom.cjs \
+            --image=local \
+            --output="${{ runner.temp }}/ql3-local-application.cdx.json"
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --volume "${{ github.workspace }}:/audit:ro" \
+            --workdir /audit \
+            --entrypoint node \
+            "${IMAGE}" \
+            scripts/ql3-cluster-image-sbom.cjs \
+            --image=local \
+            --inventory-root=/opt/qinglong/node_modules
+      - name: Exercise the entrypoint under the router stress envelope
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+        run: >-
+          docker run --rm --read-only
+          --network none
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --memory=128m
+          --memory-swap=128m
+          --cpus=0.5
+          --pids-limit=64
+          --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m
+          "${IMAGE}"
+          --help
+      - name: Build the short-lived fresh deployment authority
+        working-directory: packages/ql3-local-owner-cli
+        run: node ../../scripts/ql3-build-package-closure.cjs
+      - name: Run fresh Edge and Standalone SQLite lifecycles
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+        run: |
+          node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=edge
+          node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=standalone
+
+  cluster-image:
+    name: Cluster ${{ matrix.image }} image (${{ matrix.image_arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            node_arch: x64
+            image_arch: amd64
+            image: control
+            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
+            target: runtime
+          - runner: ubuntu-24.04-arm
+            node_arch: arm64
+            image_arch: arm64
+            image: control
+            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
+            target: runtime
+          - runner: ubuntu-24.04
+            node_arch: x64
+            image_arch: amd64
+            image: control-ai
+            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
+            target: runtime-ai
+          - runner: ubuntu-24.04-arm
+            node_arch: arm64
+            image_arch: arm64
+            image: control-ai
+            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
+            target: runtime-ai
+          - runner: ubuntu-24.04
+            node_arch: x64
+            image_arch: amd64
+            image: admin
+            dockerfile: deploy/containers/ql3-cluster-admin/Dockerfile
+            target: runtime
+          - runner: ubuntu-24.04-arm
+            node_arch: arm64
+            image_arch: arm64
+            image: admin
+            dockerfile: deploy/containers/ql3-cluster-admin/Dockerfile
+            target: runtime
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.node_arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Test exact SBOM and release contract failures
+        run: node --test test/back/ql3ClusterImageSbom.test.cjs test/back/ql3ClusterImageReleaseAudit.test.cjs
+      - name: Audit deployment and image release contracts
+        run: |
+          pnpm audit:cluster-deployment:ql3
+          pnpm audit:image-release:ql3
+      - name: Build the native production image
+        env:
+          IMAGE: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
+        run: >-
+          docker build
+          --file ${{ matrix.dockerfile }}
+          --target ${{ matrix.target }}
+          --build-arg SOURCE_REVISION=${{ github.sha }}
+          --tag "${IMAGE}"
+          .
+      - name: Materialize the reviewed Cluster OS vulnerability exceptions
+        run: >-
+          node scripts/ql3-image-os-vulnerability-policy.cjs
+          --image=${{ matrix.image }}
+          --output=${{ runner.temp }}/ql3-${{ matrix.image }}-${{ matrix.image_arch }}.trivyignore.yaml
+      - name: Reject unexcepted high or critical Cluster OS vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
+          scanners: 'vuln'
+          vuln-type: 'os'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: 'false'
+          exit-code: '1'
+          format: 'table'
+          hide-progress: 'true'
+          timeout: '10m0s'
+          cache: 'false'
+          trivyignores: ${{ runner.temp }}/ql3-${{ matrix.image }}-${{ matrix.image_arch }}.trivyignore.yaml
+      - name: Verify architecture and non-root runtime identity
+        env:
+          IMAGE: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
+          EXPECTED: ${{ matrix.image_arch }} 10001:10001
+        run: |
+          set -euo pipefail
+          actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}}' "${IMAGE}")"
+          if [[ "${actual}" != "${EXPECTED}" ]]; then
+            echo "unexpected image contract: ${actual}" >&2
+            exit 1
+          fi
+      - name: Generate the reviewed application SBOM
+        run: >-
+          node scripts/ql3-cluster-image-sbom.cjs
+          --image=${{ matrix.image }}
+          --output=${{ runner.temp }}/ql3-cluster-${{ matrix.image }}.cdx.json
+      - name: Reconcile SBOM with the actual read-only image inventory
+        env:
+          IMAGE: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
+        run: >-
+          docker run --rm --read-only
+          --security-opt no-new-privileges
+          --user 10001:10001
+          --volume "${{ github.workspace }}:/audit:ro"
+          --workdir /audit
+          --entrypoint node
+          "${IMAGE}"
+          scripts/ql3-cluster-image-sbom.cjs
+          --image=${{ matrix.image }}
+          --inventory-root=/opt/qinglong/node_modules
+
+  image-oci:
+    name: ${{ matrix.image }} multi-architecture OCI evidence
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: control
+            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
+            target: runtime
+          - image: control-ai
+            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
+            target: runtime-ai
+          - image: admin
+            dockerfile: deploy/containers/ql3-cluster-admin/Dockerfile
+            target: runtime
+          - image: local
+            dockerfile: deploy/containers/ql3-local-application/Dockerfile
+            target: runtime
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - name: Test bounded OCI layout audit failures
+        run: node --test test/back/ql3ClusterOciLayoutAudit.test.cjs
+      - name: Build an attested amd64 and arm64 OCI layout
+        run: >-
+          docker buildx build
+          --platform linux/amd64,linux/arm64
+          --file ${{ matrix.dockerfile }}
+          --target ${{ matrix.target }}
+          --build-arg SOURCE_REVISION=${{ github.sha }}
+          --attest type=provenance,mode=max
+          --attest type=sbom
+          --output type=oci,dest=${{ runner.temp }}/ql3-${{ matrix.image }}.oci.tar
+          .
+      - name: Audit both image manifests and bound attestations
+        run: |
+          mkdir "${{ runner.temp }}/ql3-${{ matrix.image }}-oci"
+          tar -xf "${{ runner.temp }}/ql3-${{ matrix.image }}.oci.tar" \
+            -C "${{ runner.temp }}/ql3-${{ matrix.image }}-oci"
+          node scripts/ql3-cluster-oci-layout-audit.cjs \
+            --image="${{ matrix.image }}" \
+            --layout="${{ runner.temp }}/ql3-${{ matrix.image }}-oci" \
+            --expected-revision="${{ github.sha }}"
+
+  worker-runtime:
+    name: Worker runtime (${{ matrix.arch }}, Node 24)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit profile dependency boundaries
+        run: |
+          pnpm audit:edge-imports:ql3
+          pnpm audit:cluster-dependencies:ql3
+      - name: Build QL3 workspace once
+        run: pnpm run build:packages:ql3
+      - name: Test local identity, atomic install and explicit renewal
+        run: node --test packages/ql3-worker-runtime/test/*.test.cjs
+
+  local-profiles:
+    name: Local Profiles (${{ matrix.arch }}, Node 24)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit exact Profile dependency and import boundaries
+        run: pnpm audit:cluster-dependencies:ql3
+      - name: Test bounded QL3 artifact cleanup scope
+        run: node --test test/back/ql3CleanPackageArtifacts.test.cjs
+      - name: Build once and test all QL3 packages
+        run: pnpm run test:packages:ql3
+      - name: Exercise Owner authorities as root in a read-only container
+        run: >-
+          docker run --rm --read-only
+          --memory=192m
+          --memory-swap=192m
+          --cpus=1
+          --pids-limit=64
+          --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=64m
+          --volume "${{ github.workspace }}:/workspace:ro"
+          --workdir /workspace
+          node:24.18.0-bookworm-slim
+          node --test --test-concurrency=1
+          packages/ql3-local-command-file/test/*.test.cjs
+          packages/ql3-local-owner-*/test/*.test.cjs
+      - name: Exercise Owner authorities as non-root in a read-only container
+        run: >-
+          docker run --rm --read-only
+          --user 65532:65532
+          --memory=192m
+          --memory-swap=192m
+          --cpus=1
+          --pids-limit=64
+          --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=64m
+          --volume "${{ github.workspace }}:/workspace:ro"
+          --workdir /workspace
+          node:24.18.0-bookworm-slim
+          node --test --test-concurrency=1
+          packages/ql3-local-command-file/test/*.test.cjs
+          packages/ql3-local-owner-*/test/*.test.cjs
+      - name: Build and audit production-only local Profile artifacts
+        run: |
+          pnpm audit:artifact:edge:ql3
+          pnpm audit:artifact:standalone:ql3
+          pnpm audit:artifact:edge-adopted:ql3
+          pnpm audit:artifact:standalone-adopted:ql3
+          pnpm audit:artifact:edge-application:ql3
+          pnpm audit:artifact:standalone-application:ql3
+          pnpm audit:artifact:edge-application-api:ql3
+          pnpm audit:artifact:standalone-application-api:ql3
+          pnpm audit:artifact:edge-ai:ql3
+          pnpm audit:artifact:standalone-ai:ql3
+
+  cluster-postgres:
+    name: Cluster PostgreSQL ${{ matrix.postgres }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+            postgres: '16'
+          - runner: ubuntu-24.04
+            arch: x64
+            postgres: '18'
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            postgres: '16'
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            postgres: '18'
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_DB: ql3_contract
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ql3_contract"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit exact cluster dependency graph
+        run: pnpm audit:cluster-dependencies:ql3
+      - name: Build QL3 workspace once
+        run: pnpm run build:packages:ql3
+      - name: Test profile-neutral runtime contracts
+        run: node --test packages/ql3-runtime-core/test/*.test.cjs
+      - name: Test optional bounded AI gateway and remote provider contracts
+        run: node --test packages/ql3-ai/test/*.test.cjs
+      - name: Build and test lazy pg.Pool binding
+        run: node --test packages/ql3-cluster-postgres/test/*.test.cjs
+      - name: Test readiness-first cluster composition root
+        run: node --test packages/ql3-cluster-control/test/*.test.cjs
+      - name: Test isolated short-lived cluster administration root
+        run: node --test packages/ql3-cluster-admin/test/*.test.cjs
+      - name: Provision unprivileged database roles before migration
+        run: |
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_migration LOGIN PASSWORD 'ql3_migration_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_runtime LOGIN PASSWORD 'ql3_runtime_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_admin LOGIN PASSWORD 'ql3_admin_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_automation_manager LOGIN PASSWORD 'ql3_automation_manager_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_package_manager LOGIN PASSWORD 'ql3_package_manager_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_package_executor LOGIN PASSWORD 'ql3_package_executor_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_worker_credential_manager LOGIN PASSWORD 'ql3_worker_credential_manager_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_worker_credential_executor LOGIN PASSWORD 'ql3_worker_credential_executor_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_worker_ingress LOGIN PASSWORD 'ql3_worker_ingress_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER DATABASE ql3_contract OWNER TO ql3_migration"
+      - name: Create schema and exact grants through the reviewed migration stream
+        env:
+          QL3_TEST_POSTGRES_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
+        run: node --test packages/ql3-cluster-postgres/test/postgres.integration.test.cjs
+      - name: Test readiness, isolated roles, shared Repositories, rollback and SQLSTATE mapping
+        env:
+          QL3_TEST_POSTGRES_MIGRATION_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_RUNTIME_URL: postgresql://ql3_runtime:ql3_runtime_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_ADMIN_URL: postgresql://ql3_admin:ql3_admin_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_AUTOMATION_MANAGER_URL: postgresql://ql3_automation_manager:ql3_automation_manager_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_PACKAGE_MANAGER_URL: postgresql://ql3_package_manager:ql3_package_manager_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_PACKAGE_EXECUTOR_URL: postgresql://ql3_package_executor:ql3_package_executor_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_WORKER_INGRESS_URL: postgresql://ql3_worker_ingress:ql3_worker_ingress_test@127.0.0.1:5432/ql3_contract
+        run: node --test packages/ql3-cluster-postgres/test/postgres.integration.test.cjs
+      - name: Test automation management concurrency and post-commit response loss over mTLS
+        env:
+          QL3_TEST_POSTGRES_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_AUTOMATION_MANAGER_URL: postgresql://ql3_automation_manager:ql3_automation_manager_test@127.0.0.1:5432/ql3_contract
+        run: pnpm --filter @qinglong/cluster-admin test:automation-integration
+      - name: Test bootstrap-owned cluster recovery before admission
+        env:
+          QL3_TEST_POSTGRES_MIGRATION_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_RUNTIME_URL: postgresql://ql3_runtime:ql3_runtime_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_WORKER_INGRESS_URL: postgresql://ql3_worker_ingress:ql3_worker_ingress_test@127.0.0.1:5432/ql3_contract
+        run: node --test packages/ql3-cluster-control/test/postgres.integration.test.cjs
+      - name: Test optional AI invocation and price catalog against isolated roles
+        env:
+          QL3_TEST_POSTGRES_MIGRATION_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_RUNTIME_URL: postgresql://ql3_runtime:ql3_runtime_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_ADMIN_URL: postgresql://ql3_admin:ql3_admin_test@127.0.0.1:5432/ql3_contract
+        run: >-
+          node --test --test-concurrency=1
+          packages/ql3-ai/test/postgresModelInvocationRepository.integration.test.cjs
+          packages/ql3-ai/test/postgresModelPriceCatalogRepository.integration.test.cjs
+
+  cluster-postgres-ha:
+    name: PostgreSQL 18 physical promotion (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit exact cluster dependency graph
+        run: pnpm audit:cluster-dependencies:ql3
+      - name: Rotate PostgreSQL TLS trust through overlap and rollback
+        run: pnpm test:postgres-tls-rotation:ql3
+      - name: Fence the old primary, promote the standby and reactivate two controls
+        env:
+          QL3_HA_REPORT: ${{ runner.temp }}/ql3-postgres-ha/report.json
+        run: |
+          install -d -m 0700 "${RUNNER_TEMP}/ql3-postgres-ha"
+          pnpm test:postgres-ha:ql3
+          pnpm audit:postgres-ha-evidence:ql3 -- \
+            --report="${RUNNER_TEMP}/ql3-postgres-ha/report.json"
+      - name: Upload PostgreSQL HA evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-postgres-ha-${{ matrix.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-postgres-ha/report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  cluster-cloudnativepg-live:
+    name: CloudNativePG live failover contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install verified kind v0.31.0
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kind-linux-amd64 \
+            https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+          curl --fail --location --silent --show-error \
+            --output kind.sha256sum \
+            https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64.sha256sum
+          sha256sum --check kind.sha256sum
+          chmod +x kind-linux-amd64
+      - name: Install verified kubectl v1.32.8
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kubectl \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output kubectl.sha256 \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl.sha256
+          test "$(cat kubectl.sha256)" = "$(sha256sum kubectl | cut -d ' ' -f 1)"
+          chmod +x kubectl
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit the locked CloudNativePG deployment contract
+        run: |
+          pnpm audit:cloudnativepg:ql3
+          pnpm audit:cloudnativepg-backup:ql3
+          pnpm audit:barman-cloud-supply-chain:ql3
+          pnpm audit:cert-manager-selection:ql3
+          kubectl kustomize deploy/kubernetes/ql3-cluster/operations/cloudnative-pg-restore >/dev/null
+      - name: Prove operator, roles, migration, runtime and fenced node failover
+        env:
+          QL3_CLOUDNATIVEPG_LIVE: '1'
+          QL3_KIND_BIN: ${{ github.workspace }}/kind-linux-amd64
+          QL3_KUBECTL_BIN: ${{ github.workspace }}/kubectl
+          QL3_KIND_CLUSTER: ql3-cnpg-ci
+        run: pnpm test:cloudnativepg-live:ql3
+
+  cluster-provider-credential-test-kubernetes-live:
+    name: Provider credential test K3s and CloudNativePG live contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install verified kubectl v1.34.3
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kubectl \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output kubectl.sha256 \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl.sha256
+          test "$(cat kubectl.sha256)" = "$(sha256sum kubectl | cut -d ' ' -f 1)"
+          chmod +x kubectl
+      - name: Fetch locked K3s and CloudNativePG release manifest
+        run: |
+          docker pull rancher/k3s:v1.34.3-k3s1
+          curl --fail --location --silent --show-error \
+            --output cnpg-1.30.0.yaml \
+            https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml
+          echo "f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88  cnpg-1.30.0.yaml" | sha256sum --check
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Audit the static provider credential test deployment
+        run: pnpm audit:provider-credential-test-deployment:ql3
+      - name: Prove eight isolated Jobs, material and CIDR rotation, and database failover
+        env:
+          QL3_PROVIDER_CREDENTIAL_TEST_KUBERNETES_LIVE: '1'
+          QL3_CNPG_OPERATOR_MANIFEST_FILE: ${{ github.workspace }}/cnpg-1.30.0.yaml
+          QL3_KUBECTL_BIN: ${{ github.workspace }}/kubectl
+        run: pnpm test:provider-credential-test-kubernetes-live:ql3
+
+  cluster-plugin-package-kubernetes-live:
+    name: Plugin Package Kubernetes CAS and RBAC live contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - name: Install verified kind v0.31.0
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kind-linux-amd64 \
+            https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+          curl --fail --location --silent --show-error \
+            --output kind.sha256sum \
+            https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64.sha256sum
+          sha256sum --check kind.sha256sum
+          chmod +x kind-linux-amd64
+      - name: Install verified kubectl v1.32.8
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kubectl \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output kubectl.sha256 \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl.sha256
+          test "$(cat kubectl.sha256)" = "$(sha256sum kubectl | cut -d ' ' -f 1)"
+          chmod +x kubectl
+      - name: Prove two restricted recovery Pods converge without overreach
+        env:
+          QL3_PLUGIN_PACKAGE_KUBERNETES_LIVE: '1'
+          QL3_KIND_BIN: ${{ github.workspace }}/kind-linux-amd64
+          QL3_KUBECTL_BIN: ${{ github.workspace }}/kubectl
+          QL3_KIND_CLUSTER: ql3-plugin-activation-ci
+        run: pnpm test:plugin-package-kubernetes-live:ql3
+
+  cluster-plugin-package-recovery-e2e:
+    name: Plugin Package PostgreSQL OCI Kubernetes recovery E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install verified kind v0.31.0
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kind-linux-amd64 \
+            https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+          curl --fail --location --silent --show-error \
+            --output kind.sha256sum \
+            https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64.sha256sum
+          sha256sum --check kind.sha256sum
+          chmod +x kind-linux-amd64
+      - name: Install verified kubectl v1.32.8
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kubectl \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output kubectl.sha256 \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl.sha256
+          test "$(cat kubectl.sha256)" = "$(sha256sum kubectl | cut -d ' ' -f 1)"
+          chmod +x kubectl
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Pull exact PostgreSQL 18.4 fixture image
+        run: >-
+          docker pull
+          postgres:18.4-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
+      - name: Prove migration, durable OCI recovery and rollout ordering
+        env:
+          QL3_PLUGIN_PACKAGE_RECOVERY_E2E_LIVE: '1'
+          QL3_KIND_BIN: ${{ github.workspace }}/kind-linux-amd64
+          QL3_KUBECTL_BIN: ${{ github.workspace }}/kubectl
+          QL3_KIND_CLUSTER: ql3-plugin-recovery-e2e-ci
+        run: pnpm test:plugin-package-recovery-e2e:ql3

@@ -9,6 +9,12 @@ import {
   InstanceStatus,
 } from '../data/runningInstance';
 import dayjs from 'dayjs';
+import {
+  observeLegacyCancellation,
+  observeLegacyExecution,
+} from '../runtime/compatibility/legacyExecutionBridge';
+import { observeLegacyChildProcess } from '../runtime/compatibility/observeLegacyChildProcess';
+import { createLegacyTaskRevision } from '../runtime/compatibility/legacyTaskRevision';
 
 export function runCron(cmd: string, cron: ICron): Promise<number | void> {
   return taskLimit.runWithCronLimit(cron, () => {
@@ -30,6 +36,16 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
           (existingCron.status === CrontabStatus.running ||
             existingCron.status === CrontabStatus.queued)
         ) {
+          observeLegacyCancellation({
+            legacyCronId: Number(cron.id),
+            pid: existingCron.pid,
+            ...(existingCron.log_path
+              ? { logPath: existingCron.log_path }
+              : {}),
+            atMs: Date.now(),
+            scope: 'all',
+            reason: 'policy',
+          });
           Logger.info(
             `[schedule][停止已运行任务] 任务ID: ${cron.id}, PID: ${existingCron.pid}`,
           );
@@ -58,7 +74,26 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
           command: cmd,
         })}`,
       );
+      const legacyCronId = Number(cron.id);
+      const observation = observeLegacyExecution('scheduled_node', () => ({
+        origin: 'scheduled_node',
+        projectId: 'default',
+        taskId: `legacy-cron:${cron.id}`,
+        taskRevision: createLegacyTaskRevision({
+          command: cmd,
+          schedule: cron.schedule,
+          extraSchedules: cron.extra_schedules.map((item) => item.schedule),
+        }),
+        taskName: cron.name,
+        ...(Number.isSafeInteger(legacyCronId) && legacyCronId > 0
+          ? { legacyCronId }
+          : {}),
+        triggerType: 'scheduled',
+        triggeredBy: 'legacy:scheduler',
+        acceptedAtMs: Date.now(),
+      }));
       const cp = spawn(cmd, { shell: '/bin/bash' });
+      if (observation) observeLegacyChildProcess(cp, observation);
 
       cp.stderr.on('data', (data) => {
         Logger.info(

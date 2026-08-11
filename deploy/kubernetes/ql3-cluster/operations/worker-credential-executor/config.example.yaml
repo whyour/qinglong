@@ -1,0 +1,32 @@
+# Example only. Copy these objects into a private, per-dispatch overlay.
+# Replace every placeholder, keep command.json exact, and never commit pepper.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-worker-credential-executor-config
+  namespace: qinglong3-system
+data:
+  cluster-identity: REPLACE_WITH_CLUSTER_IDENTITY
+  target-namespace: qinglong3-worker
+  target-secret: ql3-worker-credential
+  target-deployment: ql3-worker
+  identity-secret: ql3-worker-identity
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-worker-credential-execution-command
+  namespace: qinglong3-system
+immutable: true
+data:
+  command.json: |
+    {"schemaVersion":1,"actionRef":"REPLACE_WITH_APPROVED_ACTION_REF","approvalRequestId":"REPLACE_WITH_APPROVAL_REQUEST_ID","consumptionId":"REPLACE_WITH_UNIQUE_CONSUMPTION_ID","dispatchId":"REPLACE_WITH_APPROVED_DISPATCH_ID","auditEventId":"REPLACE_WITH_UNIQUE_AUDIT_EVENT_ID"}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-worker-credential-executor-pepper
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  worker-credential-pepper: REPLACE_WITH_DISTINCT_CANONICAL_32_BYTE_BASE64URL

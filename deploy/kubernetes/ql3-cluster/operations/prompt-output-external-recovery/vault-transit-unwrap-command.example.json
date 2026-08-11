@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "operation": "external.prompt-output-key.vault-transit.unwrap",
+  "vault": {
+    "transport": "https",
+    "endpoint": "https://vault.example.invalid:8200",
+    "caFile": "/owner-private/vault/ca.pem",
+    "tokenFile": "/owner-private/vault/unwrap-token",
+    "transitMount": "prompt-output-transit",
+    "keyName": "prompt-output-custody"
+  },
+  "bundleFile": "/owner-private/prompt-output/custody-bundle.json",
+  "custodyPublicKeyFile": "/owner-private/prompt-output/custody-signing-public.pem",
+  "recoveredMaterialOutputFile": "/owner-private/prompt-output/recovered-material.bin"
+}

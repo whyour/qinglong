@@ -1,0 +1,134 @@
+name: QingLong 3.0 CloudNativePG DR live evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ql3-cloudnativepg-dr-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cloudnativepg-dr-live:
+    name: Barman WAL, latest and PITR recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Require enough ephemeral disk for four isolated K3s nodes
+        shell: bash
+        run: |
+          set -euo pipefail
+          available_kib="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          minimum_kib="$((35 * 1024 * 1024))"
+          if (( available_kib < minimum_kib )); then
+            echo "CloudNativePG DR live gate requires at least 35 GiB free; found ${available_kib} KiB" >&2
+            exit 1
+          fi
+          docker volume ls --quiet --filter dangling=true | sort > \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.before"
+          docker system df
+
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install verified kubectl v1.32.8
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl" \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl.sha256" \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl.sha256
+          test "$(cat "${RUNNER_TEMP}/kubectl.sha256")" = \
+            "$(sha256sum "${RUNNER_TEMP}/kubectl" | cut -d ' ' -f 1)"
+          chmod 0755 "${RUNNER_TEMP}/kubectl"
+
+      - name: Fetch checksum-locked operator manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/cert-manager.yaml" \
+            https://github.com/cert-manager/cert-manager/releases/download/v1.20.3/cert-manager.yaml
+          echo "7ee74ba06845213e96d8ceaff3d20dd51e682765c1418eddda4e8780ba082261  ${RUNNER_TEMP}/cert-manager.yaml" | sha256sum --check
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/barman-cloud.yaml" \
+            https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.13.0/manifest.yaml
+          echo "d2e71e7b06822448f1a421f05781846cfdb9cc621e7ef32eef5e20c5133213b0  ${RUNNER_TEMP}/barman-cloud.yaml" | sha256sum --check
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/cloudnative-pg.yaml" \
+            https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml
+          echo "f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88  ${RUNNER_TEMP}/cloudnative-pg.yaml" | sha256sum --check
+
+      - name: Recheck the static backup and supply-chain contracts
+        run: |
+          pnpm audit:cloudnativepg-backup:ql3
+          pnpm audit:barman-cloud-supply-chain:ql3
+          pnpm audit:cert-manager-selection:ql3
+          node --test \
+            test/back/ql3CloudNativePgBarmanLiveContract.test.cjs \
+            test/back/ql3CloudNativePgDrEvidenceAudit.test.cjs \
+            test/back/ql3CloudNativePgBarmanWorkflow.test.cjs
+
+      - name: Prove TLS object storage, continuous WAL, latest restore and PITR
+        env:
+          QL3_CLOUDNATIVEPG_BARMAN_LIVE: '1'
+          QL3_SOURCE_REVISION: ${{ github.sha }}
+          QL3_KUBECTL_BIN: ${{ runner.temp }}/kubectl
+          QL3_CERT_MANAGER_MANIFEST_FILE: ${{ runner.temp }}/cert-manager.yaml
+          QL3_BARMAN_MANIFEST_FILE: ${{ runner.temp }}/barman-cloud.yaml
+          QL3_CNPG_OPERATOR_MANIFEST_FILE: ${{ runner.temp }}/cloudnative-pg.yaml
+          QL3_DR_REPORT: ${{ runner.temp }}/ql3-cloudnativepg-dr/report.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -m 0700 "$(dirname "${QL3_DR_REPORT}")"
+          pnpm test:cloudnativepg-barman-live:ql3 -- \
+            "--report=${QL3_DR_REPORT}"
+
+      - name: Re-audit the exact private report and isolated cleanup
+        env:
+          QL3_DR_REPORT: ${{ runner.temp }}/ql3-cloudnativepg-dr/report.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(stat -c '%a' "${QL3_DR_REPORT}")" = '600'
+          pnpm audit:cloudnativepg-dr-evidence:ql3 -- \
+            "--report=${QL3_DR_REPORT}"
+          sha256sum "${QL3_DR_REPORT}"
+          test -z "$(docker ps -aq --filter name=ql3-barman-dr-)"
+          test -z "$(docker network ls -q --filter name=ql3-barman-dr-)"
+          test -z "$(docker ps -aq --filter label=io.qinglong.ql3.live=cloudnativepg-barman-disaster-recovery)"
+          test -z "$(docker network ls -q --filter label=io.qinglong.ql3.live=cloudnativepg-barman-disaster-recovery)"
+          docker volume ls --quiet --filter dangling=true | sort > \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.after"
+          diff --unified \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.before" \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.after"
+          docker system df
+
+      - name: Upload the audited content-free DR evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-cloudnativepg-dr-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-cloudnativepg-dr/report.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false

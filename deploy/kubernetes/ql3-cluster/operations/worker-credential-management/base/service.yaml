@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ql3-worker-credential-management
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-worker-credential-management
+    app.kubernetes.io/component: worker-credential-management
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ql3-worker-credential-management
+    app.kubernetes.io/component: worker-credential-management
+  ports:
+    - name: https
+      port: 8444
+      targetPort: https
+      protocol: TCP

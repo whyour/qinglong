@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-cluster-control
+spec:
+  template:
+    spec:
+      containers:
+        - name: cluster-control
+          env:
+            - name: QL3_POSTGRES_RUNTIME_URL
+              $patch: delete
+            - name: QL3_POSTGRES_RUNTIME_HOST
+              value: ql3-postgres-rw.qinglong3-system.svc
+            - name: QL3_POSTGRES_RUNTIME_PORT
+              value: '5432'
+            - name: QL3_POSTGRES_RUNTIME_DATABASE
+              value: qinglong
+            - name: QL3_POSTGRES_RUNTIME_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-postgres-runtime-auth
+                  key: username
+            - name: QL3_POSTGRES_RUNTIME_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-postgres-runtime-auth
+                  key: password
+            - name: QL3_POSTGRES_TLS_SERVERNAME
+              value: ql3-postgres-rw.qinglong3-system.svc
+              valueFrom: null
+            - name: QL3_POSTGRES_WORKER_INGRESS_URL
+              $patch: delete
+            - name: QL3_POSTGRES_WORKER_INGRESS_HOST
+              value: ql3-postgres-rw.qinglong3-system.svc
+            - name: QL3_POSTGRES_WORKER_INGRESS_PORT
+              value: '5432'
+            - name: QL3_POSTGRES_WORKER_INGRESS_DATABASE
+              value: qinglong
+            - name: QL3_POSTGRES_WORKER_INGRESS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-postgres-worker-ingress-auth
+                  key: username
+            - name: QL3_POSTGRES_WORKER_INGRESS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ql3-postgres-worker-ingress-auth
+                  key: password
+            - name: QL3_WORKER_INGRESS_POSTGRES_TLS_SERVERNAME
+              value: ql3-postgres-rw.qinglong3-system.svc
+              valueFrom: null
+      volumes:
+        - name: postgres-runtime-ca
+          secret:
+            secretName: ql3-postgres-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+        - name: postgres-worker-ingress-ca
+          secret:
+            secretName: ql3-postgres-ca
+            items:
+              - key: ca.crt
+                path: ca.crt

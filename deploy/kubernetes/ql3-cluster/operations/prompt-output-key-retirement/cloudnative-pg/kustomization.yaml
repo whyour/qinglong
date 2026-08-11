@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../base
+
+patches:
+  - path: job-patch.yaml
+    target:
+      group: batch
+      version: v1
+      kind: Job
+      name: ql3-prompt-output-key-retirement
+  - path: network-policy-patch.yaml
+    target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: ql3-prompt-output-key-retirement
+
+images:
+  - name: qinglong3-cluster-admin
+    newName: registry.example.com/qinglong/qinglong3-cluster-admin
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

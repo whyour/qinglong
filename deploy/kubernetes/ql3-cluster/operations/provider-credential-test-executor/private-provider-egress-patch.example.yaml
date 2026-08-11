@@ -1,0 +1,12 @@
+# Standard NetworkPolicy cannot select an FQDN. Resolve the exact private
+# provider endpoint through controlled DNS, pin its routed private CIDR here,
+# and keep the same canonical HTTPS URL in the signed allowlist ConfigMap.
+- op: add
+  path: /spec/egress/-
+  value:
+    to:
+      - ipBlock:
+          cidr: 10.42.7.19/32
+    ports:
+      - protocol: TCP
+        port: 443

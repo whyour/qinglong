@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ql3-plugin-package-management
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-plugin-package-management
+    app.kubernetes.io/component: plugin-package-management
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-plugin-package-management
+      app.kubernetes.io/component: plugin-package-management

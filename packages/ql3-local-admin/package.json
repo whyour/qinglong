@@ -1,0 +1,147 @@
+{
+  "name": "@qinglong/local-admin",
+  "version": "3.0.0-alpha.0",
+  "private": true,
+  "description": "QingLong 3.0 short-lived local database adoption authority",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "main": "dist/legacy-adoption/localSqliteAdoption.js",
+  "types": "dist/legacy-adoption/localSqliteAdoption.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/legacy-adoption/localSqliteAdoption.d.ts",
+      "require": "./dist/legacy-adoption/localSqliteAdoption.js",
+      "default": "./dist/legacy-adoption/localSqliteAdoption.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "require": "./dist/runtime.js",
+      "default": "./dist/runtime.js"
+    },
+    "./adopted-profile": {
+      "types": "./dist/adopted-profile/localAdoptedProfile.d.ts",
+      "require": "./dist/adopted-profile/localAdoptedProfile.js",
+      "default": "./dist/adopted-profile/localAdoptedProfile.js"
+    },
+    "./adopted-profile/edge": {
+      "types": "./dist/adopted-profile/edge.d.ts",
+      "require": "./dist/adopted-profile/edge.js",
+      "default": "./dist/adopted-profile/edge.js"
+    },
+    "./adopted-profile/standalone": {
+      "types": "./dist/adopted-profile/standalone.d.ts",
+      "require": "./dist/adopted-profile/standalone.js",
+      "default": "./dist/adopted-profile/standalone.js"
+    },
+    "./decision-issuer": {
+      "types": "./dist/legacy-adoption/legacyCrontabDecisionIssuer.d.ts",
+      "require": "./dist/legacy-adoption/legacyCrontabDecisionIssuer.js",
+      "default": "./dist/legacy-adoption/legacyCrontabDecisionIssuer.js"
+    },
+    "./package-staging": {
+      "types": "./dist/plugin-package/pluginPackageStaging.d.ts",
+      "require": "./dist/plugin-package/pluginPackageStaging.js",
+      "default": "./dist/plugin-package/pluginPackageStaging.js"
+    },
+    "./package-activation": {
+      "types": "./dist/plugin-package/pluginPackageActivation.d.ts",
+      "require": "./dist/plugin-package/pluginPackageActivation.js",
+      "default": "./dist/plugin-package/pluginPackageActivation.js"
+    },
+    "./package-resource-materialization": {
+      "types": "./dist/plugin-package/pluginPackageResourceMaterialization.d.ts",
+      "require": "./dist/plugin-package/pluginPackageResourceMaterialization.js",
+      "default": "./dist/plugin-package/pluginPackageResourceMaterialization.js"
+    },
+    "./package-installation": {
+      "types": "./dist/plugin-package/pluginPackageInstallation.d.ts",
+      "require": "./dist/plugin-package/pluginPackageInstallation.js",
+      "default": "./dist/plugin-package/pluginPackageInstallation.js"
+    },
+    "./package-approved-action": {
+      "types": "./dist/plugin-package/pluginPackageApprovedAction.d.ts",
+      "require": "./dist/plugin-package/pluginPackageApprovedAction.js",
+      "default": "./dist/plugin-package/pluginPackageApprovedAction.js"
+    },
+    "./package-management": {
+      "types": "./dist/plugin-package/pluginPackageManagement.d.ts",
+      "require": "./dist/plugin-package/pluginPackageManagement.js",
+      "default": "./dist/plugin-package/pluginPackageManagement.js"
+    },
+    "./package-lifecycle": {
+      "types": "./dist/plugin-package/pluginPackageLifecycle.d.ts",
+      "require": "./dist/plugin-package/pluginPackageLifecycle.js",
+      "default": "./dist/plugin-package/pluginPackageLifecycle.js"
+    },
+    "./package-recovery-catalog": {
+      "types": "./dist/plugin-package/pluginPackageRecoveryCatalog.d.ts",
+      "require": "./dist/plugin-package/pluginPackageRecoveryCatalog.js",
+      "default": "./dist/plugin-package/pluginPackageRecoveryCatalog.js"
+    },
+    "./package-publisher-trust": {
+      "types": "./dist/plugin-package/pluginPackagePublisherTrust.d.ts",
+      "require": "./dist/plugin-package/pluginPackagePublisherTrust.js",
+      "default": "./dist/plugin-package/pluginPackagePublisherTrust.js"
+    },
+    "./project-policy-administration": {
+      "types": "./dist/security-administration/projectPolicyAdministration.d.ts",
+      "require": "./dist/security-administration/projectPolicyAdministration.js",
+      "default": "./dist/security-administration/projectPolicyAdministration.js"
+    },
+    "./security-audit-query": {
+      "types": "./dist/security-administration/securityAuditQuery.d.ts",
+      "require": "./dist/security-administration/securityAuditQuery.js",
+      "default": "./dist/security-administration/securityAuditQuery.js"
+    },
+    "./security-audit-retention": {
+      "types": "./dist/security-administration/securityAuditRetention.d.ts",
+      "require": "./dist/security-administration/securityAuditRetention.js",
+      "default": "./dist/security-administration/securityAuditRetention.js"
+    },
+    "./identity-credential-administration": {
+      "types": "./dist/security-administration/identityCredentialAdministration.d.ts",
+      "require": "./dist/security-administration/identityCredentialAdministration.js",
+      "default": "./dist/security-administration/identityCredentialAdministration.js"
+    },
+    "./secret-administration": {
+      "types": "./dist/security-administration/secretAdministration.d.ts",
+      "require": "./dist/security-administration/secretAdministration.js",
+      "default": "./dist/security-administration/secretAdministration.js"
+    },
+    "./task-definition-administration": {
+      "types": "./dist/automation-administration/taskDefinitionAdministration.d.ts",
+      "require": "./dist/automation-administration/taskDefinitionAdministration.js",
+      "default": "./dist/automation-administration/taskDefinitionAdministration.js"
+    },
+    "./trigger-administration": {
+      "types": "./dist/automation-administration/triggerAdministration.d.ts",
+      "require": "./dist/automation-administration/triggerAdministration.js",
+      "default": "./dist/automation-administration/triggerAdministration.js"
+    },
+    "./plugin-package-workflow-administration": {
+      "types": "./dist/plugin-package/pluginPackageWorkflowAdministration.d.ts",
+      "require": "./dist/plugin-package/pluginPackageWorkflowAdministration.js",
+      "default": "./dist/plugin-package/pluginPackageWorkflowAdministration.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
+    "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/local-secret": "workspace:*",
+    "@qinglong/local-sqlite": "workspace:*",
+    "@qinglong/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
+  }
+}

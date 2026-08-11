@@ -2,10 +2,7 @@ import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
-import {
-  RunningInstanceModel,
-  InstanceStatus,
-} from '../data/runningInstance';
+import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
 import { exec, execSync } from 'child_process';
 import fs from 'fs/promises';
 import CronExpressionParser from 'cron-parser';
@@ -32,10 +29,25 @@ import { t } from '../shared/i18n';
 import { ScheduleType } from '../interface/schedule';
 import { logStreamManager } from '../shared/logStreamManager';
 import { isEmpty } from 'lodash';
+import {
+  observeLegacyCancellation,
+  observeLegacyExecution,
+  observeLegacyExecutionCallback,
+} from '../runtime/compatibility/legacyExecutionBridge';
+import { observeLegacyChildProcess } from '../runtime/compatibility/observeLegacyChildProcess';
+import {
+  createLegacyLogArtifactId,
+  createLegacyTaskRevision,
+} from '../runtime/compatibility/legacyTaskRevision';
+import {
+  selectManualPrimaryExecutionRouter,
+  stopManualPrimaryAttempt,
+  stopManualPrimaryCron,
+} from '../runtime/compatibility/manualPrimaryExecutionBridge';
 
 @Service()
 export default class CronService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
@@ -125,7 +137,9 @@ export default class CronService {
           error?.message || error,
         );
         throw new Error(
-          `${t('调度器注册失败，任务创建已回滚')}: ${(error as any)?.details || error?.message}`,
+          `${t('调度器注册失败，任务创建已回滚')}: ${
+            (error as any)?.details || error?.message
+          }`,
         );
       }
     }
@@ -195,7 +209,9 @@ export default class CronService {
           error?.message || error,
         );
         throw new Error(
-          `${t('调度器注册失败，任务更新已回滚')}: ${(error as any)?.details || error?.message}`,
+          `${t('调度器注册失败，任务更新已回滚')}: ${
+            (error as any)?.details || error?.message
+          }`,
         );
       }
     }
@@ -240,9 +256,19 @@ export default class CronService {
       let cron;
       try {
         cron = await this.getDb({ id });
-      } catch (err) { }
+      } catch (err) {}
       if (!cron) {
         continue;
+      }
+      if (status === CrontabStatus.running || status === CrontabStatus.idle) {
+        observeLegacyExecutionCallback({
+          legacyCronId: id,
+          ...(pid ? { pid } : {}),
+          ...(log_path ? { logPath: log_path } : {}),
+          atMs: Date.now(),
+          phase: status === CrontabStatus.running ? 'running' : 'finished',
+          ...(exit_code === undefined ? {} : { exitCode: exit_code }),
+        });
       }
       if (status === CrontabStatus.idle && log_path !== cron.log_path) {
         options = omit(options, ['status', 'log_path', 'pid']);
@@ -580,9 +606,53 @@ export default class CronService {
 
   public async stop(ids: number[]) {
     const docs = await CrontabModel.findAll({ where: { id: ids } });
+    const persistedPrimaryInstances = await RunningInstanceModel.findAll({
+      where: {
+        cron_id: ids,
+        status: InstanceStatus.running,
+        attempt_id: { [Op.not]: null },
+      },
+    });
+    const primaryCronIds = new Set(
+      persistedPrimaryInstances.map((instance) => instance.cron_id),
+    );
     for (const doc of docs) {
       // Kill all running instances of this task
       try {
+        let primaryStopMatched = false;
+        let primaryStopSafe = true;
+        if (doc.id !== undefined) {
+          try {
+            const primaryStop = await stopManualPrimaryCron(doc.id, Date.now());
+            primaryStopMatched = primaryStop.matched > 0;
+            if (primaryStopMatched) primaryCronIds.add(doc.id);
+            if (primaryStop.failed > 0) {
+              primaryStopSafe = false;
+              this.logger.warn(
+                '[ql3-primary] manual stop failed count=' + primaryStop.failed,
+              );
+            }
+          } catch {
+            primaryStopSafe = false;
+            this.logger.warn('[ql3-primary] manual stop routing failed');
+          }
+          observeLegacyCancellation({
+            legacyCronId: doc.id,
+            atMs: Date.now(),
+            scope: 'all',
+            reason: 'user',
+          });
+        }
+        if (
+          doc.id !== undefined &&
+          primaryCronIds.has(doc.id) &&
+          (!primaryStopMatched || !primaryStopSafe)
+        ) {
+          this.logger.warn(
+            '[ql3-primary] active owner unavailable; skipped PID-only stop',
+          );
+          continue;
+        }
         if (doc.pid) {
           await killTask(doc.pid);
         }
@@ -602,13 +672,22 @@ export default class CronService {
     const finishedAt = dayjs().unix();
     await RunningInstanceModel.update(
       { status: InstanceStatus.stopped, finished_at: finishedAt },
-      { where: { cron_id: ids, status: InstanceStatus.running } },
+      {
+        where: {
+          cron_id: ids,
+          status: InstanceStatus.running,
+          run_id: { [Op.is]: null },
+        },
+      },
     );
 
-    await CrontabModel.update(
-      { status: CrontabStatus.idle, pid: undefined },
-      { where: { id: ids } },
-    );
+    const legacyOnlyIds = ids.filter((id) => !primaryCronIds.has(id));
+    if (legacyOnlyIds.length > 0) {
+      await CrontabModel.update(
+        { status: CrontabStatus.idle, pid: undefined },
+        { where: { id: legacyOnlyIds } },
+      );
+    }
   }
 
   public async stopInstance(instanceId: number) {
@@ -618,6 +697,39 @@ export default class CronService {
     if (!instance) {
       return { code: 400, message: t('实例不存在或已停止') };
     }
+    if (instance.attempt_id) {
+      try {
+        const primaryStop = await stopManualPrimaryAttempt(
+          instance.attempt_id,
+          Date.now(),
+        );
+        if (primaryStop.matched > 0) {
+          if (primaryStop.failed > 0) {
+            this.logger.warn(
+              '[ql3-primary] manual instance stop failed count=' +
+                primaryStop.failed,
+            );
+            return { code: 500, message: t('停止实例失败') };
+          }
+          return { code: 200, message: t('实例已停止') };
+        }
+        this.logger.warn(
+          '[ql3-primary] active instance owner unavailable; refused PID-only stop',
+        );
+        return { code: 409, message: t('实例当前无法安全停止') };
+      } catch {
+        this.logger.warn('[ql3-primary] manual instance stop routing failed');
+        return { code: 500, message: t('停止实例失败') };
+      }
+    }
+    observeLegacyCancellation({
+      legacyCronId: instance.cron_id,
+      ...(instance.pid ? { pid: instance.pid } : {}),
+      ...(instance.log_path ? { logPath: instance.log_path } : {}),
+      atMs: Date.now(),
+      scope: 'one',
+      reason: 'user',
+    });
     if (instance.pid) {
       try {
         await killTask(instance.pid);
@@ -628,7 +740,11 @@ export default class CronService {
       }
     }
     await RunningInstanceModel.update(
-      { status: InstanceStatus.stopped, finished_at: dayjs().unix(), exit_code: 143 },
+      {
+        status: InstanceStatus.stopped,
+        finished_at: dayjs().unix(),
+        exit_code: 143,
+      },
       { where: { id: instanceId } },
     );
 
@@ -645,7 +761,10 @@ export default class CronService {
     return { code: 200, message: t('实例已停止') };
   }
 
-  private async runSingle(cronId: number): Promise<number | void> {
+  private async runSingle(
+    cronId: number,
+    executionOrigin: 'manual' | 'boot' = 'manual',
+  ): Promise<number | void> {
     return taskLimit.manualRunWithCronLimit(() => {
       return new Promise(async (resolve: any) => {
         const cron = await this.getDb({ id: cronId });
@@ -664,6 +783,52 @@ export default class CronService {
           `[panel][开始执行任务] 参数: ${JSON.stringify(params)}`,
         );
 
+        if (executionOrigin === 'manual') {
+          const primary = selectManualPrimaryExecutionRouter();
+          if (primary) {
+            try {
+              const active = await primary.start({
+                cron: {
+                  id: cronId,
+                  ...(cron.name === undefined ? {} : { name: cron.name }),
+                  command: cron.command,
+                  ...(cron.schedule === undefined
+                    ? {}
+                    : { schedule: cron.schedule }),
+                  extraSchedules:
+                    cron.extra_schedules?.map((item) => item.schedule) ?? [],
+                  ...(cron.task_before === undefined
+                    ? {}
+                    : { taskBefore: cron.task_before }),
+                  ...(cron.task_after === undefined
+                    ? {}
+                    : { taskAfter: cron.task_after }),
+                  ...(cron.work_dir === undefined
+                    ? {}
+                    : { workDirectory: cron.work_dir }),
+                  ...(cron.log_name === undefined
+                    ? {}
+                    : { logName: cron.log_name }),
+                },
+                acceptedAtMs: Date.now(),
+              });
+              const completed = await active.completion;
+              resolve({
+                ...params,
+                pid: active.pid,
+                code: completed.exitCode,
+              });
+            } catch (error) {
+              this.logger.error(
+                '[ql3-primary] manual execution failed closed type=' +
+                  (error instanceof Error ? error.name : 'unknown'),
+              );
+              resolve(params);
+            }
+            return;
+          }
+        }
+
         let { id, command, log_name } = cron;
 
         const uniqPath =
@@ -675,13 +840,43 @@ export default class CronService {
         await fs.mkdir(logDirPath, { recursive: true });
         const logPath = `${uniqPath}/${logTime}.log`;
         const absolutePath = path.resolve(config.logPath, `${logPath}`);
-        const cp = spawn(
-          `real_log_path=${logPath} no_delay=true ${this.makeCommand(
-            cron,
-            true,
-          )}`,
-          { shell: '/bin/bash' },
-        );
+        const legacyCommand = `real_log_path=${logPath} no_delay=true ${this.makeCommand(
+          cron,
+          true,
+        )}`;
+        const observation = observeLegacyExecution(executionOrigin, () => ({
+          origin: executionOrigin,
+          projectId: 'default',
+          taskId: `legacy-cron:${cron.id}`,
+          taskRevision: createLegacyTaskRevision({
+            command: cron.command,
+            ...(cron.schedule === undefined ? {} : { schedule: cron.schedule }),
+            extraSchedules:
+              cron.extra_schedules?.map((item) => item.schedule) ?? [],
+            ...(cron.task_before === undefined
+              ? {}
+              : { taskBefore: cron.task_before }),
+            ...(cron.task_after === undefined
+              ? {}
+              : { taskAfter: cron.task_after }),
+            ...(cron.work_dir === undefined
+              ? {}
+              : { workDirectory: cron.work_dir }),
+            ...(cron.log_name === undefined ? {} : { logName: cron.log_name }),
+          }),
+          ...(cron.name === undefined ? {} : { taskName: cron.name }),
+          ...(cron.id === undefined ? {} : { legacyCronId: cron.id }),
+          triggerType: executionOrigin,
+          triggeredBy:
+            executionOrigin === 'manual' ? 'legacy:manual' : 'legacy:boot',
+          acceptedAtMs: Date.now(),
+        }));
+        const cp = spawn(legacyCommand, { shell: '/bin/bash' });
+        if (observation) {
+          observeLegacyChildProcess(cp, observation, {
+            logArtifactId: createLegacyLogArtifactId(logPath),
+          });
+        }
 
         await CrontabModel.update(
           { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
@@ -760,7 +955,9 @@ export default class CronService {
         error?.message || error,
       );
       throw new Error(
-        `${t('调度器注册失败，任务启用已回滚')}: ${(error as any)?.details || error?.message}`,
+        `${t('调度器注册失败，任务启用已回滚')}: ${
+          (error as any)?.details || error?.message
+        }`,
       );
     }
     await this.setCrontab();
@@ -820,7 +1017,9 @@ export default class CronService {
     if (!command.startsWith(TASK_PREFIX) && !command.startsWith(QL_PREFIX)) {
       command = `${TASK_PREFIX}${tab.command}`;
     }
-    let commandVariable = `real_time=${Boolean(realTime)} no_tee=true ID=${tab.id} `;
+    let commandVariable = `real_time=${Boolean(realTime)} no_tee=true ID=${
+      tab.id
+    } `;
     // Only include log_name if it has a truthy value to avoid passing null/undefined to shell
     if (tab.log_name) {
       commandVariable += `log_name=${tab.log_name} `;
@@ -874,7 +1073,10 @@ export default class CronService {
         execSync(`crontab ${config.crontabFile}`);
       } catch (error: any) {
         const errorMsg = error.message || String(error);
-        this.logger.error('[crontab] Failed to update system crontab:', errorMsg);
+        this.logger.error(
+          '[crontab] Failed to update system crontab:',
+          errorMsg,
+        );
       }
     }
 
@@ -923,11 +1125,7 @@ export default class CronService {
   public async autosave_crontab() {
     const tabs = await this.crontabs();
     const regularCrons = tabs.data
-      .filter(
-        (x) =>
-          x.isDisabled !== 1 &&
-          this.shouldUseCronClient(x),
-      )
+      .filter((x) => x.isDisabled !== 1 && this.shouldUseCronClient(x))
       .map((doc) => ({
         name: doc.name || '',
         id: String(doc.id),
@@ -966,7 +1164,7 @@ export default class CronService {
         { where: { id: bootTasks.map((t) => t.id!) } },
       );
       for (const task of bootTasks) {
-        this.runSingle(task.id!);
+        this.runSingle(task.id!, 'boot');
       }
     }
   }

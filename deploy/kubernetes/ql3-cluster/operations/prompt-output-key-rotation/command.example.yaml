@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ql3-prompt-output-key-rotation-command
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-prompt-output-key-rotation
+    app.kubernetes.io/component: ai-maintenance
+    app.kubernetes.io/part-of: qinglong3
+immutable: true
+data:
+  command.json: |
+    {
+      "schemaVersion": 1,
+      "operation": "cluster.prompt-output-key.rotate",
+      "kubernetes": {
+        "namespace": "qinglong3-system",
+        "secretName": "ql3-prompt-output-keyring",
+        "expectedSecretUid": "replace-with-live-secret-uid",
+        "dataKey": "keyring.json"
+      },
+      "stagedMaterialFile": "/var/run/secrets/qinglong3/prompt-output-key-rotation/material.bin",
+      "request": {
+        "rotationId": "replace-with-unique-rotation-id",
+        "requestId": "replace-with-unique-request-id",
+        "mutationId": "replace-with-unique-mutation-id",
+        "expectedActiveKeyId": "replace-with-current-active-key-id",
+        "expectedCatalogDigest": "replace-with-current-catalog-digest",
+        "newKeyId": "replace-with-unique-new-key-id"
+      }
+    }
