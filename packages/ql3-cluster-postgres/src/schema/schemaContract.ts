@@ -15,13 +15,14 @@ export interface PostgresSchemaContractFunction {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 54;
-  readonly migrationId: 'pg-0055-run-attempt-log-retention';
+  readonly contractVersion: 55;
+  readonly migrationId: 'pg-0056-run-management-boundary';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
     run_core: 1;
     run_attempt_log_retention: 1;
+    run_management_boundary: 1;
     run_dispatch_lease: 1;
     run_retry_policy: 1;
     project_policy: 1;
@@ -101,8 +102,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 54,
-    migrationId: 'pg-0055-run-attempt-log-retention',
+    contractVersion: 55,
+    migrationId: 'pg-0056-run-management-boundary',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -143,6 +144,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       project_tool_definition_snapshot: 1,
       run_core: 1,
       run_attempt_log_retention: 1,
+      run_management_boundary: 1,
       run_dispatch_lease: 1,
       run_retry_policy: 1,
       security_audit: 1,
@@ -2316,6 +2318,15 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       }),
       Object.freeze({
         name: 'lock_approval_policy_fence',
+        identityArguments:
+          'character varying, character varying, character varying, integer, integer',
+        owner: 'ql3_migration',
+        securityDefiner: true,
+        volatility: 'volatile',
+        configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
+      Object.freeze({
+        name: 'lock_run_management_policy_fence',
         identityArguments:
           'character varying, character varying, character varying, integer, integer',
         owner: 'ql3_migration',

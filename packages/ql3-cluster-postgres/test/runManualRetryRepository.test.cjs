@@ -138,21 +138,11 @@ function fixture(options = {}) {
           if (normalized.includes('statement_timestamp()')) {
             return { rows: [{ nowMs: 1_000_000 }], rowCount: 1 };
           }
-          if (normalized.includes('FROM "ql3"."projects"')) {
-            const rows = options.projectRows ?? [
-              { projectStatus: 'active', projectVersion: 2 },
-            ];
-            return { rows, rowCount: rows.length };
-          }
-          if (normalized.includes('project_role_bindings')) {
-            const rows = options.bindingRows ?? [
-              {
-                bindingVersion: 3,
-                bindingState: 'active',
-                bindingRole: 'operator',
-              },
-            ];
-            return { rows, rowCount: rows.length };
+          if (normalized.includes('lock_run_management_policy_fence')) {
+            return {
+              rows: [{ matches: options.authorizationMatches ?? true }],
+              rowCount: 1,
+            };
           }
           if (normalized.includes('idempotency_key = $2')) {
             const rows = options.replayRows ?? [];
@@ -245,7 +235,11 @@ test('atomically appends a linked queued Run, remote Attempt, events and allowed
 });
 
 test('returns durable identities for an exact replay without appending again', async () => {
-  const { calls, repository } = fixture({ replayRows: [replayRow()] });
+  const { calls, repository } = fixture({
+    replayRows: [
+      replayRow({ runStatus: 'running', runVersion: 4, eventSequence: 4 }),
+    ],
+  });
   const result = await repository.retryRun(
     command({
       runId: '019f9200-0000-4000-8000-000000000102',
@@ -257,6 +251,7 @@ test('returns durable identities for an exact replay without appending again', a
   assert.equal(result.status, 'existing');
   assert.equal(result.runId, IDS.runId);
   assert.equal(result.attemptId, IDS.attemptId);
+  assert.equal(result.runStatus, 'queued');
   assert.equal(
     calls.some(({ sql }) => sql.startsWith('INSERT INTO')),
     false,
@@ -283,15 +278,11 @@ test('rejects stale authentication and changed authorization inside the transact
     true,
   );
   assert.equal(
-    stale.calls.some(({ sql }) => sql.includes('FROM "ql3"."projects"')),
+    stale.calls.some(({ sql }) => sql.includes('lock_run_management_policy_fence')),
     false,
   );
 
-  const changed = fixture({
-    bindingRows: [
-      { bindingVersion: 4, bindingState: 'active', bindingRole: 'operator' },
-    ],
-  });
+  const changed = fixture({ authorizationMatches: false });
   await assert.rejects(
     changed.repository.retryRun(command()),
     (error) =>

@@ -1,0 +1,72 @@
+# Example only. Copy into a private overlay and replace every placeholder.
+# This file is intentionally excluded from committed Kustomizations.
+# Assertions require aud=qinglong3-run-management,
+# typ=ql3-run-management+jwt and ql3_purpose=run-management.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-run-management-identity
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  keyset.json: |
+    {
+      "schemaVersion": 1,
+      "generation": 1,
+      "issuer": "https://identity.example.test/",
+      "audience": "qinglong3-run-management",
+      "keys": [
+        {
+          "alg": "EdDSA",
+          "crv": "Ed25519",
+          "kid": "REPLACE_WITH_KEY_ID",
+          "kty": "OKP",
+          "use": "sig",
+          "x": "REPLACE_WITH_ED25519_PUBLIC_JWK_X"
+        }
+      ],
+      "revokedKids": [],
+      "assuranceMappings": [
+        {
+          "acr": "urn:example:mfa",
+          "assurance": "multi_factor",
+          "requiredAmr": ["pwd", "otp"]
+        },
+        {
+          "acr": "urn:example:hardware",
+          "assurance": "hardware",
+          "requiredAmr": ["hwk"]
+        }
+      ],
+      "constraints": {
+        "maxAssertionBytes": 8192,
+        "maxLifetimeMs": 300000,
+        "maxAuthenticationAgeMs": 300000,
+        "clockSkewMs": 5000
+      }
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-run-management-tls
+  namespace: qinglong3-system
+type: kubernetes.io/tls
+stringData:
+  tls.crt: REPLACE_WITH_SERVER_CERTIFICATE_CHAIN
+  tls.key: REPLACE_WITH_SERVER_PRIVATE_KEY
+  ca.crt: REPLACE_WITH_1_TO_16_CLIENT_CERTIFICATE_AUTHORITIES
+  client.crl: REPLACE_WITH_1_TO_16_CLIENT_CERTIFICATE_REVOCATION_LISTS
+---
+# Non-CloudNativePG deployments only. The reviewed overlay uses
+# ql3-postgres-run-manager-auth and ql3-postgres-ca instead.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-cluster-run-management-database
+  namespace: qinglong3-system
+type: Opaque
+stringData:
+  postgres-run-manager-url: REPLACE_WITH_RUN_MANAGER_DSN
+  postgres-tls-servername: REPLACE_WITH_POSTGRES_DNS_NAME
+  postgres-ca.crt: REPLACE_WITH_POSTGRES_CA_CERTIFICATE

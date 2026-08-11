@@ -5,6 +5,8 @@
 - 关联 RFC：QL-RFC-0001 D-294
 - 前置决策：ADR-0039、ADR-0047、ADR-0119、ADR-0361、ADR-0381
 
+> 产品装配说明：ADR-0383 已 supersede 本文“复用 `ql3_runtime` 且不新增 role/migration”的决策。本文的共享 retry 语义、原子 repository 与 HA 证据继续有效；生产入口改由强认证的独立 Run Management Plane 和 `ql3_run_manager` 承载。
+
 ## 上下文
 
 ADR-0381 已冻结手动 retry 的共享语义并完成 Local SQLite/CLI 纵向切片，但 Cluster 尚缺少可在多副本下工作的 PostgreSQL authority。不能把 Local 的进程内状态或单连接假设复制到 Cluster，也不能让每个 `cluster-control` 副本各自维护限流 bucket。

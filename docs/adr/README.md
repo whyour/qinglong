@@ -386,6 +386,7 @@
 | [ADR-0380](./ADR-0380-local-lost-run-retry-single-control-cadence.md)                                         | Local lost Run retry 复用单一 execution-control cadence                                                                      | Accepted                                |
 | [ADR-0381](./ADR-0381-strong-local-manual-run-retry.md)                                                       | 强认证的 Local 手动 Run retry                                                                                                  | Accepted                                |
 | [ADR-0382](./ADR-0382-postgresql-cluster-manual-run-retry-authority.md)                                       | PostgreSQL Cluster 手动 Run retry 原子 Authority                                                                                | Accepted                                |
+| [ADR-0383](./ADR-0383-strong-cluster-run-management-plane.md)                                                 | 强认证的 Cluster Run Management Plane 与专用数据库角色                                                                           | Accepted                                |
 
 ## 规则
 

@@ -67,6 +67,19 @@ import {
   ClusterModelProviderCredentialManagementTransportRequestError,
   ClusterModelProviderCredentialManagementTransportUnavailableError,
 } from '../model-provider-credential/modelProviderCredentialManagementTransport';
+import {
+  ClusterRunManagementAuthorizationError,
+  ClusterRunManagementConflictError,
+  ClusterRunManagementRateLimitedError,
+  ClusterRunManagementRequestError,
+  ClusterRunManagementTargetUnavailableError,
+  ClusterRunManagementUnavailableError,
+} from '../run-management/runManagement';
+import {
+  ClusterRunManagementTransportAuthenticationError,
+  ClusterRunManagementTransportRequestError,
+  ClusterRunManagementTransportUnavailableError,
+} from '../run-management/runManagementTransport';
 
 export const CLUSTER_PLUGIN_PACKAGE_MANAGEMENT_PATH =
   '/api/v3/plugin-packages/management';
@@ -77,18 +90,21 @@ export const CLUSTER_AUTOMATION_MANAGEMENT_PATH =
 export const CLUSTER_APPROVAL_MANAGEMENT_PATH = '/api/v3/approvals/management';
 export const CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_PATH =
   '/api/v3/provider-credentials/management';
+export const CLUSTER_RUN_MANAGEMENT_PATH = '/api/v3/runs/management';
 export type ClusterAuthenticatedManagementPath =
   | typeof CLUSTER_PLUGIN_PACKAGE_MANAGEMENT_PATH
   | typeof CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH
   | typeof CLUSTER_AUTOMATION_MANAGEMENT_PATH
   | typeof CLUSTER_APPROVAL_MANAGEMENT_PATH
-  | typeof CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_PATH;
+  | typeof CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_PATH
+  | typeof CLUSTER_RUN_MANAGEMENT_PATH;
 const MANAGEMENT_PATHS = new Set<ClusterAuthenticatedManagementPath>([
   CLUSTER_PLUGIN_PACKAGE_MANAGEMENT_PATH,
   CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH,
   CLUSTER_AUTOMATION_MANAGEMENT_PATH,
   CLUSTER_APPROVAL_MANAGEMENT_PATH,
   CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_PATH,
+  CLUSTER_RUN_MANAGEMENT_PATH,
 ]);
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_MAX_CONNECTIONS = 64;
@@ -531,7 +547,8 @@ function responseError(error: unknown): HttpRequestError {
     error instanceof ClusterApprovalManagementTransportAuthenticationError ||
     error instanceof
       ClusterModelProviderCredentialManagementTransportAuthenticationError ||
-    error instanceof ClusterModelProviderCredentialManagementAuthenticationError
+    error instanceof ClusterModelProviderCredentialManagementAuthenticationError ||
+    error instanceof ClusterRunManagementTransportAuthenticationError
   ) {
     return new HttpRequestError(401, 'authentication_required');
   }
@@ -544,6 +561,8 @@ function responseError(error: unknown): HttpRequestError {
     error instanceof
       ClusterModelProviderCredentialManagementTransportRequestError ||
     error instanceof ClusterModelProviderCredentialManagementRequestError ||
+    error instanceof ClusterRunManagementTransportRequestError ||
+    error instanceof ClusterRunManagementRequestError ||
     error instanceof PluginPackageManagementRequestError ||
     error instanceof WorkerCredentialManagementRequestError
   ) {
@@ -554,7 +573,8 @@ function responseError(error: unknown): HttpRequestError {
     error instanceof WorkerCredentialManagementAuthorizationError ||
     error instanceof ClusterAutomationManagementAuthorizationError ||
     error instanceof ClusterApprovalManagementTransportAuthorizationError ||
-    error instanceof ClusterModelProviderCredentialManagementAuthorizationError
+    error instanceof ClusterModelProviderCredentialManagementAuthorizationError ||
+    error instanceof ClusterRunManagementAuthorizationError
   ) {
     return new HttpRequestError(403, 'forbidden');
   }
@@ -563,7 +583,8 @@ function responseError(error: unknown): HttpRequestError {
     error instanceof WorkerCredentialManagementConflictError ||
     error instanceof ClusterAutomationManagementConflictError ||
     error instanceof ClusterApprovalManagementTransportConflictError ||
-    error instanceof ClusterModelProviderCredentialManagementConflictError
+    error instanceof ClusterModelProviderCredentialManagementConflictError ||
+    error instanceof ClusterRunManagementConflictError
   ) {
     return new HttpRequestError(409, 'conflict');
   }
@@ -578,8 +599,12 @@ function responseError(error: unknown): HttpRequestError {
   ) {
     return new HttpRequestError(429, 'quota_exceeded', error.retryAfterMs);
   }
+  if (error instanceof ClusterRunManagementRateLimitedError) {
+    return new HttpRequestError(429, 'rate_limited', error.retryAfterMs);
+  }
   if (
-    error instanceof ClusterApprovalManagementTransportTargetUnavailableError
+    error instanceof ClusterApprovalManagementTransportTargetUnavailableError ||
+    error instanceof ClusterRunManagementTargetUnavailableError
   ) {
     return new HttpRequestError(404, 'not_found');
   }
@@ -594,6 +619,8 @@ function responseError(error: unknown): HttpRequestError {
     error instanceof
       ClusterModelProviderCredentialManagementTransportUnavailableError ||
     error instanceof ClusterModelProviderCredentialManagementUnavailableError ||
+    error instanceof ClusterRunManagementTransportUnavailableError ||
+    error instanceof ClusterRunManagementUnavailableError ||
     error instanceof PluginPackageManagementUnavailableError ||
     error instanceof WorkerCredentialManagementUnavailableError
   ) {

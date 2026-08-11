@@ -104,6 +104,7 @@ test('enforces role-specific bounded pool sizes', () => {
     'ai-credential-tester',
     'automation-manager',
     'approval-manager',
+    'run-manager',
     'worker-credential-manager',
     'worker-credential-executor',
   ]) {

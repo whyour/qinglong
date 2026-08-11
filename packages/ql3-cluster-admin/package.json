@@ -20,6 +20,31 @@
       "require": "./dist/approval-management/approvalDecisionManagement.js",
       "default": "./dist/approval-management/approvalDecisionManagement.js"
     },
+    "./run-management": {
+      "types": "./dist/run-management/runManagement.d.ts",
+      "require": "./dist/run-management/runManagement.js",
+      "default": "./dist/run-management/runManagement.js"
+    },
+    "./run-management-transport": {
+      "types": "./dist/run-management/runManagementTransport.d.ts",
+      "require": "./dist/run-management/runManagementTransport.js",
+      "default": "./dist/run-management/runManagementTransport.js"
+    },
+    "./run-management-http": {
+      "types": "./dist/run-management/runManagementHttp.d.ts",
+      "require": "./dist/run-management/runManagementHttp.js",
+      "default": "./dist/run-management/runManagementHttp.js"
+    },
+    "./run-management-process": {
+      "types": "./dist/run-management/runManagementProcess.d.ts",
+      "require": "./dist/run-management/runManagementProcess.js",
+      "default": "./dist/run-management/runManagementProcess.js"
+    },
+    "./run-management-client": {
+      "types": "./dist/run-management/runManagementClient.d.ts",
+      "require": "./dist/run-management/runManagementClient.js",
+      "default": "./dist/run-management/runManagementClient.js"
+    },
     "./approval-management": {
       "types": "./dist/approval-management/approvalManagement.d.ts",
       "require": "./dist/approval-management/approvalManagement.js",
@@ -331,6 +356,8 @@
     "ql3-worker-credential-client": "dist/worker-credential/workerCredentialManagementClientCli.js",
     "ql3-approval-manage": "dist/approval-management/approvalManagementCli.js",
     "ql3-approval-client": "dist/approval-management/approvalManagementClientCli.js",
+    "ql3-run-manage": "dist/run-management/runManagementCli.js",
+    "ql3-run-client": "dist/run-management/runManagementClientCli.js",
     "ql3-automation-manage": "dist/automation-management/automationManagementCli.js",
     "ql3-automation-client": "dist/automation-management/automationManagementClientCli.js",
     "ql3-provider-credential-manage": "dist/model-provider-credential/modelProviderCredentialManagementCli.js",

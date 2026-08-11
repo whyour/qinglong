@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ql3-run-management
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-run-management
+    app.kubernetes.io/component: run-management
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-run-management
+      app.kubernetes.io/component: run-management

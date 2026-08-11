@@ -75,6 +75,11 @@
       "require": "./dist/run-management/runManualRetryRepository.js",
       "default": "./dist/run-management/runManualRetryRepository.js"
     },
+    "./run-manager": {
+      "types": "./dist/entrypoints/runManager.d.ts",
+      "require": "./dist/entrypoints/runManager.js",
+      "default": "./dist/entrypoints/runManager.js"
+    },
     "./approval-manager": {
       "types": "./dist/approval-management/index.d.ts",
       "require": "./dist/approval-management/index.js",

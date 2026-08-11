@@ -202,6 +202,9 @@ const {
   assertPostgresApprovalManagerSchemaReady,
 } = require('../packages/ql3-cluster-postgres/dist/approval-management/index.js');
 const {
+  assertPostgresRunManagerSchemaReady,
+} = require('../packages/ql3-cluster-postgres/dist/entrypoints/runManager.js');
+const {
   assertPostgresPackageExecutorSchemaReady,
   PostgresPluginPackageMaterializedRevisionRepository,
   PostgresPluginPackageAutomationPublicationRepository,
@@ -341,6 +344,8 @@ const AUTOMATION_MANAGER_USER = 'ql3_automation_manager';
 const AUTOMATION_MANAGER_PASSWORD = 'ql3_automation_manager_test';
 const APPROVAL_MANAGER_USER = 'ql3_approval_manager';
 const APPROVAL_MANAGER_PASSWORD = 'ql3_approval_manager_test';
+const RUN_MANAGER_USER = 'ql3_run_manager';
+const RUN_MANAGER_PASSWORD = 'ql3_run_manager_test';
 const PACKAGE_MANAGER_USER = 'ql3_package_manager';
 const PACKAGE_MANAGER_PASSWORD = 'ql3_package_manager_test';
 const PACKAGE_EXECUTOR_USER = 'ql3_package_executor';
@@ -3722,6 +3727,9 @@ async function provisionCredentialRoles(database) {
     `CREATE ROLE ${APPROVAL_MANAGER_USER} LOGIN PASSWORD '${APPROVAL_MANAGER_PASSWORD}'`,
   );
   await database.pool.query(
+    `CREATE ROLE ${RUN_MANAGER_USER} LOGIN PASSWORD '${RUN_MANAGER_PASSWORD}'`,
+  );
+  await database.pool.query(
     `CREATE ROLE ${PACKAGE_MANAGER_USER} LOGIN PASSWORD '${PACKAGE_MANAGER_PASSWORD}'`,
   );
   await database.pool.query(
@@ -5010,54 +5018,70 @@ async function runIdentityKeysetLedgerMatrix(options) {
     authority === 'plugin-package-management' ||
       authority === 'worker-credential-management' ||
       authority === 'automation-management' ||
-      authority === 'approval-management',
+      authority === 'approval-management' ||
+      authority === 'run-management',
   );
   const workerAuthority = authority === 'worker-credential-management';
   const automationAuthority = authority === 'automation-management';
   const approvalAuthority = authority === 'approval-management';
-  const user = approvalAuthority
+  const runAuthority = authority === 'run-management';
+  const user = runAuthority
+    ? RUN_MANAGER_USER
+    : approvalAuthority
     ? APPROVAL_MANAGER_USER
     : automationAuthority
     ? AUTOMATION_MANAGER_USER
     : workerAuthority
     ? WORKER_CREDENTIAL_MANAGER_USER
     : PACKAGE_MANAGER_USER;
-  const password = approvalAuthority
+  const password = runAuthority
+    ? RUN_MANAGER_PASSWORD
+    : approvalAuthority
     ? APPROVAL_MANAGER_PASSWORD
     : automationAuthority
     ? AUTOMATION_MANAGER_PASSWORD
     : workerAuthority
     ? WORKER_CREDENTIAL_MANAGER_PASSWORD
     : PACKAGE_MANAGER_PASSWORD;
-  const role = approvalAuthority
+  const role = runAuthority
+    ? 'run-manager'
+    : approvalAuthority
     ? 'approval-manager'
     : automationAuthority
     ? 'automation-manager'
     : workerAuthority
     ? 'worker-credential-manager'
     : 'package-manager';
-  const applicationPrefix = approvalAuthority
+  const applicationPrefix = runAuthority
+    ? 'ql3-ha-run-keyset-ledger'
+    : approvalAuthority
     ? 'ql3-ha-approval-keyset-ledger'
     : automationAuthority
     ? 'ql3-ha-automation-keyset-ledger'
     : workerAuthority
     ? 'ql3-ha-worker-keyset-ledger'
     : 'ql3-ha-keyset-ledger';
-  const keyPrefix = approvalAuthority
+  const keyPrefix = runAuthority
+    ? 'ha-run-identity-key'
+    : approvalAuthority
     ? 'ha-approval-identity-key'
     : automationAuthority
     ? 'ha-automation-identity-key'
     : workerAuthority
     ? 'ha-worker-identity-key'
     : 'ha-identity-key';
-  const issuer = approvalAuthority
+  const issuer = runAuthority
+    ? 'https://run-identity.ha.example.test/'
+    : approvalAuthority
     ? 'https://approval-identity.ha.example.test/'
     : automationAuthority
     ? 'https://automation-identity.ha.example.test/'
     : workerAuthority
     ? 'https://worker-identity.ha.example.test/'
     : 'https://identity.ha.example.test/';
-  const audience = approvalAuthority
+  const audience = runAuthority
+    ? 'qinglong3-run-management'
+    : approvalAuthority
     ? 'qinglong3-approval-management'
     : automationAuthority
     ? 'qinglong3-automation-management'
@@ -9446,13 +9470,13 @@ async function runManualRunRetryHaEvidence(options) {
     })
   ).definition;
   const firstRuntime = await databaseOpener(
-    'runtime',
-    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, primaryPort),
+    'run-manager',
+    databaseUrl(RUN_MANAGER_USER, RUN_MANAGER_PASSWORD, primaryPort),
     'ql3-ha-manual-run-retry-a',
   )();
   const secondRuntime = await databaseOpener(
-    'runtime',
-    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, primaryPort),
+    'run-manager',
+    databaseUrl(RUN_MANAGER_USER, RUN_MANAGER_PASSWORD, primaryPort),
     'ql3-ha-manual-run-retry-b',
   )();
   try {
@@ -9707,6 +9731,7 @@ async function main(argv = process.argv.slice(2)) {
   let workerCredentialIdentityKeysetLedger;
   let automationIdentityKeysetLedger;
   let approvalIdentityKeysetLedger;
+  let runManagementIdentityKeysetLedger;
   let automationManagementInspection;
   let pluginPackageLifecycle;
   let pluginPackageQuarantine;
@@ -9933,6 +9958,11 @@ async function main(argv = process.argv.slice(2)) {
       ),
       'ql3-ha-approval-manager-readiness',
     )();
+    const runManagerReadinessDatabase = await databaseOpener(
+      'run-manager',
+      databaseUrl(RUN_MANAGER_USER, RUN_MANAGER_PASSWORD, primaryPort),
+      'ql3-ha-run-manager-readiness',
+    )();
     const packageManagerReadinessDatabase = await databaseOpener(
       'package-manager',
       databaseUrl(PACKAGE_MANAGER_USER, PACKAGE_MANAGER_PASSWORD, primaryPort),
@@ -9974,6 +10004,9 @@ async function main(argv = process.argv.slice(2)) {
       await assertPostgresApprovalManagerSchemaReady(
         approvalManagerReadinessDatabase.pool,
       );
+      await assertPostgresRunManagerSchemaReady(
+        runManagerReadinessDatabase.pool,
+      );
       await assertPostgresPackageManagerSchemaReady(
         packageManagerReadinessDatabase.pool,
       );
@@ -9992,6 +10025,7 @@ async function main(argv = process.argv.slice(2)) {
         adminReadinessDatabase.close(),
         automationManagerReadinessDatabase.close(),
         approvalManagerReadinessDatabase.close(),
+        runManagerReadinessDatabase.close(),
         packageManagerReadinessDatabase.close(),
         packageExecutorReadinessDatabase.close(),
         workerManagerReadinessDatabase.close(),
@@ -10030,6 +10064,10 @@ async function main(argv = process.argv.slice(2)) {
     approvalIdentityKeysetLedger = await runIdentityKeysetLedgerMatrix({
       primaryPort,
       authority: 'approval-management',
+    });
+    runManagementIdentityKeysetLedger = await runIdentityKeysetLedgerMatrix({
+      primaryPort,
+      authority: 'run-management',
     });
     timeline.push({
       state: 'durable_identity_keyset_ledger_verified',
@@ -11968,6 +12006,7 @@ async function main(argv = process.argv.slice(2)) {
       workerCredentialIdentityKeysetLedger,
       automationIdentityKeysetLedger,
       approvalIdentityKeysetLedger,
+      runManagementIdentityKeysetLedger,
       automationManagementInspection,
       pluginPackageLifecycle: pluginPackageLifecycle.report,
       pluginPackageQuarantine: pluginPackageQuarantine.report,

@@ -2367,6 +2367,11 @@ function auditSourceImports(root, packagePath, findings) {
           ].includes(path.relative(packageDirectory, filePath)) &&
             specifier === '@qinglong/cluster-postgres/approval-manager') ||
           ([
+            'src/run-management/runManagement.ts',
+            'src/run-management/runManagementProcess.ts',
+          ].includes(path.relative(packageDirectory, filePath)) &&
+            specifier === '@qinglong/cluster-postgres/run-manager') ||
+          ([
             'src/prompt-output/retention/promptOutputGcCli.ts',
             'src/prompt-output/retention/promptOutputGcProcess.ts',
             'src/prompt-output/key-management/promptOutputKeyRetirementCli.ts',

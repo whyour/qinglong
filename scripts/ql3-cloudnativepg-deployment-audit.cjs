@@ -65,6 +65,10 @@ const EXPECTED_ROLES = Object.freeze({
     connectionLimit: 32,
     secret: 'ql3-postgres-runtime-auth',
   }),
+  ql3_run_manager: Object.freeze({
+    connectionLimit: 4,
+    secret: 'ql3-postgres-run-manager-auth',
+  }),
   ql3_worker_credential_executor: Object.freeze({
     connectionLimit: 4,
     secret: 'ql3-postgres-worker-credential-executor-auth',
@@ -258,7 +262,7 @@ function assertRolesAndDatabase(readFile, root, findings) {
       findings.push(
         finding(
           'QL3_CNPG_DATABASE_ROLE',
-          'DatabaseRole resources must match the thirteen fixed least-privilege identities',
+          'DatabaseRole resources must match the fourteen fixed least-privilege identities',
         ),
       );
       break;
@@ -272,7 +276,7 @@ function assertRolesAndDatabase(readFile, root, findings) {
     findings.push(
       finding(
         'QL3_CNPG_DATABASE_ROLE_SET',
-        'exactly the thirteen reviewed migration, runtime, AI maintenance, AI credential management/testing, admin, automation, Approval, package and Worker roles are required',
+        'exactly the fourteen reviewed migration, runtime, AI maintenance, AI credential management/testing, admin, automation, Approval, Run, package and Worker roles are required',
       ),
     );
   }
@@ -332,6 +336,7 @@ function assertSecretBoundary(readFile, root, findings) {
     ['ql3-postgres-admin-auth', 'ql3_admin'],
     ['ql3-postgres-automation-manager-auth', 'ql3_automation_manager'],
     ['ql3-postgres-approval-manager-auth', 'ql3_approval_manager'],
+    ['ql3-postgres-run-manager-auth', 'ql3_run_manager'],
     ['ql3-postgres-worker-ingress-auth', 'ql3_worker_ingress'],
     ['ql3-postgres-package-manager-auth', 'ql3_package_manager'],
     ['ql3-postgres-package-executor-auth', 'ql3_package_executor'],
@@ -417,7 +422,7 @@ function assertSecretBoundary(readFile, root, findings) {
     findings.push(
       finding(
         'QL3_CNPG_SECRET_EXAMPLE_SET',
-        'the example must describe all thirteen database credentials and the reviewed workload Secrets',
+        'the example must describe all fourteen database credentials and the reviewed workload Secrets',
       ),
     );
   }

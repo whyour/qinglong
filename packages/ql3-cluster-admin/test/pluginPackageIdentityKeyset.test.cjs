@@ -12,6 +12,7 @@ const {
   createClusterAutomationIdentityKeysetFile,
   createClusterApprovalIdentityKeysetFile,
   createClusterModelProviderCredentialIdentityKeysetFile,
+  createClusterRunIdentityKeysetFile,
 } = require('@qinglong/cluster-admin/plugin-package-identity-keyset');
 
 const NOW_MS = 1_700_000_000_000;
@@ -216,6 +217,38 @@ function providerCredentialAssertion(key, overrides = {}) {
   ).toString('base64url')}`;
 }
 
+function runAssertion(key, overrides = {}) {
+  const header = Buffer.from(
+    JSON.stringify({
+      alg: 'EdDSA',
+      kid: key.kid,
+      typ: 'ql3-run-management+jwt',
+    }),
+  ).toString('base64url');
+  const now = Math.floor(NOW_MS / 1000);
+  const payload = Buffer.from(
+    JSON.stringify({
+      acr: 'urn:ql3:mfa',
+      amr: ['pwd', 'otp'],
+      aud: 'qinglong3-run-management',
+      auth_time: now - 10,
+      exp: now + 120,
+      iat: now,
+      iss: ISSUER,
+      jti: `run-assertion-${key.kid}`,
+      ql3_purpose: 'run-management',
+      sub: 'run-operator-1',
+      ...overrides,
+    }),
+  ).toString('base64url');
+  const signed = `${header}.${payload}`;
+  return `${signed}.${sign(
+    null,
+    Buffer.from(signed, 'ascii'),
+    key.privateKey,
+  ).toString('base64url')}`;
+}
+
 async function atomicWrite(filePath, document) {
   const nextPath = `${filePath}.next`;
   await writeFile(nextPath, `${JSON.stringify(document)}\n`, { mode: 0o644 });
@@ -368,6 +401,34 @@ test('loads a provider credential keyset isolated by type, purpose and audience'
             ql3_purpose: 'automation-management',
           }),
         )
+        .authenticate(),
+      { code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID' },
+    );
+  });
+});
+
+test('loads a Run keyset isolated from every other management purpose', async () => {
+  await fixture(async ({ filePath }) => {
+    const key = reviewedKey('run-identity-key-1');
+    await atomicWrite(filePath, {
+      ...keyset(1, [key]),
+      audience: 'qinglong3-run-management',
+    });
+    const provider = createClusterRunIdentityKeysetFile({
+      filePath,
+      now: () => NOW_MS,
+    });
+    const principal = await provider.bind(runAssertion(key)).authenticate();
+    assert.deepEqual(principal.subject, {
+      type: 'user',
+      id: 'run-operator-1',
+    });
+    await assert.rejects(provider.bind(approvalAssertion(key)).authenticate(), {
+      code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID',
+    });
+    await assert.rejects(
+      provider
+        .bind(runAssertion(key, { ql3_purpose: 'approval-management' }))
         .authenticate(),
       { code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID' },
     );

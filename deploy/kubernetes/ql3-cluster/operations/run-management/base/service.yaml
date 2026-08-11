@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ql3-run-management
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-run-management
+    app.kubernetes.io/component: run-management
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ql3-run-management
+    app.kubernetes.io/component: run-management
+  ports:
+    - name: https
+      port: 8448
+      targetPort: https
+      protocol: TCP

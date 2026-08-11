@@ -9,7 +9,6 @@ import {
   RunManualRetryUnavailableError,
   normalizeRunManualRetryCommand,
   normalizeRunManualRetryResult,
-  type RunManualRetryAllowedRole,
   type RunManualRetryCommand,
   type RunManualRetryRepository,
   type RunManualRetryResult,
@@ -33,11 +32,6 @@ type Row = Record<string, unknown>;
 export const CLUSTER_RUN_MANUAL_RETRY_RATE_WINDOW_MS = 60_000;
 export const CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT = 64;
 
-const ALLOWED_ROLES = new Set<RunManualRetryAllowedRole>([
-  'owner',
-  'admin',
-  'operator',
-]);
 const CLUSTER_STRONG_ASSURANCES = new Set(['multi_factor', 'hardware']);
 const TASK_REVISION_PATTERN = /^qltd:v1:([1-9]\d*):([0-9a-f]{64})$/;
 
@@ -128,45 +122,23 @@ async function confirmAuthorization(
   client: PostgresClient,
   command: Readonly<RunManualRetryCommand>,
 ): Promise<void> {
-  const project = await client.query<Row>(
+  const result = await client.query<Row>(
     `
-    SELECT status AS "projectStatus", version AS "projectVersion"
-    FROM "ql3"."projects" WHERE id = $1 FOR UPDATE
-  `,
-    [command.projectId],
-  );
-  if (project.rows.length === 0) throw new RunManualRetryNotFoundError();
-  if (project.rows.length !== 1) throw unavailable();
-  // Authorized management mutations take the same Project lock. Keeping this
-  // append-only RoleBinding read lock-free avoids granting UPDATE authority to
-  // the runtime role merely to use PostgreSQL row-lock syntax.
-  const binding = await client.query<Row>(
-    `
-    SELECT version AS "bindingVersion", state AS "bindingState",
-           role AS "bindingRole"
-    FROM "ql3"."project_role_bindings"
-    WHERE project_id = $1 AND subject_type = $2 AND subject_id = $3
-    ORDER BY version DESC LIMIT 1
+    SELECT "ql3"."lock_run_management_policy_fence"(
+      $1::varchar, $2::varchar, $3::varchar, $4::integer, $5::integer
+    ) AS "matches"
   `,
     [
       command.projectId,
       command.principal.subject.type,
       command.principal.subject.id,
+      command.policyFence.projectVersion,
+      command.policyFence.bindingVersion,
     ],
   );
-  const currentProject = project.rows[0]!;
-  const currentBinding = binding.rows[0];
   if (
-    text(currentProject, 'projectStatus') !== 'active' ||
-    integer(currentProject, 'projectVersion') !==
-      command.policyFence.projectVersion ||
-    !currentBinding ||
-    integer(currentBinding, 'bindingVersion') !==
-      command.policyFence.bindingVersion ||
-    text(currentBinding, 'bindingState') !== 'active' ||
-    !ALLOWED_ROLES.has(
-      text(currentBinding, 'bindingRole') as RunManualRetryAllowedRole,
-    )
+    result.rows.length !== 1 ||
+    !postgresRequiredBoolean(result.rows[0]!.matches, unavailable)
   ) {
     throw new RunManualRetryFenceRejectedError('authorization_changed');
   }
@@ -185,8 +157,6 @@ async function findReplay(
            run.execution_origin AS "executionOrigin",
            run.execution_owner AS "executionOwner",
            run.triggered_by AS "triggeredBy", run.request_id AS "requestId",
-           run.status AS "runStatus", run.version AS "runVersion",
-           run.event_sequence AS "eventSequence",
            run.created_at_ms AS "createdAtMs",
            attempt.id AS "attemptId", attempt.executor_type AS "executorType",
            created.actor_type AS "createdActorType",
@@ -205,7 +175,6 @@ async function findReplay(
       ON queued.run_id = run.id AND queued.sequence = 2
      AND queued.type = 'run.queued'
     WHERE run.project_id = $1 AND run.idempotency_key = $2
-    FOR UPDATE OF run
   `,
     [command.projectId, `ql3:run-manual-retry:v1:${command.mutationId}`],
   );
@@ -227,9 +196,6 @@ function replayResult(
     text(row, 'executionOwner') !== 'runtime' ||
     text(row, 'triggeredBy') !== command.principal.subject.id ||
     text(row, 'requestId') !== command.mutationId ||
-    text(row, 'runStatus') !== 'queued' ||
-    integer(row, 'runVersion') !== 2 ||
-    integer(row, 'eventSequence') !== 2 ||
     text(row, 'executorType') !== 'remote_worker' ||
     text(row, 'createdActorType') !== command.principal.subject.type ||
     text(row, 'createdActorId') !== command.principal.subject.id ||
@@ -295,7 +261,6 @@ async function findSource(
       LIMIT 1
     ) AS attempt ON true
     WHERE run.id = $1
-    FOR UPDATE OF run
   `,
     [command.sourceRunId],
   );

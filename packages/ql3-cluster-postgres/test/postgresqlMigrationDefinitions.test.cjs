@@ -104,6 +104,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0053-plugin-package-workflow-run-list-index',
       'pg-0054-approval-management-boundary',
       'pg-0055-run-attempt-log-retention',
+      'pg-0056-run-management-boundary',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -513,6 +514,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0055-run-attempt-log-retention',
       checksum:
         'c775c65ec03ae3a1606f899064d2d38fa63fd136ce52cbd1b1172c3a51e6bf30',
+    },
+    {
+      id: 'pg-0056-run-management-boundary',
+      checksum:
+        '7aa2b2ade67cdfa6839d4af02209906646a68adfd6c12c4dddeb854021da72b8',
     },
   ];
   assert.deepEqual(
@@ -1902,5 +1908,32 @@ test('advances capability v54 with durable Cluster log retention authority', asy
   assert.match(
     sql,
     /migration_id = 'pg-0054-approval-management-boundary'/,
+  );
+});
+
+test('advances capability v55 with isolated strong Run management authority', async () => {
+  const migration = migrationById('pg-0056-run-management-boundary');
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(sql, /ql3_run_manager/);
+  assert.match(sql, /lock_run_management_policy_fence/);
+  assert.match(
+    sql,
+    /GRANT SELECT, INSERT ON "ql3"\."runs", "ql3"\."run_attempts", "ql3"\."run_events", "ql3"\."security_audit_events" TO ql3_run_manager/,
+  );
+  assert.doesNotMatch(sql, /GRANT UPDATE ON "ql3"\."runs"/);
+  assert.match(sql, /'run-management'/);
+  assert.match(sql, /contract_version = 55/);
+  assert.match(sql, /"run_management_boundary":1/);
+  assert.match(sql, /contract_version = 54/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0055-run-attempt-log-retention'/,
   );
 });

@@ -80,6 +80,11 @@ export const CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_IDENTITY_ASSERTION_PRO
     purpose: 'model-provider-credential-management',
   });
 
+export const CLUSTER_RUN_MANAGEMENT_IDENTITY_ASSERTION_PROFILE = Object.freeze({
+  type: 'ql3-run-management+jwt',
+  purpose: 'run-management',
+});
+
 export interface ClusterPluginPackageIdentityAssertionVerifierOptions {
   readonly issuer: string;
   readonly audience: string;

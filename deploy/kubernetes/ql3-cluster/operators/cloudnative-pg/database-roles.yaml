@@ -241,6 +241,30 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
+  name: ql3-postgres-run-manager
+  labels:
+    app.kubernetes.io/name: ql3-postgres
+    app.kubernetes.io/component: database-role
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  cluster:
+    name: ql3-postgres
+  name: ql3_run_manager
+  comment: QingLong strongly authenticated human Run retry authority
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  databaseRoleReclaimPolicy: retain
+  passwordSecret:
+    name: ql3-postgres-run-manager-auth
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
   name: ql3-postgres-worker-credential-manager
   labels:
     app.kubernetes.io/name: ql3-postgres

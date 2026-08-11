@@ -5,7 +5,8 @@ export type ClusterManagementIdentityAuthority =
   | 'plugin-package-management'
   | 'worker-credential-management'
   | 'automation-management'
-  | 'approval-management';
+  | 'approval-management'
+  | 'run-management';
 const DIGEST_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const KEY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/;
@@ -189,7 +190,8 @@ export class PostgresPluginPackageIdentityKeysetLedgerRepository
       authority !== 'plugin-package-management' &&
       authority !== 'worker-credential-management' &&
       authority !== 'automation-management' &&
-      authority !== 'approval-management'
+      authority !== 'approval-management' &&
+      authority !== 'run-management'
     ) {
       throw new TypeError(
         'PostgreSQL management identity keyset authority is invalid',

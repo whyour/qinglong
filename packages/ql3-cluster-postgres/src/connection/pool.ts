@@ -19,6 +19,7 @@ const DEFAULT_AI_CREDENTIAL_TESTER_APPLICATION_NAME =
 const DEFAULT_AUTOMATION_MANAGER_APPLICATION_NAME =
   'qinglong-automation-manager';
 const DEFAULT_APPROVAL_MANAGER_APPLICATION_NAME = 'qinglong-approval-manager';
+const DEFAULT_RUN_MANAGER_APPLICATION_NAME = 'qinglong-run-manager';
 const DEFAULT_PACKAGE_MANAGER_APPLICATION_NAME = 'qinglong-package-manager';
 const DEFAULT_PACKAGE_EXECUTOR_APPLICATION_NAME = 'qinglong-package-executor';
 const DEFAULT_WORKER_CREDENTIAL_MANAGER_APPLICATION_NAME =
@@ -89,6 +90,7 @@ export type PostgresDatabaseRole =
   | 'admin'
   | 'automation-manager'
   | 'approval-manager'
+  | 'run-manager'
   | 'package-manager'
   | 'package-executor'
   | 'worker-credential-manager'
@@ -255,6 +257,7 @@ function buildPoolConfig(options: OpenPostgresDatabaseOptions): PoolConfig {
       'admin',
       'automation-manager',
       'approval-manager',
+      'run-manager',
       'package-manager',
       'package-executor',
       'worker-credential-manager',
@@ -296,6 +299,7 @@ function buildPoolConfig(options: OpenPostgresDatabaseOptions): PoolConfig {
   const isAdmin = options.role === 'admin';
   const isAutomationManager = options.role === 'automation-manager';
   const isApprovalManager = options.role === 'approval-manager';
+  const isRunManager = options.role === 'run-manager';
   const isPackageManager = options.role === 'package-manager';
   const isPackageExecutor = options.role === 'package-executor';
   const isWorkerCredentialManager =
@@ -309,6 +313,7 @@ function buildPoolConfig(options: OpenPostgresDatabaseOptions): PoolConfig {
     isAdmin ||
     isAutomationManager ||
     isApprovalManager ||
+    isRunManager ||
     isPackageManager ||
     isPackageExecutor ||
     isWorkerCredentialManager ||
@@ -370,6 +375,8 @@ function buildPoolConfig(options: OpenPostgresDatabaseOptions): PoolConfig {
       ? DEFAULT_AUTOMATION_MANAGER_APPLICATION_NAME
       : isApprovalManager
       ? DEFAULT_APPROVAL_MANAGER_APPLICATION_NAME
+      : isRunManager
+      ? DEFAULT_RUN_MANAGER_APPLICATION_NAME
         : isPackageManager
         ? DEFAULT_PACKAGE_MANAGER_APPLICATION_NAME
         : isPackageExecutor

@@ -19,6 +19,7 @@ export const POSTGRES_SCHEMA_READINESS_ERROR_CODES = [
   'admin_role_invalid',
   'automation_manager_role_invalid',
   'approval_manager_role_invalid',
+  'run_manager_role_invalid',
   'package_manager_role_invalid',
   'package_executor_role_invalid',
   'worker_credential_manager_role_invalid',
@@ -1361,6 +1362,37 @@ const REQUIRED_APPROVAL_MANAGER_PRIVILEGES: RequiredPrivileges = Object.freeze(
   ),
 );
 
+const REQUIRED_RUN_MANAGER_PRIVILEGES: RequiredPrivileges = Object.freeze(
+  Object.fromEntries(
+    postgresqlControlSchemaContract.tables.map(({ name }) => [
+      name,
+      Object.freeze(
+        name === 'schema_migrations' ||
+          name === 'schema_capabilities' ||
+          name === 'projects' ||
+          name === 'project_role_bindings' ||
+          name === 'task_definitions' ||
+          name === 'task_definition_revisions' ||
+          name === 'task_execution_revisions'
+          ? { ...NO_TABLE_PRIVILEGES, select: true }
+          : name === 'runs' ||
+              name === 'run_attempts' ||
+              name === 'run_events' ||
+              name === 'security_audit_events'
+          ? { ...NO_TABLE_PRIVILEGES, select: true, insert: true }
+          : name === 'plugin_package_identity_keyset_ledger'
+          ? {
+              ...NO_TABLE_PRIVILEGES,
+              select: true,
+              insert: true,
+              update: true,
+            }
+          : NO_TABLE_PRIVILEGES,
+      ),
+    ]),
+  ),
+);
+
 const REQUIRED_WORKER_CREDENTIAL_MANAGER_PRIVILEGES: RequiredPrivileges =
   Object.freeze(
     Object.fromEntries(
@@ -1448,6 +1480,7 @@ const REQUIRED_RUNTIME_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: false,
     lock_approval_policy_fence: false,
+    lock_run_management_policy_fence: true,
     plugin_package_automation_start_allowed: true,
     plugin_package_workflow_admission_snapshot: true,
     plugin_package_workflow_task_attempt_snapshot: true,
@@ -1464,6 +1497,7 @@ const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: false,
     lock_approval_policy_fence: true,
+    lock_run_management_policy_fence: false,
     plugin_package_automation_start_allowed: false,
     plugin_package_workflow_admission_snapshot: false,
     plugin_package_workflow_task_attempt_snapshot: false,
@@ -1480,6 +1514,7 @@ const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: true,
     lock_approval_policy_fence: true,
+    lock_run_management_policy_fence: false,
     plugin_package_automation_start_allowed: false,
     plugin_package_workflow_admission_snapshot: false,
     plugin_package_workflow_task_attempt_snapshot: false,
@@ -1498,6 +1533,12 @@ const REQUIRED_APPROVAL_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
   Object.freeze({
     ...NO_FUNCTION_PRIVILEGES,
     lock_approval_policy_fence: true,
+  });
+
+const REQUIRED_RUN_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
+  Object.freeze({
+    ...NO_FUNCTION_PRIVILEGES,
+    lock_run_management_policy_fence: true,
   });
 
 function safeInteger(value: unknown): number | null {
@@ -1864,6 +1905,7 @@ async function assertRole(
     | 'admin_role_invalid'
     | 'automation_manager_role_invalid'
     | 'approval_manager_role_invalid'
+    | 'run_manager_role_invalid'
     | 'package_manager_role_invalid'
     | 'package_executor_role_invalid'
     | 'worker_credential_manager_role_invalid'
@@ -2110,6 +2152,30 @@ export async function assertPostgresApprovalManagerSchemaReady(
     REQUIRED_APPROVAL_MANAGER_PRIVILEGES,
     REQUIRED_APPROVAL_MANAGER_FUNCTION_PRIVILEGES,
     'approval_manager_role_invalid',
+  );
+  return Object.freeze({
+    ready: true,
+    ...server,
+    contractName: contract.contractName,
+    contractVersion: contract.contractVersion,
+    migrationIds,
+  });
+}
+
+export async function assertPostgresRunManagerSchemaReady(
+  queryable: PostgresMigrationQueryable,
+  contract: PostgresSchemaContract = postgresqlControlSchemaContract,
+): Promise<PostgresSchemaReadinessReport> {
+  const server = await readServer(queryable, contract);
+  const migrationIds = await assertHistory(queryable);
+  await assertCapability(queryable, contract);
+  await assertSchemaContract(queryable, contract);
+  await assertRole(
+    queryable,
+    contract,
+    REQUIRED_RUN_MANAGER_PRIVILEGES,
+    REQUIRED_RUN_MANAGER_FUNCTION_PRIVILEGES,
+    'run_manager_role_invalid',
   );
   return Object.freeze({
     ready: true,

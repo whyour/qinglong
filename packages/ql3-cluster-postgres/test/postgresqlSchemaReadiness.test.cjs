@@ -4,6 +4,7 @@ const {
   PostgresSchemaReadinessError,
   assertPostgresAdminSchemaReady,
   assertPostgresApprovalManagerSchemaReady,
+  assertPostgresRunManagerSchemaReady,
   assertPostgresAutomationManagerSchemaReady,
   assertPostgresPackageExecutorSchemaReady,
   assertPostgresPackageManagerSchemaReady,
@@ -474,6 +475,37 @@ function approvalManagerPrivileges() {
   }));
 }
 
+function runManagerPrivileges() {
+  const readable = new Set([
+    'schema_migrations',
+    'schema_capabilities',
+    'projects',
+    'project_role_bindings',
+    'task_definitions',
+    'task_definition_revisions',
+    'task_execution_revisions',
+    'runs',
+    'run_attempts',
+    'run_events',
+    'security_audit_events',
+    'plugin_package_identity_keyset_ledger',
+  ]);
+  return postgresqlControlSchemaContract.tables.map(({ name: tableName }) => ({
+    tableName,
+    selectAllowed: readable.has(tableName),
+    insertAllowed: [
+      'runs',
+      'run_attempts',
+      'run_events',
+      'security_audit_events',
+      'plugin_package_identity_keyset_ledger',
+    ].includes(tableName),
+    updateAllowed: tableName === 'plugin_package_identity_keyset_ledger',
+    deleteAllowed: false,
+    isOwner: false,
+  }));
+}
+
 function workerCredentialPrivileges(kind) {
   const manager = kind === 'manager';
   const readable = new Set([
@@ -634,6 +666,8 @@ function queryable(overrides = {}) {
               executeAllowed:
                 overrides.functionMode === 'manager'
                   ? functionName === 'lock_approval_policy_fence'
+                  : overrides.functionMode === 'run-manager'
+                  ? functionName === 'lock_run_management_policy_fence'
                   : overrides.functionMode === 'executor'
                   ? [
                       'commit_plugin_package_lifecycle',
@@ -651,6 +685,7 @@ function queryable(overrides = {}) {
                       'plugin_package_workflow_task_attempt_snapshot',
                       'plugin_package_run_start_allowed',
                       'plugin_package_tool_start_allowed',
+                      'lock_run_management_policy_fence',
                     ].includes(functionName),
               isOwner: false,
             })),
@@ -696,7 +731,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 54,
+    contractVersion: 55,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -753,6 +788,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0053-plugin-package-workflow-run-list-index',
       'pg-0054-approval-management-boundary',
       'pg-0055-run-attempt-log-retention',
+      'pg-0056-run-management-boundary',
     ],
   });
 });
@@ -783,10 +819,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 54);
+  assert.equal(report.contractVersion, 55);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0055-run-attempt-log-retention',
+    'pg-0056-run-management-boundary',
   );
 });
 
@@ -799,10 +835,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 54);
+  assert.equal(report.contractVersion, 55);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0055-run-attempt-log-retention',
+    'pg-0056-run-management-boundary',
   );
 
   const widened = automationManagerPrivileges();
@@ -831,10 +867,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 54);
+  assert.equal(report.contractVersion, 55);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0055-run-attempt-log-retention',
+    'pg-0056-run-management-boundary',
   );
 
   const widened = approvalManagerPrivileges();
@@ -853,6 +889,35 @@ test('accepts the isolated least-privilege human Approval manager role', async (
       error instanceof PostgresSchemaReadinessError &&
       error.code === 'approval_manager_role_invalid' &&
       error.facts.includes('table-privileges:tool_invocation_input_artifacts'),
+  );
+});
+
+test('accepts the isolated least-privilege Run manager role', async () => {
+  const report = await assertPostgresRunManagerSchemaReady(
+    queryable({
+      currentUser: 'ql3_run_manager',
+      privileges: runManagerPrivileges(),
+      functionMode: 'run-manager',
+    }),
+  );
+  assert.equal(report.currentUser, 'ql3_run_manager');
+  assert.equal(report.contractVersion, 55);
+  assert.equal(report.migrationIds.at(-1), 'pg-0056-run-management-boundary');
+
+  const widened = runManagerPrivileges();
+  widened.find(({ tableName }) => tableName === 'runs').updateAllowed = true;
+  await assert.rejects(
+    assertPostgresRunManagerSchemaReady(
+      queryable({
+        currentUser: 'ql3_run_manager',
+        privileges: widened,
+        functionMode: 'run-manager',
+      }),
+    ),
+    (error) =>
+      error instanceof PostgresSchemaReadinessError &&
+      error.code === 'run_manager_role_invalid' &&
+      error.facts.includes('table-privileges:runs'),
   );
 });
 
@@ -941,10 +1006,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 54);
+  assert.equal(report.contractVersion, 55);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0055-run-attempt-log-retention',
+    'pg-0056-run-management-boundary',
   );
 });
 

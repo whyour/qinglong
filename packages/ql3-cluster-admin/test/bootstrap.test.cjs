@@ -163,6 +163,7 @@ function database(serverVersionNum = '160014') {
                 'enforce_plugin_package_stage_provenance',
                 'lock_active_plugin_package_project',
                 'lock_approval_policy_fence',
+                'lock_run_management_policy_fence',
                 'plugin_package_lifecycle_blocking_runs',
                 'plugin_package_automation_start_allowed',
                 'plugin_package_run_start_allowed',

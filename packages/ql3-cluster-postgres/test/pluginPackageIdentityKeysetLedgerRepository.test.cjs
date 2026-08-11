@@ -108,7 +108,7 @@ test('serializes first observation, exact replay and append-only rotation', asyn
   assert.equal(value.releases(), 3);
 });
 
-test('isolates Plugin, Worker, automation and Approval generations by authority key', async () => {
+test('isolates Plugin, Worker, automation, Approval and Run generations by authority key', async () => {
   const value = fixture('worker-credential-management');
   await value.repository.observe(
     snapshot(1, { audience: 'qinglong3-worker-credential-management' }),
@@ -130,6 +130,14 @@ test('isolates Plugin, Worker, automation and Approval generations by authority 
   assert.equal(
     approval.queries.find(({ text }) => text.startsWith('INSERT')).values[0],
     'approval-management',
+  );
+  const run = fixture('run-management');
+  await run.repository.observe(
+    snapshot(1, { audience: 'qinglong3-run-management' }),
+  );
+  assert.equal(
+    run.queries.find(({ text }) => text.startsWith('INSERT')).values[0],
+    'run-management',
   );
   assert.throws(
     () => fixture('worker-credential-executor'),

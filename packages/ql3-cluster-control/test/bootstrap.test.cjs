@@ -243,6 +243,7 @@ function databaseResource(events, overrides = {}) {
               'plugin_package_workflow_task_attempt_snapshot',
               'plugin_package_run_start_allowed',
               'plugin_package_tool_start_allowed',
+              'lock_run_management_policy_fence',
             ].includes(functionName),
             isOwner: false,
           })),

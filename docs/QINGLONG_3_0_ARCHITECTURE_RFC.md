@@ -11,6 +11,22 @@
 
 最新增量证据（2026-08-12）：
 
+- D-295/ADR-0383（已接受）
+  Cluster 手动 `run.retry` 已从“仅有 PostgreSQL authority”推进到独立强认证产品面：能力内聚在既有 `@qinglong/cluster-admin`
+  的 `run-management/` 目录，不新增 workspace package；只有 `QL3_PROFILE=cluster-admin` 且显式启用时才读取 mTLS/CRL、
+  purpose-bound OIDC keyset 和创建 PostgreSQL Pool/HTTPS listener。固定 route `/api/v3/runs/management` 同时要求 mTLS 与
+  `aud=qinglong3-run-management`、`typ=ql3-run-management+jwt`、`ql3_purpose=run-management` 的五分钟内
+  `multi_factor|hardware` User，服务端生成新 Run/Attempt/Event identity；keyset generation 使用独立 durable
+  `run-management` authority。PostgreSQL capability v55 / migration `pg-0056-run-management-boundary` 引入专用
+  `ql3_run_manager` 与最小 `SECURITY DEFINER` Project/RoleBinding lock function，产品进程不再使用宽泛的常驻 runtime role；精确
+  replay 改由 immutable created/queued Events 恢复最初创建事实，因此调度进展后仍返回原 durable identity。Kubernetes 部署作为
+  `operations/run-management` opt-in overlay 提供两副本/PDB/反亲和/私网 egress，默认 Edge、Standalone 与 Cluster base 均不引用，
+  低配设备继续保持零新增进程、连接、timer、listener、watcher、cache 或 sidecar。完整 18-package clean build/test 退出 0；
+  backend 1,165 pass/2 conditional skip/0 fail；workspace 保持 18 package/1,070 source/1,052 nested，且无 single-source
+  或 shallow package。PostgreSQL migration ledger 直属文件仍受 58 hard cap 约束，v55 migration 已归入既有 `run-management`
+  领域目录而非放宽阈值。真实 PostgreSQL 18.4 arm64 physical HA 以两个 `ql3_run_manager` Pool 验证 exact concurrent replay、
+  最后 quota slot、独立 keyset ledger、同步 WAL 与 promotion 后事实，共 119 gates、timeline `1→2`；报告 SHA-256
+  `6ca8ccfb48841589e10c6484f5c97ce72e24b123f3abb1066a639e63718e64c6`，离线证据审计无 finding。
 - D-294/ADR-0382（已接受）
   Cluster 已补齐共享 `qinglong/run-manual-retry@v1` 的 PostgreSQL 原子 authority，但在可信强认证 transport 完成前保持产品 route
   关闭。adapter 只接受五分钟内的 `multi_factor|hardware` User，在单个 `SERIALIZABLE` 事务中取得 Project 行锁，重验

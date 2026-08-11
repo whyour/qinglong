@@ -1,0 +1,71 @@
+- op: replace
+  path: /spec/template/spec/containers/0/env
+  value:
+    - name: QL3_PROFILE
+      value: cluster-admin
+    - name: QL3_RUN_MANAGEMENT_ENABLED
+      value: 'true'
+    - name: QL3_RUN_MANAGEMENT_HOST
+      value: 0.0.0.0
+    - name: QL3_RUN_MANAGEMENT_PORT
+      value: '8448'
+    - name: QL3_RUN_MANAGEMENT_TLS_CERT_FILE
+      value: /var/run/secrets/qinglong3/run-management-tls/tls.crt
+    - name: QL3_RUN_MANAGEMENT_TLS_KEY_FILE
+      value: /var/run/secrets/qinglong3/run-management-tls/tls.key
+    - name: QL3_RUN_MANAGEMENT_CLIENT_CA_FILE
+      value: /var/run/secrets/qinglong3/run-management-tls/ca.crt
+    - name: QL3_RUN_MANAGEMENT_CLIENT_CRL_FILE
+      value: /var/run/secrets/qinglong3/run-management-tls/client.crl
+    - name: QL3_RUN_MANAGEMENT_IDENTITY_KEYSET_FILE
+      value: /var/run/qinglong3/run-management-identity/keyset.json
+    - name: QL3_RUN_MANAGEMENT_MAX_BODY_BYTES
+      value: '32768'
+    - name: QL3_RUN_MANAGEMENT_MAX_CONNECTIONS
+      value: '32'
+    - name: QL3_RUN_MANAGEMENT_MAX_CONCURRENT_REQUESTS
+      value: '16'
+    - name: QL3_RUN_MANAGEMENT_REQUEST_TIMEOUT_MS
+      value: '10000'
+    - name: QL3_RUN_MANAGEMENT_DRAIN_TIMEOUT_MS
+      value: '5000'
+    - name: QL3_RUN_MANAGEMENT_RATE_WINDOW_MS
+      value: '60000'
+    - name: QL3_RUN_MANAGEMENT_PEER_REQUEST_LIMIT
+      value: '30'
+    - name: QL3_RUN_MANAGEMENT_GLOBAL_REQUEST_LIMIT
+      value: '300'
+    - name: QL3_RUN_MANAGEMENT_MAX_RATE_LIMIT_PEERS
+      value: '1024'
+    - name: QL3_POSTGRES_RUN_MANAGER_TLS_MODE
+      value: verify-full
+    - name: QL3_POSTGRES_RUN_MANAGER_TLS_CA_FILE
+      value: /var/run/secrets/qinglong3/postgres-run-manager/ca.crt
+    - name: QL3_POSTGRES_RUN_MANAGER_APPLICATION_NAME
+      value: qinglong3-run-manager
+    - name: QL3_POSTGRES_RUN_MANAGER_POOL_MAX
+      value: '2'
+    - name: QL3_POSTGRES_RUN_MANAGER_HOST
+      value: ql3-postgres-rw.qinglong3-system.svc
+    - name: QL3_POSTGRES_RUN_MANAGER_PORT
+      value: '5432'
+    - name: QL3_POSTGRES_RUN_MANAGER_DATABASE
+      value: qinglong
+    - name: QL3_POSTGRES_RUN_MANAGER_USER
+      valueFrom:
+        secretKeyRef:
+          name: ql3-postgres-run-manager-auth
+          key: username
+    - name: QL3_POSTGRES_RUN_MANAGER_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: ql3-postgres-run-manager-auth
+          key: password
+    - name: QL3_POSTGRES_RUN_MANAGER_TLS_SERVERNAME
+      value: ql3-postgres-rw.qinglong3-system.svc
+- op: replace
+  path: /spec/template/spec/volumes/3/secret/secretName
+  value: ql3-postgres-ca
+- op: replace
+  path: /spec/template/spec/volumes/3/secret/items/0/key
+  value: ca.crt
