@@ -169,6 +169,16 @@ const {
   assertPostgresAdminSchemaReady,
 } = require('../packages/ql3-cluster-postgres/dist/entrypoints/admin.js');
 const {
+  PostgresTaskStartRepository,
+} = require('../packages/ql3-cluster-postgres/dist/task-start/taskStartRepository.js');
+const {
+  CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+  PostgresRunManualRetryRepository,
+} = require('../packages/ql3-cluster-postgres/dist/run-management/runManualRetryRepository.js');
+const {
+  RunManualRetryRateLimitedError,
+} = require('../packages/ql3-runtime-core/dist/run/manual-retry/runManualRetry.js');
+const {
   assertPostgresPackageManagerSchemaReady,
   PostgresPluginPackageIdentityKeysetLedgerConflictError,
   PostgresPluginPackageIdentityKeysetLedgerRepository,
@@ -9347,6 +9357,288 @@ async function verifyRunAttemptLogRetentionAfterPromotion({
   }
 }
 
+async function manualRunRetryFacts(pool, fixture) {
+  const result = await pool.query(
+    `SELECT
+       (SELECT status FROM "ql3"."runs" WHERE id = $1) AS "sourceStatus",
+       (SELECT count(*)::integer FROM "ql3"."runs"
+         WHERE project_id = $2 AND trigger_type = 'run_manual_retry'
+           AND retry_of_run_id = $1) AS "retryRunCount",
+       (SELECT count(*)::integer FROM "ql3"."run_attempts" AS attempt
+          JOIN "ql3"."runs" AS run ON run.id = attempt.run_id
+         WHERE run.project_id = $2
+           AND run.trigger_type = 'run_manual_retry'
+           AND attempt.executor_type = 'remote_worker') AS "attemptCount",
+       (SELECT count(*)::integer FROM "ql3"."run_events" AS event
+          JOIN "ql3"."runs" AS run ON run.id = event.run_id
+         WHERE run.project_id = $2
+           AND run.trigger_type = 'run_manual_retry') AS "eventCount",
+       (SELECT count(*)::integer FROM "ql3"."security_audit_events"
+         WHERE project_id = $2 AND operation_id = 'run.retry'
+           AND outcome = 'allowed') AS "allowedAuditCount",
+       (SELECT count(*)::integer FROM "ql3"."run_retry_policies" AS policy
+          JOIN "ql3"."runs" AS run ON run.id = policy.run_id
+         WHERE run.project_id = $2
+           AND run.trigger_type = 'run_manual_retry') AS "retryPolicyCount"`,
+    [fixture.sourceRunId, fixture.projectId],
+  );
+  assert.equal(result.rowCount, 1);
+  return result.rows[0];
+}
+
+async function runManualRunRetryHaEvidence(options) {
+  const { primaryPort, primaryDatabase, standbyDatabase } = options;
+  const suffix = `${process.pid}-${randomBytes(3).toString('hex')}`;
+  const fixture = Object.freeze({
+    projectId: `ha-manual-retry-${suffix}`,
+    actorId: `ha-manual-retry-operator-${suffix}`,
+    taskId: `ha-manual-retry-task-${suffix}`,
+    sourceRunId: randomUUID(),
+    sourceAttemptId: randomUUID(),
+  });
+  const clock = await primaryDatabase.pool.query(
+    `SELECT floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint
+            AS "nowMs"`,
+  );
+  const nowMs = Number(clock.rows[0].nowMs);
+  await primaryDatabase.pool.query(
+    `INSERT INTO "ql3"."projects" (
+       id, name, slug, status, version, created_at_ms, updated_at_ms
+     ) VALUES ($1, 'HA manual Run retry', $1, 'active', 1, $2, $2)`,
+    [fixture.projectId, nowMs],
+  );
+  await primaryDatabase.pool.query(
+    `INSERT INTO "ql3"."project_role_bindings" (
+       project_id, subject_type, subject_id, version, state, role,
+       mutation_id, changed_by_type, changed_by_id, created_at_ms
+     ) VALUES ($1, 'user', $2, 1, 'active', 'operator', $3,
+               'system', 'ha-contract', $4)`,
+    [
+      fixture.projectId,
+      fixture.actorId,
+      `ha-manual-retry-binding-${suffix}`,
+      nowMs,
+    ],
+  );
+  const task = (
+    await new PostgresTaskDefinitionRepository(
+      primaryDatabase.pool,
+    ).appendTaskDefinitionRevision({
+      projectId: fixture.projectId,
+      taskId: fixture.taskId,
+      expectedRevision: null,
+      mutationId: randomUUID(),
+      name: 'HA manual Run retry source',
+      kind: 'command',
+      spec: {
+        schema: 'qinglong/command@v1',
+        config: {
+          command: {
+            kind: 'argv',
+            file: '/bin/echo',
+            args: ['manual-retry-ha'],
+          },
+        },
+      },
+      labels: {},
+      enabled: true,
+      occurredAtMs: nowMs,
+    })
+  ).definition;
+  const firstRuntime = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, primaryPort),
+    'ql3-ha-manual-run-retry-a',
+  )();
+  const secondRuntime = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, primaryPort),
+    'ql3-ha-manual-run-retry-b',
+  )();
+  try {
+    const source = await new PostgresTaskStartRepository(
+      primaryDatabase.pool,
+    ).startTask({
+      projectId: fixture.projectId,
+      taskId: fixture.taskId,
+      mutationId: randomUUID(),
+      expectedRevision: task.revision,
+      expectedContentDigest: task.contentDigest,
+      runId: fixture.sourceRunId,
+      attemptId: fixture.sourceAttemptId,
+      createdEventId: randomUUID(),
+      queuedEventId: randomUUID(),
+      subject: { type: 'user', id: fixture.actorId },
+      policyFence: { projectVersion: 1, bindingVersion: 1 },
+    });
+    await primaryDatabase.pool.query('BEGIN');
+    try {
+      await primaryDatabase.pool.query(
+        `UPDATE "ql3"."runs"
+            SET status = 'failed', version = 3, event_sequence = 3,
+                finished_at_ms = $2, error_code = 'HA_SOURCE_FAILURE',
+                error_summary = 'terminal source for manual retry'
+          WHERE id = $1`,
+        [fixture.sourceRunId, nowMs + 1],
+      );
+      await primaryDatabase.pool.query(
+        `UPDATE "ql3"."run_attempts"
+            SET status = 'failed', finished_at_ms = $2,
+                error_code = 'HA_SOURCE_FAILURE',
+                error_summary = 'terminal source for manual retry'
+          WHERE id = $1`,
+        [fixture.sourceAttemptId, nowMs + 1],
+      );
+      await primaryDatabase.pool.query(
+        `INSERT INTO "ql3"."run_events" (
+           id, run_id, sequence, type, dedupe_key, actor_type, actor_id,
+           attempt_id, payload, created_at_ms
+         ) VALUES ($1, $2, 3, 'run.failed', $3, 'executor', 'ha-contract',
+                   $4, $5::jsonb, $6)`,
+        [
+          randomUUID(),
+          fixture.sourceRunId,
+          `ha-manual-retry-source-failed-${suffix}`,
+          fixture.sourceAttemptId,
+          JSON.stringify({
+            from_status: 'queued',
+            to_status: 'failed',
+            version: 3,
+            error_code: 'HA_SOURCE_FAILURE',
+          }),
+          nowMs + 1,
+        ],
+      );
+      await primaryDatabase.pool.query('COMMIT');
+    } catch (error) {
+      await primaryDatabase.pool.query('ROLLBACK');
+      throw error;
+    }
+
+    const authentication = Object.freeze({
+      subject: { type: 'user', id: fixture.actorId },
+      authenticationId: `oidc:mfa-${suffix}`,
+      authenticatedAtMs: nowMs,
+      expiresAtMs: nowMs + 60 * 60_000,
+      assurance: 'multi_factor',
+    });
+    let commandIndex = 0;
+    const retryCommand = () => {
+      commandIndex += 1;
+      return {
+        projectId: fixture.projectId,
+        sourceRunId: fixture.sourceRunId,
+        mutationId: randomUUID(),
+        expectedRunVersion: 3,
+        expectedRunStatus: 'failed',
+        runId: randomUUID(),
+        attemptId: randomUUID(),
+        createdEventId: randomUUID(),
+        queuedEventId: randomUUID(),
+        auditEventId: randomUUID(),
+        requestId: `ha-manual-retry-${suffix}-${commandIndex}`,
+        principal: authentication,
+        policyFence: { projectVersion: 1, bindingVersion: 1 },
+      };
+    };
+    const firstRepository = new PostgresRunManualRetryRepository(
+      firstRuntime.pool,
+    );
+    const secondRepository = new PostgresRunManualRetryRepository(
+      secondRuntime.pool,
+    );
+    const replayCommand = retryCommand();
+    const exactRace = await Promise.all([
+      firstRepository.retryRun(replayCommand),
+      secondRepository.retryRun(replayCommand),
+    ]);
+    assert.deepEqual(exactRace.map(({ status }) => status).sort(), [
+      'accepted',
+      'existing',
+    ]);
+    assert.equal(exactRace[0].runId, exactRace[1].runId);
+    assert.equal(exactRace[0].attemptId, exactRace[1].attemptId);
+
+    for (
+      let index = 1;
+      index < CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT - 1;
+      index += 1
+    ) {
+      const repository = index % 2 === 0 ? firstRepository : secondRepository;
+      assert.equal(
+        (await repository.retryRun(retryCommand())).status,
+        'accepted',
+      );
+    }
+    const quotaRace = await Promise.allSettled([
+      firstRepository.retryRun(retryCommand()),
+      secondRepository.retryRun(retryCommand()),
+    ]);
+    const accepted = quotaRace.filter(({ status }) => status === 'fulfilled');
+    const rejected = quotaRace.filter(({ status }) => status === 'rejected');
+    assert.equal(accepted.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.equal(accepted[0].value.status, 'accepted');
+    assert.equal(
+      rejected[0].reason instanceof RunManualRetryRateLimitedError,
+      true,
+    );
+    assert.ok(rejected[0].reason.retryAfterMs > 0);
+
+    const expectedFacts = {
+      sourceStatus: 'failed',
+      retryRunCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+      attemptCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+      eventCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT * 2,
+      allowedAuditCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+      retryPolicyCount: 0,
+    };
+    assert.deepEqual(
+      await manualRunRetryFacts(primaryDatabase.pool, fixture),
+      expectedFacts,
+    );
+    await waitFor(async () => {
+      const facts = await manualRunRetryFacts(standbyDatabase.pool, fixture);
+      return facts.retryRunCount === CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT
+        ? facts
+        : null;
+    }, 'manual Run retry WAL replay');
+    assert.deepEqual(
+      await manualRunRetryFacts(standbyDatabase.pool, fixture),
+      expectedFacts,
+    );
+    return {
+      fixture,
+      report: {
+        sourceRunId: source.runId,
+        exactConcurrentReplay: true,
+        crossReplicaQuotaSerialized: true,
+        acceptedRetryRuns: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+        rejectedOverQuota: 1,
+        inheritedRetryPolicies: 0,
+        allowedAuditEvents: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+        replicatedBeforePromotion: true,
+        survivedPromotion: false,
+      },
+    };
+  } finally {
+    await Promise.all([firstRuntime.close(), secondRuntime.close()]);
+  }
+}
+
+async function verifyManualRunRetryAfterPromotion(options) {
+  const { promotedPool, evidence } = options;
+  assert.deepEqual(await manualRunRetryFacts(promotedPool, evidence.fixture), {
+    sourceStatus: 'failed',
+    retryRunCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+    attemptCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+    eventCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT * 2,
+    allowedAuditCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+    retryPolicyCount: 0,
+  });
+  evidence.report.survivedPromotion = true;
+}
+
 async function main(argv = process.argv.slice(2)) {
   const reportFile = privateReportPath(argv);
   const nodeMajor = Number(process.versions.node.split('.')[0]);
@@ -9432,6 +9724,7 @@ async function main(argv = process.argv.slice(2)) {
   let modelProviderCredentialTestConnection;
   let runAttemptLogRetentionEvidence;
   let runAttemptLogRetention;
+  let manualRunRetry;
   const startedAt = performance.now();
   const timeline = [];
   let report;
@@ -9865,6 +10158,15 @@ async function main(argv = process.argv.slice(2)) {
     }, 'synchronous standby readiness');
     timeline.push({
       state: 'synchronous_remote_apply_ready',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    manualRunRetry = await runManualRunRetryHaEvidence({
+      primaryPort,
+      primaryDatabase,
+      standbyDatabase,
+    });
+    timeline.push({
+      state: 'manual_run_retry_replicated',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     modelProviderCredentialTestConnection =
@@ -10828,6 +11130,14 @@ async function main(argv = process.argv.slice(2)) {
       promotedPool: promotedDatabase.pool,
       report: modelProviderCredentialTestConnection,
     });
+    await verifyManualRunRetryAfterPromotion({
+      promotedPool: promotedDatabase.pool,
+      evidence: manualRunRetry,
+    });
+    timeline.push({
+      state: 'manual_run_retry_survived_promotion',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
     timeline.push({
       state: 'optional_ai_feature_schema_survived_promotion',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
@@ -11560,7 +11870,7 @@ async function main(argv = process.argv.slice(2)) {
             FROM "ql3"."worker_credential_deliveries") AS "credentialDeliveries"`,
     );
     assert.deepEqual(sideEffects.rows, [
-      { runs: 11, runEvents: 39, credentialDeliveries: 4 },
+      { runs: 76, runEvents: 170, credentialDeliveries: 4 },
     ]);
     timeline.push({
       state: 'two_fresh_control_replicas_ready',
@@ -11628,6 +11938,7 @@ async function main(argv = process.argv.slice(2)) {
         ...sideEffects.rows[0],
         unexpectedDomainSideEffects: 0,
       },
+      manualRunRetry: manualRunRetry.report,
       transactionWindows: {
         ambiguousCommit: {
           clientObservedFailure: ambiguousCommitClientRejected,
@@ -11981,6 +12292,19 @@ async function main(argv = process.argv.slice(2)) {
         toolResultCatalogCommitResponseLossConvergesExactlyOnce: true,
         toolResultCompletionCommitResponseLossRecoversWithoutReexecution: true,
         toolResultRekeyCommitResponseLossConvergesExactlyOnce: true,
+        manualRunRetryConcurrentReplayIsExact:
+          manualRunRetry.report.exactConcurrentReplay,
+        manualRunRetryQuotaIsSerializedAcrossReplicas:
+          manualRunRetry.report.crossReplicaQuotaSerialized,
+        manualRunRetryDoesNotInheritAutomaticPolicy:
+          manualRunRetry.report.inheritedRetryPolicies === 0,
+        manualRunRetryAllowedAuditIsDurable:
+          manualRunRetry.report.allowedAuditEvents ===
+          CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
+        manualRunRetryReplicatesBeforePromotion:
+          manualRunRetry.report.replicatedBeforePromotion,
+        manualRunRetrySurvivesPromotion:
+          manualRunRetry.report.survivedPromotion,
         physicalStreaming: true,
         oldPrimaryFencedBeforePromotion: true,
         bothOldReplicasNotReady: true,

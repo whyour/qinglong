@@ -385,6 +385,7 @@
 | [ADR-0379](./ADR-0379-cluster-run-attempt-log-retention.md)                                                    | Cluster Run Attempt 日志多副本保留与条件删除                                                                                | Accepted                                |
 | [ADR-0380](./ADR-0380-local-lost-run-retry-single-control-cadence.md)                                         | Local lost Run retry 复用单一 execution-control cadence                                                                      | Accepted                                |
 | [ADR-0381](./ADR-0381-strong-local-manual-run-retry.md)                                                       | 强认证的 Local 手动 Run retry                                                                                                  | Accepted                                |
+| [ADR-0382](./ADR-0382-postgresql-cluster-manual-run-retry-authority.md)                                       | PostgreSQL Cluster 手动 Run retry 原子 Authority                                                                                | Accepted                                |
 
 ## 规则
 

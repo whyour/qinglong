@@ -11,6 +11,20 @@
 
 最新增量证据（2026-08-12）：
 
+- D-294/ADR-0382（已接受）
+  Cluster 已补齐共享 `qinglong/run-manual-retry@v1` 的 PostgreSQL 原子 authority，但在可信强认证 transport 完成前保持产品 route
+  关闭。adapter 只接受五分钟内的 `multi_factor|hardware` User，在单个 `SERIALIZABLE` 事务中取得 Project 行锁，重验
+  Project/RoleBinding、源 Run、current Task 与 immutable remote Worker execution revision，随后原子创建新 queued Run、claimed
+  Attempt、双 Event 与 allowed audit；精确 replay 返回原 identity，源 Run 不变且新 Run 不继承自动 retry policy。Project 行锁同时
+  序列化每 Project/User 64 次/分钟的既有 Run-ledger quota，因此不新增 package、dependency、migration、table/index、role、timer、
+  listener、cache 或 sidecar。实现刻意不使用会隐含要求 UPDATE privilege 的 RoleBinding/Task `FOR SHARE`，避免为了读取证明扩权。
+  PostgreSQL package 307 pass/1 conditional skip；真实 PostgreSQL 18.4 arm64 physical HA 在两个独立 Runtime Pool 下通过 exact
+  concurrent replay、最后 quota slot 竞争、同步 WAL 与 promotion 后核验，共 119 gates、timeline `1→2`，报告 SHA-256 为
+  `ca5d33a30f2768072223fb22346d962866948b0c0c970b62a6338d25a3ac9dda`。完整 18-package clean build/test 退出
+  0，backend 1163 pass/2 skip/0 fail；workspace 为 18 package/1061 source/1043 nested，package/dependency/Edge import
+  边界零 finding，14 种 Local Profile artifact 与 Local image static audit 全部 compatible；最小 Edge 保持 53 个 loaded module 且
+  不包含 Cluster/PostgreSQL/pg。现有 Cluster bearer 仍只有
+  `single_factor`，不得连接此 mutation；purpose-bound OIDC MFA/hardware HTTP/UI 与 Kubernetes 多节点组合证据仍待后续完成。
 - D-293/ADR-0381（已接受）
   Local Edge/Standalone 已增加强认证的人工 `run.retry` 纵向切片。共享 `qinglong/run-manual-retry@v1` 契约位于 Runtime Core；
   手工 retry 只接受 `failed|cancelled|timed_out` 的顶层 runtime-owned 非 Workflow Run，源 Run 与历史保持终态不变，并创建以
@@ -8508,7 +8522,7 @@ flowchart LR
 
 > ADR-0058 至 ADR-0092 的以下段落是历史快照，其 PostgreSQL 数字与“下一切片”已由 ADR-0104/0105 及后续 Accepted ADR 取代；资源、Package 和物理证据边界仍保留作为演进记录：PostgreSQL 当时 baseline 为 11 条 reviewed migration、capability v10、19 张表和 migration/runtime/admin/worker-ingress 四角色；本机 SQLite 为二十八条 reviewed migration、capability v14、二十六张 owned table，并新增正式 TaskDefinition head/immutable revision Repository。当前有二十七个受审 3.0 importer：Owner maintenance 已合并为两个权限隔离 subpath，execution/control/recovery/dispatch 已合并为 `@qinglong/local-execution` 四个单向 subpath，bootstrap/credential-recovery 已合并为 `@qinglong/local-owner-ceremony` 两个互不依赖 subpath；三个 package 都不提供聚合根入口，hard cap 已同步降为 27。一次拓扑 build/test 会先清理已登记 QL3 package 的 stale dist；27 包全量测试、dependency/source boundary、联网 vulnerability audit 与六种 Profile 制品门禁均通过。ADR-0090 让 production packlist 只发布 JS、`.d.ts` 和受审 assets/drizzle，不再携带开发 map；ADR-0092 后当前最大 application 为 1,691,009 bytes、267 files、61 loaded modules，最大抽样 RSS delta 11,780,096 bytes，低于 4 MiB/512 files/16 MiB。所有 package build 已变为 self-only，全量从约 198 次编译降至精确 27 次，clean 状态单包测试仍按依赖闭包工作。资源门禁已拆为原生 Linux x64/arm64 的 128 MiB router stress、256 MiB Edge release guard 与 512 MiB Cluster control guard，并从容器内部验证 cgroup v2、零 swap/OOM、非 root、只读挂载、seccomp 和 `NoNewPrivs`；本轮本地原生 arm64 三档已通过，x64 等待远端 CI，所有档位均明确不是物理设备或生产容量承诺。物理 Edge candidate recorder 已绑定设备 manifest、实际 Linux/存储环境、Edge/SQLite 基准与 no-replace SHA-256 报告，并会拒绝容器/VM；同设备同 boot 的 idle sampler、不主动填盘的专用文件系统 fault probe，以及通过正式 Repository 写入/扫描 100/1000/10000 个 `qinglong/command@v1` TaskDefinition 的规模记录协议均已具备契约门禁，但尚未取得固定实机报告或 signature。ADR-0091 已冻结 1–32 个 exact descriptor 的不可变 TaskSpec semantic registry、内建 command v1 和本机写前门禁；历史 revision 在 provider 缺失时仍可读。ADR-0092 已实现绑定 source revision/content digest 的 Profile-neutral command plan 与确定性本机 context/execution 映射，且保持 subpath-only。
 
-> 下表 PR-1 的旧“未完成”累计文字中，`completion/cancellation/timeout` 已由 ADR-0072 取代并闭环，Artifact range read 与 Local/Cluster retention 已由 ADR-0377/0378/0379 闭环，Local admission-safe lost retry lifecycle 已由 ADR-0380 闭环，强认证的 Local 手动 retry CLI、审计与 rate limit 已由 ADR-0381 闭环；当前本机剩余项是可信 HTTP MFA/hardware adapter、UI、Workflow recovery、部署 controller 与固定路由设备实机门。远端 Worker completion、Workflow cancellation 和 Cluster expiry/retry 的核心数据库链、HA 重放与启动装配也已闭环；仍缺 Cluster 手动 retry/PostgreSQL 全局 quota 与真实 Kubernetes 多节点故障证据，不能与本机结论混用。
+> 下表 PR-1 的旧“未完成”累计文字中，`completion/cancellation/timeout` 已由 ADR-0072 取代并闭环，Artifact range read 与 Local/Cluster retention 已由 ADR-0377/0378/0379 闭环，Local admission-safe lost retry lifecycle 已由 ADR-0380 闭环，强认证的 Local 手动 retry CLI、审计与 rate limit 已由 ADR-0381 闭环，Cluster 手动 retry/PostgreSQL 全局 quota 与 physical HA authority 已由 ADR-0382 闭环；当前剩余项是可信 HTTP MFA/hardware adapter、UI、Workflow recovery、部署 controller、固定路由设备实机门与真实 Kubernetes 多节点故障证据。远端 Worker completion、Workflow cancellation 和 Cluster expiry/retry 的核心数据库链、HA 重放与启动装配也已闭环；数据库 authority 完成不代表单因子 Cluster bearer 已获授权，不能与产品 transport 结论混用。
 >
 > 下表 PR-0 的累积长文本仍含“四角色、21 条 migration、capability v20、21 项 HA”历史短语；当前权威基线应读取为六角色、23 条 migration、capability v22/36 表和 23 项 physical HA gate。ADR-0145/0146 又增加默认关闭的 manager-only TLS 1.3 management process、可选双副本 operation 与 durable distributed quota；它仍缺全副本重启 keyset anti-rollback 和真实 IdP/live ingress，所以“受认证管理入口”保持“已孵化但生产失败关闭”。
 

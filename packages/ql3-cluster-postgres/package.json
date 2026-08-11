@@ -70,6 +70,11 @@
       "require": "./dist/task-start/taskStartRepository.js",
       "default": "./dist/task-start/taskStartRepository.js"
     },
+    "./run-manual-retry": {
+      "types": "./dist/run-management/runManualRetryRepository.d.ts",
+      "require": "./dist/run-management/runManualRetryRepository.js",
+      "default": "./dist/run-management/runManualRetryRepository.js"
+    },
     "./approval-manager": {
       "types": "./dist/approval-management/index.d.ts",
       "require": "./dist/approval-management/index.js",
