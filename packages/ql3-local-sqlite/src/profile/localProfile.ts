@@ -47,6 +47,7 @@ export type LocalProfileStorageBootstrapResult =
       readonly executionControl: LocalSqliteRuntimeDatabase['executionControl'];
       readonly completionReceipts: LocalSqliteRuntimeDatabase['completionReceipts'];
       readonly runAttemptLogRetention: LocalSqliteRuntimeDatabase['runAttemptLogRetention'];
+      readonly runLostRetry: LocalSqliteRuntimeDatabase['runLostRetry'];
       readonly localSecrets: LocalSqliteRuntimeDatabase['localSecrets'];
       readonly localSecretAdministration: LocalSqliteRuntimeDatabase['localSecretAdministration'];
       readonly projectPolicy: LocalSqliteRuntimeDatabase['projectPolicy'];
@@ -140,6 +141,7 @@ export async function bootstrapLocalProfileStorage(
       executionControl: database.executionControl,
       completionReceipts: database.completionReceipts,
       runAttemptLogRetention: database.runAttemptLogRetention,
+      runLostRetry: database.runLostRetry,
       localSecrets: database.localSecrets,
       localSecretAdministration: database.localSecretAdministration,
       projectPolicy: database.projectPolicy,

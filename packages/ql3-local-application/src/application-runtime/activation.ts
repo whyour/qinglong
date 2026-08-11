@@ -73,6 +73,7 @@ const EXECUTION_CONTROL_POLICIES = Object.freeze({
     cleanupPageSize: 8,
     controlIntervalMs: 5_000,
     controlPageSize: 4,
+    lostRetryPageSize: 2,
     maxDrainPages: 2,
     retentionMs: 24 * 60 * 60_000,
     artifactNormalRetentionMs: 7 * 24 * 60 * 60_000,
@@ -87,6 +88,7 @@ const EXECUTION_CONTROL_POLICIES = Object.freeze({
     cleanupPageSize: 32,
     controlIntervalMs: 1_000,
     controlPageSize: 32,
+    lostRetryPageSize: 16,
     maxDrainPages: 8,
     retentionMs: 60 * 60_000,
     artifactNormalRetentionMs: 30 * 24 * 60 * 60_000,
@@ -345,6 +347,8 @@ export async function bootstrapLocalApplication(
         stopTimeoutMs: executionPolicy.stopTimeoutMs,
         maxDrainPages: executionPolicy.maxDrainPages,
         artifactRetention,
+        lostRetry: storage.runLostRetry,
+        lostRetryPageSize: executionPolicy.lostRetryPageSize,
         onDiagnostic: async (error) => {
           if (error === undefined) return;
           await bestEffortAudit(options, {

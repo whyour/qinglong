@@ -1,6 +1,11 @@
 import type { LocalCompletionReceiptJournalCursor } from '@qinglong/runtime-core/local-completion-receipt-journal';
 import { assertLocalExecutionControlLimit } from '@qinglong/runtime-core/local-execution-control';
 import type { RunAttemptLogRetentionSweepSummary } from '@qinglong/runtime-core/run-attempt-log-retention';
+import {
+  RunLostRetryCoordinator,
+  type RunLostRetryPageResult,
+  type RunLostRetryRepository,
+} from '@qinglong/runtime-core/run-lost-retry';
 import type {
   LocalCompletionReceiptCleanupScanner,
   LocalCompletionReceiptCleanupSummary,
@@ -25,6 +30,8 @@ export interface LocalExecutionControlLifecycleOptions {
   readonly artifactRetention?: Readonly<{
     sweep(): Promise<RunAttemptLogRetentionSweepSummary>;
   }>;
+  readonly lostRetry?: RunLostRetryRepository;
+  readonly lostRetryPageSize?: number;
   readonly clock?: { now(): number };
   readonly onDiagnostic?: (
     error: unknown,
@@ -38,6 +45,7 @@ export interface LocalExecutionControlCycleSummary {
   readonly control: LocalExecutionControlScanSummary;
   readonly cleanup?: LocalCompletionReceiptCleanupSummary;
   readonly artifactRetention?: RunAttemptLogRetentionSweepSummary;
+  readonly lostRetry?: Readonly<RunLostRetryPageResult>;
 }
 
 export interface LocalExecutionControlStopSummary {
@@ -49,6 +57,7 @@ export interface LocalExecutionControlStopSummary {
 export class LocalExecutionControlLifecycle {
   private readonly clock: { now(): number };
   private readonly maxNotifications: number;
+  private readonly lostRetry: RunLostRetryCoordinator | undefined;
   private timer: NodeJS.Timeout | undefined;
   private inFlight: Promise<LocalExecutionControlCycleSummary> | undefined;
   private stopPromise: Promise<LocalExecutionControlStopSummary> | undefined;
@@ -122,6 +131,18 @@ export class LocalExecutionControlLifecycle {
     ) {
       throw new TypeError('Local Artifact retention lifecycle is invalid');
     }
+    if (
+      (options.lostRetry === undefined) !==
+      (options.lostRetryPageSize === undefined)
+    ) {
+      throw new TypeError('Local Run lost retry lifecycle is invalid');
+    }
+    this.lostRetry =
+      options.lostRetry && options.lostRetryPageSize !== undefined
+        ? new RunLostRetryCoordinator(options.lostRetry, {
+            pageSize: options.lostRetryPageSize,
+          })
+        : undefined;
     this.clock = options.clock ?? { now: Date.now };
   }
 
@@ -238,6 +259,7 @@ export class LocalExecutionControlLifecycle {
         : { cursor: this.controlCursor }),
     });
     this.controlCursor = control.truncated ? control.nextCursor : undefined;
+    const lostRetry = await this.lostRetry?.reconcile();
     const now = this.clock.now();
     if (!Number.isSafeInteger(now) || now < 0) {
       throw new RangeError(
@@ -266,6 +288,7 @@ export class LocalExecutionControlLifecycle {
       completions: completion.processed,
       completionFailures: completion.failed,
       control,
+      ...(lostRetry === undefined ? {} : { lostRetry }),
       ...(cleanup === undefined ? {} : { cleanup }),
       ...(artifactRetention === undefined ? {} : { artifactRetention }),
     });

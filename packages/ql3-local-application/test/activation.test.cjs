@@ -87,6 +87,8 @@ const RECEIPT_ATTEMPT_ID = '019f70c0-0000-7000-8000-000000000002';
 const RECEIPT_TOKEN = 'A'.repeat(32);
 const CLEANUP_RUN_ID = '019f70c0-0000-7000-8000-000000000011';
 const CLEANUP_ATTEMPT_ID = '019f70c0-0000-7000-8000-000000000012';
+const LOST_RETRY_RUN_ID = '019f70c0-0000-7000-8000-000000000021';
+const LOST_RETRY_ATTEMPT_ID = '019f70c0-0000-7000-8000-000000000022';
 const WORKFLOW_CANCELLATION_CREDENTIAL_ID = 'application-workflow-owner';
 const WORKFLOW_CANCELLATION_PEPPER_KEY_ID = 'application-workflow-owner-v1';
 const WORKFLOW_CANCELLATION_PEPPER_BYTES = Buffer.alloc(32, 141);
@@ -476,6 +478,58 @@ function insertActiveTargetRun(value, id, status = 'running') {
   );
   statement.run(id, status);
   target.close();
+}
+
+function insertSafeLostTargetRun(value) {
+  const now = Date.now();
+  const target = new DatabaseSync(value.targetPath);
+  target.exec('BEGIN IMMEDIATE');
+  try {
+    target
+      .prepare(
+        `INSERT INTO "Runs" (
+          id, project_id, task_id, task_revision, trigger_type,
+          execution_origin, execution_owner, status, version, event_sequence,
+          priority, created_at_ms, queued_at_ms, started_at_ms,
+          error_code, error_summary
+        ) VALUES (?, 'default', 'task-lost-retry', 'revision-lost-retry',
+          'manual', 'manual', 'runtime', 'lost', 1, 0, 0, ?, ?, ?,
+          'LOCAL_RECOVERY_EXECUTION_NOT_RUNNING', 'lost')`,
+      )
+      .run(LOST_RETRY_RUN_ID, now - 300, now - 250, now - 200);
+    target
+      .prepare(
+        `INSERT INTO "RunAttempts" (
+          id, run_id, attempt, status, executor_type, callback_sequence,
+          created_at_ms, started_at_ms, finished_at_ms,
+          error_code, error_summary
+        ) VALUES (?, ?, 1, 'lost', 'local_process', 0, ?, ?, ?,
+          'LOCAL_RECOVERY_EXECUTION_NOT_RUNNING', 'lost')`,
+      )
+      .run(
+        LOST_RETRY_ATTEMPT_ID,
+        LOST_RETRY_RUN_ID,
+        now - 250,
+        now - 200,
+        now - 100,
+      );
+    target
+      .prepare(
+        `INSERT INTO "RunRetryPolicies" (
+          run_id, max_attempts, retry_on_lost, safety,
+          backoff_base_ms, backoff_max_ms, next_attempt_at_ms,
+          version, created_at_ms, updated_at_ms
+        ) VALUES (?, 3, 1, 'idempotent', 86400000, 86400000,
+          NULL, 0, ?, ?)`,
+      )
+      .run(LOST_RETRY_RUN_ID, now - 300, now - 300);
+    target.exec('COMMIT');
+  } catch (error) {
+    if (target.isTransaction) target.exec('ROLLBACK');
+    throw error;
+  } finally {
+    target.close();
+  }
 }
 
 function insertManyActiveTargetRuns(value, count) {
@@ -2177,6 +2231,39 @@ test('durable Run candidates block lifecycle activation', async (t) => {
       error.truncated === false,
   );
   assertSourceWritable(value, 2);
+});
+
+test('reconciles a safe lost Run before the first Local scheduler pass', async (t) => {
+  const value = await prepare(t, 'edge');
+  insertSafeLostTargetRun(value);
+  const audits = [];
+  const result = await bootstrapLocalApplication(
+    options(value, {
+      applicationAudit: (record) => audits.push(record),
+    }),
+  );
+
+  assert.equal(result.status, 'active');
+  assert.equal(
+    (await result.runs.findRunById(LOST_RETRY_RUN_ID)).status,
+    'retry_wait',
+  );
+  const reconciled = audits.find(
+    (record) => record.state === 'receipts_reconciled',
+  );
+  assert.deepEqual(reconciled.executionControl.lostRetry, {
+    scanned: 1,
+    scheduled: 1,
+    requeued: 0,
+    failed: 0,
+    raced: 0,
+    hasMore: false,
+  });
+  assert.equal(
+    (await result.runs.findLatestAttemptByRunId(LOST_RETRY_RUN_ID)).attempt,
+    1,
+  );
+  assert.equal(await result.stop(), 'stopped');
 });
 
 test('startup recovery candidate overflow fails closed at the hard page bound', async (t) => {

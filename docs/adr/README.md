@@ -383,6 +383,7 @@
 | [ADR-0377](./ADR-0377-profile-aware-run-attempt-log-range-read.md)                                             | Profile-aware Run Attempt 日志 Range 读取                                                                                  | Accepted |
 | [ADR-0378](./ADR-0378-local-run-attempt-log-retention-and-tombstones.md)                                       | Local Run Attempt 日志有界保留与 durable tombstone                                                                         | Accepted |
 | [ADR-0379](./ADR-0379-cluster-run-attempt-log-retention.md)                                                    | Cluster Run Attempt 日志多副本保留与条件删除                                                                                | Accepted                                |
+| [ADR-0380](./ADR-0380-local-lost-run-retry-single-control-cadence.md)                                         | Local lost Run retry 复用单一 execution-control cadence                                                                      | Accepted                                |
 
 ## 规则
 

@@ -218,6 +218,12 @@
       "run": [
         "dist/run/run.d.ts"
       ],
+      "run-lost-retry": [
+        "dist/run/clusterRunLostRetry.d.ts"
+      ],
+      "cluster-run-lost-retry": [
+        "dist/run/clusterRunLostRetry.d.ts"
+      ],
       "project-run-list": [
         "dist/run/projectRunList.d.ts"
       ],
@@ -264,6 +270,16 @@
       "types": "./dist/run/runRepositoryContract.d.ts",
       "require": "./dist/run/runRepositoryContract.js",
       "default": "./dist/run/runRepositoryContract.js"
+    },
+    "./run-lost-retry": {
+      "types": "./dist/run/clusterRunLostRetry.d.ts",
+      "require": "./dist/run/clusterRunLostRetry.js",
+      "default": "./dist/run/clusterRunLostRetry.js"
+    },
+    "./cluster-run-lost-retry": {
+      "types": "./dist/run/clusterRunLostRetry.d.ts",
+      "require": "./dist/run/clusterRunLostRetry.js",
+      "default": "./dist/run/clusterRunLostRetry.js"
     },
     "./project-run-list": {
       "types": "./dist/run/projectRunList.d.ts",

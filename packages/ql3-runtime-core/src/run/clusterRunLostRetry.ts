@@ -1,12 +1,5 @@
-import type {
-  RunAttemptRecord,
-  RunEventRecord,
-  RunRecord,
-} from './run';
-import {
-  runRetryDelayMs,
-  type RunRetryPolicyRecord,
-} from './runRetryPolicy';
+import type { RunAttemptRecord, RunEventRecord, RunRecord } from './run';
+import { runRetryDelayMs, type RunRetryPolicyRecord } from './runRetryPolicy';
 
 export const MAX_CLUSTER_RUN_LOST_RETRY_PAGE_SIZE = 64;
 
@@ -62,7 +55,7 @@ export class ClusterRunLostRetryUnavailableError extends Error {
   readonly code = 'CLUSTER_RUN_LOST_RETRY_UNAVAILABLE';
 
   constructor(options?: ErrorOptions) {
-    super('Cluster Run lost retry is unavailable', options);
+    super('Run lost retry is unavailable', options);
     this.name = 'ClusterRunLostRetryUnavailableError';
   }
 }
@@ -71,7 +64,7 @@ export class InvalidClusterRunLostRetryTransitionError extends TypeError {
   readonly code = 'CLUSTER_RUN_LOST_RETRY_INVALID';
 
   constructor(message: string) {
-    super(`Cluster Run lost retry is invalid: ${message}`);
+    super(`Run lost retry is invalid: ${message}`);
     this.name = 'InvalidClusterRunLostRetryTransitionError';
   }
 }
@@ -182,10 +175,7 @@ function transitionTime(
 function finish(
   input: Readonly<ClusterRunLostRetryTransitionInput>,
   atMs: number,
-  disposition:
-    | 'failed_disabled'
-    | 'failed_unsafe'
-    | 'failed_exhausted',
+  disposition: 'failed_disabled' | 'failed_unsafe' | 'failed_exhausted',
   error: Readonly<{ code: string; summary: string }>,
 ): Readonly<ClusterRunLostRetryTransition> {
   const run = reserve(input.run, 'failed', atMs, error);
@@ -209,7 +199,7 @@ function finish(
         run,
         input.attempt.id,
         'run.failed',
-        `cluster-lost-retry:${disposition}:${input.attempt.id}`,
+        `run-lost-retry:${disposition}:${input.attempt.id}`,
         atMs,
         {
           from_status: input.run.status,
@@ -271,8 +261,11 @@ export function buildClusterRunLostRetryTransition(
 
   if (run.status === 'lost') {
     const nextAttemptAtMs =
-      Math.max(run.createdAtMs, attempt.createdAtMs, attempt.finishedAtMs ?? 0) +
-      runRetryDelayMs(policy, attempt.attempt);
+      Math.max(
+        run.createdAtMs,
+        attempt.createdAtMs,
+        attempt.finishedAtMs ?? 0,
+      ) + runRetryDelayMs(policy, attempt.attempt);
     if (!Number.isSafeInteger(nextAttemptAtMs)) {
       return invalid('next Attempt time overflowed');
     }
@@ -297,7 +290,7 @@ export function buildClusterRunLostRetryTransition(
           nextRun,
           attempt.id,
           'run.retry_wait',
-          `cluster-lost-retry:scheduled:${attempt.id}`,
+          `run-lost-retry:scheduled:${attempt.id}`,
           atMs,
           {
             from_status: 'lost',
@@ -313,10 +306,7 @@ export function buildClusterRunLostRetryTransition(
     });
   }
 
-  if (
-    policy.nextAttemptAtMs === undefined ||
-    policy.nextAttemptAtMs > atMs
-  ) {
+  if (policy.nextAttemptAtMs === undefined || policy.nextAttemptAtMs > atMs) {
     return invalid('retry_wait policy is not due');
   }
   const nextAttemptId = identifier('replacement Attempt ID', input.attemptId);
@@ -352,7 +342,7 @@ export function buildClusterRunLostRetryTransition(
         queued,
         replacement.id,
         'run.queued',
-        `cluster-lost-retry:queued:${replacement.id}`,
+        `run-lost-retry:queued:${replacement.id}`,
         atMs,
         {
           from_status: 'retry_wait',
@@ -365,7 +355,7 @@ export function buildClusterRunLostRetryTransition(
         claimed,
         replacement.id,
         'attempt.claimed',
-        `cluster-lost-retry:attempt-claimed:${replacement.id}`,
+        `run-lost-retry:attempt-claimed:${replacement.id}`,
         atMs,
         {
           attempt: replacement.attempt,
@@ -387,11 +377,11 @@ export function normalizeClusterRunLostRetryPageCommand(
     Object.keys(value).length !== 1 ||
     !Object.prototype.hasOwnProperty.call(value, 'limit')
   ) {
-    throw new TypeError('Cluster Run lost retry command is invalid');
+    throw new TypeError('Run lost retry command is invalid');
   }
   return Object.freeze({
     limit: boundedInteger(
-      'Cluster Run lost retry page size',
+      'Run lost retry page size',
       value.limit,
       1,
       MAX_CLUSTER_RUN_LOST_RETRY_PAGE_SIZE,
@@ -410,40 +400,40 @@ export function normalizeClusterRunLostRetryPageResult(
     Object.keys(value).sort().join(',') !==
       'failed,hasMore,raced,requeued,scanned,scheduled'
   ) {
-    throw new TypeError('Cluster Run lost retry result is invalid');
+    throw new TypeError('Run lost retry result is invalid');
   }
   const maximum = boundedInteger(
-    'Cluster Run lost retry result limit',
+    'Run lost retry result limit',
     limit,
     1,
     MAX_CLUSTER_RUN_LOST_RETRY_PAGE_SIZE,
   );
   const scanned = boundedInteger(
-    'Cluster Run lost retry scanned count',
+    'Run lost retry scanned count',
     value.scanned,
     0,
     maximum,
   );
   const scheduled = boundedInteger(
-    'Cluster Run lost retry scheduled count',
+    'Run lost retry scheduled count',
     value.scheduled,
     0,
     scanned,
   );
   const requeued = boundedInteger(
-    'Cluster Run lost retry requeued count',
+    'Run lost retry requeued count',
     value.requeued,
     0,
     scanned,
   );
   const failed = boundedInteger(
-    'Cluster Run lost retry failed count',
+    'Run lost retry failed count',
     value.failed,
     0,
     scanned,
   );
   const raced = boundedInteger(
-    'Cluster Run lost retry raced count',
+    'Run lost retry raced count',
     value.raced,
     0,
     scanned,
@@ -452,7 +442,7 @@ export function normalizeClusterRunLostRetryPageResult(
     scheduled + requeued + failed + raced !== scanned ||
     typeof value.hasMore !== 'boolean'
   ) {
-    throw new TypeError('Cluster Run lost retry result counts are invalid');
+    throw new TypeError('Run lost retry result counts are invalid');
   }
   return Object.freeze({
     scanned,
@@ -481,10 +471,10 @@ export class ClusterRunLostRetryCoordinator {
       typeof options !== 'object' ||
       Array.isArray(options)
     ) {
-      throw new TypeError('Cluster Run lost retry coordinator is invalid');
+      throw new TypeError('Run lost retry coordinator is invalid');
     }
     this.pageSize = boundedInteger(
-      'Cluster Run lost retry page size',
+      'Run lost retry page size',
       options.pageSize ?? 16,
       1,
       MAX_CLUSTER_RUN_LOST_RETRY_PAGE_SIZE,
@@ -494,9 +484,7 @@ export class ClusterRunLostRetryCoordinator {
   reconcile(): Promise<Readonly<ClusterRunLostRetryPageResult>> {
     if (this.inFlight) return this.inFlight;
     const operation = Promise.resolve()
-      .then(() =>
-        this.repository.reconcilePage({ limit: this.pageSize }),
-      )
+      .then(() => this.repository.reconcilePage({ limit: this.pageSize }))
       .then((result) =>
         normalizeClusterRunLostRetryPageResult(result, this.pageSize),
       )
@@ -511,3 +499,32 @@ export class ClusterRunLostRetryCoordinator {
     return operation;
   }
 }
+
+/**
+ * Profile-neutral names are the canonical API for new adapters. The Cluster
+ * names remain exported because early 3.0 incubator consumers used them before
+ * Local Profiles acquired the same reconciliation lifecycle.
+ */
+export const MAX_RUN_LOST_RETRY_PAGE_SIZE =
+  MAX_CLUSTER_RUN_LOST_RETRY_PAGE_SIZE;
+export type RunLostRetryDisposition = ClusterRunLostRetryDisposition;
+export type RunLostRetryPageCommand = ClusterRunLostRetryPageCommand;
+export type RunLostRetryPageResult = ClusterRunLostRetryPageResult;
+export type RunLostRetryRepository = ClusterRunLostRetryRepository;
+export type RunLostRetryCoordinatorOptions =
+  ClusterRunLostRetryCoordinatorOptions;
+export type RunLostRetryTransitionInput = ClusterRunLostRetryTransitionInput;
+export type RunLostRetryTransition = ClusterRunLostRetryTransition;
+export type RunLostRetryUnavailableError = ClusterRunLostRetryUnavailableError;
+export type InvalidRunLostRetryTransitionError =
+  InvalidClusterRunLostRetryTransitionError;
+export type RunLostRetryCoordinator = ClusterRunLostRetryCoordinator;
+export const RunLostRetryUnavailableError = ClusterRunLostRetryUnavailableError;
+export const InvalidRunLostRetryTransitionError =
+  InvalidClusterRunLostRetryTransitionError;
+export const buildRunLostRetryTransition = buildClusterRunLostRetryTransition;
+export const normalizeRunLostRetryPageCommand =
+  normalizeClusterRunLostRetryPageCommand;
+export const normalizeRunLostRetryPageResult =
+  normalizeClusterRunLostRetryPageResult;
+export const RunLostRetryCoordinator = ClusterRunLostRetryCoordinator;

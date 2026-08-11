@@ -63,6 +63,7 @@ import type { LocalSqlitePluginPackageWorkflowFrontierRepository } from '../plug
 import type { LocalSqlitePluginPackageWorkflowTaskAttemptAdmissionRepository } from '../plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmissionRepository';
 import type { LocalSqlitePluginPackageWorkflowCancellationConvergenceRepository } from '../plugin-package/workflow/pluginPackageWorkflowCancellationConvergenceRepository';
 import { LocalSqliteRunAttemptLogRetentionRepository } from '../run/runAttemptLogRetentionRepository';
+import { LocalSqliteRunLostRetryRepository } from '../run/runLostRetryRepository';
 
 export interface LocalSqliteRuntimeDependencies {
   readonly taskSpecSemanticRegistry?: TaskSpecSemanticRegistry;
@@ -99,6 +100,7 @@ export interface LocalSqliteRuntimeDatabase {
   readonly executionControl: LocalExecutionControlSource;
   readonly completionReceipts: LocalCompletionReceiptJournal;
   readonly runAttemptLogRetention: LocalSqliteRunAttemptLogRetentionRepository;
+  readonly runLostRetry: LocalSqliteRunLostRetryRepository;
   readonly localSecrets: LocalSecretEnvelopeRepository;
   readonly localSecretAdministration: LocalSecretAdministrationRepository;
   readonly projectPolicy: ProjectPolicyRepository;
@@ -183,6 +185,10 @@ export async function openLocalSqliteRuntimeDatabase(
     const ownerPepper = new LocalSqliteOwnerPepperRepository(authority);
     const runAttemptLogRetention =
       new LocalSqliteRunAttemptLogRetentionRepository(authority);
+    const runLostRetry = new LocalSqliteRunLostRetryRepository(
+      authority,
+      runRepository,
+    );
     let pluginPackageInstallsPromise:
       | Promise<PluginPackageInstallRepository>
       | undefined;
@@ -237,6 +243,7 @@ export async function openLocalSqliteRuntimeDatabase(
       executionControl: runRuntimeCapabilities.executionControl,
       completionReceipts: runRuntimeCapabilities.completionReceipts,
       runAttemptLogRetention,
+      runLostRetry,
       localSecrets: securityAuthority,
       localSecretAdministration: securityAuthority,
       projectPolicy,

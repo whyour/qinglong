@@ -250,6 +250,11 @@
       "require": "./dist/run/runAttemptLogRetentionRepository.js",
       "default": "./dist/run/runAttemptLogRetentionRepository.js"
     },
+    "./run-lost-retry": {
+      "types": "./dist/run/runLostRetryRepository.d.ts",
+      "require": "./dist/run/runLostRetryRepository.js",
+      "default": "./dist/run/runLostRetryRepository.js"
+    },
     "./trigger-administration": {
       "types": "./dist/scheduling/triggerAdministration.d.ts",
       "require": "./dist/scheduling/triggerAdministration.js",

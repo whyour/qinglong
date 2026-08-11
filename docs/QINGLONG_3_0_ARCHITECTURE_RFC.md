@@ -11,6 +11,16 @@
 
 最新增量证据（2026-08-12）：
 
+- D-292/ADR-0380（已接受）
+  Local Edge/Standalone 已补齐 admission-safe lost Run retry 纵向闭环，并修正“共享纯策略却暴露 Cluster-only 名称”的边界。
+  Runtime Core 在既有 Run 域发布 canonical `RunLostRetry*`/`run-lost-retry` subpath，同时保留早期 Cluster 名称兼容；SQLite
+  adapter 复用唯一 operation authority 与 `BEGIN IMMEDIATE` Run aggregate transaction，有界选择 runtime-owned、非 Workflow、
+  无 cancellation intent 且 latest Attempt 为 lost 的候选，原子 CAS Run/RetryPolicy、插入新 Attempt 与 Events。Local application
+  把一页 retry 接入现有 execution-control 周期，顺序为 completion→control→lost retry→慢速 cleanup；启动时在 recovery 后、Scheduler
+  前执行首轮。Edge 为 2 条/5 秒，Standalone 为 16 条/1 秒，不新增 package、migration、表、索引、timer、连接、listener 或 sidecar。
+  无 policy/禁用、unknown safety、attempt 耗尽均终态失败关闭；只有 admission 时已证明 `idempotent|deduplicated` 的策略才创建全新
+  Attempt。workspace 仍为 18 package/1055 source/1037 nested，`singleSourcePackages=[]`、`shallowSourcePackages=[]`。人工
+  `run.retry` API/CLI/UI、强认证、审计与 rate limit 仍未包含，不能把自动 lost retry 误报为人工恢复完成。
 - D-291/ADR-0379（已接受）
   Cluster Run Attempt 日志 retention 已完成多副本纵向闭环，且没有新增 package：共享 claim contract 位于 Runtime Core 既有 Run
   log-retention 目录；PostgreSQL v54 提供 durable control、immutable tombstone、terminal remote Worker candidate index 与最小权限
@@ -8485,7 +8495,7 @@ flowchart LR
 
 > ADR-0058 至 ADR-0092 的以下段落是历史快照，其 PostgreSQL 数字与“下一切片”已由 ADR-0104/0105 及后续 Accepted ADR 取代；资源、Package 和物理证据边界仍保留作为演进记录：PostgreSQL 当时 baseline 为 11 条 reviewed migration、capability v10、19 张表和 migration/runtime/admin/worker-ingress 四角色；本机 SQLite 为二十八条 reviewed migration、capability v14、二十六张 owned table，并新增正式 TaskDefinition head/immutable revision Repository。当前有二十七个受审 3.0 importer：Owner maintenance 已合并为两个权限隔离 subpath，execution/control/recovery/dispatch 已合并为 `@qinglong/local-execution` 四个单向 subpath，bootstrap/credential-recovery 已合并为 `@qinglong/local-owner-ceremony` 两个互不依赖 subpath；三个 package 都不提供聚合根入口，hard cap 已同步降为 27。一次拓扑 build/test 会先清理已登记 QL3 package 的 stale dist；27 包全量测试、dependency/source boundary、联网 vulnerability audit 与六种 Profile 制品门禁均通过。ADR-0090 让 production packlist 只发布 JS、`.d.ts` 和受审 assets/drizzle，不再携带开发 map；ADR-0092 后当前最大 application 为 1,691,009 bytes、267 files、61 loaded modules，最大抽样 RSS delta 11,780,096 bytes，低于 4 MiB/512 files/16 MiB。所有 package build 已变为 self-only，全量从约 198 次编译降至精确 27 次，clean 状态单包测试仍按依赖闭包工作。资源门禁已拆为原生 Linux x64/arm64 的 128 MiB router stress、256 MiB Edge release guard 与 512 MiB Cluster control guard，并从容器内部验证 cgroup v2、零 swap/OOM、非 root、只读挂载、seccomp 和 `NoNewPrivs`；本轮本地原生 arm64 三档已通过，x64 等待远端 CI，所有档位均明确不是物理设备或生产容量承诺。物理 Edge candidate recorder 已绑定设备 manifest、实际 Linux/存储环境、Edge/SQLite 基准与 no-replace SHA-256 报告，并会拒绝容器/VM；同设备同 boot 的 idle sampler、不主动填盘的专用文件系统 fault probe，以及通过正式 Repository 写入/扫描 100/1000/10000 个 `qinglong/command@v1` TaskDefinition 的规模记录协议均已具备契约门禁，但尚未取得固定实机报告或 signature。ADR-0091 已冻结 1–32 个 exact descriptor 的不可变 TaskSpec semantic registry、内建 command v1 和本机写前门禁；历史 revision 在 provider 缺失时仍可读。ADR-0092 已实现绑定 source revision/content digest 的 Profile-neutral command plan 与确定性本机 context/execution 映射，且保持 subpath-only。
 
-> 下表 PR-1 的旧“未完成”累计文字中，`completion/cancellation/timeout` 已由 ADR-0072 取代并闭环，Artifact range read 已由 ADR-0377 闭环；当前本机剩余项是人工 recovery、retry 产品策略、Artifact retention/tombstone、HTTP/CLI/UI 与部署 controller。远端 Worker completion 与 Workflow cancellation 的核心数据库链和 HA 重放已闭环；仍缺 production ingress/internal runtime port、expiry/retry lifecycle、部署启动装配与真实 Kubernetes 故障证据，不能与本机结论混用。
+> 下表 PR-1 的旧“未完成”累计文字中，`completion/cancellation/timeout` 已由 ADR-0072 取代并闭环，Artifact range read 与 Local/Cluster retention 已由 ADR-0377/0378/0379 闭环，Local admission-safe lost retry lifecycle 已由 ADR-0380 闭环；当前本机剩余项是人工 recovery、手工 retry 产品策略/API、HTTP/CLI/UI、部署 controller 与固定路由设备实机门。远端 Worker completion、Workflow cancellation 和 Cluster expiry/retry 的核心数据库链、HA 重放与启动装配也已闭环；仍缺真实 Kubernetes 多节点故障证据，不能与本机结论混用。
 >
 > 下表 PR-0 的累积长文本仍含“四角色、21 条 migration、capability v20、21 项 HA”历史短语；当前权威基线应读取为六角色、23 条 migration、capability v22/36 表和 23 项 physical HA gate。ADR-0145/0146 又增加默认关闭的 manager-only TLS 1.3 management process、可选双副本 operation 与 durable distributed quota；它仍缺全副本重启 keyset anti-rollback 和真实 IdP/live ingress，所以“受认证管理入口”保持“已孵化但生产失败关闭”。
 

@@ -88,6 +88,7 @@ export type LocalAdoptedProfileBootstrapResult =
       readonly executionControl: ReadyLocalStorage['executionControl'];
       readonly completionReceipts: ReadyLocalStorage['completionReceipts'];
       readonly runAttemptLogRetention: ReadyLocalStorage['runAttemptLogRetention'];
+      readonly runLostRetry: ReadyLocalStorage['runLostRetry'];
       readonly localSecrets: LocalSecretEnvelopeRepository;
       readonly localSecretAdministration: LocalSecretAdministrationRepository;
       readonly projectPolicy: ProjectPolicyRepository;
@@ -233,6 +234,7 @@ export async function bootstrapLocalAdoptedProfileStorage(
       executionControl: readyStorage.executionControl,
       completionReceipts: readyStorage.completionReceipts,
       runAttemptLogRetention: readyStorage.runAttemptLogRetention,
+      runLostRetry: readyStorage.runLostRetry,
       localSecrets: readyStorage.localSecrets,
       localSecretAdministration: readyStorage.localSecretAdministration,
       projectPolicy: readyStorage.projectPolicy,
