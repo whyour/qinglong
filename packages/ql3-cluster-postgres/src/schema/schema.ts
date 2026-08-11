@@ -4474,6 +4474,162 @@ export const runAttempts = ql3Schema.table(
     index('ql3_run_attempts_lease_idx')
       .on(table.leaseExpiresAtMs, table.id)
       .where(sql`${table.leaseExpiresAtMs} is not null`),
+    index('ql3_run_log_retention_candidate_idx')
+      .on(table.finishedAtMs, table.id)
+      .where(
+        sql`${table.executorType} = 'remote_worker' and ${table.logArtifactId} is not null and ${table.status} in ('succeeded', 'failed', 'cancelled', 'timed_out')`,
+      ),
+  ],
+);
+
+export const runAttemptLogRetentionControls = ql3Schema.table(
+  'run_attempt_log_retention_controls',
+  {
+    attemptId: varchar('attempt_id', { length: 36 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    runId: varchar('run_id', { length: 36 }).notNull(),
+    logArtifactId: varchar('log_artifact_id', { length: 36 }).notNull(),
+    executorType: varchar('executor_type', { length: 32 }).notNull(),
+    finishedAtMs: bigint('finished_at_ms', { mode: 'number' }).notNull(),
+    eligibleAtMs: bigint('eligible_at_ms', { mode: 'number' }).notNull(),
+    state: varchar('state', { length: 16 }).notNull(),
+    claimOwner: varchar('claim_owner', { length: 128 }),
+    claimToken: varchar('claim_token', { length: 64 }),
+    claimVersion: integer('claim_version').default(1).notNull(),
+    claimExpiresAtMs: bigint('claim_expires_at_ms', { mode: 'number' }),
+    nextClaimAtMs: bigint('next_claim_at_ms', { mode: 'number' }),
+    failureCount: integer('failure_count').default(0).notNull(),
+    lastFailureCode: varchar('last_failure_code', { length: 64 }),
+    createdAtMs: bigint('created_at_ms', { mode: 'number' }).notNull(),
+    updatedAtMs: bigint('updated_at_ms', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('ql3_run_log_retention_control_artifact_key').on(
+      table.logArtifactId,
+    ),
+    check(
+      'ql3_run_log_retention_control_identity_check',
+      sql`char_length(${table.projectId}) between 1 and 128 and char_length(${table.runId}) between 1 and 36 and char_length(${table.attemptId}) between 1 and 36 and ${table.logArtifactId} ~ '^wlog-[a-f0-9]{30}$' and ${table.executorType} = 'remote_worker'`,
+    ),
+    check(
+      'ql3_run_log_retention_control_time_check',
+      sql`${table.finishedAtMs} >= 0 and ${table.eligibleAtMs} >= ${table.finishedAtMs} and ${table.createdAtMs} >= 0 and ${table.updatedAtMs} >= ${table.createdAtMs}`,
+    ),
+    check(
+      'ql3_run_log_retention_control_state_check',
+      sql`${table.state} in ('claimed', 'retry', 'manual')`,
+    ),
+    check(
+      'ql3_run_log_retention_control_claim_owner_check',
+      sql`${table.claimOwner} is null or ${table.claimOwner} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'`,
+    ),
+    check(
+      'ql3_run_log_retention_control_claim_token_check',
+      sql`${table.claimToken} is null or ${table.claimToken} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{15,63}$'`,
+    ),
+    check(
+      'ql3_run_log_retention_control_claim_version_check',
+      sql`${table.claimVersion} between 1 and 2147483647`,
+    ),
+    check(
+      'ql3_run_log_retention_control_claim_expiry_check',
+      sql`${table.claimExpiresAtMs} is null or ${table.claimExpiresAtMs} >= 0`,
+    ),
+    check(
+      'ql3_run_log_retention_control_next_claim_check',
+      sql`${table.nextClaimAtMs} is null or ${table.nextClaimAtMs} >= 0`,
+    ),
+    check(
+      'ql3_run_log_retention_control_failure_count_check',
+      sql`${table.failureCount} between 0 and 2147483647`,
+    ),
+    check(
+      'ql3_run_log_retention_control_failure_code_check',
+      sql`${table.lastFailureCode} is null or ${table.lastFailureCode} in ('artifact_unavailable', 'artifact_integrity_mismatch', 'retirement_record_unavailable')`,
+    ),
+    check(
+      'ql3_run_log_retention_control_state_shape_check',
+      sql`(${table.state} = 'claimed' and ${table.claimOwner} is not null and ${table.claimToken} is not null and ${table.claimExpiresAtMs} is not null and ${table.nextClaimAtMs} is null) or (${table.state} = 'retry' and ${table.claimOwner} is null and ${table.claimToken} is null and ${table.claimExpiresAtMs} is null and ${table.nextClaimAtMs} is not null and ${table.lastFailureCode} is not null) or (${table.state} = 'manual' and ${table.claimOwner} is null and ${table.claimToken} is null and ${table.claimExpiresAtMs} is null and ${table.nextClaimAtMs} is null and ${table.lastFailureCode} is not null)`,
+    ),
+    foreignKey({
+      name: 'ql3_run_log_retention_control_attempt_fk',
+      columns: [table.attemptId],
+      foreignColumns: [runAttempts.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'ql3_run_log_retention_control_run_fk',
+      columns: [table.runId],
+      foreignColumns: [runs.id],
+    }).onDelete('cascade'),
+    index('ql3_run_log_retention_retry_idx')
+      .on(table.nextClaimAtMs, table.finishedAtMs, table.attemptId)
+      .where(sql`${table.state} = 'retry'`),
+    index('ql3_run_log_retention_claim_expiry_idx')
+      .on(table.claimExpiresAtMs, table.finishedAtMs, table.attemptId)
+      .where(sql`${table.state} = 'claimed'`),
+  ],
+);
+
+export const runAttemptLogArtifactTombstones = ql3Schema.table(
+  'run_attempt_log_artifact_tombstones',
+  {
+    logArtifactId: varchar('log_artifact_id', { length: 36 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    runId: varchar('run_id', { length: 36 }).notNull(),
+    attemptId: varchar('attempt_id', { length: 36 }).notNull(),
+    executorType: varchar('executor_type', { length: 32 }).notNull(),
+    finishedAtMs: bigint('finished_at_ms', { mode: 'number' }).notNull(),
+    eligibleAtMs: bigint('eligible_at_ms', { mode: 'number' }).notNull(),
+    retiredAtMs: bigint('retired_at_ms', { mode: 'number' }).notNull(),
+    disposition: varchar('disposition', { length: 16 }).notNull(),
+    byteLength: bigint('byte_length', { mode: 'number' }).notNull(),
+    truncated: varchar('truncated', { length: 16 }).notNull(),
+    maximumBytes: bigint('maximum_bytes', { mode: 'number' }),
+    truncationObservedAtMs: bigint('truncation_observed_at_ms', {
+      mode: 'number',
+    }),
+    recordDigest: char('record_digest', { length: 64 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('ql3_run_log_tombstone_attempt_key').on(table.attemptId),
+    check(
+      'ql3_run_log_tombstone_identity_check',
+      sql`char_length(${table.projectId}) between 1 and 128 and char_length(${table.runId}) between 1 and 36 and char_length(${table.attemptId}) between 1 and 36 and ${table.logArtifactId} ~ '^wlog-[a-f0-9]{30}$' and ${table.executorType} = 'remote_worker'`,
+    ),
+    check(
+      'ql3_run_log_tombstone_time_check',
+      sql`${table.finishedAtMs} >= 0 and ${table.eligibleAtMs} >= ${table.finishedAtMs} and ${table.retiredAtMs} >= ${table.eligibleAtMs}`,
+    ),
+    check(
+      'ql3_run_log_tombstone_disposition_check',
+      sql`${table.disposition} in ('deleted', 'already_absent') and (${table.disposition} <> 'already_absent' or ${table.byteLength} = 0)`,
+    ),
+    check(
+      'ql3_run_log_tombstone_size_check',
+      sql`${table.byteLength} between 0 and 1073741824`,
+    ),
+    check(
+      'ql3_run_log_tombstone_truncation_check',
+      sql`(${table.truncated} = 'unknown' and ${table.maximumBytes} is null and ${table.truncationObservedAtMs} is null) or (${table.truncated} in ('true', 'false') and ${table.maximumBytes} >= 1 and ${table.truncationObservedAtMs} >= 0)`,
+    ),
+    check(
+      'ql3_run_log_tombstone_digest_check',
+      sql`${table.recordDigest} ~ '^[a-f0-9]{64}$'`,
+    ),
+    foreignKey({
+      name: 'ql3_run_log_tombstone_attempt_fk',
+      columns: [table.attemptId],
+      foreignColumns: [runAttempts.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'ql3_run_log_tombstone_run_fk',
+      columns: [table.runId],
+      foreignColumns: [runs.id],
+    }).onDelete('cascade'),
+    index('ql3_run_log_tombstone_retired_idx').on(
+      table.retiredAtMs,
+      table.attemptId,
+    ),
   ],
 );
 
@@ -5700,6 +5856,8 @@ export const ql3PostgresTables = [
   toolExecutionResultRekeyHeads,
   toolResultKeyRetirementReceipts,
   runAttempts,
+  runAttemptLogRetentionControls,
+  runAttemptLogArtifactTombstones,
   workerSessions,
   runDispatchLeases,
   workerCredentials,

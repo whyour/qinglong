@@ -103,6 +103,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0052-automation-management-identity-keyset-ledger',
       'pg-0053-plugin-package-workflow-run-list-index',
       'pg-0054-approval-management-boundary',
+      'pg-0055-run-attempt-log-retention',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -507,6 +508,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0054-approval-management-boundary',
       checksum:
         '5e3e6b222269f095e0d7a985fdeb0ea154510e59dfe15873192af8c8d603fca3',
+    },
+    {
+      id: 'pg-0055-run-attempt-log-retention',
+      checksum:
+        'c775c65ec03ae3a1606f899064d2d38fa63fd136ce52cbd1b1172c3a51e6bf30',
     },
   ];
   assert.deepEqual(
@@ -1873,5 +1879,28 @@ test('advances capability v53 with isolated human Approval management authority'
   assert.match(
     sql,
     /migration_id = 'pg-0053-plugin-package-workflow-run-list-index'/,
+  );
+});
+
+test('advances capability v54 with durable Cluster log retention authority', async () => {
+  const migration = migrationById('pg-0055-run-attempt-log-retention');
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(sql, /run_attempt_log_retention_controls/);
+  assert.match(sql, /run_attempt_log_artifact_tombstones/);
+  assert.match(sql, /FOR UPDATE|SKIP LOCKED|claim_expires_at_ms/);
+  assert.match(sql, /TO ql3_runtime/);
+  assert.match(sql, /contract_version = 54/);
+  assert.match(sql, /"run_attempt_log_retention":1/);
+  assert.match(sql, /contract_version = 53/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0054-approval-management-boundary'/,
   );
 });

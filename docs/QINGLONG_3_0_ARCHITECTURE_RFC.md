@@ -11,6 +11,17 @@
 
 最新增量证据（2026-08-12）：
 
+- D-291/ADR-0379（进行中，PostgreSQL authority 阶段完成）
+  Cluster Run Attempt 日志 retention 第一阶段已冻结并实现多副本权威边界，且没有新增 package：共享 claim contract 位于既有
+  Runtime Core Run log-retention 目录，PostgreSQL v54 增加 durable control 与 immutable tombstone、terminal remote Worker
+  candidate index 和 `run_attempt_log_retention` capability。候选只允许 runtime-owned、Run/Attempt 双终态、非 lost、canonical
+  `remote_worker/wlog-*` 且超过 cutoff；每批最多 16 条，通过短 `READ COMMITTED` 事务和 `FOR UPDATE ... SKIP LOCKED` 获取
+  owner/token/version/expiry fence。S3 网络调用明确位于数据库事务之外；finalize 在第二个短事务中重验完整 fence 与 durable
+  Run/Attempt identity，写 exact retirement record 后删除 control。retry/manual 持久化失败分类并提供最长 24 小时 backoff；lease
+  过期可由其他副本安全接管。`ql3_runtime` 可完整维护 control，但 tombstone 只有 SELECT/INSERT，其他角色保持零权限；repository
+  已提供 digest/identity 失败关闭的 retention state read，为 Cluster 410 wiring 提供权威来源。migration/schema/readiness/repository
+  定向 63/63 通过。ADR 暂保持 Proposed；下一阶段继续完成 validated S3 HEAD、ETag/VersionId 条件删除、bounded lifecycle、MinIO
+  failure matrix 与 PostgreSQL HA failover，全部完整门通过后才接受。
 - D-290/ADR-0378（已接受）
   Local Run Attempt 日志 retention 已形成真实纵向切片：Runtime Core 增加精确 identity、canonical SHA-256 的 immutable
   retirement record、容量压力策略、有界 page/delete budget 与 durable cursor；日志读取在存储前检查 tombstone，并在 missing 后二次

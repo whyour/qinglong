@@ -54,6 +54,7 @@ export { PostgresToolResultKeyCatalogReader } from '../tool-execution/toolResult
 export { PostgresToolResultRekeyReader } from '../tool-execution/toolResultRekeyRepository';
 
 export * from '../run/runRepository';
+export * from '../run/runAttemptLogRetentionClaimRepository';
 export * from '../security/projectPolicyRepository';
 export * from '../security/apiCredentialRepository';
 export * from '../security/securityAuditRepository';

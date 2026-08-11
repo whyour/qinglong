@@ -58,6 +58,8 @@ function validPrivileges() {
     tool_invocation_input_artifacts: [true, true, false, false],
     tool_invocation_preview_artifacts: [true, true, false, false],
     run_attempts: [true, true, true, false],
+    run_attempt_log_retention_controls: [true, true, true, true],
+    run_attempt_log_artifact_tombstones: [true, true, false, false],
     worker_sessions: [true, true, true, false],
     run_dispatch_leases: [true, true, true, false],
     worker_credentials: [false, false, false, false],
@@ -178,6 +180,8 @@ function validAdminPrivileges() {
     tool_invocation_input_artifacts: [false, false, false, false],
     tool_invocation_preview_artifacts: [false, false, false, false],
     run_attempts: [false, false, false, false],
+    run_attempt_log_retention_controls: [false, false, false, false],
+    run_attempt_log_artifact_tombstones: [false, false, false, false],
     worker_sessions: [false, false, false, false],
     run_dispatch_leases: [false, false, false, false],
     worker_credentials: [true, true, true, false],
@@ -692,7 +696,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 53,
+    contractVersion: 54,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -748,6 +752,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0052-automation-management-identity-keyset-ledger',
       'pg-0053-plugin-package-workflow-run-list-index',
       'pg-0054-approval-management-boundary',
+      'pg-0055-run-attempt-log-retention',
     ],
   });
 });
@@ -778,10 +783,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 53);
+  assert.equal(report.contractVersion, 54);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0054-approval-management-boundary',
+    'pg-0055-run-attempt-log-retention',
   );
 });
 
@@ -794,10 +799,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 53);
+  assert.equal(report.contractVersion, 54);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0054-approval-management-boundary',
+    'pg-0055-run-attempt-log-retention',
   );
 
   const widened = automationManagerPrivileges();
@@ -826,10 +831,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 53);
+  assert.equal(report.contractVersion, 54);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0054-approval-management-boundary',
+    'pg-0055-run-attempt-log-retention',
   );
 
   const widened = approvalManagerPrivileges();
@@ -936,10 +941,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 53);
+  assert.equal(report.contractVersion, 54);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0054-approval-management-boundary',
+    'pg-0055-run-attempt-log-retention',
   );
 });
 

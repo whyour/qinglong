@@ -278,5 +278,10 @@ export const postgresqlMainMigrationManifest: MigrationStreamManifest =
         checksum:
           '5e3e6b222269f095e0d7a985fdeb0ea154510e59dfe15873192af8c8d603fca3',
       }),
+      Object.freeze({
+        id: 'pg-0055-run-attempt-log-retention',
+        checksum:
+          'c775c65ec03ae3a1606f899064d2d38fa63fd136ce52cbd1b1172c3a51e6bf30',
+      }),
     ]),
   });

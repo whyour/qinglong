@@ -539,6 +539,18 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: true,
     delete: false,
   }),
+  run_attempt_log_retention_controls: Object.freeze({
+    select: true,
+    insert: true,
+    update: true,
+    delete: true,
+  }),
+  run_attempt_log_artifact_tombstones: Object.freeze({
+    select: true,
+    insert: true,
+    update: false,
+    delete: false,
+  }),
   worker_sessions: Object.freeze({
     select: true,
     insert: true,
@@ -1029,6 +1041,18 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     delete: false,
   }),
   run_attempts: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  run_attempt_log_retention_controls: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  run_attempt_log_artifact_tombstones: Object.freeze({
     select: false,
     insert: false,
     update: false,

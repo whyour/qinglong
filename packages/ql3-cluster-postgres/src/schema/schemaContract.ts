@@ -15,12 +15,13 @@ export interface PostgresSchemaContractFunction {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 53;
-  readonly migrationId: 'pg-0054-approval-management-boundary';
+  readonly contractVersion: 54;
+  readonly migrationId: 'pg-0055-run-attempt-log-retention';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
     run_core: 1;
+    run_attempt_log_retention: 1;
     run_dispatch_lease: 1;
     run_retry_policy: 1;
     project_policy: 1;
@@ -100,8 +101,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 53,
-    migrationId: 'pg-0054-approval-management-boundary',
+    contractVersion: 54,
+    migrationId: 'pg-0055-run-attempt-log-retention',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -141,6 +142,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       project_policy: 1,
       project_tool_definition_snapshot: 1,
       run_core: 1,
+      run_attempt_log_retention: 1,
       run_dispatch_lease: 1,
       run_retry_policy: 1,
       security_audit: 1,
@@ -1166,6 +1168,41 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         'error_code',
         'error_summary',
       ]),
+      table('run_attempt_log_retention_controls', [
+        'attempt_id',
+        'project_id',
+        'run_id',
+        'log_artifact_id',
+        'executor_type',
+        'finished_at_ms',
+        'eligible_at_ms',
+        'state',
+        'claim_owner',
+        'claim_token',
+        'claim_version',
+        'claim_expires_at_ms',
+        'next_claim_at_ms',
+        'failure_count',
+        'last_failure_code',
+        'created_at_ms',
+        'updated_at_ms',
+      ]),
+      table('run_attempt_log_artifact_tombstones', [
+        'log_artifact_id',
+        'project_id',
+        'run_id',
+        'attempt_id',
+        'executor_type',
+        'finished_at_ms',
+        'eligible_at_ms',
+        'retired_at_ms',
+        'disposition',
+        'byte_length',
+        'truncated',
+        'maximum_bytes',
+        'truncation_observed_at_ms',
+        'record_digest',
+      ]),
       table('worker_sessions', [
         'worker_id',
         'session_id',
@@ -1594,6 +1631,14 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_run_attempts_dispatch_candidates_idx',
       'ql3_run_attempts_recovery_idx',
       'ql3_run_attempts_lease_idx',
+      'run_attempt_log_retention_controls_pkey',
+      'ql3_run_log_retention_control_artifact_key',
+      'ql3_run_log_retention_retry_idx',
+      'ql3_run_log_retention_claim_expiry_idx',
+      'run_attempt_log_artifact_tombstones_pkey',
+      'ql3_run_log_tombstone_attempt_key',
+      'ql3_run_log_tombstone_retired_idx',
+      'ql3_run_log_retention_candidate_idx',
       'worker_sessions_pkey',
       'ql3_worker_sessions_available_idx',
       'run_dispatch_leases_pkey',
@@ -1913,6 +1958,23 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_run_attempts_created_at_check',
       'ql3_run_attempts_started_at_check',
       'ql3_run_attempts_finished_at_check',
+      'ql3_run_log_retention_control_identity_check',
+      'ql3_run_log_retention_control_time_check',
+      'ql3_run_log_retention_control_state_check',
+      'ql3_run_log_retention_control_claim_owner_check',
+      'ql3_run_log_retention_control_claim_token_check',
+      'ql3_run_log_retention_control_claim_version_check',
+      'ql3_run_log_retention_control_claim_expiry_check',
+      'ql3_run_log_retention_control_next_claim_check',
+      'ql3_run_log_retention_control_failure_count_check',
+      'ql3_run_log_retention_control_failure_code_check',
+      'ql3_run_log_retention_control_state_shape_check',
+      'ql3_run_log_tombstone_identity_check',
+      'ql3_run_log_tombstone_time_check',
+      'ql3_run_log_tombstone_disposition_check',
+      'ql3_run_log_tombstone_size_check',
+      'ql3_run_log_tombstone_truncation_check',
+      'ql3_run_log_tombstone_digest_check',
       'ql3_worker_sessions_worker_id_check',
       'ql3_worker_sessions_session_id_check',
       'ql3_worker_sessions_generation_check',
@@ -2211,6 +2273,10 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_result_retirement_catalog_fk',
       'ql3_run_attempts_run_fk',
       'ql3_run_attempts_step_run_fk',
+      'ql3_run_log_retention_control_attempt_fk',
+      'ql3_run_log_retention_control_run_fk',
+      'ql3_run_log_tombstone_attempt_fk',
+      'ql3_run_log_tombstone_run_fk',
       'ql3_run_dispatch_leases_attempt_fk',
       'ql3_run_dispatch_leases_run_fk',
       'ql3_run_dispatch_leases_worker_fk',

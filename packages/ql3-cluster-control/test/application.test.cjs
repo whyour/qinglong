@@ -137,6 +137,8 @@ function runtimePrivileges() {
     tool_invocation_input_artifacts: [true, true, false, false],
     tool_invocation_preview_artifacts: [true, true, false, false],
     run_attempts: [true, true, true, false],
+    run_attempt_log_retention_controls: [true, true, true, true],
+    run_attempt_log_artifact_tombstones: [true, true, false, false],
     run_recovery_controls: [true, true, true, false],
     worker_sessions: [true, true, true, false],
     run_dispatch_leases: [true, true, true, false],

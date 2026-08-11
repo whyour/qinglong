@@ -379,6 +379,10 @@
 | [ADR-0373](./ADR-0373-profile-reachable-runtime-javascript-projection.md)                                      | Profile 可达的 Runtime JavaScript 投影                                                                                     | Accepted                     |
 | [ADR-0374](./ADR-0374-shared-bounded-task-discovery-http-api.md)                                               | 共享、有界的 Task Discovery HTTP API                                                                                       | Accepted |
 | [ADR-0375](./ADR-0375-shared-current-task-point-read-api.md)                                                   | 共享的 current Task point-read API                                                                                         | Proposed（设计冻结，实现中） |
+| [ADR-0376](./ADR-0376-policy-and-digest-fenced-task-start.md)                                                  | Policy 与 digest fenced 的 Task Start                                                                                      | Accepted |
+| [ADR-0377](./ADR-0377-profile-aware-run-attempt-log-range-read.md)                                             | Profile-aware Run Attempt 日志 Range 读取                                                                                  | Accepted |
+| [ADR-0378](./ADR-0378-local-run-attempt-log-retention-and-tombstones.md)                                       | Local Run Attempt 日志有界保留与 durable tombstone                                                                         | Accepted |
+| [ADR-0379](./ADR-0379-cluster-run-attempt-log-retention.md)                                                    | Cluster Run Attempt 日志多副本保留与条件删除                                                                                | Proposed（PostgreSQL authority 已完成） |
 
 ## 规则
 

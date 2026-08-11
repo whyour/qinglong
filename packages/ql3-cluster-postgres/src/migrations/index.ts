@@ -57,6 +57,7 @@ import { pg0051AutomationManagementBoundaryMigration } from './pg-0051-automatio
 import { pg0052AutomationManagementIdentityKeysetLedgerMigration } from './pg-0052-automation-management-identity-keyset-ledger';
 import { pg0053PluginPackageWorkflowRunListIndexMigration } from './pg-0053-plugin-package-workflow-run-list-index';
 import { pg0054ApprovalManagementBoundaryMigration } from './pg-0054-approval-management-boundary';
+import { pg0055RunAttemptLogRetentionMigration } from './pg-0055-run-attempt-log-retention';
 
 export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMigrationContext> =
   Object.freeze({
@@ -119,5 +120,6 @@ export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMi
       pg0052AutomationManagementIdentityKeysetLedgerMigration,
       pg0053PluginPackageWorkflowRunListIndexMigration,
       pg0054ApprovalManagementBoundaryMigration,
+      pg0055RunAttemptLogRetentionMigration,
     ]),
   });
