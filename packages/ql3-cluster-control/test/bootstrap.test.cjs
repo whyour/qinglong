@@ -388,6 +388,7 @@ function bootstrapOptions(events, overrides = {}) {
         authenticator,
         policies,
         runs,
+        runAttemptLogRetention,
         runCancellation,
         taskDefinitions,
         taskExecutionRevisions,
@@ -408,6 +409,7 @@ function bootstrapOptions(events, overrides = {}) {
       assert.equal(typeof authenticator.authenticate, 'function');
       assert.equal(typeof policies.resolve, 'function');
       assert.equal(typeof runs.transaction, 'function');
+      assert.equal(typeof runAttemptLogRetention.inspect, 'function');
       assert.equal(typeof runCancellation.requestUserCancellation, 'function');
       assert.equal(
         typeof taskDefinitions.findCurrentTaskDefinition,

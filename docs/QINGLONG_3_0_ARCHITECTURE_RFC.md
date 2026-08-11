@@ -11,17 +11,24 @@
 
 最新增量证据（2026-08-12）：
 
-- D-291/ADR-0379（进行中，PostgreSQL authority 阶段完成）
-  Cluster Run Attempt 日志 retention 第一阶段已冻结并实现多副本权威边界，且没有新增 package：共享 claim contract 位于既有
-  Runtime Core Run log-retention 目录，PostgreSQL v54 增加 durable control 与 immutable tombstone、terminal remote Worker
-  candidate index 和 `run_attempt_log_retention` capability。候选只允许 runtime-owned、Run/Attempt 双终态、非 lost、canonical
-  `remote_worker/wlog-*` 且超过 cutoff；每批最多 16 条，通过短 `READ COMMITTED` 事务和 `FOR UPDATE ... SKIP LOCKED` 获取
-  owner/token/version/expiry fence。S3 网络调用明确位于数据库事务之外；finalize 在第二个短事务中重验完整 fence 与 durable
-  Run/Attempt identity，写 exact retirement record 后删除 control。retry/manual 持久化失败分类并提供最长 24 小时 backoff；lease
-  过期可由其他副本安全接管。`ql3_runtime` 可完整维护 control，但 tombstone 只有 SELECT/INSERT，其他角色保持零权限；repository
-  已提供 digest/identity 失败关闭的 retention state read，为 Cluster 410 wiring 提供权威来源。migration/schema/readiness/repository
-  定向 63/63 通过。ADR 暂保持 Proposed；下一阶段继续完成 validated S3 HEAD、ETag/VersionId 条件删除、bounded lifecycle、MinIO
-  failure matrix 与 PostgreSQL HA failover，全部完整门通过后才接受。
+- D-291/ADR-0379（已接受）
+  Cluster Run Attempt 日志 retention 已完成多副本纵向闭环，且没有新增 package：共享 claim contract 位于 Runtime Core 既有 Run
+  log-retention 目录；PostgreSQL v54 提供 durable control、immutable tombstone、terminal remote Worker candidate index 与最小权限
+  `ql3_runtime` authority。副本以短 `READ COMMITTED`/`SKIP LOCKED` 事务取得 owner/token/version/expiry fence，事务提交后才做
+  validated S3 HEAD；versioned object 与 upload 临时对象按精确 VersionId 删除，unversioned object 按 ETag `If-Match` 删除，412
+  identity drift 失败关闭，删除响应丢失由下一租约经 HEAD absent 收敛为 `already_absent`。第二个短事务重验数据库时钟、完整 claim 与
+  Run/Attempt identity，原子写 exact tombstone 并清除 control。Cluster application 已接入有界 claim/delete、指数退避/manual、单
+  `unref` timer、共享 wall-clock abort 和 reverse-stop drain；只有 Worker ingress/S3 激活时才装配。生产日志读取在对象存储前后检查
+  tombstone，稳定返回 410，而普通 missing 保持 503。
+
+  真实 MinIO 在强制 SSE-S3 下通过 versioning disabled/enabled 条件删除，versioned 路径最终零旧版本、零 delete marker；PostgreSQL
+  18.4 arm64 physical HA 在 timeline `1→2` 下通过 113 gates，证明旧主 claim 已同步复制、旧 settlement 被 fenced、新主以 version 2
+  接管并把 control/tombstone 收敛为 0/1，报告 SHA-256 为
+  `4be3053fc1af9ad6304715f5398292ba9a31ec5b3d49f64787510e2f2645ec5f`。最终 `cluster-control` 230 pass/2 外部条件 skip，完整
+  18-package clean build/test 退出 0，backend 1163 pass/2 skip/0 fail；workspace 保持 18 package/1054 source/1036 nested/18
+  reviewed root entry，`cluster-control` 为 51 source/49 nested/2 root binary entry，无 single-source/shallow package。dependency、
+  package、Edge import 边界零 finding，121 个 Edge 实际 imported module 不含 PostgreSQL、AWS SDK 或 Cluster package；14 档 Local
+  Profile artifact 与 Local image static audit 保持 compatible。
 - D-290/ADR-0378（已接受）
   Local Run Attempt 日志 retention 已形成真实纵向切片：Runtime Core 增加精确 identity、canonical SHA-256 的 immutable
   retirement record、容量压力策略、有界 page/delete budget 与 durable cursor；日志读取在存储前检查 tombstone，并在 missing 后二次

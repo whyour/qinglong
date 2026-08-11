@@ -75,8 +75,14 @@ test('runs one production replica and drains it on the first signal', async () =
 
   assert.equal(result, 'stopped');
   assert.deepEqual(events, ['subscribe', 'start', 'stop', 'unsubscribe']);
-  assert.equal(facts.some((fact) => fact.event === 'activation'), true);
-  assert.equal(facts.some((fact) => fact.event === 'listening'), true);
+  assert.equal(
+    facts.some((fact) => fact.event === 'activation'),
+    true,
+  );
+  assert.equal(
+    facts.some((fact) => fact.event === 'listening'),
+    true,
+  );
   assert.equal(
     facts.some(
       (fact) =>
@@ -105,7 +111,11 @@ test('fails closed before startup for a disabled profile or invalid replica id',
     await assert.rejects(
       runProductionClusterControlProcess({
         environment,
-        signals: { subscribe() { return () => {}; } },
+        signals: {
+          subscribe() {
+            return () => {};
+          },
+        },
         emit() {},
         async start() {
           starts += 1;
@@ -154,6 +164,7 @@ test('starts the optional Worker listener and closes its lazy Artifact binding',
   const artifactStore = {
     async put() {},
     async inspect() {},
+    async retire() {},
   };
   const environment = {
     ...BASE_ENV,
@@ -187,6 +198,14 @@ test('starts the optional Worker listener and closes its lazy Artifact binding',
       events.push('start');
       assert.equal(options.workerIngress.config.enabled, true);
       assert.equal(options.workerIngress.artifactStore, artifactStore);
+      assert.equal(options.logRetention.store, artifactStore);
+      assert.equal(options.logRetention.ownerId, 'cluster-control-0');
+      assert.equal(options.logRetention.claimLimit, 4);
+      options.logRetention.onDiagnostic(
+        Object.assign(new Error('must-not-be-logged'), {
+          code: 'S3Unavailable',
+        }),
+      );
       return {
         status: 'active',
         address: { host: '0.0.0.0', port: 5800 },
@@ -219,6 +238,16 @@ test('starts the optional Worker listener and closes its lazy Artifact binding',
     facts.some((fact) => fact.event === 'worker_ingress_listening'),
     true,
   );
+  assert.equal(
+    facts.some(
+      (fact) =>
+        fact.event === 'runtime_diagnostic' &&
+        fact.diagnostic.scope === 'log-retention' &&
+        fact.diagnostic.code === 'S3Unavailable' &&
+        JSON.stringify(fact).includes('must-not-be-logged') === false,
+    ),
+    true,
+  );
 });
 
 test('creates the configured mounted Secret provider before Worker activation', async () => {
@@ -226,6 +255,7 @@ test('creates the configured mounted Secret provider before Worker activation', 
   const artifactStore = {
     async put() {},
     async inspect() {},
+    async retire() {},
   };
   const provider = { async resolve() {} };
   const result = await runProductionClusterControlProcess({
@@ -353,7 +383,10 @@ test('fails the process after a database fence drains the active application', a
     ),
     true,
   );
-  assert.equal(facts.some(({ event }) => event === 'shutdown_requested'), false);
+  assert.equal(
+    facts.some(({ event }) => event === 'shutdown_requested'),
+    false,
+  );
   assert.equal(facts.at(-1).event, 'stopped');
   assert.equal(
     JSON.stringify(facts).includes('must-not-escape-database-detail'),

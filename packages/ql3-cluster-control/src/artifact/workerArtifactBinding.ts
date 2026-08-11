@@ -5,9 +5,11 @@ import {
 } from './s3ArtifactStore';
 import type { ClusterRemoteWorkerArtifactStore } from '../remote-execution/remoteWorkerCompletionService';
 import type { ClusterWorkerArtifactS3Config } from '../worker-ingress/workerIngressConfig';
+import type { ClusterRunAttemptLogRetirementStore } from '../run/runAttemptLogRetentionLifecycle';
 
 export interface ClusterWorkerArtifactBinding {
-  readonly store: ClusterRemoteWorkerArtifactStore;
+  readonly store: ClusterRemoteWorkerArtifactStore &
+    ClusterRunAttemptLogRetirementStore;
   close(): Promise<void>;
 }
 
@@ -19,9 +21,7 @@ export function createClusterWorkerArtifactBinding(
   }
   const client = createS3ClusterRemoteWorkerArtifactClient({
     region: config.region,
-    ...(config.endpoint === undefined
-      ? {}
-      : { endpoint: config.endpoint }),
+    ...(config.endpoint === undefined ? {} : { endpoint: config.endpoint }),
     forcePathStyle: config.forcePathStyle,
   });
   const store = new S3ClusterRemoteWorkerArtifactStore({

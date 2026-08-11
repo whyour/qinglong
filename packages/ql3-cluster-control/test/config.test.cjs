@@ -114,6 +114,18 @@ test('builds an exact runtime-only TLS-verified Pool configuration', async () =>
   assert.deepEqual(config.security, {
     apiCredentialPepper: BASE_ENV.QL3_API_CREDENTIAL_PEPPER,
   });
+  assert.deepEqual(config.logRetention, {
+    enabled: true,
+    retentionMs: 30 * 24 * 60 * 60_000,
+    claimLimit: 4,
+    leaseMs: 30_000,
+    maximumCycleMs: 10_000,
+    retryBaseMs: 5_000,
+    retryMaximumMs: 60 * 60_000,
+    maximumFailures: 8,
+    intervalMs: 60_000,
+    stopTimeoutMs: 10_000,
+  });
 
   const binding = createClusterControlDatabaseBinding(config);
   assert.equal(binding.availability.status, 'available');
@@ -192,10 +204,55 @@ test('rejects TLS query overrides, missing credentials and unbounded values', ()
     { ...BASE_ENV, QL3_CLUSTER_AUTH_RATE_GLOBAL: '1000001' },
     { ...BASE_ENV, QL3_CLUSTER_AUTH_RATE_MAX_PEERS: '65537' },
     { ...BASE_ENV, QL3_API_CREDENTIAL_PEPPER: 'weak' },
+    { ...BASE_ENV, QL3_CLUSTER_LOG_RETENTION_CLAIM_LIMIT: '17' },
+    {
+      ...BASE_ENV,
+      QL3_CLUSTER_LOG_RETENTION_LEASE_MS: '5000',
+      QL3_CLUSTER_LOG_RETENTION_CYCLE_BUDGET_MS: '4501',
+    },
+    {
+      ...BASE_ENV,
+      QL3_CLUSTER_LOG_RETENTION_RETRY_BASE_MS: '5000',
+      QL3_CLUSTER_LOG_RETENTION_RETRY_MAX_MS: '4999',
+    },
   ]) {
     assert.throws(
       () => loadClusterControlConfig(environment),
       ClusterControlConfigError,
     );
   }
+});
+
+test('loads bounded Cluster log retention policy and permits explicit disable', () => {
+  const disabled = loadClusterControlConfig({
+    ...BASE_ENV,
+    QL3_CLUSTER_LOG_RETENTION_ENABLED: 'false',
+    QL3_CLUSTER_LOG_RETENTION_CLAIM_LIMIT: '999',
+  });
+  assert.deepEqual(disabled.logRetention, { enabled: false });
+
+  const configured = loadClusterControlConfig({
+    ...BASE_ENV,
+    QL3_CLUSTER_LOG_RETENTION_MS: '60000',
+    QL3_CLUSTER_LOG_RETENTION_CLAIM_LIMIT: '2',
+    QL3_CLUSTER_LOG_RETENTION_LEASE_MS: '5000',
+    QL3_CLUSTER_LOG_RETENTION_CYCLE_BUDGET_MS: '4000',
+    QL3_CLUSTER_LOG_RETENTION_RETRY_BASE_MS: '250',
+    QL3_CLUSTER_LOG_RETENTION_RETRY_MAX_MS: '1000',
+    QL3_CLUSTER_LOG_RETENTION_MAX_FAILURES: '3',
+    QL3_CLUSTER_LOG_RETENTION_INTERVAL_MS: '2000',
+    QL3_CLUSTER_LOG_RETENTION_STOP_TIMEOUT_MS: '500',
+  });
+  assert.deepEqual(configured.logRetention, {
+    enabled: true,
+    retentionMs: 60_000,
+    claimLimit: 2,
+    leaseMs: 5_000,
+    maximumCycleMs: 4_000,
+    retryBaseMs: 250,
+    retryMaximumMs: 1_000,
+    maximumFailures: 3,
+    intervalMs: 2_000,
+    stopTimeoutMs: 500,
+  });
 });

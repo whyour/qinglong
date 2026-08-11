@@ -30,6 +30,17 @@ import {
   type ClusterRunCancellationConvergenceCycleResult,
 } from '@qinglong/runtime-core';
 import type { ClusterRunCancellationRepository } from '@qinglong/runtime-core/cluster-run-cancellation';
+import {
+  MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_CLAIMS,
+  MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+  MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_RETRY_DELAY_MS,
+  MIN_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+} from '@qinglong/runtime-core/cluster-run-attempt-log-retention';
+import {
+  MAX_RUN_ATTEMPT_LOG_RETENTION_MS,
+  MIN_RUN_ATTEMPT_LOG_RETENTION_MS,
+  type RunAttemptLogRetentionStateReader,
+} from '@qinglong/runtime-core/run-attempt-log-retention';
 import type { ProjectRunListReader } from '@qinglong/runtime-core/project-run-list';
 import type { ClusterScheduleStore } from '@qinglong/runtime-core/cluster-scheduler';
 import type { TaskDefinitionSource } from '@qinglong/runtime-core/task-definition';
@@ -60,6 +71,7 @@ import {
   PostgresSecurityAuditRepository,
   PostgresRunRepository,
   PostgresWorkerExecutionAttestationRepository,
+  PostgresRunAttemptLogRetentionClaimRepository,
   PostgresTaskDefinitionSource,
   PostgresTaskExecutionRevisionSource,
   PostgresTriggerSource,
@@ -104,6 +116,12 @@ import {
 import { ClusterWorkflowSchedulerCoordinator } from '../scheduling/workflowScheduler';
 import { ClusterRuntimeSchedulerCoordinator } from '../scheduling/runtimeScheduler';
 import { ClusterRunCancellationConvergenceLifecycle } from '../run/runCancellationLifecycle';
+import {
+  ClusterRunAttemptLogRetentionCoordinator,
+  ClusterRunAttemptLogRetentionLifecycle,
+  type ClusterRunAttemptLogRetirementStore,
+  type ClusterRunAttemptLogRetentionCycleSummary,
+} from '../run/runAttemptLogRetentionLifecycle';
 import type { TaskStartRepository } from '@qinglong/runtime-core/task-start';
 import {
   createClusterWorkerRuntimePort,
@@ -131,6 +149,7 @@ export interface ClusterControlAssemblyInput {
   readonly evidence: ClusterControlReadinessEvidence;
   readonly policies: ProjectPolicyRepository;
   readonly runs: RunRepository & ProjectRunListReader;
+  readonly runAttemptLogRetention: RunAttemptLogRetentionStateReader;
   readonly runCancellation: ClusterRunCancellationRepository;
   readonly taskStart: TaskStartRepository;
   readonly taskDefinitions: TaskDefinitionSource;
@@ -178,6 +197,24 @@ export interface ClusterRunCancellationConvergenceRuntimeOptions {
   ) => void | Promise<void>;
 }
 
+export interface ClusterRunAttemptLogRetentionRuntimeOptions {
+  readonly store: ClusterRunAttemptLogRetirementStore;
+  readonly ownerId?: string;
+  readonly retentionMs?: number;
+  readonly claimLimit?: number;
+  readonly leaseMs?: number;
+  readonly maximumCycleMs?: number;
+  readonly retryBaseMs?: number;
+  readonly retryMaximumMs?: number;
+  readonly maximumFailures?: number;
+  readonly intervalMs?: number;
+  readonly stopTimeoutMs?: number;
+  readonly onDiagnostic?: (
+    error: unknown,
+    summary?: Readonly<ClusterRunAttemptLogRetentionCycleSummary>,
+  ) => void | Promise<void>;
+}
+
 export interface ClusterControlBootstrapOptions {
   readonly enabled?: boolean;
   readonly profile: DeploymentProfile;
@@ -185,6 +222,7 @@ export interface ClusterControlBootstrapOptions {
   readonly recovery?: ClusterControlRecoveryRuntimeOptions;
   readonly scheduler?: ClusterSchedulerRuntimeOptions;
   readonly cancellationConvergence?: ClusterRunCancellationConvergenceRuntimeOptions;
+  readonly logRetention?: ClusterRunAttemptLogRetentionRuntimeOptions;
   readonly workerRuntime?: ClusterWorkerRuntimeDependencies;
   readonly openDatabase: OpenPostgresDatabase;
   readonly create: (
@@ -221,6 +259,21 @@ interface PreparedCancellationConvergenceRuntime {
   readonly intervalMs: number;
   readonly stopTimeoutMs: number;
   readonly onDiagnostic?: ClusterRunCancellationConvergenceRuntimeOptions['onDiagnostic'];
+}
+
+interface PreparedLogRetentionRuntime {
+  readonly store: ClusterRunAttemptLogRetirementStore;
+  readonly ownerId: string;
+  readonly retentionMs: number;
+  readonly claimLimit: number;
+  readonly leaseMs: number;
+  readonly maximumCycleMs: number;
+  readonly retryBaseMs: number;
+  readonly retryMaximumMs: number;
+  readonly maximumFailures: number;
+  readonly intervalMs: number;
+  readonly stopTimeoutMs: number;
+  readonly onDiagnostic?: ClusterRunAttemptLogRetentionRuntimeOptions['onDiagnostic'];
 }
 
 function boundedInteger(
@@ -439,6 +492,116 @@ function prepareCancellationConvergenceRuntime(
   });
 }
 
+function prepareLogRetentionRuntime(
+  options: ClusterRunAttemptLogRetentionRuntimeOptions | undefined,
+  fallbackOwnerId: string,
+): PreparedLogRetentionRuntime | undefined {
+  if (options === undefined) return undefined;
+  const allowedKeys = new Set([
+    'claimLimit',
+    'intervalMs',
+    'leaseMs',
+    'maximumCycleMs',
+    'maximumFailures',
+    'onDiagnostic',
+    'ownerId',
+    'retentionMs',
+    'retryBaseMs',
+    'retryMaximumMs',
+    'stopTimeoutMs',
+    'store',
+  ]);
+  if (
+    !options ||
+    typeof options !== 'object' ||
+    Array.isArray(options) ||
+    Object.keys(options).some((key) => !allowedKeys.has(key)) ||
+    typeof options.store?.retire !== 'function' ||
+    (options.onDiagnostic !== undefined &&
+      typeof options.onDiagnostic !== 'function')
+  ) {
+    throw new TypeError(
+      'Cluster Run Attempt log retention configuration is invalid',
+    );
+  }
+  const ownerId = options.ownerId ?? fallbackOwnerId;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(ownerId)) {
+    throw new TypeError('Cluster Run Attempt log retention ownerId is invalid');
+  }
+  const leaseMs = boundedInteger(
+    'Cluster Run Attempt log retention lease',
+    options.leaseMs,
+    30_000,
+    MIN_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+    MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+  );
+  const retryBaseMs = boundedInteger(
+    'Cluster Run Attempt log retention retry base',
+    options.retryBaseMs,
+    5_000,
+    0,
+    MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_RETRY_DELAY_MS,
+  );
+  return Object.freeze({
+    store: options.store,
+    ownerId,
+    retentionMs: boundedInteger(
+      'Cluster Run Attempt log retention duration',
+      options.retentionMs,
+      30 * 24 * 60 * 60_000,
+      MIN_RUN_ATTEMPT_LOG_RETENTION_MS,
+      MAX_RUN_ATTEMPT_LOG_RETENTION_MS,
+    ),
+    claimLimit: boundedInteger(
+      'Cluster Run Attempt log retention claim limit',
+      options.claimLimit,
+      4,
+      1,
+      MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_CLAIMS,
+    ),
+    leaseMs,
+    maximumCycleMs: boundedInteger(
+      'Cluster Run Attempt log retention cycle budget',
+      options.maximumCycleMs,
+      10_000,
+      100,
+      leaseMs - 500,
+    ),
+    retryBaseMs,
+    retryMaximumMs: boundedInteger(
+      'Cluster Run Attempt log retention retry maximum',
+      options.retryMaximumMs,
+      60 * 60_000,
+      retryBaseMs,
+      MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_RETRY_DELAY_MS,
+    ),
+    maximumFailures: boundedInteger(
+      'Cluster Run Attempt log retention failure limit',
+      options.maximumFailures,
+      8,
+      1,
+      32,
+    ),
+    intervalMs: boundedInteger(
+      'Cluster Run Attempt log retention interval',
+      options.intervalMs,
+      60_000,
+      1_000,
+      24 * 60 * 60_000,
+    ),
+    stopTimeoutMs: boundedInteger(
+      'Cluster Run Attempt log retention stop timeout',
+      options.stopTimeoutMs,
+      10_000,
+      100,
+      30_000,
+    ),
+    ...(options.onDiagnostic === undefined
+      ? {}
+      : { onDiagnostic: options.onDiagnostic }),
+  });
+}
+
 function readinessEvidence(
   report: PostgresSchemaReadinessReport,
 ): ClusterControlReadinessEvidence {
@@ -463,6 +626,7 @@ export async function bootstrapClusterControlRuntime(
   let cancellationConvergenceRuntime:
     | PreparedCancellationConvergenceRuntime
     | undefined;
+  let logRetentionRuntime: PreparedLogRetentionRuntime | undefined;
   let recoveryRegistry: ClusterControlRecoveryEvidenceRegistry | undefined;
   if ((options.enabled ?? false) && options.profile === 'cluster-control') {
     assertClusterControlApiCredentialPepper(options.apiCredentialPepper ?? '');
@@ -473,6 +637,10 @@ export async function bootstrapClusterControlRuntime(
     );
     cancellationConvergenceRuntime = prepareCancellationConvergenceRuntime(
       options.cancellationConvergence,
+    );
+    logRetentionRuntime = prepareLogRetentionRuntime(
+      options.logRetention,
+      recoveryRuntime.ownerId,
     );
   }
   let database: PostgresDatabaseResource | undefined;
@@ -576,6 +744,8 @@ export async function bootstrapClusterControlRuntime(
         );
         const schedules = new PostgresClusterScheduleRepository(database.pool);
         const runs = new PostgresRunRepository(database.pool);
+        const runAttemptLogRetention =
+          new PostgresRunAttemptLogRetentionClaimRepository(database.pool);
         const trustedToolStorage: ClusterTrustedToolStorage = Object.freeze({
           invocationArtifacts: new PostgresToolInvocationArtifactRepository(
             database.pool,
@@ -653,6 +823,32 @@ export async function bootstrapClusterControlRuntime(
                   }),
             },
           );
+        const logRetentionLifecycle =
+          logRetentionRuntime === undefined
+            ? undefined
+            : new ClusterRunAttemptLogRetentionLifecycle(
+                new ClusterRunAttemptLogRetentionCoordinator(
+                  runAttemptLogRetention,
+                  logRetentionRuntime.store,
+                  {
+                    ownerId: logRetentionRuntime.ownerId,
+                    retentionMs: logRetentionRuntime.retentionMs,
+                    claimLimit: logRetentionRuntime.claimLimit,
+                    leaseMs: logRetentionRuntime.leaseMs,
+                    maximumCycleMs: logRetentionRuntime.maximumCycleMs,
+                    retryBaseMs: logRetentionRuntime.retryBaseMs,
+                    retryMaximumMs: logRetentionRuntime.retryMaximumMs,
+                    maximumFailures: logRetentionRuntime.maximumFailures,
+                  },
+                ),
+                {
+                  intervalMs: logRetentionRuntime.intervalMs,
+                  stopTimeoutMs: logRetentionRuntime.stopTimeoutMs,
+                  ...(logRetentionRuntime.onDiagnostic === undefined
+                    ? {}
+                    : { onDiagnostic: logRetentionRuntime.onDiagnostic }),
+                },
+              );
         const runCancellation = new PostgresClusterRunCancellationRepository(
           database.pool,
         );
@@ -665,6 +861,7 @@ export async function bootstrapClusterControlRuntime(
           ),
           policies: new PostgresProjectPolicyRepository(database.pool),
           runs,
+          runAttemptLogRetention,
           runCancellation,
           taskStart,
           taskDefinitions: new PostgresTaskDefinitionSource(database.pool),
@@ -739,6 +936,7 @@ export async function bootstrapClusterControlRuntime(
             if (!(await application.startLifecycles())) return false;
             schedulerLifecycle.start();
             cancellationConvergenceLifecycle.start();
+            logRetentionLifecycle?.start();
             return true;
           },
           installAdmission: () => application.installAdmission(),
@@ -746,14 +944,21 @@ export async function bootstrapClusterControlRuntime(
             recoveryRegistry?.dispose();
             let schedulerStatus: 'stopped' | 'timed_out' = 'stopped';
             let cancellationStatus: 'stopped' | 'timed_out' = 'stopped';
+            let logRetentionStatus: 'stopped' | 'timed_out' = 'stopped';
             let applicationStatus: ClusterControlStopResult = 'stopped';
             let primaryError: unknown;
+            try {
+              logRetentionStatus =
+                (await logRetentionLifecycle?.stopAndDrain()) ?? 'stopped';
+            } catch (error) {
+              primaryError = error;
+            }
             try {
               cancellationStatus = (
                 await cancellationConvergenceLifecycle.stopAndDrain()
               ).status;
             } catch (error) {
-              primaryError = error;
+              primaryError ??= error;
             }
             try {
               schedulerStatus = (await schedulerLifecycle.stopAndDrain())
@@ -768,6 +973,7 @@ export async function bootstrapClusterControlRuntime(
             }
             if (primaryError) throw primaryError;
             return cancellationStatus === 'timed_out' ||
+              logRetentionStatus === 'timed_out' ||
               schedulerStatus === 'timed_out' ||
               applicationStatus === 'timed_out'
               ? 'timed_out'

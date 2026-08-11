@@ -38,6 +38,7 @@ export interface ClusterControlProcessEvent {
     scope:
       | 'scheduler'
       | 'cancellation-convergence'
+      | 'log-retention'
       | 'database'
       | 'worker-ingress';
     name: string;
@@ -78,10 +79,7 @@ export class ClusterControlProcessError extends Error {
     | 'QL3_CLUSTER_CONTROL_PROCESS_CONFIG_INVALID'
     | 'QL3_CLUSTER_CONTROL_PROCESS_DISABLED';
 
-  constructor(
-    code: ClusterControlProcessError['code'],
-    message: string,
-  ) {
+  constructor(code: ClusterControlProcessError['code'], message: string) {
     super(message);
     this.name = 'ClusterControlProcessError';
     this.code = code;
@@ -103,10 +101,7 @@ function processConfiguration(environment: ClusterControlEnvironment): {
     );
   }
   const replicaId = environment.QL3_CLUSTER_REPLICA_ID;
-  if (
-    typeof replicaId !== 'string' ||
-    !REPLICA_ID_PATTERN.test(replicaId)
-  ) {
+  if (typeof replicaId !== 'string' || !REPLICA_ID_PATTERN.test(replicaId)) {
     throw new ClusterControlProcessError(
       'QL3_CLUSTER_CONTROL_PROCESS_CONFIG_INVALID',
       'QL3_CLUSTER_REPLICA_ID must be a stable safe identifier',
@@ -205,9 +200,11 @@ export async function runProductionClusterControlProcess(
   let resolveSignal:
     | ((signal: ClusterControlProcessSignal) => void)
     | undefined;
-  const requestedSignal = new Promise<ClusterControlProcessSignal>((resolve) => {
-    resolveSignal = resolve;
-  });
+  const requestedSignal = new Promise<ClusterControlProcessSignal>(
+    (resolve) => {
+      resolveSignal = resolve;
+    },
+  );
   let acceptedSignal = false;
   const unsubscribe = options.signals.subscribe((signal) => {
     if (acceptedSignal) return;
@@ -230,6 +227,14 @@ export async function runProductionClusterControlProcess(
         );
       }
       artifactBinding = await createBinding(workerIngress.artifact);
+      if (
+        config.logRetention.enabled &&
+        typeof artifactBinding?.store?.retire !== 'function'
+      ) {
+        throw new TypeError(
+          'Cluster Worker Artifact binding has no log retirement capability',
+        );
+      }
       if (
         workerIngress.secret !== undefined &&
         workerSecretProvider === undefined
@@ -274,15 +279,40 @@ export async function runProductionClusterControlProcess(
               event(replicaId, {
                 level: 'error',
                 event: 'runtime_diagnostic',
-                diagnostic: diagnosticFact(
-                  'cancellation-convergence',
-                  error,
-                ),
+                diagnostic: diagnosticFact('cancellation-convergence', error),
               }),
             ),
           ).catch(() => undefined);
         },
       },
+      ...(workerIngress !== undefined && config.logRetention.enabled
+        ? {
+            logRetention: {
+              store: artifactBinding!.store,
+              ownerId: replicaId,
+              retentionMs: config.logRetention.retentionMs,
+              claimLimit: config.logRetention.claimLimit,
+              leaseMs: config.logRetention.leaseMs,
+              maximumCycleMs: config.logRetention.maximumCycleMs,
+              retryBaseMs: config.logRetention.retryBaseMs,
+              retryMaximumMs: config.logRetention.retryMaximumMs,
+              maximumFailures: config.logRetention.maximumFailures,
+              intervalMs: config.logRetention.intervalMs,
+              stopTimeoutMs: config.logRetention.stopTimeoutMs,
+              onDiagnostic(error: unknown) {
+                void Promise.resolve(
+                  options.emit(
+                    event(replicaId, {
+                      level: 'error',
+                      event: 'runtime_diagnostic',
+                      diagnostic: diagnosticFact('log-retention', error),
+                    }),
+                  ),
+                ).catch(() => undefined);
+              },
+            },
+          }
+        : {}),
       ...(workerIngress === undefined
         ? {}
         : {
@@ -298,10 +328,7 @@ export async function runProductionClusterControlProcess(
                     event(replicaId, {
                       level: 'error',
                       event: 'runtime_diagnostic',
-                      diagnostic: diagnosticFact(
-                        'worker-ingress',
-                        error,
-                      ),
+                      diagnostic: diagnosticFact('worker-ingress', error),
                     }),
                   ),
                 ).catch(() => undefined);
@@ -395,10 +422,7 @@ export async function runProductionClusterControlProcess(
     unsubscribe();
     resolveSignal = undefined;
     let cleanupError: unknown;
-    if (
-      application?.status === 'active' &&
-      !applicationStopStarted
-    ) {
+    if (application?.status === 'active' && !applicationStopStarted) {
       try {
         applicationStopStarted = true;
         await application.stop();

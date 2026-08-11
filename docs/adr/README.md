@@ -382,7 +382,7 @@
 | [ADR-0376](./ADR-0376-policy-and-digest-fenced-task-start.md)                                                  | Policy 与 digest fenced 的 Task Start                                                                                      | Accepted |
 | [ADR-0377](./ADR-0377-profile-aware-run-attempt-log-range-read.md)                                             | Profile-aware Run Attempt 日志 Range 读取                                                                                  | Accepted |
 | [ADR-0378](./ADR-0378-local-run-attempt-log-retention-and-tombstones.md)                                       | Local Run Attempt 日志有界保留与 durable tombstone                                                                         | Accepted |
-| [ADR-0379](./ADR-0379-cluster-run-attempt-log-retention.md)                                                    | Cluster Run Attempt 日志多副本保留与条件删除                                                                                | Proposed（PostgreSQL authority 已完成） |
+| [ADR-0379](./ADR-0379-cluster-run-attempt-log-retention.md)                                                    | Cluster Run Attempt 日志多副本保留与条件删除                                                                                | Accepted                                |
 
 ## 规则
 

@@ -73,6 +73,14 @@ class MemoryS3Client {
             ? Buffer.alloc(32, 9).toString('base64')
             : checksum(object.content),
         Metadata: metadata,
+        ...(input.Key.includes('/objects/') &&
+        this.options.headVersionId !== undefined
+          ? { VersionId: this.options.headVersionId }
+          : {}),
+        ...(input.Key.includes('/temporary/') &&
+        this.options.temporaryHeadVersionId !== undefined
+          ? { VersionId: this.options.temporaryHeadVersionId }
+          : {}),
       };
     }
     if (command instanceof GetObjectCommand) {
@@ -168,7 +176,33 @@ class MemoryS3Client {
     }
     if (command instanceof DeleteObjectCommand) {
       if (this.options.failDelete) throw new Error('delete unavailable');
+      if (input.Key.includes('/objects/')) {
+        if (this.options.permanentDeletePreconditionFailure) {
+          const error = new Error('precondition failed');
+          error.name = 'PreconditionFailed';
+          error.$metadata = { httpStatusCode: 412 };
+          throw error;
+        }
+        const object = this.objects.get(input.Key);
+        if (!object) throw notFound();
+        if (this.options.headVersionId === undefined) {
+          assert.equal(
+            input.IfMatch,
+            `"${checksum(object.content).slice(0, 32)}"`,
+          );
+          assert.equal(input.VersionId, undefined);
+        } else {
+          assert.equal(input.IfMatch, undefined);
+          assert.equal(input.VersionId, this.options.headVersionId);
+        }
+      }
       this.objects.delete(input.Key);
+      if (
+        input.Key.includes('/objects/') &&
+        this.options.throwAfterPermanentDelete
+      ) {
+        throw new Error('lost delete response');
+      }
       return {};
     }
     throw new Error(`unexpected command: ${command.constructor.name}`);
@@ -199,6 +233,15 @@ function chunks(content = CONTENT, observed) {
 
 function permanentKey(client) {
   return [...client.objects.keys()].find((key) => key.includes('/objects/'));
+}
+
+function retentionCandidate(overrides = {}) {
+  return Object.freeze({
+    ...LOOKUP,
+    executorType: 'remote_worker',
+    finishedAtMs: 1_000,
+    ...overrides,
+  });
 }
 
 test('streams to a checksummed temporary object then conditionally promotes it', async () => {
@@ -233,6 +276,13 @@ test('streams to a checksummed temporary object then conditionally promotes it',
   const copy = client.commands.find(
     (command) => command instanceof CopyObjectCommand,
   );
+  const cleanup = client.commands.find(
+    (command) =>
+      command instanceof DeleteObjectCommand &&
+      command.input.Key.includes('/temporary/'),
+  );
+  assert.match(cleanup.input.IfMatch, /^"[A-Za-z0-9+/=]+"$/);
+  assert.equal(cleanup.input.VersionId, undefined);
   assert.equal(copy.input.Metadata['ql3-content-sha256'], CONTENT_SHA256);
   assert.equal(
     JSON.stringify(copy.input.Metadata).includes(COMMAND.projectId),
@@ -245,6 +295,20 @@ test('streams to a checksummed temporary object then conditionally promotes it',
 
   const inspected = await adapter.inspect(LOOKUP);
   assert.deepEqual(inspected, { ...receipt, status: 'already_stored' });
+});
+
+test('cleans one exact temporary object version after validated HEAD', async () => {
+  const client = new MemoryS3Client({
+    temporaryHeadVersionId: 'temporary/version+1=',
+  });
+  await store(client).put(COMMAND, chunks());
+  const cleanup = client.commands.find(
+    (command) =>
+      command instanceof DeleteObjectCommand &&
+      command.input.Key.includes('/temporary/'),
+  );
+  assert.equal(cleanup.input.VersionId, 'temporary/version+1=');
+  assert.equal(cleanup.input.IfMatch, undefined);
 });
 
 test('exact replay consumes and hashes the whole body without another write', async () => {
@@ -509,4 +573,102 @@ test('a pre-aborted request performs no object-store operation', async () => {
     (error) => error === reason,
   );
   assert.equal(client.commands.length, 0);
+});
+
+test('retires an unversioned Artifact only with its validated ETag', async () => {
+  const client = new MemoryS3Client();
+  const adapter = store(client, { expectedBucketOwner: '123456789012' });
+  await adapter.put(COMMAND, chunks());
+  client.commands.length = 0;
+
+  assert.deepEqual(await adapter.retire(retentionCandidate()), {
+    disposition: 'deleted',
+    byteLength: CONTENT.byteLength,
+    truncation: { truncated: false },
+  });
+  assert.deepEqual(
+    client.commands.map((command) => command.constructor.name),
+    ['HeadObjectCommand', 'DeleteObjectCommand'],
+  );
+  assert.equal(client.commands[1].input.ExpectedBucketOwner, '123456789012');
+  assert.equal(permanentKey(client), undefined);
+});
+
+test('retires one exact version when HEAD returns an opaque VersionId', async () => {
+  const client = new MemoryS3Client({ headVersionId: 'version/opaque+1=' });
+  const adapter = store(client);
+  await adapter.put(COMMAND, chunks());
+  client.commands.length = 0;
+
+  const result = await adapter.retire(retentionCandidate());
+  assert.equal(result.disposition, 'deleted');
+  assert.equal(client.commands[1].input.VersionId, 'version/opaque+1=');
+  assert.equal(client.commands[1].input.IfMatch, undefined);
+  assert.equal(permanentKey(client), undefined);
+});
+
+test('returns durable absent evidence without issuing a delete', async () => {
+  const client = new MemoryS3Client();
+  const adapter = store(client);
+
+  assert.deepEqual(await adapter.retire(retentionCandidate()), {
+    disposition: 'already_absent',
+    byteLength: 0,
+    truncation: { truncated: 'unknown' },
+  });
+  assert.deepEqual(
+    client.commands.map((command) => command.constructor.name),
+    ['HeadObjectCommand'],
+  );
+});
+
+test('fails closed on conditional-delete drift and malformed version authority', async () => {
+  for (const options of [
+    { permanentDeletePreconditionFailure: true },
+    { headVersionId: 'invalid\nversion' },
+  ]) {
+    const client = new MemoryS3Client(options);
+    const adapter = store(client);
+    await adapter.put(COMMAND, chunks());
+    client.commands.length = 0;
+
+    await assert.rejects(
+      adapter.retire(retentionCandidate()),
+      (error) =>
+        error instanceof S3ClusterRemoteWorkerArtifactStoreError &&
+        error.reason === 'integrity_mismatch',
+    );
+    assert.notEqual(permanentKey(client), undefined);
+  }
+
+  const wrongExecutor = new MemoryS3Client();
+  await assert.rejects(
+    store(wrongExecutor).retire(
+      retentionCandidate({ executorType: 'local_process' }),
+    ),
+    (error) =>
+      error instanceof S3ClusterRemoteWorkerArtifactStoreError &&
+      error.reason === 'integrity_mismatch',
+  );
+  assert.equal(wrongExecutor.commands.length, 0);
+});
+
+test('lost delete response converges through a later absent inspection', async () => {
+  const client = new MemoryS3Client({ throwAfterPermanentDelete: true });
+  const adapter = store(client);
+  await adapter.put(COMMAND, chunks());
+  client.commands.length = 0;
+
+  await assert.rejects(
+    adapter.retire(retentionCandidate()),
+    (error) =>
+      error instanceof S3ClusterRemoteWorkerArtifactStoreError &&
+      error.reason === 'unavailable',
+  );
+  client.options.throwAfterPermanentDelete = false;
+  assert.deepEqual(await adapter.retire(retentionCandidate()), {
+    disposition: 'already_absent',
+    byteLength: 0,
+    truncation: { truncated: 'unknown' },
+  });
 });

@@ -20,6 +20,12 @@ import {
   type RunAttemptLogReadRange,
 } from '@qinglong/runtime-core/run-attempt-log-read';
 import {
+  normalizeRunAttemptLogRetentionCandidate,
+  type RunAttemptLogRetentionCandidate,
+  type RunAttemptLogRetirementStore,
+  type RunAttemptLogRetirementStoreResult,
+} from '@qinglong/runtime-core/run-attempt-log-retention';
+import {
   MAX_REMOTE_WORKER_ARTIFACT_BYTES,
   REMOTE_WORKER_ARTIFACT_CONTENT_TYPE,
   normalizeRemoteWorkerArtifactReceipt,
@@ -124,6 +130,7 @@ type ArtifactAuthority = Readonly<{
 type StoredArtifactHead = Readonly<{
   receipt: Readonly<RemoteWorkerArtifactReceipt>;
   eTag?: string;
+  versionId?: string;
 }>;
 
 type NormalizedStorageCommand = ArtifactAuthority &
@@ -484,6 +491,18 @@ function canonicalETag(value: unknown): string {
   return value;
 }
 
+function canonicalVersionId(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    value.length < 1 ||
+    Buffer.byteLength(value, 'utf8') > 1024 ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  ) {
+    throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+  }
+  return value;
+}
+
 function assertRangeMetadata(
   authority: ArtifactAuthority,
   receipt: Readonly<RemoteWorkerArtifactReceipt>,
@@ -580,6 +599,20 @@ function isNotFound(error: unknown): boolean {
   );
 }
 
+function isPreconditionFailed(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const value = error as {
+    name?: unknown;
+    Code?: unknown;
+    $metadata?: { httpStatusCode?: unknown };
+  };
+  return (
+    value.name === 'PreconditionFailed' ||
+    value.Code === 'PreconditionFailed' ||
+    value.$metadata?.httpStatusCode === 412
+  );
+}
+
 function requestOptions(
   signal?: AbortSignal,
 ): { abortSignal: AbortSignal } | undefined {
@@ -655,10 +688,11 @@ class ArtifactContentDigest {
 /**
  * Shared immutable S3 adapter. A unique temporary upload is checksummed first,
  * then promoted by one destination-conditional server-side copy. Permanent
- * objects are never overwritten or deleted by this adapter.
+ * objects are never overwritten and are retired only after an identity-checked
+ * HEAD followed by a VersionId- or ETag-fenced delete.
  */
 export class S3ClusterRemoteWorkerArtifactStore
-  implements ClusterRemoteWorkerArtifactStore
+  implements ClusterRemoteWorkerArtifactStore, RunAttemptLogRetirementStore
 {
   private readonly options: PreparedOptions;
 
@@ -751,6 +785,75 @@ export class S3ClusterRemoteWorkerArtifactStore
     }
   }
 
+  async retire(
+    rawCandidate: Readonly<RunAttemptLogRetentionCandidate>,
+    signal?: AbortSignal,
+  ): Promise<Readonly<RunAttemptLogRetirementStoreResult>> {
+    const candidate = normalizeRunAttemptLogRetentionCandidate(rawCandidate);
+    if (candidate.executorType !== 'remote_worker') {
+      throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+    }
+    const authority = Object.freeze({
+      projectId: candidate.projectId,
+      runId: candidate.runId,
+      attemptId: candidate.attemptId,
+      logArtifactId: candidate.logArtifactId,
+    });
+    const stored = await this.head(authority, signal);
+    if (!stored) {
+      return Object.freeze({
+        disposition: 'already_absent' as const,
+        byteLength: 0,
+        truncation: Object.freeze({ truncated: 'unknown' as const }),
+      });
+    }
+    const versionId =
+      stored.versionId === undefined
+        ? undefined
+        : canonicalVersionId(stored.versionId);
+    const eTag =
+      versionId === undefined ? canonicalETag(stored.eTag) : undefined;
+    try {
+      await this.options.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.options.bucket,
+          Key: finalObjectKey(this.options.prefix, authority),
+          ...(versionId === undefined
+            ? { IfMatch: eTag }
+            : { VersionId: versionId }),
+          ...(this.options.expectedBucketOwner === undefined
+            ? {}
+            : { ExpectedBucketOwner: this.options.expectedBucketOwner }),
+        }),
+        requestOptions(signal),
+      );
+    } catch (error) {
+      if (isNotFound(error)) {
+        return Object.freeze({
+          disposition: 'already_absent' as const,
+          byteLength: 0,
+          truncation: Object.freeze({ truncated: 'unknown' as const }),
+        });
+      }
+      if (isPreconditionFailed(error)) {
+        throw new S3ClusterRemoteWorkerArtifactStoreError(
+          'integrity_mismatch',
+          { cause: error },
+        );
+      }
+      throw new S3ClusterRemoteWorkerArtifactStoreError('unavailable', {
+        cause: error,
+      });
+    }
+    return Object.freeze({
+      disposition: 'deleted' as const,
+      byteLength: stored.receipt.byteLength,
+      truncation: Object.freeze({
+        truncated: stored.receipt.truncated ?? ('unknown' as const),
+      }),
+    });
+  }
+
   private async head(
     authority: ArtifactAuthority,
     signal?: AbortSignal,
@@ -771,6 +874,9 @@ export class S3ClusterRemoteWorkerArtifactStore
       return Object.freeze({
         receipt: parseStoredReceipt(authority, output),
         ...(output.ETag === undefined ? {} : { eTag: output.ETag }),
+        ...(output.VersionId === undefined
+          ? {}
+          : { versionId: output.VersionId }),
       });
     } catch (error) {
       if (isNotFound(error)) return undefined;
@@ -811,7 +917,9 @@ export class S3ClusterRemoteWorkerArtifactStore
       this.options.createTemporaryId,
     );
     const temporaryOwner = temporaryOwnershipDigest();
-    let temporaryOwned = false;
+    let temporaryDeleteAuthority:
+      | Readonly<{ readonly eTag: string; readonly versionId?: string }>
+      | undefined;
     let result: Readonly<RemoteWorkerArtifactReceipt> | undefined;
     let primaryError: unknown;
     try {
@@ -837,21 +945,19 @@ export class S3ClusterRemoteWorkerArtifactStore
           }),
           requestOptions(signal),
         );
-        temporaryOwned = true;
       } catch (error) {
         if (!digest.isComplete()) throw error;
       } finally {
         body.destroy();
       }
       const sha256 = digest.digest();
-      await this.assertTemporaryObject(
+      temporaryDeleteAuthority = await this.assertTemporaryObject(
         temporaryKey,
         temporaryOwner,
         command.byteLength,
         sha256,
         signal,
       );
-      temporaryOwned = true;
 
       let copied = false;
       try {
@@ -898,12 +1004,15 @@ export class S3ClusterRemoteWorkerArtifactStore
       primaryError = error;
     }
 
-    if (temporaryOwned) {
+    if (temporaryDeleteAuthority !== undefined) {
       try {
         await this.options.client.send(
           new DeleteObjectCommand({
             Bucket: this.options.bucket,
             Key: temporaryKey,
+            ...(temporaryDeleteAuthority.versionId === undefined
+              ? { IfMatch: temporaryDeleteAuthority.eTag }
+              : { VersionId: temporaryDeleteAuthority.versionId }),
             ...(this.options.expectedBucketOwner === undefined
               ? {}
               : { ExpectedBucketOwner: this.options.expectedBucketOwner }),
@@ -937,7 +1046,7 @@ export class S3ClusterRemoteWorkerArtifactStore
     byteLength: number,
     sha256: string,
     signal?: AbortSignal,
-  ): Promise<void> {
+  ): Promise<Readonly<{ readonly eTag: string; readonly versionId?: string }>> {
     let output;
     try {
       output = await this.options.client.send(
@@ -965,5 +1074,14 @@ export class S3ClusterRemoteWorkerArtifactStore
     ) {
       throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
     }
+    const eTag = canonicalETag(output.ETag);
+    const versionId =
+      output.VersionId === undefined
+        ? undefined
+        : canonicalVersionId(output.VersionId);
+    return Object.freeze({
+      eTag,
+      ...(versionId === undefined ? {} : { versionId }),
+    });
   }
 }

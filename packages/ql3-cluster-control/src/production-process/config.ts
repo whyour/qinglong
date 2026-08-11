@@ -12,6 +12,16 @@ import {
 } from '@qinglong/cluster-postgres/runtime';
 import { ClusterControlAvailabilityFence } from '../database/availability';
 import type { ClusterControlHttpSurfaceOptions } from '../transport/httpSurface';
+import {
+  MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_CLAIMS,
+  MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+  MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_RETRY_DELAY_MS,
+  MIN_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+} from '@qinglong/runtime-core/cluster-run-attempt-log-retention';
+import {
+  MAX_RUN_ATTEMPT_LOG_RETENTION_MS,
+  MIN_RUN_ATTEMPT_LOG_RETENTION_MS,
+} from '@qinglong/runtime-core/run-attempt-log-retention';
 
 export type ClusterControlEnvironment = Readonly<
   Record<string, string | undefined>
@@ -33,6 +43,20 @@ export interface EnabledClusterControlConfig {
   readonly security: Readonly<{
     apiCredentialPepper: string;
   }>;
+  readonly logRetention:
+    | Readonly<{ readonly enabled: false }>
+    | Readonly<{
+        readonly enabled: true;
+        readonly retentionMs: number;
+        readonly claimLimit: number;
+        readonly leaseMs: number;
+        readonly maximumCycleMs: number;
+        readonly retryBaseMs: number;
+        readonly retryMaximumMs: number;
+        readonly maximumFailures: number;
+        readonly intervalMs: number;
+        readonly stopTimeoutMs: number;
+      }>;
 }
 
 export type ClusterControlConfig =
@@ -222,6 +246,82 @@ function apiCredentialPepper(environment: ClusterControlEnvironment): string {
   return value;
 }
 
+function logRetentionConfig(
+  environment: ClusterControlEnvironment,
+): EnabledClusterControlConfig['logRetention'] {
+  if (!booleanValue(environment, 'QL3_CLUSTER_LOG_RETENTION_ENABLED', true)) {
+    return Object.freeze({ enabled: false as const });
+  }
+  const leaseMs = integerValue(
+    environment,
+    'QL3_CLUSTER_LOG_RETENTION_LEASE_MS',
+    30_000,
+    MIN_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+    MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_LEASE_MS,
+  );
+  const retryBaseMs = integerValue(
+    environment,
+    'QL3_CLUSTER_LOG_RETENTION_RETRY_BASE_MS',
+    5_000,
+    0,
+    MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_RETRY_DELAY_MS,
+  );
+  return Object.freeze({
+    enabled: true as const,
+    retentionMs: integerValue(
+      environment,
+      'QL3_CLUSTER_LOG_RETENTION_MS',
+      30 * 24 * 60 * 60_000,
+      MIN_RUN_ATTEMPT_LOG_RETENTION_MS,
+      MAX_RUN_ATTEMPT_LOG_RETENTION_MS,
+    ),
+    claimLimit: integerValue(
+      environment,
+      'QL3_CLUSTER_LOG_RETENTION_CLAIM_LIMIT',
+      4,
+      1,
+      MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_CLAIMS,
+    ),
+    leaseMs,
+    maximumCycleMs: integerValue(
+      environment,
+      'QL3_CLUSTER_LOG_RETENTION_CYCLE_BUDGET_MS',
+      10_000,
+      100,
+      leaseMs - 500,
+    ),
+    retryBaseMs,
+    retryMaximumMs: integerValue(
+      environment,
+      'QL3_CLUSTER_LOG_RETENTION_RETRY_MAX_MS',
+      60 * 60_000,
+      retryBaseMs,
+      MAX_CLUSTER_RUN_ATTEMPT_LOG_RETENTION_RETRY_DELAY_MS,
+    ),
+    maximumFailures: integerValue(
+      environment,
+      'QL3_CLUSTER_LOG_RETENTION_MAX_FAILURES',
+      8,
+      1,
+      32,
+    ),
+    intervalMs: integerValue(
+      environment,
+      'QL3_CLUSTER_LOG_RETENTION_INTERVAL_MS',
+      60_000,
+      1_000,
+      24 * 60 * 60_000,
+    ),
+    stopTimeoutMs: integerValue(
+      environment,
+      'QL3_CLUSTER_LOG_RETENTION_STOP_TIMEOUT_MS',
+      10_000,
+      100,
+      30_000,
+    ),
+  });
+}
+
 /**
  * Parses the profile gate before reading PostgreSQL configuration. A disabled
  * cluster-control therefore does not touch its runtime credential source.
@@ -345,6 +445,7 @@ export function loadClusterControlConfig(
     security: Object.freeze({
       apiCredentialPepper: apiCredentialPepper(environment),
     }),
+    logRetention: logRetentionConfig(environment),
   };
   return Object.freeze(config);
 }

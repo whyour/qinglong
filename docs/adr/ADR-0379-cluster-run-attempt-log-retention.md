@@ -1,6 +1,6 @@
 # ADR-0379：Cluster Run Attempt 日志多副本保留与条件删除
 
-- 状态：Proposed（PostgreSQL authority 已实现，S3/lifecycle/HA 验收待完成）
+- 状态：Accepted
 - 日期：2026-08-12
 - 关联 RFC：QL-RFC-0001 D-291
 - 前置决策：ADR-0026、ADR-0027、ADR-0377、ADR-0378
@@ -34,14 +34,17 @@ Cluster 还必须保持与低配 Local 部署的物理隔离：本能力不得�
 
 1. validated HEAD 校验 content type、metadata identity、checksum、byte length，并取得 ETag 与可用的 VersionId；
 2. 对 versioned object 使用精确 VersionId，对未版本化对象使用 ETag `If-Match` 条件删除；
-3. 412/对象身份变化失败关闭并进入 retry/manual，不得删除新对象；
-4. 删除成功或 HEAD 已不存在后，开启第二个短 PostgreSQL 事务；
-5. 事务重验 owner/token/version/expiry、terminal Run/Attempt 与 immutable identity，插入 exact tombstone 后删除 control；
-6. 删除响应丢失时，lease 过期后的新 claim 以 HEAD absent 写入 `already_absent`，最终收敛。
+3. upload promotion 的临时对象也必须先取得精确 VersionId 或 ETag authority，再按同一规则清理；无法证明临时对象身份时宁可留下可诊断对象，不得执行无条件删除；
+4. 412/对象身份变化失败关闭并进入 retry/manual，不得删除新对象；
+5. 删除成功或 HEAD 已不存在后，开启第二个短 PostgreSQL 事务；
+6. 事务重验 owner/token/version/expiry、terminal Run/Attempt 与 immutable identity，插入 exact tombstone 后删除 control；
+7. 删除响应丢失时，lease 过期后的新 claim 以 HEAD absent 写入 `already_absent`，最终收敛。
 
 ### 4. 有界调度与退避
 
-每轮 claim 不超过 16 条，lease 范围 5 秒至 5 分钟；retry delay 最大 24 小时。副本不得持有跨 sweep cursor，也不得为每个 Attempt 建 timer。调度复用 Cluster control application 既有 lifecycle，并受每轮 claim 数、删除数和 wall-clock budget 共同限制。`artifact_unavailable`、`artifact_integrity_mismatch`、`retirement_record_unavailable` 是持久化失败分类；达到策略阈值后转 manual，避免坏对象形成热循环。
+每轮 claim 不超过 16 条，lease 范围 5 秒至 5 分钟；retry delay 最大 24 小时。副本不得持有跨 sweep cursor，也不得为每个 Attempt 建 timer。`ClusterRunAttemptLogRetentionLifecycle` 只拥有一个 `unref` timer，重叠 tick 合并为同一轮，单轮共享一个 wall-clock `AbortSignal`；停机先 abort、再在上限内 drain，且位于 application reverse-stop 的最前端。`artifact_unavailable`、`artifact_integrity_mismatch`、`retirement_record_unavailable` 是持久化失败分类；达到策略阈值后转 manual，避免坏对象形成热循环。
+
+生产配置使用显式 `QL3_CLUSTER_LOG_RETENTION_*` 边界控制 retention、claim、lease、cycle budget、retry、manual threshold、cadence 与 stop timeout。能力默认启用，但只有 Worker ingress/S3 store 已激活时才装配，不为没有远端日志的 Cluster 进程增加 timer。
 
 ### 5. 读取收敛
 
@@ -49,20 +52,16 @@ PostgreSQL claim repository 同时实现 retention state reader。Cluster 日志
 
 ## 阶段验收
 
-第一阶段已完成 PostgreSQL authority：共享 claim contract、v54 migration、typed Drizzle/schema/readiness、最小权限、短事务 claim、完整 lease fence、retry/manual settlement、exact tombstone finalize/replay、tombstone state read。定向 63 项 migration/schema/readiness/repository 门通过；`runtime-core` 498 项全通过，`cluster-postgres` 302 项通过、1 项条件跳过，`cluster-control` 216 项通过、2 项条件跳过。
+本 ADR 已完成从 PostgreSQL ownership 到对象删除、生产 lifecycle 和读取 410 的纵向闭环：
 
-阶段收口还通过 18 个 QL3 workspace package 的完整 build/test 门，以及后端兼容回归 1163 项通过、2 项条件跳过、0 失败/取消。v54 readiness 引入的两张表已同步进入 `cluster-control` 测试数据库的最小权限 fixture，避免旧 v53 fixture 把正常启动误判为 `runtime_role_invalid`。
+- PostgreSQL v54 authority 已覆盖 typed schema/readiness、最小权限、短事务 claim、完整 lease fence、retry/manual settlement、exact tombstone finalize/replay 与 state read；`cluster-postgres` 为 302 pass/1 条件 skip。
+- S3 单元矩阵覆盖 versioned/unversioned 条件删除、412 identity drift、对象已不存在、删除响应丢失收敛、malformed HEAD，以及临时对象的 VersionId/ETag 精确清理；真实 MinIO 在强制 SSE-S3 下分别通过 versioning disabled/enabled，versioned 路径最终为零旧版本、零 delete marker。
+- production composition 已把 reader、retirement store、coordinator 与 lifecycle 接入唯一 Cluster application；生产 HTTP 读取可由 durable tombstone 返回 410。`cluster-control` 为 230 pass/2 外部条件 skip。
+- PostgreSQL 18.4 arm64 physical HA 在 timeline `1→2` 下通过 113 gates：旧主 claim 已 `remote_apply` 到 standby，提升且同步冗余恢复后旧 owner settlement 被 fenced，新主以 claim version 2 接管，随后原子写唯一 tombstone 并把 control count 收敛为 0。报告 SHA-256 为 `4be3053fc1af9ad6304715f5398292ba9a31ec5b3d49f64787510e2f2645ec5f`。
+- 18 个 QL3 workspace package 的 clean build/test 门退出 0；后端兼容回归为 1163 pass/2 条件 skip/0 fail。package boundary 保持 18 package、1054 source、1036 nested、18 个受审 root entry，`singleSourcePackages=[]`、`shallowSourcePackages=[]`；`cluster-control` 为 51 source，其中 49 个 nested、2 个 root binary entry。
+- dependency 与 Edge import audit 零 finding；Edge closure 的 121 个实际 imported module 不包含 PostgreSQL、AWS SDK 或 Cluster package。14 档 Local Profile artifact 与 Local image static audit 保持 compatible，因此本能力不会改变路由设备的默认数据库、连接、timer 或对象存储负担。
 
-结构门保持 18 个 workspace package，`singleSourcePackages=[]`、`shallowSourcePackages=[]`。新 repository 只从明确的 Cluster runtime entrypoint 导出，不扩大 package root；PostgreSQL migration append-only `ordered_ledger` 的 reviewed hard cap 随 pg-0055 由 57 精确推进到 58，不把版本账本伪拆为子目录。
-
-ADR 保持 Proposed，只有以下剩余项全部完成后才转 Accepted：
-
-1. S3 validated HEAD + ETag/VersionId 条件删除和失败矩阵；
-2. Cluster service 的 bounded claim/delete/backoff/manual 策略；
-3. production composition、lifecycle drain 与读取 410；
-4. MinIO versioned/unversioned 集成、响应丢失重放；
-5. PostgreSQL 18 HA failover 中 lease takeover/tombstone 收敛；
-6. 完整 package/backend/boundary/Profile/image gates，证明 Local closure 无 PostgreSQL/AWS SDK 回归。
+这些证据满足原六项收口条件，ADR 转为 Accepted。真实生产对象存储厂商矩阵、Kubernetes 多节点分区、基础设施 STONITH 与长期容量基准仍属于 Release Gate，不由本地 MinIO/PostgreSQL Docker 合约代替。
 
 ## 被否决的替代方案
 

@@ -13,6 +13,7 @@ import {
   type ClusterControlAssemblyInput,
   type ClusterControlRecoveryRuntimeOptions,
   type ClusterRunCancellationConvergenceRuntimeOptions,
+  type ClusterRunAttemptLogRetentionRuntimeOptions,
   type ClusterSchedulerRuntimeOptions,
   type ClusterWorkerRuntimeDependencies,
 } from './clusterControlRuntime';
@@ -39,6 +40,7 @@ export interface ClusterControlApplicationOptions {
   readonly recovery?: ClusterControlRecoveryRuntimeOptions;
   readonly scheduler?: ClusterSchedulerRuntimeOptions;
   readonly cancellationConvergence?: ClusterRunCancellationConvergenceRuntimeOptions;
+  readonly logRetention?: ClusterRunAttemptLogRetentionRuntimeOptions;
   readonly workerRuntime?: ClusterWorkerRuntimeDependencies;
   readonly openDatabase: OpenPostgresDatabase;
   readonly availability: ClusterControlAvailabilitySource;
@@ -88,6 +90,9 @@ function inactiveBootstrap(
     ...(options.cancellationConvergence === undefined
       ? {}
       : { cancellationConvergence: options.cancellationConvergence }),
+    ...(options.logRetention === undefined
+      ? {}
+      : { logRetention: options.logRetention }),
     ...(options.workerRuntime === undefined
       ? {}
       : { workerRuntime: options.workerRuntime }),
@@ -163,6 +168,9 @@ export async function startClusterControlApplication(
       ...(options.cancellationConvergence === undefined
         ? {}
         : { cancellationConvergence: options.cancellationConvergence }),
+      ...(options.logRetention === undefined
+        ? {}
+        : { logRetention: options.logRetention }),
       ...(options.workerRuntime === undefined
         ? {}
         : { workerRuntime: options.workerRuntime }),

@@ -7,7 +7,9 @@ const {
   CreateBucketCommand,
   DeleteBucketCommand,
   DeleteObjectsCommand,
+  ListObjectVersionsCommand,
   ListObjectsV2Command,
+  PutBucketVersioningCommand,
   S3Client,
 } = require('@aws-sdk/client-s3');
 const {
@@ -35,6 +37,7 @@ test(
       credentials: { accessKeyId, secretAccessKey },
     });
     const bucket = `ql3-artifact-${process.pid}-${Date.now()}`.slice(0, 63);
+    const versionedBucket = `${bucket}-v`.slice(0, 63);
     const command = Object.freeze({
       projectId: 'project-s3-integration',
       runId: 'run-s3-integration',
@@ -101,27 +104,123 @@ test(
       );
       assert.equal(objects.KeyCount, 1);
       assert.match(objects.Contents[0].Key, /\/objects\//);
-    } finally {
-      try {
-        const objects = await client.send(
-          new ListObjectsV2Command({
-            Bucket: bucket,
-          }),
-        );
-        if (objects.Contents?.length) {
+      const retired = await store.retire({
+        projectId: command.projectId,
+        runId: command.runId,
+        attemptId: command.attemptId,
+        logArtifactId: command.logArtifactId,
+        executorType: 'remote_worker',
+        finishedAtMs: 1,
+      });
+      assert.deepEqual(retired, {
+        disposition: 'deleted',
+        byteLength: content.byteLength,
+        truncation: { truncated: true },
+      });
+      assert.equal(
+        (
           await client.send(
-            new DeleteObjectsCommand({
+            new ListObjectsV2Command({
               Bucket: bucket,
-              Delete: {
-                Objects: objects.Contents.map(({ Key }) => ({ Key })),
-                Quiet: true,
-              },
+              Prefix: 'qinglong/integration/',
             }),
+          )
+        ).KeyCount,
+        0,
+      );
+      assert.deepEqual(
+        await store.retire({
+          projectId: command.projectId,
+          runId: command.runId,
+          attemptId: command.attemptId,
+          logArtifactId: command.logArtifactId,
+          executorType: 'remote_worker',
+          finishedAtMs: 1,
+        }),
+        {
+          disposition: 'already_absent',
+          byteLength: 0,
+          truncation: { truncated: 'unknown' },
+        },
+      );
+
+      await client.send(new CreateBucketCommand({ Bucket: versionedBucket }));
+      await client.send(
+        new PutBucketVersioningCommand({
+          Bucket: versionedBucket,
+          VersioningConfiguration: { Status: 'Enabled' },
+        }),
+      );
+      const versionedStore = new S3ClusterRemoteWorkerArtifactStore({
+        client,
+        bucket: versionedBucket,
+        prefix: 'qinglong/integration',
+        encryption: { mode: 's3' },
+      });
+      assert.equal(
+        (await versionedStore.put(command, body(content))).status,
+        'stored',
+      );
+      const beforeVersionedRetirement = await client.send(
+        new ListObjectVersionsCommand({ Bucket: versionedBucket }),
+      );
+      assert.equal(beforeVersionedRetirement.Versions?.length, 1);
+      assert.equal(beforeVersionedRetirement.DeleteMarkers?.length ?? 0, 0);
+      assert.match(beforeVersionedRetirement.Versions[0].Key, /\/objects\//);
+      assert.equal(
+        (
+          await versionedStore.retire({
+            projectId: command.projectId,
+            runId: command.runId,
+            attemptId: command.attemptId,
+            logArtifactId: command.logArtifactId,
+            executorType: 'remote_worker',
+            finishedAtMs: 1,
+          })
+        ).disposition,
+        'deleted',
+      );
+      const afterVersionedRetirement = await client.send(
+        new ListObjectVersionsCommand({ Bucket: versionedBucket }),
+      );
+      assert.equal(afterVersionedRetirement.Versions?.length ?? 0, 0);
+      assert.equal(afterVersionedRetirement.DeleteMarkers?.length ?? 0, 0);
+    } finally {
+      for (const cleanupBucket of [versionedBucket, bucket]) {
+        try {
+          const versions = await client.send(
+            new ListObjectVersionsCommand({ Bucket: cleanupBucket }),
           );
+          const versionedObjects = [
+            ...(versions.Versions ?? []),
+            ...(versions.DeleteMarkers ?? []),
+          ].map(({ Key, VersionId }) => ({ Key, VersionId }));
+          if (versionedObjects.length) {
+            await client.send(
+              new DeleteObjectsCommand({
+                Bucket: cleanupBucket,
+                Delete: { Objects: versionedObjects, Quiet: true },
+              }),
+            );
+          }
+          const objects = await client.send(
+            new ListObjectsV2Command({ Bucket: cleanupBucket }),
+          );
+          if (objects.Contents?.length) {
+            await client.send(
+              new DeleteObjectsCommand({
+                Bucket: cleanupBucket,
+                Delete: {
+                  Objects: objects.Contents.map(({ Key }) => ({ Key })),
+                  Quiet: true,
+                },
+              }),
+            );
+          }
+          await client.send(new DeleteBucketCommand({ Bucket: cleanupBucket }));
+        } catch {
+          // Preserve the integration assertion; the ephemeral container is removed.
         }
-        await client.send(new DeleteBucketCommand({ Bucket: bucket }));
-      } catch {
-        // Preserve the integration assertion; the ephemeral container is removed.
       }
       client.destroy();
     }

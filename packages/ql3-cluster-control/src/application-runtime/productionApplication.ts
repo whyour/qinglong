@@ -200,6 +200,7 @@ export function createProductionClusterControlApplicationStack(
     createClusterControlRunAttemptLogReadRoute(
       input.runs,
       input.workerRuntime?.runAttemptLogRead,
+      input.runAttemptLogRetention,
     ),
     createClusterControlRunCancellationRoute(
       input.runCancellation,

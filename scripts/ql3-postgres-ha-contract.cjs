@@ -24,6 +24,7 @@ const {
   PostgresClusterScheduleRepository,
   PostgresRemoteWorkerCompletionRepository,
   PostgresRemoteWorkerLeaseControlRepository,
+  PostgresRunAttemptLogRetentionClaimRepository,
   PostgresToolInvocationArtifactRepository,
   PostgresWorkerSessionRepository,
 } = require('../packages/ql3-cluster-postgres/dist/entrypoints/runtime.js');
@@ -213,6 +214,9 @@ const {
 const {
   resolveClusterScheduleDecision,
 } = require('../packages/ql3-runtime-core/dist/scheduler/clusterScheduler.js');
+const {
+  createRunAttemptLogRetirementRecord,
+} = require('../packages/ql3-runtime-core/dist/run/log-retention/runAttemptLogRetention.js');
 const {
   PluginPackageManagementQuotaExceededError,
   PluginPackageManagementUnavailableError,
@@ -9109,6 +9113,240 @@ async function assertAutomationManagementInspectionFailsClosed({
   report.failedClosedWithoutSynchronousStandby = true;
 }
 
+async function persistRunAttemptLogRetentionClaimBeforePromotion({
+  primaryPort,
+  primaryDatabase,
+  standbyDatabase,
+}) {
+  const fixture = Object.freeze({
+    projectId: 'ha-log-retention-project',
+    runId: 'ha-log-retention-run',
+    attemptId: 'ha-log-retention-attempt',
+    logArtifactId: `wlog-${'f'.repeat(30)}`,
+    ownerId: 'ha-log-retention-primary',
+    token: 'ha-log-retention-primary-token-0001',
+    retentionMs: 60_000,
+    leaseMs: 5_000,
+  });
+  const clock = await primaryDatabase.pool.query(
+    `SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint::text
+            AS "observedAtMs"`,
+  );
+  const observedAtMs = Number(clock.rows[0].observedAtMs);
+  const finishedAtMs = observedAtMs - 120_000;
+  await primaryDatabase.pool.query(
+    `INSERT INTO "ql3"."projects" (
+       id, name, slug, status, version, created_at_ms, updated_at_ms
+     ) VALUES ($1, 'HA Log Retention', 'ha-log-retention', 'active', 1, $2, $2)`,
+    [fixture.projectId, finishedAtMs],
+  );
+  await primaryDatabase.pool.query(
+    `INSERT INTO "ql3"."runs" (
+       id, project_id, task_id, task_revision, trigger_type,
+       execution_origin, execution_owner, status, created_at_ms,
+       queued_at_ms, started_at_ms, finished_at_ms, version, event_sequence
+     ) VALUES ($1, $2, 'ha-log-retention-task', 'v1', 'manual', 'api',
+       'runtime', 'succeeded', $3, $3, $3, $3, 3, 0)`,
+    [fixture.runId, fixture.projectId, finishedAtMs],
+  );
+  await primaryDatabase.pool.query(
+    `INSERT INTO "ql3"."run_attempts" (
+       id, run_id, attempt, status, executor_type, log_artifact_id,
+       callback_sequence, created_at_ms, started_at_ms, finished_at_ms,
+       exit_code
+     ) VALUES ($1, $2, 1, 'succeeded', 'remote_worker', $3, 0,
+       $4, $4, $4, 0)`,
+    [fixture.attemptId, fixture.runId, fixture.logArtifactId, finishedAtMs],
+  );
+
+  const runtimeDatabase = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, primaryPort),
+    'ql3-ha-log-retention-primary',
+  )();
+  let claim;
+  try {
+    const repository = new PostgresRunAttemptLogRetentionClaimRepository(
+      runtimeDatabase.pool,
+      () => fixture.token,
+    );
+    const page = await repository.claim({
+      ownerId: fixture.ownerId,
+      retentionMs: fixture.retentionMs,
+      limit: 1,
+      leaseMs: fixture.leaseMs,
+    });
+    assert.equal(page.claims.length, 1);
+    claim = page.claims[0];
+    assert.deepEqual(claim.candidate, {
+      projectId: fixture.projectId,
+      runId: fixture.runId,
+      attemptId: fixture.attemptId,
+      logArtifactId: fixture.logArtifactId,
+      executorType: 'remote_worker',
+      finishedAtMs,
+    });
+    assert.equal(claim.ownerId, fixture.ownerId);
+    assert.equal(claim.token, fixture.token);
+    assert.equal(claim.version, 1);
+    assert.equal(claim.failureCount, 0);
+    assert.equal(claim.expiresAtMs - claim.observedAtMs, fixture.leaseMs);
+  } finally {
+    await runtimeDatabase.close();
+  }
+
+  const replicated = await waitFor(async () => {
+    const result = await standbyDatabase.pool.query(
+      `SELECT claim_owner AS "ownerId", claim_token AS token,
+              claim_version AS version, claim_expires_at_ms::text AS "expiresAtMs",
+              (SELECT count(*)::integer
+                 FROM "ql3"."run_attempt_log_artifact_tombstones"
+                WHERE attempt_id = $1) AS "tombstoneCount"
+         FROM "ql3"."run_attempt_log_retention_controls"
+        WHERE attempt_id = $1`,
+      [fixture.attemptId],
+    );
+    return result.rowCount === 1 ? result.rows[0] : null;
+  }, 'Run Attempt log retention claim remote apply');
+  assert.deepEqual(replicated, {
+    ownerId: fixture.ownerId,
+    token: fixture.token,
+    version: 1,
+    expiresAtMs: String(claim.expiresAtMs),
+    tombstoneCount: 0,
+  });
+
+  return {
+    fixture,
+    claim,
+    report: {
+      replicatedBeforePromotion: true,
+      initialOwnerId: claim.ownerId,
+      initialClaimVersion: claim.version,
+      initialClaimExpiresAtMs: claim.expiresAtMs,
+      initialTombstoneCount: replicated.tombstoneCount,
+    },
+  };
+}
+
+async function verifyRunAttemptLogRetentionAfterPromotion({
+  promotedPort,
+  promotedDatabase,
+  evidence,
+}) {
+  const runtimeDatabase = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, promotedPort),
+    'ql3-ha-log-retention-promoted',
+  )();
+  try {
+    const expired = await waitFor(async () => {
+      const result = await promotedDatabase.pool.query(
+        `SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint::text
+                AS "observedAtMs"`,
+      );
+      return Number(result.rows[0].observedAtMs) >= evidence.claim.expiresAtMs
+        ? result.rows[0]
+        : null;
+    }, 'Run Attempt log retention lease expiry');
+    const oldRepository = new PostgresRunAttemptLogRetentionClaimRepository(
+      runtimeDatabase.pool,
+    );
+    const staleRecord = createRunAttemptLogRetirementRecord({
+      ...evidence.claim.candidate,
+      eligibleAtMs: evidence.claim.eligibleAtMs,
+      retiredAtMs: Math.max(
+        Number(expired.observedAtMs),
+        evidence.claim.eligibleAtMs,
+      ),
+      disposition: 'already_absent',
+      byteLength: 0,
+      truncation: { truncated: 'unknown' },
+    });
+    assert.equal(
+      await oldRepository.settle(evidence.claim, {
+        status: 'retired',
+        record: staleRecord,
+      }),
+      'fenced',
+    );
+
+    const promotedToken = 'ha-log-retention-promoted-token-0002';
+    const promotedOwnerId = 'ha-log-retention-promoted';
+    const promotedRepository =
+      new PostgresRunAttemptLogRetentionClaimRepository(
+        runtimeDatabase.pool,
+        () => promotedToken,
+      );
+    const page = await promotedRepository.claim({
+      ownerId: promotedOwnerId,
+      retentionMs: evidence.fixture.retentionMs,
+      limit: 1,
+      leaseMs: evidence.fixture.leaseMs,
+    });
+    assert.equal(page.claims.length, 1);
+    const promotedClaim = page.claims[0];
+    assert.deepEqual(promotedClaim.candidate, evidence.claim.candidate);
+    assert.equal(promotedClaim.ownerId, promotedOwnerId);
+    assert.equal(promotedClaim.token, promotedToken);
+    assert.equal(promotedClaim.version, evidence.claim.version + 1);
+    assert.ok(promotedClaim.observedAtMs >= evidence.claim.expiresAtMs);
+
+    const record = createRunAttemptLogRetirementRecord({
+      ...promotedClaim.candidate,
+      eligibleAtMs: promotedClaim.eligibleAtMs,
+      retiredAtMs: Math.max(
+        promotedClaim.observedAtMs,
+        promotedClaim.eligibleAtMs,
+      ),
+      disposition: 'already_absent',
+      byteLength: 0,
+      truncation: { truncated: 'unknown' },
+    });
+    assert.equal(
+      await promotedRepository.settle(promotedClaim, {
+        status: 'retired',
+        record,
+      }),
+      'settled',
+    );
+    assert.deepEqual(
+      await promotedRepository.inspect({
+        projectId: evidence.fixture.projectId,
+        runId: evidence.fixture.runId,
+        attemptId: evidence.fixture.attemptId,
+        logArtifactId: evidence.fixture.logArtifactId,
+      }),
+      { status: 'retired', record },
+    );
+    const durable = await promotedDatabase.pool.query(
+      `SELECT
+         (SELECT count(*)::integer
+            FROM "ql3"."run_attempt_log_retention_controls"
+           WHERE attempt_id = $1) AS "controlCount",
+         (SELECT count(*)::integer
+            FROM "ql3"."run_attempt_log_artifact_tombstones"
+           WHERE attempt_id = $1 AND record_digest = $2) AS "tombstoneCount"`,
+      [evidence.fixture.attemptId, record.recordDigest],
+    );
+    assert.deepEqual(durable.rows, [{ controlCount: 0, tombstoneCount: 1 }]);
+    return {
+      ...evidence.report,
+      stalePrimarySettlementFenced: true,
+      promotedOwnerId,
+      promotedClaimVersion: promotedClaim.version,
+      promotedClaimObservedAtMs: promotedClaim.observedAtMs,
+      controlCountAfterSettlement: durable.rows[0].controlCount,
+      tombstoneCountAfterSettlement: durable.rows[0].tombstoneCount,
+      tombstoneDisposition: record.disposition,
+      recordDigest: record.recordDigest,
+      survivedPromotion: true,
+    };
+  } finally {
+    await runtimeDatabase.close();
+  }
+}
+
 async function main(argv = process.argv.slice(2)) {
   const reportFile = privateReportPath(argv);
   const nodeMajor = Number(process.versions.node.split('.')[0]);
@@ -9192,6 +9430,8 @@ async function main(argv = process.argv.slice(2)) {
   let modelInvocationFeaturePromotion;
   let modelProviderCredentialCatalog;
   let modelProviderCredentialTestConnection;
+  let runAttemptLogRetentionEvidence;
+  let runAttemptLogRetention;
   const startedAt = performance.now();
   const timeline = [];
   let report;
@@ -10290,6 +10530,17 @@ async function main(argv = process.argv.slice(2)) {
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
 
+    runAttemptLogRetentionEvidence =
+      await persistRunAttemptLogRetentionClaimBeforePromotion({
+        primaryPort,
+        primaryDatabase,
+        standbyDatabase,
+      });
+    timeline.push({
+      state: 'run_attempt_log_retention_claim_replicated',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+
     await primaryDatabase.pool.query(
       `INSERT INTO "ql3"."projects" (
          id, name, slug, status, version, created_at_ms, updated_at_ms
@@ -10914,6 +11165,15 @@ async function main(argv = process.argv.slice(2)) {
         ? { afterRejoinMarkers, partitionOutcomeUnknownMarkers }
         : null;
     }, 'post-rewind synchronous WAL replay');
+    runAttemptLogRetention = await verifyRunAttemptLogRetentionAfterPromotion({
+      promotedPort: standbyPort,
+      promotedDatabase,
+      evidence: runAttemptLogRetentionEvidence,
+    });
+    timeline.push({
+      state: 'run_attempt_log_retention_tombstone_survived_promotion',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
     const recoveredAutomationManagerDatabase = await databaseOpener(
       'automation-manager',
       databaseUrl(
@@ -11300,7 +11560,7 @@ async function main(argv = process.argv.slice(2)) {
             FROM "ql3"."worker_credential_deliveries") AS "credentialDeliveries"`,
     );
     assert.deepEqual(sideEffects.rows, [
-      { runs: 10, runEvents: 39, credentialDeliveries: 4 },
+      { runs: 11, runEvents: 39, credentialDeliveries: 4 },
     ]);
     timeline.push({
       state: 'two_fresh_control_replicas_ready',
@@ -11414,8 +11674,16 @@ async function main(argv = process.argv.slice(2)) {
       modelInvocationFeaturePromotion,
       modelProviderCredentialCatalog,
       modelProviderCredentialTestConnection,
+      runAttemptLogRetention,
       timeline,
       gates: {
+        runAttemptLogRetentionLeaseTakeoverAndTombstoneConverge:
+          runAttemptLogRetention.replicatedBeforePromotion &&
+          runAttemptLogRetention.stalePrimarySettlementFenced &&
+          runAttemptLogRetention.promotedClaimVersion === 2 &&
+          runAttemptLogRetention.controlCountAfterSettlement === 0 &&
+          runAttemptLogRetention.tombstoneCountAfterSettlement === 1 &&
+          runAttemptLogRetention.survivedPromotion,
         packageAuthoritySplitReadinessBeforeAndAfterPromotion: true,
         optionalAiFeatureSchemaSurvivesPromotion: true,
         modelProviderCredentialCatalogSurvivesPromotion:

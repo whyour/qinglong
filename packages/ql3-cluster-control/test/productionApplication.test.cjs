@@ -617,6 +617,87 @@ test('wires the production Worker object reader into the Project-scoped log rout
   assert.equal(Buffer.from(result.body.content, 'base64').toString(), 'prod');
 });
 
+test('wires durable retirement authority into the production log route', async () => {
+  const {
+    createRunAttemptLogRetirementRecord,
+  } = require('@qinglong/runtime-core/run-attempt-log-retention');
+  const { input } = fixture();
+  const run = await input.runs.findRunById('run-1');
+  const logArtifactId = `wlog-${'b'.repeat(30)}`;
+  let objectReads = 0;
+  const stack = createProductionClusterControlApplicationStack({
+    ...input,
+    runs: {
+      ...input.runs,
+      async findRunById() {
+        return { ...run, status: 'succeeded', finishedAtMs: 10 };
+      },
+      async findAttemptById() {
+        return {
+          id: 'attempt-1',
+          runId: 'run-1',
+          attempt: 1,
+          status: 'succeeded',
+          executorType: 'remote_worker',
+          logArtifactId,
+          callbackSequence: 0,
+          createdAtMs: 1,
+          finishedAtMs: 10,
+        };
+      },
+    },
+    runAttemptLogRetention: {
+      async inspect(identity) {
+        assert.deepEqual(identity, {
+          projectId: 'project-1',
+          runId: 'run-1',
+          attemptId: 'attempt-1',
+          logArtifactId,
+        });
+        return {
+          status: 'retired',
+          record: createRunAttemptLogRetirementRecord({
+            ...identity,
+            executorType: 'remote_worker',
+            finishedAtMs: 10,
+            eligibleAtMs: 20,
+            retiredAtMs: 30,
+            disposition: 'deleted',
+            byteLength: 64,
+            truncation: { truncated: 'unknown' },
+          }),
+        };
+      },
+    },
+    workerRuntime: {
+      offers: { claimNext() {} },
+      activation: {
+        acknowledgeStarting() {},
+        acknowledgeRunning() {},
+        failStart() {},
+      },
+      artifacts: { upload() {} },
+      completion: { complete() {} },
+      leaseControl: { control() {} },
+      runAttemptLogRead: {
+        async read() {
+          objectReads += 1;
+          return { status: 'missing' };
+        },
+      },
+    },
+  });
+  const result = await invoke(
+    stack,
+    metadata('/api/v3/projects/project-1/runs/run-1/attempts/attempt-1/log'),
+  );
+  assert.equal(result.statusCode, 410);
+  assert.equal(result.body.status, 'retired');
+  assert.equal(result.body.retiredAtMs, 30);
+  assert.equal(result.body.byteLength, 64);
+  assert.equal(objectReads, 0);
+});
+
 test('optionally exposes Prompt execution behind shared admission and policy', async () => {
   const { events, input } = fixture();
   let command;
