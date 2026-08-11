@@ -24,6 +24,7 @@ import { createClusterControlRunReadRoute } from '../run/runReadRoute';
 import { createClusterControlRunListRoute } from '../run/runListRoute';
 import { createClusterControlRunEventListRoute } from '../run/runEventListRoute';
 import { createClusterControlRunStepListRoute } from '../run/runStepListRoute';
+import { createClusterControlRunAttemptLogReadRoute } from '../run/runAttemptLogReadRoute';
 import { createClusterControlTaskListRoute } from '../task/taskListRoute';
 import { createClusterControlTaskReadRoute } from '../task/taskReadRoute';
 import { createClusterControlTaskStartRoute } from '../task/taskStartRoute';
@@ -69,6 +70,7 @@ export const PRODUCTION_CLUSTER_CONTROL_ROUTE_OPERATIONS = Object.freeze([
   'run.list',
   'run.events.list',
   'run.steps.list',
+  'run.log.read',
   'run.cancel',
   'workflow.read',
   'workflow.run.read',
@@ -194,6 +196,10 @@ export function createProductionClusterControlApplicationStack(
     createClusterControlRunStepListRoute(
       input.runs,
       input.trustedToolStorage.stepRuns,
+    ),
+    createClusterControlRunAttemptLogReadRoute(
+      input.runs,
+      input.workerRuntime?.runAttemptLogRead,
     ),
     createClusterControlRunCancellationRoute(
       input.runCancellation,

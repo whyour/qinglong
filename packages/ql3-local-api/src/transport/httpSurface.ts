@@ -28,6 +28,8 @@ const RUN_STEP_LIST_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/steps$/;
 const RUN_CANCELLATION_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/cancellation$/;
+const RUN_ATTEMPT_LOG_READ_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/attempts\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/log$/;
 const TASK_LIST_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks$/;
 const TASK_READ_ROUTE_PATTERN =
@@ -44,6 +46,7 @@ type LocalApiRouteResolution =
         | 'invalid_run_list_query'
         | 'invalid_run_event_list_query'
         | 'invalid_run_step_list_query'
+        | 'invalid_run_log_read_query'
         | 'invalid_task_list_query';
     }>;
 
@@ -340,10 +343,7 @@ function parseTaskListQuery(
     }
     const name = field.slice(0, separator);
     const value = field.slice(separator + 1);
-    if (
-      values.has(name) ||
-      (name !== 'limit' && name !== 'after_task_id')
-    ) {
+    if (values.has(name) || (name !== 'limit' && name !== 'after_task_id')) {
       throw new TypeError();
     }
     values.set(name, value);
@@ -363,13 +363,58 @@ function parseTaskListQuery(
   }
   return Object.freeze({
     ...(limit === undefined ? {} : { limit }),
-    ...(taskId === undefined
-      ? {}
-      : { after: Object.freeze({ taskId }) }),
+    ...(taskId === undefined ? {} : { after: Object.freeze({ taskId }) }),
   });
 }
 
-function route(request: IncomingMessage): LocalApiRouteResolution | null {
+function parseRunAttemptLogReadQuery(
+  rawQuery: string | undefined,
+  profile: LocalApplicationProfile,
+): Readonly<{ offset: number; length: number }> {
+  const defaultLength = profile === 'edge' ? 16 * 1024 : 32 * 1024;
+  if (rawQuery === undefined) {
+    return Object.freeze({ offset: 0, length: defaultLength });
+  }
+  if (rawQuery.length === 0) throw new TypeError();
+  const values = new Map<string, string>();
+  for (const field of rawQuery.split('&')) {
+    const separator = field.indexOf('=');
+    if (
+      separator < 1 ||
+      separator !== field.lastIndexOf('=') ||
+      separator === field.length - 1
+    ) {
+      throw new TypeError();
+    }
+    const name = field.slice(0, separator);
+    const value = field.slice(separator + 1);
+    if (values.has(name) || (name !== 'offset' && name !== 'length')) {
+      throw new TypeError();
+    }
+    values.set(name, value);
+  }
+  const rawOffset = values.get('offset');
+  const offset = rawOffset === undefined ? 0 : Number(rawOffset);
+  const rawLength = values.get('length');
+  const length = rawLength === undefined ? defaultLength : Number(rawLength);
+  if (
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    (rawOffset !== undefined && String(offset) !== rawOffset) ||
+    !Number.isSafeInteger(length) ||
+    length < 1 ||
+    length > 32 * 1024 ||
+    (rawLength !== undefined && String(length) !== rawLength)
+  ) {
+    throw new TypeError();
+  }
+  return Object.freeze({ offset, length });
+}
+
+function route(
+  request: IncomingMessage,
+  profile: LocalApplicationProfile,
+): LocalApiRouteResolution | null {
   const rawUrl = request.url;
   if (
     typeof rawUrl !== 'string' ||
@@ -403,6 +448,20 @@ function route(request: IncomingMessage): LocalApiRouteResolution | null {
       : null;
   }
   if (request.method !== 'GET') return null;
+  const runAttemptLogReadMatch = RUN_ATTEMPT_LOG_READ_ROUTE_PATTERN.exec(path);
+  if (runAttemptLogReadMatch) {
+    try {
+      return Object.freeze({
+        operationId: 'run.log.read',
+        projectId: runAttemptLogReadMatch[1]!,
+        runId: runAttemptLogReadMatch[2]!,
+        attemptId: runAttemptLogReadMatch[3]!,
+        ...parseRunAttemptLogReadQuery(rawQuery, profile),
+      });
+    } catch {
+      return Object.freeze({ errorCode: 'invalid_run_log_read_query' });
+    }
+  }
   const taskReadMatch = TASK_READ_ROUTE_PATTERN.exec(path);
   if (taskReadMatch) {
     return rawQuery === undefined
@@ -552,7 +611,7 @@ export async function startLocalApiHttpSurface(
         send(response, requestId, errorResponse(503, 'server_overloaded'));
         return;
       }
-      const resolvedRoute = route(request);
+      const resolvedRoute = route(request, options.profile);
       if (!resolvedRoute) {
         send(response, requestId, errorResponse(404, 'route_not_found'));
         return;
@@ -608,9 +667,9 @@ export async function startLocalApiHttpSurface(
               error instanceof RangeError
                 ? 'request_body_too_large'
                 : error instanceof Error &&
-                    error.message === 'request_unavailable'
-                  ? 'request_unavailable'
-                  : 'invalid_request_body';
+                  error.message === 'request_unavailable'
+                ? 'request_unavailable'
+                : 'invalid_request_body';
             send(
               response,
               requestId,
@@ -618,8 +677,8 @@ export async function startLocalApiHttpSurface(
                 code === 'request_body_too_large'
                   ? 413
                   : code === 'request_unavailable'
-                    ? 503
-                    : 400,
+                  ? 503
+                  : 400,
                 code,
               ),
             );

@@ -6,12 +6,19 @@ import {
   ChecksumMode,
   CopyObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   MetadataDirective,
   PutObjectCommand,
   S3Client,
   ServerSideEncryption,
 } from '@aws-sdk/client-s3';
+import {
+  normalizeRunAttemptLogReadRange,
+  type RunAttemptLogRangeReadResult,
+  type RunAttemptLogReadIdentity,
+  type RunAttemptLogReadRange,
+} from '@qinglong/runtime-core/run-attempt-log-read';
 import {
   MAX_REMOTE_WORKER_ARTIFACT_BYTES,
   REMOTE_WORKER_ARTIFACT_CONTENT_TYPE,
@@ -31,7 +38,8 @@ const TEMPORARY_METADATA_SCHEMA =
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const BUCKET_PATTERN = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
 const PREFIX_PATTERN = /^[A-Za-z0-9][A-Za-z0-9/_=-]{0,254}$/;
-const TEMPORARY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const TEMPORARY_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 type S3SendClient = Pick<S3Client, 'send'>;
 
@@ -70,8 +78,7 @@ export function createS3ClusterRemoteWorkerArtifactClient(
     typeof options !== 'object' ||
     Array.isArray(options) ||
     !/^[a-z0-9][a-z0-9-]{0,62}$/.test(options.region) ||
-    (options.endpoint !== undefined &&
-      typeof options.endpoint !== 'string') ||
+    (options.endpoint !== undefined && typeof options.endpoint !== 'string') ||
     (options.forcePathStyle !== undefined &&
       typeof options.forcePathStyle !== 'boolean')
   ) {
@@ -79,9 +86,7 @@ export function createS3ClusterRemoteWorkerArtifactClient(
   }
   return new S3Client({
     region: options.region,
-    ...(options.endpoint === undefined
-      ? {}
-      : { endpoint: options.endpoint }),
+    ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
     forcePathStyle: options.forcePathStyle ?? false,
   });
 }
@@ -116,6 +121,11 @@ type ArtifactAuthority = Readonly<{
   logArtifactId: string;
 }>;
 
+type StoredArtifactHead = Readonly<{
+  receipt: Readonly<RemoteWorkerArtifactReceipt>;
+  eTag?: string;
+}>;
+
 type NormalizedStorageCommand = ArtifactAuthority &
   Readonly<{
     byteLength: number;
@@ -127,7 +137,9 @@ const DIAGNOSTIC_CONTEXT = Object.freeze({
 });
 
 function configurationError(message: string): TypeError {
-  return new TypeError(`S3 Remote Worker Artifact store is invalid: ${message}`);
+  return new TypeError(
+    `S3 Remote Worker Artifact store is invalid: ${message}`,
+  );
 }
 
 function prepareOptions(
@@ -175,14 +187,15 @@ function prepareOptions(
     throw configurationError('expected bucket owner is invalid');
   }
   const encryption = options.encryption;
-  if (!encryption || typeof encryption !== 'object' || Array.isArray(encryption)) {
+  if (
+    !encryption ||
+    typeof encryption !== 'object' ||
+    Array.isArray(encryption)
+  ) {
     throw configurationError('encryption is required');
   }
   let preparedEncryption: PreparedOptions['encryption'];
-  if (
-    encryption.mode === 's3' &&
-    Object.keys(encryption).length === 1
-  ) {
+  if (encryption.mode === 's3' && Object.keys(encryption).length === 1) {
     preparedEncryption = Object.freeze({
       ServerSideEncryption: ServerSideEncryption.AES256,
     });
@@ -383,9 +396,8 @@ function finalMetadata(
     ),
     'ql3-byte-length': String(command.byteLength),
     'ql3-content-sha256': sha256,
-    'ql3-truncated': command.truncated === undefined
-      ? 'omitted'
-      : String(command.truncated),
+    'ql3-truncated':
+      command.truncated === undefined ? 'omitted' : String(command.truncated),
   });
 }
 
@@ -460,6 +472,99 @@ function parseStoredReceipt(
   );
 }
 
+function canonicalETag(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    value.length < 3 ||
+    value.length > 256 ||
+    !/^"[^"\u0000-\u001f\u007f]+"$/.test(value)
+  ) {
+    throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+  }
+  return value;
+}
+
+function assertRangeMetadata(
+  authority: ArtifactAuthority,
+  receipt: Readonly<RemoteWorkerArtifactReceipt>,
+  output: Readonly<{
+    ContentLength?: number | undefined;
+    ContentRange?: string | undefined;
+    ContentType?: string | undefined;
+    ETag?: string | undefined;
+    Metadata?: Readonly<Record<string, string | undefined>> | undefined;
+  }>,
+  eTag: string,
+  start: number,
+  endExclusive: number,
+): void {
+  const metadata = output.Metadata;
+  const truncated =
+    receipt.truncated === undefined ? 'omitted' : String(receipt.truncated);
+  if (
+    output.ContentLength !== endExclusive - start ||
+    output.ContentRange !==
+      `bytes ${start}-${endExclusive - 1}/${receipt.byteLength}` ||
+    output.ContentType !== REMOTE_WORKER_ARTIFACT_CONTENT_TYPE ||
+    canonicalETag(output.ETag) !== eTag ||
+    metadataValue(metadata, 'ql3-schema') !== METADATA_SCHEMA ||
+    metadataValue(metadata, 'ql3-project-sha256') !==
+      fieldDigest('project', authority.projectId) ||
+    metadataValue(metadata, 'ql3-run-sha256') !==
+      fieldDigest('run', authority.runId) ||
+    metadataValue(metadata, 'ql3-attempt-sha256') !==
+      fieldDigest('attempt', authority.attemptId) ||
+    metadataValue(metadata, 'ql3-log-artifact-sha256') !==
+      fieldDigest('log-artifact', authority.logArtifactId) ||
+    metadataValue(metadata, 'ql3-byte-length') !== String(receipt.byteLength) ||
+    metadataValue(metadata, 'ql3-content-sha256') !== receipt.sha256 ||
+    metadataValue(metadata, 'ql3-truncated') !== truncated
+  ) {
+    throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+  }
+}
+
+async function readBoundedRangeBody(
+  body: unknown,
+  expectedBytes: number,
+  signal?: AbortSignal,
+): Promise<Buffer> {
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !(Symbol.asyncIterator in body) ||
+    typeof (body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] !==
+      'function'
+  ) {
+    throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+  }
+  const content = Buffer.allocUnsafe(expectedBytes);
+  let received = 0;
+  try {
+    for await (const chunk of body as AsyncIterable<Uint8Array>) {
+      if (signal?.aborted) throw signal.reason;
+      if (!(chunk instanceof Uint8Array) || chunk.byteLength === 0) {
+        throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+      }
+      if (received + chunk.byteLength > expectedBytes) {
+        throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+      }
+      Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength).copy(
+        content,
+        received,
+      );
+      received += chunk.byteLength;
+    }
+    if (received !== expectedBytes) {
+      throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
+    }
+    return content;
+  } catch (error) {
+    content.fill(0);
+    throw error;
+  }
+}
+
 function isNotFound(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const value = error as {
@@ -467,13 +572,17 @@ function isNotFound(error: unknown): boolean {
     Code?: unknown;
     $metadata?: { httpStatusCode?: unknown };
   };
-  return value.name === 'NotFound' ||
+  return (
+    value.name === 'NotFound' ||
     value.name === 'NoSuchKey' ||
     value.Code === 'NoSuchKey' ||
-    value.$metadata?.httpStatusCode === 404;
+    value.$metadata?.httpStatusCode === 404
+  );
 }
 
-function requestOptions(signal?: AbortSignal): { abortSignal: AbortSignal } | undefined {
+function requestOptions(
+  signal?: AbortSignal,
+): { abortSignal: AbortSignal } | undefined {
   return signal === undefined ? undefined : { abortSignal: signal };
 }
 
@@ -549,7 +658,8 @@ class ArtifactContentDigest {
  * objects are never overwritten or deleted by this adapter.
  */
 export class S3ClusterRemoteWorkerArtifactStore
-  implements ClusterRemoteWorkerArtifactStore {
+  implements ClusterRemoteWorkerArtifactStore
+{
   private readonly options: PreparedOptions;
 
   constructor(options: S3ClusterRemoteWorkerArtifactStoreOptions) {
@@ -561,6 +671,90 @@ export class S3ClusterRemoteWorkerArtifactStore
     signal?: AbortSignal,
   ): Promise<Readonly<RemoteWorkerArtifactReceipt> | undefined> {
     const authority = normalizeLookup(lookup);
+    return (await this.head(authority, signal))?.receipt;
+  }
+
+  async readLogRange(
+    rawIdentity: Readonly<RunAttemptLogReadIdentity>,
+    rawRange: Readonly<RunAttemptLogReadRange>,
+    signal?: AbortSignal,
+  ): Promise<RunAttemptLogRangeReadResult> {
+    const authority = normalizeLookup(rawIdentity);
+    const range = normalizeRunAttemptLogReadRange(rawRange);
+    const stored = await this.head(authority, signal);
+    if (!stored) return Object.freeze({ status: 'missing' as const });
+    const start = Math.min(range.offset, stored.receipt.byteLength);
+    const endExclusive = Math.min(
+      start + range.length,
+      stored.receipt.byteLength,
+    );
+    const truncation = Object.freeze({
+      truncated: stored.receipt.truncated ?? ('unknown' as const),
+    });
+    if (start === endExclusive) {
+      return Object.freeze({
+        status: 'available' as const,
+        content: Buffer.alloc(0),
+        start,
+        endExclusive,
+        totalBytes: stored.receipt.byteLength,
+        truncation,
+      });
+    }
+    const eTag = canonicalETag(stored.eTag);
+    if (signal?.aborted) throw signal.reason;
+    try {
+      const output = await this.options.client.send(
+        new GetObjectCommand({
+          Bucket: this.options.bucket,
+          Key: finalObjectKey(this.options.prefix, authority),
+          IfMatch: eTag,
+          Range: `bytes=${start}-${endExclusive - 1}`,
+          ...(this.options.expectedBucketOwner === undefined
+            ? {}
+            : { ExpectedBucketOwner: this.options.expectedBucketOwner }),
+        }),
+        requestOptions(signal),
+      );
+      assertRangeMetadata(
+        authority,
+        stored.receipt,
+        output,
+        eTag,
+        start,
+        endExclusive,
+      );
+      const bytes = await readBoundedRangeBody(
+        output.Body,
+        endExclusive - start,
+        signal,
+      );
+      return Object.freeze({
+        status: 'available' as const,
+        content: bytes,
+        start,
+        endExclusive,
+        totalBytes: stored.receipt.byteLength,
+        ...(endExclusive < stored.receipt.byteLength
+          ? { nextOffset: endExclusive }
+          : {}),
+        truncation,
+      });
+    } catch (error) {
+      if (isNotFound(error)) {
+        return Object.freeze({ status: 'missing' as const });
+      }
+      if (error instanceof S3ClusterRemoteWorkerArtifactStoreError) throw error;
+      throw new S3ClusterRemoteWorkerArtifactStoreError('unavailable', {
+        cause: error,
+      });
+    }
+  }
+
+  private async head(
+    authority: ArtifactAuthority,
+    signal?: AbortSignal,
+  ): Promise<StoredArtifactHead | undefined> {
     if (signal?.aborted) throw signal.reason;
     try {
       const output = await this.options.client.send(
@@ -574,7 +768,10 @@ export class S3ClusterRemoteWorkerArtifactStore
         }),
         requestOptions(signal),
       );
-      return parseStoredReceipt(authority, output);
+      return Object.freeze({
+        receipt: parseStoredReceipt(authority, output),
+        ...(output.ETag === undefined ? {} : { eTag: output.ETag }),
+      });
     } catch (error) {
       if (isNotFound(error)) return undefined;
       if (error instanceof S3ClusterRemoteWorkerArtifactStoreError) throw error;
@@ -604,9 +801,7 @@ export class S3ClusterRemoteWorkerArtifactStore
         existing.truncated !== command.truncated ||
         existing.sha256 !== incomingSha256
       ) {
-        throw new S3ClusterRemoteWorkerArtifactStoreError(
-          'integrity_mismatch',
-        );
+        throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
       }
       return existing;
     }
@@ -693,13 +888,11 @@ export class S3ClusterRemoteWorkerArtifactStore
         stored.truncated !== command.truncated ||
         stored.sha256 !== sha256
       ) {
-        throw new S3ClusterRemoteWorkerArtifactStoreError(
-          'integrity_mismatch',
-        );
+        throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
       }
       result = Object.freeze({
         ...stored,
-        status: copied ? 'stored' as const : 'already_stored' as const,
+        status: copied ? ('stored' as const) : ('already_stored' as const),
       });
     } catch (error) {
       primaryError = error;
@@ -770,9 +963,7 @@ export class S3ClusterRemoteWorkerArtifactStore
       output.Metadata?.['ql3-owner-sha256'] !== ownerSha256 ||
       canonicalChecksum(output.ChecksumSHA256) !== sha256
     ) {
-      throw new S3ClusterRemoteWorkerArtifactStoreError(
-        'integrity_mismatch',
-      );
+      throw new S3ClusterRemoteWorkerArtifactStoreError('integrity_mismatch');
     }
   }
 }

@@ -455,11 +455,28 @@ export async function bootstrapLocalApplication(
     });
 
     if (options.productSurface) {
-      const [stepRuns, runCancellation, taskStart] = await Promise.all([
+      const [
+        stepRuns,
+        runCancellation,
+        taskStart,
+        { LocalRunAttemptLogRangeReader },
+        { RunAttemptLogReadService },
+      ] = await Promise.all([
         storage.stepRunReader(),
         storage.runCancellationRepository(),
         storage.taskStartRepository(),
+        import('@qinglong/local-execution/artifact-read'),
+        import('@qinglong/runtime-core/run-attempt-log-read'),
       ]);
+      const runAttemptLogRead = new RunAttemptLogReadService(
+        storage.runs,
+        new LocalRunAttemptLogRangeReader(options.artifactRoot),
+        {
+          executorType: 'local_process',
+          artifactIdPattern: /^local-[a-f0-9]{30}$/,
+          maximumReadBytes: 32 * 1024,
+        },
+      );
       productSurfaceLifecycle = await options.productSurface.start(
         Object.freeze({
           profile: options.profile,
@@ -467,6 +484,7 @@ export async function bootstrapLocalApplication(
           stepRuns,
           runCancellation,
           taskStart,
+          runAttemptLogRead,
           taskDefinitions: storage.taskDefinitions,
           apiCredentials: storage.apiCredentials,
           ownerPepper: storage.ownerPepper,

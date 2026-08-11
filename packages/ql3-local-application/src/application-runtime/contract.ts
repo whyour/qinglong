@@ -18,6 +18,10 @@ import type { PluginPackageRecoveryCycleResult } from '@qinglong/runtime-core/pl
 import type { PluginPackageAutomationPublicationRecoveryCycleResult } from '@qinglong/runtime-core/plugin-package-automation-publication';
 import type { PluginPackageTaskPublicationRecoveryCycleResult } from '@qinglong/runtime-core/plugin-package-task-publication';
 import type { ProjectToolDefinitionSnapshotRecoveryCycleResult } from '@qinglong/runtime-core/project-tool-definition-snapshot';
+import type {
+  RunAttemptLogReadRequest,
+  RunAttemptLogReadResult,
+} from '@qinglong/runtime-core/run-attempt-log-read';
 
 export type LocalApplicationProfile = 'edge' | 'standalone';
 
@@ -59,6 +63,11 @@ export interface LocalApplicationProductSurfaceAuthority {
     ReadyFreshStorage['taskDefinitions'],
     'findCurrentTaskDefinition' | 'listTaskDefinitions'
   >;
+  readonly runAttemptLogRead: Readonly<{
+    read(
+      request: Readonly<RunAttemptLogReadRequest>,
+    ): Promise<RunAttemptLogReadResult>;
+  }>;
   readonly apiCredentials: ReadyFreshStorage['apiCredentials'];
   readonly ownerPepper: ReadyFreshStorage['ownerPepper'];
   readonly projectPolicy: ReadyFreshStorage['projectPolicy'];

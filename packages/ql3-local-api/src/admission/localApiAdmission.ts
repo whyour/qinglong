@@ -22,6 +22,7 @@ import type { LocalApiRunListRoute } from '../run/runListRoute';
 import type { LocalApiRunReadRoute } from '../run/runReadRoute';
 import type { LocalApiRunStepListRoute } from '../run/runStepListRoute';
 import type { LocalApiRunCancellationRoute } from '../run/runCancellationRoute';
+import type { LocalApiRunAttemptLogReadRoute } from '../run/runAttemptLogReadRoute';
 import type { LocalApiTaskListRoute } from '../task/taskListRoute';
 import type { LocalApiTaskReadRoute } from '../task/taskReadRoute';
 import type { LocalApiTaskStartRoute } from '../task/taskStartRoute';
@@ -49,6 +50,14 @@ export type LocalApiAdmissionOperation =
       projectId: string;
       runId: string;
       input: Readonly<BoundedRunStepListInput>;
+    }>
+  | Readonly<{
+      operationId: 'run.log.read';
+      projectId: string;
+      runId: string;
+      attemptId: string;
+      offset: number;
+      length: number;
     }>
   | Readonly<{
       operationId: 'run.cancel';
@@ -99,6 +108,7 @@ export interface LocalApiAdmissionOptions {
   readonly runEventListRoute: LocalApiRunEventListRoute;
   readonly runStepListRoute: LocalApiRunStepListRoute;
   readonly runCancellationRoute: LocalApiRunCancellationRoute;
+  readonly runAttemptLogReadRoute: LocalApiRunAttemptLogReadRoute;
   readonly taskListRoute: LocalApiTaskListRoute;
   readonly taskReadRoute: LocalApiTaskReadRoute;
   readonly taskStartRoute: LocalApiTaskStartRoute;
@@ -176,6 +186,7 @@ export function createLocalApiAdmission(
     typeof options.runEventListRoute?.handle !== 'function' ||
     typeof options.runStepListRoute?.handle !== 'function' ||
     typeof options.runCancellationRoute?.handle !== 'function' ||
+    typeof options.runAttemptLogReadRoute?.handle !== 'function' ||
     typeof options.taskListRoute?.handle !== 'function' ||
     typeof options.taskReadRoute?.handle !== 'function' ||
     typeof options.taskStartRoute?.handle !== 'function' ||
@@ -236,12 +247,14 @@ export function createLocalApiAdmission(
             request.operation.projectId,
             request.operation.operationId === 'run.cancel'
               ? 'run.stop'
+              : request.operation.operationId === 'run.log.read'
+              ? 'artifact.read'
               : request.operation.operationId === 'task.start'
-                ? 'run.start'
+              ? 'run.start'
               : request.operation.operationId === 'task.list' ||
-                  request.operation.operationId === 'task.get'
-                ? 'task.read'
-                : 'run.read',
+                request.operation.operationId === 'task.get'
+              ? 'task.read'
+              : 'run.read',
           ),
         );
       } catch {
@@ -279,9 +292,15 @@ export function createLocalApiAdmission(
         ),
       );
       if (auditFailure) return auditFailure;
-      if (decision.effect === 'deny') return response(403, 'forbidden');
+      if (decision.effect === 'deny') {
+        return request.operation.operationId === 'run.log.read'
+          ? response(404, 'artifact_not_found')
+          : response(403, 'forbidden');
+      }
       if (decision.effect === 'require_approval') {
-        return response(403, 'approval_required');
+        return request.operation.operationId === 'run.log.read'
+          ? response(404, 'artifact_not_found')
+          : response(403, 'approval_required');
       }
       if (request.signal.aborted) return response(503, 'request_unavailable');
       try {
@@ -336,6 +355,16 @@ export function createLocalApiAdmission(
                 body,
                 principal: authenticated.principal,
                 policyFence: decision.fence,
+              });
+            case 'run.log.read':
+              if (body !== null) return response(400, 'invalid_request_body');
+              return options.runAttemptLogReadRoute.handle({
+                projectId: request.operation.projectId,
+                runId: request.operation.runId,
+                attemptId: request.operation.attemptId,
+                offset: request.operation.offset,
+                length: request.operation.length,
+                signal: request.signal,
               });
             case 'task.list':
               if (body !== null) return response(400, 'invalid_request_body');

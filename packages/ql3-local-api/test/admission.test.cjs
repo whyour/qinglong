@@ -101,6 +101,14 @@ function fixture(overrides = {}) {
         return { statusCode: 202, body: { status: 'accepted' } };
       },
     },
+    runAttemptLogReadRoute: {
+      async handle(value) {
+        events.push(
+          `log:${value.projectId}:${value.runId}:${value.attemptId}:${value.offset}:${value.length}`,
+        );
+        return { statusCode: 200, body: { status: 'available' } };
+      },
+    },
     taskListRoute: {
       async handle(value) {
         events.push(`tasks:${value.projectId}:${value.input.limit ?? 32}`);
@@ -146,6 +154,51 @@ test('authenticates, authorizes, durably audits and re-confirms before reading',
     'confirm',
     'route:prj_default:run_123',
   ]);
+});
+
+test('uses artifact.read and masks denied or approval-fenced log existence', async () => {
+  const operation = Object.freeze({
+    operationId: 'run.log.read',
+    projectId: 'prj_default',
+    runId: 'run_123',
+    attemptId: 'attempt_123',
+    offset: 4,
+    length: 16,
+  });
+  const allowed = fixture();
+  assert.deepEqual(await execute(allowed.admission, request({ operation })), {
+    statusCode: 200,
+    body: { status: 'available' },
+  });
+  assert.deepEqual(allowed.events, [
+    'authenticate',
+    'authorize:artifact.read:prj_default',
+    'audit:allowed:run.log.read',
+    'confirm',
+    'log:prj_default:run_123:attempt_123:4:16',
+  ]);
+
+  for (const effect of ['deny', 'require_approval']) {
+    let routed = false;
+    const denied = fixture({
+      policy: {
+        async authorize() {
+          return { effect, reasons: ['masked'], fence: null };
+        },
+      },
+      runAttemptLogReadRoute: {
+        async handle() {
+          routed = true;
+          throw new Error('must not route');
+        },
+      },
+    });
+    assert.deepEqual(await execute(denied.admission, request({ operation })), {
+      statusCode: 404,
+      body: { code: 'artifact_not_found' },
+    });
+    assert.equal(routed, false);
+  }
 });
 
 test('uses the same admission chain with a route-owned run.list audit identity', async () => {

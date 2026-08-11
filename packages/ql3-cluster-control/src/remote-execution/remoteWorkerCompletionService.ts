@@ -16,6 +16,11 @@ import {
   type RemoteWorkerCompletionRepository,
   type RemoteWorkerCompletionResult,
 } from '@qinglong/runtime-core/remote-worker-completion';
+import type {
+  RunAttemptLogRangeReadResult,
+  RunAttemptLogReadIdentity,
+  RunAttemptLogReadRange,
+} from '@qinglong/runtime-core/run-attempt-log-read';
 
 export interface ClusterRemoteWorkerArtifactStorageCommand {
   readonly projectId: string;
@@ -47,6 +52,12 @@ export interface ClusterRemoteWorkerArtifactStore {
     lookup: Readonly<ClusterRemoteWorkerArtifactLookup>,
     signal?: AbortSignal,
   ): Promise<Readonly<RemoteWorkerArtifactReceipt> | undefined>;
+  /** Optional during Alpha so upload-only test and alternate stores remain compatible. */
+  readLogRange?(
+    identity: Readonly<RunAttemptLogReadIdentity>,
+    range: Readonly<RunAttemptLogReadRange>,
+    signal?: AbortSignal,
+  ): Promise<RunAttemptLogRangeReadResult>;
 }
 
 export interface ClusterRemoteWorkerArtifactUploadInput {
@@ -353,11 +364,13 @@ export class ClusterRemoteWorkerCompletionService {
     }
     try {
       const result = normalizeRemoteWorkerCompletionResult(
-        await this.repository.complete(Object.freeze({
-          ...command,
-          attemptEventId: eventId(this.createEventId),
-          runEventId: eventId(this.createEventId),
-        })),
+        await this.repository.complete(
+          Object.freeze({
+            ...command,
+            attemptEventId: eventId(this.createEventId),
+            runEventId: eventId(this.createEventId),
+          }),
+        ),
       );
       if (
         result.runId !== command.runId ||

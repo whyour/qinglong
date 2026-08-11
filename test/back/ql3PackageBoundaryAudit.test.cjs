@@ -130,10 +130,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localApi.rootSourceFileRoles,
     },
     {
-      sourceFiles: 16,
+      sourceFiles: 17,
       rootSourceFiles: 1,
       rootSourceLines: 84,
-      nestedSourceFiles: 15,
+      nestedSourceFiles: 16,
       rootSourceFileRoles: { 'cli.ts': 'binary_entry' },
     },
   );
@@ -146,10 +146,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
     {
       path: 'packages/ql3-local-execution',
       name: '@qinglong/local-execution',
-      sourceFiles: 19,
+      sourceFiles: 21,
       rootSourceFiles: 0,
       rootSourceLines: 0,
-      nestedSourceFiles: 19,
+      nestedSourceFiles: 21,
       rootSourceFileHardCap: 0,
       rootSourceLineHardCap: 0,
       rootSourceFileRoles: {},
@@ -299,10 +299,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: runtimeCore.rootSourceFileRoles,
     },
     {
-      sourceFiles: 148,
+      sourceFiles: 149,
       rootSourceFiles: 1,
       rootSourceLines: 160,
-      nestedSourceFiles: 147,
+      nestedSourceFiles: 148,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );
@@ -385,10 +385,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterControl.rootSourceFileRoles,
     },
     {
-      sourceFiles: 49,
+      sourceFiles: 50,
       rootSourceFiles: 2,
       rootSourceLines: 195,
-      nestedSourceFiles: 47,
+      nestedSourceFiles: 48,
       rootSourceFileRoles: {
         'aiCli.ts': 'binary_entry',
         'cli.ts': 'binary_entry',

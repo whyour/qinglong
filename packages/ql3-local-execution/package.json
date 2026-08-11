@@ -28,6 +28,11 @@
       "require": "./dist/dispatch/index.js",
       "default": "./dist/dispatch/index.js"
     },
+    "./artifact-read": {
+      "types": "./dist/artifact-read/index.d.ts",
+      "require": "./dist/artifact-read/index.js",
+      "default": "./dist/artifact-read/index.js"
+    },
     "./scheduler": {
       "types": "./dist/scheduler/index.d.ts",
       "require": "./dist/scheduler/index.js",

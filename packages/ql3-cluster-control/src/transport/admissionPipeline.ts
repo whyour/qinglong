@@ -308,6 +308,13 @@ export function createClusterControlAdmissionPipeline(
         now,
       );
       if (decision.effect === 'deny') {
+        if (route.permission === 'artifact.read') {
+          throw securityError(
+            404,
+            'artifact_not_found',
+            'Cluster-control Artifact is not available',
+          );
+        }
         throw securityError(
           403,
           'forbidden',
@@ -315,6 +322,13 @@ export function createClusterControlAdmissionPipeline(
         );
       }
       if (decision.effect === 'require_approval') {
+        if (route.permission === 'artifact.read') {
+          throw securityError(
+            404,
+            'artifact_not_found',
+            'Cluster-control Artifact is not available',
+          );
+        }
         throw securityError(
           403,
           'approval_required',

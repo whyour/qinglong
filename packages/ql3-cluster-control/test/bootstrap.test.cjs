@@ -573,6 +573,9 @@ test('injects reviewed Worker operations without exposing the runtime Pool', asy
     async inspect() {
       throw new Error('not invoked during assembly');
     },
+    async readLogRange() {
+      throw new Error('not invoked during assembly');
+    },
   };
   const result = await bootstrapClusterControlRuntime(
     bootstrapOptions(events, {
@@ -594,6 +597,10 @@ test('injects reviewed Worker operations without exposing the runtime Pool', asy
         );
         assert.equal(
           typeof input.workerRuntime.leaseControl.control,
+          'function',
+        );
+        assert.equal(
+          typeof input.workerRuntime.runAttemptLogRead.read,
           'function',
         );
         return activationStack(events);

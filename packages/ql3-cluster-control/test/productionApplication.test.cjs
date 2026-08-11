@@ -143,6 +143,9 @@ function fixture(overrides = {}) {
           },
         ];
       },
+      async findAttemptById() {
+        return null;
+      },
     },
     trustedToolStorage: {
       stepRuns: {
@@ -190,7 +193,8 @@ function fixture(overrides = {}) {
     taskDefinitions: {
       async findCurrentTaskDefinition(projectId, taskId) {
         events.push(`task-get:${projectId}:${taskId}`);
-        return projectId === currentTask.projectId && taskId === currentTask.taskId
+        return projectId === currentTask.projectId &&
+          taskId === currentTask.taskId
           ? currentTask
           : null;
       },
@@ -328,6 +332,7 @@ test('production composition exposes the reviewed Run and Workflow routes', asyn
     'run.list',
     'run.events.list',
     'run.steps.list',
+    'run.log.read',
     'run.cancel',
     'workflow.read',
     'workflow.run.read',
@@ -401,6 +406,15 @@ test('production composition exposes the reviewed Run and Workflow routes', asyn
     body: { steps: [], hasMore: false, next: null },
   });
 
+  const log = await invoke(
+    stack,
+    metadata('/api/v3/projects/project-1/runs/run-1/attempts/attempt-1/log'),
+  );
+  assert.deepEqual(log, {
+    statusCode: 503,
+    body: { code: 'artifact_unavailable' },
+  });
+
   const cancellation = await invoke(
     stack,
     metadata('/api/v3/projects/project-1/runs/run-1/cancellation', 'POST', {
@@ -414,6 +428,7 @@ test('production composition exposes the reviewed Run and Workflow routes', asyn
   assert.equal(events.includes('audit:run.get:allowed'), true);
   assert.equal(events.includes('audit:run.events.list:allowed'), true);
   assert.equal(events.includes('audit:run.steps.list:allowed'), true);
+  assert.equal(events.includes('audit:run.log.read:allowed'), true);
   assert.equal(events.includes('audit:run.cancel:allowed'), true);
 
   const workflows = await invoke(
@@ -537,6 +552,69 @@ test('production composition fails closed for an unreviewed route', async () => 
     ),
     (error) => error?.statusCode === 404 && error?.code === 'route_not_found',
   );
+});
+
+test('wires the production Worker object reader into the Project-scoped log route', async () => {
+  const { input } = fixture();
+  const run = await input.runs.findRunById('run-1');
+  const logArtifactId = `wlog-${'a'.repeat(30)}`;
+  const stack = createProductionClusterControlApplicationStack({
+    ...input,
+    runs: {
+      ...input.runs,
+      async findRunById() {
+        return { ...run, status: 'running' };
+      },
+      async findAttemptById() {
+        return {
+          id: 'attempt-1',
+          runId: 'run-1',
+          attempt: 1,
+          status: 'running',
+          executorType: 'remote_worker',
+          logArtifactId,
+          callbackSequence: 0,
+          createdAtMs: 1,
+        };
+      },
+    },
+    workerRuntime: {
+      offers: { claimNext() {} },
+      activation: {
+        acknowledgeStarting() {},
+        acknowledgeRunning() {},
+        failStart() {},
+      },
+      artifacts: { upload() {} },
+      completion: { complete() {} },
+      leaseControl: { control() {} },
+      runAttemptLogRead: {
+        async read(identity, range) {
+          assert.equal(identity.logArtifactId, logArtifactId);
+          assert.deepEqual(range, { offset: 1, length: 4 });
+          return {
+            status: 'available',
+            content: Buffer.from('prod'),
+            start: 1,
+            endExclusive: 5,
+            totalBytes: 5,
+            truncation: { truncated: false },
+          };
+        },
+      },
+    },
+  });
+  const result = await invoke(
+    stack,
+    metadata(
+      '/api/v3/projects/project-1/runs/run-1/attempts/attempt-1/log',
+      'GET',
+      null,
+      { offset: ['1'], length: ['4'] },
+    ),
+  );
+  assert.equal(result.statusCode, 200);
+  assert.equal(Buffer.from(result.body.content, 'base64').toString(), 'prod');
 });
 
 test('optionally exposes Prompt execution behind shared admission and policy', async () => {

@@ -25,6 +25,9 @@ const {
   compileLocalCommandTaskDefinition,
 } = require('@qinglong/runtime-core/task-definition-execution-compiler');
 const {
+  RunAttemptLogReadService,
+} = require('@qinglong/runtime-core/run-attempt-log-read');
+const {
   createBuiltInTaskSpecSemanticRegistry,
 } = require('@qinglong/runtime-core/task-spec-semantic');
 const { migrateLocalSqlitePath } = require('@qinglong/local-sqlite/migration');
@@ -34,11 +37,16 @@ const {
 const {
   createLocalApiProductSurface,
 } = require('../dist/application-runtime/localApiProductSurface.js');
+const {
+  LocalRunAttemptLogRangeReader,
+} = require('../../ql3-local-execution/dist/artifact-read/localRunAttemptLogRangeReader.js');
 
 const NOW = 1_800_000_000_000;
 const PEPPER_KEY_ID = 'local-api-pepper-v1';
 const CREDENTIAL_ID = 'local-api-owner';
 const RUN_ID = 'run_local_api_1';
+const ATTEMPT_ID = 'attempt_local_api_1';
+const LOG_ARTIFACT_ID = `local-${'a'.repeat(30)}`;
 const SECRET = Buffer.alloc(32, 81).toString('base64url');
 const PEPPER = Buffer.alloc(32, 82).toString('base64url');
 const TOKEN = formatApiCredentialToken(CREDENTIAL_ID, SECRET);
@@ -206,15 +214,18 @@ function seed(databasePath, materialDigest) {
       enabled: true,
       occurredAtMs: NOW - 200,
     };
-    const taskDefinition = createTaskDefinitionRecord({
-      ...taskCommand,
-      spec: taskSemantics.normalize({
-        projectId: taskCommand.projectId,
-        taskId: taskCommand.taskId,
-        kind: taskCommand.kind,
-        spec: taskCommand.spec,
-      }),
-    }, NOW - 200);
+    const taskDefinition = createTaskDefinitionRecord(
+      {
+        ...taskCommand,
+        spec: taskSemantics.normalize({
+          projectId: taskCommand.projectId,
+          taskId: taskCommand.taskId,
+          kind: taskCommand.kind,
+          spec: taskCommand.spec,
+        }),
+      },
+      NOW - 200,
+    );
     const taskExecution = compileLocalCommandTaskDefinition(
       taskDefinition,
       taskSemantics,
@@ -300,6 +311,15 @@ function seed(databasePath, materialDigest) {
       .run(RUN_ID, NOW - 100);
     client
       .prepare(
+        `INSERT INTO "RunAttempts" (
+           "id", "run_id", "attempt", "status", "executor_type",
+           "log_artifact_id", "callback_sequence", "created_at_ms",
+           "started_at_ms"
+         ) VALUES (?, ?, 1, 'running', 'local_process', ?, 0, ?, ?)`,
+      )
+      .run(ATTEMPT_ID, RUN_ID, LOG_ARTIFACT_ID, NOW - 90, NOW - 80);
+    client
+      .prepare(
         `INSERT INTO "StepRuns" (
            "id", "run_id", "parent_step_run_id", "step_key", "kind",
            "definition_ref", "definition_digest", "required", "status",
@@ -357,6 +377,15 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   fs.chmodSync(root, 0o700);
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const databasePath = path.join(root, 'qinglong3.sqlite');
+  const artifactRoot = path.join(root, 'artifacts');
+  const artifactShard = path.join(artifactRoot, 'aa');
+  fs.mkdirSync(artifactShard, { recursive: true, mode: 0o700 });
+  fs.chmodSync(artifactRoot, 0o700);
+  fs.chmodSync(artifactShard, 0o700);
+  const logContent = Buffer.from('local-api-log-line\n', 'utf8');
+  const logPath = path.join(artifactShard, `${LOG_ARTIFACT_ID}.log`);
+  fs.writeFileSync(logPath, logContent, { mode: 0o600 });
+  fs.chmodSync(logPath, 0o600);
   const keyringDirectory = path.join(root, 'owner-pepper');
   fs.mkdirSync(keyringDirectory, { mode: 0o700 });
   const summary = provisionLocalOwnerPepperKey({
@@ -398,6 +427,15 @@ test('serves an authenticated Run through one real SQLite authority and durable 
     stepRuns: await runtime.stepRunReader(),
     runCancellation: await runtime.runCancellationRepository(),
     taskStart: await runtime.taskStartRepository(),
+    runAttemptLogRead: new RunAttemptLogReadService(
+      runtime.runRepository,
+      new LocalRunAttemptLogRangeReader(artifactRoot),
+      {
+        executorType: 'local_process',
+        artifactIdPattern: /^local-[a-f0-9]{30}$/,
+        maximumReadBytes: 32 * 1024,
+      },
+    ),
     taskDefinitions: runtime.taskDefinitions,
     apiCredentials: runtime.apiCredentials,
     ownerPepper: runtime.ownerPepper,
@@ -572,12 +610,29 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   });
   assert.equal(JSON.stringify(steps).includes('private'), false);
 
+  const log = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    `/api/v3/projects/default/runs/${RUN_ID}/attempts/${ATTEMPT_ID}/log?offset=0&length=8`,
+  );
+  assert.equal(log.statusCode, 200);
+  assert.equal(log.body.schema, 'qinglong/run-attempt-log-read-result@v1');
+  assert.equal(log.body.status, 'available');
+  assert.equal(log.body.encoding, 'base64');
+  assert.equal(Buffer.from(log.body.content, 'base64').toString(), 'local-ap');
+  assert.deepEqual(log.body.range, {
+    start: 0,
+    endExclusive: 8,
+    totalBytes: logContent.byteLength,
+    nextOffset: 8,
+  });
+  assert.deepEqual(log.body.truncation, { truncated: 'unknown' });
+
   const cancellationBody = JSON.stringify({
     schema: 'qinglong/run-cancellation@v1',
     mutationId: 'cancel-local-api-1',
   });
-  const cancellationPath =
-    `/api/v3/projects/default/runs/${RUN_ID}/cancellation`;
+  const cancellationPath = `/api/v3/projects/default/runs/${RUN_ID}/cancellation`;
   const cancellationOptions = {
     method: 'POST',
     headers: {
@@ -623,7 +678,7 @@ test('serves an authenticated Run through one real SQLite authority and durable 
            WHERE operation_id IN (
              'run.get', 'run.list', 'run.events.list', 'run.steps.list',
              'run.cancel', 'task.get', 'task.list'
-             , 'task.start'
+             , 'task.start', 'run.log.read'
            )
            ORDER BY operation_id, outcome`,
         )
@@ -636,6 +691,7 @@ test('serves an authenticated Run through one real SQLite authority and durable 
         'run.get:allowed',
         'run.get:authentication_rejected',
         'run.list:allowed',
+        'run.log.read:allowed',
         'run.steps.list:allowed',
         'task.get:allowed',
         'task.get:allowed',

@@ -15,6 +15,7 @@ import { createLocalApiRunReadRoute } from '../run/runReadRoute';
 import { createLocalApiRunEventListRoute } from '../run/runEventListRoute';
 import { createLocalApiRunStepListRoute } from '../run/runStepListRoute';
 import { createLocalApiRunCancellationRoute } from '../run/runCancellationRoute';
+import { createLocalApiRunAttemptLogReadRoute } from '../run/runAttemptLogReadRoute';
 import { createLocalApiTaskListRoute } from '../task/taskListRoute';
 import { createLocalApiTaskReadRoute } from '../task/taskReadRoute';
 import { createLocalApiTaskStartRoute } from '../task/taskStartRoute';
@@ -109,6 +110,9 @@ export function createLocalApiProductSurface(
         authority.runCancellation,
         options.randomUuid ?? randomUUID,
       );
+      const runAttemptLogReadRoute = createLocalApiRunAttemptLogReadRoute(
+        authority.runAttemptLogRead,
+      );
       const taskListRoute = createLocalApiTaskListRoute(
         authority.taskDefinitions,
       );
@@ -128,6 +132,7 @@ export function createLocalApiProductSurface(
         runEventListRoute,
         runStepListRoute,
         runCancellationRoute,
+        runAttemptLogReadRoute,
         taskListRoute,
         taskReadRoute,
         taskStartRoute,

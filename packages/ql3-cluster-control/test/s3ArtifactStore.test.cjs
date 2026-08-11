@@ -6,6 +6,7 @@ const { test } = require('node:test');
 const {
   CopyObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
 } = require('@aws-sdk/client-s3');
@@ -57,17 +58,56 @@ class MemoryS3Client {
       const object = this.objects.get(input.Key);
       if (!object) throw notFound();
       const metadata = { ...object.metadata };
-      if (this.options.corruptFinalMetadata && input.Key.includes('/objects/')) {
+      if (
+        this.options.corruptFinalMetadata &&
+        input.Key.includes('/objects/')
+      ) {
         metadata['ql3-content-sha256'] = '0'.repeat(64);
       }
       return {
         ContentLength: object.content.byteLength,
         ContentType: object.contentType,
-        ChecksumSHA256: this.options.corruptFinalChecksum &&
-          input.Key.includes('/objects/')
-          ? Buffer.alloc(32, 9).toString('base64')
-          : checksum(object.content),
+        ETag: `"${checksum(object.content).slice(0, 32)}"`,
+        ChecksumSHA256:
+          this.options.corruptFinalChecksum && input.Key.includes('/objects/')
+            ? Buffer.alloc(32, 9).toString('base64')
+            : checksum(object.content),
         Metadata: metadata,
+      };
+    }
+    if (command instanceof GetObjectCommand) {
+      const object = this.objects.get(input.Key);
+      if (!object || this.options.rangeNotFound) throw notFound();
+      const eTag = `"${checksum(object.content).slice(0, 32)}"`;
+      assert.equal(input.IfMatch, eTag);
+      const match = /^bytes=(\d+)-(\d+)$/.exec(input.Range);
+      assert.ok(match);
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      let content = object.content.subarray(start, end + 1);
+      if (this.options.shortRangeBody) content = content.subarray(0, -1);
+      if (this.options.oversizedRangeBody) {
+        content = Buffer.concat([content, Buffer.from('x')]);
+      }
+      const metadata = { ...object.metadata };
+      if (this.options.corruptRangeMetadata) {
+        metadata['ql3-run-sha256'] = '0'.repeat(64);
+      }
+      return {
+        ContentLength: end - start + 1,
+        ContentRange: this.options.corruptContentRange
+          ? `bytes ${start}-${end}/${object.content.byteLength + 1}`
+          : `bytes ${start}-${end}/${object.content.byteLength}`,
+        ContentType: object.contentType,
+        ETag: this.options.corruptRangeETag ? '"other"' : eTag,
+        Metadata: metadata,
+        Body: {
+          async *[Symbol.asyncIterator]() {
+            const split = Math.min(2, content.byteLength);
+            if (split > 0) yield content.subarray(0, split);
+            if (split < content.byteLength) yield content.subarray(split);
+          },
+        },
       };
     }
     if (command instanceof PutObjectCommand) {
@@ -183,14 +223,25 @@ test('streams to a checksummed temporary object then conditionally promotes it',
     ],
   );
   const key = permanentKey(client);
-  assert.match(key, /^tenant-a\/worker-artifacts\/objects\/[a-f0-9]{2}\/[a-f0-9]{64}$/);
+  assert.match(
+    key,
+    /^tenant-a\/worker-artifacts\/objects\/[a-f0-9]{2}\/[a-f0-9]{64}$/,
+  );
   assert.equal(key.includes(COMMAND.runId), false);
   assert.equal(client.objects.size, 1);
 
-  const copy = client.commands.find((command) => command instanceof CopyObjectCommand);
+  const copy = client.commands.find(
+    (command) => command instanceof CopyObjectCommand,
+  );
   assert.equal(copy.input.Metadata['ql3-content-sha256'], CONTENT_SHA256);
-  assert.equal(JSON.stringify(copy.input.Metadata).includes(COMMAND.projectId), false);
-  assert.equal(JSON.stringify(copy.input.Metadata).includes(COMMAND.runId), false);
+  assert.equal(
+    JSON.stringify(copy.input.Metadata).includes(COMMAND.projectId),
+    false,
+  );
+  assert.equal(
+    JSON.stringify(copy.input.Metadata).includes(COMMAND.runId),
+    false,
+  );
 
   const inspected = await adapter.inspect(LOOKUP);
   assert.deepEqual(inspected, { ...receipt, status: 'already_stored' });
@@ -217,6 +268,78 @@ test('exact replay consumes and hashes the whole body without another write', as
       error instanceof S3ClusterRemoteWorkerArtifactStoreError &&
       error.reason === 'integrity_mismatch',
   );
+});
+
+test('reads only one ETag-fenced immutable byte range and stable end snapshot', async () => {
+  const client = new MemoryS3Client();
+  const adapter = store(client);
+  await adapter.put(COMMAND, chunks());
+  client.commands.length = 0;
+
+  const result = await adapter.readLogRange(LOOKUP, { offset: 2, length: 4 });
+  assert.equal(result.status, 'available');
+  assert.equal(Buffer.from(result.content).toString(), 'llo ');
+  assert.deepEqual(
+    {
+      start: result.start,
+      endExclusive: result.endExclusive,
+      totalBytes: result.totalBytes,
+      nextOffset: result.nextOffset,
+      truncation: result.truncation,
+    },
+    {
+      start: 2,
+      endExclusive: 6,
+      totalBytes: 11,
+      nextOffset: 6,
+      truncation: { truncated: false },
+    },
+  );
+  assert.deepEqual(
+    client.commands.map((command) => command.constructor.name),
+    ['HeadObjectCommand', 'GetObjectCommand'],
+  );
+  assert.equal(client.commands[1].input.Range, 'bytes=2-5');
+
+  client.commands.length = 0;
+  const ended = await adapter.readLogRange(LOOKUP, {
+    offset: 999,
+    length: 4,
+  });
+  assert.equal(ended.status, 'available');
+  assert.equal(ended.content.byteLength, 0);
+  assert.equal(ended.start, 11);
+  assert.equal(ended.totalBytes, 11);
+  assert.deepEqual(
+    client.commands.map((command) => command.constructor.name),
+    ['HeadObjectCommand'],
+  );
+});
+
+test('maps absent objects and fails closed on range evidence drift', async () => {
+  const absent = new MemoryS3Client();
+  assert.deepEqual(
+    await store(absent).readLogRange(LOOKUP, { offset: 0, length: 1 }),
+    { status: 'missing' },
+  );
+  for (const option of [
+    'corruptContentRange',
+    'corruptRangeETag',
+    'corruptRangeMetadata',
+    'shortRangeBody',
+    'oversizedRangeBody',
+  ]) {
+    const client = new MemoryS3Client();
+    const adapter = store(client);
+    await adapter.put(COMMAND, chunks());
+    client.options[option] = true;
+    await assert.rejects(
+      adapter.readLogRange(LOOKUP, { offset: 0, length: 4 }),
+      (error) =>
+        error instanceof S3ClusterRemoteWorkerArtifactStoreError &&
+        error.reason === 'integrity_mismatch',
+    );
+  }
 });
 
 test('resolves a concurrent conditional-copy winner by immutable inspect', async () => {
@@ -270,38 +393,40 @@ test('temporary cleanup failure is diagnostic and never reverses promotion', asy
     },
   }).put(COMMAND, chunks());
   assert.equal(receipt.status, 'stored');
-  assert.deepEqual(diagnostics, [[
-    'delete unavailable',
-    'temporary_object_cleanup',
-  ]]);
+  assert.deepEqual(diagnostics, [
+    ['delete unavailable', 'temporary_object_cleanup'],
+  ]);
   assert.equal(client.objects.size, 2);
 });
 
 test('requires exact bucket, prefix, encryption and temporary ID configuration', async () => {
   const client = new MemoryS3Client();
   assert.throws(
-    () => new S3ClusterRemoteWorkerArtifactStore({
-      client,
-      bucket: 'Invalid_Bucket',
-      encryption: { mode: 's3' },
-    }),
+    () =>
+      new S3ClusterRemoteWorkerArtifactStore({
+        client,
+        bucket: 'Invalid_Bucket',
+        encryption: { mode: 's3' },
+      }),
     /bucket is invalid/,
   );
   assert.throws(
-    () => new S3ClusterRemoteWorkerArtifactStore({
-      client,
-      bucket: 'valid-bucket',
-      prefix: '../escape',
-      encryption: { mode: 's3' },
-    }),
+    () =>
+      new S3ClusterRemoteWorkerArtifactStore({
+        client,
+        bucket: 'valid-bucket',
+        prefix: '../escape',
+        encryption: { mode: 's3' },
+      }),
     /prefix is invalid/,
   );
   assert.throws(
-    () => new S3ClusterRemoteWorkerArtifactStore({
-      client,
-      bucket: 'valid-bucket',
-      encryption: { mode: 'kms' },
-    }),
+    () =>
+      new S3ClusterRemoteWorkerArtifactStore({
+        client,
+        bucket: 'valid-bucket',
+        encryption: { mode: 'kms' },
+      }),
     /encryption is invalid/,
   );
   await assert.rejects(
@@ -355,8 +480,7 @@ test('propagates KMS and expected-owner fences to both sides of promotion', asyn
 
 test('never deletes a colliding temporary object it cannot prove it owns', async () => {
   const client = new MemoryS3Client();
-  const temporaryKey =
-    `tenant-a/worker-artifacts/temporary/${TEMPORARY_ID}`;
+  const temporaryKey = `tenant-a/worker-artifacts/temporary/${TEMPORARY_ID}`;
   client.objects.set(temporaryKey, {
     content: Buffer.from('other operation'),
     contentType: 'application/octet-stream',

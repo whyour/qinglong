@@ -232,6 +232,9 @@
       ],
       "bounded-run-step-list-projection": [
         "dist/run/projection/boundedRunStepListProjection.d.ts"
+      ],
+      "run-attempt-log-read": [
+        "dist/run/log-read/runAttemptLogRead.d.ts"
       ]
     }
   },
@@ -280,6 +283,11 @@
       "types": "./dist/run/projection/boundedRunStepListProjection.d.ts",
       "require": "./dist/run/projection/boundedRunStepListProjection.js",
       "default": "./dist/run/projection/boundedRunStepListProjection.js"
+    },
+    "./run-attempt-log-read": {
+      "types": "./dist/run/log-read/runAttemptLogRead.d.ts",
+      "require": "./dist/run/log-read/runAttemptLogRead.js",
+      "default": "./dist/run/log-read/runAttemptLogRead.js"
     },
     "./task-definition": {
       "types": "./dist/task-definition/taskDefinition.d.ts",

@@ -74,60 +74,71 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     host: '127.0.0.1',
     port,
     admission: preparedAdmission(async (value, body) => {
-        observed.push(value);
-        if (
-          value.operation.operationId === 'run.cancel' ||
-          value.operation.operationId === 'task.start'
-        ) {
-          return { statusCode: 202, body: { accepted: body } };
-        }
-        if (value.operation.operationId === 'run.get') {
-          return {
-            statusCode: 200,
-            body: { run: { id: value.operation.runId } },
-          };
-        }
-        if (value.operation.operationId === 'run.events.list') {
-          return {
-            statusCode: 200,
-            body: {
-              events: [],
-              hasMore: false,
-              nextAfterSequence: value.operation.input.afterSequence ?? 0,
-            },
-          };
-        }
-        if (value.operation.operationId === 'run.steps.list') {
-          return {
-            statusCode: 200,
-            body: {
-              steps: [],
-              hasMore: false,
-              next: value.operation.input.after ?? null,
-            },
-          };
-        }
-        if (value.operation.operationId === 'task.list') {
-          return {
-            statusCode: 200,
-            body: {
-              tasks: [],
-              hasMore: false,
-              input: value.operation.input,
-            },
-          };
-        }
-        if (value.operation.operationId === 'task.get') {
-          return {
-            statusCode: 200,
-            body: { task: { taskId: value.operation.taskId } },
-          };
-        }
+      observed.push(value);
+      if (
+        value.operation.operationId === 'run.cancel' ||
+        value.operation.operationId === 'task.start'
+      ) {
+        return { statusCode: 202, body: { accepted: body } };
+      }
+      if (value.operation.operationId === 'run.get') {
         return {
           statusCode: 200,
-          body: { runs: [], hasMore: false, input: value.operation.input },
+          body: { run: { id: value.operation.runId } },
         };
-      }),
+      }
+      if (value.operation.operationId === 'run.events.list') {
+        return {
+          statusCode: 200,
+          body: {
+            events: [],
+            hasMore: false,
+            nextAfterSequence: value.operation.input.afterSequence ?? 0,
+          },
+        };
+      }
+      if (value.operation.operationId === 'run.steps.list') {
+        return {
+          statusCode: 200,
+          body: {
+            steps: [],
+            hasMore: false,
+            next: value.operation.input.after ?? null,
+          },
+        };
+      }
+      if (value.operation.operationId === 'run.log.read') {
+        return {
+          statusCode: 200,
+          body: {
+            range: {
+              offset: value.operation.offset,
+              length: value.operation.length,
+            },
+          },
+        };
+      }
+      if (value.operation.operationId === 'task.list') {
+        return {
+          statusCode: 200,
+          body: {
+            tasks: [],
+            hasMore: false,
+            input: value.operation.input,
+          },
+        };
+      }
+      if (value.operation.operationId === 'task.get') {
+        return {
+          statusCode: 200,
+          body: { task: { taskId: value.operation.taskId } },
+        };
+      }
+      return {
+        statusCode: 200,
+        body: { runs: [], hasMore: false, input: value.operation.input },
+      };
+    }),
     randomUuid: () => '019f70c0-0000-4000-8000-000000000003',
   });
   t.after(() => surface.stopAndDrain());
@@ -212,10 +223,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     input: { after: { taskId: 'task_100' }, limit: 8 },
   });
 
-  const task = await request(
-    port,
-    '/api/v3/projects/prj_default/tasks/task_1',
-  );
+  const task = await request(port, '/api/v3/projects/prj_default/tasks/task_1');
   assert.deepEqual(task.body, { task: { taskId: 'task_1' } });
   assert.deepEqual(observed[5].operation, {
     operationId: 'task.get',
@@ -275,6 +283,28 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     taskId: 'task_1',
   });
 
+  const log = await request(
+    port,
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?offset=4&length=32',
+  );
+  assert.deepEqual(log.body, { range: { offset: 4, length: 32 } });
+  assert.deepEqual(observed[8].operation, {
+    operationId: 'run.log.read',
+    projectId: 'prj_default',
+    runId: 'run_123',
+    attemptId: 'attempt_1',
+    offset: 4,
+    length: 32,
+  });
+
+  const defaultLog = await request(
+    port,
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log',
+  );
+  assert.deepEqual(defaultLog.body, {
+    range: { offset: 0, length: 16 * 1024 },
+  });
+
   for (const invalidPath of [
     '/api/v3/projects/prj_default/runs/run_123?expanded=true',
     '/api/v3/projects/prj_default/runs/run%5f123',
@@ -298,6 +328,18 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     const invalid = await request(port, invalidQuery);
     assert.equal(invalid.statusCode, 400);
     assert.deepEqual(invalid.body, { code: 'invalid_run_list_query' });
+  }
+  for (const invalidQuery of [
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?',
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?offset=-1',
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?offset=04',
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?length=0',
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?length=32769',
+    '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?unknown=1',
+  ]) {
+    const invalid = await request(port, invalidQuery);
+    assert.equal(invalid.statusCode, 400);
+    assert.deepEqual(invalid.body, { code: 'invalid_run_log_read_query' });
   }
   for (const invalidQuery of [
     '/api/v3/projects/prj_default/tasks?',
@@ -332,7 +374,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     assert.equal(invalid.statusCode, 400);
     assert.deepEqual(invalid.body, { code: 'invalid_run_step_list_query' });
   }
-  assert.equal(observed.length, 8);
+  assert.equal(observed.length, 10);
   assert.deepEqual(
     await Promise.all([surface.stopAndDrain(), surface.stopAndDrain()]),
     ['stopped', 'stopped'],
@@ -347,9 +389,9 @@ test('rejects GET bodies without invoking the prepared route handler', async (t)
     host: '127.0.0.1',
     port,
     admission: preparedAdmission(async () => {
-        handlers += 1;
-        return { statusCode: 200, body: {} };
-      }),
+      handlers += 1;
+      return { statusCode: 200, body: {} };
+    }),
   });
   t.after(() => surface.stopAndDrain());
   const response = await request(
@@ -477,15 +519,15 @@ test('serves the reviewed worst-case 64-item Run list inside the fixed response 
     host: '127.0.0.1',
     port,
     admission: preparedAdmission(async () => {
-        return {
-          statusCode: 200,
-          body: {
-            runs: Object.freeze(Array.from({ length: 64 }, () => item)),
-            hasMore: true,
-            next: { createdAtMs: Number.MAX_SAFE_INTEGER, runId: id128 },
-          },
-        };
-      }),
+      return {
+        statusCode: 200,
+        body: {
+          runs: Object.freeze(Array.from({ length: 64 }, () => item)),
+          hasMore: true,
+          next: { createdAtMs: Number.MAX_SAFE_INTEGER, runId: id128 },
+        },
+      };
+    }),
   });
   t.after(() => surface.stopAndDrain());
   const response = await request(
@@ -545,15 +587,15 @@ test('serves the reviewed worst-case 64-item RunEvent list inside the fixed resp
     host: '127.0.0.1',
     port,
     admission: preparedAdmission(async () => {
-        return {
-          statusCode: 200,
-          body: {
-            events: Object.freeze(Array.from({ length: 64 }, () => event)),
-            hasMore: true,
-            nextAfterSequence: event.sequence,
-          },
-        };
-      }),
+      return {
+        statusCode: 200,
+        body: {
+          events: Object.freeze(Array.from({ length: 64 }, () => event)),
+          hasMore: true,
+          nextAfterSequence: event.sequence,
+        },
+      };
+    }),
   });
   t.after(() => surface.stopAndDrain());
   const response = await request(
@@ -589,15 +631,15 @@ test('serves the reviewed worst-case 64-item Run Step list inside the fixed resp
     host: '127.0.0.1',
     port,
     admission: preparedAdmission(async () => {
-        return {
-          statusCode: 200,
-          body: {
-            steps: Object.freeze(Array.from({ length: 64 }, () => item)),
-            hasMore: true,
-            next: { stepKey: id128, stepRunId: id128 },
-          },
-        };
-      }),
+      return {
+        statusCode: 200,
+        body: {
+          steps: Object.freeze(Array.from({ length: 64 }, () => item)),
+          hasMore: true,
+          next: { stepKey: id128, stepRunId: id128 },
+        },
+      };
+    }),
   });
   t.after(() => surface.stopAndDrain());
   const response = await request(
@@ -621,13 +663,13 @@ test('bounds Edge admission concurrency and drains accepted work', async (t) => 
     host: '127.0.0.1',
     port,
     admission: preparedAdmission(async (value) => {
-        admissions += 1;
-        await barrier;
-        return {
-          statusCode: 200,
-          body: { run: { id: value.operation.runId } },
-        };
-      }),
+      admissions += 1;
+      await barrier;
+      return {
+        statusCode: 200,
+        body: { run: { id: value.operation.runId } },
+      };
+    }),
   });
   t.after(() => surface.stopAndDrain());
   const accepted = Array.from({ length: 4 }, () =>

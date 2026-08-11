@@ -1461,6 +1461,7 @@ function auditSourceImports(root, packagePath, findings) {
           specifier.startsWith('@qinglong/local-execution/')) &&
         (packagePath !== 'packages/ql3-local-application' ||
           ![
+            '@qinglong/local-execution/artifact-read',
             '@qinglong/local-execution/control',
             '@qinglong/local-execution/dispatch',
             '@qinglong/local-execution/execution',
@@ -2418,6 +2419,7 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/plugin-package-recovery',
           '@qinglong/runtime-core/plugin-package-task-publication',
           '@qinglong/runtime-core/project-tool-definition-snapshot',
+          '@qinglong/runtime-core/run-attempt-log-read',
           '@qinglong/runtime-core/task-spec-semantic',
         ].includes(specifier) &&
         !(

@@ -1,6 +1,7 @@
 // Remote execution owns the least-privilege assembly of Worker-facing runtime capabilities.
 import type { PostgresPool } from '@qinglong/runtime-core';
 import type { RemoteWorkerSecretValueProvider } from '@qinglong/runtime-core/remote-secret-delivery';
+import type { RunAttemptLogRangeReader } from '@qinglong/runtime-core/run-attempt-log-read';
 import {
   PostgresClusterDispatchSource,
   PostgresRemoteRunActivationRepository,
@@ -11,23 +12,15 @@ import {
   PostgresTaskExecutionRevisionSource,
   PostgresWorkerSessionRepository,
 } from '@qinglong/cluster-postgres/runtime';
-import {
-  ClusterRemoteWorkerOfferClaimService,
-} from './remoteWorkerDispatcher';
-import {
-  ClusterRemoteRunActivationService,
-} from './remoteRunActivationService';
-import {
-  ClusterRemoteWorkerSecretDeliveryService,
-} from './remoteWorkerSecretDeliveryService';
+import { ClusterRemoteWorkerOfferClaimService } from './remoteWorkerDispatcher';
+import { ClusterRemoteRunActivationService } from './remoteRunActivationService';
+import { ClusterRemoteWorkerSecretDeliveryService } from './remoteWorkerSecretDeliveryService';
 import {
   ClusterRemoteWorkerArtifactService,
   ClusterRemoteWorkerCompletionService,
   type ClusterRemoteWorkerArtifactStore,
 } from './remoteWorkerCompletionService';
-import {
-  ClusterRemoteWorkerLeaseControlService,
-} from './remoteWorkerLeaseControlService';
+import { ClusterRemoteWorkerLeaseControlService } from './remoteWorkerLeaseControlService';
 import type { WorkerIngressPipelineOptions } from '../worker-ingress/workerIngressPipeline';
 
 export interface ClusterWorkerRuntimeDependencies {
@@ -49,6 +42,7 @@ export interface ClusterWorkerRuntimePort {
   readonly leaseControl: NonNullable<
     WorkerIngressPipelineOptions['leaseControl']
   >;
+  readonly runAttemptLogRead?: RunAttemptLogRangeReader;
 }
 
 export function createClusterWorkerRuntimePort(
@@ -67,9 +61,11 @@ export function createClusterWorkerRuntimePort(
   }
 
   const workerSessions = new PostgresWorkerSessionRepository(pool);
-  const completionRepository =
-    new PostgresRemoteWorkerCompletionRepository(pool);
+  const completionRepository = new PostgresRemoteWorkerCompletionRepository(
+    pool,
+  );
   const secretProvider = dependencies.secretProvider;
+  const readLogRange = dependencies.artifactStore.readLogRange;
   return Object.freeze({
     offers: new ClusterRemoteWorkerOfferClaimService(
       new PostgresClusterDispatchSource(pool),
@@ -99,5 +95,12 @@ export function createClusterWorkerRuntimePort(
     leaseControl: new ClusterRemoteWorkerLeaseControlService(
       new PostgresRemoteWorkerLeaseControlRepository(pool),
     ),
+    ...(readLogRange === undefined
+      ? {}
+      : {
+          runAttemptLogRead: Object.freeze({
+            read: readLogRange.bind(dependencies.artifactStore),
+          }),
+        }),
   });
 }

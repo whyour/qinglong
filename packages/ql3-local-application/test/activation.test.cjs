@@ -88,8 +88,7 @@ const RECEIPT_TOKEN = 'A'.repeat(32);
 const CLEANUP_RUN_ID = '019f70c0-0000-7000-8000-000000000011';
 const CLEANUP_ATTEMPT_ID = '019f70c0-0000-7000-8000-000000000012';
 const WORKFLOW_CANCELLATION_CREDENTIAL_ID = 'application-workflow-owner';
-const WORKFLOW_CANCELLATION_PEPPER_KEY_ID =
-  'application-workflow-owner-v1';
+const WORKFLOW_CANCELLATION_PEPPER_KEY_ID = 'application-workflow-owner-v1';
 const WORKFLOW_CANCELLATION_PEPPER_BYTES = Buffer.alloc(32, 141);
 const WORKFLOW_CANCELLATION_SECRET = Buffer.alloc(32, 142).toString(
   'base64url',
@@ -322,8 +321,7 @@ function promptResourceConfiguration() {
   const prefix = 'private router model output:';
   const minimumOutputBytes = Buffer.byteLength(prefix, 'utf8');
   const rawOutputBytes =
-    process.env.QL3_PROMPT_RESOURCE_OUTPUT_BYTES ??
-    String(minimumOutputBytes);
+    process.env.QL3_PROMPT_RESOURCE_OUTPUT_BYTES ?? String(minimumOutputBytes);
   const outputBytes = Number(rawOutputBytes);
   if (
     !Number.isSafeInteger(outputBytes) ||
@@ -338,8 +336,7 @@ function promptResourceConfiguration() {
     profile,
     output: prefix + 'x'.repeat(outputBytes - Buffer.byteLength(prefix)),
     outputBytes,
-    resourceProbe:
-      process.env.QL3_PROMPT_RESOURCE_OUTPUT_BYTES !== undefined,
+    resourceProbe: process.env.QL3_PROMPT_RESOURCE_OUTPUT_BYTES !== undefined,
   });
 }
 
@@ -1263,7 +1260,10 @@ test('executes one active Package Prompt through local AI composition with conte
       promptOutputKeys: {
         async active() {
           metrics.keyLoads += 1;
-          return { keyId: 'edge-prompt-output-key-1', key: Buffer.alloc(32, 7) };
+          return {
+            keyId: 'edge-prompt-output-key-1',
+            key: Buffer.alloc(32, 7),
+          };
         },
         async resolve(keyId) {
           metrics.keyResolutions += 1;
@@ -1274,7 +1274,10 @@ test('executes one active Package Prompt through local AI composition with conte
       promptOutputRead: {
         authorizer: {
           async authorize(request) {
-            assert.equal(request.projectId, 'project-application-prompt-resource');
+            assert.equal(
+              request.projectId,
+              'project-application-prompt-resource',
+            );
             assert.equal(request.principal.subject.id, 'edge-resource-owner');
             return { effect: 'allow' };
           },
@@ -1376,7 +1379,10 @@ test('executes one active Package Prompt through local AI composition with conte
   assert.equal(recoveredByRequest.result.text, metrics.privateOutput);
   assert.deepEqual(recoveredByRequest.reference, durableFirst.outputArtifact);
   assert.equal(metrics.keyResolutions, 2);
-  assert.equal(metrics.lastResolvedKey.every((byte) => byte === 0), true);
+  assert.equal(
+    metrics.lastResolvedKey.every((byte) => byte === 0),
+    true,
+  );
   const durableStorageAfter = sqliteStorageSnapshot(value.targetPath);
   const durableStorageGrowth = sqliteStorageGrowth(
     durableStorageBefore,
@@ -1450,9 +1456,8 @@ test('executes one active Package Prompt through local AI composition with conte
           )
           .get(durableFirst.admission.invocationId),
       },
-      integrityCheck: reader
-        .prepare('PRAGMA integrity_check')
-        .get().integrity_check,
+      integrityCheck: reader.prepare('PRAGMA integrity_check').get()
+        .integrity_check,
     };
   } finally {
     reader.close();
@@ -1532,8 +1537,7 @@ test('executes one active Package Prompt through local AI composition with conte
       databaseLogicalWriteAmplificationPermille,
       databaseAllocatedWriteAmplificationPermille,
       walWriteAmplificationPermille,
-      journalMode:
-        resource.profile === 'edge' ? 'delete' : 'wal',
+      journalMode: resource.profile === 'edge' ? 'delete' : 'wal',
       providerCalls: metrics.providerCalls,
       keyLoads: metrics.keyLoads,
       keyResolutions: metrics.keyResolutions,
@@ -1700,6 +1704,7 @@ test('starts an optional product surface after recovery and drains it before own
             typeof authority.taskDefinitions.listTaskDefinitions,
             'function',
           );
+          assert.equal(typeof authority.runAttemptLogRead.read, 'function');
           assert.equal(typeof authority.apiCredentials.resolve, 'function');
           assert.equal(typeof authority.ownerPepper.resolveKey, 'function');
           assert.equal(typeof authority.projectPolicy.resolve, 'function');
