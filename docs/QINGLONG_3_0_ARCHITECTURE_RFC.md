@@ -11,6 +11,23 @@
 
 最新增量证据（2026-08-12）：
 
+- D-290/ADR-0378（已接受）
+  Local Run Attempt 日志 retention 已形成真实纵向切片：Runtime Core 增加精确 identity、canonical SHA-256 的 immutable
+  retirement record、容量压力策略、有界 page/delete budget 与 durable cursor；日志读取在存储前检查 tombstone，并在 missing 后二次
+  检查，授权调用方稳定获得 `410 retired`，未授权/不存在继续在 metadata 前遮蔽为 404。SQLite 追加 0087/0088，将 Local contract
+  升至 v44，候选严格排除 lost、legacy owner、非 Local executor、未终态 Run/Attempt、未完成 receipt 与既有 tombstone。私有文件端只
+  删除 0700 owner-only shard 中 0600、单 hard-link 的 canonical 日志及唯一 truncation fact，执行 unlink→helper unlink→directory
+  fsync→tombstone；unlink 后崩溃以下一轮 `already_absent` 收敛。Edge 为 7 天/压力 24 小时、64 MiB 阈值、page 4/delete 2；
+  Standalone 为 30 天/压力 24 小时、256 MiB、page 16/delete 8。sweep 复用现有 completion cleanup cadence，不新增 package、依赖、
+  timer、listener、连接、watcher 或 cache。Runtime Core 定向 9/9、Local SQLite 220/220、文件与 control 定向 10/10、应用真实删除+
+  tombstone+读取闭环通过。最终验收为 Runtime Core 498/498、Local SQLite 220/220、Local Execution 39/39、Local API
+  45/45、Local Application 46 pass/4 skip、Local Admin 91/91、Local Owner CLI 157 pass/5 skip、Cluster Control
+  216 pass/2 skip；完整 18-package 门退出 0，backend 1,163 pass/2 skip/0 fail。package/dependency/Edge import
+  审计与 14 档 Profile artifact 全部 compatible，且没有 single-source/shallow package。真实 arm64 Local image 以固定 repo
+  digest 完成 Edge/Standalone preflight 和 rollout，均观测 SQLite contract v44；镜像、静态审计和 CI compatibility label
+  已统一为 v44。PostgreSQL 18.4 arm64 HA 回归通过 112 gates、timeline 1→2，独立证据审计无 finding。Cluster 仅冻结可注入的
+  410 语义；
+  PostgreSQL 多副本 claim/backoff、ETag/version 条件 S3 删除与 HA/MinIO 门由 D-291 独立完成。
 - D-289/ADR-0377（已接受）
   Local/Cluster 已增加同构 `GET /api/v3/projects/{projectId}/runs/{runId}/attempts/{attemptId}/log`、
   `run.log.read`/`artifact.read`。请求只接受 Project/Run/Attempt identity 与 offset/length，不接受 Artifact ID、路径、URI、bucket

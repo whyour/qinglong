@@ -367,6 +367,7 @@ test('coalesces completion notifications and owns one idempotent shutdown drain'
   let scans = 0;
   let drains = 0;
   let cleanups = 0;
+  let retentionSweeps = 0;
   const lifecycle = new LocalExecutionControlLifecycle(
     {
       async process(attemptId) {
@@ -420,6 +421,25 @@ test('coalesces completion notifications and owns one idempotent shutdown drain'
       stopTimeoutMs: 1_000,
       maxDrainPages: 1,
       clock: { now: () => 100 },
+      artifactRetention: {
+        async sweep() {
+          retentionSweeps += 1;
+          return {
+            status: 'complete',
+            pressure: false,
+            observedAtMs: 100,
+            retentionMs: 60_000,
+            availableBytes: '100',
+            totalBytes: '100',
+            candidatesScanned: 0,
+            deletionsAttempted: 0,
+            recordsWritten: 0,
+            failedCandidates: 0,
+            bytesReclaimed: 0,
+            entries: [],
+          };
+        },
+      },
     },
   );
   assert.equal(lifecycle.notifyCompletion(IDS.completionAttempt), true);
@@ -428,10 +448,12 @@ test('coalesces completion notifications and owns one idempotent shutdown drain'
   assert.deepEqual(completions, [IDS.completionAttempt]);
   assert.equal(scans, 1);
   assert.equal(cleanups, 1);
+  assert.equal(retentionSweeps, 1);
   const first = lifecycle.stopAndDrain();
   const second = lifecycle.stopAndDrain();
   assert.equal(first, second);
   assert.equal((await first).status, 'stopped');
   assert.equal(drains, 1);
   assert.equal(cleanups, 2);
+  assert.equal(retentionSweeps, 1);
 });

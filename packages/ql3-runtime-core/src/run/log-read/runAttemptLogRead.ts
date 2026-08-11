@@ -1,5 +1,10 @@
 import { RUN_ATTEMPT_STATUSES, type RunAttemptStatus } from '../run';
 import type { RunRepositoryReader } from '../runRepository';
+import {
+  normalizeRunAttemptLogRetirementRecord,
+  type RunAttemptLogRetentionStateReader,
+  type RunAttemptLogRetirementRecord,
+} from '../log-retention/runAttemptLogRetention';
 
 export const MAX_RUN_ATTEMPT_LOG_READ_BYTES = 256 * 1024;
 
@@ -69,6 +74,13 @@ export type RunAttemptLogReadResult =
     }>
   | (Readonly<RunAttemptLogReadIdentity> &
       Readonly<{ readonly status: 'missing' }>)
+  | (Readonly<RunAttemptLogReadIdentity> &
+      Readonly<{
+        readonly status: 'retired';
+        readonly retiredAtMs: number;
+        readonly byteLength: number;
+        readonly truncation: Readonly<RunAttemptLogTruncationView>;
+      }>)
   | (Readonly<RunAttemptLogReadIdentity> &
       Extract<RunAttemptLogRangeReadResult, { readonly status: 'available' }>);
 
@@ -244,13 +256,15 @@ export class RunAttemptLogReadService {
     >,
     private readonly reader: RunAttemptLogRangeReader,
     options: RunAttemptLogReadServiceOptions,
+    private readonly retention?: RunAttemptLogRetentionStateReader,
   ) {
     if (
       !runs ||
       typeof runs.findRunById !== 'function' ||
       typeof runs.findAttemptById !== 'function' ||
       !reader ||
-      typeof reader.read !== 'function'
+      typeof reader.read !== 'function' ||
+      (retention !== undefined && typeof retention.inspect !== 'function')
     ) {
       throw new InvalidRunAttemptLogReadError('dependencies are invalid');
     }
@@ -319,8 +333,12 @@ export class RunAttemptLogReadService {
         attemptId,
         logArtifactId: attempt.logArtifactId,
       });
+      const retiredBeforeRead = await this.retired(identity);
+      if (retiredBeforeRead) return retiredBeforeRead;
       const result = await this.reader.read(identity, range, request.signal);
       if (result.status === 'missing') {
+        const retiredAfterMissing = await this.retired(identity);
+        if (retiredAfterMissing) return retiredAfterMissing;
         if (
           this.options.activeMissingIsPending === true &&
           !TERMINAL_ATTEMPT_STATUSES.has(attempt.status)
@@ -339,5 +357,40 @@ export class RunAttemptLogReadService {
       }
       throw new RunAttemptLogReadUnavailableError({ cause: error });
     }
+  }
+
+  private async retired(identity: Readonly<RunAttemptLogReadIdentity>): Promise<
+    | (Readonly<RunAttemptLogReadIdentity> &
+        Readonly<{
+          readonly status: 'retired';
+          readonly retiredAtMs: number;
+          readonly byteLength: number;
+          readonly truncation: Readonly<RunAttemptLogTruncationView>;
+        }>)
+    | undefined
+  > {
+    if (!this.retention) return undefined;
+    const state = await this.retention.inspect(identity);
+    if (!state || (state.status !== 'active' && state.status !== 'retired')) {
+      throw new RunAttemptLogReadUnavailableError();
+    }
+    if (state.status === 'active') return undefined;
+    const record: Readonly<RunAttemptLogRetirementRecord> =
+      normalizeRunAttemptLogRetirementRecord(state.record);
+    if (
+      record.projectId !== identity.projectId ||
+      record.runId !== identity.runId ||
+      record.attemptId !== identity.attemptId ||
+      record.logArtifactId !== identity.logArtifactId
+    ) {
+      throw new RunAttemptLogReadUnavailableError();
+    }
+    return Object.freeze({
+      status: 'retired' as const,
+      ...identity,
+      retiredAtMs: record.retiredAtMs,
+      byteLength: record.byteLength,
+      truncation: record.truncation,
+    });
   }
 }

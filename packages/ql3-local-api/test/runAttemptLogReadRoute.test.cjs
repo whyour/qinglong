@@ -88,6 +88,31 @@ test('maps pending, masked absence, missing storage and unavailable evidence', a
       },
       { statusCode: 503, body: { code: 'artifact_unavailable' } },
     ],
+    [
+      {
+        status: 'retired',
+        projectId: 'prj_default',
+        runId: 'run_123',
+        attemptId: 'attempt_123',
+        logArtifactId: `local-${'a'.repeat(30)}`,
+        retiredAtMs: 30,
+        byteLength: 42,
+        truncation: { truncated: 'unknown' },
+      },
+      {
+        statusCode: 410,
+        body: {
+          schema: 'qinglong/run-attempt-log-read-result@v1',
+          status: 'retired',
+          projectId: 'prj_default',
+          runId: 'run_123',
+          attemptId: 'attempt_123',
+          retiredAtMs: 30,
+          byteLength: 42,
+          truncation: { truncated: 'unknown' },
+        },
+      },
+    ],
   ];
   for (const [result, expected] of cases) {
     const route = createLocalApiRunAttemptLogReadRoute({

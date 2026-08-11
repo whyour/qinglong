@@ -96,6 +96,18 @@ export function createLocalApiRunAttemptLogReadRoute(
         if (result.status === 'missing') {
           return response(503, { code: 'artifact_unavailable' });
         }
+        if (result.status === 'retired') {
+          return response(410, {
+            schema: 'qinglong/run-attempt-log-read-result@v1',
+            status: 'retired',
+            projectId: result.projectId,
+            runId: result.runId,
+            attemptId: result.attemptId,
+            retiredAtMs: result.retiredAtMs,
+            byteLength: result.byteLength,
+            truncation: result.truncation,
+          });
+        }
         return response(200, projection(result));
       } catch (error) {
         if (error instanceof InvalidRunAttemptLogReadError) {

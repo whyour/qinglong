@@ -34,18 +34,15 @@ test('inspects the exact fresh Profile schema without exposing its path', async 
   assert.equal(result.status, 'ready');
   assert.equal(result.profile, 'edge');
   assert.equal(result.storage.contractName, 'local-control-core');
-  assert.equal(result.storage.contractVersion, 43);
-  assert.equal(result.storage.migrationCount, 86);
+  assert.equal(result.storage.contractVersion, 44);
+  assert.equal(result.storage.migrationCount, 88);
   assert.equal(result.storage.journalMode, 'delete');
   assert.equal(JSON.stringify(result).includes(state.directory), false);
 });
 
 test('CLI is explicit, content-free and rejects a non-private database', async (t) => {
   const state = await fixture(t, 'standalone');
-  const cli = path.resolve(
-    __dirname,
-    '../dist/lifecycle/localReadinessCli.js',
-  );
+  const cli = path.resolve(__dirname, '../dist/lifecycle/localReadinessCli.js');
   const args = [
     cli,
     `--database=${state.databasePath}`,

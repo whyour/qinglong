@@ -4,6 +4,9 @@
 - 日期：2026-07-19
 - 关联：QL-RFC-0001、ADR-0024、ADR-0026
 
+> 2026-08-12：Local/Cluster 生产读取接线由 ADR-0377 接受，Local retention 二次检查与 durable 410
+> 由 ADR-0378 接受；Cluster retention 删除实现仍属于 D-291，本 ADR 的其余跨 adapter 扩展继续保持 Proposed。
+
 ## 上下文
 
 2.x 日志 API 由全局登录或 Open API scope 保护，读取端仍接受 `path + file`，无法表达 Project 所有权、`artifact.read` 策略和 opaque Artifact identity。3.0 已把 LocalProcess 日志绑定到 `(projectId, runId, attemptId, logArtifactId)`，并用 retention tombstone 与 canonical truncation fact 保存清理和截断证据，但尚无稳定读取语义。

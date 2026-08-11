@@ -1,5 +1,6 @@
 import type { LocalCompletionReceiptJournalCursor } from '@qinglong/runtime-core/local-completion-receipt-journal';
 import { assertLocalExecutionControlLimit } from '@qinglong/runtime-core/local-execution-control';
+import type { RunAttemptLogRetentionSweepSummary } from '@qinglong/runtime-core/run-attempt-log-retention';
 import type {
   LocalCompletionReceiptCleanupScanner,
   LocalCompletionReceiptCleanupSummary,
@@ -21,6 +22,9 @@ export interface LocalExecutionControlLifecycleOptions {
   readonly stopTimeoutMs: number;
   readonly maxDrainPages: number;
   readonly maxNotifications?: number;
+  readonly artifactRetention?: Readonly<{
+    sweep(): Promise<RunAttemptLogRetentionSweepSummary>;
+  }>;
   readonly clock?: { now(): number };
   readonly onDiagnostic?: (
     error: unknown,
@@ -33,6 +37,7 @@ export interface LocalExecutionControlCycleSummary {
   readonly completionFailures: number;
   readonly control: LocalExecutionControlScanSummary;
   readonly cleanup?: LocalCompletionReceiptCleanupSummary;
+  readonly artifactRetention?: RunAttemptLogRetentionSweepSummary;
 }
 
 export interface LocalExecutionControlStopSummary {
@@ -110,6 +115,12 @@ export class LocalExecutionControlLifecycle {
       this.maxNotifications > MAX_LOCAL_COMPLETION_NOTIFICATIONS
     ) {
       throw new RangeError('Local completion notification budget is invalid');
+    }
+    if (
+      options.artifactRetention !== undefined &&
+      typeof options.artifactRetention.sweep !== 'function'
+    ) {
+      throw new TypeError('Local Artifact retention lifecycle is invalid');
     }
     this.clock = options.clock ?? { now: Date.now };
   }
@@ -234,6 +245,7 @@ export class LocalExecutionControlLifecycle {
       );
     }
     let cleanup: LocalCompletionReceiptCleanupSummary | undefined;
+    let artifactRetention: RunAttemptLogRetentionSweepSummary | undefined;
     if (
       forceCleanup ||
       this.lastCleanupAtMs === undefined ||
@@ -246,6 +258,7 @@ export class LocalExecutionControlLifecycle {
           : { cursor: this.cleanupCursor }),
       });
       this.cleanupCursor = cleanup.truncated ? cleanup.nextCursor : undefined;
+      artifactRetention = await this.options.artifactRetention?.sweep();
       this.lastCleanupAtMs = now;
     }
     if (this.pending.size > 0) this.kick();
@@ -254,6 +267,7 @@ export class LocalExecutionControlLifecycle {
       completionFailures: completion.failed,
       control,
       ...(cleanup === undefined ? {} : { cleanup }),
+      ...(artifactRetention === undefined ? {} : { artifactRetention }),
     });
   }
 

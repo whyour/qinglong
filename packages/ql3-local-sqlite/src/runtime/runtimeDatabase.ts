@@ -62,6 +62,7 @@ import type { LocalSqliteWorkflowTaskExecutionRepository } from '../plugin-packa
 import type { LocalSqlitePluginPackageWorkflowFrontierRepository } from '../plugin-package/workflow/pluginPackageWorkflowFrontierRepository';
 import type { LocalSqlitePluginPackageWorkflowTaskAttemptAdmissionRepository } from '../plugin-package/workflow/pluginPackageWorkflowTaskAttemptAdmissionRepository';
 import type { LocalSqlitePluginPackageWorkflowCancellationConvergenceRepository } from '../plugin-package/workflow/pluginPackageWorkflowCancellationConvergenceRepository';
+import { LocalSqliteRunAttemptLogRetentionRepository } from '../run/runAttemptLogRetentionRepository';
 
 export interface LocalSqliteRuntimeDependencies {
   readonly taskSpecSemanticRegistry?: TaskSpecSemanticRegistry;
@@ -97,6 +98,7 @@ export interface LocalSqliteRuntimeDatabase {
   readonly localDispatch: LocalDispatchStore;
   readonly executionControl: LocalExecutionControlSource;
   readonly completionReceipts: LocalCompletionReceiptJournal;
+  readonly runAttemptLogRetention: LocalSqliteRunAttemptLogRetentionRepository;
   readonly localSecrets: LocalSecretEnvelopeRepository;
   readonly localSecretAdministration: LocalSecretAdministrationRepository;
   readonly projectPolicy: ProjectPolicyRepository;
@@ -179,6 +181,8 @@ export async function openLocalSqliteRuntimeDatabase(
     const schedules = new LocalSqliteScheduleRepository(authority);
     const apiCredentials = new LocalSqliteApiCredentialRepository(authority);
     const ownerPepper = new LocalSqliteOwnerPepperRepository(authority);
+    const runAttemptLogRetention =
+      new LocalSqliteRunAttemptLogRetentionRepository(authority);
     let pluginPackageInstallsPromise:
       | Promise<PluginPackageInstallRepository>
       | undefined;
@@ -232,6 +236,7 @@ export async function openLocalSqliteRuntimeDatabase(
       localDispatch: runRuntimeCapabilities.dispatch,
       executionControl: runRuntimeCapabilities.executionControl,
       completionReceipts: runRuntimeCapabilities.completionReceipts,
+      runAttemptLogRetention,
       localSecrets: securityAuthority,
       localSecretAdministration: securityAuthority,
       projectPolicy,

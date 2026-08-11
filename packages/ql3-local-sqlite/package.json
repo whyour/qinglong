@@ -245,6 +245,11 @@
       "require": "./dist/task-start/taskStartRepository.js",
       "default": "./dist/task-start/taskStartRepository.js"
     },
+    "./run-attempt-log-retention": {
+      "types": "./dist/run/runAttemptLogRetentionRepository.d.ts",
+      "require": "./dist/run/runAttemptLogRetentionRepository.js",
+      "default": "./dist/run/runAttemptLogRetentionRepository.js"
+    },
     "./trigger-administration": {
       "types": "./dist/scheduling/triggerAdministration.d.ts",
       "require": "./dist/scheduling/triggerAdministration.js",

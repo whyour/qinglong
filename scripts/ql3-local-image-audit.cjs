@@ -245,9 +245,9 @@ function auditDockerfile(contents, findings) {
     !contents.includes('io.qinglong.ai="excluded"') ||
     !contents.includes('io.qinglong.profile="edge,standalone"') ||
     !contents.includes('io.qinglong.local.application-config="2"') ||
-    !contents.includes('io.qinglong.local.sqlite-contract-min="43"') ||
-    !contents.includes('io.qinglong.local.sqlite-contract-max="43"') ||
-    !contents.includes('io.qinglong.local.sqlite-write-contract="43"') ||
+    !contents.includes('io.qinglong.local.sqlite-contract-min="44"') ||
+    !contents.includes('io.qinglong.local.sqlite-contract-max="44"') ||
+    !contents.includes('io.qinglong.local.sqlite-write-contract="44"') ||
     !contents.includes('io.qinglong.local.compose-selection="1"')
   ) {
     addFinding(findings, 'RUNTIME_IDENTITY_OR_LABEL_DRIFT');

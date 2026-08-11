@@ -361,8 +361,8 @@ async function main() {
           (fs.statSync(path.join(rolloutRoot, name)).mode & 0o777) !== 0o600,
       ) ||
       (fs.statSync(backupPath).mode & 0o777) !== 0o600 ||
-      receipt.sqlite?.contractVersion !== 43 ||
-      receipt.sqlite?.writeContractVersion !== 43 ||
+      receipt.sqlite?.contractVersion !== 44 ||
+      receipt.sqlite?.writeContractVersion !== 44 ||
       (receipt.sqlite?.writeObservation !== 'unchanged' &&
         receipt.sqlite?.writeObservation !== 'changed') ||
       receipt.sqlite?.backup?.sha256 !== backup.sha256 ||

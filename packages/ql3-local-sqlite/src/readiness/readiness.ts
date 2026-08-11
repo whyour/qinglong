@@ -8,7 +8,7 @@ import {
 } from '../run/stepRunSchemaContract';
 
 export const LOCAL_SQLITE_CONTRACT_NAME = 'local-control-core';
-export const LOCAL_SQLITE_CONTRACT_VERSION = 43;
+export const LOCAL_SQLITE_CONTRACT_VERSION = 44;
 
 const OPTIONAL_FEATURE_TABLE_NAMES = new Set([
   'QingLong3AiSchemaMigrations',
@@ -164,6 +164,7 @@ const REQUIRED_SCHEMA = Object.freeze({
       'ql3_local_attempts_run_status_idx',
       'ql3_local_attempts_lease_idx',
       'ql3_local_attempts_deadline_idx',
+      'ql3_run_log_retention_candidate_idx',
     ]),
   }),
   RunEvents: Object.freeze({
@@ -513,6 +514,37 @@ const REQUIRED_SCHEMA = Object.freeze({
       'ql3_local_receipt_journal_scan_idx',
       'ql3_local_receipt_journal_purge_idx',
     ]),
+  }),
+  QingLong3RunAttemptLogArtifactTombstones: Object.freeze({
+    columns: Object.freeze([
+      'log_artifact_id',
+      'project_id',
+      'run_id',
+      'attempt_id',
+      'executor_type',
+      'finished_at_ms',
+      'eligible_at_ms',
+      'retired_at_ms',
+      'disposition',
+      'byte_length',
+      'truncated',
+      'maximum_bytes',
+      'truncation_observed_at_ms',
+      'record_digest',
+    ]),
+    indexes: Object.freeze([
+      'ql3_run_log_tombstone_attempt_uidx',
+      'ql3_run_log_tombstone_retired_idx',
+    ]),
+  }),
+  QingLong3RunAttemptLogRetentionState: Object.freeze({
+    columns: Object.freeze([
+      'maintenance_id',
+      'cursor_finished_at_ms',
+      'cursor_attempt_id',
+      'updated_at_ms',
+    ]),
+    indexes: Object.freeze([]),
   }),
   QingLong3LocalExecutionContextRecipes: Object.freeze({
     columns: Object.freeze([
@@ -2464,11 +2496,10 @@ export async function auditLocalSqliteReadiness(
       !capability ||
       capability.contract_name !== LOCAL_SQLITE_CONTRACT_NAME ||
       capability.contract_version !== LOCAL_SQLITE_CONTRACT_VERSION ||
-      capability.migration_id !==
-        '0085-plugin-package-workflow-run-list-index' ||
+      capability.migration_id !== '0087-run-attempt-log-retention' ||
       typeof capability.capabilities !== 'string' ||
       capability.capabilities !==
-        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"plugin_package_workflow_task_attempt_admission":1}' ||
+        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"run_attempt_log_retention":1,"plugin_package_workflow_task_attempt_admission":1}' ||
       typeof capability.updated_at_ms !== 'number' ||
       !Number.isSafeInteger(capability.updated_at_ms) ||
       capability.updated_at_ms < 0

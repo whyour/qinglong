@@ -2420,6 +2420,7 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/plugin-package-task-publication',
           '@qinglong/runtime-core/project-tool-definition-snapshot',
           '@qinglong/runtime-core/run-attempt-log-read',
+          '@qinglong/runtime-core/run-attempt-log-retention',
           '@qinglong/runtime-core/task-spec-semantic',
         ].includes(specifier) &&
         !(

@@ -67,14 +67,20 @@ function service(overrides = {}) {
   };
   return {
     calls,
-    value: new RunAttemptLogReadService(runs, reader, {
-      executorType: overrides.executorType ?? 'local_process',
-      artifactIdPattern: overrides.artifactIdPattern ?? /^local-[a-f0-9]{30}$/,
-      maximumReadBytes: overrides.maximumReadBytes ?? 32 * 1024,
-      ...(overrides.activeMissingIsPending === undefined
-        ? {}
-        : { activeMissingIsPending: overrides.activeMissingIsPending }),
-    }),
+    value: new RunAttemptLogReadService(
+      runs,
+      reader,
+      {
+        executorType: overrides.executorType ?? 'local_process',
+        artifactIdPattern:
+          overrides.artifactIdPattern ?? /^local-[a-f0-9]{30}$/,
+        maximumReadBytes: overrides.maximumReadBytes ?? 32 * 1024,
+        ...(overrides.activeMissingIsPending === undefined
+          ? {}
+          : { activeMissingIsPending: overrides.activeMissingIsPending }),
+      },
+      overrides.retention,
+    ),
   };
 }
 
@@ -222,6 +228,72 @@ test('returns a validated bounded snapshot without copying storage bytes', async
     observedAtMs: 10,
   });
   assert.equal(calls.length, 0);
+});
+
+test('returns a durable retirement before storage and rechecks after a missing read', async () => {
+  const {
+    createRunAttemptLogRetirementRecord,
+  } = require('../dist/run/log-retention/runAttemptLogRetention.js');
+  const tombstone = createRunAttemptLogRetirementRecord({
+    projectId: 'prj_default',
+    runId: 'run_123',
+    attemptId: 'attempt_123',
+    logArtifactId: `local-${'a'.repeat(30)}`,
+    executorType: 'local_process',
+    finishedAtMs: 10,
+    eligibleAtMs: 20,
+    retiredAtMs: 30,
+    disposition: 'deleted',
+    byteLength: 42,
+    truncation: { truncated: false, maximumBytes: 1024, observedAtMs: 9 },
+  });
+  let inspections = 0;
+  let reads = 0;
+  const before = service({
+    retention: {
+      async inspect() {
+        inspections += 1;
+        return { status: 'retired', record: tombstone };
+      },
+    },
+    reader: {
+      async read() {
+        reads += 1;
+        return { status: 'missing' };
+      },
+    },
+  });
+  assert.deepEqual(await before.value.read(request()), {
+    status: 'retired',
+    projectId: 'prj_default',
+    runId: 'run_123',
+    attemptId: 'attempt_123',
+    logArtifactId: `local-${'a'.repeat(30)}`,
+    retiredAtMs: 30,
+    byteLength: 42,
+    truncation: { truncated: false, maximumBytes: 1024, observedAtMs: 9 },
+  });
+  assert.equal(inspections, 1);
+  assert.equal(reads, 0);
+
+  inspections = 0;
+  const after = service({
+    retention: {
+      async inspect() {
+        inspections += 1;
+        return inspections === 1
+          ? { status: 'active' }
+          : { status: 'retired', record: tombstone };
+      },
+    },
+    reader: {
+      async read() {
+        return { status: 'missing' };
+      },
+    },
+  });
+  assert.equal((await after.value.read(request())).status, 'retired');
+  assert.equal(inspections, 2);
 });
 
 test('fails closed on malformed storage results and dependency failures', async () => {

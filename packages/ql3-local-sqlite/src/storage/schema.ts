@@ -331,6 +331,9 @@ export const runAttempts = sqliteTable(
       table.deadlineAtMs,
       table.id,
     ),
+    index('ql3_run_log_retention_candidate_idx')
+      .on(table.executorType, table.status, table.finishedAtMs, table.id)
+      .where(sql`${table.logArtifactId} is not null`),
   ],
 );
 
@@ -508,6 +511,93 @@ export const localCompletionReceiptJournal = sqliteTable(
     index('ql3_local_receipt_journal_purge_idx')
       .on(table.purgeAfterMs, table.attemptId)
       .where(sql`${table.state} = 'quarantined'`),
+  ],
+);
+
+export const runAttemptLogArtifactTombstones = sqliteTable(
+  'QingLong3RunAttemptLogArtifactTombstones',
+  {
+    logArtifactId: text('log_artifact_id').primaryKey(),
+    projectId: text('project_id').notNull(),
+    runId: text('run_id')
+      .notNull()
+      .references(() => runs.id, { onDelete: 'cascade' }),
+    attemptId: text('attempt_id')
+      .notNull()
+      .references(() => runAttempts.id, { onDelete: 'cascade' }),
+    executorType: text('executor_type').notNull(),
+    finishedAtMs: integer('finished_at_ms').notNull(),
+    eligibleAtMs: integer('eligible_at_ms').notNull(),
+    retiredAtMs: integer('retired_at_ms').notNull(),
+    disposition: text('disposition').notNull(),
+    byteLength: integer('byte_length').notNull(),
+    truncated: text('truncated').notNull(),
+    maximumBytes: integer('maximum_bytes'),
+    truncationObservedAtMs: integer('truncation_observed_at_ms'),
+    recordDigest: text('record_digest').notNull(),
+  },
+  (table) => [
+    uniqueIndex('ql3_run_log_tombstone_attempt_uidx').on(table.attemptId),
+    index('ql3_run_log_tombstone_retired_idx').on(
+      table.retiredAtMs,
+      table.attemptId,
+    ),
+    check(
+      'ql3_run_log_tombstone_executor_check',
+      sql`${table.executorType} = 'local_process'`,
+    ),
+    check(
+      'ql3_run_log_tombstone_disposition_check',
+      sql`${table.disposition} in ('deleted','already_absent')`,
+    ),
+    check(
+      'ql3_run_log_tombstone_truncated_check',
+      sql`${table.truncated} in ('true','false','unknown')`,
+    ),
+    check(
+      'ql3_run_log_tombstone_identity_check',
+      sql`length(${table.projectId}) between 1 and 128 and length(${table.runId}) between 1 and 128 and length(${table.attemptId}) between 1 and 128 and length(${table.logArtifactId}) = 36 and substr(${table.logArtifactId}, 1, 6) = 'local-' and substr(${table.logArtifactId}, 7) not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_run_log_tombstone_time_check',
+      sql`${table.finishedAtMs} >= 0 and ${table.eligibleAtMs} >= ${table.finishedAtMs} and ${table.retiredAtMs} >= ${table.eligibleAtMs}`,
+    ),
+    check(
+      'ql3_run_log_tombstone_size_check',
+      sql`${table.byteLength} between 0 and 1073741824 and (${table.disposition} <> 'already_absent' or ${table.byteLength} = 0)`,
+    ),
+    check(
+      'ql3_run_log_tombstone_truncation_shape_check',
+      sql`(${table.truncated} = 'unknown' and ${table.maximumBytes} is null and ${table.truncationObservedAtMs} is null) or (${table.truncated} in ('true','false') and ${table.maximumBytes} >= 1 and ${table.truncationObservedAtMs} >= 0)`,
+    ),
+    check(
+      'ql3_run_log_tombstone_digest_check',
+      sql`length(${table.recordDigest}) = 64 and ${table.recordDigest} not glob '*[^0-9a-f]*'`,
+    ),
+  ],
+);
+
+export const runAttemptLogRetentionState = sqliteTable(
+  'QingLong3RunAttemptLogRetentionState',
+  {
+    maintenanceId: text('maintenance_id').primaryKey(),
+    cursorFinishedAtMs: integer('cursor_finished_at_ms'),
+    cursorAttemptId: text('cursor_attempt_id'),
+    updatedAtMs: integer('updated_at_ms').notNull(),
+  },
+  (table) => [
+    check(
+      'ql3_run_log_retention_state_id_check',
+      sql`${table.maintenanceId} = 'local-run-attempt-log'`,
+    ),
+    check(
+      'ql3_run_log_retention_state_cursor_check',
+      sql`(${table.cursorFinishedAtMs} is null and ${table.cursorAttemptId} is null) or (${table.cursorFinishedAtMs} >= 0 and length(${table.cursorAttemptId}) between 1 and 128)`,
+    ),
+    check(
+      'ql3_run_log_retention_state_time_check',
+      sql`${table.updatedAtMs} >= 0`,
+    ),
   ],
 );
 
@@ -4702,16 +4792,12 @@ export const pluginPackageWorkflowTaskAttemptAdmissions = sqliteTable(
       .onDelete('restrict')
       .onUpdate('restrict'),
     foreignKey({
-      columns: [
-        table.generationDigest,
-        table.taskReconciliationReceiptDigest,
-      ],
+      columns: [table.generationDigest, table.taskReconciliationReceiptDigest],
       foreignColumns: [
         pluginPackageTaskReconciliations.generationDigest,
         pluginPackageTaskReconciliations.receiptDigest,
       ],
-      name:
-        'ql3_plugin_package_workflow_task_attempt_admission_reconciliation_fk',
+      name: 'ql3_plugin_package_workflow_task_attempt_admission_reconciliation_fk',
     })
       .onDelete('restrict')
       .onUpdate('restrict'),
@@ -4770,6 +4856,8 @@ export const localSqliteSchema = Object.freeze({
   stepRunMutations,
   runRetryPolicies,
   localCompletionReceiptJournal,
+  runAttemptLogArtifactTombstones,
+  runAttemptLogRetentionState,
   localExecutionContextRecipes,
   localTaskExecutionRevisions,
   localSecretEnvelopes,

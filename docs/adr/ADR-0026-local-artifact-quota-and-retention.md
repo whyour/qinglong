@@ -4,6 +4,9 @@
 - 日期：2026-07-18
 - 关联：QL-RFC-0001、ADR-0007、ADR-0021、ADR-0024、ADR-0025
 
+> 2026-08-12：Local Run Attempt 日志 retention、durable tombstone、压力档位与 lifecycle 接线已由
+> ADR-0378 接受；本 ADR 仍保持 Proposed，仅表示其余通用 Artifact quota/跨 Profile 扩展尚未整体关闭。
+
 ## 上下文
 
 ADR-0024 已建立 Attempt-scoped opaque Artifact 和 direct-file durable output，但未限制单次运行能够写入的字节数，也没有终态清理证据。对小型路由设备，这意味着一个失控脚本可以填满系统盘；只按 timer 删除目录又可能误删仍在运行、等待 completion receipt 或无法证明进程退出的日志。standalone/cluster 虽然容量更高，同样需要可审计的配额和生命周期语义。

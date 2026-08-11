@@ -552,7 +552,7 @@ test('imports a different-boot Compose collection storage candidate without wide
     maximumResumeWriteAmplificationPermille: 50_000,
   });
   const targetSnapshot = {
-    contractVersion: 43,
+    contractVersion: 44,
     sha256: 'a'.repeat(64),
     bytes: 4_000_000,
     pageCount: 1000,

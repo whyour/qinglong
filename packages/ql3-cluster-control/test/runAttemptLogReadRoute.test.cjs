@@ -249,3 +249,73 @@ test('returns pending during upload and fails closed without an object reader', 
     body: { code: 'artifact_unavailable' },
   });
 });
+
+test('maps an injected durable retention state to 410 without object access', async () => {
+  const {
+    createRunAttemptLogRetirementRecord,
+  } = require('@qinglong/runtime-core/run-attempt-log-retention');
+  let reads = 0;
+  const route = createClusterControlRunAttemptLogReadRoute(
+    {
+      async findRunById() {
+        return run({ status: 'succeeded', finishedAtMs: 10 });
+      },
+      async findAttemptById() {
+        return attempt({ status: 'succeeded', finishedAtMs: 10 });
+      },
+    },
+    {
+      async read() {
+        reads += 1;
+        return { status: 'missing' };
+      },
+    },
+    {
+      async inspect() {
+        return {
+          status: 'retired',
+          record: createRunAttemptLogRetirementRecord({
+            projectId: 'prj_default',
+            runId: 'run_123',
+            attemptId: 'attempt_123',
+            logArtifactId: `wlog-${'a'.repeat(30)}`,
+            executorType: 'remote_worker',
+            finishedAtMs: 10,
+            eligibleAtMs: 20,
+            retiredAtMs: 30,
+            disposition: 'deleted',
+            byteLength: 42,
+            truncation: { truncated: 'unknown' },
+          }),
+        };
+      },
+    },
+  );
+  const prepared = await createClusterControlAdmissionPipeline({
+    routes: createClusterControlRouteRegistry([route]),
+    authenticator: { authenticate: () => PRINCIPAL },
+    policy: {
+      authorize: () => ({
+        effect: 'allow',
+        reasons: ['role_grant'],
+        fence: { projectVersion: 1, bindingVersion: 1 },
+      }),
+    },
+    audit: { record() {} },
+    now: () => 10_000,
+  }).prepare(metadata());
+  assert.deepEqual(await prepared.handle(null), {
+    statusCode: 410,
+    body: {
+      schema: 'qinglong/run-attempt-log-read-result@v1',
+      status: 'retired',
+      projectId: 'prj_default',
+      runId: 'run_123',
+      attemptId: 'attempt_123',
+      retiredAtMs: 30,
+      byteLength: 42,
+      truncation: { truncated: 'unknown' },
+    },
+  });
+  assert.equal(reads, 0);
+});

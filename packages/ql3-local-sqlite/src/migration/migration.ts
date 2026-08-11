@@ -96,6 +96,8 @@ import { local0083PluginPackageWorkflowTaskAttemptAdmissionsMigration } from '..
 import { local0084CapabilityV42Migration } from '../migrations/0084-capability-v42';
 import { local0085PluginPackageWorkflowRunListIndexMigration } from '../migrations/0085-plugin-package-workflow-run-list-index';
 import { local0086CapabilityV43Migration } from '../migrations/0086-capability-v43';
+import { local0087RunAttemptLogRetentionMigration } from '../migrations/0087-run-attempt-log-retention';
+import { local0088CapabilityV44Migration } from '../migrations/0088-capability-v44';
 import type { LocalSqliteMigrationContext } from '../migrations/sqlMigration';
 import {
   LOCAL_SQLITE_MIGRATION_STREAM_ID,
@@ -204,6 +206,8 @@ export const localSqliteMigrationDefinition: MigrationStreamDefinition<LocalSqli
       local0084CapabilityV42Migration,
       local0085PluginPackageWorkflowRunListIndexMigration,
       local0086CapabilityV43Migration,
+      local0087RunAttemptLogRetentionMigration,
+      local0088CapabilityV44Migration,
     ]),
   });
 

@@ -34,7 +34,9 @@ const {
 const {
   LocalSqlitePluginPackageWorkflowAdmissionRepository,
 } = require('../dist/plugin-package/workflow/pluginPackageWorkflowAdmissionRepository');
-const { LocalSqliteStepRunRepository } = require('../dist/run/stepRunRepository');
+const {
+  LocalSqliteStepRunRepository,
+} = require('../dist/run/stepRunRepository');
 const { auditLocalSqliteReadiness } = require('../dist/readiness/readiness');
 
 function fixture(namespace) {
@@ -154,7 +156,7 @@ test('atomically admits one generation-bound Workflow Run and exactly replays it
     },
     { runs: 1, steps: 2, events: 3, mutations: 2, admissions: 1 },
   );
-  assert.equal((await auditLocalSqliteReadiness(client)).contractVersion, 43);
+  assert.equal((await auditLocalSqliteReadiness(client)).contractVersion, 44);
 });
 
 test('runs an optional authorization guard inside new and replay transactions', async (t) => {
@@ -286,7 +288,7 @@ test('exactly replays immutable admission after the Workflow StepRun advances', 
     },
     { status: 'running', version: 5, eventSequence: 5 },
   );
-  assert.equal((await auditLocalSqliteReadiness(client)).contractVersion, 43);
+  assert.equal((await auditLocalSqliteReadiness(client)).contractVersion, 44);
 });
 
 test('fails closed before writing when the exact installation is not active', async (t) => {

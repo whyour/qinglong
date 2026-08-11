@@ -535,7 +535,7 @@ function snapshotReceipt(evidence) {
 function isSnapshot(value) {
   return (
     hasExactKeys(value, SNAPSHOT_KEYS) &&
-    value.contractVersion === 43 &&
+    value.contractVersion === 44 &&
     typeof value.sha256 === 'string' &&
     SHA256_PATTERN.test(value.sha256) &&
     Number.isSafeInteger(value.bytes) &&
@@ -1337,7 +1337,7 @@ async function resumePhase(options, manifest) {
   const outcomes = Object.freeze({
     commitStatus: committed.status,
     replayStatus: replay.status,
-    sqliteIntegrity: databaseEvidence.contractVersion === 43 ? 'ok' : 'invalid',
+    sqliteIntegrity: databaseEvidence.contractVersion === 44 ? 'ok' : 'invalid',
     stageRemoved: !fs.existsSync(session.collection.stagePath),
     tombstonePresent: fs.existsSync(tombstonePath),
     retainedSnapshots,

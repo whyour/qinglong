@@ -442,5 +442,15 @@ export const localSqliteMigrationManifest: MigrationStreamManifest =
         checksum:
           'd7affd7b3d1f3719dabc7abc7d5e8a2880fc4dc455b5103585befe9b51f705f9',
       }),
+      Object.freeze({
+        id: '0087-run-attempt-log-retention',
+        checksum:
+          'b13088c1926150ada6f010d7c694b3cf603ad44646991e77c713b882aba0e416',
+      }),
+      Object.freeze({
+        id: '0088-capability-v44',
+        checksum:
+          'c47a61b140b54d448c30ce7d5f7927c0d16fb897ab36dbe1d6010da2c39075a7',
+      }),
     ]),
   });

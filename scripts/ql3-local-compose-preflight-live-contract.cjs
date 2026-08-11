@@ -148,7 +148,7 @@ async function main() {
       report.status !== 'ready' ||
       report.generation !== 1 ||
       report.profile !== input.profile ||
-      report.sqlite?.contractVersion !== 43 ||
+      report.sqlite?.contractVersion !== 44 ||
       (report.image?.architecture !== 'amd64' &&
         report.image?.architecture !== 'arm64') ||
       report.service?.kind !== 'compose'

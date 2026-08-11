@@ -75,6 +75,11 @@ const EXECUTION_CONTROL_POLICIES = Object.freeze({
     controlPageSize: 4,
     maxDrainPages: 2,
     retentionMs: 24 * 60 * 60_000,
+    artifactNormalRetentionMs: 7 * 24 * 60 * 60_000,
+    artifactPressureRetentionMs: 24 * 60 * 60_000,
+    artifactMinimumFreeBytes: 64 * 1024 * 1024,
+    artifactRetentionPageSize: 4,
+    artifactMaximumDeletions: 2,
     stopTimeoutMs: 5_000,
   }),
   standalone: Object.freeze({
@@ -84,6 +89,11 @@ const EXECUTION_CONTROL_POLICIES = Object.freeze({
     controlPageSize: 32,
     maxDrainPages: 8,
     retentionMs: 60 * 60_000,
+    artifactNormalRetentionMs: 30 * 24 * 60 * 60_000,
+    artifactPressureRetentionMs: 24 * 60 * 60_000,
+    artifactMinimumFreeBytes: 256 * 1024 * 1024,
+    artifactRetentionPageSize: 16,
+    artifactMaximumDeletions: 8,
     stopTimeoutMs: 10_000,
   }),
 });
@@ -267,6 +277,24 @@ export async function bootstrapLocalApplication(
     });
 
     const executionPolicy = EXECUTION_CONTROL_POLICIES[options.profile];
+    const [artifactStorage, retentionCore] = await Promise.all([
+      import('@qinglong/local-execution/artifact-read'),
+      import('@qinglong/runtime-core/run-attempt-log-retention'),
+    ]);
+    const artifactRetention = new retentionCore.RunAttemptLogRetentionService(
+      storage.runAttemptLogRetention,
+      new artifactStorage.LocalRunAttemptLogRetirementStore(
+        options.artifactRoot,
+      ),
+      new artifactStorage.LocalRunAttemptLogCapacityProbe(options.artifactRoot),
+      {
+        normalRetentionMs: executionPolicy.artifactNormalRetentionMs,
+        pressureRetentionMs: executionPolicy.artifactPressureRetentionMs,
+        minimumFreeBytes: executionPolicy.artifactMinimumFreeBytes,
+        pageSize: executionPolicy.artifactRetentionPageSize,
+        maximumDeletions: executionPolicy.artifactMaximumDeletions,
+      },
+    );
     const receipts = new CompletionReceiptFileStore(options.receiptRoot);
     const localProcessLauncher = new LocalProcessLauncher(
       storage.completionReceipts,
@@ -316,6 +344,7 @@ export async function bootstrapLocalApplication(
         cleanupPageSize: executionPolicy.cleanupPageSize,
         stopTimeoutMs: executionPolicy.stopTimeoutMs,
         maxDrainPages: executionPolicy.maxDrainPages,
+        artifactRetention,
         onDiagnostic: async (error) => {
           if (error === undefined) return;
           await bestEffortAudit(options, {
@@ -476,6 +505,7 @@ export async function bootstrapLocalApplication(
           artifactIdPattern: /^local-[a-f0-9]{30}$/,
           maximumReadBytes: 32 * 1024,
         },
+        storage.runAttemptLogRetention,
       );
       productSurfaceLifecycle = await options.productSurface.start(
         Object.freeze({

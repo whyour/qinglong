@@ -235,6 +235,9 @@
       ],
       "run-attempt-log-read": [
         "dist/run/log-read/runAttemptLogRead.d.ts"
+      ],
+      "run-attempt-log-retention": [
+        "dist/run/log-retention/runAttemptLogRetention.d.ts"
       ]
     }
   },
@@ -288,6 +291,11 @@
       "types": "./dist/run/log-read/runAttemptLogRead.d.ts",
       "require": "./dist/run/log-read/runAttemptLogRead.js",
       "default": "./dist/run/log-read/runAttemptLogRead.js"
+    },
+    "./run-attempt-log-retention": {
+      "types": "./dist/run/log-retention/runAttemptLogRetention.d.ts",
+      "require": "./dist/run/log-retention/runAttemptLogRetention.js",
+      "default": "./dist/run/log-retention/runAttemptLogRetention.js"
     },
     "./task-definition": {
       "types": "./dist/task-definition/taskDefinition.d.ts",

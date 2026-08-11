@@ -1733,6 +1733,76 @@ test('starts an optional product surface after recovery and drains it before own
   );
 });
 
+test('retires one eligible Local log before product reads and returns durable 410 state', async (t) => {
+  const value = await prepare(t, 'edge');
+  const runId = 'retention-run-1';
+  const attemptId = 'retention-attempt-1';
+  const artifactId = `local-${'b'.repeat(30)}`;
+  const database = new DatabaseSync(value.targetPath);
+  database
+    .prepare(
+      `INSERT INTO "Runs" (
+         id, project_id, task_id, task_revision, trigger_type,
+         execution_origin, execution_owner, status, version, event_sequence,
+         priority, created_at_ms, finished_at_ms
+       ) VALUES (?, 'default', 'task-retention', 'revision-1', 'manual',
+                 'manual', 'runtime', 'succeeded', 1, 1, 0, 1, 1)`,
+    )
+    .run(runId);
+  database
+    .prepare(
+      `INSERT INTO "RunAttempts" (
+         id, run_id, attempt, status, executor_type, log_artifact_id,
+         callback_sequence, created_at_ms, finished_at_ms
+       ) VALUES (?, ?, 1, 'succeeded', 'local_process', ?, 0, 1, 1)`,
+    )
+    .run(attemptId, runId, artifactId);
+  database.close();
+
+  const artifactRoot = path.join(value.directory, 'artifacts');
+  const shard = path.join(artifactRoot, 'bb');
+  fs.mkdirSync(shard, { recursive: true, mode: 0o700 });
+  fs.chmodSync(artifactRoot, 0o700);
+  fs.chmodSync(shard, 0o700);
+  const logPath = path.join(shard, `${artifactId}.log`);
+  fs.writeFileSync(logPath, 'expired', { mode: 0o600 });
+  fs.chmodSync(logPath, 0o600);
+
+  let readResult;
+  const result = await bootstrapLocalApplication(
+    options(value, {
+      productSurface: {
+        async start(authority) {
+          readResult = await authority.runAttemptLogRead.read({
+            projectId: 'default',
+            runId,
+            attemptId,
+            range: { offset: 0, length: 16 },
+          });
+          return { stopAndDrain: async () => 'stopped' };
+        },
+      },
+    }),
+  );
+  assert.equal(readResult.status, 'retired');
+  assert.equal(readResult.byteLength, 7);
+  assert.equal(readResult.truncation.truncated, 'unknown');
+  assert.equal(fs.existsSync(logPath), false);
+  const evidence = new DatabaseSync(value.targetPath, { readonly: true });
+  const tombstone = evidence
+    .prepare(
+      `SELECT disposition, byte_length AS "byteLength", record_digest AS "recordDigest"
+       FROM "QingLong3RunAttemptLogArtifactTombstones"
+       WHERE attempt_id = ?`,
+    )
+    .get(attemptId);
+  evidence.close();
+  assert.equal(tombstone.disposition, 'deleted');
+  assert.equal(tombstone.byteLength, 7);
+  assert.match(tombstone.recordDigest, /^[a-f0-9]{64}$/);
+  assert.equal(await result.stop(), 'stopped');
+});
+
 test('executes one admitted Workflow through the single application cadence without duplicate Tasks', async (t) => {
   if (process.platform !== 'linux') {
     t.skip('durable local process identity requires Linux /proc');

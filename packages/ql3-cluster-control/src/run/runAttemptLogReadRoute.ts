@@ -6,6 +6,7 @@ import {
   type RunAttemptLogReadResult,
 } from '@qinglong/runtime-core/run-attempt-log-read';
 import type { RunRepositoryReader } from '@qinglong/runtime-core/run-repository';
+import type { RunAttemptLogRetentionStateReader } from '@qinglong/runtime-core/run-attempt-log-retention';
 
 import type { ClusterControlAdmissionResponse } from '../transport/httpSurface';
 import type {
@@ -99,12 +100,14 @@ function projection(
 export function createClusterControlRunAttemptLogReadRoute(
   runs: Pick<RunRepositoryReader, 'findRunById' | 'findAttemptById'>,
   reader?: RunAttemptLogRangeReader,
+  retention?: RunAttemptLogRetentionStateReader,
 ): Readonly<ClusterControlRouteDefinition> {
   if (
     !runs ||
     typeof runs.findRunById !== 'function' ||
     typeof runs.findAttemptById !== 'function' ||
-    (reader !== undefined && typeof reader.read !== 'function')
+    (reader !== undefined && typeof reader.read !== 'function') ||
+    (retention !== undefined && typeof retention.inspect !== 'function')
   ) {
     throw new TypeError(
       'Cluster-control Run Attempt log read dependencies are invalid',
@@ -113,12 +116,17 @@ export function createClusterControlRunAttemptLogReadRoute(
   const service =
     reader === undefined
       ? undefined
-      : new RunAttemptLogReadService(runs, reader, {
-          executorType: 'remote_worker',
-          artifactIdPattern: /^wlog-[a-f0-9]{30}$/,
-          maximumReadBytes: MAXIMUM_READ_BYTES,
-          activeMissingIsPending: true,
-        });
+      : new RunAttemptLogReadService(
+          runs,
+          reader,
+          {
+            executorType: 'remote_worker',
+            artifactIdPattern: /^wlog-[a-f0-9]{30}$/,
+            maximumReadBytes: MAXIMUM_READ_BYTES,
+            activeMissingIsPending: true,
+          },
+          retention,
+        );
   return Object.freeze({
     ...CLUSTER_CONTROL_RUN_ATTEMPT_LOG_READ_ROUTE,
     validateQuery,
@@ -160,6 +168,18 @@ export function createClusterControlRunAttemptLogReadRoute(
         }
         if (result.status === 'missing') {
           return response(503, { code: 'artifact_unavailable' });
+        }
+        if (result.status === 'retired') {
+          return response(410, {
+            schema: 'qinglong/run-attempt-log-read-result@v1',
+            status: 'retired',
+            projectId: result.projectId,
+            runId: result.runId,
+            attemptId: result.attemptId,
+            retiredAtMs: result.retiredAtMs,
+            byteLength: result.byteLength,
+            truncation: result.truncation,
+          });
         }
         return response(200, projection(result));
       } catch (error) {

@@ -128,7 +128,7 @@ test('rejects retaining npm bin links, debug maps or declarations in the product
     const dockerfile = fs
       .readFileSync(dockerfilePath, 'utf8')
       .replace(
-          'RUN rm -rf node_modules/.bin \\\n' +
+        'RUN rm -rf node_modules/.bin \\\n' +
           '  && node /tmp/ql3-prune-runtime-artifact.cjs node_modules/@qinglong \\\n' +
           '    @qinglong/local-application \\\n' +
           '    @qinglong/local-application/process \\\n' +
@@ -156,7 +156,7 @@ test('rejects removal of the SQLite rollout compatibility labels', () => {
     const dockerfilePath = path.join(current.target, 'Dockerfile');
     const dockerfile = fs
       .readFileSync(dockerfilePath, 'utf8')
-      .replace('  io.qinglong.local.sqlite-write-contract="43" \\\n', '');
+      .replace('  io.qinglong.local.sqlite-write-contract="44" \\\n', '');
     fs.writeFileSync(dockerfilePath, dockerfile);
     const report = auditLocalImageContract(current.root);
     assert.equal(report.compatible, false);
