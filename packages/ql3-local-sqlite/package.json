@@ -255,6 +255,16 @@
       "require": "./dist/run/runLostRetryRepository.js",
       "default": "./dist/run/runLostRetryRepository.js"
     },
+    "./run-manual-retry": {
+      "types": "./dist/run/runManualRetryRepository.d.ts",
+      "require": "./dist/run/runManualRetryRepository.js",
+      "default": "./dist/run/runManualRetryRepository.js"
+    },
+    "./run-management": {
+      "types": "./dist/administration/runManagement.d.ts",
+      "require": "./dist/administration/runManagement.js",
+      "default": "./dist/administration/runManagement.js"
+    },
     "./trigger-administration": {
       "types": "./dist/scheduling/triggerAdministration.d.ts",
       "require": "./dist/scheduling/triggerAdministration.js",

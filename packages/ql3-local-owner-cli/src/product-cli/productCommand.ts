@@ -85,6 +85,12 @@ export const QINGLONG3_PRODUCT_COMMANDS: readonly QingLong3ProductCommandDefinit
       description: 'manage Task definitions',
     }),
     Object.freeze({
+      name: 'run',
+      binary: 'ql3-run',
+      target: 'run-management/runRetryCli.js',
+      description: 'retry terminal Runs under strong local authentication',
+    }),
+    Object.freeze({
       name: 'trigger',
       binary: 'ql3-trigger',
       target: 'automation-management/triggerCli.js',

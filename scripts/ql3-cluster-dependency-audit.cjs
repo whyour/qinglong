@@ -1676,6 +1676,15 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/run-management/runRetryCommand.ts' &&
+          [
+            '@qinglong/local-owner-console/authenticated-command',
+            '@qinglong/local-sqlite/authenticated-management',
+            '@qinglong/local-sqlite/run-management',
+          ].includes(specifier)
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/lifecycle/adoption.ts' &&
           [
             '@qinglong/local-admin',
@@ -2510,6 +2519,18 @@ function auditSourceImports(root, packagePath, findings) {
           'src/production-process/processApplication.ts',
         ].includes(path.relative(packageDirectory, filePath)) &&
         specifier === '@qinglong/local-sqlite/profile'
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-owner-cli' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/run-management/runRetryCommand.ts' &&
+        [
+          '@qinglong/runtime-core/project-policy',
+          '@qinglong/runtime-core/run-manual-retry',
+          '@qinglong/runtime-core/security-audit',
+        ].includes(specifier)
       ) {
         continue;
       }

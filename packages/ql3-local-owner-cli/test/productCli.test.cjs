@@ -32,7 +32,7 @@ function runCli(args) {
 
 test('catalog maps every product subcommand to an existing same-package binary', () => {
   assert.equal(manifest.bin.ql3, 'dist/product-cli/cli.js');
-  assert.equal(QINGLONG3_PRODUCT_COMMANDS.length, 20);
+  assert.equal(QINGLONG3_PRODUCT_COMMANDS.length, 21);
   assert.equal(
     new Set(QINGLONG3_PRODUCT_COMMANDS.map(({ name }) => name)).size,
     QINGLONG3_PRODUCT_COMMANDS.length,
@@ -60,6 +60,7 @@ test('help and version are bounded installation-derived product facts', () => {
   const help = qingLong3ProductHelp();
   assert.match(help, /^Usage: ql3 <command> \[arguments\]/);
   assert.match(help, /\n  task\s+manage Task definitions\n/);
+  assert.match(help, /\n  run\s+retry terminal Runs/);
   assert.match(help, /Root service mutation remains isolated/);
   assert.equal(help.includes('ql3-service-bridge  '), false);
   assert.equal(loadQingLong3ProductVersion(moduleDirectory), manifest.version);
@@ -152,6 +153,14 @@ test('product binary exposes help/version and delegates without a shell', () => 
     'Usage: ql3-task run --command-file /absolute/private-command.json',
   );
   assert.equal(delegatedHelp.stderr, '');
+
+  const delegatedRunHelp = runCli(['run', '--help']);
+  assert.equal(delegatedRunHelp.status, 0);
+  assert.equal(
+    delegatedRunHelp.stdout.trim(),
+    'Usage: ql3-run retry --command-file /absolute/private-command.json',
+  );
+  assert.equal(delegatedRunHelp.stderr, '');
 
   const delegatedFailure = runCli(['task']);
   assert.equal(delegatedFailure.status, 64);

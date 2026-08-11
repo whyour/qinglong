@@ -60,6 +60,11 @@
       "require": "./dist/automation-management/taskDefinitionCommand.js",
       "default": "./dist/automation-management/taskDefinitionCommand.js"
     },
+    "./run-retry-command": {
+      "types": "./dist/run-management/runRetryCommand.d.ts",
+      "require": "./dist/run-management/runRetryCommand.js",
+      "default": "./dist/run-management/runRetryCommand.js"
+    },
     "./plugin-package-workflow-command": {
       "types": "./dist/plugin-package/pluginPackageWorkflowCommand.d.ts",
       "require": "./dist/plugin-package/pluginPackageWorkflowCommand.js",
@@ -125,6 +130,7 @@
     "ql3-ai-feature": "dist/ai-management/aiFeatureCli.js",
     "ql3-secret": "dist/security-management/secretCli.js",
     "ql3-task": "dist/automation-management/taskDefinitionCli.js",
+    "ql3-run": "dist/run-management/runRetryCli.js",
     "ql3-workflow": "dist/plugin-package/pluginPackageWorkflowCli.js",
     "ql3-trigger": "dist/automation-management/triggerCli.js",
     "ql3-policy": "dist/security-management/projectPolicyCli.js",

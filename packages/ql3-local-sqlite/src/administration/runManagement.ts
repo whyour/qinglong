@@ -1,0 +1,129 @@
+import type { ApiCredentialRepository } from '@qinglong/runtime-core/api-credential';
+import type { LocalOwnerPepperRepository } from '@qinglong/runtime-core/local-owner-pepper';
+import type { ProjectPolicyRepository } from '@qinglong/runtime-core/project-policy';
+import type { RunManualRetryRepository } from '@qinglong/runtime-core/run-manual-retry';
+import type { SecurityAuditSink } from '@qinglong/runtime-core/security-audit';
+
+import { LocalSqliteOperationAuthority } from '../authority/operationAuthority';
+import { LocalSqliteOwnerPepperRepository } from '../local-owner/ownerPepperRepository';
+import {
+  EDGE_RUN_MANUAL_RETRY_RATE_LIMIT,
+  LocalSqliteRunManualRetryRepository,
+  STANDALONE_RUN_MANUAL_RETRY_RATE_LIMIT,
+} from '../run/runManualRetryRepository';
+import { LocalSqliteApiCredentialRepository } from '../security/apiCredentialRepository';
+import { LocalSqliteProjectPolicyRepository } from '../security/projectPolicyRepository';
+import { LocalSqliteSecurityAuthorityStore } from '../security/securityAuthorityStore';
+import {
+  assertLocalSqliteOptions,
+  assertLocalSqlitePathBoundary,
+  openLocalSqliteClient,
+  type LocalSqliteDatabaseOptions,
+  type LocalSqliteProfile,
+} from '../storage/config';
+import {
+  auditLocalSqliteReadiness,
+  type LocalSqliteReadinessEvidence,
+} from '../readiness/readiness';
+import {
+  confirmLocalSqliteAuthenticatedUserCredentialFence,
+  LocalSqliteAuthenticatedManagementFenceError,
+  type LocalSqliteAuthenticatedUserCredentialFence,
+} from './packageManagement';
+
+export interface LocalSqliteRunManagementDatabase {
+  readonly profile: LocalSqliteProfile;
+  readonly readiness: LocalSqliteReadinessEvidence;
+  readonly apiCredentials: ApiCredentialRepository;
+  readonly ownerPepper: Pick<LocalOwnerPepperRepository, 'resolveKey'>;
+  readonly projectPolicy: ProjectPolicyRepository;
+  readonly runManualRetry: RunManualRetryRepository;
+  readonly securityAudit: SecurityAuditSink;
+  activateUserCredentialFence(
+    fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+  ): void;
+  close(): Promise<void>;
+}
+
+function sameCredentialFence(
+  left: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+  right: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+): boolean {
+  return (
+    left.credentialId === right.credentialId &&
+    left.credentialVersion === right.credentialVersion &&
+    left.pepperKeyId === right.pepperKeyId &&
+    left.materialDigest === right.materialDigest &&
+    left.subjectType === right.subjectType &&
+    left.subjectId === right.subjectId &&
+    left.secretDigest === right.secretDigest &&
+    left.notBeforeAtMs === right.notBeforeAtMs &&
+    left.expiresAtMs === right.expiresAtMs
+  );
+}
+
+/** Short-lived strong-User authority; it never migrates or starts a timer. */
+export async function openLocalSqliteRunManagementDatabase(
+  options: LocalSqliteDatabaseOptions,
+): Promise<LocalSqliteRunManagementDatabase> {
+  assertLocalSqliteOptions(options);
+  assertLocalSqlitePathBoundary(options.databasePath, false);
+  const client = openLocalSqliteClient(options, false);
+  try {
+    const readiness = await auditLocalSqliteReadiness(client);
+    const authority = new LocalSqliteOperationAuthority(client);
+    let activeFence:
+      | Readonly<LocalSqliteAuthenticatedUserCredentialFence>
+      | undefined;
+    const securityAuthority = new LocalSqliteSecurityAuthorityStore(authority);
+    const runManualRetry = new LocalSqliteRunManualRetryRepository(authority, {
+      rateLimit:
+        options.profile === 'edge'
+          ? EDGE_RUN_MANUAL_RETRY_RATE_LIMIT
+          : STANDALONE_RUN_MANUAL_RETRY_RATE_LIMIT,
+      beforeMutation(actor) {
+        if (
+          !activeFence ||
+          actor.type !== activeFence.subjectType ||
+          actor.id !== activeFence.subjectId
+        ) {
+          throw new LocalSqliteAuthenticatedManagementFenceError();
+        }
+        confirmLocalSqliteAuthenticatedUserCredentialFence(
+          authority,
+          activeFence,
+        );
+      },
+    });
+    let closePromise: Promise<void> | undefined;
+    return Object.freeze({
+      profile: options.profile,
+      readiness,
+      apiCredentials: new LocalSqliteApiCredentialRepository(authority),
+      ownerPepper: new LocalSqliteOwnerPepperRepository(authority),
+      projectPolicy: new LocalSqliteProjectPolicyRepository(authority),
+      runManualRetry,
+      securityAudit: securityAuthority,
+      activateUserCredentialFence(
+        fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+      ) {
+        confirmLocalSqliteAuthenticatedUserCredentialFence(authority, fence);
+        if (activeFence && !sameCredentialFence(activeFence, fence)) {
+          throw new LocalSqliteAuthenticatedManagementFenceError();
+        }
+        activeFence = Object.freeze({ ...fence });
+      },
+      close() {
+        if (closePromise) return closePromise;
+        closePromise = authority.close();
+        return closePromise;
+      },
+    });
+  } catch (error) {
+    if (client.isOpen) client.close();
+    throw error;
+  }
+}
+
+export type { LocalSqliteDatabaseOptions, LocalSqliteProfile };
+export type { LocalSqliteReadinessEvidence } from '../readiness/readiness';

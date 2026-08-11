@@ -276,6 +276,11 @@
       "require": "./dist/run/clusterRunLostRetry.js",
       "default": "./dist/run/clusterRunLostRetry.js"
     },
+    "./run-manual-retry": {
+      "types": "./dist/run/manual-retry/runManualRetry.d.ts",
+      "require": "./dist/run/manual-retry/runManualRetry.js",
+      "default": "./dist/run/manual-retry/runManualRetry.js"
+    },
     "./cluster-run-lost-retry": {
       "types": "./dist/run/clusterRunLostRetry.d.ts",
       "require": "./dist/run/clusterRunLostRetry.js",
