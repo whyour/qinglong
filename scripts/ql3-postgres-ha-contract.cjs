@@ -9396,7 +9396,8 @@ async function manualRunRetryFacts(pool, fixture) {
        (SELECT count(*)::integer FROM "ql3"."run_events" AS event
           JOIN "ql3"."runs" AS run ON run.id = event.run_id
          WHERE run.project_id = $2
-           AND run.trigger_type = 'run_manual_retry') AS "eventCount",
+           AND run.trigger_type = 'run_manual_retry'
+           AND event.type IN ('run.created', 'run.queued')) AS "eventCount",
        (SELECT count(*)::integer FROM "ql3"."security_audit_events"
          WHERE project_id = $2 AND operation_id = 'run.retry'
            AND outcome = 'allowed') AS "allowedAuditCount",
@@ -9405,6 +9406,26 @@ async function manualRunRetryFacts(pool, fixture) {
          WHERE run.project_id = $2
            AND run.trigger_type = 'run_manual_retry') AS "retryPolicyCount"`,
     [fixture.sourceRunId, fixture.projectId],
+  );
+  assert.equal(result.rowCount, 1);
+  return result.rows[0];
+}
+
+async function runManagementStopFacts(pool, projectId, runIds) {
+  const result = await pool.query(
+    `SELECT
+       (SELECT count(*)::integer FROM "ql3"."runs"
+         WHERE project_id = $1 AND id = ANY($2::varchar[])
+           AND cancel_requested_at_ms IS NOT NULL
+           AND cancel_reason = 'user') AS "stoppedRunCount",
+       (SELECT count(*)::integer FROM "ql3"."run_events" AS event
+          JOIN "ql3"."runs" AS run ON run.id = event.run_id
+         WHERE run.project_id = $1 AND run.id = ANY($2::varchar[])
+           AND event.type = 'run.cancel_requested') AS "eventCount",
+       (SELECT count(*)::integer FROM "ql3"."security_audit_events"
+         WHERE project_id = $1 AND operation_id = 'run.stop'
+           AND outcome = 'allowed') AS "allowedAuditCount"`,
+    [projectId, runIds],
   );
   assert.equal(result.rowCount, 1);
   return result.rows[0];
@@ -9478,6 +9499,11 @@ async function runManualRunRetryHaEvidence(options) {
     'run-manager',
     databaseUrl(RUN_MANAGER_USER, RUN_MANAGER_PASSWORD, primaryPort),
     'ql3-ha-manual-run-retry-b',
+  )();
+  const cancellationRuntime = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, primaryPort),
+    'ql3-ha-manual-run-stop-convergence',
   )();
   try {
     const source = await new PostgresTaskStartRepository(
@@ -9571,6 +9597,12 @@ async function runManualRunRetryHaEvidence(options) {
     const secondRepository = new PostgresRunManualRetryRepository(
       secondRuntime.pool,
     );
+    const firstCancellation = new PostgresClusterRunCancellationRepository(
+      firstRuntime.pool,
+    );
+    const secondCancellation = new PostgresClusterRunCancellationRepository(
+      secondRuntime.pool,
+    );
     const replayCommand = retryCommand();
     const exactRace = await Promise.all([
       firstRepository.retryRun(replayCommand),
@@ -9582,6 +9614,26 @@ async function runManualRunRetryHaEvidence(options) {
     ]);
     assert.equal(exactRace[0].runId, exactRace[1].runId);
     assert.equal(exactRace[0].attemptId, exactRace[1].attemptId);
+    const stopCommand = {
+      projectId: fixture.projectId,
+      runId: exactRace[0].runId,
+      mutationId: randomUUID(),
+      eventId: randomUUID(),
+      requestId: `ha-run-stop-${suffix}-before-promotion`,
+      auditEventId: randomUUID(),
+      principal: authentication,
+      policyFence: { projectVersion: 1, bindingVersion: 1 },
+    };
+    assert.equal(
+      (await firstCancellation.requestUserCancellationAudited(stopCommand))
+        .status,
+      'accepted',
+    );
+    assert.equal(
+      (await secondCancellation.requestUserCancellationAudited(stopCommand))
+        .status,
+      'already_requested',
+    );
 
     for (
       let index = 1;
@@ -9608,6 +9660,7 @@ async function runManualRunRetryHaEvidence(options) {
       true,
     );
     assert.ok(rejected[0].reason.retryAfterMs > 0);
+    const promotionStopRunId = accepted[0].value.runId;
 
     const expectedFacts = {
       sourceStatus: 'failed',
@@ -9621,6 +9674,12 @@ async function runManualRunRetryHaEvidence(options) {
       await manualRunRetryFacts(primaryDatabase.pool, fixture),
       expectedFacts,
     );
+    assert.deepEqual(
+      await runManagementStopFacts(primaryDatabase.pool, fixture.projectId, [
+        stopCommand.runId,
+      ]),
+      { stoppedRunCount: 1, eventCount: 1, allowedAuditCount: 1 },
+    );
     await waitFor(async () => {
       const facts = await manualRunRetryFacts(standbyDatabase.pool, fixture);
       return facts.retryRunCount === CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT
@@ -9631,8 +9690,28 @@ async function runManualRunRetryHaEvidence(options) {
       await manualRunRetryFacts(standbyDatabase.pool, fixture),
       expectedFacts,
     );
+    assert.deepEqual(
+      await runManagementStopFacts(standbyDatabase.pool, fixture.projectId, [
+        stopCommand.runId,
+      ]),
+      { stoppedRunCount: 1, eventCount: 1, allowedAuditCount: 1 },
+    );
+    assert.deepEqual(
+      await new PostgresClusterRunCancellationConvergenceRepository(
+        cancellationRuntime.pool,
+      ).convergePage({ limit: 1 }),
+      {
+        scanned: 1,
+        settledRuns: 1,
+        settledAttempts: 1,
+        blocked: 0,
+        hasMore: false,
+      },
+    );
     return {
       fixture,
+      authentication,
+      stopRunIds: [stopCommand.runId, promotionStopRunId],
       report: {
         sourceRunId: source.runId,
         exactConcurrentReplay: true,
@@ -9643,15 +9722,25 @@ async function runManualRunRetryHaEvidence(options) {
         allowedAuditEvents: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
         replicatedBeforePromotion: true,
         survivedPromotion: false,
+        stopExactReplay: true,
+        stopAllowedAuditEvents: 1,
+        stopReplicatedBeforePromotion: true,
+        stopConvergedBeforePromotion: true,
+        stopAcceptedAfterPromotion: false,
+        stopConvergedAfterPromotion: false,
       },
     };
   } finally {
-    await Promise.all([firstRuntime.close(), secondRuntime.close()]);
+    await Promise.all([
+      firstRuntime.close(),
+      secondRuntime.close(),
+      cancellationRuntime.close(),
+    ]);
   }
 }
 
 async function verifyManualRunRetryAfterPromotion(options) {
-  const { promotedPool, evidence } = options;
+  const { promotedPort, promotedPool, evidence } = options;
   assert.deepEqual(await manualRunRetryFacts(promotedPool, evidence.fixture), {
     sourceStatus: 'failed',
     retryRunCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
@@ -9660,7 +9749,74 @@ async function verifyManualRunRetryAfterPromotion(options) {
     allowedAuditCount: CLUSTER_RUN_MANUAL_RETRY_RATE_LIMIT,
     retryPolicyCount: 0,
   });
+  assert.deepEqual(
+    await runManagementStopFacts(promotedPool, evidence.fixture.projectId, [
+      evidence.stopRunIds[0],
+    ]),
+    { stoppedRunCount: 1, eventCount: 1, allowedAuditCount: 1 },
+  );
+  const clock = await promotedPool.query(
+    `SELECT floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint
+            AS "nowMs"`,
+  );
+  const nowMs = Number(clock.rows[0].nowMs);
+  const promotedRunManager = await databaseOpener(
+    'run-manager',
+    databaseUrl(RUN_MANAGER_USER, RUN_MANAGER_PASSWORD, promotedPort),
+    'ql3-ha-run-stop-promoted',
+  )();
+  const promotedRuntime = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, promotedPort),
+    'ql3-ha-run-stop-promoted-convergence',
+  )();
+  try {
+    const result = await new PostgresClusterRunCancellationRepository(
+      promotedRunManager.pool,
+    ).requestUserCancellationAudited({
+      projectId: evidence.fixture.projectId,
+      runId: evidence.stopRunIds[1],
+      mutationId: randomUUID(),
+      eventId: randomUUID(),
+      requestId: `ha-run-stop-promoted-${process.pid}`,
+      auditEventId: randomUUID(),
+      principal: {
+        subject: { type: 'user', id: evidence.fixture.actorId },
+        authenticationId: `oidc:mfa-promoted-${process.pid}`,
+        authenticatedAtMs: nowMs,
+        expiresAtMs: nowMs + 60 * 60_000,
+        assurance: 'hardware',
+      },
+      policyFence: { projectVersion: 1, bindingVersion: 1 },
+    });
+    assert.equal(result.status, 'accepted');
+    assert.deepEqual(
+      await new PostgresClusterRunCancellationConvergenceRepository(
+        promotedRuntime.pool,
+      ).convergePage({ limit: 1 }),
+      {
+        scanned: 1,
+        settledRuns: 1,
+        settledAttempts: 1,
+        blocked: 0,
+        hasMore: false,
+      },
+    );
+  } finally {
+    await Promise.all([promotedRunManager.close(), promotedRuntime.close()]);
+  }
+  assert.deepEqual(
+    await runManagementStopFacts(
+      promotedPool,
+      evidence.fixture.projectId,
+      evidence.stopRunIds,
+    ),
+    { stoppedRunCount: 2, eventCount: 2, allowedAuditCount: 2 },
+  );
   evidence.report.survivedPromotion = true;
+  evidence.report.stopAllowedAuditEvents = 2;
+  evidence.report.stopAcceptedAfterPromotion = true;
+  evidence.report.stopConvergedAfterPromotion = true;
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -11168,14 +11324,6 @@ async function main(argv = process.argv.slice(2)) {
       promotedPool: promotedDatabase.pool,
       report: modelProviderCredentialTestConnection,
     });
-    await verifyManualRunRetryAfterPromotion({
-      promotedPool: promotedDatabase.pool,
-      evidence: manualRunRetry,
-    });
-    timeline.push({
-      state: 'manual_run_retry_survived_promotion',
-      atMs: Number((performance.now() - startedAt).toFixed(3)),
-    });
     timeline.push({
       state: 'optional_ai_feature_schema_survived_promotion',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
@@ -11474,6 +11622,15 @@ async function main(argv = process.argv.slice(2)) {
     await promotedDatabase.pool.query(
       `SET synchronous_commit = 'remote_apply'`,
     );
+    await verifyManualRunRetryAfterPromotion({
+      promotedPort: standbyPort,
+      promotedPool: promotedDatabase.pool,
+      evidence: manualRunRetry,
+    });
+    timeline.push({
+      state: 'manual_run_retry_survived_promotion',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
     await promotedDatabase.pool.query(
       `INSERT INTO "ql3"."projects" (
          id, name, slug, status, version, created_at_ms, updated_at_ms
@@ -11908,7 +12065,7 @@ async function main(argv = process.argv.slice(2)) {
             FROM "ql3"."worker_credential_deliveries") AS "credentialDeliveries"`,
     );
     assert.deepEqual(sideEffects.rows, [
-      { runs: 76, runEvents: 170, credentialDeliveries: 4 },
+      { runs: 76, runEvents: 176, credentialDeliveries: 4 },
     ]);
     timeline.push({
       state: 'two_fresh_control_replicas_ready',
@@ -12344,6 +12501,16 @@ async function main(argv = process.argv.slice(2)) {
           manualRunRetry.report.replicatedBeforePromotion,
         manualRunRetrySurvivesPromotion:
           manualRunRetry.report.survivedPromotion,
+        runManagementStopExactlyReplaysAcrossPools:
+          manualRunRetry.report.stopExactReplay,
+        runManagementStopAuditReplicatesAtomically:
+          manualRunRetry.report.stopReplicatedBeforePromotion &&
+          manualRunRetry.report.stopAllowedAuditEvents === 2,
+        runManagementStopWritesAfterPromotion:
+          manualRunRetry.report.stopAcceptedAfterPromotion,
+        runManagementStopFeedsCancellationLifecycle:
+          manualRunRetry.report.stopConvergedBeforePromotion &&
+          manualRunRetry.report.stopConvergedAfterPromotion,
         physicalStreaming: true,
         oldPrimaryFencedBeforePromotion: true,
         bothOldReplicasNotReady: true,

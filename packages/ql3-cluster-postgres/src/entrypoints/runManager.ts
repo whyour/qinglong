@@ -1,4 +1,8 @@
 export { PostgresRunManualRetryRepository } from '../run-management/runManualRetryRepository';
+export {
+  PostgresClusterRunCancellationRepository,
+  type PostgresRunManagementCancellationCommand,
+} from '../run-recovery/clusterRunCancellationRepository';
 export { PostgresProjectPolicyRepository } from '../security/projectPolicyRepository';
 export { PostgresSecurityAuditRepository } from '../security/securityAuditRepository';
 export {

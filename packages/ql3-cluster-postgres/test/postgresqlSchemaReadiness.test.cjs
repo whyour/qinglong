@@ -13,7 +13,9 @@ const {
   assertPostgresWorkerCredentialManagerSchemaReady,
   assertPostgresWorkerIngressSchemaReady,
 } = require('../dist/schema/schemaReadiness');
-const { postgresqlControlSchemaContract } = require('../dist/schema/schemaContract');
+const {
+  postgresqlControlSchemaContract,
+} = require('../dist/schema/schemaContract');
 const { postgresqlMainMigrationStream } = require('../dist/migrations');
 
 function validHistory() {
@@ -86,12 +88,7 @@ function validPrivileges() {
     plugin_package_automation_publication_heads: [true, false, false, false],
     plugin_package_workflow_admissions: [true, true, false, false],
     plugin_package_workflow_admission_steps: [true, true, false, false],
-    plugin_package_workflow_task_attempt_admissions: [
-      true,
-      true,
-      false,
-      false,
-    ],
+    plugin_package_workflow_task_attempt_admissions: [true, true, false, false],
     plugin_package_publisher_provenance: [false, false, false, false],
     plugin_package_publisher_revocation_receipts: [false, false, false, false],
     plugin_package_publisher_revocation_impacts: [false, false, false, false],
@@ -523,11 +520,11 @@ function workerCredentialPrivileges(kind) {
         ]
       : []),
     ...(manager
-        ? []
-        : [
-            'approved_action_dispatches',
-            'approved_action_executions',
-            'worker_credentials',
+      ? []
+      : [
+          'approved_action_dispatches',
+          'approved_action_executions',
+          'worker_credentials',
           'worker_credential_mutations',
           'worker_credential_deliveries',
           'worker_credential_stage_discards',
@@ -714,6 +711,26 @@ function queryable(overrides = {}) {
           ],
         };
       }
+      if (text.includes('has_column_privilege')) {
+        assert.match(text, /format\('%I\.%I', \$1::text, 'runs'\)/);
+        const columns = contract.tables.find(
+          ({ name }) => name === 'runs',
+        ).columns;
+        const allowed = new Set([
+          'cancel_requested_at_ms',
+          'cancel_reason',
+          'version',
+          'event_sequence',
+        ]);
+        return {
+          rows:
+            overrides.runManagerColumnPrivileges ??
+            columns.map((columnName) => ({
+              columnName,
+              updateAllowed: allowed.has(columnName),
+            })),
+        };
+      }
       if (text.includes('has_table_privilege')) {
         return { rows: overrides.privileges ?? validPrivileges() };
       }
@@ -731,7 +748,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 55,
+    contractVersion: 56,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -789,6 +806,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0054-approval-management-boundary',
       'pg-0055-run-attempt-log-retention',
       'pg-0056-run-management-boundary',
+      'pg-0057-run-management-stop-boundary',
     ],
   });
 });
@@ -819,10 +837,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 55);
+  assert.equal(report.contractVersion, 56);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0056-run-management-boundary',
+    'pg-0057-run-management-stop-boundary',
   );
 });
 
@@ -835,10 +853,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 55);
+  assert.equal(report.contractVersion, 56);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0056-run-management-boundary',
+    'pg-0057-run-management-stop-boundary',
   );
 
   const widened = automationManagerPrivileges();
@@ -867,10 +885,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 55);
+  assert.equal(report.contractVersion, 56);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0056-run-management-boundary',
+    'pg-0057-run-management-stop-boundary',
   );
 
   const widened = approvalManagerPrivileges();
@@ -901,8 +919,11 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 55);
-  assert.equal(report.migrationIds.at(-1), 'pg-0056-run-management-boundary');
+  assert.equal(report.contractVersion, 56);
+  assert.equal(
+    report.migrationIds.at(-1),
+    'pg-0057-run-management-stop-boundary',
+  );
 
   const widened = runManagerPrivileges();
   widened.find(({ tableName }) => tableName === 'runs').updateAllowed = true;
@@ -918,6 +939,33 @@ test('accepts the isolated least-privilege Run manager role', async () => {
       error instanceof PostgresSchemaReadinessError &&
       error.code === 'run_manager_role_invalid' &&
       error.facts.includes('table-privileges:runs'),
+  );
+
+  const widenedColumns = postgresqlControlSchemaContract.tables
+    .find(({ name }) => name === 'runs')
+    .columns.map((columnName) => ({
+      columnName,
+      updateAllowed: [
+        'cancel_requested_at_ms',
+        'cancel_reason',
+        'version',
+        'event_sequence',
+        'status',
+      ].includes(columnName),
+    }));
+  await assert.rejects(
+    assertPostgresRunManagerSchemaReady(
+      queryable({
+        currentUser: 'ql3_run_manager',
+        privileges: runManagerPrivileges(),
+        functionMode: 'run-manager',
+        runManagerColumnPrivileges: widenedColumns,
+      }),
+    ),
+    (error) =>
+      error instanceof PostgresSchemaReadinessError &&
+      error.code === 'run_manager_role_invalid' &&
+      error.facts.includes('column-update-privilege:runs.status'),
   );
 });
 
@@ -1006,10 +1054,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 55);
+  assert.equal(report.contractVersion, 56);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0056-run-management-boundary',
+    'pg-0057-run-management-stop-boundary',
   );
 });
 

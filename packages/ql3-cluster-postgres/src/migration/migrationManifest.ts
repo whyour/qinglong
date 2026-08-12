@@ -288,5 +288,10 @@ export const postgresqlMainMigrationManifest: MigrationStreamManifest =
         checksum:
           '7aa2b2ade67cdfa6839d4af02209906646a68adfd6c12c4dddeb854021da72b8',
       }),
+      Object.freeze({
+        id: 'pg-0057-run-management-stop-boundary',
+        checksum:
+          'ab2d0eee3d85a937e1e87243b1fd1e75181529122b64026303488404162e4ba7',
+      }),
     ]),
   });

@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { postgresqlControlSchemaContract } = require('../dist/schema/schemaContract');
+const {
+  postgresqlControlSchemaContract,
+} = require('../dist/schema/schemaContract');
 const {
   postgresqlMainMigrationManifest,
 } = require('../dist/migration/migrationManifest');
@@ -105,6 +107,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0054-approval-management-boundary',
       'pg-0055-run-attempt-log-retention',
       'pg-0056-run-management-boundary',
+      'pg-0057-run-management-stop-boundary',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -519,6 +522,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0056-run-management-boundary',
       checksum:
         '7aa2b2ade67cdfa6839d4af02209906646a68adfd6c12c4dddeb854021da72b8',
+    },
+    {
+      id: 'pg-0057-run-management-stop-boundary',
+      checksum:
+        'ab2d0eee3d85a937e1e87243b1fd1e75181529122b64026303488404162e4ba7',
     },
   ];
   assert.deepEqual(
@@ -1588,7 +1596,10 @@ test('advances capability v45 with generation-bound Workflow Task attempts', asy
     /CREATE FUNCTION "ql3"\."plugin_package_workflow_task_attempt_snapshot"/,
   );
   assert.match(sql, /SECURITY DEFINER/);
-  assert.match(sql, /FOR KEY SHARE OF workflow, source, reconciliation, item, execution/);
+  assert.match(
+    sql,
+    /FOR KEY SHARE OF workflow, source, reconciliation, item, execution/,
+  );
   assert.match(
     sql,
     /GRANT SELECT, INSERT[\s\S]*plugin_package_workflow_task_attempt_admissions[\s\S]*TO ql3_runtime/,
@@ -1611,16 +1622,11 @@ test('advances capability v45 with generation-bound Workflow Task attempts', asy
     sql,
     /migration_id\s*=\s*'pg-0045-plugin-package-workflow-admissions'/,
   );
-  assert.match(
-    sql,
-    /"plugin_package_workflow_task_attempt_admission":1/,
-  );
+  assert.match(sql, /"plugin_package_workflow_task_attempt_admission":1/);
 });
 
 test('advances capability v46 with split Worker credential management authorities', async () => {
-  const migration = migrationById(
-    'pg-0047-worker-credential-management-plans',
-  );
+  const migration = migrationById('pg-0047-worker-credential-management-plans');
   const statements = [];
   await migration.up({
     async query(statement) {
@@ -1629,10 +1635,7 @@ test('advances capability v46 with split Worker credential management authoritie
     },
   });
   const sql = statements.join('\n');
-  assert.match(
-    sql,
-    /CREATE TABLE "ql3"\."worker_credential_management_plans"/,
-  );
+  assert.match(sql, /CREATE TABLE "ql3"\."worker_credential_management_plans"/);
   assert.match(sql, /'ql3_worker_credential_manager'/);
   assert.match(sql, /'ql3_worker_credential_executor'/);
   assert.match(
@@ -1676,10 +1679,7 @@ test('advances capability v47 without invalidating preapproved Worker credential
     },
   });
   const sql = statements.join('\n');
-  assert.match(
-    sql,
-    /DROP CONSTRAINT ql3_worker_credentials_lifetime_check/,
-  );
+  assert.match(sql, /DROP CONSTRAINT ql3_worker_credentials_lifetime_check/);
   assert.match(
     sql,
     /expires_at_ms > GREATEST\(created_at_ms, not_before_at_ms\)/,
@@ -1747,7 +1747,10 @@ test('advances capability v49 with durable Worker credential management boundari
     },
   });
   const sql = statements.join('\n');
-  assert.match(sql, /CREATE TABLE "ql3"\."worker_credential_management_quota_buckets"/);
+  assert.match(
+    sql,
+    /CREATE TABLE "ql3"\."worker_credential_management_quota_buckets"/,
+  );
   assert.match(sql, /TO ql3_worker_credential_manager/);
   assert.doesNotMatch(
     sql,
@@ -1820,10 +1823,7 @@ test('advances capability v51 with a restart-safe automation identity keyset led
   assert.match(sql, /contract_version = 51/);
   assert.match(sql, /"automation_management_identity_keyset_ledger":1/);
   assert.match(sql, /contract_version = 50/);
-  assert.match(
-    sql,
-    /migration_id = 'pg-0051-automation-management-boundary'/,
-  );
+  assert.match(sql, /migration_id = 'pg-0051-automation-management-boundary'/);
 });
 
 test('advances capability v52 with a bounded Workflow Run history index', async () => {
@@ -1905,10 +1905,7 @@ test('advances capability v54 with durable Cluster log retention authority', asy
   assert.match(sql, /contract_version = 54/);
   assert.match(sql, /"run_attempt_log_retention":1/);
   assert.match(sql, /contract_version = 53/);
-  assert.match(
-    sql,
-    /migration_id = 'pg-0054-approval-management-boundary'/,
-  );
+  assert.match(sql, /migration_id = 'pg-0054-approval-management-boundary'/);
 });
 
 test('advances capability v55 with isolated strong Run management authority', async () => {
@@ -1932,8 +1929,26 @@ test('advances capability v55 with isolated strong Run management authority', as
   assert.match(sql, /contract_version = 55/);
   assert.match(sql, /"run_management_boundary":1/);
   assert.match(sql, /contract_version = 54/);
+  assert.match(sql, /migration_id = 'pg-0055-run-attempt-log-retention'/);
+});
+
+test('advances capability v56 with column-scoped Run stop authority', async () => {
+  const migration = migrationById('pg-0057-run-management-stop-boundary');
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
   assert.match(
     sql,
-    /migration_id = 'pg-0055-run-attempt-log-retention'/,
+    /GRANT UPDATE \(cancel_requested_at_ms, cancel_reason, version, event_sequence\) ON "ql3"\."runs" TO ql3_run_manager/,
   );
+  assert.doesNotMatch(sql, /GRANT UPDATE ON "ql3"\."runs" TO ql3_run_manager/);
+  assert.match(sql, /contract_version = 56/);
+  assert.match(sql, /"run_management_stop":1/);
+  assert.match(sql, /contract_version = 55/);
+  assert.match(sql, /migration_id = 'pg-0056-run-management-boundary'/);
 });

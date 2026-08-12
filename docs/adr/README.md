@@ -387,6 +387,7 @@
 | [ADR-0381](./ADR-0381-strong-local-manual-run-retry.md)                                                       | 强认证的 Local 手动 Run retry                                                                                                  | Accepted                                |
 | [ADR-0382](./ADR-0382-postgresql-cluster-manual-run-retry-authority.md)                                       | PostgreSQL Cluster 手动 Run retry 原子 Authority                                                                                | Accepted                                |
 | [ADR-0383](./ADR-0383-strong-cluster-run-management-plane.md)                                                 | 强认证的 Cluster Run Management Plane 与专用数据库角色                                                                           | Accepted                                |
+| [ADR-0384](./ADR-0384-strong-cluster-run-stop-management.md)                                                  | 强认证的 Cluster Run Stop Management 与列级数据库权限                                                                            | Accepted                                |
 
 ## 规则
 

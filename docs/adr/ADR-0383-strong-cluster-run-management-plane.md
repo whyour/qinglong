@@ -6,6 +6,8 @@
 - 前置决策：ADR-0039、ADR-0056、ADR-0356、ADR-0364、ADR-0366、ADR-0381、ADR-0382
 - Supersedes：ADR-0382 中“复用 `ql3_runtime` 且不新增 role/migration”的产品装配决策；ADR-0382 的共享语义与 PostgreSQL 原子事务仍有效
 
+> 后续说明：ADR-0384 在不改变本 ADR 的进程、认证、部署与 package 边界下增加 `run.stop`，并 supersede 本文“`ql3_run_manager` 不更新既有 Run”的最小权限定义；该角色改为只允许更新取消意图所需的四个列。
+
 ## 上下文
 
 ADR-0382 已证明 PostgreSQL 手动 Run retry 的原子语义与 HA 收敛，但现有 Cluster Control bearer 只能建立 `single_factor` User，不能承载会再次执行外部副作用的人工恢复操作。直接把 repository 接进通用 Cluster HTTP 会混合普通控制面与强人类认证 authority；继续使用 `ql3_runtime` 又会使常驻 runtime 持有本不需要的人工恢复权限。

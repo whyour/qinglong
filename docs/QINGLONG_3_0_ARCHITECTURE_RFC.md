@@ -11,6 +11,20 @@
 
 最新增量证据（2026-08-12）：
 
+- D-296/ADR-0384（已接受）
+  Cluster Run Management Plane 已在既有内聚领域内增加强认证 `run.stop`，不新增 package、进程、listener、Pool、timer、watcher、cache、
+  sidecar 或部署 overlay。`run.retry | run.stop` 共用 mTLS、purpose-bound OIDC、五分钟内 `multi_factor|hardware` User、固定
+  `/api/v3/runs/management` route 与 `operations/run-management` opt-in workload；默认 Edge、Standalone 和 Cluster base 的资源与
+  依赖闭包不变。服务端生成 canonical `qinglong/run-cancellation@v1` Event identity，并在单个 `SERIALIZABLE` 事务中重验
+  Project/RoleBinding fence、写 durable cancellation intent/Event 和 `run.stop` allowed audit；相同 mutation 精确重放，不同 mutation
+  不覆写，实际终态仍由既有 cancellation dispatch/fencing 收敛。PostgreSQL capability v56 / migration
+  `pg-0057-run-management-stop-boundary` 只向 `ql3_run_manager` 授予 Runs 的
+  `cancel_requested_at_ms/cancel_reason/version/event_sequence` 四列 UPDATE，表级 UPDATE 和 `status` 列 UPDATE 均保持禁止。
+  本阶段坚持由领域内聚、依赖方向和部署生命周期决定 package 粒度，拒绝为 stop 新增浅 package。完整 18-package clean build/test
+  与 backend 1,165 pass/2 conditional skip/0 fail；workspace 保持 18 package/1,071 source/1,053 nested，无 single-source 或 shallow
+  package；14 档 Local Profile artifact 全部 compatible，最小 Edge 仍为 53 loaded modules 且不含 Cluster/PostgreSQL。真实 PostgreSQL
+  18.4 arm64 physical HA 通过 123 gates、timeline `1→2`，覆盖双 Pool exact replay、原子审计复制、cancellation convergence 和同步冗余
+  恢复后的 promotion stop；报告 SHA-256 `2e5759d3b5e62cd571f6c31450aec0d7f611fa8cafd727b7bb25471792e83c29`，离线审计零 finding。
 - D-295/ADR-0383（已接受）
   Cluster 手动 `run.retry` 已从“仅有 PostgreSQL authority”推进到独立强认证产品面：能力内聚在既有 `@qinglong/cluster-admin`
   的 `run-management/` 目录，不新增 workspace package；只有 `QL3_PROFILE=cluster-admin` 且显式启用时才读取 mTLS/CRL、

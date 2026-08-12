@@ -31,6 +31,22 @@ const command = normalizeClusterRunManagementCommand({
   },
 });
 
+const stopCommand = normalizeClusterRunManagementCommand({
+  schemaVersion: 1,
+  operation: 'run.stop',
+  request: {
+    projectId: 'project-1',
+    runId: 'run-1',
+    requestId: 'request-stop-1',
+    auditEventId: '019f9400-0000-4000-8000-000000000021',
+    failureAuditEventId: '019f9400-0000-4000-8000-000000000022',
+    body: {
+      schema: 'qinglong/run-cancellation@v1',
+      mutationId: '019f9400-0000-4000-8000-000000000023',
+    },
+  },
+});
+
 function response(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -59,7 +75,10 @@ function response(overrides = {}) {
 }
 
 test('validates one low-sensitive retry response against the request fence', () => {
-  assert.deepEqual(validateClusterRunManagementClientResult(response(), command), response());
+  assert.deepEqual(
+    validateClusterRunManagementClientResult(response(), command),
+    response(),
+  );
 });
 
 test('rejects response target, execution placement and shape drift', () => {
@@ -71,6 +90,38 @@ test('rejects response target, execution placement and shape drift', () => {
   ]) {
     assert.throws(
       () => validateClusterRunManagementClientResult(candidate, command),
+      ClusterPluginPackageManagementClientRequestError,
+    );
+  }
+});
+
+test('validates one low-sensitive stop response against the request target', () => {
+  const value = {
+    schemaVersion: 1,
+    operation: 'run.stop',
+    stop: {
+      schema: 'qinglong/run-cancellation@v1',
+      status: 'accepted',
+      projectId: 'project-1',
+      runId: 'run-1',
+      runStatus: 'running',
+      runVersion: 5,
+      eventSequence: 7,
+      cancelRequestedAtMs: 1_000_000,
+      cancelReason: 'user',
+    },
+  };
+  assert.deepEqual(
+    validateClusterRunManagementClientResult(value, stopCommand),
+    value,
+  );
+  for (const drift of [
+    { ...value, stop: { ...value.stop, projectId: 'project-2' } },
+    { ...value, stop: { ...value.stop, runId: 'run-2' } },
+    { ...value, operation: 'run.retry' },
+  ]) {
+    assert.throws(
+      () => validateClusterRunManagementClientResult(drift, stopCommand),
       ClusterPluginPackageManagementClientRequestError,
     );
   }

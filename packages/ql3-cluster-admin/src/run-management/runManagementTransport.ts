@@ -4,6 +4,11 @@ import {
   type RunManualRetryResponseBody,
 } from '@qinglong/runtime-core/run-manual-retry';
 import {
+  createRunCancellationResponseBody,
+  parseRunCancellationRequestBody,
+  type RunCancellationResponseBody,
+} from '@qinglong/runtime-core/run-cancellation';
+import {
   normalizeSecurityPrincipal,
   type SecurityPrincipal,
 } from '@qinglong/runtime-core/security';
@@ -14,7 +19,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const STRONG_ASSURANCES = new Set(['multi_factor', 'hardware']);
 
-export type ClusterRunManagementCommand = Readonly<{
+export type ClusterRunManagementRetryCommand = Readonly<{
   schemaVersion: 1;
   operation: 'run.retry';
   request: Readonly<{
@@ -32,11 +37,41 @@ export type ClusterRunManagementCommand = Readonly<{
   }>;
 }>;
 
-export type ClusterRunManagementTransportResult = Readonly<{
+export type ClusterRunManagementStopCommand = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.stop';
+  request: Readonly<{
+    projectId: string;
+    runId: string;
+    requestId: string;
+    auditEventId: string;
+    failureAuditEventId: string;
+    body: Readonly<{
+      schema: 'qinglong/run-cancellation@v1';
+      mutationId: string;
+    }>;
+  }>;
+}>;
+
+export type ClusterRunManagementCommand =
+  | ClusterRunManagementRetryCommand
+  | ClusterRunManagementStopCommand;
+
+export type ClusterRunManagementRetryTransportResult = Readonly<{
   schemaVersion: 1;
   operation: 'run.retry';
   retry: Readonly<RunManualRetryResponseBody>;
 }>;
+
+export type ClusterRunManagementStopTransportResult = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.stop';
+  stop: Readonly<RunCancellationResponseBody>;
+}>;
+
+export type ClusterRunManagementTransportResult =
+  | ClusterRunManagementRetryTransportResult
+  | ClusterRunManagementStopTransportResult;
 
 export interface ClusterRunManagementAuthentication {
   authenticate(): Promise<Readonly<SecurityPrincipal> | null>;
@@ -85,7 +120,10 @@ function invalid(): never {
   throw new ClusterRunManagementTransportRequestError();
 }
 
-function exact(value: unknown, keys: readonly string[]): Record<string, unknown> {
+function exact(
+  value: unknown,
+  keys: readonly string[],
+): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid();
   const actual = Object.keys(value as object).sort();
   const expected = [...keys].sort();
@@ -112,30 +150,65 @@ export function normalizeClusterRunManagementCommand(
   value: unknown,
 ): Readonly<ClusterRunManagementCommand> {
   const envelope = exact(value, ['schemaVersion', 'operation', 'request']);
-  if (envelope.schemaVersion !== 1 || envelope.operation !== 'run.retry') invalid();
-  const request = exact(envelope.request, [
-    'projectId',
-    'sourceRunId',
-    'requestId',
-    'auditEventId',
-    'failureAuditEventId',
-    'body',
-  ]);
-  let body: ReturnType<typeof parseRunManualRetryRequestBody>;
-  try {
-    body = parseRunManualRetryRequestBody(request.body);
-  } catch {
-    invalid();
-  }
+  if (envelope.schemaVersion !== 1) invalid();
+  const operation = envelope.operation;
+  if (operation !== 'run.retry' && operation !== 'run.stop') invalid();
+  const request = exact(
+    envelope.request,
+    operation === 'run.retry'
+      ? [
+          'projectId',
+          'sourceRunId',
+          'requestId',
+          'auditEventId',
+          'failureAuditEventId',
+          'body',
+        ]
+      : [
+          'projectId',
+          'runId',
+          'requestId',
+          'auditEventId',
+          'failureAuditEventId',
+          'body',
+        ],
+  );
   const auditEventId = uuid(request.auditEventId);
   const failureAuditEventId = uuid(request.failureAuditEventId);
   if (auditEventId === failureAuditEventId) invalid();
+  if (operation === 'run.retry') {
+    let body: ReturnType<typeof parseRunManualRetryRequestBody>;
+    try {
+      body = parseRunManualRetryRequestBody(request.body);
+    } catch {
+      invalid();
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      operation,
+      request: Object.freeze({
+        projectId: identifier(request.projectId),
+        sourceRunId: identifier(request.sourceRunId),
+        requestId: identifier(request.requestId),
+        auditEventId,
+        failureAuditEventId,
+        body,
+      }),
+    });
+  }
+  let body: ReturnType<typeof parseRunCancellationRequestBody>;
+  try {
+    body = parseRunCancellationRequestBody(request.body);
+  } catch {
+    invalid();
+  }
+  uuid(body.mutationId);
   return Object.freeze({
     schemaVersion: 1,
-    operation: 'run.retry',
+    operation,
     request: Object.freeze({
       projectId: identifier(request.projectId),
-      sourceRunId: identifier(request.sourceRunId),
+      runId: identifier(request.runId),
       requestId: identifier(request.requestId),
       auditEventId,
       failureAuditEventId,
@@ -144,10 +217,12 @@ export function normalizeClusterRunManagementCommand(
   });
 }
 
-export function createClusterRunManagementTransport(options: Readonly<{
-  service: ClusterRunManagementService;
-  now?: () => number;
-}>): Readonly<ClusterRunManagementTransport> {
+export function createClusterRunManagementTransport(
+  options: Readonly<{
+    service: ClusterRunManagementService;
+    now?: () => number;
+  }>,
+): Readonly<ClusterRunManagementTransport> {
   if (
     !options ||
     typeof options !== 'object' ||
@@ -155,6 +230,7 @@ export function createClusterRunManagementTransport(options: Readonly<{
     Object.keys(options).some((key) => key !== 'service' && key !== 'now') ||
     !options.service ||
     typeof options.service.retry !== 'function' ||
+    typeof options.service.stop !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function')
   ) {
     throw new ClusterRunManagementTransportConfigurationError();
@@ -183,7 +259,10 @@ export function createClusterRunManagementTransport(options: Readonly<{
       }
       let principal: Readonly<SecurityPrincipal>;
       try {
-        principal = normalizeSecurityPrincipal(candidate as SecurityPrincipal, now());
+        principal = normalizeSecurityPrincipal(
+          candidate as SecurityPrincipal,
+          now(),
+        );
       } catch {
         throw new ClusterRunManagementTransportAuthenticationError();
       }
@@ -193,12 +272,28 @@ export function createClusterRunManagementTransport(options: Readonly<{
       ) {
         throw new ClusterRunManagementTransportAuthenticationError();
       }
-      const result = await options.service.retry({
+      if (command.operation === 'run.retry') {
+        const result = await options.service.retry({
+          projectId: command.request.projectId,
+          sourceRunId: command.request.sourceRunId,
+          mutationId: command.request.body.mutationId,
+          expectedRunVersion: command.request.body.expectedRunVersion,
+          expectedRunStatus: command.request.body.expectedRunStatus,
+          requestId: command.request.requestId,
+          auditEventId: command.request.auditEventId,
+          failureAuditEventId: command.request.failureAuditEventId,
+          principal,
+        });
+        return Object.freeze({
+          schemaVersion: 1,
+          operation: command.operation,
+          retry: createRunManualRetryResponseBody(result),
+        });
+      }
+      const result = await options.service.stop({
         projectId: command.request.projectId,
-        sourceRunId: command.request.sourceRunId,
+        runId: command.request.runId,
         mutationId: command.request.body.mutationId,
-        expectedRunVersion: command.request.body.expectedRunVersion,
-        expectedRunStatus: command.request.body.expectedRunStatus,
         requestId: command.request.requestId,
         auditEventId: command.request.auditEventId,
         failureAuditEventId: command.request.failureAuditEventId,
@@ -206,8 +301,8 @@ export function createClusterRunManagementTransport(options: Readonly<{
       });
       return Object.freeze({
         schemaVersion: 1,
-        operation: 'run.retry',
-        retry: createRunManualRetryResponseBody(result),
+        operation: command.operation,
+        stop: createRunCancellationResponseBody(result),
       });
     },
   });

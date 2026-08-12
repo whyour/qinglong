@@ -15,14 +15,15 @@ export interface PostgresSchemaContractFunction {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 55;
-  readonly migrationId: 'pg-0056-run-management-boundary';
+  readonly contractVersion: 56;
+  readonly migrationId: 'pg-0057-run-management-stop-boundary';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
     run_core: 1;
     run_attempt_log_retention: 1;
     run_management_boundary: 1;
+    run_management_stop: 1;
     run_dispatch_lease: 1;
     run_retry_policy: 1;
     project_policy: 1;
@@ -102,8 +103,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 55,
-    migrationId: 'pg-0056-run-management-boundary',
+    contractVersion: 56,
+    migrationId: 'pg-0057-run-management-stop-boundary',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -145,6 +146,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       run_core: 1,
       run_attempt_log_retention: 1,
       run_management_boundary: 1,
+      run_management_stop: 1,
       run_dispatch_lease: 1,
       run_retry_policy: 1,
       security_audit: 1,

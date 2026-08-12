@@ -65,6 +65,38 @@ function retryResult() {
   };
 }
 
+function stopCommand(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    operation: 'run.stop',
+    request: {
+      projectId: 'project-1',
+      runId: 'run-1',
+      requestId: 'request-stop-1',
+      auditEventId: '019f9300-0000-4000-8000-000000000021',
+      failureAuditEventId: '019f9300-0000-4000-8000-000000000022',
+      body: {
+        schema: 'qinglong/run-cancellation@v1',
+        mutationId: '019f9300-0000-4000-8000-000000000023',
+      },
+      ...overrides,
+    },
+  };
+}
+
+function stopResult() {
+  return {
+    status: 'accepted',
+    projectId: 'project-1',
+    runId: 'run-1',
+    runStatus: 'running',
+    runVersion: 5,
+    eventSequence: 7,
+    cancelRequestedAtMs: NOW,
+    cancelReason: 'user',
+  };
+}
+
 test('routes one exact strong User retry and emits the shared response', async () => {
   const calls = [];
   const transport = createClusterRunManagementTransport({
@@ -73,6 +105,9 @@ test('routes one exact strong User retry and emits the shared response', async (
       async retry(request) {
         calls.push(request);
         return retryResult();
+      },
+      async stop() {
+        return stopResult();
       },
     },
   });
@@ -92,6 +127,36 @@ test('routes one exact strong User retry and emits the shared response', async (
   });
 });
 
+test('routes one exact strong User stop and emits the shared response', async () => {
+  const calls = [];
+  const transport = createClusterRunManagementTransport({
+    now: () => NOW,
+    service: {
+      async retry() {
+        return retryResult();
+      },
+      async stop(request) {
+        calls.push(request);
+        return stopResult();
+      },
+    },
+  });
+  const result = await transport.execute(stopCommand(), {
+    authenticate: async () => principal({ assurance: 'hardware' }),
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].runId, 'run-1');
+  assert.equal(calls[0].mutationId, stopCommand().request.body.mutationId);
+  assert.deepEqual(result, {
+    schemaVersion: 1,
+    operation: 'run.stop',
+    stop: {
+      schema: 'qinglong/run-cancellation@v1',
+      ...stopResult(),
+    },
+  });
+});
+
 test('rejects weak or non-User identity before service authority', async () => {
   let called = false;
   const transport = createClusterRunManagementTransport({
@@ -100,6 +165,9 @@ test('rejects weak or non-User identity before service authority', async () => {
       async retry() {
         called = true;
         return retryResult();
+      },
+      async stop() {
+        return stopResult();
       },
     },
   });
@@ -121,7 +189,11 @@ test('rejects weak or non-User identity before service authority', async () => {
 
 test('rejects widened commands and ambiguous audit identity', () => {
   assert.throws(
-    () => normalizeClusterRunManagementCommand({ ...command(), principal: principal() }),
+    () =>
+      normalizeClusterRunManagementCommand({
+        ...command(),
+        principal: principal(),
+      }),
     ClusterRunManagementTransportRequestError,
   );
   assert.throws(
@@ -134,7 +206,18 @@ test('rejects widened commands and ambiguous audit identity', () => {
   assert.throws(
     () =>
       normalizeClusterRunManagementCommand(
-        command({ body: { ...command().request.body, expectedRunStatus: 'lost' } }),
+        command({
+          body: { ...command().request.body, expectedRunStatus: 'lost' },
+        }),
+      ),
+    ClusterRunManagementTransportRequestError,
+  );
+  assert.throws(
+    () =>
+      normalizeClusterRunManagementCommand(
+        stopCommand({
+          body: { ...stopCommand().request.body, mutationId: 'weak' },
+        }),
       ),
     ClusterRunManagementTransportRequestError,
   );

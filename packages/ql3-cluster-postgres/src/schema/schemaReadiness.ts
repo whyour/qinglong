@@ -119,6 +119,11 @@ interface FunctionPrivilegeRow extends Record<string, unknown> {
   isOwner: unknown;
 }
 
+interface ColumnPrivilegeRow extends Record<string, unknown> {
+  columnName: unknown;
+  updateAllowed: unknown;
+}
+
 const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
   schema_migrations: Object.freeze({
     select: true,
@@ -1315,13 +1320,13 @@ const REQUIRED_AUTOMATION_MANAGER_PRIVILEGES: RequiredPrivileges =
                 update: true,
               }
             : name === 'security_audit_events' ||
-                name === 'task_definition_revisions' ||
-                name === 'task_execution_revisions' ||
-                name === 'trigger_revisions'
+              name === 'task_definition_revisions' ||
+              name === 'task_execution_revisions' ||
+              name === 'trigger_revisions'
             ? { ...NO_TABLE_PRIVILEGES, select: true, insert: true }
             : name === 'task_definitions' ||
-                name === 'triggers' ||
-                name === 'trigger_schedules'
+              name === 'triggers' ||
+              name === 'trigger_schedules'
             ? {
                 ...NO_TABLE_PRIVILEGES,
                 select: true,
@@ -1376,9 +1381,9 @@ const REQUIRED_RUN_MANAGER_PRIVILEGES: RequiredPrivileges = Object.freeze(
           name === 'task_execution_revisions'
           ? { ...NO_TABLE_PRIVILEGES, select: true }
           : name === 'runs' ||
-              name === 'run_attempts' ||
-              name === 'run_events' ||
-              name === 'security_audit_events'
+            name === 'run_attempts' ||
+            name === 'run_events' ||
+            name === 'security_audit_events'
           ? { ...NO_TABLE_PRIVILEGES, select: true, insert: true }
           : name === 'plugin_package_identity_keyset_ledger'
           ? {
@@ -1415,7 +1420,7 @@ const REQUIRED_WORKER_CREDENTIAL_MANAGER_PRIVILEGES: RequiredPrivileges =
                 update: true,
               }
             : name === 'worker_credential_management_quota_buckets' ||
-                name === 'plugin_package_identity_keyset_ledger'
+              name === 'plugin_package_identity_keyset_ledger'
             ? {
                 ...NO_TABLE_PRIVILEGES,
                 select: true,
@@ -2042,6 +2047,56 @@ ORDER BY requested.function_name
   }
 }
 
+async function assertRunManagerColumnPrivileges(
+  queryable: PostgresMigrationQueryable,
+  contract: PostgresSchemaContract,
+): Promise<void> {
+  const run = contract.tables.find(({ name }) => name === 'runs');
+  if (!run) {
+    throw new PostgresSchemaReadinessError('run_manager_role_invalid', [
+      'missing-runs-contract',
+    ]);
+  }
+  const result = await queryable.query<ColumnPrivilegeRow>(
+    `
+SELECT
+  requested.column_name AS "columnName",
+  has_column_privilege(
+    current_user,
+    format('%I.%I', $1::text, 'runs'),
+    requested.column_name,
+    'UPDATE'
+  ) AS "updateAllowed"
+FROM unnest($2::text[]) AS requested(column_name)
+ORDER BY requested.column_name
+    `.trim(),
+    [contract.schema, run.columns],
+  );
+  const allowed = new Set([
+    'cancel_requested_at_ms',
+    'cancel_reason',
+    'version',
+    'event_sequence',
+  ]);
+  const actual = new Map(result.rows.map((row) => [row.columnName, row]));
+  const findings: string[] = [];
+  for (const columnName of run.columns) {
+    const row = actual.get(columnName);
+    if (!row || row.updateAllowed !== allowed.has(columnName)) {
+      findings.push(`column-update-privilege:runs.${columnName}`);
+    }
+  }
+  if (actual.size !== run.columns.length) {
+    findings.push('column-privilege-row-count:runs');
+  }
+  if (findings.length > 0) {
+    throw new PostgresSchemaReadinessError(
+      'run_manager_role_invalid',
+      sorted(findings),
+    );
+  }
+}
+
 export async function assertPostgresSchemaReady(
   queryable: PostgresMigrationQueryable,
   contract: PostgresSchemaContract = postgresqlControlSchemaContract,
@@ -2177,6 +2232,7 @@ export async function assertPostgresRunManagerSchemaReady(
     REQUIRED_RUN_MANAGER_FUNCTION_PRIVILEGES,
     'run_manager_role_invalid',
   );
+  await assertRunManagerColumnPrivileges(queryable, contract);
   return Object.freeze({
     ready: true,
     ...server,
