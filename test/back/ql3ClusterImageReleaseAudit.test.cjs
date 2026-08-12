@@ -27,6 +27,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       nativeArchitectures: ['amd64', 'arm64'],
       runtimeInventory: true,
       clusterAdminProductFacade: true,
+      clusterAdminOperatorContext: true,
       ociAttestations: true,
       osVulnerabilityScan: {
         scanner: 'trivy@0.70.0',
@@ -107,6 +108,21 @@ test('rejects removal of the native Cluster Admin product facade gate', () => {
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
     /bounded product facade contract/,
+  );
+});
+
+test('rejects a Cluster Admin live gate that omits operator context injection', () => {
+  const contract = fs.readFileSync(
+    path.join(root, 'scripts/ql3-cluster-admin-product-live-contract.cjs'),
+    'utf8',
+  );
+  assert.throws(
+    () =>
+      auditClusterImageCiWorkflow(
+        ciSource,
+        contract.replace('operatorContext: true', 'operatorContext: false'),
+      ),
+    /owner-private operator context injection/,
   );
 });
 

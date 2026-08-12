@@ -39,7 +39,15 @@ function requireExactOccurrences(source, pattern, expected, finding) {
   }
 }
 
-function auditClusterImageCiWorkflow(source) {
+function auditClusterImageCiWorkflow(
+  source,
+  adminProductLiveContract = readBoundedText(
+    path.join(
+      DEFAULT_ROOT,
+      'scripts/ql3-cluster-admin-product-live-contract.cjs',
+    ),
+  ),
+) {
   const workflow = yaml.load(source);
   const clusterImageJob = workflow?.jobs?.['cluster-image'];
   const localImageJob = workflow?.jobs?.['local-image'];
@@ -280,6 +288,11 @@ function auditClusterImageCiWorkflow(source) {
     'native admin image CI must run the bounded product facade contract',
   );
   requirePattern(
+    adminProductLiveContract,
+    /runOperatorContextContract\(image\);[\s\S]*operatorContext: true/,
+    'native admin image contract must verify owner-private operator context injection',
+  );
+  requirePattern(
     source,
     /^  image-oci:\s*$/m,
     'QL3 CI must contain a multi-architecture OCI evidence job',
@@ -320,6 +333,7 @@ function auditClusterImageCiWorkflow(source) {
     nativeArchitectures: ['amd64', 'arm64'],
     runtimeInventory: true,
     clusterAdminProductFacade: true,
+    clusterAdminOperatorContext: true,
     ociAttestations: true,
     osVulnerabilityScan: {
       scanner: 'trivy@0.70.0',
@@ -926,6 +940,12 @@ function auditClusterImageRelease(root = DEFAULT_ROOT) {
   const resolvedRoot = path.resolve(root);
   const ci = auditClusterImageCiWorkflow(
     readBoundedText(path.join(resolvedRoot, CI_WORKFLOW_PATH)),
+    readBoundedText(
+      path.join(
+        resolvedRoot,
+        'scripts/ql3-cluster-admin-product-live-contract.cjs',
+      ),
+    ),
   );
   const release = auditReleaseWorkflow(
     readBoundedText(path.join(resolvedRoot, RELEASE_WORKFLOW_PATH)),

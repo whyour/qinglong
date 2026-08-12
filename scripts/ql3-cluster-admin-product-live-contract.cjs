@@ -70,10 +70,77 @@ function runImage(image, args) {
     '--cpus',
     '0.25',
     '--tmpfs',
-    '/tmp:rw,noexec,nosuid,nodev,size=8m,mode=700',
+    '/tmp:rw,noexec,nosuid,nodev,size=8m,mode=700,uid=10001,gid=10001',
     image,
     ...args,
   ]);
+}
+
+function runOperatorContextContract(image) {
+  const source = String.raw`
+const { spawnSync } = require('node:child_process');
+const { writeFileSync } = require('node:fs');
+const facade = '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js';
+const config = '/tmp/run-client.json';
+const command = '/tmp/command.json';
+const assertion = '/tmp/assertion.jwt';
+const context = '/tmp/operator-context.json';
+for (const [file, contents] of [
+  [config, '{}'],
+  [command, '{}'],
+  [assertion, 'a.b.c'],
+  [context, JSON.stringify({ schemaVersion: 1, commands: { run: { configFile: config } } })],
+]) writeFileSync(file, contents, { mode: 0o600 });
+const injected = spawnSync(process.execPath, [facade, 'run', '--context=' + context, '--command=' + command, '--assertion=' + assertion], { encoding: 'utf8' });
+let injectedFailure;
+try { injectedFailure = JSON.parse(injected.stderr); } catch { process.exit(21); }
+if (injected.status !== 1 || injectedFailure.code !== 'QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_CONFIG_INVALID' || injected.stdout !== '') process.exit(22);
+writeFileSync(context, JSON.stringify({ schemaVersion: 1, commands: { run: { configFile: config, assertionFile: assertion } } }), { mode: 0o600 });
+const rejected = spawnSync(process.execPath, [facade, 'run', '--context=' + context, '--command=' + command, '--assertion=' + assertion], { encoding: 'utf8' });
+let rejectedFailure;
+try { rejectedFailure = JSON.parse(rejected.stderr); } catch { process.exit(23); }
+if (rejected.status !== 78 || rejectedFailure.code !== 'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID' || rejected.stdout !== '' || rejected.stderr.includes('/tmp/') || rejected.stderr.includes('assertion.jwt')) process.exit(24);
+process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, secretFieldsRejected: true }));
+`;
+  const output = docker([
+    'run',
+    '--rm',
+    '--read-only',
+    '--network',
+    'none',
+    '--cap-drop',
+    'ALL',
+    '--security-opt',
+    'no-new-privileges',
+    '--user',
+    '10001:10001',
+    '--pids-limit',
+    '32',
+    '--memory',
+    '128m',
+    '--cpus',
+    '0.25',
+    '--tmpfs',
+    '/tmp:rw,noexec,nosuid,nodev,size=8m,mode=700,uid=10001,gid=10001',
+    '--entrypoint',
+    'node',
+    image,
+    '-e',
+    source,
+  ]);
+  let result;
+  try {
+    result = JSON.parse(output);
+  } catch {
+    fail('operator context result is invalid');
+  }
+  if (
+    result?.schemaVersion !== 1 ||
+    result?.injected !== true ||
+    result?.secretFieldsRejected !== true
+  ) {
+    fail('operator context contract drifted');
+  }
 }
 
 function main() {
@@ -114,6 +181,7 @@ function main() {
   }
   const version = runImage(image, ['--version']).trim();
   if (version !== '3.0.0-alpha.0') fail('product version contract drifted');
+  runOperatorContextContract(image);
 
   process.stdout.write(
     `${JSON.stringify({
@@ -123,6 +191,7 @@ function main() {
       user: fact.Config.User,
       imageBytes: fact.Size,
       commandCount: COMMANDS.length,
+      operatorContext: true,
       isolation: Object.freeze({
         readOnlyRoot: true,
         network: 'none',

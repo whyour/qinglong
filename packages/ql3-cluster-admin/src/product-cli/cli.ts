@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { constants } from 'node:os';
 
 import { resolveQingLong3ClusterProductCommand } from './productCommand';
+import { QingLong3ClusterProductContextError } from './productContext';
 
 const FORWARDED_SIGNALS = Object.freeze([
   'SIGINT',
@@ -124,7 +125,25 @@ function main(argv: readonly string[]): void {
       return;
     }
     invoke(resolution.targetFilePath, resolution.argv);
-  } catch {
+  } catch (error) {
+    if (
+      error instanceof QingLong3ClusterProductContextError ||
+      (error !== null &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID')
+    ) {
+      process.stderr.write(
+        `${JSON.stringify(
+          lowSensitivityFailure(
+            'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID',
+            'QingLong 3.0 Cluster operator context is invalid',
+          ),
+        )}\n`,
+      );
+      process.exitCode = 78;
+      return;
+    }
     process.stderr.write(
       `${JSON.stringify(
         lowSensitivityFailure(

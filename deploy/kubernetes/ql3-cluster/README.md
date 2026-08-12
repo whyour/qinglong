@@ -49,6 +49,26 @@ and garbage collection remain separate explicit binaries and Kubernetes
 operations. Existing Jobs continue to name their exact binary and do not
 inherit facade authority.
 
+Workstation operators may pass an explicit owner-private context to reuse only
+stable client paths:
+
+```sh
+chmod 600 /secure/qinglong3/operator-context.json
+ql3-cluster-admin run \
+  --context=/secure/qinglong3/operator-context.json \
+  --command=/secure/qinglong3/run-command.json \
+  --assertion=/secure/qinglong3/strong-user-assertion.jwt
+```
+
+Start from `operator-context.example.json`, copy it outside the repository and
+replace only the required entries. The context and every referenced file must
+be canonical, owned by the current UID and mode `0600`. It may contain only a
+`configFile` per command and, for `package-kubernetes`, one `kubernetesFile`.
+Short-lived assertions, per-operation command files, private keys and their
+contents are deliberately forbidden. There is no home-directory, environment
+or ambient Kubernetes context discovery. Existing explicit `--config` calls
+remain supported when `--context` is absent.
+
 The runtime image installs only the 43 external packages reachable from the
 five exact production roots in its production-only lock plus `runtime-core`,
 `cluster-postgres` and `cluster-control`: 46 runtime components in total. The

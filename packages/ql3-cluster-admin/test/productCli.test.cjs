@@ -22,12 +22,47 @@ const {
   clusterProductSignalExitCode,
   forwardClusterProductSignals,
 } = require('../dist/product-cli/cli.js');
+const {
+  loadQingLong3ClusterProductContext,
+  resolveQingLong3ClusterProductContextArguments,
+} = require('../dist/product-cli/productContext.js');
 
 function runCli(args) {
   return spawnSync(process.execPath, [cliPath, ...args], {
     cwd: packageRoot,
     encoding: 'utf8',
   });
+}
+
+function privateFile(directory, name, contents) {
+  const filePath = path.join(directory, name);
+  fs.writeFileSync(filePath, contents, { mode: 0o600 });
+  return filePath;
+}
+
+function contextFixture(t) {
+  const directory = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-cluster-context-')),
+  );
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const runConfig = privateFile(directory, 'run-client.json', '{}');
+  const packageConfig = privateFile(directory, 'package-client.json', '{}');
+  const kubernetes = privateFile(directory, 'kubernetes.json', '{}');
+  const contextFile = privateFile(
+    directory,
+    'operator-context.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      commands: {
+        run: { configFile: runConfig },
+        'package-kubernetes': {
+          configFile: packageConfig,
+          kubernetesFile: kubernetes,
+        },
+      },
+    }),
+  );
+  return { directory, runConfig, packageConfig, kubernetes, contextFile };
 }
 
 test('catalog exposes only reviewed remote clients from the same package', () => {
@@ -128,6 +163,162 @@ test('resolves only static remote-client targets and preserves opaque arguments'
   }
 });
 
+test('injects only stable paths from an explicit owner-private operator context', (t) => {
+  const fixture = contextFixture(t);
+  const context = loadQingLong3ClusterProductContext(fixture.contextFile);
+  assert.deepEqual(context, {
+    schemaVersion: 1,
+    commands: {
+      run: { configFile: fixture.runConfig },
+      'package-kubernetes': {
+        configFile: fixture.packageConfig,
+        kubernetesFile: fixture.kubernetes,
+      },
+    },
+  });
+  assert.equal(Object.isFrozen(context), true);
+  assert.equal(Object.isFrozen(context.commands), true);
+  assert.equal(Object.isFrozen(context.commands.run), true);
+
+  const run = resolveQingLong3ClusterProductCommand(
+    [
+      'run',
+      `--context=${fixture.contextFile}`,
+      '--command=/private/command.json',
+      '--assertion=/private/assertion.jwt',
+    ],
+    moduleDirectory,
+  );
+  assert.equal(run.kind, 'invoke');
+  assert.deepEqual(run.argv, [
+    `--config=${fixture.runConfig}`,
+    '--command=/private/command.json',
+    '--assertion=/private/assertion.jwt',
+  ]);
+
+  const tunnel = resolveQingLong3ClusterProductContextArguments(
+    fixture.contextFile,
+    'package-kubernetes',
+    ['--command=/private/command.json', '--assertion=/private/assertion.jwt'],
+  );
+  assert.deepEqual(tunnel, [
+    `--config=${fixture.packageConfig}`,
+    `--kubernetes=${fixture.kubernetes}`,
+    '--command=/private/command.json',
+    '--assertion=/private/assertion.jwt',
+  ]);
+});
+
+test('operator context rejects weak files, unknown or secret fields and argument conflicts', (t) => {
+  const fixture = contextFixture(t);
+  const cases = [
+    { schemaVersion: 1, commands: {} },
+    { schemaVersion: 2, commands: { run: { configFile: fixture.runConfig } } },
+    {
+      schemaVersion: 1,
+      commands: { unknown: { configFile: fixture.runConfig } },
+    },
+    {
+      schemaVersion: 1,
+      commands: {
+        run: {
+          configFile: fixture.runConfig,
+          assertionFile: '/private/assertion.jwt',
+        },
+      },
+    },
+    {
+      schemaVersion: 1,
+      commands: {
+        run: { configFile: fixture.runConfig, privateKeyFile: '/private/key' },
+      },
+    },
+    {
+      schemaVersion: 1,
+      commands: {
+        'package-kubernetes': { configFile: fixture.packageConfig },
+      },
+    },
+  ];
+  for (const [index, value] of cases.entries()) {
+    const filePath = privateFile(
+      fixture.directory,
+      `invalid-${index}.json`,
+      JSON.stringify(value),
+    );
+    assert.throws(
+      () => loadQingLong3ClusterProductContext(filePath),
+      /operator context is invalid/,
+    );
+  }
+
+  const publicContext = privateFile(
+    fixture.directory,
+    'public.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      commands: { run: { configFile: fixture.runConfig } },
+    }),
+  );
+  fs.chmodSync(publicContext, 0o644);
+  assert.throws(() => loadQingLong3ClusterProductContext(publicContext));
+
+  const symlink = path.join(fixture.directory, 'context-link.json');
+  fs.symlinkSync(fixture.contextFile, symlink);
+  assert.throws(() => loadQingLong3ClusterProductContext(symlink));
+
+  const binaryRejected = runCli([
+    'run',
+    `--context=${publicContext}`,
+    '--command=/private/command.json',
+    '--assertion=/private/assertion.jwt',
+  ]);
+  assert.equal(binaryRejected.status, 78);
+  assert.equal(binaryRejected.stdout, '');
+  assert.deepEqual(JSON.parse(binaryRejected.stderr), {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-product-cli',
+    code: 'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID',
+    message: 'QingLong 3.0 Cluster operator context is invalid',
+  });
+  assert.equal(binaryRejected.stderr.includes(fixture.directory), false);
+
+  assert.throws(
+    () =>
+      resolveQingLong3ClusterProductCommand(
+        [
+          'approval',
+          `--context=${fixture.contextFile}`,
+          '--command=/private/command.json',
+          '--assertion=/private/assertion.jwt',
+        ],
+        moduleDirectory,
+      ),
+    /operator context is invalid/,
+  );
+
+  for (const args of [
+    ['run', '--context'],
+    ['run', '--context='],
+    [
+      'run',
+      `--context=${fixture.contextFile}`,
+      `--context=${fixture.contextFile}`,
+    ],
+  ]) {
+    const result = resolveQingLong3ClusterProductCommand(args, moduleDirectory);
+    assert.equal(result.kind, 'invalid');
+  }
+  assert.throws(
+    () =>
+      resolveQingLong3ClusterProductCommand(
+        ['run', `--context=${fixture.contextFile}`, '--config'],
+        moduleDirectory,
+      ),
+    /operator context is invalid/,
+  );
+});
+
 test('rejects symlink targets and package manifests', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-cluster-product-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -169,6 +360,7 @@ test('binary exposes help/version and delegates without a shell', () => {
   const help = runCli(['--help']);
   assert.equal(help.status, 0);
   assert.match(help.stdout, /^Usage: ql3-cluster-admin <command>/);
+  assert.match(help.stdout, /--context=\/absolute\/operator-context\.json/);
   assert.equal(help.stderr, '');
 
   const version = runCli(['--version']);

@@ -392,6 +392,7 @@
 | [ADR-0386](./ADR-0386-cluster-run-management-kubernetes-live-evidence.md)                                     | Cluster Run Management Kubernetes 多节点实证                                                                                       | Accepted |
 | [ADR-0387](./ADR-0387-local-api-cancellation-linux-live-evidence.md)                                           | Local API Cancellation Linux 组合实证门                                                                                             | Accepted |
 | [ADR-0388](./ADR-0388-bounded-unified-cluster-product-cli.md)                                                  | 有界统一 Cluster Operator 产品 CLI                                                                                                  | Accepted |
+| [ADR-0389](./ADR-0389-owner-private-cluster-operator-context.md)                                               | Owner-private Cluster Operator Context                                                                                               | Accepted |
 
 ## 规则
 

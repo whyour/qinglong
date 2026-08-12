@@ -6,11 +6,25 @@
 - 目标版本：QingLong 3.x
 - 作者：QingLong Maintainers
 - 创建日期：2026-07-17
-- 最后更新：2026-08-12
+- 最后更新：2026-08-13
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-12）：
+最新增量证据（2026-08-13）：
 
+- D-301/ADR-0389（已接受）
+  `ql3-cluster-admin` 现在可通过显式 `--context=/absolute/operator-context.json` 复用七个远程 client 的稳定路径，同时保持每次
+  command 与短生命周期强 assertion 必须显式传入。schema v1 只允许 catalog command → `configFile`，Kubernetes tunnel 精确多一个
+  `kubernetesFile`；assertion、command、私钥、token、endpoint 内容和默认命令字段全部禁止。context 及引用文件必须 absolute、canonical、
+  当前 UID、non-symlink regular、精确 `0600`；reader 使用 `O_NOFOLLOW|O_CLOEXEC`、descriptor 前后 identity/size 复验、64 KiB/4,096-byte
+  上限与 buffer 清零。无 home/XDG/env/ambient Kubernetes 发现，context 与显式 config/tunnel 参数冲突失败关闭；旧 opaque argv 保持兼容。
+  实现继续位于既有 `cluster-admin/product-cli`，不新增 package、依赖、listener、timer、watcher、cache、Secret 或 workload，Local/Edge、
+  Cluster Control 与 Worker 零导入。专项 70/70；真实 arm64 Admin image 为 330,453,309 bytes，较 D-300 增加 9,237 bytes，并在
+  `10001:10001`、read-only root、network none、drop ALL、no-new-privileges、0.25 CPU、128 MiB/32 PIDs 下验证路径注入和敏感字段拒绝。
+  workspace 保持 18 package，Cluster Admin 97 source 中 96 nested/1 root，无 single-source/shallow package。Cluster Admin 完整 package 为
+  293 pass/2 条件 skip，18-package clean build/test 退出 0，backend 为 1,186 pass/2 skip；五项边界审计零 finding。14 个 Local Profile
+  artifact 全部 compatible，最小 Edge 2,467,343 bytes、最大 Standalone MCP 7,168,978 bytes，均与 D-300 对应制品字节数一致。
+  PostgreSQL 18.4 arm64 HA 123 项 gate 全绿、timeline `1→2`，证据 SHA-256 为
+  `55707a4b59483a2281e0a338e06336eef0ce2ba5126efbdfe4dad6a88a466157`，离线审计及 Docker 资源清理通过。完整回归见 ADR-0389。
 - D-300/ADR-0388（已接受）
   Cluster operator 已获得统一 `ql3-cluster-admin <command>` 产品入口，能力内聚在既有 `@qinglong/cluster-admin/product-cli`，不新增
   package 或依赖。catalog 只允许 Package（直连/Kubernetes tunnel）、Worker Credential、Approval、Run、Automation、Model

@@ -101,6 +101,44 @@ test('requires the bounded Cluster product facade and image entrypoint', () => {
   );
 });
 
+test('ships a path-only Cluster operator context example without durable authority', () => {
+  const example = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        ROOT,
+        'deploy/kubernetes/ql3-cluster/operator-context.example.json',
+      ),
+      'utf8',
+    ),
+  );
+  assert.deepEqual(Object.keys(example).sort(), ['commands', 'schemaVersion']);
+  assert.equal(example.schemaVersion, 1);
+  assert.deepEqual(Object.keys(example.commands).sort(), [
+    'approval',
+    'automation',
+    'model-credential',
+    'package',
+    'package-kubernetes',
+    'run',
+    'worker-credential',
+  ]);
+  for (const [name, command] of Object.entries(example.commands)) {
+    assert.deepEqual(
+      Object.keys(command).sort(),
+      name === 'package-kubernetes'
+        ? ['configFile', 'kubernetesFile']
+        : ['configFile'],
+    );
+    for (const value of Object.values(command)) {
+      assert.match(value, /^\/secure\/qinglong3\/[a-z0-9-]+\.json$/);
+    }
+  }
+  assert.doesNotMatch(
+    JSON.stringify(example),
+    /assertion|commandFile|privateKey|token|password|secret/i,
+  );
+});
+
 test('keeps Cluster AI optional with projected authority and an independent digest', () => {
   const defaultEnabled = auditClusterDeployment({
     root: ROOT,

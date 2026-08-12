@@ -1,6 +1,8 @@
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
+import { resolveQingLong3ClusterProductContextArguments } from './productContext';
+
 export interface QingLong3ClusterProductCommandDefinition {
   readonly name: string;
   readonly binary: string;
@@ -171,6 +173,8 @@ export function qingLong3ClusterProductHelp(): string {
     commands,
     '',
     'Use `ql3-cluster-admin <command> --help` for command-specific usage.',
+    'Use `--context=/absolute/operator-context.json` to inject only stable client paths.',
+    'Command and short-lived assertion files always remain explicit per invocation.',
     'Server, migration, recovery, executor and key-custody authorities remain isolated.',
   ].join('\n');
 }
@@ -208,11 +212,36 @@ export function resolveQingLong3ClusterProductCommand(
       message: 'unknown QingLong 3.0 Cluster product command',
     });
   }
+  const commandArguments = argv.slice(1);
+  const contextArguments = commandArguments.filter(
+    (argument) => argument === '--context' || argument.startsWith('--context='),
+  );
+  if (
+    contextArguments.length > 1 ||
+    contextArguments[0] === '--context' ||
+    contextArguments[0] === '--context='
+  ) {
+    return Object.freeze({
+      kind: 'invalid',
+      code: 'QL3_CLUSTER_PRODUCT_CLI_USAGE_INVALID',
+      message: 'QingLong 3.0 Cluster product context option is invalid',
+    });
+  }
+  const forwardedArguments =
+    contextArguments.length === 0
+      ? Object.freeze(commandArguments)
+      : resolveQingLong3ClusterProductContextArguments(
+          contextArguments[0]!.slice('--context='.length),
+          command.name,
+          commandArguments.filter(
+            (argument) => argument !== contextArguments[0],
+          ),
+        );
   const { distRoot } = installationPaths(moduleDirectory);
   return Object.freeze({
     kind: 'invoke',
     command,
     targetFilePath: resolveInstalledTarget(distRoot, command),
-    argv: Object.freeze(argv.slice(1)),
+    argv: forwardedArguments,
   });
 }
