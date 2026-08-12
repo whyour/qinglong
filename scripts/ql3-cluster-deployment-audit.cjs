@@ -68,6 +68,68 @@ function yamlDocuments(readFile, filePath) {
   return parsed;
 }
 
+function kubernetesYamlFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const filePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return kubernetesYamlFiles(filePath);
+    return entry.isFile() && /\.ya?ml$/u.test(entry.name) ? [filePath] : [];
+  });
+}
+
+function podSpecFor(document) {
+  if (document?.kind === 'CronJob') {
+    return document.spec?.jobTemplate?.spec?.template?.spec;
+  }
+  if (
+    ['DaemonSet', 'Deployment', 'Job', 'StatefulSet'].includes(document?.kind)
+  ) {
+    return document.spec?.template?.spec;
+  }
+  return undefined;
+}
+
+function assertClusterAdminImageCommands(readFile, root, findings) {
+  const kubernetesRoot = path.join(root, 'deploy/kubernetes/ql3-cluster');
+  let references = 0;
+  for (const filePath of kubernetesYamlFiles(kubernetesRoot)) {
+    for (const document of yamlDocuments(readFile, filePath)) {
+      const podSpec = podSpecFor(document);
+      for (const section of ['initContainers', 'containers']) {
+        for (const container of podSpec?.[section] ?? []) {
+          if (container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0') {
+            continue;
+          }
+          references += 1;
+          if (
+            !Array.isArray(container.command) ||
+            container.command.length === 0
+          ) {
+            findings.push(
+              finding(
+                'QL3_CLUSTER_ADMIN_IMAGE_COMMAND_IMPLICIT',
+                `${path.relative(root, filePath)} ${document.kind}/${
+                  document.metadata?.name ?? 'unnamed'
+                } ${section}/${
+                  container.name ?? 'unnamed'
+                } must explicitly override the Cluster Admin image command`,
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+  if (references === 0) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_ADMIN_IMAGE_REFERENCE_MISSING',
+        'The Kubernetes deployment must contain reviewed Cluster Admin image references',
+      ),
+    );
+  }
+  return references;
+}
+
 function namedResource(resources, kind, name) {
   return resources.find(
     (resource) => resource?.kind === kind && resource?.metadata?.name === name,
@@ -294,6 +356,7 @@ function assertExactExternalClosure(readFile, root, findings) {
     path.join(root, 'packages/ql3-cluster-admin/package.json'),
   );
   if (
+    adminManifest.bin?.['ql3-cluster-admin'] !== 'dist/product-cli/cli.js' ||
     adminManifest.bin?.['ql3-plugin-package-recover'] !==
       'dist/plugin-package/recovery/pluginPackageRecoveryCli.js' ||
     adminManifest.bin?.['ql3-plugin-package-manage'] !==
@@ -335,7 +398,7 @@ function assertExactExternalClosure(readFile, root, findings) {
     findings.push(
       finding(
         'QL3_CLUSTER_PLUGIN_RECOVERY_ENTRYPOINT_MISSING',
-        'cluster-admin must publish the reviewed Package and Worker management and executor entrypoints',
+        'cluster-admin must publish the reviewed product facade, Package and Worker management and executor entrypoints',
       ),
     );
   }
@@ -465,7 +528,7 @@ function assertDockerfile(readFile, root, findings) {
     '/workspace/packages/ql3-cluster-postgres/dist',
     '/workspace/packages/ql3-cluster-admin/dist',
     'USER 10001:10001',
-    'ENTRYPOINT ["node", "/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/plugin-package/recovery/pluginPackageRecoveryCli.js"]',
+    'ENTRYPOINT ["node", "/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js"]',
   ];
   for (const value of adminRequired) {
     if (!adminDockerfile.includes(value)) {
@@ -5014,10 +5077,16 @@ function auditClusterDeployment(options = {}) {
   const root = path.resolve(options.root ?? path.join(__dirname, '..'));
   const readFile = options.readFile ?? fs.readFileSync;
   const findings = [];
+  let clusterAdminImageReferences = 0;
   try {
     assertExactExternalClosure(readFile, root, findings);
     assertDockerfile(readFile, root, findings);
     assertKubernetes(readFile, root, findings);
+    clusterAdminImageReferences = assertClusterAdminImageCommands(
+      readFile,
+      root,
+      findings,
+    );
     assertClusterAiComponent(readFile, root, findings);
     assertPluginPackageManagementDeployment(readFile, root, findings);
     assertWorkerCredentialManagementDeployment(readFile, root, findings);
@@ -5071,6 +5140,7 @@ function auditClusterDeployment(options = {}) {
     clusterAi: 'optional-projected-authority',
     clusterAiPromptOutput: 'optional-read-only-projected-keyring',
     imageReleasePins: 'independent-fail-closed-digests',
+    clusterAdminImageReferences,
     findings: Object.freeze(findings),
     compatible: findings.length === 0,
   });

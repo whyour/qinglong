@@ -548,6 +548,12 @@ jobs:
             echo "unexpected image contract: ${actual}" >&2
             exit 1
           fi
+      - name: Run the bounded Cluster Admin product facade
+        if: matrix.image == 'admin'
+        env:
+          IMAGE: qinglong3-cluster-admin:ci-${{ matrix.image_arch }}
+          QL3_CLUSTER_ADMIN_PRODUCT_LIVE: '1'
+        run: node scripts/ql3-cluster-admin-product-live-contract.cjs --image="${IMAGE}"
       - name: Generate the reviewed application SBOM
         run: >-
           node scripts/ql3-cluster-image-sbom.cjs

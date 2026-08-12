@@ -93,4 +93,4 @@ COPY --from=assembled --chown=10001:10001 /opt/qinglong ./
 
 USER 10001:10001
 
-ENTRYPOINT ["node", "/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/plugin-package/recovery/pluginPackageRecoveryCli.js"]
+ENTRYPOINT ["node", "/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js"]

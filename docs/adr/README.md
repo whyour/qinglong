@@ -391,6 +391,7 @@
 | [ADR-0385](./ADR-0385-strong-local-run-stop-product-entry.md)                                                 | 强认证的 Local Run Stop 产品入口与原子审计                                                                                        | Accepted                                |
 | [ADR-0386](./ADR-0386-cluster-run-management-kubernetes-live-evidence.md)                                     | Cluster Run Management Kubernetes 多节点实证                                                                                       | Accepted |
 | [ADR-0387](./ADR-0387-local-api-cancellation-linux-live-evidence.md)                                           | Local API Cancellation Linux 组合实证门                                                                                             | Accepted |
+| [ADR-0388](./ADR-0388-bounded-unified-cluster-product-cli.md)                                                  | 有界统一 Cluster Operator 产品 CLI                                                                                                  | Accepted |
 
 ## 规则
 

@@ -77,6 +77,7 @@
     "test:vault-transit-custody-live:ql3": "pnpm --filter @qinglong/ai build && pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-vault-transit-prompt-output-custody-live-contract.cjs",
     "test:postgres-backup-prompt-output-recovery-live:ql3": "pnpm --filter @qinglong/ai build && pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-postgres-prompt-output-recovery-live-contract.cjs",
     "audit:cluster-deployment:ql3": "node scripts/ql3-cluster-deployment-audit.cjs",
+    "test:cluster-admin-product-live:ql3": "node scripts/ql3-cluster-admin-product-live-contract.cjs",
     "audit:provider-credential-management-deployment:ql3": "node scripts/ql3-provider-credential-management-deployment-audit.cjs",
     "audit:provider-credential-test-deployment:ql3": "node scripts/ql3-provider-credential-test-deployment-audit.cjs",
     "audit:worker-deployment:ql3": "node scripts/ql3-worker-deployment-audit.cjs",

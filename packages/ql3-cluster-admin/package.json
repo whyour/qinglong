@@ -342,6 +342,7 @@
     "test:automation-integration": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/automationManagementPostgres.integration.test.cjs"
   },
   "bin": {
+    "ql3-cluster-admin": "dist/product-cli/cli.js",
     "ql3-plugin-package-recover": "dist/plugin-package/recovery/pluginPackageRecoveryCli.js",
     "ql3-plugin-package-manage": "dist/plugin-package/management/pluginPackageManagementCli.js",
     "ql3-plugin-package-client": "dist/plugin-package/management/pluginPackageManagementClientCli.js",

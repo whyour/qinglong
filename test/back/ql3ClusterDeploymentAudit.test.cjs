@@ -29,6 +29,7 @@ test('accepts the exact locked non-root multi-replica cluster deployment', () =>
     'optional-read-only-projected-keyring',
   );
   assert.equal(report.promptOutputKeyRotation, 'caller-driven-staged-material');
+  assert.equal(report.clusterAdminImageReferences, 24);
   assert.deepEqual(report.workspacePackages, [
     '@qinglong/runtime-core',
     '@qinglong/cluster-postgres',
@@ -39,6 +40,65 @@ test('accepts the exact locked non-root multi-replica cluster deployment', () =>
     '@qinglong/cluster-postgres',
     '@qinglong/cluster-admin',
   ]);
+});
+
+test('requires every Cluster Admin Kubernetes workload to override the image command', () => {
+  const report = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/operations/approval-management/base/deployment.yaml',
+      (source) =>
+        source.replace(
+          '          command:\n            - node\n            - /opt/qinglong/node_modules/@qinglong/cluster-admin/dist/approval-management/approvalManagementCli.js\n',
+          '',
+        ),
+    ),
+  });
+  assert.equal(report.compatible, false);
+  assert.equal(report.clusterAdminImageReferences, 24);
+  assert.equal(
+    report.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_ADMIN_IMAGE_COMMAND_IMPLICIT',
+    ),
+    true,
+  );
+});
+
+test('requires the bounded Cluster product facade and image entrypoint', () => {
+  const missingBinary = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept('packages/ql3-cluster-admin/package.json', (source) => {
+      const manifest = JSON.parse(source);
+      delete manifest.bin['ql3-cluster-admin'];
+      return JSON.stringify(manifest);
+    }),
+  });
+  assert.equal(missingBinary.compatible, false);
+  assert.equal(
+    missingBinary.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_PLUGIN_RECOVERY_ENTRYPOINT_MISSING',
+    ),
+    true,
+  );
+
+  const legacyEntrypoint = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/containers/ql3-cluster-admin/Dockerfile',
+      (source) =>
+        source.replace(
+          'dist/product-cli/cli.js',
+          'dist/plugin-package/recovery/pluginPackageRecoveryCli.js',
+        ),
+    ),
+  });
+  assert.equal(legacyEntrypoint.compatible, false);
+  assert.equal(
+    legacyEntrypoint.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_ADMIN_DOCKERFILE_CONTRACT_MISSING',
+    ),
+    true,
+  );
 });
 
 test('keeps Cluster AI optional with projected authority and an independent digest', () => {

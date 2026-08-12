@@ -11,6 +11,20 @@
 
 最新增量证据（2026-08-12）：
 
+- D-300/ADR-0388（已接受）
+  Cluster operator 已获得统一 `ql3-cluster-admin <command>` 产品入口，能力内聚在既有 `@qinglong/cluster-admin/product-cli`，不新增
+  package 或依赖。catalog 只允许 Package（直连/Kubernetes tunnel）、Worker Credential、Approval、Run、Automation、Model
+  Credential 七个现有强认证远程 client；服务端 `*-manage`、migration、recovery、executor、AI migration 与 Prompt output key
+  custody/GC 继续使用隔离 binary 和显式 Kubernetes operation。dispatcher 使用冻结同制品 target、当前 Node、`shell=false` 与 opaque
+  argv，并复验 canonical non-symlink target/package manifest，未知或损坏安装只输出低敏错误。Admin image 默认入口改为 facade，但现有
+  Job/Deployment 的 24 个 Admin image 引用均显式覆盖 command，authority 与生命周期不变；该规则已进入部署审计与突变测试。Local/Edge、
+  Cluster Control 和 Worker 制品不加载此能力。facade 6/6、deployment 49/49、CI/release contract 48/48；真实 arm64 Admin image 为
+  330,444,072 bytes，在 `10001:10001`、read-only root、network none、capabilities none、0.25 CPU、128 MiB/32 PIDs 下 7/7 委派通过。
+  Cluster Admin 完整 package 为 291 pass/2 条件 skip，18-package clean build/test 退出 0，backend 为 1,184 pass/2 skip。workspace
+  保持 18 package，Cluster Admin 96 source 中 95 nested/1 root，无 single-source/shallow package，五项边界审计零 finding。14 个 Local
+  Profile artifact 全部 compatible，最小 Edge 2,467,343 bytes/295 files/53 modules，最大 Standalone MCP 7,168,978 bytes/778 files/
+  213 modules，证明路由设备制品不受影响。PostgreSQL 18.4 arm64 HA 123 项 gate 全绿、timeline `1→2`，证据 SHA-256 为
+  `f5df5998d505b6d5af552e627bd3f83983bc347d08d94da5a2d73fde46eab0a4`，离线审计及 Docker 资源清理均通过。完整回归见 ADR-0388。
 - D-299/ADR-0387（已接受）
   Local `run.cancel` 已从“HTTP durable intent 与 `/proc` stop 分别验证”推进为同一次真实 Linux 组合门。门先用既有离线 pack/prune
   生成可选 `edge/standalone-application-api` 最终制品，再在锁定 Node 24 arm64 Linux 容器内以 non-root、read-only root、network none、

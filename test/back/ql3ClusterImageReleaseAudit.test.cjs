@@ -26,6 +26,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       images: ['control', 'control-ai', 'admin', 'local'],
       nativeArchitectures: ['amd64', 'arm64'],
       runtimeInventory: true,
+      clusterAdminProductFacade: true,
       ociAttestations: true,
       osVulnerabilityScan: {
         scanner: 'trivy@0.70.0',
@@ -95,6 +96,17 @@ test('rejects removal of the native arm64 image gate', () => {
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
     /matrices must contain only exact/,
+  );
+});
+
+test('rejects removal of the native Cluster Admin product facade gate', () => {
+  const mutated = ciSource.replace(
+    "QL3_CLUSTER_ADMIN_PRODUCT_LIVE: '1'",
+    "QL3_CLUSTER_ADMIN_PRODUCT_LIVE: '0'",
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /bounded product facade contract/,
   );
 });
 

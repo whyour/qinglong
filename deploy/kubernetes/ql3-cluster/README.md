@@ -39,6 +39,16 @@ roots resolve to 84 external packages and it adds only `runtime-core`,
 database role therefore exist only in an ephemeral Job image, never in
 `cluster-control`.
 
+Its default entrypoint is the bounded `ql3-cluster-admin` product facade. The
+facade exposes only seven operator-facing remote clients: `package`,
+`package-kubernetes`, `worker-credential`, `approval`, `run`, `automation` and
+`model-credential`. It delegates with the current Node executable, an exact
+same-image target and `shell=false`; arguments remain opaque. Server
+`*-manage` processes, migration, recovery, executors, Prompt output key custody
+and garbage collection remain separate explicit binaries and Kubernetes
+operations. Existing Jobs continue to name their exact binary and do not
+inherit facade authority.
+
 The runtime image installs only the 43 external packages reachable from the
 five exact production roots in its production-only lock plus `runtime-core`,
 `cluster-postgres` and `cluster-control`: 46 runtime components in total. The

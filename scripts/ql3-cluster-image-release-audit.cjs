@@ -276,6 +276,11 @@ function auditClusterImageCiWorkflow(source) {
   );
   requirePattern(
     source,
+    /name: Run the bounded Cluster Admin product facade\s+if: matrix\.image == 'admin'\s+env:\s+IMAGE: qinglong3-cluster-admin:ci-\$\{\{ matrix\.image_arch \}\}\s+QL3_CLUSTER_ADMIN_PRODUCT_LIVE: '1'\s+run: node scripts\/ql3-cluster-admin-product-live-contract\.cjs --image="\$\{IMAGE\}"/,
+    'native admin image CI must run the bounded product facade contract',
+  );
+  requirePattern(
+    source,
     /^  image-oci:\s*$/m,
     'QL3 CI must contain a multi-architecture OCI evidence job',
   );
@@ -314,6 +319,7 @@ function auditClusterImageCiWorkflow(source) {
     images: ['control', 'control-ai', 'admin', 'local'],
     nativeArchitectures: ['amd64', 'arm64'],
     runtimeInventory: true,
+    clusterAdminProductFacade: true,
     ociAttestations: true,
     osVulnerabilityScan: {
       scanner: 'trivy@0.70.0',
