@@ -57,7 +57,8 @@ function createManagementIdentityCeremony(options) {
     });
   }
 
-  function assertion(key, suffix = crypto.randomUUID()) {
+  function assertionForSubject(key, subject, suffix = crypto.randomUUID()) {
+    assert.match(subject, /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
     const now = Math.floor(Date.now() / 1_000);
     const header = Buffer.from(
       JSON.stringify({
@@ -77,6 +78,43 @@ function createManagementIdentityCeremony(options) {
         iss: options.issuer,
         jti: options.jtiPrefix + '-' + suffix,
         ql3_purpose: options.purpose,
+        sub: subject,
+      }),
+    ).toString('base64url');
+    const signed = header + '.' + payload;
+    return (
+      signed +
+      '.' +
+      crypto
+        .sign(null, Buffer.from(signed, 'ascii'), key.privateKey)
+        .toString('base64url')
+    );
+  }
+
+  function assertion(key, suffix = crypto.randomUUID()) {
+    return assertionForSubject(key, options.subject, suffix);
+  }
+
+  function weakAssertion(key, suffix = crypto.randomUUID()) {
+    const now = Math.floor(Date.now() / 1_000);
+    const header = Buffer.from(
+      JSON.stringify({
+        alg: 'EdDSA',
+        kid: key.kid,
+        typ: options.tokenType,
+      }),
+    ).toString('base64url');
+    const payload = Buffer.from(
+      JSON.stringify({
+        acr: 'urn:ql3:password',
+        amr: ['pwd'],
+        aud: options.audience,
+        auth_time: now - 1,
+        exp: now + 290,
+        iat: now,
+        iss: options.issuer,
+        jti: options.jtiPrefix + '-weak-' + suffix,
+        ql3_purpose: options.purpose,
         sub: options.subject,
       }),
     ).toString('base64url');
@@ -90,7 +128,13 @@ function createManagementIdentityCeremony(options) {
     );
   }
 
-  return Object.freeze({ assertion, keyset, reviewedKey });
+  return Object.freeze({
+    assertion,
+    assertionForSubject,
+    keyset,
+    reviewedKey,
+    weakAssertion,
+  });
 }
 
 module.exports = { createManagementIdentityCeremony };

@@ -100,9 +100,7 @@ async function waitForTwoPreserved(options) {
         '-l',
         'app.kubernetes.io/name=' + options.deployment,
       ])
-      .items.filter(
-        (pod) => pod.metadata.deletionTimestamp === undefined,
-      );
+      .items.filter((pod) => pod.metadata.deletionTimestamp === undefined);
     const ready = pods.filter(podReady);
     minimumReady = Math.min(minimumReady, ready.length);
     const replacements = ready.filter(
@@ -117,10 +115,7 @@ async function waitForTwoPreserved(options) {
       : {
           ready: false,
           fact:
-            ready.length +
-            ' ready, ' +
-            replacements.length +
-            ' replacements',
+            ready.length + ' ready, ' + replacements.length + ' replacements',
         };
   });
   assert.ok(
@@ -131,6 +126,17 @@ async function waitForTwoPreserved(options) {
 }
 
 function createManagementClientExecutor(options) {
+  const retryableClientCodes = options.retryableClientCodes ?? [
+    'QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_REQUEST_FAILED',
+  ];
+  assert.ok(
+    Array.isArray(retryableClientCodes) &&
+      retryableClientCodes.length >= 1 &&
+      retryableClientCodes.every(
+        (code) => typeof code === 'string' && /^[A-Z0-9_]{1,128}$/.test(code),
+      ),
+    'management client retryable codes are invalid',
+  );
   options.fixture.apply({
     apiVersion: 'v1',
     kind: 'ServiceAccount',
@@ -243,9 +249,14 @@ function createManagementClientExecutor(options) {
                       '--command=/tmp/command.json ' +
                       '--assertion=/tmp/assertion.jwt 2>&1)"',
                     '  status=$?',
-                    '  if [ "$status" -eq 0 ] || { ! printf \'%s\' "$output" | ' +
-                      'grep -q QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_REQUEST_FAILED && ' +
-                      '! printf \'%s\' "$output" | grep -q \'"statusCode":503\'; } || ' +
+                    '  if [ "$status" -eq 0 ] || { ' +
+                      retryableClientCodes
+                        .map(
+                          (code) =>
+                            '! printf \'%s\' "$output" | grep -q ' + code,
+                        )
+                        .join(' && ') +
+                      ' && ! printf \'%s\' "$output" | grep -q \'"statusCode":503\'; } || ' +
                       '[ "$attempt" -ge 60 ]; then',
                     '    break',
                     '  fi',
@@ -373,7 +384,10 @@ function createManagementClientExecutor(options) {
       assert.equal(output.event, 'command_completed');
       assert.equal(output.result.operation, definition.command.operation);
       if (expected.resultStatus) {
-        assert.ok(expected.resultStatus.includes(output.result.status));
+        const status = expected.resultField
+          ? output.result[expected.resultField]?.status
+          : output.result.status;
+        assert.ok(expected.resultStatus.includes(status));
       }
     } else {
       assert.equal(
@@ -409,6 +423,36 @@ function createManagementClientExecutor(options) {
   };
 }
 
+function managementHealthStatus(options) {
+  const script = [
+    "const fs=require('node:fs');const https=require('node:https');",
+    "const request=https.request({host:'127.0.0.1',port:Number(process.argv[1]),path:process.argv[2],",
+    'servername:process.argv[3],ca:fs.readFileSync(process.argv[4]),',
+    "minVersion:'TLSv1.3',maxVersion:'TLSv1.3',rejectUnauthorized:true,agent:false},",
+    "(response)=>{response.resume();response.on('end',()=>process.stdout.write(String(response.statusCode)))});",
+    "request.on('error',(error)=>{process.stderr.write(error.message);process.exitCode=1});request.end();",
+  ].join('\n');
+  return Number(
+    options.fixture.kubectl(
+      [
+        '-n',
+        options.namespace,
+        'exec',
+        options.podName,
+        '--',
+        'node',
+        '-e',
+        script,
+        String(options.port),
+        options.route,
+        options.servername,
+        options.caFile,
+      ],
+      { capture: true, quiet: true },
+    ).stdout,
+  );
+}
+
 function podTcpProbe(options) {
   const script = [
     "const net=require('node:net');let finished=false;",
@@ -437,9 +481,7 @@ function podTcpProbe(options) {
 async function clientTcpProbe(options) {
   const labels = {
     'app.kubernetes.io/name': options.appName,
-    ...(options.labelled
-      ? { [options.networkPolicyLabel]: 'true' }
-      : {}),
+    ...(options.labelled ? { [options.networkPolicyLabel]: 'true' } : {}),
   };
   const script = [
     "const fs=require('node:fs');const net=require('node:net');let finished=false;let attempt=0;let socket;",
@@ -497,30 +539,25 @@ async function clientTcpProbe(options) {
       },
     },
   });
-  const observed = await waitFor(
-    options.name + ' completion',
-    180_000,
-    () => {
-      const job = options.fixture.kubectlJson([
-        '-n',
-        options.namespace,
-        'get',
-        'job',
-        options.name,
-      ]);
-      const complete = job.status.conditions?.some(
-        (condition) =>
-          condition.type === 'Complete' && condition.status === 'True',
-      );
-      const failed = job.status.conditions?.some(
-        (condition) =>
-          condition.type === 'Failed' && condition.status === 'True',
-      );
-      return complete || failed
-        ? { ready: true, value: { complete, failed } }
-        : { ready: false, fact: JSON.stringify(job.status ?? {}) };
-    },
-  );
+  const observed = await waitFor(options.name + ' completion', 180_000, () => {
+    const job = options.fixture.kubectlJson([
+      '-n',
+      options.namespace,
+      'get',
+      'job',
+      options.name,
+    ]);
+    const complete = job.status.conditions?.some(
+      (condition) =>
+        condition.type === 'Complete' && condition.status === 'True',
+    );
+    const failed = job.status.conditions?.some(
+      (condition) => condition.type === 'Failed' && condition.status === 'True',
+    );
+    return complete || failed
+      ? { ready: true, value: { complete, failed } }
+      : { ready: false, fact: JSON.stringify(job.status ?? {}) };
+  });
   const probePod = (
     await waitFor(options.name + ' terminal pod', 30_000, () => {
       const pods = options.fixture.kubectlJson([
@@ -541,16 +578,8 @@ async function clientTcpProbe(options) {
   const terminated = probePod.status.containerStatuses[0].state.terminated;
   const observation =
     options.name + ': ' + (terminated.message ?? 'no-message');
-  assert.equal(
-    observed.value.complete,
-    options.expectedConnected,
-    observation,
-  );
-  assert.equal(
-    observed.value.failed,
-    !options.expectedConnected,
-    observation,
-  );
+  assert.equal(observed.value.complete, options.expectedConnected, observation);
+  assert.equal(observed.value.failed, !options.expectedConnected, observation);
   assert.equal(
     terminated.exitCode === 0,
     options.expectedConnected,
@@ -562,14 +591,7 @@ async function clientTcpProbe(options) {
     assert.match(terminated.message ?? '', /^denied:/);
   }
   options.fixture.kubectl(
-    [
-      '-n',
-      options.namespace,
-      'delete',
-      'job',
-      options.name,
-      '--wait=false',
-    ],
+    ['-n', options.namespace, 'delete', 'job', options.name, '--wait=false'],
     { capture: true, quiet: true },
   );
   return options.expectedConnected
@@ -580,6 +602,7 @@ async function clientTcpProbe(options) {
 module.exports = {
   clientTcpProbe,
   createManagementClientExecutor,
+  managementHealthStatus,
   patchManagementGeneration,
   podReady,
   podTcpProbe,

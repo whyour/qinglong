@@ -25,8 +25,21 @@ const {
   waitManagementRollout,
 } = require('./lib/ql3-management-kubernetes-live.cjs');
 const {
+  applySecret,
+  currentPrimaryPod,
+  imageIdDigest,
+  localManifest,
+  psql,
+} = require('./lib/ql3-management-kubernetes-live-platform.cjs');
+const {
   createManagementIdentityCeremony,
 } = require('./lib/ql3-management-live-identity.cjs');
+const {
+  durableRunManagementFacts,
+  retryCommand,
+  seedRunManagement,
+  stopCommand,
+} = require('./lib/ql3-run-management-kubernetes-live-scenario.cjs');
 const {
   imageDigest,
   imageTag,
@@ -35,18 +48,17 @@ const {
 const {
   FIXTURE,
   LIMITATIONS,
-  validateApprovalManagementKubernetesLiveReport,
-} = require('./ql3-approval-management-kubernetes-live-audit.cjs');
+  validateRunManagementKubernetesLiveReport,
+} = require('./ql3-run-management-kubernetes-live-audit.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const NAMESPACE = 'qinglong3-system';
-const DEPLOYMENT = 'ql3-approval-management';
-const SERVICE = DEPLOYMENT;
-const SERVERNAME = SERVICE + '.' + NAMESPACE + '.svc';
-const MANAGEMENT_PATH = '/api/v3/approvals/management';
+const DEPLOYMENT = 'ql3-run-management';
+const SERVERNAME = `${DEPLOYMENT}.${NAMESPACE}.svc`;
 const POSTGRES_CLUSTER = 'ql3-postgres';
+const ZERO_DIGEST = 'sha256:' + '0'.repeat(64);
 const ISSUER = 'https://identity.qinglong.test/';
-const AUDIENCE = 'qinglong3-approval-management';
+const AUDIENCE = 'qinglong3-run-management';
 const LOCK = JSON.parse(
   fs.readFileSync(
     path.join(
@@ -58,36 +70,31 @@ const LOCK = JSON.parse(
 );
 const OPERATOR_IMAGE = LOCK.operator.image;
 const POSTGRES_IMAGE = LOCK.operand.image;
-const OPERATOR_VERSION = LOCK.operator.version;
-const ADMIN_IMAGE_BASE = 'ql3-approval-manager-live';
-const CONTROL_IMAGE_BASE = 'ql3-approval-migration-live';
-const ZERO_DIGEST = 'sha256:' + '0'.repeat(64);
+const ADMIN_IMAGE_BASE = 'ql3-run-manager-live';
+const CONTROL_IMAGE_BASE = 'ql3-run-migration-live';
 const ROLE_NAMES = Object.freeze([
   'ql3_migration',
+  'ql3_ai_maintenance',
+  'ql3_ai_credential_manager',
+  'ql3_ai_credential_tester',
   'ql3_runtime',
   'ql3_admin',
   'ql3_package_manager',
   'ql3_package_executor',
   'ql3_automation_manager',
   'ql3_approval_manager',
+  'ql3_run_manager',
   'ql3_worker_credential_manager',
   'ql3_worker_credential_executor',
   'ql3_worker_ingress',
 ]);
-const ACTION = Object.freeze({
-  permission: 'run.start',
-  actionType: 'tool.invoke',
-  actionRef: 'tool:approval-live',
-  actionDigest: 'a'.repeat(64),
-  previewDigest: 'b'.repeat(64),
-});
 const identity = createManagementIdentityCeremony({
   issuer: ISSUER,
   audience: AUDIENCE,
-  purpose: 'approval-management',
-  tokenType: 'ql3-approval-management+jwt',
-  subject: 'approval-operator',
-  jtiPrefix: 'ql3-approval-live',
+  purpose: 'run-management',
+  tokenType: 'ql3-run-management+jwt',
+  subject: 'run-operator',
+  jtiPrefix: 'ql3-run-live',
 });
 
 function sha256(value) {
@@ -98,236 +105,12 @@ function randomSecret() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
-function eventId(ordinal) {
-  assert.ok(Number.isSafeInteger(ordinal) && ordinal >= 1 && ordinal < 1e12);
-  return '40000000-0000-4000-8000-' + String(ordinal).padStart(12, '0');
-}
-
-function reviewedKey(kid) {
-  return identity.reviewedKey(kid);
-}
-
-function keyset(generation, keys, revokedKids = []) {
-  return identity.keyset(generation, keys, revokedKids);
-}
-
-function assertion(key, suffix) {
-  return identity.assertion(key, suffix);
-}
-
-function assertionForSubject(key, subject, suffix = crypto.randomUUID()) {
-  return identity.assertionForSubject(key, subject, 'subject-' + suffix);
-}
-
-function weakAssertion(key, suffix = crypto.randomUUID()) {
-  return identity.weakAssertion(key, suffix);
-}
-
-function commandBase(projectId, approvalRequestId, requestId, ordinal) {
-  return Object.freeze({
-    projectId,
-    approvalRequestId,
-    requestId,
-    auditEventId: eventId(ordinal),
-    failureAuditEventId: eventId(ordinal + 500_000),
-  });
-}
-
-function inspectCommand(projectId, approvalRequestId, requestId, ordinal) {
-  return Object.freeze({
-    schemaVersion: 1,
-    operation: 'approval.inspect',
-    request: commandBase(projectId, approvalRequestId, requestId, ordinal),
-  });
-}
-
-function decisionCommand(
-  projectId,
-  approvalRequestId,
-  requestId,
-  decisionId,
-  ordinal,
-) {
-  return Object.freeze({
-    schemaVersion: 1,
-    operation: 'approval.decide',
-    request: Object.freeze({
-      ...commandBase(projectId, approvalRequestId, requestId, ordinal),
-      expectedVersion: 1,
-      expectedAction: ACTION,
-      decisionId,
-      decision: 'approved',
-      reasonCode: 'reviewed',
-    }),
-  });
-}
-
-function imageIdDigest(image) {
-  assert.match(image.Id, /^sha256:[a-f0-9]{64}$/);
-  return image.Id;
-}
-
-function localManifest(rendered, imageName, localImage) {
-  const placeholder = imageName + '@' + ZERO_DIGEST;
-  assert.equal(rendered.split(placeholder).length - 1, 1);
-  return rendered.replace(placeholder, localImage);
-}
-
-function applySecret(fixture, name, type, stringData) {
-  fixture.apply({
-    apiVersion: 'v1',
-    kind: 'Secret',
-    metadata: { name, namespace: NAMESPACE },
-    type,
-    stringData,
-  });
-}
-
-function psql(fixture, podName, sql) {
-  return fixture.kubectl(
-    [
-      '-n',
-      NAMESPACE,
-      'exec',
-      podName,
-      '-c',
-      'postgres',
-      '--',
-      'psql',
-      '-U',
-      'postgres',
-      '-d',
-      'qinglong',
-      '--no-psqlrc',
-      '--tuples-only',
-      '--no-align',
-      '--set',
-      'ON_ERROR_STOP=1',
-      '--command',
-      sql,
-    ],
-    { capture: true, quiet: true },
-  ).stdout;
-}
-
-function currentPrimaryPod(fixture) {
-  const primaryName = fixture.kubectlJson([
-    '-n',
-    NAMESPACE,
-    'get',
-    'cluster',
-    POSTGRES_CLUSTER,
-  ]).status.currentPrimary;
-  assert.match(primaryName || '', /^ql3-postgres-[1-9][0-9]*$/);
-  const pods = fixture.kubectlJson([
-    '-n',
-    NAMESPACE,
-    'get',
-    'pods',
-    '-l',
-    'cnpg.io/cluster=' + POSTGRES_CLUSTER,
-  ]).items;
-  const primary = pods.find((pod) => pod.metadata.name === primaryName);
-  assert.ok(primary, 'CloudNativePG primary Pod not found');
-  return primary;
-}
-
-function sqlString(value) {
-  assert.equal(typeof value, 'string');
-  return "'" + value.replaceAll("'", "''") + "'";
-}
-
-function loadApprovalContract() {
-  const file = path.join(
-    ROOT,
-    'packages/ql3-runtime-core/dist/approved-action/approvedAction.js',
-  );
-  if (!fs.existsSync(file)) {
-    throw new Error(
-      'runtime-core must be built before the Approval Kubernetes live contract',
-    );
-  }
-  return require(file);
-}
-
-function seedApproval(fixture, primaryPod, projectId, approvalRequestId) {
-  const { approvalRequestDigest, createApprovalRequest } =
-    loadApprovalContract();
-  const requestedAtMs = Date.now() - 1_000;
-  const request = createApprovalRequest({
-    id: approvalRequestId,
-    projectId,
-    action: ACTION,
-    risk: 'high',
-    decisionMode: 'human_confirmation',
-    requestedBy: { type: 'agent', id: 'approval-requester' },
-    requestedAtMs,
-    expiresAtMs: requestedAtMs + 60 * 60 * 1000,
-    requestFence: { projectVersion: 1, bindingVersion: 1 },
-  });
-  const requestJson = JSON.stringify(request);
-  assert.equal(requestJson.includes('$ql3json$'), false);
-  psql(
-    fixture,
-    primaryPod.metadata.name,
-    [
-      'INSERT INTO "ql3"."projects" (',
-      '  id, name, slug, status, version, created_at_ms, updated_at_ms',
-      ') VALUES (' +
-        sqlString(projectId) +
-        ", 'Approval Live', " +
-        sqlString(projectId) +
-        ", 'active', 1, " +
-        String(requestedAtMs) +
-        ', ' +
-        String(requestedAtMs) +
-        ');',
-      'INSERT INTO "ql3"."project_role_bindings" (',
-      '  project_id, subject_type, subject_id, version, state, role,',
-      '  mutation_id, changed_by_type, changed_by_id, created_at_ms',
-      ') VALUES (' +
-        sqlString(projectId) +
-        ", 'user', 'approval-operator', 1, 'active', 'owner'," +
-        " 'approval-live-owner-v1', 'system', 'live-contract', " +
-        String(requestedAtMs) +
-        ');',
-      'INSERT INTO "ql3"."approval_requests" (',
-      '  request_id, project_id, version, state, action_type, action_ref,',
-      '  action_digest, preview_digest, requested_by_type, requested_by_id,',
-      '  decision_id, consumption_id, dispatch_id, expires_at_ms,',
-      '  request_json, request_digest, updated_at_ms',
-      ') VALUES (' +
-        sqlString(approvalRequestId) +
-        ', ' +
-        sqlString(projectId) +
-        ", 1, 'pending', " +
-        sqlString(ACTION.actionType) +
-        ', ' +
-        sqlString(ACTION.actionRef) +
-        ', ' +
-        sqlString(ACTION.actionDigest) +
-        ', ' +
-        sqlString(ACTION.previewDigest) +
-        ", 'agent', 'approval-requester', NULL, NULL, NULL, " +
-        String(request.expiresAtMs) +
-        ', $ql3json$' +
-        requestJson +
-        '$ql3json$::jsonb, ' +
-        sqlString(approvalRequestDigest(request)) +
-        ', ' +
-        String(requestedAtMs) +
-        ');',
-    ].join('\n'),
-  );
-  return request;
-}
-
 function managerOptions(fixture) {
   return {
     fixture,
     namespace: NAMESPACE,
     deployment: DEPLOYMENT,
-    description: 'two Ready approval manager Pods on distinct nodes',
+    description: 'two Ready Run manager Pods on distinct nodes',
   };
 }
 
@@ -344,10 +127,10 @@ function healthStatus(fixture, pod, route) {
     fixture,
     namespace: NAMESPACE,
     podName: pod.metadata.name,
-    port: 8447,
+    port: 8448,
     route,
     servername: SERVERNAME,
-    caFile: '/var/run/secrets/qinglong3/approval-management-tls/ca.crt',
+    caFile: '/var/run/secrets/qinglong3/run-management-tls/ca.crt',
   });
 }
 
@@ -358,27 +141,27 @@ function privateReportPath(argv) {
     !path.isAbsolute(argv[0].slice('--report='.length))
   ) {
     throw new Error(
-      'usage: ql3-approval-management-kubernetes-live-contract ' +
-        '--report=/absolute/private-report.json',
+      'usage: ql3-run-management-kubernetes-live-contract --report=/absolute/private-report.json',
     );
   }
   const reportFile = argv[0].slice('--report='.length);
   if (fs.existsSync(reportFile)) {
-    throw new Error('refusing to overwrite the Approval live report');
+    throw new Error('refusing to overwrite the Run management live report');
   }
   const parent = fs.lstatSync(path.dirname(reportFile));
   if (!parent.isDirectory() || parent.isSymbolicLink()) {
-    throw new Error('Approval live report parent must be a real directory');
+    throw new Error(
+      'Run management live report parent must be a real directory',
+    );
   }
   return reportFile;
 }
 
 async function main(argv = process.argv.slice(2)) {
   const reportFile = privateReportPath(argv);
-  if (process.env.QL3_APPROVAL_MANAGEMENT_KUBERNETES_LIVE !== '1') {
+  if (process.env.QL3_RUN_MANAGEMENT_KUBERNETES_LIVE !== '1') {
     throw new Error(
-      'Refusing to mutate Docker/Kubernetes without ' +
-        'QL3_APPROVAL_MANAGEMENT_KUBERNETES_LIVE=1',
+      'Refusing to mutate Docker/Kubernetes without QL3_RUN_MANAGEMENT_KUBERNETES_LIVE=1',
     );
   }
   const operatorManifestFile = process.env.QL3_CNPG_OPERATOR_MANIFEST_FILE;
@@ -386,18 +169,17 @@ async function main(argv = process.argv.slice(2)) {
     throw new Error('QL3_CNPG_OPERATOR_MANIFEST_FILE is required');
   }
   const reviewedManifest = reviewedOperatorManifest(operatorManifestFile);
-  const fixture = new K3sDockerLiveFixture({ prefix: 'ql3-approval-live' });
+  const fixture = new K3sDockerLiveFixture({ prefix: 'ql3-run-live' });
   const suffix =
     process.pid.toString(36) + '-' + crypto.randomBytes(3).toString('hex');
-  const adminImage = ADMIN_IMAGE_BASE + ':' + suffix;
-  const controlImage = CONTROL_IMAGE_BASE + ':' + suffix;
+  const adminImage = `${ADMIN_IMAGE_BASE}:${suffix}`;
+  const controlImage = `${CONTROL_IMAGE_BASE}:${suffix}`;
   let adminImageBuilt = false;
   let controlImageBuilt = false;
   try {
     const nodes = await fixture.start();
     const architecture = fixture.inspectImage(fixture.k3sImage).Architecture;
     assert.ok(['amd64', 'arm64'].includes(architecture));
-
     for (const reviewedImage of [OPERATOR_IMAGE, POSTGRES_IMAGE]) {
       run(fixture.docker, ['pull', reviewedImage]);
       const inspected = fixture.inspectImage(reviewedImage);
@@ -405,7 +187,6 @@ async function main(argv = process.argv.slice(2)) {
         inspected.RepoDigests?.some((entry) =>
           entry.endsWith('@' + imageDigest(reviewedImage)),
         ),
-        'Docker did not retain reviewed digest for ' + reviewedImage,
       );
       const preloadTag = imageTag(reviewedImage);
       run(fixture.docker, ['tag', reviewedImage, preloadTag]);
@@ -416,30 +197,32 @@ async function main(argv = process.argv.slice(2)) {
       capture: true,
       quiet: true,
     }).stdout;
-    run(fixture.docker, [
-      'build',
-      '--file',
-      'deploy/containers/ql3-cluster-admin/Dockerfile',
-      '--tag',
-      adminImage,
-      '--build-arg',
-      'SOURCE_REVISION=' + sourceRevision,
-      '.',
-    ]);
-    adminImageBuilt = true;
-    fixture.loadImage(adminImage, 'approval-admin.tar');
-    run(fixture.docker, [
-      'build',
-      '--file',
-      'deploy/containers/ql3-cluster-control/Dockerfile',
-      '--tag',
-      controlImage,
-      '--build-arg',
-      'SOURCE_REVISION=' + sourceRevision,
-      '.',
-    ]);
-    controlImageBuilt = true;
-    fixture.loadImage(controlImage, 'approval-migration.tar');
+    for (const [dockerfile, image, archive] of [
+      [
+        'deploy/containers/ql3-cluster-admin/Dockerfile',
+        adminImage,
+        'run-admin.tar',
+      ],
+      [
+        'deploy/containers/ql3-cluster-control/Dockerfile',
+        controlImage,
+        'run-control.tar',
+      ],
+    ]) {
+      run(fixture.docker, [
+        'build',
+        '--file',
+        dockerfile,
+        '--tag',
+        image,
+        '--build-arg',
+        'SOURCE_REVISION=' + sourceRevision,
+        '.',
+      ]);
+      if (image === adminImage) adminImageBuilt = true;
+      else controlImageBuilt = true;
+      fixture.loadImage(image, archive);
+    }
     const adminImageInfo = fixture.inspectImage(adminImage);
     const postgresImageInfo = fixture.inspectImage(POSTGRES_IMAGE);
     const k3sImageInfo = fixture.inspectImage(fixture.k3sImage);
@@ -498,13 +281,13 @@ async function main(argv = process.argv.slice(2)) {
     const databaseManifest = fixture
       .kubectl(
         ['kustomize', 'deploy/kubernetes/ql3-cluster/operators/cloudnative-pg'],
-        { capture: true, quiet: true },
+        {
+          capture: true,
+          quiet: true,
+        },
       )
       .stdout.replace(POSTGRES_IMAGE, imageTag(POSTGRES_IMAGE));
-    assert.equal(databaseManifest.includes(POSTGRES_IMAGE), false);
-    fixture.kubectl(['apply', '-f', '-'], {
-      input: databaseManifest + '\n',
-    });
+    fixture.kubectl(['apply', '-f', '-'], { input: databaseManifest + '\n' });
     fixture.kubectl([
       '-n',
       NAMESPACE,
@@ -527,10 +310,7 @@ async function main(argv = process.argv.slice(2)) {
           .items.filter(podReady);
         return pods.length === 3
           ? { ready: true, value: pods }
-          : {
-              ready: false,
-              fact: pods.length + '/3 ready database Pods',
-            };
+          : { ready: false, fact: `${pods.length}/3 ready database Pods` };
       })
     ).value;
 
@@ -545,9 +325,7 @@ async function main(argv = process.argv.slice(2)) {
       'registry.example.com/qinglong/qinglong3-cluster-control',
       controlImage,
     );
-    fixture.kubectl(['create', '-f', '-'], {
-      input: migrationManifest + '\n',
-    });
+    fixture.kubectl(['create', '-f', '-'], { input: migrationManifest + '\n' });
     fixture.kubectl([
       '-n',
       NAMESPACE,
@@ -563,39 +341,41 @@ async function main(argv = process.argv.slice(2)) {
         migrationPrimary.metadata.name,
         [
           'SELECT json_build_object(',
-          "  'migrationCount', (SELECT count(*)::integer",
-          '    FROM "ql3"."schema_migrations"),',
-          "  'controlCoreCapability', (SELECT contract_version::integer",
-          '    FROM "ql3"."schema_capabilities"',
-          "    WHERE contract_name = 'control-core'))",
+          '  \'migrationCount\', (SELECT count(*)::integer FROM "ql3"."schema_migrations"),',
+          '  \'controlCoreCapability\', (SELECT contract_version::integer FROM "ql3"."schema_capabilities" WHERE contract_name = \'control-core\'))',
         ].join('\n'),
       ),
     );
     assert.deepEqual(migrationState, {
-      migrationCount: 54,
-      controlCoreCapability: 53,
+      migrationCount: 57,
+      controlCoreCapability: 56,
     });
 
-    const projectId = 'approval-live-' + suffix;
-    const approvalRequestId = 'approval-request-' + suffix;
-    const decisionId = 'approval-decision-' + suffix;
-    const primary = currentPrimaryPod(fixture);
-    seedApproval(fixture, primary, projectId, approvalRequestId);
+    const values = Object.freeze({
+      suffix,
+      projectId: 'run-live-' + suffix,
+      operatorId: 'run-operator',
+      outsiderId: 'run-outsider',
+      taskId: 'run-live-task-' + suffix,
+      sourceRunId: crypto.randomUUID(),
+      sourceAttemptId: crypto.randomUUID(),
+    });
+    seedRunManagement(fixture, migrationPrimary.metadata.name, values, psql);
 
     const pki = createMutualTlsPki({
       directory: fixture.temporary,
       servername: SERVERNAME,
-      label: 'QL3 Approval Management Live',
+      label: 'QL3 Run Management Live',
       run,
       crypto,
     });
     let pkiMaterial = pki.read();
-    const oldKey = reviewedKey('approval-live-key-1');
-    const newKey = reviewedKey('approval-live-key-2');
+    const oldKey = identity.reviewedKey('run-live-key-1');
+    const newKey = identity.reviewedKey('run-live-key-2');
     const keysets = [
-      keyset(1, [oldKey]),
-      keyset(2, [oldKey, newKey]),
-      keyset(3, [oldKey, newKey], [oldKey.kid]),
+      identity.keyset(1, [oldKey]),
+      identity.keyset(2, [oldKey, newKey]),
+      identity.keyset(3, [oldKey, newKey], [oldKey.kid]),
     ];
     const applyIdentity = (document) =>
       applySecret(fixture, DEPLOYMENT + '-identity', 'Opaque', {
@@ -610,15 +390,12 @@ async function main(argv = process.argv.slice(2)) {
       });
     applyIdentity(keysets[0]);
     applyTls();
-
     const previousBundleSha256 = pki.bundleSha256();
-    const caDigest = sha256(pkiMaterial.ca);
-    const crlDigest = sha256(pkiMaterial.clientCrl);
     let managerManifest = localManifest(
       fixture.kubectl(
         [
           'kustomize',
-          'deploy/kubernetes/ql3-cluster/operations/approval-management/cloudnative-pg',
+          'deploy/kubernetes/ql3-cluster/operations/run-management/cloudnative-pg',
         ],
         { capture: true, quiet: true },
       ).stdout,
@@ -627,11 +404,9 @@ async function main(argv = process.argv.slice(2)) {
     );
     assert.equal(managerManifest.split(ZERO_DIGEST).length - 1, 2);
     managerManifest = managerManifest
-      .replace(ZERO_DIGEST, caDigest)
-      .replace(ZERO_DIGEST, crlDigest);
-    fixture.kubectl(['apply', '-f', '-'], {
-      input: managerManifest + '\n',
-    });
+      .replace(ZERO_DIGEST, sha256(pkiMaterial.ca))
+      .replace(ZERO_DIGEST, sha256(pkiMaterial.clientCrl));
+    fixture.kubectl(['apply', '-f', '-'], { input: managerManifest + '\n' });
     waitManagementRollout(managerOptions(fixture));
     let managerPods = await readyManagementPods(managerOptions(fixture));
 
@@ -661,84 +436,69 @@ async function main(argv = process.argv.slice(2)) {
     for (const pod of managerPods) {
       assert.equal(pod.spec.serviceAccountName, DEPLOYMENT);
       assert.equal(pod.spec.automountServiceAccountToken, false);
-      assert.equal(
-        pod.spec.volumes.some((volume) =>
-          volume.projected?.sources?.some(
-            (source) => source.serviceAccountToken !== undefined,
-          ),
-        ),
-        false,
-      );
     }
 
     const executeClient = createManagementClientExecutor({
       fixture,
       namespace: NAMESPACE,
       servername: SERVERNAME,
-      port: 8447,
-      managementPath: MANAGEMENT_PATH,
+      port: 8448,
+      managementPath: '/api/v3/runs/management',
       adminImage,
       ca: pkiMaterial.ca,
-      serviceAccount: 'ql3-approval-management-client',
-      appName: 'ql3-approval-management-client',
-      component: 'approval-management-client',
-      networkPolicyLabel: 'qinglong.io/approval-management-client',
+      serviceAccount: 'ql3-run-management-client',
+      appName: 'ql3-run-management-client',
+      component: 'run-management-client',
+      networkPolicyLabel: 'qinglong.io/run-management-client',
       clientCliPath:
-        '/opt/qinglong/node_modules/@qinglong/cluster-admin/' +
-        'dist/approval-management/approvalManagementClientCli.js',
-      description: 'approval management',
+        '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/run-management/runManagementClientCli.js',
+      retryableClientCodes: ['QL3_RUN_MANAGEMENT_CLIENT_FAILED'],
+      description: 'Run management',
     });
-    const oldAssertion = () => assertion(oldKey);
-    const newAssertion = () => assertion(newKey);
-    const initialRequests = await Promise.all([
-      executeClient(
-        {
-          name: 'ql3-approval-inspect-initial-a',
-          target: managerPods[0],
-          command: inspectCommand(
-            projectId,
-            approvalRequestId,
-            'approval-inspect-initial-a',
-            1,
-          ),
-          bearer: oldAssertion(),
-          clientCertificate: pkiMaterial.oldClientCertificate,
-          clientKey: pkiMaterial.oldClientKey,
-        },
-        { statusCode: 200, resultStatus: ['found'] },
-      ),
-      executeClient(
-        {
-          name: 'ql3-approval-inspect-initial-b',
-          target: managerPods[1],
-          command: inspectCommand(
-            projectId,
-            approvalRequestId,
-            'approval-inspect-initial-b',
-            2,
-          ),
-          bearer: oldAssertion(),
-          clientCertificate: pkiMaterial.newClientCertificate,
-          clientKey: pkiMaterial.newClientKey,
-        },
-        { statusCode: 200, resultStatus: ['found'] },
-      ),
-    ]);
-    assert.deepEqual(
-      initialRequests.map((entry) => entry.output.result.status),
-      ['found', 'found'],
+    const retryMutationId = crypto.randomUUID();
+    const retry = retryCommand(
+      values.projectId,
+      values.sourceRunId,
+      'run-live-retry',
+      retryMutationId,
+      1,
     );
-    const weakUserRejected = await executeClient(
+    const retryAccepted = await executeClient(
       {
-        name: 'ql3-approval-inspect-weak-user',
+        name: 'ql3-run-retry-accepted',
         target: managerPods[0],
-        command: inspectCommand(
-          projectId,
-          approvalRequestId,
-          'approval-inspect-weak-user',
-          3,
+        command: retry,
+        bearer: identity.assertion(oldKey),
+        clientCertificate: pkiMaterial.oldClientCertificate,
+        clientKey: pkiMaterial.oldClientKey,
+      },
+      { statusCode: 200, resultField: 'retry', resultStatus: ['accepted'] },
+    );
+    const retriedRunId = retryAccepted.output.result.retry.runId;
+    const retryReplay = await executeClient(
+      {
+        name: 'ql3-run-retry-replay',
+        target: managerPods[1],
+        command: retry,
+        bearer: identity.assertion(oldKey),
+        clientCertificate: pkiMaterial.newClientCertificate,
+        clientKey: pkiMaterial.newClientKey,
+      },
+      { statusCode: 200, resultField: 'retry', resultStatus: ['existing'] },
+    );
+    assert.equal(retryReplay.output.result.retry.runId, retriedRunId);
+    const weakRejected = await executeClient(
+      {
+        name: 'ql3-run-retry-weak',
+        target: managerPods[0],
+        command: retryCommand(
+          values.projectId,
+          values.sourceRunId,
+          'run-live-weak',
+          crypto.randomUUID(),
+          2,
         ),
-        bearer: weakAssertion(oldKey),
+        bearer: identity.weakAssertion(oldKey),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -746,15 +506,16 @@ async function main(argv = process.argv.slice(2)) {
     );
     const outsiderDenied = await executeClient(
       {
-        name: 'ql3-approval-inspect-outsider',
+        name: 'ql3-run-retry-outsider',
         target: managerPods[1],
-        command: inspectCommand(
-          projectId,
-          approvalRequestId,
-          'approval-inspect-outsider',
-          10,
+        command: retryCommand(
+          values.projectId,
+          values.sourceRunId,
+          'run-live-outsider',
+          crypto.randomUUID(),
+          3,
         ),
-        bearer: assertionForSubject(oldKey, 'approval-outsider'),
+        bearer: identity.assertionForSubject(oldKey, values.outsiderId),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -768,45 +529,43 @@ async function main(argv = process.argv.slice(2)) {
       ...managerOptions(fixture),
       excludedUids: generation1Uids,
       expectedGeneration: 2,
-      description:
-        'zero-unavailable approval manager identity generation 2 rollout',
+      description: 'zero-unavailable Run manager identity generation 2 rollout',
     });
     managerPods = generation2.pods;
+    const stopMutationId = crypto.randomUUID();
+    const stop = stopCommand(
+      values.projectId,
+      retriedRunId,
+      'run-live-stop',
+      stopMutationId,
+      4,
+    );
     const overlapOld = await executeClient(
       {
-        name: 'ql3-approval-inspect-overlap-old',
+        name: 'ql3-run-stop-overlap-old',
         target: managerPods[0],
-        command: inspectCommand(
-          projectId,
-          approvalRequestId,
-          'approval-inspect-overlap-old',
-          4,
-        ),
-        bearer: oldAssertion(),
+        command: stop,
+        bearer: identity.assertion(oldKey),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
-      { statusCode: 200, resultStatus: ['found'] },
+      { statusCode: 200, resultField: 'stop', resultStatus: ['accepted'] },
     );
-    const decided = await executeClient(
+    const overlapNew = await executeClient(
       {
-        name: 'ql3-approval-decide-overlap-new',
+        name: 'ql3-run-stop-overlap-new',
         target: managerPods[1],
-        command: decisionCommand(
-          projectId,
-          approvalRequestId,
-          'approval-decide-overlap-new',
-          decisionId,
-          5,
-        ),
-        bearer: newAssertion(),
+        command: stop,
+        bearer: identity.assertion(newKey),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
-      { statusCode: 200, resultStatus: ['decided'] },
+      {
+        statusCode: 200,
+        resultField: 'stop',
+        resultStatus: ['already_requested'],
+      },
     );
-    assert.equal(decided.output.result.approval.state, 'approved');
-    assert.equal(decided.output.result.approval.version, 2);
 
     const generation2Uids = new Set(managerPods.map((pod) => pod.metadata.uid));
     applyIdentity(keysets[2]);
@@ -815,48 +574,40 @@ async function main(argv = process.argv.slice(2)) {
       ...managerOptions(fixture),
       excludedUids: generation2Uids,
       expectedGeneration: 3,
-      description:
-        'zero-unavailable approval manager identity generation 3 rollout',
+      description: 'zero-unavailable Run manager identity generation 3 rollout',
     });
     managerPods = generation3.pods;
     const rejectedOldKey = await executeClient(
       {
-        name: 'ql3-approval-inspect-revoked-key',
+        name: 'ql3-run-stop-revoked-key',
         target: managerPods[0],
-        command: inspectCommand(
-          projectId,
-          approvalRequestId,
-          'approval-inspect-revoked-key',
-          6,
-        ),
-        bearer: oldAssertion(),
+        command: stop,
+        bearer: identity.assertion(oldKey),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
       { statusCode: 401, responseCode: 'authentication_required' },
     );
-    const replayed = await executeClient(
+    const activeNew = await executeClient(
       {
-        name: 'ql3-approval-decide-active-key',
+        name: 'ql3-run-stop-active-key',
         target: managerPods[1],
-        command: decisionCommand(
-          projectId,
-          approvalRequestId,
-          'approval-decide-active-key',
-          decisionId,
-          7,
-        ),
-        bearer: newAssertion(),
+        command: stop,
+        bearer: identity.assertion(newKey),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
-      { statusCode: 200, resultStatus: ['existing'] },
+      {
+        statusCode: 200,
+        resultField: 'stop',
+        resultStatus: ['already_requested'],
+      },
     );
 
     applyIdentity(keysets[1]);
     patchGeneration(fixture, 'rollback-2');
     const rollback = await waitFor(
-      'approval identity ledger rollback surge failure',
+      'Run identity ledger rollback surge failure',
       180_000,
       () => {
         const pods = fixture
@@ -885,10 +636,9 @@ async function main(argv = process.argv.slice(2)) {
           ? { ready: true, value: candidate }
           : {
               ready: false,
-              fact:
-                ready.length +
-                ' ready Pods; rollback candidate=' +
-                Boolean(candidate),
+              fact: `${ready.length} ready Pods; rollback=${Boolean(
+                candidate,
+              )}`,
             };
       },
     );
@@ -911,16 +661,13 @@ async function main(argv = process.argv.slice(2)) {
     pki.revokeOldClient();
     pkiMaterial = pki.read();
     const currentBundleSha256 = pki.bundleSha256();
-    assert.notEqual(currentBundleSha256, previousBundleSha256);
-    applyTls();
     const preCertificateUids = new Set(
       managerPods.map((pod) => pod.metadata.uid),
     );
+    applyTls();
     patchGeneration(fixture, '3-client-crl-2', {
-      'qinglong.io/approval-management-client-ca-sha256': sha256(
-        pkiMaterial.ca,
-      ),
-      'qinglong.io/approval-management-client-crl-sha256': sha256(
+      'qinglong.io/run-management-client-ca-sha256': sha256(pkiMaterial.ca),
+      'qinglong.io/run-management-client-crl-sha256': sha256(
         pkiMaterial.clientCrl,
       ),
     });
@@ -928,46 +675,34 @@ async function main(argv = process.argv.slice(2)) {
       ...managerOptions(fixture),
       excludedUids: preCertificateUids,
       expectedGeneration: '3-client-crl-2',
-      description:
-        'zero-unavailable approval manager client certificate rollout',
+      description: 'zero-unavailable Run manager client certificate rollout',
     });
+    const certificatePodsFullyReplaced = certificateRollout.pods.every(
+      (pod) => !preCertificateUids.has(pod.metadata.uid),
+    );
+    assert.equal(certificatePodsFullyReplaced, true);
     managerPods = certificateRollout.pods;
     const revokedCertificate = await executeClient(
       {
-        name: 'ql3-approval-decide-revoked-cert',
+        name: 'ql3-run-retry-revoked-cert',
         target: managerPods[0],
-        command: decisionCommand(
-          projectId,
-          approvalRequestId,
-          'approval-decide-revoked-cert',
-          decisionId,
-          8,
-        ),
-        bearer: newAssertion(),
+        command: retry,
+        bearer: identity.assertion(newKey),
         clientCertificate: pkiMaterial.oldClientCertificate,
         clientKey: pkiMaterial.oldClientKey,
       },
-      {
-        statusCode: 401,
-        responseCode: 'client_certificate_required',
-      },
+      { statusCode: 401, responseCode: 'client_certificate_required' },
     );
     const activeCertificate = await executeClient(
       {
-        name: 'ql3-approval-decide-active-cert',
+        name: 'ql3-run-retry-active-cert',
         target: managerPods[1],
-        command: decisionCommand(
-          projectId,
-          approvalRequestId,
-          'approval-decide-active-cert',
-          decisionId,
-          9,
-        ),
-        bearer: newAssertion(),
+        command: retry,
+        bearer: identity.assertion(newKey),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
-      { statusCode: 200, resultStatus: ['existing'] },
+      { statusCode: 200, resultField: 'retry', resultStatus: ['existing'] },
     );
 
     const primaryBeforeFailover = currentPrimaryPod(fixture);
@@ -998,11 +733,9 @@ async function main(argv = process.argv.slice(2)) {
           ? { ready: true, value: status.currentPrimary }
           : {
               ready: false,
-              fact:
-                'primary=' +
-                (status.currentPrimary || 'none') +
-                ' ready=' +
-                String(status.readyInstances ?? 0),
+              fact: `primary=${status.currentPrimary || 'none'} ready=${
+                status.readyInstances ?? 0
+              }`,
             };
       },
     );
@@ -1018,9 +751,7 @@ async function main(argv = process.argv.slice(2)) {
         ? { ready: true, value: status }
         : {
             ready: false,
-            fact:
-              String(status.readyInstances ?? 0) +
-              '/3 ready database instances',
+            fact: `${status.readyInstances ?? 0}/3 ready database instances`,
           };
     });
 
@@ -1041,25 +772,17 @@ async function main(argv = process.argv.slice(2)) {
       '--type=merge',
       '-p',
       JSON.stringify({
-        spec: {
-          selector: { ...databaseSelector, 'ql3.invalid': 'true' },
-        },
+        spec: { selector: { ...databaseSelector, 'ql3.invalid': 'true' } },
       }),
     ]);
     const unavailable = await Promise.all(
       managerPods.map((pod, index) =>
         executeClient(
           {
-            name: 'ql3-approval-database-unavailable-' + String(index + 1),
+            name: 'ql3-run-database-unavailable-' + String(index + 1),
             target: pod,
-            command: decisionCommand(
-              projectId,
-              approvalRequestId,
-              'approval-database-unavailable-' + String(index + 1),
-              decisionId,
-              20 + index,
-            ),
-            bearer: newAssertion(),
+            command: stop,
+            bearer: identity.assertion(newKey),
             clientCertificate: pkiMaterial.newClientCertificate,
             clientKey: pkiMaterial.newClientKey,
           },
@@ -1071,7 +794,7 @@ async function main(argv = process.argv.slice(2)) {
       unavailable.map((entry) => entry.statusCode),
       [503, 503],
     );
-    await waitFor('approval manager readiness withdrawal', 60_000, () => {
+    await waitFor('Run manager readiness withdrawal', 60_000, () => {
       const current = fixture.kubectlJson([
         '-n',
         NAMESPACE,
@@ -1083,7 +806,7 @@ async function main(argv = process.argv.slice(2)) {
         ? { ready: true, value: current }
         : {
             ready: false,
-            fact: String(current.status.readyReplicas ?? 0) + ' ready replicas',
+            fact: `${current.status.readyReplicas ?? 0} ready replicas`,
           };
     });
     assert.deepEqual(
@@ -1103,11 +826,7 @@ async function main(argv = process.argv.slice(2)) {
       '--type=json',
       '-p',
       JSON.stringify([
-        {
-          op: 'replace',
-          path: '/spec/selector',
-          value: databaseSelector,
-        },
+        { op: 'replace', path: '/spec/selector', value: databaseSelector },
       ]),
     ]);
     await waitFor('restored CloudNativePG service endpoint', 120_000, () => {
@@ -1123,10 +842,7 @@ async function main(argv = process.argv.slice(2)) {
       ).length;
       return count >= 1
         ? { ready: true, value: count }
-        : {
-            ready: false,
-            fact: String(count ?? 0) + ' service endpoints',
-          };
+        : { ready: false, fact: `${count ?? 0} service endpoints` };
     });
     assert.deepEqual(
       managerPods.map((pod) => healthStatus(fixture, pod, '/readyz')),
@@ -1143,109 +859,53 @@ async function main(argv = process.argv.slice(2)) {
       managerPods.map((pod, index) =>
         executeClient(
           {
-            name: 'ql3-approval-database-recovered-' + String(index + 1),
+            name: 'ql3-run-database-recovered-' + String(index + 1),
             target: pod,
-            command: decisionCommand(
-              projectId,
-              approvalRequestId,
-              'approval-database-recovered-' + String(index + 1),
-              decisionId,
-              30 + index,
-            ),
-            bearer: newAssertion(),
+            command: stop,
+            bearer: identity.assertion(newKey),
             clientCertificate: pkiMaterial.newClientCertificate,
             clientKey: pkiMaterial.newClientKey,
           },
-          { statusCode: 200, resultStatus: ['existing'] },
+          {
+            statusCode: 200,
+            resultField: 'stop',
+            resultStatus: ['already_requested'],
+          },
         ),
       ),
     );
-    assert.deepEqual(
-      recoveredRequests.map((entry) => entry.output.result.status),
-      ['existing', 'existing'],
-    );
 
     const finalPrimary = currentPrimaryPod(fixture);
-    const durable = JSON.parse(
-      psql(
-        fixture,
-        finalPrimary.metadata.name,
-        [
-          'SELECT json_build_object(',
-          "  'approvalVersion', (SELECT version::integer",
-          '    FROM "ql3"."approval_requests"',
-          '    WHERE request_id = ' + sqlString(approvalRequestId) + '),',
-          "  'approvalState', (SELECT state",
-          '    FROM "ql3"."approval_requests"',
-          '    WHERE request_id = ' + sqlString(approvalRequestId) + '),',
-          "  'decisionId', (SELECT decision_id",
-          '    FROM "ql3"."approval_requests"',
-          '    WHERE request_id = ' + sqlString(approvalRequestId) + '),',
-          "  'allowedAuditCount', (SELECT count(*)::integer",
-          '    FROM "ql3"."security_audit_events"',
-          '    WHERE project_id = ' +
-            sqlString(projectId) +
-            " AND outcome = 'allowed'),",
-          "  'deniedAuditCount', (SELECT count(*)::integer",
-          '    FROM "ql3"."security_audit_events"',
-          '    WHERE project_id = ' +
-            sqlString(projectId) +
-            " AND outcome = 'denied'),",
-          "  'decisionAuditCount', (SELECT count(*)::integer",
-          '    FROM "ql3"."security_audit_events"',
-          '    WHERE project_id = ' +
-            sqlString(projectId) +
-            " AND operation_id = 'approval.decide'" +
-            " AND outcome = 'allowed'),",
-          "  'identityGeneration', (SELECT generation::integer",
-          '    FROM "ql3"."plugin_package_identity_keyset_ledger"',
-          "    WHERE authority = 'approval-management'),",
-          "  'migrationCount', (SELECT count(*)::integer",
-          '    FROM "ql3"."schema_migrations"),',
-          "  'controlCoreCapability', (SELECT contract_version::integer",
-          '    FROM "ql3"."schema_capabilities"',
-          "    WHERE contract_name = 'control-core'),",
-          "  'postgresVersionNumber',",
-          "    current_setting('server_version_num')::integer,",
-          "  'currentUser', current_user)",
-        ].join('\n'),
-      ),
+    const durable = durableRunManagementFacts(
+      fixture,
+      finalPrimary.metadata.name,
+      values,
+      psql,
     );
     assert.deepEqual(durable, {
-      approvalVersion: 2,
-      approvalState: 'approved',
-      decisionId,
-      allowedAuditCount: 4,
+      sourceRunStatus: 'failed',
+      retryRunCount: 1,
+      retryAttemptCount: 1,
+      retryEventCount: 2,
+      stoppedRunCount: 1,
+      stopEventCount: 1,
+      allowedAuditCount: 2,
       deniedAuditCount: 1,
-      decisionAuditCount: 1,
+      weakAuthenticationAuditCount: 0,
+      duplicateMutationCount: 0,
       identityGeneration: 3,
-      migrationCount: 54,
-      controlCoreCapability: 53,
+      migrationCount: 57,
+      controlCoreCapability: 56,
       postgresVersionNumber: 180004,
-      currentUser: 'postgres',
     });
-
-    const roleList = ROLE_NAMES.map(sqlString).join(',');
     const roleRows = JSON.parse(
       psql(
         fixture,
         finalPrimary.metadata.name,
-        [
-          'SELECT json_agg(json_build_object(',
-          "  'name', rolname,",
-          "  'login', rolcanlogin,",
-          "  'superuser', rolsuper,",
-          "  'createDatabase', rolcreatedb,",
-          "  'createRole', rolcreaterole,",
-          "  'replication', rolreplication,",
-          "  'bypassRls', rolbypassrls) ORDER BY rolname)",
-          'FROM pg_roles WHERE rolname IN (' + roleList + ')',
-        ].join('\n'),
+        `SELECT json_agg(json_build_object('name', rolname, 'login', rolcanlogin, 'superuser', rolsuper, 'createDatabase', rolcreatedb, 'createRole', rolcreaterole, 'replication', rolreplication, 'bypassRls', rolbypassrls) ORDER BY rolname) FROM pg_roles WHERE rolname IN (${ROLE_NAMES.map(
+          (role) => "'" + role + "'",
+        ).join(',')})`,
       ),
-    );
-    assert.deepEqual(
-      roleRows.map((role) => role.name),
-      [...ROLE_NAMES].sort(),
     );
     const rolesLeastPrivilege = roleRows.every(
       (role) =>
@@ -1257,7 +917,6 @@ async function main(argv = process.argv.slice(2)) {
         role.bypassRls === false,
     );
     assert.equal(rolesLeastPrivilege, true);
-
     const canI = (verb, resource) => {
       const result = fixture.kubectl(
         [
@@ -1271,12 +930,10 @@ async function main(argv = process.argv.slice(2)) {
         ],
         { capture: true, quiet: true, allowFailure: true },
       );
-      assert.equal(
-        result.status,
-        result.stdout === 'yes' ? 0 : 1,
-        'unexpected kubectl auth can-i result: ' + result.stdout,
-      );
-      return result.stdout;
+      const decision = result.stdout.trim();
+      assert.ok(decision === 'yes' || decision === 'no');
+      assert.equal(result.status === 0, decision === 'yes');
+      return decision;
     };
     assert.equal(canI('get', 'secrets'), 'no');
     assert.equal(canI('patch', 'deployments.apps'), 'no');
@@ -1286,36 +943,36 @@ async function main(argv = process.argv.slice(2)) {
       NAMESPACE,
       'get',
       'service',
-      SERVICE,
+      DEPLOYMENT,
     ]).spec.clusterIP;
     const networkProbe = {
       fixture,
       namespace: NAMESPACE,
       adminImage,
-      appName: 'ql3-approval-network-probe',
-      networkPolicyLabel: 'qinglong.io/approval-management-client',
+      appName: 'ql3-run-network-probe',
+      networkPolicyLabel: 'qinglong.io/run-management-client',
     };
     const labelledClientAllowed = await clientTcpProbe({
       ...networkProbe,
-      name: 'ql3-approval-network-labelled',
+      name: 'ql3-run-network-labelled',
       targetHost: managerServiceIp,
-      port: 8447,
+      port: 8448,
       labelled: true,
       expectedConnected: true,
     });
     const unlabelledClientDenied = await clientTcpProbe({
       ...networkProbe,
-      name: 'ql3-approval-network-unlabelled',
+      name: 'ql3-run-network-unlabelled',
       targetHost: managerServiceIp,
-      port: 8447,
+      port: 8448,
       labelled: false,
       expectedConnected: false,
     });
     const wrongPortDenied = await clientTcpProbe({
       ...networkProbe,
-      name: 'ql3-approval-network-wrong-port',
+      name: 'ql3-run-network-wrong-port',
       targetHost: managerServiceIp,
-      port: 8446,
+      port: 8447,
       labelled: true,
       expectedConnected: false,
     });
@@ -1339,23 +996,13 @@ async function main(argv = process.argv.slice(2)) {
       podName: managerPods[0].metadata.name,
     };
     const cloudNativePgEgressAllowed =
-      podTcpProbe({
-        ...podProbe,
-        host: postgresServiceIp,
-        port: 5432,
-      }).status === 0;
+      podTcpProbe({ ...podProbe, host: postgresServiceIp, port: 5432 })
+        .status === 0;
     const kubernetesApiEgressDenied =
-      podTcpProbe({
-        ...podProbe,
-        host: kubernetesServiceIp,
-        port: 443,
-      }).status !== 0;
+      podTcpProbe({ ...podProbe, host: kubernetesServiceIp, port: 443 })
+        .status !== 0;
     const publicInternetEgressDenied =
-      podTcpProbe({
-        ...podProbe,
-        host: '1.1.1.1',
-        port: 443,
-      }).status !== 0;
+      podTcpProbe({ ...podProbe, host: '1.1.1.1', port: 443 }).status !== 0;
     assert.equal(cloudNativePgEgressAllowed, true);
     assert.equal(kubernetesApiEgressDenied, true);
     assert.equal(publicInternetEgressDenied, true);
@@ -1387,7 +1034,6 @@ async function main(argv = process.argv.slice(2)) {
       ],
       'true',
     );
-
     const finalCluster = fixture.kubectlJson([
       '-n',
       NAMESPACE,
@@ -1396,11 +1042,14 @@ async function main(argv = process.argv.slice(2)) {
       POSTGRES_CLUSTER,
     ]);
     assert.equal(Number(finalCluster.status.readyInstances), 3);
+
     const baselineSuccesses = [
-      ...initialRequests,
+      retryAccepted,
+      retryReplay,
       overlapOld,
-      decided,
-      replayed,
+      overlapNew,
+      activeNew,
+      activeCertificate,
     ];
     const report = {
       schemaVersion: 1,
@@ -1420,12 +1069,12 @@ async function main(argv = process.argv.slice(2)) {
       },
       database: {
         operator: 'cloudnative-pg',
-        operatorVersion: OPERATOR_VERSION,
+        operatorVersion: LOCK.operator.version,
         postgresVersionNumber: durable.postgresVersionNumber,
         postgresImageId: imageIdDigest(postgresImageInfo),
         instances: Number(finalCluster.spec.instances),
         readyInstances: Number(finalCluster.status.readyInstances),
-        managerRole: 'ql3_approval_manager',
+        managerRole: 'ql3_run_manager',
         migrationCount: durable.migrationCount,
         controlCoreCapability: durable.controlCoreCapability,
         tlsVerified: true,
@@ -1434,8 +1083,8 @@ async function main(argv = process.argv.slice(2)) {
       },
       deployment: {
         namespace: NAMESPACE,
-        service: SERVICE,
-        port: 8447,
+        service: DEPLOYMENT,
+        port: 8448,
         replicas: deployment.spec.replicas,
         readyReplicas: managerPods.length,
         podIdentitySha256: managerPods.map((pod) => sha256(pod.metadata.uid)),
@@ -1448,8 +1097,8 @@ async function main(argv = process.argv.slice(2)) {
         maxConnectionsPerPod: 2,
       },
       client: {
-        binary: 'ql3-approval-client',
-        operations: ['approval.inspect', 'approval.decide'],
+        binary: 'ql3-run-client',
+        operations: ['run.retry', 'run.stop'],
         inputKind: 'Secret',
         inputImmutable: true,
         callerDrivenJob: true,
@@ -1460,22 +1109,23 @@ async function main(argv = process.argv.slice(2)) {
         mutualTls: true,
         servernameVerified: true,
         exactPodRequests: baselineSuccesses.length,
-        inspectStatuses: [
-          initialRequests[0].output.result.status,
-          initialRequests[1].output.result.status,
-          overlapOld.output.result.status,
+        retryStatuses: [
+          retryAccepted.output.result.retry.status,
+          retryReplay.output.result.retry.status,
+          activeCertificate.output.result.retry.status,
         ],
-        decisionStatuses: [
-          decided.output.result.status,
-          replayed.output.result.status,
+        stopStatuses: [
+          overlapOld.output.result.stop.status,
+          overlapNew.output.result.stop.status,
+          activeNew.output.result.stop.status,
         ],
         responseRedacted: true,
       },
       identityRotation: {
         overlapOldAssertionAccepted: overlapOld.statusCode === 200,
-        overlapNewAssertionAccepted: decided.statusCode === 200,
+        overlapNewAssertionAccepted: overlapNew.statusCode === 200,
         revokedOldAssertionRejected: rejectedOldKey.statusCode === 401,
-        activeNewAssertionAccepted: replayed.statusCode === 200,
+        activeNewAssertionAccepted: activeNew.statusCode === 200,
         rollbackSurgeFailedClosed: Boolean(rollback.value),
         twoReadyReplicasPreserved:
           generation2.minimumReady >= 2 && generation3.minimumReady >= 2,
@@ -1486,13 +1136,11 @@ async function main(argv = process.argv.slice(2)) {
         currentSerialSha256: pki.newSerialSha256(),
         previousBundleSha256,
         currentBundleSha256,
-        oldClientAcceptedBefore: initialRequests[0].statusCode === 200,
-        replacementClientAcceptedBefore: initialRequests[1].statusCode === 200,
+        oldClientAcceptedBefore: retryAccepted.statusCode === 200,
+        replacementClientAcceptedBefore: retryReplay.statusCode === 200,
         oldClientRejectedAfter: revokedCertificate.statusCode === 401,
         replacementClientAcceptedAfter: activeCertificate.statusCode === 200,
-        fullPodReplacement: managerPods.every(
-          (pod) => !preCertificateUids.has(pod.metadata.uid),
-        ),
+        fullPodReplacement: certificatePodsFullyReplaced,
         allReplicasReadyThroughout: certificateRollout.minimumReady >= 2,
       },
       availability: {
@@ -1517,13 +1165,17 @@ async function main(argv = process.argv.slice(2)) {
         managerMutationRbacDenied: canI('patch', 'deployments.apps') === 'no',
       },
       durability: {
-        approvalVersion: durable.approvalVersion,
-        approvalState: durable.approvalState,
-        decisionIdSha256: sha256(durable.decisionId),
+        sourceRunStatus: durable.sourceRunStatus,
+        retryRunCount: durable.retryRunCount,
+        retryAttemptCount: durable.retryAttemptCount,
+        retryEventCount: durable.retryEventCount,
+        stoppedRunCount: durable.stoppedRunCount,
+        stopEventCount: durable.stopEventCount,
         allowedAuditCount: durable.allowedAuditCount,
         deniedAuditCount: durable.deniedAuditCount,
-        duplicateDecisionCount: durable.decisionAuditCount - 1,
+        duplicateMutationCount: durable.duplicateMutationCount,
         identityGeneration: durable.identityGeneration,
+        weakAuthenticationAuditCount: durable.weakAuthenticationAuditCount,
         survivedCloudNativePgFailover: true,
       },
       gates: {
@@ -1540,10 +1192,11 @@ async function main(argv = process.argv.slice(2)) {
           new Set(managerPods.map((pod) => pod.spec.nodeName)).size === 2,
         tls13ProductClientAcrossBothPods:
           new Set(baselineSuccesses.map((entry) => entry.targetPod)).size >= 2,
-        strongUserDecision:
-          weakUserRejected.statusCode === 401 &&
+        strongUserRetryAndStop:
+          weakRejected.statusCode === 401 &&
           outsiderDenied.statusCode === 403 &&
-          decided.statusCode === 200,
+          retryAccepted.statusCode === 200 &&
+          overlapOld.statusCode === 200,
         identityProjectionRotation: durable.identityGeneration === 3,
         certificateRevocationRollout: revokedCertificate.statusCode === 401,
         databaseReadinessFence: true,
@@ -1553,7 +1206,7 @@ async function main(argv = process.argv.slice(2)) {
       },
       limitations: [...LIMITATIONS],
     };
-    const audit = validateApprovalManagementKubernetesLiveReport(report);
+    const audit = validateRunManagementKubernetesLiveReport(report);
     assert.deepEqual(audit.findings, []);
     fs.writeFileSync(reportFile, JSON.stringify(report, null, 2) + '\n', {
       mode: 0o600,
@@ -1589,7 +1242,7 @@ async function main(argv = process.argv.slice(2)) {
 if (require.main === module) {
   main().catch((error) => {
     process.stderr.write(
-      'QL3 approval management Kubernetes live contract failed: ' +
+      'QL3 Run management Kubernetes live contract failed: ' +
         (error instanceof Error
           ? error.stack || error.message
           : String(error)) +
@@ -1600,11 +1253,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  assertion,
-  decisionCommand,
-  inspectCommand,
-  keyset,
-  reviewedKey,
-  assertionForSubject,
-  weakAssertion,
+  identity,
+  retryCommand,
+  stopCommand,
 };

@@ -389,6 +389,7 @@
 | [ADR-0383](./ADR-0383-strong-cluster-run-management-plane.md)                                                 | 强认证的 Cluster Run Management Plane 与专用数据库角色                                                                           | Accepted                                |
 | [ADR-0384](./ADR-0384-strong-cluster-run-stop-management.md)                                                  | 强认证的 Cluster Run Stop Management 与列级数据库权限                                                                            | Accepted                                |
 | [ADR-0385](./ADR-0385-strong-local-run-stop-product-entry.md)                                                 | 强认证的 Local Run Stop 产品入口与原子审计                                                                                        | Accepted                                |
+| [ADR-0386](./ADR-0386-cluster-run-management-kubernetes-live-evidence.md)                                     | Cluster Run Management Kubernetes 多节点实证                                                                                       | Proposed（实现完成，固定 live 证据待补录） |
 
 ## 规则
 

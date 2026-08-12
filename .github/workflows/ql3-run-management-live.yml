@@ -1,0 +1,124 @@
+name: QingLong 3.0 Run Management Kubernetes live evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ql3-run-management-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  run-management-live:
+    name: Three-node Run retry, stop, OIDC, mTLS and CloudNativePG
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Require enough ephemeral disk for three isolated K3s nodes
+        shell: bash
+        run: |
+          set -euo pipefail
+          available_kib="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          minimum_kib="$((25 * 1024 * 1024))"
+          if (( available_kib < minimum_kib )); then
+            echo "Run management live gate requires at least 25 GiB free; found ${available_kib} KiB" >&2
+            exit 1
+          fi
+          docker volume ls --quiet --filter dangling=true | sort > \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.before"
+          docker system df
+
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install verified kubectl v1.32.8
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl" \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl.sha256" \
+            https://dl.k8s.io/release/v1.32.8/bin/linux/amd64/kubectl.sha256
+          test "$(cat "${RUNNER_TEMP}/kubectl.sha256")" = \
+            "$(sha256sum "${RUNNER_TEMP}/kubectl" | cut -d ' ' -f 1)"
+          chmod 0755 "${RUNNER_TEMP}/kubectl"
+
+      - name: Fetch checksum-locked CloudNativePG operator manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/cloudnative-pg.yaml" \
+            https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml
+          echo "f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88  ${RUNNER_TEMP}/cloudnative-pg.yaml" | sha256sum --check
+
+      - name: Recheck static Run management and evidence contracts
+        run: |
+          pnpm audit:cluster-deployment:ql3
+          node --test \
+            test/back/ql3RunManagementDeployment.test.cjs \
+            test/back/ql3RunManagementKubernetesLiveContract.test.cjs \
+            test/back/ql3RunManagementKubernetesLiveAudit.test.cjs
+          pnpm --filter @qinglong/cluster-admin build
+          pnpm --filter @qinglong/cluster-control build
+
+      - name: Preload the digest-bound K3s distribution
+        run: docker pull rancher/k3s:v1.34.3-k3s1
+
+      - name: Prove Run retry and stop over three nodes, mTLS, OIDC and CloudNativePG
+        env:
+          QL3_RUN_MANAGEMENT_KUBERNETES_LIVE: '1'
+          QL3_KUBECTL_BIN: ${{ runner.temp }}/kubectl
+          QL3_CNPG_OPERATOR_MANIFEST_FILE: ${{ runner.temp }}/cloudnative-pg.yaml
+          QL3_RUN_MANAGEMENT_REPORT: ${{ runner.temp }}/ql3-run-management/report.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -m 0700 "$(dirname "${QL3_RUN_MANAGEMENT_REPORT}")"
+          node scripts/ql3-run-management-kubernetes-live-contract.cjs \
+            "--report=${QL3_RUN_MANAGEMENT_REPORT}"
+
+      - name: Re-audit private report and isolated cleanup
+        env:
+          QL3_RUN_MANAGEMENT_REPORT: ${{ runner.temp }}/ql3-run-management/report.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(stat -c '%a' "${QL3_RUN_MANAGEMENT_REPORT}")" = '600'
+          pnpm audit:run-management-kubernetes-live:ql3 \
+            "--report=${QL3_RUN_MANAGEMENT_REPORT}"
+          sha256sum "${QL3_RUN_MANAGEMENT_REPORT}"
+          test -z "$(docker ps -aq --filter name=ql3-run-live-)"
+          test -z "$(docker network ls -q --filter name=ql3-run-live-)"
+          docker volume ls --quiet --filter dangling=true | sort > \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.after"
+          diff --unified \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.before" \
+            "${RUNNER_TEMP}/ql3-dangling-volumes.after"
+          docker system df
+
+      - name: Upload audited content-free Run management evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-run-management-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-run-management/report.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
