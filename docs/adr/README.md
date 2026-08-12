@@ -375,7 +375,7 @@
 | [ADR-0369](./ADR-0369-profile-exact-runtime-export-projection.md)                                              | Profile 精确 Runtime Export 投影                                                                                        | Accepted                    |
 | [ADR-0370](./ADR-0370-bounded-project-run-event-timeline-http-api.md)                                          | 有界、Project-scoped 的 RunEvent 时间线 HTTP API                                                                         | Accepted                    |
 | [ADR-0371](./ADR-0371-bounded-project-run-step-list-http-and-mcp-api.md)                                       | 有界、Project-scoped 的 Run StepRun HTTP 与 MCP API                                                                       | Accepted                    |
-| [ADR-0372](./ADR-0372-two-phase-authenticated-local-run-cancellation-api.md)                                   | 两阶段认证的 Local Run Cancellation API                                                                                   | Proposed（实现完成，固定实机 API/进程 stop 门待补） |
+| [ADR-0372](./ADR-0372-two-phase-authenticated-local-run-cancellation-api.md)                                   | 两阶段认证的 Local Run Cancellation API                                                                                   | Proposed（Linux 组合门已完成，固定物理设备报告待补） |
 | [ADR-0373](./ADR-0373-profile-reachable-runtime-javascript-projection.md)                                      | Profile 可达的 Runtime JavaScript 投影                                                                                     | Accepted                     |
 | [ADR-0374](./ADR-0374-shared-bounded-task-discovery-http-api.md)                                               | 共享、有界的 Task Discovery HTTP API                                                                                       | Accepted |
 | [ADR-0375](./ADR-0375-shared-current-task-point-read-api.md)                                                   | 共享的 current Task point-read API                                                                                         | Proposed（设计冻结，实现中） |
@@ -390,6 +390,7 @@
 | [ADR-0384](./ADR-0384-strong-cluster-run-stop-management.md)                                                  | 强认证的 Cluster Run Stop Management 与列级数据库权限                                                                            | Accepted                                |
 | [ADR-0385](./ADR-0385-strong-local-run-stop-product-entry.md)                                                 | 强认证的 Local Run Stop 产品入口与原子审计                                                                                        | Accepted                                |
 | [ADR-0386](./ADR-0386-cluster-run-management-kubernetes-live-evidence.md)                                     | Cluster Run Management Kubernetes 多节点实证                                                                                       | Accepted |
+| [ADR-0387](./ADR-0387-local-api-cancellation-linux-live-evidence.md)                                           | Local API Cancellation Linux 组合实证门                                                                                             | Accepted |
 
 ## 规则
 

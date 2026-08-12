@@ -37,6 +37,8 @@
     "audit:approval-management-kubernetes-live:ql3": "node scripts/ql3-approval-management-kubernetes-live-audit.cjs",
     "test:run-management-kubernetes-live:ql3": "pnpm --filter @qinglong/cluster-admin build && pnpm --filter @qinglong/cluster-control build && node scripts/ql3-run-management-kubernetes-live-contract.cjs",
     "audit:run-management-kubernetes-live:ql3": "node scripts/ql3-run-management-kubernetes-live-audit.cjs",
+    "test:local-api-cancellation-live:ql3": "node scripts/ql3-local-api-cancellation-live-contract.cjs",
+    "audit:local-api-cancellation-live:ql3": "node scripts/ql3-local-api-cancellation-live-audit.cjs",
     "test:provider-credential-test-kubernetes-live:ql3": "pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs",
     "audit:provider-credential-test-kubernetes-live:ql3": "node scripts/ql3-provider-credential-test-kubernetes-live-audit.cjs",
     "test:prompt-output-key-retirement-kubernetes-live:ql3": "pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-prompt-output-key-retirement-kubernetes-live-contract.cjs",

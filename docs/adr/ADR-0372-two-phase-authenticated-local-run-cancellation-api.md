@@ -35,7 +35,7 @@ D-283 后，Local `/api/v3` 已能按 Project 读取 Run、列表、RunEvent 与
 - Runtime Core 覆盖 profile-neutral canonical schema、严格 body/result、compat export 与非法状态；
 - Local admission/transport 覆盖认证与持久审计早于 body、512-byte hard cap、content-type/content-length/UTF-8/JSON 严格性、GET 零 body parser；
 - SQLite repository 覆盖 accepted、response-loss replay、already-requested、already-terminal、跨 Project、Role revoke/version drift、counter overflow、Event collision、rollback 与 bounded authority queue；
-- 真实 SQLite HTTP 覆盖 Owner/Operator allow、Viewer deny、credential confirm、durable Run/Event、取消 lifecycle 收敛与重启后可观察状态；
+- 真实 SQLite HTTP 覆盖 Owner/Operator allow、Viewer deny、credential confirm、durable Run/Event、取消 lifecycle 收敛与重启后可观察状态；Linux 虚拟化组合门必须在同一进程链证明 API→intent→真实 PID stop，固定物理设备报告仍独立采集；
 - Cluster canonical schema、完整源码、制品、Local image 与 PostgreSQL HA 门全绿，且 MCP Tool 清单和默认 Edge/Standalone import closure 不获得写 authority。
 
 ## 当前验证证据
@@ -45,4 +45,4 @@ D-283 后，Local `/api/v3` 已能按 Project 读取 Run、列表、RunEvent 与
 - 14 个 Profile artifact 全部 compatible。默认 Edge/Standalone 仅包含 SQLite/Runtime Core/SemVer，为 3,694,042/3,694,096 bytes、375 files、50 loaded modules；API 组合为 5,113,425/5,113,569 bytes。最紧 Application+AI 为 6,281,428/6,281,560 bytes，距 6 MiB 只余 10,028/9,896 bytes，后续增量必须先恢复包内可达文件裁剪余量，不得提高 cap。
 - AI/API-excluded arm64 Local image 为 478 files/4,717,459 bytes；Edge 128 MiB/64 PIDs 与 Standalone 256 MiB/256 PIDs 均在只读根、无网络、非 root 条件下 active→graceful stop，SQLite integrity 为 `ok`。
 - PostgreSQL 18.4 arm64 HA 112/112 gates、timeline 1→2；私有报告 SHA-256 为 `8416a26aa6220210961a40e22aec897215a55e59423ad48638ca203a8cb488e6`，离线审计 `compatible=true/findings=[]`，Docker 资源零残留。
-- HTTP→SQLite durable intent/exact replay、重启前 cancellation intent 收敛，以及 Linux `/proc` 真实进程 stop 已由相邻集成门分别证明；固定型号低配路由器上的同一 API→进程 stop 链尚无物理报告，因此本 ADR 保持 Proposed。
+- D-299/ADR-0387 已把相邻证据收敛为同一真实 arm64 Linux 链：可选 `edge/standalone-application-api` 制品经 HTTP `task.start` 拉起真实子进程，再经 HTTP cancellation 写入唯一 durable intent/Event，exact replay 不重复，execution-control 收敛 `run/attempt=cancelled`，`/proc/<pid>` 的精确 start identity 消失，重启后仍可读 cancelled。Edge 128 MiB/64 PIDs 与 Standalone 256 MiB/256 PIDs 报告均通过独立离线审计；两份报告明确标记 `physicalDevice:false`，因此不能替代固定型号低配路由器上的物理报告，本 ADR 保持 Proposed。

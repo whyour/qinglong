@@ -11,6 +11,24 @@
 
 最新增量证据（2026-08-12）：
 
+- D-299/ADR-0387（已接受）
+  Local `run.cancel` 已从“HTTP durable intent 与 `/proc` stop 分别验证”推进为同一次真实 Linux 组合门。门先用既有离线 pack/prune
+  生成可选 `edge/standalone-application-api` 最终制品，再在锁定 Node 24 arm64 Linux 容器内以 non-root、read-only root、network none、
+  capabilities none、0.5 CPU、Edge 128 MiB/64 PIDs 或 Standalone 256 MiB/256 PIDs 运行单进程 Local API。真实 HTTP `task.start`
+  拉起长期子进程，SQLite 持久 PID 后由 `/proc/<pid>/stat` 绑定 start ticks；真实 HTTP cancellation 必须得到
+  `accepted → already_requested`，最终只有 1 条 intent Event、1 条 cancelled Event、2 条 allowed audit，Run/Attempt 均 cancelled，精确
+  PID/start identity 消失，SQLite integrity `ok`，API 有序重启后仍通过 HTTP 观察 cancelled。Edge/Standalone 可选 API 制品为
+  3,668,052/3,668,196 bytes、429 files、85 modules，距 6 MiB 保留 2,623,404/2,623,260 bytes；API RSS 为
+  80,736,256/78,868,480 bytes，低于对应 envelope。两份 `0600` 私有报告经独立 audit 零 finding，SHA-256 分别为
+  `056f8f1c07f0c5dfe4552fcb605d6b55b194cd826dbf1c720b21fdba4bd55e53` 与
+  `223b7241ec3af8edea824dd802f24d573d0987c2ec55fd82b380c95acdf46ba7`。报告固定声明
+  `linux_virtualized_live_contract/physicalDevice:false`，因此关闭自动化组合缝隙但不冒充固定型号路由器报告，ADR-0372 继续保持
+  Proposed。实现只增强 artifact auditor 的可选临时输出并新增 scripts/test/CI，不新增 package、生产依赖、migration、表、默认 listener、
+  timer、watcher、连接、cache 或 sidecar；默认 API-excluded Edge/Standalone 产品闭包不变。完整 backend 为 1,180 tests、1,178 pass/2
+  conditional skip/0 fail，完整 18-package clean build/test 退出 0；package/dependency/local-image boundary 全绿，仍无 single-source/shallow
+  package。14 个 Profile artifact 全部 compatible，最小 Edge 为 2,467,343 bytes/295 files/53 modules，最重 Standalone MCP 为
+  7,168,978 bytes/778 files/213 modules，RSS delta 38,158,336 bytes，均低于各自预算。PostgreSQL 18.4 arm64 HA 干净重跑通过 123 gates、
+  timeline `1→2`，报告 SHA-256 `4bf01be43b6eaa0bb6b2d5a2510e6a701c7d02a0fe4a0f246e207cc2c63dc003`。
 - D-298/ADR-0386（已接受）
   Cluster `run.retry | run.stop` 已建立人工触发的真实三节点 Kubernetes 组合门：1 control-plane + 2 worker K3s/Flannel、3 实例
   CloudNativePG 1.30.0/PostgreSQL 18.4、2 个跨节点 Run manager Pod、TLS 1.3 mTLS、purpose-bound OIDC strong User、identity

@@ -284,8 +284,8 @@ function auditWorkflow(contents, findings) {
     'scripts/ql3-local-image-inventory.cjs',
     '--inventory-root=/opt/qinglong/node_modules',
     'node ../../scripts/ql3-build-package-closure.cjs',
-    '--profile=edge',
-    '--profile=standalone',
+    'node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=edge',
+    'node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=standalone',
   ];
   for (const value of required) {
     if (!job.includes(value)) {

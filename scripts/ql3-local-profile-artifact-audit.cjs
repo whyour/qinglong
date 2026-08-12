@@ -48,6 +48,35 @@ function boundedPositiveInteger(value, fallback, label) {
   return normalized;
 }
 
+function outputDirectoryArgument(value) {
+  if (value === undefined) return undefined;
+  if (
+    value.length < 1 ||
+    Buffer.byteLength(value, 'utf8') > 4_096 ||
+    value.includes('\0') ||
+    !path.isAbsolute(value) ||
+    path.normalize(value) !== value ||
+    path.parse(value).root === value
+  ) {
+    fail(
+      'output directory must be a normalized bounded absolute non-root path',
+    );
+  }
+  if (fs.existsSync(value)) {
+    fail('output directory must not already exist');
+  }
+  const parent = path.dirname(value);
+  const stat = fs.lstatSync(parent);
+  if (
+    !stat.isDirectory() ||
+    stat.isSymbolicLink() ||
+    fs.realpathSync(parent) !== parent
+  ) {
+    fail('output directory parent must be a canonical real directory');
+  }
+  return value;
+}
+
 function parseArguments(argv) {
   const profile = argv[0];
   if (
@@ -70,13 +99,23 @@ function parseArguments(argv) {
       'Profile must be edge, standalone, an adopted/application variant, an AI/API variant, or an MCP variant',
     );
   }
-  const values = Object.fromEntries(
-    argv.slice(1).map((argument) => {
-      const match = /^--([a-z-]+)=(\d+)$/.exec(argument);
-      if (!match) fail(`unsupported argument ${argument}`);
-      return [match[1], match[2]];
-    }),
-  );
+  const values = {};
+  for (const argument of argv.slice(1)) {
+    const match = /^--([a-z-]+)=(.+)$/.exec(argument);
+    if (!match || Object.hasOwn(values, match[1])) {
+      fail(`unsupported argument ${argument}`);
+    }
+    values[match[1]] = match[2];
+  }
+  const supported = new Set([
+    'max-artifact-files',
+    'max-artifact-bytes',
+    'max-rss-delta-bytes',
+    'output-directory',
+  ]);
+  for (const name of Object.keys(values)) {
+    if (!supported.has(name)) fail(`unsupported argument --${name}`);
+  }
   return Object.freeze({
     profile,
     runtimeProfile: profile.startsWith('edge') ? 'edge' : 'standalone',
@@ -128,6 +167,7 @@ function parseArguments(argv) {
       profile.includes('-application') && profile.endsWith('-ai')
         ? MIN_APPLICATION_AI_ARTIFACT_HEADROOM_BYTES
         : 0,
+    outputDirectory: outputDirectoryArgument(values['output-directory']),
   });
 }
 
@@ -221,8 +261,7 @@ function auditImportClosure(
   }
   const forbidden = result.loaded.filter(
     (filePath) =>
-      (!allowSemver &&
-        /node_modules[\\/]semver(?:[\\/]|$)/i.test(filePath)) ||
+      (!allowSemver && /node_modules[\\/]semver(?:[\\/]|$)/i.test(filePath)) ||
       /(?:node_modules[\\/](?:croner|pg|drizzle-orm|sequelize|sqlite3)(?:[\\/]|$)|node_modules[\\/]@qinglong[\\/]cluster-|local-sqlite[\\/]dist[\\/]migration\.js$|local-sqlite[\\/]dist[\\/]migrations[\\/])/i.test(
         filePath,
       ),
@@ -309,8 +348,7 @@ function auditLocalApiExecutable(artifactDirectory) {
     artifactDirectory,
   );
   if (
-    output !==
-    'Usage: ql3-local-api --config /absolute/private-config.json'
+    output !== 'Usage: ql3-local-api --config /absolute/private-config.json'
   ) {
     fail('local API executable help output is invalid');
   }
@@ -670,6 +708,13 @@ function main() {
         `import RSS delta is ${closure.rssDeltaBytes} bytes, budget is ${options.maxRssDeltaBytes}`,
       );
     }
+    if (options.outputDirectory !== undefined) {
+      fs.cpSync(artifactDirectory, options.outputDirectory, {
+        recursive: true,
+        errorOnExist: true,
+        force: false,
+      });
+    }
     process.stdout.write(
       `${JSON.stringify({
         schemaVersion: 1,
@@ -680,8 +725,7 @@ function main() {
         maxArtifactFiles: options.maxArtifactFiles,
         maxArtifactBytes: options.maxArtifactBytes,
         artifactHeadroomBytes,
-        minimumArtifactHeadroomBytes:
-          options.minimumArtifactHeadroomBytes,
+        minimumArtifactHeadroomBytes: options.minimumArtifactHeadroomBytes,
         prunedRuntimeDevelopmentFiles: prunedRuntimeArtifact.development.files,
         prunedRuntimeDevelopmentBytes: prunedRuntimeArtifact.development.bytes,
         runtimeJavaScriptFilesBefore:
@@ -716,10 +760,8 @@ function main() {
           prunedRuntimeArtifact.packageManifests.runtimeExports
             .excludedSpecifiers,
         prunedRuntimeArtifactBytes: prunedRuntimeArtifact.savedBytes,
-        prunedMcpExternalDevelopmentFiles:
-          prunedMcpExternalDevelopment.files,
-        prunedMcpExternalDevelopmentBytes:
-          prunedMcpExternalDevelopment.bytes,
+        prunedMcpExternalDevelopmentFiles: prunedMcpExternalDevelopment.files,
+        prunedMcpExternalDevelopmentBytes: prunedMcpExternalDevelopment.bytes,
         loadedModuleCount: closure.loadedModuleCount,
         rssDeltaBytes: closure.rssDeltaBytes,
         maxRssDeltaBytes: options.maxRssDeltaBytes,

@@ -435,6 +435,21 @@ jobs:
         run: |
           node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=edge
           node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=standalone
+      - name: Run authenticated Local API cancellation through real Linux processes
+        env:
+          QL3_LOCAL_API_CANCELLATION_LIVE: '1'
+        run: |
+          install -d -m 0700 "${{ runner.temp }}/ql3-local-api-cancellation"
+          node scripts/ql3-local-api-cancellation-live-contract.cjs \
+            --profile=edge \
+            --report="${{ runner.temp }}/ql3-local-api-cancellation/edge.json"
+          node scripts/ql3-local-api-cancellation-live-contract.cjs \
+            --profile=standalone \
+            --report="${{ runner.temp }}/ql3-local-api-cancellation/standalone.json"
+          node scripts/ql3-local-api-cancellation-live-audit.cjs \
+            --report="${{ runner.temp }}/ql3-local-api-cancellation/edge.json"
+          node scripts/ql3-local-api-cancellation-live-audit.cjs \
+            --report="${{ runner.temp }}/ql3-local-api-cancellation/standalone.json"
 
   cluster-image:
     name: Cluster ${{ matrix.image }} image (${{ matrix.image_arch }})
