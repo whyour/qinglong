@@ -69,6 +69,21 @@ contents are deliberately forbidden. There is no home-directory, environment
 or ambient Kubernetes context discovery. Existing explicit `--config` calls
 remain supported when `--context` is absent.
 
+Validate the complete local operator context before a maintenance window:
+
+```sh
+ql3-cluster-admin context validate \
+  --context=/secure/qinglong3/operator-context.json
+```
+
+This command reuses the production client parsers to validate every selected
+endpoint shape, CA, matching client certificate/private key and the bounded
+Kubernetes config. It also verifies that all seven facade targets exist in the
+same installation. It does not read a command or assertion, open a network
+connection, query Kubernetes or mutate the cluster. Its JSON summary contains
+only command names and reviewed transport/authentication classes; paths,
+endpoints, namespaces, context names and credentials are never emitted.
+
 The runtime image installs only the 43 external packages reachable from the
 five exact production roots in its production-only lock plus `runtime-core`,
 `cluster-postgres` and `cluster-control`: 46 runtime components in total. The

@@ -5,6 +5,7 @@ import { constants } from 'node:os';
 
 import { resolveQingLong3ClusterProductCommand } from './productCommand';
 import { QingLong3ClusterProductContextError } from './productContext';
+import { validateQingLong3ClusterProductContext } from './productContext';
 
 const FORWARDED_SIGNALS = Object.freeze([
   'SIGINT',
@@ -108,7 +109,7 @@ function invoke(targetFilePath: string, argv: readonly string[]): void {
   });
 }
 
-function main(argv: readonly string[]): void {
+async function main(argv: readonly string[]): Promise<void> {
   try {
     const resolution = resolveQingLong3ClusterProductCommand(argv, __dirname);
     if (resolution.kind === 'help' || resolution.kind === 'version') {
@@ -122,6 +123,13 @@ function main(argv: readonly string[]): void {
         )}\n`,
       );
       process.exitCode = 64;
+      return;
+    }
+    if (resolution.kind === 'context-validation') {
+      const result = await validateQingLong3ClusterProductContext(
+        resolution.contextFile,
+      );
+      process.stdout.write(`${JSON.stringify(result)}\n`);
       return;
     }
     invoke(resolution.targetFilePath, resolution.argv);
@@ -157,5 +165,5 @@ function main(argv: readonly string[]): void {
 }
 
 if (require.main === module) {
-  main(process.argv.slice(2));
+  void main(process.argv.slice(2));
 }

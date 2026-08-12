@@ -9,6 +9,18 @@ const { test } = require('node:test');
 const packageRoot = path.resolve(__dirname, '..');
 const moduleDirectory = path.join(packageRoot, 'dist', 'product-cli');
 const cliPath = path.join(moduleDirectory, 'cli.js');
+const certificateFixture = path.join(
+  packageRoot,
+  'test',
+  'fixtures',
+  'management-service-cert.pem',
+);
+const privateKeyFixture = path.join(
+  packageRoot,
+  'test',
+  'fixtures',
+  'management-service-key.pem',
+);
 const manifest = JSON.parse(
   fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
 );
@@ -26,6 +38,9 @@ const {
   loadQingLong3ClusterProductContext,
   resolveQingLong3ClusterProductContextArguments,
 } = require('../dist/product-cli/productContext.js');
+const {
+  validateClusterAuthenticatedManagementClientConfiguration,
+} = require('../dist/management-support/pluginPackageManagementClient.js');
 
 function runCli(args) {
   return spawnSync(process.execPath, [cliPath, ...args], {
@@ -63,6 +78,135 @@ function contextFixture(t) {
     }),
   );
   return { directory, runConfig, packageConfig, kubernetes, contextFile };
+}
+
+function validContextFixture(t) {
+  const directory = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-cluster-valid-context-')),
+  );
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const caFile = privateFile(
+    directory,
+    'management-ca.pem',
+    fs.readFileSync(certificateFixture),
+  );
+  const clientCertificateFile = privateFile(
+    directory,
+    'operator-certificate.pem',
+    fs.readFileSync(certificateFixture),
+  );
+  const clientPrivateKeyFile = privateFile(
+    directory,
+    'operator-private-key.pem',
+    fs.readFileSync(privateKeyFixture),
+  );
+  function config(name, managementPath, clientCertificate) {
+    return privateFile(
+      directory,
+      `${name}.json`,
+      JSON.stringify({
+        schemaVersion: 1,
+        endpoint: `https://manager.example.test:8443${managementPath}`,
+        servername: 'manager.example.test',
+        caFile,
+        ...(clientCertificate === 'required'
+          ? { clientCertificateFile, clientPrivateKeyFile }
+          : {}),
+        requestTimeoutMs: 1_000,
+      }),
+    );
+  }
+  const packageConfig = config(
+    'package-client',
+    '/api/v3/plugin-packages/management',
+    'forbidden',
+  );
+  const kubeconfigFile = privateFile(
+    directory,
+    'kubeconfig.json',
+    JSON.stringify({
+      apiVersion: 'v1',
+      kind: 'Config',
+      clusters: [
+        {
+          name: 'production',
+          cluster: {
+            server: 'https://kubernetes.example.test:6443',
+            'certificate-authority-data': fs
+              .readFileSync(certificateFixture)
+              .toString('base64'),
+          },
+        },
+      ],
+      users: [{ name: 'operator', user: { token: 'bounded-token' } }],
+      contexts: [
+        {
+          name: 'production',
+          context: {
+            cluster: 'production',
+            user: 'operator',
+            namespace: 'qinglong3',
+          },
+        },
+      ],
+      'current-context': 'production',
+    }),
+  );
+  const kubernetesFile = privateFile(
+    directory,
+    'kubernetes-client.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      kubeconfigFile,
+      context: 'production',
+      namespace: 'qinglong3',
+      apiTimeoutMs: 1_000,
+    }),
+  );
+  const commands = {
+    package: { configFile: packageConfig },
+    'package-kubernetes': { configFile: packageConfig, kubernetesFile },
+    'worker-credential': {
+      configFile: config(
+        'worker-client',
+        '/api/v3/worker-credentials/management',
+        'required',
+      ),
+    },
+    approval: {
+      configFile: config(
+        'approval-client',
+        '/api/v3/approvals/management',
+        'required',
+      ),
+    },
+    run: {
+      configFile: config('run-client', '/api/v3/runs/management', 'required'),
+    },
+    automation: {
+      configFile: config(
+        'automation-client',
+        '/api/v3/automations/management',
+        'required',
+      ),
+    },
+    'model-credential': {
+      configFile: config(
+        'provider-client',
+        '/api/v3/provider-credentials/management',
+        'required',
+      ),
+    },
+  };
+  return {
+    directory,
+    contextFile: privateFile(
+      directory,
+      'operator-context.json',
+      JSON.stringify({ schemaVersion: 1, commands }),
+    ),
+    commands,
+  };
 }
 
 test('catalog exposes only reviewed remote clients from the same package', () => {
@@ -316,6 +460,126 @@ test('operator context rejects weak files, unknown or secret fields and argument
         moduleDirectory,
       ),
     /operator context is invalid/,
+  );
+});
+
+test('validates the complete operator context offline without operational authority', (t) => {
+  const fixture = validContextFixture(t);
+  const resolution = resolveQingLong3ClusterProductCommand(
+    ['context', 'validate', `--context=${fixture.contextFile}`],
+    moduleDirectory,
+  );
+  assert.deepEqual(resolution, {
+    kind: 'context-validation',
+    contextFile: fixture.contextFile,
+  });
+
+  const validated = runCli([
+    'context',
+    'validate',
+    `--context=${fixture.contextFile}`,
+  ]);
+  assert.equal(validated.status, 0);
+  assert.equal(validated.stderr, '');
+  const fact = JSON.parse(validated.stdout);
+  assert.deepEqual(fact, {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-product-cli',
+    event: 'context_valid',
+    commandCount: 7,
+    commands: [
+      { name: 'package', transport: 'https', clientCertificate: 'forbidden' },
+      {
+        name: 'package-kubernetes',
+        transport: 'kubernetes-port-forward',
+        clientCertificate: 'forbidden',
+        kubernetesAuthentication: 'token',
+      },
+      {
+        name: 'worker-credential',
+        transport: 'https',
+        clientCertificate: 'required',
+      },
+      { name: 'approval', transport: 'https', clientCertificate: 'required' },
+      { name: 'run', transport: 'https', clientCertificate: 'required' },
+      {
+        name: 'automation',
+        transport: 'https',
+        clientCertificate: 'required',
+      },
+      {
+        name: 'model-credential',
+        transport: 'https',
+        clientCertificate: 'required',
+      },
+    ],
+    networkAccess: false,
+    mutation: false,
+  });
+  assert.equal(validated.stdout.includes(fixture.directory), false);
+  assert.equal(validated.stdout.includes('manager.example.test'), false);
+  assert.equal(validated.stdout.includes('bounded-token'), false);
+});
+
+test('context validation fails closed for invalid client configuration and syntax', (t) => {
+  const fixture = validContextFixture(t);
+  fs.writeFileSync(fixture.commands.run.configFile, '{}', { mode: 0o600 });
+  const invalid = runCli([
+    'context',
+    'validate',
+    `--context=${fixture.contextFile}`,
+  ]);
+  assert.equal(invalid.status, 78);
+  assert.equal(invalid.stdout, '');
+  assert.deepEqual(JSON.parse(invalid.stderr), {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-product-cli',
+    code: 'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID',
+    message: 'QingLong 3.0 Cluster operator context is invalid',
+  });
+  assert.equal(invalid.stderr.includes(fixture.directory), false);
+
+  for (const argv of [
+    ['context'],
+    ['context', 'validate'],
+    ['context', 'validate', '--context'],
+    ['context', 'validate', '--context='],
+    ['context', 'inspect', `--context=${fixture.contextFile}`],
+  ]) {
+    const rejected = resolveQingLong3ClusterProductCommand(
+      argv,
+      moduleDirectory,
+    );
+    assert.equal(rejected.kind, 'invalid');
+    assert.equal(rejected.code, 'QL3_CLUSTER_PRODUCT_CLI_USAGE_INVALID');
+  }
+});
+
+test('configuration preflight fixes every management route to its reviewed authentication class', (t) => {
+  const fixture = validContextFixture(t);
+  assert.throws(
+    () =>
+      validateClusterAuthenticatedManagementClientConfiguration(
+        fixture.commands.run.configFile,
+        'package',
+      ),
+    /configuration is invalid/,
+  );
+  assert.throws(
+    () =>
+      validateClusterAuthenticatedManagementClientConfiguration(
+        fixture.commands.package.configFile,
+        'run',
+      ),
+    /configuration is invalid/,
+  );
+  assert.throws(
+    () =>
+      validateClusterAuthenticatedManagementClientConfiguration(
+        fixture.commands.package.configFile,
+        'unknown',
+      ),
+    /configuration is invalid/,
   );
 });
 

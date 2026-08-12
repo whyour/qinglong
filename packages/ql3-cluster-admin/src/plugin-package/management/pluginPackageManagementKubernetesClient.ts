@@ -49,6 +49,20 @@ interface ReviewedKubernetesClientConfig {
   readonly apiTimeoutMs: number;
 }
 
+export interface ClusterPluginPackageManagementKubernetesConfigurationSummary {
+  readonly schemaVersion: 1;
+  readonly transport: 'kubernetes-port-forward';
+  readonly authentication: 'token' | 'client-certificate';
+}
+
+interface PreparedKubernetesClientConfiguration {
+  readonly config: Readonly<ReviewedKubernetesClientConfig>;
+  readonly kubeConfig: KubernetesConfig;
+  readonly kubernetes: KubernetesModule;
+  readonly authentication: 'token' | 'client-certificate';
+  dispose(): void;
+}
+
 interface KubernetesPod {
   readonly metadata?: {
     readonly name?: string;
@@ -450,6 +464,95 @@ function validateKubeConfig(
   }
 }
 
+async function prepareKubernetesClientConfiguration(
+  kubernetesFile: string,
+): Promise<PreparedKubernetesClientConfiguration> {
+  let kubernetesConfigBytes: Buffer | undefined;
+  let kubeconfigBytes: Buffer | undefined;
+  try {
+    kubernetesConfigBytes = readPrivateFile(
+      kubernetesFile,
+      MAX_KUBERNETES_CONFIG_BYTES,
+    );
+    const config = normalizeConfig(parseJson(kubernetesConfigBytes));
+    kubeconfigBytes = readPrivateFile(
+      config.kubeconfigFile,
+      MAX_KUBECONFIG_BYTES,
+    );
+    const rawKubeconfig = parseJson(kubeconfigBytes);
+    validateRawKubeconfig(rawKubeconfig, config);
+    let kubernetes: KubernetesModule;
+    try {
+      kubernetes = await import('@kubernetes/client-node');
+    } catch (error) {
+      throw new ClusterPluginPackageManagementKubernetesClientTunnelError(
+        error,
+      );
+    }
+    const kubeConfig = new kubernetes.KubeConfig();
+    try {
+      kubeConfig.loadFromString(decodeUtf8(kubeconfigBytes));
+      validateKubeConfig(kubeConfig, config);
+    } catch (error) {
+      if (
+        error instanceof
+        ClusterPluginPackageManagementKubernetesClientConfigurationError
+      ) {
+        throw error;
+      }
+      throw configurationFailure();
+    }
+    const rawUser = (rawKubeconfig as JsonObject).users as readonly JsonObject[];
+    const authentication = Object.hasOwn(
+      rawUser[0]!.user as object,
+      'token',
+    )
+      ? 'token'
+      : 'client-certificate';
+    let disposed = false;
+    return Object.freeze({
+      config,
+      kubeConfig,
+      kubernetes,
+      authentication,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        kubernetesConfigBytes?.fill(0);
+        kubeconfigBytes?.fill(0);
+      },
+    });
+  } catch (error) {
+    kubernetesConfigBytes?.fill(0);
+    kubeconfigBytes?.fill(0);
+    if (
+      error instanceof
+        ClusterPluginPackageManagementKubernetesClientConfigurationError ||
+      error instanceof ClusterPluginPackageManagementKubernetesClientTunnelError
+    ) {
+      throw error;
+    }
+    throw configurationFailure();
+  }
+}
+
+export async function validateClusterPluginPackageManagementKubernetesConfiguration(
+  kubernetesFile: string,
+): Promise<
+  Readonly<ClusterPluginPackageManagementKubernetesConfigurationSummary>
+> {
+  const prepared = await prepareKubernetesClientConfiguration(kubernetesFile);
+  try {
+    return Object.freeze({
+      schemaVersion: 1,
+      transport: 'kubernetes-port-forward',
+      authentication: prepared.authentication,
+    });
+  } finally {
+    prepared.dispose();
+  }
+}
+
 function isReviewedPod(
   value: KubernetesPod,
   namespace: string,
@@ -681,34 +784,12 @@ export async function executeClusterPluginPackageManagementKubernetesClient(
     throw configurationFailure();
   }
 
-  let kubernetesConfigBytes: Buffer | undefined;
-  let kubeconfigBytes: Buffer | undefined;
+  let prepared: PreparedKubernetesClientConfiguration | undefined;
   try {
-    kubernetesConfigBytes = readPrivateFile(
+    prepared = await prepareKubernetesClientConfiguration(
       paths.kubernetesFile,
-      MAX_KUBERNETES_CONFIG_BYTES,
     );
-    const config = normalizeConfig(parseJson(kubernetesConfigBytes));
-    kubeconfigBytes = readPrivateFile(
-      config.kubeconfigFile,
-      MAX_KUBECONFIG_BYTES,
-    );
-    const kubernetes = await import('@kubernetes/client-node');
-    const kubeConfig = new kubernetes.KubeConfig();
-    try {
-      const kubeconfigText = decodeUtf8(kubeconfigBytes);
-      validateRawKubeconfig(parseJson(kubeconfigBytes), config);
-      kubeConfig.loadFromString(kubeconfigText);
-      validateKubeConfig(kubeConfig, config);
-    } catch (error) {
-      if (
-        error instanceof
-        ClusterPluginPackageManagementKubernetesClientConfigurationError
-      ) {
-        throw error;
-      }
-      throw configurationFailure();
-    }
+    const { config, kubeConfig, kubernetes } = prepared;
     const runtime = (options.createRuntime ?? productionRuntime)(
       kubeConfig,
       kubernetes,
@@ -790,7 +871,6 @@ export async function executeClusterPluginPackageManagementKubernetesClient(
       error,
     );
   } finally {
-    kubernetesConfigBytes?.fill(0);
-    kubeconfigBytes?.fill(0);
+    prepared?.dispose();
   }
 }

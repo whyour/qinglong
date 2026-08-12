@@ -11,6 +11,18 @@
 
 最新增量证据（2026-08-13）：
 
+- D-302/ADR-0390（已接受）
+  Cluster operator context 增加无网络、无 mutation 的内建 `ql3-cluster-admin context validate` 预检。它先复用 owner-private context
+  reader，再让每个 entry 经过与真实请求相同的 production HTTPS/Kubernetes configuration preparation，验证精确 route、hostname、CA、
+  client certificate/private key 配对、embedded Kubernetes credential/config 与同安装七项 client target；只有真实命令才读取 command/
+  assertion、创建 Pod client、PortForward、socket 或 deadline timer。成功结果只暴露固定 command、transport/authentication class 与
+  `networkAccess:false/mutation:false`，不输出路径、endpoint、port、namespace、context、证书主体或 credential。实现仍内聚在既有
+  Cluster Admin product/client 目录，不新增 package、依赖、binary、listener、timer、数据库或 workload，Local/Edge、Control、Worker 零导入。
+  product/preflight 11/11、七类 client/tunnel 定向 45/45；Cluster Admin 完整 296 pass/2 条件 skip，18-package clean build/test 退出 0，
+  backend 1,187 pass/2 skip，五项边界审计零 finding。真实 arm64 Admin image 为 330,463,528 bytes，较 D-301 增加 10,219 bytes，并在
+  `10001:10001`、network none、read-only root、drop ALL、128 MiB/32 PIDs 下报告 `contextPreflight=true`。14 个 Local Profile artifact
+  字节数与 D-301 完全一致。PostgreSQL 18.4 arm64 HA 123 项 gate 全绿、timeline `1→2`，证据 SHA-256 为
+  `339cd10e1da2428da6c099c52c2397d5f79f7cb32b64b7e1ae927d2803b8cfc0`，离线审计及 Docker 清理通过。完整证据见 ADR-0390。
 - D-301/ADR-0389（已接受）
   `ql3-cluster-admin` 现在可通过显式 `--context=/absolute/operator-context.json` 复用七个远程 client 的稳定路径，同时保持每次
   command 与短生命周期强 assertion 必须显式传入。schema v1 只允许 catalog command → `configFile`，Kubernetes tunnel 精确多一个

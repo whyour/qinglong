@@ -23,14 +23,48 @@ import {
 } from '../plugin-package/management/pluginPackageManagementTransport';
 
 const MANAGEMENT_PATH = '/api/v3/plugin-packages/management';
-const ALLOWED_MANAGEMENT_PATHS = new Set([
-  MANAGEMENT_PATH,
-  '/api/v3/worker-credentials/management',
-  '/api/v3/automations/management',
-  '/api/v3/approvals/management',
-  '/api/v3/provider-credentials/management',
-  '/api/v3/runs/management',
-]);
+export type ClusterAuthenticatedManagementClientKind =
+  | 'package'
+  | 'worker-credential'
+  | 'automation'
+  | 'approval'
+  | 'model-credential'
+  | 'run';
+
+const MANAGEMENT_CLIENT_POLICIES: Readonly<
+  Record<
+    ClusterAuthenticatedManagementClientKind,
+    Readonly<{
+      managementPath: string;
+      clientCertificate: 'forbidden' | 'required';
+    }>
+  >
+> = Object.freeze({
+  package: Object.freeze({
+    managementPath: MANAGEMENT_PATH,
+    clientCertificate: 'forbidden',
+  }),
+  'worker-credential': Object.freeze({
+    managementPath: '/api/v3/worker-credentials/management',
+    clientCertificate: 'required',
+  }),
+  automation: Object.freeze({
+    managementPath: '/api/v3/automations/management',
+    clientCertificate: 'required',
+  }),
+  approval: Object.freeze({
+    managementPath: '/api/v3/approvals/management',
+    clientCertificate: 'required',
+  }),
+  'model-credential': Object.freeze({
+    managementPath: '/api/v3/provider-credentials/management',
+    clientCertificate: 'required',
+  }),
+  run: Object.freeze({
+    managementPath: '/api/v3/runs/management',
+    clientCertificate: 'required',
+  }),
+});
 const MAX_CONFIG_BYTES = 16 * 1024;
 const MAX_ASSERTION_BYTES = 16 * 1024;
 const MAX_COMMAND_BYTES = 256 * 1024;
@@ -778,68 +812,48 @@ function rawHeaderCount(rawHeaders: readonly string[], name: string): number {
   return count;
 }
 
-export async function executeClusterAuthenticatedManagementClient<
-  Command,
-  Result,
->(
-  paths: ClusterPluginPackageManagementClientPaths,
-  protocol: ClusterAuthenticatedManagementClientProtocol<Command, Result>,
-  connectionOptions?: ClusterPluginPackageManagementClientConnectionOptions,
-): Promise<Readonly<ClusterAuthenticatedManagementClientResult<Result>>> {
-  exactObject(paths, ['configFile', 'commandFile', 'assertionFile']);
+export interface ClusterAuthenticatedManagementClientConfigurationSummary {
+  readonly schemaVersion: 1;
+  readonly managementPath: string;
+  readonly transport: 'https';
+  readonly clientCertificate: 'forbidden' | 'required';
+}
+
+interface PreparedClusterAuthenticatedManagementClientConfiguration {
+  readonly endpoint: URL;
+  readonly servername: string;
+  readonly port: number;
+  readonly requestTimeoutMs: number;
+  readonly caBytes: Buffer;
+  readonly clientCertificateBytes?: Buffer;
+  readonly clientPrivateKeyBytes?: Buffer;
+  dispose(): void;
+}
+
+function prepareClusterAuthenticatedManagementClientConfiguration(
+  configFile: string,
+  managementPath: string,
+  clientCertificate: 'forbidden' | 'required',
+): PreparedClusterAuthenticatedManagementClientConfiguration {
   if (
-    !protocol ||
-    typeof protocol !== 'object' ||
-    Array.isArray(protocol) ||
-    Object.keys(protocol).length !== 4 ||
-    Object.keys(protocol).some(
-      (key) =>
-        ![
-          'managementPath',
-          'clientCertificate',
-          'normalizeCommand',
-          'validateResult',
-        ].includes(key),
-    ) ||
-    !ALLOWED_MANAGEMENT_PATHS.has(protocol.managementPath) ||
-    !['forbidden', 'required'].includes(protocol.clientCertificate) ||
-    typeof protocol.normalizeCommand !== 'function' ||
-    typeof protocol.validateResult !== 'function' ||
-    (connectionOptions !== undefined &&
-      (!connectionOptions ||
-        typeof connectionOptions !== 'object' ||
-        Array.isArray(connectionOptions) ||
-        Object.keys(connectionOptions).length !== 1 ||
-        typeof connectionOptions.connect !== 'function'))
+    !Object.values(MANAGEMENT_CLIENT_POLICIES).some(
+      (policy) =>
+        policy.managementPath === managementPath &&
+        policy.clientCertificate === clientCertificate,
+    )
   ) {
     throw configurationFailure();
   }
   let configBytes: Buffer | undefined;
-  let commandBytes: Buffer | undefined;
-  let assertionBytes: Buffer | undefined;
   let caBytes: Buffer | undefined;
   let clientCertificateBytes: Buffer | undefined;
   let clientPrivateKeyBytes: Buffer | undefined;
   try {
-    configBytes = readCanonicalFile(
-      paths.configFile,
-      MAX_CONFIG_BYTES,
-      'private',
-    );
-    commandBytes = readCanonicalFile(
-      paths.commandFile,
-      MAX_COMMAND_BYTES,
-      'private',
-    );
-    assertionBytes = readCanonicalFile(
-      paths.assertionFile,
-      MAX_ASSERTION_BYTES,
-      'private',
-    );
+    configBytes = readCanonicalFile(configFile, MAX_CONFIG_BYTES, 'private');
     const config = parseJson(configBytes);
     exactObject(
       config,
-      protocol.clientCertificate === 'required'
+      clientCertificate === 'required'
         ? [
             'schemaVersion',
             'endpoint',
@@ -864,7 +878,7 @@ export async function executeClusterAuthenticatedManagementClient<
       !DNS_NAME_PATTERN.test(config.servername) ||
       isIP(config.servername) !== 0 ||
       typeof config.caFile !== 'string' ||
-      (protocol.clientCertificate === 'required' &&
+      (clientCertificate === 'required' &&
         (typeof config.clientCertificateFile !== 'string' ||
           typeof config.clientPrivateKeyFile !== 'string')) ||
       !Number.isSafeInteger(config.requestTimeoutMs) ||
@@ -874,7 +888,6 @@ export async function executeClusterAuthenticatedManagementClient<
       throw configurationFailure();
     }
     const servername = config.servername;
-    const caFile = config.caFile;
     const requestTimeoutMs = config.requestTimeoutMs as number;
     let endpoint: URL;
     try {
@@ -888,7 +901,7 @@ export async function executeClusterAuthenticatedManagementClient<
       endpoint.password !== '' ||
       endpoint.search !== '' ||
       endpoint.hash !== '' ||
-      endpoint.pathname !== protocol.managementPath ||
+      endpoint.pathname !== managementPath ||
       endpoint.hostname !== servername ||
       isIP(endpoint.hostname) !== 0
     ) {
@@ -898,13 +911,17 @@ export async function executeClusterAuthenticatedManagementClient<
     if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
       throw configurationFailure();
     }
-    caBytes = readCanonicalFile(caFile, MAX_CA_BYTES, 'public-integrity');
+    caBytes = readCanonicalFile(
+      config.caFile as string,
+      MAX_CA_BYTES,
+      'public-integrity',
+    );
     try {
       new X509Certificate(caBytes);
     } catch {
       throw configurationFailure();
     }
-    if (protocol.clientCertificate === 'required') {
+    if (clientCertificate === 'required') {
       clientCertificateBytes = readCanonicalFile(
         config.clientCertificateFile as string,
         MAX_CLIENT_CERTIFICATE_BYTES,
@@ -931,6 +948,134 @@ export async function executeClusterAuthenticatedManagementClient<
         throw configurationFailure();
       }
     }
+    let disposed = false;
+    return Object.freeze({
+      endpoint,
+      servername,
+      port,
+      requestTimeoutMs,
+      caBytes,
+      ...(clientCertificateBytes === undefined
+        ? {}
+        : {
+            clientCertificateBytes,
+            clientPrivateKeyBytes: clientPrivateKeyBytes!,
+          }),
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        caBytes?.fill(0);
+        clientCertificateBytes?.fill(0);
+        clientPrivateKeyBytes?.fill(0);
+      },
+    });
+  } catch (error) {
+    caBytes?.fill(0);
+    clientCertificateBytes?.fill(0);
+    clientPrivateKeyBytes?.fill(0);
+    if (
+      error instanceof ClusterPluginPackageManagementClientConfigurationError
+    ) {
+      throw error;
+    }
+    throw configurationFailure();
+  } finally {
+    configBytes?.fill(0);
+  }
+}
+
+export function validateClusterAuthenticatedManagementClientConfiguration(
+  configFile: string,
+  kind: ClusterAuthenticatedManagementClientKind,
+): Readonly<ClusterAuthenticatedManagementClientConfigurationSummary> {
+  const policy = MANAGEMENT_CLIENT_POLICIES[kind];
+  if (policy === undefined) throw configurationFailure();
+  const prepared = prepareClusterAuthenticatedManagementClientConfiguration(
+    configFile,
+    policy.managementPath,
+    policy.clientCertificate,
+  );
+  try {
+    return Object.freeze({
+      schemaVersion: 1,
+      managementPath: policy.managementPath,
+      transport: 'https',
+      clientCertificate: policy.clientCertificate,
+    });
+  } finally {
+    prepared.dispose();
+  }
+}
+
+export async function executeClusterAuthenticatedManagementClient<
+  Command,
+  Result,
+>(
+  paths: ClusterPluginPackageManagementClientPaths,
+  protocol: ClusterAuthenticatedManagementClientProtocol<Command, Result>,
+  connectionOptions?: ClusterPluginPackageManagementClientConnectionOptions,
+): Promise<Readonly<ClusterAuthenticatedManagementClientResult<Result>>> {
+  exactObject(paths, ['configFile', 'commandFile', 'assertionFile']);
+  if (
+    !protocol ||
+    typeof protocol !== 'object' ||
+    Array.isArray(protocol) ||
+    Object.keys(protocol).length !== 4 ||
+    Object.keys(protocol).some(
+      (key) =>
+        ![
+          'managementPath',
+          'clientCertificate',
+          'normalizeCommand',
+          'validateResult',
+        ].includes(key),
+    ) ||
+    !Object.values(MANAGEMENT_CLIENT_POLICIES).some(
+      (policy) =>
+        policy.managementPath === protocol.managementPath &&
+        policy.clientCertificate === protocol.clientCertificate,
+    ) ||
+    typeof protocol.normalizeCommand !== 'function' ||
+    typeof protocol.validateResult !== 'function' ||
+    (connectionOptions !== undefined &&
+      (!connectionOptions ||
+        typeof connectionOptions !== 'object' ||
+        Array.isArray(connectionOptions) ||
+        Object.keys(connectionOptions).length !== 1 ||
+        typeof connectionOptions.connect !== 'function'))
+  ) {
+    throw configurationFailure();
+  }
+  let commandBytes: Buffer | undefined;
+  let assertionBytes: Buffer | undefined;
+  let prepared:
+    | PreparedClusterAuthenticatedManagementClientConfiguration
+    | undefined;
+  try {
+    prepared = prepareClusterAuthenticatedManagementClientConfiguration(
+      paths.configFile,
+      protocol.managementPath,
+      protocol.clientCertificate,
+    );
+    commandBytes = readCanonicalFile(
+      paths.commandFile,
+      MAX_COMMAND_BYTES,
+      'private',
+    );
+    assertionBytes = readCanonicalFile(
+      paths.assertionFile,
+      MAX_ASSERTION_BYTES,
+      'private',
+    );
+    const {
+      endpoint,
+      servername,
+      port,
+      requestTimeoutMs,
+      caBytes,
+      clientCertificateBytes,
+      clientPrivateKeyBytes,
+    } = prepared;
     const command = protocol.normalizeCommand(parseJson(commandBytes));
     const assertion = assertionBytes.toString('ascii');
     if (
@@ -1186,12 +1331,9 @@ export async function executeClusterAuthenticatedManagementClient<
       }
     }
   } finally {
-    configBytes?.fill(0);
     commandBytes?.fill(0);
     assertionBytes?.fill(0);
-    caBytes?.fill(0);
-    clientCertificateBytes?.fill(0);
-    clientPrivateKeyBytes?.fill(0);
+    prepared?.dispose();
   }
 }
 

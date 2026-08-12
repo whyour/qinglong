@@ -28,6 +28,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       runtimeInventory: true,
       clusterAdminProductFacade: true,
       clusterAdminOperatorContext: true,
+      clusterAdminContextPreflight: true,
       ociAttestations: true,
       osVulnerabilityScan: {
         scanner: 'trivy@0.70.0',
@@ -123,6 +124,24 @@ test('rejects a Cluster Admin live gate that omits operator context injection', 
         contract.replace('operatorContext: true', 'operatorContext: false'),
       ),
     /owner-private operator context injection/,
+  );
+});
+
+test('rejects a Cluster Admin live gate that omits offline context preflight', () => {
+  const contract = fs.readFileSync(
+    path.join(root, 'scripts/ql3-cluster-admin-product-live-contract.cjs'),
+    'utf8',
+  );
+  assert.throws(
+    () =>
+      auditClusterImageCiWorkflow(
+        ciSource,
+        contract.replace(
+          'operatorContext: true,\n      contextPreflight: true',
+          'operatorContext: true,\n      contextPreflight: false',
+        ),
+      ),
+    /offline preflight/,
   );
 });
 

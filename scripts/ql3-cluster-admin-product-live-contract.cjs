@@ -80,11 +80,13 @@ function runOperatorContextContract(image) {
   const source = String.raw`
 const { spawnSync } = require('node:child_process');
 const { writeFileSync } = require('node:fs');
+const { rootCertificates } = require('node:tls');
 const facade = '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js';
 const config = '/tmp/run-client.json';
 const command = '/tmp/command.json';
 const assertion = '/tmp/assertion.jwt';
 const context = '/tmp/operator-context.json';
+const ca = '/tmp/management-ca.pem';
 for (const [file, contents] of [
   [config, '{}'],
   [command, '{}'],
@@ -95,12 +97,19 @@ const injected = spawnSync(process.execPath, [facade, 'run', '--context=' + cont
 let injectedFailure;
 try { injectedFailure = JSON.parse(injected.stderr); } catch { process.exit(21); }
 if (injected.status !== 1 || injectedFailure.code !== 'QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_CONFIG_INVALID' || injected.stdout !== '') process.exit(22);
+writeFileSync(ca, rootCertificates[0], { mode: 0o600 });
+writeFileSync(config, JSON.stringify({ schemaVersion: 1, endpoint: 'https://manager.example.test:8443/api/v3/plugin-packages/management', servername: 'manager.example.test', caFile: ca, requestTimeoutMs: 1000 }), { mode: 0o600 });
+writeFileSync(context, JSON.stringify({ schemaVersion: 1, commands: { package: { configFile: config } } }), { mode: 0o600 });
+const validated = spawnSync(process.execPath, [facade, 'context', 'validate', '--context=' + context], { encoding: 'utf8' });
+let validationFact;
+try { validationFact = JSON.parse(validated.stdout); } catch { process.exit(25); }
+if (validated.status !== 0 || validated.stderr !== '' || validationFact.event !== 'context_valid' || validationFact.commandCount !== 1 || validationFact.networkAccess !== false || validationFact.mutation !== false || JSON.stringify(validationFact.commands) !== JSON.stringify([{ name: 'package', transport: 'https', clientCertificate: 'forbidden' }]) || validated.stdout.includes('/tmp/') || validated.stdout.includes('manager.example.test')) process.exit(26);
 writeFileSync(context, JSON.stringify({ schemaVersion: 1, commands: { run: { configFile: config, assertionFile: assertion } } }), { mode: 0o600 });
 const rejected = spawnSync(process.execPath, [facade, 'run', '--context=' + context, '--command=' + command, '--assertion=' + assertion], { encoding: 'utf8' });
 let rejectedFailure;
 try { rejectedFailure = JSON.parse(rejected.stderr); } catch { process.exit(23); }
 if (rejected.status !== 78 || rejectedFailure.code !== 'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID' || rejected.stdout !== '' || rejected.stderr.includes('/tmp/') || rejected.stderr.includes('assertion.jwt')) process.exit(24);
-process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, secretFieldsRejected: true }));
+process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, contextPreflight: true, secretFieldsRejected: true }));
 `;
   const output = docker([
     'run',
@@ -137,6 +146,7 @@ process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, secretFi
   if (
     result?.schemaVersion !== 1 ||
     result?.injected !== true ||
+    result?.contextPreflight !== true ||
     result?.secretFieldsRejected !== true
   ) {
     fail('operator context contract drifted');
@@ -192,6 +202,7 @@ function main() {
       imageBytes: fact.Size,
       commandCount: COMMANDS.length,
       operatorContext: true,
+      contextPreflight: true,
       isolation: Object.freeze({
         readOnlyRoot: true,
         network: 'none',

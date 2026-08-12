@@ -10,6 +10,10 @@ import {
 import { isAbsolute } from 'node:path';
 import { TextDecoder } from 'node:util';
 
+import { validateClusterAuthenticatedManagementClientConfiguration } from '../management-support/pluginPackageManagementClient';
+import type { ClusterAuthenticatedManagementClientKind } from '../management-support/pluginPackageManagementClient';
+import { validateClusterPluginPackageManagementKubernetesConfiguration } from '../plugin-package/management/pluginPackageManagementKubernetesClient';
+
 const MAXIMUM_CONTEXT_BYTES = 64 * 1024;
 const MAXIMUM_PATH_BYTES = 4_096;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
@@ -37,6 +41,33 @@ export interface QingLong3ClusterProductContext {
     Partial<Record<ContextCommandName, QingLong3ClusterProductContextCommand>>
   >;
 }
+
+export interface QingLong3ClusterProductContextValidation {
+  readonly schemaVersion: 1;
+  readonly component: 'qinglong3-cluster-product-cli';
+  readonly event: 'context_valid';
+  readonly commandCount: number;
+  readonly commands: readonly Readonly<{
+    name: ContextCommandName;
+    transport: 'https' | 'kubernetes-port-forward';
+    clientCertificate: 'forbidden' | 'required';
+    kubernetesAuthentication?: 'token' | 'client-certificate';
+  }>[];
+  readonly networkAccess: false;
+  readonly mutation: false;
+}
+
+const CONTEXT_COMMAND_CLIENT_KINDS: Readonly<
+  Record<ContextCommandName, ClusterAuthenticatedManagementClientKind>
+> = Object.freeze({
+  package: 'package',
+  'package-kubernetes': 'package',
+  'worker-credential': 'worker-credential',
+  approval: 'approval',
+  run: 'run',
+  automation: 'automation',
+  'model-credential': 'model-credential',
+});
 
 export class QingLong3ClusterProductContextError extends TypeError {
   readonly code = 'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID';
@@ -242,4 +273,58 @@ export function resolveQingLong3ClusterProductContextArguments(
       : [`--kubernetes=${command.kubernetesFile}`]),
     ...argv,
   ]);
+}
+
+export async function validateQingLong3ClusterProductContext(
+  contextFile: string,
+): Promise<Readonly<QingLong3ClusterProductContextValidation>> {
+  try {
+    const context = loadQingLong3ClusterProductContext(contextFile);
+    const commands: Array<
+      QingLong3ClusterProductContextValidation['commands'][number]
+    > = [];
+    for (const name of CONTEXT_COMMANDS) {
+      const command = context.commands[name];
+      if (command === undefined) continue;
+      const clientKind = CONTEXT_COMMAND_CLIENT_KINDS[name];
+      const https = validateClusterAuthenticatedManagementClientConfiguration(
+        command.configFile,
+        clientKind,
+      );
+      if (name === 'package-kubernetes') {
+        const kubernetes =
+          await validateClusterPluginPackageManagementKubernetesConfiguration(
+            command.kubernetesFile!,
+          );
+        commands.push(
+          Object.freeze({
+            name,
+            transport: kubernetes.transport,
+            clientCertificate: https.clientCertificate,
+            kubernetesAuthentication: kubernetes.authentication,
+          }),
+        );
+      } else {
+        commands.push(
+          Object.freeze({
+            name,
+            transport: https.transport,
+            clientCertificate: https.clientCertificate,
+          }),
+        );
+      }
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      component: 'qinglong3-cluster-product-cli',
+      event: 'context_valid',
+      commandCount: commands.length,
+      commands: Object.freeze(commands),
+      networkAccess: false,
+      mutation: false,
+    });
+  } catch (error) {
+    if (error instanceof QingLong3ClusterProductContextError) throw error;
+    throw new QingLong3ClusterProductContextError();
+  }
 }
