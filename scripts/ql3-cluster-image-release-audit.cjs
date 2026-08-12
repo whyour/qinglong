@@ -289,8 +289,8 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     adminProductLiveContract,
-    /runOperatorContextContract\(image\);[\s\S]*operatorContext: true,[\s\S]*contextPreflight: true/,
-    'native admin image contract must verify owner-private operator context injection and offline preflight',
+    /runOperatorContextContract\(image\);[\s\S]*operatorContext: true,[\s\S]*contextPreflight: true,[\s\S]*contextReadiness: true/,
+    'native admin image contract must verify owner-private operator context injection, offline preflight and read-only readiness',
   );
   requirePattern(
     source,
@@ -335,6 +335,7 @@ function auditClusterImageCiWorkflow(
     clusterAdminProductFacade: true,
     clusterAdminOperatorContext: true,
     clusterAdminContextPreflight: true,
+    clusterAdminContextReadiness: true,
     ociAttestations: true,
     osVulnerabilityScan: {
       scanner: 'trivy@0.70.0',

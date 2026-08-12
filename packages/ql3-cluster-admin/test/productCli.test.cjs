@@ -1,10 +1,11 @@
 const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
+const { createServer } = require('node:https');
 
 const packageRoot = path.resolve(__dirname, '..');
 const moduleDirectory = path.join(packageRoot, 'dist', 'product-cli');
@@ -20,6 +21,18 @@ const privateKeyFixture = path.join(
   'test',
   'fixtures',
   'management-service-key.pem',
+);
+const localhostCertificateFixture = path.resolve(
+  packageRoot,
+  '../ql3-cluster-control/test/fixtures/mtls/server-cert.pem',
+);
+const localhostCaFixture = path.resolve(
+  packageRoot,
+  '../ql3-cluster-control/test/fixtures/mtls/ca-cert.pem',
+);
+const localhostPrivateKeyFixture = path.resolve(
+  packageRoot,
+  '../ql3-cluster-control/test/fixtures/mtls/server-key.pem',
 );
 const manifest = JSON.parse(
   fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
@@ -47,6 +60,65 @@ function runCli(args) {
     cwd: packageRoot,
     encoding: 'utf8',
   });
+}
+
+function runCliAsync(args) {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, [cliPath, ...args], {
+      cwd: packageRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on('data', (chunk) => stdout.push(chunk));
+    child.stderr.on('data', (chunk) => stderr.push(chunk));
+    child.once('error', reject);
+    child.once('close', (status, signal) => {
+      resolvePromise({
+        status,
+        signal,
+        stdout: Buffer.concat(stdout).toString('utf8'),
+        stderr: Buffer.concat(stderr).toString('utf8'),
+      });
+    });
+  });
+}
+
+async function startReadinessServer(status) {
+  const server = createServer(
+    {
+      key: fs.readFileSync(localhostPrivateKeyFixture),
+      cert: fs.readFileSync(localhostCertificateFixture),
+      minVersion: 'TLSv1.3',
+      maxVersion: 'TLSv1.3',
+    },
+    (request, response) => {
+      assert.equal(request.method, 'GET');
+      assert.equal(request.url, '/readyz');
+      assert.equal(request.headers.authorization, undefined);
+      const body = Buffer.from(
+        JSON.stringify({ schemaVersion: 1, status: status.value }),
+      );
+      response.writeHead(status.value === 'ready' ? 200 : 503, {
+        'content-type': 'application/json; charset=utf-8',
+        'content-length': String(body.length),
+      });
+      response.end(body);
+    },
+  );
+  await new Promise((resolvePromise, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolvePromise);
+  });
+  return {
+    port: server.address().port,
+    close: () =>
+      new Promise((resolvePromise, reject) => {
+        server.close((error) =>
+          error ? reject(error) : resolvePromise(),
+        );
+      }),
+  };
 }
 
 function privateFile(directory, name, contents) {
@@ -521,6 +593,84 @@ test('validates the complete operator context offline without operational author
   assert.equal(validated.stdout.includes('bounded-token'), false);
 });
 
+test('probes a context with fixed read-only readiness semantics and exit status', async (t) => {
+  const status = { value: 'ready' };
+  const server = await startReadinessServer(status);
+  t.after(() => server.close());
+  const directory = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-cluster-probe-context-')),
+  );
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const caFile = privateFile(
+    directory,
+    'ca.pem',
+    fs.readFileSync(localhostCaFixture),
+  );
+  const configFile = privateFile(
+    directory,
+    'package.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      endpoint: `https://localhost:${server.port}/api/v3/plugin-packages/management`,
+      servername: 'localhost',
+      caFile,
+      requestTimeoutMs: 1_000,
+    }),
+  );
+  const contextFile = privateFile(
+    directory,
+    'operator-context.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      commands: { package: { configFile } },
+    }),
+  );
+  assert.deepEqual(
+    resolveQingLong3ClusterProductCommand(
+      ['context', 'probe', `--context=${contextFile}`],
+      moduleDirectory,
+    ),
+    { kind: 'context-probe', contextFile },
+  );
+
+  const ready = await runCliAsync([
+    'context',
+    'probe',
+    `--context=${contextFile}`,
+  ]);
+  assert.equal(
+    ready.status,
+    0,
+    JSON.stringify({ stdout: ready.stdout, stderr: ready.stderr }),
+  );
+  assert.equal(ready.stderr, '');
+  assert.deepEqual(JSON.parse(ready.stdout), {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-product-cli',
+    event: 'context_probed',
+    commandCount: 1,
+    commands: [{ name: 'package', transport: 'https', status: 'ready' }],
+    allReady: true,
+    requestMethod: 'GET',
+    requestPath: '/readyz',
+    mutation: false,
+  });
+  assert.equal(ready.stdout.includes(directory), false);
+  assert.equal(ready.stdout.includes('localhost'), false);
+
+  status.value = 'not_ready';
+  const notReady = await runCliAsync([
+    'context',
+    'probe',
+    `--context=${contextFile}`,
+  ]);
+  assert.equal(notReady.status, 69);
+  assert.equal(notReady.stderr, '');
+  const fact = JSON.parse(notReady.stdout);
+  assert.equal(fact.allReady, false);
+  assert.equal(fact.commands[0].status, 'not_ready');
+});
+
 test('context validation fails closed for invalid client configuration and syntax', (t) => {
   const fixture = validContextFixture(t);
   fs.writeFileSync(fixture.commands.run.configFile, '{}', { mode: 0o600 });
@@ -544,6 +694,8 @@ test('context validation fails closed for invalid client configuration and synta
     ['context', 'validate'],
     ['context', 'validate', '--context'],
     ['context', 'validate', '--context='],
+    ['context', 'probe'],
+    ['context', 'probe', '--context='],
     ['context', 'inspect', `--context=${fixture.contextFile}`],
   ]) {
     const rejected = resolveQingLong3ClusterProductCommand(

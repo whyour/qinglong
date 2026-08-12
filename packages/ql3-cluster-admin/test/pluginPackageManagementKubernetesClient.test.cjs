@@ -20,6 +20,7 @@ const {
   ClusterPluginPackageManagementKubernetesClientTunnelError,
   executeClusterPluginPackageManagementKubernetesClient,
   openClusterPluginPackageManagementPortForward,
+  probeClusterPluginPackageManagementKubernetesReadiness,
 } = require(
   '@qinglong/cluster-admin/plugin-package-management-kubernetes-client'
 );
@@ -294,6 +295,85 @@ test('uses one ready Pod tunnel and preserves end-to-end TLS 1.3 hostname verifi
         protocol: 'TLSv1.3',
         servername: SERVICE_HOST,
         body: inspectCommand(),
+      },
+    ]);
+  } finally {
+    await server.close();
+    rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test('probes readiness through one reviewed Pod tunnel without an assertion or command', async () => {
+  const requests = [];
+  const server = await startServer((request, response) => {
+    const chunks = [];
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.once('end', () => {
+      requests.push({
+        method: request.method,
+        path: request.url,
+        authorization: request.headers.authorization,
+        bodyBytes: Buffer.concat(chunks).length,
+        protocol: request.socket.getProtocol(),
+        servername: request.socket.servername,
+      });
+      sendJson(response, { schemaVersion: 1, status: 'ready' });
+    });
+  });
+  const files = createClientFiles();
+  const calls = { lists: 0, tunnels: 0, closes: 0 };
+  try {
+    const result =
+      await probeClusterPluginPackageManagementKubernetesReadiness(
+        files.paths.configFile,
+        files.paths.kubernetesFile,
+        {
+          createRuntime() {
+            return {
+              pods: {
+                async listNamespacedPod() {
+                  calls.lists += 1;
+                  return {
+                    items: [
+                      readyPod(
+                        'ql3-plugin-package-management-aaaaa-11111',
+                      ),
+                    ],
+                  };
+                },
+              },
+              async openPortForward() {
+                calls.tunnels += 1;
+                const stream = connectTcp({
+                  host: '127.0.0.1',
+                  port: server.port,
+                });
+                return {
+                  stream,
+                  close() {
+                    calls.closes += 1;
+                    stream.end();
+                  },
+                };
+              },
+            };
+          },
+        },
+      );
+    assert.deepEqual(result, {
+      schemaVersion: 1,
+      transport: 'https',
+      ready: true,
+    });
+    assert.deepEqual(calls, { lists: 1, tunnels: 1, closes: 1 });
+    assert.deepEqual(requests, [
+      {
+        method: 'GET',
+        path: '/readyz',
+        authorization: undefined,
+        bodyBytes: 0,
+        protocol: 'TLSv1.3',
+        servername: SERVICE_HOST,
       },
     ]);
   } finally {

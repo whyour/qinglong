@@ -16,6 +16,10 @@ import {
   type ClusterPluginPackageManagementClientRawConnection,
   type ClusterPluginPackageManagementClientResult,
 } from '../../management-support/pluginPackageManagementClient';
+import {
+  probeClusterAuthenticatedManagementClientReadiness,
+  type ClusterAuthenticatedManagementClientReadiness,
+} from '../../management-support/managementReadinessProbe';
 
 const MAX_KUBERNETES_CONFIG_BYTES = 16 * 1024;
 const MAX_KUBECONFIG_BYTES = 256 * 1024;
@@ -870,6 +874,97 @@ export async function executeClusterPluginPackageManagementKubernetesClient(
     throw new ClusterPluginPackageManagementKubernetesClientTunnelError(
       error,
     );
+  } finally {
+    prepared?.dispose();
+  }
+}
+
+export async function probeClusterPluginPackageManagementKubernetesReadiness(
+  configFile: string,
+  kubernetesFile: string,
+  options: ClusterPluginPackageManagementKubernetesClientOptions = {},
+): Promise<Readonly<ClusterAuthenticatedManagementClientReadiness>> {
+  if (
+    !options ||
+    typeof options !== 'object' ||
+    Array.isArray(options) ||
+    Object.keys(options).some((key) => key !== 'createRuntime') ||
+    (options.createRuntime !== undefined &&
+      typeof options.createRuntime !== 'function')
+  ) {
+    throw configurationFailure();
+  }
+  let prepared: PreparedKubernetesClientConfiguration | undefined;
+  try {
+    prepared = await prepareKubernetesClientConfiguration(kubernetesFile);
+    const { config, kubeConfig, kubernetes } = prepared;
+    const runtime = (options.createRuntime ?? productionRuntime)(
+      kubeConfig,
+      kubernetes,
+    );
+    if (
+      !runtime ||
+      typeof runtime !== 'object' ||
+      typeof runtime.pods?.listNamespacedPod !== 'function' ||
+      typeof runtime.openPortForward !== 'function'
+    ) {
+      throw configurationFailure();
+    }
+    const expectedHostname = `${MANAGEMENT_NAME}.${config.namespace}.svc`;
+    return await probeClusterAuthenticatedManagementClientReadiness(
+      configFile,
+      'package',
+      {
+        async connect(target) {
+          if (
+            target.hostname !== expectedHostname ||
+            target.port !== MANAGEMENT_PORT
+          ) {
+            throw configurationFailure();
+          }
+          const list = await deadline(
+            runtime.pods.listNamespacedPod({
+              namespace: config.namespace,
+              labelSelector: MANAGEMENT_LABEL_SELECTOR,
+              limit: 3,
+              timeoutSeconds: Math.ceil(config.apiTimeoutMs / 1_000),
+              watch: false,
+            }),
+            config.apiTimeoutMs,
+          );
+          const podName = selectManagementPod(list, config.namespace);
+          return await deadline(
+            runtime.openPortForward({
+              namespace: config.namespace,
+              podName,
+              port: MANAGEMENT_PORT,
+            }),
+            config.apiTimeoutMs,
+            async (connection) => {
+              await connection.close();
+            },
+          );
+        },
+      },
+    );
+  } catch (error) {
+    if (
+      error instanceof ClusterPluginPackageManagementClientRequestError &&
+      error.cause instanceof
+        ClusterPluginPackageManagementKubernetesClientTunnelError
+    ) {
+      throw error.cause;
+    }
+    if (
+      error instanceof
+        ClusterPluginPackageManagementKubernetesClientConfigurationError ||
+      error instanceof ClusterPluginPackageManagementKubernetesClientTunnelError ||
+      error instanceof ClusterPluginPackageManagementClientConfigurationError ||
+      error instanceof ClusterPluginPackageManagementClientRequestError
+    ) {
+      throw error;
+    }
+    throw new ClusterPluginPackageManagementKubernetesClientTunnelError(error);
   } finally {
     prepared?.dispose();
   }

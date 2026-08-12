@@ -394,6 +394,7 @@
 | [ADR-0388](./ADR-0388-bounded-unified-cluster-product-cli.md)                                                  | 有界统一 Cluster Operator 产品 CLI                                                                                                  | Accepted |
 | [ADR-0389](./ADR-0389-owner-private-cluster-operator-context.md)                                               | Owner-private Cluster Operator Context                                                                                               | Accepted |
 | [ADR-0390](./ADR-0390-offline-cluster-operator-context-preflight.md)                                          | Offline Cluster Operator Context Preflight                                                                                           | Accepted |
+| [ADR-0391](./ADR-0391-read-only-cluster-operator-context-readiness.md)                                        | Read-only Cluster Operator Context Readiness                                                                                         | Accepted |
 
 ## 规则
 

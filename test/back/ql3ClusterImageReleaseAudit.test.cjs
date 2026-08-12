@@ -29,6 +29,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       clusterAdminProductFacade: true,
       clusterAdminOperatorContext: true,
       clusterAdminContextPreflight: true,
+      clusterAdminContextReadiness: true,
       ociAttestations: true,
       osVulnerabilityScan: {
         scanner: 'trivy@0.70.0',
@@ -142,6 +143,24 @@ test('rejects a Cluster Admin live gate that omits offline context preflight', (
         ),
       ),
     /offline preflight/,
+  );
+});
+
+test('rejects a Cluster Admin live gate that omits read-only context readiness', () => {
+  const contract = fs.readFileSync(
+    path.join(root, 'scripts/ql3-cluster-admin-product-live-contract.cjs'),
+    'utf8',
+  );
+  assert.throws(
+    () =>
+      auditClusterImageCiWorkflow(
+        ciSource,
+        contract.replace(
+          'contextPreflight: true,\n      contextReadiness: true',
+          'contextPreflight: true,\n      contextReadiness: false',
+        ),
+      ),
+    /read-only readiness/,
   );
 });
 

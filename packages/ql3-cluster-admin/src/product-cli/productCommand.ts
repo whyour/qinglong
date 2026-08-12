@@ -14,6 +14,7 @@ export type QingLong3ClusterProductCommandResolution =
   | Readonly<{ kind: 'help'; output: string }>
   | Readonly<{ kind: 'version'; output: string }>
   | Readonly<{ kind: 'context-validation'; contextFile: string }>
+  | Readonly<{ kind: 'context-probe'; contextFile: string }>
   | Readonly<{
       kind: 'invoke';
       command: QingLong3ClusterProductCommandDefinition;
@@ -175,6 +176,7 @@ export function qingLong3ClusterProductHelp(): string {
     '',
     'Local operator commands:',
     '  context validate --context=/absolute/operator-context.json',
+    '  context probe    --context=/absolute/operator-context.json',
     '',
     'Use `ql3-cluster-admin <command> --help` for command-specific usage.',
     'Use `--context=/absolute/operator-context.json` to inject only stable client paths.',
@@ -200,7 +202,7 @@ export function resolveQingLong3ClusterProductCommand(
   if (argv[0] === 'context') {
     if (
       argv.length !== 3 ||
-      argv[1] !== 'validate' ||
+      (argv[1] !== 'validate' && argv[1] !== 'probe') ||
       !argv[2]!.startsWith('--context=') ||
       argv[2] === '--context='
     ) {
@@ -215,7 +217,7 @@ export function resolveQingLong3ClusterProductCommand(
       resolveInstalledTarget(distRoot, definition);
     }
     return Object.freeze({
-      kind: 'context-validation',
+      kind: argv[1] === 'validate' ? 'context-validation' : 'context-probe',
       contextFile: argv[2]!.slice('--context='.length),
     });
   }

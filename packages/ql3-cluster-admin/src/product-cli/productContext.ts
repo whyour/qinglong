@@ -10,9 +10,15 @@ import {
 import { isAbsolute } from 'node:path';
 import { TextDecoder } from 'node:util';
 
-import { validateClusterAuthenticatedManagementClientConfiguration } from '../management-support/pluginPackageManagementClient';
+import {
+  validateClusterAuthenticatedManagementClientConfiguration,
+} from '../management-support/pluginPackageManagementClient';
 import type { ClusterAuthenticatedManagementClientKind } from '../management-support/pluginPackageManagementClient';
-import { validateClusterPluginPackageManagementKubernetesConfiguration } from '../plugin-package/management/pluginPackageManagementKubernetesClient';
+import { probeClusterAuthenticatedManagementClientReadiness } from '../management-support/managementReadinessProbe';
+import {
+  probeClusterPluginPackageManagementKubernetesReadiness,
+  validateClusterPluginPackageManagementKubernetesConfiguration,
+} from '../plugin-package/management/pluginPackageManagementKubernetesClient';
 
 const MAXIMUM_CONTEXT_BYTES = 64 * 1024;
 const MAXIMUM_PATH_BYTES = 4_096;
@@ -57,6 +63,22 @@ export interface QingLong3ClusterProductContextValidation {
   readonly mutation: false;
 }
 
+export interface QingLong3ClusterProductContextProbe {
+  readonly schemaVersion: 1;
+  readonly component: 'qinglong3-cluster-product-cli';
+  readonly event: 'context_probed';
+  readonly commandCount: number;
+  readonly commands: readonly Readonly<{
+    name: ContextCommandName;
+    transport: 'https' | 'kubernetes-port-forward';
+    status: 'ready' | 'not_ready';
+  }>[];
+  readonly allReady: boolean;
+  readonly requestMethod: 'GET';
+  readonly requestPath: '/readyz';
+  readonly mutation: false;
+}
+
 const CONTEXT_COMMAND_CLIENT_KINDS: Readonly<
   Record<ContextCommandName, ClusterAuthenticatedManagementClientKind>
 > = Object.freeze({
@@ -75,6 +97,15 @@ export class QingLong3ClusterProductContextError extends TypeError {
   constructor() {
     super('QingLong 3.0 Cluster operator context is invalid');
     this.name = 'QingLong3ClusterProductContextError';
+  }
+}
+
+export class QingLong3ClusterProductContextProbeError extends Error {
+  readonly code = 'QL3_CLUSTER_PRODUCT_CONTEXT_PROBE_FAILED';
+
+  constructor() {
+    super('QingLong 3.0 Cluster operator context probe failed');
+    this.name = 'QingLong3ClusterProductContextProbeError';
   }
 }
 
@@ -326,5 +357,64 @@ export async function validateQingLong3ClusterProductContext(
   } catch (error) {
     if (error instanceof QingLong3ClusterProductContextError) throw error;
     throw new QingLong3ClusterProductContextError();
+  }
+}
+
+export async function probeQingLong3ClusterProductContext(
+  contextFile: string,
+): Promise<Readonly<QingLong3ClusterProductContextProbe>> {
+  try {
+    await validateQingLong3ClusterProductContext(contextFile);
+    const context = loadQingLong3ClusterProductContext(contextFile);
+    const commands: Array<
+      QingLong3ClusterProductContextProbe['commands'][number]
+    > = [];
+    for (const name of CONTEXT_COMMANDS) {
+      const command = context.commands[name];
+      if (command === undefined) continue;
+      const result =
+        name === 'package-kubernetes'
+          ? await probeClusterPluginPackageManagementKubernetesReadiness(
+              command.configFile,
+              command.kubernetesFile!,
+            )
+          : await probeClusterAuthenticatedManagementClientReadiness(
+              command.configFile,
+              CONTEXT_COMMAND_CLIENT_KINDS[name],
+            );
+      commands.push(
+        Object.freeze({
+          name,
+          transport:
+            name === 'package-kubernetes'
+              ? 'kubernetes-port-forward'
+              : result.transport,
+          status: result.ready ? 'ready' : 'not_ready',
+        }),
+      );
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      component: 'qinglong3-cluster-product-cli',
+      event: 'context_probed',
+      commandCount: commands.length,
+      commands: Object.freeze(commands),
+      allReady: commands.every(({ status }) => status === 'ready'),
+      requestMethod: 'GET',
+      requestPath: '/readyz',
+      mutation: false,
+    });
+  } catch (error) {
+    if (error instanceof QingLong3ClusterProductContextError) throw error;
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      typeof error.code === 'string' &&
+      error.code.endsWith('CONFIG_INVALID')
+    ) {
+      throw new QingLong3ClusterProductContextError();
+    }
+    throw new QingLong3ClusterProductContextProbeError();
   }
 }

@@ -4,8 +4,12 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { constants } from 'node:os';
 
 import { resolveQingLong3ClusterProductCommand } from './productCommand';
-import { QingLong3ClusterProductContextError } from './productContext';
-import { validateQingLong3ClusterProductContext } from './productContext';
+import {
+  probeQingLong3ClusterProductContext,
+  QingLong3ClusterProductContextError,
+  QingLong3ClusterProductContextProbeError,
+  validateQingLong3ClusterProductContext,
+} from './productContext';
 
 const FORWARDED_SIGNALS = Object.freeze([
   'SIGINT',
@@ -132,6 +136,14 @@ async function main(argv: readonly string[]): Promise<void> {
       process.stdout.write(`${JSON.stringify(result)}\n`);
       return;
     }
+    if (resolution.kind === 'context-probe') {
+      const result = await probeQingLong3ClusterProductContext(
+        resolution.contextFile,
+      );
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+      if (!result.allReady) process.exitCode = 69;
+      return;
+    }
     invoke(resolution.targetFilePath, resolution.argv);
   } catch (error) {
     if (
@@ -150,6 +162,24 @@ async function main(argv: readonly string[]): Promise<void> {
         )}\n`,
       );
       process.exitCode = 78;
+      return;
+    }
+    if (
+      error instanceof QingLong3ClusterProductContextProbeError ||
+      (error !== null &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'QL3_CLUSTER_PRODUCT_CONTEXT_PROBE_FAILED')
+    ) {
+      process.stderr.write(
+        `${JSON.stringify(
+          lowSensitivityFailure(
+            'QL3_CLUSTER_PRODUCT_CONTEXT_PROBE_FAILED',
+            'QingLong 3.0 Cluster operator context probe failed',
+          ),
+        )}\n`,
+      );
+      process.exitCode = 69;
       return;
     }
     process.stderr.write(

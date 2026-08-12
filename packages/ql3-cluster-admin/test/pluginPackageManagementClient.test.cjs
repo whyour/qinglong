@@ -20,6 +20,10 @@ const {
   ClusterPluginPackageManagementClientRequestError,
   executeClusterPluginPackageManagementClient,
 } = require('@qinglong/cluster-admin/plugin-package-management-client');
+const publicClientModule = require('@qinglong/cluster-admin/plugin-package-management-client');
+const {
+  probeClusterAuthenticatedManagementClientReadiness,
+} = require('../dist/management-support/managementReadinessProbe.js');
 
 const CA_CERT = resolve(
   __dirname,
@@ -33,11 +37,34 @@ const SERVER_CERT = resolve(
   __dirname,
   '../../ql3-cluster-control/test/fixtures/mtls/server-cert.pem',
 );
+const CLIENT_KEY = resolve(
+  __dirname,
+  '../../ql3-cluster-control/test/fixtures/mtls/client-key.pem',
+);
+const CLIENT_CERT = resolve(
+  __dirname,
+  '../../ql3-cluster-control/test/fixtures/mtls/client-cert.pem',
+);
 const CLIENT_CLI = resolve(
   __dirname,
   '../dist/plugin-package/management/pluginPackageManagementClientCli.js',
 );
 const ASSERTION = 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJvcGVyYXRvciJ9.c2ln';
+
+test('keeps owned TLS preparation out of the public client subpath', () => {
+  assert.equal(
+    publicClientModule.prepareClusterAuthenticatedManagementClientConfiguration,
+    undefined,
+  );
+  assert.equal(
+    publicClientModule.prepareClusterAuthenticatedManagementClientKindConfiguration,
+    undefined,
+  );
+  assert.equal(
+    publicClientModule.probeClusterAuthenticatedManagementClientReadiness,
+    undefined,
+  );
+});
 
 function inspectCommand(operation = 'plugin-package.inspect') {
   return {
@@ -392,13 +419,14 @@ function createClientFiles(port, command = inspectCommand()) {
   };
 }
 
-async function startServer(handler) {
+async function startServer(handler, options = {}) {
   const server = createServer(
     {
       key: readFileSync(SERVER_KEY),
       cert: readFileSync(SERVER_CERT),
       minVersion: 'TLSv1.3',
       maxVersion: 'TLSv1.3',
+      ...options,
     },
     handler,
   );
@@ -469,6 +497,142 @@ test('sends one TLS 1.3 management command and validates the low-sensitive resul
         command: inspectCommand(),
       },
     ]);
+  } finally {
+    await fixture.close();
+    rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test('probes only the fixed TLS readiness endpoint without management authority', async () => {
+  const received = [];
+  let ready = true;
+  const fixture = await startServer((request, response) => {
+    const chunks = [];
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.once('end', () => {
+      received.push({
+        method: request.method,
+        path: request.url,
+        authorization: request.headers.authorization,
+        contentType: request.headers['content-type'],
+        bodyBytes: Buffer.concat(chunks).length,
+        protocol: request.socket.getProtocol(),
+      });
+      sendJson(response, ready ? 200 : 503, {
+        schemaVersion: 1,
+        status: ready ? 'ready' : 'not_ready',
+      });
+    });
+  });
+  const files = createClientFiles(fixture.port);
+  try {
+    assert.deepEqual(
+      await probeClusterAuthenticatedManagementClientReadiness(
+        files.paths.configFile,
+        'package',
+      ),
+      { schemaVersion: 1, transport: 'https', ready: true },
+    );
+    ready = false;
+    assert.deepEqual(
+      await probeClusterAuthenticatedManagementClientReadiness(
+        files.paths.configFile,
+        'package',
+      ),
+      { schemaVersion: 1, transport: 'https', ready: false },
+    );
+    assert.deepEqual(received, [
+      {
+        method: 'GET',
+        path: '/readyz',
+        authorization: undefined,
+        contentType: undefined,
+        bodyBytes: 0,
+        protocol: 'TLSv1.3',
+      },
+      {
+        method: 'GET',
+        path: '/readyz',
+        authorization: undefined,
+        contentType: undefined,
+        bodyBytes: 0,
+        protocol: 'TLSv1.3',
+      },
+    ]);
+  } finally {
+    await fixture.close();
+    rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test('presents the reviewed client certificate for mTLS readiness', async () => {
+  let authorized = false;
+  const fixture = await startServer(
+    (request, response) => {
+      authorized = request.socket.authorized;
+      sendJson(response, 200, { schemaVersion: 1, status: 'ready' });
+    },
+    {
+      ca: readFileSync(CA_CERT),
+      requestCert: true,
+      rejectUnauthorized: true,
+    },
+  );
+  const files = createClientFiles(fixture.port);
+  const clientKeyFile = join(files.directory, 'client-key.pem');
+  privateWrite(clientKeyFile, readFileSync(CLIENT_KEY, 'utf8'));
+  privateWrite(files.paths.configFile, {
+    schemaVersion: 1,
+    endpoint: `https://localhost:${fixture.port}/api/v3/runs/management`,
+    servername: 'localhost',
+    caFile: CA_CERT,
+    clientCertificateFile: CLIENT_CERT,
+    clientPrivateKeyFile: clientKeyFile,
+    requestTimeoutMs: 1_000,
+  });
+  try {
+    assert.deepEqual(
+      await probeClusterAuthenticatedManagementClientReadiness(
+        files.paths.configFile,
+        'run',
+      ),
+      { schemaVersion: 1, transport: 'https', ready: true },
+    );
+    assert.equal(authorized, true);
+  } finally {
+    await fixture.close();
+    rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test('readiness probe rejects unreviewed status and bounded response drift', async () => {
+  let behavior = 'wrong-status';
+  const fixture = await startServer((_request, response) => {
+    if (behavior === 'wrong-status') {
+      sendJson(response, 200, { schemaVersion: 1, status: 'live' });
+      return;
+    }
+    if (behavior === 'redirect') {
+      sendJson(response, 302, { schemaVersion: 1, status: 'ready' });
+      return;
+    }
+    response.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+    });
+    response.end(Buffer.alloc(1_025, 0x61));
+  });
+  const files = createClientFiles(fixture.port);
+  try {
+    for (const next of ['wrong-status', 'redirect', 'oversized']) {
+      behavior = next;
+      await assert.rejects(
+        probeClusterAuthenticatedManagementClientReadiness(
+          files.paths.configFile,
+          'package',
+        ),
+        ClusterPluginPackageManagementClientRequestError,
+      );
+    }
   } finally {
     await fixture.close();
     rmSync(files.directory, { recursive: true, force: true });

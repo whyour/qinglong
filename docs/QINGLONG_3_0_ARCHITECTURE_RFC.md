@@ -11,6 +11,19 @@
 
 最新增量证据（2026-08-13）：
 
+- D-303/ADR-0391（已接受）
+  Cluster operator context 在离线 `validate` 之后增加显式、只读的 `ql3-cluster-admin context probe`。probe 先完整预检全部
+  context entry，任何晚出现的配置错误都会在首个网络请求前失败关闭；随后才按固定 catalog 顺序，以 production TLS 1.3、CA、
+  servername、mTLS client certificate 或 Kubernetes PortForward 配置逐项 `GET /readyz`。探针不读取 command/assertion，不发送
+  Authorization、body 或业务 management POST，不重试、不切换 Pod，响应限 1 KiB，只接受精确 `200/ready` 或 `503/not_ready`。
+  输出仅含 command、transport、ready 状态及 `mutation:false`；配置错误退出 78，不可达/协议错误或任一 not-ready 退出 69。
+  TLS preparation 与六类 management route/client-certificate policy 收敛为一个 package-private 真源，既有 mutation client 的公开
+  subpath 与请求语义不变。能力仍只存在于短生命周期 Cluster Admin，不新增 package、依赖、binary、listener、timer、controller、
+  workload 或 sidecar；Local/Edge、Cluster Control 与 Worker 零导入。Cluster Admin 完整 302 pass/2 条件 skip，18-package clean
+  build/test 退出 0，backend 1,188 pass/2 skip；五项边界审计零 finding。真实 arm64 Admin image 为 330,487,296 bytes，并在
+  `10001:10001`、network none、read-only root、drop ALL、128 MiB/32 PIDs 下完成本地 TLS readiness 契约。14 个 Local Profile
+  artifact 与 D-302 对应字节数一致；PostgreSQL 18.4 arm64 HA 123 项 gate 全绿、timeline `1→2`，证据 SHA-256 为
+  `e7c1743e932f2d7c35dc9153cdf5bc4a03356a38d93fce5507354652aa207a05`，独立审计与 Docker 清理通过。完整验证证据见 ADR-0391。
 - D-302/ADR-0390（已接受）
   Cluster operator context 增加无网络、无 mutation 的内建 `ql3-cluster-admin context validate` 预检。它先复用 owner-private context
   reader，再让每个 entry 经过与真实请求相同的 production HTTPS/Kubernetes configuration preparation，验证精确 route、hostname、CA、

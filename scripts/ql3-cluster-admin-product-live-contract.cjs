@@ -1,6 +1,7 @@
 'use strict';
 
 const { execFileSync } = require('node:child_process');
+const { resolve } = require('node:path');
 
 const IMAGE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}$/u;
 const ENTRYPOINT = [
@@ -77,9 +78,29 @@ function runImage(image, args) {
 }
 
 function runOperatorContextContract(image) {
+  const fixtureRoot = resolve(
+    __dirname,
+    '../packages/ql3-cluster-control/test/fixtures/mtls',
+  );
+  const readinessServerSource = String.raw`
+const { readFileSync, writeFileSync } = require('node:fs');
+const { createServer } = require('node:https');
+const server = createServer({ key: readFileSync('/evidence/server-key.pem'), cert: readFileSync('/evidence/server-cert.pem'), minVersion: 'TLSv1.3', maxVersion: 'TLSv1.3' }, (request, response) => {
+  const chunks = [];
+  request.on('data', (chunk) => chunks.push(chunk));
+  request.once('end', () => {
+    writeFileSync('/tmp/readiness-observation.json', JSON.stringify({ method: request.method, path: request.url, authorization: request.headers.authorization ?? null, bodyBytes: Buffer.concat(chunks).length }), { mode: 0o600 });
+    const body = Buffer.from(JSON.stringify({ schemaVersion: 1, status: 'ready' }));
+    response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'content-length': String(body.length) });
+    response.end(body);
+  });
+});
+server.listen(0, '127.0.0.1', () => writeFileSync('/tmp/readiness-port', String(server.address().port), { mode: 0o600 }));
+process.once('SIGTERM', () => server.close(() => process.exit(0)));
+`;
   const source = String.raw`
-const { spawnSync } = require('node:child_process');
-const { writeFileSync } = require('node:fs');
+const { spawn, spawnSync } = require('node:child_process');
+const { existsSync, readFileSync, writeFileSync } = require('node:fs');
 const { rootCertificates } = require('node:tls');
 const facade = '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js';
 const config = '/tmp/run-client.json';
@@ -104,12 +125,27 @@ const validated = spawnSync(process.execPath, [facade, 'context', 'validate', '-
 let validationFact;
 try { validationFact = JSON.parse(validated.stdout); } catch { process.exit(25); }
 if (validated.status !== 0 || validated.stderr !== '' || validationFact.event !== 'context_valid' || validationFact.commandCount !== 1 || validationFact.networkAccess !== false || validationFact.mutation !== false || JSON.stringify(validationFact.commands) !== JSON.stringify([{ name: 'package', transport: 'https', clientCertificate: 'forbidden' }]) || validated.stdout.includes('/tmp/') || validated.stdout.includes('manager.example.test')) process.exit(26);
+const readinessServer = spawn(process.execPath, ['-e', ${JSON.stringify(readinessServerSource)}], { stdio: 'ignore' });
+const waitArray = new Int32Array(new SharedArrayBuffer(4));
+for (let attempt = 0; attempt < 200 && !existsSync('/tmp/readiness-port'); attempt += 1) Atomics.wait(waitArray, 0, 0, 10);
+if (!existsSync('/tmp/readiness-port')) process.exit(27);
+const readinessPort = Number(readFileSync('/tmp/readiness-port', 'utf8'));
+writeFileSync(ca, readFileSync('/evidence/ca-cert.pem'), { mode: 0o600 });
+writeFileSync(config, JSON.stringify({ schemaVersion: 1, endpoint: 'https://localhost:' + readinessPort + '/api/v3/plugin-packages/management', servername: 'localhost', caFile: ca, requestTimeoutMs: 1000 }), { mode: 0o600 });
+const probed = spawnSync(process.execPath, [facade, 'context', 'probe', '--context=' + context], { encoding: 'utf8' });
+readinessServer.kill('SIGTERM');
+let probeFact;
+try { probeFact = JSON.parse(probed.stdout); } catch { process.exit(28); }
+if (probed.status !== 0 || probed.stderr !== '' || probeFact.event !== 'context_probed' || probeFact.commandCount !== 1 || probeFact.allReady !== true || probeFact.requestMethod !== 'GET' || probeFact.requestPath !== '/readyz' || probeFact.mutation !== false || JSON.stringify(probeFact.commands) !== JSON.stringify([{ name: 'package', transport: 'https', status: 'ready' }]) || probed.stdout.includes('/tmp/') || probed.stdout.includes('localhost')) process.exit(29);
+let readinessObservation;
+try { readinessObservation = JSON.parse(readFileSync('/tmp/readiness-observation.json', 'utf8')); } catch { process.exit(30); }
+if (JSON.stringify(readinessObservation) !== JSON.stringify({ method: 'GET', path: '/readyz', authorization: null, bodyBytes: 0 })) process.exit(31);
 writeFileSync(context, JSON.stringify({ schemaVersion: 1, commands: { run: { configFile: config, assertionFile: assertion } } }), { mode: 0o600 });
 const rejected = spawnSync(process.execPath, [facade, 'run', '--context=' + context, '--command=' + command, '--assertion=' + assertion], { encoding: 'utf8' });
 let rejectedFailure;
 try { rejectedFailure = JSON.parse(rejected.stderr); } catch { process.exit(23); }
 if (rejected.status !== 78 || rejectedFailure.code !== 'QL3_CLUSTER_PRODUCT_CONTEXT_INVALID' || rejected.stdout !== '' || rejected.stderr.includes('/tmp/') || rejected.stderr.includes('assertion.jwt')) process.exit(24);
-process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, contextPreflight: true, secretFieldsRejected: true }));
+process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, contextPreflight: true, contextReadiness: true, secretFieldsRejected: true }));
 `;
   const output = docker([
     'run',
@@ -131,6 +167,12 @@ process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, contextP
     '0.25',
     '--tmpfs',
     '/tmp:rw,noexec,nosuid,nodev,size=8m,mode=700,uid=10001,gid=10001',
+    '--volume',
+    `${resolve(fixtureRoot, 'ca-cert.pem')}:/evidence/ca-cert.pem:ro`,
+    '--volume',
+    `${resolve(fixtureRoot, 'server-cert.pem')}:/evidence/server-cert.pem:ro`,
+    '--volume',
+    `${resolve(fixtureRoot, 'server-key.pem')}:/evidence/server-key.pem:ro`,
     '--entrypoint',
     'node',
     image,
@@ -147,6 +189,7 @@ process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, contextP
     result?.schemaVersion !== 1 ||
     result?.injected !== true ||
     result?.contextPreflight !== true ||
+    result?.contextReadiness !== true ||
     result?.secretFieldsRejected !== true
   ) {
     fail('operator context contract drifted');
@@ -203,6 +246,7 @@ function main() {
       commandCount: COMMANDS.length,
       operatorContext: true,
       contextPreflight: true,
+      contextReadiness: true,
       isolation: Object.freeze({
         readOnlyRoot: true,
         network: 'none',
