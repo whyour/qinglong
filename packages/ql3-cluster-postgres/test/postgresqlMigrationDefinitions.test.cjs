@@ -109,6 +109,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0056-run-management-boundary',
       'pg-0057-run-management-stop-boundary',
       'pg-0058-plugin-package-automation-disposition-events',
+      'pg-0059-plugin-package-secret-bindings',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -160,6 +161,7 @@ test('keeps local-only and legacy tables out of the cluster baseline', async () 
     'plugin_package_install_heads',
     'plugin_package_install_mutations',
     'plugin_package_materialized_revisions',
+    'plugin_package_secret_bindings',
     'plugin_package_lifecycle_events',
     'plugin_package_lifecycle_heads',
     'plugin_package_lifecycle_receipts',
@@ -533,6 +535,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0058-plugin-package-automation-disposition-events',
       checksum:
         'd184324909f1e450f3c1b58d422796e3869a1360df60c3f2dfe4af0bacc37471',
+    },
+    {
+      id: 'pg-0059-plugin-package-secret-bindings',
+      checksum:
+        '87582d256c868bd7f5af352c4b052fdab9f3714e1e7179e35d33bfa5d62957be',
     },
   ];
   assert.deepEqual(
@@ -1957,4 +1964,27 @@ test('advances capability v56 with column-scoped Run stop authority', async () =
   assert.match(sql, /"run_management_stop":1/);
   assert.match(sql, /contract_version = 55/);
   assert.match(sql, /migration_id = 'pg-0056-run-management-boundary'/);
+});
+
+test('advances capability v58 with immutable generation-bound Package Secret bindings', async () => {
+  const migration = migrationById('pg-0059-plugin-package-secret-bindings');
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(sql, /CREATE TABLE "ql3"\."plugin_package_secret_bindings"/);
+  assert.match(sql, /qinglong\/plugin-package-secret-binding@v1/);
+  assert.match(sql, /GRANT SELECT, INSERT[^;]+TO ql3_package_executor/);
+  assert.doesNotMatch(sql, /GRANT UPDATE|GRANT DELETE/);
+  assert.match(sql, /contract_version = 58/);
+  assert.match(sql, /"plugin_package_secret_binding":1/);
+  assert.match(sql, /contract_version = 57/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0058-plugin-package-automation-disposition-events'/,
+  );
 });

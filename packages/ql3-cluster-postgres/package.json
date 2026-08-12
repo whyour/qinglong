@@ -140,6 +140,11 @@
       "require": "./dist/plugin-package/installation/pluginPackageMaterializedRevisionRepository.js",
       "default": "./dist/plugin-package/installation/pluginPackageMaterializedRevisionRepository.js"
     },
+    "./plugin-package-secret-binding": {
+      "types": "./dist/plugin-package/installation/pluginPackageSecretBindingRepository.d.ts",
+      "require": "./dist/plugin-package/installation/pluginPackageSecretBindingRepository.js",
+      "default": "./dist/plugin-package/installation/pluginPackageSecretBindingRepository.js"
+    },
     "./plugin-package-automation-publication": {
       "types": "./dist/plugin-package/publication/pluginPackageAutomationPublicationRepository.d.ts",
       "require": "./dist/plugin-package/publication/pluginPackageAutomationPublicationRepository.js",

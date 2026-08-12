@@ -298,5 +298,10 @@ export const postgresqlMainMigrationManifest: MigrationStreamManifest =
         checksum:
           'd184324909f1e450f3c1b58d422796e3869a1360df60c3f2dfe4af0bacc37471',
       }),
+      Object.freeze({
+        id: 'pg-0059-plugin-package-secret-bindings',
+        checksum:
+          '87582d256c868bd7f5af352c4b052fdab9f3714e1e7179e35d33bfa5d62957be',
+      }),
     ]),
   });

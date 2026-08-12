@@ -396,6 +396,7 @@
 | [ADR-0390](./ADR-0390-offline-cluster-operator-context-preflight.md)                                          | Offline Cluster Operator Context Preflight                                                                                           | Accepted |
 | [ADR-0391](./ADR-0391-read-only-cluster-operator-context-readiness.md)                                        | Read-only Cluster Operator Context Readiness                                                                                         | Accepted |
 | [ADR-0392](./ADR-0392-atomic-plugin-package-automation-security-withdrawal.md)                                | Plugin Package Automation 安全隔离原子撤回                                                                                           | Accepted |
+| [ADR-0393](./ADR-0393-generation-bound-plugin-package-secret-binding-ledger.md)                              | 按 Generation 固定的 Plugin Package Secret 绑定账本                                                                                  | Accepted |
 
 ## 规则
 

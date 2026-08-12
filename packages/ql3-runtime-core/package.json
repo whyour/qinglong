@@ -83,6 +83,9 @@
       "plugin-package-resource-materialization": [
         "dist/plugin-package/pluginPackageResourceMaterialization.d.ts"
       ],
+      "plugin-package-secret-binding": [
+        "dist/plugin-package/pluginPackageSecretBinding.d.ts"
+      ],
       "plugin-package-task-reconciliation": [
         "dist/plugin-package/pluginPackageTaskReconciliation.d.ts"
       ],
@@ -370,6 +373,11 @@
       "types": "./dist/plugin-package/pluginPackageResourceMaterialization.d.ts",
       "require": "./dist/plugin-package/pluginPackageResourceMaterialization.js",
       "default": "./dist/plugin-package/pluginPackageResourceMaterialization.js"
+    },
+    "./plugin-package-secret-binding": {
+      "types": "./dist/plugin-package/pluginPackageSecretBinding.d.ts",
+      "require": "./dist/plugin-package/pluginPackageSecretBinding.js",
+      "default": "./dist/plugin-package/pluginPackageSecretBinding.js"
     },
     "./plugin-package-task-reconciliation": {
       "types": "./dist/plugin-package/pluginPackageTaskReconciliation.d.ts",

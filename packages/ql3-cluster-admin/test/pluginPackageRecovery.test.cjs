@@ -34,6 +34,7 @@ function executorPrivileges() {
     'plugin_package_materialized_revisions',
     'plugin_package_automation_publications',
     'plugin_package_automation_publication_heads',
+    'plugin_package_secret_bindings',
     'project_tool_definition_snapshots',
     'project_tool_definition_snapshot_sources',
     'plugin_package_publisher_provenance',

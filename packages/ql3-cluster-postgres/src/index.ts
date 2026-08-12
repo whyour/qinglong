@@ -25,6 +25,7 @@ export {
   pluginPackageIdentityKeysetLedger,
   pluginPackageManagementQuotaBuckets,
   pluginPackageMaterializedRevisions,
+  pluginPackageSecretBindings,
   pluginPackageQuarantineEvents,
   pluginPackageWorkflowAdmissions,
   pluginPackageWorkflowAdmissionSteps,

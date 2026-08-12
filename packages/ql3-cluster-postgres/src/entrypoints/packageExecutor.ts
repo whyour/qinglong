@@ -40,6 +40,7 @@ export {
 } from '../schema/schemaReadiness';
 
 export { PostgresPluginPackageMaterializedRevisionRepository } from '../plugin-package/installation/pluginPackageMaterializedRevisionRepository';
+export { PostgresPluginPackageSecretBindingRepository } from '../plugin-package/installation/pluginPackageSecretBindingRepository';
 export { PostgresPluginPackageAutomationPublicationRepository } from '../plugin-package/publication/pluginPackageAutomationPublicationRepository';
 export {
   CLUSTER_PLUGIN_PACKAGE_QUARANTINE_TARGET_LIMIT,

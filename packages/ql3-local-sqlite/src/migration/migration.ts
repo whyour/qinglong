@@ -100,6 +100,8 @@ import { local0087RunAttemptLogRetentionMigration } from '../migrations/0087-run
 import { local0088CapabilityV44Migration } from '../migrations/0088-capability-v44';
 import { local0089PluginPackageAutomationDispositionEventsMigration } from '../migrations/0089-plugin-package-automation-disposition-events';
 import { local0090CapabilityV45Migration } from '../migrations/0090-capability-v45';
+import { local0091PluginPackageSecretBindingsMigration } from '../migrations/0091-plugin-package-secret-bindings';
+import { local0092CapabilityV46Migration } from '../migrations/0092-capability-v46';
 import type { LocalSqliteMigrationContext } from '../migrations/sqlMigration';
 import {
   LOCAL_SQLITE_MIGRATION_STREAM_ID,
@@ -212,6 +214,8 @@ export const localSqliteMigrationDefinition: MigrationStreamDefinition<LocalSqli
       local0088CapabilityV44Migration,
       local0089PluginPackageAutomationDispositionEventsMigration,
       local0090CapabilityV45Migration,
+      local0091PluginPackageSecretBindingsMigration,
+      local0092CapabilityV46Migration,
     ]),
   });
 

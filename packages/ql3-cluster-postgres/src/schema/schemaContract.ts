@@ -15,8 +15,8 @@ export interface PostgresSchemaContractFunction {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 57;
-  readonly migrationId: 'pg-0058-plugin-package-automation-disposition-events';
+  readonly contractVersion: 58;
+  readonly migrationId: 'pg-0059-plugin-package-secret-bindings';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -55,6 +55,7 @@ export interface PostgresSchemaContract {
     plugin_package_lifecycle_plan: 1;
     plugin_package_management_quota: 1;
     plugin_package_materialized_revision: 1;
+    plugin_package_secret_binding: 1;
     plugin_package_proposal: 1;
     plugin_package_publisher_provenance: 1;
     plugin_package_publisher_trust_authority: 1;
@@ -104,8 +105,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 57,
-    migrationId: 'pg-0058-plugin-package-automation-disposition-events',
+    contractVersion: 58,
+    migrationId: 'pg-0059-plugin-package-secret-bindings',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -137,6 +138,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       plugin_package_lifecycle_plan: 1,
       plugin_package_management_quota: 1,
       plugin_package_materialized_revision: 1,
+      plugin_package_secret_binding: 1,
       plugin_package_proposal: 1,
       plugin_package_publisher_provenance: 1,
       plugin_package_publisher_trust_authority: 1,
@@ -241,6 +243,20 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         'revision_digest',
         'revision_json',
         'created_at_ms',
+      ]),
+      table('plugin_package_secret_bindings', [
+        'generation_digest',
+        'project_id',
+        'package_name',
+        'installation_id',
+        'lock_digest',
+        'generation',
+        'manifest_digest',
+        'authority_kind',
+        'evidence_digest',
+        'bound_at_ms',
+        'binding_digest',
+        'binding_json',
       ]),
       table('project_tool_definition_snapshots', [
         'project_id',
@@ -1417,6 +1433,10 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_plugin_package_materialized_revision_generation_uidx',
       'ql3_plugin_package_materialized_revision_lock_idx',
       'ql3_plugin_package_materialized_revision_snapshot_source_uidx',
+      'plugin_package_secret_bindings_pkey',
+      'ql3_plugin_package_secret_binding_generation_uidx',
+      'ql3_plugin_package_secret_binding_digest_uidx',
+      'ql3_plugin_package_secret_binding_install_idx',
       'project_tool_definition_snapshots_pkey',
       'ql3_project_tool_snapshot_withdrawal_key',
       'ql3_project_tool_definition_snapshot_digest_uidx',
@@ -1708,6 +1728,9 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_plugin_package_installs_version_check',
       'ql3_plugin_package_installs_digest_check',
       'ql3_plugin_package_installs_record_check',
+      'ql3_plugin_package_secret_binding_identity_check',
+      'ql3_plugin_package_secret_binding_digest_check',
+      'ql3_plugin_package_secret_binding_json_check',
       'ql3_plugin_package_quarantine_identity_check',
       'ql3_plugin_package_quarantine_state_check',
       'ql3_plugin_package_quarantine_subject_check',
@@ -2161,6 +2184,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_plugin_package_install_heads_install_fk',
       'ql3_plugin_package_install_mutations_install_fk',
       'ql3_plugin_package_materialized_revision_project_fk',
+      'ql3_plugin_package_secret_binding_project_fk',
+      'ql3_plugin_package_secret_binding_install_fk',
       'ql3_project_tool_definition_snapshot_project_fk',
       'ql3_project_tool_definition_snapshot_source_snapshot_fk',
       'ql3_project_tool_definition_snapshot_source_install_fk',

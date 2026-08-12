@@ -167,6 +167,12 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  plugin_package_secret_bindings: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   project_tool_definition_snapshots: Object.freeze({
     select: false,
     insert: false,
@@ -675,6 +681,12 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     delete: false,
   }),
   plugin_package_materialized_revisions: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  plugin_package_secret_bindings: Object.freeze({
     select: false,
     insert: false,
     update: false,
@@ -1230,6 +1242,7 @@ const REQUIRED_PACKAGE_EXECUTOR_PRIVILEGES: RequiredPrivileges = Object.freeze(
             name === 'approved_action_dispatches' ||
             name === 'plugin_package_install_mutations' ||
             name === 'plugin_package_materialized_revisions' ||
+            name === 'plugin_package_secret_bindings' ||
             name === 'project_tool_definition_snapshots' ||
             name === 'project_tool_definition_snapshot_sources' ||
             name === 'plugin_package_lifecycle_plans' ||

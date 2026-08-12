@@ -85,6 +85,11 @@
       "require": "./dist/plugin-package/pluginPackageMaterializedRevisionRepository.js",
       "default": "./dist/plugin-package/pluginPackageMaterializedRevisionRepository.js"
     },
+    "./plugin-package-secret-binding": {
+      "types": "./dist/plugin-package/pluginPackageSecretBindingRepository.d.ts",
+      "require": "./dist/plugin-package/pluginPackageSecretBindingRepository.js",
+      "default": "./dist/plugin-package/pluginPackageSecretBindingRepository.js"
+    },
     "./plugin-package-task-reconciliation": {
       "types": "./dist/plugin-package/pluginPackageTaskReconciliationRepository.d.ts",
       "require": "./dist/plugin-package/pluginPackageTaskReconciliationRepository.js",

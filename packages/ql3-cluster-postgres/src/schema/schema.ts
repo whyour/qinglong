@@ -326,6 +326,66 @@ export const pluginPackageMaterializedRevisions = ql3Schema.table(
   ],
 );
 
+export const pluginPackageSecretBindings = ql3Schema.table(
+  'plugin_package_secret_bindings',
+  {
+    generationDigest: char('generation_digest', { length: 64 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    packageName: varchar('package_name', { length: 63 }).notNull(),
+    installationId: varchar('installation_id', { length: 128 }).notNull(),
+    lockDigest: char('lock_digest', { length: 64 }).notNull(),
+    generation: integer('generation').notNull(),
+    manifestDigest: char('manifest_digest', { length: 64 }).notNull(),
+    authorityKind: varchar('authority_kind', { length: 32 }).notNull(),
+    evidenceDigest: char('evidence_digest', { length: 64 }).notNull(),
+    boundAtMs: bigint('bound_at_ms', { mode: 'number' }).notNull(),
+    bindingDigest: char('binding_digest', { length: 64 }).notNull(),
+    bindingJson: jsonb('binding_json')
+      .$type<Record<string, unknown>>()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'ql3_plugin_package_secret_binding_project_fk',
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      name: 'ql3_plugin_package_secret_binding_install_fk',
+      columns: [table.installationId],
+      foreignColumns: [pluginPackageInstalls.installationId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_plugin_package_secret_binding_identity_check',
+      sql`${table.projectId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.packageName} ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$' and ${table.installationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.generation} between 1 and 2147483647 and ${table.authorityKind} in ('approved-action-execution','local-owner-confirmation') and ${table.boundAtMs} >= 0`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_digest_check',
+      sql`${table.generationDigest} ~ '^[0-9a-f]{64}$' and ${table.lockDigest} ~ '^[0-9a-f]{64}$' and ${table.manifestDigest} ~ '^[0-9a-f]{64}$' and ${table.evidenceDigest} ~ '^[0-9a-f]{64}$' and ${table.bindingDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_json_check',
+      sql`jsonb_typeof(${table.bindingJson}) = 'object' and octet_length(${table.bindingJson}::text) between 2 and 65536 and ${table.bindingJson} @> jsonb_build_object('schema', 'qinglong/plugin-package-secret-binding@v1', 'target', jsonb_build_object('generationDigest', ${table.generationDigest}, 'projectId', ${table.projectId}, 'packageName', ${table.packageName}, 'installationId', ${table.installationId}, 'lockDigest', ${table.lockDigest}, 'generation', ${table.generation}, 'manifestDigest', ${table.manifestDigest}), 'authority', jsonb_build_object('kind', ${table.authorityKind}, 'evidenceDigest', ${table.evidenceDigest}), 'boundAtMs', ${table.boundAtMs}, 'bindingDigest', ${table.bindingDigest}) and jsonb_typeof(${table.bindingJson} -> 'entries') = 'array' and jsonb_array_length(${table.bindingJson} -> 'entries') between 1 and 64`,
+    ),
+    uniqueIndex('ql3_plugin_package_secret_binding_generation_uidx').on(
+      table.projectId,
+      table.packageName,
+      table.generation,
+    ),
+    uniqueIndex('ql3_plugin_package_secret_binding_digest_uidx').on(
+      table.bindingDigest,
+    ),
+    index('ql3_plugin_package_secret_binding_install_idx').on(
+      table.installationId,
+      table.generationDigest,
+    ),
+  ],
+);
+
 export const projectToolDefinitionSnapshots = ql3Schema.table(
   'project_tool_definition_snapshots',
   {
@@ -5812,6 +5872,7 @@ export const ql3PostgresTables = [
   pluginPackageInstallHeads,
   pluginPackageInstallMutations,
   pluginPackageMaterializedRevisions,
+  pluginPackageSecretBindings,
   projectToolDefinitionSnapshots,
   projectToolDefinitionSnapshotSources,
   pluginPackageQuarantineEvents,

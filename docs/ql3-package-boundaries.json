@@ -6,13 +6,13 @@
     "reviewedDenseDirectories": [
       {
         "kind": "ordered_ledger",
-        "maxDirectSourceFiles": 59,
+        "maxDirectSourceFiles": 60,
         "path": "packages/ql3-cluster-postgres/src/migrations",
         "rationale": "PostgreSQL migrations are an append-only version ledger whose ordering and discoverability are safer in one reviewed directory."
       },
       {
         "kind": "ordered_ledger",
-        "maxDirectSourceFiles": 91,
+        "maxDirectSourceFiles": 93,
         "path": "packages/ql3-local-sqlite/src/migrations",
         "rationale": "SQLite migrations are an append-only version ledger whose ordering and discoverability are safer in one reviewed directory."
       }
@@ -84,7 +84,7 @@
       "path": "packages/ql3-cluster-postgres",
       "name": "@qinglong/cluster-postgres",
       "rootSourceFileHardCap": 1,
-      "rootSourceLineHardCap": 125,
+      "rootSourceLineHardCap": 126,
       "rootSourceFileRoles": {
         "index.ts": "public_export"
       },

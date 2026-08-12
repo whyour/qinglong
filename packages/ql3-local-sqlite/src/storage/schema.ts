@@ -1217,6 +1217,62 @@ export const pluginPackageMaterializedRevisions = sqliteTable(
   ],
 );
 
+export const pluginPackageSecretBindings = sqliteTable(
+  'QingLong3PluginPackageSecretBindings',
+  {
+    generationDigest: text('generation_digest').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => localProjects.id, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    packageName: text('package_name').notNull(),
+    installationId: text('installation_id')
+      .notNull()
+      .references(() => pluginPackageInstalls.installationId, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    lockDigest: text('lock_digest').notNull(),
+    generation: integer('generation').notNull(),
+    manifestDigest: text('manifest_digest').notNull(),
+    authorityKind: text('authority_kind').notNull(),
+    evidenceDigest: text('evidence_digest').notNull(),
+    boundAtMs: integer('bound_at_ms').notNull(),
+    bindingDigest: text('binding_digest').notNull(),
+    bindingJson: text('binding_json', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      'ql3_plugin_package_secret_binding_identity_check',
+      sql`length(${table.projectId}) between 1 and 128 and length(${table.packageName}) between 1 and 63 and length(${table.installationId}) between 1 and 128 and ${table.generation} between 1 and 2147483647 and ${table.authorityKind} in ('approved-action-execution','local-owner-confirmation') and ${table.boundAtMs} >= 0`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_digest_check',
+      sql`length(${table.generationDigest}) = 64 and ${table.generationDigest} not glob '*[^0-9a-f]*' and length(${table.lockDigest}) = 64 and ${table.lockDigest} not glob '*[^0-9a-f]*' and length(${table.manifestDigest}) = 64 and ${table.manifestDigest} not glob '*[^0-9a-f]*' and length(${table.evidenceDigest}) = 64 and ${table.evidenceDigest} not glob '*[^0-9a-f]*' and length(${table.bindingDigest}) = 64 and ${table.bindingDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_json_check',
+      sql`length(cast(${table.bindingJson} as blob)) between 2 and 65536 and json_valid(${table.bindingJson}) and json_type(${table.bindingJson}) = 'object' and json_extract(${table.bindingJson}, '$.schema') = 'qinglong/plugin-package-secret-binding@v1' and json_extract(${table.bindingJson}, '$.target.generationDigest') = ${table.generationDigest} and json_extract(${table.bindingJson}, '$.target.projectId') = ${table.projectId} and json_extract(${table.bindingJson}, '$.target.packageName') = ${table.packageName} and json_extract(${table.bindingJson}, '$.target.installationId') = ${table.installationId} and json_extract(${table.bindingJson}, '$.target.lockDigest') = ${table.lockDigest} and json_extract(${table.bindingJson}, '$.target.generation') = ${table.generation} and json_extract(${table.bindingJson}, '$.target.manifestDigest') = ${table.manifestDigest} and json_extract(${table.bindingJson}, '$.authority.kind') = ${table.authorityKind} and json_extract(${table.bindingJson}, '$.authority.evidenceDigest') = ${table.evidenceDigest} and json_extract(${table.bindingJson}, '$.boundAtMs') = ${table.boundAtMs} and json_extract(${table.bindingJson}, '$.bindingDigest') = ${table.bindingDigest} and json_type(${table.bindingJson}, '$.entries') = 'array' and json_array_length(json_extract(${table.bindingJson}, '$.entries')) between 1 and 64`,
+    ),
+    uniqueIndex('ql3_plugin_package_secret_binding_generation_uidx').on(
+      table.projectId,
+      table.packageName,
+      table.generation,
+    ),
+    uniqueIndex('ql3_plugin_package_secret_binding_digest_uidx').on(
+      table.bindingDigest,
+    ),
+    index('ql3_plugin_package_secret_binding_install_idx').on(
+      table.installationId,
+      table.generationDigest,
+    ),
+  ],
+);
+
 export const projectToolDefinitionSnapshots = sqliteTable(
   'QingLong3ProjectToolDefinitionSnapshots',
   {
@@ -4888,6 +4944,7 @@ export const localSqliteSchema = Object.freeze({
   pluginPackageInstallHeads,
   pluginPackageInstallMutations,
   pluginPackageMaterializedRevisions,
+  pluginPackageSecretBindings,
   pluginPackageQuarantineEvents,
   pluginPackageWithdrawalReceipts,
   pluginPackageWithdrawalTasks,
