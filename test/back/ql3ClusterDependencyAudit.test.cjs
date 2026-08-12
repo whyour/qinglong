@@ -119,6 +119,65 @@ test('accepts package-local and declared forward source imports', (t) => {
   assert.deepEqual(findings, []);
 });
 
+test('confines local Run management authority to reviewed retry and stop commands', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-run-management-boundary-'),
+  );
+  const sourceDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/run-management',
+  );
+  fs.mkdirSync(sourceDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(sourceDirectory, 'runRetryCommand.ts'),
+    [
+      "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { fence } from '@qinglong/local-sqlite/authenticated-management';",
+      "import { database } from '@qinglong/local-sqlite/run-management';",
+      "import { policy } from '@qinglong/runtime-core/project-policy';",
+      "import { retry } from '@qinglong/runtime-core/run-manual-retry';",
+      "import { audit } from '@qinglong/runtime-core/security-audit';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(sourceDirectory, 'runStopCommand.ts'),
+    [
+      "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { fence } from '@qinglong/local-sqlite/authenticated-management';",
+      "import { database } from '@qinglong/local-sqlite/run-management';",
+      "import { policy } from '@qinglong/runtime-core/project-policy';",
+      "import { stop } from '@qinglong/runtime-core/run-cancellation';",
+      "import { audit } from '@qinglong/runtime-core/security-audit';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(sourceDirectory, 'widenedRunCommand.ts'),
+    [
+      "import { database } from '@qinglong/local-sqlite/run-management';",
+      "import { stop } from '@qinglong/runtime-core/run-cancellation';",
+    ].join('\n'),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/run-management/widenedRunCommand.ts',
+        specifier: '@qinglong/local-sqlite/run-management',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/run-management/widenedRunCommand.ts',
+        specifier: '@qinglong/runtime-core/run-cancellation',
+      },
+    ],
+  );
+});
+
 test('confines local MCP to its reviewed protocol and read-authority subpaths', (t) => {
   const root = fixture(
     t,
@@ -1973,8 +2032,7 @@ test('confines Local API identity authentication to its exact read-only adapter'
     [
       {
         code: 'FORBIDDEN_LOCAL_OWNER_PEPPER_DESTRUCTIVE_ENTRYPOINT',
-        file:
-          'packages/ql3-local-api/src/authentication/destructive.ts',
+        file: 'packages/ql3-local-api/src/authentication/destructive.ts',
       },
       {
         code: 'FORBIDDEN_LOCAL_IDENTITY_AUTHORITY_IMPORT',

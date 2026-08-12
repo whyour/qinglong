@@ -60,7 +60,10 @@ test('help and version are bounded installation-derived product facts', () => {
   const help = qingLong3ProductHelp();
   assert.match(help, /^Usage: ql3 <command> \[arguments\]/);
   assert.match(help, /\n  task\s+manage Task definitions\n/);
-  assert.match(help, /\n  run\s+retry terminal Runs/);
+  assert.match(
+    help,
+    /\n  run\s+retry or stop Runs under strong local authentication/,
+  );
   assert.match(help, /Root service mutation remains isolated/);
   assert.equal(help.includes('ql3-service-bridge  '), false);
   assert.equal(loadQingLong3ProductVersion(moduleDirectory), manifest.version);
@@ -158,7 +161,10 @@ test('product binary exposes help/version and delegates without a shell', () => 
   assert.equal(delegatedRunHelp.status, 0);
   assert.equal(
     delegatedRunHelp.stdout.trim(),
-    'Usage: ql3-run retry --command-file /absolute/private-command.json',
+    [
+      'Usage: ql3-run retry --command-file /absolute/private-command.json',
+      '       ql3-run stop --command-file /absolute/private-command.json',
+    ].join('\n'),
   );
   assert.equal(delegatedRunHelp.stderr, '');
 

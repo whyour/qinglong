@@ -11,6 +11,7 @@ import {
   LocalSqliteRunManualRetryRepository,
   STANDALONE_RUN_MANUAL_RETRY_RATE_LIMIT,
 } from '../run/runManualRetryRepository';
+import { LocalSqliteRunCancellationRepository } from '../run/runCancellationRepository';
 import { LocalSqliteApiCredentialRepository } from '../security/apiCredentialRepository';
 import { LocalSqliteProjectPolicyRepository } from '../security/projectPolicyRepository';
 import { LocalSqliteSecurityAuthorityStore } from '../security/securityAuthorityStore';
@@ -37,6 +38,10 @@ export interface LocalSqliteRunManagementDatabase {
   readonly apiCredentials: ApiCredentialRepository;
   readonly ownerPepper: Pick<LocalOwnerPepperRepository, 'resolveKey'>;
   readonly projectPolicy: ProjectPolicyRepository;
+  readonly runCancellation: Pick<
+    LocalSqliteRunCancellationRepository,
+    'requestUserCancellationAudited'
+  >;
   readonly runManualRetry: RunManualRetryRepository;
   readonly securityAudit: SecurityAuditSink;
   activateUserCredentialFence(
@@ -95,6 +100,25 @@ export async function openLocalSqliteRunManagementDatabase(
         );
       },
     });
+    const runCancellation = new LocalSqliteRunCancellationRepository(
+      authority,
+      Date.now,
+      {
+        beforeMutation(actor) {
+          if (
+            !activeFence ||
+            actor.type !== activeFence.subjectType ||
+            actor.id !== activeFence.subjectId
+          ) {
+            throw new LocalSqliteAuthenticatedManagementFenceError();
+          }
+          confirmLocalSqliteAuthenticatedUserCredentialFence(
+            authority,
+            activeFence,
+          );
+        },
+      },
+    );
     let closePromise: Promise<void> | undefined;
     return Object.freeze({
       profile: options.profile,
@@ -102,6 +126,7 @@ export async function openLocalSqliteRunManagementDatabase(
       apiCredentials: new LocalSqliteApiCredentialRepository(authority),
       ownerPepper: new LocalSqliteOwnerPepperRepository(authority),
       projectPolicy: new LocalSqliteProjectPolicyRepository(authority),
+      runCancellation,
       runManualRetry,
       securityAudit: securityAuthority,
       activateUserCredentialFence(

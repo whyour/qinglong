@@ -195,7 +195,7 @@ test('binary exposes only the private command-file retry interface', () => {
     '..',
     'dist',
     'run-management',
-    'runRetryCli.js',
+    'runManagementCli.js',
   );
   const help = spawnSync(process.execPath, [cli, '--help'], {
     encoding: 'utf8',
@@ -203,7 +203,10 @@ test('binary exposes only the private command-file retry interface', () => {
   assert.equal(help.status, 0);
   assert.equal(
     help.stdout.trim(),
-    'Usage: ql3-run retry --command-file /absolute/private-command.json',
+    [
+      'Usage: ql3-run retry --command-file /absolute/private-command.json',
+      '       ql3-run stop --command-file /absolute/private-command.json',
+    ].join('\n'),
   );
   const invalid = spawnSync(process.execPath, [cli, 'retry'], {
     encoding: 'utf8',
@@ -211,6 +214,6 @@ test('binary exposes only the private command-file retry interface', () => {
   assert.equal(invalid.status, 64);
   assert.equal(
     JSON.parse(invalid.stderr).code,
-    'LOCAL_RUN_RETRY_CLI_USAGE_INVALID',
+    'LOCAL_RUN_MANAGEMENT_CLI_USAGE_INVALID',
   );
 });

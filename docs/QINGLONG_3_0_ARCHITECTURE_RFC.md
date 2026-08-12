@@ -11,6 +11,17 @@
 
 最新增量证据（2026-08-12）：
 
+- D-297/ADR-0385（已接受）
+  Local Edge/Standalone 已补齐强认证 `run.stop` 产品入口，并与既有 `run.retry` 统一为同一个 caller-driven `ql3-run retry|stop`
+  binary，不新增 package、migration、表、索引、进程、listener、timer、watcher、连接、cache 或 sidecar。stop 只接受 POSIX 私有命令文件
+  中的 Project/Run、UUID mutation、request/audit identity 与既有 deployment authority 路径；Event ID、`local_console` User、Policy
+  fence、取消原因和数据库时间均由进程/服务端建立。SQLite audited cancellation 在一个 `BEGIN IMMEDIATE` 中重验 Owner
+  credential/pepper/material、Project/RoleBinding，原子提交 cancellation intent、immutable Event 与 `run.stop` allowed audit；相同命令
+  精确重放不重复 Event/audit，实际终态继续由既有 cancellation lifecycle 收敛。常驻 runtime 保留原轻量 repository 方法，只有短生命周期
+  CLI 加载 Owner/Policy/audit authority；单因子 Local HTTP、MCP 与 AI Tool 不因此获得强 stop authority。完整 18-package clean
+  build/test 与 backend 1,166 pass/2 conditional skip/0 fail；workspace 保持 18 package/1,072 source/1,054 nested，无 single-source 或
+  shallow package；14 档 Local Profile artifact 全部 compatible，最小 Edge 为 2,467,343 bytes/295 files/53 loaded modules，RSS delta
+  11,141,120 bytes，低于 4 MiB/512 files/16 MiB 门限。完整验收记录见 ADR-0385。
 - D-296/ADR-0384（已接受）
   Cluster Run Management Plane 已在既有内聚领域内增加强认证 `run.stop`，不新增 package、进程、listener、Pool、timer、watcher、cache、
   sidecar 或部署 overlay。`run.retry | run.stop` 共用 mTLS、purpose-bound OIDC、五分钟内 `multi_factor|hardware` User、固定

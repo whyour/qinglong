@@ -65,6 +65,11 @@
       "require": "./dist/run-management/runRetryCommand.js",
       "default": "./dist/run-management/runRetryCommand.js"
     },
+    "./run-stop-command": {
+      "types": "./dist/run-management/runStopCommand.d.ts",
+      "require": "./dist/run-management/runStopCommand.js",
+      "default": "./dist/run-management/runStopCommand.js"
+    },
     "./plugin-package-workflow-command": {
       "types": "./dist/plugin-package/pluginPackageWorkflowCommand.d.ts",
       "require": "./dist/plugin-package/pluginPackageWorkflowCommand.js",
@@ -130,7 +135,7 @@
     "ql3-ai-feature": "dist/ai-management/aiFeatureCli.js",
     "ql3-secret": "dist/security-management/secretCli.js",
     "ql3-task": "dist/automation-management/taskDefinitionCli.js",
-    "ql3-run": "dist/run-management/runRetryCli.js",
+    "ql3-run": "dist/run-management/runManagementCli.js",
     "ql3-workflow": "dist/plugin-package/pluginPackageWorkflowCli.js",
     "ql3-trigger": "dist/automation-management/triggerCli.js",
     "ql3-policy": "dist/security-management/projectPolicyCli.js",

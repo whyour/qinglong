@@ -56,6 +56,27 @@ function command(overrides = {}) {
   };
 }
 
+function auditedCommand(overrides = {}) {
+  const now = Date.now();
+  return {
+    projectId: 'default',
+    runId: 'run-1',
+    mutationId: '018f0000-0000-4000-8000-000000000010',
+    eventId: '018f0000-0000-4000-8000-000000000011',
+    requestId: 'local-run-stop-request',
+    auditEventId: '018f0000-0000-4000-8000-000000000012',
+    principal: {
+      subject: { type: 'user', id: 'user-1' },
+      authenticationId: 'local-console:run-stop',
+      authenticatedAtMs: now - 1_000,
+      expiresAtMs: now + 60_000,
+      assurance: 'local_console',
+    },
+    policyFence: { projectVersion: 1, bindingVersion: 1 },
+    ...overrides,
+  };
+}
+
 async function fixture(t, status = 'running') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-run-cancel-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -68,6 +89,7 @@ async function fixture(t, status = 'running') {
   t.after(() => authority.close());
   return {
     client,
+    authority,
     repository: new LocalSqliteRunCancellationRepository(authority, () => NOW),
   };
 }
@@ -85,9 +107,11 @@ test('atomically publishes one durable cancellation intent and exact replay', as
     cancelReason: 'user',
   });
   assert.equal(
-    (await repository.requestUserCancellation(
-      command({ eventId: '018f0000-0000-7000-8000-000000000002' }),
-    )).status,
+    (
+      await repository.requestUserCancellation(
+        command({ eventId: '018f0000-0000-7000-8000-000000000002' }),
+      )
+    ).status,
     'already_requested',
   );
   assert.deepEqual(
@@ -105,6 +129,75 @@ test('atomically publishes one durable cancellation intent and exact replay', as
         actorType: 'user',
       },
     ],
+  );
+});
+
+test('atomically binds strong management cancellation to one allowed audit', async (t) => {
+  const { authority, client } = await fixture(t);
+  let fenceChecks = 0;
+  const repository = new LocalSqliteRunCancellationRepository(
+    authority,
+    Date.now,
+    {
+      beforeMutation(subject) {
+        assert.deepEqual(subject, { type: 'user', id: 'user-1' });
+        fenceChecks += 1;
+      },
+    },
+  );
+  const value = auditedCommand();
+  const accepted = await repository.requestUserCancellationAudited(value);
+  assert.equal(accepted.status, 'accepted');
+  assert.equal(
+    (await repository.requestUserCancellationAudited(value)).status,
+    'already_requested',
+  );
+  assert.equal(fenceChecks, 2);
+  assert.deepEqual(
+    {
+      ...client
+        .prepare(
+          `SELECT "operation_id" AS "operationId", outcome, reasons_json AS "reasonsJson"
+           FROM "QingLong3SecurityAuditEvents" WHERE "event_id" = ?`,
+        )
+        .get(value.auditEventId),
+    },
+    {
+      operationId: 'run.stop',
+      outcome: 'allowed',
+      reasonsJson: '["role_grant","strong_authentication"]',
+    },
+  );
+});
+
+test('rolls cancellation back when the authenticated credential fence changes', async (t) => {
+  const { authority, client } = await fixture(t);
+  const repository = new LocalSqliteRunCancellationRepository(
+    authority,
+    Date.now,
+    {
+      beforeMutation() {
+        throw new Error('credential changed');
+      },
+    },
+  );
+  await assert.rejects(
+    repository.requestUserCancellationAudited(auditedCommand()),
+    (error) =>
+      error instanceof RunCancellationFenceRejectedError &&
+      error.reason === 'authorization_changed',
+  );
+  assert.deepEqual(
+    {
+      ...client
+        .prepare(
+          `SELECT "cancel_requested_at_ms" AS "cancelRequestedAtMs",
+                  (SELECT count(*) FROM "QingLong3SecurityAuditEvents") AS audits
+           FROM "Runs" WHERE "id" = 'run-1'`,
+        )
+        .get(),
+    },
+    { cancelRequestedAtMs: null, audits: 0 },
   );
 });
 
@@ -148,7 +241,9 @@ test('revalidates the latest RoleBinding inside the mutation transaction', async
   );
   assert.equal(
     client
-      .prepare(`SELECT "cancel_requested_at_ms" AS value FROM "Runs" WHERE "id" = 'run-1'`)
+      .prepare(
+        `SELECT "cancel_requested_at_ms" AS value FROM "Runs" WHERE "id" = 'run-1'`,
+      )
       .get().value,
     null,
   );
