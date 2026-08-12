@@ -29,6 +29,7 @@ const ALLOWED_MANAGEMENT_PATHS = new Set([
   '/api/v3/automations/management',
   '/api/v3/approvals/management',
   '/api/v3/provider-credentials/management',
+  '/api/v3/runs/management',
 ]);
 const MAX_CONFIG_BYTES = 16 * 1024;
 const MAX_ASSERTION_BYTES = 16 * 1024;
@@ -777,7 +778,10 @@ function rawHeaderCount(rawHeaders: readonly string[], name: string): number {
   return count;
 }
 
-export async function executeClusterAuthenticatedManagementClient<Command, Result>(
+export async function executeClusterAuthenticatedManagementClient<
+  Command,
+  Result,
+>(
   paths: ClusterPluginPackageManagementClientPaths,
   protocol: ClusterAuthenticatedManagementClientProtocol<Command, Result>,
   connectionOptions?: ClusterPluginPackageManagementClientConnectionOptions,
@@ -919,7 +923,8 @@ export async function executeClusterAuthenticatedManagementClient<Command, Resul
         }
       } catch (error) {
         if (
-          error instanceof ClusterPluginPackageManagementClientConfigurationError
+          error instanceof
+          ClusterPluginPackageManagementClientConfigurationError
         ) {
           throw error;
         }

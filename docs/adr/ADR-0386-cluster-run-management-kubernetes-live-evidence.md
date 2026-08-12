@@ -1,6 +1,6 @@
 # ADR-0386：Cluster Run Management Kubernetes 多节点实证
 
-- 状态：Proposed（实现与静态回归完成；固定本机 live 证据待锁定输入可达后补录）
+- 状态：Accepted
 - 日期：2026-08-12
 - 关联 RFC：QL-RFC-0001 D-298
 - 前置决策：ADR-0359、ADR-0364、ADR-0366、ADR-0382、ADR-0383、ADR-0384
@@ -38,13 +38,16 @@ Cluster 已有强认证 `run.retry | run.stop`、专用 `ql3_run_manager`、两�
 
 ## 验收状态
 
-- Run/Approval live 静态合同、离线审计与既有 deployment 回归：20/20；Run report 审计含 topology/schema/deployment/client/rotation/availability/isolation/durability/secret 反向 fixture。
+- 锁定的 CNPG v1.30.0 manifest SHA-256 为 `f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88`；本机 arm64 真实三节点 K3s/CNPG Run gate 已通过，报告时间 `2026-08-12T08:25:36.761Z`，报告 SHA-256 为 `4be50ad1ebbe0b9fea76ecac33133ea709461d44acbff730c60a37fe3fd2921a`，权限 `0600`，离线审计零 finding。
+- 实证为 K3s `v1.34.3+k3s1`、3 个 CNI Ready 节点、CloudNativePG 1.30.0/PostgreSQL 18.4 三实例、2 个跨节点 Ready manager；migration 57/control-core capability 56。retry 状态为 `accepted → existing → existing`，stop 为 `accepted → already_requested → already_requested`，最终 retry Run/Attempt/Event 为 `1/1/2`、cancel Event 为 1、重复 mutation 为 0。
+- identity generation overlap/revoke/rollback、mTLS CRL 全 Pod replacement、CNPG primary promotion、数据库断连 readiness withdrawal/liveness preservation、恢复后强制 Pod replacement、CNI ingress/egress 与 RBAC/数据库角色 least privilege 全部通过；运行后 `ql3-run-live-*` 容器、网络和临时镜像均无残留。
+- 真实门首先暴露并修正三处组合缺口：共享产品 client 未允许精确 Run route；本地镜像替换误伤非镜像 zero-digest annotation；live 重放重新签发 JTI 导致认证/audit fence 漂移。最终重放在签名 key rotation 中固定认证会话 JTI，保留生产端强认证围栏；现场只把测试渲染的 HTTP rate window 收窄为 1 秒，生产清单仍为 peer 30/global 300 次每 60 秒。
+- Run/Approval live 静态合同、离线审计与既有 deployment 回归通过；Run report 审计含 topology/schema/deployment/client/rotation/availability/isolation/durability/secret 反向 fixture。
 - runner、scenario、platform、identity、PKI 与 audit 均通过 Node syntax check；现有 Run deployment 合同通过。
-- 本机真实门尝试下载校验和锁定的 CNPG manifest 时，`github.com:443` 在 75 秒无数据后超时；本机无缓存。未降低 checksum、未改用未审计输入，也未把静态结果记录为 live 通过。
-- 完整 18-package build/test 退出 0；backend 1,174 pass/2 conditional skip/0 fail；14 个 Edge/Standalone Profile artifact 全部 compatible。基础 Edge 为 2,467,343 bytes/295 files/53 loaded modules，RSS delta 10,928,128 bytes，仍低于 4 MiB/512 files/16 MiB 门限。
+- 完整 18-package clean build/test 退出 0；backend 1,177 tests、1,175 pass/2 conditional skip/0 fail；14 个 Edge/Standalone Profile artifact 全部 compatible。基础 Edge 为 2,467,343 bytes/295 files/53 loaded modules，RSS delta 10,960,896 bytes，仍低于 4 MiB/512 files/16 MiB 门限。
 - package/dependency/local-image boundary 全部 compatible，18 个 workspace package 无 single-source/shallow package；本切片没有改变任一 Local artifact 的生产闭包。
 - PostgreSQL 18.4 arm64 HA 通过 123 gates、primary timeline `1→2`，报告 SHA-256 `6adb8c9de8929ff54b522e9a251e3081d9dd004c1a91f72f83c33288ddce63a9`；运行后 `ql3-ha-*` container、volume、network 均为空。
-- 固定 K3s/CloudNativePG live report 仍是 ADR 从 Proposed 转为 Accepted 的唯一未满足证据。
+- 固定 K3s/CloudNativePG live report 已满足，本 ADR 转为 Accepted。
 
 ## 后果
 

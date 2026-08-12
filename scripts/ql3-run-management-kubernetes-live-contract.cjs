@@ -403,9 +403,16 @@ async function main(argv = process.argv.slice(2)) {
       adminImage,
     );
     assert.equal(managerManifest.split(ZERO_DIGEST).length - 1, 2);
+    const productionRateWindowPattern =
+      /(- name: QL3_RUN_MANAGEMENT_RATE_WINDOW_MS\n\s+value: )"60000"/g;
+    assert.equal(
+      managerManifest.match(productionRateWindowPattern)?.length ?? 0,
+      1,
+    );
     managerManifest = managerManifest
       .replace(ZERO_DIGEST, sha256(pkiMaterial.ca))
-      .replace(ZERO_DIGEST, sha256(pkiMaterial.clientCrl));
+      .replace(ZERO_DIGEST, sha256(pkiMaterial.clientCrl))
+      .replace(productionRateWindowPattern, '$1"1000"');
     fixture.kubectl(['apply', '-f', '-'], { input: managerManifest + '\n' });
     waitManagementRollout(managerOptions(fixture));
     let managerPods = await readyManagementPods(managerOptions(fixture));
@@ -452,7 +459,10 @@ async function main(argv = process.argv.slice(2)) {
       networkPolicyLabel: 'qinglong.io/run-management-client',
       clientCliPath:
         '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/run-management/runManagementClientCli.js',
-      retryableClientCodes: ['QL3_RUN_MANAGEMENT_CLIENT_FAILED'],
+      retryableClientCodes: [
+        'QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_REQUEST_FAILED',
+        'QL3_RUN_MANAGEMENT_CLIENT_FAILED',
+      ],
       description: 'Run management',
     });
     const retryMutationId = crypto.randomUUID();
@@ -463,12 +473,14 @@ async function main(argv = process.argv.slice(2)) {
       retryMutationId,
       1,
     );
+    const retryAuthenticationJti = 'run-live-retry-session-' + values.suffix;
+    const retryBearer = identity.assertion(oldKey, retryAuthenticationJti);
     const retryAccepted = await executeClient(
       {
         name: 'ql3-run-retry-accepted',
         target: managerPods[0],
         command: retry,
-        bearer: identity.assertion(oldKey),
+        bearer: retryBearer,
         clientCertificate: pkiMaterial.oldClientCertificate,
         clientKey: pkiMaterial.oldClientKey,
       },
@@ -480,7 +492,7 @@ async function main(argv = process.argv.slice(2)) {
         name: 'ql3-run-retry-replay',
         target: managerPods[1],
         command: retry,
-        bearer: identity.assertion(oldKey),
+        bearer: retryBearer,
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -540,12 +552,13 @@ async function main(argv = process.argv.slice(2)) {
       stopMutationId,
       4,
     );
+    const stopAuthenticationJti = 'run-live-stop-session-' + values.suffix;
     const overlapOld = await executeClient(
       {
         name: 'ql3-run-stop-overlap-old',
         target: managerPods[0],
         command: stop,
-        bearer: identity.assertion(oldKey),
+        bearer: identity.assertion(oldKey, stopAuthenticationJti),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -556,7 +569,7 @@ async function main(argv = process.argv.slice(2)) {
         name: 'ql3-run-stop-overlap-new',
         target: managerPods[1],
         command: stop,
-        bearer: identity.assertion(newKey),
+        bearer: identity.assertion(newKey, stopAuthenticationJti),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -582,7 +595,7 @@ async function main(argv = process.argv.slice(2)) {
         name: 'ql3-run-stop-revoked-key',
         target: managerPods[0],
         command: stop,
-        bearer: identity.assertion(oldKey),
+        bearer: identity.assertion(oldKey, stopAuthenticationJti),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -593,7 +606,7 @@ async function main(argv = process.argv.slice(2)) {
         name: 'ql3-run-stop-active-key',
         target: managerPods[1],
         command: stop,
-        bearer: identity.assertion(newKey),
+        bearer: identity.assertion(newKey, stopAuthenticationJti),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -687,7 +700,7 @@ async function main(argv = process.argv.slice(2)) {
         name: 'ql3-run-retry-revoked-cert',
         target: managerPods[0],
         command: retry,
-        bearer: identity.assertion(newKey),
+        bearer: identity.assertion(newKey, retryAuthenticationJti),
         clientCertificate: pkiMaterial.oldClientCertificate,
         clientKey: pkiMaterial.oldClientKey,
       },
@@ -698,7 +711,7 @@ async function main(argv = process.argv.slice(2)) {
         name: 'ql3-run-retry-active-cert',
         target: managerPods[1],
         command: retry,
-        bearer: identity.assertion(newKey),
+        bearer: identity.assertion(newKey, retryAuthenticationJti),
         clientCertificate: pkiMaterial.newClientCertificate,
         clientKey: pkiMaterial.newClientKey,
       },
@@ -782,7 +795,7 @@ async function main(argv = process.argv.slice(2)) {
             name: 'ql3-run-database-unavailable-' + String(index + 1),
             target: pod,
             command: stop,
-            bearer: identity.assertion(newKey),
+            bearer: identity.assertion(newKey, stopAuthenticationJti),
             clientCertificate: pkiMaterial.newClientCertificate,
             clientKey: pkiMaterial.newClientKey,
           },
@@ -862,7 +875,7 @@ async function main(argv = process.argv.slice(2)) {
             name: 'ql3-run-database-recovered-' + String(index + 1),
             target: pod,
             command: stop,
-            bearer: identity.assertion(newKey),
+            bearer: identity.assertion(newKey, stopAuthenticationJti),
             clientCertificate: pkiMaterial.newClientCertificate,
             clientKey: pkiMaterial.newClientKey,
           },

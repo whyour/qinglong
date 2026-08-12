@@ -11,19 +11,22 @@
 
 最新增量证据（2026-08-12）：
 
-- D-298/ADR-0386（实现完成；固定本机 live 证据待锁定输入可达后补录）
+- D-298/ADR-0386（已接受）
   Cluster `run.retry | run.stop` 已建立人工触发的真实三节点 Kubernetes 组合门：1 control-plane + 2 worker K3s/Flannel、3 实例
   CloudNativePG 1.30.0/PostgreSQL 18.4、2 个跨节点 Run manager Pod、TLS 1.3 mTLS、purpose-bound OIDC strong User、identity
   generation overlap/revoke/rollback、client CRL rotation、CNPG primary promotion、数据库断连 readiness/liveness fence、CNI 与 RBAC
   least privilege，并以最终 PostgreSQL facts 验证 retry/stop 首写和 exact replay 无重复。报告 schema 固定 migration 57/control-core
   capability 56，只允许 `0600` content-free evidence，敏感材料与隐藏 limitation 均失败。实现没有新增 package、生产依赖、migration、表、
-  角色或默认 workload；live 代码按通用管理 Kubernetes helper、Run scenario、离线 audit 分层，现有 Approval 回归通过。当前静态/负向合同
-  20/20；本机首次 live 取锁定 CNPG manifest 时 GitHub 443 连接 75 秒无数据超时且无缓存，因此没有降低 checksum 或把静态结果冒充 live
-  证据。完整 18-package build/test 退出 0，backend 1,174 pass/2 conditional skip/0 fail，14 个 Profile artifact 全部 compatible；基础
-  Edge 为 2,467,343 bytes/295 files/53 modules，RSS delta 10,928,128 bytes，低于既有低配门限。package/dependency/local-image boundary
+  角色或默认 workload；live 代码按通用管理 Kubernetes helper、Run scenario、离线 audit 分层，现有 Approval 回归通过。锁定 CNPG
+  manifest SHA-256 `f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88` 后，本机 arm64 真实门完整通过：
+  K3s `v1.34.3+k3s1` 三节点、CNPG/PostgreSQL 三实例、双跨节点 manager、identity generation/CRL rotation、primary promotion、数据库
+  fail-closed recovery、CNI/RBAC/DB least privilege 全绿，重复 mutation 为 0；报告权限 `0600`、离线审计零 finding，SHA-256
+  `4be50ad1ebbe0b9fea76ecac33133ea709461d44acbff730c60a37fe3fd2921a`，运行后临时 Docker 资源零残留。真实组合门同时修正共享 client
+  缺少精确 Run route、本地镜像 placeholder 替换误伤 annotation，以及 live 重放 JTI 漂移三处问题；生产强认证/审计围栏与 60 秒限流参数均未
+  放宽。完整 18-package clean build/test 退出 0，backend 1,177 tests、1,175 pass/2 conditional skip/0 fail，14 个 Profile artifact 全部
+  compatible；基础 Edge 为 2,467,343 bytes/295 files/53 modules，RSS delta 10,960,896 bytes，低于既有低配门限。package/dependency/local-image boundary
   全绿，仍为 18 package、无 single-source/shallow package。PostgreSQL 18.4 arm64 HA 通过 123 gates、timeline `1→2`，报告 SHA-256
-  `6adb8c9de8929ff54b522e9a251e3081d9dd004c1a91f72f83c33288ddce63a9` 且 Docker 零残留。固定 K3s/CNPG live report 是 ADR 从
-  Proposed 转为 Accepted 的唯一剩余证据。
+  `6adb8c9de8929ff54b522e9a251e3081d9dd004c1a91f72f83c33288ddce63a9` 且 Docker 零残留。
 - D-297/ADR-0385（已接受）
   Local Edge/Standalone 已补齐强认证 `run.stop` 产品入口，并与既有 `run.retry` 统一为同一个 caller-driven `ql3-run retry|stop`
   binary，不新增 package、migration、表、索引、进程、listener、timer、watcher、连接、cache 或 sidecar。stop 只接受 POSIX 私有命令文件

@@ -1,9 +1,20 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { test } = require('node:test');
+const {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join, resolve } = require('node:path');
+const { afterEach, test } = require('node:test');
 
 const {
+  executeClusterRunManagementClient,
   validateClusterRunManagementClientResult,
 } = require('@qinglong/cluster-admin/run-management-client');
 const {
@@ -12,6 +23,65 @@ const {
 const {
   ClusterPluginPackageManagementClientRequestError,
 } = require('@qinglong/cluster-admin/plugin-package-management-client');
+
+const FIXTURES = resolve(
+  __dirname,
+  '../../ql3-cluster-control/test/fixtures/mtls',
+);
+const temporaryDirectories = [];
+
+function privateWrite(filePath, value) {
+  writeFileSync(filePath, value, { mode: 0o600 });
+  chmodSync(filePath, 0o600);
+}
+
+function clientFiles() {
+  const directory = realpathSync(
+    mkdtempSync(join(tmpdir(), 'ql3-run-management-client-')),
+  );
+  temporaryDirectories.push(directory);
+  const paths = {
+    configFile: join(directory, 'client.json'),
+    commandFile: join(directory, 'command.json'),
+    assertionFile: join(directory, 'assertion.jwt'),
+  };
+  const caFile = join(directory, 'ca.crt');
+  const clientCertificateFile = join(directory, 'client.crt');
+  const clientPrivateKeyFile = join(directory, 'client.key');
+  privateWrite(caFile, readFileSync(join(FIXTURES, 'ca-cert.pem')));
+  privateWrite(
+    clientCertificateFile,
+    readFileSync(join(FIXTURES, 'client-cert.pem')),
+  );
+  privateWrite(
+    clientPrivateKeyFile,
+    readFileSync(join(FIXTURES, 'client-key.pem')),
+  );
+  privateWrite(
+    paths.configFile,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      endpoint: 'https://run.example.test:8448/api/v3/runs/management',
+      servername: 'run.example.test',
+      caFile,
+      clientCertificateFile,
+      clientPrivateKeyFile,
+      requestTimeoutMs: 1_000,
+    })}\n`,
+  );
+  privateWrite(paths.commandFile, `${JSON.stringify(command)}\n`);
+  privateWrite(
+    paths.assertionFile,
+    'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ1In0.c2lnbmF0dXJl',
+  );
+  return paths;
+}
+
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 const command = normalizeClusterRunManagementCommand({
   schemaVersion: 1,
@@ -79,6 +149,24 @@ test('validates one low-sensitive retry response against the request fence', () 
     validateClusterRunManagementClientResult(response(), command),
     response(),
   );
+});
+
+test('accepts only the exact Run route before opening one mTLS connection', async () => {
+  let connects = 0;
+  await assert.rejects(
+    executeClusterRunManagementClient(clientFiles(), {
+      async connect(target) {
+        connects += 1;
+        assert.deepEqual(target, {
+          hostname: 'run.example.test',
+          port: 8448,
+        });
+        throw new Error('expected-connect-stop');
+      },
+    }),
+    { code: 'QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_REQUEST_FAILED' },
+  );
+  assert.equal(connects, 1);
 });
 
 test('rejects response target, execution placement and shape drift', () => {

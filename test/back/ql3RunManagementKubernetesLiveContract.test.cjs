@@ -9,6 +9,28 @@ const {
   retryCommand,
   stopCommand,
 } = require('../../scripts/ql3-run-management-kubernetes-live-contract.cjs');
+const {
+  localManifest,
+} = require('../../scripts/lib/ql3-management-kubernetes-live-platform.cjs');
+
+test('Run live local manifest replaces only the exact image placeholder', () => {
+  const zeroDigest = 'sha256:' + '0'.repeat(64);
+  const image = 'registry.example.com/qinglong/control';
+  const rendered = [
+    `image: ${image}@${zeroDigest}`,
+    'imagePullPolicy: IfNotPresent',
+    `qinglong.io/client-ca-sha256: ${zeroDigest}`,
+  ].join('\n');
+  const local = localManifest(rendered, image, 'ql3-control-live:test');
+  assert.match(local, /image: ql3-control-live:test/);
+  assert.match(local, /imagePullPolicy: Never/);
+  assert.match(local, new RegExp(`client-ca-sha256: ${zeroDigest}`));
+  assert.doesNotMatch(local, new RegExp(`${image}@${zeroDigest}`));
+  assert.throws(
+    () => localManifest(rendered.replace('@' + zeroDigest, ''), image, 'x:y'),
+    /one reviewed image placeholder/,
+  );
+});
 
 test('Run management live report path is mandatory before mutation begins', () => {
   const script = path.resolve(
@@ -90,6 +112,20 @@ test('Run live runner remains opt-in, layered and observation backed', () => {
   assert.match(source, /reviewedOperatorManifest\(operatorManifestFile\)/);
   assert.match(source, /validateRunManagementKubernetesLiveReport/);
   assert.match(source, /createManagementClientExecutor/);
+  assert.match(source, /QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_REQUEST_FAILED/);
+  assert.match(source, /QL3_RUN_MANAGEMENT_CLIENT_FAILED/);
+  assert.match(source, /const productionRateWindowPattern =/);
+  assert.match(source, /const retryAuthenticationJti =/);
+  assert.match(source, /const stopAuthenticationJti =/);
+  assert.match(
+    source,
+    /const retryBearer = identity\.assertion\(oldKey, retryAuthenticationJti\)/,
+  );
+  assert.equal(
+    source.split('bearer: retryBearer').length - 1,
+    2,
+    'an exact mutation replay must retain its original authentication fence',
+  );
   assert.match(source, /durableRunManagementFacts/);
   assert.match(source, /Run identity ledger rollback surge failure/);
   assert.match(source, /CloudNativePG primary promotion/);

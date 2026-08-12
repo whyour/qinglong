@@ -10,10 +10,16 @@ function imageIdDigest(image) {
 }
 
 function localManifest(rendered, imageName, localImage) {
-  const occurrences = rendered.split(imageName).length - 1;
-  assert.ok(occurrences >= 1, 'reviewed image reference is missing');
+  const zeroDigest = 'sha256:' + '0'.repeat(64);
+  const placeholder = imageName + '@' + zeroDigest;
+  const occurrences = rendered.split(placeholder).length - 1;
+  assert.equal(
+    occurrences,
+    1,
+    'rendered manifest must contain one reviewed image placeholder',
+  );
   return rendered
-    .replaceAll(imageName, localImage)
+    .replace(placeholder, localImage)
     .replaceAll('imagePullPolicy: IfNotPresent', 'imagePullPolicy: Never');
 }
 
