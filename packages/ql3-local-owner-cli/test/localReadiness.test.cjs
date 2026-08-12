@@ -34,8 +34,8 @@ test('inspects the exact fresh Profile schema without exposing its path', async 
   assert.equal(result.status, 'ready');
   assert.equal(result.profile, 'edge');
   assert.equal(result.storage.contractName, 'local-control-core');
-  assert.equal(result.storage.contractVersion, 44);
-  assert.equal(result.storage.migrationCount, 88);
+  assert.equal(result.storage.contractVersion, 45);
+  assert.equal(result.storage.migrationCount, 90);
   assert.equal(result.storage.journalMode, 'delete');
   assert.equal(JSON.stringify(result).includes(state.directory), false);
 });

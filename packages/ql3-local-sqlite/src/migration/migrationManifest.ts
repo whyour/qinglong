@@ -452,5 +452,15 @@ export const localSqliteMigrationManifest: MigrationStreamManifest =
         checksum:
           'c47a61b140b54d448c30ce7d5f7927c0d16fb897ab36dbe1d6010da2c39075a7',
       }),
+      Object.freeze({
+        id: '0089-plugin-package-automation-disposition-events',
+        checksum:
+          '3eaff9c7621fc4a69a7605fd7de29d38dfde856df13b5e467ccc2bf1245e21aa',
+      }),
+      Object.freeze({
+        id: '0090-capability-v45',
+        checksum:
+          '1919987d29ef581e150116c590f1dc98f5d327791fc6425d5f1a27b8f6de5475',
+      }),
     ]),
   });

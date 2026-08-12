@@ -1707,6 +1707,24 @@ export const pluginPackageLifecyclePlans = ql3Schema.table(
   ],
 );
 
+export const pluginPackageAutomationDispositionEvents = ql3Schema.table(
+  'plugin_package_automation_disposition_events',
+  {
+    eventDigest: char('event_digest', { length: 64 }).primaryKey(),
+    eventKind: varchar('event_kind', { length: 16 }).notNull(),
+  },
+  (table) => [
+    check(
+      'ql3_plugin_package_automation_disposition_kind_check',
+      sql`${table.eventKind} in ('lifecycle','quarantine')`,
+    ),
+    check(
+      'ql3_plugin_package_automation_disposition_digest_check',
+      sql`${table.eventDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+  ],
+);
+
 export const pluginPackageAutomationPublications = ql3Schema.table(
   'plugin_package_automation_publications',
   {
@@ -1743,9 +1761,9 @@ export const pluginPackageAutomationPublications = ql3Schema.table(
       foreignColumns: [table.publicationDigest],
     }).onDelete('restrict'),
     foreignKey({
-      name: 'ql3_plugin_package_automation_publication_lifecycle_fk',
+      name: 'ql3_plugin_package_automation_publication_disposition_fk',
       columns: [table.lifecycleEventDigest],
-      foreignColumns: [pluginPackageLifecycleEvents.eventDigest],
+      foreignColumns: [pluginPackageAutomationDispositionEvents.eventDigest],
     }).onDelete('restrict'),
     uniqueIndex('ql3_plugin_package_automation_publication_version_key').on(
       table.projectId,
@@ -5653,9 +5671,11 @@ export const pluginPackageWorkflowTaskAttemptAdmissions = ql3Schema.table(
     uniqueIndex(
       'plugin_package_workflow_task_attempt_admissions_event_id_key',
     ).on(table.eventId),
-    uniqueIndex(
-      'plugin_package_workflow_task_attempt_admissions_epoch_key',
-    ).on(table.runId, table.stepRunId, table.stepRunVersion),
+    uniqueIndex('plugin_package_workflow_task_attempt_admissions_epoch_key').on(
+      table.runId,
+      table.stepRunId,
+      table.stepRunVersion,
+    ),
     uniqueIndex(
       'plugin_package_workflow_task_attempt_admissions_number_key',
     ).on(table.runId, table.attemptNumber),
@@ -5684,10 +5704,7 @@ export const pluginPackageWorkflowTaskAttemptAdmissions = ql3Schema.table(
     }).onDelete('restrict'),
     foreignKey({
       name: 'ql3_pp_workflow_task_attempt_reconciliation_fk',
-      columns: [
-        table.generationDigest,
-        table.taskReconciliationReceiptDigest,
-      ],
+      columns: [table.generationDigest, table.taskReconciliationReceiptDigest],
       foreignColumns: [
         pluginPackageTaskReconciliations.generationDigest,
         pluginPackageTaskReconciliations.receiptDigest,
@@ -5724,9 +5741,11 @@ export const pluginPackageWorkflowTaskAttemptAdmissions = ql3Schema.table(
       'ql3_plugin_package_workflow_task_attempt_admission_json_check',
       sql`jsonb_typeof(${table.receiptJson}) = 'object' and octet_length(${table.receiptJson}::text) between 2 and 16384 and ${table.receiptJson} @> jsonb_build_object('schema', 'qinglong/plugin-package-workflow-task-attempt-admission@v1', 'receiptDigest', ${table.receiptDigest}, 'attemptId', ${table.attemptId}, 'planDigest', ${table.planDigest}, 'runId', ${table.runId}, 'stepRunId', ${table.stepRunId}, 'stepRunVersion', ${table.stepRunVersion}, 'stepRunDigest', ${table.stepRunDigest}, 'resourceTaskId', ${table.resourceTaskId}, 'taskReconciliationReceiptDigest', ${table.taskReconciliationReceiptDigest}, 'taskId', ${table.taskId}, 'taskRevision', ${table.taskRevision}, 'taskDefinitionDigest', ${table.taskDefinitionDigest}, 'executorType', ${table.executorType}, 'executionDigest', ${table.executionDigest}, 'attemptNumber', ${table.attemptNumber}, 'eventId', ${table.eventId}, 'runVersion', ${table.runVersion}, 'runEventSequence', ${table.runEventSequence}, 'admittedAtMs', ${table.admittedAtMs})`,
     ),
-    index(
-      'ql3_pp_workflow_task_attempt_candidate_idx',
-    ).on(table.runId, table.stepRunId, table.admittedAtMs),
+    index('ql3_pp_workflow_task_attempt_candidate_idx').on(
+      table.runId,
+      table.stepRunId,
+      table.admittedAtMs,
+    ),
   ],
 );
 
@@ -5803,6 +5822,7 @@ export const ql3PostgresTables = [
   pluginPackageLifecycleReceipts,
   pluginPackageLifecycleTasks,
   pluginPackageLifecyclePlans,
+  pluginPackageAutomationDispositionEvents,
   pluginPackageAutomationPublications,
   pluginPackageAutomationPublicationHeads,
   pluginPackageWorkflowAdmissions,

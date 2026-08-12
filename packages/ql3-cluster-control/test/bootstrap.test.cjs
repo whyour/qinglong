@@ -111,6 +111,7 @@ function runtimePrivileges() {
     plugin_package_lifecycle_tasks: [false, false, false, false],
     plugin_package_lifecycle_plans: [false, false, false, false],
     plugin_package_automation_publications: [true, false, false, false],
+    plugin_package_automation_disposition_events: [false, false, false, false],
     plugin_package_automation_publication_heads: [true, false, false, false],
     plugin_package_workflow_admissions: [true, true, false, false],
     plugin_package_workflow_admission_steps: [true, true, false, false],

@@ -24,6 +24,8 @@
   `10001:10001`、network none、read-only root、drop ALL、128 MiB/32 PIDs 下完成本地 TLS readiness 契约。14 个 Local Profile
   artifact 与 D-302 对应字节数一致；PostgreSQL 18.4 arm64 HA 123 项 gate 全绿、timeline `1→2`，证据 SHA-256 为
   `e7c1743e932f2d7c35dc9153cdf5bc4a03356a38d93fce5507354652aa207a05`，独立审计与 Docker 清理通过。完整验证证据见 ADR-0391。
+
+- D-304/ADR-0392（已接受）：Plugin Package 进入安全 quarantine 时，Workflow/Prompt automation publication 不再仅依赖运行时 start guard 间接拒绝，而是与 quarantine event、Package-owned Task disabled revisions、Project Tool snapshot 和 withdrawal receipt 在同一 SQLite/PostgreSQL 事务中收敛为 `withdrawn`。原先仅能引用普通 lifecycle event 的外键升级为 append-only disposition-event 联合引用，历史 migration 与 publication digest schema 保持不变；SQLite edge/standalone 崩溃矩阵覆盖 automation publication insert 后、event/task/receipt/COMMIT 前后，PostgreSQL 通过触发器在既有 `SECURITY DEFINER` quarantine commit 内登记 disposition，再由同一外层 SERIALIZABLE transaction CAS publication head。能力位为 `plugin_package_automation_security_withdrawal@1`；不新增 package、daemon、timer、连接或常驻缓存，适用于低配路由设备和集群节点。SQLite 全量 228/228；PostgreSQL package 311 pass/1 条外部 URL 条件 skip；完整 18-package build/test 退出 0，backend 1,188 pass/2 skip，package/dependency boundary 零 finding；PostgreSQL 18.4 arm64 HA 125 项 gate 全绿、timeline `1→2`，报告 SHA-256 为 `ab156901b9c96ec5a62259c44d83d24ded011e0616dc827d928f3e13efd11786`。
 - D-302/ADR-0390（已接受）
   Cluster operator context 增加无网络、无 mutation 的内建 `ql3-cluster-admin context validate` 预检。它先复用 owner-private context
   reader，再让每个 entry 经过与真实请求相同的 production HTTPS/Kubernetes configuration preparation，验证精确 route、hostname、CA、

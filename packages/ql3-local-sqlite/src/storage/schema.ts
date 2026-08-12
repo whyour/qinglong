@@ -4486,6 +4486,24 @@ export const pluginPackageLifecycleTasks = sqliteTable(
   ],
 );
 
+export const pluginPackageAutomationDispositionEvents = sqliteTable(
+  'QingLong3PluginPackageAutomationDispositionEvents',
+  {
+    eventDigest: text('event_digest').primaryKey(),
+    eventKind: text('event_kind').notNull(),
+  },
+  (table) => [
+    check(
+      'ql3_plugin_package_automation_disposition_kind_check',
+      sql`${table.eventKind} in ('lifecycle','quarantine')`,
+    ),
+    check(
+      'ql3_plugin_package_automation_disposition_digest_check',
+      sql`length(${table.eventDigest}) = 64 and ${table.eventDigest} not glob '*[^0-9a-f]*'`,
+    ),
+  ],
+);
+
 export const pluginPackageAutomationPublications = sqliteTable(
   'QingLong3PluginPackageAutomationPublications',
   {
@@ -4510,7 +4528,7 @@ export const pluginPackageAutomationPublications = sqliteTable(
       { onDelete: 'restrict', onUpdate: 'restrict' },
     ),
     lifecycleEventDigest: text('lifecycle_event_digest').references(
-      () => pluginPackageLifecycleEvents.eventDigest,
+      () => pluginPackageAutomationDispositionEvents.eventDigest,
       { onDelete: 'restrict', onUpdate: 'restrict' },
     ),
     publishedAtMs: integer('published_at_ms').notNull(),
@@ -4877,6 +4895,7 @@ export const localSqliteSchema = Object.freeze({
   pluginPackageLifecycleHeads,
   pluginPackageLifecycleReceipts,
   pluginPackageLifecycleTasks,
+  pluginPackageAutomationDispositionEvents,
   pluginPackageAutomationPublications,
   pluginPackageAutomationPublicationHeads,
   pluginPackageWorkflowAdmissions,

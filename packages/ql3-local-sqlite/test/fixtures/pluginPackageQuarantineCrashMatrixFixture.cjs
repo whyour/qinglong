@@ -5,6 +5,9 @@ const {
   createPluginPackageQuarantineEvent,
 } = require('@qinglong/runtime-core/plugin-package-quarantine');
 const {
+  createInitialPluginPackageAutomationPublication,
+} = require('@qinglong/runtime-core/plugin-package-automation-publication');
+const {
   activateInstall,
   pluginPackageTaskReconciliationFixture,
 } = require('../../../../test/contracts/pluginPackageTaskReconciliationRepositoryContract.cjs');
@@ -14,6 +17,9 @@ const {
 const {
   LocalSqlitePluginPackageInstallRepository,
 } = require('../../dist/plugin-package/pluginPackageInstallRepository');
+const {
+  LocalSqlitePluginPackageAutomationPublicationRepository,
+} = require('../../dist/plugin-package/pluginPackageAutomationPublicationRepository');
 const {
   LocalSqlitePluginPackageMaterializedRevisionRepository,
 } = require('../../dist/plugin-package/pluginPackageMaterializedRevisionRepository');
@@ -30,6 +36,11 @@ const DIGEST_D = 'd'.repeat(64);
 const DIGEST_E = 'e'.repeat(64);
 
 const CRASH_POINTS = Object.freeze({
+  after_automation_withdrawal: Object.freeze({
+    timing: 'afterRun',
+    sql: 'INSERT INTO "QingLong3PluginPackageAutomationPublications"',
+    durable: false,
+  }),
   after_task_disable: Object.freeze({
     timing: 'afterRun',
     sql: 'INSERT INTO "QingLong3TaskDefinitionRevisions"',
@@ -60,6 +71,24 @@ const CRASH_POINTS = Object.freeze({
 function fixture(profile) {
   return pluginPackageTaskReconciliationFixture(`quarantine-crash-${profile}`, {
     profile,
+    workflows: [
+      {
+        schema: 'qinglong/plugin-package-workflow-resource@v1',
+        id: 'daily',
+        name: 'Daily workflow',
+        enabled: true,
+        steps: [{ id: 'run', task: 'alpha', needs: [] }],
+      },
+    ],
+    prompts: [
+      {
+        schema: 'qinglong/plugin-package-prompt-resource@v1',
+        id: 'operator',
+        name: 'Operator prompt',
+        template: 'Run {{task}}',
+        parameters: [{ name: 'task', required: true }],
+      },
+    ],
   });
 }
 
@@ -119,6 +148,15 @@ async function setupScenario({ databasePath, profile }) {
       );
     await activateInstall(install, value);
     await materialized.publish(value.revision);
+    await new LocalSqlitePluginPackageAutomationPublicationRepository(
+      authority,
+    ).publish(
+      createInitialPluginPackageAutomationPublication(
+        value.revision,
+        value.registry,
+        value.install.active.updatedAtMs,
+      ),
+    );
     await reconciliation.reconcile(value.revision, {
       async findActiveResourceGeneration() {
         return value.revision.generation;
@@ -258,6 +296,24 @@ async function verifyScenario({ databasePath, pointName, profile }) {
       taskFacts.some((fact) => fact.enabled !== 0 || fact.currentRevision !== 2)
     ) {
       throw new Error(`${profile}/${pointName} Task withdrawal is incomplete`);
+    }
+    const automation = database
+      .prepare(
+        `SELECT publication.state,
+                publication.lifecycle_event_digest AS "lifecycleEventDigest"
+         FROM "QingLong3PluginPackageAutomationPublicationHeads" AS head
+         JOIN "QingLong3PluginPackageAutomationPublications" AS publication
+           ON publication.publication_digest = head.publication_digest
+         WHERE head.project_id = ? AND head.package_name = ?`,
+      )
+      .get(value.projectId, value.packageName);
+    if (
+      automation?.state !== 'withdrawn' ||
+      automation.lifecycleEventDigest !== quarantineEvent.eventDigest
+    ) {
+      throw new Error(
+        `${profile}/${pointName} automation withdrawal is incomplete`,
+      );
     }
     await auditLocalSqliteReadiness(database);
     const integrity = database.prepare('PRAGMA integrity_check').get();

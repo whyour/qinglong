@@ -7705,6 +7705,17 @@ async function runPluginPackageQuarantineMatrix(options) {
       ),
       false,
     );
+    const withdrawnAutomation = await automationRepository.findCurrent(
+      fixture.projectId,
+      fixture.packageName,
+    );
+    assert.ok(withdrawnAutomation);
+    assert.equal(withdrawnAutomation.state, 'withdrawn');
+    assert.equal(withdrawnAutomation.lifecycleEventDigest, event.eventDigest);
+    assert.equal(
+      withdrawnAutomation.previousPublicationDigest,
+      lifecycle.automationPublication.publicationDigest,
+    );
     const currentSnapshot = await snapshotRepository.findCurrent(
       fixture.projectId,
     );
@@ -7740,6 +7751,20 @@ async function runPluginPackageQuarantineMatrix(options) {
               FROM "ql3"."project_tool_definition_snapshot_sources"
              WHERE project_id = $2 AND active_vector_digest = $3)
              AS "retainedSources",
+           (SELECT count(*)::integer
+              FROM "ql3"."plugin_package_automation_disposition_events"
+             WHERE event_digest = $1 AND event_kind = 'quarantine')
+             AS "automationDispositionEvents",
+           (SELECT count(*)::integer
+              FROM "ql3"."plugin_package_automation_publication_heads" AS head
+              JOIN "ql3"."plugin_package_automation_publications" AS publication
+                ON publication.project_id = head.project_id
+               AND publication.package_name = head.package_name
+               AND publication.publication_digest = head.publication_digest
+             WHERE head.project_id = $2
+               AND publication.lifecycle_event_digest = $1
+               AND publication.state = 'withdrawn')
+             AS "withdrawnAutomationHeads",
            (SELECT count(*)::integer
               FROM "ql3"."plugin_package_workflow_admissions"
              WHERE plan_digest = $4) AS "workflowAdmissions",
@@ -7791,6 +7816,8 @@ async function runPluginPackageQuarantineMatrix(options) {
         row?.taskCount === 2 &&
         row?.disabledTasks === 2 &&
         row?.retainedSources === 0 &&
+        row?.automationDispositionEvents === 1 &&
+        row?.withdrawnAutomationHeads === 1 &&
         row?.workflowAdmissions === 1 &&
         row?.workflowEvents === 5 &&
         row?.workflowStepMutations === 3 &&
@@ -7857,6 +7884,7 @@ async function runPluginPackageQuarantineMatrix(options) {
         automationStartAllowedBeforeRevocationReceipt: true,
         automationStartAllowedAfterRevocationReceipt: false,
         automationStartAllowedAfterQuarantine: false,
+        automationPublicationWithdrawnAtomically: true,
         taskWithdrawals:
           responseLossResult.receipt.capability.taskWithdrawals.length,
         retainedSources:
@@ -7868,6 +7896,7 @@ async function runPluginPackageQuarantineMatrix(options) {
         automationRecoverySourceConverged: true,
         automationStartGuardRuntimeOnly: false,
         automationStartFenceSurvivedPromotion: false,
+        automationPublicationSurvivedPromotion: false,
         workflowAdmissionCreatedAtomically: true,
         workflowAuthorizedAdmissionAtomic: true,
         workflowAdmissionExactReplay: true,
@@ -8312,6 +8341,20 @@ async function verifyPluginPackageQuarantineAfterPromotion(options) {
       ),
       false,
     );
+    const withdrawnAutomation =
+      await new PostgresPluginPackageAutomationPublicationRepository(
+        packageDatabase.pool,
+      ).findCurrent(quarantine.report.projectId, quarantine.report.packageName);
+    assert.ok(withdrawnAutomation);
+    assert.equal(withdrawnAutomation.state, 'withdrawn');
+    assert.equal(
+      withdrawnAutomation.lifecycleEventDigest,
+      quarantine.event.eventDigest,
+    );
+    assert.equal(
+      withdrawnAutomation.previousPublicationDigest,
+      quarantine.lifecycle.automationPublication.publicationDigest,
+    );
     const workflowAdmissions =
       new PostgresAuthorizedPluginPackageWorkflowAdmissionRepository(
         runtimeDatabase.pool,
@@ -8568,6 +8611,7 @@ async function verifyPluginPackageQuarantineAfterPromotion(options) {
     assert.equal(executorWorkflowTaskAttemptDenied, true);
     quarantine.report.automationStartGuardRuntimeOnly = true;
     quarantine.report.automationStartFenceSurvivedPromotion = true;
+    quarantine.report.automationPublicationSurvivedPromotion = true;
     quarantine.report.workflowAdmissionRuntimeOnly = true;
     quarantine.report.workflowAdmissionSurvivedPromotion = true;
     quarantine.report.workflowAuthorizedAdmissionSurvivedPromotion = true;
@@ -8592,6 +8636,20 @@ async function verifyPluginPackageQuarantineAfterPromotion(options) {
        (SELECT count(*)::integer
           FROM "ql3"."plugin_package_withdrawal_tasks"
          WHERE event_digest = $1) AS "taskCount",
+       (SELECT count(*)::integer
+          FROM "ql3"."plugin_package_automation_disposition_events"
+         WHERE event_digest = $1 AND event_kind = 'quarantine')
+         AS "automationDispositionEventCount",
+       (SELECT count(*)::integer
+          FROM "ql3"."plugin_package_automation_publication_heads" AS head
+          JOIN "ql3"."plugin_package_automation_publications" AS publication
+            ON publication.project_id = head.project_id
+           AND publication.package_name = head.package_name
+           AND publication.publication_digest = head.publication_digest
+         WHERE head.project_id = $7
+           AND publication.lifecycle_event_digest = $1
+           AND publication.state = 'withdrawn')
+         AS "withdrawnAutomationHeadCount",
        (SELECT count(*)::integer
           FROM "ql3"."plugin_package_publisher_revocation_receipts"
          WHERE receipt_digest = $2) AS "revocationReceiptCount",
@@ -8637,6 +8695,7 @@ async function verifyPluginPackageQuarantineAfterPromotion(options) {
       quarantine.report.proposalDigest,
       quarantine.workflowAdmission.plan.planDigest,
       quarantine.workflowAdmission.plan.runId,
+      quarantine.report.projectId,
     ],
   );
   assert.deepEqual(facts.rows, [
@@ -8644,6 +8703,8 @@ async function verifyPluginPackageQuarantineAfterPromotion(options) {
       eventCount: 1,
       receiptCount: 1,
       taskCount: 2,
+      automationDispositionEventCount: 1,
+      withdrawnAutomationHeadCount: 1,
       revocationReceiptCount: 1,
       impactCount: 1,
       impactItemCount: 1,
@@ -8696,9 +8757,8 @@ async function verifyPluginPackageLifecycleAfterPromotion(options) {
       lifecycle.enableReceipt.lifecycle,
     );
     assert.deepEqual(
-      await automations.findCurrent(
-        lifecycle.report.projectId,
-        lifecycle.report.packageName,
+      await automations.findByDigest(
+        lifecycle.automationPublication.publicationDigest,
       ),
       lifecycle.automationPublication,
     );
@@ -8716,6 +8776,10 @@ async function verifyPluginPackageLifecycleAfterPromotion(options) {
        (SELECT count(*)::integer
           FROM "ql3"."plugin_package_lifecycle_tasks"
          WHERE event_digest IN ($1, $2)) AS "taskCount",
+       (SELECT count(*)::integer
+          FROM "ql3"."plugin_package_automation_publications"
+         WHERE publication_digest = $5)
+         AS "lifecycleAutomationPublicationCount",
        (SELECT count(*)::integer
           FROM "ql3"."plugin_package_automation_publications"
          WHERE project_id = $3 AND package_name = $4)
@@ -8737,6 +8801,7 @@ async function verifyPluginPackageLifecycleAfterPromotion(options) {
       lifecycle.enableEvent.eventDigest,
       lifecycle.report.projectId,
       lifecycle.report.packageName,
+      lifecycle.automationPublication.publicationDigest,
     ],
   );
   assert.deepEqual(facts.rows, [
@@ -8744,9 +8809,10 @@ async function verifyPluginPackageLifecycleAfterPromotion(options) {
       eventCount: 2,
       receiptCount: 2,
       taskCount: 4,
-      automationPublicationCount: 5,
-      automationState: 'active',
-      automationVersion: 5,
+      lifecycleAutomationPublicationCount: 1,
+      automationPublicationCount: 6,
+      automationState: 'withdrawn',
+      automationVersion: 6,
       version: lifecycle.report.lifecycleVersion,
       disposition: 'active',
     },
@@ -11356,10 +11422,13 @@ async function main(argv = process.argv.slice(2)) {
           .keyId,
       ),
     };
-    assert.deepEqual(
-      promotedPromptExecution,
-      pluginPackageQuarantine.promptExecution.beforePromotion,
-    );
+    assert.deepEqual(promotedPromptExecution, {
+      ...pluginPackageQuarantine.promptExecution.beforePromotion,
+      catalog: {
+        ...pluginPackageQuarantine.promptExecution.beforePromotion.catalog,
+        publicationState: 'withdrawn',
+      },
+    });
     pluginPackageQuarantine.promptExecution.afterPromotion =
       promotedPromptExecution;
     pluginPackageQuarantine.promptExecution.survivedPromotion = true;
@@ -12391,6 +12460,11 @@ async function main(argv = process.argv.slice(2)) {
           pluginPackageLifecycle.report.automationPublicationSurvivedPromotion,
         pluginPackageAutomationRecoverySourceConverges:
           pluginPackageQuarantine.report.automationRecoverySourceConverged,
+        pluginPackageQuarantineWithdrawsAutomationAtomically:
+          pluginPackageQuarantine.report
+            .automationPublicationWithdrawnAtomically,
+        pluginPackageQuarantineAutomationWithdrawalSurvivesPromotion:
+          pluginPackageQuarantine.report.automationPublicationSurvivedPromotion,
         pluginPackagePublisherRevocationImmediatelyFencesAutomation:
           pluginPackageQuarantine.report
             .automationStartAllowedBeforeRevocationReceipt &&

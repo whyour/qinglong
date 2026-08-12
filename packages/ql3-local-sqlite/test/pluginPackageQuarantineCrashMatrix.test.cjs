@@ -60,10 +60,10 @@ test(
         assert.equal(reports.at(-1).durableAfterCrash, point.durable);
       }
     }
-    assert.equal(reports.length, 10);
+    assert.equal(reports.length, 12);
     assert.equal(
       reports.filter(({ crashBeforeCommit }) => crashBeforeCommit).length,
-      8,
+      10,
     );
     assert.equal(
       reports.filter(({ durableAfterCrash }) => durableAfterCrash).length,

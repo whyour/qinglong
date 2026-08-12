@@ -44,7 +44,10 @@ function integer(row: Row, key: string): number {
   return value as number;
 }
 
-function targetIdentity(projectId: unknown, packageName: unknown): {
+function targetIdentity(
+  projectId: unknown,
+  packageName: unknown,
+): {
   readonly projectId: string;
   readonly packageName: string;
 } {
@@ -119,19 +122,18 @@ export class LocalSqlitePluginPackageAutomationPublicationRepository
   #parse(row: Row): Readonly<PluginPackageAutomationPublication> {
     try {
       const publication = normalizePluginPackageAutomationPublication(
-        JSON.parse(text(row, 'publicationJson')) as
-          PluginPackageAutomationPublication,
+        JSON.parse(
+          text(row, 'publicationJson'),
+        ) as PluginPackageAutomationPublication,
       );
       if (
-        publication.publicationDigest !==
-          text(row, 'publicationDigest') ||
+        publication.publicationDigest !== text(row, 'publicationDigest') ||
         publication.target.projectId !== text(row, 'projectId') ||
         publication.target.packageName !== text(row, 'packageName') ||
         publication.target.installationId !== text(row, 'installationId') ||
         publication.target.lockDigest !== text(row, 'lockDigest') ||
         publication.target.generation !== integer(row, 'generation') ||
-        publication.target.generationDigest !==
-          text(row, 'generationDigest') ||
+        publication.target.generationDigest !== text(row, 'generationDigest') ||
         publication.target.materializedRevisionDigest !==
           text(row, 'materializedRevisionDigest') ||
         publication.state !== text(row, 'state') ||
@@ -142,9 +144,7 @@ export class LocalSqlitePluginPackageAutomationPublicationRepository
       }
       return publication;
     } catch (error) {
-      if (
-        error instanceof PluginPackageAutomationPublicationUnavailableError
-      ) {
+      if (error instanceof PluginPackageAutomationPublicationUnavailableError) {
         throw error;
       }
       throw new PluginPackageAutomationPublicationUnavailableError();
@@ -389,8 +389,9 @@ export class LocalSqlitePluginPackageAutomationPublicationRepository
     return this.#findCurrent(projectId, packageName);
   }
 
-  publishInTransaction(
+  #publishInTransaction(
     value: Readonly<PluginPackageAutomationPublication>,
+    securityWithdrawal: boolean,
   ): Readonly<{
     status: 'created' | 'existing';
     publication: Readonly<PluginPackageAutomationPublication>;
@@ -430,10 +431,7 @@ export class LocalSqlitePluginPackageAutomationPublicationRepository
         );
       }
       try {
-        assertPluginPackageAutomationPublicationSuccessor(
-          current,
-          publication,
-        );
+        assertPluginPackageAutomationPublicationSuccessor(current, publication);
       } catch (error) {
         if (error instanceof InvalidPluginPackageAutomationPublicationError) {
           throw new PluginPackageAutomationPublicationConflictError(
@@ -467,33 +465,35 @@ export class LocalSqlitePluginPackageAutomationPublicationRepository
         'materialized revision fence does not match publication target',
       );
     }
-    const securityFence = client
-      .prepare(
-        `SELECT EXISTS (
-           SELECT 1
-           FROM "QingLong3PluginPackageQuarantineEvents" AS quarantine
-           WHERE quarantine.project_id = ?
-             AND quarantine.package_name = ?
-             AND quarantine.installation_id = ?
-             AND quarantine.lock_digest = ?
-         ) AS "blocked"`,
-      )
-      .get(
-        publication.target.projectId,
-        publication.target.packageName,
-        publication.target.installationId,
-        publication.target.lockDigest,
-      ) as Row | undefined;
-    if (
-      !securityFence ||
-      (securityFence.blocked !== 0 && securityFence.blocked !== 1)
-    ) {
-      throw new PluginPackageAutomationPublicationUnavailableError();
-    }
-    if (securityFence.blocked === 1) {
-      throw new PluginPackageAutomationPublicationConflictError(
-        'quarantined Package generation cannot publish automation',
-      );
+    if (!securityWithdrawal) {
+      const securityFence = client
+        .prepare(
+          `SELECT EXISTS (
+             SELECT 1
+             FROM "QingLong3PluginPackageQuarantineEvents" AS quarantine
+             WHERE quarantine.project_id = ?
+               AND quarantine.package_name = ?
+               AND quarantine.installation_id = ?
+               AND quarantine.lock_digest = ?
+           ) AS "blocked"`,
+        )
+        .get(
+          publication.target.projectId,
+          publication.target.packageName,
+          publication.target.installationId,
+          publication.target.lockDigest,
+        ) as Row | undefined;
+      if (
+        !securityFence ||
+        (securityFence.blocked !== 0 && securityFence.blocked !== 1)
+      ) {
+        throw new PluginPackageAutomationPublicationUnavailableError();
+      }
+      if (securityFence.blocked === 1) {
+        throw new PluginPackageAutomationPublicationConflictError(
+          'quarantined Package generation cannot publish automation',
+        );
+      }
     }
     client
       .prepare(
@@ -570,9 +570,31 @@ export class LocalSqlitePluginPackageAutomationPublicationRepository
     });
   }
 
-  publish(
+  publishInTransaction(
     value: Readonly<PluginPackageAutomationPublication>,
-  ): Promise<
+  ): Readonly<{
+    status: 'created' | 'existing';
+    publication: Readonly<PluginPackageAutomationPublication>;
+  }> {
+    return this.#publishInTransaction(value, false);
+  }
+
+  publishSecurityWithdrawalInTransaction(
+    value: Readonly<PluginPackageAutomationPublication>,
+  ): Readonly<{
+    status: 'created' | 'existing';
+    publication: Readonly<PluginPackageAutomationPublication>;
+  }> {
+    const publication = normalizePluginPackageAutomationPublication(value);
+    if (publication.state !== 'withdrawn') {
+      throw new PluginPackageAutomationPublicationConflictError(
+        'security withdrawal must narrow automation state',
+      );
+    }
+    return this.#publishInTransaction(publication, true);
+  }
+
+  publish(value: Readonly<PluginPackageAutomationPublication>): Promise<
     Readonly<{
       status: 'created' | 'existing';
       publication: Readonly<PluginPackageAutomationPublication>;

@@ -40,9 +40,9 @@ test('creates and exactly replays a reviewed rollout backup', async (t) => {
   await migrateLocalSqlitePath(state);
   const prepared = await createLocalSqliteRolloutBackup(state);
   assert.equal(prepared.status, 'prepared');
-  assert.equal(prepared.contractVersion, 44);
-  assert.equal(prepared.writeContractVersion, 44);
-  assert.equal(LOCAL_SQLITE_WRITE_CONTRACT_VERSION, 44);
+  assert.equal(prepared.contractVersion, 45);
+  assert.equal(prepared.writeContractVersion, 45);
+  assert.equal(LOCAL_SQLITE_WRITE_CONTRACT_VERSION, 45);
   assert.match(prepared.sha256, /^[0-9a-f]{64}$/);
   assert.equal(prepared.bytes > 0, true);
   assert.equal(prepared.pageCount > 0, true);

@@ -193,12 +193,10 @@ function packageArtifact(manifest) {
       path: 'package.json',
       body: Buffer.from(serializePluginPackageManifest(manifest)),
     },
-    ...CLI_PACKAGE_RESOURCES
-      .map(({ reference, body }) => ({
-        path: reference.path,
-        body,
-      }))
-      .sort((left, right) => left.path.localeCompare(right.path)),
+    ...CLI_PACKAGE_RESOURCES.map(({ reference, body }) => ({
+      path: reference.path,
+      body,
+    })).sort((left, right) => left.path.localeCompare(right.path)),
   ]);
 }
 
@@ -259,13 +257,11 @@ function actionInput() {
       artifactDigest,
       artifactBytes: artifact.byteLength,
       contentDigest: pluginPackageContentTreeDigest(
-        CLI_PACKAGE_RESOURCES
-          .map(({ reference, body }) => ({
-            path: reference.path,
-            bytes: body.byteLength,
-            digest: digest(body),
-          }))
-          .sort((left, right) => left.path.localeCompare(right.path)),
+        CLI_PACKAGE_RESOURCES.map(({ reference, body }) => ({
+          path: reference.path,
+          bytes: body.byteLength,
+          digest: digest(body),
+        })).sort((left, right) => left.path.localeCompare(right.path)),
       ),
     },
     architecture: 'arm64',
@@ -478,9 +474,7 @@ async function activatePackageAutomation(databasePath, lock, manifest) {
     const revision = materializePluginPackageResources({
       generation,
       lock,
-      manifestBytes: Buffer.from(
-        serializePluginPackageManifest(manifest),
-      ),
+      manifestBytes: Buffer.from(serializePluginPackageManifest(manifest)),
       resources: generation.resources.map((reference) => ({
         reference,
         bytes: bodies.get(`${reference.kind}\0${reference.path}`),
@@ -521,10 +515,8 @@ function publisherTrustRunnerWithOneSnapshotFault() {
     inspect: inspectLocalPluginPackagePublisherTrust,
     publish: publishLocalPluginPackagePublisherTrust,
     retire: retireLocalPluginPackagePublisherKey,
-    analyzePublisherKey:
-      analyzeLocalPluginPackageRecoveryCatalogPublisherKey,
-    proposeRevocation:
-      proposeLocalPluginPackagePublisherKeyRevocation,
+    analyzePublisherKey: analyzeLocalPluginPackageRecoveryCatalogPublisherKey,
+    proposeRevocation: proposeLocalPluginPackagePublisherKeyRevocation,
     async confirmRevocation(options) {
       return confirmLocalPluginPackagePublisherKeyRevocation({
         ...options,
@@ -896,10 +888,7 @@ test('runs the private command-file package lifecycle with replay-safe IDs', asy
   const catalogHelp = spawnSync(
     process.execPath,
     [
-      path.join(
-        __dirname,
-        '../dist/plugin-package/pluginPackageCatalogCli.js',
-      ),
+      path.join(__dirname, '../dist/plugin-package/pluginPackageCatalogCli.js'),
       '--help',
     ],
     { encoding: 'utf8' },
@@ -1183,15 +1172,29 @@ test('runs the private command-file package lifecycle with replay-safe IDs', asy
          WHERE project_id = ? AND package_name = ?`,
       )
       .get(lock.projectId, lock.packageName);
-    assert.deepEqual({ ...automationHead }, {
-      publicationDigest:
-        activeAutomation.publication.publicationDigest,
-      state: 'active',
-    });
-    assert.equal(
-      await new LocalSqlitePluginPackageAutomationPublicationRepository(
+    const automationRepository =
+      new LocalSqlitePluginPackageAutomationPublicationRepository(
         quarantineAuthority,
-      ).isStartAllowed(
+      );
+    const withdrawnAutomation = await automationRepository.findCurrent(
+      lock.projectId,
+      lock.packageName,
+    );
+    assert.ok(withdrawnAutomation);
+    assert.equal(withdrawnAutomation.state, 'withdrawn');
+    assert.equal(
+      withdrawnAutomation.previousPublicationDigest,
+      activeAutomation.publication.publicationDigest,
+    );
+    assert.deepEqual(
+      { ...automationHead },
+      {
+        publicationDigest: withdrawnAutomation.publicationDigest,
+        state: 'withdrawn',
+      },
+    );
+    assert.equal(
+      await automationRepository.isStartAllowed(
         lock.projectId,
         lock.packageName,
         activeAutomation.publication.publicationDigest,

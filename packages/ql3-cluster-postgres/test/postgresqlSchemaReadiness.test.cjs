@@ -85,6 +85,7 @@ function validPrivileges() {
     plugin_package_lifecycle_tasks: [false, false, false, false],
     plugin_package_lifecycle_plans: [false, false, false, false],
     plugin_package_automation_publications: [true, false, false, false],
+    plugin_package_automation_disposition_events: [false, false, false, false],
     plugin_package_automation_publication_heads: [true, false, false, false],
     plugin_package_workflow_admissions: [true, true, false, false],
     plugin_package_workflow_admission_steps: [true, true, false, false],
@@ -202,6 +203,7 @@ function validAdminPrivileges() {
     plugin_package_lifecycle_tasks: [false, false, false, false],
     plugin_package_lifecycle_plans: [false, false, false, false],
     plugin_package_automation_publications: [false, false, false, false],
+    plugin_package_automation_disposition_events: [false, false, false, false],
     plugin_package_automation_publication_heads: [false, false, false, false],
     plugin_package_workflow_admissions: [false, false, false, false],
     plugin_package_workflow_admission_steps: [false, false, false, false],
@@ -748,7 +750,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 56,
+    contractVersion: 57,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -807,6 +809,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0055-run-attempt-log-retention',
       'pg-0056-run-management-boundary',
       'pg-0057-run-management-stop-boundary',
+      'pg-0058-plugin-package-automation-disposition-events',
     ],
   });
 });
@@ -837,10 +840,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 56);
+  assert.equal(report.contractVersion, 57);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0057-run-management-stop-boundary',
+    'pg-0058-plugin-package-automation-disposition-events',
   );
 });
 
@@ -853,10 +856,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 56);
+  assert.equal(report.contractVersion, 57);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0057-run-management-stop-boundary',
+    'pg-0058-plugin-package-automation-disposition-events',
   );
 
   const widened = automationManagerPrivileges();
@@ -885,10 +888,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 56);
+  assert.equal(report.contractVersion, 57);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0057-run-management-stop-boundary',
+    'pg-0058-plugin-package-automation-disposition-events',
   );
 
   const widened = approvalManagerPrivileges();
@@ -919,10 +922,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 56);
+  assert.equal(report.contractVersion, 57);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0057-run-management-stop-boundary',
+    'pg-0058-plugin-package-automation-disposition-events',
   );
 
   const widened = runManagerPrivileges();
@@ -1054,10 +1057,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 56);
+  assert.equal(report.contractVersion, 57);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0057-run-management-stop-boundary',
+    'pg-0058-plugin-package-automation-disposition-events',
   );
 });
 

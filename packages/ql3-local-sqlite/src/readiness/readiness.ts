@@ -8,7 +8,20 @@ import {
 } from '../run/stepRunSchemaContract';
 
 export const LOCAL_SQLITE_CONTRACT_NAME = 'local-control-core';
-export const LOCAL_SQLITE_CONTRACT_VERSION = 44;
+export const LOCAL_SQLITE_CONTRACT_VERSION = 45;
+
+const PLUGIN_PACKAGE_AUTOMATION_DISPOSITION_TRIGGERS = Object.freeze([
+  Object.freeze({
+    name: 'ql3_plugin_package_automation_lifecycle_disposition_insert',
+    tableName: 'QingLong3PluginPackageLifecycleEvents',
+    sql: `CREATE TRIGGER ql3_plugin_package_automation_lifecycle_disposition_insert AFTER INSERT ON "QingLong3PluginPackageLifecycleEvents" BEGIN INSERT OR IGNORE INTO "QingLong3PluginPackageAutomationDispositionEvents" (event_digest, event_kind) VALUES (NEW.event_digest, 'lifecycle'); END`,
+  }),
+  Object.freeze({
+    name: 'ql3_plugin_package_automation_quarantine_disposition_insert',
+    tableName: 'QingLong3PluginPackageQuarantineEvents',
+    sql: `CREATE TRIGGER ql3_plugin_package_automation_quarantine_disposition_insert AFTER INSERT ON "QingLong3PluginPackageQuarantineEvents" BEGIN INSERT OR IGNORE INTO "QingLong3PluginPackageAutomationDispositionEvents" (event_digest, event_kind) VALUES (NEW.event_digest, 'quarantine'); END`,
+  }),
+]);
 
 const OPTIONAL_FEATURE_TABLE_NAMES = new Set([
   'QingLong3AiSchemaMigrations',
@@ -1007,6 +1020,10 @@ const REQUIRED_SCHEMA = Object.freeze({
       'ql3_plugin_package_automation_publication_generation_idx',
     ]),
   }),
+  QingLong3PluginPackageAutomationDispositionEvents: Object.freeze({
+    columns: Object.freeze(['event_digest', 'event_kind']),
+    indexes: Object.freeze([]),
+  }),
   QingLong3PluginPackageAutomationPublicationHeads: Object.freeze({
     columns: Object.freeze([
       'project_id',
@@ -1702,9 +1719,10 @@ function assertRequiredSchema(client: DatabaseSync): number {
        ORDER BY name`,
     )
     .all(...ownedTableNames) as unknown as TriggerRow[];
-  const expectedTriggers = [...LOCAL_STEP_RUN_REFERENCE_TRIGGERS].sort(
-    (left, right) => left.name.localeCompare(right.name),
-  );
+  const expectedTriggers = [
+    ...LOCAL_STEP_RUN_REFERENCE_TRIGGERS,
+    ...PLUGIN_PACKAGE_AUTOMATION_DISPOSITION_TRIGGERS,
+  ].sort((left, right) => left.name.localeCompare(right.name));
   if (
     triggerRows.length !== expectedTriggers.length ||
     triggerRows.some((row, index) => {
@@ -2097,8 +2115,15 @@ function assertPluginPackageAutomationPublicationIntegrity(
        LEFT JOIN "QingLong3PluginPackageAutomationPublications" AS previous
          ON previous.publication_digest =
            publication.previous_publication_digest
+       LEFT JOIN "QingLong3PluginPackageAutomationDispositionEvents"
+         AS disposition
+         ON disposition.event_digest = publication.lifecycle_event_digest
        LEFT JOIN "QingLong3PluginPackageLifecycleEvents" AS lifecycle
          ON lifecycle.event_digest = publication.lifecycle_event_digest
+        AND disposition.event_kind = 'lifecycle'
+       LEFT JOIN "QingLong3PluginPackageQuarantineEvents" AS quarantine
+         ON quarantine.event_digest = publication.lifecycle_event_digest
+        AND disposition.event_kind = 'quarantine'
        WHERE materialized.generation_digest IS NULL
           OR materialized.project_id <> publication.project_id
           OR materialized.package_name <> publication.package_name
@@ -2129,14 +2154,25 @@ function assertPluginPackageAutomationPublicationIntegrity(
           )
           OR (
             publication.lifecycle_event_digest IS NOT NULL AND (
-              lifecycle.event_digest IS NULL OR
-              lifecycle.project_id <> publication.project_id OR
-              lifecycle.package_name <> publication.package_name OR
-              lifecycle.installation_id <> publication.installation_id OR
-              lifecycle.lock_digest <> publication.lock_digest OR
-              lifecycle.generation_digest <> publication.generation_digest OR
-              lifecycle.materialized_revision_digest <>
-                publication.materialized_revision_digest OR
+              disposition.event_digest IS NULL OR
+              disposition.event_kind = 'lifecycle' AND (
+                lifecycle.event_digest IS NULL OR
+                lifecycle.project_id <> publication.project_id OR
+                lifecycle.package_name <> publication.package_name OR
+                lifecycle.installation_id <> publication.installation_id OR
+                lifecycle.lock_digest <> publication.lock_digest OR
+                lifecycle.generation_digest <> publication.generation_digest OR
+                lifecycle.materialized_revision_digest <>
+                  publication.materialized_revision_digest
+              ) OR
+              disposition.event_kind = 'quarantine' AND (
+                quarantine.event_digest IS NULL OR
+                quarantine.project_id <> publication.project_id OR
+                quarantine.package_name <> publication.package_name OR
+                quarantine.installation_id <> publication.installation_id OR
+                quarantine.lock_digest <> publication.lock_digest OR
+                publication.state <> 'withdrawn'
+              ) OR
               previous.installation_id <> publication.installation_id OR
               previous.lock_digest <> publication.lock_digest OR
               previous.generation_digest <> publication.generation_digest OR
@@ -2496,10 +2532,11 @@ export async function auditLocalSqliteReadiness(
       !capability ||
       capability.contract_name !== LOCAL_SQLITE_CONTRACT_NAME ||
       capability.contract_version !== LOCAL_SQLITE_CONTRACT_VERSION ||
-      capability.migration_id !== '0087-run-attempt-log-retention' ||
+      capability.migration_id !==
+        '0089-plugin-package-automation-disposition-events' ||
       typeof capability.capabilities !== 'string' ||
       capability.capabilities !==
-        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"run_attempt_log_retention":1,"plugin_package_workflow_task_attempt_admission":1}' ||
+        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_automation_security_withdrawal":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"run_attempt_log_retention":1,"plugin_package_workflow_task_attempt_admission":1}' ||
       typeof capability.updated_at_ms !== 'number' ||
       !Number.isSafeInteger(capability.updated_at_ms) ||
       capability.updated_at_ms < 0

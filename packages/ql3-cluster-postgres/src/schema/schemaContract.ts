@@ -15,8 +15,8 @@ export interface PostgresSchemaContractFunction {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 56;
-  readonly migrationId: 'pg-0057-run-management-stop-boundary';
+  readonly contractVersion: 57;
+  readonly migrationId: 'pg-0058-plugin-package-automation-disposition-events';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -44,6 +44,7 @@ export interface PostgresSchemaContract {
     plugin_package_admission: 1;
     plugin_package_authority_split: 1;
     plugin_package_automation_publication: 1;
+    plugin_package_automation_security_withdrawal: 1;
     plugin_package_automation_start_guard: 1;
     plugin_package_workflow_admission: 1;
     plugin_package_workflow_run_list: 1;
@@ -103,8 +104,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 56,
-    migrationId: 'pg-0057-run-management-stop-boundary',
+    contractVersion: 57,
+    migrationId: 'pg-0058-plugin-package-automation-disposition-events',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -125,6 +126,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       plugin_package_admission: 1,
       plugin_package_authority_split: 1,
       plugin_package_automation_publication: 1,
+      plugin_package_automation_security_withdrawal: 1,
       plugin_package_automation_start_guard: 1,
       plugin_package_workflow_admission: 1,
       plugin_package_workflow_run_list: 1,
@@ -381,6 +383,10 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         'planned_at_ms',
         'expires_at_ms',
         'plan_json',
+      ]),
+      table('plugin_package_automation_disposition_events', [
+        'event_digest',
+        'event_kind',
       ]),
       table('plugin_package_automation_publications', [
         'publication_digest',
@@ -1445,6 +1451,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_plugin_package_lifecycle_plan_impact_key',
       'ql3_plugin_package_lifecycle_plan_expiry_idx',
       'plugin_package_automation_publications_pkey',
+      'plugin_package_automation_disposition_events_pkey',
       'ql3_plugin_package_automation_publication_version_key',
       'ql3_plugin_package_automation_publication_previous_key',
       'ql3_plugin_package_automation_publication_generation_idx',
@@ -1736,6 +1743,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_plugin_package_automation_publication_digest_check',
       'ql3_plugin_package_automation_publication_json_check',
       'ql3_plugin_package_automation_publication_head_state_check',
+      'ql3_plugin_package_automation_disposition_kind_check',
+      'ql3_plugin_package_automation_disposition_digest_check',
       'ql3_plugin_package_workflow_admission_identity_check',
       'ql3_plugin_package_workflow_admission_digest_check',
       'ql3_plugin_package_workflow_admission_json_check',
@@ -2175,7 +2184,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_plugin_package_lifecycle_plan_install_fk',
       'ql3_plugin_package_automation_publication_revision_fk',
       'ql3_plugin_package_automation_publication_previous_fk',
-      'ql3_plugin_package_automation_publication_lifecycle_fk',
+      'ql3_plugin_package_automation_publication_disposition_fk',
       'ql3_plugin_package_automation_publication_head_publication_fk',
       'ql3_plugin_package_workflow_admission_run_fk',
       'ql3_plugin_package_workflow_admission_publication_fk',
@@ -2302,6 +2311,14 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_run_retry_policies_run_fk',
     ]),
     functions: Object.freeze([
+      Object.freeze({
+        name: 'register_plugin_package_automation_disposition_event',
+        identityArguments: '',
+        owner: 'ql3_migration',
+        securityDefiner: true,
+        volatility: 'volatile',
+        configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
       Object.freeze({
         name: 'enforce_plugin_package_stage_provenance',
         identityArguments: '',

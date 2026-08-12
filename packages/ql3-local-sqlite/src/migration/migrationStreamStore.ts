@@ -70,9 +70,7 @@ CREATE TABLE IF NOT EXISTS "QingLong3SchemaMigrations" (
     ).map(record);
   }
 
-  async findById(
-    migrationId: string,
-  ): Promise<MigrationStreamRecord | null> {
+  async findById(migrationId: string): Promise<MigrationStreamRecord | null> {
     const row = this.client
       .prepare(
         `SELECT migration_id, stream_id, dialect, checksum, applied_at_ms
@@ -88,6 +86,11 @@ CREATE TABLE IF NOT EXISTS "QingLong3SchemaMigrations" (
       transaction: MigrationStreamTransaction<LocalSqliteMigrationContext>,
     ) => Promise<T>,
   ): Promise<T> {
+    const foreignKeys = this.client.prepare('PRAGMA foreign_keys').get() as
+      | { foreign_keys?: unknown }
+      | undefined;
+    const restoreForeignKeys = foreignKeys?.foreign_keys === 1;
+    if (restoreForeignKeys) this.client.exec('PRAGMA foreign_keys = OFF');
     this.client.exec('BEGIN IMMEDIATE');
     try {
       const result = await work({
@@ -116,9 +119,11 @@ CREATE TABLE IF NOT EXISTS "QingLong3SchemaMigrations" (
         },
       });
       this.client.exec('COMMIT');
+      if (restoreForeignKeys) this.client.exec('PRAGMA foreign_keys = ON');
       return result;
     } catch (error) {
       if (this.client.isTransaction) this.client.exec('ROLLBACK');
+      if (restoreForeignKeys) this.client.exec('PRAGMA foreign_keys = ON');
       throw error;
     }
   }

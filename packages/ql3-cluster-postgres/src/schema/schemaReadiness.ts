@@ -233,6 +233,12 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  plugin_package_automation_disposition_events: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   plugin_package_automation_publication_heads: Object.freeze({
     select: true,
     insert: false,
@@ -735,6 +741,12 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     delete: false,
   }),
   plugin_package_automation_publications: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  plugin_package_automation_disposition_events: Object.freeze({
     select: false,
     insert: false,
     update: false,
@@ -1492,6 +1504,7 @@ const REQUIRED_RUNTIME_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     plugin_package_lifecycle_blocking_runs: false,
     plugin_package_run_start_allowed: true,
     plugin_package_tool_start_allowed: true,
+    register_plugin_package_automation_disposition_event: false,
   });
 
 const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
@@ -1509,6 +1522,7 @@ const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     plugin_package_lifecycle_blocking_runs: false,
     plugin_package_run_start_allowed: false,
     plugin_package_tool_start_allowed: false,
+    register_plugin_package_automation_disposition_event: false,
   });
 
 const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
@@ -1526,6 +1540,7 @@ const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
     plugin_package_lifecycle_blocking_runs: true,
     plugin_package_run_start_allowed: false,
     plugin_package_tool_start_allowed: false,
+    register_plugin_package_automation_disposition_event: false,
   });
 
 const REQUIRED_WORKER_CREDENTIAL_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =

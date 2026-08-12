@@ -60,6 +60,7 @@ import { pg0054ApprovalManagementBoundaryMigration } from './pg-0054-approval-ma
 import { pg0055RunAttemptLogRetentionMigration } from './pg-0055-run-attempt-log-retention';
 import { pg0056RunManagementBoundaryMigration } from '../run-management/pg-0056-run-management-boundary';
 import { pg0057RunManagementStopBoundaryMigration } from '../run-management/pg-0057-run-management-stop-boundary';
+import { pg0058PluginPackageAutomationDispositionEventsMigration } from './pg-0058-plugin-package-automation-disposition-events';
 
 export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMigrationContext> =
   Object.freeze({
@@ -125,5 +126,6 @@ export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMi
       pg0055RunAttemptLogRetentionMigration,
       pg0056RunManagementBoundaryMigration,
       pg0057RunManagementStopBoundaryMigration,
+      pg0058PluginPackageAutomationDispositionEventsMigration,
     ]),
   });

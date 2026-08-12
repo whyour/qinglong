@@ -198,6 +198,7 @@ function database(serverVersionNum = '160014') {
                 'plugin_package_workflow_admission_snapshot',
                 'plugin_package_workflow_task_attempt_snapshot',
                 'lock_run_management_policy_fence',
+                'register_plugin_package_automation_disposition_event',
               ].includes(functionName),
               isOwner: false,
             })),

@@ -8,6 +8,9 @@ const {
   createPluginPackageQuarantineEvent,
 } = require('@qinglong/runtime-core/plugin-package-quarantine');
 const {
+  createInitialPluginPackageAutomationPublication,
+} = require('@qinglong/runtime-core/plugin-package-automation-publication');
+const {
   RunRepositoryConstraintError,
 } = require('@qinglong/runtime-core/run-repository');
 const {
@@ -17,13 +20,18 @@ const {
   activateInstall,
   pluginPackageTaskReconciliationFixture,
 } = require('../../../test/contracts/pluginPackageTaskReconciliationRepositoryContract.cjs');
-const { LocalSqliteOperationAuthority } = require('../dist/authority/operationAuthority');
+const {
+  LocalSqliteOperationAuthority,
+} = require('../dist/authority/operationAuthority');
 const {
   LocalSqlitePluginPackageInstallRepository,
 } = require('../dist/plugin-package/pluginPackageInstallRepository');
 const {
   LocalSqlitePluginPackageMaterializedRevisionRepository,
 } = require('../dist/plugin-package/pluginPackageMaterializedRevisionRepository');
+const {
+  LocalSqlitePluginPackageAutomationPublicationRepository,
+} = require('../dist/plugin-package/pluginPackageAutomationPublicationRepository');
 const {
   LocalSqlitePluginPackageTaskReconciliationRepository,
 } = require('../dist/plugin-package/pluginPackageTaskReconciliationRepository');
@@ -46,6 +54,24 @@ const digest = (value) => value.repeat(64);
 async function harness(t, namespace) {
   const fixture = pluginPackageTaskReconciliationFixture(namespace, {
     profile: 'edge',
+    workflows: [
+      {
+        schema: 'qinglong/plugin-package-workflow-resource@v1',
+        id: 'daily',
+        name: 'Daily workflow',
+        enabled: true,
+        steps: [{ id: 'run', task: 'alpha', needs: [] }],
+      },
+    ],
+    prompts: [
+      {
+        schema: 'qinglong/plugin-package-prompt-resource@v1',
+        id: 'operator',
+        name: 'Operator prompt',
+        template: 'Run {{task}}',
+        parameters: [{ name: 'task', required: true }],
+      },
+    ],
   });
   const client = new DatabaseSync(':memory:');
   client.exec('PRAGMA foreign_keys = ON');
@@ -66,6 +92,9 @@ async function harness(t, namespace) {
     materialized: new LocalSqlitePluginPackageMaterializedRevisionRepository(
       authority,
       fixture.registry,
+    ),
+    automation: new LocalSqlitePluginPackageAutomationPublicationRepository(
+      authority,
     ),
     reconciliation: new LocalSqlitePluginPackageTaskReconciliationRepository(
       authority,
@@ -108,6 +137,13 @@ function quarantineEvent(fixture, record = fixture.install.active) {
 async function publishActivePackage(value) {
   await activateInstall(value.install, value.fixture);
   await value.materialized.publish(value.fixture.revision);
+  await value.automation.publish(
+    createInitialPluginPackageAutomationPublication(
+      value.fixture.revision,
+      value.fixture.registry,
+      value.fixture.install.active.updatedAtMs,
+    ),
+  );
   await value.reconciliation.reconcile(value.fixture.revision, {
     async findActiveResourceGeneration() {
       return value.fixture.revision.generation;
@@ -199,6 +235,13 @@ test('withdraws active Package Tasks and Tool source in one exact replayable tra
       .snapshotDigest,
     created.receipt.capability.currentToolSnapshotDigest,
   );
+  const automation = await value.automation.findCurrent(
+    value.fixture.projectId,
+    value.fixture.packageName,
+  );
+  assert.equal(automation.state, 'withdrawn');
+  assert.equal(automation.lifecycleEventDigest, event.eventDigest);
+  assert.equal(automation.version, 2);
 
   const replay = await value.quarantine.quarantine(event, () => {
     authorizationChecks += 1;
@@ -263,6 +306,51 @@ test('rolls back every withdrawal fact when the target install advanced', async 
       )
       .get(value.fixture.projectId).count,
     0,
+  );
+  assert.equal(
+    (
+      await value.automation.findCurrent(
+        value.fixture.projectId,
+        value.fixture.packageName,
+      )
+    ).state,
+    'active',
+  );
+});
+
+test('fails closed when quarantine automation withdrawal evidence is rewound', async (t) => {
+  const value = await harness(t, 'sqlite-quarantine-automation-corrupt');
+  await publishActivePackage(value);
+  const event = quarantineEvent(value.fixture);
+  await value.quarantine.quarantine(event, () => {});
+  const active = value.client
+    .prepare(
+      `SELECT publication_digest AS "publicationDigest"
+       FROM "QingLong3PluginPackageAutomationPublications"
+       WHERE project_id = ? AND package_name = ? AND state = 'active'`,
+    )
+    .get(value.fixture.projectId, value.fixture.packageName);
+  value.client.exec('PRAGMA foreign_keys = OFF');
+  value.client
+    .prepare(
+      `UPDATE "QingLong3PluginPackageAutomationPublicationHeads"
+       SET publication_digest = ?, state = 'active', version = 1
+       WHERE project_id = ? AND package_name = ?`,
+    )
+    .run(
+      active.publicationDigest,
+      value.fixture.projectId,
+      value.fixture.packageName,
+    );
+  value.client
+    .prepare(
+      `DELETE FROM "QingLong3PluginPackageAutomationPublications"
+       WHERE project_id = ? AND package_name = ? AND state = 'withdrawn'`,
+    )
+    .run(value.fixture.projectId, value.fixture.packageName);
+  await assert.rejects(
+    value.quarantine.findByEventDigest(event.eventDigest),
+    PluginPackageQuarantineUnavailableError,
   );
 });
 

@@ -20,6 +20,7 @@ import {
   normalizePluginPackageInstallRecord,
   type PluginPackageInstallRecord,
 } from '@qinglong/runtime-core/plugin-package-install';
+import { createPluginPackageAutomationLifecyclePublication } from '@qinglong/runtime-core/plugin-package-automation-publication';
 import {
   createProjectToolDefinitionSnapshot,
   normalizeProjectToolDefinitionSnapshot,
@@ -40,6 +41,7 @@ import {
 } from '@qinglong/runtime-core/task-spec-semantic';
 
 import { LocalSqliteOperationAuthority } from '../authority/operationAuthority';
+import { LocalSqlitePluginPackageAutomationPublicationRepository } from './pluginPackageAutomationPublicationRepository';
 
 type Row = Record<string, unknown>;
 
@@ -314,6 +316,30 @@ export class LocalSqlitePluginPackageQuarantineRepository
       if (error instanceof PluginPackageQuarantineUnavailableError) throw error;
       throw new PluginPackageQuarantineUnavailableError();
     }
+    const automation = this.#authority.client
+      .prepare(
+        `SELECT state,
+                lifecycle_event_digest AS "lifecycleEventDigest"
+         FROM "QingLong3PluginPackageAutomationPublications"
+         WHERE project_id = ? AND package_name = ?
+           AND installation_id = ? AND lock_digest = ?
+         ORDER BY version DESC
+         LIMIT 1`,
+      )
+      .get(
+        receipt.target.projectId,
+        receipt.target.packageName,
+        receipt.target.installationId,
+        receipt.target.lockDigest,
+      ) as Row | undefined;
+    if (
+      automation &&
+      (text(automation, 'state') === 'active' ||
+        (automation.lifecycleEventDigest === receipt.eventDigest &&
+          text(automation, 'state') !== 'withdrawn'))
+    ) {
+      throw new PluginPackageQuarantineUnavailableError();
+    }
   }
 
   #findStored(
@@ -431,6 +457,40 @@ export class LocalSqlitePluginPackageQuarantineRepository
       );
     }
     return record;
+  }
+
+  #withdrawAutomation(
+    event: Readonly<PluginPackageQuarantineEvent>,
+    record: Readonly<PluginPackageInstallRecord>,
+    committedAtMs: number,
+  ): void {
+    const publications =
+      new LocalSqlitePluginPackageAutomationPublicationRepository(
+        this.#authority,
+      );
+    const current = publications.findCurrentInTransaction(
+      event.target.projectId,
+      event.target.packageName,
+    );
+    if (!current) return;
+    if (
+      current.target.installationId !== event.target.installationId ||
+      current.target.lockDigest !== event.target.lockDigest ||
+      current.target.generation !== record.targetGeneration
+    ) {
+      throw new PluginPackageQuarantineConflictError(
+        'Workflow/Prompt publication does not match the quarantined Package generation',
+      );
+    }
+    if (current.state === 'absent' || current.state === 'withdrawn') return;
+    publications.publishSecurityWithdrawalInTransaction(
+      createPluginPackageAutomationLifecyclePublication({
+        previous: current,
+        state: 'withdrawn',
+        lifecycleEventDigest: event.eventDigest,
+        publishedAtMs: committedAtMs,
+      }),
+    );
   }
 
   #activeContributions(
@@ -792,7 +852,7 @@ export class LocalSqlitePluginPackageQuarantineRepository
             'target lock is already quarantined by another event',
           );
         }
-        this.#install(event);
+        const install = this.#install(event);
         const clock = client
           .prepare(
             `SELECT CAST(unixepoch('subsec') * 1000 AS INTEGER) AS "nowMs"`,
@@ -857,6 +917,7 @@ export class LocalSqlitePluginPackageQuarantineRepository
           ),
         );
         this.#insertEvent(event);
+        this.#withdrawAutomation(event, install, committedAtMs);
         this.#publishSnapshot(snapshot, committedAtMs);
         const receipt = createPluginPackageWithdrawalReceipt({
           eventDigest: event.eventDigest,

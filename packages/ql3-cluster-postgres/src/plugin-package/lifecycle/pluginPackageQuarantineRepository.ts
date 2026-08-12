@@ -25,6 +25,7 @@ import {
   normalizePluginPackageInstallRecord,
   type PluginPackageInstallRecord,
 } from '@qinglong/runtime-core/plugin-package-install';
+import { createPluginPackageAutomationLifecyclePublication } from '@qinglong/runtime-core/plugin-package-automation-publication';
 import {
   createProjectToolDefinitionSnapshot,
   normalizeProjectToolDefinitionSnapshot,
@@ -56,15 +57,14 @@ import {
   rollbackPostgresDefinitionTransaction,
 } from '../../repository/definitionRepositorySupport';
 import { isPostgresAvailabilityError } from '../../connection/pool';
+import { PostgresPluginPackageAutomationPublicationRepository } from '../publication/pluginPackageAutomationPublicationRepository';
 
 type Row = Record<string, unknown>;
 type Queryable = Pick<PostgresQueryable, 'query'>;
 
 export const CLUSTER_PLUGIN_PACKAGE_QUARANTINE_TARGET_LIMIT = 128;
 
-function unavailable(
-  cause?: unknown,
-): PluginPackageQuarantineUnavailableError {
+function unavailable(cause?: unknown): PluginPackageQuarantineUnavailableError {
   return new PluginPackageQuarantineUnavailableError({
     cause: cause instanceof Error ? cause : undefined,
   });
@@ -189,8 +189,10 @@ export class PostgresPluginPackageQuarantineRepository
     if (result.rows.length !== 1) throw unavailable();
     try {
       return normalizePluginPackageQuarantineEvent(
-        recordJson(result.rows[0]!, 'eventJson') as unknown as
-          PluginPackageQuarantineEvent,
+        recordJson(
+          result.rows[0]!,
+          'eventJson',
+        ) as unknown as PluginPackageQuarantineEvent,
       );
     } catch (error) {
       if (error instanceof PluginPackageQuarantineUnavailableError) {
@@ -215,8 +217,10 @@ export class PostgresPluginPackageQuarantineRepository
     if (result.rows.length !== 1) throw unavailable();
     try {
       const receipt = normalizePluginPackageWithdrawalReceipt(
-        recordJson(result.rows[0]!, 'receiptJson') as unknown as
-          PluginPackageWithdrawalReceipt,
+        recordJson(
+          result.rows[0]!,
+          'receiptJson',
+        ) as unknown as PluginPackageWithdrawalReceipt,
       );
       assertPluginPackageWithdrawalMatchesEvent(event, receipt);
       await this.#assertReceiptRelations(queryable, receipt);
@@ -296,8 +300,10 @@ export class PostgresPluginPackageQuarantineRepository
     if (snapshots.rows.length !== 1) throw unavailable();
     try {
       const snapshot = normalizeProjectToolDefinitionSnapshot(
-        recordJson(snapshots.rows[0]!, 'snapshotJson') as unknown as
-          ProjectToolDefinitionSnapshot,
+        recordJson(
+          snapshots.rows[0]!,
+          'snapshotJson',
+        ) as unknown as ProjectToolDefinitionSnapshot,
       );
       if (
         snapshot.sources.length !== receipt.capability.retainedSourceCount ||
@@ -315,6 +321,31 @@ export class PostgresPluginPackageQuarantineRepository
         throw error;
       }
       throw unavailable(error);
+    }
+    const automation = await queryable.query<Row>(
+      `SELECT state,
+              lifecycle_event_digest AS "lifecycleEventDigest"
+       FROM "ql3"."plugin_package_automation_publications"
+       WHERE project_id = $1 AND package_name = $2
+         AND installation_id = $3 AND lock_digest = $4
+       ORDER BY version DESC
+       LIMIT 1`,
+      [
+        receipt.target.projectId,
+        receipt.target.packageName,
+        receipt.target.installationId,
+        receipt.target.lockDigest,
+      ],
+    );
+    if (automation.rows.length > 1) throw unavailable();
+    const publication = automation.rows[0];
+    if (
+      publication &&
+      (text(publication, 'state') === 'active' ||
+        (publication.lifecycleEventDigest === receipt.eventDigest &&
+          text(publication, 'state') !== 'withdrawn'))
+    ) {
+      throw unavailable();
     }
   }
 
@@ -345,9 +376,7 @@ export class PostgresPluginPackageQuarantineRepository
          LIMIT $2`,
         [lockDigest, CLUSTER_PLUGIN_PACKAGE_QUARANTINE_TARGET_LIMIT + 1],
       );
-      if (
-        result.rows.length > CLUSTER_PLUGIN_PACKAGE_QUARANTINE_TARGET_LIMIT
-      ) {
+      if (result.rows.length > CLUSTER_PLUGIN_PACKAGE_QUARANTINE_TARGET_LIMIT) {
         throw new PluginPackageQuarantineConflictError(
           'matching install targets exceed the Cluster limit',
         );
@@ -355,8 +384,10 @@ export class PostgresPluginPackageQuarantineRepository
       return Object.freeze(
         result.rows.map((row) => {
           const record = normalizePluginPackageInstallRecord(
-            recordJson(row, 'recordJson') as unknown as
-              PluginPackageInstallRecord,
+            recordJson(
+              row,
+              'recordJson',
+            ) as unknown as PluginPackageInstallRecord,
           );
           return Object.freeze({
             projectId: record.projectId,
@@ -411,8 +442,10 @@ export class PostgresPluginPackageQuarantineRepository
     let record: Readonly<PluginPackageInstallRecord>;
     try {
       record = normalizePluginPackageInstallRecord(
-        recordJson(result.rows[0]!, 'recordJson') as unknown as
-          PluginPackageInstallRecord,
+        recordJson(
+          result.rows[0]!,
+          'recordJson',
+        ) as unknown as PluginPackageInstallRecord,
       );
     } catch (error) {
       if (error instanceof PluginPackageQuarantineUnavailableError) {
@@ -436,12 +469,45 @@ export class PostgresPluginPackageQuarantineRepository
     return record;
   }
 
+  async #withdrawAutomation(
+    client: PostgresClient,
+    event: Readonly<PluginPackageQuarantineEvent>,
+    record: Readonly<PluginPackageInstallRecord>,
+    committedAtMs: number,
+  ): Promise<void> {
+    const publications =
+      new PostgresPluginPackageAutomationPublicationRepository(this.pool);
+    const current = await publications.findCurrentInTransaction(
+      client,
+      event.target.projectId,
+      event.target.packageName,
+    );
+    if (!current) return;
+    if (
+      current.target.installationId !== event.target.installationId ||
+      current.target.lockDigest !== event.target.lockDigest ||
+      current.target.generation !== record.targetGeneration
+    ) {
+      throw new PluginPackageQuarantineConflictError(
+        'Workflow/Prompt publication does not match the quarantined Package generation',
+      );
+    }
+    if (current.state === 'absent' || current.state === 'withdrawn') return;
+    await publications.publishSecurityWithdrawalInTransaction(
+      client,
+      createPluginPackageAutomationLifecyclePublication({
+        previous: current,
+        state: 'withdrawn',
+        lifecycleEventDigest: event.eventDigest,
+        publishedAtMs: committedAtMs,
+      }),
+    );
+  }
+
   async #activeContributions(
     queryable: Queryable,
     projectId: string,
-  ): Promise<
-    readonly Readonly<ProjectToolDefinitionSnapshotContribution>[]
-  > {
+  ): Promise<readonly Readonly<ProjectToolDefinitionSnapshotContribution>[]> {
     const result = await queryable.query<Row>(
       `SELECT revision.revision_json AS "revisionJson"
        FROM "ql3"."plugin_package_install_heads" AS head
@@ -532,9 +598,7 @@ export class PostgresPluginPackageQuarantineRepository
         MAX_PLUGIN_PACKAGE_QUARANTINE_TASK_WITHDRAWALS + 1,
       ],
     );
-    if (
-      result.rows.length > MAX_PLUGIN_PACKAGE_QUARANTINE_TASK_WITHDRAWALS
-    ) {
+    if (result.rows.length > MAX_PLUGIN_PACKAGE_QUARANTINE_TASK_WITHDRAWALS) {
       throw new PluginPackageQuarantineConflictError(
         'owned Tasks exceed the quarantine withdrawal limit',
       );
@@ -608,14 +672,11 @@ export class PostgresPluginPackageQuarantineRepository
           'event digest is bound to another quarantine',
         );
       }
-      const existingReceipt = await this.#receiptByEvent(
-        client,
-        existingEvent,
-      );
+      const existingReceipt = await this.#receiptByEvent(client, existingEvent);
       if (!existingReceipt) throw unavailable();
       return Object.freeze({ created: false, receipt: existingReceipt });
     }
-    await this.#install(client, event);
+    const install = await this.#install(client, event);
     const committedAtMs = Math.max(
       await this.#databaseNowMs(client),
       event.occurredAtMs,
@@ -705,6 +766,9 @@ export class PostgresPluginPackageQuarantineRepository
       typeof committed.rows[0]?.created !== 'boolean'
     ) {
       throw unavailable();
+    }
+    if (event.target.installState === 'active') {
+      await this.#withdrawAutomation(client, event, install, committedAtMs);
     }
     const stored = await this.#findStored(client, event.eventDigest);
     if (!stored || !same(stored, receipt)) throw unavailable();

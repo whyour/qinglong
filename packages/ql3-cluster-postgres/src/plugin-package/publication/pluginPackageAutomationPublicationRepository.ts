@@ -1,8 +1,5 @@
 // PostgreSQL adapter owned by Plugin Package publication and recovery.
-import type {
-  PostgresClient,
-  PostgresPool,
-} from '@qinglong/runtime-core';
+import type { PostgresClient, PostgresPool } from '@qinglong/runtime-core';
 import {
   InvalidPluginPackageAutomationPublicationError,
   MAX_PLUGIN_PACKAGE_AUTOMATION_PUBLICATION_BYTES,
@@ -49,7 +46,10 @@ function unavailable(
   });
 }
 
-function targetIdentity(projectId: unknown, packageName: unknown): {
+function targetIdentity(
+  projectId: unknown,
+  packageName: unknown,
+): {
   readonly projectId: string;
   readonly packageName: string;
 } {
@@ -147,8 +147,7 @@ export class PostgresPluginPackageAutomationPublicationRepository
           postgresRequiredString(row.generationDigest, unavailable) ||
         publication.target.materializedRevisionDigest !==
           postgresRequiredString(row.materializedRevisionDigest, unavailable) ||
-        publication.state !==
-          postgresRequiredString(row.state, unavailable) ||
+        publication.state !== postgresRequiredString(row.state, unavailable) ||
         publication.version !==
           postgresRequiredInteger(row.version, unavailable) ||
         publication.publishedAtMs !==
@@ -158,9 +157,7 @@ export class PostgresPluginPackageAutomationPublicationRepository
       }
       return publication;
     } catch (error) {
-      if (
-        error instanceof PluginPackageAutomationPublicationUnavailableError
-      ) {
+      if (error instanceof PluginPackageAutomationPublicationUnavailableError) {
         throw error;
       }
       throw unavailable(error);
@@ -393,9 +390,10 @@ export class PostgresPluginPackageAutomationPublicationRepository
     return this.#findCurrent(client, projectId, packageName, true);
   }
 
-  async publishInTransaction(
+  async #publishInTransaction(
     client: PostgresClient,
     value: Readonly<PluginPackageAutomationPublication>,
+    securityWithdrawal: boolean,
   ): Promise<
     Readonly<{
       status: 'created' | 'existing';
@@ -443,10 +441,7 @@ export class PostgresPluginPackageAutomationPublicationRepository
         );
       }
       try {
-        assertPluginPackageAutomationPublicationSuccessor(
-          current,
-          publication,
-        );
+        assertPluginPackageAutomationPublicationSuccessor(current, publication);
       } catch (error) {
         if (error instanceof InvalidPluginPackageAutomationPublicationError) {
           throw new PluginPackageAutomationPublicationConflictError(
@@ -469,20 +464,14 @@ export class PostgresPluginPackageAutomationPublicationRepository
     );
     if (
       revision.rows.length !== 1 ||
-      postgresRequiredString(
-        revision.rows[0]!.revisionDigest,
-        unavailable,
-      ) !== publication.target.materializedRevisionDigest ||
+      postgresRequiredString(revision.rows[0]!.revisionDigest, unavailable) !==
+        publication.target.materializedRevisionDigest ||
       postgresRequiredString(revision.rows[0]!.projectId, unavailable) !==
         publication.target.projectId ||
-      postgresRequiredString(
-        revision.rows[0]!.packageName,
-        unavailable,
-      ) !== publication.target.packageName ||
-      postgresRequiredInteger(
-        revision.rows[0]!.generation,
-        unavailable,
-      ) !== publication.target.generation ||
+      postgresRequiredString(revision.rows[0]!.packageName, unavailable) !==
+        publication.target.packageName ||
+      postgresRequiredInteger(revision.rows[0]!.generation, unavailable) !==
+        publication.target.generation ||
       postgresRequiredString(revision.rows[0]!.lockDigest, unavailable) !==
         publication.target.lockDigest
     ) {
@@ -490,41 +479,43 @@ export class PostgresPluginPackageAutomationPublicationRepository
         'materialized revision fence does not match publication target',
       );
     }
-    const securityFence = await client.query<Row>(
-      `SELECT
-         EXISTS (
-           SELECT 1
-           FROM "ql3"."plugin_package_quarantine_events" AS quarantine
-           WHERE quarantine.project_id = $1
-             AND quarantine.package_name = $2
-             AND quarantine.installation_id = $3
-             AND quarantine.lock_digest = $4
-         ) OR EXISTS (
-           SELECT 1
-           FROM "ql3"."plugin_package_publisher_provenance" AS provenance
-           JOIN "ql3"."plugin_package_publisher_revocation_receipts" AS revoked
-             ON revoked.publisher = provenance.publisher
-            AND revoked.key_id = provenance.key_id
-           WHERE provenance.installation_id = $3
-             AND provenance.lock_digest = $4
-         ) AS "blocked"`,
-      [
-        publication.target.projectId,
-        publication.target.packageName,
-        publication.target.installationId,
-        publication.target.lockDigest,
-      ],
-    );
-    if (
-      securityFence.rows.length !== 1 ||
-      typeof securityFence.rows[0]?.blocked !== 'boolean'
-    ) {
-      throw unavailable();
-    }
-    if (securityFence.rows[0].blocked) {
-      throw new PluginPackageAutomationPublicationConflictError(
-        'security-fenced Package generation cannot publish automation',
+    if (!securityWithdrawal) {
+      const securityFence = await client.query<Row>(
+        `SELECT
+           EXISTS (
+             SELECT 1
+             FROM "ql3"."plugin_package_quarantine_events" AS quarantine
+             WHERE quarantine.project_id = $1
+               AND quarantine.package_name = $2
+               AND quarantine.installation_id = $3
+               AND quarantine.lock_digest = $4
+           ) OR EXISTS (
+             SELECT 1
+             FROM "ql3"."plugin_package_publisher_provenance" AS provenance
+             JOIN "ql3"."plugin_package_publisher_revocation_receipts" AS revoked
+               ON revoked.publisher = provenance.publisher
+              AND revoked.key_id = provenance.key_id
+             WHERE provenance.installation_id = $3
+               AND provenance.lock_digest = $4
+           ) AS "blocked"`,
+        [
+          publication.target.projectId,
+          publication.target.packageName,
+          publication.target.installationId,
+          publication.target.lockDigest,
+        ],
       );
+      if (
+        securityFence.rows.length !== 1 ||
+        typeof securityFence.rows[0]?.blocked !== 'boolean'
+      ) {
+        throw unavailable();
+      }
+      if (securityFence.rows[0].blocked) {
+        throw new PluginPackageAutomationPublicationConflictError(
+          'security-fenced Package generation cannot publish automation',
+        );
+      }
     }
     await client.query(
       `INSERT INTO "ql3"."plugin_package_automation_publications" (
@@ -601,9 +592,37 @@ export class PostgresPluginPackageAutomationPublicationRepository
     });
   }
 
-  async publish(
+  publishInTransaction(
+    client: PostgresClient,
     value: Readonly<PluginPackageAutomationPublication>,
   ): Promise<
+    Readonly<{
+      status: 'created' | 'existing';
+      publication: Readonly<PluginPackageAutomationPublication>;
+    }>
+  > {
+    return this.#publishInTransaction(client, value, false);
+  }
+
+  publishSecurityWithdrawalInTransaction(
+    client: PostgresClient,
+    value: Readonly<PluginPackageAutomationPublication>,
+  ): Promise<
+    Readonly<{
+      status: 'created' | 'existing';
+      publication: Readonly<PluginPackageAutomationPublication>;
+    }>
+  > {
+    const publication = normalizePluginPackageAutomationPublication(value);
+    if (publication.state !== 'withdrawn') {
+      throw new PluginPackageAutomationPublicationConflictError(
+        'security withdrawal must narrow automation state',
+      );
+    }
+    return this.#publishInTransaction(client, publication, true);
+  }
+
+  async publish(value: Readonly<PluginPackageAutomationPublication>): Promise<
     Readonly<{
       status: 'created' | 'existing';
       publication: Readonly<PluginPackageAutomationPublication>;
