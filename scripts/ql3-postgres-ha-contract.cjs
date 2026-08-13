@@ -12303,7 +12303,7 @@ async function main(argv = process.argv.slice(2)) {
           pluginPackageQuarantine.promptExecution.afterPromotion.catalog
             .found &&
           pluginPackageQuarantine.promptExecution.afterPromotion.catalog
-            .publicationState === 'active' &&
+            .publicationState === 'withdrawn' &&
           pluginPackageQuarantine.promptExecution.afterPromotion.catalog
             .templateFieldAbsent &&
           pluginPackageQuarantine.promptExecution.afterPromotion.catalog
@@ -12615,6 +12615,13 @@ async function main(argv = process.argv.slice(2)) {
         'domain COMMIT-response-loss faults are injected at the PostgresClient boundary, not by dropping raw PostgreSQL protocol packets',
       ],
     };
+    assert.deepEqual(
+      Object.entries(report.gates)
+        .filter(([, passed]) => passed !== true)
+        .map(([name]) => name),
+      [],
+      'PostgreSQL HA gates must all pass before evidence publication',
+    );
   } catch (error) {
     const logs = {};
     for (const containerName of [names.primary, names.standby]) {
