@@ -1,18 +1,7 @@
 // Remote Execution owns mounted Secret resolution for authenticated delivery.
-import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
-import {
-  lstat,
-  open,
-  realpath,
-} from 'node:fs/promises';
-import {
-  isAbsolute,
-  join,
-  normalize,
-  parse,
-  relative,
-} from 'node:path';
+import { lstat, open, realpath } from 'node:fs/promises';
+import { isAbsolute, join, normalize, parse, relative } from 'node:path';
 import {
   MAX_REMOTE_SECRET_DELIVERY_TOTAL_VALUE_BYTES,
   MAX_REMOTE_SECRET_VALUE_BYTES,
@@ -21,10 +10,9 @@ import {
   type RemoteWorkerSecretResolution,
   type RemoteWorkerSecretValueProvider,
 } from '@qinglong/runtime-core/remote-secret-delivery';
-import { parseSecretRef } from '@qinglong/runtime-core/secret-reference';
+import { secretProjectionFileName } from '@qinglong/runtime-core/secret-projection';
 
 const MAX_SECRET_ROOT_BYTES = 4096;
-const SECRET_FILE_NAME = /^[0-9a-f]{64}$/;
 
 export interface ClusterMountedSecretProviderOptions {
   /**
@@ -69,25 +57,13 @@ function rootDirectory(value: string): string {
  * non-reversible name also prevents Project/name input from becoming a path.
  */
 export function clusterMountedSecretFileName(secretRef: string): string {
-  let canonical: string;
   try {
-    const parsed = parseSecretRef(secretRef);
-    canonical = secretRef;
-    if (
-      parsed.projectId.length < 1 ||
-      parsed.name.length < 1
-    ) throw new Error('invalid SecretRef');
+    return secretProjectionFileName(secretRef);
   } catch (error) {
-    throw new ClusterMountedSecretProviderError(
-      'invalid_configuration',
-      { cause: error },
-    );
+    throw new ClusterMountedSecretProviderError('invalid_configuration', {
+      cause: error,
+    });
   }
-  const name = createHash('sha256').update(canonical, 'utf8').digest('hex');
-  if (!SECRET_FILE_NAME.test(name)) {
-    throw new ClusterMountedSecretProviderError('invalid_configuration');
-  }
-  return name;
 }
 
 function remainsBelow(root: string, candidate: string): boolean {
@@ -108,17 +84,13 @@ async function resolvedRoot(path: string): Promise<string> {
     }
     return await realpath(path);
   } catch (error) {
-    throw new ClusterMountedSecretProviderError(
-      'root_unavailable',
-      { cause: error },
-    );
+    throw new ClusterMountedSecretProviderError('root_unavailable', {
+      cause: error,
+    });
   }
 }
 
-async function readMaterial(
-  root: string,
-  secretRef: string,
-): Promise<Buffer> {
+async function readMaterial(root: string, secretRef: string): Promise<Buffer> {
   const candidate = join(root, clusterMountedSecretFileName(secretRef));
   let handle;
   try {
@@ -152,10 +124,9 @@ async function readMaterial(
     }
     return bytes;
   } catch (error) {
-    throw new ClusterMountedSecretProviderError(
-      'material_unavailable',
-      { cause: error },
-    );
+    throw new ClusterMountedSecretProviderError('material_unavailable', {
+      cause: error,
+    });
   } finally {
     await handle?.close().catch(() => undefined);
   }
@@ -169,10 +140,9 @@ function secretValue(bytes: Buffer): string {
     }
     return value;
   } catch (error) {
-    throw new ClusterMountedSecretProviderError(
-      'material_unavailable',
-      { cause: error },
-    );
+    throw new ClusterMountedSecretProviderError('material_unavailable', {
+      cause: error,
+    });
   }
 }
 
@@ -205,10 +175,9 @@ export class ClusterMountedSecretProvider
     try {
       normalized = normalizeRemoteWorkerSecretDeliveryAuthority(authority);
     } catch (error) {
-      throw new ClusterMountedSecretProviderError(
-        'material_unavailable',
-        { cause: error },
-      );
+      throw new ClusterMountedSecretProviderError('material_unavailable', {
+        cause: error,
+      });
     }
     const root = await resolvedRoot(this.rootDirectory);
     const buffers: Buffer[] = [];
@@ -220,9 +189,7 @@ export class ClusterMountedSecretProvider
         buffers.push(bytes);
         totalBytes += bytes.byteLength;
         if (totalBytes > MAX_REMOTE_SECRET_DELIVERY_TOTAL_VALUE_BYTES) {
-          throw new ClusterMountedSecretProviderError(
-            'material_unavailable',
-          );
+          throw new ClusterMountedSecretProviderError('material_unavailable');
         }
         values.push(
           Object.freeze({
@@ -243,10 +210,9 @@ export class ClusterMountedSecretProvider
     } catch (error) {
       for (const bytes of buffers) bytes.fill(0);
       if (error instanceof ClusterMountedSecretProviderError) throw error;
-      throw new ClusterMountedSecretProviderError(
-        'material_unavailable',
-        { cause: error },
-      );
+      throw new ClusterMountedSecretProviderError('material_unavailable', {
+        cause: error,
+      });
     }
   }
 }

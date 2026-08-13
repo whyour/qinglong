@@ -250,6 +250,11 @@
       "require": "./dist/plugin-package/management/pluginPackageManagement.js",
       "default": "./dist/plugin-package/management/pluginPackageManagement.js"
     },
+    "./plugin-package-secret-existence-inspector": {
+      "types": "./dist/plugin-package/secret-binding/projectedSecretExistenceInspector.d.ts",
+      "require": "./dist/plugin-package/secret-binding/projectedSecretExistenceInspector.js",
+      "default": "./dist/plugin-package/secret-binding/projectedSecretExistenceInspector.js"
+    },
     "./plugin-package-lifecycle-management": {
       "types": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.d.ts",
       "require": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.js",

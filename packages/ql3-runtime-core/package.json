@@ -89,6 +89,9 @@
       "plugin-package-secret-binding-plan": [
         "dist/plugin-package/secret-binding/plan.d.ts"
       ],
+      "secret-projection": [
+        "dist/secret/secretProjection.d.ts"
+      ],
       "plugin-package-task-reconciliation": [
         "dist/plugin-package/pluginPackageTaskReconciliation.d.ts"
       ],
@@ -386,6 +389,11 @@
       "types": "./dist/plugin-package/secret-binding/plan.d.ts",
       "require": "./dist/plugin-package/secret-binding/plan.js",
       "default": "./dist/plugin-package/secret-binding/plan.js"
+    },
+    "./secret-projection": {
+      "types": "./dist/secret/secretProjection.d.ts",
+      "require": "./dist/secret/secretProjection.js",
+      "default": "./dist/secret/secretProjection.js"
     },
     "./plugin-package-task-reconciliation": {
       "types": "./dist/plugin-package/pluginPackageTaskReconciliation.d.ts",
