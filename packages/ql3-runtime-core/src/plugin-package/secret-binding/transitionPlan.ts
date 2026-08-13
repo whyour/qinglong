@@ -13,6 +13,7 @@ import {
   type PluginPackageSecretBinding,
   type PluginPackageSecretBindingAssignment,
   type PluginPackageSecretBindingEntry,
+  type PluginPackageSecretBindingTarget,
 } from './binding';
 import {
   createPluginPackageSecretBindingPlan,
@@ -68,7 +69,8 @@ export interface PluginPackageSecretBindingTransitionChange {
 export interface PluginPackageSecretBindingTransitionPlan {
   readonly schema: typeof PLUGIN_PACKAGE_SECRET_BINDING_TRANSITION_PLAN_SCHEMA;
   readonly kind: PluginPackageSecretBindingTransitionKind;
-  readonly previousBinding: Readonly<PluginPackageSecretBinding>;
+  readonly previousTarget: Readonly<PluginPackageSecretBindingTarget>;
+  readonly previousBinding: Readonly<PluginPackageSecretBinding> | null;
   readonly previousActiveLockDigest: string;
   readonly previousAttemptGeneration: number;
   readonly nextTarget: Readonly<PluginPackageSecretBinding['target']>;
@@ -78,7 +80,8 @@ export interface PluginPackageSecretBindingTransitionPlan {
 }
 
 export interface CreatePluginPackageSecretBindingTransitionPlanInput {
-  readonly previousBinding: Readonly<PluginPackageSecretBinding>;
+  readonly previousTarget: Readonly<PluginPackageSecretBindingTarget>;
+  readonly previousBinding: Readonly<PluginPackageSecretBinding> | null;
   readonly previousAttemptGeneration: number;
   readonly nextGeneration: Parameters<
     typeof normalizePluginPackageResourceGeneration
@@ -235,7 +238,7 @@ function deriveKind(
 }
 
 function assertLineage(
-  previous: Readonly<PluginPackageSecretBinding>,
+  previousTarget: Readonly<PluginPackageSecretBindingTarget>,
   nextTarget: Readonly<PluginPackageSecretBinding['target']>,
   previousActiveLockDigest: unknown,
   previousAttemptGeneration: unknown,
@@ -246,23 +249,23 @@ function assertLineage(
   if (
     typeof previousActiveLockDigest !== 'string' ||
     !DIGEST.test(previousActiveLockDigest) ||
-    previousActiveLockDigest !== previous.target.lockDigest
+    previousActiveLockDigest !== previousTarget.lockDigest
   ) {
     return invalid('previous active lock digest is invalid');
   }
   if (
     !Number.isSafeInteger(previousAttemptGeneration) ||
-    (previousAttemptGeneration as number) < previous.target.generation ||
+    (previousAttemptGeneration as number) < previousTarget.generation ||
     (previousAttemptGeneration as number) >= 2_147_483_647
   ) {
     return invalid('previous attempt generation is invalid');
   }
   if (
-    nextTarget.projectId !== previous.target.projectId ||
-    nextTarget.packageName !== previous.target.packageName ||
+    nextTarget.projectId !== previousTarget.projectId ||
+    nextTarget.packageName !== previousTarget.packageName ||
     nextTarget.generation !== (previousAttemptGeneration as number) + 1 ||
-    nextTarget.installationId === previous.target.installationId ||
-    nextTarget.lockDigest === previous.target.lockDigest
+    nextTarget.installationId === previousTarget.installationId ||
+    nextTarget.lockDigest === previousTarget.lockDigest
   ) {
     return invalid(
       'next target is not the immediate durable attempt generation',
@@ -275,19 +278,21 @@ function assertLineage(
 }
 
 function unsignedPlan(
-  previousBinding: Readonly<PluginPackageSecretBinding>,
+  previousTarget: Readonly<PluginPackageSecretBindingTarget>,
+  previousBinding: Readonly<PluginPackageSecretBinding> | null,
   previousActiveLockDigest: string,
   previousAttemptGeneration: number,
   nextTarget: Readonly<PluginPackageSecretBinding['target']>,
   nextBindingPlan: Readonly<PluginPackageSecretBindingPlan> | null,
 ): Omit<PluginPackageSecretBindingTransitionPlan, 'transitionDigest'> {
   const changes = deriveChanges(
-    previousBinding.entries,
+    previousBinding?.entries ?? [],
     nextBindingPlan?.entries ?? [],
   );
   return Object.freeze({
     schema: PLUGIN_PACKAGE_SECRET_BINDING_TRANSITION_PLAN_SCHEMA,
     kind: deriveKind(changes),
+    previousTarget,
     previousBinding,
     previousActiveLockDigest,
     previousAttemptGeneration,
@@ -335,19 +340,30 @@ export function createPluginPackageSecretBindingTransitionPlan(
       'plannedAtMs',
       'previousAttemptGeneration',
       'previousBinding',
+      'previousTarget',
     ],
     'transition plan input',
   );
-  const previousBinding = normalizePluginPackageSecretBinding(
-    input.previousBinding,
+  const previousTarget = normalizePluginPackageSecretBindingTarget(
+    input.previousTarget,
   );
+  const previousBinding =
+    input.previousBinding === null
+      ? null
+      : normalizePluginPackageSecretBinding(input.previousBinding);
+  if (
+    previousBinding !== null &&
+    JSON.stringify(previousBinding.target) !== JSON.stringify(previousTarget)
+  ) {
+    return invalid('previous binding does not match the previous target');
+  }
   const nextGeneration = normalizePluginPackageResourceGeneration(
     input.nextGeneration,
   );
   const nextManifest = normalizePluginPackageManifest(input.nextManifest);
   if (
     nextGeneration.previousActiveLockDigest !==
-    previousBinding.target.lockDigest
+    previousTarget.lockDigest
   ) {
     return invalid('next generation does not name the previous active lock');
   }
@@ -371,13 +387,14 @@ export function createPluginPackageSecretBindingTransitionPlan(
           plannedAtMs: input.plannedAtMs,
         });
   const lineage = assertLineage(
-    previousBinding,
+    previousTarget,
     nextTarget,
     nextGeneration.previousActiveLockDigest,
     input.previousAttemptGeneration,
   );
   return withDigest(
     unsignedPlan(
+      previousTarget,
       previousBinding,
       lineage.previousActiveLockDigest,
       lineage.previousAttemptGeneration,
@@ -401,6 +418,7 @@ export function normalizePluginPackageSecretBindingTransitionPlan(
       'previousActiveLockDigest',
       'previousAttemptGeneration',
       'previousBinding',
+      'previousTarget',
       'schema',
       'transitionDigest',
     ],
@@ -409,9 +427,19 @@ export function normalizePluginPackageSecretBindingTransitionPlan(
   if (plan.schema !== PLUGIN_PACKAGE_SECRET_BINDING_TRANSITION_PLAN_SCHEMA) {
     return invalid('schema is unsupported');
   }
-  const previousBinding = normalizePluginPackageSecretBinding(
-    plan.previousBinding,
+  const previousTarget = normalizePluginPackageSecretBindingTarget(
+    plan.previousTarget,
   );
+  const previousBinding =
+    plan.previousBinding === null
+      ? null
+      : normalizePluginPackageSecretBinding(plan.previousBinding);
+  if (
+    previousBinding !== null &&
+    JSON.stringify(previousBinding.target) !== JSON.stringify(previousTarget)
+  ) {
+    return invalid('previous binding does not match the previous target');
+  }
   const nextTarget = normalizePluginPackageSecretBindingTarget(plan.nextTarget);
   const nextBindingPlan =
     plan.nextBindingPlan === null
@@ -424,12 +452,13 @@ export function normalizePluginPackageSecretBindingTransitionPlan(
     return invalid('next binding plan does not match the next target');
   }
   const lineage = assertLineage(
-    previousBinding,
+    previousTarget,
     nextTarget,
     plan.previousActiveLockDigest,
     plan.previousAttemptGeneration,
   );
   const unsigned = unsignedPlan(
+    previousTarget,
     previousBinding,
     lineage.previousActiveLockDigest,
     lineage.previousAttemptGeneration,

@@ -76,6 +76,7 @@ const previousBinding = createPluginPackageSecretBinding({
   },
   boundAtMs: 90,
 });
+const previousTarget = previousBinding.target;
 
 function nextGeneration(overrides = {}) {
   return createPluginPackageResourceGeneration({
@@ -93,6 +94,7 @@ function nextGeneration(overrides = {}) {
 
 function transition(assignments, overrides = {}) {
   return createPluginPackageSecretBindingTransitionPlan({
+    previousTarget,
     previousBinding,
     previousAttemptGeneration: overrides.previousAttemptGeneration ?? 1,
     nextGeneration: nextGeneration(overrides.generation),
@@ -199,6 +201,34 @@ test('treats requirement additions and optional binding as rebind', () => {
   assert.equal(value.changes[0].reference, 'bound');
 });
 
+test('supports adding the first Secret after an active generation without a binding', () => {
+  const value = createPluginPackageSecretBindingTransitionPlan({
+    previousTarget,
+    previousBinding: null,
+    previousAttemptGeneration: 1,
+    nextGeneration: nextGeneration(),
+    nextManifest: manifest([{ name: 'TOKEN', required: true }]),
+    assignments: [{ name: 'TOKEN', secretRef: secret('runtime-token', 1) }],
+    plannedAtMs: 100,
+  });
+  assert.equal(value.kind, 'rebind');
+  assert.equal(value.previousBinding, null);
+  assert.deepEqual(value.previousTarget, previousTarget);
+  assert.deepEqual(value.changes, [
+    {
+      name: 'TOKEN',
+      requirement: 'added',
+      reference: 'bound',
+      previous: null,
+      next: { required: true, secretRef: secret('runtime-token', 1) },
+    },
+  ]);
+  assert.deepEqual(
+    normalizePluginPackageSecretBindingTransitionPlan(value),
+    value,
+  );
+});
+
 test('uses durable attempt generations and rejects skipped or detached targets', () => {
   const assignments = [
     { name: 'OPTIONAL_TOKEN', secretRef: null },
@@ -265,6 +295,7 @@ test('rejects extensible or accessor-bearing creation input', () => {
     { name: 'TOKEN', secretRef: secret('runtime-token', 2) },
   ];
   const input = {
+    previousTarget,
     previousBinding,
     previousAttemptGeneration: 1,
     nextGeneration: nextGeneration(),
