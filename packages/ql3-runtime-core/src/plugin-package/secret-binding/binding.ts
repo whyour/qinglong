@@ -329,6 +329,21 @@ function targetFromGeneration(
   });
 }
 
+export function createPluginPackageSecretBindingTarget(
+  generationValue: Readonly<PluginPackageResourceGeneration>,
+  manifestValue: Readonly<PluginPackageManifest>,
+): Readonly<PluginPackageSecretBindingTarget> {
+  const generation = normalizePluginPackageResourceGeneration(generationValue);
+  const manifest = normalizePluginPackageManifest(manifestValue);
+  if (manifest.metadata.name !== generation.packageName) {
+    return invalid('Manifest Package does not match generation');
+  }
+  return targetFromGeneration(
+    generation,
+    pluginPackageManifestDigest(manifest),
+  );
+}
+
 function unsignedBinding(
   target: Readonly<PluginPackageSecretBindingTarget>,
   entries: readonly Readonly<PluginPackageSecretBindingEntry>[],
@@ -455,6 +470,12 @@ function normalizeTarget(
     generationDigest: digest(targetValue.generationDigest, 'generation digest'),
     manifestDigest: digest(targetValue.manifestDigest, 'Manifest digest'),
   });
+}
+
+export function normalizePluginPackageSecretBindingTarget(
+  value: unknown,
+): Readonly<PluginPackageSecretBindingTarget> {
+  return normalizeTarget(value);
 }
 
 export function normalizePluginPackageSecretBinding(
