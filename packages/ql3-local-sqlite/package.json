@@ -95,6 +95,16 @@
       "require": "./dist/plugin-package/secret-binding/administration.js",
       "default": "./dist/plugin-package/secret-binding/administration.js"
     },
+    "./plugin-package-secret-binding-transition-receipt": {
+      "types": "./dist/plugin-package/secret-binding/transitionReceiptRepository.d.ts",
+      "require": "./dist/plugin-package/secret-binding/transitionReceiptRepository.js",
+      "default": "./dist/plugin-package/secret-binding/transitionReceiptRepository.js"
+    },
+    "./plugin-package-secret-binding-activation-prerequisite": {
+      "types": "./dist/plugin-package/secret-binding/activationPrerequisite.d.ts",
+      "require": "./dist/plugin-package/secret-binding/activationPrerequisite.js",
+      "default": "./dist/plugin-package/secret-binding/activationPrerequisite.js"
+    },
     "./plugin-package-task-reconciliation": {
       "types": "./dist/plugin-package/pluginPackageTaskReconciliationRepository.d.ts",
       "require": "./dist/plugin-package/pluginPackageTaskReconciliationRepository.js",

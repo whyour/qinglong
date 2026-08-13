@@ -12,8 +12,17 @@ const {
 } = require('@qinglong/runtime-core/plugin-package-resource-generation');
 const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
 const {
+  createPluginPackageSecretBindingTransitionPlan,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-transition-plan');
+const {
+  createPluginPackageSecretBindingTransitionReceipt,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-transition-receipt');
+const {
   LocalSqlitePluginPackageSecretBindingRepository,
 } = require('../dist/plugin-package/secret-binding/repository');
+const {
+  LocalSqlitePluginPackageSecretBindingTransitionReceiptRepository,
+} = require('../dist/plugin-package/secret-binding/transitionReceiptRepository');
 const { migrateLocalSqliteDatabase } = require('../dist/migration/migration');
 
 const LOCK_DIGEST = 'a'.repeat(64);
@@ -247,7 +256,10 @@ test('rejects inactive targets and conflicting content', async (t) => {
 test('publishes a reviewed current staged generation but rejects post-stage states', async (t) => {
   const staged = await harness('staged');
   t.after(() => staged.client.close());
-  assert.equal((await staged.repository.publish(staged.binding)).status, 'created');
+  assert.equal(
+    (await staged.repository.publish(staged.binding)).status,
+    'created',
+  );
 
   for (const state of ['queued', 'activating']) {
     const rejected = await harness(state);
@@ -257,6 +269,102 @@ test('publishes a reviewed current staged generation but rejects post-stage stat
       PluginPackageSecretBindingConflictError,
     );
   }
+});
+
+test('persists one exact staged transition receipt and rejects durable drift', async (t) => {
+  const value = await harness('staged');
+  t.after(() => value.client.close());
+  const previousGeneration = createPluginPackageResourceGeneration({
+    installationId: 'install-1',
+    projectId: 'project-1',
+    packageName: 'example-monitor',
+    lockDigest: 'f'.repeat(64),
+    generation: 1,
+    previousActiveLockDigest: null,
+    contentDigest: '9'.repeat(64),
+    contents: MANIFEST.spec.contents,
+  });
+  const previousBinding = createPluginPackageSecretBinding({
+    generation: previousGeneration,
+    manifest: MANIFEST,
+    assignments: value.binding.entries.map(({ name, secretRef }) => ({
+      name,
+      secretRef,
+    })),
+    authority: value.binding.authority,
+    boundAtMs: 90,
+  });
+  value.client
+    .prepare(
+      `UPDATE "QingLong3PluginPackageInstalls"
+       SET lock_json = json_set(lock_json, '$.manifestDigest', ?)
+       WHERE installation_id = 'install-1'`,
+    )
+    .run(previousBinding.target.manifestDigest);
+  value.client
+    .prepare(
+      `UPDATE "QingLong3PluginPackageInstalls"
+       SET lock_json = json_set(lock_json, '$.manifestDigest', ?)
+       WHERE installation_id = 'install-2'`,
+    )
+    .run(value.binding.target.manifestDigest);
+  value.client
+    .prepare(
+      `UPDATE "QingLong3PluginPackageInstallHeads"
+       SET installation_id = 'install-1'
+       WHERE project_id = 'project-1' AND package_name = 'example-monitor'`,
+    )
+    .run();
+  await value.repository.publish(previousBinding);
+  value.client
+    .prepare(
+      `UPDATE "QingLong3PluginPackageInstallHeads"
+       SET installation_id = 'install-2'
+       WHERE project_id = 'project-1' AND package_name = 'example-monitor'`,
+    )
+    .run();
+  await value.repository.publish(value.binding);
+  const plan = createPluginPackageSecretBindingTransitionPlan({
+    previousTarget: previousBinding.target,
+    previousBinding,
+    previousAttemptGeneration: 1,
+    nextGeneration: value.generation,
+    nextManifest: MANIFEST,
+    assignments: value.binding.entries.map(({ name, secretRef }) => ({
+      name,
+      secretRef,
+    })),
+    plannedAtMs: 95,
+  });
+  const receipt = createPluginPackageSecretBindingTransitionReceipt({
+    transitionPlan: plan,
+    authority: value.binding.authority,
+    binding: value.binding,
+    committedAtMs: value.binding.boundAtMs,
+  });
+  const receipts =
+    new LocalSqlitePluginPackageSecretBindingTransitionReceiptRepository(
+      value.client,
+    );
+  assert.equal(receipts.publishInTransaction(receipt).status, 'created');
+  assert.equal(receipts.publishInTransaction(receipt).status, 'existing');
+  assert.deepEqual(
+    await receipts.find(value.generation.generationDigest),
+    receipt,
+  );
+
+  value.client.exec('PRAGMA ignore_check_constraints = ON');
+  value.client
+    .prepare(
+      `UPDATE "QingLong3PluginPackageSecretBindingTransitionReceipts"
+       SET receipt_json = json_set(receipt_json, '$.committedAtMs', 999)
+       WHERE generation_digest = ?`,
+    )
+    .run(value.generation.generationDigest);
+  await assert.rejects(
+    receipts.find(value.generation.generationDigest),
+    PluginPackageSecretBindingUnavailableError,
+  );
 });
 
 test('fails closed when durable binding JSON is changed in place', async (t) => {

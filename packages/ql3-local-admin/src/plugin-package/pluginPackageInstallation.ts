@@ -1,5 +1,6 @@
 import {
   PluginPackageInstallationCoordinator,
+  type PluginPackageActivationPrerequisite,
   type PluginPackageStageProvider,
 } from '@qinglong/runtime-core/plugin-package-installation';
 import type { PluginPackageAdmissionRepository } from '@qinglong/runtime-core/plugin-package-admission';
@@ -64,6 +65,7 @@ export function createLocalPluginPackageFileStageProvider(
 export function createLocalPluginPackageInstallationCoordinator(options: {
   readonly repository: PluginPackageAdmissionRepository;
   readonly publisher: PluginPackageActivationPublisher;
+  readonly activationPrerequisite?: PluginPackageActivationPrerequisite;
 }): PluginPackageInstallationCoordinator {
   return new PluginPackageInstallationCoordinator(options);
 }

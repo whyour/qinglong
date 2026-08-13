@@ -31,6 +31,10 @@ import {
   type PluginPackageSecretBindingPlan,
 } from '@qinglong/runtime-core/plugin-package-secret-binding-plan';
 import {
+  normalizePluginPackageSecretBindingTransitionPlan,
+  type PluginPackageSecretBindingTransitionPlan,
+} from '@qinglong/runtime-core/plugin-package-secret-binding-transition-plan';
+import {
   pluginPackageInstallRecoveryAction,
   type PluginPackageInstallActionInput,
   type PluginPackageInstallInventoryItem,
@@ -206,6 +210,30 @@ export interface ExecuteLocalPluginPackageSecretBindingCommand {
   };
 }
 
+export interface PlanLocalPluginPackageSecretBindingTransitionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.transition.plan';
+  readonly options: LocalPluginPackageCommandOptions;
+  readonly request: {
+    readonly projectId: string;
+    readonly packageName: string;
+    readonly assignments: readonly Readonly<{
+      name: string;
+      secretRef: string | null;
+    }>[];
+  };
+}
+
+export interface ExecuteLocalPluginPackageSecretBindingTransitionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.transition.execute';
+  readonly options: LocalPluginPackageCommandOptions;
+  readonly request: {
+    readonly plan: PluginPackageSecretBindingTransitionPlan;
+    readonly auditEventId: string;
+  };
+}
+
 export type LocalPluginPackageCommand =
   | ProposeLocalPluginPackageCommand
   | DecideLocalPluginPackageCommand
@@ -217,7 +245,9 @@ export type LocalPluginPackageCommand =
   | PlanLocalPluginPackageLifecycleCommand
   | ExecuteLocalPluginPackageLifecycleCommand
   | PlanLocalPluginPackageSecretBindingCommand
-  | ExecuteLocalPluginPackageSecretBindingCommand;
+  | ExecuteLocalPluginPackageSecretBindingCommand
+  | PlanLocalPluginPackageSecretBindingTransitionCommand
+  | ExecuteLocalPluginPackageSecretBindingTransitionCommand;
 
 export interface LocalPluginPackageCommandRunner {
   run(
@@ -294,6 +324,21 @@ export type LocalPluginPackageCommandResult =
       operation: 'plugin-package.secret-binding.execute';
       status: 'created' | 'existing';
       bindingDigest: string;
+      generationDigest: string;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.transition.plan';
+      plan: Readonly<PluginPackageSecretBindingTransitionPlan>;
+      summary: ReturnType<typeof secretBindingTransitionPlanSummary>;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.transition.execute';
+      status: 'created' | 'existing';
+      transitionDigest: string;
+      receiptDigest: string;
+      bindingDigest: string | null;
       generationDigest: string;
     }>;
 
@@ -603,6 +648,7 @@ function normalizeCommand(value: unknown): Readonly<LocalPluginPackageCommand> {
       }
       break;
     case 'plugin-package.secret-binding.plan':
+    case 'plugin-package.secret-binding.transition.plan':
       exactObject(
         value.request,
         ['assignments', 'packageName', 'projectId'],
@@ -637,6 +683,7 @@ function normalizeCommand(value: unknown): Readonly<LocalPluginPackageCommand> {
       }
       break;
     case 'plugin-package.secret-binding.execute':
+    case 'plugin-package.secret-binding.transition.execute':
       exactObject(
         value.request,
         ['auditEventId', 'plan'],
@@ -653,7 +700,11 @@ function normalizeCommand(value: unknown): Readonly<LocalPluginPackageCommand> {
         );
       }
       try {
-        normalizePluginPackageSecretBindingPlan(value.request.plan);
+        if (value.operation === 'plugin-package.secret-binding.execute') {
+          normalizePluginPackageSecretBindingPlan(value.request.plan);
+        } else {
+          normalizePluginPackageSecretBindingTransitionPlan(value.request.plan);
+        }
       } catch (error) {
         throw new LocalPluginPackageCommandConfigurationError(
           'Secret binding plan is invalid',
@@ -851,6 +902,43 @@ function secretBindingPlanSummary(
   });
 }
 
+function secretBindingTransitionPlanSummary(
+  plan: Readonly<PluginPackageSecretBindingTransitionPlan>,
+) {
+  return Object.freeze({
+    kind: plan.kind,
+    projectId: plan.nextTarget.projectId,
+    packageName: plan.nextTarget.packageName,
+    previousInstallationId: plan.previousTarget.installationId,
+    previousGeneration: plan.previousTarget.generation,
+    previousGenerationDigest: plan.previousTarget.generationDigest,
+    previousBindingDigest: plan.previousBinding?.bindingDigest ?? null,
+    previousAttemptGeneration: plan.previousAttemptGeneration,
+    installationId: plan.nextTarget.installationId,
+    generation: plan.nextTarget.generation,
+    generationDigest: plan.nextTarget.generationDigest,
+    manifestDigest: plan.nextTarget.manifestDigest,
+    bindingRequired: plan.nextBindingPlan !== null,
+    assignments:
+      plan.nextBindingPlan?.entries.map((entry) =>
+        Object.freeze({
+          name: entry.name,
+          required: entry.required,
+          bound: entry.secretRef !== null,
+          secretRef: entry.secretRef,
+        }),
+      ) ?? Object.freeze([]),
+    changes: plan.changes.map((change) =>
+      Object.freeze({
+        name: change.name,
+        requirement: change.requirement,
+        reference: change.reference,
+      }),
+    ),
+    transitionDigest: plan.transitionDigest,
+  });
+}
+
 async function execute(
   command: Readonly<LocalPluginPackageCommand>,
   database: LocalSqlitePluginPackageManagementDatabase,
@@ -873,11 +961,44 @@ async function execute(
       summary: secretBindingPlanSummary(plan),
     });
   }
+  if (command.operation === 'plugin-package.secret-binding.transition.plan') {
+    const service = createLocalPluginPackageSecretBindingService(
+      database.authority,
+    );
+    const plan = await service.planTransition({
+      ...command.request,
+      principal: authenticated.principal,
+      plannedAtMs: Date.now(),
+    });
+    return Object.freeze({
+      schemaVersion: 1,
+      operation: command.operation,
+      plan,
+      summary: secretBindingTransitionPlanSummary(plan),
+    });
+  }
   if (command.operation === 'plugin-package.secret-binding.execute') {
     const service = createLocalPluginPackageSecretBindingService(
       database.authority,
     );
     const result = await service.execute({
+      ...command.request,
+      principal: authenticated.principal,
+      confirmAuthorization: authenticated.confirm,
+    });
+    return Object.freeze({
+      schemaVersion: 1,
+      operation: command.operation,
+      ...result,
+    });
+  }
+  if (
+    command.operation === 'plugin-package.secret-binding.transition.execute'
+  ) {
+    const service = createLocalPluginPackageSecretBindingService(
+      database.authority,
+    );
+    const result = await service.executeTransition({
       ...command.request,
       principal: authenticated.principal,
       confirmAuthorization: authenticated.confirm,

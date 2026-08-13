@@ -286,6 +286,7 @@ test('recovers queued install through stage and activation without consuming app
     retry: 0,
     manualRequired: 0,
     superseded: 0,
+    deferred: 0,
     remaining: false,
     safeToAdmit: true,
   });
@@ -294,6 +295,62 @@ test('recovers queued install through stage and activation without consuming app
     'active',
   );
   assert.deepEqual(calls, { stage: 1, publish: 1, inspect: 0 });
+});
+
+test('stages but defers activation until the exact prerequisite is ready', async () => {
+  const value = fixture();
+  const repository = new MemoryRepository([value]);
+  const calls = { stage: 0, publish: 0, inspect: 0, prerequisite: 0 };
+  let ready = false;
+  const coordinator = new PluginPackageRecoveryCoordinator({
+    repository,
+    stageProvider: {
+      async stage(lock) {
+        calls.stage += 1;
+        return stageEvidence(lock);
+      },
+    },
+    publisher: publisherFor(repository, calls),
+    activationPrerequisite: {
+      async inspect() {
+        calls.prerequisite += 1;
+        return ready
+          ? { status: 'ready' }
+          : {
+              status: 'deferred',
+              reason: 'secret_binding_transition_required',
+            };
+      },
+    },
+    now: () => 250,
+  });
+
+  const deferred = await coordinator.recoverPage({ limit: 1 });
+  assert.equal(deferred.items[0].status, 'deferred');
+  assert.equal(
+    (await repository.find('default', 'example-monitor')).state,
+    'staged',
+  );
+  assert.deepEqual(calls, {
+    stage: 1,
+    publish: 0,
+    inspect: 0,
+    prerequisite: 2,
+  });
+
+  ready = true;
+  const settled = await coordinator.recoverPage({ limit: 1 });
+  assert.equal(settled.items[0].status, 'settled');
+  assert.equal(
+    (await repository.find('default', 'example-monitor')).state,
+    'active',
+  );
+  assert.deepEqual(calls, {
+    stage: 1,
+    publish: 1,
+    inspect: 0,
+    prerequisite: 3,
+  });
 });
 
 test('inspects an activating install without republishing it', async () => {

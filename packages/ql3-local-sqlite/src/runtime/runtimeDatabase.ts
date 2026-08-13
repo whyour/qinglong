@@ -30,6 +30,7 @@ import type {
 } from '@qinglong/runtime-core/plugin-package-automation-publication';
 import type { PluginPackageMaterializedRevisionRepository } from '@qinglong/runtime-core/plugin-package-resource-materialization';
 import type { PluginPackageSecretBindingRepository } from '@qinglong/runtime-core/plugin-package-secret-binding';
+import type { PluginPackageActivationPrerequisite } from '@qinglong/runtime-core/plugin-package-installation';
 import type { PluginPackageTaskReconciliationRepository } from '@qinglong/runtime-core/plugin-package-task-reconciliation';
 import type { PluginPackageTaskPublicationRecoverySource } from '@qinglong/runtime-core/plugin-package-task-publication';
 import type { StepRunRepository } from '@qinglong/runtime-core/step-run';
@@ -111,6 +112,7 @@ export interface LocalSqliteRuntimeDatabase {
   pluginPackageInstalls(): Promise<PluginPackageInstallRepository>;
   pluginPackageMaterializedRevisions(): Promise<PluginPackageMaterializedRevisionRepository>;
   pluginPackageSecretBindings(): Promise<PluginPackageSecretBindingRepository>;
+  pluginPackageActivationPrerequisite(): Promise<PluginPackageActivationPrerequisite>;
   pluginPackageTaskReconciliations(): Promise<
     PluginPackageTaskReconciliationRepository &
       PluginPackageTaskPublicationRecoverySource
@@ -200,6 +202,9 @@ export async function openLocalSqliteRuntimeDatabase(
     let pluginPackageSecretBindingsPromise:
       | Promise<PluginPackageSecretBindingRepository>
       | undefined;
+    let pluginPackageActivationPrerequisitePromise:
+      | Promise<PluginPackageActivationPrerequisite>
+      | undefined;
     let pluginPackageTaskReconciliationsPromise:
       | Promise<
           PluginPackageTaskReconciliationRepository &
@@ -284,6 +289,17 @@ export async function openLocalSqliteRuntimeDatabase(
             new LocalSqlitePluginPackageSecretBindingRepository(authority),
         );
         return pluginPackageSecretBindingsPromise;
+      },
+      pluginPackageActivationPrerequisite() {
+        pluginPackageActivationPrerequisitePromise ??= import(
+          '../plugin-package/secret-binding/activationPrerequisite.js'
+        ).then(
+          ({ LocalSqlitePluginPackageSecretBindingActivationPrerequisite }) =>
+            new LocalSqlitePluginPackageSecretBindingActivationPrerequisite(
+              authority,
+            ),
+        );
+        return pluginPackageActivationPrerequisitePromise;
       },
       pluginPackageTaskReconciliations() {
         pluginPackageTaskReconciliationsPromise ??= import(

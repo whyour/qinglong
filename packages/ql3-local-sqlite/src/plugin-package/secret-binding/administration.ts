@@ -11,12 +11,22 @@ import {
   type PluginPackageLock,
 } from '@qinglong/runtime-core/plugin-package-install';
 import { createPluginPackageResourceGenerationFromReferences } from '@qinglong/runtime-core/plugin-package-resource-generation';
+import { createPluginPackageSecretBindingTarget } from '@qinglong/runtime-core/plugin-package-secret-binding';
 import {
   createPluginPackageSecretBindingFromPlan,
   createPluginPackageSecretBindingPlan,
   normalizePluginPackageSecretBindingPlan,
   type PluginPackageSecretBindingPlan,
 } from '@qinglong/runtime-core/plugin-package-secret-binding-plan';
+import {
+  createPluginPackageSecretBindingTransitionPlan,
+  normalizePluginPackageSecretBindingTransitionPlan,
+  type PluginPackageSecretBindingTransitionPlan,
+} from '@qinglong/runtime-core/plugin-package-secret-binding-transition-plan';
+import {
+  createPluginPackageSecretBindingFromTransitionPlan,
+  createPluginPackageSecretBindingTransitionReceipt,
+} from '@qinglong/runtime-core/plugin-package-secret-binding-transition-receipt';
 import { parseSecretRef } from '@qinglong/runtime-core/secret-reference';
 import type { SecurityPrincipal } from '@qinglong/runtime-core/security';
 import type { SecurityAuditRecord } from '@qinglong/runtime-core/security-audit';
@@ -35,6 +45,7 @@ import {
   sameSecurityAuditSemantic,
 } from '../../security/securityPersistence';
 import { LocalSqlitePluginPackageSecretBindingRepository } from './repository';
+import { LocalSqlitePluginPackageSecretBindingTransitionReceiptRepository } from './transitionReceiptRepository';
 
 type Row = Record<string, unknown>;
 
@@ -61,6 +72,24 @@ export interface ExecuteLocalPluginPackageSecretBindingRequest {
   readonly confirmAuthorization: () => void | Promise<void>;
 }
 
+export interface PlanLocalPluginPackageSecretBindingTransitionRequest {
+  readonly projectId: string;
+  readonly packageName: string;
+  readonly assignments: readonly Readonly<{
+    name: string;
+    secretRef: string | null;
+  }>[];
+  readonly principal: SecurityPrincipal;
+  readonly plannedAtMs: number;
+}
+
+export interface ExecuteLocalPluginPackageSecretBindingTransitionRequest {
+  readonly plan: PluginPackageSecretBindingTransitionPlan;
+  readonly auditEventId: string;
+  readonly principal: SecurityPrincipal;
+  readonly confirmAuthorization: () => void | Promise<void>;
+}
+
 export interface LocalPluginPackageSecretBindingService {
   plan(
     request: PlanLocalPluginPackageSecretBindingRequest,
@@ -69,6 +98,20 @@ export interface LocalPluginPackageSecretBindingService {
     Readonly<{
       status: 'created' | 'existing';
       bindingDigest: string;
+      generationDigest: string;
+    }>
+  >;
+  planTransition(
+    request: PlanLocalPluginPackageSecretBindingTransitionRequest,
+  ): Promise<Readonly<PluginPackageSecretBindingTransitionPlan>>;
+  executeTransition(
+    request: ExecuteLocalPluginPackageSecretBindingTransitionRequest,
+  ): Promise<
+    Readonly<{
+      status: 'created' | 'existing';
+      transitionDigest: string;
+      receiptDigest: string;
+      bindingDigest: string | null;
       generationDigest: string;
     }>
   >;
@@ -213,6 +256,145 @@ function generationFrom(current: ReturnType<typeof loadCurrent>) {
   });
 }
 
+function loadTransition(
+  client: DatabaseSync,
+  projectId: string,
+  packageName: string,
+): Readonly<{
+  previous: ReturnType<typeof loadCurrent>;
+  next: ReturnType<typeof loadCurrent>;
+  previousAttemptGeneration: number;
+}> {
+  const rows = client
+    .prepare(
+      `SELECT current.record_json AS "nextRecordJson",
+              current.lock_json AS "nextLockJson",
+              current_proposal.proposal_json AS "nextProposalJson",
+              previous.record_json AS "previousRecordJson",
+              previous.lock_json AS "previousLockJson",
+              previous_proposal.proposal_json AS "previousProposalJson",
+              (
+                SELECT MAX(history.target_generation)
+                  FROM "QingLong3PluginPackageInstalls" AS history
+                 WHERE history.project_id = current.project_id
+                   AND history.package_name = current.package_name
+                   AND history.target_generation < current.target_generation
+              ) AS "previousAttemptGeneration"
+       FROM "QingLong3PluginPackageInstallHeads" AS head
+       JOIN "QingLong3PluginPackageInstalls" AS current
+         ON current.installation_id = head.installation_id
+       JOIN "QingLong3PluginPackageAdmissionReceipts" AS current_admission
+         ON current_admission.installation_id = current.installation_id
+       JOIN "QingLong3PluginPackageInstallProposals" AS current_proposal
+         ON current_proposal.action_ref = current_admission.action_ref
+       JOIN "QingLong3PluginPackageInstalls" AS previous
+         ON previous.project_id = current.project_id
+        AND previous.package_name = current.package_name
+        AND previous.lock_digest = current.previous_active_lock_digest
+       JOIN "QingLong3PluginPackageAdmissionReceipts" AS previous_admission
+         ON previous_admission.installation_id = previous.installation_id
+       JOIN "QingLong3PluginPackageInstallProposals" AS previous_proposal
+         ON previous_proposal.action_ref = previous_admission.action_ref
+       WHERE head.project_id = ?
+         AND head.package_name = ?
+         AND current.state = 'staged'
+         AND current.previous_active_lock_digest IS NOT NULL
+         AND current.active_lock_digest = current.previous_active_lock_digest
+         AND current.target_generation = (
+           SELECT MAX(latest.target_generation)
+             FROM "QingLong3PluginPackageInstalls" AS latest
+            WHERE latest.project_id = current.project_id
+              AND latest.package_name = current.package_name
+         )
+         AND previous.state = 'active'
+         AND previous.active_lock_digest = previous.lock_digest
+       LIMIT 2`,
+    )
+    .all(projectId, packageName) as Row[];
+  if (rows.length !== 1) {
+    throw new LocalPluginPackageSecretBindingConflictError(
+      'reviewed staged Package generation is absent or ambiguous',
+    );
+  }
+  try {
+    const row = rows[0]!;
+    const next = Object.freeze({
+      record: normalizePluginPackageInstallRecord(
+        JSON.parse(rowText(row, 'nextRecordJson')),
+      ),
+      lock: normalizePluginPackageLock(
+        JSON.parse(rowText(row, 'nextLockJson')),
+      ),
+      proposal: normalizePluginPackageInstallProposal(
+        JSON.parse(rowText(row, 'nextProposalJson')),
+      ),
+    });
+    const previous = Object.freeze({
+      record: normalizePluginPackageInstallRecord(
+        JSON.parse(rowText(row, 'previousRecordJson')),
+      ),
+      lock: normalizePluginPackageLock(
+        JSON.parse(rowText(row, 'previousLockJson')),
+      ),
+      proposal: normalizePluginPackageInstallProposal(
+        JSON.parse(rowText(row, 'previousProposalJson')),
+      ),
+    });
+    const previousAttemptGeneration = row.previousAttemptGeneration;
+    if (
+      !Number.isSafeInteger(previousAttemptGeneration) ||
+      previousAttemptGeneration !== next.record.targetGeneration - 1 ||
+      next.record.projectId !== projectId ||
+      next.record.packageName !== packageName ||
+      next.record.lockDigest !== next.lock.lockDigest ||
+      next.record.previousActiveLockDigest !== previous.lock.lockDigest ||
+      next.proposal.actionDigest !== next.lock.approval.actionDigest ||
+      next.proposal.previewDigest !== next.lock.approval.previewDigest ||
+      next.proposal.actionInput.targetGeneration !==
+        next.record.targetGeneration ||
+      next.proposal.actionInput.manifest.metadata.name !== packageName ||
+      next.proposal.actionInput.source.contentDigest !==
+        next.lock.source.contentDigest ||
+      previous.record.lockDigest !== previous.lock.lockDigest ||
+      previous.proposal.actionDigest !== previous.lock.approval.actionDigest ||
+      previous.proposal.previewDigest !==
+        previous.lock.approval.previewDigest ||
+      previous.proposal.actionInput.targetGeneration !==
+        previous.record.targetGeneration ||
+      previous.proposal.actionInput.source.contentDigest !==
+        previous.lock.source.contentDigest
+    ) {
+      throw new Error('Package transition provenance drift');
+    }
+    return Object.freeze({
+      previous,
+      next,
+      previousAttemptGeneration: previousAttemptGeneration as number,
+    });
+  } catch (error) {
+    if (error instanceof LocalPluginPackageSecretBindingConflictError)
+      throw error;
+    throw new LocalPluginPackageSecretBindingUnavailableError({
+      cause: error instanceof Error ? error : undefined,
+    });
+  }
+}
+
+function transitionGeneration(
+  value: ReturnType<typeof loadTransition>['next'],
+) {
+  return createPluginPackageResourceGenerationFromReferences({
+    installationId: value.record.installationId,
+    projectId: value.record.projectId,
+    packageName: value.record.packageName,
+    lockDigest: value.record.lockDigest,
+    generation: value.record.targetGeneration,
+    previousActiveLockDigest: value.record.previousActiveLockDigest,
+    contentDigest: value.lock.source.contentDigest,
+    resources: value.lock.resources,
+  });
+}
+
 function auditRecord(
   plan: Readonly<PluginPackageSecretBindingPlan>,
   eventId: string,
@@ -229,6 +411,27 @@ function auditRecord(
     authenticationId: principal.authenticationId,
     outcome: 'allowed',
     reasons: Object.freeze(['owner_confirmed_secret_binding']),
+    fence,
+    occurredAtMs,
+  });
+}
+
+function transitionAuditRecord(
+  plan: Readonly<PluginPackageSecretBindingTransitionPlan>,
+  eventId: string,
+  principal: Readonly<SecurityPrincipal>,
+  fence: Readonly<SecurityPolicyFence>,
+  occurredAtMs: number,
+): Readonly<SecurityAuditRecord> {
+  return Object.freeze({
+    eventId,
+    requestId: `package_secret_binding_transition:${plan.transitionDigest}`,
+    operationId: 'plugin_package.secret.transition',
+    projectId: plan.nextTarget.projectId,
+    subject: principal.subject,
+    authenticationId: principal.authenticationId,
+    outcome: 'allowed',
+    reasons: Object.freeze([`owner_confirmed_secret_${plan.kind}`]),
     fence,
     occurredAtMs,
   });
@@ -327,6 +530,10 @@ export function createLocalPluginPackageSecretBindingService(
   const bindings = new LocalSqlitePluginPackageSecretBindingRepository(
     authority,
   );
+  const transitionReceipts =
+    new LocalSqlitePluginPackageSecretBindingTransitionReceiptRepository(
+      authority,
+    );
 
   const authorize = async (
     principalValue: SecurityPrincipal,
@@ -520,6 +727,251 @@ export function createLocalPluginPackageSecretBindingService(
               status: result.status,
               bindingDigest: result.binding.bindingDigest,
               generationDigest: result.binding.target.generationDigest,
+            });
+          } catch (error) {
+            if (authority.client.isTransaction)
+              authority.client.exec('ROLLBACK');
+            if (
+              error instanceof LocalPluginPackageSecretBindingConflictError ||
+              error instanceof LocalPluginPackageSecretBindingUnavailableError
+            ) {
+              throw error;
+            }
+            throw new LocalPluginPackageSecretBindingUnavailableError({
+              cause: error instanceof Error ? error : undefined,
+            });
+          }
+        },
+        () => new LocalPluginPackageSecretBindingUnavailableError(),
+      );
+    },
+
+    async planTransition(
+      request: PlanLocalPluginPackageSecretBindingTransitionRequest,
+    ) {
+      const projectId = identity(request.projectId, 'Project ID', IDENTIFIER);
+      const packageName = identity(
+        request.packageName,
+        'Package name',
+        PACKAGE_NAME,
+      );
+      const plannedAtMs = timestamp(request.plannedAtMs, 'plannedAtMs');
+      const authorization = await authorize(
+        request.principal,
+        projectId,
+        plannedAtMs,
+      );
+      return authority.enqueue(
+        async () => {
+          verifyPolicyFence(
+            authority.client,
+            authorization.principal,
+            authorization.fence,
+            projectId,
+          );
+          const transition = loadTransition(
+            authority.client,
+            projectId,
+            packageName,
+          );
+          const previousGeneration = generationFrom(transition.previous);
+          const previousTarget = createPluginPackageSecretBindingTarget(
+            previousGeneration,
+            transition.previous.proposal.actionInput.manifest,
+          );
+          const previousBinding = bindings.findInTransaction(
+            previousTarget.generationDigest,
+          );
+          if (
+            transitionReceipts.findInTransaction(
+              transitionGeneration(transition.next).generationDigest,
+            )
+          ) {
+            throw new LocalPluginPackageSecretBindingConflictError(
+              'staged generation transition is already committed',
+            );
+          }
+          const plan = createPluginPackageSecretBindingTransitionPlan({
+            previousTarget,
+            previousBinding,
+            previousAttemptGeneration: transition.previousAttemptGeneration,
+            nextGeneration: transitionGeneration(transition.next),
+            nextManifest: transition.next.proposal.actionInput.manifest,
+            assignments: request.assignments,
+            plannedAtMs,
+          });
+          if (plan.nextBindingPlan) {
+            verifySecretVersions(authority.client, plan.nextBindingPlan);
+          }
+          return plan;
+        },
+        () => new LocalPluginPackageSecretBindingUnavailableError(),
+      );
+    },
+
+    async executeTransition(
+      request: ExecuteLocalPluginPackageSecretBindingTransitionRequest,
+    ) {
+      const plan = normalizePluginPackageSecretBindingTransitionPlan(
+        request.plan,
+      );
+      if (typeof request.confirmAuthorization !== 'function') {
+        throw new TypeError('confirmAuthorization is invalid');
+      }
+      const observedAtMs = timestamp(now(), 'transition execution clock');
+      const authorization = await authorize(
+        request.principal,
+        plan.nextTarget.projectId,
+        observedAtMs,
+      );
+      await request.confirmAuthorization();
+      return authority.enqueue(
+        async () => {
+          authority.client.exec('BEGIN IMMEDIATE');
+          try {
+            verifyPolicyFence(
+              authority.client,
+              authorization.principal,
+              authorization.fence,
+              plan.nextTarget.projectId,
+            );
+            const auditEventId = identity(
+              request.auditEventId,
+              'audit event ID',
+              UUID,
+            );
+            const auditsForPlan = authority.client
+              .prepare(
+                `SELECT ${LOCAL_SECURITY_AUDIT_SELECT}
+                 FROM "QingLong3SecurityAuditEvents"
+                 WHERE "request_id" = ? AND "operation_id" = ?
+                 LIMIT 2`,
+              )
+              .all(
+                `package_secret_binding_transition:${plan.transitionDigest}`,
+                'plugin_package.secret.transition',
+              ) as Row[];
+            if (
+              auditsForPlan.length > 1 ||
+              (auditsForPlan.length === 1 &&
+                rowText(auditsForPlan[0]!, 'eventId') !== auditEventId)
+            ) {
+              throw new LocalPluginPackageSecretBindingConflictError(
+                'transition plan already has another audit identity',
+              );
+            }
+            const existingReceipt = transitionReceipts.findInTransaction(
+              plan.nextTarget.generationDigest,
+            );
+            if (existingReceipt) {
+              if (
+                existingReceipt.transitionPlan.transitionDigest !==
+                  plan.transitionDigest ||
+                existingReceipt.authority.kind !== 'local-owner-confirmation' ||
+                existingReceipt.authority.evidenceDigest !==
+                  plan.transitionDigest ||
+                auditsForPlan.length !== 1
+              ) {
+                throw new LocalPluginPackageSecretBindingConflictError(
+                  'generation is committed by another transition authority',
+                );
+              }
+              authority.client.exec('COMMIT');
+              return Object.freeze({
+                status: 'existing' as const,
+                transitionDigest: plan.transitionDigest,
+                receiptDigest: existingReceipt.receiptDigest,
+                bindingDigest: existingReceipt.bindingDigest,
+                generationDigest: plan.nextTarget.generationDigest,
+              });
+            }
+            const transition = loadTransition(
+              authority.client,
+              plan.nextTarget.projectId,
+              plan.nextTarget.packageName,
+            );
+            const previousTarget = createPluginPackageSecretBindingTarget(
+              generationFrom(transition.previous),
+              transition.previous.proposal.actionInput.manifest,
+            );
+            const expected = createPluginPackageSecretBindingTransitionPlan({
+              previousTarget,
+              previousBinding: bindings.findInTransaction(
+                previousTarget.generationDigest,
+              ),
+              previousAttemptGeneration: transition.previousAttemptGeneration,
+              nextGeneration: transitionGeneration(transition.next),
+              nextManifest: transition.next.proposal.actionInput.manifest,
+              assignments:
+                plan.nextBindingPlan?.entries.map(({ name, secretRef }) => ({
+                  name,
+                  secretRef,
+                })) ?? [],
+              plannedAtMs: plan.nextBindingPlan?.plannedAtMs ?? observedAtMs,
+            });
+            if (expected.transitionDigest !== plan.transitionDigest) {
+              throw new LocalPluginPackageSecretBindingConflictError(
+                'staged Package generation changed after transition planning',
+              );
+            }
+            if (plan.nextBindingPlan) {
+              verifySecretVersions(authority.client, plan.nextBindingPlan);
+            }
+            const audit = transitionAuditRecord(
+              plan,
+              auditEventId,
+              authorization.principal,
+              authorization.fence,
+              observedAtMs,
+            );
+            const existingAudit = authority.client
+              .prepare(
+                `SELECT ${LOCAL_SECURITY_AUDIT_SELECT}
+                 FROM "QingLong3SecurityAuditEvents"
+                 WHERE "event_id" = ? LIMIT 2`,
+              )
+              .get(audit.eventId) as Row | undefined;
+            if (existingAudit) {
+              if (
+                !sameSecurityAuditSemantic(
+                  localSecurityAuditFromRow(existingAudit),
+                  audit,
+                )
+              ) {
+                throw new LocalPluginPackageSecretBindingConflictError(
+                  'audit identity is already used by another operation',
+                );
+              }
+            } else {
+              insertLocalSecurityAudit(authority.client, audit);
+            }
+            const binding = createPluginPackageSecretBindingFromTransitionPlan(
+              plan,
+              'local-owner-confirmation',
+              plan.transitionDigest,
+              observedAtMs,
+            );
+            const bindingResult = binding
+              ? bindings.publishInTransaction(binding)
+              : null;
+            const receipt = createPluginPackageSecretBindingTransitionReceipt({
+              transitionPlan: plan,
+              authority: {
+                kind: 'local-owner-confirmation',
+                evidenceDigest: plan.transitionDigest,
+              },
+              binding: bindingResult?.binding ?? null,
+              committedAtMs: observedAtMs,
+            });
+            const receiptResult =
+              transitionReceipts.publishInTransaction(receipt);
+            authority.client.exec('COMMIT');
+            return Object.freeze({
+              status: receiptResult.status,
+              transitionDigest: plan.transitionDigest,
+              receiptDigest: receiptResult.receipt.receiptDigest,
+              bindingDigest: receiptResult.receipt.bindingDigest,
+              generationDigest: plan.nextTarget.generationDigest,
             });
           } catch (error) {
             if (authority.client.isTransaction)

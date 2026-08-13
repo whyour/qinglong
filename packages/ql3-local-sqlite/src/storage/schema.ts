@@ -1273,6 +1273,60 @@ export const pluginPackageSecretBindings = sqliteTable(
   ],
 );
 
+export const pluginPackageSecretBindingTransitionReceipts = sqliteTable(
+  'QingLong3PluginPackageSecretBindingTransitionReceipts',
+  {
+    generationDigest: text('generation_digest').primaryKey(),
+    transitionDigest: text('transition_digest').notNull(),
+    projectId: text('project_id').notNull(),
+    packageName: text('package_name').notNull(),
+    installationId: text('installation_id')
+      .notNull()
+      .references(() => pluginPackageInstalls.installationId, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    lockDigest: text('lock_digest').notNull(),
+    generation: integer('generation').notNull(),
+    manifestDigest: text('manifest_digest').notNull(),
+    previousActiveLockDigest: text('previous_active_lock_digest').notNull(),
+    authorityKind: text('authority_kind').notNull(),
+    evidenceDigest: text('evidence_digest').notNull(),
+    bindingDigest: text('binding_digest').references(
+      () => pluginPackageSecretBindings.bindingDigest,
+      { onDelete: 'restrict', onUpdate: 'restrict' },
+    ),
+    committedAtMs: integer('committed_at_ms').notNull(),
+    receiptDigest: text('receipt_digest').notNull(),
+    receiptJson: text('receipt_json', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      'ql3_plugin_package_secret_binding_transition_receipt_identity_check',
+      sql`length(${table.projectId}) between 1 and 128 and length(${table.packageName}) between 1 and 63 and length(${table.installationId}) between 1 and 128 and ${table.generation} between 2 and 2147483647 and ${table.authorityKind} in ('approved-action-execution','local-owner-confirmation') and ${table.committedAtMs} >= 0`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_transition_receipt_digest_check',
+      sql`length(${table.generationDigest}) = 64 and ${table.generationDigest} not glob '*[^0-9a-f]*' and length(${table.transitionDigest}) = 64 and ${table.transitionDigest} not glob '*[^0-9a-f]*' and length(${table.lockDigest}) = 64 and ${table.lockDigest} not glob '*[^0-9a-f]*' and length(${table.manifestDigest}) = 64 and ${table.manifestDigest} not glob '*[^0-9a-f]*' and length(${table.previousActiveLockDigest}) = 64 and ${table.previousActiveLockDigest} not glob '*[^0-9a-f]*' and length(${table.evidenceDigest}) = 64 and ${table.evidenceDigest} not glob '*[^0-9a-f]*' and (${table.bindingDigest} is null or (length(${table.bindingDigest}) = 64 and ${table.bindingDigest} not glob '*[^0-9a-f]*')) and length(${table.receiptDigest}) = 64 and ${table.receiptDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_transition_receipt_json_check',
+      sql`length(cast(${table.receiptJson} as blob)) between 2 and 196608 and json_valid(${table.receiptJson}) and json_type(${table.receiptJson}) = 'object' and json_extract(${table.receiptJson}, '$.schema') = 'qinglong/plugin-package-secret-binding-transition-receipt@v1' and json_extract(${table.receiptJson}, '$.transitionPlan.transitionDigest') = ${table.transitionDigest} and json_extract(${table.receiptJson}, '$.transitionPlan.nextTarget.generationDigest') = ${table.generationDigest} and json_extract(${table.receiptJson}, '$.transitionPlan.nextTarget.projectId') = ${table.projectId} and json_extract(${table.receiptJson}, '$.transitionPlan.nextTarget.packageName') = ${table.packageName} and json_extract(${table.receiptJson}, '$.transitionPlan.nextTarget.installationId') = ${table.installationId} and json_extract(${table.receiptJson}, '$.transitionPlan.nextTarget.lockDigest') = ${table.lockDigest} and json_extract(${table.receiptJson}, '$.transitionPlan.nextTarget.generation') = ${table.generation} and json_extract(${table.receiptJson}, '$.transitionPlan.nextTarget.manifestDigest') = ${table.manifestDigest} and json_extract(${table.receiptJson}, '$.transitionPlan.previousActiveLockDigest') = ${table.previousActiveLockDigest} and json_extract(${table.receiptJson}, '$.authority.kind') = ${table.authorityKind} and json_extract(${table.receiptJson}, '$.authority.evidenceDigest') = ${table.evidenceDigest} and json_extract(${table.receiptJson}, '$.bindingDigest') is ${table.bindingDigest} and json_extract(${table.receiptJson}, '$.committedAtMs') = ${table.committedAtMs} and json_extract(${table.receiptJson}, '$.receiptDigest') = ${table.receiptDigest}`,
+    ),
+    uniqueIndex(
+      'ql3_plugin_package_secret_binding_transition_receipt_transition_uidx',
+    ).on(table.transitionDigest),
+    uniqueIndex(
+      'ql3_plugin_package_secret_binding_transition_receipt_digest_uidx',
+    ).on(table.receiptDigest),
+    index(
+      'ql3_plugin_package_secret_binding_transition_receipt_install_idx',
+    ).on(table.installationId, table.generationDigest),
+  ],
+);
+
 export const projectToolDefinitionSnapshots = sqliteTable(
   'QingLong3ProjectToolDefinitionSnapshots',
   {
@@ -4945,6 +4999,7 @@ export const localSqliteSchema = Object.freeze({
   pluginPackageInstallMutations,
   pluginPackageMaterializedRevisions,
   pluginPackageSecretBindings,
+  pluginPackageSecretBindingTransitionReceipts,
   pluginPackageQuarantineEvents,
   pluginPackageWithdrawalReceipts,
   pluginPackageWithdrawalTasks,

@@ -45,6 +45,8 @@ export async function recoverLocalApplicationPluginPackages(
   storage: LocalApplicationReadyStorage,
 ): Promise<LocalApplicationPluginPackageStartup> {
   const pluginPackageInstalls = await storage.pluginPackageInstalls();
+  const pluginPackageActivationPrerequisite =
+    await storage.pluginPackageActivationPrerequisite();
   const pluginPackageActivation = new LocalPluginPackageActivationPublisher({
     stagingRoot: options.pluginPackages.stagingRoot,
     activationRoot: options.pluginPackages.activationRoot,
@@ -54,6 +56,7 @@ export async function recoverLocalApplicationPluginPackages(
     repository: pluginPackageInstalls,
     stageProvider: options.pluginPackages.stageProvider,
     publisher: pluginPackageActivation,
+    activationPrerequisite: pluginPackageActivationPrerequisite,
     now: options.pluginPackages.now,
   }).recover({
     ...(options.pluginPackages.pageSize === undefined

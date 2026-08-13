@@ -1142,6 +1142,41 @@ export class LocalSqlitePluginPackageInstallRepository
            JOIN "QingLong3PluginPackageInstalls" AS install
              ON install."installation_id" = head."installation_id"
            WHERE install."state" IN ('queued','staged','activating')
+             AND NOT (
+               install."state" = 'staged' AND
+               install."previous_active_lock_digest" IS NOT NULL AND
+               (
+                 EXISTS (
+                   SELECT 1
+                     FROM "QingLong3PluginPackageSecretBindings" AS previous_binding
+                     JOIN "QingLong3PluginPackageInstalls" AS previous_install
+                       ON previous_install.project_id = install.project_id
+                      AND previous_install.package_name = install.package_name
+                      AND previous_install.lock_digest =
+                          install.previous_active_lock_digest
+                    WHERE previous_binding.installation_id =
+                          previous_install.installation_id
+                 ) OR
+                 EXISTS (
+                   SELECT 1
+                     FROM "QingLong3PluginPackageAdmissionReceipts" AS admission
+                     JOIN "QingLong3PluginPackageInstallProposals" AS proposal
+                       ON proposal.action_ref = admission.action_ref
+                    WHERE admission.installation_id = install.installation_id
+                      AND json_array_length(
+                        json_extract(
+                          proposal.proposal_json,
+                          '$.actionInput.manifest.spec.permissions.secrets'
+                        )
+                      ) > 0
+                 )
+               ) AND
+               NOT EXISTS (
+                 SELECT 1
+                   FROM "QingLong3PluginPackageSecretBindingTransitionReceipts" AS transition_receipt
+                  WHERE transition_receipt.installation_id = install.installation_id
+               )
+             )
              AND NOT EXISTS (
                SELECT 1
                FROM "QingLong3PluginPackageQuarantineEvents" AS quarantine

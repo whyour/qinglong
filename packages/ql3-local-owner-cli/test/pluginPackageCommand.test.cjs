@@ -42,6 +42,9 @@ const {
   LocalSqlitePluginPackageInstallRepository,
 } = require('@qinglong/local-sqlite/plugin-package-install');
 const {
+  LocalSqlitePluginPackageSecretBindingActivationPrerequisite,
+} = require('@qinglong/local-sqlite/plugin-package-secret-binding-activation-prerequisite');
+const {
   LocalSqlitePluginPackageAutomationPublicationRepository,
 } = require('@qinglong/local-sqlite/plugin-package-automation-publication');
 const {
@@ -72,10 +75,14 @@ const {
 } = require('@qinglong/runtime-core/plugin-package-bundle');
 const {
   serializePluginPackageManifest,
+  createPluginPackageActivationReceipt,
   pluginPackageActivationIntentDigest,
   pluginPackageInstallCommit,
   transitionPluginPackageInstall,
 } = require('@qinglong/runtime-core/plugin-package-install');
+const {
+  PluginPackageRecoveryCoordinator,
+} = require('@qinglong/runtime-core/plugin-package-recovery');
 const {
   createInitialPluginPackageAutomationPublication,
 } = require('@qinglong/runtime-core/plugin-package-automation-publication');
@@ -270,6 +277,38 @@ function actionInput(secretAware = false) {
     architecture: 'arm64',
     deploymentProfile: 'edge',
     targetGeneration: 1,
+  };
+}
+
+function upgradeActionInput(previousInput, previousLockDigest) {
+  const manifest = {
+    ...previousInput.manifest,
+    metadata: {
+      ...previousInput.manifest.metadata,
+      version: '1.1.0',
+      description: 'One bounded upgraded package',
+    },
+  };
+  const artifact = packageArtifact(manifest);
+  const artifactDigest = digest(artifact);
+  return {
+    ...previousInput,
+    lockId: 'cli-monitor-v2',
+    manifest,
+    plan: planPluginPackageInstall(
+      manifest,
+      previousInput.environment,
+      previousInput.manifest,
+    ),
+    previousManifest: previousInput.manifest,
+    source: {
+      ...previousInput.source,
+      locator: `offline:sha256:${artifactDigest}`,
+      artifactDigest,
+      artifactBytes: artifact.byteLength,
+    },
+    targetGeneration: 2,
+    previousLockDigest,
   };
 }
 
@@ -545,6 +584,30 @@ async function activatePackageOnly(databasePath, projectId, packageName) {
     });
     await installs.commit(pluginPackageInstallCommit(activating, active));
     return { active, lock };
+  } finally {
+    await authority.close();
+  }
+}
+
+async function stagePackageOnly(databasePath, projectId, packageName) {
+  const client = new DatabaseSync(databasePath);
+  const authority = new LocalSqliteOperationAuthority(client);
+  try {
+    const installs = new LocalSqlitePluginPackageInstallRepository(authority);
+    const queued = await installs.find(projectId, packageName);
+    const lock = await installs.findLock(queued.lockDigest);
+    const staged = transitionPluginPackageInstall(lock, queued, {
+      type: 'stage_completed',
+      mutationId: `secret-binding-stage-package-${queued.targetGeneration}`,
+      occurredAtMs: queued.updatedAtMs + 1,
+      stageRef: `stage:${lock.lockDigest}`,
+      artifactDigest: lock.source.artifactDigest,
+      manifestDigest: lock.manifestDigest,
+      contentDigest: lock.source.contentDigest,
+      evidenceDigest: 'e'.repeat(64),
+    });
+    await installs.commit(pluginPackageInstallCommit(queued, staged));
+    return { staged, lock };
   } finally {
     await authority.close();
   }
@@ -1660,6 +1723,296 @@ test('plans and atomically binds a versioned Secret to the current Package gener
   } finally {
     inspection.close();
   }
+});
+
+test('keeps an upgrade staged until the Owner commits its Secret transition', async (t) => {
+  const value = await fixture(t);
+  const initialInput = actionInput(true);
+  const initialActionRef = 'proposal:transition-cli-monitor-v1';
+  const initialApprovalId = 'approval-transition-cli-monitor-v1';
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.propose',
+      {
+        actionRef: initialActionRef,
+        approvalRequestId: initialApprovalId,
+        proposalAuditEventId: '22000000-0000-4000-8000-000000000001',
+        approvalAuditEventId: '22000000-0000-4000-8000-000000000002',
+        actionInput: initialInput,
+      },
+      'transition-01-propose',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.decide',
+      {
+        actionRef: initialActionRef,
+        approvalRequestId: initialApprovalId,
+        expectedVersion: 1,
+        decisionId: 'decision-transition-cli-monitor-v1',
+        auditEventId: '22000000-0000-4000-8000-000000000003',
+        decision: 'approved',
+        reasonCode: 'reviewed',
+      },
+      'transition-02-decide',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.consume',
+      {
+        actionRef: initialActionRef,
+        approvalRequestId: initialApprovalId,
+        expectedVersion: 2,
+        consumptionId: 'consume-transition-cli-monitor-v1',
+        dispatchId: 'dispatch-transition-cli-monitor-v1',
+        auditEventId: '22000000-0000-4000-8000-000000000004',
+      },
+      'transition-03-consume',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.dispatch',
+      { limit: 1 },
+      'transition-04-dispatch',
+    ),
+  );
+  const { active, lock: activeLock } = await activatePackageOnly(
+    value.databasePath,
+    'default',
+    'cli-monitor',
+  );
+  const secretRef = createSecretRef({
+    projectId: 'default',
+    name: 'transition-token',
+    version: 1,
+  });
+  const database = new DatabaseSync(value.databasePath);
+  try {
+    database
+      .prepare(
+        `INSERT INTO "QingLong3LocalSecretEnvelopes" (
+           "project_id", "secret_name", "version", "mutation_id",
+           "key_id", "algorithm", "nonce", "ciphertext", "auth_tag",
+           "created_at_ms"
+         ) VALUES (?, ?, 1, ?, ?, 'aes-256-gcm', ?, ?, ?, ?)`,
+      )
+      .run(
+        'default',
+        'transition-token',
+        'transition-secret-v1',
+        'fixture-key-v1',
+        Buffer.alloc(12, 3),
+        Buffer.from('ciphertext'),
+        Buffer.alloc(16, 4),
+        Date.now(),
+      );
+  } finally {
+    database.close();
+  }
+  const initialPlan = await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.secret-binding.plan',
+      {
+        projectId: 'default',
+        packageName: 'cli-monitor',
+        assignments: [{ name: 'TOKEN', secretRef }],
+      },
+      'transition-05-bind-plan',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.secret-binding.execute',
+      {
+        plan: initialPlan.plan,
+        auditEventId: '22000000-0000-4000-8000-000000000005',
+      },
+      'transition-06-bind-execute',
+    ),
+  );
+
+  const upgradeInput = upgradeActionInput(initialInput, activeLock.lockDigest);
+  const upgradeActionRef = 'proposal:transition-cli-monitor-v2';
+  const upgradeApprovalId = 'approval-transition-cli-monitor-v2';
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.propose',
+      {
+        actionRef: upgradeActionRef,
+        approvalRequestId: upgradeApprovalId,
+        proposalAuditEventId: '22000000-0000-4000-8000-000000000006',
+        approvalAuditEventId: '22000000-0000-4000-8000-000000000007',
+        actionInput: upgradeInput,
+      },
+      'transition-07-upgrade-propose',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.decide',
+      {
+        actionRef: upgradeActionRef,
+        approvalRequestId: upgradeApprovalId,
+        expectedVersion: 1,
+        decisionId: 'decision-transition-cli-monitor-v2',
+        auditEventId: '22000000-0000-4000-8000-000000000008',
+        decision: 'approved',
+        reasonCode: 'reviewed',
+      },
+      'transition-08-upgrade-decide',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.consume',
+      {
+        actionRef: upgradeActionRef,
+        approvalRequestId: upgradeApprovalId,
+        expectedVersion: 2,
+        consumptionId: 'consume-transition-cli-monitor-v2',
+        dispatchId: 'dispatch-transition-cli-monitor-v2',
+        auditEventId: '22000000-0000-4000-8000-000000000009',
+      },
+      'transition-09-upgrade-consume',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.dispatch',
+      { limit: 1 },
+      'transition-10-upgrade-dispatch',
+    ),
+  );
+  const { staged } = await stagePackageOnly(
+    value.databasePath,
+    'default',
+    'cli-monitor',
+  );
+
+  const recoveryClient = new DatabaseSync(value.databasePath);
+  const recoveryAuthority = new LocalSqliteOperationAuthority(recoveryClient);
+  const installs = new LocalSqlitePluginPackageInstallRepository(
+    recoveryAuthority,
+  );
+  const published = [];
+  let publishedReceipt;
+  const activationPrerequisite =
+    new LocalSqlitePluginPackageSecretBindingActivationPrerequisite(
+      recoveryAuthority,
+    );
+  const recovery = new PluginPackageRecoveryCoordinator({
+    repository: installs,
+    stageProvider: {
+      async stage() {
+        throw new Error('staged upgrade must not be staged twice');
+      },
+    },
+    publisher: {
+      async publish(intent) {
+        published.push(intent.intentDigest);
+        const receipt = createPluginPackageActivationReceipt({
+          activationRef: `activation:${intent.lockDigest}`,
+          intentDigest: intent.intentDigest,
+          generation: intent.targetGeneration,
+          contentDigest: intent.contentDigest,
+          activatedAtMs: staged.updatedAtMs + 2,
+        });
+        publishedReceipt = receipt;
+        return receipt;
+      },
+      async inspect() {
+        return publishedReceipt
+          ? { status: 'published', receipt: publishedReceipt }
+          : { status: 'not_published' };
+      },
+    },
+    activationPrerequisite,
+    now: () => staged.updatedAtMs + 1,
+  });
+  assert.deepEqual(
+    await activationPrerequisite.inspect(
+      staged,
+      await installs.findLock(staged.lockDigest),
+    ),
+    {
+      status: 'deferred',
+      reason: 'secret_binding_transition_required',
+    },
+  );
+  const deferred = await recovery.recover({ pageSize: 1, maxPages: 1 });
+  assert.equal(deferred.scanned, 0);
+  assert.equal(deferred.safeToAdmit, true);
+  assert.equal((await installs.find('default', 'cli-monitor')).state, 'staged');
+  assert.deepEqual(published, []);
+
+  const transitionPlan = await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.secret-binding.transition.plan',
+      {
+        projectId: 'default',
+        packageName: 'cli-monitor',
+        assignments: [{ name: 'TOKEN', secretRef }],
+      },
+      'transition-11-plan',
+    ),
+  );
+  assert.equal(transitionPlan.summary.generation, 2);
+  assert.equal(transitionPlan.summary.kind, 'carry-forward');
+  const executePath = commandFile(
+    value,
+    'plugin-package.secret-binding.transition.execute',
+    {
+      plan: transitionPlan.plan,
+      auditEventId: '22000000-0000-4000-8000-00000000000a',
+    },
+    'transition-12-execute',
+  );
+  const created = await runLocalPluginPackageCommandFile(executePath);
+  assert.equal(created.status, 'created');
+  assert.match(created.receiptDigest, /^[0-9a-f]{64}$/);
+  assert.equal(
+    (await runLocalPluginPackageCommandFile(executePath)).status,
+    'existing',
+  );
+  const settled = await recovery.recoverPage({ limit: 1 });
+  const recovered = await installs.find('default', 'cli-monitor');
+  assert.equal(settled.items[0].status, 'settled');
+  assert.equal(
+    recovered.state,
+    'active',
+    JSON.stringify({ recovered, publishedReceipt }),
+  );
+  assert.equal(published.length, 1);
+  const inspection = new DatabaseSync(value.databasePath, { readOnly: true });
+  try {
+    assert.equal(
+      inspection
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM "QingLong3PluginPackageSecretBindingTransitionReceipts"`,
+        )
+        .get().count,
+      1,
+    );
+  } finally {
+    inspection.close();
+    await recoveryAuthority.close();
+  }
+  assert.equal(active.state, 'active');
 });
 
 test('denies an authenticated non-owner before package proposal mutation', async (t) => {

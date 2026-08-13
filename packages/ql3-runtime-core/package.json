@@ -92,6 +92,9 @@
       "plugin-package-secret-binding-transition-plan": [
         "dist/plugin-package/secret-binding/transitionPlan.d.ts"
       ],
+      "plugin-package-secret-binding-transition-receipt": [
+        "dist/plugin-package/secret-binding/transitionReceipt.d.ts"
+      ],
       "plugin-package-secret-binding-approval-plan": [
         "dist/plugin-package/secret-binding/approvalPlan.d.ts"
       ],
@@ -400,6 +403,11 @@
       "types": "./dist/plugin-package/secret-binding/transitionPlan.d.ts",
       "require": "./dist/plugin-package/secret-binding/transitionPlan.js",
       "default": "./dist/plugin-package/secret-binding/transitionPlan.js"
+    },
+    "./plugin-package-secret-binding-transition-receipt": {
+      "types": "./dist/plugin-package/secret-binding/transitionReceipt.d.ts",
+      "require": "./dist/plugin-package/secret-binding/transitionReceipt.js",
+      "default": "./dist/plugin-package/secret-binding/transitionReceipt.js"
     },
     "./plugin-package-secret-binding-approval-plan": {
       "types": "./dist/plugin-package/secret-binding/approvalPlan.d.ts",

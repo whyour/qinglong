@@ -57,6 +57,7 @@ export type LocalProfileStorageBootstrapResult =
       readonly pluginPackageInstalls: LocalSqliteRuntimeDatabase['pluginPackageInstalls'];
       readonly pluginPackageMaterializedRevisions: LocalSqliteRuntimeDatabase['pluginPackageMaterializedRevisions'];
       readonly pluginPackageSecretBindings: LocalSqliteRuntimeDatabase['pluginPackageSecretBindings'];
+      readonly pluginPackageActivationPrerequisite: LocalSqliteRuntimeDatabase['pluginPackageActivationPrerequisite'];
       readonly pluginPackageTaskReconciliations: LocalSqliteRuntimeDatabase['pluginPackageTaskReconciliations'];
       readonly pluginPackageAutomationPublications: LocalSqliteRuntimeDatabase['pluginPackageAutomationPublications'];
       readonly projectToolDefinitionSnapshots: LocalSqliteRuntimeDatabase['projectToolDefinitionSnapshots'];
@@ -153,6 +154,8 @@ export async function bootstrapLocalProfileStorage(
       pluginPackageMaterializedRevisions:
         database.pluginPackageMaterializedRevisions,
       pluginPackageSecretBindings: database.pluginPackageSecretBindings,
+      pluginPackageActivationPrerequisite:
+        database.pluginPackageActivationPrerequisite,
       pluginPackageTaskReconciliations:
         database.pluginPackageTaskReconciliations,
       pluginPackageAutomationPublications:

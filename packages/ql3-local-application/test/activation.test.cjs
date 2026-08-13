@@ -1660,6 +1660,7 @@ test('activates the concrete headless runtime in recovery and lifecycle order', 
     retry: 0,
     manualRequired: 0,
     superseded: 0,
+    deferred: 0,
     remaining: false,
     safeToAdmit: true,
   });

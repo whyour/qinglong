@@ -26,6 +26,7 @@ import {
 } from './pluginPackageInstall';
 import {
   normalizePluginPackageStageEvidence,
+  type PluginPackageActivationPrerequisite,
   type PluginPackageStageProvider,
 } from './pluginPackageInstallation';
 
@@ -37,6 +38,7 @@ export const PLUGIN_PACKAGE_RECOVERY_ITEM_STATUSES = [
   'retry',
   'manual_required',
   'superseded',
+  'deferred',
 ] as const;
 
 export type PluginPackageRecoveryItemStatus =
@@ -64,6 +66,7 @@ export interface PluginPackageRecoveryCycleResult {
   readonly retry: number;
   readonly manualRequired: number;
   readonly superseded: number;
+  readonly deferred: number;
   readonly remaining: boolean;
   readonly safeToAdmit: boolean;
 }
@@ -235,18 +238,20 @@ export class PluginPackageRecoveryCoordinator {
   readonly #stageProvider: PluginPackageStageProvider;
   readonly #activation: PluginPackageActivationCoordinator;
   readonly #now: () => number | Promise<number>;
+  readonly #activationPrerequisite?: PluginPackageActivationPrerequisite;
 
   constructor(options: {
     readonly repository: PluginPackageInstallRepository;
     readonly stageProvider: PluginPackageStageProvider;
     readonly publisher: PluginPackageActivationPublisher;
     readonly now: () => number | Promise<number>;
+    readonly activationPrerequisite?: PluginPackageActivationPrerequisite;
   }) {
     const value = dataRecord(options, 'recovery coordinator options');
     exactKeys(
       value,
       ['repository', 'stageProvider', 'publisher', 'now'],
-      [],
+      ['activationPrerequisite'],
       'recovery coordinator options',
     );
     if (
@@ -257,7 +262,10 @@ export class PluginPackageRecoveryCoordinator {
       typeof options.repository.listRecoveryPage !== 'function' ||
       !options.stageProvider ||
       typeof options.stageProvider.stage !== 'function' ||
-      typeof options.now !== 'function'
+      typeof options.now !== 'function' ||
+      (options.activationPrerequisite !== undefined &&
+        (!options.activationPrerequisite ||
+          typeof options.activationPrerequisite.inspect !== 'function'))
     ) {
       throw new InvalidPluginPackageInstallError(
         'recovery coordinator authority is invalid',
@@ -270,6 +278,9 @@ export class PluginPackageRecoveryCoordinator {
       publisher: options.publisher,
     });
     this.#now = options.now;
+    if (options.activationPrerequisite !== undefined) {
+      this.#activationPrerequisite = options.activationPrerequisite;
+    }
   }
 
   async #current(
@@ -292,6 +303,14 @@ export class PluginPackageRecoveryCoordinator {
       installationId: record.installationId,
     };
     if (record.state === 'staged') {
+      const lock = await this.#repository.findLock(record.lockDigest);
+      if (!lock) throw new PluginPackageInstallUnavailableError();
+      assertPluginPackageInstallMatchesLock(lock, record);
+      const prerequisite = await this.#activationPrerequisite?.inspect(
+        record,
+        lock,
+      );
+      if (prerequisite?.status === 'deferred') return record;
       return this.#activation.activate({
         ...identity,
         activationStartedMutationId: mutationId(
@@ -374,6 +393,18 @@ export class PluginPackageRecoveryCoordinator {
         current = committed;
       }
       current = await this.#convergeActivation(current, occurredAtMs);
+      if (current.state === 'staged' && this.#activationPrerequisite) {
+        const lock = await this.#repository.findLock(current.lockDigest);
+        if (!lock) throw new PluginPackageInstallUnavailableError();
+        assertPluginPackageInstallMatchesLock(lock, current);
+        const prerequisite = await this.#activationPrerequisite.inspect(
+          current,
+          lock,
+        );
+        if (prerequisite.status === 'deferred') {
+          return result(source, action, 'deferred', current);
+        }
+      }
       if (current.state === 'active' || current.state === 'failed') {
         return result(source, action, 'settled', current);
       }
@@ -477,6 +508,7 @@ export class PluginPackageRecoveryCoordinator {
       retry: 0,
       manualRequired: 0,
       superseded: 0,
+      deferred: 0,
     };
     let after: Readonly<PluginPackageInstallRecoveryCursor> | undefined;
     let exhausted = false;
@@ -501,6 +533,9 @@ export class PluginPackageRecoveryCoordinator {
           case 'superseded':
             counts.superseded += 1;
             break;
+          case 'deferred':
+            counts.deferred += 1;
+            break;
         }
       }
       if (!page.truncated) {
@@ -517,7 +552,8 @@ export class PluginPackageRecoveryCoordinator {
     return Object.freeze({
       ...counts,
       remaining,
-      safeToAdmit: !remaining && counts.manualRequired === 0,
+      safeToAdmit:
+        !remaining && counts.retry === 0 && counts.manualRequired === 0,
     });
   }
 }

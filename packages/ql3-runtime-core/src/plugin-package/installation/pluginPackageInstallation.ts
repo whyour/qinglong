@@ -5,6 +5,8 @@ import {
 import {
   InvalidPluginPackageInstallError,
   PluginPackageInstallTransitionConflictError,
+  PluginPackageInstallUnavailableError,
+  assertPluginPackageInstallMatchesLock,
   normalizePluginPackageLock,
   pluginPackageInstallCommit,
   transitionPluginPackageInstall,
@@ -31,6 +33,20 @@ export interface PluginPackageStageProvider {
   stage(
     lock: Readonly<PluginPackageLock>,
   ): Promise<Readonly<PluginPackageStageEvidence>>;
+}
+
+export type PluginPackageActivationPrerequisiteObservation =
+  | Readonly<{ status: 'ready' }>
+  | Readonly<{
+      status: 'deferred';
+      reason: 'secret_binding_transition_required';
+    }>;
+
+export interface PluginPackageActivationPrerequisite {
+  inspect(
+    record: Readonly<PluginPackageInstallRecord>,
+    lock: Readonly<PluginPackageLock>,
+  ): Promise<Readonly<PluginPackageActivationPrerequisiteObservation>>;
 }
 
 export interface InstallPluginPackageOptions {
@@ -139,15 +155,23 @@ export function normalizePluginPackageStageEvidence(
 export class PluginPackageInstallationCoordinator {
   readonly #repository: PluginPackageAdmissionRepository;
   readonly #activation: PluginPackageActivationCoordinator;
+  readonly #activationPrerequisite?: PluginPackageActivationPrerequisite;
 
   constructor(options: {
     readonly repository: PluginPackageAdmissionRepository;
     readonly publisher: PluginPackageActivationPublisher;
+    readonly activationPrerequisite?: PluginPackageActivationPrerequisite;
   }) {
     const value = dataRecord(options, 'installation coordinator options');
     exactKeys(
       value,
-      ['repository', 'publisher'],
+      [
+        'repository',
+        'publisher',
+        ...(options.activationPrerequisite === undefined
+          ? []
+          : ['activationPrerequisite']),
+      ],
       'installation coordinator options',
     );
     if (
@@ -157,7 +181,10 @@ export class PluginPackageInstallationCoordinator {
       typeof options.repository.create !== 'function' ||
       typeof options.repository.commit !== 'function' ||
       typeof options.repository.admit !== 'function' ||
-      typeof options.repository.findAdmissionReceipt !== 'function'
+      typeof options.repository.findAdmissionReceipt !== 'function' ||
+      (options.activationPrerequisite !== undefined &&
+        (!options.activationPrerequisite ||
+          typeof options.activationPrerequisite.inspect !== 'function'))
     ) {
       throw new InvalidPluginPackageInstallError(
         'installation coordinator authority is invalid',
@@ -168,6 +195,9 @@ export class PluginPackageInstallationCoordinator {
       repository: options.repository,
       publisher: options.publisher,
     });
+    if (options.activationPrerequisite !== undefined) {
+      this.#activationPrerequisite = options.activationPrerequisite;
+    }
   }
 
   async #convergeActivation(
@@ -186,6 +216,14 @@ export class PluginPackageInstallationCoordinator {
       installationId: record.installationId,
     };
     if (record.state === 'staged') {
+      const lock = await this.#repository.findLock(record.lockDigest);
+      if (!lock) throw new PluginPackageInstallUnavailableError();
+      assertPluginPackageInstallMatchesLock(lock, record);
+      const prerequisite = await this.#activationPrerequisite?.inspect(
+        record,
+        lock,
+      );
+      if (prerequisite?.status === 'deferred') return record;
       return this.#activation.activate({
         ...identity,
         activationStartedMutationId: options.activationStartedMutationId,
