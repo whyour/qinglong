@@ -74,12 +74,12 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
     [
       {
         directory: 'packages/ql3-cluster-postgres/src/migrations',
-        directSourceFiles: 62,
+        directSourceFiles: 63,
         reviewKind: 'ordered_ledger',
       },
       {
         directory: 'packages/ql3-local-sqlite/src/migrations',
-        directSourceFiles: 95,
+        directSourceFiles: 97,
         reviewKind: 'ordered_ledger',
       },
     ],
@@ -299,10 +299,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: runtimeCore.rootSourceFileRoles,
     },
     {
-      sourceFiles: 156,
+      sourceFiles: 157,
       rootSourceFiles: 1,
       rootSourceLines: 160,
-      nestedSourceFiles: 155,
+      nestedSourceFiles: 156,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );
@@ -421,10 +421,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterPostgres.rootSourceFileRoles,
     },
     {
-      sourceFiles: 159,
+      sourceFiles: 160,
       rootSourceFiles: 1,
       rootSourceLines: 126,
-      nestedSourceFiles: 158,
+      nestedSourceFiles: 159,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );
@@ -540,10 +540,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localSqlite.rootSourceFileRoles,
     },
     {
-      sourceFiles: 188,
+      sourceFiles: 191,
       rootSourceFiles: 1,
       rootSourceLines: 31,
-      nestedSourceFiles: 187,
+      nestedSourceFiles: 190,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

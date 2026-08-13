@@ -716,6 +716,19 @@ function queryable(overrides = {}) {
           })),
         };
       }
+      if (text.includes('FROM pg_trigger triggers')) {
+        return {
+          rows: contract.triggers
+            .filter(({ name }) => name !== overrides.missingTrigger)
+            .map((definition) => ({
+              triggerName: definition.name,
+              tableName: definition.tableName,
+              functionName: definition.functionName,
+              enabled:
+                definition.name === overrides.disabledTrigger ? 'D' : 'O',
+            })),
+        };
+      }
       if (text.includes('has_schema_privilege')) {
         return {
           rows: [
@@ -763,7 +776,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 60,
+    contractVersion: 61,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -826,6 +839,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0059-plugin-package-secret-bindings',
       'pg-0060-plugin-package-secret-materialization-guard',
       'pg-0061-plugin-package-secret-binding-approval-plans',
+      'pg-0062-plugin-package-secret-binding-target-guard',
     ],
   });
 });
@@ -856,10 +870,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 60);
+  assert.equal(report.contractVersion, 61);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0061-plugin-package-secret-binding-approval-plans',
+    'pg-0062-plugin-package-secret-binding-target-guard',
   );
 });
 
@@ -872,10 +886,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 60);
+  assert.equal(report.contractVersion, 61);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0061-plugin-package-secret-binding-approval-plans',
+    'pg-0062-plugin-package-secret-binding-target-guard',
   );
 
   const widened = automationManagerPrivileges();
@@ -904,10 +918,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 60);
+  assert.equal(report.contractVersion, 61);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0061-plugin-package-secret-binding-approval-plans',
+    'pg-0062-plugin-package-secret-binding-target-guard',
   );
 
   const widened = approvalManagerPrivileges();
@@ -938,10 +952,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 60);
+  assert.equal(report.contractVersion, 61);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0061-plugin-package-secret-binding-approval-plans',
+    'pg-0062-plugin-package-secret-binding-target-guard',
   );
 
   const widened = runManagerPrivileges();
@@ -1073,10 +1087,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 60);
+  assert.equal(report.contractVersion, 61);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0061-plugin-package-secret-binding-approval-plans',
+    'pg-0062-plugin-package-secret-binding-target-guard',
   );
 });
 
@@ -1155,6 +1169,35 @@ test('rejects unknown ql3 objects and an over-privileged runtime role', async ()
       error.code === 'runtime_role_invalid' &&
       error.facts.includes(
         'function-privileges:lock_active_plugin_package_project',
+      ),
+  );
+});
+
+test('fails closed when a reviewed Package Secret trigger is missing or disabled', async () => {
+  await assert.rejects(
+    assertPostgresSchemaReady(
+      queryable({
+        missingTrigger: 'ql3_plugin_package_secret_binding_target_guard',
+      }),
+    ),
+    (error) =>
+      error instanceof PostgresSchemaReadinessError &&
+      error.code === 'schema_contract_invalid' &&
+      error.facts.includes(
+        'missing-trigger:ql3_plugin_package_secret_binding_target_guard',
+      ),
+  );
+  await assert.rejects(
+    assertPostgresSchemaReady(
+      queryable({
+        disabledTrigger: 'ql3_plugin_package_secret_materialization_guard',
+      }),
+    ),
+    (error) =>
+      error instanceof PostgresSchemaReadinessError &&
+      error.code === 'schema_contract_invalid' &&
+      error.facts.includes(
+        'trigger-contract:ql3_plugin_package_secret_materialization_guard',
       ),
   );
 });

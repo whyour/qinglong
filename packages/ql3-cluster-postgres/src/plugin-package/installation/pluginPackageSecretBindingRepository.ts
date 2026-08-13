@@ -193,10 +193,31 @@ export class PostgresPluginPackageSecretBindingRepository
            AND install.project_id = $2
            AND install.package_name = $3
            AND install.lock_digest = $5
-           AND install.active_lock_digest = $5
            AND install.target_generation = $6
-           AND install.state = 'active'
            AND install.lock_json ->> 'manifestDigest' = $7
+           AND (
+             (install.state = 'active' AND
+              install.active_lock_digest = install.lock_digest) OR
+             (install.state = 'staged' AND
+              install.previous_active_lock_digest IS NOT NULL AND
+              install.active_lock_digest = install.previous_active_lock_digest AND
+              install.target_generation = (
+                SELECT MAX(history.target_generation)
+                  FROM "ql3"."plugin_package_installs" AS history
+                 WHERE history.project_id = install.project_id
+                   AND history.package_name = install.package_name
+              ) AND
+              EXISTS (
+                SELECT 1
+                  FROM "ql3"."plugin_package_installs" AS previous
+                 WHERE previous.project_id = install.project_id
+                   AND previous.package_name = install.package_name
+                   AND previous.lock_digest = install.previous_active_lock_digest
+                   AND previous.state = 'active'
+                   AND previous.active_lock_digest = previous.lock_digest
+                   AND previous.target_generation < install.target_generation
+              ))
+           )
          ON CONFLICT (generation_digest) DO NOTHING
          RETURNING generation_digest`,
         [
@@ -217,7 +238,7 @@ export class PostgresPluginPackageSecretBindingRepository
       const stored = await this.findStored(binding.target.generationDigest);
       if (!stored) {
         throw new PluginPackageSecretBindingConflictError(
-          'binding target is not the current active Package generation',
+          'binding target is not the current active or reviewed staged Package generation',
         );
       }
       if (JSON.stringify(stored) !== bindingJson) {

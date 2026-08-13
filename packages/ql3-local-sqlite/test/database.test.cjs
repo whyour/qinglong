@@ -144,9 +144,11 @@ test('creates a reviewed edge database and opens runtime only after readiness', 
     '0092-capability-v46',
     '0093-plugin-package-secret-materialization-guard',
     '0094-capability-v47',
+    '0095-plugin-package-secret-binding-target-guard',
+    '0096-capability-v48',
   ]);
   assert.equal(migrated.readiness.contractName, 'local-control-core');
-  assert.equal(migrated.readiness.contractVersion, 47);
+  assert.equal(migrated.readiness.contractVersion, 48);
   assert.equal(migrated.readiness.journalMode, 'delete');
   assert.equal(fs.statSync(databasePath).mode & 0o777, 0o600);
 
@@ -592,8 +594,8 @@ test('backfills v14 execution revisions with a verified independent digest', asy
           .get(),
       },
       {
-        contract_version: 47,
-        migration_id: '0093-plugin-package-secret-materialization-guard',
+        contract_version: 48,
+        migration_id: '0095-plugin-package-secret-binding-target-guard',
       },
     );
   } finally {

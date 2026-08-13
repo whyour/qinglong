@@ -129,6 +129,14 @@ test('publishes, exact-replays and finds one binding', async () => {
     value.queries.find(({ text }) => text.startsWith('INSERT')).text,
     /install\.state = 'active'/,
   );
+  assert.match(
+    value.queries.find(({ text }) => text.startsWith('INSERT')).text,
+    /install\.state = 'staged'/,
+  );
+  assert.match(
+    value.queries.find(({ text }) => text.startsWith('INSERT')).text,
+    /MAX\(history\.target_generation\)/,
+  );
 });
 
 test('rejects inactive targets and conflicting content', async () => {

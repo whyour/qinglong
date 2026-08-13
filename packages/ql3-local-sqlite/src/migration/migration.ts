@@ -104,6 +104,8 @@ import { local0091PluginPackageSecretBindingsMigration } from '../migrations/009
 import { local0092CapabilityV46Migration } from '../migrations/0092-capability-v46';
 import { local0093PluginPackageSecretMaterializationGuardMigration } from '../migrations/0093-plugin-package-secret-materialization-guard';
 import { local0094CapabilityV47Migration } from '../migrations/0094-capability-v47';
+import { local0095PluginPackageSecretBindingTargetGuardMigration } from '../migrations/0095-plugin-package-secret-binding-target-guard';
+import { local0096CapabilityV48Migration } from '../migrations/0096-capability-v48';
 import type { LocalSqliteMigrationContext } from '../migrations/sqlMigration';
 import {
   LOCAL_SQLITE_MIGRATION_STREAM_ID,
@@ -220,6 +222,8 @@ export const localSqliteMigrationDefinition: MigrationStreamDefinition<LocalSqli
       local0092CapabilityV46Migration,
       local0093PluginPackageSecretMaterializationGuardMigration,
       local0094CapabilityV47Migration,
+      local0095PluginPackageSecretBindingTargetGuardMigration,
+      local0096CapabilityV48Migration,
     ]),
   });
 

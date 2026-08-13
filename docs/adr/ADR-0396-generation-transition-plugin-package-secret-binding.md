@@ -32,4 +32,6 @@ D-306B1 只允许给当前 active 且尚未绑定的 Package generation 做首�
 
 ## 当前进度
 
-- 已冻结共享 transition plan v1 的 lineage 与差异分类语义；Local/Cluster activation 前发布和持久化门仍待实现，因此 ADR 保持 Proposed。
+- 已冻结共享 transition plan v1 的 lineage 与差异分类语义，并完成 Local/Cluster 的 activation 前持久化门：SQLite capability v48 通过 migration 0095/0096、PostgreSQL capability v61 通过 migration pg0062，把 repository 写入和数据库 trigger 同时约束为“当前 active target”或“由完整上一 active lineage 支撑、且为 durable install history 最大 generation 的 staged target”。`queued|activating|failed`、陈旧/跳代 staged target、断裂 lineage 与直接 SQL 绕过均失败关闭；readiness 校验 exact trigger/function attachment，避免 schema 名义升级但约束缺失。
+- 本切片没有新增 workspace package、第三方依赖、表、连接、daemon、timer、watcher 或常驻资源；Edge/Standalone 只增加 SQLite schema guard，Cluster 复用既有 PostgreSQL Pool/role。完整 18-package 串行测试与 backend 门已通过；真实 PostgreSQL 18.4 的 migration/runtime role 门证明 active、合规 staged 与 exact replay 可写，activating、陈旧/非最大 staged 以及直接 SQL 可被拒绝。
+- Local Owner 与 Cluster management/executor 尚未消费 transition plan，完成“审批 → 发布 binding → materialize → active CAS”的产品纵切面；真实 Kubernetes rotation/revoke、升级失败回滚及物理低配设备证据也仍待完成。因此 ADR 继续保持 Proposed，下一切片只补产品编排，不再扩张 package 或常驻部署面。

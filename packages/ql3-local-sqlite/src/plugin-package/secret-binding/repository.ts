@@ -220,10 +220,31 @@ export class LocalSqlitePluginPackageSecretBindingRepository
              AND install.project_id = ?
              AND install.package_name = ?
              AND install.lock_digest = ?
-             AND install.active_lock_digest = ?
              AND install.target_generation = ?
-             AND install.state = 'active'
              AND json_extract(install.lock_json, '$.manifestDigest') = ?
+             AND (
+               (install.state = 'active' AND
+                install.active_lock_digest = install.lock_digest) OR
+               (install.state = 'staged' AND
+                install.previous_active_lock_digest IS NOT NULL AND
+                install.active_lock_digest = install.previous_active_lock_digest AND
+                install.target_generation = (
+                  SELECT MAX(history.target_generation)
+                  FROM "QingLong3PluginPackageInstalls" AS history
+                  WHERE history.project_id = install.project_id
+                    AND history.package_name = install.package_name
+                ) AND
+                EXISTS (
+                  SELECT 1
+                  FROM "QingLong3PluginPackageInstalls" AS previous
+                  WHERE previous.project_id = install.project_id
+                    AND previous.package_name = install.package_name
+                    AND previous.lock_digest = install.previous_active_lock_digest
+                    AND previous.state = 'active'
+                    AND previous.active_lock_digest = previous.lock_digest
+                    AND previous.target_generation < install.target_generation
+                ))
+             )
            ON CONFLICT (generation_digest) DO NOTHING`,
         )
         .run(
@@ -243,14 +264,13 @@ export class LocalSqlitePluginPackageSecretBindingRepository
           binding.target.projectId,
           binding.target.packageName,
           binding.target.lockDigest,
-          binding.target.lockDigest,
           binding.target.generation,
           binding.target.manifestDigest,
         );
       const stored = this.findStored(binding.target.generationDigest);
       if (!stored) {
         throw new PluginPackageSecretBindingConflictError(
-          'binding target is not the current active Package generation',
+          'binding target is not the current active or reviewed staged Package generation',
         );
       }
       if (JSON.stringify(stored) !== bindingJson) {

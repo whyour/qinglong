@@ -12,11 +12,17 @@ export interface PostgresSchemaContractFunction {
   readonly configuration: readonly string[];
 }
 
+export interface PostgresSchemaContractTrigger {
+  readonly name: string;
+  readonly tableName: string;
+  readonly functionName: string;
+}
+
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 60;
-  readonly migrationId: 'pg-0061-plugin-package-secret-binding-approval-plans';
+  readonly contractVersion: 61;
+  readonly migrationId: 'pg-0062-plugin-package-secret-binding-target-guard';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -57,6 +63,7 @@ export interface PostgresSchemaContract {
     plugin_package_materialized_revision: 1;
     plugin_package_secret_binding: 1;
     plugin_package_secret_binding_approval_plan: 1;
+    plugin_package_secret_binding_transition: 1;
     plugin_package_secret_materialization: 1;
     plugin_package_proposal: 1;
     plugin_package_publisher_provenance: 1;
@@ -94,6 +101,7 @@ export interface PostgresSchemaContract {
   readonly checks: readonly string[];
   readonly foreignKeys: readonly string[];
   readonly functions: readonly PostgresSchemaContractFunction[];
+  readonly triggers: readonly PostgresSchemaContractTrigger[];
 }
 
 function table(
@@ -107,8 +115,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 60,
-    migrationId: 'pg-0061-plugin-package-secret-binding-approval-plans',
+    contractVersion: 61,
+    migrationId: 'pg-0062-plugin-package-secret-binding-target-guard',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -142,6 +150,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       plugin_package_materialized_revision: 1,
       plugin_package_secret_binding: 1,
       plugin_package_secret_binding_approval_plan: 1,
+      plugin_package_secret_binding_transition: 1,
       plugin_package_secret_materialization: 1,
       plugin_package_proposal: 1,
       plugin_package_publisher_provenance: 1,
@@ -2385,6 +2394,14 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         configuration: Object.freeze(['search_path=pg_catalog, ql3']),
       }),
       Object.freeze({
+        name: 'enforce_plugin_package_secret_binding_target',
+        identityArguments: '',
+        owner: 'ql3_migration',
+        securityDefiner: false,
+        volatility: 'volatile',
+        configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
+      Object.freeze({
         name: 'enforce_plugin_package_secret_materialization',
         identityArguments: '',
         owner: 'ql3_migration',
@@ -2514,6 +2531,18 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         securityDefiner: true,
         volatility: 'volatile',
         configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
+    ]),
+    triggers: Object.freeze([
+      Object.freeze({
+        name: 'ql3_plugin_package_secret_binding_target_guard',
+        tableName: 'plugin_package_secret_bindings',
+        functionName: 'enforce_plugin_package_secret_binding_target',
+      }),
+      Object.freeze({
+        name: 'ql3_plugin_package_secret_materialization_guard',
+        tableName: 'plugin_package_materialized_revisions',
+        functionName: 'enforce_plugin_package_secret_materialization',
       }),
     ]),
   });

@@ -167,6 +167,16 @@ function database(serverVersionNum = '160014') {
             })),
           };
         }
+        if (text.includes('FROM pg_trigger triggers')) {
+          return {
+            rows: contract.triggers.map((definition) => ({
+              triggerName: definition.name,
+              tableName: definition.tableName,
+              functionName: definition.functionName,
+              enabled: 'O',
+            })),
+          };
+        }
         if (text.includes('FROM pg_catalog.pg_roles')) {
           return {
             rows: [
@@ -193,6 +203,7 @@ function database(serverVersionNum = '160014') {
             rows: contract.functions.map(({ name: functionName }) => ({
               functionName,
               executeAllowed: ![
+                'enforce_plugin_package_secret_binding_target',
                 'enforce_plugin_package_secret_materialization',
                 'enforce_plugin_package_stage_provenance',
                 'plugin_package_automation_start_allowed',

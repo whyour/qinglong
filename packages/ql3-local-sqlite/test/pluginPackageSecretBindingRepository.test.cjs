@@ -80,11 +80,38 @@ function fixture(boundAtMs = 100) {
   return { binding, generation };
 }
 
-async function harness(active = true) {
+async function harness(state = 'active') {
   const client = new DatabaseSync(':memory:');
   client.exec('PRAGMA foreign_keys = ON');
   await migrateLocalSqliteDatabase(client);
-  const { binding, generation } = fixture();
+  const isActive = state === 'active';
+  const isStaged = state === 'staged';
+  const source = fixture();
+  const previousLockDigest = 'f'.repeat(64);
+  const generation = isStaged
+    ? createPluginPackageResourceGeneration({
+        installationId: 'install-2',
+        projectId: 'project-1',
+        packageName: 'example-monitor',
+        lockDigest: LOCK_DIGEST,
+        generation: 2,
+        previousActiveLockDigest: previousLockDigest,
+        contentDigest: 'b'.repeat(64),
+        contents: MANIFEST.spec.contents,
+      })
+    : source.generation;
+  const binding = isStaged
+    ? createPluginPackageSecretBinding({
+        generation,
+        manifest: MANIFEST,
+        assignments: source.binding.entries.map(({ name, secretRef }) => ({
+          name,
+          secretRef,
+        })),
+        authority: source.binding.authority,
+        boundAtMs: source.binding.boundAtMs,
+      })
+    : source.binding;
   client
     .prepare(
       `INSERT INTO "QingLong3Projects"
@@ -100,11 +127,11 @@ async function harness(active = true) {
     manifestDigest: binding.target.manifestDigest,
   });
   const recordJson = JSON.stringify({
-    installationId: 'install-1',
+    installationId: isStaged ? 'install-2' : 'install-1',
     projectId: 'project-1',
     packageName: 'example-monitor',
     lockDigest: LOCK_DIGEST,
-    state: active ? 'active' : 'failed',
+    state,
     version: 1,
     recordDigest,
   });
@@ -116,16 +143,18 @@ async function harness(active = true) {
          previous_active_lock_digest, active_lock_digest, state, version,
          last_mutation_id, last_mutation_digest, lock_json, record_json,
          record_digest, created_at_ms, updated_at_ms
-       ) VALUES (?, ?, ?, '1.0.0', 'install', ?, 1, NULL, ?, ?, 1,
+       ) VALUES (?, ?, ?, '1.0.0', 'install', ?, ?, ?, ?, ?, 1,
                  'mutation-1', ?, ?, ?, ?, 1, 1)`,
     )
     .run(
-      'install-1',
+      isStaged ? 'install-2' : 'install-1',
       'project-1',
       'example-monitor',
       LOCK_DIGEST,
-      active ? LOCK_DIGEST : null,
-      active ? 'active' : 'failed',
+      generation.generation,
+      isStaged ? previousLockDigest : null,
+      isActive ? LOCK_DIGEST : isStaged ? previousLockDigest : null,
+      state,
       'e'.repeat(64),
       lockJson,
       recordJson,
@@ -135,9 +164,47 @@ async function harness(active = true) {
     .prepare(
       `INSERT INTO "QingLong3PluginPackageInstallHeads"
        (project_id, package_name, installation_id)
-       VALUES ('project-1', 'example-monitor', 'install-1')`,
+       VALUES ('project-1', 'example-monitor', ?)`,
     )
-    .run();
+    .run(isStaged ? 'install-2' : 'install-1');
+  if (isStaged) {
+    const previousRecordDigest = '9'.repeat(64);
+    const previousLockJson = JSON.stringify({
+      lockDigest: previousLockDigest,
+      projectId: 'project-1',
+      packageName: 'example-monitor',
+      manifestDigest: '8'.repeat(64),
+    });
+    const previousRecordJson = JSON.stringify({
+      installationId: 'install-1',
+      projectId: 'project-1',
+      packageName: 'example-monitor',
+      lockDigest: previousLockDigest,
+      state: 'active',
+      version: 1,
+      recordDigest: previousRecordDigest,
+    });
+    client
+      .prepare(
+        `INSERT INTO "QingLong3PluginPackageInstalls" (
+           installation_id, project_id, package_name, package_version,
+           operation, lock_digest, target_generation,
+           previous_active_lock_digest, active_lock_digest, state, version,
+           last_mutation_id, last_mutation_digest, lock_json, record_json,
+           record_digest, created_at_ms, updated_at_ms
+         ) VALUES ('install-1', 'project-1', 'example-monitor', '0.9.0',
+                   'install', ?, 1, NULL, ?, 'active', 1,
+                   'mutation-previous', ?, ?, ?, ?, 0, 0)`,
+      )
+      .run(
+        previousLockDigest,
+        previousLockDigest,
+        '7'.repeat(64),
+        previousLockJson,
+        previousRecordJson,
+        previousRecordDigest,
+      );
+  }
   return {
     client,
     binding,
@@ -161,7 +228,7 @@ test('publishes and exact-replays one active generation binding', async (t) => {
 });
 
 test('rejects inactive targets and conflicting content', async (t) => {
-  const inactive = await harness(false);
+  const inactive = await harness('failed');
   t.after(() => inactive.client.close());
   await assert.rejects(
     inactive.repository.publish(inactive.binding),
@@ -175,6 +242,21 @@ test('rejects inactive targets and conflicting content', async (t) => {
     active.repository.publish(fixture(101).binding),
     PluginPackageSecretBindingConflictError,
   );
+});
+
+test('publishes a reviewed current staged generation but rejects post-stage states', async (t) => {
+  const staged = await harness('staged');
+  t.after(() => staged.client.close());
+  assert.equal((await staged.repository.publish(staged.binding)).status, 'created');
+
+  for (const state of ['queued', 'activating']) {
+    const rejected = await harness(state);
+    t.after(() => rejected.client.close());
+    await assert.rejects(
+      rejected.repository.publish(rejected.binding),
+      PluginPackageSecretBindingConflictError,
+    );
+  }
 });
 
 test('fails closed when durable binding JSON is changed in place', async (t) => {

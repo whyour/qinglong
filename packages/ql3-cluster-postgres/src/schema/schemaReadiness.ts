@@ -89,6 +89,13 @@ interface FunctionRow extends Record<string, unknown> {
   publicExecute: unknown;
 }
 
+interface TriggerRow extends Record<string, unknown> {
+  triggerName: unknown;
+  tableName: unknown;
+  functionName: unknown;
+  enabled: unknown;
+}
+
 interface SchemaPrivilegeRow extends Record<string, unknown> {
   schemaUsage: unknown;
   schemaCreate: unknown;
@@ -1523,6 +1530,7 @@ const REQUIRED_RUNTIME_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     commit_plugin_package_quarantine: false,
     commit_plugin_package_task_reconciliation: false,
     enforce_plugin_package_secret_materialization: false,
+    enforce_plugin_package_secret_binding_target: false,
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: false,
     lock_approval_policy_fence: false,
@@ -1544,6 +1552,7 @@ const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     commit_plugin_package_quarantine: false,
     commit_plugin_package_task_reconciliation: false,
     enforce_plugin_package_secret_materialization: false,
+    enforce_plugin_package_secret_binding_target: false,
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: false,
     lock_approval_policy_fence: true,
@@ -1565,6 +1574,7 @@ const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
     commit_plugin_package_quarantine: true,
     commit_plugin_package_task_reconciliation: true,
     enforce_plugin_package_secret_materialization: false,
+    enforce_plugin_package_secret_binding_target: false,
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: true,
     lock_approval_policy_fence: true,
@@ -1728,7 +1738,13 @@ async function assertSchemaContract(
   queryable: PostgresMigrationQueryable,
   contract: PostgresSchemaContract,
 ): Promise<void> {
-  const [columnsResult, indexesResult, constraintsResult, functionsResult] =
+  const [
+    columnsResult,
+    indexesResult,
+    constraintsResult,
+    functionsResult,
+    triggersResult,
+  ] =
     await Promise.all([
       queryable.query<ColumnRow>(
         `
@@ -1802,6 +1818,27 @@ WHERE schemas.nspname = $1
 ORDER BY routines.proname, pg_get_function_identity_arguments(routines.oid)
       `.trim(),
         [contract.schema],
+      ),
+      queryable.query<TriggerRow>(
+        `
+SELECT
+  triggers.tgname AS "triggerName",
+  tables.relname AS "tableName",
+  routines.proname AS "functionName",
+  triggers.tgenabled AS "enabled"
+FROM pg_trigger triggers
+JOIN pg_class tables ON tables.oid = triggers.tgrelid
+JOIN pg_namespace schemas ON schemas.oid = tables.relnamespace
+JOIN pg_proc routines ON routines.oid = triggers.tgfoid
+WHERE schemas.nspname = $1
+  AND NOT triggers.tgisinternal
+  AND triggers.tgname = ANY($2::text[])
+ORDER BY triggers.tgname
+        `.trim(),
+        [
+          contract.schema,
+          contract.triggers.map(({ name }) => name),
+        ],
       ),
     ]);
   const actualTables = new Map<string, Set<string>>();
@@ -1942,6 +1979,35 @@ ORDER BY routines.proname, pg_get_function_identity_arguments(routines.oid)
     if (!expectedFunctions.has(identity)) {
       findings.push(`unknown-function:${identity}`);
     }
+  }
+  const actualTriggers = new Map<string, TriggerRow>();
+  for (const row of triggersResult.rows) {
+    if (
+      typeof row.triggerName !== 'string' ||
+      typeof row.tableName !== 'string' ||
+      typeof row.functionName !== 'string' ||
+      typeof row.enabled !== 'string'
+    ) {
+      throw new PostgresSchemaReadinessError('schema_contract_invalid');
+    }
+    actualTriggers.set(row.triggerName, row);
+  }
+  for (const expected of contract.triggers) {
+    const actual = actualTriggers.get(expected.name);
+    if (!actual) {
+      findings.push(`missing-trigger:${expected.name}`);
+      continue;
+    }
+    if (
+      actual.tableName !== expected.tableName ||
+      actual.functionName !== expected.functionName ||
+      actual.enabled !== 'O'
+    ) {
+      findings.push(`trigger-contract:${expected.name}`);
+    }
+  }
+  if (actualTriggers.size !== contract.triggers.length) {
+    findings.push('trigger-contract-row-count');
   }
   if (findings.length > 0) {
     throw new PostgresSchemaReadinessError(

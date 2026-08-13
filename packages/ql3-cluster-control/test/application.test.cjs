@@ -301,6 +301,16 @@ function databaseResource(events, options = {}) {
           })),
         };
       }
+      if (text.includes('FROM pg_trigger triggers')) {
+        return {
+          rows: contract.triggers.map((definition) => ({
+            triggerName: definition.name,
+            tableName: definition.tableName,
+            functionName: definition.functionName,
+            enabled: 'O',
+          })),
+        };
+      }
       if (text.includes('FROM pg_catalog.pg_roles')) {
         return {
           rows: [
