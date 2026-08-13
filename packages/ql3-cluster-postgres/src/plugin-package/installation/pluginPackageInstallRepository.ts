@@ -1345,6 +1345,44 @@ export class PostgresPluginPackageInstallRepository
          JOIN "ql3"."plugin_package_installs" AS install
            ON install.installation_id = head.installation_id
          WHERE install.state IN ('queued', 'staged', 'activating')
+           AND (
+             install.state <> 'staged' OR
+             install.previous_active_lock_digest IS NULL OR
+             NOT (
+               EXISTS (
+                 SELECT 1
+                   FROM "ql3"."plugin_package_admission_receipts" AS admission
+                   JOIN "ql3"."plugin_package_install_proposals" AS proposal
+                     ON proposal.action_ref = admission.action_ref
+                  WHERE admission.installation_id = install.installation_id
+                    AND jsonb_array_length(
+                      proposal.proposal_json #> '{actionInput,manifest,spec,permissions,secrets}'
+                    ) > 0
+               ) OR
+               EXISTS (
+                 SELECT 1
+                   FROM "ql3"."plugin_package_installs" AS previous
+                   JOIN "ql3"."plugin_package_secret_bindings" AS binding
+                     ON binding.installation_id = previous.installation_id
+                  WHERE previous.project_id = install.project_id
+                    AND previous.package_name = install.package_name
+                    AND previous.lock_digest = install.previous_active_lock_digest
+               )
+             ) OR
+             EXISTS (
+               SELECT 1
+                 FROM "ql3"."plugin_package_secret_binding_transition_receipts"
+                      AS receipt
+                WHERE receipt.project_id = install.project_id
+                  AND receipt.package_name = install.package_name
+                  AND receipt.installation_id = install.installation_id
+                  AND receipt.lock_digest = install.lock_digest
+                  AND receipt.generation = install.target_generation
+                  AND receipt.manifest_digest = install.lock_json ->> 'manifestDigest'
+                  AND receipt.previous_active_lock_digest =
+                      install.previous_active_lock_digest
+             )
+           )
            AND NOT EXISTS (
              SELECT 1
              FROM "ql3"."plugin_package_quarantine_events" AS quarantine

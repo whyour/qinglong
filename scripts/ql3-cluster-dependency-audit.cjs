@@ -2855,6 +2855,7 @@ function auditSourceImports(root, packagePath, findings) {
         [
           '@qinglong/local-admin/package-secret-binding',
           '@qinglong/runtime-core/plugin-package-secret-binding-plan',
+          '@qinglong/runtime-core/plugin-package-secret-binding-transition-plan',
         ].includes(specifier)
       ) {
         continue;

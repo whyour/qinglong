@@ -113,6 +113,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0060-plugin-package-secret-materialization-guard',
       'pg-0061-plugin-package-secret-binding-approval-plans',
       'pg-0062-plugin-package-secret-binding-target-guard',
+      'pg-0063-plugin-package-secret-binding-transition-receipts',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -166,6 +167,7 @@ test('keeps local-only and legacy tables out of the cluster baseline', async () 
     'plugin_package_materialized_revisions',
     'plugin_package_secret_bindings',
     'plugin_package_secret_binding_approval_plans',
+    'plugin_package_secret_binding_transition_receipts',
     'plugin_package_lifecycle_events',
     'plugin_package_lifecycle_heads',
     'plugin_package_lifecycle_receipts',
@@ -559,6 +561,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0062-plugin-package-secret-binding-target-guard',
       checksum:
         'cd4f92d8702da6b92dd9ae5153b5180400b94442f56393692b6ec038f998596b',
+    },
+    {
+      id: 'pg-0063-plugin-package-secret-binding-transition-receipts',
+      checksum:
+        '20c4d6e640b7fb05fc2f44dd9bec6d2d081697b83acf4e7dd5deb9a07afe54df',
     },
   ];
   assert.deepEqual(
@@ -2125,5 +2132,43 @@ test('advances capability v61 with a staged-target Secret binding database guard
   assert.match(
     sql,
     /migration_id = 'pg-0061-plugin-package-secret-binding-approval-plans'/,
+  );
+});
+
+test('advances capability v62 with immutable Secret binding transition receipts', async () => {
+  const migration = migrationById(
+    'pg-0063-plugin-package-secret-binding-transition-receipts',
+  );
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(
+    sql,
+    /CREATE TABLE "ql3"\."plugin_package_secret_binding_transition_receipts"/,
+  );
+  assert.match(
+    sql,
+    /CREATE FUNCTION "ql3"\."enforce_plugin_package_secret_binding_transition_receipt_target"\(\)/,
+  );
+  assert.match(sql, /install\.state = 'staged'/);
+  assert.match(sql, /previous\.state = 'active'/);
+  assert.match(sql, /MAX\(history\.target_generation\)/);
+  assert.match(sql, /binding\.binding_digest = NEW\.binding_digest/);
+  assert.doesNotMatch(sql, /SECURITY DEFINER/);
+  assert.match(
+    sql,
+    /GRANT SELECT, INSERT ON "ql3"\."plugin_package_secret_binding_transition_receipts" TO ql3_package_executor/,
+  );
+  assert.match(sql, /contract_version = 62/);
+  assert.match(sql, /"plugin_package_secret_binding_transition_receipt":1/);
+  assert.match(sql, /contract_version = 61/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0062-plugin-package-secret-binding-target-guard'/,
   );
 });

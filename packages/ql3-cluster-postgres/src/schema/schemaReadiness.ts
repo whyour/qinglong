@@ -186,6 +186,12 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  plugin_package_secret_binding_transition_receipts: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   project_tool_definition_snapshots: Object.freeze({
     select: false,
     insert: false,
@@ -706,6 +712,12 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     delete: false,
   }),
   plugin_package_secret_binding_approval_plans: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  plugin_package_secret_binding_transition_receipts: Object.freeze({
     select: false,
     insert: false,
     update: false,
@@ -1264,6 +1276,7 @@ const REQUIRED_PACKAGE_EXECUTOR_PRIVILEGES: RequiredPrivileges = Object.freeze(
             name === 'plugin_package_install_mutations' ||
             name === 'plugin_package_materialized_revisions' ||
             name === 'plugin_package_secret_bindings' ||
+            name === 'plugin_package_secret_binding_transition_receipts' ||
             name === 'project_tool_definition_snapshots' ||
             name === 'project_tool_definition_snapshot_sources' ||
             name === 'plugin_package_lifecycle_plans' ||
@@ -1531,6 +1544,7 @@ const REQUIRED_RUNTIME_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     commit_plugin_package_task_reconciliation: false,
     enforce_plugin_package_secret_materialization: false,
     enforce_plugin_package_secret_binding_target: false,
+    enforce_plugin_package_secret_binding_transition_receipt_target: false,
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: false,
     lock_approval_policy_fence: false,
@@ -1553,6 +1567,7 @@ const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     commit_plugin_package_task_reconciliation: false,
     enforce_plugin_package_secret_materialization: false,
     enforce_plugin_package_secret_binding_target: false,
+    enforce_plugin_package_secret_binding_transition_receipt_target: false,
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: false,
     lock_approval_policy_fence: true,
@@ -1575,6 +1590,7 @@ const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
     commit_plugin_package_task_reconciliation: true,
     enforce_plugin_package_secret_materialization: false,
     enforce_plugin_package_secret_binding_target: false,
+    enforce_plugin_package_secret_binding_transition_receipt_target: false,
     enforce_plugin_package_stage_provenance: false,
     lock_active_plugin_package_project: true,
     lock_approval_policy_fence: true,
@@ -1744,10 +1760,9 @@ async function assertSchemaContract(
     constraintsResult,
     functionsResult,
     triggersResult,
-  ] =
-    await Promise.all([
-      queryable.query<ColumnRow>(
-        `
+  ] = await Promise.all([
+    queryable.query<ColumnRow>(
+      `
 SELECT
   tables.relname AS "tableName",
   columns.attname AS "columnName"
@@ -1760,19 +1775,19 @@ WHERE schemas.nspname = $1
   AND NOT columns.attisdropped
 ORDER BY tables.relname, columns.attnum
       `.trim(),
-        [contract.schema],
-      ),
-      queryable.query<IndexRow>(
-        `
+      [contract.schema],
+    ),
+    queryable.query<IndexRow>(
+      `
 SELECT indexname AS "indexName"
 FROM pg_indexes
 WHERE schemaname = $1
 ORDER BY indexname
       `.trim(),
-        [contract.schema],
-      ),
-      queryable.query<ConstraintRow>(
-        `
+      [contract.schema],
+    ),
+    queryable.query<ConstraintRow>(
+      `
 SELECT
   constraints.conname AS "constraintName",
   CASE constraints.contype
@@ -1786,10 +1801,10 @@ WHERE schemas.nspname = $1
   AND constraints.contype IN ('c', 'f')
 ORDER BY constraints.contype, constraints.conname
       `.trim(),
-        [contract.schema],
-      ),
-      queryable.query<FunctionRow>(
-        `
+      [contract.schema],
+    ),
+    queryable.query<FunctionRow>(
+      `
 SELECT
   routines.proname AS "functionName",
   pg_get_function_identity_arguments(routines.oid) AS "identityArguments",
@@ -1817,10 +1832,10 @@ JOIN pg_namespace schemas ON schemas.oid = routines.pronamespace
 WHERE schemas.nspname = $1
 ORDER BY routines.proname, pg_get_function_identity_arguments(routines.oid)
       `.trim(),
-        [contract.schema],
-      ),
-      queryable.query<TriggerRow>(
-        `
+      [contract.schema],
+    ),
+    queryable.query<TriggerRow>(
+      `
 SELECT
   triggers.tgname AS "triggerName",
   tables.relname AS "tableName",
@@ -1835,12 +1850,9 @@ WHERE schemas.nspname = $1
   AND triggers.tgname = ANY($2::text[])
 ORDER BY triggers.tgname
         `.trim(),
-        [
-          contract.schema,
-          contract.triggers.map(({ name }) => name),
-        ],
-      ),
-    ]);
+      [contract.schema, contract.triggers.map(({ name }) => name)],
+    ),
+  ]);
   const actualTables = new Map<string, Set<string>>();
   for (const row of columnsResult.rows) {
     if (

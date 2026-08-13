@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 
 import { normalizePluginPackageResourceGeneration } from '../pluginPackageResourceGeneration';
 import {
@@ -466,7 +467,7 @@ export function normalizePluginPackageSecretBindingTransitionPlan(
     nextBindingPlan,
   );
   if (
-    JSON.stringify(plan.changes) !== JSON.stringify(unsigned.changes) ||
+    !isDeepStrictEqual(plan.changes, unsigned.changes) ||
     plan.kind !== unsigned.kind
   ) {
     return invalid('derived transition classification does not match content');

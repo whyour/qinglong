@@ -104,6 +104,20 @@ function transition(assignments, overrides = {}) {
   });
 }
 
+function postgresJsonbRoundTrip(value) {
+  if (Array.isArray(value)) {
+    return value.map(postgresJsonbRoundTrip);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, postgresJsonbRoundTrip(entry)]),
+    );
+  }
+  return value;
+}
+
 test('derives an exact carry-forward for an unchanged next generation', () => {
   const value = transition([
     { name: 'OPTIONAL_TOKEN', secretRef: null },
@@ -132,6 +146,19 @@ test('derives an exact carry-forward for an unchanged next generation', () => {
   );
   assert.deepEqual(
     normalizePluginPackageSecretBindingTransitionPlan(value),
+    value,
+  );
+});
+
+test('normalizes a transition after PostgreSQL jsonb reorders object keys', () => {
+  const value = transition([
+    { name: 'OPTIONAL_TOKEN', secretRef: null },
+    { name: 'TOKEN', secretRef: secret('runtime-token', 3) },
+  ]);
+  assert.deepEqual(
+    normalizePluginPackageSecretBindingTransitionPlan(
+      postgresJsonbRoundTrip(value),
+    ),
     value,
   );
 });

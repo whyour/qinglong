@@ -201,6 +201,12 @@ function runtimePrivileges() {
     plugin_package_automation_publication_heads: [true, false, false, false],
     plugin_package_secret_binding_approval_plans: [false, false, false, false],
     plugin_package_secret_bindings: [false, false, false, false],
+    plugin_package_secret_binding_transition_receipts: [
+      false,
+      false,
+      false,
+      false,
+    ],
     plugin_package_workflow_admissions: [true, true, false, false],
     plugin_package_workflow_admission_steps: [true, true, false, false],
     plugin_package_workflow_task_attempt_admissions: [true, true, false, false],

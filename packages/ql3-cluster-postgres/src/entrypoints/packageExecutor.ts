@@ -43,6 +43,12 @@ export { PostgresPluginPackageMaterializedRevisionRepository } from '../plugin-p
 export { PostgresApprovalRequestRepository } from '../approved-action/approvalRequestRepository';
 export { PostgresProjectPolicyRepository } from '../security/projectPolicyRepository';
 export { PostgresPluginPackageSecretBindingRepository } from '../plugin-package/installation/pluginPackageSecretBindingRepository';
+export { PostgresPluginPackageSecretBindingActivationPrerequisite } from '../plugin-package/secret-binding/pluginPackageSecretBindingActivationPrerequisite';
+export {
+  PostgresPluginPackageSecretBindingTransitionRepository,
+  type ApplyPostgresPluginPackageSecretBindingTransitionInput,
+  type ApplyPostgresPluginPackageSecretBindingTransitionResult,
+} from '../plugin-package/secret-binding/pluginPackageSecretBindingTransitionRepository';
 export { PostgresPluginPackageSecretBindingApprovalPlanReader } from '../plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository';
 export { PostgresPluginPackageAutomationPublicationRepository } from '../plugin-package/publication/pluginPackageAutomationPublicationRepository';
 export {

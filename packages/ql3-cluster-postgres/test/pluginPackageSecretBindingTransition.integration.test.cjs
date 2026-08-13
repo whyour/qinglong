@@ -8,18 +8,22 @@ const {
 const {
   createPluginPackageResourceGeneration,
 } = require('@qinglong/runtime-core/plugin-package-resource-generation');
+const {
+  createPluginPackageSecretBindingTarget,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding');
+const {
+  createPluginPackageSecretBindingTransitionPlan,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-transition-plan');
 const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
 const {
   assertPostgresPackageExecutorSchemaReady,
   createPostgresDatabaseOpener,
   PostgresPluginPackageSecretBindingRepository,
+  PostgresPluginPackageSecretBindingTransitionRepository,
 } = require('../dist/entrypoints/packageExecutor');
-const {
-  runPostgresMigrations,
-} = require('../dist/migration/migration');
+const { runPostgresMigrations } = require('../dist/migration/migration');
 
-const migrationConnectionString =
-  process.env.QL3_TEST_POSTGRES_MIGRATION_URL;
+const migrationConnectionString = process.env.QL3_TEST_POSTGRES_MIGRATION_URL;
 const executorConnectionString =
   process.env.QL3_TEST_POSTGRES_PACKAGE_EXECUTOR_URL;
 
@@ -221,9 +225,12 @@ async function open(role, connectionString) {
 }
 
 if (!migrationConnectionString || !executorConnectionString) {
-  test('PostgreSQL Secret binding transition gate requires migration and executor URLs', {
-    skip: true,
-  });
+  test(
+    'PostgreSQL Secret binding transition gate requires migration and executor URLs',
+    {
+      skip: true,
+    },
+  );
 } else {
   test('PostgreSQL enforces active and reviewed staged Secret binding targets', async () => {
     const migrationDatabase = await open(
@@ -241,7 +248,7 @@ if (!migrationConnectionString || !executorConnectionString) {
         executorDatabase.pool,
       );
       assert.equal(readiness.ready, true);
-      assert.equal(readiness.contractVersion, 61);
+      assert.equal(readiness.contractVersion, 62);
 
       const repository = new PostgresPluginPackageSecretBindingRepository(
         executorDatabase.pool,
@@ -326,8 +333,75 @@ if (!migrationConnectionString || !executorConnectionString) {
         packageName: stagedPackageName,
         installationId: stagedInstallationId,
       });
-      assert.equal((await repository.publish(stagedBinding)).status, 'created');
-      assert.equal((await repository.publish(stagedBinding)).status, 'existing');
+      const previousGeneration = createPluginPackageResourceGeneration({
+        installationId: previousInstallationId,
+        projectId: stagedProjectId,
+        packageName: stagedPackageName,
+        lockDigest: previousLockDigest,
+        generation: 1,
+        previousActiveLockDigest: null,
+        contentDigest: '7'.repeat(64),
+        contents: manifest(stagedPackageName).spec.contents,
+      });
+      const nextGeneration = createPluginPackageResourceGeneration({
+        installationId: stagedInstallationId,
+        projectId: stagedProjectId,
+        packageName: stagedPackageName,
+        lockDigest: stagedLockDigest,
+        generation: 2,
+        previousActiveLockDigest: previousLockDigest,
+        contentDigest: 'e'.repeat(64),
+        contents: manifest(stagedPackageName).spec.contents,
+      });
+      const transitionPlan = createPluginPackageSecretBindingTransitionPlan({
+        previousTarget: createPluginPackageSecretBindingTarget(
+          previousGeneration,
+          manifest(stagedPackageName),
+        ),
+        previousBinding: null,
+        previousAttemptGeneration: 1,
+        nextGeneration,
+        nextManifest: manifest(stagedPackageName),
+        assignments: [
+          {
+            name: 'TOKEN',
+            secretRef: createSecretRef({
+              projectId: stagedProjectId,
+              name: 'runtime-token',
+              version: 2,
+            }),
+          },
+        ],
+        plannedAtMs: 100,
+      });
+      const transitions =
+        new PostgresPluginPackageSecretBindingTransitionRepository(
+          executorDatabase.pool,
+        );
+      const committed = await transitions.apply({
+        transitionPlan,
+        evidenceDigest: transitionPlan.transitionDigest,
+        committedAtMs: 102,
+      });
+      assert.equal(committed.status, 'created');
+      assert.equal(
+        committed.receipt.bindingDigest,
+        committed.binding.bindingDigest,
+      );
+      assert.equal(
+        (
+          await transitions.apply({
+            transitionPlan,
+            evidenceDigest: transitionPlan.transitionDigest,
+            committedAtMs: 102,
+          })
+        ).status,
+        'existing',
+      );
+      assert.deepEqual(
+        await transitions.find(transitionPlan.nextTarget.generationDigest),
+        committed.receipt,
+      );
 
       const activatingProjectId = `${namespace}-activating`;
       const activatingPackageName = 'activating-binding';

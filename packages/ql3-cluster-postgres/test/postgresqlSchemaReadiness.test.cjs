@@ -76,6 +76,12 @@ function validPrivileges() {
     plugin_package_materialized_revisions: [false, false, false, false],
     plugin_package_secret_bindings: [false, false, false, false],
     plugin_package_secret_binding_approval_plans: [false, false, false, false],
+    plugin_package_secret_binding_transition_receipts: [
+      false,
+      false,
+      false,
+      false,
+    ],
     project_tool_definition_snapshots: [false, false, false, false],
     project_tool_definition_snapshot_sources: [false, false, false, false],
     plugin_package_quarantine_events: [false, false, false, false],
@@ -196,6 +202,12 @@ function validAdminPrivileges() {
     plugin_package_materialized_revisions: [false, false, false, false],
     plugin_package_secret_bindings: [false, false, false, false],
     plugin_package_secret_binding_approval_plans: [false, false, false, false],
+    plugin_package_secret_binding_transition_receipts: [
+      false,
+      false,
+      false,
+      false,
+    ],
     project_tool_definition_snapshots: [false, false, false, false],
     project_tool_definition_snapshot_sources: [false, false, false, false],
     plugin_package_quarantine_events: [false, false, false, false],
@@ -308,6 +320,7 @@ function packagePrivileges(kind) {
             'plugin_package_install_mutations',
             'plugin_package_materialized_revisions',
             'plugin_package_secret_bindings',
+            'plugin_package_secret_binding_transition_receipts',
             'project_tool_definition_snapshots',
             'project_tool_definition_snapshot_sources',
             'plugin_package_admission_receipts',
@@ -351,6 +364,7 @@ function packagePrivileges(kind) {
           'plugin_package_install_mutations',
           'plugin_package_materialized_revisions',
           'plugin_package_secret_bindings',
+          'plugin_package_secret_binding_transition_receipts',
           'plugin_package_automation_publications',
           'plugin_package_automation_publication_heads',
           'project_tool_definition_snapshots',
@@ -776,7 +790,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 61,
+    contractVersion: 62,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -840,6 +854,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0060-plugin-package-secret-materialization-guard',
       'pg-0061-plugin-package-secret-binding-approval-plans',
       'pg-0062-plugin-package-secret-binding-target-guard',
+      'pg-0063-plugin-package-secret-binding-transition-receipts',
     ],
   });
 });
@@ -870,10 +885,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 61);
+  assert.equal(report.contractVersion, 62);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0062-plugin-package-secret-binding-target-guard',
+    'pg-0063-plugin-package-secret-binding-transition-receipts',
   );
 });
 
@@ -886,10 +901,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 61);
+  assert.equal(report.contractVersion, 62);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0062-plugin-package-secret-binding-target-guard',
+    'pg-0063-plugin-package-secret-binding-transition-receipts',
   );
 
   const widened = automationManagerPrivileges();
@@ -918,10 +933,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 61);
+  assert.equal(report.contractVersion, 62);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0062-plugin-package-secret-binding-target-guard',
+    'pg-0063-plugin-package-secret-binding-transition-receipts',
   );
 
   const widened = approvalManagerPrivileges();
@@ -952,10 +967,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 61);
+  assert.equal(report.contractVersion, 62);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0062-plugin-package-secret-binding-target-guard',
+    'pg-0063-plugin-package-secret-binding-transition-receipts',
   );
 
   const widened = runManagerPrivileges();
@@ -1087,10 +1102,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 61);
+  assert.equal(report.contractVersion, 62);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0062-plugin-package-secret-binding-target-guard',
+    'pg-0063-plugin-package-secret-binding-transition-receipts',
   );
 });
 

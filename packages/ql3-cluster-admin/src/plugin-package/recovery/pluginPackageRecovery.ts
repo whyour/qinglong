@@ -40,6 +40,7 @@ import {
   PostgresPluginPackageAutomationPublicationRepository,
   PostgresPluginPackageMaterializedRevisionRepository,
   PostgresPluginPackageSecretBindingRepository,
+  PostgresPluginPackageSecretBindingActivationPrerequisite,
   PostgresPluginPackagePublisherProvenanceRepository,
   PostgresPluginPackageTaskReconciliationRepository,
   PostgresProjectToolDefinitionSnapshotRepository,
@@ -318,6 +319,10 @@ export async function recoverClusterPluginPackages(
       repository,
       stageProvider: stageAuthority,
       publisher,
+      activationPrerequisite:
+        new PostgresPluginPackageSecretBindingActivationPrerequisite(
+          database.pool,
+        ),
       now: options.now,
     }).recover({
       ...(options.pageSize === undefined ? {} : { pageSize: options.pageSize }),

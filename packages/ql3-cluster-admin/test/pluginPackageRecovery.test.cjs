@@ -35,6 +35,7 @@ function executorPrivileges() {
     'plugin_package_automation_publications',
     'plugin_package_automation_publication_heads',
     'plugin_package_secret_bindings',
+    'plugin_package_secret_binding_transition_receipts',
     'project_tool_definition_snapshots',
     'project_tool_definition_snapshot_sources',
     'plugin_package_publisher_provenance',
@@ -204,6 +205,7 @@ function database(serverVersionNum = '160014') {
               functionName,
               executeAllowed: ![
                 'enforce_plugin_package_secret_binding_target',
+                'enforce_plugin_package_secret_binding_transition_receipt_target',
                 'enforce_plugin_package_secret_materialization',
                 'enforce_plugin_package_stage_provenance',
                 'plugin_package_automation_start_allowed',
@@ -300,6 +302,7 @@ test('proves an empty executor queue and closes PostgreSQL before returning', as
     retry: 0,
     manualRequired: 0,
     superseded: 0,
+    deferred: 0,
     remaining: false,
     safeToAdmit: true,
   });
