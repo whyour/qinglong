@@ -89,6 +89,9 @@
       "plugin-package-secret-binding-plan": [
         "dist/plugin-package/secret-binding/plan.d.ts"
       ],
+      "plugin-package-secret-binding-approval-plan": [
+        "dist/plugin-package/secret-binding/approvalPlan.d.ts"
+      ],
       "secret-projection": [
         "dist/secret/secretProjection.d.ts"
       ],
@@ -389,6 +392,11 @@
       "types": "./dist/plugin-package/secret-binding/plan.d.ts",
       "require": "./dist/plugin-package/secret-binding/plan.js",
       "default": "./dist/plugin-package/secret-binding/plan.js"
+    },
+    "./plugin-package-secret-binding-approval-plan": {
+      "types": "./dist/plugin-package/secret-binding/approvalPlan.d.ts",
+      "require": "./dist/plugin-package/secret-binding/approvalPlan.js",
+      "default": "./dist/plugin-package/secret-binding/approvalPlan.js"
     },
     "./secret-projection": {
       "types": "./dist/secret/secretProjection.d.ts",
