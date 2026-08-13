@@ -270,6 +270,21 @@
       "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovedAction.js",
       "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovedAction.js"
     },
+    "./plugin-package-secret-binding-transition-management": {
+      "types": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionManagement.d.ts",
+      "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionManagement.js",
+      "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionManagement.js"
+    },
+    "./plugin-package-secret-binding-transition-approval-consumer": {
+      "types": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalConsumer.d.ts",
+      "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalConsumer.js",
+      "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalConsumer.js"
+    },
+    "./plugin-package-secret-binding-transition-approved-action": {
+      "types": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovedAction.d.ts",
+      "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovedAction.js",
+      "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovedAction.js"
+    },
     "./plugin-package-lifecycle-management": {
       "types": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.d.ts",
       "require": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.js",

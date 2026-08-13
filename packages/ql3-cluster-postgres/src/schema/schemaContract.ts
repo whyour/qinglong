@@ -21,8 +21,8 @@ export interface PostgresSchemaContractTrigger {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 62;
-  readonly migrationId: 'pg-0063-plugin-package-secret-binding-transition-receipts';
+  readonly contractVersion: 63;
+  readonly migrationId: 'pg-0064-plugin-package-secret-binding-transition-approval-plans';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -64,6 +64,7 @@ export interface PostgresSchemaContract {
     plugin_package_secret_binding: 1;
     plugin_package_secret_binding_approval_plan: 1;
     plugin_package_secret_binding_transition: 1;
+    plugin_package_secret_binding_transition_approval_plan: 1;
     plugin_package_secret_binding_transition_receipt: 1;
     plugin_package_secret_materialization: 1;
     plugin_package_proposal: 1;
@@ -116,8 +117,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 62,
-    migrationId: 'pg-0063-plugin-package-secret-binding-transition-receipts',
+    contractVersion: 63,
+    migrationId: 'pg-0064-plugin-package-secret-binding-transition-approval-plans',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -152,6 +153,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       plugin_package_secret_binding: 1,
       plugin_package_secret_binding_approval_plan: 1,
       plugin_package_secret_binding_transition: 1,
+      plugin_package_secret_binding_transition_approval_plan: 1,
       plugin_package_secret_binding_transition_receipt: 1,
       plugin_package_secret_materialization: 1,
       plugin_package_proposal: 1,
@@ -284,6 +286,24 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         'lock_digest',
         'generation',
         'manifest_digest',
+        'requested_by_type',
+        'requested_by_id',
+        'planned_at_ms',
+        'expires_at_ms',
+        'plan_json',
+      ]),
+      table('plugin_package_secret_binding_transition_approval_plans', [
+        'action_ref',
+        'approval_plan_digest',
+        'transition_digest',
+        'generation_digest',
+        'project_id',
+        'package_name',
+        'installation_id',
+        'lock_digest',
+        'generation',
+        'manifest_digest',
+        'previous_active_lock_digest',
         'requested_by_type',
         'requested_by_id',
         'planned_at_ms',
@@ -1494,6 +1514,10 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_package_secret_transition_receipt_transition_uidx',
       'ql3_package_secret_transition_receipt_digest_uidx',
       'ql3_package_secret_transition_receipt_install_idx',
+      'plugin_package_secret_binding_transition_approval_plans_pkey',
+      'ql3_pp_secret_transition_plan_digest_uidx',
+      'ql3_pp_secret_transition_plan_target_uidx',
+      'ql3_pp_secret_transition_plan_expiry_idx',
       'project_tool_definition_snapshots_pkey',
       'ql3_project_tool_snapshot_withdrawal_key',
       'ql3_project_tool_definition_snapshot_digest_uidx',
@@ -1795,6 +1819,10 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_package_secret_transition_receipt_identity_check',
       'ql3_package_secret_transition_receipt_digest_check',
       'ql3_package_secret_transition_receipt_json_check',
+      'ql3_pp_secret_transition_plan_identity_check',
+      'ql3_pp_secret_transition_plan_digest_check',
+      'ql3_pp_secret_transition_plan_time_check',
+      'ql3_pp_secret_transition_plan_json_check',
       'ql3_plugin_package_quarantine_identity_check',
       'ql3_plugin_package_quarantine_state_check',
       'ql3_plugin_package_quarantine_subject_check',
@@ -2254,6 +2282,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_plugin_package_secret_binding_approval_plan_install_fk',
       'ql3_plugin_package_secret_binding_transition_receipt_project_fk',
       'ql3_plugin_package_secret_binding_transition_receipt_install_fk',
+      'ql3_pp_secret_transition_plan_project_fk',
+      'ql3_pp_secret_transition_plan_install_fk',
       'ql3_project_tool_definition_snapshot_project_fk',
       'ql3_project_tool_definition_snapshot_source_snapshot_fk',
       'ql3_project_tool_definition_snapshot_source_install_fk',
@@ -2404,6 +2434,23 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_run_retry_policies_run_fk',
     ]),
     functions: Object.freeze([
+      Object.freeze({
+        name: 'plugin_package_secret_binding_transition_snapshot',
+        identityArguments:
+          'p_project_id character varying, p_package_name character varying',
+        owner: 'ql3_migration',
+        securityDefiner: true,
+        volatility: 'volatile',
+        configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
+      Object.freeze({
+        name: 'create_plugin_package_secret_transition_plan',
+        identityArguments: 'p_plan_json jsonb',
+        owner: 'ql3_migration',
+        securityDefiner: true,
+        volatility: 'volatile',
+        configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
       Object.freeze({
         name: 'plugin_package_secret_binding_planning_snapshot',
         identityArguments:

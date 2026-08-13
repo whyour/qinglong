@@ -39,6 +39,11 @@ import {
   type ClusterPluginPackageSecretBindingApprovalSummary,
   type ConsumeClusterPluginPackageSecretBindingApprovalsOptions,
 } from '../secret-binding/pluginPackageSecretBindingApprovalConsumer';
+import {
+  consumeClusterPluginPackageSecretBindingTransitionApprovals,
+  type ClusterPluginPackageSecretBindingTransitionApprovalSummary,
+  type ConsumeClusterPluginPackageSecretBindingTransitionApprovalsOptions,
+} from '../secret-binding/pluginPackageSecretBindingTransitionApprovalConsumer';
 import { ProjectedPluginPackageSecretExistenceInspector } from '../secret-binding/projectedSecretExistenceInspector';
 import {
   runClusterPluginPackagePublisherRevocation,
@@ -70,6 +75,7 @@ export interface ClusterPluginPackageExecutorBatchResult {
   readonly approvals: Readonly<ClusterPluginPackagePublisherRevocationApprovalSummary>;
   readonly trustTransitionApprovals: Readonly<ClusterPluginPackagePublisherTrustTransitionApprovalSummary>;
   readonly secretBindingApprovals: Readonly<ClusterPluginPackageSecretBindingApprovalSummary>;
+  readonly secretBindingTransitionApprovals: Readonly<ClusterPluginPackageSecretBindingTransitionApprovalSummary>;
   readonly dispatch: Readonly<ApprovedActionDispatchBatchSummary>;
 }
 
@@ -97,6 +103,11 @@ export interface RunClusterPluginPackageExecutorProcessOptions {
   readonly consumeSecretBindingApprovals?: (
     options: ConsumeClusterPluginPackageSecretBindingApprovalsOptions,
   ) => Promise<Readonly<ClusterPluginPackageSecretBindingApprovalSummary>>;
+  readonly consumeSecretBindingTransitionApprovals?: (
+    options: ConsumeClusterPluginPackageSecretBindingTransitionApprovalsOptions,
+  ) => Promise<
+    Readonly<ClusterPluginPackageSecretBindingTransitionApprovalSummary>
+  >;
   readonly createDispatcher?: (
     options: ClusterPluginPackageApprovedActionDispatcherOptions,
   ) => ApprovedActionDispatcher;
@@ -375,6 +386,7 @@ function isIdleBatch(
     batch.approvals.scanned === 0 &&
     batch.trustTransitionApprovals.scanned === 0 &&
     batch.secretBindingApprovals.scanned === 0 &&
+    batch.secretBindingTransitionApprovals.scanned === 0 &&
     batch.dispatch.scanned === 0
   );
 }
@@ -395,6 +407,8 @@ export async function runClusterPluginPackageExecutorProcess(
       typeof options.consumeTrustTransitionApprovals !== 'function') ||
     (options.consumeSecretBindingApprovals !== undefined &&
       typeof options.consumeSecretBindingApprovals !== 'function') ||
+    (options.consumeSecretBindingTransitionApprovals !== undefined &&
+      typeof options.consumeSecretBindingTransitionApprovals !== 'function') ||
     (options.createDispatcher !== undefined &&
       typeof options.createDispatcher !== 'function') ||
     (options.now !== undefined && typeof options.now !== 'function')
@@ -431,6 +445,9 @@ export async function runClusterPluginPackageExecutorProcess(
     const consumeSecretBindingApprovals =
       options.consumeSecretBindingApprovals ??
       consumeClusterPluginPackageSecretBindingApprovals;
+    const consumeSecretBindingTransitionApprovals =
+      options.consumeSecretBindingTransitionApprovals ??
+      consumeClusterPluginPackageSecretBindingTransitionApprovals;
     const dispatcher = dispatcherFactory({
       pool: database.pool,
       owner: config.owner,
@@ -487,6 +504,12 @@ export async function runClusterPluginPackageExecutorProcess(
           limit: config.approvalBatchSize,
           ...(options.now ? { now: options.now } : {}),
         });
+      const secretBindingTransitionApprovals =
+        await consumeSecretBindingTransitionApprovals({
+          pool: database.pool,
+          limit: config.approvalBatchSize,
+          ...(options.now ? { now: options.now } : {}),
+        });
       const dispatch = await dispatcher.dispatchBatch({
         limit: config.dispatchBatchSize,
       });
@@ -494,6 +517,7 @@ export async function runClusterPluginPackageExecutorProcess(
         approvals,
         trustTransitionApprovals,
         secretBindingApprovals,
+        secretBindingTransitionApprovals,
         dispatch,
       });
       batches.push(batch);

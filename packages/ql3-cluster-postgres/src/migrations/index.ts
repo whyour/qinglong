@@ -66,6 +66,7 @@ import { pg0060PluginPackageSecretMaterializationGuardMigration } from './pg-006
 import { pg0061PluginPackageSecretBindingApprovalPlansMigration } from './pg-0061-plugin-package-secret-binding-approval-plans';
 import { pg0062PluginPackageSecretBindingTargetGuardMigration } from './pg-0062-plugin-package-secret-binding-target-guard';
 import { pg0063PluginPackageSecretBindingTransitionReceiptsMigration } from './pg-0063-plugin-package-secret-binding-transition-receipts';
+import { pg0064PluginPackageSecretBindingTransitionApprovalPlansMigration } from './pg-0064-plugin-package-secret-binding-transition-approval-plans';
 
 export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMigrationContext> =
   Object.freeze({
@@ -137,5 +138,6 @@ export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMi
       pg0061PluginPackageSecretBindingApprovalPlansMigration,
       pg0062PluginPackageSecretBindingTargetGuardMigration,
       pg0063PluginPackageSecretBindingTransitionReceiptsMigration,
+      pg0064PluginPackageSecretBindingTransitionApprovalPlansMigration,
     ]),
   });

@@ -1265,6 +1265,7 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/plugin-package-proposal',
           '@qinglong/runtime-core/plugin-package-secret-binding',
           '@qinglong/runtime-core/plugin-package-secret-binding-approval-plan',
+          '@qinglong/runtime-core/plugin-package-secret-binding-transition-approval-plan',
           '@qinglong/runtime-core/security',
         ]);
         if (
@@ -2349,6 +2350,14 @@ function auditSourceImports(root, packagePath, findings) {
             specifier === '@qinglong/cluster-postgres/package-manager') ||
           (path.relative(packageDirectory, filePath) ===
             'src/plugin-package/secret-binding/pluginPackageSecretBindingApprovalConsumer.ts' &&
+            specifier === '@qinglong/cluster-postgres/package-executor') ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/plugin-package/secret-binding/pluginPackageSecretBindingTransitionManagement.ts' &&
+            specifier === '@qinglong/cluster-postgres/package-manager') ||
+          ([
+            'src/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalConsumer.ts',
+            'src/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovedAction.ts',
+          ].includes(path.relative(packageDirectory, filePath)) &&
             specifier === '@qinglong/cluster-postgres/package-executor') ||
           ([
             'src/worker-credential/management-server/workerCredentialManagement.ts',

@@ -186,6 +186,8 @@ function database(serverVersionNum = '160014') {
                 'plugin_package_workflow_task_attempt_snapshot',
                 'register_plugin_package_automation_disposition_event',
                 'create_plugin_package_secret_binding_approval_plan',
+                'create_plugin_package_secret_transition_plan',
+                'plugin_package_secret_binding_transition_snapshot',
               ].includes(functionName),
               isOwner: false,
             })),

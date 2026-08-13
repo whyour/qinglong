@@ -410,6 +410,116 @@ function fakeSecretBinding() {
   };
 }
 
+function secretBindingTransitionPlan() {
+  const previousSecretRef =
+    'qlsecret:v1:eyJwcm9qZWN0SWQiOiJkZWZhdWx0IiwibmFtZSI6InJ1bnRpbWUtdG9rZW4iLCJ2ZXJzaW9uIjoxfQ';
+  const nextSecretRef =
+    'qlsecret:v1:eyJwcm9qZWN0SWQiOiJkZWZhdWx0IiwibmFtZSI6InJ1bnRpbWUtdG9rZW4iLCJ2ZXJzaW9uIjoyfQ';
+  return {
+    schema:
+      'qinglong/plugin-package-secret-binding-transition-approval-plan@v1',
+    actionRef: 'secret-transition:cluster-monitor:2',
+    approvalPlanDigest: 'a'.repeat(64),
+    requestedBy: { type: 'user', id: 'cluster-reviewer' },
+    plannedAtMs: NOW - 10,
+    expiresAtMs: NOW + 10_000,
+    transitionPlan: {
+      schema: 'qinglong/plugin-package-secret-binding-transition-plan@v1',
+      kind: 'rotate',
+      previousTarget: {
+        installationId: 'cluster-monitor-installation-v1',
+        projectId: 'default',
+        packageName: 'cluster-monitor',
+        lockDigest: '1'.repeat(64),
+        generation: 1,
+        generationDigest: '2'.repeat(64),
+        manifestDigest: '3'.repeat(64),
+      },
+      previousBinding: null,
+      previousActiveLockDigest: '1'.repeat(64),
+      previousAttemptGeneration: 1,
+      nextTarget: {
+        installationId: 'cluster-monitor-installation-v2',
+        projectId: 'default',
+        packageName: 'cluster-monitor',
+        lockDigest: '4'.repeat(64),
+        generation: 2,
+        generationDigest: '5'.repeat(64),
+        manifestDigest: '6'.repeat(64),
+      },
+      nextBindingPlan: null,
+      changes: [{
+        name: 'TOKEN',
+        requirement: 'unchanged',
+        reference: 'rotated',
+        previous: { required: true, secretRef: previousSecretRef },
+        next: { required: true, secretRef: nextSecretRef },
+      }],
+      transitionDigest: 'b'.repeat(64),
+    },
+  };
+}
+
+function fakeSecretBindingTransition() {
+  const calls = { plan: [], propose: [], decide: [], inspectAuthorized: [] };
+  return {
+    calls,
+    service: {
+      async plan(request) {
+        calls.plan.push(request);
+        return { status: 'created', plan: secretBindingTransitionPlan() };
+      },
+      async propose(request) {
+        calls.propose.push(request);
+        return {
+          plan: secretBindingTransitionPlan(),
+          approvalStatus: 'created',
+          approvalRequest: approval({
+            id: request.approvalRequestId,
+            projectId: 'default',
+            action: {
+              permission: 'secret.manage',
+              actionType: 'plugin_package.secret_binding.transition',
+              actionRef: request.actionRef,
+              actionDigest: 'a'.repeat(64),
+              previewDigest: 'b'.repeat(64),
+            },
+            requestedBy: request.principal.subject,
+          }),
+        };
+      },
+      async decide(request) {
+        calls.decide.push(request);
+        return {
+          status: 'decided',
+          request: approval({
+            id: request.approvalRequestId,
+            projectId: 'default',
+            version: 2,
+            state: request.decision,
+            decisionId: request.decisionId,
+            decision: request.decision,
+            decisionReasonCode: request.reasonCode,
+            decidedBy: request.principal.subject,
+            decisionAuthenticationId: request.principal.authenticationId,
+            decisionAssurance: request.principal.assurance,
+            decidedAtMs: NOW,
+            decisionFence: { projectVersion: 1, bindingVersion: 1 },
+          }),
+        };
+      },
+      async inspectAuthorized(request) {
+        calls.inspectAuthorized.push(request);
+        return {
+          plan: secretBindingTransitionPlan(),
+          approvalRequest: null,
+          stale: false,
+        };
+      },
+    },
+  };
+}
+
 function lifecyclePlan() {
   return {
     schema: 'qinglong/plugin-package-lifecycle-plan@v1',
@@ -978,6 +1088,78 @@ test('routes content-free Secret binding review without executor authority', asy
   assert.equal(secretBinding.calls.propose.length, 1);
   assert.equal(secretBinding.calls.decide.length, 1);
   assert.equal(secretBinding.calls.inspectAuthorized.length, 1);
+  assert.deepEqual(management.calls.consume, []);
+  assert.deepEqual(management.calls.dispatch, []);
+});
+
+test('routes content-free Secret transition review without executor authority', async () => {
+  const management = fakeService();
+  const transition = fakeSecretBindingTransition();
+  const transport = createClusterPluginPackageManagementTransport({
+    service: management.service,
+    secretBindingTransition: transition.service,
+    now: () => NOW,
+  });
+  const plan = secretBindingTransitionPlan();
+  const assignments = plan.transitionPlan.changes
+    .filter(({ next }) => next !== null)
+    .map(({ name, next }) => ({ name, secretRef: next.secretRef }));
+  const planned = await transport.execute({
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.transition.plan',
+    request: {
+      actionRef: plan.actionRef,
+      projectId: 'default',
+      packageName: 'cluster-monitor',
+      assignments,
+    },
+  }, authentication().authority);
+  assert.equal(planned.status, 'created');
+  assert.equal(planned.plan.kind, 'rotate');
+  assert.equal(planned.plan.previousGeneration, 1);
+  assert.equal(planned.plan.nextGeneration, 2);
+  assert.equal(Object.hasOwn(planned.plan, 'previousBinding'), false);
+
+  const proposed = await transport.execute({
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.transition.propose',
+    request: {
+      actionRef: plan.actionRef,
+      approvalRequestId: 'approval-secret-transition-1',
+      approvalAuditEventId: 'audit-secret-transition-approval-1',
+    },
+  }, authentication().authority);
+  assert.equal(proposed.approvalStatus, 'created');
+
+  const decided = await transport.execute({
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.transition.decide',
+    request: {
+      actionRef: plan.actionRef,
+      approvalRequestId: 'approval-secret-transition-1',
+      expectedVersion: 1,
+      decisionId: 'decision-secret-transition-1',
+      auditEventId: 'audit-secret-transition-decision-1',
+      decision: 'approved',
+      reasonCode: 'reviewed',
+    },
+  }, authentication().authority);
+  assert.equal(decided.status, 'decided');
+
+  const inspected = await transport.execute({
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.transition.inspect',
+    request: {
+      actionRef: plan.actionRef,
+      approvalRequestId: 'approval-secret-transition-1',
+      inspectionId: 'inspection-secret-transition-1',
+    },
+  }, authentication().authority);
+  assert.equal(inspected.stale, false);
+  assert.equal(transition.calls.plan.length, 1);
+  assert.equal(transition.calls.propose.length, 1);
+  assert.equal(transition.calls.decide.length, 1);
+  assert.equal(transition.calls.inspectAuthorized.length, 1);
   assert.deepEqual(management.calls.consume, []);
   assert.deepEqual(management.calls.dispatch, []);
 });

@@ -16,6 +16,7 @@ import type { PluginPackageInstallProposal } from '@qinglong/runtime-core/plugin
 import type { PluginPackageLifecyclePlan } from '@qinglong/runtime-core/plugin-package-lifecycle-plan';
 import type { PluginPackageSecretBindingAssignment } from '@qinglong/runtime-core/plugin-package-secret-binding';
 import type { PluginPackageSecretBindingApprovalPlan } from '@qinglong/runtime-core/plugin-package-secret-binding-approval-plan';
+import type { PluginPackageSecretBindingTransitionApprovalPlan } from '@qinglong/runtime-core/plugin-package-secret-binding-transition-approval-plan';
 import {
   normalizeSecurityPrincipal,
   type SecurityPrincipal,
@@ -28,6 +29,7 @@ import type {
   InspectClusterPluginPackagePublisherTrustTransitionResult,
 } from '../publisher/pluginPackagePublisherTrustManagement';
 import type { ClusterPluginPackageSecretBindingManagementService } from '../secret-binding/pluginPackageSecretBindingManagement';
+import type { ClusterPluginPackageSecretBindingTransitionManagementService } from '../secret-binding/pluginPackageSecretBindingTransitionManagement';
 
 const STRONG_CLUSTER_ASSURANCES = new Set(['multi_factor', 'hardware']);
 
@@ -202,6 +204,30 @@ export interface InspectClusterPluginPackageSecretBindingCommand {
   readonly request: InspectClusterPluginPackageCommand['request'];
 }
 
+export interface PlanClusterPluginPackageSecretBindingTransitionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.transition.plan';
+  readonly request: PlanClusterPluginPackageSecretBindingCommand['request'];
+}
+
+export interface ProposeClusterPluginPackageSecretBindingTransitionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.transition.propose';
+  readonly request: ProposeClusterPluginPackageSecretBindingCommand['request'];
+}
+
+export interface DecideClusterPluginPackageSecretBindingTransitionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.transition.decide';
+  readonly request: DecideClusterPluginPackageSecretBindingCommand['request'];
+}
+
+export interface InspectClusterPluginPackageSecretBindingTransitionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.transition.inspect';
+  readonly request: InspectClusterPluginPackageSecretBindingCommand['request'];
+}
+
 export type ClusterPluginPackageManagementCommand =
   | ProposeClusterPluginPackageCommand
   | DecideClusterPluginPackageCommand
@@ -220,7 +246,11 @@ export type ClusterPluginPackageManagementCommand =
   | PlanClusterPluginPackageSecretBindingCommand
   | ProposeClusterPluginPackageSecretBindingCommand
   | DecideClusterPluginPackageSecretBindingCommand
-  | InspectClusterPluginPackageSecretBindingCommand;
+  | InspectClusterPluginPackageSecretBindingCommand
+  | PlanClusterPluginPackageSecretBindingTransitionCommand
+  | ProposeClusterPluginPackageSecretBindingTransitionCommand
+  | DecideClusterPluginPackageSecretBindingTransitionCommand
+  | InspectClusterPluginPackageSecretBindingTransitionCommand;
 
 export type ClusterPluginPackageManagementTransportResult =
   | Readonly<{
@@ -342,6 +372,32 @@ export type ClusterPluginPackageManagementTransportResult =
       plan: ReturnType<typeof secretBindingPlanSummary> | null;
       approval: ReturnType<typeof approvalSummary> | null;
       stale: boolean;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.transition.plan';
+      status: 'created' | 'existing';
+      plan: ReturnType<typeof secretBindingTransitionPlanSummary>;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.transition.propose';
+      approvalStatus: 'created' | 'existing';
+      plan: ReturnType<typeof secretBindingTransitionPlanSummary>;
+      approval: ReturnType<typeof approvalSummary>;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.transition.decide';
+      status: 'decided' | 'existing';
+      approval: ReturnType<typeof approvalSummary>;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.transition.inspect';
+      plan: ReturnType<typeof secretBindingTransitionPlanSummary> | null;
+      approval: ReturnType<typeof approvalSummary> | null;
+      stale: boolean;
     }>;
 
 export interface ClusterPluginPackageManagementTransport {
@@ -356,6 +412,7 @@ export interface ClusterPluginPackageManagementTransportOptions {
   readonly lifecycle?: ClusterPluginPackageLifecycleManagementService;
   readonly publisherTrust?: ClusterPluginPackagePublisherTrustManagementService;
   readonly secretBinding?: ClusterPluginPackageSecretBindingManagementService;
+  readonly secretBindingTransition?: ClusterPluginPackageSecretBindingTransitionManagementService;
   readonly now?: () => number;
 }
 
@@ -639,6 +696,54 @@ export function normalizeClusterPluginPackageManagementCommand(
         'Secret binding inspection request',
       );
       break;
+    case 'plugin-package.secret-binding.transition.plan':
+      exactObject(
+        value.request,
+        ['actionRef', 'assignments', 'packageName', 'projectId'],
+        'Secret transition plan request',
+      );
+      if (!Array.isArray(value.request.assignments)) {
+        throw new ClusterPluginPackageManagementTransportRequestError(
+          'Secret transition assignments are invalid',
+        );
+      }
+      for (const assignment of value.request.assignments) {
+        exactObject(
+          assignment,
+          ['name', 'secretRef'],
+          'Secret transition assignment',
+        );
+      }
+      break;
+    case 'plugin-package.secret-binding.transition.propose':
+      exactObject(
+        value.request,
+        ['actionRef', 'approvalAuditEventId', 'approvalRequestId'],
+        'Secret transition proposal request',
+      );
+      break;
+    case 'plugin-package.secret-binding.transition.decide':
+      exactObject(
+        value.request,
+        [
+          'actionRef',
+          'approvalRequestId',
+          'expectedVersion',
+          'decisionId',
+          'auditEventId',
+          'decision',
+          'reasonCode',
+        ],
+        'Secret transition decision request',
+      );
+      break;
+    case 'plugin-package.secret-binding.transition.inspect':
+      exactObject(
+        value.request,
+        ['actionRef', 'approvalRequestId', 'inspectionId'],
+        'Secret transition inspection request',
+      );
+      break;
     default:
       throw new ClusterPluginPackageManagementTransportRequestError(
         'operation is not publicly available',
@@ -771,6 +876,33 @@ function secretBindingPlanSummary(
   });
 }
 
+function secretBindingTransitionPlanSummary(
+  plan: Readonly<PluginPackageSecretBindingTransitionApprovalPlan>,
+) {
+  const transition = plan.transitionPlan;
+  return Object.freeze({
+    actionRef: plan.actionRef,
+    approvalPlanDigest: plan.approvalPlanDigest,
+    plannedAtMs: plan.plannedAtMs,
+    expiresAtMs: plan.expiresAtMs,
+    kind: transition.kind,
+    transitionDigest: transition.transitionDigest,
+    projectId: transition.nextTarget.projectId,
+    packageName: transition.nextTarget.packageName,
+    previousInstallationId: transition.previousTarget.installationId,
+    previousGeneration: transition.previousTarget.generation,
+    previousGenerationDigest: transition.previousTarget.generationDigest,
+    previousActiveLockDigest: transition.previousActiveLockDigest,
+    previousAttemptGeneration: transition.previousAttemptGeneration,
+    nextInstallationId: transition.nextTarget.installationId,
+    nextGeneration: transition.nextTarget.generation,
+    nextGenerationDigest: transition.nextTarget.generationDigest,
+    nextLockDigest: transition.nextTarget.lockDigest,
+    nextManifestDigest: transition.nextTarget.manifestDigest,
+    changes: transition.changes,
+  });
+}
+
 function publisherRevocationProposalSummary(
   proposal: NonNullable<
     InspectClusterPluginPackagePublisherRevocationResult['proposal']
@@ -826,6 +958,7 @@ function exactDecisionReplay(
     | DecideClusterPluginPackagePublisherRevocationCommand
     | DecideClusterPluginPackagePublisherTrustTransitionCommand
     | DecideClusterPluginPackageSecretBindingCommand
+    | DecideClusterPluginPackageSecretBindingTransitionCommand
   >,
   principal: Readonly<SecurityPrincipal>,
 ): Readonly<DecideApprovalRequestResult> | null {
@@ -859,6 +992,7 @@ export function createClusterPluginPackageManagementTransport(
         key !== 'lifecycle' &&
         key !== 'publisherTrust' &&
         key !== 'secretBinding' &&
+        key !== 'secretBindingTransition' &&
         key !== 'now',
     ) ||
     !options.service ||
@@ -884,6 +1018,13 @@ export function createClusterPluginPackageManagementTransport(
         typeof options.secretBinding.propose !== 'function' ||
         typeof options.secretBinding.decide !== 'function' ||
         typeof options.secretBinding.inspectAuthorized !== 'function')) ||
+    (options.secretBindingTransition !== undefined &&
+      (!options.secretBindingTransition ||
+        typeof options.secretBindingTransition.plan !== 'function' ||
+        typeof options.secretBindingTransition.propose !== 'function' ||
+        typeof options.secretBindingTransition.decide !== 'function' ||
+        typeof options.secretBindingTransition.inspectAuthorized !==
+          'function')) ||
     (options.now !== undefined && typeof options.now !== 'function')
   ) {
     throw new ClusterPluginPackageManagementTransportConfigurationError(
@@ -1146,6 +1287,81 @@ export function createClusterPluginPackageManagementTransport(
             schemaVersion: 1 as const,
             operation: command.operation,
             plan: result.plan ? secretBindingPlanSummary(result.plan) : null,
+            approval: result.approvalRequest
+              ? approvalSummary(result.approvalRequest)
+              : null,
+            stale: result.stale,
+          });
+        }
+        case 'plugin-package.secret-binding.transition.plan': {
+          if (!options.secretBindingTransition) {
+            throw new ClusterPluginPackageManagementTransportConfigurationError(
+              'Secret transition management is not configured',
+            );
+          }
+          const result = await options.secretBindingTransition.plan({
+            ...command.request,
+            principal,
+          });
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            status: result.status,
+            plan: secretBindingTransitionPlanSummary(result.plan),
+          });
+        }
+        case 'plugin-package.secret-binding.transition.propose': {
+          if (!options.secretBindingTransition) {
+            throw new ClusterPluginPackageManagementTransportConfigurationError(
+              'Secret transition management is not configured',
+            );
+          }
+          const result = await options.secretBindingTransition.propose({
+            ...command.request,
+            principal,
+          });
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            approvalStatus: result.approvalStatus,
+            plan: secretBindingTransitionPlanSummary(result.plan),
+            approval: approvalSummary(result.approvalRequest),
+          });
+        }
+        case 'plugin-package.secret-binding.transition.decide': {
+          if (!options.secretBindingTransition) {
+            throw new ClusterPluginPackageManagementTransportConfigurationError(
+              'Secret transition management is not configured',
+            );
+          }
+          const result = await options.secretBindingTransition.decide({
+            ...command.request,
+            principal,
+          });
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            status: result.status,
+            approval: approvalSummary(result.request),
+          });
+        }
+        case 'plugin-package.secret-binding.transition.inspect': {
+          if (!options.secretBindingTransition) {
+            throw new ClusterPluginPackageManagementTransportConfigurationError(
+              'Secret transition management is not configured',
+            );
+          }
+          const result =
+            await options.secretBindingTransition.inspectAuthorized({
+              ...command.request,
+              principal,
+            });
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            plan: result.plan
+              ? secretBindingTransitionPlanSummary(result.plan)
+              : null,
             approval: result.approvalRequest
               ? approvalSummary(result.approvalRequest)
               : null,

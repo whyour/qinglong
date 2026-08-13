@@ -50,6 +50,7 @@ export {
   type ApplyPostgresPluginPackageSecretBindingTransitionResult,
 } from '../plugin-package/secret-binding/pluginPackageSecretBindingTransitionRepository';
 export { PostgresPluginPackageSecretBindingApprovalPlanReader } from '../plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository';
+export { PostgresPluginPackageSecretBindingTransitionApprovalPlanReader } from '../plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalPlanRepository';
 export { PostgresPluginPackageAutomationPublicationRepository } from '../plugin-package/publication/pluginPackageAutomationPublicationRepository';
 export {
   CLUSTER_PLUGIN_PACKAGE_QUARANTINE_TARGET_LIMIT,

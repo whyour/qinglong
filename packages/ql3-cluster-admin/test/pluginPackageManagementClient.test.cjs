@@ -240,6 +240,47 @@ function commands() {
         inspectionId: 'inspection-secret-binding-1',
       },
     },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.transition.plan',
+      request: {
+        actionRef: 'secret-transition:cluster-monitor:2',
+        projectId: 'project-1',
+        packageName: 'cluster-monitor',
+        assignments: [{
+          name: 'TOKEN',
+          secretRef:
+            'qlsecret:v1:eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJuYW1lIjoicnVudGltZS10b2tlbiIsInZlcnNpb24iOjJ9',
+        }],
+      },
+    },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.transition.propose',
+      request: {
+        actionRef: 'secret-transition:cluster-monitor:2',
+        approvalRequestId: 'approval-secret-transition-1',
+        approvalAuditEventId: 'audit-secret-transition-approval-1',
+      },
+    },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.transition.decide',
+      request: {
+        ...decision,
+        actionRef: 'secret-transition:cluster-monitor:2',
+        approvalRequestId: 'approval-secret-transition-1',
+      },
+    },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.transition.inspect',
+      request: {
+        actionRef: 'secret-transition:cluster-monitor:2',
+        approvalRequestId: 'approval-secret-transition-1',
+        inspectionId: 'inspection-secret-transition-1',
+      },
+    },
   ];
 }
 
@@ -391,6 +432,42 @@ function secretBindingPlanSummary() {
   };
 }
 
+function secretBindingTransitionPlanSummary() {
+  const secretRef =
+    'qlsecret:v1:eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJuYW1lIjoicnVudGltZS10b2tlbiIsInZlcnNpb24iOjJ9';
+  return {
+    actionRef: 'secret-transition:cluster-monitor:2',
+    approvalPlanDigest: '1'.repeat(64),
+    plannedAtMs: 1_000,
+    expiresAtMs: 10_000,
+    kind: 'rotate',
+    transitionDigest: '2'.repeat(64),
+    projectId: 'project-1',
+    packageName: 'cluster-monitor',
+    previousInstallationId: 'install-cluster-monitor-1',
+    previousGeneration: 1,
+    previousGenerationDigest: '3'.repeat(64),
+    previousActiveLockDigest: '4'.repeat(64),
+    previousAttemptGeneration: 1,
+    nextInstallationId: 'install-cluster-monitor-2',
+    nextGeneration: 2,
+    nextGenerationDigest: '5'.repeat(64),
+    nextLockDigest: '6'.repeat(64),
+    nextManifestDigest: '7'.repeat(64),
+    changes: [{
+      name: 'TOKEN',
+      requirement: 'unchanged',
+      reference: 'rotated',
+      previous: {
+        required: true,
+        secretRef:
+          'qlsecret:v1:eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJuYW1lIjoicnVudGltZS10b2tlbiIsInZlcnNpb24iOjF9',
+      },
+      next: { required: true, secretRef },
+    }],
+  };
+}
+
 function successfulResult(operation) {
   const secretApproval = {
     ...approvalSummary(),
@@ -398,6 +475,47 @@ function successfulResult(operation) {
     actionDigest: 'd'.repeat(64),
     previewDigest: 'c'.repeat(64),
   };
+  const transitionApproval = {
+    ...approvalSummary(),
+    id: 'approval-secret-transition-1',
+    projectId: 'project-1',
+    actionDigest: '1'.repeat(64),
+    previewDigest: '2'.repeat(64),
+  };
+  if (operation === 'plugin-package.secret-binding.transition.plan') {
+    return {
+      schemaVersion: 1,
+      operation,
+      status: 'created',
+      plan: secretBindingTransitionPlanSummary(),
+    };
+  }
+  if (operation === 'plugin-package.secret-binding.transition.propose') {
+    return {
+      schemaVersion: 1,
+      operation,
+      approvalStatus: 'created',
+      plan: secretBindingTransitionPlanSummary(),
+      approval: transitionApproval,
+    };
+  }
+  if (operation === 'plugin-package.secret-binding.transition.inspect') {
+    return {
+      schemaVersion: 1,
+      operation,
+      plan: secretBindingTransitionPlanSummary(),
+      approval: transitionApproval,
+      stale: false,
+    };
+  }
+  if (operation === 'plugin-package.secret-binding.transition.decide') {
+    return {
+      schemaVersion: 1,
+      operation,
+      status: 'decided',
+      approval: transitionApproval,
+    };
+  }
   if (operation === 'plugin-package.secret-binding.plan') {
     return {
       schemaVersion: 1,
@@ -743,7 +861,7 @@ test('readiness probe rejects unreviewed status and bounded response drift', asy
   }
 });
 
-test('permits and validates exactly the eighteen public management operations', async () => {
+test('permits and validates exactly the twenty-two public management operations', async () => {
   const received = [];
   const fixture = await startServer((request, response) => {
     const chunks = [];
@@ -788,7 +906,7 @@ test('permits and validates exactly the eighteen public management operations', 
         return true;
       },
     );
-    assert.equal(received.length, 18);
+    assert.equal(received.length, 22);
   } finally {
     await fixture.close();
     rmSync(files.directory, { recursive: true, force: true });

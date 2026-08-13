@@ -74,7 +74,7 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
     [
       {
         directory: 'packages/ql3-cluster-postgres/src/migrations',
-        directSourceFiles: 64,
+        directSourceFiles: 65,
         reviewKind: 'ordered_ledger',
       },
       {
@@ -299,10 +299,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: runtimeCore.rootSourceFileRoles,
     },
     {
-      sourceFiles: 158,
+      sourceFiles: 159,
       rootSourceFiles: 1,
       rootSourceLines: 160,
-      nestedSourceFiles: 157,
+      nestedSourceFiles: 158,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );
@@ -340,10 +340,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterAdmin.rootSourceFileRoles,
     },
     {
-      sourceFiles: 103,
+      sourceFiles: 106,
       rootSourceFiles: 1,
       rootSourceLines: 61,
-      nestedSourceFiles: 102,
+      nestedSourceFiles: 105,
       rootSourceFileRoles: {
         'modelInvocationMigrationCli.ts': 'binary_entry',
       },
@@ -421,10 +421,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterPostgres.rootSourceFileRoles,
     },
     {
-      sourceFiles: 163,
+      sourceFiles: 165,
       rootSourceFiles: 1,
       rootSourceLines: 126,
-      nestedSourceFiles: 162,
+      nestedSourceFiles: 164,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

@@ -10,6 +10,8 @@ import { PostgresPluginPackageInstallRepository } from '@qinglong/cluster-postgr
 import {
   PostgresPluginPackageSecretBindingApprovalPlanReader,
   PostgresPluginPackageSecretBindingRepository,
+  PostgresPluginPackageSecretBindingTransitionApprovalPlanReader,
+  PostgresPluginPackageSecretBindingTransitionRepository,
 } from '@qinglong/cluster-postgres/package-executor';
 import { PostgresPluginPackageInstallProposalRepository } from '@qinglong/cluster-postgres/plugin-package-proposal';
 import {
@@ -27,6 +29,7 @@ import {
   type ClusterPluginPackagePublisherTrustTransitionExecutionPort,
 } from '../publisher/pluginPackagePublisherTrustTransitionApprovedAction';
 import { ClusterPluginPackageSecretBindingApprovedActionHandler } from '../secret-binding/pluginPackageSecretBindingApprovedAction';
+import { ClusterPluginPackageSecretBindingTransitionApprovedActionHandler } from '../secret-binding/pluginPackageSecretBindingTransitionApprovedAction';
 import type { PluginPackageSecretExistenceInspector } from '../secret-binding/projectedSecretExistenceInspector';
 
 export const CLUSTER_PLUGIN_PACKAGE_DISPATCH_BATCH_LIMIT = 16;
@@ -64,6 +67,11 @@ export function createClusterPluginPackageApprovedActionDispatcher(
     new ClusterPluginPackageSecretBindingApprovedActionHandler(
       new PostgresPluginPackageSecretBindingApprovalPlanReader(pool),
       new PostgresPluginPackageSecretBindingRepository(pool),
+      secretExistenceInspector,
+    ),
+    new ClusterPluginPackageSecretBindingTransitionApprovedActionHandler(
+      new PostgresPluginPackageSecretBindingTransitionApprovalPlanReader(pool),
+      new PostgresPluginPackageSecretBindingTransitionRepository(pool),
       secretExistenceInspector,
     ),
     ...(['overlap_add', 'safe_retire'] as const).map(

@@ -62,6 +62,11 @@ export {
   PostgresPluginPackageSecretBindingApprovalPlanReader,
   PostgresPluginPackageSecretBindingApprovalPlanRepository,
 } from '../plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository';
+export {
+  PostgresPluginPackageSecretBindingTransitionApprovalPlanReader,
+  PostgresPluginPackageSecretBindingTransitionApprovalPlanRepository,
+  type PostgresPluginPackageSecretBindingTransitionPlanningSnapshot,
+} from '../plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalPlanRepository';
 export { PostgresPluginPackageInstallInventoryReader } from '../plugin-package/installation/pluginPackageInstallRepository';
 export { PostgresPluginPackagePublisherRevocationProposalRepository } from '../plugin-package/publisher/pluginPackagePublisherRevocationProposalRepository';
 export { PostgresPluginPackagePublisherTrustTransitionProposalRepository } from '../plugin-package/publisher/pluginPackagePublisherTrustTransitionProposalRepository';

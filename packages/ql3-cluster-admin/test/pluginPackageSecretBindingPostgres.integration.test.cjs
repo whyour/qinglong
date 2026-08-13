@@ -11,6 +11,7 @@ const {
   createPostgresDatabaseOpener,
   PostgresPluginPackageSecretBindingApprovalPlanReader,
   PostgresPluginPackageSecretBindingRepository,
+  PostgresPluginPackageSecretBindingTransitionApprovalPlanReader,
 } = require('@qinglong/cluster-postgres/package-executor');
 const {
   PostgresApprovedActionExecutionRepository,
@@ -62,6 +63,12 @@ const {
 const {
   ClusterPluginPackageSecretBindingApprovedActionHandler,
 } = require('@qinglong/cluster-admin/plugin-package-secret-binding-approved-action');
+const {
+  createClusterPluginPackageSecretBindingTransitionManagementService,
+} = require('@qinglong/cluster-admin/plugin-package-secret-binding-transition-management');
+const {
+  consumeClusterPluginPackageSecretBindingTransitionApprovals,
+} = require('@qinglong/cluster-admin/plugin-package-secret-binding-transition-approval-consumer');
 
 const MIGRATION_URL =
   process.env.QL3_TEST_POSTGRES_MIGRATION_URL ??
@@ -525,6 +532,284 @@ if (!MIGRATION_URL || !MANAGER_URL || !EXECUTOR_URL) {
       assert.deepEqual(binding.entries, plannedPublic.plan.entries);
       assert.doesNotMatch(JSON.stringify(binding), /secret-value/);
       assert.equal((await secretDispatcher.dispatchBatch({ limit: 4 })).scanned, 0);
+
+      const manifestV2 = Object.freeze({
+        ...manifest,
+        metadata: Object.freeze({ ...manifest.metadata, version: '2.0.0' }),
+      });
+      const actionInputV2 = Object.freeze({
+        lockId: `lock-v2-${suffix}`,
+        projectId,
+        manifest: manifestV2,
+        previousManifest: manifest,
+        plan: planPluginPackageInstall(manifestV2, environment, manifest),
+        environment,
+        source: {
+          kind: 'offline',
+          locator: `offline:sha256:${'e'.repeat(64)}`,
+          artifactDigest: 'e'.repeat(64),
+          artifactBytes: 2048,
+          contentDigest: 'f'.repeat(64),
+        },
+        architecture: 'arm64',
+        deploymentProfile: 'cluster-control',
+        targetGeneration: 2,
+        previousLockDigest: lock.lockDigest,
+      });
+      const upgradeApprovalId = `upgrade-approval-${suffix}`;
+      now += 10;
+      const upgradeProposed = await installManagement.propose({
+        actionRef: `install:${packageName}:v2`,
+        approvalRequestId: upgradeApprovalId,
+        proposalAuditEventId: randomUUID(),
+        approvalAuditEventId: randomUUID(),
+        requestedAtMs: now,
+        actionInput: actionInputV2,
+        principal: principal(requesterSubject, `upgrade-owner-${suffix}`, now),
+      });
+      now += 10;
+      const upgradeDecision = await installManagement.decide({
+        approvalRequestId: upgradeApprovalId,
+        expectedVersion: upgradeProposed.approvalRequest.version,
+        decisionId: `upgrade-decision-${suffix}`,
+        auditEventId: randomUUID(),
+        decision: 'approved',
+        reasonCode: 'reviewed',
+        decidedAtMs: now,
+        principal: principal(reviewerSubject, `upgrade-reviewer-${suffix}`, now),
+      });
+      now += 10;
+      const upgradeConsumed = await new PostgresApprovalRequestRepository(
+        executor.pool,
+      ).consume({
+        requestId: upgradeApprovalId,
+        expectedVersion: upgradeDecision.request.version,
+        consumptionId: `upgrade-consume-${suffix}`,
+        dispatchId: `upgrade-dispatch-${suffix}`,
+        action: upgradeDecision.request.action,
+        requestedBy: requesterSubject,
+        consumedBy: { type: 'system', id: 'cluster_package_executor' },
+        consumedAtMs: now,
+        authorizationFence: fence,
+        audit: audit(
+          randomUUID(),
+          upgradeApprovalId,
+          'approval.consume',
+          projectId,
+          { type: 'system', id: 'cluster_package_executor' },
+          now,
+          fence,
+        ),
+      });
+      assert.equal(upgradeConsumed.status, 'consumed');
+      id = 0;
+      now += 10;
+      const upgradeDispatch =
+        await createClusterPluginPackageApprovedActionDispatcher({
+          pool: executor.pool,
+          owner: `upgrade-executor-${suffix}`,
+          clock: () => now,
+          createId: () => `upgrade-executor-id-${suffix}-${++id}`,
+          secretExistenceInspector: inspector,
+        }).dispatchBatch({ limit: 4 });
+      assert.equal(upgradeDispatch.succeeded, 1);
+      const queuedV2 = await installs.find(projectId, packageName);
+      assert.ok(queuedV2);
+      assert.equal(queuedV2.targetGeneration, 2);
+      const lockV2 = await installs.findLock(queuedV2.lockDigest);
+      assert.ok(lockV2);
+      now += 10;
+      const stagedV2 = transitionPluginPackageInstall(lockV2, queuedV2, {
+        type: 'stage_completed',
+        mutationId: `stage-v2-${suffix}`,
+        occurredAtMs: now,
+        stageRef: `stage:${lockV2.lockDigest}`,
+        artifactDigest: lockV2.source.artifactDigest,
+        manifestDigest: lockV2.manifestDigest,
+        contentDigest: lockV2.source.contentDigest,
+        evidenceDigest: '8'.repeat(64),
+      });
+      const provenanceV2 = createPluginPackagePublisherProvenance({
+        projectId,
+        packageName,
+        installationId: queuedV2.installationId,
+        lockDigest: lockV2.lockDigest,
+        artifactDigest: stagedV2.stageReceipt.artifactDigest,
+        manifestDigest: stagedV2.stageReceipt.manifestDigest,
+        contentDigest: stagedV2.stageReceipt.contentDigest,
+        stageEvidenceDigest: stagedV2.stageReceipt.evidenceDigest,
+        signature: {
+          publisher: 'integration.qinglong.dev',
+          keyId: 'integration-key-1',
+          signatureDigest: '9'.repeat(64),
+          keyNotBeforeMs: now - 1,
+          keyNotAfterMs: now + 60_000,
+          verifiedAtMs: now,
+        },
+      });
+      await executor.pool.query(
+        `INSERT INTO "ql3"."plugin_package_publisher_provenance" (
+           installation_id, project_id, package_name, lock_digest,
+           artifact_digest, manifest_digest, content_digest,
+           stage_evidence_digest, publisher, key_id, signature_digest,
+           key_not_before_ms, key_not_after_ms, verified_at_ms,
+           provenance_digest, provenance_json
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+           $12, $13, $14, $15, $16::jsonb
+         )`,
+        [
+          provenanceV2.installationId,
+          provenanceV2.projectId,
+          provenanceV2.packageName,
+          provenanceV2.lockDigest,
+          provenanceV2.artifactDigest,
+          provenanceV2.manifestDigest,
+          provenanceV2.contentDigest,
+          provenanceV2.stageEvidenceDigest,
+          provenanceV2.publisher,
+          provenanceV2.keyId,
+          provenanceV2.signatureDigest,
+          provenanceV2.keyNotBeforeMs,
+          provenanceV2.keyNotAfterMs,
+          provenanceV2.verifiedAtMs,
+          provenanceV2.provenanceDigest,
+          JSON.stringify(provenanceV2),
+        ],
+      );
+      await installs.commit(pluginPackageInstallCommit(queuedV2, stagedV2));
+
+      const secretRefV2 = createSecretRef({
+        projectId,
+        name: 'runtime-token',
+        version: 2,
+      });
+      writeFileSync(
+        join(projectionRoot, secretProjectionFileName(secretRefV2)),
+        '',
+        { mode: 0o440 },
+      );
+      const transitionActionRef = `secret-transition:${packageName}:v2`;
+      const transitionApprovalId = `secret-transition-approval-${suffix}`;
+      const transitionManagement =
+        createClusterPluginPackageSecretBindingTransitionManagementService({
+          pool: manager.pool,
+          now: () => now,
+          planLifetimeMs: 60_000,
+          approvalLifetimeMs: 60_000,
+        });
+      const transitionTransport = createClusterPluginPackageManagementTransport({
+        service: installManagement,
+        secretBindingTransition: transitionManagement,
+        now: () => now,
+      });
+      const transitionPlan = await transitionTransport.execute({
+        schemaVersion: 1,
+        operation: 'plugin-package.secret-binding.transition.plan',
+        request: {
+          actionRef: transitionActionRef,
+          projectId,
+          packageName,
+          assignments: [{ name: 'TOKEN', secretRef: secretRefV2 }],
+        },
+      }, requesterAuthentication);
+      assert.equal(transitionPlan.status, 'created');
+      assert.equal(transitionPlan.plan.kind, 'rotate');
+      assert.equal(transitionPlan.plan.previousGeneration, 1);
+      assert.equal(transitionPlan.plan.nextGeneration, 2);
+      assert.equal(
+        transitionPlan.plan.previousActiveLockDigest,
+        lock.lockDigest,
+      );
+      now = Math.max(now, transitionPlan.plan.plannedAtMs) + 10;
+      const transitionProposed = await transitionTransport.execute({
+        schemaVersion: 1,
+        operation: 'plugin-package.secret-binding.transition.propose',
+        request: {
+          actionRef: transitionActionRef,
+          approvalRequestId: transitionApprovalId,
+          approvalAuditEventId: randomUUID(),
+        },
+      }, requesterAuthentication);
+      now += 10;
+      const transitionDecision = await transitionTransport.execute({
+        schemaVersion: 1,
+        operation: 'plugin-package.secret-binding.transition.decide',
+        request: {
+          actionRef: transitionActionRef,
+          approvalRequestId: transitionApprovalId,
+          expectedVersion: transitionProposed.approval.version,
+          decisionId: `secret-transition-decision-${suffix}`,
+          auditEventId: randomUUID(),
+          decision: 'approved',
+          reasonCode: 'reviewed',
+        },
+      }, {
+        async authenticate() {
+          return principal(
+            reviewerSubject,
+            `secret-transition-reviewer-${suffix}`,
+            now,
+          );
+        },
+      });
+      assert.equal(transitionDecision.status, 'decided');
+      now += 10;
+      assert.deepEqual(
+        await consumeClusterPluginPackageSecretBindingTransitionApprovals({
+          pool: executor.pool,
+          now: () => now,
+          limit: 4,
+        }),
+        { scanned: 1, consumed: 1, existing: 0, expired: 0, blocked: 0 },
+      );
+      const transitionApproval =
+        await new PostgresApprovalRequestRepository(executor.pool).findById(
+          transitionApprovalId,
+        );
+      assert.ok(transitionApproval?.dispatchId);
+      const transitionExecution =
+        await new PostgresApprovedActionExecutionRepository(
+          executor.pool,
+        ).findExecutionByDispatchId(transitionApproval.dispatchId);
+      assert.ok(transitionExecution);
+      const storedTransitionPlan =
+        await new PostgresPluginPackageSecretBindingTransitionApprovalPlanReader(
+          executor.pool,
+        ).findByActionRef(transitionActionRef);
+      assert.equal(
+        storedTransitionPlan?.approvalPlanDigest,
+        transitionPlan.plan.approvalPlanDigest,
+      );
+      id = 0;
+      now += 10;
+      const transitionDispatch =
+        await createClusterPluginPackageApprovedActionDispatcher({
+          pool: executor.pool,
+          owner: `transition-executor-${suffix}`,
+          clock: () => now,
+          createId: () => `transition-executor-id-${suffix}-${++id}`,
+          secretExistenceInspector: inspector,
+        }).dispatchBatch({ limit: 4 });
+      assert.equal(transitionDispatch.succeeded, 1);
+      const transitionReceipt = await executor.pool.query(
+        `SELECT receipt_json AS "receiptJson"
+           FROM "ql3"."plugin_package_secret_binding_transition_receipts"
+          WHERE generation_digest = $1`,
+        [transitionPlan.plan.nextGenerationDigest],
+      );
+      assert.equal(transitionReceipt.rows.length, 1);
+      assert.equal(
+        transitionReceipt.rows[0].receiptJson.authority.evidenceDigest,
+        transitionPlan.plan.approvalPlanDigest,
+      );
+      const bindingV2 = await bindings.find(
+        transitionPlan.plan.nextGenerationDigest,
+      );
+      assert.ok(bindingV2);
+      assert.deepEqual(bindingV2.entries, [
+        { name: 'TOKEN', required: false, secretRef: secretRefV2 },
+      ]);
       await assert.rejects(
         manager.pool.query(
           `SELECT * FROM "ql3"."plugin_package_secret_bindings" WHERE generation_digest = $1`,

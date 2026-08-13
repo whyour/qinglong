@@ -150,6 +150,11 @@
       "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository.js",
       "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository.js"
     },
+    "./plugin-package-secret-binding-transition-approval-plan": {
+      "types": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalPlanRepository.d.ts",
+      "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalPlanRepository.js",
+      "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingTransitionApprovalPlanRepository.js"
+    },
     "./plugin-package-automation-publication": {
       "types": "./dist/plugin-package/publication/pluginPackageAutomationPublicationRepository.d.ts",
       "require": "./dist/plugin-package/publication/pluginPackageAutomationPublicationRepository.js",
