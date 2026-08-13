@@ -29,6 +29,7 @@ import type {
   PluginPackageAutomationPublicationRecoverySource,
 } from '@qinglong/runtime-core/plugin-package-automation-publication';
 import type { PluginPackageMaterializedRevisionRepository } from '@qinglong/runtime-core/plugin-package-resource-materialization';
+import type { PluginPackageSecretBindingRepository } from '@qinglong/runtime-core/plugin-package-secret-binding';
 import type { PluginPackageTaskReconciliationRepository } from '@qinglong/runtime-core/plugin-package-task-reconciliation';
 import type { PluginPackageTaskPublicationRecoverySource } from '@qinglong/runtime-core/plugin-package-task-publication';
 import type { StepRunRepository } from '@qinglong/runtime-core/step-run';
@@ -109,6 +110,7 @@ export interface LocalSqliteRuntimeDatabase {
   readonly ownerPepper: LocalOwnerPepperRepository;
   pluginPackageInstalls(): Promise<PluginPackageInstallRepository>;
   pluginPackageMaterializedRevisions(): Promise<PluginPackageMaterializedRevisionRepository>;
+  pluginPackageSecretBindings(): Promise<PluginPackageSecretBindingRepository>;
   pluginPackageTaskReconciliations(): Promise<
     PluginPackageTaskReconciliationRepository &
       PluginPackageTaskPublicationRecoverySource
@@ -195,6 +197,9 @@ export async function openLocalSqliteRuntimeDatabase(
     let pluginPackageMaterializedRevisionsPromise:
       | Promise<PluginPackageMaterializedRevisionRepository>
       | undefined;
+    let pluginPackageSecretBindingsPromise:
+      | Promise<PluginPackageSecretBindingRepository>
+      | undefined;
     let pluginPackageTaskReconciliationsPromise:
       | Promise<
           PluginPackageTaskReconciliationRepository &
@@ -270,6 +275,15 @@ export async function openLocalSqliteRuntimeDatabase(
             ),
         );
         return pluginPackageMaterializedRevisionsPromise;
+      },
+      pluginPackageSecretBindings() {
+        pluginPackageSecretBindingsPromise ??= import(
+          '../plugin-package/pluginPackageSecretBindingRepository.js'
+        ).then(
+          ({ LocalSqlitePluginPackageSecretBindingRepository }) =>
+            new LocalSqlitePluginPackageSecretBindingRepository(authority),
+        );
+        return pluginPackageSecretBindingsPromise;
       },
       pluginPackageTaskReconciliations() {
         pluginPackageTaskReconciliationsPromise ??= import(

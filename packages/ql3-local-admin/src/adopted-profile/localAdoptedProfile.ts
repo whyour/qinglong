@@ -30,6 +30,8 @@ type PluginPackageInstallRepository =
   ReadyLocalStorage['pluginPackageInstalls'];
 type PluginPackageMaterializedRevisionRepository =
   ReadyLocalStorage['pluginPackageMaterializedRevisions'];
+type PluginPackageSecretBindingRepository =
+  ReadyLocalStorage['pluginPackageSecretBindings'];
 type PluginPackageTaskReconciliationRepository =
   ReadyLocalStorage['pluginPackageTaskReconciliations'];
 type PluginPackageAutomationPublicationRepository =
@@ -97,6 +99,7 @@ export type LocalAdoptedProfileBootstrapResult =
       readonly ownerPepper: LocalOwnerPepperRepository;
       readonly pluginPackageInstalls: PluginPackageInstallRepository;
       readonly pluginPackageMaterializedRevisions: PluginPackageMaterializedRevisionRepository;
+      readonly pluginPackageSecretBindings: PluginPackageSecretBindingRepository;
       readonly pluginPackageTaskReconciliations: PluginPackageTaskReconciliationRepository;
       readonly pluginPackageAutomationPublications: PluginPackageAutomationPublicationRepository;
       readonly projectToolDefinitionSnapshots: ProjectToolDefinitionSnapshotRepository;
@@ -244,6 +247,7 @@ export async function bootstrapLocalAdoptedProfileStorage(
       pluginPackageInstalls: readyStorage.pluginPackageInstalls,
       pluginPackageMaterializedRevisions:
         readyStorage.pluginPackageMaterializedRevisions,
+      pluginPackageSecretBindings: readyStorage.pluginPackageSecretBindings,
       pluginPackageTaskReconciliations:
         readyStorage.pluginPackageTaskReconciliations,
       pluginPackageAutomationPublications:

@@ -192,6 +192,7 @@ function database(serverVersionNum = '160014') {
             rows: contract.functions.map(({ name: functionName }) => ({
               functionName,
               executeAllowed: ![
+                'enforce_plugin_package_secret_materialization',
                 'enforce_plugin_package_stage_provenance',
                 'plugin_package_automation_start_allowed',
                 'plugin_package_run_start_allowed',

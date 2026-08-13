@@ -39,6 +39,7 @@ import {
   assertPostgresPackageExecutorSchemaReady,
   PostgresPluginPackageAutomationPublicationRepository,
   PostgresPluginPackageMaterializedRevisionRepository,
+  PostgresPluginPackageSecretBindingRepository,
   PostgresPluginPackagePublisherProvenanceRepository,
   PostgresPluginPackageTaskReconciliationRepository,
   PostgresProjectToolDefinitionSnapshotRepository,
@@ -102,8 +103,7 @@ export class ClusterPluginPackagePublisherProvenanceRecoveryRequiredError extend
     readonly recovery: Readonly<ClusterPluginPackagePublisherProvenanceRecoveryResult>,
   ) {
     super('Cluster has unresolved Plugin Package publisher provenance work');
-    this.name =
-      'ClusterPluginPackagePublisherProvenanceRecoveryRequiredError';
+    this.name = 'ClusterPluginPackagePublisherProvenanceRecoveryRequiredError';
   }
 }
 
@@ -166,9 +166,7 @@ function assertOptions(options: ClusterPluginPackageRecoveryOptions): void {
       (!options.resourceByteSource ||
         typeof options.resourceByteSource.open !== 'function')) ||
     typeof options.trustAuthorityId !== 'string' ||
-    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(
-      options.trustAuthorityId,
-    ) ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(options.trustAuthorityId) ||
     typeof options.now !== 'function' ||
     (options.pageSize !== undefined &&
       (!Number.isSafeInteger(options.pageSize) ||
@@ -313,8 +311,7 @@ export async function recoverClusterPluginPackages(
     const resourceByteSource =
       options.resourceByteSource ??
       new ClusterPluginPackageOciResourceByteSource({
-        authority:
-          stageAuthority as ClusterPluginPackageOciStageAuthority,
+        authority: stageAuthority as ClusterPluginPackageOciStageAuthority,
         lockSource: repository,
       });
     const recovery = await new PluginPackageRecoveryCoordinator({
@@ -340,6 +337,8 @@ export async function recoverClusterPluginPackages(
         database.pool,
         taskSpecSemanticRegistry,
       );
+    const secretBindingRepository =
+      new PostgresPluginPackageSecretBindingRepository(database.pool);
     const taskPublicationRecovery =
       await new PluginPackageTaskPublicationRecoveryCoordinator({
         source: taskReconciliationRepository,
@@ -348,6 +347,7 @@ export async function recoverClusterPluginPackages(
           lockSource: repository,
           byteSource: resourceByteSource,
           materializedRepository,
+          secretBindingSource: secretBindingRepository,
           reconciliationRepository: taskReconciliationRepository,
           taskSpecSemanticRegistry,
         }),

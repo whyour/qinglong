@@ -24,6 +24,11 @@ import {
   type PluginPackageResourceReference,
 } from './pluginPackageResourceGeneration';
 import {
+  assertPluginPackageSecretBindingMatches,
+  type PluginPackageSecretBinding,
+  type PluginPackageSecretBindingRepository,
+} from './pluginPackageSecretBinding';
+import {
   normalizeTaskDefinitionLabels,
   normalizeTaskDefinitionSpec,
   type TaskDefinitionJson,
@@ -125,6 +130,7 @@ export interface PluginPackageMaterializedRevision {
   readonly lock: Readonly<PluginPackageLock>;
   readonly manifest: Readonly<PluginPackageManifest>;
   readonly manifestDigest: string;
+  readonly secretBinding?: Readonly<PluginPackageSecretBinding>;
   readonly resources: readonly Readonly<PluginPackageMaterializedResource>[];
   readonly revisionDigest: string;
 }
@@ -138,6 +144,7 @@ export interface MaterializePluginPackageResourcesInput {
   readonly generation: Readonly<PluginPackageResourceGeneration>;
   readonly lock: Readonly<PluginPackageLock>;
   readonly manifestBytes: Uint8Array;
+  readonly secretBinding?: Readonly<PluginPackageSecretBinding>;
   readonly resources: readonly Readonly<PluginPackageResourceMaterializationEntry>[];
   readonly taskSpecSemanticRegistry: TaskSpecSemanticRegistry;
 }
@@ -171,6 +178,10 @@ export interface MaterializeActivePluginPackageResourcesOptions {
   readonly generationSource: PluginPackageResourceGenerationSource;
   readonly lockSource: PluginPackageResourceLockSource;
   readonly byteSource: PluginPackageResourceByteSource;
+  readonly secretBindingSource?: Pick<
+    PluginPackageSecretBindingRepository,
+    'find'
+  >;
   readonly taskSpecSemanticRegistry: TaskSpecSemanticRegistry;
 }
 
@@ -498,6 +509,8 @@ function normalizeTaskResource(
   projectId: string,
   manifest: Readonly<PluginPackageManifest>,
   registry: TaskSpecSemanticRegistry,
+  secretBinding: Readonly<PluginPackageSecretBinding> | undefined,
+  source: boolean,
 ): Readonly<PluginPackageTaskResource> {
   const task = dataRecord(value, 'Task resource');
   exactKeys(
@@ -512,7 +525,7 @@ function normalizeTaskResource(
   const id = resourceId(task.id, 'Task id');
   const taskId = taskIdentity(packageName, id);
   const kind = task.kind;
-  const spec = normalizeTaskDefinitionSpec(task.spec as TaskDefinitionSpec);
+  let spec = normalizeTaskDefinitionSpec(task.spec as TaskDefinitionSpec);
   if (kind !== 'command' || spec.schema !== BUILT_IN_COMMAND_TASK_SPEC_SCHEMA) {
     return invalid(
       'Task resource v1 only supports qinglong/command@v1 command tasks',
@@ -526,6 +539,9 @@ function normalizeTaskResource(
   if (!(registry instanceof TaskSpecSemanticRegistry)) {
     return invalid('TaskSpec semantic registry is invalid');
   }
+  if (source) {
+    spec = compilePackageSecretEnvironment(spec, secretBinding);
+  }
   let normalizedSpec: TaskDefinitionSpec;
   try {
     normalizedSpec = registry.normalize({
@@ -537,22 +553,7 @@ function normalizeTaskResource(
   } catch {
     return invalid('Task resource spec semantics are invalid or unsupported');
   }
-  const environment = normalizedSpec.config.environment;
-  if (
-    Array.isArray(environment) &&
-    environment.some(
-      (entry) =>
-        entry !== null &&
-        typeof entry === 'object' &&
-        !Array.isArray(entry) &&
-        (entry as Readonly<Record<string, TaskDefinitionJson>>).kind ===
-          'secret',
-    )
-  ) {
-    return invalid(
-      'Task resource v1 does not support unresolved package Secret bindings',
-    );
-  }
+  assertResolvedPackageSecretEnvironment(normalizedSpec, secretBinding);
   const description = optionalDescription(task.description);
   if (typeof task.enabled !== 'boolean') {
     return invalid('Task enabled is invalid');
@@ -569,6 +570,78 @@ function normalizeTaskResource(
     kind,
     spec: normalizedSpec,
   });
+}
+
+function compilePackageSecretEnvironment(
+  spec: Readonly<TaskDefinitionSpec>,
+  secretBinding: Readonly<PluginPackageSecretBinding> | undefined,
+): Readonly<TaskDefinitionSpec> {
+  const environment = spec.config.environment;
+  if (!Array.isArray(environment)) return spec;
+  const entries = new Map(
+    (secretBinding?.entries ?? []).map((entry) => [entry.name, entry]),
+  );
+  const compiled = environment.flatMap((value) => {
+    const entry = dataRecord(value, 'Task environment');
+    if (entry.kind === 'secret') {
+      return invalid('Package Task source cannot contain a direct SecretRef');
+    }
+    if (entry.kind !== 'package-secret') return [value];
+    exactKeys(
+      entry,
+      ['kind', 'name', 'requirement'],
+      [],
+      'Package Secret environment',
+    );
+    const requirement = boundedText(
+      entry.requirement,
+      'Package Secret requirement',
+      128,
+    );
+    const binding = entries.get(requirement);
+    if (!binding) {
+      return invalid(
+        'Package Task references an undeclared Secret requirement',
+      );
+    }
+    if (binding.secretRef === null) return [];
+    return [
+      Object.freeze({
+        name: entry.name as TaskDefinitionJson,
+        kind: 'secret' as const,
+        secretRef: binding.secretRef,
+      }),
+    ];
+  });
+  return normalizeTaskDefinitionSpec(
+    Object.freeze({
+      schema: spec.schema,
+      config: Object.freeze({
+        ...spec.config,
+        environment: Object.freeze(compiled),
+      }),
+    }),
+  );
+}
+
+function assertResolvedPackageSecretEnvironment(
+  spec: Readonly<TaskDefinitionSpec>,
+  secretBinding: Readonly<PluginPackageSecretBinding> | undefined,
+): void {
+  const allowed = new Set(
+    (secretBinding?.entries ?? []).flatMap((entry) =>
+      entry.secretRef === null ? [] : [entry.secretRef],
+    ),
+  );
+  const environment = spec.config.environment;
+  if (!Array.isArray(environment)) return;
+  for (const value of environment) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const entry = value as Readonly<Record<string, TaskDefinitionJson>>;
+    if (entry.kind === 'secret' && !allowed.has(entry.secretRef as string)) {
+      invalid('Task SecretRef is not authorized by the Package binding');
+    }
+  }
 }
 
 function normalizeWorkflowResource(
@@ -784,6 +857,8 @@ function normalizeMaterializedValue(
   projectId: string,
   manifest: Readonly<PluginPackageManifest>,
   registry: TaskSpecSemanticRegistry,
+  secretBinding: Readonly<PluginPackageSecretBinding> | undefined,
+  source: boolean,
 ): PluginPackageMaterializedResourceValue {
   switch (kind) {
     case 'task':
@@ -793,6 +868,8 @@ function normalizeMaterializedValue(
         projectId,
         manifest,
         registry,
+        secretBinding,
+        source,
       );
     case 'workflow':
       return normalizeWorkflowResource(value);
@@ -877,6 +954,7 @@ function normalizeRevisionResources(
   generation: Readonly<PluginPackageResourceGeneration>,
   manifest: Readonly<PluginPackageManifest>,
   registry: TaskSpecSemanticRegistry,
+  secretBinding: Readonly<PluginPackageSecretBinding> | undefined,
 ): readonly Readonly<PluginPackageMaterializedResource>[] {
   const entries = boundedDenseArray(
     values,
@@ -918,6 +996,8 @@ function normalizeRevisionResources(
         generation.projectId,
         manifest,
         registry,
+        secretBinding,
+        false,
       ),
     });
   });
@@ -972,7 +1052,7 @@ export function normalizePluginPackageMaterializedRevision(
       'resources',
       'revisionDigest',
     ],
-    [],
+    ['secretBinding'],
     'materialized revision',
   );
   if (revision.schema !== PLUGIN_PACKAGE_MATERIALIZED_REVISION_SCHEMA) {
@@ -994,11 +1074,17 @@ export function normalizePluginPackageMaterializedRevision(
     return invalid('materialized manifest identity or digest is invalid');
   }
   assertManifestMatchesGeneration(manifest, generation);
+  const secretBinding = normalizeMaterializationSecretBinding(
+    revision.secretBinding as Readonly<PluginPackageSecretBinding> | undefined,
+    generation,
+    manifest,
+  );
   const resources = normalizeRevisionResources(
     revision.resources,
     generation,
     manifest,
     taskSpecSemanticRegistry,
+    secretBinding,
   );
   const descriptors: PluginPackageContentEntryDescriptor[] = resources
     .map((resource) =>
@@ -1020,6 +1106,7 @@ export function normalizePluginPackageMaterializedRevision(
     lock,
     manifest,
     manifestDigest,
+    ...(secretBinding === undefined ? {} : { secretBinding }),
     resources,
   });
   const revisionDigest = digest(revision.revisionDigest, 'revision digest');
@@ -1042,7 +1129,7 @@ export function materializePluginPackageResources(
       'resources',
       'taskSpecSemanticRegistry',
     ],
-    [],
+    ['secretBinding'],
     'materialization input',
   );
   const generation = normalizePluginPackageResourceGeneration(value.generation);
@@ -1050,6 +1137,11 @@ export function materializePluginPackageResources(
   assertGenerationMatchesLock(generation, lock);
   const manifest = normalizeManifestBytes(value.manifestBytes, lock);
   assertManifestMatchesGeneration(manifest, generation);
+  const secretBinding = normalizeMaterializationSecretBinding(
+    value.secretBinding,
+    generation,
+    manifest,
+  );
   const entries = boundedDenseArray(
     value.resources,
     generation.resources.length,
@@ -1095,6 +1187,8 @@ export function materializePluginPackageResources(
         generation.projectId,
         manifest,
         value.taskSpecSemanticRegistry,
+        secretBinding,
+        true,
       ),
     });
   });
@@ -1119,6 +1213,7 @@ export function materializePluginPackageResources(
     lock,
     manifest,
     manifestDigest: lock.manifestDigest,
+    ...(secretBinding === undefined ? {} : { secretBinding }),
     resources: Object.freeze(resources),
   });
   return normalizePluginPackageMaterializedRevision(
@@ -1128,6 +1223,32 @@ export function materializePluginPackageResources(
     }),
     value.taskSpecSemanticRegistry,
   );
+}
+
+function normalizeMaterializationSecretBinding(
+  value: Readonly<PluginPackageSecretBinding> | undefined,
+  generation: Readonly<PluginPackageResourceGeneration>,
+  manifest: Readonly<PluginPackageManifest>,
+): Readonly<PluginPackageSecretBinding> | undefined {
+  if (manifest.spec.permissions.secrets.length === 0) {
+    if (value !== undefined) {
+      invalid('Secret binding is forbidden when Manifest declares no Secrets');
+    }
+    return undefined;
+  }
+  if (!manifest.spec.permissions.tools.includes('secret.use')) {
+    return invalid(
+      'Secret-aware Package requires the approved secret.use permission',
+    );
+  }
+  if (value === undefined) {
+    return invalid('Secret-aware Package requires an approved binding');
+  }
+  try {
+    return assertPluginPackageSecretBindingMatches(value, generation, manifest);
+  } catch {
+    return invalid('Secret binding does not match generation and Manifest');
+  }
 }
 
 function materializationSources(
@@ -1143,6 +1264,9 @@ function materializationSources(
     typeof value.lockSource.findLock !== 'function' ||
     !value.byteSource ||
     typeof value.byteSource.open !== 'function' ||
+    (value.secretBindingSource !== undefined &&
+      (!value.secretBindingSource ||
+        typeof value.secretBindingSource.find !== 'function')) ||
     !(value.taskSpecSemanticRegistry instanceof TaskSpecSemanticRegistry)
   ) {
     invalid('active materialization sources are invalid');
@@ -1226,10 +1350,19 @@ export async function materializeActivePluginPackageResources(
         });
       }
     }
+    const activeManifest = normalizeManifestBytes(manifestBytes, lock);
+    const activeSecretBindingValue =
+      activeManifest.spec.permissions.secrets.length === 0
+        ? undefined
+        : await value.secretBindingSource?.find(generation.generationDigest);
+    const activeSecretBinding = activeSecretBindingValue ?? undefined;
     const revision = materializePluginPackageResources({
       generation,
       lock,
       manifestBytes,
+      ...(activeSecretBinding === undefined
+        ? {}
+        : { secretBinding: activeSecretBinding }),
       resources: Object.freeze(resources),
       taskSpecSemanticRegistry: value.taskSpecSemanticRegistry,
     });

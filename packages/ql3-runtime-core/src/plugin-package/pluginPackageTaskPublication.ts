@@ -9,6 +9,7 @@ import {
   type PluginPackageResourceLockSource,
 } from './pluginPackageResourceMaterialization';
 import type { PluginPackageResourceGenerationSource } from './pluginPackageResourceGeneration';
+import type { PluginPackageSecretBindingRepository } from './pluginPackageSecretBinding';
 import {
   InvalidPluginPackageTaskReconciliationError,
   PluginPackageTaskReconciliationConflictError,
@@ -103,7 +104,10 @@ export class PluginPackageTaskPublicationConflictError extends Error {
   readonly code = 'PLUGIN_PACKAGE_TASK_PUBLICATION_CONFLICT';
 
   constructor(message: string, options?: ErrorOptions) {
-    super(`Plugin Package Task publication conflicts with state: ${message}`, options);
+    super(
+      `Plugin Package Task publication conflicts with state: ${message}`,
+      options,
+    );
     this.name = 'PluginPackageTaskPublicationConflictError';
   }
 }
@@ -172,7 +176,11 @@ function packageName(value: unknown): string {
   return value;
 }
 
-function positiveInteger(value: unknown, maximum: number, label: string): number {
+function positiveInteger(
+  value: unknown,
+  maximum: number,
+  label: string,
+): number {
   if (
     !Number.isSafeInteger(value) ||
     (value as number) < 1 ||
@@ -242,8 +250,7 @@ function normalizePage(
   if (
     candidates.some(
       (candidate, index) =>
-        index > 0 &&
-        compareCandidates(candidates[index - 1]!, candidate) >= 0,
+        index > 0 && compareCandidates(candidates[index - 1]!, candidate) >= 0,
     )
   ) {
     return invalid('recovery candidates must be uniquely sorted');
@@ -274,6 +281,10 @@ function publicationAuthorities(options: {
   readonly lockSource: PluginPackageResourceLockSource;
   readonly byteSource: PluginPackageResourceByteSource;
   readonly materializedRepository: PluginPackageMaterializedRevisionRepository;
+  readonly secretBindingSource?: Pick<
+    PluginPackageSecretBindingRepository,
+    'find'
+  >;
   readonly reconciliationRepository: PluginPackageTaskReconciliationRepository;
   readonly taskSpecSemanticRegistry: TaskSpecSemanticRegistry;
 }): void {
@@ -288,12 +299,13 @@ function publicationAuthorities(options: {
       'reconciliationRepository',
       'taskSpecSemanticRegistry',
     ],
-    [],
+    ['secretBindingSource'],
     'publication coordinator options',
   );
   if (
     !options.generationSource ||
-    typeof options.generationSource.findActiveResourceGeneration !== 'function' ||
+    typeof options.generationSource.findActiveResourceGeneration !==
+      'function' ||
     !options.lockSource ||
     typeof options.lockSource.findLock !== 'function' ||
     !options.byteSource ||
@@ -301,6 +313,9 @@ function publicationAuthorities(options: {
     !options.materializedRepository ||
     typeof options.materializedRepository.find !== 'function' ||
     typeof options.materializedRepository.publish !== 'function' ||
+    (options.secretBindingSource !== undefined &&
+      (!options.secretBindingSource ||
+        typeof options.secretBindingSource.find !== 'function')) ||
     !options.reconciliationRepository ||
     typeof options.reconciliationRepository.find !== 'function' ||
     typeof options.reconciliationRepository.reconcile !== 'function' ||
@@ -316,6 +331,9 @@ export class PluginPackageTaskPublicationCoordinator {
   readonly #byteSource: PluginPackageResourceByteSource;
   readonly #materializedRepository: PluginPackageMaterializedRevisionRepository;
   readonly #reconciliationRepository: PluginPackageTaskReconciliationRepository;
+  readonly #secretBindingSource:
+    | Pick<PluginPackageSecretBindingRepository, 'find'>
+    | undefined;
   readonly #registry: TaskSpecSemanticRegistry;
 
   constructor(options: {
@@ -323,6 +341,10 @@ export class PluginPackageTaskPublicationCoordinator {
     readonly lockSource: PluginPackageResourceLockSource;
     readonly byteSource: PluginPackageResourceByteSource;
     readonly materializedRepository: PluginPackageMaterializedRevisionRepository;
+    readonly secretBindingSource?: Pick<
+      PluginPackageSecretBindingRepository,
+      'find'
+    >;
     readonly reconciliationRepository: PluginPackageTaskReconciliationRepository;
     readonly taskSpecSemanticRegistry: TaskSpecSemanticRegistry;
   }) {
@@ -331,6 +353,7 @@ export class PluginPackageTaskPublicationCoordinator {
     this.#lockSource = options.lockSource;
     this.#byteSource = options.byteSource;
     this.#materializedRepository = options.materializedRepository;
+    this.#secretBindingSource = options.secretBindingSource;
     this.#reconciliationRepository = options.reconciliationRepository;
     this.#registry = options.taskSpecSemanticRegistry;
   }
@@ -362,20 +385,28 @@ export class PluginPackageTaskPublicationCoordinator {
       );
       let materialized: 'created' | 'existing' = 'existing';
       if (revision === null) {
-        const materializedValue = await materializeActivePluginPackageResources({
-          ...identity,
-          generationSource: this.#generationSource,
-          lockSource: this.#lockSource,
-          byteSource: this.#byteSource,
-          taskSpecSemanticRegistry: this.#registry,
-        });
+        const materializedValue = await materializeActivePluginPackageResources(
+          {
+            ...identity,
+            generationSource: this.#generationSource,
+            lockSource: this.#lockSource,
+            byteSource: this.#byteSource,
+            ...(this.#secretBindingSource === undefined
+              ? {}
+              : { secretBindingSource: this.#secretBindingSource }),
+            taskSpecSemanticRegistry: this.#registry,
+          },
+        );
         if (materializedValue === null) {
           return Object.freeze({
             status: 'superseded',
             generationDigest: first.generationDigest,
           });
         }
-        if (materializedValue.generation.generationDigest !== first.generationDigest) {
+        if (
+          materializedValue.generation.generationDigest !==
+          first.generationDigest
+        ) {
           return Object.freeze({
             status: 'superseded',
             generationDigest: first.generationDigest,
@@ -454,7 +485,9 @@ export class PluginPackageTaskPublicationCoordinator {
         error instanceof PluginPackageResourceMaterializationUnavailableError ||
         error instanceof PluginPackageTaskReconciliationUnavailableError
       ) {
-        throw new PluginPackageTaskPublicationUnavailableError({ cause: error });
+        throw new PluginPackageTaskPublicationUnavailableError({
+          cause: error,
+        });
       }
       throw new PluginPackageTaskPublicationUnavailableError({
         cause: error instanceof Error ? error : undefined,
@@ -472,7 +505,12 @@ export class PluginPackageTaskPublicationRecoveryCoordinator {
     readonly publisher: PluginPackageTaskPublicationCoordinator;
   }) {
     const value = record(options, 'recovery coordinator options');
-    exactKeys(value, ['publisher', 'source'], [], 'recovery coordinator options');
+    exactKeys(
+      value,
+      ['publisher', 'source'],
+      [],
+      'recovery coordinator options',
+    );
     if (
       !options.source ||
       typeof options.source.listPendingPage !== 'function' ||
@@ -511,7 +549,8 @@ export class PluginPackageTaskPublicationRecoveryCoordinator {
         options.limit,
       );
     } catch (error) {
-      if (error instanceof InvalidPluginPackageTaskPublicationError) throw error;
+      if (error instanceof InvalidPluginPackageTaskPublicationError)
+        throw error;
       throw new PluginPackageTaskPublicationUnavailableError({
         cause: error instanceof Error ? error : undefined,
       });
@@ -528,8 +567,8 @@ export class PluginPackageTaskPublicationRecoveryCoordinator {
           published.status === 'current'
             ? 'settled'
             : published.status === 'superseded'
-              ? 'superseded'
-              : 'manual_required';
+            ? 'superseded'
+            : 'manual_required';
       } catch (error) {
         status =
           error instanceof InvalidPluginPackageTaskPublicationError ||
@@ -595,7 +634,10 @@ export class PluginPackageTaskPublicationRecoveryCoordinator {
     }
     let probe: Readonly<PluginPackageTaskPublicationRecoveryPage>;
     try {
-      probe = normalizePage(await this.#source.listPendingPage({ limit: 1 }), 1);
+      probe = normalizePage(
+        await this.#source.listPendingPage({ limit: 1 }),
+        1,
+      );
     } catch (error) {
       throw new PluginPackageTaskPublicationUnavailableError({
         cause: error instanceof Error ? error : undefined,

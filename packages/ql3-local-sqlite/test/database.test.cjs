@@ -142,9 +142,11 @@ test('creates a reviewed edge database and opens runtime only after readiness', 
     '0090-capability-v45',
     '0091-plugin-package-secret-bindings',
     '0092-capability-v46',
+    '0093-plugin-package-secret-materialization-guard',
+    '0094-capability-v47',
   ]);
   assert.equal(migrated.readiness.contractName, 'local-control-core');
-  assert.equal(migrated.readiness.contractVersion, 46);
+  assert.equal(migrated.readiness.contractVersion, 47);
   assert.equal(migrated.readiness.journalMode, 'delete');
   assert.equal(fs.statSync(databasePath).mode & 0o777, 0o600);
 
@@ -225,6 +227,89 @@ test('creates a reviewed edge database and opens runtime only after readiness', 
       operation,
       (error) => error?.name === 'RunRepositoryOperationError',
     );
+  }
+});
+
+test('rejects malformed and unbound Package Secret materialized revisions at the database boundary', async () => {
+  const client = new DatabaseSync(':memory:');
+  try {
+    client.exec('PRAGMA foreign_keys = ON');
+    await runMigrationStream({
+      stream: localSqliteMigrationDefinition,
+      store: new LocalSqliteMigrationStreamStore(client),
+    });
+    const insert = client.prepare(
+      `INSERT INTO "QingLong3PluginPackageMaterializedRevisions" (
+         generation_digest, project_id, package_name, generation,
+         lock_digest, manifest_digest, revision_digest, revision_json,
+         created_at_ms
+       ) VALUES (?, 'default', 'secret-guard', 1, ?, ?, ?, ?, 1)`,
+    );
+    const digest = 'a'.repeat(64);
+    const revision = ({ manifest, resources = [] }) => ({
+      schema: 'qinglong/plugin-package-materialized-revision@v1',
+      generation: {
+        installationId: 'install-secret-guard',
+        projectId: 'default',
+        packageName: 'secret-guard',
+        lockDigest: digest,
+        generation: 1,
+        generationDigest: digest,
+      },
+      manifestDigest: digest,
+      manifest,
+      resources,
+      revisionDigest: digest,
+      createdAtMs: 1,
+    });
+
+    assert.throws(
+      () =>
+        insert.run(
+          digest,
+          digest,
+          digest,
+          digest,
+          JSON.stringify(revision({ manifest: {} })),
+        ),
+      /permission declarations are malformed/,
+    );
+    assert.throws(
+      () =>
+        insert.run(
+          digest,
+          digest,
+          digest,
+          digest,
+          JSON.stringify(
+            revision({
+              manifest: { spec: { permissions: { secrets: [] } } },
+              resources: [
+                {
+                  kind: 'task',
+                  value: {
+                    spec: {
+                      config: {
+                        environment: [
+                          {
+                            name: 'TOKEN',
+                            kind: 'secret',
+                            secretRef:
+                              'qlsecret://default/runtime-token?version=1',
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              ],
+            }),
+          ),
+        ),
+      /outside Package binding/,
+    );
+  } finally {
+    client.close();
   }
 });
 
@@ -507,8 +592,8 @@ test('backfills v14 execution revisions with a verified independent digest', asy
           .get(),
       },
       {
-        contract_version: 46,
-        migration_id: '0091-plugin-package-secret-bindings',
+        contract_version: 47,
+        migration_id: '0093-plugin-package-secret-materialization-guard',
       },
     );
   } finally {

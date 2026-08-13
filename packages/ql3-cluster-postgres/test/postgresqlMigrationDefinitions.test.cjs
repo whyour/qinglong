@@ -110,6 +110,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0057-run-management-stop-boundary',
       'pg-0058-plugin-package-automation-disposition-events',
       'pg-0059-plugin-package-secret-bindings',
+      'pg-0060-plugin-package-secret-materialization-guard',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -540,6 +541,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0059-plugin-package-secret-bindings',
       checksum:
         '87582d256c868bd7f5af352c4b052fdab9f3714e1e7179e35d33bfa5d62957be',
+    },
+    {
+      id: 'pg-0060-plugin-package-secret-materialization-guard',
+      checksum:
+        '28284ca860b39ff9de5b2aa1a2a60ef2c463fd6a72798d237040174272b64b1e',
     },
   ];
   assert.deepEqual(
@@ -1987,4 +1993,40 @@ test('advances capability v58 with immutable generation-bound Package Secret bin
     sql,
     /migration_id = 'pg-0058-plugin-package-automation-disposition-events'/,
   );
+});
+
+test('advances capability v59 with fail-closed Package Secret materialization', async () => {
+  const migration = migrationById(
+    'pg-0060-plugin-package-secret-materialization-guard',
+  );
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(
+    sql,
+    /CREATE FUNCTION "ql3"\."enforce_plugin_package_secret_materialization"\(\)/,
+  );
+  assert.match(
+    sql,
+    /jsonb_typeof\([\s\S]+IS DISTINCT FROM 'array'[\s\S]+permission declarations are malformed/,
+  );
+  assert.match(sql, /unresolved Package Secret placeholder/);
+  assert.match(sql, /Task SecretRef is outside Package binding/);
+  assert.match(
+    sql,
+    /CREATE TRIGGER ql3_plugin_package_secret_materialization_guard BEFORE INSERT/,
+  );
+  assert.match(
+    sql,
+    /REVOKE ALL ON FUNCTION [^;]+ FROM PUBLIC, ql3_runtime, ql3_admin, ql3_package_manager, ql3_package_executor, ql3_worker_ingress/,
+  );
+  assert.match(sql, /contract_version = 59/);
+  assert.match(sql, /"plugin_package_secret_materialization":1/);
+  assert.match(sql, /contract_version = 58/);
+  assert.match(sql, /migration_id = 'pg-0059-plugin-package-secret-bindings'/);
 });

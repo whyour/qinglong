@@ -24,6 +24,9 @@ const {
 } = require('../dist/task-definition/taskSpecSemantic');
 const { createSecretRef } = require('../dist/secret/secretReference');
 const {
+  createPluginPackageSecretBinding,
+} = require('../dist/plugin-package/pluginPackageSecretBinding');
+const {
   InvalidPluginPackageResourceMaterializationError,
   MAX_PLUGIN_PACKAGE_MATERIALIZED_RESOURCE_BYTES,
   PLUGIN_PACKAGE_MATERIALIZED_REVISION_SCHEMA,
@@ -287,10 +290,7 @@ test('materializes exact Task, Workflow, Prompt and Tool JSON into one immutable
     revision,
   );
 
-  const drafts = pluginPackageTaskDefinitionDrafts(
-    revision,
-    value.registry,
-  );
+  const drafts = pluginPackageTaskDefinitionDrafts(revision, value.registry);
   assert.deepEqual(JSON.parse(JSON.stringify(drafts)), [
     {
       projectId: 'project-001',
@@ -366,9 +366,7 @@ test('fails closed on unapproved capabilities, unresolved references and source 
 
   const drift = fixture();
   const changed = drift.entries.map((entry, index) =>
-    index === 0
-      ? { ...entry, bytes: Buffer.from('{}') }
-      : entry,
+    index === 0 ? { ...entry, bytes: Buffer.from('{}') } : entry,
   );
   assert.throws(
     () =>
@@ -383,8 +381,8 @@ test('fails closed on unapproved capabilities, unresolved references and source 
   );
 });
 
-test('rejects secret-bearing package Tasks until an approved binding format exists', () => {
-  const value = fixture({
+test('compiles approved Package Secret requirements into pinned Task SecretRefs', () => {
+  const direct = fixture({
     manifest: {
       spec: {
         permissions: {
@@ -427,13 +425,128 @@ test('rejects secret-bearing package Tasks until an approved binding format exis
   assert.throws(
     () =>
       materializePluginPackageResources({
-        generation: value.generation,
-        lock: value.lock,
-        manifestBytes: value.manifestBytes,
-        resources: value.entries,
-        taskSpecSemanticRegistry: value.registry,
+        generation: direct.generation,
+        lock: direct.lock,
+        manifestBytes: direct.manifestBytes,
+        resources: direct.entries,
+        taskSpecSemanticRegistry: direct.registry,
       }),
-    /does not support unresolved package Secret bindings/,
+    /requires an approved binding/,
+  );
+
+  const directBinding = createPluginPackageSecretBinding({
+    generation: direct.generation,
+    manifest: direct.manifest,
+    assignments: [
+      {
+        name: 'TOKEN',
+        secretRef: createSecretRef({
+          projectId: 'project-001',
+          name: 'TOKEN',
+          version: 1,
+        }),
+      },
+    ],
+    authority: {
+      kind: 'local-owner-confirmation',
+      evidenceDigest: 'e'.repeat(64),
+    },
+    boundAtMs: 200,
+  });
+  assert.throws(
+    () =>
+      materializePluginPackageResources({
+        generation: direct.generation,
+        lock: direct.lock,
+        manifestBytes: direct.manifestBytes,
+        secretBinding: directBinding,
+        resources: direct.entries,
+        taskSpecSemanticRegistry: direct.registry,
+      }),
+    /cannot contain a direct SecretRef/,
+  );
+
+  const value = fixture({
+    manifest: {
+      spec: {
+        permissions: {
+          secrets: [
+            { name: 'OPTIONAL_TOKEN', required: false },
+            { name: 'TOKEN', required: true },
+          ],
+          tools: ['run.read', 'secret.use', 'system.command'],
+        },
+      },
+    },
+    resourceValues: {
+      'tasks/collect.json': {
+        schema: 'qinglong/plugin-package-task-resource@v1',
+        id: 'collect',
+        name: 'Collect',
+        labels: {},
+        enabled: true,
+        kind: 'command',
+        spec: {
+          schema: 'qinglong/command@v1',
+          config: {
+            command: {
+              kind: 'argv',
+              file: '/usr/bin/printf',
+              args: ['ok'],
+            },
+            environment: [
+              {
+                name: 'OPTIONAL_TOKEN',
+                kind: 'package-secret',
+                requirement: 'OPTIONAL_TOKEN',
+              },
+              {
+                name: 'API_TOKEN',
+                kind: 'package-secret',
+                requirement: 'TOKEN',
+              },
+            ],
+          },
+        },
+      },
+    },
+  });
+  const secretRef = createSecretRef({
+    projectId: 'project-001',
+    name: 'runtime-token',
+    version: 3,
+  });
+  const binding = createPluginPackageSecretBinding({
+    generation: value.generation,
+    manifest: value.manifest,
+    assignments: [
+      { name: 'OPTIONAL_TOKEN', secretRef: null },
+      { name: 'TOKEN', secretRef },
+    ],
+    authority: {
+      kind: 'approved-action-execution',
+      evidenceDigest: 'e'.repeat(64),
+    },
+    boundAtMs: 200,
+  });
+  const revision = materializePluginPackageResources({
+    generation: value.generation,
+    lock: value.lock,
+    manifestBytes: value.manifestBytes,
+    secretBinding: binding,
+    resources: value.entries,
+    taskSpecSemanticRegistry: value.registry,
+  });
+  assert.equal(revision.secretBinding.bindingDigest, binding.bindingDigest);
+  assert.deepEqual(
+    JSON.parse(
+      JSON.stringify(revision.resources[1].value.spec.config.environment),
+    ),
+    [{ kind: 'secret', name: 'API_TOKEN', secretRef }],
+  );
+  assert.deepEqual(
+    normalizePluginPackageMaterializedRevision(revision, value.registry),
+    revision,
   );
 });
 
@@ -523,7 +636,10 @@ test('reads active bytes sequentially with explicit bounds and rejects a generat
     },
     byteSource: {
       async open(generation) {
-        assert.equal(generation.generationDigest, value.generation.generationDigest);
+        assert.equal(
+          generation.generationDigest,
+          value.generation.generationDigest,
+        );
         return {
           async read(path, maximumBytes) {
             reads.push({ path, maximumBytes });
@@ -568,7 +684,11 @@ test('reads active bytes sequentially with explicit bounds and rejects a generat
           return this.calls === 1 ? value.generation : changed;
         },
       },
-      lockSource: { async findLock() { return value.lock; } },
+      lockSource: {
+        async findLock() {
+          return value.lock;
+        },
+      },
       byteSource: {
         async open() {
           return {
@@ -588,10 +708,7 @@ test('reads active bytes sequentially with explicit bounds and rejects a generat
 });
 
 test('publishes materialization only through the explicit runtime-core subpath', () => {
-  assert.equal(
-    require('../dist').materializePluginPackageResources,
-    undefined,
-  );
+  assert.equal(require('../dist').materializePluginPackageResources, undefined);
   assert.equal(
     require('@qinglong/runtime-core/plugin-package-resource-materialization')
       .materializePluginPackageResources,

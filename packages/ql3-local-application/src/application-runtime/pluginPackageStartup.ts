@@ -79,6 +79,8 @@ export async function recoverLocalApplicationPluginPackages(
     await storage.pluginPackageTaskReconciliations();
   const pluginPackageMaterializedRevisions =
     await storage.pluginPackageMaterializedRevisions();
+  const pluginPackageSecretBindings =
+    await storage.pluginPackageSecretBindings();
   const pluginPackageTaskPublicationRecovery =
     await new PluginPackageTaskPublicationRecoveryCoordinator({
       source: pluginPackageTaskReconciliations,
@@ -89,6 +91,7 @@ export async function recoverLocalApplicationPluginPackages(
           stagingRoot: options.pluginPackages.stagingRoot,
         }),
         materializedRepository: pluginPackageMaterializedRevisions,
+        secretBindingSource: pluginPackageSecretBindings,
         reconciliationRepository: pluginPackageTaskReconciliations,
         taskSpecSemanticRegistry,
       }),

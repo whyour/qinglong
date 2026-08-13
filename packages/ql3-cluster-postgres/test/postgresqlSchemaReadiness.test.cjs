@@ -754,7 +754,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 58,
+    contractVersion: 59,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -815,6 +815,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0057-run-management-stop-boundary',
       'pg-0058-plugin-package-automation-disposition-events',
       'pg-0059-plugin-package-secret-bindings',
+      'pg-0060-plugin-package-secret-materialization-guard',
     ],
   });
 });
@@ -845,10 +846,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 58);
+  assert.equal(report.contractVersion, 59);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0059-plugin-package-secret-bindings',
+    'pg-0060-plugin-package-secret-materialization-guard',
   );
 });
 
@@ -861,10 +862,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 58);
+  assert.equal(report.contractVersion, 59);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0059-plugin-package-secret-bindings',
+    'pg-0060-plugin-package-secret-materialization-guard',
   );
 
   const widened = automationManagerPrivileges();
@@ -893,10 +894,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 58);
+  assert.equal(report.contractVersion, 59);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0059-plugin-package-secret-bindings',
+    'pg-0060-plugin-package-secret-materialization-guard',
   );
 
   const widened = approvalManagerPrivileges();
@@ -927,10 +928,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 58);
+  assert.equal(report.contractVersion, 59);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0059-plugin-package-secret-bindings',
+    'pg-0060-plugin-package-secret-materialization-guard',
   );
 
   const widened = runManagerPrivileges();
@@ -1062,10 +1063,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 58);
+  assert.equal(report.contractVersion, 59);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0059-plugin-package-secret-bindings',
+    'pg-0060-plugin-package-secret-materialization-guard',
   );
 });
 

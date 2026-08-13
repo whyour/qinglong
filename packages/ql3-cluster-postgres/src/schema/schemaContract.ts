@@ -15,8 +15,8 @@ export interface PostgresSchemaContractFunction {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 58;
-  readonly migrationId: 'pg-0059-plugin-package-secret-bindings';
+  readonly contractVersion: 59;
+  readonly migrationId: 'pg-0060-plugin-package-secret-materialization-guard';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -56,6 +56,7 @@ export interface PostgresSchemaContract {
     plugin_package_management_quota: 1;
     plugin_package_materialized_revision: 1;
     plugin_package_secret_binding: 1;
+    plugin_package_secret_materialization: 1;
     plugin_package_proposal: 1;
     plugin_package_publisher_provenance: 1;
     plugin_package_publisher_trust_authority: 1;
@@ -105,8 +106,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 58,
-    migrationId: 'pg-0059-plugin-package-secret-bindings',
+    contractVersion: 59,
+    migrationId: 'pg-0060-plugin-package-secret-materialization-guard',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -139,6 +140,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       plugin_package_management_quota: 1,
       plugin_package_materialized_revision: 1,
       plugin_package_secret_binding: 1,
+      plugin_package_secret_materialization: 1,
       plugin_package_proposal: 1,
       plugin_package_publisher_provenance: 1,
       plugin_package_publisher_trust_authority: 1,
@@ -2336,6 +2338,14 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_run_retry_policies_run_fk',
     ]),
     functions: Object.freeze([
+      Object.freeze({
+        name: 'enforce_plugin_package_secret_materialization',
+        identityArguments: '',
+        owner: 'ql3_migration',
+        securityDefiner: false,
+        volatility: 'volatile',
+        configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
       Object.freeze({
         name: 'register_plugin_package_automation_disposition_event',
         identityArguments: '',

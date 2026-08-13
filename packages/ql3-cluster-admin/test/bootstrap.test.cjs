@@ -160,6 +160,7 @@ function database(serverVersionNum = '160014') {
                 'commit_plugin_package_lifecycle',
                 'commit_plugin_package_task_reconciliation',
                 'commit_plugin_package_quarantine',
+                'enforce_plugin_package_secret_materialization',
                 'enforce_plugin_package_stage_provenance',
                 'lock_active_plugin_package_project',
                 'lock_approval_policy_fence',
