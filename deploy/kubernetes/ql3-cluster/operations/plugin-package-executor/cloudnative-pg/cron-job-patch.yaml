@@ -17,6 +17,8 @@
       value: '16'
     - name: QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_MAX_PAGES
       value: '16'
+    - name: QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT
+      value: /var/run/secrets/qinglong3/plugin-package-values
     - name: QL3_POSTGRES_TLS_MODE
       value: verify-full
     - name: QL3_POSTGRES_TLS_CA_FILE

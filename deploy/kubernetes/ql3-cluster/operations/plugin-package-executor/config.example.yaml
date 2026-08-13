@@ -10,3 +10,13 @@ stringData:
   postgres-package-executor-url: REPLACE_WITH_PACKAGE_EXECUTOR_DSN
   postgres-tls-servername: REPLACE_WITH_POSTGRES_DNS_NAME
   postgres-ca.crt: REPLACE_WITH_POSTGRES_CA_CERTIFICATE
+---
+# Optional SecretRef projection. Each key is the lowercase SHA-256 of the
+# canonical qlsecret:v1 reference; the executor checks metadata only.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ql3-cluster-plugin-package-values
+  namespace: qinglong3-system
+type: Opaque
+data: {}

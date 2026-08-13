@@ -180,7 +180,10 @@ export class PostgresPluginPackageSecretBindingRepository
            lock_digest, generation, manifest_digest, authority_kind,
            evidence_digest, bound_at_ms, binding_digest, binding_json
          )
-         SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb
+         SELECT $1::char(64), $2::varchar(128), $3::varchar(63),
+                $4::varchar(128), $5::char(64), $6::integer, $7::char(64),
+                $8::varchar(32), $9::char(64), $10::bigint, $11::char(64),
+                $12::jsonb
          FROM "ql3"."plugin_package_installs" AS install
          INNER JOIN "ql3"."plugin_package_install_heads" AS head
            ON head.installation_id = install.installation_id

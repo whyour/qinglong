@@ -4,6 +4,11 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
 const {
+  approvalRequestDigest,
+  createApprovalRequest,
+  decideApprovalRequest,
+} = require('@qinglong/runtime-core/approved-action');
+const {
   PLUGIN_PACKAGE_API_VERSION,
   PLUGIN_PACKAGE_KIND,
   planPluginPackageInstall,
@@ -289,6 +294,66 @@ test('returns absence and fails closed on replay drift or storage conflict', asy
   await assert.rejects(
     conflict.create(approvalPlan),
     PluginPackageSecretBindingApprovalPlanConflictError,
+  );
+});
+
+test('lists only a bounded digest-verified approved Secret binding queue', async () => {
+  const { approvalPlan } = fixture();
+  const pending = createApprovalRequest({
+    id: 'approval-secret-binding-list-1',
+    projectId: approvalPlan.bindingPlan.target.projectId,
+    action: require('@qinglong/runtime-core/plugin-package-secret-binding-approval-plan')
+      .pluginPackageSecretBindingApprovedAction(approvalPlan),
+    risk: 'high',
+    decisionMode: 'separation_of_duty',
+    requestedBy: approvalPlan.requestedBy,
+    requestedAtMs: 301,
+    expiresAtMs: 800,
+    requestFence: { projectVersion: 1, bindingVersion: 1 },
+  });
+  const approved = decideApprovalRequest(pending, {
+    expectedVersion: 1,
+    decisionId: 'decision-secret-binding-list-1',
+    decision: 'approved',
+    reasonCode: 'reviewed',
+    principal: {
+      subject: { type: 'user', id: 'security-reviewer' },
+      authenticationId: 'auth-security-reviewer',
+      authenticatedAtMs: 302,
+      expiresAtMs: 700,
+      assurance: 'multi_factor',
+    },
+    decidedAtMs: 303,
+    authorizationFence: { projectVersion: 1, bindingVersion: 1 },
+  });
+  const calls = [];
+  const reader = new PostgresPluginPackageSecretBindingApprovalPlanReader({
+    async query(text, parameters) {
+      calls.push({ text, parameters });
+      return {
+        rows: [{
+          requestJson: approved,
+          requestDigest: approvalRequestDigest(approved),
+        }],
+      };
+    },
+  });
+  assert.deepEqual(await reader.listApprovedRequests(4), [approved]);
+  assert.match(calls[0].text, /request\.state = 'approved'/);
+  assert.match(calls[0].text, /plugin_package\.secret_binding\.bind/);
+  assert.deepEqual(calls[0].parameters, [4]);
+  await assert.rejects(reader.listApprovedRequests(65), TypeError);
+
+  const corrupt = new PostgresPluginPackageSecretBindingApprovalPlanReader({
+    async query() {
+      return {
+        rows: [{ requestJson: approved, requestDigest: 'f'.repeat(64) }],
+      };
+    },
+  });
+  await assert.rejects(
+    corrupt.listApprovedRequests(4),
+    PluginPackageSecretBindingApprovalPlanUnavailableError,
   );
 });
 

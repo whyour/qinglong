@@ -17,6 +17,8 @@ function environment(overrides = {}) {
     QL3_PLUGIN_PACKAGE_EXECUTOR_LEASE_DURATION_MS: '600000',
     QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_PAGE_SIZE: '8',
     QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_MAX_PAGES: '4',
+    QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT:
+      '/var/run/secrets/qinglong3/plugin-package-values',
     QL3_POSTGRES_PACKAGE_EXECUTOR_URL:
       'postgresql://ql3_package_executor:secret@postgres/qinglong',
     QL3_POSTGRES_TLS_MODE: 'disable',
@@ -47,6 +49,10 @@ test('loads bounded low-footprint Package-executor configuration', () => {
   assert.equal(config.maxBatches, 2);
   assert.equal(config.revocationPageSize, 8);
   assert.equal(config.revocationMaxPages, 4);
+  assert.equal(
+    config.secretProjectionRoot,
+    '/var/run/secrets/qinglong3/plugin-package-values',
+  );
   assert.equal(config.database.pool.maxConnections, 2);
   assert.equal(config.database.connection.tls.mode, 'disable');
 });
@@ -57,6 +63,7 @@ test('rejects implicit insecure PostgreSQL and unbounded work', () => {
     environment({ QL3_PLUGIN_PACKAGE_EXECUTOR_MAX_BATCHES: '65' }),
     environment({ QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_PAGE_SIZE: '129' }),
     environment({ QL3_PLUGIN_PACKAGE_EXECUTOR_OWNER: 'not safe' }),
+    environment({ QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT: 'relative/path' }),
   ]) {
     assert.throws(
       () => loadClusterPluginPackageExecutorProcessConfig(invalid),

@@ -7,6 +7,10 @@ import {
 import { PluginPackageApprovedActionHandler } from '@qinglong/runtime-core/plugin-package-approved-action';
 import { PostgresApprovedActionExecutionRepository } from '@qinglong/cluster-postgres/approved-action-execution';
 import { PostgresPluginPackageInstallRepository } from '@qinglong/cluster-postgres/plugin-package-install';
+import {
+  PostgresPluginPackageSecretBindingApprovalPlanReader,
+  PostgresPluginPackageSecretBindingRepository,
+} from '@qinglong/cluster-postgres/package-executor';
 import { PostgresPluginPackageInstallProposalRepository } from '@qinglong/cluster-postgres/plugin-package-proposal';
 import {
   PostgresPluginPackagePublisherRevocationProposalRepository,
@@ -22,6 +26,8 @@ import {
   ClusterPluginPackagePublisherTrustTransitionApprovedActionHandler,
   type ClusterPluginPackagePublisherTrustTransitionExecutionPort,
 } from '../publisher/pluginPackagePublisherTrustTransitionApprovedAction';
+import { ClusterPluginPackageSecretBindingApprovedActionHandler } from '../secret-binding/pluginPackageSecretBindingApprovedAction';
+import type { PluginPackageSecretExistenceInspector } from '../secret-binding/projectedSecretExistenceInspector';
 
 export const CLUSTER_PLUGIN_PACKAGE_DISPATCH_BATCH_LIMIT = 16;
 
@@ -31,6 +37,7 @@ export interface ClusterPluginPackageApprovedActionDispatcherOptions
   readonly defaultBatchSize?: number;
   readonly publisherRevocations?: ClusterPluginPackagePublisherRevocationExecutionPort;
   readonly publisherTrustTransitions?: ClusterPluginPackagePublisherTrustTransitionExecutionPort;
+  readonly secretExistenceInspector: PluginPackageSecretExistenceInspector;
 }
 
 export function createClusterPluginPackageApprovedActionDispatcher(
@@ -44,15 +51,21 @@ export function createClusterPluginPackageApprovedActionDispatcher(
     defaultBatchSize,
     publisherRevocations,
     publisherTrustTransitions,
+    secretExistenceInspector,
     ...dispatcherOptions
   } = options;
   const executions = new PostgresApprovedActionExecutionRepository(pool);
-  const handler = new PluginPackageApprovedActionHandler(
+  const installHandler = new PluginPackageApprovedActionHandler(
     new PostgresPluginPackageInstallProposalRepository(pool),
     new PostgresPluginPackageInstallRepository(pool),
   );
   const handlers = [
-    handler,
+    installHandler,
+    new ClusterPluginPackageSecretBindingApprovedActionHandler(
+      new PostgresPluginPackageSecretBindingApprovalPlanReader(pool),
+      new PostgresPluginPackageSecretBindingRepository(pool),
+      secretExistenceInspector,
+    ),
     ...(['overlap_add', 'safe_retire'] as const).map(
       (mode) =>
         new ClusterPluginPackagePublisherTrustTransitionApprovedActionHandler(

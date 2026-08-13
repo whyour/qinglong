@@ -55,6 +55,8 @@ export {
 } from '../management/pluginPackageIdentityKeysetLedgerRepository';
 
 export { PostgresPluginPackagePublisherTrustAuthorityRepository } from '../plugin-package/publisher/pluginPackagePublisherTrustAuthorityRepository';
+export { PostgresApprovalRequestRepository } from '../approved-action/approvalRequestRepository';
+export { PostgresProjectPolicyRepository } from '../security/projectPolicyRepository';
 export { PostgresPluginPackageLifecyclePlanReader } from '../plugin-package/lifecycle/pluginPackageLifecyclePlanRepository';
 export {
   PostgresPluginPackageSecretBindingApprovalPlanReader,

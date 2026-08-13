@@ -2342,6 +2342,12 @@ function auditSourceImports(root, packagePath, findings) {
           (path.relative(packageDirectory, filePath) ===
             'src/plugin-package/management/pluginPackageManagementProcess.ts' &&
             specifier === '@qinglong/cluster-postgres/package-manager') ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/plugin-package/secret-binding/pluginPackageSecretBindingManagement.ts' &&
+            specifier === '@qinglong/cluster-postgres/package-manager') ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/plugin-package/secret-binding/pluginPackageSecretBindingApprovalConsumer.ts' &&
+            specifier === '@qinglong/cluster-postgres/package-executor') ||
           ([
             'src/worker-credential/management-server/workerCredentialManagement.ts',
             'src/worker-credential/management-server/workerCredentialManagementProcess.ts',

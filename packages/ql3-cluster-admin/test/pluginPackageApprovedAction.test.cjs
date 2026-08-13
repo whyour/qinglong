@@ -20,6 +20,9 @@ test('composes one bounded caller-driven cluster Package dispatcher', async () =
     owner: 'cluster_package_dispatcher_1',
     clock: () => 100,
     createId: () => 'dispatcher-id-1',
+    secretExistenceInspector: {
+      async assertExists() {},
+    },
   });
   let observedLimit = null;
   dispatcher.repository.listDueExecutions = async (query) => {

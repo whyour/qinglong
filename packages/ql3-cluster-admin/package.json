@@ -255,6 +255,21 @@
       "require": "./dist/plugin-package/secret-binding/projectedSecretExistenceInspector.js",
       "default": "./dist/plugin-package/secret-binding/projectedSecretExistenceInspector.js"
     },
+    "./plugin-package-secret-binding-management": {
+      "types": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingManagement.d.ts",
+      "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingManagement.js",
+      "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingManagement.js"
+    },
+    "./plugin-package-secret-binding-approval-consumer": {
+      "types": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovalConsumer.d.ts",
+      "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovalConsumer.js",
+      "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovalConsumer.js"
+    },
+    "./plugin-package-secret-binding-approved-action": {
+      "types": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovedAction.d.ts",
+      "require": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovedAction.js",
+      "default": "./dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovedAction.js"
+    },
     "./plugin-package-lifecycle-management": {
       "types": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.d.ts",
       "require": "./dist/plugin-package/lifecycle/pluginPackageLifecycleManagement.js",

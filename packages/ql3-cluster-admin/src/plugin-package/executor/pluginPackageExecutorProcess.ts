@@ -8,6 +8,7 @@ import type {
   ApprovedActionDispatchBatchSummary,
   ApprovedActionDispatcher,
 } from '@qinglong/runtime-core/approved-action-dispatcher';
+import { isAbsolute, normalize, parse } from 'node:path';
 import {
   assertPostgresPackageExecutorSchemaReady,
   createPostgresDatabaseOpener,
@@ -34,6 +35,12 @@ import {
   type ConsumeClusterPluginPackagePublisherTrustTransitionApprovalsOptions,
 } from '../publisher/pluginPackagePublisherTrustTransitionApprovalConsumer';
 import {
+  consumeClusterPluginPackageSecretBindingApprovals,
+  type ClusterPluginPackageSecretBindingApprovalSummary,
+  type ConsumeClusterPluginPackageSecretBindingApprovalsOptions,
+} from '../secret-binding/pluginPackageSecretBindingApprovalConsumer';
+import { ProjectedPluginPackageSecretExistenceInspector } from '../secret-binding/projectedSecretExistenceInspector';
+import {
   runClusterPluginPackagePublisherRevocation,
 } from '../publisher/pluginPackagePublisherRevocation';
 
@@ -52,6 +59,7 @@ export type ClusterPluginPackageExecutorProcessConfig =
       leaseDurationMs: number;
       revocationPageSize: number;
       revocationMaxPages: number;
+      secretProjectionRoot: string | null;
       database: Readonly<{
         connection: PostgresConnectionOptions;
         pool: PostgresPoolOptions;
@@ -61,6 +69,7 @@ export type ClusterPluginPackageExecutorProcessConfig =
 export interface ClusterPluginPackageExecutorBatchResult {
   readonly approvals: Readonly<ClusterPluginPackagePublisherRevocationApprovalSummary>;
   readonly trustTransitionApprovals: Readonly<ClusterPluginPackagePublisherTrustTransitionApprovalSummary>;
+  readonly secretBindingApprovals: Readonly<ClusterPluginPackageSecretBindingApprovalSummary>;
   readonly dispatch: Readonly<ApprovedActionDispatchBatchSummary>;
 }
 
@@ -85,6 +94,9 @@ export interface RunClusterPluginPackageExecutorProcessOptions {
   ) => Promise<
     Readonly<ClusterPluginPackagePublisherTrustTransitionApprovalSummary>
   >;
+  readonly consumeSecretBindingApprovals?: (
+    options: ConsumeClusterPluginPackageSecretBindingApprovalsOptions,
+  ) => Promise<Readonly<ClusterPluginPackageSecretBindingApprovalSummary>>;
   readonly createDispatcher?: (
     options: ClusterPluginPackageApprovedActionDispatcherOptions,
   ) => ApprovedActionDispatcher;
@@ -258,6 +270,27 @@ function databaseConfig(
   });
 }
 
+function secretProjectionRoot(
+  environment: ClusterPluginPackageExecutorProcessEnvironment,
+): string | null {
+  const value = boundedValue(
+    environment,
+    'QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT',
+    4096,
+  );
+  if (value === undefined) return null;
+  if (
+    !isAbsolute(value) ||
+    parse(value).root === value ||
+    normalize(value) !== value
+  ) {
+    throw new ClusterPluginPackageExecutorProcessConfigError(
+      'QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT must be an exact absolute directory',
+    );
+  }
+  return value;
+}
+
 export function loadClusterPluginPackageExecutorProcessConfig(
   environment: ClusterPluginPackageExecutorProcessEnvironment,
 ): ClusterPluginPackageExecutorProcessConfig {
@@ -320,6 +353,7 @@ export function loadClusterPluginPackageExecutorProcessConfig(
       1,
       64,
     ),
+    secretProjectionRoot: secretProjectionRoot(environment),
     database: databaseConfig(environment),
   });
 }
@@ -340,6 +374,7 @@ function isIdleBatch(
   return (
     batch.approvals.scanned === 0 &&
     batch.trustTransitionApprovals.scanned === 0 &&
+    batch.secretBindingApprovals.scanned === 0 &&
     batch.dispatch.scanned === 0
   );
 }
@@ -358,6 +393,8 @@ export async function runClusterPluginPackageExecutorProcess(
       typeof options.consumeApprovals !== 'function') ||
     (options.consumeTrustTransitionApprovals !== undefined &&
       typeof options.consumeTrustTransitionApprovals !== 'function') ||
+    (options.consumeSecretBindingApprovals !== undefined &&
+      typeof options.consumeSecretBindingApprovals !== 'function') ||
     (options.createDispatcher !== undefined &&
       typeof options.createDispatcher !== 'function') ||
     (options.now !== undefined && typeof options.now !== 'function')
@@ -391,11 +428,26 @@ export async function runClusterPluginPackageExecutorProcess(
     const consumeTrustTransitionApprovals =
       options.consumeTrustTransitionApprovals ??
       consumeClusterPluginPackagePublisherTrustTransitionApprovals;
+    const consumeSecretBindingApprovals =
+      options.consumeSecretBindingApprovals ??
+      consumeClusterPluginPackageSecretBindingApprovals;
     const dispatcher = dispatcherFactory({
       pool: database.pool,
       owner: config.owner,
       leaseDurationMs: config.leaseDurationMs,
       defaultBatchSize: config.dispatchBatchSize,
+      secretExistenceInspector:
+        config.secretProjectionRoot === null
+          ? Object.freeze({
+              async assertExists(): Promise<never> {
+                throw new Error(
+                  'Plugin Package Secret projection is not configured',
+                );
+              },
+            })
+          : new ProjectedPluginPackageSecretExistenceInspector({
+              rootDirectory: config.secretProjectionRoot,
+            }),
       ...(options.now ? { clock: options.now } : {}),
       publisherRevocations: {
         async run(receipt) {
@@ -429,12 +481,19 @@ export async function runClusterPluginPackageExecutorProcess(
           limit: config.approvalBatchSize,
           ...(options.now ? { now: options.now } : {}),
         });
+      const secretBindingApprovals =
+        await consumeSecretBindingApprovals({
+          pool: database.pool,
+          limit: config.approvalBatchSize,
+          ...(options.now ? { now: options.now } : {}),
+        });
       const dispatch = await dispatcher.dispatchBatch({
         limit: config.dispatchBatchSize,
       });
       const batch = Object.freeze({
         approvals,
         trustTransitionApprovals,
+        secretBindingApprovals,
         dispatch,
       });
       batches.push(batch);

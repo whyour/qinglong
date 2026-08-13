@@ -40,6 +40,8 @@ export {
 } from '../schema/schemaReadiness';
 
 export { PostgresPluginPackageMaterializedRevisionRepository } from '../plugin-package/installation/pluginPackageMaterializedRevisionRepository';
+export { PostgresApprovalRequestRepository } from '../approved-action/approvalRequestRepository';
+export { PostgresProjectPolicyRepository } from '../security/projectPolicyRepository';
 export { PostgresPluginPackageSecretBindingRepository } from '../plugin-package/installation/pluginPackageSecretBindingRepository';
 export { PostgresPluginPackageSecretBindingApprovalPlanReader } from '../plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository';
 export { PostgresPluginPackageAutomationPublicationRepository } from '../plugin-package/publication/pluginPackageAutomationPublicationRepository';

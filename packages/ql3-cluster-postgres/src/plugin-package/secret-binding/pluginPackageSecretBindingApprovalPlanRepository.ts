@@ -1,5 +1,10 @@
 import type { PostgresPool } from '@qinglong/runtime-core';
 import {
+  approvalRequestDigest,
+  normalizeApprovalRequestRecord,
+  type ApprovalRequestRecord,
+} from '@qinglong/runtime-core/approved-action';
+import {
   normalizePluginPackageInstallProposal,
   type PluginPackageInstallProposal,
 } from '@qinglong/runtime-core/plugin-package-proposal';
@@ -81,6 +86,26 @@ function normalizeRow(
         unavailable,
       ) as unknown as PluginPackageSecretBindingApprovalPlan,
     );
+  } catch (error) {
+    throw unavailable(error);
+  }
+}
+
+function normalizeApprovalRow(row: Row): Readonly<ApprovalRequestRecord> {
+  try {
+    const request = normalizeApprovalRequestRecord(
+      postgresRequiredJsonObject(
+        row.requestJson,
+        unavailable,
+      ) as unknown as ApprovalRequestRecord,
+    );
+    if (
+      approvalRequestDigest(request) !==
+      postgresRequiredString(row.requestDigest, unavailable)
+    ) {
+      throw unavailable();
+    }
+    return request;
   } catch (error) {
     throw unavailable(error);
   }
@@ -190,6 +215,36 @@ export class PostgresPluginPackageSecretBindingApprovalPlanReader {
         throw unavailable();
       }
       return Object.freeze({ record, lock, proposal, observedAtMs });
+    } catch (error) {
+      throw mapStorageError(error);
+    }
+  }
+
+  async listApprovedRequests(
+    limitValue: number,
+  ): Promise<readonly Readonly<ApprovalRequestRecord>[]> {
+    if (
+      !Number.isSafeInteger(limitValue) ||
+      limitValue < 1 ||
+      limitValue > 64
+    ) {
+      throw new TypeError('Secret binding approval page limit is invalid');
+    }
+    try {
+      const result = await this.pool.query<Row>(
+        `SELECT request.request_json AS "requestJson",
+                request.request_digest AS "requestDigest"
+         FROM "ql3"."approval_requests" AS request
+         JOIN "ql3"."plugin_package_secret_binding_approval_plans" AS plan
+           ON plan.action_ref = request.action_ref
+         WHERE request.state = 'approved'
+           AND request.action_type = 'plugin_package.secret_binding.bind'
+         ORDER BY request.updated_at_ms, request.request_id
+         LIMIT $1`,
+        [limitValue],
+      );
+      if (result.rows.length > limitValue) throw unavailable();
+      return Object.freeze(result.rows.map(normalizeApprovalRow));
     } catch (error) {
       throw mapStorageError(error);
     }

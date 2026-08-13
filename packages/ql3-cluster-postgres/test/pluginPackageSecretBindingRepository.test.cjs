@@ -187,3 +187,21 @@ test('publishes storage through package-executor and explicit subpath', () => {
     PostgresPluginPackageSecretBindingRepository,
   );
 });
+
+test('casts reused INSERT parameters to their durable PostgreSQL column types', async () => {
+  let statement = '';
+  const repository = new PostgresPluginPackageSecretBindingRepository({
+    async query(text) {
+      if (text.includes('INSERT INTO')) {
+        statement = text;
+        return { rows: [{ generation_digest: 'a'.repeat(64) }], rowCount: 1 };
+      }
+      return { rows: [] };
+    },
+  });
+  await assert.rejects(repository.publish(fixture()));
+  assert.match(statement, /\$2::varchar\(128\)/);
+  assert.match(statement, /\$3::varchar\(63\)/);
+  assert.match(statement, /\$6::integer/);
+  assert.match(statement, /\$10::bigint/);
+});
