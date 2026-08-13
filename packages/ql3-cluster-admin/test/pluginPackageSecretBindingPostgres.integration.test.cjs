@@ -45,6 +45,9 @@ const {
   createClusterPluginPackageManagementService,
 } = require('@qinglong/cluster-admin/plugin-package-management');
 const {
+  createClusterPluginPackageManagementTransport,
+} = require('@qinglong/cluster-admin/plugin-package-management-transport');
+const {
   createClusterPluginPackageApprovedActionDispatcher,
 } = require('@qinglong/cluster-admin/plugin-package-approved-action');
 const {
@@ -363,42 +366,105 @@ if (!MIGRATION_URL || !MANAGER_URL || !EXECUTOR_URL) {
         planLifetimeMs: 60_000,
         approvalLifetimeMs: 60_000,
       });
-      const planned = await secretManagement.plan({
-        actionRef: secretActionRef,
-        projectId,
-        packageName,
-        assignments: [{ name: 'TOKEN', secretRef }],
-        principal: principal(requesterSubject, `secret-owner-${suffix}`, now),
+      const secretTransport = createClusterPluginPackageManagementTransport({
+        service: installManagement,
+        secretBinding: secretManagement,
+        now: () => now,
       });
-      assert.equal(planned.status, 'created');
-      now = Math.max(now, planned.plan.bindingPlan.plannedAtMs);
-      const replay = await secretManagement.plan({
-        actionRef: secretActionRef,
-        projectId,
-        packageName,
-        assignments: [{ name: 'TOKEN', secretRef }],
-        principal: principal(requesterSubject, `secret-owner-${suffix}`, now),
-      });
+      const requesterAuthentication = {
+        async authenticate() {
+          return principal(requesterSubject, `secret-owner-${suffix}`, now);
+        },
+      };
+      const plannedPublic = await secretTransport.execute(
+        {
+          schemaVersion: 1,
+          operation: 'plugin-package.secret-binding.plan',
+          request: {
+            actionRef: secretActionRef,
+            projectId,
+            packageName,
+            assignments: [{ name: 'TOKEN', secretRef }],
+          },
+        },
+        requesterAuthentication,
+      );
+      assert.equal(plannedPublic.status, 'created');
+      assert.equal(plannedPublic.plan.actionRef, secretActionRef);
+      assert.deepEqual(plannedPublic.plan.entries, [
+        { name: 'TOKEN', required: false, secretRef },
+      ]);
+      assert.equal(Object.hasOwn(plannedPublic.plan, 'authenticationId'), false);
+      now = Math.max(now, plannedPublic.plan.plannedAtMs);
+      const replay = await secretTransport.execute(
+        {
+          schemaVersion: 1,
+          operation: 'plugin-package.secret-binding.plan',
+          request: {
+            actionRef: secretActionRef,
+            projectId,
+            packageName,
+            assignments: [{ name: 'TOKEN', secretRef }],
+          },
+        },
+        requesterAuthentication,
+      );
       assert.equal(replay.status, 'existing');
       now += 10;
-      const secretProposed = await secretManagement.propose({
-        actionRef: secretActionRef,
-        approvalRequestId: secretApprovalId,
-        approvalAuditEventId: randomUUID(),
-        principal: principal(requesterSubject, `secret-owner-${suffix}`, now),
-      });
+      const secretProposed = await secretTransport.execute(
+        {
+          schemaVersion: 1,
+          operation: 'plugin-package.secret-binding.propose',
+          request: {
+            actionRef: secretActionRef,
+            approvalRequestId: secretApprovalId,
+            approvalAuditEventId: randomUUID(),
+          },
+        },
+        requesterAuthentication,
+      );
       now += 10;
-      const secretDecision = await secretManagement.decide({
-        actionRef: secretActionRef,
-        approvalRequestId: secretApprovalId,
-        expectedVersion: secretProposed.approvalRequest.version,
-        decisionId: `secret-decision-${suffix}`,
-        auditEventId: randomUUID(),
-        decision: 'approved',
-        reasonCode: 'reviewed',
-        principal: principal(reviewerSubject, `secret-reviewer-${suffix}`, now),
-      });
+      const secretDecision = await secretTransport.execute(
+        {
+          schemaVersion: 1,
+          operation: 'plugin-package.secret-binding.decide',
+          request: {
+            actionRef: secretActionRef,
+            approvalRequestId: secretApprovalId,
+            expectedVersion: secretProposed.approval.version,
+            decisionId: `secret-decision-${suffix}`,
+            auditEventId: randomUUID(),
+            decision: 'approved',
+            reasonCode: 'reviewed',
+          },
+        },
+        {
+          async authenticate() {
+            return principal(
+              reviewerSubject,
+              `secret-reviewer-${suffix}`,
+              now,
+            );
+          },
+        },
+      );
       assert.equal(secretDecision.status, 'decided');
+      const inspected = await secretTransport.execute(
+        {
+          schemaVersion: 1,
+          operation: 'plugin-package.secret-binding.inspect',
+          request: {
+            actionRef: secretActionRef,
+            approvalRequestId: secretApprovalId,
+            inspectionId: `secret-inspection-${suffix}`,
+          },
+        },
+        requesterAuthentication,
+      );
+      assert.deepEqual(inspected.plan, plannedPublic.plan);
+      assert.equal(inspected.approval?.state, 'approved');
+      assert.equal(inspected.approval?.decision, 'approved');
+      assert.equal(inspected.stale, false);
       now += 10;
       assert.deepEqual(
         await consumeClusterPluginPackageSecretBindingApprovals({
@@ -432,7 +498,7 @@ if (!MIGRATION_URL || !MANAGER_URL || !EXECUTOR_URL) {
         ).inspect(pendingSecretExecution.dispatch),
         {
           status: 'ready',
-          actionDigest: planned.plan.approvalPlanDigest,
+          actionDigest: plannedPublic.plan.approvalPlanDigest,
         },
       );
       id = 0;
@@ -448,12 +514,15 @@ if (!MIGRATION_URL || !MANAGER_URL || !EXECUTOR_URL) {
       assert.equal(secretDispatch.succeeded, 1);
       const bindings = new PostgresPluginPackageSecretBindingRepository(executor.pool);
       const binding = await bindings.find(
-        planned.plan.bindingPlan.target.generationDigest,
+        plannedPublic.plan.generationDigest,
       );
       assert.ok(binding);
       assert.equal(binding.authority.kind, 'approved-action-execution');
-      assert.equal(binding.authority.evidenceDigest, planned.plan.approvalPlanDigest);
-      assert.deepEqual(binding.entries, planned.plan.bindingPlan.entries);
+      assert.equal(
+        binding.authority.evidenceDigest,
+        plannedPublic.plan.approvalPlanDigest,
+      );
+      assert.deepEqual(binding.entries, plannedPublic.plan.entries);
       assert.doesNotMatch(JSON.stringify(binding), /secret-value/);
       assert.equal((await secretDispatcher.dispatchBatch({ limit: 4 })).scanned, 0);
       await assert.rejects(

@@ -322,6 +322,94 @@ function authentication(value = principal()) {
   };
 }
 
+function secretBindingPlan() {
+  return {
+    schema: 'qinglong/plugin-package-secret-binding-approval-plan@v1',
+    actionRef: 'secret-binding:cluster-monitor:1',
+    bindingPlan: {
+      schema: 'qinglong/plugin-package-secret-binding-plan@v1',
+      target: {
+        installationId: 'cluster-monitor-installation',
+        projectId: 'default',
+        packageName: 'cluster-monitor',
+        lockDigest: '1'.repeat(64),
+        generation: 1,
+        generationDigest: '2'.repeat(64),
+        manifestDigest: '3'.repeat(64),
+      },
+      entries: [{
+        name: 'TOKEN',
+        required: true,
+        secretRef:
+          'qlsecret:v1:eyJwcm9qZWN0SWQiOiJkZWZhdWx0IiwibmFtZSI6InJ1bnRpbWUtdG9rZW4iLCJ2ZXJzaW9uIjoyfQ',
+      }],
+      plannedAtMs: NOW - 10,
+      planDigest: '4'.repeat(64),
+    },
+    requestedBy: { type: 'user', id: 'cluster-reviewer' },
+    expiresAtMs: NOW + 10_000,
+    approvalPlanDigest: '5'.repeat(64),
+  };
+}
+
+function fakeSecretBinding() {
+  const calls = { plan: [], propose: [], decide: [], inspectAuthorized: [] };
+  return {
+    calls,
+    service: {
+      async plan(request) {
+        calls.plan.push(request);
+        return { status: 'created', plan: secretBindingPlan() };
+      },
+      async propose(request) {
+        calls.propose.push(request);
+        return {
+          plan: secretBindingPlan(),
+          approvalStatus: 'created',
+          approvalRequest: approval({
+            id: request.approvalRequestId,
+            action: {
+              permission: 'secret.manage',
+              actionType: 'plugin_package.secret_binding.bind',
+              actionRef: request.actionRef,
+              actionDigest: '5'.repeat(64),
+              previewDigest: '4'.repeat(64),
+            },
+            requestedBy: request.principal.subject,
+          }),
+        };
+      },
+      async decide(request) {
+        calls.decide.push(request);
+        return {
+          status: 'decided',
+          request: approval({
+            id: request.approvalRequestId,
+            version: 2,
+            state: request.decision,
+            decisionId: request.decisionId,
+            decision: request.decision,
+            decisionReasonCode: request.reasonCode,
+            decidedBy: request.principal.subject,
+            decisionAuthenticationId: request.principal.authenticationId,
+            decisionAssurance: request.principal.assurance,
+            decidedAtMs: NOW,
+            decisionFence: { projectVersion: 1, bindingVersion: 1 },
+          }),
+        };
+      },
+      async inspectAuthorized(request) {
+        calls.inspectAuthorized.push(request);
+        return {
+          plan: secretBindingPlan(),
+          approvalRequest: null,
+          stale: false,
+        };
+      },
+    },
+  };
+}
+
 function lifecyclePlan() {
   return {
     schema: 'qinglong/plugin-package-lifecycle-plan@v1',
@@ -814,6 +902,82 @@ test('routes lifecycle review without exposing executor mutation authority', asy
   assert.equal(inspected.stale, true);
   assert.equal(inspected.approval, null);
   assert.equal(lifecycle.calls.inspectAuthorized.length, 1);
+  assert.deepEqual(management.calls.consume, []);
+  assert.deepEqual(management.calls.dispatch, []);
+});
+
+test('routes content-free Secret binding review without executor authority', async () => {
+  const management = fakeService();
+  const secretBinding = fakeSecretBinding();
+  const transport = createClusterPluginPackageManagementTransport({
+    service: management.service,
+    secretBinding: secretBinding.service,
+    now: () => NOW,
+  });
+  const planCommand = {
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.plan',
+    request: {
+      actionRef: secretBindingPlan().actionRef,
+      projectId: 'default',
+      packageName: 'cluster-monitor',
+      assignments: secretBindingPlan().bindingPlan.entries.map(
+        ({ name, secretRef }) => ({ name, secretRef }),
+      ),
+    },
+  };
+  const planned = await transport.execute(
+    planCommand,
+    authentication().authority,
+  );
+  assert.equal(planned.status, 'created');
+  assert.deepEqual(Object.keys(planned.plan).sort(), [
+    'actionRef', 'approvalPlanDigest', 'entries', 'expiresAtMs', 'generation',
+    'generationDigest', 'installationId', 'lockDigest', 'manifestDigest',
+    'packageName', 'planDigest', 'plannedAtMs', 'projectId',
+  ]);
+  assert.equal(JSON.stringify(planned).includes('authenticationId'), false);
+
+  const proposed = await transport.execute({
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.propose',
+    request: {
+      actionRef: secretBindingPlan().actionRef,
+      approvalRequestId: 'approval-secret-binding-1',
+      approvalAuditEventId: 'audit-secret-binding-approval-1',
+    },
+  }, authentication().authority);
+  assert.equal(proposed.approvalStatus, 'created');
+
+  const decided = await transport.execute({
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.decide',
+    request: {
+      actionRef: secretBindingPlan().actionRef,
+      approvalRequestId: 'approval-secret-binding-1',
+      expectedVersion: 1,
+      decisionId: 'decision-secret-binding-1',
+      auditEventId: 'audit-secret-binding-decision-1',
+      decision: 'approved',
+      reasonCode: 'reviewed',
+    },
+  }, authentication().authority);
+  assert.equal(decided.status, 'decided');
+
+  const inspected = await transport.execute({
+    schemaVersion: 1,
+    operation: 'plugin-package.secret-binding.inspect',
+    request: {
+      actionRef: secretBindingPlan().actionRef,
+      approvalRequestId: 'approval-secret-binding-1',
+      inspectionId: 'inspection-secret-binding-1',
+    },
+  }, authentication().authority);
+  assert.equal(inspected.stale, false);
+  assert.equal(secretBinding.calls.plan.length, 1);
+  assert.equal(secretBinding.calls.propose.length, 1);
+  assert.equal(secretBinding.calls.decide.length, 1);
+  assert.equal(secretBinding.calls.inspectAuthorized.length, 1);
   assert.deepEqual(management.calls.consume, []);
   assert.deepEqual(management.calls.dispatch, []);
 });

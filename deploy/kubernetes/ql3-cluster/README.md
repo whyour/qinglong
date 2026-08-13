@@ -451,7 +451,12 @@ become trusted by restarting every replica. Server TLS certificate rotation
 requires a controlled Pod rollout because TLS material is loaded only at
 process startup.
 
-This deployment exposes only `propose`, `decide`, and low-sensitive `inspect`.
+This deployment exposes only reviewed Package proposal/decision/inspection,
+installation inventory, lifecycle review, publisher trust review, and
+content-free Secret binding `plan|propose|decide|inspect`. Secret binding plans
+derive generation and digests from PostgreSQL; the caller supplies only logical
+requirements and fixed-version same-Project Secret references. The management
+Pods never receive projected Secret values or package-executor database authority.
 It has no Kubernetes API token or RBAC, no Registry credential, and no Package
 executor/admin/runtime database identity. Process-local rate limiting is a
 bounded anonymous-traffic shield, not a distributed quota. Authenticated

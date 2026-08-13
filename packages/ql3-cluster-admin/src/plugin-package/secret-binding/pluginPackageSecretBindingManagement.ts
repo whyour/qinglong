@@ -15,8 +15,11 @@ import {
 import {
   PluginPackageManagementAuthorizationError,
   PluginPackageManagementConflictError,
+  PluginPackageManagementQuotaExceededError,
   PluginPackageManagementRequestError,
   PluginPackageManagementUnavailableError,
+  type PluginPackageManagementQuotaOperation,
+  type PluginPackageManagementQuotaPort,
 } from '@qinglong/runtime-core/plugin-package-management';
 import { createPluginPackageResourceGenerationFromReferences } from '@qinglong/runtime-core/plugin-package-resource-generation';
 import type { PluginPackageSecretBindingAssignment } from '@qinglong/runtime-core/plugin-package-secret-binding';
@@ -111,6 +114,7 @@ export interface ClusterPluginPackageSecretBindingManagementOptions {
   readonly now?: () => number;
   readonly planLifetimeMs?: number;
   readonly approvalLifetimeMs?: number;
+  readonly quota?: PluginPackageManagementQuotaPort;
 }
 
 function exact(value: unknown, keys: readonly string[], label: string): void {
@@ -226,12 +230,15 @@ export function createClusterPluginPackageSecretBindingManagementService(
         key !== 'pool' &&
         key !== 'now' &&
         key !== 'planLifetimeMs' &&
-        key !== 'approvalLifetimeMs',
+        key !== 'approvalLifetimeMs' &&
+        key !== 'quota',
     ) ||
     !options.pool ||
     typeof options.pool.query !== 'function' ||
     typeof options.pool.connect !== 'function' ||
-    (options.now !== undefined && typeof options.now !== 'function')
+    (options.now !== undefined && typeof options.now !== 'function') ||
+    (options.quota !== undefined &&
+      (!options.quota || typeof options.quota.consume !== 'function'))
   ) {
     throw new TypeError(
       'cluster Plugin Package Secret binding management options are invalid',
@@ -264,6 +271,28 @@ export function createClusterPluginPackageSecretBindingManagementService(
   const policy = new ProjectPolicyEngine(
     new PostgresProjectPolicyRepository(options.pool),
   );
+
+  const consumeQuota = async (
+    projectId: string,
+    principal: Readonly<SecurityPrincipal>,
+    operation: PluginPackageManagementQuotaOperation,
+    idempotencyKey: string,
+  ): Promise<void> => {
+    if (!options.quota) return;
+    try {
+      await options.quota.consume({
+        projectId,
+        subject: principal.subject,
+        operation,
+        idempotencyKey,
+      });
+    } catch (error) {
+      if (error instanceof PluginPackageManagementQuotaExceededError) throw error;
+      throw new PluginPackageManagementUnavailableError({
+        cause: error instanceof Error ? error : undefined,
+      });
+    }
+  };
 
   const authorize = async (
     principalValue: SecurityPrincipal,
@@ -346,6 +375,12 @@ export function createClusterPluginPackageSecretBindingManagementService(
         currentTime(now),
       );
       const requestedActionRef = actionRef(request.actionRef);
+      await consumeQuota(
+        projectId,
+        authorization.principal,
+        'plugin-package.propose',
+        requestedActionRef,
+      );
       let existingValue;
       try {
         existingValue = await plans.findByActionRef(requestedActionRef);
@@ -457,6 +492,12 @@ export function createClusterPluginPackageSecretBindingManagementService(
         plan.bindingPlan.target.projectId,
         'secret.manage',
         observedAtMs,
+      );
+      await consumeQuota(
+        plan.bindingPlan.target.projectId,
+        authorization.principal,
+        'plugin-package.propose',
+        approvalRequestId,
       );
       if (!sameSubject(plan.requestedBy, authorization.principal.subject)) {
         throw new PluginPackageManagementAuthorizationError();
@@ -572,6 +613,12 @@ export function createClusterPluginPackageSecretBindingManagementService(
         'approval.decide',
         observedAtMs,
       );
+      await consumeQuota(
+        approval.projectId,
+        authorization.principal,
+        'plugin-package.decide',
+        decisionId,
+      );
       if (
         approval.decisionId === decisionId &&
         approval.decision === request.decision &&
@@ -636,19 +683,31 @@ export function createClusterPluginPackageSecretBindingManagementService(
         plan?.bindingPlan.target.projectId ?? approval?.projectId;
       if (!projectId) throw new PluginPackageManagementUnavailableError();
       const observedAtMs = currentTime(now);
+      let authorization;
       try {
-        await authorize(request.principal, projectId, 'secret.manage', observedAtMs);
+        authorization = await authorize(
+          request.principal,
+          projectId,
+          'secret.manage',
+          observedAtMs,
+        );
       } catch (error) {
         if (!(error instanceof PluginPackageManagementAuthorizationError)) {
           throw error;
         }
-        await authorize(
+        authorization = await authorize(
           request.principal,
           projectId,
           'approval.decide',
           observedAtMs,
         );
       }
+      await consumeQuota(
+        projectId,
+        authorization.principal,
+        'plugin-package.inspect',
+        request.inspectionId,
+      );
       return Object.freeze({
         plan,
         approvalRequest: approval,

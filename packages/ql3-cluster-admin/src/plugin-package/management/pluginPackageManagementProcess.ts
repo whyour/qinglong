@@ -28,6 +28,7 @@ import {
 } from '../../management-support/pluginPackageIdentityKeyset';
 import { createClusterPluginPackageManagementService } from './pluginPackageManagement';
 import { createClusterPluginPackageLifecycleManagementService } from '../lifecycle/pluginPackageLifecycleManagement';
+import { createClusterPluginPackageSecretBindingManagementService } from '../secret-binding/pluginPackageSecretBindingManagement';
 import {
   loadClusterPluginPackagePublisherTrustFileEvidence,
   type ClusterPluginPackagePublisherTrustFileEvidence,
@@ -635,10 +636,18 @@ export async function startClusterPluginPackageManagementProcess(
         now,
         quota,
       });
+    const secretBinding =
+      createClusterPluginPackageSecretBindingManagementService({
+        pool: database.pool,
+        approvalLifetimeMs: config.approvalLifetimeMs,
+        now,
+        quota,
+      });
     const transport = createClusterPluginPackageManagementTransport({
       service,
       lifecycle,
       publisherTrust,
+      secretBinding,
       now,
     });
     const privateKey = readTlsFile(config.privateKeyFile, true);

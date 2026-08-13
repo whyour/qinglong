@@ -199,6 +199,47 @@ function commands() {
       operation: 'plugin-package.publisher-trust-transition.inspect',
       request: inspection,
     },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.plan',
+      request: {
+        actionRef: 'secret-binding:cluster-monitor:1',
+        projectId: 'project-1',
+        packageName: 'cluster-monitor',
+        assignments: [{
+          name: 'TOKEN',
+          secretRef:
+            'qlsecret:v1:eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJuYW1lIjoicnVudGltZS10b2tlbiIsInZlcnNpb24iOjJ9',
+        }],
+      },
+    },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.propose',
+      request: {
+        actionRef: 'secret-binding:cluster-monitor:1',
+        approvalRequestId: 'approval-secret-binding-1',
+        approvalAuditEventId: 'audit-secret-binding-approval-1',
+      },
+    },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.decide',
+      request: {
+        ...decision,
+        actionRef: 'secret-binding:cluster-monitor:1',
+        approvalRequestId: 'approval-secret-binding-1',
+      },
+    },
+    {
+      schemaVersion: 1,
+      operation: 'plugin-package.secret-binding.inspect',
+      request: {
+        actionRef: 'secret-binding:cluster-monitor:1',
+        approvalRequestId: 'approval-secret-binding-1',
+        inspectionId: 'inspection-secret-binding-1',
+      },
+    },
   ];
 }
 
@@ -327,7 +368,70 @@ function lifecyclePlanSummary() {
   };
 }
 
+function secretBindingPlanSummary() {
+  return {
+    actionRef: 'secret-binding:cluster-monitor:1',
+    projectId: 'project-1',
+    packageName: 'cluster-monitor',
+    installationId: 'install-cluster-monitor-1',
+    generation: 1,
+    generationDigest: '9'.repeat(64),
+    lockDigest: 'a'.repeat(64),
+    manifestDigest: 'b'.repeat(64),
+    entries: [{
+      name: 'TOKEN',
+      required: true,
+      secretRef:
+        'qlsecret:v1:eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJuYW1lIjoicnVudGltZS10b2tlbiIsInZlcnNpb24iOjJ9',
+    }],
+    plannedAtMs: 1_000,
+    expiresAtMs: 10_000,
+    planDigest: 'c'.repeat(64),
+    approvalPlanDigest: 'd'.repeat(64),
+  };
+}
+
 function successfulResult(operation) {
+  const secretApproval = {
+    ...approvalSummary(),
+    id: 'approval-secret-binding-1',
+    actionDigest: 'd'.repeat(64),
+    previewDigest: 'c'.repeat(64),
+  };
+  if (operation === 'plugin-package.secret-binding.plan') {
+    return {
+      schemaVersion: 1,
+      operation,
+      status: 'created',
+      plan: secretBindingPlanSummary(),
+    };
+  }
+  if (operation === 'plugin-package.secret-binding.propose') {
+    return {
+      schemaVersion: 1,
+      operation,
+      approvalStatus: 'created',
+      plan: secretBindingPlanSummary(),
+      approval: secretApproval,
+    };
+  }
+  if (operation === 'plugin-package.secret-binding.inspect') {
+    return {
+      schemaVersion: 1,
+      operation,
+      plan: secretBindingPlanSummary(),
+      approval: secretApproval,
+      stale: false,
+    };
+  }
+  if (operation === 'plugin-package.secret-binding.decide') {
+    return {
+      schemaVersion: 1,
+      operation,
+      status: 'decided',
+      approval: secretApproval,
+    };
+  }
   if (operation === 'plugin-package.installation.inspect') {
     return {
       schemaVersion: 1,
@@ -639,7 +743,7 @@ test('readiness probe rejects unreviewed status and bounded response drift', asy
   }
 });
 
-test('permits and validates exactly the fourteen public management operations', async () => {
+test('permits and validates exactly the eighteen public management operations', async () => {
   const received = [];
   const fixture = await startServer((request, response) => {
     const chunks = [];
@@ -684,7 +788,7 @@ test('permits and validates exactly the fourteen public management operations', 
         return true;
       },
     );
-    assert.equal(received.length, 14);
+    assert.equal(received.length, 18);
   } finally {
     await fixture.close();
     rmSync(files.directory, { recursive: true, force: true });
@@ -753,6 +857,137 @@ test('rejects installation inventory responses outside the requested project and
   } finally {
     await fixture.close();
     rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test('rejects Secret binding response drift before reporting success', async () => {
+  const command = commands().find(
+    ({ operation }) => operation === 'plugin-package.secret-binding.propose',
+  );
+  const invalidResults = [
+    {
+      ...successfulResult(command.operation),
+      plan: {
+        ...secretBindingPlanSummary(),
+        actionRef: 'secret-binding:another-package:1',
+      },
+    },
+    {
+      ...successfulResult(command.operation),
+      plan: {
+        ...secretBindingPlanSummary(),
+        entries: [
+          {
+            ...secretBindingPlanSummary().entries[0],
+            secretRef:
+              'qlsecret:v1:eyJwcm9qZWN0SWQiOiJhbm90aGVyLXByb2plY3QiLCJuYW1lIjoicnVudGltZS10b2tlbiIsInZlcnNpb24iOjJ9',
+          },
+        ],
+      },
+    },
+    {
+      ...successfulResult(command.operation),
+      plan: {
+        ...secretBindingPlanSummary(),
+        entries: [
+          ...secretBindingPlanSummary().entries,
+          ...secretBindingPlanSummary().entries,
+        ],
+      },
+    },
+    {
+      ...successfulResult(command.operation),
+      approval: {
+        ...successfulResult(command.operation).approval,
+        actionDigest: 'e'.repeat(64),
+      },
+    },
+  ];
+  const fixture = await startServer((_request, response) => {
+    sendJson(response, 200, {
+      schemaVersion: 1,
+      requestId: `request-invalid-secret-binding-${invalidResults.length}`,
+      result: invalidResults.shift(),
+    });
+  });
+  const files = createClientFiles(fixture.port, command);
+  try {
+    for (let index = 0; index < 4; index += 1) {
+      await assert.rejects(
+        executeClusterPluginPackageManagementClient(files.paths),
+        ClusterPluginPackageManagementClientRequestError,
+      );
+    }
+  } finally {
+    await fixture.close();
+    rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test('binds Secret binding plan and plan-less inspection to the exact request', async () => {
+  const planCommand = commands().find(
+    ({ operation }) => operation === 'plugin-package.secret-binding.plan',
+  );
+  const inspectCommand = commands().find(
+    ({ operation }) => operation === 'plugin-package.secret-binding.inspect',
+  );
+  const invalidResponses = [
+    {
+      command: planCommand,
+      result: {
+        ...successfulResult(planCommand.operation),
+        plan: {
+          ...secretBindingPlanSummary(),
+          entries: [{
+            ...secretBindingPlanSummary().entries[0],
+            secretRef:
+              'qlsecret:v1:eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJuYW1lIjoiYW5vdGhlci10b2tlbiIsInZlcnNpb24iOjJ9',
+          }],
+        },
+      },
+    },
+    {
+      command: inspectCommand,
+      result: {
+        ...successfulResult(inspectCommand.operation),
+        plan: null,
+        approval: {
+          ...successfulResult(inspectCommand.operation).approval,
+          id: 'approval-secret-binding-another',
+        },
+      },
+    },
+    {
+      command: inspectCommand,
+      result: {
+        ...successfulResult(inspectCommand.operation),
+        plan: null,
+        approval: null,
+      },
+    },
+  ];
+  const fixture = await startServer((_request, response) => {
+    sendJson(response, 200, {
+      schemaVersion: 1,
+      requestId: `request-exact-secret-binding-${invalidResponses.length}`,
+      result: invalidResponses[0].result,
+    });
+  });
+  try {
+    for (const invalid of invalidResponses) {
+      invalidResponses[0] = invalid;
+      const files = createClientFiles(fixture.port, invalid.command);
+      try {
+        await assert.rejects(
+          executeClusterPluginPackageManagementClient(files.paths),
+          ClusterPluginPackageManagementClientRequestError,
+        );
+      } finally {
+        rmSync(files.directory, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    await fixture.close();
   }
 });
 

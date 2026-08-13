@@ -3,6 +3,7 @@ import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
 import { Duplex } from 'node:stream';
 import { connect as tlsConnect } from 'node:tls';
 import { TextDecoder } from 'node:util';
+import { parseSecretRef } from '@qinglong/runtime-core/secret-reference';
 import {
   ClusterPluginPackageManagementClientConfigurationError,
   isReviewedClusterAuthenticatedManagementClientProtocol,
@@ -290,6 +291,21 @@ const LIFECYCLE_PLAN_KEYS = Object.freeze([
   'blockingReferences',
   'impactDigest',
 ]);
+const SECRET_BINDING_PLAN_KEYS = Object.freeze([
+  'actionRef',
+  'projectId',
+  'packageName',
+  'installationId',
+  'generation',
+  'generationDigest',
+  'lockDigest',
+  'manifestDigest',
+  'entries',
+  'plannedAtMs',
+  'expiresAtMs',
+  'planDigest',
+  'approvalPlanDigest',
+]);
 
 function validateScalarSummary(value: unknown, keys: readonly string[]): void {
   const record = exactResponseObject(value, keys);
@@ -463,10 +479,211 @@ function validateLifecyclePlanSummary(value: unknown): void {
   }
 }
 
+function validateSecretBindingPlanSummary(
+  value: unknown,
+  command: Readonly<
+    Extract<
+      ClusterPluginPackageManagementCommand,
+      { readonly operation: `plugin-package.secret-binding.${string}` }
+    >
+  >,
+): void {
+  const summary = exactResponseObject(value, SECRET_BINDING_PLAN_KEYS);
+  if (
+    typeof summary.actionRef !== 'string' ||
+    summary.actionRef.length < 1 ||
+    summary.actionRef.length > 255 ||
+    typeof summary.projectId !== 'string' ||
+    summary.projectId.length < 1 ||
+    summary.projectId.length > 128 ||
+    typeof summary.packageName !== 'string' ||
+    !PACKAGE_NAME_PATTERN.test(summary.packageName) ||
+    typeof summary.installationId !== 'string' ||
+    summary.installationId.length < 1 ||
+    summary.installationId.length > 128 ||
+    !Number.isSafeInteger(summary.generation) ||
+    (summary.generation as number) < 1 ||
+    !Number.isSafeInteger(summary.plannedAtMs) ||
+    !Number.isSafeInteger(summary.expiresAtMs) ||
+    (summary.expiresAtMs as number) <= (summary.plannedAtMs as number) ||
+    !Array.isArray(summary.entries) ||
+    summary.entries.length > 64 ||
+    new Set(
+      summary.entries.map((entry) =>
+        entry && typeof entry === 'object' && !Array.isArray(entry)
+          ? (entry as JsonObject).name
+          : undefined,
+      ),
+    ).size !== summary.entries.length
+  ) {
+    throw new ClusterPluginPackageManagementClientRequestError();
+  }
+  for (const key of [
+    'generationDigest',
+    'lockDigest',
+    'manifestDigest',
+    'planDigest',
+    'approvalPlanDigest',
+  ]) {
+    if (
+      typeof summary[key] !== 'string' ||
+      !DIGEST_PATTERN.test(summary[key] as string)
+    ) {
+      throw new ClusterPluginPackageManagementClientRequestError();
+    }
+  }
+  for (const entryValue of summary.entries) {
+    const entry = exactResponseObject(entryValue, [
+      'name',
+      'required',
+      'secretRef',
+    ]);
+    if (
+      typeof entry.name !== 'string' ||
+      !/^[A-Z_][A-Z0-9_]{0,127}$/.test(entry.name) ||
+      typeof entry.required !== 'boolean' ||
+      (entry.secretRef !== null &&
+        (typeof entry.secretRef !== 'string' ||
+          entry.secretRef.length > 2_048 ||
+          CONTROL_PATTERN.test(entry.secretRef))) ||
+      (entry.required === true && entry.secretRef === null)
+    ) {
+      throw new ClusterPluginPackageManagementClientRequestError();
+    }
+    if (entry.secretRef !== null) {
+      try {
+        const reference = parseSecretRef(entry.secretRef);
+        if (
+          reference.projectId !== summary.projectId ||
+          typeof reference.version !== 'number' ||
+          !Number.isSafeInteger(reference.version) ||
+          reference.version < 1
+        ) {
+          throw new ClusterPluginPackageManagementClientRequestError();
+        }
+      } catch (error) {
+        if (error instanceof ClusterPluginPackageManagementClientRequestError) {
+          throw error;
+        }
+        throw new ClusterPluginPackageManagementClientRequestError();
+      }
+    }
+  }
+  if (
+    summary.actionRef !== command.request.actionRef ||
+    command.operation === 'plugin-package.secret-binding.plan' &&
+    (summary.projectId !== command.request.projectId ||
+      summary.packageName !== command.request.packageName ||
+      summary.entries.length !== command.request.assignments.length ||
+      command.request.assignments.some((assignment) => {
+        const responseEntry = (summary.entries as JsonObject[]).find(
+          (entry) => entry.name === assignment.name,
+        );
+        return !responseEntry || responseEntry.secretRef !== assignment.secretRef;
+      }))
+  ) {
+    throw new ClusterPluginPackageManagementClientRequestError();
+  }
+}
+
 function validateResult(
   value: unknown,
   command: Readonly<ClusterPluginPackageManagementCommand>,
 ): Readonly<ClusterPluginPackageManagementTransportResult> {
+  if (command.operation === 'plugin-package.secret-binding.plan') {
+    const result = exactResponseObject(value, [
+      'schemaVersion',
+      'operation',
+      'status',
+      'plan',
+    ]);
+    if (
+      result.schemaVersion !== 1 ||
+      result.operation !== command.operation ||
+      !['created', 'existing'].includes(String(result.status))
+    ) {
+      throw new ClusterPluginPackageManagementClientRequestError();
+    }
+    validateSecretBindingPlanSummary(result.plan, command);
+    return Object.freeze(
+      result as unknown as ClusterPluginPackageManagementTransportResult,
+    );
+  }
+  if (command.operation === 'plugin-package.secret-binding.propose') {
+    const result = exactResponseObject(value, [
+      'schemaVersion',
+      'operation',
+      'approvalStatus',
+      'plan',
+      'approval',
+    ]);
+    if (
+      result.schemaVersion !== 1 ||
+      result.operation !== command.operation ||
+      !['created', 'existing'].includes(String(result.approvalStatus))
+    ) {
+      throw new ClusterPluginPackageManagementClientRequestError();
+    }
+    validateSecretBindingPlanSummary(result.plan, command);
+    validateScalarSummary(result.approval, APPROVAL_KEYS);
+    const plan = result.plan as JsonObject;
+    const approval = result.approval as JsonObject;
+    if (
+      approval.id !== command.request.approvalRequestId ||
+      approval.projectId !== plan.projectId ||
+      approval.actionDigest !== plan.approvalPlanDigest ||
+      approval.previewDigest !== plan.planDigest
+    ) {
+      throw new ClusterPluginPackageManagementClientRequestError();
+    }
+    return Object.freeze(
+      result as unknown as ClusterPluginPackageManagementTransportResult,
+    );
+  }
+  if (command.operation === 'plugin-package.secret-binding.inspect') {
+    const result = exactResponseObject(value, [
+      'schemaVersion',
+      'operation',
+      'plan',
+      'approval',
+      'stale',
+    ]);
+    if (
+      result.schemaVersion !== 1 ||
+      result.operation !== command.operation ||
+      typeof result.stale !== 'boolean' ||
+      result.plan === null && result.approval === null
+    ) {
+      throw new ClusterPluginPackageManagementClientRequestError();
+    }
+    if (result.plan !== null) {
+      validateSecretBindingPlanSummary(result.plan, command);
+    }
+    if (result.approval !== null) {
+      validateScalarSummary(result.approval, APPROVAL_KEYS);
+      if (
+        (result.approval as JsonObject).id !==
+        command.request.approvalRequestId
+      ) {
+        throw new ClusterPluginPackageManagementClientRequestError();
+      }
+    }
+    if (result.plan !== null && result.approval !== null) {
+      const plan = result.plan as JsonObject;
+      const approval = result.approval as JsonObject;
+      if (
+        approval.id !== command.request.approvalRequestId ||
+        approval.projectId !== plan.projectId ||
+        approval.actionDigest !== plan.approvalPlanDigest ||
+        approval.previewDigest !== plan.planDigest
+      ) {
+        throw new ClusterPluginPackageManagementClientRequestError();
+      }
+    }
+    return Object.freeze(
+      result as unknown as ClusterPluginPackageManagementTransportResult,
+    );
+  }
   if (command.operation === 'plugin-package.installation.inspect') {
     const result = exactResponseObject(value, [
       'schemaVersion',
@@ -617,6 +834,12 @@ function validateResult(
   }
   if (result.approval !== null) {
     validateScalarSummary(result.approval, APPROVAL_KEYS);
+    if (
+      command.operation === 'plugin-package.secret-binding.decide' &&
+      (result.approval as JsonObject).id !== command.request.approvalRequestId
+    ) {
+      throw new ClusterPluginPackageManagementClientRequestError();
+    }
   } else if (kind !== 'inspect') {
     throw new ClusterPluginPackageManagementClientRequestError();
   }

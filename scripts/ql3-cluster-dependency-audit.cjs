@@ -1263,6 +1263,8 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/plugin-package-lifecycle-plan',
           '@qinglong/runtime-core/plugin-package-management',
           '@qinglong/runtime-core/plugin-package-proposal',
+          '@qinglong/runtime-core/plugin-package-secret-binding',
+          '@qinglong/runtime-core/plugin-package-secret-binding-approval-plan',
           '@qinglong/runtime-core/security',
         ]);
         if (

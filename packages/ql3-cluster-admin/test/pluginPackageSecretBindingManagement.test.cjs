@@ -379,3 +379,71 @@ test('rejects weak requester, self-decision and semantic actionRef replay drift'
     (error) => error?.name === 'ApprovalSeparationOfDutyError',
   );
 });
+
+test('consumes durable quota with stable operation identities', async () => {
+  const state = fixture();
+  const consumed = [];
+  const service = createClusterPluginPackageSecretBindingManagementService({
+    pool: state.pool,
+    now: () => 210,
+    planLifetimeMs: 1_000,
+    quota: {
+      async consume(command) {
+        consumed.push(command);
+        return { remaining: 9, resetAtMs: 2_000, observedAtMs: 210 };
+      },
+    },
+  });
+  const created = await service.plan(planRequest());
+  const proposed = await service.propose({
+    actionRef: created.plan.actionRef,
+    approvalRequestId: 'approval-secret-binding-quota',
+    approvalAuditEventId: '123e4567-e89b-42d3-a456-426614175211',
+    principal: REQUESTER,
+  });
+  await service.decide({
+    actionRef: created.plan.actionRef,
+    approvalRequestId: proposed.approvalRequest.id,
+    expectedVersion: 1,
+    decisionId: 'decision-secret-binding-quota',
+    auditEventId: '123e4567-e89b-42d3-a456-426614175212',
+    decision: 'approved',
+    reasonCode: 'reviewed',
+    principal: REVIEWER,
+  });
+  await service.inspectAuthorized({
+    actionRef: created.plan.actionRef,
+    approvalRequestId: proposed.approvalRequest.id,
+    inspectionId: 'inspection-secret-binding-quota',
+    principal: REVIEWER,
+  });
+  assert.deepEqual(
+    consumed.map(({ operation, idempotencyKey, subject }) => ({
+      operation,
+      idempotencyKey,
+      subject,
+    })),
+    [
+      {
+        operation: 'plugin-package.propose',
+        idempotencyKey: created.plan.actionRef,
+        subject: REQUESTER.subject,
+      },
+      {
+        operation: 'plugin-package.propose',
+        idempotencyKey: proposed.approvalRequest.id,
+        subject: REQUESTER.subject,
+      },
+      {
+        operation: 'plugin-package.decide',
+        idempotencyKey: 'decision-secret-binding-quota',
+        subject: REVIEWER.subject,
+      },
+      {
+        operation: 'plugin-package.inspect',
+        idempotencyKey: 'inspection-secret-binding-quota',
+        subject: REVIEWER.subject,
+      },
+    ],
+  );
+});

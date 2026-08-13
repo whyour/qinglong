@@ -52,17 +52,49 @@ chmod 600 /absolute/path/client.json \
 ## 执行
 
 ```sh
-ql3-plugin-package-client \
+ql3-cluster-admin package \
   --config=/absolute/path/client.json \
   --command=/absolute/path/command.json \
   --assertion=/absolute/path/assertion.jwt
 ```
 
-可用 operation 只有以下九个：
+统一产品入口会在同一 Cluster Admin 制品内委派给
+`ql3-plugin-package-client`；后者保留为直接 binary 兼容入口，两者使用同一协议和
+authority，不会启动第二个管理进程。
+
+可用 operation 只有以下十八个：
 
 - `plugin-package.propose|decide|inspect`
+- `plugin-package.installation.inspect|list`
+- `plugin-package.lifecycle.propose|decide|inspect`
 - `plugin-package.publisher-revocation.propose|decide|inspect`
 - `plugin-package.publisher-trust-transition.propose|decide|inspect`
+- `plugin-package.secret-binding.plan|propose|decide|inspect`
+
+首次 Secret binding 必须先提交 `plan`，由服务端从当前 active installation、lock、
+Manifest 和 generation 重建目标。调用方只提供逻辑 requirement 到同 Project、固定
+version `qlsecret:v1:` 引用的 assignment；不得提交 generation、digest、Manifest 或
+Secret value。`plan` 返回 content-free target、requirement、digest 和有效期；随后以同一
+`actionRef` 执行 `propose`，由另一名强认证 User 执行 `decide`。审批后的实际 binding 由
+短生命周期 package executor 消费，management client 不持有 executor authority。
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "plugin-package.secret-binding.plan",
+  "request": {
+    "actionRef": "secret-binding:example:1",
+    "projectId": "project-1",
+    "packageName": "example",
+    "assignments": [
+      {
+        "name": "TOKEN",
+        "secretRef": "qlsecret:v1:REPLACE_WITH_FIXED_VERSION_REFERENCE"
+      }
+    ]
+  }
+}
+```
 
 成功时 stdout 只有服务端审查过的低敏 result。失败时 stderr 只有稳定 code，以及可能的
 HTTP status、response code、request ID 和 Retry-After；不会输出 assertion、路径、
@@ -114,7 +146,7 @@ port-forward 是 Kubernetes RBAC 控制的独立私有入口，不是 labelled-P
 执行：
 
 ```sh
-ql3-plugin-package-client-kubernetes \
+ql3-cluster-admin package-kubernetes \
   --config=/absolute/path/client.json \
   --command=/absolute/path/command.json \
   --assertion=/absolute/path/assertion.jwt \
