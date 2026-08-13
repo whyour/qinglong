@@ -278,7 +278,7 @@ export async function openLocalSqliteRuntimeDatabase(
       },
       pluginPackageSecretBindings() {
         pluginPackageSecretBindingsPromise ??= import(
-          '../plugin-package/pluginPackageSecretBindingRepository.js'
+          '../plugin-package/secret-binding/repository.js'
         ).then(
           ({ LocalSqlitePluginPackageSecretBindingRepository }) =>
             new LocalSqlitePluginPackageSecretBindingRepository(authority),

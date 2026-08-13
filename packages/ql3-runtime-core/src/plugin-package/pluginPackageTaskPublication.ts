@@ -9,7 +9,7 @@ import {
   type PluginPackageResourceLockSource,
 } from './pluginPackageResourceMaterialization';
 import type { PluginPackageResourceGenerationSource } from './pluginPackageResourceGeneration';
-import type { PluginPackageSecretBindingRepository } from './pluginPackageSecretBinding';
+import type { PluginPackageSecretBindingRepository } from './secret-binding/binding';
 import {
   InvalidPluginPackageTaskReconciliationError,
   PluginPackageTaskReconciliationConflictError,

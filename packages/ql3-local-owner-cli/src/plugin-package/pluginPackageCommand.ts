@@ -27,6 +27,10 @@ import {
   type PluginPackageLifecycleReceipt,
 } from '@qinglong/runtime-core/plugin-package-lifecycle';
 import {
+  normalizePluginPackageSecretBindingPlan,
+  type PluginPackageSecretBindingPlan,
+} from '@qinglong/runtime-core/plugin-package-secret-binding-plan';
+import {
   pluginPackageInstallRecoveryAction,
   type PluginPackageInstallActionInput,
   type PluginPackageInstallInventoryItem,
@@ -35,6 +39,7 @@ import type { PluginPackageInstallProposal } from '@qinglong/runtime-core/plugin
 
 import { createLocalPluginPackageManagementService } from '@qinglong/local-admin/package-management';
 import { createLocalPluginPackageLifecycleService } from '@qinglong/local-admin/package-lifecycle';
+import { createLocalPluginPackageSecretBindingService } from '@qinglong/local-admin/package-secret-binding';
 
 const MAX_PATH_BYTES = 4096;
 const MAX_DISPATCH_LIMIT = 64;
@@ -177,6 +182,30 @@ export interface ExecuteLocalPluginPackageLifecycleCommand {
   };
 }
 
+export interface PlanLocalPluginPackageSecretBindingCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.plan';
+  readonly options: LocalPluginPackageCommandOptions;
+  readonly request: {
+    readonly projectId: string;
+    readonly packageName: string;
+    readonly assignments: readonly Readonly<{
+      name: string;
+      secretRef: string | null;
+    }>[];
+  };
+}
+
+export interface ExecuteLocalPluginPackageSecretBindingCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'plugin-package.secret-binding.execute';
+  readonly options: LocalPluginPackageCommandOptions;
+  readonly request: {
+    readonly plan: PluginPackageSecretBindingPlan;
+    readonly auditEventId: string;
+  };
+}
+
 export type LocalPluginPackageCommand =
   | ProposeLocalPluginPackageCommand
   | DecideLocalPluginPackageCommand
@@ -186,7 +215,9 @@ export type LocalPluginPackageCommand =
   | ListLocalPluginPackageInstallationsCommand
   | DispatchLocalPluginPackageCommand
   | PlanLocalPluginPackageLifecycleCommand
-  | ExecuteLocalPluginPackageLifecycleCommand;
+  | ExecuteLocalPluginPackageLifecycleCommand
+  | PlanLocalPluginPackageSecretBindingCommand
+  | ExecuteLocalPluginPackageSecretBindingCommand;
 
 export interface LocalPluginPackageCommandRunner {
   run(
@@ -251,6 +282,19 @@ export type LocalPluginPackageCommandResult =
       status: 'created' | 'existing';
       approval: ReturnType<typeof approvalSummary>;
       receipt: ReturnType<typeof lifecycleReceiptSummary>;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.plan';
+      plan: Readonly<PluginPackageSecretBindingPlan>;
+      summary: ReturnType<typeof secretBindingPlanSummary>;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'plugin-package.secret-binding.execute';
+      status: 'created' | 'existing';
+      bindingDigest: string;
+      generationDigest: string;
     }>;
 
 export class LocalPluginPackageCommandConfigurationError extends TypeError {
@@ -558,6 +602,65 @@ function normalizeCommand(value: unknown): Readonly<LocalPluginPackageCommand> {
         );
       }
       break;
+    case 'plugin-package.secret-binding.plan':
+      exactObject(
+        value.request,
+        ['assignments', 'packageName', 'projectId'],
+        'Secret binding plan request',
+      );
+      if (
+        typeof value.request.projectId !== 'string' ||
+        !PROJECT_ID_PATTERN.test(value.request.projectId) ||
+        typeof value.request.packageName !== 'string' ||
+        !PACKAGE_NAME_PATTERN.test(value.request.packageName) ||
+        !Array.isArray(value.request.assignments) ||
+        value.request.assignments.length < 1 ||
+        value.request.assignments.length > 64
+      ) {
+        throw new LocalPluginPackageCommandConfigurationError(
+          'Secret binding plan request is invalid',
+        );
+      }
+      for (const assignment of value.request.assignments) {
+        exactObject(assignment, ['name', 'secretRef'], 'Secret assignment');
+        if (
+          typeof assignment.name !== 'string' ||
+          !/^[A-Z_][A-Z0-9_]{0,127}$/.test(assignment.name) ||
+          (assignment.secretRef !== null &&
+            (typeof assignment.secretRef !== 'string' ||
+              Buffer.byteLength(assignment.secretRef, 'utf8') > 512))
+        ) {
+          throw new LocalPluginPackageCommandConfigurationError(
+            'Secret assignment is invalid',
+          );
+        }
+      }
+      break;
+    case 'plugin-package.secret-binding.execute':
+      exactObject(
+        value.request,
+        ['auditEventId', 'plan'],
+        'Secret binding execution request',
+      );
+      if (
+        typeof value.request.auditEventId !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+          value.request.auditEventId,
+        )
+      ) {
+        throw new LocalPluginPackageCommandConfigurationError(
+          'Secret binding audit event ID is invalid',
+        );
+      }
+      try {
+        normalizePluginPackageSecretBindingPlan(value.request.plan);
+      } catch (error) {
+        throw new LocalPluginPackageCommandConfigurationError(
+          'Secret binding plan is invalid',
+          error,
+        );
+      }
+      break;
     default:
       throw new LocalPluginPackageCommandConfigurationError(
         'operation is invalid',
@@ -714,13 +817,37 @@ function lifecycleReceiptSummary(
     disposition: receipt.lifecycle.disposition,
     capabilityStatus: receipt.capability.status,
     taskTransitions: receipt.capability.taskTransitions.length,
-    previousActiveVectorDigest:
-      receipt.capability.previousActiveVectorDigest,
+    previousActiveVectorDigest: receipt.capability.previousActiveVectorDigest,
     currentActiveVectorDigest: receipt.capability.currentActiveVectorDigest,
     currentToolSnapshotDigest: receipt.capability.currentToolSnapshotDigest,
     retainedSourceCount: receipt.capability.retainedSourceCount,
     committedAtMs: receipt.committedAtMs,
     receiptDigest: receipt.receiptDigest,
+  });
+}
+
+function secretBindingPlanSummary(
+  plan: Readonly<PluginPackageSecretBindingPlan>,
+) {
+  return Object.freeze({
+    projectId: plan.target.projectId,
+    packageName: plan.target.packageName,
+    installationId: plan.target.installationId,
+    generation: plan.target.generation,
+    generationDigest: plan.target.generationDigest,
+    manifestDigest: plan.target.manifestDigest,
+    assignments: Object.freeze(
+      plan.entries.map((entry) =>
+        Object.freeze({
+          name: entry.name,
+          required: entry.required,
+          bound: entry.secretRef !== null,
+          secretRef: entry.secretRef,
+        }),
+      ),
+    ),
+    plannedAtMs: plan.plannedAtMs,
+    planDigest: plan.planDigest,
   });
 }
 
@@ -730,6 +857,37 @@ async function execute(
   authenticated: Readonly<AuthenticatedLocalCommand>,
 ): Promise<Readonly<LocalPluginPackageCommandResult>> {
   await authenticated.confirm();
+  if (command.operation === 'plugin-package.secret-binding.plan') {
+    const service = createLocalPluginPackageSecretBindingService(
+      database.authority,
+    );
+    const plan = await service.plan({
+      ...command.request,
+      principal: authenticated.principal,
+      plannedAtMs: Date.now(),
+    });
+    return Object.freeze({
+      schemaVersion: 1,
+      operation: command.operation,
+      plan,
+      summary: secretBindingPlanSummary(plan),
+    });
+  }
+  if (command.operation === 'plugin-package.secret-binding.execute') {
+    const service = createLocalPluginPackageSecretBindingService(
+      database.authority,
+    );
+    const result = await service.execute({
+      ...command.request,
+      principal: authenticated.principal,
+      confirmAuthorization: authenticated.confirm,
+    });
+    return Object.freeze({
+      schemaVersion: 1,
+      operation: command.operation,
+      ...result,
+    });
+  }
   if (command.operation === 'plugin-package.lifecycle.plan') {
     const service = createLocalPluginPackageLifecycleService({
       authority: database.authority,

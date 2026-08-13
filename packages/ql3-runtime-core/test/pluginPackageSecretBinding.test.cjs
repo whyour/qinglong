@@ -7,7 +7,7 @@ const {
   assertPluginPackageSecretBindingMatches,
   createPluginPackageSecretBinding,
   normalizePluginPackageSecretBinding,
-} = require('../dist/plugin-package/pluginPackageSecretBinding');
+} = require('../dist/plugin-package/secret-binding/binding');
 const {
   createPluginPackageResourceGeneration,
 } = require('../dist/plugin-package/pluginPackageResourceGeneration');

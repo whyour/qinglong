@@ -82,6 +82,7 @@ const {
 const {
   createPluginPackageResourceGeneration,
 } = require('@qinglong/runtime-core/plugin-package-resource-generation');
+const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
 const {
   materializePluginPackageResources,
 } = require('@qinglong/runtime-core/plugin-package-resource-materialization');
@@ -200,7 +201,7 @@ function packageArtifact(manifest) {
   ]);
 }
 
-function actionInput() {
+function actionInput(secretAware = false) {
   const manifest = {
     apiVersion: PLUGIN_PACKAGE_API_VERSION,
     kind: PLUGIN_PACKAGE_KIND,
@@ -224,8 +225,10 @@ function actionInput() {
       },
       permissions: {
         network: { allowedHosts: [] },
-        secrets: [],
-        tools: ['system.command'],
+        secrets: secretAware ? [{ name: 'TOKEN', required: true }] : [],
+        tools: secretAware
+          ? ['secret.use', 'system.command']
+          : ['system.command'],
       },
       contents: {
         tasks: ['tasks/collect.json'],
@@ -502,6 +505,46 @@ async function activatePackageAutomation(databasePath, lock, manifest) {
       true,
     );
     return { active, publication };
+  } finally {
+    await authority.close();
+  }
+}
+
+async function activatePackageOnly(databasePath, projectId, packageName) {
+  const client = new DatabaseSync(databasePath);
+  const authority = new LocalSqliteOperationAuthority(client);
+  try {
+    const installs = new LocalSqlitePluginPackageInstallRepository(authority);
+    const queued = await installs.find(projectId, packageName);
+    const lock = await installs.findLock(queued.lockDigest);
+    const staged = transitionPluginPackageInstall(lock, queued, {
+      type: 'stage_completed',
+      mutationId: 'secret-binding-stage-package',
+      occurredAtMs: queued.updatedAtMs + 1,
+      stageRef: `stage:${lock.lockDigest}`,
+      artifactDigest: lock.source.artifactDigest,
+      manifestDigest: lock.manifestDigest,
+      contentDigest: lock.source.contentDigest,
+      evidenceDigest: 'e'.repeat(64),
+    });
+    await installs.commit(pluginPackageInstallCommit(queued, staged));
+    const activating = transitionPluginPackageInstall(lock, staged, {
+      type: 'activation_started',
+      mutationId: 'secret-binding-start-package',
+      occurredAtMs: staged.updatedAtMs + 1,
+    });
+    await installs.commit(pluginPackageInstallCommit(staged, activating));
+    const active = transitionPluginPackageInstall(lock, activating, {
+      type: 'activation_committed',
+      mutationId: 'secret-binding-commit-package',
+      occurredAtMs: activating.updatedAtMs + 1,
+      activationRef: `activation:${lock.lockDigest}`,
+      intentDigest: pluginPackageActivationIntentDigest(lock, activating),
+      generation: lock.targetGeneration,
+      contentDigest: lock.source.contentDigest,
+    });
+    await installs.commit(pluginPackageInstallCommit(activating, active));
+    return { active, lock };
   } finally {
     await authority.close();
   }
@@ -1346,6 +1389,277 @@ test('runs the private command-file package lifecycle with replay-safe IDs', asy
   assert.equal(installationList.truncated, false);
   assert.equal(installationList.next, null);
   assertNoSensitiveMaterial(installationList);
+});
+
+test('plans and atomically binds a versioned Secret to the current Package generation', async (t) => {
+  const value = await fixture(t);
+  const input = actionInput(true);
+  const actionRef = 'proposal:secret-aware-cli-monitor-v1';
+  const approvalRequestId = 'approval-secret-aware-cli-monitor-v1';
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.propose',
+      {
+        actionRef,
+        approvalRequestId,
+        proposalAuditEventId: '21000000-0000-4000-8000-000000000001',
+        approvalAuditEventId: '21000000-0000-4000-8000-000000000002',
+        actionInput: input,
+      },
+      'secret-01-propose',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.decide',
+      {
+        actionRef,
+        approvalRequestId,
+        expectedVersion: 1,
+        decisionId: 'decision-secret-aware-cli-monitor-v1',
+        auditEventId: '21000000-0000-4000-8000-000000000003',
+        decision: 'approved',
+        reasonCode: 'reviewed',
+      },
+      'secret-02-decide',
+    ),
+  );
+  await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.consume',
+      {
+        actionRef,
+        approvalRequestId,
+        expectedVersion: 2,
+        consumptionId: 'consume-secret-aware-cli-monitor-v1',
+        dispatchId: 'dispatch-secret-aware-cli-monitor-v1',
+        auditEventId: '21000000-0000-4000-8000-000000000004',
+      },
+      'secret-03-consume',
+    ),
+  );
+  const dispatched = await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.dispatch',
+      { limit: 1 },
+      'secret-04-dispatch',
+    ),
+  );
+  assert.equal(dispatched.summary.succeeded, 1);
+  const { active } = await activatePackageOnly(
+    value.databasePath,
+    'default',
+    'cli-monitor',
+  );
+  const secretRef = createSecretRef({
+    projectId: 'default',
+    name: 'runtime-token',
+    version: 1,
+  });
+  await assert.rejects(
+    runLocalPluginPackageCommandFile(
+      commandFile(
+        value,
+        'plugin-package.secret-binding.plan',
+        {
+          projectId: 'default',
+          packageName: 'cli-monitor',
+          assignments: [
+            {
+              name: 'TOKEN',
+              secretRef: createSecretRef({
+                projectId: 'default',
+                name: 'runtime-token',
+                version: 2,
+              }),
+            },
+          ],
+        },
+        'secret-05-missing-version',
+      ),
+    ),
+    /version is unavailable/,
+  );
+  const secretDatabase = new DatabaseSync(value.databasePath);
+  try {
+    secretDatabase
+      .prepare(
+        `INSERT INTO "QingLong3LocalSecretEnvelopes" (
+           "project_id", "secret_name", "version", "mutation_id",
+           "key_id", "algorithm", "nonce", "ciphertext", "auth_tag",
+           "created_at_ms"
+         ) VALUES (?, ?, 1, ?, ?, 'aes-256-gcm', ?, ?, ?, ?)`,
+      )
+      .run(
+        'default',
+        'runtime-token',
+        'secret-aware-fixture-v1',
+        'fixture-key-v1',
+        Buffer.alloc(12, 1),
+        Buffer.from('ciphertext'),
+        Buffer.alloc(16, 2),
+        Date.now(),
+      );
+  } finally {
+    secretDatabase.close();
+  }
+
+  const planResult = await runLocalPluginPackageCommandFile(
+    commandFile(
+      value,
+      'plugin-package.secret-binding.plan',
+      {
+        projectId: 'default',
+        packageName: 'cli-monitor',
+        assignments: [{ name: 'TOKEN', secretRef }],
+      },
+      'secret-05-plan',
+    ),
+  );
+  assert.equal(planResult.summary.installationId, active.installationId);
+  assert.equal(planResult.summary.generation, 1);
+  assert.deepEqual(planResult.summary.assignments, [
+    { name: 'TOKEN', required: true, bound: true, secretRef },
+  ]);
+  assertNoSensitiveMaterial(planResult);
+
+  const revokeDatabase = new DatabaseSync(value.databasePath);
+  try {
+    revokeDatabase
+      .prepare(
+        `INSERT INTO "QingLong3ProjectRoleBindings" (
+           "project_id", "subject_type", "subject_id", "version", "state",
+           "role", "mutation_id", "changed_by_type", "changed_by_id",
+           "created_at_ms"
+         ) VALUES (
+           'default', 'user', 'owner-user', 2, 'revoked', NULL,
+           'secret-binding-revoke-owner', 'user', 'owner-user', ?
+         )`,
+      )
+      .run(Date.now());
+  } finally {
+    revokeDatabase.close();
+  }
+  const executePath = commandFile(
+    value,
+    'plugin-package.secret-binding.execute',
+    {
+      plan: planResult.plan,
+      auditEventId: '21000000-0000-4000-8000-000000000005',
+    },
+    'secret-06-execute',
+  );
+  await assert.rejects(
+    runLocalPluginPackageCommandFile(executePath),
+    /denies Secret management|Project policy changed/,
+  );
+  const restoreDatabase = new DatabaseSync(value.databasePath);
+  try {
+    assert.equal(
+      restoreDatabase
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM "QingLong3PluginPackageSecretBindings"`,
+        )
+        .get().count,
+      0,
+    );
+    assert.equal(
+      restoreDatabase
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM "QingLong3SecurityAuditEvents"
+           WHERE "operation_id" = 'plugin_package.secret.bind'`,
+        )
+        .get().count,
+      0,
+    );
+    restoreDatabase
+      .prepare(
+        `INSERT INTO "QingLong3ProjectRoleBindings" (
+           "project_id", "subject_type", "subject_id", "version", "state",
+           "role", "mutation_id", "changed_by_type", "changed_by_id",
+           "created_at_ms"
+         ) VALUES (
+           'default', 'user', 'owner-user', 3, 'active', 'owner',
+           'secret-binding-restore-owner', 'user', 'owner-user', ?
+         )`,
+      )
+      .run(Date.now());
+  } finally {
+    restoreDatabase.close();
+  }
+
+  const created = await runLocalPluginPackageCommandFile(executePath);
+  assert.equal(created.status, 'created');
+  assert.equal(
+    created.generationDigest,
+    planResult.plan.target.generationDigest,
+  );
+  assert.match(created.bindingDigest, /^[0-9a-f]{64}$/);
+  assertNoSensitiveMaterial(created);
+  const replay = await runLocalPluginPackageCommandFile(executePath);
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.bindingDigest, created.bindingDigest);
+
+  await assert.rejects(
+    runLocalPluginPackageCommandFile(
+      commandFile(
+        value,
+        'plugin-package.secret-binding.plan',
+        {
+          projectId: 'default',
+          packageName: 'cli-monitor',
+          assignments: [{ name: 'TOKEN', secretRef }],
+        },
+        'secret-07-rebind-current-generation',
+      ),
+    ),
+    /rebind requires a new generation/,
+  );
+  await assert.rejects(
+    runLocalPluginPackageCommandFile(
+      commandFile(
+        value,
+        'plugin-package.secret-binding.execute',
+        {
+          plan: planResult.plan,
+          auditEventId: '21000000-0000-4000-8000-000000000006',
+        },
+        'secret-08-different-audit',
+      ),
+    ),
+    /another audit identity/,
+  );
+
+  const inspection = new DatabaseSync(value.databasePath, { readOnly: true });
+  try {
+    assert.equal(
+      inspection
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM "QingLong3PluginPackageSecretBindings"`,
+        )
+        .get().count,
+      1,
+    );
+    assert.equal(
+      inspection
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM "QingLong3SecurityAuditEvents"
+           WHERE "operation_id" = 'plugin_package.secret.bind'`,
+        )
+        .get().count,
+      1,
+    );
+  } finally {
+    inspection.close();
+  }
 });
 
 test('denies an authenticated non-owner before package proposal mutation', async (t) => {

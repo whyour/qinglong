@@ -398,6 +398,7 @@
 | [ADR-0392](./ADR-0392-atomic-plugin-package-automation-security-withdrawal.md)                                | Plugin Package Automation 安全隔离原子撤回                                                                                           | Accepted |
 | [ADR-0393](./ADR-0393-generation-bound-plugin-package-secret-binding-ledger.md)                              | 按 Generation 固定的 Plugin Package Secret 绑定账本                                                                                  | Accepted |
 | [ADR-0394](./ADR-0394-generation-bound-plugin-package-secret-materialization.md)                             | 按 Generation 固定的 Plugin Package Secret Materialization                                                                           | Accepted |
+| [ADR-0395](./ADR-0395-owner-confirmed-plugin-package-secret-binding.md)                                      | Owner 确认的 Plugin Package Secret 首次绑定                                                                                           | Proposed |
 
 ## 规则
 

@@ -84,7 +84,10 @@
         "dist/plugin-package/pluginPackageResourceMaterialization.d.ts"
       ],
       "plugin-package-secret-binding": [
-        "dist/plugin-package/pluginPackageSecretBinding.d.ts"
+        "dist/plugin-package/secret-binding/binding.d.ts"
+      ],
+      "plugin-package-secret-binding-plan": [
+        "dist/plugin-package/secret-binding/plan.d.ts"
       ],
       "plugin-package-task-reconciliation": [
         "dist/plugin-package/pluginPackageTaskReconciliation.d.ts"
@@ -375,9 +378,14 @@
       "default": "./dist/plugin-package/pluginPackageResourceMaterialization.js"
     },
     "./plugin-package-secret-binding": {
-      "types": "./dist/plugin-package/pluginPackageSecretBinding.d.ts",
-      "require": "./dist/plugin-package/pluginPackageSecretBinding.js",
-      "default": "./dist/plugin-package/pluginPackageSecretBinding.js"
+      "types": "./dist/plugin-package/secret-binding/binding.d.ts",
+      "require": "./dist/plugin-package/secret-binding/binding.js",
+      "default": "./dist/plugin-package/secret-binding/binding.js"
+    },
+    "./plugin-package-secret-binding-plan": {
+      "types": "./dist/plugin-package/secret-binding/plan.d.ts",
+      "require": "./dist/plugin-package/secret-binding/plan.js",
+      "default": "./dist/plugin-package/secret-binding/plan.js"
     },
     "./plugin-package-task-reconciliation": {
       "types": "./dist/plugin-package/pluginPackageTaskReconciliation.d.ts",

@@ -13,7 +13,7 @@ const {
 const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
 const {
   LocalSqlitePluginPackageSecretBindingRepository,
-} = require('../dist/plugin-package/pluginPackageSecretBindingRepository');
+} = require('../dist/plugin-package/secret-binding/repository');
 const { migrateLocalSqliteDatabase } = require('../dist/migration/migration');
 
 const LOCK_DIGEST = 'a'.repeat(64);

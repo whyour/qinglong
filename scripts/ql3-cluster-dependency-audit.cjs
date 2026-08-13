@@ -1844,6 +1844,11 @@ function auditSourceImports(root, packagePath, findings) {
             '@qinglong/local-sqlite/task-definition-administration',
           ].includes(specifier)
         ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
+            'src/plugin-package/pluginPackageCommand.ts' &&
+          specifier === '@qinglong/local-admin/package-secret-binding'
+        ) &&
         ![
           {
             file: 'src/plugin-package/plugin-package-workflow-command/contractAuthority.ts',
@@ -2042,7 +2047,11 @@ function auditSourceImports(root, packagePath, findings) {
               '@qinglong/local-sqlite/operation-authority',
               '@qinglong/local-sqlite/plugin-package-lifecycle',
               '@qinglong/local-sqlite/project-policy',
-            ].includes(specifier))
+            ].includes(specifier)) ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/plugin-package/pluginPackageSecretBinding.ts' &&
+            specifier ===
+              '@qinglong/local-sqlite/plugin-package-secret-binding-administration')
         )
       ) {
         findings.push({
@@ -2828,6 +2837,17 @@ function auditSourceImports(root, packagePath, findings) {
             path.relative(packageDirectory, filePath) === file &&
             specifiers.includes(specifier),
         )
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-owner-cli' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/plugin-package/pluginPackageCommand.ts' &&
+        [
+          '@qinglong/local-admin/package-secret-binding',
+          '@qinglong/runtime-core/plugin-package-secret-binding-plan',
+        ].includes(specifier)
       ) {
         continue;
       }

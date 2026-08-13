@@ -10,7 +10,7 @@ import {
   type PluginPackageSecretBindingRepository,
 } from '@qinglong/runtime-core/plugin-package-secret-binding';
 
-import { LocalSqliteOperationAuthority } from '../authority/operationAuthority';
+import { LocalSqliteOperationAuthority } from '../../authority/operationAuthority';
 
 type Row = Record<string, unknown>;
 
@@ -143,6 +143,16 @@ export class LocalSqlitePluginPackageSecretBindingRepository
     return row ? this.parse(row) : null;
   }
 
+  findInTransaction(
+    digest: string,
+  ): Readonly<PluginPackageSecretBinding> | null {
+    try {
+      return this.findStored(generationDigest(digest));
+    } catch (error) {
+      throw mapStorageError(error);
+    }
+  }
+
   private enqueue<T>(work: () => T): Promise<T> {
     return this.authority.enqueue(
       async () => {
@@ -170,8 +180,16 @@ export class LocalSqlitePluginPackageSecretBindingRepository
     }>
   > {
     const binding = normalizePluginPackageSecretBinding(value);
+    return this.enqueue(() => this.publishInTransaction(binding));
+  }
+
+  publishInTransaction(value: Readonly<PluginPackageSecretBinding>): Readonly<{
+    status: 'created' | 'existing';
+    binding: Readonly<PluginPackageSecretBinding>;
+  }> {
+    const binding = normalizePluginPackageSecretBinding(value);
     const bindingJson = serialize(binding);
-    return this.enqueue(() => {
+    try {
       const existing = this.findStored(binding.target.generationDigest);
       if (existing) {
         if (JSON.stringify(existing) !== bindingJson) {
@@ -245,6 +263,8 @@ export class LocalSqlitePluginPackageSecretBindingRepository
           result.changes === 1 ? ('created' as const) : ('existing' as const),
         binding: stored,
       });
-    });
+    } catch (error) {
+      throw mapStorageError(error);
+    }
   }
 }

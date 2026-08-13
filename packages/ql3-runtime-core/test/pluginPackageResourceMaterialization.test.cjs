@@ -25,7 +25,7 @@ const {
 const { createSecretRef } = require('../dist/secret/secretReference');
 const {
   createPluginPackageSecretBinding,
-} = require('../dist/plugin-package/pluginPackageSecretBinding');
+} = require('../dist/plugin-package/secret-binding/binding');
 const {
   InvalidPluginPackageResourceMaterializationError,
   MAX_PLUGIN_PACKAGE_MATERIALIZED_RESOURCE_BYTES,

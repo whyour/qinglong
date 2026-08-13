@@ -27,7 +27,7 @@ import {
   assertPluginPackageSecretBindingMatches,
   type PluginPackageSecretBinding,
   type PluginPackageSecretBindingRepository,
-} from './pluginPackageSecretBinding';
+} from './secret-binding/binding';
 import {
   normalizeTaskDefinitionLabels,
   normalizeTaskDefinitionSpec,

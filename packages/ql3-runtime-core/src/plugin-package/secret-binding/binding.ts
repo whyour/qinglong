@@ -5,13 +5,13 @@ import {
   normalizePluginPackageManifest,
   type PluginPackageManifest,
   type PluginPackageSecretRequirement,
-} from './pluginPackage';
-import { pluginPackageManifestDigest } from './installation/pluginPackageInstall';
+} from '../pluginPackage';
+import { pluginPackageManifestDigest } from '../installation/pluginPackageInstall';
 import {
   normalizePluginPackageResourceGeneration,
   type PluginPackageResourceGeneration,
-} from './pluginPackageResourceGeneration';
-import { parseSecretRef } from '../secret/secretReference';
+} from '../pluginPackageResourceGeneration';
+import { parseSecretRef } from '../../secret/secretReference';
 
 export const PLUGIN_PACKAGE_SECRET_BINDING_SCHEMA =
   'qinglong/plugin-package-secret-binding@v1' as const;
@@ -63,6 +63,13 @@ export interface CreatePluginPackageSecretBindingInput {
   readonly generation: Readonly<PluginPackageResourceGeneration>;
   readonly manifest: Readonly<PluginPackageManifest>;
   readonly assignments: readonly Readonly<PluginPackageSecretBindingAssignment>[];
+  readonly authority: Readonly<PluginPackageSecretBindingAuthority>;
+  readonly boundAtMs: number;
+}
+
+export interface CreatePluginPackageSecretBindingFromEntriesInput {
+  readonly target: Readonly<PluginPackageSecretBindingTarget>;
+  readonly entries: readonly Readonly<PluginPackageSecretBindingEntry>[];
   readonly authority: Readonly<PluginPackageSecretBindingAuthority>;
   readonly boundAtMs: number;
 }
@@ -408,19 +415,24 @@ export function createPluginPackageSecretBinding(
   return Object.freeze({ ...unsigned, bindingDigest: bindingDigest(unsigned) });
 }
 
-export function normalizePluginPackageSecretBinding(
-  value: unknown,
+export function createPluginPackageSecretBindingFromEntries(
+  input: CreatePluginPackageSecretBindingFromEntriesInput,
 ): Readonly<PluginPackageSecretBinding> {
-  const binding = dataRecord(value, 'binding');
-  exactKeys(
-    binding,
-    ['authority', 'bindingDigest', 'boundAtMs', 'entries', 'schema', 'target'],
-    'binding',
-  );
-  if (binding.schema !== PLUGIN_PACKAGE_SECRET_BINDING_SCHEMA) {
-    return invalid('schema is unsupported');
-  }
-  const targetValue = dataRecord(binding.target, 'target');
+  const target = normalizeTarget(input.target);
+  const entries = normalizeEntries(input.entries, target.projectId);
+  const authority = normalizeAuthority(input.authority);
+  const boundAtMs = timestamp(input.boundAtMs);
+  const unsigned = unsignedBinding(target, entries, authority, boundAtMs);
+  return normalizePluginPackageSecretBinding({
+    ...unsigned,
+    bindingDigest: bindingDigest(unsigned),
+  });
+}
+
+function normalizeTarget(
+  value: unknown,
+): Readonly<PluginPackageSecretBindingTarget> {
+  const targetValue = dataRecord(value, 'target');
   exactKeys(
     targetValue,
     [
@@ -434,7 +446,7 @@ export function normalizePluginPackageSecretBinding(
     ],
     'target',
   );
-  const target = Object.freeze({
+  return Object.freeze({
     installationId: identifier(targetValue.installationId, 'installation ID'),
     projectId: identifier(targetValue.projectId, 'Project ID'),
     packageName: packageName(targetValue.packageName),
@@ -443,6 +455,21 @@ export function normalizePluginPackageSecretBinding(
     generationDigest: digest(targetValue.generationDigest, 'generation digest'),
     manifestDigest: digest(targetValue.manifestDigest, 'Manifest digest'),
   });
+}
+
+export function normalizePluginPackageSecretBinding(
+  value: unknown,
+): Readonly<PluginPackageSecretBinding> {
+  const binding = dataRecord(value, 'binding');
+  exactKeys(
+    binding,
+    ['authority', 'bindingDigest', 'boundAtMs', 'entries', 'schema', 'target'],
+    'binding',
+  );
+  if (binding.schema !== PLUGIN_PACKAGE_SECRET_BINDING_SCHEMA) {
+    return invalid('schema is unsupported');
+  }
+  const target = normalizeTarget(binding.target);
   const entries = normalizeEntries(binding.entries, target.projectId);
   const authority = normalizeAuthority(binding.authority);
   const boundAtMs = timestamp(binding.boundAtMs);

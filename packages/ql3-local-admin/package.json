@@ -75,6 +75,11 @@
       "require": "./dist/plugin-package/pluginPackageLifecycle.js",
       "default": "./dist/plugin-package/pluginPackageLifecycle.js"
     },
+    "./package-secret-binding": {
+      "types": "./dist/plugin-package/pluginPackageSecretBinding.d.ts",
+      "require": "./dist/plugin-package/pluginPackageSecretBinding.js",
+      "default": "./dist/plugin-package/pluginPackageSecretBinding.js"
+    },
     "./package-recovery-catalog": {
       "types": "./dist/plugin-package/pluginPackageRecoveryCatalog.d.ts",
       "require": "./dist/plugin-package/pluginPackageRecoveryCatalog.js",
