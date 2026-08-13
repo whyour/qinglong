@@ -40,7 +40,7 @@ export interface ClusterPluginPackageApprovedActionDispatcherOptions
   readonly defaultBatchSize?: number;
   readonly publisherRevocations?: ClusterPluginPackagePublisherRevocationExecutionPort;
   readonly publisherTrustTransitions?: ClusterPluginPackagePublisherTrustTransitionExecutionPort;
-  readonly secretExistenceInspector: PluginPackageSecretExistenceInspector;
+  readonly secretExistenceInspector?: PluginPackageSecretExistenceInspector;
 }
 
 export function createClusterPluginPackageApprovedActionDispatcher(
@@ -64,16 +64,22 @@ export function createClusterPluginPackageApprovedActionDispatcher(
   );
   const handlers = [
     installHandler,
-    new ClusterPluginPackageSecretBindingApprovedActionHandler(
-      new PostgresPluginPackageSecretBindingApprovalPlanReader(pool),
-      new PostgresPluginPackageSecretBindingRepository(pool),
-      secretExistenceInspector,
-    ),
-    new ClusterPluginPackageSecretBindingTransitionApprovedActionHandler(
-      new PostgresPluginPackageSecretBindingTransitionApprovalPlanReader(pool),
-      new PostgresPluginPackageSecretBindingTransitionRepository(pool),
-      secretExistenceInspector,
-    ),
+    ...(secretExistenceInspector
+      ? [
+          new ClusterPluginPackageSecretBindingApprovedActionHandler(
+            new PostgresPluginPackageSecretBindingApprovalPlanReader(pool),
+            new PostgresPluginPackageSecretBindingRepository(pool),
+            secretExistenceInspector,
+          ),
+          new ClusterPluginPackageSecretBindingTransitionApprovedActionHandler(
+            new PostgresPluginPackageSecretBindingTransitionApprovalPlanReader(
+              pool,
+            ),
+            new PostgresPluginPackageSecretBindingTransitionRepository(pool),
+            secretExistenceInspector,
+          ),
+        ]
+      : []),
     ...(['overlap_add', 'safe_retire'] as const).map(
       (mode) =>
         new ClusterPluginPackagePublisherTrustTransitionApprovedActionHandler(

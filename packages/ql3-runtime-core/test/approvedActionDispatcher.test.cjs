@@ -302,3 +302,43 @@ test('does not claim an action without a matching handler', async () => {
   assert.equal(repository.execution.status, 'pending');
   assert.equal(repository.startCalls, 0);
 });
+
+test('dispatches only the requested durable action without a queue scan', async () => {
+  const repository = new InMemoryExecutionRepository(dispatch());
+  repository.listDueExecutions = async () => {
+    throw new Error('exact dispatch must not scan');
+  };
+  const summary = await createDispatcher(repository, {
+    actionType: 'plugin_package.install',
+    async inspect(value) {
+      return { status: 'ready', actionDigest: value.action.actionDigest };
+    },
+    async execute() {
+      return {
+        outcome: 'succeeded',
+        resultCode: 'package_admitted',
+        resultDigest: RESULT_DIGEST,
+      };
+    },
+  }).dispatchById({ dispatchId: 'dispatch-dispatcher-v1' });
+  assert.equal(summary.scanned, 1);
+  assert.equal(summary.claimed, 1);
+  assert.equal(summary.succeeded, 1);
+  assert.equal(summary.truncated, false);
+});
+
+test('exact dispatch does not claim an action outside configured authority', async () => {
+  const repository = new InMemoryExecutionRepository(dispatch());
+  const dispatcher = new ApprovedActionDispatcher(repository, [], {
+    owner: 'dispatcher_instance_1',
+    clock: () => 100,
+    createId: () => 'dispatcher-exact-id',
+  });
+  const summary = await dispatcher.dispatchById({
+    dispatchId: 'dispatch-dispatcher-v1',
+  });
+  assert.equal(summary.scanned, 1);
+  assert.equal(summary.claimed, 0);
+  assert.equal(summary.unavailable, 1);
+  assert.equal(repository.execution.status, 'pending');
+});

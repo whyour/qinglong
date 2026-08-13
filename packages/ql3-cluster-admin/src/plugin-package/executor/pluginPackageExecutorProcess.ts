@@ -64,6 +64,7 @@ export type ClusterPluginPackageExecutorProcessConfig =
       leaseDurationMs: number;
       revocationPageSize: number;
       revocationMaxPages: number;
+      dispatchId: string | null;
       secretProjectionRoot: string | null;
       database: Readonly<{
         connection: PostgresConnectionOptions;
@@ -111,6 +112,9 @@ export interface RunClusterPluginPackageExecutorProcessOptions {
   readonly createDispatcher?: (
     options: ClusterPluginPackageApprovedActionDispatcherOptions,
   ) => ApprovedActionDispatcher;
+  readonly assertReady?: (
+    pool: PostgresPool,
+  ) => Promise<PostgresSchemaReadinessReport>;
   readonly now?: () => number;
 }
 
@@ -126,6 +130,7 @@ export class ClusterPluginPackageExecutorProcessConfigError extends TypeError {
 }
 
 const SAFE_OWNER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const SAFE_DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 function enabledValue(
   environment: ClusterPluginPackageExecutorProcessEnvironment,
@@ -319,6 +324,17 @@ export function loadClusterPluginPackageExecutorProcessConfig(
       'QL3_PLUGIN_PACKAGE_EXECUTOR_OWNER is invalid',
     );
   }
+  const dispatchId =
+    boundedValue(
+      environment,
+      'QL3_PLUGIN_PACKAGE_EXECUTOR_DISPATCH_ID',
+      128,
+    ) ?? null;
+  if (dispatchId !== null && !SAFE_DISPATCH_ID.test(dispatchId)) {
+    throw new ClusterPluginPackageExecutorProcessConfigError(
+      'QL3_PLUGIN_PACKAGE_EXECUTOR_DISPATCH_ID is invalid',
+    );
+  }
   return Object.freeze({
     enabled: true,
     owner,
@@ -364,6 +380,7 @@ export function loadClusterPluginPackageExecutorProcessConfig(
       1,
       64,
     ),
+    dispatchId,
     secretProjectionRoot: secretProjectionRoot(environment),
     database: databaseConfig(environment),
   });
@@ -391,6 +408,22 @@ function isIdleBatch(
   );
 }
 
+function emptyApprovalSummary(): Readonly<{
+  scanned: 0;
+  consumed: 0;
+  existing: 0;
+  expired: 0;
+  blocked: 0;
+}> {
+  return Object.freeze({
+    scanned: 0,
+    consumed: 0,
+    existing: 0,
+    expired: 0,
+    blocked: 0,
+  });
+}
+
 export async function runClusterPluginPackageExecutorProcess(
   options: RunClusterPluginPackageExecutorProcessOptions,
 ): Promise<ClusterPluginPackageExecutorProcessResult> {
@@ -411,6 +444,8 @@ export async function runClusterPluginPackageExecutorProcess(
       typeof options.consumeSecretBindingTransitionApprovals !== 'function') ||
     (options.createDispatcher !== undefined &&
       typeof options.createDispatcher !== 'function') ||
+    (options.assertReady !== undefined &&
+      typeof options.assertReady !== 'function') ||
     (options.now !== undefined && typeof options.now !== 'function')
   ) {
     throw new TypeError('Plugin Package executor process options are invalid');
@@ -430,9 +465,9 @@ export async function runClusterPluginPackageExecutorProcess(
   const database = await openDatabase();
   let failure: unknown;
   try {
-    const evidence = await assertPostgresPackageExecutorSchemaReady(
-      database.pool,
-    );
+    const evidence = await (
+      options.assertReady ?? assertPostgresPackageExecutorSchemaReady
+    )(database.pool);
     const dispatcherFactory =
       options.createDispatcher ??
       createClusterPluginPackageApprovedActionDispatcher;
@@ -453,18 +488,14 @@ export async function runClusterPluginPackageExecutorProcess(
       owner: config.owner,
       leaseDurationMs: config.leaseDurationMs,
       defaultBatchSize: config.dispatchBatchSize,
-      secretExistenceInspector:
-        config.secretProjectionRoot === null
-          ? Object.freeze({
-              async assertExists(): Promise<never> {
-                throw new Error(
-                  'Plugin Package Secret projection is not configured',
-                );
-              },
-            })
-          : new ProjectedPluginPackageSecretExistenceInspector({
-              rootDirectory: config.secretProjectionRoot,
-            }),
+      ...(config.secretProjectionRoot === null
+        ? {}
+        : {
+            secretExistenceInspector:
+              new ProjectedPluginPackageSecretExistenceInspector({
+                rootDirectory: config.secretProjectionRoot,
+              }),
+          }),
       ...(options.now ? { clock: options.now } : {}),
       publisherRevocations: {
         async run(receipt) {
@@ -486,6 +517,24 @@ export async function runClusterPluginPackageExecutorProcess(
       },
     });
     const batches: Readonly<ClusterPluginPackageExecutorBatchResult>[] = [];
+    if (config.dispatchId !== null) {
+      const dispatch = await dispatcher.dispatchById({
+        dispatchId: config.dispatchId,
+      });
+      return Object.freeze({
+        status: 'completed',
+        database: evidence,
+        batches: Object.freeze([
+          Object.freeze({
+            approvals: emptyApprovalSummary(),
+            trustTransitionApprovals: emptyApprovalSummary(),
+            secretBindingApprovals: emptyApprovalSummary(),
+            secretBindingTransitionApprovals: emptyApprovalSummary(),
+            dispatch,
+          }),
+        ]),
+      });
+    }
     for (let index = 0; index < config.maxBatches; index += 1) {
       const approvals = await consumeApprovals({
         pool: database.pool,

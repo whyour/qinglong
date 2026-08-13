@@ -65,8 +65,6 @@ spec:
                   value: '16'
                 - name: QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_MAX_PAGES
                   value: '16'
-                - name: QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT
-                  value: /var/run/secrets/qinglong3/plugin-package-values
                 - name: QL3_POSTGRES_TLS_MODE
                   value: verify-full
                 - name: QL3_POSTGRES_TLS_CA_FILE
@@ -98,9 +96,6 @@ spec:
                 - name: postgres-package-executor-ca
                   mountPath: /var/run/secrets/qinglong3/postgres-package-executor
                   readOnly: true
-                - name: plugin-package-values
-                  mountPath: /var/run/secrets/qinglong3/plugin-package-values
-                  readOnly: true
           volumes:
             - name: tmp
               emptyDir:
@@ -113,8 +108,3 @@ spec:
                 items:
                   - key: postgres-ca.crt
                     path: ca.crt
-            - name: plugin-package-values
-              secret:
-                secretName: ql3-cluster-plugin-package-values
-                optional: true
-                defaultMode: 288

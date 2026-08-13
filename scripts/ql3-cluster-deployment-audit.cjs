@@ -3254,10 +3254,6 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     ['QL3_PLUGIN_PACKAGE_EXECUTOR_LEASE_DURATION_MS', '600000'],
     ['QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_PAGE_SIZE', '16'],
     ['QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_MAX_PAGES', '16'],
-    [
-      'QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT',
-      '/var/run/secrets/qinglong3/plugin-package-values',
-    ],
     ['QL3_POSTGRES_TLS_MODE', 'verify-full'],
     [
       'QL3_POSTGRES_TLS_CA_FILE',
@@ -3311,13 +3307,14 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     caVolume?.secret?.defaultMode !== 0o444 ||
     JSON.stringify(caVolume?.secret?.items) !==
       JSON.stringify([{ key: 'postgres-ca.crt', path: 'ca.crt' }]) ||
-    secretMount?.readOnly !== true ||
-    secretMount?.mountPath !==
-      '/var/run/secrets/qinglong3/plugin-package-values' ||
-    secretVolume?.secret?.secretName !==
-      'ql3-cluster-plugin-package-values' ||
-    secretVolume?.secret?.optional !== true ||
-    secretVolume?.secret?.defaultMode !== 0o440 ||
+    secretMount !== undefined ||
+    secretVolume !== undefined ||
+    env.has('QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT') ||
+    env.has('QL3_PLUGIN_PACKAGE_EXECUTOR_DISPATCH_ID') ||
+    JSON.stringify(networkPolicy?.spec?.podSelector?.matchLabels) !==
+      JSON.stringify({
+        'app.kubernetes.io/component': 'plugin-package-executor',
+      }) ||
     JSON.stringify(networkPolicy?.spec?.policyTypes) !==
       JSON.stringify(['Ingress', 'Egress']) ||
     JSON.stringify(networkPolicy?.spec?.ingress) !== JSON.stringify([]) ||
@@ -3326,7 +3323,7 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     findings.push(
       finding(
         'QL3_CLUSTER_PLUGIN_EXECUTOR_BOUNDARY',
-        'Plugin Package executor must have private read-only CA and optional SecretRef projections, no ingress and DNS-only base egress',
+        'Plugin Package batch executor must have private read-only CA, no Package value projection, no ingress and DNS-only base egress',
       ),
     );
   }
@@ -3382,8 +3379,8 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
         },
       ]) ||
     cloudNativeEnv.has('QL3_POSTGRES_PACKAGE_EXECUTOR_URL') ||
-    cloudNativeEnv.get('QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT')?.value !==
-      '/var/run/secrets/qinglong3/plugin-package-values' ||
+    cloudNativeEnv.has('QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT') ||
+    cloudNativeEnv.has('QL3_PLUGIN_PACKAGE_EXECUTOR_DISPATCH_ID') ||
     cloudNativeEnv.get('QL3_POSTGRES_PACKAGE_EXECUTOR_HOST')?.value !==
       'ql3-postgres-rw.qinglong3-system.svc' ||
     cloudNativeEnv.get('QL3_POSTGRES_PACKAGE_EXECUTOR_USER')?.valueFrom

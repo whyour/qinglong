@@ -74,6 +74,10 @@ export interface ApprovedActionDispatchBatchSummary {
   readonly nextCursor?: Readonly<ApprovedActionExecutionCursor>;
 }
 
+export interface ApprovedActionDispatchByIdOptions {
+  readonly dispatchId: string;
+}
+
 interface MutableSummary {
   scanned: number;
   claimed: number;
@@ -259,6 +263,54 @@ export class ApprovedActionDispatcher {
     for (const candidate of page.executions) {
       await this.#dispatchOne(candidate.dispatch.id, summary);
     }
+    return Object.freeze({ ...summary });
+  }
+
+  /**
+   * Execute one durable dispatch without scanning the shared due queue.
+   *
+   * This is the entry point for an action-scoped executor (for example a
+   * Kubernetes Job with an exact Secret projection). The handler check happens
+   * before the claim so a narrowly configured executor cannot lease and block
+   * an action outside its authority.
+   */
+  async dispatchById(
+    options: Readonly<ApprovedActionDispatchByIdOptions>,
+  ): Promise<Readonly<ApprovedActionDispatchBatchSummary>> {
+    if (
+      !options ||
+      typeof options !== 'object' ||
+      Array.isArray(options) ||
+      !exactKeys(options, ['dispatchId'])
+    ) {
+      throw new TypeError('Approved Action exact dispatch is invalid');
+    }
+    const dispatchId = identifier(options.dispatchId, 'dispatch id');
+    const summary: MutableSummary = {
+      scanned: 0,
+      claimed: 0,
+      started: 0,
+      succeeded: 0,
+      failed: 0,
+      blocked: 0,
+      retrying: 0,
+      deferred: 0,
+      recoveryRequired: 0,
+      alreadyTerminal: 0,
+      unavailable: 0,
+      truncated: false,
+    };
+    const snapshot = await this.#find(dispatchId);
+    if (!snapshot) {
+      summary.unavailable = 1;
+      return Object.freeze({ ...summary });
+    }
+    summary.scanned = 1;
+    if (!this.#handlers.has(snapshot.dispatch.action.actionType)) {
+      summary.unavailable = 1;
+      return Object.freeze({ ...summary });
+    }
+    await this.#dispatchOne(dispatchId, summary);
     return Object.freeze({ ...summary });
   }
 

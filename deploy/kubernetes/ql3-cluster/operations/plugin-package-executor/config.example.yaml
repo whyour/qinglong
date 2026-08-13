@@ -11,8 +11,9 @@ stringData:
   postgres-tls-servername: REPLACE_WITH_POSTGRES_DNS_NAME
   postgres-ca.crt: REPLACE_WITH_POSTGRES_CA_CERTIFICATE
 ---
-# Optional SecretRef projection. Each key is the lowercase SHA-256 of the
-# canonical qlsecret:v1 reference; the executor checks metadata only.
+# Source for action-scoped Secret projection Jobs. The batch executor never
+# mounts this Secret. Each exact Job selects only the reviewed lowercase
+# SHA-256 key(s) for one durable dispatch and checks metadata only.
 apiVersion: v1
 kind: Secret
 metadata:
