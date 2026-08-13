@@ -75,6 +75,7 @@ function validPrivileges() {
     plugin_package_install_mutations: [false, false, false, false],
     plugin_package_materialized_revisions: [false, false, false, false],
     plugin_package_secret_bindings: [false, false, false, false],
+    plugin_package_secret_binding_approval_plans: [false, false, false, false],
     project_tool_definition_snapshots: [false, false, false, false],
     project_tool_definition_snapshot_sources: [false, false, false, false],
     plugin_package_quarantine_events: [false, false, false, false],
@@ -194,6 +195,7 @@ function validAdminPrivileges() {
     plugin_package_install_mutations: [false, false, false, false],
     plugin_package_materialized_revisions: [false, false, false, false],
     plugin_package_secret_bindings: [false, false, false, false],
+    plugin_package_secret_binding_approval_plans: [false, false, false, false],
     project_tool_definition_snapshots: [false, false, false, false],
     project_tool_definition_snapshot_sources: [false, false, false, false],
     plugin_package_quarantine_events: [false, false, false, false],
@@ -287,6 +289,7 @@ function packagePrivileges(kind) {
       'plugin_package_publisher_trust_transition_proposals',
       'plugin_package_publisher_trust_transition_receipts',
       'plugin_package_lifecycle_plans',
+      'plugin_package_secret_binding_approval_plans',
       'plugin_package_automation_publications',
       'plugin_package_automation_publication_heads',
       ...(manager
@@ -667,7 +670,13 @@ function queryable(overrides = {}) {
             contract.functions.map(({ name: functionName }) => ({
               functionName,
               executeAllowed:
-                overrides.functionMode === 'manager'
+                overrides.functionMode === 'package-manager'
+                  ? [
+                      'create_plugin_package_secret_binding_approval_plan',
+                      'lock_approval_policy_fence',
+                      'plugin_package_secret_binding_planning_snapshot',
+                    ].includes(functionName)
+                  : overrides.functionMode === 'manager'
                   ? functionName === 'lock_approval_policy_fence'
                   : overrides.functionMode === 'run-manager'
                   ? functionName === 'lock_run_management_policy_fence'
@@ -754,7 +763,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 59,
+    contractVersion: 60,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -816,6 +825,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0058-plugin-package-automation-disposition-events',
       'pg-0059-plugin-package-secret-bindings',
       'pg-0060-plugin-package-secret-materialization-guard',
+      'pg-0061-plugin-package-secret-binding-approval-plans',
     ],
   });
 });
@@ -846,10 +856,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 59);
+  assert.equal(report.contractVersion, 60);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0060-plugin-package-secret-materialization-guard',
+    'pg-0061-plugin-package-secret-binding-approval-plans',
   );
 });
 
@@ -862,10 +872,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 59);
+  assert.equal(report.contractVersion, 60);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0060-plugin-package-secret-materialization-guard',
+    'pg-0061-plugin-package-secret-binding-approval-plans',
   );
 
   const widened = automationManagerPrivileges();
@@ -894,10 +904,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 59);
+  assert.equal(report.contractVersion, 60);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0060-plugin-package-secret-materialization-guard',
+    'pg-0061-plugin-package-secret-binding-approval-plans',
   );
 
   const widened = approvalManagerPrivileges();
@@ -928,10 +938,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 59);
+  assert.equal(report.contractVersion, 60);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0060-plugin-package-secret-materialization-guard',
+    'pg-0061-plugin-package-secret-binding-approval-plans',
   );
 
   const widened = runManagerPrivileges();
@@ -983,7 +993,7 @@ test('accepts isolated Package manager and executor roles', async () => {
     queryable({
       currentUser: 'ql3_package_manager',
       privileges: packagePrivileges('manager'),
-      functionMode: 'manager',
+      functionMode: 'package-manager',
     }),
   );
   assert.equal(manager.currentUser, 'ql3_package_manager');
@@ -1063,10 +1073,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 59);
+  assert.equal(report.contractVersion, 60);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0060-plugin-package-secret-materialization-guard',
+    'pg-0061-plugin-package-secret-binding-approval-plans',
   );
 });
 

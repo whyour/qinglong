@@ -41,6 +41,7 @@ export {
 
 export { PostgresPluginPackageMaterializedRevisionRepository } from '../plugin-package/installation/pluginPackageMaterializedRevisionRepository';
 export { PostgresPluginPackageSecretBindingRepository } from '../plugin-package/installation/pluginPackageSecretBindingRepository';
+export { PostgresPluginPackageSecretBindingApprovalPlanReader } from '../plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository';
 export { PostgresPluginPackageAutomationPublicationRepository } from '../plugin-package/publication/pluginPackageAutomationPublicationRepository';
 export {
   CLUSTER_PLUGIN_PACKAGE_QUARANTINE_TARGET_LIMIT,

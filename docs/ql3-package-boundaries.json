@@ -6,7 +6,7 @@
     "reviewedDenseDirectories": [
       {
         "kind": "ordered_ledger",
-        "maxDirectSourceFiles": 61,
+        "maxDirectSourceFiles": 62,
         "path": "packages/ql3-cluster-postgres/src/migrations",
         "rationale": "PostgreSQL migrations are an append-only version ledger whose ordering and discoverability are safer in one reviewed directory."
       },

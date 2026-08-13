@@ -108,7 +108,10 @@ const {
 } = require('@qinglong/runtime-core/plugin-package-admission');
 const {
   pluginPackageInstallActionDigest,
+  pluginPackageActivationIntentDigest,
+  pluginPackageInstallCommit,
   pluginPackageInstallPlanDigest,
+  transitionPluginPackageInstall,
 } = require('@qinglong/runtime-core/plugin-package-install');
 const {
   createPluginPackageInstallProposal,
@@ -183,6 +186,17 @@ const {
 const {
   createPluginPackageResourceGenerationFromReferences,
 } = require('@qinglong/runtime-core/plugin-package-resource-generation');
+const {
+  createPluginPackageSecretBindingPlan,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-plan');
+const {
+  createPluginPackageSecretBindingApprovalPlan,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-approval-plan');
+const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
+const {
+  PostgresPluginPackageSecretBindingApprovalPlanReader,
+  PostgresPluginPackageSecretBindingApprovalPlanRepository,
+} = require('../dist/plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository');
 const {
   createProjectToolDefinitionSnapshot,
   projectToolDefinitionRegistry,
@@ -291,8 +305,8 @@ function admissionPackageAction() {
       },
       permissions: {
         network: { allowedHosts: [] },
-        secrets: [],
-        tools: [],
+        secrets: [{ name: 'TOKEN', required: true }],
+        tools: ['secret.use'],
       },
       contents: { tasks: [], workflows: [], prompts: [], tools: [] },
     },
@@ -882,14 +896,16 @@ if (!migrationConnectionString) {
          GROUP BY run.id, attempt.id`,
         [accepted.runId],
       );
-      assert.deepEqual(durable.rows, [{
-        status: 'queued',
-        version: 2,
-        eventSequence: 2,
-        trigger_type: 'task_start',
-        attemptStatus: 'claimed',
-        eventCount: 2,
-      }]);
+      assert.deepEqual(durable.rows, [
+        {
+          status: 'queued',
+          version: 2,
+          eventSequence: 2,
+          trigger_type: 'task_start',
+          attemptStatus: 'claimed',
+          eventCount: 2,
+        },
+      ]);
     } finally {
       if (runtimeDatabase && runtimeDatabase !== migrationDatabase) {
         await runtimeDatabase.close();
@@ -2087,12 +2103,14 @@ if (!migrationConnectionString) {
           runtimeDatabase.pool,
         );
       assert.deepEqual(await taskAttempts.listCandidates({ limit: 8 }), {
-        candidates: [{
-          runId: plan.runId,
-          stepRunId: plan.steps[0].stepRunId,
-          readyAtMs: plan.plannedAtMs,
-          planDigest: plan.planDigest,
-        }],
+        candidates: [
+          {
+            runId: plan.runId,
+            stepRunId: plan.steps[0].stepRunId,
+            readyAtMs: plan.plannedAtMs,
+            planDigest: plan.planDigest,
+          },
+        ],
         truncated: false,
       });
       const taskAttempt = await taskAttempts.admit(
@@ -2167,29 +2185,34 @@ if (!migrationConnectionString) {
          GROUP BY run.id, attempt.id, step.id`,
         [plan.runId, taskAttempt.receipt.attemptId],
       );
-      assert.deepEqual(recovered.rows, [{
-        runStatus: 'running',
-        runVersion: 6,
-        eventSequence: 6,
-        attemptStatus: 'lost',
-        stepStatus: 'ready',
-        stepVersion: 2,
-        stepAttemptCount: 0,
-        events: [
-          'workflow.task_attempt_admitted',
-          'workflow.task_attempt.lost',
-          'step.ready',
-        ],
-      }]);
+      assert.deepEqual(recovered.rows, [
+        {
+          runStatus: 'running',
+          runVersion: 6,
+          eventSequence: 6,
+          attemptStatus: 'lost',
+          stepStatus: 'ready',
+          stepVersion: 2,
+          stepAttemptCount: 0,
+          events: [
+            'workflow.task_attempt_admitted',
+            'workflow.task_attempt.lost',
+            'step.ready',
+          ],
+        },
+      ]);
       const requeued = await taskAttempts.listCandidates({ limit: 8 });
       assert.deepEqual(
-        requeued.candidates.map(
-          ({ runId, stepRunId }) => ({ runId, stepRunId }),
-        ),
-        [{
-          runId: plan.runId,
-          stepRunId: plan.steps[0].stepRunId,
-        }],
+        requeued.candidates.map(({ runId, stepRunId }) => ({
+          runId,
+          stepRunId,
+        })),
+        [
+          {
+            runId: plan.runId,
+            stepRunId: plan.steps[0].stepRunId,
+          },
+        ],
       );
       const secondTaskAttempt = await taskAttempts.admit(
         plan.runId,
@@ -2242,20 +2265,22 @@ if (!migrationConnectionString) {
          WHERE run.id = $1`,
         [plan.runId],
       );
-      assert.deepEqual(cancelled.rows, [{
-        runStatus: 'cancelled',
-        runVersion: 11,
-        eventSequence: 11,
-        attemptStatuses: ['cancelled', 'lost'],
-        stepStatuses: ['cancelled'],
-        events: [
-          'workflow.task_attempt_admitted',
-          'workflow.task_attempt.cancelled',
-          'step.cancelled',
-          'step.cancelled',
-          'workflow.cancelled',
-        ],
-      }]);
+      assert.deepEqual(cancelled.rows, [
+        {
+          runStatus: 'cancelled',
+          runVersion: 11,
+          eventSequence: 11,
+          attemptStatuses: ['cancelled', 'lost'],
+          stepStatuses: ['cancelled'],
+          events: [
+            'workflow.task_attempt_admitted',
+            'workflow.task_attempt.cancelled',
+            'step.cancelled',
+            'step.cancelled',
+            'workflow.cancelled',
+          ],
+        },
+      ]);
     } finally {
       await runtimeDatabase.close();
     }
@@ -3607,8 +3632,179 @@ if (!migrationConnectionString) {
         await repository.findAdmissionReceipt(consumed.dispatch.id),
         admitted.receipt,
       );
+
+      const staged = transitionPluginPackageInstall(lock, admitted.record, {
+        type: 'stage_completed',
+        mutationId: 'stage-package-secret-binding-integration-1',
+        occurredAtMs: admittedAtMs + 1,
+        stageRef: `stage:${lock.lockDigest}`,
+        artifactDigest: lock.source.artifactDigest,
+        manifestDigest: lock.manifestDigest,
+        contentDigest: lock.source.contentDigest,
+        evidenceDigest: 'd'.repeat(64),
+      });
+      const stageProvenance = createPluginPackagePublisherProvenance({
+        projectId: staged.projectId,
+        packageName: staged.packageName,
+        installationId: staged.installationId,
+        lockDigest: staged.lockDigest,
+        artifactDigest: staged.stageReceipt.artifactDigest,
+        manifestDigest: staged.stageReceipt.manifestDigest,
+        contentDigest: staged.stageReceipt.contentDigest,
+        stageEvidenceDigest: staged.stageReceipt.evidenceDigest,
+        signature: {
+          publisher: 'integration.qinglong.dev',
+          keyId: 'integration-key-1',
+          signatureDigest: 'e'.repeat(64),
+          keyNotBeforeMs: 0,
+          keyNotAfterMs: admittedAtMs + 60_000,
+          verifiedAtMs: admittedAtMs,
+        },
+      });
+      await executorDatabase.pool.query(
+        `INSERT INTO "ql3"."plugin_package_publisher_provenance" (
+           installation_id, project_id, package_name, lock_digest,
+           artifact_digest, manifest_digest, content_digest,
+           stage_evidence_digest, publisher, key_id, signature_digest,
+           key_not_before_ms, key_not_after_ms, verified_at_ms,
+           provenance_digest, provenance_json
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+           $12, $13, $14, $15, $16::jsonb
+         )`,
+        [
+          stageProvenance.installationId,
+          stageProvenance.projectId,
+          stageProvenance.packageName,
+          stageProvenance.lockDigest,
+          stageProvenance.artifactDigest,
+          stageProvenance.manifestDigest,
+          stageProvenance.contentDigest,
+          stageProvenance.stageEvidenceDigest,
+          stageProvenance.publisher,
+          stageProvenance.keyId,
+          stageProvenance.signatureDigest,
+          stageProvenance.keyNotBeforeMs,
+          stageProvenance.keyNotAfterMs,
+          stageProvenance.verifiedAtMs,
+          stageProvenance.provenanceDigest,
+          JSON.stringify(stageProvenance),
+        ],
+      );
+      await repository.commit(
+        pluginPackageInstallCommit(admitted.record, staged),
+      );
+      const activating = transitionPluginPackageInstall(lock, staged, {
+        type: 'activation_started',
+        mutationId: 'activate-package-secret-binding-integration-1',
+        occurredAtMs: admittedAtMs + 2,
+      });
+      await repository.commit(pluginPackageInstallCommit(staged, activating));
+      const active = transitionPluginPackageInstall(lock, activating, {
+        type: 'activation_committed',
+        mutationId: 'commit-package-secret-binding-integration-1',
+        occurredAtMs: admittedAtMs + 3,
+        activationRef: `active:${lock.lockDigest}`,
+        intentDigest: pluginPackageActivationIntentDigest(lock, activating),
+        generation: lock.targetGeneration,
+        contentDigest: lock.source.contentDigest,
+      });
+      await repository.commit(pluginPackageInstallCommit(activating, active));
     } finally {
       await executorDatabase.close();
+    }
+
+    const bindingManagerDatabase = await open('package-manager');
+    let approvalPlan;
+    try {
+      const plans =
+        new PostgresPluginPackageSecretBindingApprovalPlanRepository(
+          bindingManagerDatabase.pool,
+        );
+      const snapshot = await plans.loadPlanningSnapshot(
+        'default',
+        'postgres-monitor',
+      );
+      assert.ok(snapshot);
+      const generation = createPluginPackageResourceGenerationFromReferences({
+        installationId: snapshot.record.installationId,
+        projectId: snapshot.record.projectId,
+        packageName: snapshot.record.packageName,
+        lockDigest: snapshot.record.lockDigest,
+        generation: snapshot.record.targetGeneration,
+        previousActiveLockDigest: snapshot.record.previousActiveLockDigest,
+        contentDigest: snapshot.lock.source.contentDigest,
+        resources: [],
+      });
+      const bindingPlan = createPluginPackageSecretBindingPlan({
+        generation,
+        manifest: snapshot.proposal.actionInput.manifest,
+        assignments: [
+          {
+            name: 'TOKEN',
+            secretRef: createSecretRef({
+              projectId: 'default',
+              name: 'postgres-monitor-token',
+              version: 1,
+            }),
+          },
+        ],
+        plannedAtMs: snapshot.observedAtMs,
+      });
+      approvalPlan = createPluginPackageSecretBindingApprovalPlan({
+        actionRef: 'secret-binding:postgres-monitor-v1',
+        bindingPlan,
+        requestedBy: requester,
+        expiresAtMs: snapshot.observedAtMs + 60_000,
+      });
+      assert.equal((await plans.create(approvalPlan)).status, 'created');
+      assert.equal((await plans.create(approvalPlan)).status, 'existing');
+      await assert.rejects(
+        bindingManagerDatabase.pool.query(
+          `INSERT INTO "ql3"."plugin_package_secret_binding_approval_plans" (
+             action_ref
+           ) VALUES ('forbidden-direct-manager-insert')`,
+        ),
+        (error) => error?.code === '42501',
+      );
+    } finally {
+      await bindingManagerDatabase.close();
+    }
+
+    const bindingExecutorDatabase = await open('package-executor');
+    try {
+      assert.deepEqual(
+        await new PostgresPluginPackageSecretBindingApprovalPlanReader(
+          bindingExecutorDatabase.pool,
+        ).findByActionRef(approvalPlan.actionRef),
+        approvalPlan,
+      );
+      await assert.rejects(
+        bindingExecutorDatabase.pool.query(
+          `SELECT "ql3"."create_plugin_package_secret_binding_approval_plan"(
+             $1::jsonb
+           )`,
+          [JSON.stringify(approvalPlan)],
+        ),
+        (error) => error?.code === '42501',
+      );
+    } finally {
+      await bindingExecutorDatabase.close();
+    }
+
+    const runtimeDatabase = await open('runtime');
+    try {
+      await assert.rejects(
+        runtimeDatabase.pool.query(
+          `SELECT *
+             FROM "ql3"."plugin_package_secret_binding_planning_snapshot"(
+               'default', 'postgres-monitor'
+             )`,
+        ),
+        (error) => error?.code === '42501',
+      );
+    } finally {
+      await runtimeDatabase.close();
     }
 
     const verificationDatabase = await open('migration');
@@ -3623,13 +3819,17 @@ if (!migrationConnectionString) {
               FROM "ql3"."plugin_package_admission_receipts") AS receipts,
            (SELECT count(*)::integer
               FROM "ql3"."security_audit_events"
-             WHERE operation_id = 'plugin_package.admit') AS audits`,
+             WHERE operation_id = 'plugin_package.admit') AS audits,
+           (SELECT count(*)::integer
+              FROM "ql3"."plugin_package_secret_binding_approval_plans")
+             AS "approvalPlans"`,
       );
       assert.deepEqual(facts.rows[0], {
         installs: 1,
-        mutations: 1,
+        mutations: 4,
         receipts: 1,
         audits: 1,
+        approvalPlans: 1,
       });
     } finally {
       await verificationDatabase.close();
@@ -4718,10 +4918,9 @@ if (!migrationConnectionString) {
           new PostgresTaskDefinitionAdministrationRepository(
             automationDatabase.pool,
           );
-        const triggerMutations =
-          new PostgresTriggerAdministrationRepository(
-            automationDatabase.pool,
-          );
+        const triggerMutations = new PostgresTriggerAdministrationRepository(
+          automationDatabase.pool,
+        );
         const taskBase = {
           projectId,
           taskId: 'automation-task',

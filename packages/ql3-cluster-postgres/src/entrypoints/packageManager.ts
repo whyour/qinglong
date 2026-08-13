@@ -56,6 +56,10 @@ export {
 
 export { PostgresPluginPackagePublisherTrustAuthorityRepository } from '../plugin-package/publisher/pluginPackagePublisherTrustAuthorityRepository';
 export { PostgresPluginPackageLifecyclePlanReader } from '../plugin-package/lifecycle/pluginPackageLifecyclePlanRepository';
+export {
+  PostgresPluginPackageSecretBindingApprovalPlanReader,
+  PostgresPluginPackageSecretBindingApprovalPlanRepository,
+} from '../plugin-package/secret-binding/pluginPackageSecretBindingApprovalPlanRepository';
 export { PostgresPluginPackageInstallInventoryReader } from '../plugin-package/installation/pluginPackageInstallRepository';
 export { PostgresPluginPackagePublisherRevocationProposalRepository } from '../plugin-package/publisher/pluginPackagePublisherRevocationProposalRepository';
 export { PostgresPluginPackagePublisherTrustTransitionProposalRepository } from '../plugin-package/publisher/pluginPackagePublisherTrustTransitionProposalRepository';

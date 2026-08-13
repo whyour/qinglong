@@ -386,6 +386,72 @@ export const pluginPackageSecretBindings = ql3Schema.table(
   ],
 );
 
+export const pluginPackageSecretBindingApprovalPlans = ql3Schema.table(
+  'plugin_package_secret_binding_approval_plans',
+  {
+    actionRef: varchar('action_ref', { length: 255 }).primaryKey(),
+    approvalPlanDigest: char('approval_plan_digest', { length: 64 }).notNull(),
+    bindingPlanDigest: char('binding_plan_digest', { length: 64 }).notNull(),
+    generationDigest: char('generation_digest', { length: 64 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    packageName: varchar('package_name', { length: 63 }).notNull(),
+    installationId: varchar('installation_id', { length: 128 }).notNull(),
+    lockDigest: char('lock_digest', { length: 64 }).notNull(),
+    generation: integer('generation').notNull(),
+    manifestDigest: char('manifest_digest', { length: 64 }).notNull(),
+    requestedByType: varchar('requested_by_type', { length: 16 }).notNull(),
+    requestedById: varchar('requested_by_id', { length: 255 }).notNull(),
+    plannedAtMs: bigint('planned_at_ms', { mode: 'number' }).notNull(),
+    expiresAtMs: bigint('expires_at_ms', { mode: 'number' }).notNull(),
+    planJson: jsonb('plan_json').$type<Record<string, unknown>>().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'ql3_plugin_package_secret_binding_approval_plan_project_fk',
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      name: 'ql3_plugin_package_secret_binding_approval_plan_install_fk',
+      columns: [table.installationId],
+      foreignColumns: [pluginPackageInstalls.installationId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_plugin_package_secret_binding_approval_plan_identity_check',
+      sql`${table.actionRef} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}$' and ${table.projectId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.packageName} ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$' and ${table.installationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.generation} between 1 and 2147483647 and ${table.requestedByType} = 'user' and octet_length(${table.requestedById}) between 1 and 255 and ${table.requestedById} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_approval_plan_digest_check',
+      sql`${table.approvalPlanDigest} ~ '^[0-9a-f]{64}$' and ${table.bindingPlanDigest} ~ '^[0-9a-f]{64}$' and ${table.generationDigest} ~ '^[0-9a-f]{64}$' and ${table.lockDigest} ~ '^[0-9a-f]{64}$' and ${table.manifestDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_approval_plan_time_check',
+      sql`${table.plannedAtMs} >= 0 and ${table.expiresAtMs} > ${table.plannedAtMs} and ${table.expiresAtMs} - ${table.plannedAtMs} <= 900000`,
+    ),
+    check(
+      'ql3_plugin_package_secret_binding_approval_plan_json_check',
+      sql`jsonb_typeof(${table.planJson}) = 'object' and octet_length(${table.planJson}::text) between 2 and 98304 and ${table.planJson} @> jsonb_build_object('schema', 'qinglong/plugin-package-secret-binding-approval-plan@v1', 'actionRef', ${table.actionRef}, 'approvalPlanDigest', ${table.approvalPlanDigest}, 'requestedBy', jsonb_build_object('type', ${table.requestedByType}, 'id', ${table.requestedById}), 'expiresAtMs', ${table.expiresAtMs}, 'bindingPlan', jsonb_build_object('schema', 'qinglong/plugin-package-secret-binding-plan@v1', 'planDigest', ${table.bindingPlanDigest}, 'plannedAtMs', ${table.plannedAtMs}, 'target', jsonb_build_object('generationDigest', ${table.generationDigest}, 'projectId', ${table.projectId}, 'packageName', ${table.packageName}, 'installationId', ${table.installationId}, 'lockDigest', ${table.lockDigest}, 'generation', ${table.generation}, 'manifestDigest', ${table.manifestDigest}))) and jsonb_typeof(${table.planJson} #> '{bindingPlan,entries}') = 'array' and jsonb_array_length(${table.planJson} #> '{bindingPlan,entries}') between 1 and 64`,
+    ),
+    uniqueIndex(
+      'ql3_plugin_package_secret_binding_approval_plan_digest_uidx',
+    ).on(table.approvalPlanDigest),
+    index('ql3_plugin_package_secret_binding_approval_plan_target_idx').on(
+      table.projectId,
+      table.packageName,
+      table.generation,
+      table.actionRef,
+    ),
+    index('ql3_plugin_package_secret_binding_approval_plan_expiry_idx').on(
+      table.expiresAtMs,
+      table.actionRef,
+    ),
+  ],
+);
+
 export const projectToolDefinitionSnapshots = ql3Schema.table(
   'project_tool_definition_snapshots',
   {
@@ -5873,6 +5939,7 @@ export const ql3PostgresTables = [
   pluginPackageInstallMutations,
   pluginPackageMaterializedRevisions,
   pluginPackageSecretBindings,
+  pluginPackageSecretBindingApprovalPlans,
   projectToolDefinitionSnapshots,
   projectToolDefinitionSnapshotSources,
   pluginPackageQuarantineEvents,

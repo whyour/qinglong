@@ -111,6 +111,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0058-plugin-package-automation-disposition-events',
       'pg-0059-plugin-package-secret-bindings',
       'pg-0060-plugin-package-secret-materialization-guard',
+      'pg-0061-plugin-package-secret-binding-approval-plans',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -163,6 +164,7 @@ test('keeps local-only and legacy tables out of the cluster baseline', async () 
     'plugin_package_install_mutations',
     'plugin_package_materialized_revisions',
     'plugin_package_secret_bindings',
+    'plugin_package_secret_binding_approval_plans',
     'plugin_package_lifecycle_events',
     'plugin_package_lifecycle_heads',
     'plugin_package_lifecycle_receipts',
@@ -546,6 +548,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0060-plugin-package-secret-materialization-guard',
       checksum:
         '28284ca860b39ff9de5b2aa1a2a60ef2c463fd6a72798d237040174272b64b1e',
+    },
+    {
+      id: 'pg-0061-plugin-package-secret-binding-approval-plans',
+      checksum:
+        'c995b7846ae8a57d3abb4b5523961e81aeba890e7405a030bcb505dfc6be3d25',
     },
   ];
   assert.deepEqual(
@@ -2029,4 +2036,50 @@ test('advances capability v59 with fail-closed Package Secret materialization', 
   assert.match(sql, /"plugin_package_secret_materialization":1/);
   assert.match(sql, /contract_version = 58/);
   assert.match(sql, /migration_id = 'pg-0059-plugin-package-secret-bindings'/);
+});
+
+test('advances capability v60 with least-privilege Package Secret binding approval plans', async () => {
+  const migration = migrationById(
+    'pg-0061-plugin-package-secret-binding-approval-plans',
+  );
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(
+    sql,
+    /CREATE TABLE "ql3"\."plugin_package_secret_binding_approval_plans"/,
+  );
+  assert.match(
+    sql,
+    /CREATE FUNCTION "ql3"\."plugin_package_secret_binding_planning_snapshot"\([\s\S]+p_project_id varchar,[\s\S]+p_package_name varchar[\s\S]+\)/,
+  );
+  assert.match(
+    sql,
+    /CREATE FUNCTION "ql3"\."create_plugin_package_secret_binding_approval_plan"\([\s\S]+p_plan_json jsonb[\s\S]+\)/,
+  );
+  assert.match(sql, /SECURITY DEFINER/);
+  assert.match(
+    sql,
+    /GRANT SELECT ON "ql3"\."plugin_package_secret_binding_approval_plans" TO ql3_package_manager/,
+  );
+  assert.match(
+    sql,
+    /GRANT SELECT ON "ql3"\."plugin_package_secret_binding_approval_plans" TO ql3_package_executor/,
+  );
+  assert.doesNotMatch(
+    sql,
+    /GRANT (?:INSERT|UPDATE|DELETE)[^;]+plugin_package_secret_binding_approval_plans[^;]+ql3_package_manager/,
+  );
+  assert.match(sql, /contract_version = 60/);
+  assert.match(sql, /"plugin_package_secret_binding_approval_plan":1/);
+  assert.match(sql, /contract_version = 59/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0060-plugin-package-secret-materialization-guard'/,
+  );
 });

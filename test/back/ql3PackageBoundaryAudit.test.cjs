@@ -74,7 +74,7 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
     [
       {
         directory: 'packages/ql3-cluster-postgres/src/migrations',
-        directSourceFiles: 61,
+        directSourceFiles: 62,
         reviewKind: 'ordered_ledger',
       },
       {
@@ -97,10 +97,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localAdmin.rootSourceFileRoles,
     },
     {
-      sourceFiles: 43,
+      sourceFiles: 44,
       rootSourceFiles: 1,
       rootSourceLines: 9,
-      nestedSourceFiles: 42,
+      nestedSourceFiles: 43,
       rootSourceFileRoles: { 'runtime.ts': 'public_export' },
     },
   );
@@ -299,10 +299,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: runtimeCore.rootSourceFileRoles,
     },
     {
-      sourceFiles: 153,
+      sourceFiles: 156,
       rootSourceFiles: 1,
       rootSourceLines: 160,
-      nestedSourceFiles: 152,
+      nestedSourceFiles: 155,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );
@@ -340,10 +340,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterAdmin.rootSourceFileRoles,
     },
     {
-      sourceFiles: 99,
+      sourceFiles: 100,
       rootSourceFiles: 1,
       rootSourceLines: 61,
-      nestedSourceFiles: 98,
+      nestedSourceFiles: 99,
       rootSourceFileRoles: {
         'modelInvocationMigrationCli.ts': 'binary_entry',
       },
@@ -421,10 +421,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterPostgres.rootSourceFileRoles,
     },
     {
-      sourceFiles: 157,
+      sourceFiles: 159,
       rootSourceFiles: 1,
       rootSourceLines: 126,
-      nestedSourceFiles: 156,
+      nestedSourceFiles: 158,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );
@@ -540,10 +540,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localSqlite.rootSourceFileRoles,
     },
     {
-      sourceFiles: 187,
+      sourceFiles: 188,
       rootSourceFiles: 1,
       rootSourceLines: 31,
-      nestedSourceFiles: 186,
+      nestedSourceFiles: 187,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

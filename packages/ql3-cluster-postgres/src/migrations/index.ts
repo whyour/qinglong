@@ -63,6 +63,7 @@ import { pg0057RunManagementStopBoundaryMigration } from '../run-management/pg-0
 import { pg0058PluginPackageAutomationDispositionEventsMigration } from './pg-0058-plugin-package-automation-disposition-events';
 import { pg0059PluginPackageSecretBindingsMigration } from './pg-0059-plugin-package-secret-bindings';
 import { pg0060PluginPackageSecretMaterializationGuardMigration } from './pg-0060-plugin-package-secret-materialization-guard';
+import { pg0061PluginPackageSecretBindingApprovalPlansMigration } from './pg-0061-plugin-package-secret-binding-approval-plans';
 
 export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMigrationContext> =
   Object.freeze({
@@ -131,5 +132,6 @@ export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMi
       pg0058PluginPackageAutomationDispositionEventsMigration,
       pg0059PluginPackageSecretBindingsMigration,
       pg0060PluginPackageSecretMaterializationGuardMigration,
+      pg0061PluginPackageSecretBindingApprovalPlansMigration,
     ]),
   });

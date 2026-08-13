@@ -173,6 +173,12 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  plugin_package_secret_binding_approval_plans: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   project_tool_definition_snapshots: Object.freeze({
     select: false,
     insert: false,
@@ -692,6 +698,12 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  plugin_package_secret_binding_approval_plans: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   project_tool_definition_snapshots: Object.freeze({
     select: false,
     insert: false,
@@ -1193,6 +1205,7 @@ const REQUIRED_PACKAGE_MANAGER_PRIVILEGES: RequiredPrivileges = Object.freeze(
           name === 'projects' ||
           name === 'project_role_bindings' ||
           name === 'plugin_package_lifecycle_plans' ||
+          name === 'plugin_package_secret_binding_approval_plans' ||
           name === 'plugin_package_automation_publications' ||
           name === 'plugin_package_automation_publication_heads' ||
           name === 'plugin_package_publisher_trust_transition_receipts'
@@ -1235,6 +1248,7 @@ const REQUIRED_PACKAGE_EXECUTOR_PRIVILEGES: RequiredPrivileges = Object.freeze(
           name === 'projects' ||
           name === 'project_role_bindings' ||
           name === 'plugin_package_install_proposals' ||
+          name === 'plugin_package_secret_binding_approval_plans' ||
           name === 'plugin_package_publisher_revocation_proposals' ||
           name === 'plugin_package_publisher_trust_transition_proposals'
           ? { ...NO_TABLE_PRIVILEGES, select: true }
@@ -1504,6 +1518,7 @@ const REQUIRED_ADMIN_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
 
 const REQUIRED_RUNTIME_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
   Object.freeze({
+    create_plugin_package_secret_binding_approval_plan: false,
     commit_plugin_package_lifecycle: false,
     commit_plugin_package_quarantine: false,
     commit_plugin_package_task_reconciliation: false,
@@ -1517,12 +1532,14 @@ const REQUIRED_RUNTIME_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     plugin_package_workflow_task_attempt_snapshot: true,
     plugin_package_lifecycle_blocking_runs: false,
     plugin_package_run_start_allowed: true,
+    plugin_package_secret_binding_planning_snapshot: false,
     plugin_package_tool_start_allowed: true,
     register_plugin_package_automation_disposition_event: false,
   });
 
 const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
   Object.freeze({
+    create_plugin_package_secret_binding_approval_plan: true,
     commit_plugin_package_lifecycle: false,
     commit_plugin_package_quarantine: false,
     commit_plugin_package_task_reconciliation: false,
@@ -1536,12 +1553,14 @@ const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     plugin_package_workflow_task_attempt_snapshot: false,
     plugin_package_lifecycle_blocking_runs: false,
     plugin_package_run_start_allowed: false,
+    plugin_package_secret_binding_planning_snapshot: true,
     plugin_package_tool_start_allowed: false,
     register_plugin_package_automation_disposition_event: false,
   });
 
 const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
   Object.freeze({
+    create_plugin_package_secret_binding_approval_plan: false,
     commit_plugin_package_lifecycle: true,
     commit_plugin_package_quarantine: true,
     commit_plugin_package_task_reconciliation: true,
@@ -1555,6 +1574,7 @@ const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
     plugin_package_workflow_task_attempt_snapshot: false,
     plugin_package_lifecycle_blocking_runs: true,
     plugin_package_run_start_allowed: false,
+    plugin_package_secret_binding_planning_snapshot: false,
     plugin_package_tool_start_allowed: false,
     register_plugin_package_automation_disposition_event: false,
   });
