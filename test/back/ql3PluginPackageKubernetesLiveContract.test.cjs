@@ -16,8 +16,13 @@ const actorFile = path.join(
   root,
   'scripts/ql3-plugin-package-kubernetes-live-actor.cjs',
 );
+const k3sHostFile = path.join(
+  root,
+  'scripts/ql3-plugin-package-kubernetes-k3s-live-contract.cjs',
+);
 const hostSource = fs.readFileSync(hostFile, 'utf8');
 const actorSource = fs.readFileSync(actorFile, 'utf8');
+const k3sHostSource = fs.readFileSync(k3sHostFile, 'utf8');
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
 );
@@ -107,4 +112,33 @@ test('CI runs the dedicated live gate without reusing another cluster', () => {
     QL3_KIND_CLUSTER: 'ql3-plugin-activation-ci',
   });
   assert.equal(liveStep.env.QL3_REUSE_KIND_CLUSTER, undefined);
+});
+
+test('three-node K3s gate proves exact workload projection and receipt-bound revoke', () => {
+  const result = spawnSync(process.execPath, [k3sHostFile], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /refusing to run without QL3_PLUGIN_PACKAGE_K3S_LIVE=1/,
+  );
+  assert.equal(
+    packageJson.scripts['test:plugin-package-kubernetes-k3s-live:ql3'],
+    'pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-plugin-package-kubernetes-k3s-live-contract.cjs',
+  );
+  assert.match(k3sHostSource, /fixture\.apply\(actorPod\('c'\)\)/);
+  assert.match(k3sHostSource, /maxUnavailable: 0, maxSurge: 1/);
+  assert.match(k3sHostSource, /requiredDuringSchedulingIgnoredDuringExecution/);
+  assert.match(k3sHostSource, /sourceSecret\(rotated\.pointer\.secretProjection\)/);
+  assert.match(k3sHostSource, /assert\.deepEqual\(inspection\.files, \[projectedPath\]\)/);
+  assert.match(k3sHostSource, /revokedWorkloadHasNoSecretMount: true/);
+  assert.match(k3sHostSource, /sourceSecretRetainedButInaccessible: true/);
+  assert.match(actorSource, /mode: 'revoke'/);
+  assert.match(actorSource, /active\.secretProjection\.items\.length, 0/);
+  assert.match(
+    actorSource,
+    /pluginPackageKubernetesProjectedSecretWorkloadVolume\([\s\S]*active\.secretProjection/,
+  );
 });

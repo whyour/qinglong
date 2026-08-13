@@ -21,6 +21,11 @@ const RESULT_SCHEMA = 'qinglong/plugin-package-kubernetes-live-actor-result@v1';
 const NAMESPACE = 'ql3-plugin-package-live';
 const SERVICE_ACCOUNT = 'ql3-plugin-package-recovery-live';
 const IMAGE = 'qinglong3-cluster-admin:ql3-k3s-kubernetes-live';
+const WORKLOAD = 'ql3-plugin-package-workload-live';
+const SECRET_ROOT = '/var/run/secrets/qinglong3/plugin-package-values';
+const WORKLOAD_REPLICAS = 2;
+const SECRET_MARKER = 'ql3-live-exact-projection';
+let renderWorkloadVolume = null;
 
 function run(binary, args, options = {}) {
   const result = spawnSync(binary, args, {
@@ -171,10 +176,233 @@ async function actorResult(fixture, actor) {
   return value;
 }
 
+function activePointer(fixture) {
+  const pointers = fixture.kubectlJson([
+    '-n',
+    NAMESPACE,
+    'get',
+    'configmaps',
+    '-l',
+    'qinglong.io/plugin-package-active=v3',
+  ]).items;
+  assert.equal(pointers.length, 1);
+  const pointer = JSON.parse(pointers[0].data['active.json']);
+  assert.equal(
+    pointer.schema,
+    'qinglong/plugin-package-kubernetes-active-pointer@v3',
+  );
+  return Object.freeze({ configMap: pointers[0], pointer });
+}
+
+function sourceSecret(projection) {
+  assert.equal(projection.items.length, 1);
+  const projected = projection.items[0].key;
+  const decoy = projected === 'f'.repeat(64) ? 'e'.repeat(64) : 'f'.repeat(64);
+  return Object.freeze({
+    decoy,
+    document: {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      type: 'Opaque',
+      immutable: true,
+      metadata: {
+        name: projection.sourceSecretName,
+        namespace: NAMESPACE,
+        labels: {
+          'app.kubernetes.io/managed-by': 'qinglong3-live-gate',
+          'qinglong.io/live-gate-role': 'projection-source',
+        },
+      },
+      data: {
+        [projected]: Buffer.from(SECRET_MARKER, 'utf8').toString('base64'),
+        [decoy]: Buffer.from('ql3-live-decoy', 'utf8').toString('base64'),
+      },
+    },
+  });
+}
+
+function workloadDeployment(active) {
+  const projection = active.pointer.secretProjection;
+  assert.equal(typeof renderWorkloadVolume, 'function');
+  const rendered = renderWorkloadVolume(projection);
+  const labels = {
+    'app.kubernetes.io/name': WORKLOAD,
+    'app.kubernetes.io/component': 'plugin-package-workload',
+  };
+  return {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: WORKLOAD,
+      namespace: NAMESPACE,
+      labels,
+    },
+    spec: {
+      replicas: WORKLOAD_REPLICAS,
+      revisionHistoryLimit: 2,
+      progressDeadlineSeconds: 60,
+      strategy: {
+        type: 'RollingUpdate',
+        rollingUpdate: { maxUnavailable: 0, maxSurge: 1 },
+      },
+      selector: { matchLabels: labels },
+      template: {
+        metadata: {
+          labels,
+          annotations: {
+            'qinglong.io/plugin-package-generation-digest':
+              active.pointer.intent.resourceGeneration.generationDigest,
+            'qinglong.io/plugin-package-lock-digest':
+              active.pointer.intent.lockDigest,
+            'qinglong.io/plugin-package-secret-projection-digest':
+              projection?.projectionDigest ?? 'none',
+          },
+        },
+        spec: {
+          automountServiceAccountToken: false,
+          securityContext: {
+            runAsNonRoot: true,
+            runAsUser: 10001,
+            runAsGroup: 10001,
+            fsGroup: 10001,
+            seccompProfile: { type: 'RuntimeDefault' },
+          },
+          affinity: {
+            podAntiAffinity: {
+              requiredDuringSchedulingIgnoredDuringExecution: [
+                {
+                  labelSelector: { matchLabels: labels },
+                  topologyKey: 'kubernetes.io/hostname',
+                },
+              ],
+            },
+          },
+          containers: [
+            {
+              name: 'workload',
+              image: IMAGE,
+              imagePullPolicy: 'Never',
+              command: [
+                'node',
+                '-e',
+                'setInterval(() => {}, 2147483647)',
+              ],
+              securityContext: {
+                allowPrivilegeEscalation: false,
+                readOnlyRootFilesystem: true,
+                capabilities: { drop: ['ALL'] },
+              },
+              resources: {
+                requests: { cpu: '10m', memory: '32Mi' },
+                limits: { cpu: '250m', memory: '128Mi' },
+              },
+              ...(rendered
+                ? { volumeMounts: [rendered.volumeMount] }
+                : {}),
+            },
+          ],
+          ...(rendered ? { volumes: [rendered.volume] } : {}),
+        },
+      },
+    },
+  };
+}
+
+async function workloadReady(fixture, active, minimumGeneration = 1) {
+  const expectedLockDigest = active.pointer.intent.lockDigest;
+  const expectedProjectionDigest =
+    active.pointer.secretProjection?.projectionDigest ?? 'none';
+  const observed = await waitFor(
+    `Deployment/${WORKLOAD} rollout`,
+    120_000,
+    () => {
+      const deployment = fixture.kubectlJson([
+        '-n',
+        NAMESPACE,
+        'get',
+        'deployment',
+        WORKLOAD,
+      ]);
+      const pods = fixture.kubectlJson([
+        '-n',
+        NAMESPACE,
+        'get',
+        'pods',
+        '-l',
+        `app.kubernetes.io/name=${WORKLOAD}`,
+      ]).items;
+      const currentPods = pods.filter(
+        (pod) =>
+          pod.metadata?.annotations?.[
+            'qinglong.io/plugin-package-lock-digest'
+          ] === expectedLockDigest &&
+          pod.metadata?.annotations?.[
+            'qinglong.io/plugin-package-secret-projection-digest'
+          ] === expectedProjectionDigest &&
+          pod.status?.phase === 'Running' &&
+          pod.status?.conditions?.some(
+            (condition) =>
+              condition.type === 'Ready' && condition.status === 'True',
+          ),
+      );
+      const generation = deployment.metadata?.generation ?? 0;
+      const ready =
+        generation >= minimumGeneration &&
+        deployment.status?.observedGeneration === generation &&
+        deployment.status?.updatedReplicas === WORKLOAD_REPLICAS &&
+        deployment.status?.readyReplicas === WORKLOAD_REPLICAS &&
+        deployment.status?.availableReplicas === WORKLOAD_REPLICAS &&
+        currentPods.length === WORKLOAD_REPLICAS &&
+        new Set(currentPods.map((pod) => pod.spec?.nodeName)).size ===
+          WORKLOAD_REPLICAS;
+      return ready
+        ? { ready: true, value: { deployment, pods: currentPods } }
+        : {
+            ready: false,
+            fact: JSON.stringify({
+              generation,
+              observedGeneration: deployment.status?.observedGeneration,
+              updatedReplicas: deployment.status?.updatedReplicas,
+              readyReplicas: deployment.status?.readyReplicas,
+              availableReplicas: deployment.status?.availableReplicas,
+              currentPods: currentPods.length,
+            }),
+          };
+    },
+  );
+  return observed.value;
+}
+
+function inspectWorkloadPod(fixture, pod, expectedPath) {
+  const source = expectedPath
+    ? `
+      const fs = require('node:fs');
+      const root = ${JSON.stringify(SECRET_ROOT)};
+      const expected = ${JSON.stringify(expectedPath)};
+      const files = fs.readdirSync(root).filter((name) => !name.startsWith('..')).sort();
+      const value = fs.readFileSync(root + '/' + expected, 'utf8');
+      const mode = fs.statSync(root + '/' + expected).mode & 0o777;
+      process.stdout.write(JSON.stringify({ files, valueMatches: value === ${JSON.stringify(SECRET_MARKER)}, mode }));
+    `
+    : `
+      const fs = require('node:fs');
+      process.stdout.write(JSON.stringify({ rootAbsent: !fs.existsSync(${JSON.stringify(SECRET_ROOT)}) }));
+    `;
+  return JSON.parse(
+    fixture.kubectl(
+      ['-n', NAMESPACE, 'exec', pod.metadata.name, '--', 'node', '-e', source],
+      { capture: true, quiet: true },
+    ).stdout,
+  );
+}
+
 async function main() {
   if (process.env.QL3_PLUGIN_PACKAGE_K3S_LIVE !== '1') {
     throw new Error('refusing to run without QL3_PLUGIN_PACKAGE_K3S_LIVE=1');
   }
+  ({
+    pluginPackageKubernetesProjectedSecretWorkloadVolume: renderWorkloadVolume,
+  } = require('../packages/ql3-cluster-admin/dist/plugin-package/recovery/pluginPackageKubernetesActivation.js'));
   const fixture = new K3sDockerLiveFixture({
     prefix: 'ql3-plugin-v3-live',
     kubectl:
@@ -256,15 +484,63 @@ async function main() {
       crossNamespaceRead: 403,
     });
     assert.deepEqual(loser.rbac, winner.rbac);
-    const pointers = fixture.kubectlJson([
+    const rotated = activePointer(fixture);
+    const projectedPath = rotated.pointer.secretProjection.items[0].path;
+    const secret = sourceSecret(rotated.pointer.secretProjection);
+    fixture.apply(secret.document);
+    fixture.apply(workloadDeployment(rotated));
+    const mounted = await workloadReady(fixture, rotated);
+    const mountedInspection = mounted.pods.map((pod) =>
+      inspectWorkloadPod(fixture, pod, projectedPath),
+    );
+    for (const inspection of mountedInspection) {
+      assert.deepEqual(inspection.files, [projectedPath]);
+      assert.equal(inspection.valueMatches, true);
+      assert.equal(inspection.mode, 0o440);
+      assert.equal(inspection.files.includes(secret.decoy), false);
+    }
+
+    fixture.apply(actorPod('c'));
+    const revoker = await actorResult(fixture, 'c');
+    assert.equal(revoker.mode, 'revoke');
+    assert.equal(revoker.cas.status, 'fulfilled');
+    assert.equal(revoker.final.pointerSchema.endsWith('@v3'), true);
+    assert.equal(revoker.final.projectionItemCount, 0);
+    assert.equal(revoker.final.projectedWorkloadVolume, false);
+    assert.deepEqual(revoker.rbac, winner.rbac);
+    const revoked = activePointer(fixture);
+    assert.equal(revoked.pointer.secretProjection.items.length, 0);
+    assert.equal(
+      revoked.pointer.secretProjection.transitionReceiptDigest,
+      revoker.final.transitionReceiptDigest,
+    );
+    fixture.apply(workloadDeployment(revoked));
+    const unmounted = await workloadReady(
+      fixture,
+      revoked,
+      (mounted.deployment.metadata?.generation ?? 1) + 1,
+    );
+    assert.equal(
+      unmounted.pods.some((pod) =>
+        mounted.pods.some((old) => old.metadata.uid === pod.metadata.uid),
+      ),
+      false,
+    );
+    const revokedInspection = unmounted.pods.map((pod) =>
+      inspectWorkloadPod(fixture, pod, null),
+    );
+    assert.equal(
+      revokedInspection.every((inspection) => inspection.rootAbsent === true),
+      true,
+    );
+    const retainedSource = fixture.kubectlJson([
       '-n',
       NAMESPACE,
       'get',
-      'configmaps',
-      '-l',
-      'qinglong.io/plugin-package-active=v3',
-    ]).items;
-    assert.equal(pointers.length, 1);
+      'secret',
+      rotated.pointer.secretProjection.sourceSecretName,
+    ]);
+    assert.equal(Object.keys(retainedSource.data).length, 2);
     process.stdout.write(
       `${JSON.stringify(
         {
@@ -283,7 +559,15 @@ async function main() {
             transitionReceiptDigest: winner.final.transitionReceiptDigest,
             exactProjectionItems: winner.final.projectionItemCount,
             secretApiReadDenied: winner.rbac.readSecret === 403,
-            activePointers: pointers.length,
+            activePointers: 1,
+            workloadReplicas: WORKLOAD_REPLICAS,
+            workloadNodes: new Set(
+              unmounted.pods.map((pod) => pod.spec.nodeName),
+            ).size,
+            revokeProjectionItems:
+              revoked.pointer.secretProjection.items.length,
+            revokeTransitionReceiptDigest:
+              revoker.final.transitionReceiptDigest,
           },
           gates: {
             realThreeNodeKubernetes: true,
@@ -291,6 +575,13 @@ async function main() {
             v3TransitionReceiptBound: true,
             exactSecretProjectionRendered: true,
             secretApiReadDenied: true,
+            exactItemMountedByRealWorkload: true,
+            unprojectedSecretKeyAbsent: true,
+            workloadReplicasOnDistinctNodes: true,
+            revokeReceiptBound: true,
+            revokeRolledNewPods: true,
+            revokedWorkloadHasNoSecretMount: true,
+            sourceSecretRetainedButInaccessible: true,
             passed: true,
           },
           elapsedMs: Date.now() - startedAt,

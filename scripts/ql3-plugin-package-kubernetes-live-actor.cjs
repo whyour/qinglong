@@ -37,7 +37,7 @@ const TOKEN_FILE = '/var/run/secrets/kubernetes.io/serviceaccount/token';
 const RESULT_SCHEMA = 'qinglong/plugin-package-kubernetes-live-actor-result@v1';
 const NAMESPACE = process.env.QL3_LIVE_NAMESPACE;
 const ACTOR = process.env.QL3_LIVE_ACTOR;
-const PEER = ACTOR === 'a' ? 'b' : 'a';
+const PEER = ACTOR === 'a' ? 'b' : ACTOR === 'b' ? 'a' : null;
 const INITIAL_LOCK_DIGEST = 'a'.repeat(64);
 const CANDIDATES = Object.freeze({
   a: Object.freeze({
@@ -55,6 +55,14 @@ const CANDIDATES = Object.freeze({
     stageEvidenceDigest: '8'.repeat(64),
     contentDigest: '9'.repeat(64),
     intentDigest: '0'.repeat(64),
+  }),
+  c: Object.freeze({
+    installationId: 'install-live-revoke',
+    lockDigest: 'f'.repeat(64),
+    stageReceiptDigest: 'a'.repeat(64),
+    stageEvidenceDigest: 'b'.repeat(64),
+    contentDigest: 'c'.repeat(64),
+    intentDigest: 'd'.repeat(64),
   }),
 });
 
@@ -171,10 +179,10 @@ function manifest(version, secrets) {
   });
 }
 
-function transitionEvidence(initial, candidate) {
+function transitionEvidence(initial, candidate, actor = ACTOR) {
   const secretRef = createSecretRef({
     projectId: 'default',
-    name: `live-token-${ACTOR}`,
+    name: `live-token-${actor}`,
     version: 2,
   });
   const previousManifest = manifest('1.0.0', []);
@@ -209,6 +217,57 @@ function transitionEvidence(initial, candidate) {
     committedAtMs: 200,
   });
   return Object.freeze({ secretRef, binding, receipt });
+}
+
+function revokeEvidence(activeCandidate, activeTransition, candidate) {
+  const plan = createPluginPackageSecretBindingTransitionPlan({
+    previousTarget: createPluginPackageSecretBindingTarget(
+      activeCandidate.resourceGeneration,
+      manifest('2.0.0', [
+        Object.freeze({ name: 'TOKEN', required: true }),
+      ]),
+    ),
+    previousBinding: activeTransition.binding,
+    previousAttemptGeneration: 2,
+    nextGeneration: candidate.resourceGeneration,
+    nextManifest: manifest('3.0.0', []),
+    assignments: [],
+    plannedAtMs: 300,
+  });
+  const receipt = createPluginPackageSecretBindingTransitionReceipt({
+    transitionPlan: plan,
+    authority: Object.freeze({
+      kind: 'approved-action-execution',
+      evidenceDigest: candidate.stageEvidenceDigest,
+    }),
+    binding: null,
+    committedAtMs: 400,
+  });
+  return Object.freeze({ binding: null, receipt });
+}
+
+function activeTargetName() {
+  return (
+    'ql3p-' +
+    require('node:crypto')
+      .createHash('sha256')
+      .update(
+        Buffer.from('qinglong/plugin-package-kubernetes-target@v1\0', 'utf8'),
+      )
+      .update(
+        require('node:crypto')
+          .createHash('sha256')
+          .update('qinglong/plugin-package-kubernetes-cluster@v1\0', 'utf8')
+          .update('ql3-plugin-package-live-cluster', 'utf8')
+          .digest('hex'),
+        'utf8',
+      )
+      .update('\0', 'utf8')
+      .update(NAMESPACE, 'utf8')
+      .update('\0default\0live-cas-package', 'utf8')
+      .digest('hex')
+      .slice(0, 52)
+  );
 }
 
 function exactEvidence(intent) {
@@ -252,8 +311,8 @@ async function main() {
   if (!/^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$/.test(NAMESPACE ?? '')) {
     fail('QL3_LIVE_NAMESPACE is invalid');
   }
-  if (ACTOR !== 'a' && ACTOR !== 'b') {
-    fail('QL3_LIVE_ACTOR must be a or b');
+  if (ACTOR !== 'a' && ACTOR !== 'b' && ACTOR !== 'c') {
+    fail('QL3_LIVE_ACTOR must be a, b or c');
   }
   const token = fs.readFileSync(TOKEN_FILE);
   assert.ok(token.length >= 32 && token.length <= 16 * 1024);
@@ -286,29 +345,34 @@ async function main() {
       replaceCalls += 1;
       replaceResourceVersion = request.body.metadata.resourceVersion;
       assert.match(replaceResourceVersion ?? '', /^[1-9][0-9]*$/);
-      const ownReadyName = `ql3-live-cas-ready-${ACTOR}`;
-      const peerReadyName = `ql3-live-cas-ready-${PEER}`;
-      await rawApi.createNamespacedConfigMap({
-        namespace: NAMESPACE,
-        body: readyConfigMap(ownReadyName),
-        fieldManager: 'qinglong-plugin-package-live-gate',
-        fieldValidation: 'Strict',
-      });
-      await waitFor(`peer CAS barrier ConfigMap/${peerReadyName}`, async () => {
-        try {
-          const peer = await rawApi.readNamespacedConfigMap({
-            namespace: NAMESPACE,
-            name: peerReadyName,
-          });
-          return {
-            ready: peer.data?.actor === PEER,
-            fact: `peer actor=${String(peer.data?.actor)}`,
-          };
-        } catch (error) {
-          if (apiStatus(error) === 404) return { ready: false };
-          throw error;
-        }
-      });
+      if (PEER !== null) {
+        const ownReadyName = `ql3-live-cas-ready-${ACTOR}`;
+        const peerReadyName = `ql3-live-cas-ready-${PEER}`;
+        await rawApi.createNamespacedConfigMap({
+          namespace: NAMESPACE,
+          body: readyConfigMap(ownReadyName),
+          fieldManager: 'qinglong-plugin-package-live-gate',
+          fieldValidation: 'Strict',
+        });
+        await waitFor(
+          `peer CAS barrier ConfigMap/${peerReadyName}`,
+          async () => {
+            try {
+              const peer = await rawApi.readNamespacedConfigMap({
+                namespace: NAMESPACE,
+                name: peerReadyName,
+              });
+              return {
+                ready: peer.data?.actor === PEER,
+                fact: `peer actor=${String(peer.data?.actor)}`,
+              };
+            } catch (error) {
+              if (apiStatus(error) === 404) return { ready: false };
+              throw error;
+            }
+          },
+        );
+      }
       return rawApi.replaceNamespacedConfigMap(request);
     },
   };
@@ -328,6 +392,117 @@ async function main() {
         ...(secretProjection === undefined ? {} : { secretProjection }),
       },
     );
+
+  if (ACTOR === 'c') {
+    const initial = activationIntent();
+    const activeConfigMap = await rawApi.readNamespacedConfigMap({
+      namespace: NAMESPACE,
+      name: activeTargetName(),
+    });
+    const activePointer = JSON.parse(activeConfigMap.data?.['active.json']);
+    const winnerActor = ['a', 'b'].find(
+      (actor) => CANDIDATES[actor].lockDigest === activePointer.intent.lockDigest,
+    );
+    assert.ok(winnerActor);
+    const activeCandidate = activationIntent({
+      ...CANDIDATES[winnerActor],
+      targetGeneration: 2,
+      previousActiveLockDigest: INITIAL_LOCK_DIGEST,
+    });
+    const activeTransition = transitionEvidence(
+      initial,
+      activeCandidate,
+      winnerActor,
+    );
+    assert.equal(
+      activePointer.secretProjection.bindingDigest,
+      activeTransition.binding.bindingDigest,
+    );
+    const candidate = activationIntent({
+      ...CANDIDATES.c,
+      targetGeneration: 3,
+      previousActiveLockDigest: activeCandidate.lockDigest,
+    });
+    const transition = revokeEvidence(
+      activeCandidate,
+      activeTransition,
+      candidate,
+    );
+    const publisher = createPublisher({
+      sourceSecretName: 'ql3-cluster-plugin-package-values',
+      bindings: { find: async () => null },
+      transitions: { find: async () => transition.receipt },
+    });
+    const receipt = await publisher.publish(candidate);
+    assert.equal(replaceCalls, 1);
+    const active = await publisher.findActiveDeployment(
+      'default',
+      'live-cas-package',
+    );
+    assert.ok(active);
+    assert.equal(active.resourceGeneration.lockDigest, candidate.lockDigest);
+    assert.equal(active.secretProjection.items.length, 0);
+    assert.equal(
+      pluginPackageKubernetesProjectedSecretWorkloadVolume(
+        active.secretProjection,
+      ),
+      null,
+    );
+    const rbac = Object.freeze({
+      listConfigMaps: await expectForbidden(() =>
+        rawApi.listNamespacedConfigMap({ namespace: NAMESPACE }),
+      ),
+      deleteConfigMap: await expectForbidden(() =>
+        rawApi.deleteNamespacedConfigMap({
+          namespace: NAMESPACE,
+          name: activeTargetName(),
+        }),
+      ),
+      readSecret: await expectForbidden(() =>
+        rawApi.readNamespacedSecret({
+          namespace: NAMESPACE,
+          name: 'forbidden-secret',
+        }),
+      ),
+      crossNamespaceRead: await expectForbidden(() =>
+        rawApi.readNamespacedConfigMap({
+          namespace: 'default',
+          name: 'kube-root-ca.crt',
+        }),
+      ),
+    });
+    const result = JSON.stringify({
+      schema: RESULT_SCHEMA,
+      actor: ACTOR,
+      mode: 'revoke',
+      serviceAccountTokenMounted: true,
+      responseLoss: null,
+      cas: {
+        status: 'fulfilled',
+        receipt,
+        attemptedResourceVersion: replaceResourceVersion,
+        replaceCalls,
+      },
+      final: {
+        resourceVersion: activeConfigMap.metadata.resourceVersion,
+        lockDigest: candidate.lockDigest,
+        generation: receipt.generation,
+        pointerSchema: 'qinglong/plugin-package-kubernetes-active-pointer@v3',
+        projectionDigest: active.secretProjection.projectionDigest,
+        transitionReceiptDigest:
+          active.secretProjection.transitionReceiptDigest,
+        projectionItemCount: active.secretProjection.items.length,
+        projectedWorkloadVolume: false,
+      },
+      rbac,
+    });
+    fs.writeFileSync('/dev/termination-log', result, {
+      encoding: 'utf8',
+      flag: 'w',
+    });
+    process.stdout.write(`${result}\n`);
+    return;
+  }
 
   const initial = activationIntent();
   const initialPublisher = createPublisher();
@@ -386,26 +561,7 @@ async function main() {
   }
   assert.equal(replaceCalls, 1);
 
-  const targetName =
-    'ql3p-' +
-    require('node:crypto')
-      .createHash('sha256')
-      .update(
-        Buffer.from('qinglong/plugin-package-kubernetes-target@v1\0', 'utf8'),
-      )
-      .update(
-        require('node:crypto')
-          .createHash('sha256')
-          .update('qinglong/plugin-package-kubernetes-cluster@v1\0', 'utf8')
-          .update('ql3-plugin-package-live-cluster', 'utf8')
-          .digest('hex'),
-        'utf8',
-      )
-      .update('\0', 'utf8')
-      .update(NAMESPACE, 'utf8')
-      .update('\0default\0live-cas-package', 'utf8')
-      .digest('hex')
-      .slice(0, 52);
+  const targetName = activeTargetName();
   const finalConfigMap = await rawApi.readNamespacedConfigMap({
     namespace: NAMESPACE,
     name: targetName,
@@ -458,6 +614,7 @@ async function main() {
   const result = JSON.stringify({
     schema: RESULT_SCHEMA,
     actor: ACTOR,
+    mode: 'rotate',
     serviceAccountTokenMounted: true,
     responseLoss,
     cas: {
