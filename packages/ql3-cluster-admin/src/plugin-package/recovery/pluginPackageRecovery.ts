@@ -41,6 +41,7 @@ import {
   PostgresPluginPackageMaterializedRevisionRepository,
   PostgresPluginPackageSecretBindingRepository,
   PostgresPluginPackageSecretBindingActivationPrerequisite,
+  PostgresPluginPackageSecretBindingTransitionRepository,
   PostgresPluginPackagePublisherProvenanceRepository,
   PostgresPluginPackageTaskReconciliationRepository,
   PostgresProjectToolDefinitionSnapshotRepository,
@@ -307,6 +308,16 @@ export async function recoverClusterPluginPackages(
         clusterIdentity: options.clusterIdentity,
         namespace: options.namespace,
         now: options.now,
+        secretProjection: {
+          sourceSecretName: 'ql3-cluster-plugin-package-values',
+          bindings: new PostgresPluginPackageSecretBindingRepository(
+            database.pool,
+          ),
+          transitions:
+            new PostgresPluginPackageSecretBindingTransitionRepository(
+              database.pool,
+            ),
+        },
       },
     );
     const resourceByteSource =

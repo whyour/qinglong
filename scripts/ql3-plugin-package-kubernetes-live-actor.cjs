@@ -15,7 +15,22 @@ const {
   createPluginPackageResourceGeneration,
 } = require('@qinglong/runtime-core/plugin-package-resource-generation');
 const {
+  createPluginPackageSecretBindingTarget,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding');
+const {
+  createPluginPackageSecretBindingTransitionPlan,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-transition-plan');
+const {
+  createPluginPackageSecretBindingFromTransitionPlan,
+  createPluginPackageSecretBindingTransitionReceipt,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-transition-receipt');
+const {
+  secretProjectionFileName,
+} = require('@qinglong/runtime-core/secret-projection');
+const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
+const {
   PluginPackageKubernetesActivationPublisher,
+  pluginPackageKubernetesProjectedSecretWorkloadVolume,
 } = require('@qinglong/cluster-admin/plugin-package-kubernetes-activation');
 
 const TOKEN_FILE = '/var/run/secrets/kubernetes.io/serviceaccount/token';
@@ -117,6 +132,83 @@ function activationIntent(overrides = {}) {
     }),
     intentDigest: overrides.intentDigest ?? 'e'.repeat(64),
   });
+}
+
+function manifest(version, secrets) {
+  return Object.freeze({
+    apiVersion: 'qinglong.io/v1alpha1',
+    kind: 'Package',
+    metadata: Object.freeze({
+      name: 'live-cas-package',
+      displayName: 'Live CAS Package',
+      version,
+      description: 'Real Kubernetes Secret projection CAS gate',
+      license: 'Apache-2.0',
+    }),
+    spec: Object.freeze({
+      compatibility: Object.freeze({
+        qinglong: '>=3.0.0-0 <4.0.0',
+        architectures: Object.freeze(['arm64']),
+        deploymentProfiles: Object.freeze(['cluster-control']),
+      }),
+      runtimes: Object.freeze([]),
+      resources: Object.freeze({
+        memory: Object.freeze({ recommended: '16Mi' }),
+        disk: Object.freeze({ install: '4Mi', working: '16Mi' }),
+      }),
+      permissions: Object.freeze({
+        network: Object.freeze({ allowedHosts: Object.freeze([]) }),
+        secrets: Object.freeze(secrets),
+        tools: Object.freeze(secrets.length === 0 ? [] : ['secret.use']),
+      }),
+      contents: Object.freeze({
+        tasks: Object.freeze(['tasks/live.yaml']),
+        workflows: Object.freeze([]),
+        prompts: Object.freeze([]),
+        tools: Object.freeze([]),
+      }),
+    }),
+  });
+}
+
+function transitionEvidence(initial, candidate) {
+  const secretRef = createSecretRef({
+    projectId: 'default',
+    name: `live-token-${ACTOR}`,
+    version: 2,
+  });
+  const previousManifest = manifest('1.0.0', []);
+  const nextManifest = manifest('2.0.0', [
+    Object.freeze({ name: 'TOKEN', required: true }),
+  ]);
+  const plan = createPluginPackageSecretBindingTransitionPlan({
+    previousTarget: createPluginPackageSecretBindingTarget(
+      initial.resourceGeneration,
+      previousManifest,
+    ),
+    previousBinding: null,
+    previousAttemptGeneration: 1,
+    nextGeneration: candidate.resourceGeneration,
+    nextManifest,
+    assignments: [Object.freeze({ name: 'TOKEN', secretRef })],
+    plannedAtMs: 100,
+  });
+  const binding = createPluginPackageSecretBindingFromTransitionPlan(
+    plan,
+    'approved-action-execution',
+    candidate.stageEvidenceDigest,
+    200,
+  );
+  const receipt = createPluginPackageSecretBindingTransitionReceipt({
+    transitionPlan: plan,
+    authority: Object.freeze({
+      kind: 'approved-action-execution',
+      evidenceDigest: candidate.stageEvidenceDigest,
+    }),
+    binding,
+    committedAtMs: 200,
+  });
+  return Object.freeze({ secretRef, binding, receipt });
 }
 
 function exactEvidence(intent) {
@@ -222,29 +314,32 @@ async function main() {
   };
 
   let nowCalls = 0;
-  const publisher = new PluginPackageKubernetesActivationPublisher(
-    activationApi,
-    { verify: async (intent) => exactEvidence(intent) },
-    {
-      clusterIdentity: 'ql3-plugin-package-live-cluster',
-      namespace: NAMESPACE,
-      now() {
-        nowCalls += 1;
-        return (ACTOR === 'a' ? 1_000 : 2_000) + nowCalls;
+  const createPublisher = (secretProjection) =>
+    new PluginPackageKubernetesActivationPublisher(
+      activationApi,
+      { verify: async (intent) => exactEvidence(intent) },
+      {
+        clusterIdentity: 'ql3-plugin-package-live-cluster',
+        namespace: NAMESPACE,
+        now() {
+          nowCalls += 1;
+          return (ACTOR === 'a' ? 1_000 : 2_000) + nowCalls;
+        },
+        ...(secretProjection === undefined ? {} : { secretProjection }),
       },
-    },
-  );
+    );
 
   const initial = activationIntent();
+  const initialPublisher = createPublisher();
   let responseLoss = null;
   if (ACTOR === 'a') {
     await assert.rejects(
-      publisher.publish(initial),
+      initialPublisher.publish(initial),
       PluginPackageActivationUnavailableError,
     );
-    const observation = await publisher.inspect(initial);
+    const observation = await initialPublisher.inspect(initial);
     assert.equal(observation.status, 'published');
-    const replay = await publisher.publish(initial);
+    const replay = await initialPublisher.publish(initial);
     assert.deepEqual(replay, observation.receipt);
     assert.equal(createCalls, 1);
     assert.equal(nowCalls, 1);
@@ -258,7 +353,7 @@ async function main() {
     });
   } else {
     await waitFor('initial active pointer', async () => {
-      const observation = await publisher.inspect(initial);
+      const observation = await initialPublisher.inspect(initial);
       return {
         ready: observation.status === 'published',
         fact: observation.status,
@@ -271,6 +366,12 @@ async function main() {
     ...CANDIDATES[ACTOR],
     targetGeneration: 2,
     previousActiveLockDigest: INITIAL_LOCK_DIGEST,
+  });
+  const transition = transitionEvidence(initial, candidate);
+  const publisher = createPublisher({
+    sourceSecretName: 'ql3-cluster-plugin-package-values',
+    bindings: { find: async () => transition.binding },
+    transitions: { find: async () => transition.receipt },
   });
   let outcome;
   try {
@@ -310,6 +411,25 @@ async function main() {
     name: targetName,
   });
   const finalPointer = JSON.parse(finalConfigMap.data['active.json']);
+  assert.equal(finalPointer.schema.endsWith('@v3'), true);
+  assert.equal(finalPointer.secretProjection.defaultMode, 0o440);
+  assert.match(
+    finalPointer.secretProjection.transitionReceiptDigest,
+    /^[0-9a-f]{64}$/,
+  );
+  const projectionPath = secretProjectionFileName(transition.secretRef);
+  const winnerUsesThisActor =
+    finalPointer.intent.lockDigest === candidate.lockDigest;
+  if (winnerUsesThisActor) {
+    assert.deepEqual(finalPointer.secretProjection.items, [
+      { key: projectionPath, path: projectionPath },
+    ]);
+  }
+  const workloadVolume = pluginPackageKubernetesProjectedSecretWorkloadVolume(
+    finalPointer.secretProjection,
+  );
+  assert.equal(workloadVolume.volume.secret.optional, false);
+  assert.equal(workloadVolume.volume.secret.defaultMode, 0o440);
 
   const rbac = Object.freeze({
     listConfigMaps: await expectForbidden(() =>
@@ -335,25 +455,34 @@ async function main() {
     ),
   });
 
-  process.stdout.write(
-    `${JSON.stringify({
-      schema: RESULT_SCHEMA,
-      actor: ACTOR,
-      serviceAccountTokenMounted: true,
-      responseLoss,
-      cas: {
-        ...outcome,
-        attemptedResourceVersion: replaceResourceVersion,
-        replaceCalls,
-      },
-      final: {
-        resourceVersion: finalConfigMap.metadata.resourceVersion,
-        lockDigest: finalPointer.intent.lockDigest,
-        generation: finalPointer.receipt.generation,
-      },
-      rbac,
-    })}\n`,
-  );
+  const result = JSON.stringify({
+    schema: RESULT_SCHEMA,
+    actor: ACTOR,
+    serviceAccountTokenMounted: true,
+    responseLoss,
+    cas: {
+      ...outcome,
+      attemptedResourceVersion: replaceResourceVersion,
+      replaceCalls,
+    },
+    final: {
+      resourceVersion: finalConfigMap.metadata.resourceVersion,
+      lockDigest: finalPointer.intent.lockDigest,
+      generation: finalPointer.receipt.generation,
+      pointerSchema: finalPointer.schema,
+      projectionDigest: finalPointer.secretProjection.projectionDigest,
+      transitionReceiptDigest:
+        finalPointer.secretProjection.transitionReceiptDigest,
+      projectionItemCount: finalPointer.secretProjection.items.length,
+      projectedWorkloadVolume: workloadVolume !== null,
+    },
+    rbac,
+  });
+  fs.writeFileSync('/dev/termination-log', result, {
+    encoding: 'utf8',
+    flag: 'w',
+  });
+  process.stdout.write(`${result}\n`);
 }
 
 main().catch((error) => {

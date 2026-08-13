@@ -10,6 +10,20 @@ const {
   createPluginPackageResourceGeneration,
 } = require('@qinglong/runtime-core/plugin-package-resource-generation');
 const {
+  createPluginPackageSecretBinding,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding');
+const {
+  createPluginPackageSecretBindingTransitionPlan,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-transition-plan');
+const {
+  createPluginPackageSecretBindingFromTransitionPlan,
+  createPluginPackageSecretBindingTransitionReceipt,
+} = require('@qinglong/runtime-core/plugin-package-secret-binding-transition-receipt');
+const {
+  secretProjectionFileName,
+} = require('@qinglong/runtime-core/secret-projection');
+const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
+const {
   PLUGIN_PACKAGE_API_VERSION,
   PLUGIN_PACKAGE_KIND,
   planPluginPackageInstall,
@@ -28,6 +42,7 @@ const {
 } = require('@qinglong/runtime-core/plugin-package-recovery');
 const {
   PluginPackageKubernetesActivationPublisher,
+  pluginPackageKubernetesProjectedSecretWorkloadVolume,
 } = require('../dist/plugin-package/recovery/pluginPackageKubernetesActivation');
 
 function apiError(code) {
@@ -298,9 +313,165 @@ function publisher(api = new FakeConfigMapApi(), overrides = {}) {
         nowCalls += 1;
         return overrides.now?.() ?? 500 + nowCalls;
       },
+      ...(overrides.secretProjection === undefined
+        ? {}
+        : { secretProjection: overrides.secretProjection }),
     },
   );
   return { api, publisher: value, nowCalls: () => nowCalls };
+}
+
+function secretManifest(version, secrets) {
+  return {
+    apiVersion: PLUGIN_PACKAGE_API_VERSION,
+    kind: PLUGIN_PACKAGE_KIND,
+    metadata: {
+      name: 'example-monitor',
+      displayName: 'Example Monitor',
+      version,
+      description: 'Kubernetes Secret projection fixture',
+      license: 'Apache-2.0',
+    },
+    spec: {
+      compatibility: {
+        qinglong: '>=3.0.0-0 <4.0.0',
+        architectures: ['arm64'],
+        deploymentProfiles: ['cluster-control'],
+      },
+      runtimes: [],
+      resources: {
+        memory: { recommended: '16Mi' },
+        disk: { install: '4Mi', working: '16Mi' },
+      },
+      permissions: {
+        network: { allowedHosts: [] },
+        secrets,
+        tools: secrets.length === 0 ? [] : ['secret.use'],
+      },
+      contents: { tasks: [], workflows: [], prompts: [], tools: [] },
+    },
+  };
+}
+
+function projectedTransition(kind) {
+  const previousManifest = secretManifest('1.0.0', [
+    { name: 'TOKEN', required: true },
+  ]);
+  const previousGeneration = createPluginPackageResourceGeneration({
+    installationId: 'install-secret-v1',
+    projectId: 'default',
+    packageName: 'example-monitor',
+    lockDigest: '1'.repeat(64),
+    generation: 1,
+    previousActiveLockDigest: null,
+    contentDigest: '2'.repeat(64),
+    contents: previousManifest.spec.contents,
+  });
+  const previousBinding = createPluginPackageSecretBinding({
+    generation: previousGeneration,
+    manifest: previousManifest,
+    assignments: [
+      {
+        name: 'TOKEN',
+        secretRef: createSecretRef({
+          projectId: 'default',
+          name: 'token',
+          version: 1,
+        }),
+      },
+    ],
+    authority: {
+      kind: 'approved-action-execution',
+      evidenceDigest: '3'.repeat(64),
+    },
+    boundAtMs: 10,
+  });
+  const previousActivation = intent({
+    installationId: previousGeneration.installationId,
+    lockDigest: previousGeneration.lockDigest,
+    targetGeneration: previousGeneration.generation,
+    previousActiveLockDigest: null,
+    contentDigest: previousGeneration.contentDigest,
+    resourceGeneration: previousGeneration,
+    intentDigest: kind === 'revoke' ? 'b'.repeat(64) : 'c'.repeat(64),
+  });
+  const nextManifest =
+    kind === 'revoke'
+      ? secretManifest('2.0.0', [])
+      : secretManifest('2.0.0', [{ name: 'TOKEN', required: true }]);
+  const nextGeneration = createPluginPackageResourceGeneration({
+    installationId: `install-secret-${kind}`,
+    projectId: 'default',
+    packageName: 'example-monitor',
+    lockDigest: kind === 'revoke' ? '4'.repeat(64) : '5'.repeat(64),
+    generation: 2,
+    previousActiveLockDigest: previousBinding.target.lockDigest,
+    contentDigest: kind === 'revoke' ? '6'.repeat(64) : '7'.repeat(64),
+    contents: nextManifest.spec.contents,
+  });
+  const secretRef = createSecretRef({
+    projectId: 'default',
+    name: 'token',
+    version: 2,
+  });
+  const plan = createPluginPackageSecretBindingTransitionPlan({
+    previousTarget: previousBinding.target,
+    previousBinding,
+    previousAttemptGeneration: 1,
+    nextGeneration,
+    nextManifest,
+    assignments: kind === 'revoke' ? [] : [{ name: 'TOKEN', secretRef }],
+    plannedAtMs: 20,
+  });
+  const binding = createPluginPackageSecretBindingFromTransitionPlan(
+    plan,
+    'approved-action-execution',
+    '8'.repeat(64),
+    30,
+  );
+  const receipt = createPluginPackageSecretBindingTransitionReceipt({
+    transitionPlan: plan,
+    authority: {
+      kind: 'approved-action-execution',
+      evidenceDigest: '8'.repeat(64),
+    },
+    binding,
+    committedAtMs: 30,
+  });
+  const activation = intent({
+    installationId: nextGeneration.installationId,
+    lockDigest: nextGeneration.lockDigest,
+    targetGeneration: nextGeneration.generation,
+    previousActiveLockDigest: nextGeneration.previousActiveLockDigest,
+    contentDigest: nextGeneration.contentDigest,
+    resourceGeneration: nextGeneration,
+    intentDigest: kind === 'revoke' ? '9'.repeat(64) : 'a'.repeat(64),
+  });
+  return { previousActivation, activation, binding, receipt, secretRef };
+}
+
+function projectionSource(value) {
+  return {
+    sourceSecretName: 'ql3-cluster-plugin-package-values',
+    bindings: {
+      async find(generationDigest) {
+        assert.equal(
+          generationDigest,
+          value.activation.resourceGeneration.generationDigest,
+        );
+        return value.binding;
+      },
+    },
+    transitions: {
+      async find(generationDigest) {
+        assert.equal(
+          generationDigest,
+          value.activation.resourceGeneration.generationDigest,
+        );
+        return value.receipt;
+      },
+    },
+  };
 }
 
 test('publishes one resourceVersion-fenced ConfigMap and exact replays it', async () => {
@@ -389,6 +560,195 @@ test('replaces only the exact previous lock and rejects a stale writer', async (
     fixture.publisher.publish(stale),
     PluginPackageActivationConflictError,
   );
+});
+
+test('publishes a content-blind v3 projection for an approved Secret rotation', async () => {
+  const value = projectedTransition('rotate');
+  const api = new FakeConfigMapApi();
+  await publisher(api).publisher.publish(value.previousActivation);
+  const fixture = publisher(api, {
+    secretProjection: projectionSource(value),
+  });
+  await fixture.publisher.publish(value.activation);
+  const deployment = await fixture.publisher.findActiveDeployment(
+    'default',
+    'example-monitor',
+  );
+  assert.equal(
+    deployment.resourceGeneration.generationDigest,
+    value.activation.resourceGeneration.generationDigest,
+  );
+  assert.deepEqual(deployment.secretProjection.assignments, [
+    {
+      name: 'TOKEN',
+      required: true,
+      path: secretProjectionFileName(value.secretRef),
+    },
+  ]);
+  assert.deepEqual(deployment.secretProjection.items, [
+    {
+      key: secretProjectionFileName(value.secretRef),
+      path: secretProjectionFileName(value.secretRef),
+    },
+  ]);
+  assert.equal(deployment.secretProjection.defaultMode, 0o440);
+  assert.equal(
+    deployment.secretProjection.bindingDigest,
+    value.binding.bindingDigest,
+  );
+  assert.equal(
+    deployment.secretProjection.transitionReceiptDigest,
+    value.receipt.receiptDigest,
+  );
+  const [stored] = fixture.api.items.values();
+  const pointer = JSON.parse(stored.data['active.json']);
+  assert.equal(pointer.schema.endsWith('@v3'), true);
+  assert.equal(
+    stored.metadata.labels['qinglong.io/plugin-package-active'],
+    'v3',
+  );
+  assert.equal(JSON.stringify(pointer).includes(value.secretRef), false);
+  assert.deepEqual(
+    pluginPackageKubernetesProjectedSecretWorkloadVolume(
+      deployment.secretProjection,
+    ),
+    {
+      volume: {
+        name: 'plugin-package-values',
+        secret: {
+          secretName: 'ql3-cluster-plugin-package-values',
+          optional: false,
+          defaultMode: 0o440,
+          items: [
+            {
+              key: secretProjectionFileName(value.secretRef),
+              path: secretProjectionFileName(value.secretRef),
+            },
+          ],
+        },
+      },
+      volumeMount: {
+        name: 'plugin-package-values',
+        mountPath: '/var/run/secrets/qinglong3/plugin-package-values',
+        readOnly: true,
+      },
+    },
+  );
+});
+
+test('publishes an explicit empty projection for revoke and rejects projection drift', async () => {
+  const value = projectedTransition('revoke');
+  const api = new FakeConfigMapApi();
+  await publisher(api).publisher.publish(value.previousActivation);
+  const fixture = publisher(api, {
+    secretProjection: projectionSource(value),
+  });
+  await fixture.publisher.publish(value.activation);
+  const deployment = await fixture.publisher.findActiveDeployment(
+    'default',
+    'example-monitor',
+  );
+  assert.deepEqual(deployment.secretProjection.items, []);
+  assert.deepEqual(deployment.secretProjection.assignments, []);
+  assert.equal(deployment.secretProjection.bindingDigest, null);
+  assert.equal(
+    deployment.secretProjection.transitionReceiptDigest,
+    value.receipt.receiptDigest,
+  );
+  assert.equal(
+    pluginPackageKubernetesProjectedSecretWorkloadVolume(
+      deployment.secretProjection,
+    ),
+    null,
+  );
+
+  const [key, stored] = fixture.api.items.entries().next().value;
+  const pointer = JSON.parse(stored.data['active.json']);
+  pointer.secretProjection.projectionDigest = '0'.repeat(64);
+  fixture.api.items.set(key, {
+    ...stored,
+    data: { 'active.json': `${JSON.stringify(pointer)}\n` },
+  });
+  await assert.rejects(
+    fixture.publisher.findActiveDeployment('default', 'example-monitor'),
+    PluginPackageActivationConflictError,
+  );
+});
+
+test('converges a lost v3 replacement response without republishing projection', async () => {
+  const value = projectedTransition('rotate');
+  const api = new FakeConfigMapApi();
+  await publisher(api).publisher.publish(value.previousActivation);
+  api.loseReplaceResponse = true;
+  const fixture = publisher(api, {
+    secretProjection: projectionSource(value),
+  });
+  await assert.rejects(
+    fixture.publisher.publish(value.activation),
+    PluginPackageActivationUnavailableError,
+  );
+  assert.equal(api.replaceCalls, 1);
+  assert.equal(
+    (await fixture.publisher.inspect(value.activation)).status,
+    'published',
+  );
+  await fixture.publisher.publish(value.activation);
+  assert.equal(api.replaceCalls, 1);
+  assert.equal(fixture.nowCalls(), 1);
+});
+
+test('does not switch the active pointer when projection evidence is unavailable', async () => {
+  const value = projectedTransition('rotate');
+  const api = new FakeConfigMapApi();
+  await publisher(api).publisher.publish(value.previousActivation);
+  const previousPointer = structuredClone([...api.items.values()][0]);
+  const fixture = publisher(api, {
+    secretProjection: {
+      ...projectionSource(value),
+      transitions: {
+        async find() {
+          throw new Error('database unavailable');
+        },
+      },
+    },
+  });
+  await assert.rejects(
+    fixture.publisher.publish(value.activation),
+    PluginPackageActivationUnavailableError,
+  );
+  assert.deepEqual([...api.items.values()][0], previousPointer);
+  assert.equal(fixture.api.replaceCalls, 0);
+  assert.equal(fixture.nowCalls(), 0);
+});
+
+test('keeps a staged upgrade without Secret facts on the compatible v2 pointer', async () => {
+  const value = projectedTransition('rotate');
+  const api = new FakeConfigMapApi();
+  await publisher(api).publisher.publish(value.previousActivation);
+  const fixture = publisher(api, {
+    secretProjection: {
+      ...projectionSource(value),
+      bindings: {
+        async find() {
+          return null;
+        },
+      },
+      transitions: {
+        async find() {
+          return null;
+        },
+      },
+    },
+  });
+  await fixture.publisher.publish(value.activation);
+  const deployment = await fixture.publisher.findActiveDeployment(
+    'default',
+    'example-monitor',
+  );
+  assert.equal(deployment.secretProjection, null);
+  const pointer = JSON.parse([...api.items.values()][0].data['active.json']);
+  assert.equal(pointer.schema.endsWith('@v2'), true);
+  assert.equal(Object.hasOwn(pointer, 'secretProjection'), false);
 });
 
 test('leaves response loss for recovery inspection without republishing', async () => {

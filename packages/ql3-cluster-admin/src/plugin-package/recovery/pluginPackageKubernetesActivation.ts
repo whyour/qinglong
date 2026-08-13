@@ -18,9 +18,34 @@ import {
   normalizePluginPackageActivationReceipt,
   type PluginPackageActivationReceipt,
 } from '@qinglong/runtime-core/plugin-package-install';
+import type { PluginPackageSecretBindingRepository } from '@qinglong/runtime-core/plugin-package-secret-binding';
+import type { PluginPackageSecretBindingTransitionReceiptRepository } from '@qinglong/runtime-core/plugin-package-secret-binding-transition-receipt';
 
-const ACTIVE_POINTER_SCHEMA =
+import {
+  createPluginPackageKubernetesSecretProjection,
+  isPluginPackageKubernetesSecretName,
+  normalizePluginPackageKubernetesSecretProjection,
+  pluginPackageKubernetesProjectedSecretWorkloadVolume,
+  type PluginPackageKubernetesActiveDeployment,
+  type PluginPackageKubernetesProjectedSecretWorkloadVolume,
+  type PluginPackageKubernetesSecretProjection,
+  type PluginPackageKubernetesSecretProjectionAssignment,
+  type PluginPackageKubernetesSecretProjectionItem,
+} from '../secret-binding/pluginPackageKubernetesSecretProjection';
+
+export {
+  pluginPackageKubernetesProjectedSecretWorkloadVolume,
+  type PluginPackageKubernetesActiveDeployment,
+  type PluginPackageKubernetesProjectedSecretWorkloadVolume,
+  type PluginPackageKubernetesSecretProjection,
+  type PluginPackageKubernetesSecretProjectionAssignment,
+  type PluginPackageKubernetesSecretProjectionItem,
+};
+
+const ACTIVE_POINTER_SCHEMA_V2 =
   'qinglong/plugin-package-kubernetes-active-pointer@v2';
+const ACTIVE_POINTER_SCHEMA_V3 =
+  'qinglong/plugin-package-kubernetes-active-pointer@v3';
 const ACTIVE_POINTER_KEY = 'active.json';
 const MANAGED_BY_LABEL = 'app.kubernetes.io/managed-by';
 const MANAGED_BY_VALUE = 'qinglong3';
@@ -58,6 +83,19 @@ export interface PluginPackageKubernetesActivationPublisherOptions {
   readonly namespace: string;
   /** Explicit authoritative clock called only for a new publication attempt. */
   readonly now: () => number | Promise<number>;
+  /**
+   * Optional content-blind source used by the production recovery Job. When
+   * configured, v3 pointers bind the exact projected Secret keys to the same
+   * resourceVersion-fenced activation as the Package generation.
+   */
+  readonly secretProjection?: Readonly<{
+    readonly sourceSecretName: string;
+    readonly bindings: Pick<PluginPackageSecretBindingRepository, 'find'>;
+    readonly transitions: Pick<
+      PluginPackageSecretBindingTransitionReceiptRepository,
+      'find'
+    >;
+  }>;
 }
 
 export interface PluginPackageKubernetesConfigMap {
@@ -110,16 +148,24 @@ export interface PluginPackageKubernetesConfigMapApi {
   ): Promise<PluginPackageKubernetesConfigMap>;
 }
 
-interface ActivePointer {
-  readonly schema: typeof ACTIVE_POINTER_SCHEMA;
+interface ActivePointerV2 {
+  readonly schema: typeof ACTIVE_POINTER_SCHEMA_V2;
   readonly clusterIdentityDigest: string;
   readonly intent: Readonly<PluginPackageActivationIntent>;
   readonly receipt: Readonly<PluginPackageActivationReceipt>;
 }
 
-interface StoredPointer extends ActivePointer {
-  readonly resourceVersion: string;
+interface ActivePointerV3 {
+  readonly schema: typeof ACTIVE_POINTER_SCHEMA_V3;
+  readonly clusterIdentityDigest: string;
+  readonly intent: Readonly<PluginPackageActivationIntent>;
+  readonly receipt: Readonly<PluginPackageActivationReceipt>;
+  readonly secretProjection: Readonly<PluginPackageKubernetesSecretProjection> | null;
 }
+
+type ActivePointer = ActivePointerV2 | ActivePointerV3;
+
+type StoredPointer = ActivePointer & Readonly<{ resourceVersion: string }>;
 
 function apiStatus(error: unknown): number | null {
   if (!error || typeof error !== 'object') return null;
@@ -237,11 +283,29 @@ export class PluginPackageKubernetesActivationPublisher
       !options ||
       typeof options !== 'object' ||
       Array.isArray(options) ||
-      Object.keys(options).sort().join(',') !==
-        'clusterIdentity,namespace,now' ||
+      Object.keys(options).some(
+        (key) =>
+          key !== 'clusterIdentity' &&
+          key !== 'namespace' &&
+          key !== 'now' &&
+          key !== 'secretProjection',
+      ) ||
       !SAFE_IDENTITY.test(options.clusterIdentity) ||
       !DNS_LABEL.test(options.namespace) ||
-      typeof options.now !== 'function'
+      typeof options.now !== 'function' ||
+      (options.secretProjection !== undefined &&
+        (!options.secretProjection ||
+          typeof options.secretProjection !== 'object' ||
+          Array.isArray(options.secretProjection) ||
+          Object.keys(options.secretProjection).sort().join(',') !==
+            'bindings,sourceSecretName,transitions' ||
+          !isPluginPackageKubernetesSecretName(
+            options.secretProjection.sourceSecretName,
+          ) ||
+          !options.secretProjection.bindings ||
+          typeof options.secretProjection.bindings.find !== 'function' ||
+          !options.secretProjection.transitions ||
+          typeof options.secretProjection.transitions.find !== 'function'))
     ) {
       throw new TypeError(
         'Plugin Package Kubernetes activation options are invalid',
@@ -306,6 +370,38 @@ export class PluginPackageKubernetesActivationPublisher
     }
   }
 
+  async #secretProjection(
+    intent: Readonly<PluginPackageActivationIntent>,
+  ): Promise<Readonly<PluginPackageKubernetesSecretProjection> | null> {
+    const source = this.options.secretProjection;
+    if (!source) return null;
+    try {
+      const generationDigest = intent.resourceGeneration.generationDigest;
+      const [binding, transition] = await Promise.all([
+        source.bindings.find(generationDigest),
+        source.transitions.find(generationDigest),
+      ]);
+      if (
+        binding &&
+        (binding.target.installationId !== intent.installationId ||
+          binding.target.projectId !== intent.projectId ||
+          binding.target.packageName !== intent.packageName ||
+          binding.target.lockDigest !== intent.lockDigest ||
+          binding.target.generation !== intent.targetGeneration)
+      ) {
+        throw new PluginPackageActivationConflictError();
+      }
+      return createPluginPackageKubernetesSecretProjection(
+        source.sourceSecretName,
+        generationDigest,
+        binding,
+        transition,
+      );
+    } catch (error) {
+      return preserveDomainError(error);
+    }
+  }
+
   #parsePointer(
     configMap: PluginPackageKubernetesConfigMap,
     expectedName: string,
@@ -336,37 +432,71 @@ export class PluginPackageKubernetesActivationPublisher
       const serialized = data[ACTIVE_POINTER_KEY];
       if (
         labels[MANAGED_BY_LABEL] !== MANAGED_BY_VALUE ||
-        labels[ACTIVE_LABEL] !== 'v2' ||
+        (labels[ACTIVE_LABEL] !== 'v2' && labels[ACTIVE_LABEL] !== 'v3') ||
         typeof serialized !== 'string' ||
         Buffer.byteLength(serialized, 'utf8') > MAX_ACTIVE_POINTER_BYTES
       ) {
         throw new PluginPackageActivationConflictError();
       }
       const pointer = dataRecord(JSON.parse(serialized));
-      exactKeys(pointer, [
-        'schema',
-        'clusterIdentityDigest',
-        'intent',
-        'receipt',
-      ]);
+      if (pointer.schema === ACTIVE_POINTER_SCHEMA_V2) {
+        exactKeys(pointer, [
+          'schema',
+          'clusterIdentityDigest',
+          'intent',
+          'receipt',
+        ]);
+      } else if (pointer.schema === ACTIVE_POINTER_SCHEMA_V3) {
+        exactKeys(pointer, [
+          'schema',
+          'clusterIdentityDigest',
+          'intent',
+          'receipt',
+          'secretProjection',
+        ]);
+      } else {
+        throw new PluginPackageActivationConflictError();
+      }
       const intent = normalizeIntent(
         pointer.intent as PluginPackageActivationIntent,
       );
       const receipt = normalizePluginPackageActivationReceipt(pointer.receipt);
-      const normalized: ActivePointer = Object.freeze({
-        schema: ACTIVE_POINTER_SCHEMA,
-        clusterIdentityDigest: this.#clusterIdentityDigest,
-        intent,
-        receipt,
-      });
+      const secretProjection =
+        pointer.schema === ACTIVE_POINTER_SCHEMA_V3
+          ? pointer.secretProjection === null
+            ? null
+            : normalizePluginPackageKubernetesSecretProjection(
+                pointer.secretProjection,
+              )
+          : undefined;
+      const normalized: ActivePointer =
+        pointer.schema === ACTIVE_POINTER_SCHEMA_V3
+          ? Object.freeze({
+              schema: ACTIVE_POINTER_SCHEMA_V3,
+              clusterIdentityDigest: this.#clusterIdentityDigest,
+              intent,
+              receipt,
+              secretProjection: secretProjection!,
+            })
+          : Object.freeze({
+              schema: ACTIVE_POINTER_SCHEMA_V2,
+              clusterIdentityDigest: this.#clusterIdentityDigest,
+              intent,
+              receipt,
+            });
       if (
-        pointer.schema !== ACTIVE_POINTER_SCHEMA ||
         pointer.clusterIdentityDigest !== this.#clusterIdentityDigest ||
         this.#name(intent) !== expectedName ||
         labels[TARGET_LABEL] !==
           Buffer.from(this.#targetDigest(intent), 'hex').toString(
             'base64url',
           ) ||
+        labels[ACTIVE_LABEL] !==
+          (pointer.schema === ACTIVE_POINTER_SCHEMA_V3 ? 'v3' : 'v2') ||
+        (secretProjection !== undefined &&
+          secretProjection !== null &&
+          secretProjection.generationDigest !==
+            intent.resourceGeneration.generationDigest) ||
         annotations[INTENT_ANNOTATION] !== intent.intentDigest ||
         receipt.intentDigest !== intent.intentDigest ||
         receipt.generation !== intent.targetGeneration ||
@@ -409,6 +539,7 @@ export class PluginPackageKubernetesActivationPublisher
     intent: Readonly<PluginPackageActivationIntent>,
   ): Promise<Readonly<PluginPackageActivationObservation>> {
     await this.#verifyStage(intent);
+    const expectedProjection = await this.#secretProjection(intent);
     const pointer = await this.#optionalPointer(intent);
     if (!pointer) {
       if (intent.previousActiveLockDigest !== null) {
@@ -416,7 +547,12 @@ export class PluginPackageKubernetesActivationPublisher
       }
       return Object.freeze({ status: 'not_published' });
     }
-    if (same(pointer.intent, intent)) {
+    if (
+      same(pointer.intent, intent) &&
+      (pointer.schema === ACTIVE_POINTER_SCHEMA_V2
+        ? expectedProjection === null
+        : same(pointer.secretProjection, expectedProjection))
+    ) {
       return Object.freeze({ status: 'published', receipt: pointer.receipt });
     }
     if (
@@ -433,14 +569,24 @@ export class PluginPackageKubernetesActivationPublisher
     intent: Readonly<PluginPackageActivationIntent>,
     receipt: Readonly<PluginPackageActivationReceipt>,
     current: Readonly<StoredPointer> | null,
+    secretProjection: Readonly<PluginPackageKubernetesSecretProjection> | null,
   ): ConfigMapWrite {
     const targetDigest = this.#targetDigest(intent);
-    const pointer: Readonly<ActivePointer> = Object.freeze({
-      schema: ACTIVE_POINTER_SCHEMA,
-      clusterIdentityDigest: this.#clusterIdentityDigest,
-      intent,
-      receipt,
-    });
+    const usesSecretProjection = secretProjection !== null;
+    const pointer: Readonly<ActivePointer> = usesSecretProjection
+      ? Object.freeze({
+          schema: ACTIVE_POINTER_SCHEMA_V3,
+          clusterIdentityDigest: this.#clusterIdentityDigest,
+          intent,
+          receipt,
+          secretProjection,
+        })
+      : Object.freeze({
+          schema: ACTIVE_POINTER_SCHEMA_V2,
+          clusterIdentityDigest: this.#clusterIdentityDigest,
+          intent,
+          receipt,
+        });
     const serialized = `${JSON.stringify(pointer)}\n`;
     if (Buffer.byteLength(serialized, 'utf8') > MAX_ACTIVE_POINTER_BYTES) {
       throw new PluginPackageActivationUnavailableError();
@@ -455,7 +601,7 @@ export class PluginPackageKubernetesActivationPublisher
         ...(current ? { resourceVersion: current.resourceVersion } : {}),
         labels: Object.freeze({
           [MANAGED_BY_LABEL]: MANAGED_BY_VALUE,
-          [ACTIVE_LABEL]: 'v2',
+          [ACTIVE_LABEL]: usesSecretProjection ? 'v3' : 'v2',
           [TARGET_LABEL]: Buffer.from(targetDigest, 'hex').toString(
             'base64url',
           ),
@@ -500,6 +646,42 @@ export class PluginPackageKubernetesActivationPublisher
     }
   }
 
+  /**
+   * Returns one parsed active deployment snapshot for a workload renderer.
+   * It performs no Secret API call and exposes only projection keys, never
+   * Secret material or reversible Secret references.
+   */
+  async findActiveDeployment(
+    projectId: string,
+    packageName: string,
+  ): Promise<Readonly<PluginPackageKubernetesActiveDeployment> | null> {
+    if (
+      typeof projectId !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(projectId) ||
+      typeof packageName !== 'string' ||
+      !DNS_LABEL.test(packageName)
+    ) {
+      throw new TypeError(
+        'Plugin Package active deployment identity is invalid',
+      );
+    }
+    try {
+      const pointer = await this.#optionalPointer(
+        Object.freeze({ projectId, packageName }),
+      );
+      if (!pointer) return null;
+      return Object.freeze({
+        resourceGeneration: pointer.intent.resourceGeneration,
+        secretProjection:
+          pointer.schema === ACTIVE_POINTER_SCHEMA_V3
+            ? pointer.secretProjection
+            : null,
+      });
+    } catch (error) {
+      return preserveDomainError(error);
+    }
+  }
+
   async publish(
     value: Readonly<PluginPackageActivationIntent>,
   ): Promise<Readonly<PluginPackageActivationReceipt>> {
@@ -508,7 +690,18 @@ export class PluginPackageKubernetesActivationPublisher
       const first = await this.#observe(intent);
       if (first.status === 'published') return first.receipt;
       const current = await this.#optionalPointer(intent);
-      if (current && same(current.intent, intent)) return current.receipt;
+      if (current && same(current.intent, intent)) {
+        const expectedProjection = await this.#secretProjection(intent);
+        if (
+          (current.schema === ACTIVE_POINTER_SCHEMA_V2 &&
+            expectedProjection === null) ||
+          (current.schema === ACTIVE_POINTER_SCHEMA_V3 &&
+            same(current.secretProjection, expectedProjection))
+        ) {
+          return current.receipt;
+        }
+        throw new PluginPackageActivationConflictError();
+      }
       if (
         (!current && intent.previousActiveLockDigest !== null) ||
         (current &&
@@ -529,7 +722,8 @@ export class PluginPackageKubernetesActivationPublisher
         contentDigest: intent.contentDigest,
         activatedAtMs,
       });
-      const body = this.#body(intent, receipt, current);
+      const secretProjection = await this.#secretProjection(intent);
+      const body = this.#body(intent, receipt, current, secretProjection);
       try {
         if (current) {
           await this.api.replaceNamespacedConfigMap({

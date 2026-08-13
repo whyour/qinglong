@@ -63,7 +63,10 @@ test('live actors fence the same resourceVersion and recover one lost create res
     actorSource,
     /injected response loss after Kubernetes API-confirmed create/,
   );
-  assert.match(actorSource, /publisher\.inspect\(initial\)/);
+  assert.match(actorSource, /initialPublisher\.inspect\(initial\)/);
+  assert.match(actorSource, /publisher\.publish\(candidate\)/);
+  assert.match(actorSource, /finalPointer\.schema\.endsWith\('@v3'\)/);
+  assert.match(actorSource, /finalPointer\.secretProjection\.items/);
   assert.match(actorSource, /assert\.equal\(createCalls, 1\)/);
   assert.match(actorSource, /ql3-live-cas-ready-\$\{ACTOR\}/);
   assert.match(hostSource, /sameResourceVersionAttemptedByBothPods: true/);

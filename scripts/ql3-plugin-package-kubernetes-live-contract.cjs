@@ -505,6 +505,17 @@ async function main() {
     );
     assert.equal(winner.final.generation, 2);
     assert.equal(winner.final.resourceVersion, loser.final.resourceVersion);
+    assert.equal(winner.final.pointerSchema, loser.final.pointerSchema);
+    assert.equal(winner.final.projectionDigest, loser.final.projectionDigest);
+    assert.equal(
+      winner.final.transitionReceiptDigest,
+      loser.final.transitionReceiptDigest,
+    );
+    assert.match(winner.final.projectionDigest, /^[0-9a-f]{64}$/);
+    assert.match(winner.final.transitionReceiptDigest, /^[0-9a-f]{64}$/);
+    assert.equal(winner.final.pointerSchema.endsWith('@v3'), true);
+    assert.equal(winner.final.projectionItemCount, 1);
+    assert.equal(winner.final.projectedWorkloadVolume, true);
 
     const activePointers = kubectlJson([
       '-n',
@@ -512,7 +523,7 @@ async function main() {
       'get',
       'configmaps',
       '-l',
-      'qinglong.io/plugin-package-active=v2',
+      'qinglong.io/plugin-package-active=v3',
     ]).items;
     assert.equal(activePointers.length, 1);
     const barriers = kubectlJson([
@@ -582,6 +593,15 @@ async function main() {
             winner: winner.actor,
             activePointers: activePointers.length,
           },
+          secretProjection: {
+            schema: winner.final.pointerSchema,
+            projectionDigest: winner.final.projectionDigest,
+            transitionReceiptDigest: winner.final.transitionReceiptDigest,
+            itemCount: winner.final.projectionItemCount,
+            defaultMode: 0o440,
+            workloadVolumeRendered: winner.final.projectedWorkloadVolume,
+            secretApiReadRequired: false,
+          },
           rbac,
           sideEffects: {
             activePointers: activePointers.length,
@@ -599,6 +619,9 @@ async function main() {
             concurrentReplacementSingleWinner: true,
             loserObservedConflict: true,
             finalPointerExactlyOne: true,
+            transitionReceiptBoundToV3Pointer: true,
+            exactSecretProjectionItemPublished: true,
+            projectedWorkloadVolumeUses0440: true,
             configMapGetCreateUpdateAllowed: true,
             configMapListDeleteDenied: true,
             secretReadCreateDenied: true,
@@ -609,7 +632,9 @@ async function main() {
           limitations: [
             'response loss is injected after an API-confirmed create at the Kubernetes client boundary, not by dropping raw network packets',
             'single-control-plane Kind proves API-server resourceVersion and RBAC semantics, not Kubernetes control-plane HA',
-            'the gate isolates ConfigMap publication authority and does not exercise PostgreSQL or OCI registry recovery',
+            'the gate uses in-memory content-blind binding/transition sources; durable PostgreSQL transition authority is proven independently',
+            'the gate renders the exact Secret volume source but deliberately does not create or read Secret material',
+            'the gate isolates ConfigMap publication authority and does not exercise OCI registry recovery',
           ],
         },
         null,

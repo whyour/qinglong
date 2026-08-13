@@ -114,6 +114,12 @@ function runtimePrivileges() {
     plugin_package_automation_disposition_events: [false, false, false, false],
     plugin_package_automation_publication_heads: [true, false, false, false],
     plugin_package_secret_binding_approval_plans: [false, false, false, false],
+    plugin_package_secret_binding_transition_approval_plans: [
+      false,
+      false,
+      false,
+      false,
+    ],
     plugin_package_secret_bindings: [false, false, false, false],
     plugin_package_secret_binding_transition_receipts: [
       false,
