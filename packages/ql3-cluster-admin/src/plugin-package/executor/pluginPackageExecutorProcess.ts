@@ -17,7 +17,9 @@ import {
   loadPostgresConnectionEnvironment,
   PostgresApprovedActionExecutionRepository,
   PostgresPluginPackageSecretBindingApprovalPlanReader,
+  PostgresPluginPackageSecretBindingRepository,
   PostgresPluginPackageSecretBindingTransitionApprovalPlanReader,
+  PostgresPluginPackageSecretBindingTransitionRepository,
   type PostgresConnectionOptions,
   type PostgresPoolOptions,
   type PostgresSchemaReadinessReport,
@@ -631,6 +633,9 @@ function emptySecretActionJobSummary(): Readonly<PluginPackageKubernetesSecretAc
     created: 0,
     existing: 0,
     active: 0,
+    recoveredSucceeded: 0,
+    recoveredFailed: 0,
+    recoveredBlocked: 0,
     recoveryRequired: 0,
     unavailable: 0,
     truncated: false,
@@ -794,6 +799,13 @@ export async function runClusterPluginPackageExecutorProcess(
               ),
             transitionPlans:
               new PostgresPluginPackageSecretBindingTransitionApprovalPlanReader(
+                database.pool,
+              ),
+            bindings: new PostgresPluginPackageSecretBindingRepository(
+              database.pool,
+            ),
+            transitionReceipts:
+              new PostgresPluginPackageSecretBindingTransitionRepository(
                 database.pool,
               ),
             job: config.kubernetesSecretActions.job,

@@ -1,12 +1,27 @@
-import type { ApprovedActionExecutionSnapshot } from '@qinglong/runtime-core/approved-action-execution';
+import type {
+  ApprovedActionExecutionSnapshot,
+  ClaimApprovedActionExecutionCommand,
+  ClaimApprovedActionExecutionResult,
+  CompleteApprovedActionExecutionCommand,
+  ReleaseApprovedActionExecutionBeforeStartCommand,
+} from '@qinglong/runtime-core/approved-action-execution';
 import {
   PLUGIN_PACKAGE_SECRET_BINDING_ACTION_TYPE,
+  createPluginPackageSecretBindingFromApprovalPlan,
+  normalizePluginPackageSecretBindingApprovalPlan,
   type PluginPackageSecretBindingApprovalPlan,
 } from '@qinglong/runtime-core/plugin-package-secret-binding-approval-plan';
+import type { PluginPackageSecretBinding } from '@qinglong/runtime-core/plugin-package-secret-binding';
 import {
   PLUGIN_PACKAGE_SECRET_BINDING_TRANSITION_ACTION_TYPE,
+  normalizePluginPackageSecretBindingTransitionApprovalPlan,
   type PluginPackageSecretBindingTransitionApprovalPlan,
 } from '@qinglong/runtime-core/plugin-package-secret-binding-transition-approval-plan';
+import {
+  createPluginPackageSecretBindingFromTransitionPlan,
+  createPluginPackageSecretBindingTransitionReceipt,
+  type PluginPackageSecretBindingTransitionReceipt,
+} from '@qinglong/runtime-core/plugin-package-secret-binding-transition-receipt';
 
 import {
   createPluginPackageKubernetesSecretActionJob,
@@ -14,6 +29,8 @@ import {
 } from './pluginPackageKubernetesSecretActionJob';
 
 const FIELD_MANAGER = 'qinglong-plugin-package-secret-action-controller';
+const RECOVERY_OWNER = 'qinglong-secret-action-controller';
+const RECOVERY_LEASE_DURATION_MS = 60_000;
 const MAX_PAGE_SIZE = 32;
 
 type SecretActionApprovalPlan =
@@ -26,7 +43,7 @@ export interface PluginPackageSecretActionApprovalPlanReader<T> {
   findByActionRef(actionRef: string): Promise<Readonly<T> | null>;
 }
 
-export interface PluginPackageKubernetesSecretActionExecutionReader {
+export interface PluginPackageKubernetesSecretActionExecutionPort {
   listReconciliableExecutions(query: Readonly<{
     nowMs: number;
     limit: number;
@@ -35,6 +52,19 @@ export interface PluginPackageKubernetesSecretActionExecutionReader {
     executions: readonly Readonly<ApprovedActionExecutionSnapshot>[];
     truncated: boolean;
   }>>;
+  completeExecution(
+    command: CompleteApprovedActionExecutionCommand,
+  ): Promise<Readonly<ApprovedActionExecutionSnapshot>>;
+  claimExecution(
+    command: ClaimApprovedActionExecutionCommand,
+  ): Promise<ClaimApprovedActionExecutionResult>;
+  releaseExecutionBeforeStart(
+    command: ReleaseApprovedActionExecutionBeforeStartCommand,
+  ): Promise<Readonly<ApprovedActionExecutionSnapshot>>;
+}
+
+export interface PluginPackageSecretActionDurableResultReader<T> {
+  find(generationDigest: string): Promise<Readonly<T> | null>;
 }
 
 export interface PluginPackageKubernetesSecretActionJobResource {
@@ -71,9 +101,11 @@ export interface PluginPackageKubernetesSecretActionJobApi {
 }
 
 export interface PluginPackageKubernetesSecretActionControllerOptions {
-  readonly executions: PluginPackageKubernetesSecretActionExecutionReader;
+  readonly executions: PluginPackageKubernetesSecretActionExecutionPort;
   readonly bindingPlans: PluginPackageSecretActionApprovalPlanReader<PluginPackageSecretBindingApprovalPlan>;
   readonly transitionPlans: PluginPackageSecretActionApprovalPlanReader<PluginPackageSecretBindingTransitionApprovalPlan>;
+  readonly bindings: PluginPackageSecretActionDurableResultReader<PluginPackageSecretBinding>;
+  readonly transitionReceipts: PluginPackageSecretActionDurableResultReader<PluginPackageSecretBindingTransitionReceipt>;
   readonly jobs: PluginPackageKubernetesSecretActionJobApi;
   readonly job: Readonly<PluginPackageKubernetesSecretActionJobOptions>;
   readonly now?: () => number;
@@ -84,6 +116,9 @@ export interface PluginPackageKubernetesSecretActionControllerSummary {
   readonly created: number;
   readonly existing: number;
   readonly active: number;
+  readonly recoveredSucceeded: number;
+  readonly recoveredFailed: number;
+  readonly recoveredBlocked: number;
   readonly recoveryRequired: number;
   readonly unavailable: number;
   readonly truncated: boolean;
@@ -214,10 +249,17 @@ export class PluginPackageKubernetesSecretActionController {
       typeof options !== 'object' ||
       !options.executions ||
       typeof options.executions.listReconciliableExecutions !== 'function' ||
+      typeof options.executions.completeExecution !== 'function' ||
+      typeof options.executions.claimExecution !== 'function' ||
+      typeof options.executions.releaseExecutionBeforeStart !== 'function' ||
       !options.bindingPlans ||
       typeof options.bindingPlans.findByActionRef !== 'function' ||
       !options.transitionPlans ||
       typeof options.transitionPlans.findByActionRef !== 'function' ||
+      !options.bindings ||
+      typeof options.bindings.find !== 'function' ||
+      !options.transitionReceipts ||
+      typeof options.transitionReceipts.find !== 'function' ||
       !options.jobs ||
       typeof options.jobs.createNamespacedJob !== 'function' ||
       typeof options.jobs.readNamespacedJob !== 'function' ||
@@ -269,6 +311,9 @@ export class PluginPackageKubernetesSecretActionController {
       created: 0,
       existing: 0,
       active: 0,
+      recoveredSucceeded: 0,
+      recoveredFailed: 0,
+      recoveredBlocked: 0,
       recoveryRequired: 0,
       unavailable: 0,
       truncated: page.truncated,
@@ -293,7 +338,15 @@ export class PluginPackageKubernetesSecretActionController {
   async #reconcileOne(
     snapshot: Readonly<ApprovedActionExecutionSnapshot>,
     nowMs: number,
-  ): Promise<'created' | 'existing' | 'active' | 'recoveryRequired'> {
+  ): Promise<
+    | 'created'
+    | 'existing'
+    | 'active'
+    | 'recoveredSucceeded'
+    | 'recoveredFailed'
+    | 'recoveredBlocked'
+    | 'recoveryRequired'
+  > {
     const plan = await this.#plan(snapshot);
     if (!plan) {
       throw new PluginPackageKubernetesSecretActionControllerUnavailableError();
@@ -313,10 +366,22 @@ export class PluginPackageKubernetesSecretActionController {
     } catch (error) {
       if (apiStatus(error) !== 404) throw error;
       if (
-        snapshot.execution.status === 'executing' ||
-        nowMs > plan.expiresAtMs
+        snapshot.execution.status === 'executing'
       ) {
-        return 'recoveryRequired';
+        return this.#recoverMissingExecuting(
+          snapshot,
+          plan,
+          name,
+          nowMs,
+        );
+      }
+      if (nowMs > plan.expiresAtMs) {
+        return this.#blockBeforeStart(
+          snapshot,
+          name,
+          nowMs,
+          'package_secret_action_approval_expired',
+        );
       }
       try {
         observed = await this.options.jobs.createNamespacedJob({
@@ -343,8 +408,211 @@ export class PluginPackageKubernetesSecretActionController {
     }
     assertObservedJob(desired, observed);
     const terminal = terminalStatus(observed);
-    if (terminal !== 'active') return 'recoveryRequired';
+    if (terminal !== 'active') {
+      return this.#recoverTerminal(snapshot, plan, name, terminal, nowMs);
+    }
     return disposition;
+  }
+
+  async #recoverTerminal(
+    snapshot: Readonly<ApprovedActionExecutionSnapshot>,
+    plan: Readonly<SecretActionApprovalPlan>,
+    jobName: string,
+    terminal: 'complete' | 'failed',
+    nowMs: number,
+  ): Promise<
+    'recoveredSucceeded' | 'recoveredFailed' | 'recoveredBlocked' | 'recoveryRequired'
+  > {
+    const execution = snapshot.execution;
+    if (execution.status !== 'executing') {
+      return this.#blockBeforeStart(
+        snapshot,
+        jobName,
+        nowMs,
+        terminal === 'failed'
+          ? 'package_secret_action_job_failed_before_start'
+          : 'package_secret_action_job_completed_before_start',
+      );
+    }
+    if (
+      execution.startedAtMs === null ||
+      execution.leaseOwner === null ||
+      execution.leaseToken === null
+    ) {
+      throw new PluginPackageKubernetesSecretActionControllerConflictError();
+    }
+    const durableResultDigest = await this.#durableResultDigest(
+      plan,
+      execution.startedAtMs,
+    );
+    const outcome = durableResultDigest
+      ? 'succeeded'
+      : terminal === 'failed'
+        ? 'failed'
+        : 'indeterminate';
+    return this.#completeExecuting(
+      snapshot,
+      jobName,
+      nowMs,
+      outcome,
+      durableResultDigest
+        ? snapshot.dispatch.action.actionType ===
+          PLUGIN_PACKAGE_SECRET_BINDING_ACTION_TYPE
+          ? 'package_secret_binding_job_recovered'
+          : 'package_secret_transition_job_recovered'
+        : terminal === 'failed'
+          ? 'package_secret_action_job_failed'
+          : 'package_secret_action_receipt_missing',
+      durableResultDigest,
+    );
+  }
+
+  async #recoverMissingExecuting(
+    snapshot: Readonly<ApprovedActionExecutionSnapshot>,
+    plan: Readonly<SecretActionApprovalPlan>,
+    jobName: string,
+    nowMs: number,
+  ): Promise<'recoveredSucceeded' | 'recoveryRequired'> {
+    const execution = snapshot.execution;
+    if (
+      execution.status !== 'executing' ||
+      execution.startedAtMs === null ||
+      execution.leaseOwner === null ||
+      execution.leaseToken === null
+    ) {
+      throw new PluginPackageKubernetesSecretActionControllerConflictError();
+    }
+    const durableResultDigest = await this.#durableResultDigest(
+      plan,
+      execution.startedAtMs,
+    );
+    if (!durableResultDigest) return 'recoveryRequired';
+    const recovered = await this.#completeExecuting(
+      snapshot,
+      jobName,
+      nowMs,
+      'succeeded',
+      snapshot.dispatch.action.actionType ===
+        PLUGIN_PACKAGE_SECRET_BINDING_ACTION_TYPE
+        ? 'package_secret_binding_job_recovered'
+        : 'package_secret_transition_job_recovered',
+      durableResultDigest,
+    );
+    if (recovered !== 'recoveredSucceeded') {
+      throw new PluginPackageKubernetesSecretActionControllerConflictError();
+    }
+    return recovered;
+  }
+
+  async #completeExecuting(
+    snapshot: Readonly<ApprovedActionExecutionSnapshot>,
+    jobName: string,
+    nowMs: number,
+    outcome: 'succeeded' | 'failed' | 'indeterminate',
+    resultCode: string,
+    resultDigest: string | null,
+  ): Promise<'recoveredSucceeded' | 'recoveredFailed' | 'recoveredBlocked'> {
+    const execution = snapshot.execution;
+    if (
+      execution.status !== 'executing' ||
+      execution.leaseOwner === null ||
+      execution.leaseToken === null ||
+      (outcome === 'succeeded') !== (resultDigest !== null)
+    ) {
+      throw new PluginPackageKubernetesSecretActionControllerConflictError();
+    }
+    const result = await this.options.executions.completeExecution({
+      dispatchId: execution.dispatchId,
+      owner: execution.leaseOwner,
+      leaseToken: execution.leaseToken,
+      expectedVersion: execution.version,
+      resultMutationId: `k8s-recovery-${jobName}`,
+      outcome,
+      resultCode,
+      ...(resultDigest ? { resultDigest } : {}),
+      completedAtMs: Math.max(nowMs, execution.updatedAtMs),
+    });
+    if (result.execution.status === 'succeeded') return 'recoveredSucceeded';
+    if (result.execution.status === 'failed') return 'recoveredFailed';
+    if (result.execution.status === 'blocked') return 'recoveredBlocked';
+    throw new PluginPackageKubernetesSecretActionControllerConflictError();
+  }
+
+  async #blockBeforeStart(
+    snapshot: Readonly<ApprovedActionExecutionSnapshot>,
+    jobName: string,
+    nowMs: number,
+    resultCode: string,
+  ): Promise<'recoveredBlocked' | 'recoveryRequired'> {
+    const claimed = await this.options.executions.claimExecution({
+      dispatchId: snapshot.execution.dispatchId,
+      owner: RECOVERY_OWNER,
+      leaseToken: `recovery-${jobName}`,
+      nowMs,
+      leaseDurationMs: RECOVERY_LEASE_DURATION_MS,
+    });
+    if (claimed.status !== 'claimed') {
+      return claimed.status === 'blocked' ? 'recoveredBlocked' : 'recoveryRequired';
+    }
+    const released = await this.options.executions.releaseExecutionBeforeStart({
+      dispatchId: claimed.snapshot.execution.dispatchId,
+      owner: RECOVERY_OWNER,
+      leaseToken: claimed.snapshot.execution.leaseToken!,
+      expectedVersion: claimed.snapshot.execution.version,
+      resultMutationId: `k8s-recovery-${jobName}`,
+      resultCode,
+      atMs: Math.max(nowMs, claimed.snapshot.execution.updatedAtMs),
+    });
+    if (released.execution.status !== 'blocked') {
+      throw new PluginPackageKubernetesSecretActionControllerConflictError();
+    }
+    return 'recoveredBlocked';
+  }
+
+  async #durableResultDigest(
+    plan: Readonly<SecretActionApprovalPlan>,
+    startedAtMs: number,
+  ): Promise<string | null> {
+    if ('bindingPlan' in plan) {
+      const normalized = normalizePluginPackageSecretBindingApprovalPlan(plan);
+      const expected = createPluginPackageSecretBindingFromApprovalPlan(
+        normalized,
+        startedAtMs,
+      );
+      const stored = await this.options.bindings.find(
+        normalized.bindingPlan.target.generationDigest,
+      );
+      if (!stored) return null;
+      if (JSON.stringify(stored) !== JSON.stringify(expected)) {
+        throw new PluginPackageKubernetesSecretActionControllerConflictError();
+      }
+      return stored.bindingDigest;
+    }
+    const normalized =
+      normalizePluginPackageSecretBindingTransitionApprovalPlan(plan);
+    const binding = createPluginPackageSecretBindingFromTransitionPlan(
+      normalized.transitionPlan,
+      'approved-action-execution',
+      normalized.approvalPlanDigest,
+      startedAtMs,
+    );
+    const expected = createPluginPackageSecretBindingTransitionReceipt({
+      transitionPlan: normalized.transitionPlan,
+      authority: Object.freeze({
+        kind: 'approved-action-execution',
+        evidenceDigest: normalized.approvalPlanDigest,
+      }),
+      binding,
+      committedAtMs: startedAtMs,
+    });
+    const stored = await this.options.transitionReceipts.find(
+      normalized.transitionPlan.nextTarget.generationDigest,
+    );
+    if (!stored) return null;
+    if (JSON.stringify(stored) !== JSON.stringify(expected)) {
+      throw new PluginPackageKubernetesSecretActionControllerConflictError();
+    }
+    return stored.receiptDigest;
   }
 
   #plan(

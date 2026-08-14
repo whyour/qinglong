@@ -253,6 +253,9 @@ test('batch mode consumes approvals before reconciling exact Secret action Jobs'
     },
     async createSecretActionController(options) {
       assert.equal(options.job.image.endsWith('c'.repeat(64)), true);
+      assert.equal(typeof options.executions.completeExecution, 'function');
+      assert.equal(typeof options.bindings.find, 'function');
+      assert.equal(typeof options.transitionReceipts.find, 'function');
       calls.push('controller-open');
       return {
         controller: {
@@ -263,6 +266,9 @@ test('batch mode consumes approvals before reconciling exact Secret action Jobs'
               created: 1,
               existing: 0,
               active: 0,
+              recoveredSucceeded: 0,
+              recoveredFailed: 0,
+              recoveredBlocked: 0,
               recoveryRequired: 0,
               unavailable: 0,
               truncated: false,
