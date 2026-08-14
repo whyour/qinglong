@@ -552,6 +552,11 @@
       "require": "./dist/approved-action/approvedActionExecution.js",
       "default": "./dist/approved-action/approvedActionExecution.js"
     },
+    "./approved-action-manual-recovery": {
+      "types": "./dist/approved-action/approvedActionManualRecovery.d.ts",
+      "require": "./dist/approved-action/approvedActionManualRecovery.js",
+      "default": "./dist/approved-action/approvedActionManualRecovery.js"
+    },
     "./approved-action-dispatcher": {
       "types": "./dist/approved-action/approvedActionDispatcher.d.ts",
       "require": "./dist/approved-action/approvedActionDispatcher.js",

@@ -384,6 +384,12 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  approved_action_manual_recovery_resolutions: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   plugin_package_install_proposals: Object.freeze({
     select: false,
     insert: false,
@@ -921,6 +927,12 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  approved_action_manual_recovery_resolutions: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   plugin_package_install_proposals: Object.freeze({
     select: false,
     insert: false,
@@ -1421,7 +1433,10 @@ const REQUIRED_APPROVAL_MANAGER_PRIVILEGES: RequiredPrivileges = Object.freeze(
           name === 'schema_capabilities' ||
           name === 'projects' ||
           name === 'project_role_bindings' ||
-          name === 'tool_invocation_preview_artifacts'
+          name === 'tool_invocation_preview_artifacts' ||
+          name === 'approved_action_dispatches' ||
+          name === 'approved_action_executions' ||
+          name === 'approved_action_manual_recovery_resolutions'
           ? { ...NO_TABLE_PRIVILEGES, select: true }
           : name === 'security_audit_events'
           ? { ...NO_TABLE_PRIVILEGES, select: true, insert: true }
@@ -1573,6 +1588,7 @@ const REQUIRED_RUNTIME_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     plugin_package_secret_binding_transition_snapshot: false,
     plugin_package_tool_start_allowed: true,
     register_plugin_package_automation_disposition_event: false,
+    resolve_approved_action_manual_recovery: false,
   });
 
 const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
@@ -1598,6 +1614,7 @@ const REQUIRED_PACKAGE_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
     plugin_package_secret_binding_transition_snapshot: true,
     plugin_package_tool_start_allowed: false,
     register_plugin_package_automation_disposition_event: false,
+    resolve_approved_action_manual_recovery: false,
   });
 
 const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
@@ -1623,6 +1640,7 @@ const REQUIRED_PACKAGE_EXECUTOR_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
     plugin_package_secret_binding_transition_snapshot: false,
     plugin_package_tool_start_allowed: false,
     register_plugin_package_automation_disposition_event: false,
+    resolve_approved_action_manual_recovery: false,
   });
 
 const REQUIRED_WORKER_CREDENTIAL_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =
@@ -1635,6 +1653,7 @@ const REQUIRED_APPROVAL_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges 
   Object.freeze({
     ...NO_FUNCTION_PRIVILEGES,
     lock_approval_policy_fence: true,
+    resolve_approved_action_manual_recovery: true,
   });
 
 const REQUIRED_RUN_MANAGER_FUNCTION_PRIVILEGES: RequiredFunctionPrivileges =

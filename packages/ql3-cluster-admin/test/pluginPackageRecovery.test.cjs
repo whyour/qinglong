@@ -220,6 +220,7 @@ function database(serverVersionNum = '160014') {
                 'plugin_package_secret_binding_planning_snapshot',
                 'create_plugin_package_secret_transition_plan',
                 'plugin_package_secret_binding_transition_snapshot',
+                'resolve_approved_action_manual_recovery',
               ].includes(functionName),
               isOwner: false,
             })),

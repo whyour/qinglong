@@ -134,6 +134,7 @@ function validPrivileges() {
     approval_requests: [false, false, false, false],
     approved_action_dispatches: [false, false, false, false],
     approved_action_executions: [false, false, false, false],
+    approved_action_manual_recovery_resolutions: [false, false, false, false],
     plugin_package_install_proposals: [false, false, false, false],
     plugin_package_management_quota_buckets: [false, false, false, false],
     plugin_package_identity_keyset_ledger: [false, false, false, false],
@@ -271,6 +272,7 @@ function validAdminPrivileges() {
     approval_requests: [false, false, false, false],
     approved_action_dispatches: [false, false, false, false],
     approved_action_executions: [false, false, false, false],
+    approved_action_manual_recovery_resolutions: [false, false, false, false],
     plugin_package_install_proposals: [false, false, false, false],
     plugin_package_management_quota_buckets: [false, false, false, false],
     plugin_package_identity_keyset_ledger: [false, false, false, false],
@@ -491,6 +493,9 @@ function approvalManagerPrivileges() {
     'project_role_bindings',
     'security_audit_events',
     'approval_requests',
+    'approved_action_dispatches',
+    'approved_action_executions',
+    'approved_action_manual_recovery_resolutions',
     'tool_invocation_preview_artifacts',
     'plugin_package_identity_keyset_ledger',
   ]);
@@ -705,6 +710,11 @@ function queryable(overrides = {}) {
                       'plugin_package_secret_binding_planning_snapshot',
                       'plugin_package_secret_binding_transition_snapshot',
                     ].includes(functionName)
+                  : overrides.functionMode === 'approval-manager'
+                  ? [
+                      'lock_approval_policy_fence',
+                      'resolve_approved_action_manual_recovery',
+                    ].includes(functionName)
                   : overrides.functionMode === 'manager'
                   ? functionName === 'lock_approval_policy_fence'
                   : overrides.functionMode === 'run-manager'
@@ -805,7 +815,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 63,
+    contractVersion: 64,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -871,6 +881,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0062-plugin-package-secret-binding-target-guard',
       'pg-0063-plugin-package-secret-binding-transition-receipts',
       'pg-0064-plugin-package-secret-binding-transition-approval-plans',
+      'pg-0065-approved-action-manual-recovery',
     ],
   });
 });
@@ -901,10 +912,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 63);
+  assert.equal(report.contractVersion, 64);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0064-plugin-package-secret-binding-transition-approval-plans',
+    'pg-0065-approved-action-manual-recovery',
   );
 });
 
@@ -917,10 +928,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 63);
+  assert.equal(report.contractVersion, 64);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0064-plugin-package-secret-binding-transition-approval-plans',
+    'pg-0065-approved-action-manual-recovery',
   );
 
   const widened = automationManagerPrivileges();
@@ -945,14 +956,14 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     queryable({
       currentUser: 'ql3_approval_manager',
       privileges: approvalManagerPrivileges(),
-      functionMode: 'manager',
+      functionMode: 'approval-manager',
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 63);
+  assert.equal(report.contractVersion, 64);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0064-plugin-package-secret-binding-transition-approval-plans',
+    'pg-0065-approved-action-manual-recovery',
   );
 
   const widened = approvalManagerPrivileges();
@@ -964,7 +975,7 @@ test('accepts the isolated least-privilege human Approval manager role', async (
       queryable({
         currentUser: 'ql3_approval_manager',
         privileges: widened,
-        functionMode: 'manager',
+        functionMode: 'approval-manager',
       }),
     ),
     (error) =>
@@ -983,10 +994,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 63);
+  assert.equal(report.contractVersion, 64);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0064-plugin-package-secret-binding-transition-approval-plans',
+    'pg-0065-approved-action-manual-recovery',
   );
 
   const widened = runManagerPrivileges();
@@ -1118,10 +1129,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 63);
+  assert.equal(report.contractVersion, 64);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0064-plugin-package-secret-binding-transition-approval-plans',
+    'pg-0065-approved-action-manual-recovery',
   );
 });
 

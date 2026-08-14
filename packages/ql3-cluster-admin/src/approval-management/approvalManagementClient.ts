@@ -142,15 +142,139 @@ function decisionApproval(
   safeTime(approval.decidedAtMs);
 }
 
+function recoveryResult(
+  value: unknown,
+  command: Extract<
+    ClusterApprovalManagementCommand,
+    { operation: 'approval.recover.inspect' | 'approval.recover.resolve' }
+  >,
+): void {
+  const recovery = exact(value, [
+    'projectId',
+    'dispatchId',
+    'approvalRequestId',
+    'expectedAction',
+    'execution',
+    'resolution',
+  ]);
+  if (
+    identifier(recovery.projectId) !== command.request.projectId ||
+    identifier(recovery.dispatchId) !== command.request.dispatchId
+  ) {
+    invalid();
+  }
+  identifier(recovery.approvalRequestId);
+  action(recovery.expectedAction);
+  const execution = exact(recovery.execution, [
+    'status',
+    'version',
+    'executionDigest',
+    'attemptCount',
+    'maxAttempts',
+    'startedAtMs',
+    'leaseExpiresAtMs',
+    'resultMutationId',
+    'resultCode',
+    'resultDigest',
+    'completedAtMs',
+    'createdAtMs',
+    'updatedAtMs',
+  ]);
+  if (
+    ![
+      'pending',
+      'leased',
+      'executing',
+      'recovery_required',
+      'retry_wait',
+      'succeeded',
+      'failed',
+      'blocked',
+    ].includes(execution.status as string) ||
+    !Number.isSafeInteger(execution.version) ||
+    Number(execution.version) < 1 ||
+    typeof execution.executionDigest !== 'string' ||
+    !/^[0-9a-f]{64}$/.test(execution.executionDigest) ||
+    !Number.isSafeInteger(execution.attemptCount) ||
+    Number(execution.attemptCount) < 0 ||
+    !Number.isSafeInteger(execution.maxAttempts) ||
+    Number(execution.maxAttempts) < 1
+  ) {
+    invalid();
+  }
+  safeTime(execution.startedAtMs, true);
+  safeTime(execution.leaseExpiresAtMs, true);
+  safeTime(execution.completedAtMs, true);
+  safeTime(execution.createdAtMs);
+  safeTime(execution.updatedAtMs);
+  for (const field of ['resultMutationId', 'resultCode']) {
+    const item = execution[field];
+    if (item !== null) identifier(item);
+  }
+  if (
+    execution.resultDigest !== null &&
+    (typeof execution.resultDigest !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(execution.resultDigest))
+  ) {
+    invalid();
+  }
+  if (recovery.resolution !== null) {
+    const resolution = exact(recovery.resolution, [
+      'mutationId',
+      'decision',
+      'evidenceDigest',
+      'reasonCode',
+      'resolvedBy',
+      'resolvedAtMs',
+      'resolutionDigest',
+    ]);
+    identifier(resolution.mutationId);
+    if (
+      (resolution.decision !== 'confirm_failed' &&
+        resolution.decision !== 'abandon_unknown') ||
+      typeof resolution.evidenceDigest !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(resolution.evidenceDigest) ||
+      typeof resolution.reasonCode !== 'string' ||
+      !/^[a-z][a-z0-9_]{0,63}$/.test(resolution.reasonCode) ||
+      typeof resolution.resolutionDigest !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(resolution.resolutionDigest)
+    ) {
+      invalid();
+    }
+    subject(resolution.resolvedBy);
+    safeTime(resolution.resolvedAtMs);
+    if (
+      command.operation === 'approval.recover.resolve' &&
+      (resolution.mutationId !== command.request.mutationId ||
+        resolution.decision !== command.request.decision ||
+        resolution.evidenceDigest !== command.request.evidenceDigest ||
+        resolution.reasonCode !== command.request.reasonCode)
+    ) {
+      invalid();
+    }
+  }
+  if (
+    command.operation === 'approval.recover.resolve' &&
+    (recovery.resolution === null ||
+      Number(execution.version) !== command.request.expectedExecutionVersion + 1 ||
+      (execution.status !== 'failed' && execution.status !== 'blocked'))
+  ) {
+    invalid();
+  }
+}
+
 export function validateClusterApprovalManagementClientResult(
   value: unknown,
   command: Readonly<ClusterApprovalManagementCommand>,
 ): Readonly<ClusterApprovalManagementTransportResult> {
+  const recoveryOperation =
+    command.operation === 'approval.recover.inspect' ||
+    command.operation === 'approval.recover.resolve';
   const envelope = exact(value, [
     'schemaVersion',
     'operation',
     'status',
-    'approval',
+    recoveryOperation ? 'recovery' : 'approval',
   ]);
   if (
     envelope.schemaVersion !== 1 ||
@@ -158,7 +282,22 @@ export function validateClusterApprovalManagementClientResult(
   ) {
     invalid();
   }
-  if (command.operation === 'approval.inspect') {
+  if (command.operation === 'approval.recover.inspect') {
+    if (
+      (envelope.status !== 'found' && envelope.status !== 'absent') ||
+      (envelope.status === 'absent') !== (envelope.recovery === null)
+    ) {
+      invalid();
+    }
+    if (envelope.recovery !== null) {
+      recoveryResult(envelope.recovery, command);
+    }
+  } else if (command.operation === 'approval.recover.resolve') {
+    if (envelope.status !== 'resolved' && envelope.status !== 'existing') {
+      invalid();
+    }
+    recoveryResult(envelope.recovery, command);
+  } else if (command.operation === 'approval.inspect') {
     if (
       (envelope.status !== 'found' && envelope.status !== 'absent') ||
       (envelope.status === 'absent') !== (envelope.approval === null)

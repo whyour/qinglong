@@ -68,6 +68,7 @@ function runtimePrivileges() {
     approval_requests: [false, false, false, false],
     approved_action_dispatches: [false, false, false, false],
     approved_action_executions: [false, false, false, false],
+    approved_action_manual_recovery_resolutions: [false, false, false, false],
     plugin_package_install_proposals: [false, false, false, false],
     plugin_package_admission_receipts: [false, false, false, false],
     plugin_package_management_quota_buckets: [false, false, false, false],

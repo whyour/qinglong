@@ -6,7 +6,7 @@ PostgreSQL Pool。
 
 ## 部署前置
 
-1. PostgreSQL 已完成 54 条 control-core migration、capability v53 和正常 readiness；CloudNativePG 已创建
+1. PostgreSQL 已完成 65 条 control-core migration、capability v64 和正常 readiness；CloudNativePG 已创建
    `ql3_approval_manager` 与 `ql3-postgres-approval-manager-auth`。
 2. 从
    `deploy/kubernetes/ql3-cluster/operations/approval-management/config.example.yaml`
@@ -94,6 +94,48 @@ assertion。服务会在进入领域服务前和提交前重新认证；身份�
 
 将 `decision` 改为 `rejected` 可拒绝。`reasonCode` 只允许稳定、低敏的 snake_case 分类，不写自由文本、Secret 或个人信息。
 成功返回 `decided` 与 version 2；同语义精确重放返回 `existing`。
+
+## Secret Action 人工恢复
+
+只有 controller 已报告 `executing + Job missing + durable binding/transition receipt missing` 时才使用本入口。先检查，不要从日志手工拼接 execution digest：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "approval.recover.inspect",
+  "request": {
+    "projectId": "default",
+    "dispatchId": "dispatch-secret-action-1",
+    "requestId": "cluster-recovery-inspect-1",
+    "auditEventId": "30000000-0000-4000-8000-000000000001",
+    "failureAuditEventId": "30000000-0000-4000-8000-000000000002"
+  }
+}
+```
+
+结果必须是受支持的 Secret binding/transition action，execution effective status 必须是 `recovery_required`，resolution 必须为空。完成外部取证后，用 inspect 返回的 exact version/digest 和证据文件的 SHA-256 创建新命令：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "approval.recover.resolve",
+  "request": {
+    "projectId": "default",
+    "dispatchId": "dispatch-secret-action-1",
+    "requestId": "cluster-recovery-resolve-1",
+    "auditEventId": "40000000-0000-4000-8000-000000000001",
+    "failureAuditEventId": "40000000-0000-4000-8000-000000000002",
+    "expectedExecutionVersion": 3,
+    "expectedExecutionDigest": "<64-lowercase-hex-from-inspect>",
+    "mutationId": "manual-recovery-1",
+    "decision": "abandon_unknown",
+    "evidenceDigest": "<sha256-of-external-evidence>",
+    "reasonCode": "orphan_absence_unverifiable"
+  }
+}
+```
+
+`confirm_failed` 只用于外部证据明确证明业务 mutation 未发生，终态为 failed；仍无法判定时使用 `abandon_unknown`，终态为 blocked。不存在人工 succeeded，也不得借此重建 Job 或重置 execution。响应丢失时只能用相同 User、mutation、decision、evidence、reason 和 execution fence 精确重放，返回 `existing` 表示原事务已提交。
 
 ## 使用一次性 Kubernetes Client Job
 

@@ -1,11 +1,18 @@
 import {
   PostgresApprovalManagementIdentityKeysetLedgerRepository,
+  PostgresApprovedActionManualRecoveryRepository,
   PostgresApprovalRequestRepository,
   PostgresApprovalRequestSource,
   PostgresProjectPolicyRepository,
   PostgresSecurityAuditRepository,
 } from '@qinglong/cluster-postgres/approval-manager';
 import type { PostgresPool } from '@qinglong/runtime-core';
+import {
+  createApprovedActionManualRecoveryService,
+  type ApprovedActionManualRecoveryInspectRequest,
+  type ApprovedActionManualRecoveryResolveRequest,
+  type ApprovedActionManualRecoveryService,
+} from '@qinglong/runtime-core/approved-action-manual-recovery';
 import {
   createApprovalDecisionService,
   type ApprovalDecisionRequest,
@@ -28,6 +35,14 @@ export interface ClusterApprovalManagementService {
     request: ApprovalDecisionRequest,
     confirmAuthorization: () => void | Promise<void>,
   ): ReturnType<ApprovalDecisionService['decide']>;
+  inspectRecovery(
+    request: ApprovedActionManualRecoveryInspectRequest,
+    confirmAuthorization: () => void | Promise<void>,
+  ): ReturnType<ApprovedActionManualRecoveryService['inspect']>;
+  resolveRecovery(
+    request: ApprovedActionManualRecoveryResolveRequest,
+    confirmAuthorization: () => void | Promise<void>,
+  ): ReturnType<ApprovedActionManualRecoveryService['resolve']>;
   recordFailure(record: SecurityAuditRecord): Promise<void>;
 }
 
@@ -69,6 +84,12 @@ export function createClusterApprovalManagementService(
   const approvals = new PostgresApprovalRequestRepository(options.pool);
   const source = new PostgresApprovalRequestSource(options.pool);
   const audit = new PostgresSecurityAuditRepository(options.pool);
+  const recovery = createApprovedActionManualRecoveryService({
+    repository: new PostgresApprovedActionManualRecoveryRepository(options.pool),
+    policy,
+    audit,
+    ...(options.now === undefined ? {} : { now: options.now }),
+  });
   return Object.freeze({
     inspect(
       request: ApprovalInspectionRequest,
@@ -92,6 +113,18 @@ export function createClusterApprovalManagementService(
         confirmAuthorization,
         ...(options.now === undefined ? {} : { now: options.now }),
       }).decide(request);
+    },
+    inspectRecovery(
+      request: ApprovedActionManualRecoveryInspectRequest,
+      confirmAuthorization: () => void | Promise<void>,
+    ) {
+      return recovery.inspect(request, confirmAuthorization);
+    },
+    resolveRecovery(
+      request: ApprovedActionManualRecoveryResolveRequest,
+      confirmAuthorization: () => void | Promise<void>,
+    ) {
+      return recovery.resolve(request, confirmAuthorization);
     },
     recordFailure(record: SecurityAuditRecord) {
       return audit.record(record);

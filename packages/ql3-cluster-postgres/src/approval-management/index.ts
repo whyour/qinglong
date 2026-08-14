@@ -25,6 +25,7 @@ export {
 export { postgresqlMainMigrationManifest } from '../migration/migrationManifest';
 export { PostgresApprovalRequestRepository } from '../approved-action/approvalRequestRepository';
 export { PostgresApprovalRequestSource } from '../approved-action/approvalRequestSource';
+export { PostgresApprovedActionManualRecoveryRepository } from '../approved-action/approvedActionManualRecoveryRepository';
 export { PostgresProjectPolicyRepository } from '../security/projectPolicyRepository';
 export { PostgresSecurityAuditRepository } from '../security/securityAuditRepository';
 export {

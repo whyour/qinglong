@@ -8,6 +8,15 @@ import {
   type ApprovedActionBinding,
 } from '@qinglong/runtime-core/approved-action';
 import {
+  ApprovedActionManualRecoveryAuthorizationError,
+  ApprovedActionManualRecoveryFenceConflictError,
+  ApprovedActionManualRecoveryTargetUnavailableError,
+  ApprovedActionManualRecoveryUnavailableError,
+  ApprovedActionManualRecoveryUnsupportedError,
+  type ApprovedActionManualRecoverySnapshot,
+} from '@qinglong/runtime-core/approved-action-manual-recovery';
+import { approvedActionExecutionEffectiveStatus } from '@qinglong/runtime-core/approved-action-execution';
+import {
   ApprovalDecisionAuthorizationError,
   ApprovalDecisionBindingConflictError,
   ApprovalDecisionTargetUnavailableError,
@@ -30,28 +39,52 @@ const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const STRONG_ASSURANCES = new Set(['multi_factor', 'hardware']);
 
-interface BaseRequest {
+interface AuditBaseRequest {
   readonly projectId: string;
-  readonly approvalRequestId: string;
   readonly requestId: string;
   readonly auditEventId: string;
   readonly failureAuditEventId: string;
+}
+
+interface ApprovalBaseRequest extends AuditBaseRequest {
+  readonly approvalRequestId: string;
+}
+
+interface RecoveryBaseRequest extends AuditBaseRequest {
+  readonly dispatchId: string;
 }
 
 export type ClusterApprovalManagementCommand =
   | Readonly<{
       schemaVersion: 1;
       operation: 'approval.inspect';
-      request: BaseRequest;
+      request: ApprovalBaseRequest;
     }>
   | Readonly<{
       schemaVersion: 1;
       operation: 'approval.decide';
-      request: BaseRequest & {
+      request: ApprovalBaseRequest & {
         readonly expectedVersion: 1;
         readonly expectedAction: Readonly<ApprovedActionBinding>;
         readonly decisionId: string;
         readonly decision: 'approved' | 'rejected';
+        readonly reasonCode: string;
+      };
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'approval.recover.inspect';
+      request: RecoveryBaseRequest;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'approval.recover.resolve';
+      request: RecoveryBaseRequest & {
+        readonly expectedExecutionVersion: number;
+        readonly expectedExecutionDigest: string;
+        readonly mutationId: string;
+        readonly decision: 'confirm_failed' | 'abandon_unknown';
+        readonly evidenceDigest: string;
         readonly reasonCode: string;
       };
     }>;
@@ -163,45 +196,109 @@ export function normalizeClusterApprovalManagementCommand(
   const envelope = exact(value, ['schemaVersion', 'operation', 'request']);
   if (
     envelope.schemaVersion !== 1 ||
-    (envelope.operation !== 'approval.inspect' &&
-      envelope.operation !== 'approval.decide')
+    ![
+      'approval.inspect',
+      'approval.decide',
+      'approval.recover.inspect',
+      'approval.recover.resolve',
+    ].includes(envelope.operation as string)
   ) {
     invalid();
   }
-  const operation = envelope.operation;
-  const base = [
+  const operation = envelope.operation as ClusterApprovalManagementCommand['operation'];
+  const auditBase = [
     'projectId',
-    'approvalRequestId',
     'requestId',
     'auditEventId',
     'failureAuditEventId',
   ];
+  const recoveryOperation =
+    operation === 'approval.recover.inspect' ||
+    operation === 'approval.recover.resolve';
+  const base = [
+    ...auditBase,
+    recoveryOperation ? 'dispatchId' : 'approvalRequestId',
+  ];
   const request = exact(
     envelope.request,
-    operation === 'approval.inspect'
+    operation === 'approval.inspect' || operation === 'approval.recover.inspect'
       ? base
-      : [
+      : operation === 'approval.decide'
+      ? [
           ...base,
           'expectedVersion',
           'expectedAction',
           'decisionId',
           'decision',
           'reasonCode',
+        ]
+      : [
+          ...base,
+          'expectedExecutionVersion',
+          'expectedExecutionDigest',
+          'mutationId',
+          'decision',
+          'evidenceDigest',
+          'reasonCode',
         ],
   );
-  const normalizedBase = {
+  const normalizedAuditBase = {
     projectId: identifier(request.projectId),
-    approvalRequestId: identifier(request.approvalRequestId),
     requestId: identifier(request.requestId),
     auditEventId: uuid(request.auditEventId),
     failureAuditEventId: uuid(request.failureAuditEventId),
   };
-  if (normalizedBase.auditEventId === normalizedBase.failureAuditEventId) invalid();
+  if (normalizedAuditBase.auditEventId === normalizedAuditBase.failureAuditEventId) {
+    invalid();
+  }
   if (operation === 'approval.inspect') {
     return Object.freeze({
       schemaVersion: 1,
-      operation,
-      request: Object.freeze(normalizedBase),
+      operation: 'approval.inspect',
+      request: Object.freeze({
+        ...normalizedAuditBase,
+        approvalRequestId: identifier(request.approvalRequestId),
+      }),
+    });
+  }
+  if (operation === 'approval.recover.inspect') {
+    return Object.freeze({
+      schemaVersion: 1,
+      operation: 'approval.recover.inspect',
+      request: Object.freeze({
+        ...normalizedAuditBase,
+        dispatchId: identifier(request.dispatchId),
+      }),
+    });
+  }
+  if (operation === 'approval.recover.resolve') {
+    if (
+      !Number.isSafeInteger(request.expectedExecutionVersion) ||
+      Number(request.expectedExecutionVersion) < 1 ||
+      typeof request.expectedExecutionDigest !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(request.expectedExecutionDigest) ||
+      (request.decision !== 'confirm_failed' &&
+        request.decision !== 'abandon_unknown') ||
+      typeof request.evidenceDigest !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(request.evidenceDigest) ||
+      typeof request.reasonCode !== 'string' ||
+      !REASON_PATTERN.test(request.reasonCode)
+    ) {
+      invalid();
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      operation: 'approval.recover.resolve',
+      request: Object.freeze({
+        ...normalizedAuditBase,
+        dispatchId: identifier(request.dispatchId),
+        expectedExecutionVersion: Number(request.expectedExecutionVersion),
+        expectedExecutionDigest: request.expectedExecutionDigest,
+        mutationId: identifier(request.mutationId),
+        decision: request.decision,
+        evidenceDigest: request.evidenceDigest,
+        reasonCode: request.reasonCode,
+      }),
     });
   }
   if (
@@ -222,9 +319,10 @@ export function normalizeClusterApprovalManagementCommand(
   }
   return Object.freeze({
     schemaVersion: 1,
-    operation,
+    operation: 'approval.decide',
     request: Object.freeze({
-      ...normalizedBase,
+      ...normalizedAuditBase,
+      approvalRequestId: identifier(request.approvalRequestId),
       expectedVersion: 1,
       expectedAction,
       decisionId: identifier(request.decisionId),
@@ -284,11 +382,15 @@ function failureReason(error: unknown, authenticated: boolean): Readonly<{
   }
   if (
     error instanceof ApprovalInspectionAuthorizationError ||
-    error instanceof ApprovalDecisionAuthorizationError
+    error instanceof ApprovalDecisionAuthorizationError ||
+    error instanceof ApprovedActionManualRecoveryAuthorizationError
   ) {
     return Object.freeze({ outcome: 'denied', reason: 'policy_rejected' });
   }
-  if (error instanceof ApprovalDecisionTargetUnavailableError) {
+  if (
+    error instanceof ApprovalDecisionTargetUnavailableError ||
+    error instanceof ApprovedActionManualRecoveryTargetUnavailableError
+  ) {
     return Object.freeze({ outcome: 'denied', reason: 'approval_target_unavailable' });
   }
   if (error instanceof ApprovalDecisionBindingConflictError) {
@@ -299,7 +401,9 @@ function failureReason(error: unknown, authenticated: boolean): Readonly<{
     error instanceof ApprovalRequestStateConflictError ||
     error instanceof ApprovalRequestExpiredError ||
     error instanceof ApprovalMutationConflictError ||
-    error instanceof ApprovalPolicyFenceConflictError
+    error instanceof ApprovalPolicyFenceConflictError ||
+    error instanceof ApprovedActionManualRecoveryFenceConflictError ||
+    error instanceof ApprovedActionManualRecoveryUnsupportedError
   ) {
     return Object.freeze({ outcome: 'denied', reason: 'approval_state_or_fence_conflict' });
   }
@@ -320,11 +424,15 @@ function observedTime(now: () => number): number {
 function mapped(error: unknown): Error {
   if (
     error instanceof ApprovalInspectionAuthorizationError ||
-    error instanceof ApprovalDecisionAuthorizationError
+    error instanceof ApprovalDecisionAuthorizationError ||
+    error instanceof ApprovedActionManualRecoveryAuthorizationError
   ) {
     return new ClusterApprovalManagementTransportAuthorizationError();
   }
-  if (error instanceof ApprovalDecisionTargetUnavailableError) {
+  if (
+    error instanceof ApprovalDecisionTargetUnavailableError ||
+    error instanceof ApprovedActionManualRecoveryTargetUnavailableError
+  ) {
     return new ClusterApprovalManagementTransportTargetUnavailableError();
   }
   if (
@@ -333,19 +441,63 @@ function mapped(error: unknown): Error {
     error instanceof ApprovalRequestStateConflictError ||
     error instanceof ApprovalRequestExpiredError ||
     error instanceof ApprovalMutationConflictError ||
-    error instanceof ApprovalPolicyFenceConflictError
+    error instanceof ApprovalPolicyFenceConflictError ||
+    error instanceof ApprovedActionManualRecoveryFenceConflictError ||
+    error instanceof ApprovedActionManualRecoveryUnsupportedError
   ) {
     return new ClusterApprovalManagementTransportConflictError();
   }
   if (
     error instanceof ApprovalInspectionUnavailableError ||
-    error instanceof ApprovalDecisionUnavailableError
+    error instanceof ApprovalDecisionUnavailableError ||
+    error instanceof ApprovedActionManualRecoveryUnavailableError
   ) {
     return new ClusterApprovalManagementTransportUnavailableError();
   }
   return error instanceof Error
     ? error
     : new ClusterApprovalManagementTransportUnavailableError();
+}
+
+function recoveryProjection(
+  snapshot: Readonly<ApprovedActionManualRecoverySnapshot>,
+  nowMs: number,
+): Readonly<Record<string, unknown>> {
+  const execution = snapshot.execution.execution;
+  const resolution = snapshot.resolution;
+  return Object.freeze({
+    projectId: snapshot.execution.dispatch.projectId,
+    dispatchId: snapshot.execution.dispatch.id,
+    approvalRequestId: snapshot.execution.dispatch.approvalRequestId,
+    expectedAction: snapshot.execution.dispatch.action,
+    execution: Object.freeze({
+      status: approvedActionExecutionEffectiveStatus(execution, nowMs),
+      version: execution.version,
+      executionDigest: execution.executionDigest,
+      attemptCount: execution.attemptCount,
+      maxAttempts: execution.maxAttempts,
+      startedAtMs: execution.startedAtMs,
+      leaseExpiresAtMs: execution.leaseExpiresAtMs,
+      resultMutationId: execution.resultMutationId,
+      resultCode: execution.resultCode,
+      resultDigest: execution.resultDigest,
+      completedAtMs: execution.completedAtMs,
+      createdAtMs: execution.createdAtMs,
+      updatedAtMs: execution.updatedAtMs,
+    }),
+    resolution:
+      resolution === null
+        ? null
+        : Object.freeze({
+            mutationId: resolution.mutationId,
+            decision: resolution.decision,
+            evidenceDigest: resolution.evidenceDigest,
+            reasonCode: resolution.reasonCode,
+            resolvedBy: resolution.resolvedBy,
+            resolvedAtMs: resolution.resolvedAtMs,
+            resolutionDigest: resolution.resolutionDigest,
+          }),
+  });
 }
 
 export function createClusterApprovalManagementTransport(options: Readonly<{
@@ -359,6 +511,8 @@ export function createClusterApprovalManagementTransport(options: Readonly<{
     Object.keys(options).some((key) => key !== 'service' && key !== 'now') ||
     typeof options.service?.inspect !== 'function' ||
     typeof options.service?.decide !== 'function' ||
+    typeof options.service?.inspectRecovery !== 'function' ||
+    typeof options.service?.resolveRecovery !== 'function' ||
     typeof options.service?.recordFailure !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function')
   ) {
@@ -407,6 +561,52 @@ export function createClusterApprovalManagementTransport(options: Readonly<{
             throw new ClusterApprovalManagementTransportAuthenticationError();
           }
         };
+        if (command.operation === 'approval.recover.inspect') {
+          const snapshot = await options.service.inspectRecovery(
+            {
+              projectId: command.request.projectId,
+              dispatchId: command.request.dispatchId,
+              auditEventId: command.request.auditEventId,
+              requestId: command.request.requestId,
+              principal,
+            },
+            confirmAuthorization,
+          );
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            status: snapshot === null ? ('absent' as const) : ('found' as const),
+            recovery:
+              snapshot === null
+                ? null
+                : recoveryProjection(snapshot, observedTime(now)),
+          });
+        }
+        if (command.operation === 'approval.recover.resolve') {
+          const result = await options.service.resolveRecovery(
+            {
+              projectId: command.request.projectId,
+              dispatchId: command.request.dispatchId,
+              expectedExecutionVersion:
+                command.request.expectedExecutionVersion,
+              expectedExecutionDigest: command.request.expectedExecutionDigest,
+              mutationId: command.request.mutationId,
+              decision: command.request.decision,
+              evidenceDigest: command.request.evidenceDigest,
+              reasonCode: command.request.reasonCode,
+              auditEventId: command.request.auditEventId,
+              requestId: command.request.requestId,
+              principal,
+            },
+            confirmAuthorization,
+          );
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            status: result.status,
+            recovery: recoveryProjection(result.snapshot, observedTime(now)),
+          });
+        }
         if (command.operation === 'approval.inspect') {
           const detail = await options.service.inspect(
             {

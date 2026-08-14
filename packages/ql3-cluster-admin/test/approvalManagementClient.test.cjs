@@ -39,6 +39,13 @@ const BASE_REQUEST = Object.freeze({
   auditEventId: '60000000-0000-4000-8000-000000000001',
   failureAuditEventId: '60000000-0000-4000-8000-000000000002',
 });
+const RECOVERY_BASE_REQUEST = Object.freeze({
+  projectId: 'default',
+  dispatchId: 'dispatch-1',
+  requestId: 'recovery-command-1',
+  auditEventId: '60000000-0000-4000-8000-000000000003',
+  failureAuditEventId: '60000000-0000-4000-8000-000000000004',
+});
 
 function privateWrite(filePath, value) {
   writeFileSync(filePath, value, { mode: 0o600 });
@@ -198,6 +205,117 @@ test('validates the durable decision tuple and rejects server-side drift', () =>
         validateClusterApprovalManagementClientResult(
           { ...result, approval },
           command,
+        ),
+      ClusterPluginPackageManagementClientRequestError,
+    );
+  }
+});
+
+test('validates recovery inspection and binds terminal resolution to the command fence', () => {
+  const recoveryAction = {
+    ...ACTION,
+    permission: 'secret.manage',
+    actionType: 'plugin_package.secret_binding.bind',
+    actionRef: 'secret-binding:1',
+  };
+  const inspectCommand = {
+    schemaVersion: 1,
+    operation: 'approval.recover.inspect',
+    request: RECOVERY_BASE_REQUEST,
+  };
+  const recovery = {
+    projectId: 'default',
+    dispatchId: 'dispatch-1',
+    approvalRequestId: 'approval-1',
+    expectedAction: recoveryAction,
+    execution: {
+      status: 'recovery_required',
+      version: 3,
+      executionDigest: 'c'.repeat(64),
+      attemptCount: 1,
+      maxAttempts: 3,
+      startedAtMs: 1_400,
+      leaseExpiresAtMs: 1_800,
+      resultMutationId: null,
+      resultCode: null,
+      resultDigest: null,
+      completedAtMs: null,
+      createdAtMs: 1_200,
+      updatedAtMs: 1_400,
+    },
+    resolution: null,
+  };
+  assert.deepEqual(
+    validateClusterApprovalManagementClientResult(
+      {
+        schemaVersion: 1,
+        operation: inspectCommand.operation,
+        status: 'found',
+        recovery,
+      },
+      inspectCommand,
+    ).recovery,
+    recovery,
+  );
+
+  const resolveCommand = {
+    schemaVersion: 1,
+    operation: 'approval.recover.resolve',
+    request: {
+      ...RECOVERY_BASE_REQUEST,
+      expectedExecutionVersion: 3,
+      expectedExecutionDigest: 'c'.repeat(64),
+      mutationId: 'manual-recovery-1',
+      decision: 'abandon_unknown',
+      evidenceDigest: 'e'.repeat(64),
+      reasonCode: 'orphan_absence_verified',
+    },
+  };
+  const resolved = {
+    ...recovery,
+    execution: {
+      ...recovery.execution,
+      status: 'blocked',
+      version: 4,
+      executionDigest: 'd'.repeat(64),
+      leaseExpiresAtMs: null,
+      resultMutationId: 'manual-recovery-1',
+      resultCode: 'manual_recovery_abandoned_unknown',
+      completedAtMs: 2_000,
+      updatedAtMs: 2_000,
+    },
+    resolution: {
+      mutationId: 'manual-recovery-1',
+      decision: 'abandon_unknown',
+      evidenceDigest: 'e'.repeat(64),
+      reasonCode: 'orphan_absence_verified',
+      resolvedBy: { type: 'user', id: 'owner-1' },
+      resolvedAtMs: 2_000,
+      resolutionDigest: 'f'.repeat(64),
+    },
+  };
+  const result = {
+    schemaVersion: 1,
+    operation: resolveCommand.operation,
+    status: 'resolved',
+    recovery: resolved,
+  };
+  assert.deepEqual(
+    validateClusterApprovalManagementClientResult(result, resolveCommand),
+    result,
+  );
+  for (const changed of [
+    { ...resolved, execution: { ...resolved.execution, version: 3 } },
+    {
+      ...resolved,
+      resolution: { ...resolved.resolution, evidenceDigest: '0'.repeat(64) },
+    },
+  ]) {
+    assert.throws(
+      () =>
+        validateClusterApprovalManagementClientResult(
+          { ...result, recovery: changed },
+          resolveCommand,
         ),
       ClusterPluginPackageManagementClientRequestError,
     );

@@ -1027,6 +1027,80 @@ export const approvedActionExecutions = ql3Schema.table(
   ],
 );
 
+export const approvedActionManualRecoveryResolutions = ql3Schema.table(
+  'approved_action_manual_recovery_resolutions',
+  {
+    dispatchId: varchar('dispatch_id', { length: 128 }).primaryKey(),
+    dispatchDigest: char('dispatch_digest', { length: 64 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    actionType: varchar('action_type', { length: 128 }).notNull(),
+    actionDigest: char('action_digest', { length: 64 }).notNull(),
+    executionVersion: integer('execution_version').notNull(),
+    executionDigest: char('execution_digest', { length: 64 }).notNull(),
+    mutationId: varchar('mutation_id', { length: 128 }).notNull(),
+    decision: varchar('decision', { length: 32 }).notNull(),
+    evidenceDigest: char('evidence_digest', { length: 64 }).notNull(),
+    reasonCode: varchar('reason_code', { length: 64 }).notNull(),
+    resolvedByType: varchar('resolved_by_type', { length: 16 }).notNull(),
+    resolvedById: varchar('resolved_by_id', { length: 255 }).notNull(),
+    authenticationId: varchar('authentication_id', { length: 128 }).notNull(),
+    assurance: varchar('assurance', { length: 32 }).notNull(),
+    authenticatedAtMs: bigint('authenticated_at_ms', { mode: 'number' }).notNull(),
+    projectVersion: integer('project_version').notNull(),
+    bindingVersion: integer('binding_version').notNull(),
+    auditEventId: uuid('audit_event_id').notNull(),
+    resolvedAtMs: bigint('resolved_at_ms', { mode: 'number' }).notNull(),
+    resolutionJson: jsonb('resolution_json')
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    resolutionDigest: char('resolution_digest', { length: 64 }).notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'ql3_approved_action_manual_recovery_dispatch_fk',
+      columns: [table.dispatchId],
+      foreignColumns: [approvedActionDispatches.dispatchId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'ql3_approved_action_manual_recovery_project_fk',
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'ql3_approved_action_manual_recovery_audit_fk',
+      columns: [table.auditEventId],
+      foreignColumns: [securityAuditEvents.eventId],
+    }).onDelete('restrict'),
+    check(
+      'ql3_approved_action_manual_recovery_identity_check',
+      sql`${table.dispatchId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.projectId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.actionType} in ('plugin_package.secret_binding.bind','plugin_package.secret_binding.transition') and ${table.executionVersion} between 1 and 2147483647 and ${table.mutationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.decision} in ('confirm_failed','abandon_unknown') and ${table.reasonCode} ~ '^[a-z][a-z0-9_]{0,63}$' and ${table.resolvedByType} = 'user' and octet_length(${table.resolvedById}) between 1 and 255 and ${table.resolvedById} !~ '[[:cntrl:]]' and ${table.authenticationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.assurance} in ('multi_factor','hardware') and ${table.projectVersion} >= 1 and ${table.bindingVersion} >= 1`,
+    ),
+    check(
+      'ql3_approved_action_manual_recovery_digest_check',
+      sql`${table.dispatchDigest} ~ '^[0-9a-f]{64}$' and ${table.actionDigest} ~ '^[0-9a-f]{64}$' and ${table.executionDigest} ~ '^[0-9a-f]{64}$' and ${table.evidenceDigest} ~ '^[0-9a-f]{64}$' and ${table.resolutionDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'ql3_approved_action_manual_recovery_time_check',
+      sql`${table.authenticatedAtMs} >= 0 and ${table.resolvedAtMs} >= ${table.authenticatedAtMs} and ${table.resolvedAtMs} - ${table.authenticatedAtMs} <= 300000`,
+    ),
+    check(
+      'ql3_approved_action_manual_recovery_json_check',
+      sql`jsonb_typeof(${table.resolutionJson}) = 'object' and octet_length(${table.resolutionJson}::text) between 2 and 65536 and ${table.resolutionJson} @> jsonb_build_object('schema', 'qinglong/approved-action-manual-recovery@v1', 'dispatchId', ${table.dispatchId}, 'dispatchDigest', ${table.dispatchDigest}, 'projectId', ${table.projectId}, 'actionType', ${table.actionType}, 'actionDigest', ${table.actionDigest}, 'executionVersion', ${table.executionVersion}, 'executionDigest', ${table.executionDigest}, 'mutationId', ${table.mutationId}, 'decision', ${table.decision}, 'evidenceDigest', ${table.evidenceDigest}, 'reasonCode', ${table.reasonCode}, 'resolvedBy', jsonb_build_object('type', ${table.resolvedByType}, 'id', ${table.resolvedById}), 'authenticationId', ${table.authenticationId}, 'assurance', ${table.assurance}, 'authenticatedAtMs', ${table.authenticatedAtMs}, 'authorizationFence', jsonb_build_object('projectVersion', ${table.projectVersion}, 'bindingVersion', ${table.bindingVersion}), 'auditEventId', ${table.auditEventId}, 'resolvedAtMs', ${table.resolvedAtMs}, 'resolutionDigest', ${table.resolutionDigest})`,
+    ),
+    uniqueIndex('ql3_approved_action_manual_recovery_mutation_uidx').on(
+      table.mutationId,
+    ),
+    uniqueIndex('ql3_approved_action_manual_recovery_digest_uidx').on(
+      table.resolutionDigest,
+    ),
+    index('ql3_approved_action_manual_recovery_project_idx').on(
+      table.projectId,
+      table.resolvedAtMs,
+      table.dispatchId,
+    ),
+  ],
+);
+
 export const pluginPackageInstallProposals = ql3Schema.table(
   'plugin_package_install_proposals',
   {
@@ -6103,6 +6177,7 @@ export const ql3PostgresTables = [
   approvalRequests,
   approvedActionDispatches,
   approvedActionExecutions,
+  approvedActionManualRecoveryResolutions,
   pluginPackageInstallProposals,
   pluginPackageManagementQuotaBuckets,
   workerCredentialManagementQuotaBuckets,

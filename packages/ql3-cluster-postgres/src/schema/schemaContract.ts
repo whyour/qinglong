@@ -21,8 +21,8 @@ export interface PostgresSchemaContractTrigger {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 63;
-  readonly migrationId: 'pg-0064-plugin-package-secret-binding-transition-approval-plans';
+  readonly contractVersion: 64;
+  readonly migrationId: 'pg-0065-approved-action-manual-recovery';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -38,6 +38,7 @@ export interface PostgresSchemaContract {
     api_credential_pepper_binding: 1;
     approved_action: 1;
     approved_action_execution: 1;
+    approved_action_manual_recovery: 1;
     approval_management_boundary: 1;
     automation_management_boundary: 1;
     automation_management_identity_keyset_ledger: 1;
@@ -117,8 +118,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 63,
-    migrationId: 'pg-0064-plugin-package-secret-binding-transition-approval-plans',
+    contractVersion: 64,
+    migrationId: 'pg-0065-approved-action-manual-recovery',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -127,6 +128,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       api_credential_pepper_binding: 1,
       approved_action: 1,
       approved_action_execution: 1,
+      approved_action_manual_recovery: 1,
       approval_management_boundary: 1,
       automation_management_boundary: 1,
       automation_management_identity_keyset_ledger: 1,
@@ -769,6 +771,30 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         'updated_at_ms',
         'execution_json',
         'execution_digest',
+      ]),
+      table('approved_action_manual_recovery_resolutions', [
+        'dispatch_id',
+        'dispatch_digest',
+        'project_id',
+        'action_type',
+        'action_digest',
+        'execution_version',
+        'execution_digest',
+        'mutation_id',
+        'decision',
+        'evidence_digest',
+        'reason_code',
+        'resolved_by_type',
+        'resolved_by_id',
+        'authentication_id',
+        'assurance',
+        'authenticated_at_ms',
+        'project_version',
+        'binding_version',
+        'audit_event_id',
+        'resolved_at_ms',
+        'resolution_json',
+        'resolution_digest',
       ]),
       table('plugin_package_install_proposals', [
         'action_ref',
@@ -1624,6 +1650,10 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_approved_action_execution_due_idx',
       'ql3_approved_action_execution_recovery_idx',
       'ql3_approved_action_execution_project_idx',
+      'approved_action_manual_recovery_resolutions_pkey',
+      'ql3_approved_action_manual_recovery_mutation_uidx',
+      'ql3_approved_action_manual_recovery_digest_uidx',
+      'ql3_approved_action_manual_recovery_project_idx',
       'plugin_package_install_proposals_pkey',
       'ql3_plugin_package_proposal_project_idx',
       'plugin_package_management_quota_buckets_pkey',
@@ -1942,6 +1972,10 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_approved_action_execution_digest_check',
       'ql3_approved_action_execution_json_check',
       'ql3_approved_action_execution_time_check',
+      'ql3_approved_action_manual_recovery_identity_check',
+      'ql3_approved_action_manual_recovery_digest_check',
+      'ql3_approved_action_manual_recovery_time_check',
+      'ql3_approved_action_manual_recovery_json_check',
       'ql3_plugin_package_proposal_identity_check',
       'ql3_plugin_package_proposal_digest_check',
       'ql3_plugin_package_proposal_json_check',
@@ -2347,6 +2381,9 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_approved_action_dispatch_request_fk',
       'ql3_approved_action_dispatch_project_fk',
       'ql3_approved_action_execution_dispatch_fk',
+      'ql3_approved_action_manual_recovery_dispatch_fk',
+      'ql3_approved_action_manual_recovery_project_fk',
+      'ql3_approved_action_manual_recovery_audit_fk',
       'ql3_approved_action_execution_project_fk',
       'ql3_plugin_package_proposal_project_fk',
       'ql3_plugin_package_management_quota_project_fk',
@@ -2434,6 +2471,15 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_run_retry_policies_run_fk',
     ]),
     functions: Object.freeze([
+      Object.freeze({
+        name: 'resolve_approved_action_manual_recovery',
+        identityArguments:
+          'p_resolution_json jsonb, p_next_execution_json jsonb, p_audit_json jsonb',
+        owner: 'ql3_migration',
+        securityDefiner: true,
+        volatility: 'volatile',
+        configuration: Object.freeze(['search_path=pg_catalog, ql3']),
+      }),
       Object.freeze({
         name: 'plugin_package_secret_binding_transition_snapshot',
         identityArguments:
