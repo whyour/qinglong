@@ -299,10 +299,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: runtimeCore.rootSourceFileRoles,
     },
     {
-      sourceFiles: 165,
+      sourceFiles: 168,
       rootSourceFiles: 1,
       rootSourceLines: 160,
-      nestedSourceFiles: 164,
+      nestedSourceFiles: 167,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

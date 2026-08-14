@@ -248,6 +248,12 @@
       "builtin-task-run-outcome-compare-projection": [
         "dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.d.ts"
       ],
+      "builtin-run-log-excerpt-tool": [
+        "dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptTool.d.ts"
+      ],
+      "builtin-run-log-excerpt-projection": [
+        "dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptProjection.d.ts"
+      ],
       "run": [
         "dist/run/run.d.ts"
       ],
@@ -277,6 +283,9 @@
       ],
       "run-attempt-log-read": [
         "dist/run/log-read/runAttemptLogRead.d.ts"
+      ],
+      "run-log-model-context-projection": [
+        "dist/run/log-projection/runLogModelContextProjection.d.ts"
       ],
       "run-attempt-log-retention": [
         "dist/run/log-retention/runAttemptLogRetention.d.ts"
@@ -356,6 +365,11 @@
       "types": "./dist/run/log-read/runAttemptLogRead.d.ts",
       "require": "./dist/run/log-read/runAttemptLogRead.js",
       "default": "./dist/run/log-read/runAttemptLogRead.js"
+    },
+    "./run-log-model-context-projection": {
+      "types": "./dist/run/log-projection/runLogModelContextProjection.d.ts",
+      "require": "./dist/run/log-projection/runLogModelContextProjection.js",
+      "default": "./dist/run/log-projection/runLogModelContextProjection.js"
     },
     "./run-attempt-log-retention": {
       "types": "./dist/run/log-retention/runAttemptLogRetention.d.ts",
@@ -691,6 +705,16 @@
       "types": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.d.ts",
       "require": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.js",
       "default": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.js"
+    },
+    "./builtin-run-log-excerpt-tool": {
+      "types": "./dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptTool.d.ts",
+      "require": "./dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptTool.js",
+      "default": "./dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptTool.js"
+    },
+    "./builtin-run-log-excerpt-projection": {
+      "types": "./dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptProjection.d.ts",
+      "require": "./dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptProjection.js",
+      "default": "./dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptProjection.js"
     },
     "./secret-reference": {
       "types": "./dist/secret/secretReference.d.ts",

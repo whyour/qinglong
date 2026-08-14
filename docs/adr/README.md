@@ -406,6 +406,7 @@
 | [ADR-0400](./ADR-0400-bounded-trusted-run-comparison-tool.md)                                             | 有界、受信的 Run 对比 Tool                                                                                                                   | Accepted |
 | [ADR-0401](./ADR-0401-optional-local-mcp-run-comparison-surface.md)                                      | 可选本机 MCP Run 对比产品入口                                                                                                                  | Accepted |
 | [ADR-0402](./ADR-0402-bounded-latest-task-run-outcome-comparison.md)                                    | 有界的 Task 最近成功/失败 Run 对比                                                                                                              | Accepted |
+| [ADR-0403](./ADR-0403-bounded-redacted-run-log-tail-tool.md)                                          | 有界、脱敏且不授予行动权的 Run 日志尾部 Tool                                                                                                      | Accepted |
 
 ## 规则
 

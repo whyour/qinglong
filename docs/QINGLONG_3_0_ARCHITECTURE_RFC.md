@@ -9,8 +9,9 @@
 - 最后更新：2026-08-14
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-13）：
+最新增量证据（2026-08-14）：
 
+- D-311/ADR-0403（已接受）：新增 `qinglong.run.log.excerpt@1.0.0` 共享 Trusted Tool kernel。输入只接受 Run/Attempt ID，Project 来自受信 context；禁止 Artifact ID、路径、URI、offset、length 与 cursor。Tool 复用 ADR-0377 的 Local 私有文件和 Cluster S3 日志 range reader，以一次 1-byte 尾部探测和一次 profile 固定窗口读取完成有界选择，不循环、不分页：Edge 4 KiB、Standalone 8 KiB、Cluster Control 16 KiB，Worker 拒绝；日志并发增长通过 `tailComplete=false` 和 `bounded_tail_probe_then_range_read` 明示，不冒充事务快照。内容执行非致命 UTF-8、控制/bidi 归一与七类已识别 credential 确定性掩码，始终声明 `residualSensitivity=potentially_sensitive`，并无条件作为 `data_only_never_execute`、`actionAuthority=none` 的不可信执行输出；Prompt 注入信号只作提示，不能授予 Tool/命令权限。能力位于 Runtime Core 既有二级目录，只导出精确 subpath，不新增 package、依赖、migration、连接或常驻组件；MCP/HTTP/Cluster 产品入口与最终 Prompt builder 留给独立门禁。最终 18-package clean build/test 与 backend 1,206 pass/2 条件 skip/0 fail，package/dependency/Edge import/Cluster deployment 审计零 finding，14 个 Local Profile 制品门全部通过；默认 Edge 保持 2,589,812 bytes/315 files/56 modules，Edge AI 为 3,121,108 bytes/368 files/61 modules，Edge MCP 为 7,237,187 bytes/795 files/220 modules，均在门内。PostgreSQL 18.4 arm64 HA 125/125 Gate、timeline `1→2`，报告 SHA-256 为 `1a0df2518d39db22ecf4bbaf2e06c9e6893e1bbf507b4026b2e0ef055eb2fd90`。
 - D-310/ADR-0402（已接受）：新增 `qinglong.task.runs.compare@1.0.0`，把“最近成功/失败 Run”的选择从模型无界分页收回服务端。输入只接受 Task ID，固定读取按 created/id 倒序的 64 条 Project-scoped Task Run，第 65 条仅证明窗口截断且协议不返回 cursor；选择 succeeded baseline 与 failed candidate 后按固定顺序执行最多两个低敏点查并复用共享差值算法，输出明确区分 complete 与窗口内未找到，consistency 固定为 `bounded_task_window_then_ordered_point_reads`。实现没有扩大 CRITICAL/HIGH 的通用 SQLite/PostgreSQL Run Reader，而是在双方既有 `run/outcome-comparison/` 中提供窄 adapter；不新增 package、依赖、migration、索引、连接、timer、listener、watcher 或 cache，默认 Edge/Standalone 制品字节数保持 2,589,812。定向 Runtime Core 10/10、SQLite 1/1（真实 query plan 命中既有 Task 时间索引）、PostgreSQL adapter 2/2、Local MCP 47/47、dependency firewall 53/53；最终 18-package clean build/test 与 backend 1,206 pass/2 条件 skip/0 fail，package/dependency/Edge/Cluster deployment 审计零 finding。Edge-MCP 为 7,237,187 bytes/795 files/220 modules/RSS 38,699,008 bytes，Standalone-MCP 为 7,237,295 bytes/795 files/220 modules/RSS 38,600,704 bytes，均在门内。PostgreSQL 18.4 arm64 HA 125/125 Gate、timeline `1→2`，报告 SHA-256 为 `229c7cac328ee960f667f92868374264a10cb75090ef93d644da1326385d8774`。
 - D-309/ADR-0401（已接受）：`qinglong.run.compare@1.0.0` 进入可选 `ql3-mcp` stdio 产品入口，复用 Runtime Core 的共享 Definition/projection 和既有 MCP 静态注册循环。每次调用重新执行 Owner credential 认证、`tool.call:qinglong.run.compare` + `run.read` Policy、durable allowed audit、credential fence confirm，再按 baseline→candidate 串行执行两个 Project-scoped SQLite 点查；错误稳定收敛为 `run_compare_unavailable`。该入口是 ADR-0347 的交互式只读 surface，只持久化安全 admission，不冒充 StepRun、encrypted Tool completion 或模型 Trace；内部 Copilot 的受信执行仍必须走完整 completion 链。实现不新增 package、依赖、migration、表、索引、连接、timer、listener、watcher、cache 或网络 endpoint，默认 Edge/Standalone 继续裁掉 MCP package，仅显式 `edge-mcp|standalone-mcp` 承担调用成本。Local MCP 46/46、最终 18-package clean build/test 退出 0、backend 1,206 pass/2 条件 skip/0 fail，package/dependency/Edge/Cluster deployment 审计零 finding；默认 Edge 为 2,589,812 bytes/315 files/56 modules/RSS 11,091,968 bytes，Edge-MCP 为 7,219,977 bytes/792 files/217 modules/RSS 38,649,856 bytes，Standalone-MCP 为 7,220,085 bytes/792 files/217 modules/RSS 38,043,648 bytes，均在各自门内。
 - D-308/ADR-0400（已接受）：首个只读 Copilot 的“最近成功/失败运行对比”不再依赖 Prompt 自由拼接两个查询。`qinglong.run.compare@1.0.0` 作为第二个受信内建 Tool，固定 `read/low`、`run.read`、`database.read` 和 5 秒 deadline；只有当前 Project Tool snapshot 显式包含 reviewed Definition、产品 composition 显式绑定 adapter 后才可执行。它按 baseline→candidate 串行复用两次有界 Run 点查，absent 与 cross-Project 均为 `found:false`，只输出低敏 Run projection、固定 changed fields 和可证明的 queue/execution/total duration delta；任一时间戳不完整或结束早于开始时不生成对应差值。输出明确标记 `ordered_independent_point_reads`，不冒充数据库事务快照。实现位于既有 `runtime-core/tool-execution/builtin-run-compare/`，只提供两个显式 subpath，不从 package root 导出，不新增 workspace package、依赖、表、migration、连接、timer、listener、watcher、cache 或低配设备常驻开销。最终 18-package clean build/test 退出 0；backend 1,208 项为 1,206 pass/2 条件 skip/0 fail；package/dependency/Edge/Cluster deployment 审计零 finding。Edge、Edge AI、Edge MCP 制品为 2,589,812 / 3,121,108 / 7,209,862 bytes，均低于各自上限且未装配 subpath 被发布投影裁掉。
@@ -6912,8 +6913,11 @@ completion。ADR-0402 已完成“最近成功与失败”的有界选择：
 Task Run 窗口中选择最新 succeeded/failed，并复用共享低敏对比算法。协议没有 cursor；
 窗口截断且缺少任一 outcome 时必须返回 `complete=false`，禁止模型把局部缺失解释成全历史
 不存在。可选本机 MCP 已接入同一认证/Policy/Audit/confirm 链；PostgreSQL 仅提供窄 adapter，
-Cluster 产品入口和完整 Trusted Tool completion 仍需独立门禁。日志 range/redaction 和最终
-Copilot Prompt 仍需后续产品 Gate。
+Cluster 产品入口和完整 Trusted Tool completion 仍需独立门禁。ADR-0403 已进一步提供共享的
+`qinglong.run.log.excerpt@1.0.0` Trusted Tool kernel：它复用既有 Local/S3 range reader，以
+profile 固定的两次尾读、UTF-8/control 归一、已识别 credential 掩码和 residual sensitivity
+声明交付不可信日志片段；日志始终是 `data_only_never_execute` 且无行动权。该阶段未开放
+MCP/HTTP/Cluster 产品入口，最终结构化 Copilot Prompt 与模型 egress policy 仍需后续产品 Gate。
 
 ## 17. Tool Registry
 
