@@ -11,6 +11,7 @@
 
 最新增量证据（2026-08-13）：
 
+- D-308/ADR-0400（已接受）：首个只读 Copilot 的“最近成功/失败运行对比”不再依赖 Prompt 自由拼接两个查询。`qinglong.run.compare@1.0.0` 作为第二个受信内建 Tool，固定 `read/low`、`run.read`、`database.read` 和 5 秒 deadline；只有当前 Project Tool snapshot 显式包含 reviewed Definition、产品 composition 显式绑定 adapter 后才可执行。它按 baseline→candidate 串行复用两次有界 Run 点查，absent 与 cross-Project 均为 `found:false`，只输出低敏 Run projection、固定 changed fields 和可证明的 queue/execution/total duration delta；任一时间戳不完整或结束早于开始时不生成对应差值。输出明确标记 `ordered_independent_point_reads`，不冒充数据库事务快照。实现位于既有 `runtime-core/tool-execution/builtin-run-compare/`，只提供两个显式 subpath，不从 package root 导出，不新增 workspace package、依赖、表、migration、连接、timer、listener、watcher、cache 或低配设备常驻开销。最终 18-package clean build/test 退出 0；backend 1,208 项为 1,206 pass/2 条件 skip/0 fail；package/dependency/Edge/Cluster deployment 审计零 finding。Edge、Edge AI、Edge MCP 制品为 2,589,812 / 3,121,108 / 7,209,862 bytes，均低于各自上限且未装配 subpath 被发布投影裁掉。
 - D-307/ADR-0399（已接受）：物理 Edge release archive Gate 使用外部 Ed25519 签发、QingLong verify-only 的两阶段协议。`prepare` exact 重建 owner-private 统一物理报告，要求 direct release service start 已通过，并把 repository、40 位 Git revision、设备/boot、物理报告、release archive、实机 artifact tree/metadata/entrypoint 与 Node digest/version 编入无换行 canonical payload；私钥始终位于 HSM/KMS/离线 operator。`finalize` 以 operator-pinned SPKI 公钥重算 fingerprint，稳定读取并复核所有输入后验证 64-byte detached signature，任一 source/archive/evidence 漂移均失败关闭，输出 `0600` no-replace envelope。通过只把 `release_archive_signature` 替换为 `release_archive_signature_or_attestation`，`supported:false` 与其余 firmware、整机 flash、migration、断电、固定实机采集和 Cluster 容量 Gate 全部保留。基础 importer 同时把 Edge、SQLite 与 Plugin Package 三个 workload 的 platform/architecture 精确绑定到统一物理观测，release verifier 再要求 observed/Edge/SQLite 为完整 recorder shape 且 Node identity 相同，拒绝跨主机拼接与重算外层摘要后的最小伪造。实现不新增 package、依赖、daemon、listener、timer、watcher 或设备常驻负担；18-package clean build/test 退出 0，backend 1,208 项为 1,206 pass/2 条件 skip/0 fail，package/dependency/Edge/service bridge/Cluster deployment 审计零 finding。
 - D-303/ADR-0391（已接受）
   Cluster operator context 在离线 `validate` 之后增加显式、只读的 `ql3-cluster-admin context probe`。probe 先完整预检全部
@@ -6896,6 +6897,13 @@ Copilot 默认不能直接提交修改或运行命令。写操作通过 Tool Reg
 - 限制单次日志上下文大小，优先在本地提取错误片段和统计摘要。
 - 远程模型不可用时，普通任务管理、调度、日志和通知仍完整可用。
 
+`next` 已由 ADR-0162/ADR-0400 提供两个 profile-neutral 受信只读原语：
+`qinglong.run.get@1.0.0` 和 `qinglong.run.compare@1.0.0`。后者只接受两个不同 Run ID，
+按固定顺序执行 Project-scoped 点查并返回低敏差异；它明确不声称事务快照，也不读取
+日志、error、command、Artifact 或 Secret。两者目前仍是产品组合显式装配的 Tool，
+不是默认向所有 Project、HTTP、MCP 或模型开放的 ambient capability。“最近成功与失败”
+的有界选择、日志 range/redaction 和最终 Copilot Prompt 仍需后续产品 Gate。
+
 ## 17. Tool Registry
 
 ### 17.1 ToolDefinition
@@ -6960,9 +6968,12 @@ ApprovalRequest、immutable dispatch、StepRun、Audit 和受审 handler registr
 SQLite v27 与 PostgreSQL v28 都只允许同 Project、同 Run、`ready` 或
 `waiting_approval` 的 Tool StepRun 执行 append/exact replay。PostgreSQL runtime
 仍不能 SELECT 全量 Audit，只能在同一事务写 Audit、Trace 和保存完整 audit JSON 的
-receipt，再由 foreign key 与不可变 ACL 证明审计事实存在。该 repository 没有 execute
-seam；plan/dispatch、StepRun、Trace、Audit 尚未进入同一个 start barrier，因此本节
-规则仍是 production gate，而不是已经开放的 Tool 调用路径。
+receipt，再由 foreign key 与不可变 ACL 证明审计事实存在。后续 ADR-0158 至 ADR-0163
+已经把 immutable plan/input/preview、同事务 start barrier、snapshot-specific executable
+binding、加密 result Artifact、StepRun terminal transition、RunEvent、Trace/Audit completion
+串成双方言耐久链；response loss 只读取已提交 result，不重复执行 adapter。该完成事实
+不等于默认开放产品入口：Project snapshot、Policy、binding、repository、Artifact key 与
+transport/MCP/Copilot composition 仍必须逐 Profile 显式装配。
 
 ## 18. MCP
 

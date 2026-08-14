@@ -236,6 +236,12 @@
       "builtin-run-read-projection": [
         "dist/tool-execution/builtin-run-read/builtInRunReadProjection.d.ts"
       ],
+      "builtin-run-compare-tool": [
+        "dist/tool-execution/builtin-run-compare/builtInRunCompareTool.d.ts"
+      ],
+      "builtin-run-compare-projection": [
+        "dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.d.ts"
+      ],
       "run": [
         "dist/run/run.d.ts"
       ],
@@ -651,6 +657,16 @@
       "types": "./dist/tool-execution/builtin-run-read/builtInRunReadProjection.d.ts",
       "require": "./dist/tool-execution/builtin-run-read/builtInRunReadProjection.js",
       "default": "./dist/tool-execution/builtin-run-read/builtInRunReadProjection.js"
+    },
+    "./builtin-run-compare-tool": {
+      "types": "./dist/tool-execution/builtin-run-compare/builtInRunCompareTool.d.ts",
+      "require": "./dist/tool-execution/builtin-run-compare/builtInRunCompareTool.js",
+      "default": "./dist/tool-execution/builtin-run-compare/builtInRunCompareTool.js"
+    },
+    "./builtin-run-compare-projection": {
+      "types": "./dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.d.ts",
+      "require": "./dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.js",
+      "default": "./dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.js"
     },
     "./secret-reference": {
       "types": "./dist/secret/secretReference.d.ts",
