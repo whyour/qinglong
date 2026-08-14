@@ -49,6 +49,7 @@
     "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
   },
   "dependencies": {
+    "@qinglong/local-command-file": "workspace:*",
     "@qinglong/local-process": "workspace:*",
     "@qinglong/runtime-core": "workspace:*",
     "croner": "7.0.8"

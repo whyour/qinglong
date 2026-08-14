@@ -4,7 +4,7 @@ import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
 import { assertProjectPolicyProjectId } from '@qinglong/runtime-core/project-policy';
 
 export const LOCAL_MCP_SERVER_CONFIG_SCHEMA =
-  'qinglong/local-mcp-server@v1' as const;
+  'qinglong/local-mcp-server@v2' as const;
 
 const MAX_PATH_BYTES = 4_096;
 
@@ -14,6 +14,7 @@ export interface LocalMcpServerConfig {
   readonly projectId: string;
   readonly deploymentRoot: string;
   readonly databasePath: string;
+  readonly artifactRoot: string;
   readonly ownerPepperKeyringDirectory: string;
   readonly credentialFilePath: string;
   readonly busyTimeoutMs?: number;
@@ -40,6 +41,7 @@ function exactRecord(value: unknown): Record<string, unknown> {
   }
   const record = value as Record<string, unknown>;
   const expected = [
+    'artifactRoot',
     'credentialFilePath',
     'databasePath',
     'deploymentRoot',
@@ -110,6 +112,7 @@ export function normalizeLocalMcpServerConfig(
     'deploymentRoot',
   );
   const databasePath = absolutePath(record.databasePath, 'databasePath');
+  const artifactRoot = absolutePath(record.artifactRoot, 'artifactRoot');
   const ownerPepperKeyringDirectory = absolutePath(
     record.ownerPepperKeyringDirectory,
     'ownerPepperKeyringDirectory',
@@ -119,6 +122,7 @@ export function normalizeLocalMcpServerConfig(
     'credentialFilePath',
   );
   descendant(deploymentRoot, databasePath, 'databasePath');
+  descendant(deploymentRoot, artifactRoot, 'artifactRoot');
   descendant(
     deploymentRoot,
     ownerPepperKeyringDirectory,
@@ -128,9 +132,10 @@ export function normalizeLocalMcpServerConfig(
   if (
     new Set([
       databasePath,
+      artifactRoot,
       ownerPepperKeyringDirectory,
       credentialFilePath,
-    ]).size !== 3
+    ]).size !== 4
   ) {
     throw new LocalMcpServerConfigError('authority paths must be distinct');
   }
@@ -149,6 +154,7 @@ export function normalizeLocalMcpServerConfig(
     projectId: record.projectId as string,
     deploymentRoot,
     databasePath,
+    artifactRoot,
     ownerPepperKeyringDirectory,
     credentialFilePath,
     ...(busyTimeoutMs === undefined

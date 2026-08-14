@@ -186,6 +186,7 @@ test('confines local MCP to its reviewed protocol and read-authority subpaths', 
       "import { McpServer } from '@modelcontextprotocol/server';",
       "import { serveStdio } from '@modelcontextprotocol/server/stdio';",
       "import { read } from '@qinglong/local-command-file';",
+      "import { logs } from '@qinglong/local-command-file/artifact-read';",
       "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
       "import { open } from '@qinglong/local-sqlite/mcp-read-database';",
       "import type { approvals } from '@qinglong/runtime-core/approval-discovery';",
@@ -193,8 +194,10 @@ test('confines local MCP to its reviewed protocol and read-authority subpaths', 
       "import { runs } from '@qinglong/runtime-core/bounded-run-list-projection';",
       "import { run } from '@qinglong/runtime-core/run';",
       "import { compare } from '@qinglong/runtime-core/builtin-run-compare-projection';",
+      "import { excerpt } from '@qinglong/runtime-core/builtin-run-log-excerpt-projection';",
       "import { outcomes } from '@qinglong/runtime-core/builtin-task-run-outcome-compare-projection';",
       "import { tool } from '@qinglong/runtime-core/builtin-run-read-projection';",
+      "import { logRead } from '@qinglong/runtime-core/run-attempt-log-read';",
       "import { window } from '@qinglong/runtime-core/task-run-outcome-window';",
       "import { tasks } from '@qinglong/runtime-core/bounded-task-list-projection';",
       "import { task } from '@qinglong/runtime-core/bounded-task-read-projection';",
@@ -215,6 +218,28 @@ test('confines local MCP to its reviewed protocol and read-authority subpaths', 
       {
         code: 'FORBIDDEN_LOCAL_MCP_SERVER_AUTHORITY_IMPORT',
         specifier: '@qinglong/local-sqlite/authenticated-management',
+      },
+    ],
+  );
+});
+
+test('confines private local file authority to the reviewed log-read contract', (t) => {
+  const root = fixture(
+    t,
+    'packages/ql3-local-command-file',
+    [
+      "import type { range } from '@qinglong/runtime-core/run-attempt-log-read';",
+      "import { forbidden } from '@qinglong/runtime-core/security';",
+    ].join('\n'),
+  );
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-command-file', findings);
+  assert.deepEqual(
+    findings.map(({ code, specifier }) => ({ code, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_FILE_AUTHORITY_IMPORT',
+        specifier: '@qinglong/runtime-core/security',
       },
     ],
   );

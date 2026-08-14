@@ -51,6 +51,12 @@ import {
   executeBuiltInRunCompareTool,
 } from '@qinglong/runtime-core/builtin-run-compare-projection';
 import {
+  BUILTIN_RUN_LOG_EXCERPT_TOOL,
+  BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION,
+  executeBuiltInRunLogExcerptTool,
+  type RunAttemptLogReadPort,
+} from '@qinglong/runtime-core/builtin-run-log-excerpt-projection';
+import {
   BUILTIN_TASK_RUN_OUTCOME_COMPARE_TOOL,
   BUILTIN_TASK_RUN_OUTCOME_COMPARE_TOOL_DEFINITION,
   executeBuiltInTaskRunOutcomeCompareTool,
@@ -102,10 +108,12 @@ export interface AuthenticatedLocalMcpRequest {
 
 export interface QingLongLocalMcpServerDependencies {
   readonly projectId: string;
+  readonly profile: 'edge' | 'standalone';
   readonly authenticate: () => Promise<Readonly<AuthenticatedLocalMcpRequest> | null>;
   readonly policy: ToolPolicyAuthorizer;
   readonly audit: SecurityAuditSink;
   readonly runs: LocalMcpRunReader;
+  readonly runAttemptLogs: RunAttemptLogReadPort;
   readonly stepRuns: Pick<StepRunRepository, 'listByRun'>;
   readonly taskDefinitions: LocalMcpTaskReader;
   readonly triggers: LocalMcpTriggerReader;
@@ -133,7 +141,9 @@ type LocalMcpApprovalReader = Pick<
   Pick<ApprovalRequestDetailSource, 'getApprovalRequestDetail'>;
 
 interface LocalMcpReadAuthority {
+  readonly profile: 'edge' | 'standalone';
   readonly runs: LocalMcpRunReader;
+  readonly runAttemptLogs: RunAttemptLogReadPort;
   readonly stepRuns: Pick<StepRunRepository, 'listByRun'>;
   readonly taskDefinitions: LocalMcpTaskReader;
   readonly triggers: LocalMcpTriggerReader;
@@ -188,6 +198,24 @@ const LOCAL_MCP_READ_TOOLS: readonly LocalMcpReadToolDescriptor[] =
         projectId: string,
         input: ToolJsonValue,
       ) => executeBuiltInRunReadTool(authority.runs, projectId, input),
+    }),
+    Object.freeze({
+      tool: BUILTIN_RUN_LOG_EXCERPT_TOOL,
+      definition: BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION,
+      title: 'QingLong Run Log Tail',
+      auditReason: 'tool_qinglong_run_log_excerpt',
+      unavailableCode: 'run_log_excerpt_unavailable',
+      execute: (
+        authority: LocalMcpReadAuthority,
+        projectId: string,
+        input: ToolJsonValue,
+      ) =>
+        executeBuiltInRunLogExcerptTool(
+          authority.runAttemptLogs,
+          authority.profile,
+          projectId,
+          input,
+        ),
     }),
     Object.freeze({
       tool: BUILTIN_RUN_COMPARE_TOOL,
@@ -322,12 +350,15 @@ function validateDependencies(
     typeof dependencies !== 'object' ||
     Array.isArray(dependencies) ||
     typeof dependencies.projectId !== 'string' ||
+    (dependencies.profile !== 'edge' &&
+      dependencies.profile !== 'standalone') ||
     typeof dependencies.authenticate !== 'function' ||
     typeof dependencies.policy?.authorize !== 'function' ||
     typeof dependencies.audit?.record !== 'function' ||
     typeof dependencies.runs?.listRunsByProject !== 'function' ||
     typeof dependencies.runs?.findRunById !== 'function' ||
     typeof dependencies.runs?.listEvents !== 'function' ||
+    typeof dependencies.runAttemptLogs?.read !== 'function' ||
     typeof dependencies.stepRuns?.listByRun !== 'function' ||
     typeof dependencies.taskDefinitions?.findCurrentTaskDefinition !==
       'function' ||

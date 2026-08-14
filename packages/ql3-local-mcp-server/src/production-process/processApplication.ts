@@ -1,9 +1,11 @@
 import { establishAuthenticatedLocalCommand } from '@qinglong/local-owner-console/authenticated-command';
+import { LocalRunAttemptLogRangeReader } from '@qinglong/local-command-file/artifact-read';
 import {
   openLocalSqliteMcpReadDatabase,
   type LocalSqliteMcpReadDatabase,
 } from '@qinglong/local-sqlite/mcp-read-database';
 import { ProjectPolicyEngine } from '@qinglong/runtime-core/project-policy';
+import { RunAttemptLogReadService } from '@qinglong/runtime-core/run-attempt-log-read';
 
 import {
   createQingLongLocalMcpServer,
@@ -75,8 +77,19 @@ export async function openProductionLocalMcpServer(
     });
     const activeDatabase = database;
     const policy = new ProjectPolicyEngine(activeDatabase.projectPolicy);
+    const runAttemptLogs = new RunAttemptLogReadService(
+      activeDatabase.runs,
+      new LocalRunAttemptLogRangeReader(config.artifactRoot),
+      {
+        executorType: 'local_process',
+        artifactIdPattern: /^local-[a-f0-9]{30}$/,
+        maximumReadBytes: 32 * 1024,
+      },
+      activeDatabase.runAttemptLogRetention,
+    );
     const serverDependencies: QingLongLocalMcpServerDependencies = {
       projectId: config.projectId,
+      profile: config.profile,
       authenticate: () =>
         adapters.authenticate(activeDatabase, {
           deploymentRoot: config.deploymentRoot,
@@ -88,6 +101,7 @@ export async function openProductionLocalMcpServer(
       policy,
       audit: activeDatabase.securityAudit,
       runs: activeDatabase.runs,
+      runAttemptLogs,
       stepRuns: activeDatabase.stepRuns,
       taskDefinitions: activeDatabase.taskDefinitions,
       triggers: activeDatabase.triggers,

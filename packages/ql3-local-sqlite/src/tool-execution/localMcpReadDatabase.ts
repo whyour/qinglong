@@ -22,6 +22,7 @@ import type {
   ApprovalRequestDetailSource,
   ApprovalRequestSource,
 } from '@qinglong/runtime-core/approval-discovery';
+import type { RunAttemptLogRetentionStateReader } from '@qinglong/runtime-core/run-attempt-log-retention';
 
 import { LocalSqliteOperationAuthority } from '../authority/operationAuthority';
 import { LocalSqliteOwnerPepperRepository } from '../local-owner/ownerPepperRepository';
@@ -30,6 +31,7 @@ import {
   type LocalSqliteReadinessEvidence,
 } from '../readiness/readiness';
 import { LocalSqliteRunReader } from '../run/runReader';
+import { LocalSqliteRunAttemptLogRetentionRepository } from '../run/runAttemptLogRetentionRepository';
 import { LocalSqliteTaskRunOutcomeWindowReader } from '../run/outcome-comparison/taskRunOutcomeWindowReader';
 import { LocalSqliteStepRunRepository } from '../run/stepRunRepository';
 import {
@@ -48,9 +50,13 @@ import { LocalSqliteTaskDefinitionRepository } from '../task-definition/taskDefi
 export interface LocalSqliteMcpReadDatabase {
   readonly profile: LocalSqliteProfile;
   readonly readiness: LocalSqliteReadinessEvidence;
-  readonly runs: Pick<RunRepositoryReader, 'findRunById' | 'listEvents'> &
+  readonly runs: Pick<
+    RunRepositoryReader,
+    'findRunById' | 'findAttemptById' | 'listEvents'
+  > &
     ProjectRunListReader &
     TaskRunOutcomeWindowReader;
+  readonly runAttemptLogRetention: RunAttemptLogRetentionStateReader;
   readonly stepRuns: Pick<StepRunRepository, 'listByRun'>;
   readonly taskDefinitions: Pick<
     TaskDefinitionSource,
@@ -82,6 +88,8 @@ export async function openLocalSqliteMcpReadDatabase(
     const readiness = await auditLocalSqliteReadiness(client);
     const authority = new LocalSqliteOperationAuthority(client);
     const reader = new LocalSqliteRunReader(client);
+    const runAttemptLogRetention =
+      new LocalSqliteRunAttemptLogRetentionRepository(authority);
     const outcomeWindowReader = new LocalSqliteTaskRunOutcomeWindowReader(
       client,
     );
@@ -90,7 +98,10 @@ export async function openLocalSqliteMcpReadDatabase(
     const triggerRepository = new LocalSqliteTriggerRepository(authority);
     const approvalSource = new LocalSqliteApprovalRequestSource(authority);
     const security = new LocalSqliteSecurityAuthorityStore(authority);
-    const runs: Pick<RunRepositoryReader, 'findRunById' | 'listEvents'> &
+    const runs: Pick<
+      RunRepositoryReader,
+      'findRunById' | 'findAttemptById' | 'listEvents'
+    > &
       ProjectRunListReader &
       TaskRunOutcomeWindowReader = Object.freeze({
       listRunsByProject(query: Readonly<ProjectRunListQuery>) {
@@ -126,6 +137,17 @@ export async function openLocalSqliteMcpReadDatabase(
                 ),
         );
       },
+      findAttemptById(attemptId: string) {
+        return authority.enqueue(
+          () => reader.findAttemptById(attemptId),
+          (reason) =>
+            reason === 'busy'
+              ? new RunRepositoryBusyError()
+              : new RunRepositoryOperationError(
+                  new Error('Local SQLite MCP read database is closed'),
+                ),
+        );
+      },
       listEvents(
         runId: string,
         options?: { afterSequence?: number; limit?: number },
@@ -151,6 +173,9 @@ export async function openLocalSqliteMcpReadDatabase(
       profile: options.profile,
       readiness,
       runs,
+      runAttemptLogRetention: Object.freeze({
+        inspect: runAttemptLogRetention.inspect.bind(runAttemptLogRetention),
+      }),
       stepRuns: Object.freeze({
         listByRun: stepRunRepository.listByRun.bind(stepRunRepository),
       }),

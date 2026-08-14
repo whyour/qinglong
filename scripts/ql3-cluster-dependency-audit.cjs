@@ -61,6 +61,9 @@ const EXPECTED_PACKAGE_DEPENDENCIES = Object.freeze({
     }),
   }),
   'packages/ql3-local-command-file': Object.freeze({
+    dependencies: Object.freeze({
+      '@qinglong/runtime-core': 'workspace:*',
+    }),
     devDependencies: Object.freeze({
       '@types/node': '24.13.3',
       typescript: '5.9.3',
@@ -191,6 +194,7 @@ const EXPECTED_PACKAGE_DEPENDENCIES = Object.freeze({
   }),
   'packages/ql3-local-execution': Object.freeze({
     dependencies: Object.freeze({
+      '@qinglong/local-command-file': 'workspace:*',
       '@qinglong/local-process': 'workspace:*',
       '@qinglong/runtime-core': 'workspace:*',
       croner: '7.0.8',
@@ -345,11 +349,15 @@ const EXPECTED_WORKSPACE_RESOLUTIONS = Object.freeze({
     'link:../ql3-local-owner-console',
   'packages/ql3-local-execution:@qinglong/local-process':
     'link:../ql3-local-process',
+  'packages/ql3-local-execution:@qinglong/local-command-file':
+    'link:../ql3-local-command-file',
   'packages/ql3-local-execution:@qinglong/runtime-core':
     'link:../ql3-runtime-core',
   'packages/ql3-local-execution:@qinglong/local-sqlite':
     'link:../ql3-local-sqlite',
   'packages/ql3-local-process:@qinglong/runtime-core':
+    'link:../ql3-runtime-core',
+  'packages/ql3-local-command-file:@qinglong/runtime-core':
     'link:../ql3-runtime-core',
   'packages/ql3-cluster-postgres:@qinglong/runtime-core':
     'link:../ql3-runtime-core',
@@ -477,7 +485,6 @@ const FORBIDDEN_SOURCE_IMPORTS = Object.freeze({
     '@qinglong/local-secret',
     '@qinglong/local-secret-admin',
     '@qinglong/local-sqlite',
-    '@qinglong/runtime-core',
     '@qinglong/standalone',
     '@qinglong/worker-runtime',
     'drizzle-orm',
@@ -1006,6 +1013,7 @@ function auditSourceImports(root, packagePath, findings) {
           '@modelcontextprotocol/server',
           '@modelcontextprotocol/server/stdio',
           '@qinglong/local-command-file',
+          '@qinglong/local-command-file/artifact-read',
           '@qinglong/local-owner-console/authenticated-command',
           '@qinglong/local-sqlite/mcp-read-database',
           '@qinglong/runtime-core/approval-discovery',
@@ -1014,6 +1022,7 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/bounded-run-list-projection',
           '@qinglong/runtime-core/bounded-run-step-list-projection',
           '@qinglong/runtime-core/builtin-run-compare-projection',
+          '@qinglong/runtime-core/builtin-run-log-excerpt-projection',
           '@qinglong/runtime-core/builtin-task-run-outcome-compare-projection',
           '@qinglong/runtime-core/builtin-run-read-projection',
           '@qinglong/runtime-core/bounded-task-read-projection',
@@ -1021,6 +1030,7 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/project-run-list',
           '@qinglong/runtime-core/task-run-outcome-window',
           '@qinglong/runtime-core/project-policy',
+          '@qinglong/runtime-core/run-attempt-log-read',
           '@qinglong/runtime-core/run',
           '@qinglong/runtime-core/run-repository',
           '@qinglong/runtime-core/security',
@@ -1033,6 +1043,20 @@ function auditSourceImports(root, packagePath, findings) {
       ) {
         findings.push({
           code: 'FORBIDDEN_LOCAL_MCP_SERVER_AUTHORITY_IMPORT',
+          packagePath,
+          file: path.relative(root, filePath),
+          specifier,
+        });
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-command-file' &&
+        (specifier === '@qinglong/runtime-core' ||
+          specifier.startsWith('@qinglong/runtime-core/')) &&
+        specifier !== '@qinglong/runtime-core/run-attempt-log-read'
+      ) {
+        findings.push({
+          code: 'FORBIDDEN_LOCAL_FILE_AUTHORITY_IMPORT',
           packagePath,
           file: path.relative(root, filePath),
           specifier,

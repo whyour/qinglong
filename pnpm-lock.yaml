@@ -552,6 +552,10 @@ importers:
         version: 5.9.3
 
   packages/ql3-local-command-file:
+    dependencies:
+      '@qinglong/runtime-core':
+        specifier: workspace:*
+        version: link:../ql3-runtime-core
     devDependencies:
       '@types/node':
         specifier: 24.13.3
@@ -562,6 +566,9 @@ importers:
 
   packages/ql3-local-execution:
     dependencies:
+      '@qinglong/local-command-file':
+        specifier: workspace:*
+        version: link:../ql3-local-command-file
       '@qinglong/local-process':
         specifier: workspace:*
         version: link:../ql3-local-process

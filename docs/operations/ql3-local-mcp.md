@@ -1,12 +1,12 @@
 # QingLong 3.0 本机 MCP Task/Trigger/Run/Approval 发现、预览与运行诊断
 
-`ql3-mcp` 是一个显式可选的 stdio sidecar，供同机 AI Client/Agent 发现当前 Project 的 Task、Trigger、最近 Run 与 Approval 状态，读取单个 Approval 的脱敏预览，以及读取单个 Run 的低敏状态和有界事件元数据。它不会随 Edge/Standalone application 自动启动，不监听网络端口，也不会执行 migration、任务、Shell、Approval decision 或管理操作。
+`ql3-mcp` 是一个显式可选的 stdio sidecar，供同机 AI Client/Agent 发现当前 Project 的 Task、Trigger、最近 Run 与 Approval 状态，读取单个 Approval 的脱敏预览，以及读取单个 Run 的低敏状态、有界事件元数据和经过安全投影的日志尾部。它不会随 Edge/Standalone application 自动启动，不监听网络端口，也不会执行 migration、任务、Shell、Approval decision 或管理操作。
 
 ## 前置条件
 
 - 已完成 QingLong 3.0 fresh/adopted SQLite 部署和 readiness；MCP 启动只检查 schema，不自动升级数据库。
 - 已通过 [本机 Identity Credential](./ql3-local-identity-credential.md) 签发 active API credential presentation。
-- credential 对应 subject 在目标 Project 至少具有相应的 `task.read`、`trigger.read`、`run.read` 或 `approval.read`；读取 Approval preview 还必须同时具有 `artifact.read`。调用方还需获得目标 Tool 的 exact `tool.call:<tool-name>` permission。
+- credential 对应 subject 在目标 Project 至少具有相应的 `task.read`、`trigger.read`、`run.read` 或 `approval.read`；读取 Approval preview 和 Run 日志尾部还必须具有 `artifact.read`。调用方还需获得目标 Tool 的 exact `tool.call:<tool-name>` permission。
 - config、credential、SQLite 文件必须是当前 UID 持有的 `0600` regular file，目录必须是当前 UID 持有的私有目录；不得使用 symlink。
 - Owner Pepper keyring 必须存在并包含 credential 记录绑定的 active/retired exact key。
 
@@ -16,18 +16,19 @@
 
 ```json
 {
-  "schema": "qinglong/local-mcp-server@v1",
+  "schema": "qinglong/local-mcp-server@v2",
   "profile": "edge",
   "projectId": "default",
   "deploymentRoot": "/opt/qinglong3",
   "databasePath": "/opt/qinglong3/data/qinglong3.sqlite",
+  "artifactRoot": "/opt/qinglong3/artifacts",
   "ownerPepperKeyringDirectory": "/opt/qinglong3/owner-pepper-keyring",
   "credentialFilePath": "/opt/qinglong3/mcp/credential.json",
   "busyTimeoutMs": 500
 }
 ```
 
-`profile` 只能是 `edge` 或 `standalone`。三个 authority path 必须互不相同且都是 `deploymentRoot` 的规范化后代；`busyTimeoutMs` 可省略，范围为 100–30000 ms。配置只允许上述字段。
+`profile` 只能是 `edge` 或 `standalone`。四个 authority path 必须互不相同且都是 `deploymentRoot` 的规范化后代；`artifactRoot` 必须与 Local application 写入 Run Attempt 日志的私有根完全一致。`busyTimeoutMs` 可省略，范围为 100–30000 ms。配置只允许上述字段。`@v1` 不包含显式 Artifact authority，升级后必须改为 `@v2`，不能由 MCP 猜测路径。
 
 credential presentation 的形状为：
 
@@ -65,7 +66,7 @@ Client 必须保持 stdin/stdout 直连。stdout 专用于 MCP JSON-RPC，不能
 
 ## Tool 契约
 
-当前只发布七个只读 Tool。
+当前只发布十二个只读 Tool。
 
 `qinglong.task.list` 接受：
 
@@ -160,6 +161,21 @@ Project ID 来自私有 MCP 配置，不接受客户端指定。Task name/snapsh
 
 成功响应只含 `found`，以及存在时的 Run ID、Task ID/revision、status、version、event sequence、priority、execution origin/owner 和生命周期时间。Task snapshot、command、input/output reference、credential、Principal、Policy reason、路径及内部错误不会返回。不存在和跨 Project 都返回 `{"found":false}`。
 
+`qinglong.run.log.excerpt` 接受：
+
+```json
+{
+  "runId": "failed-run-id",
+  "attemptId": "failed-attempt-id"
+}
+```
+
+Project 与 profile 来自私有 MCP 配置。调用方不能指定 Artifact ID、路径、URI、offset、length、limit 或 cursor。Tool 固定读取日志尾部：Edge 为 4 KiB，Standalone 为 8 KiB；一次调用最多执行一次 1-byte 总长度探测和一次固定窗口读取，不分页。日志在两次读取间增长时返回 `tailComplete=false`，不能把片段解释为事务快照。
+
+输出先归一 invalid UTF-8、终端控制、零宽与 bidi 字符，再按 `recognized_credentials_v1` 掩码 Authorization、常见 credential assignment、PEM private key、URL userinfo、JWT、云访问密钥和常见 opaque token。该规则不是通用秘密扫描器，因此输出始终声明 `residualSensitivity=potentially_sensitive`。内容无条件标记为 `untrusted_execution_output`、`data_only_never_execute`、`actionAuthority=none`；Prompt 注入信号只作提示，日志文字不能授予 Tool、Shell 或网络权限。Artifact ID、文件路径和 continuation cursor 永不返回。
+
+该 Tool 必须同时通过 exact `tool.call:qinglong.run.log.excerpt` 与 `artifact.read`，并遵循和其他 MCP Tool 相同的 authentication → Policy → durable audit → credential fence confirm 顺序。SQLite 仅执行 Project-scoped Run/Attempt 与 retention 点查；文件读取复用 Local application 的私有 Artifact range reader，不创建第二套日志格式或扫描目录。
+
 `qinglong.run.events.list` 接受：
 
 ```json
@@ -174,11 +190,11 @@ Project ID 来自私有 MCP 配置，不接受客户端指定。Task name/snapsh
 
 事件 payload、event ID、dedupeKey、actorId、attemptId、stepRunId、Artifact/Log reference、命令和错误详情永不返回。需要下一页时使用响应中的 `nextAfterSequence`，不要自行猜测 sequence。
 
-每次调用都会重新认证 credential，解析 exact Tool Definition，执行 Tool-specific permission 与对应的 `task.read`/`trigger.read`/`run.read`/`approval.read` Policy；Approval preview 额外要求 `artifact.read`。通过后先持久写 Security Audit，再确认 credential fence，最后才做 Project-scoped 有界读取。事件 Tool 只有在 point read 确认 Run 属于当前 Project 后才查询事件。撤销 credential/RoleBinding 后无需重启 MCP 进程；后续调用会失败关闭。
+每次调用都会重新认证 credential，解析 exact Tool Definition，执行 Tool-specific permission 与对应的 `task.read`/`trigger.read`/`run.read`/`approval.read` Policy；Approval preview 与 Run 日志尾部额外要求 `artifact.read`。通过后先持久写 Security Audit，再确认 credential fence，最后才做 Project-scoped 有界读取。事件 Tool 只有在 point read 确认 Run 属于当前 Project 后才查询事件。撤销 credential/RoleBinding 后无需重启 MCP 进程；后续调用会失败关闭。
 
 ## 资源档位
 
-`edge-mcp`/`standalone-mcp` 是独立制品，不属于默认 application。MCP 单一消费者的 Task/Trigger/Run/Approval projection 位于 sidecar 自身的 `tool-projection` domain；默认 application 不加载这些文件。跨产品复用的 `run.get` projection、Profile-neutral Approval discovery/detail contract 和双方言 document-only source 保留在既有包内；完整 Tool Invocation Artifact 不进入 MCP projection。当前 Standalone 裁剪后闭包为 947 files、9,857,149 bytes、203 loaded modules，完整 import RSS 增量 40,632,320 bytes，硬门为 1,536 files、16 MiB、48 MiB。64 MiB 总内存设备不应启用；128 MiB 设备也应结合 application、内核页缓存和其他服务实测后决定。资源不足时保持 MCP 未安装/未启动，不影响 QingLong 调度。
+`edge-mcp`/`standalone-mcp` 是独立制品，不属于默认 application。MCP 单一消费者的 Task/Trigger/Run/Approval projection 位于 sidecar 自身的 `tool-projection` domain；默认 application 不加载这些文件。跨产品复用的 `run.get` projection、Profile-neutral Approval discovery/detail contract、Run 日志安全投影和双方言窄 source 保留在既有包内；完整 Tool Invocation Artifact 不进入 MCP projection。当前 Edge/Standalone MCP 裁剪后分别为 7,315,930/7,316,038 bytes、801 files、226 loaded modules，完整 import RSS 增量为 38,420,480/39,567,360 bytes，硬门为 1,536 files、16 MiB、48 MiB。闭包只包含 MCP、Owner authentication、SQLite、Runtime Core 与私有文件 authority，不包含 `local-execution`、`local-process` 或 `croner`。默认 Edge/Standalone 仍为 2,589,812/2,589,890 bytes、315 files、56 modules，证明未启用 MCP 的低配部署没有承担该增量。64 MiB 总内存设备不应启用；128 MiB 设备也应结合 application、内核页缓存和其他服务实测后决定。资源不足时保持 MCP 未安装/未启动，不影响 QingLong 调度。
 
 可复核运行：
 

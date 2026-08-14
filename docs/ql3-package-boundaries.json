@@ -181,11 +181,12 @@
       "consumers": [
         "@qinglong/local-api",
         "@qinglong/local-application",
+        "@qinglong/local-execution",
         "@qinglong/local-mcp-server",
         "@qinglong/local-owner-cli",
         "@qinglong/local-owner-maintenance"
       ],
-      "rationale": "零生产依赖的私有 durable command-file 协议被 API、Application、MCP、Owner CLI、Maintenance 五个不同生命周期闭包复用；根层只保留公开入口，实现归入 protocol domain。"
+      "rationale": "本机私有文件 authority 被 API、Application、Execution、MCP、Owner CLI、Maintenance 六个不同生命周期闭包复用；根层只保留公开入口，command JSON 与 Run log range 实现分别归入 protocol/ 与 artifact-read/。它只依赖 Runtime Core 的纯契约，不携带 SQLite、process、scheduler 或 network provider。"
     },
     {
       "path": "packages/ql3-local-execution",
@@ -378,6 +379,7 @@
         "@qinglong/local-admin",
         "@qinglong/local-api",
         "@qinglong/local-application",
+        "@qinglong/local-command-file",
         "@qinglong/local-execution",
         "@qinglong/local-mcp-server",
         "@qinglong/local-owner-cli",

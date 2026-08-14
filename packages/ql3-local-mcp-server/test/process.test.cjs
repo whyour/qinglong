@@ -15,6 +15,7 @@ test('opens one bounded database authority and reuses production authentication 
     projectId: 'default',
     deploymentRoot: '/srv/qinglong',
     databasePath: '/srv/qinglong/data/qinglong3.sqlite',
+    artifactRoot: '/srv/qinglong/artifacts',
     ownerPepperKeyringDirectory: '/srv/qinglong/owner-peppers',
     credentialFilePath: '/srv/qinglong/operator/credential.json',
     busyTimeoutMs: 250,
@@ -35,8 +36,16 @@ test('opens one bounded database authority and reuses production authentication 
       async findRunById() {
         return null;
       },
+      async findAttemptById() {
+        return null;
+      },
       async listEvents() {
         return [];
+      },
+    },
+    runAttemptLogRetention: {
+      async inspect() {
+        return { status: 'active' };
       },
     },
     stepRuns: {

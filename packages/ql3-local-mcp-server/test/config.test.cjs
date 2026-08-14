@@ -17,6 +17,7 @@ function candidate(root) {
     projectId: 'default',
     deploymentRoot: root,
     databasePath: path.join(root, 'data', 'qinglong3.sqlite'),
+    artifactRoot: path.join(root, 'artifacts'),
     ownerPepperKeyringDirectory: path.join(root, 'owner-peppers'),
     credentialFilePath: path.join(root, 'operator', 'credential.json'),
     busyTimeoutMs: 500,
@@ -54,7 +55,23 @@ test('rejects public config files, extra keys and authority paths outside deploy
       () =>
         normalizeLocalMcpServerConfig({
           ...candidate(root),
+          schema: 'qinglong/local-mcp-server@v1',
+        }),
+      { code: 'LOCAL_MCP_SERVER_CONFIG_INVALID' },
+    );
+    assert.throws(
+      () =>
+        normalizeLocalMcpServerConfig({
+          ...candidate(root),
           credentialFilePath: path.join(os.tmpdir(), 'credential.json'),
+        }),
+      { code: 'LOCAL_MCP_SERVER_CONFIG_INVALID' },
+    );
+    assert.throws(
+      () =>
+        normalizeLocalMcpServerConfig({
+          ...candidate(root),
+          artifactRoot: path.join(root, 'data', 'qinglong3.sqlite'),
         }),
       { code: 'LOCAL_MCP_SERVER_CONFIG_INVALID' },
     );

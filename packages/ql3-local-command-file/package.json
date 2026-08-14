@@ -2,7 +2,7 @@
   "name": "@qinglong/local-command-file",
   "version": "3.0.0-alpha.0",
   "private": true,
-  "description": "QingLong 3.0 bounded private durable command-file protocol",
+  "description": "QingLong 3.0 bounded private local file authorities",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=24.18.0 <25"
@@ -14,6 +14,11 @@
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./artifact-read": {
+      "types": "./dist/artifact-read/localRunAttemptLogRangeReader.d.ts",
+      "require": "./dist/artifact-read/localRunAttemptLogRangeReader.js",
+      "default": "./dist/artifact-read/localRunAttemptLogRangeReader.js"
     }
   },
   "files": [
@@ -24,6 +29,9 @@
     "build": "tsc -p tsconfig.json",
     "check": "node ../../scripts/ql3-build-package-closure.cjs && tsc -p tsconfig.json --noEmit",
     "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@qinglong/runtime-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
