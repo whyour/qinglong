@@ -68,6 +68,7 @@
     "evidence:physical-edge-service-start": "node scripts/ql3-physical-edge-service-start.cjs",
     "evidence:physical-edge-direct-service-start": "node scripts/ql3-physical-edge-direct-service-start.cjs",
     "evidence:physical-edge-direct-service-stop": "node scripts/ql3-physical-edge-direct-service-stop.cjs",
+    "evidence:physical-edge-release": "node scripts/ql3-physical-edge-release-evidence.cjs",
     "benchmark:db:node-sqlite": "node scripts/ql3-node-sqlite-benchmark.cjs",
     "audit:schema:ql3": "pnpm --filter @qinglong/local-owner-cli run readiness",
     "audit:legacy-schema:ql3": "node scripts/ql3-schema-audit.cjs",

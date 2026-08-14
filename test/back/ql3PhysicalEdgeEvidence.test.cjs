@@ -183,12 +183,15 @@ test('produces digest-bound candidate evidence but never supported status', asyn
       report: {
         schemaVersion: 1,
         profile: 'edge',
+        host: { platform: 'linux', architecture: 'arm64' },
         gates: { passed: true, violations: [] },
       },
     },
     {
       name: 'node-sqlite-on-device-storage',
       report: {
+        platform: 'linux',
+        arch: 'arm64',
         journalMode: 'delete',
         synchronous: 'full',
         integrityCheck: 'ok',
@@ -198,7 +201,14 @@ test('produces digest-bound candidate evidence but never supported status', asyn
     },
     {
       name: 'plugin-package-failed-upgrade',
-      report: pluginPackageRecovery,
+      report: {
+        ...pluginPackageRecovery,
+        identity: {
+          ...pluginPackageRecovery.identity,
+          platform: 'linux',
+          architecture: 'arm64',
+        },
+      },
     },
   ];
   const report = buildEvidenceReport({
@@ -215,6 +225,30 @@ test('produces digest-bound candidate evidence but never supported status', asyn
     ),
   );
   assert.equal(report.sha256.length, 64);
+  const foreignWorkload = buildEvidenceReport({
+    manifest: manifest(),
+    observed: observed(),
+    workloads: [
+      workloads[0],
+      workloads[1],
+      {
+        ...workloads[2],
+        report: {
+          ...workloads[2].report,
+          identity: {
+            ...workloads[2].report.identity,
+            platform: 'darwin',
+          },
+        },
+      },
+    ],
+    generatedAt: '2026-07-22T00:00:00.000Z',
+  });
+  assert.equal(foreignWorkload.qualification.physicalCandidate, false);
+  assert.match(
+    foreignWorkload.qualification.violations.join('; '),
+    /runtime identity did not match/,
+  );
   const changed = buildEvidenceReport({
     manifest: manifest({ deviceId: 'router-a2' }),
     observed: observed(),

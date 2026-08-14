@@ -731,7 +731,7 @@ function runEvidenceWorkloads(root, dataPath) {
   }
 }
 
-function validateEvidenceWorkloads(workloads) {
+function validateEvidenceWorkloads(workloads, observed) {
   if (!Array.isArray(workloads) || workloads.length !== 3) {
     return Object.freeze(['physical evidence workloads are incomplete']);
   }
@@ -754,6 +754,8 @@ function validateEvidenceWorkloads(workloads) {
   if (
     edge?.schemaVersion !== 1 ||
     edge?.profile !== 'edge' ||
+    edge?.host?.platform !== observed?.platform ||
+    edge?.host?.architecture !== observed?.architecture ||
     edge?.gates?.passed !== true ||
     !Array.isArray(edge?.gates?.violations) ||
     edge.gates.violations.length !== 0
@@ -762,6 +764,8 @@ function validateEvidenceWorkloads(workloads) {
   }
   const sqlite = workloads[1].report;
   if (
+    sqlite?.platform !== observed?.platform ||
+    sqlite?.arch !== observed?.architecture ||
     sqlite?.journalMode !== 'delete' ||
     sqlite?.synchronous !== 'full' ||
     sqlite?.integrityCheck !== 'ok' ||
@@ -776,6 +780,14 @@ function validateEvidenceWorkloads(workloads) {
       (violation) => `Plugin Package recovery workload: ${violation}`,
     ),
   );
+  if (
+    workloads[2].report?.identity?.platform !== observed?.platform ||
+    workloads[2].report?.identity?.architecture !== observed?.architecture
+  ) {
+    violations.push(
+      'Plugin Package recovery workload runtime identity did not match',
+    );
+  }
   return Object.freeze(violations);
 }
 
@@ -1467,7 +1479,7 @@ function buildEvidenceReport({
 }) {
   const violations = [
     ...validateObservedPlatform(manifest, observed),
-    ...validateEvidenceWorkloads(workloads),
+    ...validateEvidenceWorkloads(workloads, observed),
   ];
   const idleEvidence = supplementalEvidence.find(
     ({ evidenceClass }) => evidenceClass === 'physical_edge_idle_candidate',

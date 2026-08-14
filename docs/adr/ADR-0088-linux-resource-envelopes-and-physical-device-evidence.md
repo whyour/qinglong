@@ -400,8 +400,41 @@ recorder 以 `--direct-service-start-evidence=<absolute-report>` 导入；通过
 移除 `direct_release_unit_without_evidence_wrapper`，firmware/bootloader、
 whole-device 写放大、断电、签名和其它未采集门不变。
 
+### Release archive 外部签名证明
+
+ADR-0399 将 release archive Gate 设计为 QingLong verify-only 的两阶段协议。基础物理
+报告必须已导入通过的 direct release start evidence；`prepare` 把 source repository、
+40 位 Git revision、物理设备/boot、release archive digest、实机 artifact tree 与 Node
+identity 写入 canonical signing payload，operator 在 QingLong 外部使用 Ed25519 私钥签署，
+`finalize` 再用固定 SPKI 公钥复算 fingerprint 并验证 detached signature：
+
+```sh
+pnpm evidence:physical-edge-release -- prepare \
+  --physical-report=/opt/qinglong/evidence/physical.json \
+  --release-archive=/opt/qinglong/releases/qinglong3-edge.tar.gz \
+  --repository=https://github.com/whyour/qinglong.git \
+  --revision=<40-lowercase-git-revision> \
+  --payload=/opt/qinglong/evidence/release-payload.json
+
+# operator 外部签署 exact payload bytes
+
+pnpm evidence:physical-edge-release -- finalize \
+  --physical-report=/opt/qinglong/evidence/physical.json \
+  --release-archive=/opt/qinglong/releases/qinglong3-edge.tar.gz \
+  --payload=/opt/qinglong/evidence/release-payload.json \
+  --signature=/opt/qinglong/evidence/release-payload.sig \
+  --trusted-public-key=/etc/qinglong/release-ed25519.pub \
+  --expected-repository=https://github.com/whyour/qinglong.git \
+  --expected-revision=<40-lowercase-git-revision> \
+  --output=/opt/qinglong/evidence/physical-release-evidence.json
+```
+
+验签通过只关闭 `release_archive_signature`。公钥分发/撤销、真实签发 ceremony、固定设备
+采集、firmware/bootloader、whole-device flash、adopted migration 与断电证据继续独立；
+输出永久保持 `supported=false`。私钥不得进入 QingLong 仓库、设备数据目录、环境变量或命令。
+
 ## 后续约束
 
-物理设备 candidate recorder、进程 idle sampler、专用文件系统 fault probe、正式 TaskDefinition 规模记录、Compose storage、warm-Node native application start、wrapper init-managed 与 direct release init-managed 跨启动候选协议已实现；真实 Local Workflow 也已进入 128/256 MiB CI 资源门，但下一切片仍需补齐 firmware/bootloader clock、整机 wakeup/FTL 写放大、2.x adopted migration、application recovery、受控突发断电和 release archive signature，并在固定设备采集现有协议报告，而不是继续降低容器内存数字。只有固定 x64/arm64 设备矩阵完成后，才能把某一档位从 `ci_*` 提升为产品支持证据；任何阈值调整都必须说明硬件、内核、文件系统、工作负载和历史基线，Cluster 扩容结论继续走独立容量测试。
+物理设备 candidate recorder、进程 idle sampler、专用文件系统 fault probe、正式 TaskDefinition 规模记录、Compose storage、warm-Node native application start、wrapper init-managed、direct release init-managed 与外部 release attestation 候选协议已实现；真实 Local Workflow 也已进入 128/256 MiB CI 资源门，但下一切片仍需补齐 firmware/bootloader clock、整机 wakeup/FTL 写放大、2.x adopted migration、application recovery、受控突发断电，并在固定设备执行现有 recorder 与真实 signing ceremony，而不是继续降低容器内存数字。只有固定 x64/arm64 设备矩阵完成后，才能把某一档位从 `ci_*` 提升为产品支持证据；任何阈值调整都必须说明硬件、内核、文件系统、工作负载和历史基线，Cluster 扩容结论继续走独立容量测试。
 
 首次 active recorder 已绑定最终可发布 application artifact 与正式 readiness contract；wrapper init-managed recorder 把 Node 前 kernel uptime、systemd/OpenRC 和 live process tree 纳入同一 boot；direct recorder 再以生产 startup receipt 关闭 wrapper 与最终 release unit 的结构差异。但 Linux uptime 仍不含 firmware，当前所有开发机/Docker 结果也未替代固定物理设备报告，所以仍不能替代完整 power-on Gate。当前 Executor benchmark 或一次模块 import同样不能替代。TaskDefinition 持久化 schema、Repository 与读取路径现已由 ADR-0089 冻结，100/1000/10000 规模记录器也已接入基础报告，但尚未采集固定设备结果。其 fresh schema migration 计时不得替代 2.x adopted database migration，后者仍须记录可审计的额外磁盘峰值采样精度。未完成的边界继续保留在 remaining evidence。

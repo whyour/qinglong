@@ -1258,6 +1258,45 @@ disable/descriptor removal、突然断电、firmware shutdown、whole-device fla
 release signature。报告成功保存并完成聚合后，operator 才可按受审流程 disable，删除
 exact descriptor、root handoff 与 scratch deployment；不要使用通配符。
 
+### 绑定物理报告、Release Archive 与源码 Revision
+
+统一 physical report 已通过且包含 direct release start 后，才能执行 release
+attestation。QingLong 只生成和验证 payload；发布私钥必须留在外部 HSM、KMS 或离线
+签名环境。先以最终待发布 archive 和 exact 40 位小写 Git revision 生成 payload：
+
+```sh
+pnpm evidence:physical-edge-release -- prepare \
+  --physical-report=/opt/qinglong/evidence/physical.json \
+  --release-archive=/opt/qinglong/releases/qinglong3-edge.tar.gz \
+  --repository=https://github.com/whyour/qinglong.git \
+  --revision=<40-lowercase-git-revision> \
+  --payload=/opt/qinglong/evidence/release-payload.json \
+  --json
+```
+
+必须签署 `release-payload.json` 的原始字节，不能重新格式化或追加换行。将 64-byte
+Ed25519 detached signature 安全传回设备并设为当前 UID `0600`；固定公钥可以只读，但
+不得 group/other writable。随后重新指定期望 source，完成 verify-only finalization：
+
+```sh
+pnpm evidence:physical-edge-release -- finalize \
+  --physical-report=/opt/qinglong/evidence/physical.json \
+  --release-archive=/opt/qinglong/releases/qinglong3-edge.tar.gz \
+  --payload=/opt/qinglong/evidence/release-payload.json \
+  --signature=/opt/qinglong/evidence/release-payload.sig \
+  --trusted-public-key=/etc/qinglong/release-ed25519.pub \
+  --expected-repository=https://github.com/whyour/qinglong.git \
+  --expected-revision=<40-lowercase-git-revision> \
+  --output=/opt/qinglong/evidence/physical-release-evidence.json \
+  --json
+```
+
+archive、payload、报告或 source revision 任一改变都必须重新 prepare 和外部签名，不能
+复用旧 signature。验签成功只增加
+`release_archive_signature_or_attestation`；输出仍是 `supported=false`，不得据此跳过
+firmware/bootloader、整机写入、migration、断电或固定设备矩阵。公钥轮换/撤销与签名
+透明记录由发布流程单独管理。
+
 ## 7. 后续 Owner ceremony
 
 deployment prepare 只创建存储、Owner pepper 主备和 Local Secret keyring，不会
