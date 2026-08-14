@@ -152,6 +152,19 @@ pnpm evidence:physical-edge -- \
 
 记录器拒绝 macOS、容器/VM 指示、架构/内存/文件系统漂移、symlink、根目录数据路径、已有输出和非 canonical 路径；SQLite 基准的临时库实际位于声明的数据文件系统。输出以 `0600`、no-replace、fsync 发布，并绑定 SHA-256。`storageMedium`、设备型号和 SoC 仍是 operator-declared provenance，SHA-256 也不是签名，因此报告始终为 `supported=false`。
 
+基础记录器现在还在同一真实数据文件系统的私有 scratch 中运行
+`plugin_package_failed_upgrade_edge_candidate`：在 fresh production migration SQLite
+上先激活 generation 1，再持久化一个包含循环 Workflow 的 generation 2 staged
+升级，并通过正式 recovery coordinator、正式候选资源物化 prerequisite 和正式 SQLite
+repositories 恢复。报告只有在 generation 2 精确进入
+`failed(activation_fact_conflict)`、旧 `activeLockDigest` 与
+`previousActiveLockDigest` 均保留、activation publisher 零调用、候选 materialized
+revision 零行、SQLite `integrity_check=ok`，且耗时、RSS delta、logical/allocated
+数据库增长均处于固定上限内时才通过。相同 workload 同时进入 128 MiB router stress
+与 256 MiB Edge release cgroup 门，前者仍只是 CI stress；只有由本记录器在无虚拟化
+指示的固定设备和声明数据盘上生成时，才属于物理候选证据。两条路径都明确保留
+`physical_power_loss_not_proven`，不能推出断电安全或正式最低配置。
+
 ### 补充 idle 证据
 
 idle sampler 只观察一个已经启动的 QingLong Node 进程，采样窗口为 30 至 3600 秒，间隔为 1 至 60 秒且必须整除窗口。manifest 必须绑定 device、PID 与期望 executable；采样期间 PID、boot ID、进程 start ticks、UID、executable 或命令摘要任一漂移都失败关闭：

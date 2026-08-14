@@ -58,6 +58,7 @@
     "benchmark:worker": "node scripts/ql3-worker-resource-benchmark.cjs",
     "benchmark:ai-profile": "node scripts/ql3-ai-profile-benchmark.cjs",
     "evidence:physical-edge": "node scripts/ql3-physical-edge-evidence.cjs",
+    "evidence:plugin-package-recovery-edge": "node scripts/ql3-plugin-package-recovery-edge-benchmark.cjs",
     "evidence:physical-edge-idle": "node scripts/ql3-physical-edge-idle-sampler.cjs",
     "evidence:physical-edge-fault": "node scripts/ql3-physical-edge-fault-probe.cjs",
     "evidence:physical-edge-task-scale": "node scripts/ql3-physical-edge-task-scale.cjs",

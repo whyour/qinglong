@@ -5,6 +5,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const {
+  validateReport: validatePluginPackageRecoveryEdgeReport,
+} = require('./ql3-plugin-package-recovery-edge-benchmark.cjs');
 
 const MIB = 1024 * 1024;
 const GIB = 1024 * MIB;
@@ -710,10 +713,70 @@ function runEvidenceWorkloads(root, dataPath) {
         ],
         { TMPDIR: scratchPath },
       ),
+      runJsonWorkload(
+        root,
+        'plugin-package-failed-upgrade',
+        'scripts/ql3-plugin-package-recovery-edge-benchmark.cjs',
+        [
+          '--json',
+          '--max-duration-ms=10000',
+          '--max-rss-delta-mb=96',
+          `--max-database-growth-bytes=${4 * MIB}`,
+        ],
+        { TMPDIR: scratchPath },
+      ),
     ]);
   } finally {
     fs.rmSync(scratchPath, { recursive: true, force: false });
   }
+}
+
+function validateEvidenceWorkloads(workloads) {
+  if (!Array.isArray(workloads) || workloads.length !== 3) {
+    return Object.freeze(['physical evidence workloads are incomplete']);
+  }
+  const expectedNames = [
+    'edge-executor',
+    'node-sqlite-on-device-storage',
+    'plugin-package-failed-upgrade',
+  ];
+  if (
+    workloads.some(
+      (workload, index) =>
+        !hasExactKeys(workload, ['name', 'report']) ||
+        workload.name !== expectedNames[index],
+    )
+  ) {
+    return Object.freeze(['physical evidence workload identity is invalid']);
+  }
+  const violations = [];
+  const edge = workloads[0].report;
+  if (
+    edge?.schemaVersion !== 1 ||
+    edge?.profile !== 'edge' ||
+    edge?.gates?.passed !== true ||
+    !Array.isArray(edge?.gates?.violations) ||
+    edge.gates.violations.length !== 0
+  ) {
+    violations.push('edge executor workload did not pass exactly');
+  }
+  const sqlite = workloads[1].report;
+  if (
+    sqlite?.journalMode !== 'delete' ||
+    sqlite?.synchronous !== 'full' ||
+    sqlite?.integrityCheck !== 'ok' ||
+    !Number.isSafeInteger(sqlite?.databaseBytes) ||
+    sqlite.databaseBytes < 1 ||
+    !isNonNegativeNumber(sqlite?.rssDeltaMb)
+  ) {
+    violations.push('on-device SQLite workload is invalid');
+  }
+  violations.push(
+    ...validatePluginPackageRecoveryEdgeReport(workloads[2].report).map(
+      (violation) => `Plugin Package recovery workload: ${violation}`,
+    ),
+  );
+  return Object.freeze(violations);
 }
 
 function canonicalDigest(value) {
@@ -1402,7 +1465,10 @@ function buildEvidenceReport({
   supplementalEvidence = [],
   generatedAt,
 }) {
-  const violations = validateObservedPlatform(manifest, observed);
+  const violations = [
+    ...validateObservedPlatform(manifest, observed),
+    ...validateEvidenceWorkloads(workloads),
+  ];
   const idleEvidence = supplementalEvidence.find(
     ({ evidenceClass }) => evidenceClass === 'physical_edge_idle_candidate',
   );
@@ -1491,6 +1557,19 @@ function buildEvidenceReport({
   if (directServiceStopEvidence) {
     collectedEvidence.push('init_managed_graceful_application_stop');
   }
+  const pluginPackageRecoveryEvidence = Array.isArray(workloads)
+    ? workloads.find(({ name }) => name === 'plugin-package-failed-upgrade')
+    : undefined;
+  const pluginPackageRecoveryQualified =
+    pluginPackageRecoveryEvidence !== undefined &&
+    validatePluginPackageRecoveryEdgeReport(
+      pluginPackageRecoveryEvidence.report,
+    ).length === 0;
+  if (pluginPackageRecoveryQualified) {
+    collectedEvidence.push(
+      'plugin_package_failed_upgrade_retains_active_generation',
+    );
+  }
   const remainingRequiredEvidence = [
     ...(directServiceStartEvidence
       ? ['firmware_and_bootloader_power_on_to_linux_kernel_clock']
@@ -1513,6 +1592,13 @@ function buildEvidenceReport({
     'power_loss_restart',
     'release_archive_signature',
   ];
+  if (!pluginPackageRecoveryQualified) {
+    remainingRequiredEvidence.splice(
+      1,
+      0,
+      'plugin_package_failed_upgrade_retains_active_generation',
+    );
+  }
   if (!idleEvidence) {
     remainingRequiredEvidence.splice(
       1,
@@ -1713,6 +1799,7 @@ module.exports = {
   validateServiceStartEvidenceReport,
   validateDirectServiceStartEvidenceReport,
   validateDirectServiceStopEvidenceReport,
+  validateEvidenceWorkloads,
   validateTaskScaleWorkload,
   validateObservedPlatform,
   writeNoReplace,

@@ -117,6 +117,7 @@ test('builds tier-specific workload plans without shell commands', () => {
       'local-workflow-sqlite-lock',
       'local-workflow-admission-crash-recovery',
       'local-workflow-control-crash-recovery',
+      'plugin-package-failed-upgrade',
     ],
   );
   assert.match(edge[0].script, /ql3-edge-benchmark\.cjs$/);
@@ -135,10 +136,7 @@ test('builds tier-specific workload plans without shell commands', () => {
     ),
     true,
   );
-  const edgeRelease = createWorkloadPlans(
-    '/workspace',
-    'edge-release-ci',
-  );
+  const edgeRelease = createWorkloadPlans('/workspace', 'edge-release-ci');
   assert.deepEqual(
     edgeRelease.map(({ name }) => name),
     [
@@ -152,6 +150,7 @@ test('builds tier-specific workload plans without shell commands', () => {
       'local-workflow-control-crash-recovery',
       'local-ai-prompt-model-invocation-crash-recovery',
       'local-ai-prompt-outer-transaction-crash-recovery',
+      'plugin-package-failed-upgrade',
     ],
   );
   assert.equal(
@@ -185,17 +184,11 @@ test('builds tier-specific workload plans without shell commands', () => {
   assert.equal(edgeRelease[3].contract.exactReplay, true);
   assert.equal(edgeRelease[3].contract.contentFree, true);
   assert.equal(edgeRelease[3].contract.durableOutputBytes, 512 * 1024);
-  assert.equal(
-    edgeRelease[3].contract.maxWalWriteAmplificationPermille,
-    0,
-  );
+  assert.equal(edgeRelease[3].contract.maxWalWriteAmplificationPermille, 0);
   assert.equal(edgeRelease[4].contract.profile, 'standalone');
   assert.equal(edgeRelease[4].contract.journalMode, 'wal');
   assert.equal(edgeRelease[4].contract.requireWalGrowth, true);
-  assert.match(
-    edge[3].script,
-    /ql3-local-workflow-resource-benchmark\.cjs$/,
-  );
+  assert.match(edge[3].script, /ql3-local-workflow-resource-benchmark\.cjs$/);
   assert.ok(edge[3].args.includes('--lock-samples=16'));
   assert.ok(edge[3].args.includes('--max-lock-p95-ms=500'));
   assert.equal(edge[4].contract.scenarios, 16);
@@ -221,6 +214,12 @@ test('builds tier-specific workload plans without shell commands', () => {
     true,
   );
   assert.equal(edgeRelease[9].contract.physicalPowerLossProven, false);
+  assert.match(
+    edge.at(-1).script,
+    /ql3-plugin-package-recovery-edge-benchmark\.cjs$/,
+  );
+  assert.ok(edge.at(-1).args.includes('--max-rss-delta-mb=64'));
+  assert.ok(edgeRelease.at(-1).args.includes('--max-rss-delta-mb=96'));
   const cluster = createWorkloadPlans('/workspace', 'cluster-control-ci');
   assert.deepEqual(
     cluster.map(({ name }) => name),
@@ -248,7 +247,9 @@ test('fails closed when durable Prompt resource evidence drifts', () => {
   const [edgePlan, standalonePlan] = createWorkloadPlans(
     '/workspace',
     'edge-release-ci',
-  ).filter(({ contract }) => contract?.kind === 'durable_prompt_output_resource');
+  ).filter(
+    ({ contract }) => contract?.kind === 'durable_prompt_output_resource',
+  );
   const evidence = {
     profile: 'edge',
     journalMode: 'delete',
@@ -268,7 +269,9 @@ test('fails closed when durable Prompt resource evidence drifts', () => {
     physicalPowerLossProven: false,
   };
   const output = (value) =>
-    `tests 1\npass 1\nfail 0\nskipped 0\nQL3_RESOURCE_EVIDENCE=${JSON.stringify(value)}\n`;
+    `tests 1\npass 1\nfail 0\nskipped 0\nQL3_RESOURCE_EVIDENCE=${JSON.stringify(
+      value,
+    )}\n`;
   assert.equal(
     parseNodeTestReport(output(evidence), edgePlan).evidence.profile,
     'edge',
@@ -301,12 +304,8 @@ test('fails closed when durable Prompt resource evidence drifts', () => {
 });
 
 test('fails closed when authenticated Workflow cancellation evidence drifts', () => {
-  const plan = createWorkloadPlans(
-    '/workspace',
-    'edge-release-ci',
-  ).find(
-    ({ contract }) =>
-      contract?.kind === 'local_workflow_product_lifecycle',
+  const plan = createWorkloadPlans('/workspace', 'edge-release-ci').find(
+    ({ contract }) => contract?.kind === 'local_workflow_product_lifecycle',
   );
   assert.ok(plan);
   const completionEvidence = {
@@ -332,10 +331,12 @@ test('fails closed when authenticated Workflow cancellation evidence drifts', ()
     physicalPowerLossProven: false,
   };
   const output = (value) =>
-    `tests 2\npass 2\nfail 0\nskipped 0\nQL3_RESOURCE_EVIDENCE=${JSON.stringify(completionEvidence)}\nQL3_RESOURCE_EVIDENCE=${JSON.stringify(value)}\n`;
+    `tests 2\npass 2\nfail 0\nskipped 0\nQL3_RESOURCE_EVIDENCE=${JSON.stringify(
+      completionEvidence,
+    )}\nQL3_RESOURCE_EVIDENCE=${JSON.stringify(value)}\n`;
   assert.equal(
-    parseNodeTestReport(output(cancellationEvidence), plan)
-      .evidenceRecords[1].processExited,
+    parseNodeTestReport(output(cancellationEvidence), plan).evidenceRecords[1]
+      .processExited,
     true,
   );
   assert.throws(

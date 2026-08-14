@@ -48,7 +48,9 @@ ConfigMap 和数据库 head 之间会出现第二次分布式提交窗口，并�
 - Local 与 Cluster 组合测试证明恢复顺序一致，既有 active publication/reconciliation 不回归。
 - 完整 18-package、backend、package/dependency/deployment/edge/import 审计通过。
 - 真实 PostgreSQL/Kubernetes 门证明失败升级没有移动 active ConfigMap/head；physical HA 门通过。
-- 固定物理低配设备证据仍由 ADR-0396 单独阻断，不能用开发机观测替代。
+- 固定物理低配设备必须运行真实 SQLite 失败升级 workload，证明旧 active 保留、候选
+  revision 零写入、publisher 零调用、数据库完整性及耗时/RSS/数据盘增长上限；容器
+  cgroup 结果只能作为前置 stress，不能用开发机或虚拟化观测替代。
 
 ## 影响与替代方案
 
@@ -77,8 +79,8 @@ ConfigMap 和数据库 head 之间会出现第二次分布式提交窗口，并�
   镜像 provenance、六段单调 ordering、数据库精确计数、OCI 18 次认证请求、ConfigMap-only RBAC、双节点 runtime 绑定、全部
   11 个 gate 与三项 limitation 做 exact-shape 校验，并以 `O_NOFOLLOW`/inode/mode/size 复验私有报告。CI 在独立 job 内先审计，
   再上传固定 14 天的 source-bound evidence artifact；这一证据链只属于验收，不新增产品 package、依赖或运行时常驻开销。
-- 18-package clean build/test 在允许 loopback TLS 的环境退出 0；backend 1203 项为
-  1201 pass/2 条件 skip/0 fail。新增/更新的 recovery E2E producer/离线审计契约 14/14，Runtime Core 定向 21/21。package boundary 保持 18 个 package 且
+- 18-package clean build/test 在允许 loopback TLS 的环境退出 0；backend 1205 项为
+  1203 pass/2 条件 skip/0 fail。新增/更新的 recovery E2E producer/离线审计契约 14/14，Runtime Core 定向 21/21。package boundary 保持 18 个 package 且
   `singleSourcePackages=[]`、`shallowSourcePackages=[]`；cluster dependency、cluster deployment
   与 edge import 审计均无 finding。
 - PostgreSQL `18.4` arm64 physical HA 通过 125 项门，timeline `1→2`，报告 SHA-256
@@ -86,3 +88,18 @@ ConfigMap 和数据库 head 之间会出现第二次分布式提交窗口，并�
   资源已清理。本机已成功构建现场门所需 admin/control 镜像，但固定 `kindest/node:v1.32.8` 不在本地缓存，受限网络拉取数分钟无进度；
   门在创建任何 Kind 节点前被中止，并确认没有遗留集群或容器。因此 v2 门、私有报告与离线审计代码已完成，但仍不能计为真实 Kubernetes
   现场通过；远端 CI 成功记录与固定物理低配设备证据仍待完成，本 ADR 保持 Proposed。
+- 固定低配资格门的产品工作负载已落地：`evidence:plugin-package-recovery-edge`
+  使用 fresh production migration SQLite、正式 install/materialized repositories、正式
+  recovery coordinator 与正式语义物化门，实测无效 generation 2 从 staged 进入 failed，
+  旧 active generation 保留、publisher 0 次、候选 materialized revision 0 行、数据库
+  `integrity_check=ok`。该工作负载已接入 128/256 MiB Linux 资源门和统一 physical Edge
+  recorder；统一聚合器会 exact-shape 拒绝缺失、改名或失败报告，并把
+  `plugin_package_failed_upgrade_retains_active_generation` 列为独立 collected/remaining
+  evidence。当前本机 arm64 执行仅是开发验证，尚未产生固定型号、无虚拟化设备上的
+  owner-private 总报告，也未证明受控断电，因此不能把本 ADR 转为 Accepted。
+  本轮真实 workload 在 Node `v24.18.0` arm64 开发机观测为 14.390 ms、RSS delta
+  3,014,656 bytes、SQLite logical/allocated growth 各 8,192 bytes，均低于
+  10,000 ms、96 MiB、4 MiB 的候选上限；这些数值只证明脚本与门禁可运行，不是
+  固定设备支持结论。对应 backend 新增路径、物理聚合和 Linux release 契约 34/34；
+  package boundary、cluster dependency、cluster deployment、Edge import 与 service
+  bridge import 审计均通过。

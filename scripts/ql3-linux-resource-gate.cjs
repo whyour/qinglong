@@ -295,41 +295,41 @@ function createWorkloadPlans(root, tierName) {
       ...(tierName === 'edge-release-ci'
         ? ['edge', 'standalone'].map((profile) =>
             Object.freeze({
-          name: `local-ai-prompt-durable-output-${profile}`,
-          format: 'node_test',
-          nodeArgs: Object.freeze([
-            '--test',
-            '--test-name-pattern=executes one active Package Prompt',
-            path.join(
-              root,
-              'packages/ql3-local-application/test/activation.test.cjs',
-            ),
-          ]),
-          env: Object.freeze({
-            QL3_PROMPT_RESOURCE_PROFILE: profile,
-            QL3_PROMPT_RESOURCE_OUTPUT_BYTES: String(
-              PROMPT_RESOURCE_OUTPUT_BYTES,
-            ),
-          }),
-          maxProcessRssBytes: tier.promptMaxProcessRssMb * MIB,
-          contract: Object.freeze({
-            kind: 'durable_prompt_output_resource',
-            profile,
-            journalMode: profile === 'edge' ? 'delete' : 'wal',
-            durableOutputBytes: PROMPT_RESOURCE_OUTPUT_BYTES,
-            providerCalls: 2,
-            keyLoads: 1,
-            keyResolutions: 1,
-            exactReplay: true,
-            contentFree: true,
-            maxLogicalWriteAmplificationPermille: 3_000,
-            maxAllocatedWriteAmplificationPermille: 3_500,
-            maxWalWriteAmplificationPermille:
-              profile === 'standalone' ? 3_000 : 0,
-            requireWalGrowth: profile === 'standalone',
-            runAttempts: 0,
-            physicalPowerLossProven: false,
-          }),
+              name: `local-ai-prompt-durable-output-${profile}`,
+              format: 'node_test',
+              nodeArgs: Object.freeze([
+                '--test',
+                '--test-name-pattern=executes one active Package Prompt',
+                path.join(
+                  root,
+                  'packages/ql3-local-application/test/activation.test.cjs',
+                ),
+              ]),
+              env: Object.freeze({
+                QL3_PROMPT_RESOURCE_PROFILE: profile,
+                QL3_PROMPT_RESOURCE_OUTPUT_BYTES: String(
+                  PROMPT_RESOURCE_OUTPUT_BYTES,
+                ),
+              }),
+              maxProcessRssBytes: tier.promptMaxProcessRssMb * MIB,
+              contract: Object.freeze({
+                kind: 'durable_prompt_output_resource',
+                profile,
+                journalMode: profile === 'edge' ? 'delete' : 'wal',
+                durableOutputBytes: PROMPT_RESOURCE_OUTPUT_BYTES,
+                providerCalls: 2,
+                keyLoads: 1,
+                keyResolutions: 1,
+                exactReplay: true,
+                contentFree: true,
+                maxLogicalWriteAmplificationPermille: 3_000,
+                maxAllocatedWriteAmplificationPermille: 3_500,
+                maxWalWriteAmplificationPermille:
+                  profile === 'standalone' ? 3_000 : 0,
+                requireWalGrowth: profile === 'standalone',
+                runAttempts: 0,
+                physicalPowerLossProven: false,
+              }),
             }),
           )
         : []),
@@ -395,10 +395,7 @@ function createWorkloadPlans(root, tierName) {
                 profiles: Object.freeze(['edge', 'standalone']),
                 crashPointsPerProfile: 7,
                 scenarios: 14,
-                boundaries: Object.freeze([
-                  'model_start',
-                  'model_completion',
-                ]),
+                boundaries: Object.freeze(['model_start', 'model_completion']),
                 mechanism: 'process_sigkill_then_database_reopen',
                 physicalPowerLossProven: false,
               }),
@@ -426,6 +423,20 @@ function createWorkloadPlans(root, tierName) {
             }),
           ]
         : []),
+      Object.freeze({
+        name: 'plugin-package-failed-upgrade',
+        format: 'json',
+        script: path.join(
+          root,
+          'scripts/ql3-plugin-package-recovery-edge-benchmark.cjs',
+        ),
+        args: Object.freeze([
+          '--json',
+          '--max-duration-ms=10000',
+          `--max-rss-delta-mb=${tier.edgeMaxRssDeltaMb}`,
+          `--max-database-growth-bytes=${4 * MIB}`,
+        ]),
+      }),
     ]);
   }
   return Object.freeze([
@@ -489,8 +500,7 @@ function parseNodeTestReport(output, plan) {
       evidence.exactReplay !== contract.exactReplay ||
       evidence.contentFree !== contract.contentFree ||
       evidence.durableFacts?.attempts !== contract.runAttempts ||
-      evidence.physicalPowerLossProven !==
-        contract.physicalPowerLossProven ||
+      evidence.physicalPowerLossProven !== contract.physicalPowerLossProven ||
       !Number.isSafeInteger(
         evidence.databaseLogicalWriteAmplificationPermille,
       ) ||

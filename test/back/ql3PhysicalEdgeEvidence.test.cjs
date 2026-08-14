@@ -25,6 +25,9 @@ const {
   writeNoReplace,
 } = require('../../scripts/ql3-physical-edge-evidence.cjs');
 const {
+  runBenchmark: runPluginPackageRecoveryEdgeBenchmark,
+} = require('../../scripts/ql3-plugin-package-recovery-edge-benchmark.cjs');
+const {
   buildReport: buildAdoptionScaleReport,
   normalizeManifest: normalizeAdoptionScaleManifest,
 } = require('../../scripts/ql3-physical-edge-adoption-scale.cjs');
@@ -168,15 +171,49 @@ test('fails closed on architecture, memory, filesystem and virtualization drift'
   );
 });
 
-test('produces digest-bound candidate evidence but never supported status', () => {
+test('produces digest-bound candidate evidence but never supported status', async () => {
+  const pluginPackageRecovery = await runPluginPackageRecoveryEdgeBenchmark({
+    maxDatabaseGrowthBytes: 4 * 1024 * 1024,
+    maxDurationMs: 10_000,
+    maxRssDeltaBytes: 96 * 1024 * 1024,
+  });
+  const workloads = [
+    {
+      name: 'edge-executor',
+      report: {
+        schemaVersion: 1,
+        profile: 'edge',
+        gates: { passed: true, violations: [] },
+      },
+    },
+    {
+      name: 'node-sqlite-on-device-storage',
+      report: {
+        journalMode: 'delete',
+        synchronous: 'full',
+        integrityCheck: 'ok',
+        databaseBytes: 16_384,
+        rssDeltaMb: 1,
+      },
+    },
+    {
+      name: 'plugin-package-failed-upgrade',
+      report: pluginPackageRecovery,
+    },
+  ];
   const report = buildEvidenceReport({
     manifest: manifest(),
     observed: observed(),
-    workloads: [{ name: 'edge-executor', report: { gates: { passed: true } } }],
+    workloads,
     generatedAt: '2026-07-22T00:00:00.000Z',
   });
   assert.equal(report.supported, false);
   assert.equal(report.qualification.physicalCandidate, true);
+  assert.ok(
+    report.qualification.collectedEvidence.includes(
+      'plugin_package_failed_upgrade_retains_active_generation',
+    ),
+  );
   assert.equal(report.sha256.length, 64);
   const changed = buildEvidenceReport({
     manifest: manifest({ deviceId: 'router-a2' }),
@@ -184,6 +221,12 @@ test('produces digest-bound candidate evidence but never supported status', () =
     workloads: [],
     generatedAt: '2026-07-22T00:00:00.000Z',
   });
+  assert.equal(changed.qualification.physicalCandidate, false);
+  assert.ok(
+    changed.qualification.remainingRequiredEvidence.includes(
+      'plugin_package_failed_upgrade_retains_active_generation',
+    ),
+  );
   assert.notEqual(changed.sha256, report.sha256);
 });
 
