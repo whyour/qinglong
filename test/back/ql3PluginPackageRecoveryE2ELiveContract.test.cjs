@@ -122,9 +122,33 @@ test('package script and independent CI job execute the full gate', () => {
   const job = workflow.jobs['cluster-plugin-package-recovery-e2e'];
   assert.ok(job);
   assert.equal(job['timeout-minutes'], 35);
+  assert.equal(
+    packageJson.scripts['audit:plugin-package-recovery-e2e:ql3'],
+    'node scripts/ql3-plugin-package-recovery-e2e-live-audit.cjs',
+  );
   assert.ok(
     job.steps.some(
-      (step) => step.run === 'pnpm test:plugin-package-recovery-e2e:ql3',
+      (step) =>
+        String(step.run).includes(
+          'pnpm test:plugin-package-recovery-e2e:ql3',
+        ) &&
+        String(step.run).includes('--report=') &&
+        String(step.run).includes('pnpm audit:plugin-package-recovery-e2e:ql3'),
+    ),
+  );
+  assert.ok(
+    job.steps.some(
+      (step) =>
+        step.env?.QL3_SOURCE_REVISION === '${{ github.sha }}' &&
+        step.env?.QL3_PLUGIN_PACKAGE_RECOVERY_E2E_LIVE === '1',
+    ),
+  );
+  assert.ok(
+    job.steps.some(
+      (step) =>
+        step.if === 'always()' &&
+        String(step.uses).startsWith('actions/upload-artifact@') &&
+        step.with?.['retention-days'] === 14,
     ),
   );
   assert.ok(
@@ -134,6 +158,16 @@ test('package script and independent CI job execute the full gate', () => {
       ),
     ),
   );
+});
+
+test('gate persists only a source-bound low-sensitive private report', () => {
+  assert.match(live, /privateReportPath\(argv\)/);
+  assert.match(live, /writePrivateReport\(reportFile, report\)/);
+  assert.match(live, /QL3_SOURCE_REVISION/);
+  assert.match(live, /org\.opencontainers\.image\.revision/);
+  assert.match(live, /activeJsonDigest/);
+  assert.doesNotMatch(live, /activePointer: pointerAfterRejection/);
+  assert.match(live, /reportWritten: true/);
 });
 
 test('private Registry evidence uses one exact Secret file and authenticated requests', () => {

@@ -52,6 +52,7 @@
     "test:plugin-package-secret-binding-kubernetes-live:ql3": "pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-plugin-package-secret-binding-kubernetes-live-contract.cjs",
     "audit:plugin-package-secret-binding-kubernetes-live:ql3": "node scripts/ql3-plugin-package-secret-binding-kubernetes-live-audit.cjs",
     "test:plugin-package-recovery-e2e:ql3": "pnpm --filter @qinglong/cluster-admin check && pnpm --filter @qinglong/cluster-control check && node scripts/ql3-plugin-package-recovery-e2e-live-contract.cjs",
+    "audit:plugin-package-recovery-e2e:ql3": "node scripts/ql3-plugin-package-recovery-e2e-live-audit.cjs",
     "benchmark:edge": "node scripts/ql3-edge-benchmark.cjs",
     "benchmark:cluster-control": "node scripts/ql3-cluster-control-benchmark.cjs",
     "benchmark:worker": "node scripts/ql3-worker-resource-benchmark.cjs",

@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { randomBytes } = require('node:crypto');
+const { createHash, randomBytes } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const yaml = require('js-yaml');
 
@@ -181,7 +181,62 @@ function imageExists(image) {
   );
 }
 
-function buildImages() {
+function sourceRevision() {
+  const value = process.env.QL3_SOURCE_REVISION ?? '';
+  if (!/^[a-f0-9]{40}$/.test(value)) {
+    fail(
+      'QL3_SOURCE_REVISION must be the exact lowercase 40-hex source revision',
+    );
+  }
+  return value;
+}
+
+function privateReportPath(argv) {
+  if (
+    argv.length !== 1 ||
+    !argv[0].startsWith('--report=') ||
+    !path.isAbsolute(argv[0].slice('--report='.length))
+  ) {
+    fail(
+      'usage: ql3-plugin-package-recovery-e2e-live-contract ' +
+        '--report=/absolute/private-report.json',
+    );
+  }
+  const reportFile = argv[0].slice('--report='.length);
+  if (path.resolve(reportFile) !== reportFile) {
+    fail('Plugin Package recovery E2E report path must be canonical');
+  }
+  if (fs.existsSync(reportFile)) {
+    fail('refusing to overwrite the Plugin Package recovery E2E report');
+  }
+  const parent = fs.lstatSync(path.dirname(reportFile));
+  if (!parent.isDirectory() || parent.isSymbolicLink()) {
+    fail('Plugin Package recovery E2E report parent must be a real directory');
+  }
+  return reportFile;
+}
+
+function writePrivateReport(reportFile, report) {
+  const temporaryReport = path.join(
+    path.dirname(reportFile),
+    `.${path.basename(reportFile)}.${process.pid}.` +
+      `${randomBytes(6).toString('hex')}.tmp`,
+  );
+  let descriptor;
+  try {
+    descriptor = fs.openSync(temporaryReport, 'wx', 0o600);
+    fs.writeFileSync(descriptor, `${JSON.stringify(report, null, 2)}\n`);
+    fs.fsyncSync(descriptor);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
+    fs.linkSync(temporaryReport, reportFile);
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+    fs.rmSync(temporaryReport, { force: true });
+  }
+}
+
+function buildImages(revision) {
   if (process.env.QL3_SKIP_IMAGE_BUILD === '1') {
     assert.equal(imageExists(ADMIN_IMAGE), true, `${ADMIN_IMAGE} is absent`);
     assert.equal(
@@ -200,7 +255,7 @@ function buildImages() {
       '--tag',
       ADMIN_IMAGE,
       '--build-arg',
-      'SOURCE_REVISION=ql3-plugin-recovery-e2e-live',
+      `SOURCE_REVISION=${revision}`,
       '.',
     ],
     { label: 'build current QingLong 3.0 cluster-admin image' },
@@ -214,7 +269,7 @@ function buildImages() {
       '--tag',
       CONTROL_IMAGE,
       '--build-arg',
-      'SOURCE_REVISION=ql3-plugin-recovery-e2e-live',
+      `SOURCE_REVISION=${revision}`,
       '.',
     ],
     { label: 'build current QingLong 3.0 cluster-control image' },
@@ -246,6 +301,15 @@ function imageId(image) {
       quiet: true,
     }).stdout,
   )[0].Id;
+}
+
+function imageSourceRevision(image) {
+  return JSON.parse(
+    run(DOCKER, ['image', 'inspect', image], {
+      capture: true,
+      quiet: true,
+    }).stdout,
+  )[0].Config?.Labels?.['org.opencontainers.image.revision'];
 }
 
 function createRegistryCertificate(root) {
@@ -1264,6 +1328,19 @@ function activePointerEvidence(fixture) {
   });
 }
 
+function reportActivePointer(pointer) {
+  return Object.freeze({
+    name: pointer.name,
+    uid: pointer.uid,
+    resourceVersion: pointer.resourceVersion,
+    activeJsonDigest: createHash('sha256')
+      .update(pointer.activeJson, 'utf8')
+      .digest('hex'),
+    intentDigest: pointer.intentDigest,
+    activationRef: pointer.activationRef,
+  });
+}
+
 function registryEvidence(fixture) {
   const output = kubectl(
     ['-n', NAMESPACE, 'logs', REGISTRY_NAME, '-c', 'registry'],
@@ -1542,12 +1619,14 @@ function diagnostics() {
   if (snapshot.stdout) process.stderr.write(`${snapshot.stdout}\n`);
 }
 
-async function main() {
+async function main(argv = process.argv.slice(2)) {
+  const reportFile = privateReportPath(argv);
   if (process.env.QL3_PLUGIN_PACKAGE_RECOVERY_E2E_LIVE !== '1') {
     fail(
       'Refusing to create a live cluster without QL3_PLUGIN_PACKAGE_RECOVERY_E2E_LIVE=1',
     );
   }
+  const revision = sourceRevision();
   const clusterName = exactClusterName();
   const existing = kind(['get', 'clusters'], {
     capture: true,
@@ -1605,7 +1684,13 @@ async function main() {
   let created = false;
   const startedAt = Date.now();
   try {
-    buildImages();
+    buildImages(revision);
+    const adminSourceRevision = imageSourceRevision(ADMIN_IMAGE);
+    const controlSourceRevision = imageSourceRevision(CONTROL_IMAGE);
+    assert.equal(adminSourceRevision, revision);
+    assert.equal(controlSourceRevision, revision);
+    const adminBuildId = imageId(ADMIN_IMAGE);
+    const controlBuildId = imageId(CONTROL_IMAGE);
     ensurePostgresImage();
     fs.writeFileSync(
       kindConfig,
@@ -1829,13 +1914,17 @@ async function main() {
     ]);
     const report = Object.freeze({
       schema: REPORT_SCHEMA,
+      observedAt: new Date().toISOString(),
+      sourceRevision: revision,
       passed: true,
       cluster: clusterName,
       architecture: fixtureArchitecture,
       elapsedMs: Date.now() - startedAt,
       images: Object.freeze({
-        adminBuildId: imageId(ADMIN_IMAGE),
-        controlBuildId: imageId(CONTROL_IMAGE),
+        adminBuildId,
+        adminSourceRevision,
+        controlBuildId,
+        controlSourceRevision,
         postgresRepositoryDigest: POSTGRES_REPOSITORY_DIGEST,
         migrationImageId,
         initialRecoveryImageId,
@@ -1871,17 +1960,38 @@ async function main() {
       database,
       oci,
       kubernetes: Object.freeze({
-        activePointer: pointerAfterRejection,
+        activePointer: reportActivePointer(pointerAfterRejection),
         rbac,
       }),
       runtime,
+      gates: Object.freeze({
+        healthyInitialActivation: true,
+        missingTransitionFailedClosed: true,
+        invalidUpgradeRejectedBeforeActivation: true,
+        activePointerUidUnchanged: true,
+        activePointerResourceVersionUnchanged: true,
+        activePointerJsonUnchanged: true,
+        candidateRevisionAbsent: true,
+        exactAuthenticatedOciRequests: true,
+        recoveryRbacLeastPrivilege: true,
+        runtimeRolledOutAfterRecovery: true,
+        passed: true,
+      }),
       limitations: Object.freeze([
         'isolated PostgreSQL uses explicit TLS disable; production manifests remain verify-full',
         'the authenticated HTTPS OCI Distribution fixture implements the immutable GET/referrers surface used by the resolver, not a production registry storage implementation',
         'the disposable Kind control plane is single-replica; this gate proves workload ordering, not Kubernetes control-plane HA',
       ]),
     });
-    process.stdout.write(`${JSON.stringify(report)}\n`);
+    writePrivateReport(reportFile, report);
+    process.stdout.write(
+      `${JSON.stringify({
+        schemaVersion: 1,
+        fixture: REPORT_SCHEMA,
+        reportWritten: true,
+        passed: true,
+      })}\n`,
+    );
   } catch (error) {
     diagnostics();
     throw error;
@@ -1902,13 +2012,21 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    `${JSON.stringify({
-      schema: 'qinglong/plugin-package-recovery-e2e-live-failure@v1',
-      name: error?.name ?? 'Error',
-      message: error?.message ?? 'unknown failure',
-    })}\n`,
-  );
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${JSON.stringify({
+        schema: 'qinglong/plugin-package-recovery-e2e-live-failure@v1',
+        name: error?.name ?? 'Error',
+        message: error?.message ?? 'unknown failure',
+      })}\n`,
+    );
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  REPORT_SCHEMA,
+  privateReportPath,
+  writePrivateReport,
+};

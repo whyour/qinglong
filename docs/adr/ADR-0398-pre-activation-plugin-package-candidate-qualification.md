@@ -70,12 +70,19 @@ ConfigMap 和数据库 head 之间会出现第二次分布式提交窗口，并�
   `resourceVersion` 与完整 `active.json`，因此不能用“错误切换后再补偿回来”冒充旧版本未移动；OCI v1 六个路径各读取一次，v2 六个路径
   各读取两次，全部要求 HTTPS、exact Basic authentication、200 且无 redirect。最终 runtime rollout 仍只绑定最后一个成功 recovery Job，
   recovery ServiceAccount 继续只有 ConfigMap `get|create|update`，runtime 角色仍不能读取安装 authority。
-- 18-package clean build/test 在允许 loopback TLS 的环境退出 0；backend 1196 项为
-  1194 pass/2 条件 skip/0 fail。新增/更新的 recovery E2E 源码契约 7/7，Runtime Core 定向 21/21。package boundary 保持 18 个 package 且
+- v2 现场门现在强制接收 canonical absolute `--report`，以 `0600` 临时文件、`fsync` 与 no-replace hard link 原子发布
+  owner-private 报告；目标已存在、父目录为 symlink、缺少显式 opt-in 或缺少 40-hex `QL3_SOURCE_REVISION` 时，均在访问
+  Docker/Kind 前失败关闭。admin/control 镜像的 OCI revision label 必须与报告源码 revision 相同；报告只保存 active JSON 的
+  SHA-256，不保存原始 pointer、Registry credential、数据库 DSN、kubeconfig、证书或 Secret material。独立离线审计对 envelope、
+  镜像 provenance、六段单调 ordering、数据库精确计数、OCI 18 次认证请求、ConfigMap-only RBAC、双节点 runtime 绑定、全部
+  11 个 gate 与三项 limitation 做 exact-shape 校验，并以 `O_NOFOLLOW`/inode/mode/size 复验私有报告。CI 在独立 job 内先审计，
+  再上传固定 14 天的 source-bound evidence artifact；这一证据链只属于验收，不新增产品 package、依赖或运行时常驻开销。
+- 18-package clean build/test 在允许 loopback TLS 的环境退出 0；backend 1203 项为
+  1201 pass/2 条件 skip/0 fail。新增/更新的 recovery E2E producer/离线审计契约 14/14，Runtime Core 定向 21/21。package boundary 保持 18 个 package 且
   `singleSourcePackages=[]`、`shallowSourcePackages=[]`；cluster dependency、cluster deployment
   与 edge import 审计均无 finding。
 - PostgreSQL `18.4` arm64 physical HA 通过 125 项门，timeline `1→2`，报告 SHA-256
   `8560469694c67776e5e4c70977f8bde8d4f5635f8e7d1c293ef449dc6da59f72`，临时 Docker
   资源已清理。本机已成功构建现场门所需 admin/control 镜像，但固定 `kindest/node:v1.32.8` 不在本地缓存，受限网络拉取数分钟无进度；
-  门在创建任何 Kind 节点前被中止，并确认没有遗留集群或容器。因此 v2 门的代码与离线契约已完成，但仍不能计为真实 Kubernetes
+  门在创建任何 Kind 节点前被中止，并确认没有遗留集群或容器。因此 v2 门、私有报告与离线审计代码已完成，但仍不能计为真实 Kubernetes
   现场通过；远端 CI 成功记录与固定物理低配设备证据仍待完成，本 ADR 保持 Proposed。

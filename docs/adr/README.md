@@ -401,7 +401,7 @@
 | [ADR-0395](./ADR-0395-owner-confirmed-plugin-package-secret-binding.md)                                      | Owner 确认的 Plugin Package Secret 首次绑定                                                                                           | Proposed |
 | [ADR-0396](./ADR-0396-generation-transition-plugin-package-secret-binding.md)                               | 按 Package Generation 切换 Plugin Package Secret Binding                                                                              | Proposed |
 | [ADR-0397](./ADR-0397-explicit-cluster-secret-action-manual-recovery.md)                                    | Cluster Secret Action 显式人工恢复                                                                                                     | Accepted（实现、单节点 PostgreSQL、完整 workspace/后端/边界与 physical HA 门完成） |
-| [ADR-0398](./ADR-0398-pre-activation-plugin-package-candidate-qualification.md)                             | Plugin Package 激活前候选资格校验与自动保留旧版本                                                                                       | Proposed（v2 现场门已编排、全量/HA 门完成；远端 Kubernetes 成功记录与物理低配门待闭合） |
+| [ADR-0398](./ADR-0398-pre-activation-plugin-package-candidate-qualification.md)                             | Plugin Package 激活前候选资格校验与自动保留旧版本                                                                                       | Proposed（v2 私有报告/离线审计已编排、全量/HA 门完成；远端 Kubernetes 成功记录与物理低配门待闭合） |
 
 ## 规则
 

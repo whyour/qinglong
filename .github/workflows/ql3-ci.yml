@@ -1061,7 +1061,21 @@ jobs:
       - name: Prove migration, durable OCI recovery and rollout ordering
         env:
           QL3_PLUGIN_PACKAGE_RECOVERY_E2E_LIVE: '1'
+          QL3_SOURCE_REVISION: ${{ github.sha }}
           QL3_KIND_BIN: ${{ github.workspace }}/kind-linux-amd64
           QL3_KUBECTL_BIN: ${{ github.workspace }}/kubectl
           QL3_KIND_CLUSTER: ql3-plugin-recovery-e2e-ci
-        run: pnpm test:plugin-package-recovery-e2e:ql3
+        run: |
+          install -d -m 0700 "${RUNNER_TEMP}/ql3-plugin-package-recovery-e2e"
+          pnpm test:plugin-package-recovery-e2e:ql3 -- \
+            --report="${RUNNER_TEMP}/ql3-plugin-package-recovery-e2e/report.json"
+          pnpm audit:plugin-package-recovery-e2e:ql3 -- \
+            --report="${RUNNER_TEMP}/ql3-plugin-package-recovery-e2e/report.json"
+      - name: Upload Plugin Package recovery E2E evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-plugin-package-recovery-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-plugin-package-recovery-e2e/report.json
+          if-no-files-found: warn
+          retention-days: 14
