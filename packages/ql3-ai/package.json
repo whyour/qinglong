@@ -25,6 +25,11 @@
       "require": "./dist/model-gateway/gateway.js",
       "default": "./dist/model-gateway/gateway.js"
     },
+    "./failure-diagnosis-prompt": {
+      "types": "./dist/copilot/failure-diagnosis/prompt.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/prompt.js",
+      "default": "./dist/copilot/failure-diagnosis/prompt.js"
+    },
     "./model-invocation": {
       "types": "./dist/model-invocation/modelInvocation.d.ts",
       "require": "./dist/model-invocation/modelInvocation.js",
