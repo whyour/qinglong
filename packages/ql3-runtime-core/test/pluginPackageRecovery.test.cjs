@@ -20,13 +20,18 @@ const {
 const {
   PluginPackageRecoveryCoordinator,
 } = require('../dist/plugin-package/installation/pluginPackageRecovery');
+const {
+  sequencePluginPackageActivationPrerequisites,
+} = require('../dist/plugin-package/installation/pluginPackageInstallation');
 
 const ARTIFACT_DIGEST = 'a'.repeat(64);
 const CONTENT_DIGEST = 'b'.repeat(64);
+const PREVIOUS_LOCK_DIGEST = 'c'.repeat(64);
 
 function fixture(
   packageName = 'example-monitor',
   installationId = 'install-001',
+  options = {},
 ) {
   const manifest = {
     apiVersion: PLUGIN_PACKAGE_API_VERSION,
@@ -65,13 +70,24 @@ function fixture(
     availableMemoryBytes: 128 * 1024 * 1024,
     availableDiskBytes: 256 * 1024 * 1024,
   };
-  const plan = planPluginPackageInstall(manifest, environment);
+  const previousManifest = options.upgrade
+    ? {
+        ...manifest,
+        metadata: { ...manifest.metadata, version: '1.1.0' },
+      }
+    : undefined;
+  const plan = planPluginPackageInstall(
+    manifest,
+    environment,
+    previousManifest,
+  );
   const action = {
     lockId: `lock-${packageName}`,
     projectId: 'default',
     manifest,
     plan,
     environment,
+    ...(previousManifest === undefined ? {} : { previousManifest }),
     source: {
       kind: 'offline',
       locator: `offline:sha256:${ARTIFACT_DIGEST}`,
@@ -81,7 +97,8 @@ function fixture(
     },
     architecture: 'arm64',
     deploymentProfile: 'edge',
-    targetGeneration: 1,
+    targetGeneration: options.upgrade ? 2 : 1,
+    ...(options.upgrade ? { previousLockDigest: PREVIOUS_LOCK_DIGEST } : {}),
   };
   const lock = createPluginPackageLock({
     ...action,
@@ -116,8 +133,8 @@ function stageEvidence(lock) {
   };
 }
 
-function stagedFixture(packageName, installationId) {
-  const value = fixture(packageName, installationId);
+function stagedFixture(packageName, installationId, options) {
+  const value = fixture(packageName, installationId, options);
   const staged = transitionPluginPackageInstall(value.lock, value.queued, {
     type: 'stage_completed',
     mutationId: `mutation-stage-${value.lock.packageName}`,
@@ -351,6 +368,80 @@ test('stages but defers activation until the exact prerequisite is ready', async
     inspect: 0,
     prerequisite: 3,
   });
+});
+
+test('orders activation prerequisites and stops before later authorities', async () => {
+  const value = stagedFixture();
+  const calls = [];
+  let first = {
+    status: 'deferred',
+    reason: 'secret_binding_transition_required',
+  };
+  const sequence = sequencePluginPackageActivationPrerequisites([
+    {
+      async inspect() {
+        calls.push('secret');
+        return first;
+      },
+    },
+    {
+      async inspect() {
+        calls.push('candidate');
+        return {
+          status: 'rejected',
+          reason: 'activation_fact_conflict',
+        };
+      },
+    },
+  ]);
+
+  assert.deepEqual(await sequence.inspect(value.staged, value.lock), first);
+  assert.deepEqual(calls, ['secret']);
+
+  first = { status: 'ready' };
+  assert.deepEqual(await sequence.inspect(value.staged, value.lock), {
+    status: 'rejected',
+    reason: 'activation_fact_conflict',
+  });
+  assert.deepEqual(calls, ['secret', 'secret', 'candidate']);
+});
+
+test('rejects an invalid upgrade before publication and retains the previous active lock', async () => {
+  const value = stagedFixture('example-monitor', 'install-upgrade', {
+    upgrade: true,
+  });
+  const repository = new MemoryRepository([{ ...value, record: value.staged }]);
+  const calls = { stage: 0, publish: 0, inspect: 0 };
+  const coordinator = new PluginPackageRecoveryCoordinator({
+    repository,
+    stageProvider: {
+      async stage() {
+        calls.stage += 1;
+        throw new Error('stage must not run');
+      },
+    },
+    publisher: publisherFor(repository, calls),
+    activationPrerequisite: {
+      async inspect() {
+        return {
+          status: 'rejected',
+          reason: 'activation_fact_conflict',
+        };
+      },
+    },
+    now: () => 250,
+  });
+
+  const page = await coordinator.recoverPage({ limit: 1 });
+  const durable = await repository.find('default', 'example-monitor');
+
+  assert.equal(page.items[0].status, 'settled');
+  assert.equal(durable.state, 'failed');
+  assert.equal(durable.previousActiveLockDigest, PREVIOUS_LOCK_DIGEST);
+  assert.equal(durable.activeLockDigest, PREVIOUS_LOCK_DIGEST);
+  assert.equal(durable.failure.reason, 'activation_fact_conflict');
+  assert.equal(durable.failure.failedFrom, 'staged');
+  assert.deepEqual(calls, { stage: 0, publish: 0, inspect: 0 });
 });
 
 test('inspects an activating install without republishing it', async () => {

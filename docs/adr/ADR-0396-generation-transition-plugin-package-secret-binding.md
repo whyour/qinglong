@@ -51,3 +51,8 @@ D-306B1 只允许给当前 active 且尚未绑定的 Package generation 做首�
 - start barrier 前的终态 Job、以及 approval 过期且 Job 尚未创建，复用共享 execution repository 的 claim→release-before-start 转换持久化为 `blocked`；controller 崩溃后 lease 可回收，不增加新状态、表、migration 或专用恢复 daemon。Durable result 漂移仍是全局 conflict；`executing + Job 缺失 + receipt 缺失` 不能排除孤儿 Pod 或未知副作用，继续保持 `recoveryRequired` 且绝不重建。
 - 本切片定向 controller/process 21/21；cluster-admin 全包 348 项为 345 pass、3 条件 skip、0 fail；完整 18-package 串行 build/test 退出 0；backend 1196 项为 1194 pass、2 条件 skip、0 fail；package boundary、cluster dependency、edge import、cluster deployment 均无 finding，部署/包边界聚焦测试 61/61。PostgreSQL `18.4` arm64 physical HA 125 项、timeline `1→2` 通过，报告 SHA-256 `bec512767fbbd7774baa9366698f60c25c8b017ed66f459b154d143fe86293bc`，临时 Docker 资源已清理。共享 `approved_action_executions` contract、PostgreSQL 权限与 Worker Credential 调用链均未修改；实现继续位于既有 `cluster-admin/plugin-package/executor`，Edge/Standalone 不加载 controller，也没有新增 workspace package、连接、timer、watcher 或常驻内存。
 - ADR 继续保持 Proposed：升级失败自动回滚、`executing + Job/receipt 均缺失` 的显式人工处置产品路径，以及固定物理低配设备证据仍待完成。
+- 后续 ADR-0397 已完成上述 Secret Action 显式人工处置。ADR-0398 进一步把 Local/Cluster 安装恢复顺序改为“Secret transition prerequisite → staged candidate materialization/publish → active pointer CAS → active-only reconciliation”。确定性候选错误在 pointer 发布前把当前安装写为 failed，`activeLockDigest` 保持上一 lock，旧 generation/binding/revision 继续服务；可用性错误只重试。该实现不新增 package、migration、连接或常驻组件。
+- ADR-0398 的 18-package clean build/test、backend、边界/依赖/部署/edge import 审计与 PostgreSQL
+  `18.4` arm64 physical HA 已闭合；HA 通过 125 项门、timeline `1→2`，报告 SHA-256
+  `75d7a52be75c22b2aacf32f2d7e2c432a467ebaab4d639668ff3a4b98767a17e`。真实 Kubernetes
+  失败升级未移动 active pointer/head 的现场门与固定物理低配设备证据仍阻断 ADR Accepted。

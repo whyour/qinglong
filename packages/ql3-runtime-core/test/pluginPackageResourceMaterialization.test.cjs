@@ -12,9 +12,11 @@ const {
 } = require('../dist/plugin-package/pluginPackage');
 const {
   createPluginPackageLock,
+  createPluginPackageInstall,
   pluginPackageInstallActionDigest,
   pluginPackageInstallPlanDigest,
   serializePluginPackageManifest,
+  transitionPluginPackageInstall,
 } = require('../dist/plugin-package/installation/pluginPackageInstall');
 const {
   pluginPackageContentTreeDigest,
@@ -30,6 +32,7 @@ const {
   InvalidPluginPackageResourceMaterializationError,
   MAX_PLUGIN_PACKAGE_MATERIALIZED_RESOURCE_BYTES,
   PLUGIN_PACKAGE_MATERIALIZED_REVISION_SCHEMA,
+  PluginPackageResourceActivationPrerequisite,
   PluginPackageResourceMaterializationConflictError,
   materializeActivePluginPackageResources,
   materializePluginPackageResources,
@@ -40,6 +43,7 @@ const {
 
 const ARTIFACT_DIGEST = 'a'.repeat(64);
 const OCI_MANIFEST_DIGEST = 'f'.repeat(64);
+const PREVIOUS_LOCK_DIGEST = 'c'.repeat(64);
 
 function resourceValues(overrides = {}) {
   return {
@@ -208,13 +212,24 @@ function fixture(options = {}) {
     .sort((left, right) => left.path.localeCompare(right.path));
   const contentDigest = pluginPackageContentTreeDigest(descriptors);
   const installEnvironment = environment();
-  const plan = planPluginPackageInstall(packageManifest, installEnvironment);
+  const previousManifest = options.upgrade
+    ? {
+        ...packageManifest,
+        metadata: { ...packageManifest.metadata, version: '0.9.0' },
+      }
+    : undefined;
+  const plan = planPluginPackageInstall(
+    packageManifest,
+    installEnvironment,
+    previousManifest,
+  );
   const actionInput = {
     lockId: 'lock-001',
     projectId: 'project-001',
     manifest: packageManifest,
     plan,
     environment: installEnvironment,
+    ...(previousManifest === undefined ? {} : { previousManifest }),
     source: {
       kind: 'oci',
       locator:
@@ -226,7 +241,10 @@ function fixture(options = {}) {
     },
     architecture: 'arm64',
     deploymentProfile: 'edge',
-    targetGeneration: 1,
+    targetGeneration: options.upgrade ? 2 : 1,
+    ...(options.upgrade
+      ? { previousLockDigest: PREVIOUS_LOCK_DIGEST }
+      : {}),
   };
   const lock = createPluginPackageLock({
     ...actionInput,
@@ -249,7 +267,9 @@ function fixture(options = {}) {
     packageName: lock.packageName,
     lockDigest: lock.lockDigest,
     generation: lock.targetGeneration,
-    previousActiveLockDigest: null,
+    previousActiveLockDigest: options.upgrade
+      ? PREVIOUS_LOCK_DIGEST
+      : null,
     contentDigest,
     resources: lock.resources,
   });
@@ -266,6 +286,24 @@ function fixture(options = {}) {
     entries,
     registry: createBuiltInTaskSpecSemanticRegistry(),
   };
+}
+
+function stagedRecord(value) {
+  const queued = createPluginPackageInstall(value.lock, {
+    installationId: value.generation.installationId,
+    mutationId: 'candidate-created',
+    occurredAtMs: 201,
+  });
+  return transitionPluginPackageInstall(value.lock, queued, {
+    type: 'stage_completed',
+    mutationId: 'candidate-staged',
+    occurredAtMs: 202,
+    stageRef: `stage:${value.lock.lockDigest}`,
+    artifactDigest: value.lock.source.artifactDigest,
+    manifestDigest: value.lock.manifestDigest,
+    contentDigest: value.lock.source.contentDigest,
+    evidenceDigest: 'e'.repeat(64),
+  });
 }
 
 test('materializes exact Task, Workflow, Prompt and Tool JSON into one immutable revision', () => {
@@ -705,6 +743,134 @@ test('reads active bytes sequentially with explicit bounds and rejects a generat
     }),
     PluginPackageResourceMaterializationConflictError,
   );
+});
+
+test('qualifies and durably publishes a staged candidate before activation', async () => {
+  const value = fixture({ upgrade: true });
+  const record = stagedRecord(value);
+  let durable = null;
+  let publications = 0;
+  const prerequisite = new PluginPackageResourceActivationPrerequisite({
+    byteSource: {
+      async open(generation) {
+        assert.equal(
+          generation.generationDigest,
+          value.generation.generationDigest,
+        );
+        return {
+          async read(path) {
+            return path === 'package.json'
+              ? value.manifestBytes
+              : value.resourceBytes[path];
+          },
+          async close() {},
+        };
+      },
+    },
+    materializedRepository: {
+      async find(generationDigest) {
+        return durable?.generation.generationDigest === generationDigest
+          ? durable
+          : null;
+      },
+      async publish(revision) {
+        publications += 1;
+        durable = revision;
+        return { status: 'created', revision };
+      },
+    },
+    taskSpecSemanticRegistry: value.registry,
+  });
+
+  assert.deepEqual(await prerequisite.inspect(record, value.lock), {
+    status: 'ready',
+  });
+  assert.equal(publications, 1);
+  assert.equal(
+    durable.generation.generationDigest,
+    value.generation.generationDigest,
+  );
+  assert.deepEqual(await prerequisite.inspect(record, value.lock), {
+    status: 'ready',
+  });
+  assert.equal(publications, 1);
+});
+
+test('rejects a semantically invalid staged candidate without publishing it', async () => {
+  const value = fixture({
+    upgrade: true,
+    resourceValues: {
+      'workflows/daily.json': {
+        schema: 'qinglong/plugin-package-workflow-resource@v1',
+        id: 'daily',
+        name: 'Daily report',
+        enabled: true,
+        steps: [{ id: 'missing', task: 'missing', needs: [] }],
+      },
+    },
+  });
+  const record = stagedRecord(value);
+  let publications = 0;
+  const prerequisite = new PluginPackageResourceActivationPrerequisite({
+    byteSource: {
+      async open() {
+        return {
+          async read(path) {
+            return path === 'package.json'
+              ? value.manifestBytes
+              : value.resourceBytes[path];
+          },
+          async close() {},
+        };
+      },
+    },
+    materializedRepository: {
+      async find() {
+        return null;
+      },
+      async publish(revision) {
+        publications += 1;
+        return { status: 'created', revision };
+      },
+    },
+    taskSpecSemanticRegistry: value.registry,
+  });
+
+  assert.deepEqual(await prerequisite.inspect(record, value.lock), {
+    status: 'rejected',
+    reason: 'activation_fact_conflict',
+  });
+  assert.equal(publications, 0);
+});
+
+test('leaves generation-one qualification to the post-activation B1 binding ceremony', async () => {
+  const value = fixture();
+  const record = stagedRecord(value);
+  let authorityCalls = 0;
+  const prerequisite = new PluginPackageResourceActivationPrerequisite({
+    byteSource: {
+      async open() {
+        authorityCalls += 1;
+        throw new Error('generation one must not read candidate bytes');
+      },
+    },
+    materializedRepository: {
+      async find() {
+        authorityCalls += 1;
+        return null;
+      },
+      async publish(revision) {
+        authorityCalls += 1;
+        return { status: 'created', revision };
+      },
+    },
+    taskSpecSemanticRegistry: value.registry,
+  });
+
+  assert.deepEqual(await prerequisite.inspect(record, value.lock), {
+    status: 'ready',
+  });
+  assert.equal(authorityCalls, 0);
 });
 
 test('publishes materialization only through the explicit runtime-core subpath', () => {

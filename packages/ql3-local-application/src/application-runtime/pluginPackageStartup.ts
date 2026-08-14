@@ -1,9 +1,13 @@
 import { LocalPluginPackageActivationPublisher } from '@qinglong/local-admin/package-activation';
-import { LocalPluginPackageResourceByteSource } from '@qinglong/local-admin/package-resource-materialization';
+import {
+  createLocalPluginPackageResourceActivationPrerequisite,
+  LocalPluginPackageResourceByteSource,
+} from '@qinglong/local-admin/package-resource-materialization';
 import {
   PluginPackageRecoveryCoordinator,
   type PluginPackageRecoveryCycleResult,
 } from '@qinglong/runtime-core/plugin-package-recovery';
+import { sequencePluginPackageActivationPrerequisites } from '@qinglong/runtime-core/plugin-package-installation';
 import {
   PluginPackageAutomationPublicationCoordinator,
   PluginPackageAutomationPublicationRecoveryCoordinator,
@@ -47,6 +51,15 @@ export async function recoverLocalApplicationPluginPackages(
   const pluginPackageInstalls = await storage.pluginPackageInstalls();
   const pluginPackageActivationPrerequisite =
     await storage.pluginPackageActivationPrerequisite();
+  const taskSpecSemanticRegistry = createBuiltInTaskSpecSemanticRegistry();
+  const pluginPackageMaterializedRevisions =
+    await storage.pluginPackageMaterializedRevisions();
+  const pluginPackageSecretBindings =
+    await storage.pluginPackageSecretBindings();
+  const pluginPackageResourceByteSource =
+    new LocalPluginPackageResourceByteSource({
+      stagingRoot: options.pluginPackages.stagingRoot,
+    });
   const pluginPackageActivation = new LocalPluginPackageActivationPublisher({
     stagingRoot: options.pluginPackages.stagingRoot,
     activationRoot: options.pluginPackages.activationRoot,
@@ -56,7 +69,15 @@ export async function recoverLocalApplicationPluginPackages(
     repository: pluginPackageInstalls,
     stageProvider: options.pluginPackages.stageProvider,
     publisher: pluginPackageActivation,
-    activationPrerequisite: pluginPackageActivationPrerequisite,
+    activationPrerequisite: sequencePluginPackageActivationPrerequisites([
+      pluginPackageActivationPrerequisite,
+      createLocalPluginPackageResourceActivationPrerequisite({
+        byteSource: pluginPackageResourceByteSource,
+        materializedRepository: pluginPackageMaterializedRevisions,
+        secretBindingSource: pluginPackageSecretBindings,
+        taskSpecSemanticRegistry,
+      }),
+    ]),
     now: options.pluginPackages.now,
   }).recover({
     ...(options.pluginPackages.pageSize === undefined
@@ -77,22 +98,15 @@ export async function recoverLocalApplicationPluginPackages(
     pluginPackageRecovery,
   });
 
-  const taskSpecSemanticRegistry = createBuiltInTaskSpecSemanticRegistry();
   const pluginPackageTaskReconciliations =
     await storage.pluginPackageTaskReconciliations();
-  const pluginPackageMaterializedRevisions =
-    await storage.pluginPackageMaterializedRevisions();
-  const pluginPackageSecretBindings =
-    await storage.pluginPackageSecretBindings();
   const pluginPackageTaskPublicationRecovery =
     await new PluginPackageTaskPublicationRecoveryCoordinator({
       source: pluginPackageTaskReconciliations,
       publisher: new PluginPackageTaskPublicationCoordinator({
         generationSource: pluginPackageActivation,
         lockSource: pluginPackageInstalls,
-        byteSource: new LocalPluginPackageResourceByteSource({
-          stagingRoot: options.pluginPackages.stagingRoot,
-        }),
+        byteSource: pluginPackageResourceByteSource,
         materializedRepository: pluginPackageMaterializedRevisions,
         secretBindingSource: pluginPackageSecretBindings,
         reconciliationRepository: pluginPackageTaskReconciliations,

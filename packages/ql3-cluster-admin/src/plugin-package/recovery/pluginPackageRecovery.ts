@@ -13,12 +13,16 @@ import {
   PluginPackageRecoveryCoordinator,
   type PluginPackageRecoveryCycleResult,
 } from '@qinglong/runtime-core/plugin-package-recovery';
+import { sequencePluginPackageActivationPrerequisites } from '@qinglong/runtime-core/plugin-package-installation';
 import {
   PluginPackageAutomationPublicationCoordinator,
   PluginPackageAutomationPublicationRecoveryCoordinator,
   type PluginPackageAutomationPublicationRecoveryCycleResult,
 } from '@qinglong/runtime-core/plugin-package-automation-publication';
-import type { PluginPackageResourceByteSource } from '@qinglong/runtime-core/plugin-package-resource-materialization';
+import {
+  PluginPackageResourceActivationPrerequisite,
+  type PluginPackageResourceByteSource,
+} from '@qinglong/runtime-core/plugin-package-resource-materialization';
 import {
   MAX_PLUGIN_PACKAGE_TASK_PUBLICATION_RECOVERY_PAGES,
   MAX_PLUGIN_PACKAGE_TASK_PUBLICATION_RECOVERY_PAGE_SIZE,
@@ -326,14 +330,31 @@ export async function recoverClusterPluginPackages(
         authority: stageAuthority as ClusterPluginPackageOciStageAuthority,
         lockSource: repository,
       });
+    const taskSpecSemanticRegistry = createBuiltInTaskSpecSemanticRegistry();
+    const materializedRepository =
+      new PostgresPluginPackageMaterializedRevisionRepository(
+        database.pool,
+        taskSpecSemanticRegistry,
+      );
+    const secretBindingRepository =
+      new PostgresPluginPackageSecretBindingRepository(database.pool);
+    const secretBindingActivationPrerequisite =
+      new PostgresPluginPackageSecretBindingActivationPrerequisite(
+        database.pool,
+      );
     const recovery = await new PluginPackageRecoveryCoordinator({
       repository,
       stageProvider: stageAuthority,
       publisher,
-      activationPrerequisite:
-        new PostgresPluginPackageSecretBindingActivationPrerequisite(
-          database.pool,
-        ),
+      activationPrerequisite: sequencePluginPackageActivationPrerequisites([
+        secretBindingActivationPrerequisite,
+        new PluginPackageResourceActivationPrerequisite({
+          byteSource: resourceByteSource,
+          materializedRepository,
+          secretBindingSource: secretBindingRepository,
+          taskSpecSemanticRegistry,
+        }),
+      ]),
       now: options.now,
     }).recover({
       ...(options.pageSize === undefined ? {} : { pageSize: options.pageSize }),
@@ -342,19 +363,11 @@ export async function recoverClusterPluginPackages(
     if (!recovery.safeToAdmit) {
       throw new ClusterPluginPackageRecoveryRequiredError(recovery);
     }
-    const taskSpecSemanticRegistry = createBuiltInTaskSpecSemanticRegistry();
     const taskReconciliationRepository =
       new PostgresPluginPackageTaskReconciliationRepository(
         database.pool,
         taskSpecSemanticRegistry,
       );
-    const materializedRepository =
-      new PostgresPluginPackageMaterializedRevisionRepository(
-        database.pool,
-        taskSpecSemanticRegistry,
-      );
-    const secretBindingRepository =
-      new PostgresPluginPackageSecretBindingRepository(database.pool);
     const taskPublicationRecovery =
       await new PluginPackageTaskPublicationRecoveryCoordinator({
         source: taskReconciliationRepository,

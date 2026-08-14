@@ -11,9 +11,10 @@ import {
   normalizePluginPackageResourceGeneration,
   type PluginPackageResourceGeneration,
 } from '@qinglong/runtime-core/plugin-package-resource-generation';
-import type {
-  PluginPackageResourceByteReader,
-  PluginPackageResourceByteSource,
+import {
+  PluginPackageResourceActivationPrerequisite,
+  type PluginPackageResourceByteReader,
+  type PluginPackageResourceByteSource,
 } from '@qinglong/runtime-core/plugin-package-resource-materialization';
 
 const STAGE_RECEIPT_SCHEMA = 'qinglong/plugin-package-stage-receipt@v1';
@@ -25,6 +26,15 @@ const BLOB = /^[0-9]{4}-[0-9a-f]{64}\.blob$/;
 export interface LocalPluginPackageResourceByteSourceOptions {
   /** Existing owner-only 0700 root used by Package staging. */
   readonly stagingRoot: string;
+}
+
+export type LocalPluginPackageResourceActivationPrerequisiteOptions =
+  ConstructorParameters<typeof PluginPackageResourceActivationPrerequisite>[0];
+
+export function createLocalPluginPackageResourceActivationPrerequisite(
+  options: LocalPluginPackageResourceActivationPrerequisiteOptions,
+): PluginPackageResourceActivationPrerequisite {
+  return new PluginPackageResourceActivationPrerequisite(options);
 }
 
 export class InvalidLocalPluginPackageResourceSourceError extends Error {

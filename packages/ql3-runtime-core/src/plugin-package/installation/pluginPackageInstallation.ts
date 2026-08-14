@@ -40,6 +40,10 @@ export type PluginPackageActivationPrerequisiteObservation =
   | Readonly<{
       status: 'deferred';
       reason: 'secret_binding_transition_required';
+    }>
+  | Readonly<{
+      status: 'rejected';
+      reason: 'activation_fact_conflict';
     }>;
 
 export interface PluginPackageActivationPrerequisite {
@@ -47,6 +51,37 @@ export interface PluginPackageActivationPrerequisite {
     record: Readonly<PluginPackageInstallRecord>,
     lock: Readonly<PluginPackageLock>,
   ): Promise<Readonly<PluginPackageActivationPrerequisiteObservation>>;
+}
+
+export function sequencePluginPackageActivationPrerequisites(
+  prerequisites: readonly PluginPackageActivationPrerequisite[],
+): PluginPackageActivationPrerequisite {
+  if (
+    !Array.isArray(prerequisites) ||
+    prerequisites.length < 1 ||
+    prerequisites.length > 8 ||
+    prerequisites.some(
+      (prerequisite) =>
+        !prerequisite || typeof prerequisite.inspect !== 'function',
+    )
+  ) {
+    throw new InvalidPluginPackageInstallError(
+      'activation prerequisite sequence is invalid',
+    );
+  }
+  const sequence = Object.freeze([...prerequisites]);
+  return Object.freeze({
+    async inspect(
+      record: Readonly<PluginPackageInstallRecord>,
+      lock: Readonly<PluginPackageLock>,
+    ): Promise<Readonly<PluginPackageActivationPrerequisiteObservation>> {
+      for (const prerequisite of sequence) {
+        const observation = await prerequisite.inspect(record, lock);
+        if (observation.status !== 'ready') return observation;
+      }
+      return Object.freeze({ status: 'ready' as const });
+    },
+  });
 }
 
 export interface InstallPluginPackageOptions {
@@ -224,6 +259,19 @@ export class PluginPackageInstallationCoordinator {
         lock,
       );
       if (prerequisite?.status === 'deferred') return record;
+      if (prerequisite?.status === 'rejected') {
+        const failed = transitionPluginPackageInstall(lock, record, {
+          type: 'failed',
+          mutationId: options.activationFailedMutationId,
+          occurredAtMs: options.activationObservedAtMs,
+          reason: prerequisite.reason,
+        });
+        return (
+          await this.#repository.commit(
+            pluginPackageInstallCommit(record, failed),
+          )
+        ).record;
+      }
       return this.#activation.activate({
         ...identity,
         activationStartedMutationId: options.activationStartedMutationId,

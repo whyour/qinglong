@@ -10,12 +10,21 @@ import {
   type PluginPackageContentEntryDescriptor,
 } from './pluginPackageBundle';
 import {
+  PluginPackageInstallUnavailableError,
+  assertPluginPackageInstallMatchesLock,
+  normalizePluginPackageInstallRecord,
   normalizePluginPackageLock,
   pluginPackageManifestDigest,
   serializePluginPackageManifest,
+  type PluginPackageInstallRecord,
   type PluginPackageLock,
 } from './installation/pluginPackageInstall';
+import type {
+  PluginPackageActivationPrerequisite,
+  PluginPackageActivationPrerequisiteObservation,
+} from './installation/pluginPackageInstallation';
 import {
+  createPluginPackageResourceGenerationFromReferences,
   normalizePluginPackageResourceGeneration,
   pluginPackageResourceReferencesFromContents,
   type PluginPackageResourceGeneration,
@@ -185,6 +194,17 @@ export interface MaterializeActivePluginPackageResourcesOptions {
   readonly taskSpecSemanticRegistry: TaskSpecSemanticRegistry;
 }
 
+export interface MaterializePluginPackageResourceGenerationOptions {
+  readonly generation: Readonly<PluginPackageResourceGeneration>;
+  readonly lock: Readonly<PluginPackageLock>;
+  readonly byteSource: PluginPackageResourceByteSource;
+  readonly secretBindingSource?: Pick<
+    PluginPackageSecretBindingRepository,
+    'find'
+  >;
+  readonly taskSpecSemanticRegistry: TaskSpecSemanticRegistry;
+}
+
 export interface PluginPackageMaterializedRevisionRepository {
   find(
     generationDigest: string,
@@ -195,6 +215,115 @@ export interface PluginPackageMaterializedRevisionRepository {
       revision: Readonly<PluginPackageMaterializedRevision>;
     }>
   >;
+}
+
+export class PluginPackageResourceActivationPrerequisite
+  implements PluginPackageActivationPrerequisite
+{
+  constructor(
+    private readonly options: {
+      readonly byteSource: PluginPackageResourceByteSource;
+      readonly materializedRepository: PluginPackageMaterializedRevisionRepository;
+      readonly secretBindingSource?: Pick<
+        PluginPackageSecretBindingRepository,
+        'find'
+      >;
+      readonly taskSpecSemanticRegistry: TaskSpecSemanticRegistry;
+    },
+  ) {
+    const authorities = dataRecord(options, 'activation prerequisite options');
+    exactKeys(
+      authorities,
+      ['byteSource', 'materializedRepository', 'taskSpecSemanticRegistry'],
+      ['secretBindingSource'],
+      'activation prerequisite options',
+    );
+    if (
+      !options.byteSource ||
+      typeof options.byteSource.open !== 'function' ||
+      !options.materializedRepository ||
+      typeof options.materializedRepository.find !== 'function' ||
+      typeof options.materializedRepository.publish !== 'function' ||
+      (options.secretBindingSource !== undefined &&
+        (!options.secretBindingSource ||
+          typeof options.secretBindingSource.find !== 'function')) ||
+      !(options.taskSpecSemanticRegistry instanceof TaskSpecSemanticRegistry)
+    ) {
+      invalid('activation prerequisite authority is invalid');
+    }
+  }
+
+  async inspect(
+    recordValue: Readonly<PluginPackageInstallRecord>,
+    lockValue: Readonly<PluginPackageLock>,
+  ): Promise<Readonly<PluginPackageActivationPrerequisiteObservation>> {
+    try {
+      const record = normalizePluginPackageInstallRecord(recordValue);
+      const lock = normalizePluginPackageLock(lockValue);
+      assertPluginPackageInstallMatchesLock(lock, record);
+      if (record.state !== 'staged') {
+        invalid('activation prerequisite requires a staged install');
+      }
+      // Generation one may require the post-activation B1 binding ceremony.
+      // There is no healthy previous pointer to preserve in that flow.
+      if (record.previousActiveLockDigest === null) {
+        return Object.freeze({ status: 'ready' as const });
+      }
+      const generation = createPluginPackageResourceGenerationFromReferences({
+        installationId: record.installationId,
+        projectId: record.projectId,
+        packageName: record.packageName,
+        lockDigest: lock.lockDigest,
+        generation: lock.targetGeneration,
+        previousActiveLockDigest: record.previousActiveLockDigest,
+        contentDigest: lock.source.contentDigest,
+        resources: lock.resources,
+      });
+      let revision = await this.options.materializedRepository.find(
+        generation.generationDigest,
+      );
+      if (revision === null) {
+        const candidate = await materializePluginPackageResourceGeneration({
+          generation,
+          lock,
+          byteSource: this.options.byteSource,
+          ...(this.options.secretBindingSource === undefined
+            ? {}
+            : { secretBindingSource: this.options.secretBindingSource }),
+          taskSpecSemanticRegistry: this.options.taskSpecSemanticRegistry,
+        });
+        revision = (
+          await this.options.materializedRepository.publish(candidate)
+        ).revision;
+      }
+      const durable = normalizePluginPackageMaterializedRevision(
+        revision,
+        this.options.taskSpecSemanticRegistry,
+      );
+      if (
+        durable.generation.generationDigest !== generation.generationDigest ||
+        durable.generation.installationId !== record.installationId ||
+        durable.generation.lockDigest !== lock.lockDigest
+      ) {
+        throw new PluginPackageResourceMaterializationConflictError(
+          'durable candidate revision does not match the staged generation',
+        );
+      }
+      return Object.freeze({ status: 'ready' as const });
+    } catch (error) {
+      if (
+        error instanceof InvalidPluginPackageResourceMaterializationError ||
+        error instanceof PluginPackageResourceMaterializationConflictError
+      ) {
+        return Object.freeze({
+          status: 'rejected' as const,
+          reason: 'activation_fact_conflict' as const,
+        });
+      }
+      if (error instanceof PluginPackageInstallUnavailableError) throw error;
+      throw new PluginPackageInstallUnavailableError();
+    }
+  }
 }
 
 export interface PluginPackageTaskDefinitionDraft {
@@ -1282,32 +1411,39 @@ function materializationSources(
   }
 }
 
-export async function materializeActivePluginPackageResources(
-  value: MaterializeActivePluginPackageResourcesOptions,
-): Promise<Readonly<PluginPackageMaterializedRevision> | null> {
-  materializationSources(value);
+function generationMaterializationSources(
+  value: MaterializePluginPackageResourceGenerationOptions,
+): void {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !value.byteSource ||
+    typeof value.byteSource.open !== 'function' ||
+    (value.secretBindingSource !== undefined &&
+      (!value.secretBindingSource ||
+        typeof value.secretBindingSource.find !== 'function')) ||
+    !(value.taskSpecSemanticRegistry instanceof TaskSpecSemanticRegistry)
+  ) {
+    invalid('generation materialization sources are invalid');
+  }
+}
+
+/**
+ * Qualifies one immutable candidate generation without consulting or moving
+ * the active pointer. Callers may durably publish the returned revision before
+ * activation so deterministic Package errors cannot replace a healthy head.
+ */
+export async function materializePluginPackageResourceGeneration(
+  value: MaterializePluginPackageResourceGenerationOptions,
+): Promise<Readonly<PluginPackageMaterializedRevision>> {
+  generationMaterializationSources(value);
   try {
-    const first = await value.generationSource.findActiveResourceGeneration(
-      value.projectId,
-      value.packageName,
+    const generation = normalizePluginPackageResourceGeneration(
+      value.generation,
     );
-    if (first === null) return null;
-    const generation = normalizePluginPackageResourceGeneration(first);
-    if (
-      generation.projectId !== value.projectId ||
-      generation.packageName !== value.packageName
-    ) {
-      throw new PluginPackageResourceMaterializationConflictError(
-        'generation source returned another Package identity',
-      );
-    }
-    const lockValue = await value.lockSource.findLock(generation.lockDigest);
-    if (lockValue === null) {
-      throw new PluginPackageResourceMaterializationConflictError(
-        'active generation lock is missing',
-      );
-    }
-    const lock = normalizePluginPackageLock(lockValue);
+    const lock = normalizePluginPackageLock(value.lock);
+    assertGenerationMatchesLock(generation, lock);
     const reader = await value.byteSource.open(generation);
     if (
       !reader ||
@@ -1350,20 +1486,68 @@ export async function materializeActivePluginPackageResources(
         });
       }
     }
-    const activeManifest = normalizeManifestBytes(manifestBytes, lock);
-    const activeSecretBindingValue =
-      activeManifest.spec.permissions.secrets.length === 0
+    const manifest = normalizeManifestBytes(manifestBytes, lock);
+    const bindingValue =
+      manifest.spec.permissions.secrets.length === 0
         ? undefined
         : await value.secretBindingSource?.find(generation.generationDigest);
-    const activeSecretBinding = activeSecretBindingValue ?? undefined;
-    const revision = materializePluginPackageResources({
+    return materializePluginPackageResources({
       generation,
       lock,
       manifestBytes,
-      ...(activeSecretBinding === undefined
+      ...(bindingValue === undefined || bindingValue === null
         ? {}
-        : { secretBinding: activeSecretBinding }),
+        : { secretBinding: bindingValue }),
       resources: Object.freeze(resources),
+      taskSpecSemanticRegistry: value.taskSpecSemanticRegistry,
+    });
+  } catch (error) {
+    if (
+      error instanceof InvalidPluginPackageResourceMaterializationError ||
+      error instanceof PluginPackageResourceMaterializationConflictError ||
+      error instanceof PluginPackageResourceMaterializationUnavailableError
+    ) {
+      throw error;
+    }
+    throw new PluginPackageResourceMaterializationUnavailableError({
+      cause: error instanceof Error ? error : undefined,
+    });
+  }
+}
+
+export async function materializeActivePluginPackageResources(
+  value: MaterializeActivePluginPackageResourcesOptions,
+): Promise<Readonly<PluginPackageMaterializedRevision> | null> {
+  materializationSources(value);
+  try {
+    const first = await value.generationSource.findActiveResourceGeneration(
+      value.projectId,
+      value.packageName,
+    );
+    if (first === null) return null;
+    const generation = normalizePluginPackageResourceGeneration(first);
+    if (
+      generation.projectId !== value.projectId ||
+      generation.packageName !== value.packageName
+    ) {
+      throw new PluginPackageResourceMaterializationConflictError(
+        'generation source returned another Package identity',
+      );
+    }
+    const lockValue = await value.lockSource.findLock(generation.lockDigest);
+    if (lockValue === null) {
+      throw new PluginPackageResourceMaterializationConflictError(
+        'active generation lock is missing',
+      );
+    }
+    const lock = normalizePluginPackageLock(lockValue);
+    const revision = await materializePluginPackageResourceGeneration({
+      generation,
+      lock,
+      byteSource: value.byteSource,
+      ...(value.secretBindingSource === undefined
+        ? {}
+        : { secretBindingSource: value.secretBindingSource }),
       taskSpecSemanticRegistry: value.taskSpecSemanticRegistry,
     });
     const secondValue =

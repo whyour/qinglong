@@ -311,6 +311,25 @@ export class PluginPackageRecoveryCoordinator {
         lock,
       );
       if (prerequisite?.status === 'deferred') return record;
+      if (prerequisite?.status === 'rejected') {
+        const failed = transitionPluginPackageInstall(lock, record, {
+          type: 'failed',
+          mutationId: mutationId(
+            'activation-preparation-failed',
+            record,
+            occurredAtMs,
+          ),
+          occurredAtMs,
+          reason: prerequisite.reason,
+        });
+        return normalizePluginPackageInstallRecord(
+          (
+            await this.#repository.commit(
+              pluginPackageInstallCommit(record, failed),
+            )
+          ).record,
+        );
+      }
       return this.#activation.activate({
         ...identity,
         activationStartedMutationId: mutationId(
