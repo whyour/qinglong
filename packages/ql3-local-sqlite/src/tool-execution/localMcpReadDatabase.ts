@@ -5,6 +5,10 @@ import type {
   ProjectRunListQuery,
   ProjectRunListReader,
 } from '@qinglong/runtime-core/project-run-list';
+import type {
+  TaskRunOutcomeWindowQuery,
+  TaskRunOutcomeWindowReader,
+} from '@qinglong/runtime-core/task-run-outcome-window';
 import {
   RunRepositoryBusyError,
   RunRepositoryOperationError,
@@ -26,6 +30,7 @@ import {
   type LocalSqliteReadinessEvidence,
 } from '../readiness/readiness';
 import { LocalSqliteRunReader } from '../run/runReader';
+import { LocalSqliteTaskRunOutcomeWindowReader } from '../run/outcome-comparison/taskRunOutcomeWindowReader';
 import { LocalSqliteStepRunRepository } from '../run/stepRunRepository';
 import {
   assertLocalSqliteOptions,
@@ -44,7 +49,8 @@ export interface LocalSqliteMcpReadDatabase {
   readonly profile: LocalSqliteProfile;
   readonly readiness: LocalSqliteReadinessEvidence;
   readonly runs: Pick<RunRepositoryReader, 'findRunById' | 'listEvents'> &
-    ProjectRunListReader;
+    ProjectRunListReader &
+    TaskRunOutcomeWindowReader;
   readonly stepRuns: Pick<StepRunRepository, 'listByRun'>;
   readonly taskDefinitions: Pick<
     TaskDefinitionSource,
@@ -76,16 +82,31 @@ export async function openLocalSqliteMcpReadDatabase(
     const readiness = await auditLocalSqliteReadiness(client);
     const authority = new LocalSqliteOperationAuthority(client);
     const reader = new LocalSqliteRunReader(client);
+    const outcomeWindowReader = new LocalSqliteTaskRunOutcomeWindowReader(
+      client,
+    );
     const stepRunRepository = new LocalSqliteStepRunRepository(authority);
     const taskRepository = new LocalSqliteTaskDefinitionRepository(authority);
     const triggerRepository = new LocalSqliteTriggerRepository(authority);
     const approvalSource = new LocalSqliteApprovalRequestSource(authority);
     const security = new LocalSqliteSecurityAuthorityStore(authority);
     const runs: Pick<RunRepositoryReader, 'findRunById' | 'listEvents'> &
-      ProjectRunListReader = Object.freeze({
+      ProjectRunListReader &
+      TaskRunOutcomeWindowReader = Object.freeze({
       listRunsByProject(query: Readonly<ProjectRunListQuery>) {
         return authority.enqueue(
           () => reader.listRunsByProject(query),
+          (reason) =>
+            reason === 'busy'
+              ? new RunRepositoryBusyError()
+              : new RunRepositoryOperationError(
+                  new Error('Local SQLite MCP read database is closed'),
+                ),
+        );
+      },
+      listRecentRunsByTask(query: Readonly<TaskRunOutcomeWindowQuery>) {
+        return authority.enqueue(
+          () => outcomeWindowReader.listRecentRunsByTask(query),
           (reason) =>
             reason === 'busy'
               ? new RunRepositoryBusyError()

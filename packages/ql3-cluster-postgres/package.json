@@ -75,6 +75,11 @@
       "require": "./dist/run-management/runManualRetryRepository.js",
       "default": "./dist/run-management/runManualRetryRepository.js"
     },
+    "./task-run-outcome-window": {
+      "types": "./dist/run/outcome-comparison/taskRunOutcomeWindowReader.d.ts",
+      "require": "./dist/run/outcome-comparison/taskRunOutcomeWindowReader.js",
+      "default": "./dist/run/outcome-comparison/taskRunOutcomeWindowReader.js"
+    },
     "./run-manager": {
       "types": "./dist/entrypoints/runManager.d.ts",
       "require": "./dist/entrypoints/runManager.js",

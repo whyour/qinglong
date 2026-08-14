@@ -205,6 +205,11 @@
       "require": "./dist/tool-execution/localMcpReadDatabase.js",
       "default": "./dist/tool-execution/localMcpReadDatabase.js"
     },
+    "./task-run-outcome-window": {
+      "types": "./dist/run/outcome-comparison/taskRunOutcomeWindowReader.d.ts",
+      "require": "./dist/run/outcome-comparison/taskRunOutcomeWindowReader.js",
+      "default": "./dist/run/outcome-comparison/taskRunOutcomeWindowReader.js"
+    },
     "./approved-action": {
       "types": "./dist/approved-action/approvalRequestRepository.d.ts",
       "require": "./dist/approved-action/approvalRequestRepository.js",

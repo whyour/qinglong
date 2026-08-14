@@ -165,6 +165,7 @@ function fixture(options = {}) {
   const audits = [];
   let reads = 0;
   let listReads = 0;
+  let outcomeWindowReads = 0;
   let eventReads = 0;
   let taskListReads = 0;
   let triggerListReads = 0;
@@ -180,6 +181,15 @@ function fixture(options = {}) {
     queuedAtMs: 21,
     startedAtMs: 24,
     finishedAtMs: 30,
+  });
+  const failedRun = Object.freeze({
+    ...candidateRun,
+    id: 'run-failed',
+    status: 'failed',
+    createdAtMs: 30,
+    queuedAtMs: 31,
+    startedAtMs: 34,
+    finishedAtMs: 40,
   });
   const server = createQingLongLocalMcpServer({
     projectId: 'default',
@@ -222,11 +232,37 @@ function fixture(options = {}) {
         const values = [candidateRun, run()];
         return values.slice(0, query.limit);
       },
+      async listRecentRunsByTask(query) {
+        events.push('read-outcome-window');
+        outcomeWindowReads += 1;
+        assert.deepEqual(query, {
+          projectId: 'default',
+          taskId: 'task-1',
+          limit: 65,
+        });
+        return [
+          {
+            id: failedRun.id,
+            projectId: failedRun.projectId,
+            taskId: failedRun.taskId,
+            status: failedRun.status,
+            createdAtMs: failedRun.createdAtMs,
+          },
+          {
+            id: 'run-1',
+            projectId: 'default',
+            taskId: 'task-1',
+            status: 'succeeded',
+            createdAtMs: 10,
+          },
+        ];
+      },
       async findRunById(runId) {
         events.push('read');
         reads += 1;
         if (runId === 'run-1') return run(options.runProjectId);
-        return runId === 'run-2' ? candidateRun : null;
+        if (runId === 'run-2') return candidateRun;
+        return runId === 'run-failed' ? failedRun : null;
       },
       async listEvents(runId, query) {
         events.push('read-events');
@@ -328,6 +364,7 @@ function fixture(options = {}) {
     counters: () => ({
       reads,
       listReads,
+      outcomeWindowReads,
       eventReads,
       taskListReads,
       triggerListReads,
@@ -393,6 +430,7 @@ test('advertises bounded read-only Run Tools and executes auth -> Policy -> Audi
       'qinglong.run.list',
       'qinglong.run.get',
       'qinglong.run.compare',
+      'qinglong.task.runs.compare',
       'qinglong.run.events.list',
       'qinglong.run.steps.list',
       'qinglong.task.get',
@@ -451,6 +489,7 @@ test('advertises bounded read-only Run Tools and executes auth -> Policy -> Audi
   assert.deepEqual(value.counters(), {
     reads: 1,
     listReads: 0,
+    outcomeWindowReads: 0,
     eventReads: 0,
     taskListReads: 0,
     triggerListReads: 0,
@@ -533,6 +572,98 @@ test('compares two Project Runs through the same fenced admission', async (t) =>
   assert.deepEqual(value.counters(), {
     reads: 2,
     listReads: 0,
+    outcomeWindowReads: 0,
+    eventReads: 0,
+    taskListReads: 0,
+    triggerListReads: 0,
+    approvalListReads: 0,
+    approvalDetailReads: 0,
+    confirmations: 1,
+  });
+});
+
+test('selects and compares latest Task outcomes through the same fenced admission', async (t) => {
+  const value = fixture();
+  const connected = await client(value.server, t);
+  const response = await connected.request('tools/call', {
+    name: 'qinglong.task.runs.compare',
+    arguments: { taskId: 'task-1' },
+  });
+  assert.equal(response.result.isError, undefined);
+  assert.deepEqual(response.result.structuredContent, {
+    taskId: 'task-1',
+    baselineOutcome: 'succeeded',
+    candidateOutcome: 'failed',
+    baseline: {
+      found: true,
+      id: 'run-1',
+      taskId: 'task-1',
+      taskRevision: 'revision-1',
+      status: 'succeeded',
+      version: 3,
+      eventSequence: 4,
+      priority: 0,
+      executionOrigin: 'manual',
+      executionOwner: 'runtime',
+      createdAtMs: 10,
+      queuedAtMs: 11,
+      startedAtMs: 12,
+      finishedAtMs: 13,
+    },
+    candidate: {
+      found: true,
+      id: 'run-failed',
+      taskId: 'task-1',
+      taskRevision: 'revision-2',
+      status: 'failed',
+      version: 3,
+      eventSequence: 4,
+      priority: 1,
+      executionOrigin: 'manual',
+      executionOwner: 'runtime',
+      createdAtMs: 30,
+      queuedAtMs: 31,
+      startedAtMs: 34,
+      finishedAtMs: 40,
+    },
+    comparable: true,
+    sameTask: true,
+    sameTaskRevision: false,
+    changedFields: ['taskRevision', 'status', 'priority'],
+    queueDelayDeltaMs: 0,
+    executionDurationDeltaMs: 5,
+    totalDurationDeltaMs: 7,
+    consistency: 'bounded_task_window_then_ordered_point_reads',
+    selection: {
+      windowLimit: 64,
+      searchedRunCount: 2,
+      hasOlderRuns: false,
+      complete: true,
+      order: 'created_at_desc_id_desc',
+    },
+  });
+  assert.deepEqual(value.permissions, [
+    'tool.call:qinglong.task.runs.compare',
+    'run.read',
+  ]);
+  assert.deepEqual(value.events, [
+    'authenticate',
+    'policy:tool.call:qinglong.task.runs.compare',
+    'policy:run.read',
+    'audit:allowed',
+    'confirm',
+    'read-outcome-window',
+    'read',
+    'read',
+  ]);
+  assert.deepEqual(value.audits[0].reasons, [
+    'tool_invocation_allowed',
+    'tool_qinglong_task_runs_compare',
+  ]);
+  assert.deepEqual(value.counters(), {
+    reads: 2,
+    listReads: 0,
+    outcomeWindowReads: 1,
     eventReads: 0,
     taskListReads: 0,
     triggerListReads: 0,
@@ -590,6 +721,7 @@ test('discovers recent Project Runs through the same fenced admission', async (t
   assert.deepEqual(value.counters(), {
     reads: 0,
     listReads: 1,
+    outcomeWindowReads: 0,
     eventReads: 0,
     taskListReads: 0,
     triggerListReads: 0,
@@ -642,6 +774,7 @@ test('lists a payload-free Run event page through the same fenced admission', as
   assert.deepEqual(value.counters(), {
     reads: 1,
     listReads: 0,
+    outcomeWindowReads: 0,
     eventReads: 1,
     taskListReads: 0,
     triggerListReads: 0,
@@ -694,6 +827,7 @@ test('discovers low-sensitive Tasks through task.read admission', async (t) => {
   assert.deepEqual(value.counters(), {
     reads: 0,
     listReads: 0,
+    outcomeWindowReads: 0,
     eventReads: 0,
     taskListReads: 1,
     triggerListReads: 0,
@@ -743,6 +877,7 @@ test('reads one current Task fence through task.read admission', async (t) => {
   assert.deepEqual(value.counters(), {
     reads: 0,
     listReads: 0,
+    outcomeWindowReads: 0,
     eventReads: 0,
     taskListReads: 1,
     triggerListReads: 0,
@@ -803,6 +938,7 @@ test('discovers low-sensitive Triggers through trigger.read admission', async (t
   assert.deepEqual(value.counters(), {
     reads: 0,
     listReads: 0,
+    outcomeWindowReads: 0,
     eventReads: 0,
     taskListReads: 0,
     triggerListReads: 1,
@@ -859,6 +995,7 @@ test('discovers low-sensitive Approvals through approval.read admission', async 
   assert.deepEqual(value.counters(), {
     reads: 0,
     listReads: 0,
+    outcomeWindowReads: 0,
     eventReads: 0,
     taskListReads: 0,
     triggerListReads: 0,
@@ -930,6 +1067,7 @@ test('reads one redacted Approval preview through approval.read and artifact.rea
   assert.deepEqual(value.counters(), {
     reads: 0,
     listReads: 0,
+    outcomeWindowReads: 0,
     eventReads: 0,
     taskListReads: 0,
     triggerListReads: 0,

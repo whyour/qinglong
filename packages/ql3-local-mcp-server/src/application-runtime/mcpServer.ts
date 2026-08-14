@@ -51,6 +51,11 @@ import {
   executeBuiltInRunCompareTool,
 } from '@qinglong/runtime-core/builtin-run-compare-projection';
 import {
+  BUILTIN_TASK_RUN_OUTCOME_COMPARE_TOOL,
+  BUILTIN_TASK_RUN_OUTCOME_COMPARE_TOOL_DEFINITION,
+  executeBuiltInTaskRunOutcomeCompareTool,
+} from '@qinglong/runtime-core/builtin-task-run-outcome-compare-projection';
+import {
   BUILTIN_RUN_READ_TOOL,
   BUILTIN_RUN_READ_TOOL_DEFINITION,
   executeBuiltInRunReadTool,
@@ -58,6 +63,7 @@ import {
 import type { RunRepositoryReader } from '@qinglong/runtime-core/run-repository';
 import type { StepRunRepository } from '@qinglong/runtime-core/step-run';
 import type { ProjectRunListReader } from '@qinglong/runtime-core/project-run-list';
+import type { TaskRunOutcomeWindowReader } from '@qinglong/runtime-core/task-run-outcome-window';
 import type { SecurityPrincipal } from '@qinglong/runtime-core/security';
 import type { TaskDefinitionSource } from '@qinglong/runtime-core/task-definition';
 import type { TriggerSource } from '@qinglong/runtime-core/trigger';
@@ -112,7 +118,8 @@ type LocalMcpRunReader = Pick<
   RunRepositoryReader,
   'findRunById' | 'listEvents'
 > &
-  ProjectRunListReader;
+  ProjectRunListReader &
+  TaskRunOutcomeWindowReader;
 
 type LocalMcpTaskReader = Pick<
   TaskDefinitionSource,
@@ -193,6 +200,24 @@ const LOCAL_MCP_READ_TOOLS: readonly LocalMcpReadToolDescriptor[] =
         projectId: string,
         input: ToolJsonValue,
       ) => executeBuiltInRunCompareTool(authority.runs, projectId, input),
+    }),
+    Object.freeze({
+      tool: BUILTIN_TASK_RUN_OUTCOME_COMPARE_TOOL,
+      definition: BUILTIN_TASK_RUN_OUTCOME_COMPARE_TOOL_DEFINITION,
+      title: 'Compare Latest QingLong Task Run Outcomes',
+      auditReason: 'tool_qinglong_task_runs_compare',
+      unavailableCode: 'task_run_outcome_compare_unavailable',
+      execute: (
+        authority: LocalMcpReadAuthority,
+        projectId: string,
+        input: ToolJsonValue,
+      ) =>
+        executeBuiltInTaskRunOutcomeCompareTool(
+          authority.runs,
+          authority.runs,
+          projectId,
+          input,
+        ),
     }),
     Object.freeze({
       tool: BUILTIN_RUN_EVENT_LIST_TOOL,

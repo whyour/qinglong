@@ -19,7 +19,7 @@ export const BUILTIN_RUN_COMPARE_TIMEOUT_SECONDS = 5;
 const MAX_INT = 2_147_483_647;
 const MIN_INT = -2_147_483_648;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/;
-const COMPARABLE_FIELDS = Object.freeze([
+export const BUILTIN_RUN_COMPARABLE_FIELDS = Object.freeze([
   'taskId',
   'taskRevision',
   'status',
@@ -28,7 +28,7 @@ const COMPARABLE_FIELDS = Object.freeze([
   'executionOwner',
 ] as const);
 
-const RUN_PROJECTION_SCHEMA = Object.freeze({
+export const BUILTIN_RUN_PROJECTION_SCHEMA = Object.freeze({
   type: 'object' as const,
   properties: {
     found: { type: 'boolean' as const },
@@ -103,8 +103,8 @@ export const BUILTIN_RUN_COMPARE_TOOL_DEFINITION = normalizeToolDefinition({
   outputSchema: {
     type: 'object',
     properties: {
-      baseline: RUN_PROJECTION_SCHEMA,
-      candidate: RUN_PROJECTION_SCHEMA,
+      baseline: BUILTIN_RUN_PROJECTION_SCHEMA,
+      candidate: BUILTIN_RUN_PROJECTION_SCHEMA,
       comparable: { type: 'boolean' },
       sameTask: { type: 'boolean' },
       sameTaskRevision: { type: 'boolean' },
@@ -113,9 +113,9 @@ export const BUILTIN_RUN_COMPARE_TOOL_DEFINITION = normalizeToolDefinition({
         items: {
           type: 'string',
           maxLength: 32,
-          enum: COMPARABLE_FIELDS,
+          enum: BUILTIN_RUN_COMPARABLE_FIELDS,
         },
-        maxItems: COMPARABLE_FIELDS.length,
+        maxItems: BUILTIN_RUN_COMPARABLE_FIELDS.length,
       },
       queueDelayDeltaMs: {
         type: 'integer',
@@ -212,14 +212,21 @@ function timestampDelta(
   return Number.isSafeInteger(delta) ? delta : undefined;
 }
 
-function compareProjections(
+export type BuiltInRunComparisonConsistency =
+  | 'ordered_independent_point_reads'
+  | 'bounded_task_window_then_ordered_point_reads';
+
+export function compareBoundedRunProjections(
   baseline: BoundedRunReadProjection,
   candidate: BoundedRunReadProjection,
+  consistency: BuiltInRunComparisonConsistency,
 ): Readonly<Record<string, ToolJsonValue>> {
   const comparable = baseline.found === true && candidate.found === true;
   const changedFields = Object.freeze(
     comparable
-      ? COMPARABLE_FIELDS.filter((field) => baseline[field] !== candidate[field])
+      ? BUILTIN_RUN_COMPARABLE_FIELDS.filter(
+          (field) => baseline[field] !== candidate[field],
+        )
       : [],
   );
   const queueDelayDeltaMs = comparable
@@ -259,7 +266,7 @@ function compareProjections(
       ? {}
       : { executionDurationDeltaMs }),
     ...(totalDurationDeltaMs === undefined ? {} : { totalDurationDeltaMs }),
-    consistency: 'ordered_independent_point_reads',
+    consistency,
   });
 }
 
@@ -295,7 +302,11 @@ export async function executeBuiltInRunCompareTool(
       projectId,
       inputRecord.candidateRunId,
     );
-    return compareProjections(baseline, candidate);
+    return compareBoundedRunProjections(
+      baseline,
+      candidate,
+      'ordered_independent_point_reads',
+    );
   } catch (error) {
     if (!(error instanceof BoundedRunReadProjectionUnavailableError)) {
       return invalid('execution context or input is invalid');

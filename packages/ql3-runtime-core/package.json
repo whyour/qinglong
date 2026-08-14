@@ -242,6 +242,12 @@
       "builtin-run-compare-projection": [
         "dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.d.ts"
       ],
+      "builtin-task-run-outcome-compare-tool": [
+        "dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareTool.d.ts"
+      ],
+      "builtin-task-run-outcome-compare-projection": [
+        "dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.d.ts"
+      ],
       "run": [
         "dist/run/run.d.ts"
       ],
@@ -253,6 +259,9 @@
       ],
       "project-run-list": [
         "dist/run/projectRunList.d.ts"
+      ],
+      "task-run-outcome-window": [
+        "dist/run/outcome-comparison/taskRunOutcomeWindow.d.ts"
       ],
       "bounded-run-read-projection": [
         "dist/run/projection/boundedRunReadProjection.d.ts"
@@ -317,6 +326,11 @@
       "types": "./dist/run/projectRunList.d.ts",
       "require": "./dist/run/projectRunList.js",
       "default": "./dist/run/projectRunList.js"
+    },
+    "./task-run-outcome-window": {
+      "types": "./dist/run/outcome-comparison/taskRunOutcomeWindow.d.ts",
+      "require": "./dist/run/outcome-comparison/taskRunOutcomeWindow.js",
+      "default": "./dist/run/outcome-comparison/taskRunOutcomeWindow.js"
     },
     "./bounded-run-read-projection": {
       "types": "./dist/run/projection/boundedRunReadProjection.d.ts",
@@ -667,6 +681,16 @@
       "types": "./dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.d.ts",
       "require": "./dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.js",
       "default": "./dist/tool-execution/builtin-run-compare/builtInRunCompareProjection.js"
+    },
+    "./builtin-task-run-outcome-compare-tool": {
+      "types": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareTool.d.ts",
+      "require": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareTool.js",
+      "default": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareTool.js"
+    },
+    "./builtin-task-run-outcome-compare-projection": {
+      "types": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.d.ts",
+      "require": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.js",
+      "default": "./dist/tool-execution/builtin-run-compare/builtInTaskRunOutcomeCompareProjection.js"
     },
     "./secret-reference": {
       "types": "./dist/secret/secretReference.d.ts",
