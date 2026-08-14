@@ -404,6 +404,7 @@
 | [ADR-0398](./ADR-0398-pre-activation-plugin-package-candidate-qualification.md)                             | Plugin Package 激活前候选资格校验与自动保留旧版本                                                                                       | Proposed（v2 私有报告/离线审计已编排、全量/HA 门完成；远端 Kubernetes 成功记录与物理低配门待闭合） |
 | [ADR-0399](./ADR-0399-external-release-attestation-for-physical-edge-evidence.md)                          | 物理 Edge 证据的外部发布归档证明                                                                                                           | Accepted（exact recorder 重建与离线验签已实现；固定实机 ceremony 待执行） |
 | [ADR-0400](./ADR-0400-bounded-trusted-run-comparison-tool.md)                                             | 有界、受信的 Run 对比 Tool                                                                                                                   | Accepted |
+| [ADR-0401](./ADR-0401-optional-local-mcp-run-comparison-surface.md)                                      | 可选本机 MCP Run 对比产品入口                                                                                                                  | Accepted |
 
 ## 规则
 

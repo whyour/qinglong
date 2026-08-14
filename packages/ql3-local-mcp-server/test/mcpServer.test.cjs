@@ -171,6 +171,16 @@ function fixture(options = {}) {
   let approvalListReads = 0;
   let approvalDetailReads = 0;
   let confirmations = 0;
+  const candidateRun = Object.freeze({
+    ...run(),
+    id: 'run-2',
+    taskRevision: 'revision-2',
+    priority: 1,
+    createdAtMs: 20,
+    queuedAtMs: 21,
+    startedAtMs: 24,
+    finishedAtMs: 30,
+  });
   const server = createQingLongLocalMcpServer({
     projectId: 'default',
     now: () => NOW,
@@ -209,13 +219,14 @@ function fixture(options = {}) {
       async listRunsByProject(query) {
         events.push('read-list');
         listReads += 1;
-        const values = [{ ...run(), id: 'run-2', createdAtMs: 20 }, run()];
+        const values = [candidateRun, run()];
         return values.slice(0, query.limit);
       },
       async findRunById(runId) {
         events.push('read');
         reads += 1;
-        return runId === 'run-1' ? run(options.runProjectId) : null;
+        if (runId === 'run-1') return run(options.runProjectId);
+        return runId === 'run-2' ? candidateRun : null;
       },
       async listEvents(runId, query) {
         events.push('read-events');
@@ -381,6 +392,7 @@ test('advertises bounded read-only Run Tools and executes auth -> Policy -> Audi
     [
       'qinglong.run.list',
       'qinglong.run.get',
+      'qinglong.run.compare',
       'qinglong.run.events.list',
       'qinglong.run.steps.list',
       'qinglong.task.get',
@@ -448,6 +460,88 @@ test('advertises bounded read-only Run Tools and executes auth -> Policy -> Audi
   });
 });
 
+test('compares two Project Runs through the same fenced admission', async (t) => {
+  const value = fixture();
+  const connected = await client(value.server, t);
+  const response = await connected.request('tools/call', {
+    name: 'qinglong.run.compare',
+    arguments: {
+      baselineRunId: 'run-1',
+      candidateRunId: 'run-2',
+    },
+  });
+  assert.equal(response.result.isError, undefined);
+  assert.deepEqual(response.result.structuredContent, {
+    baseline: {
+      found: true,
+      id: 'run-1',
+      taskId: 'task-1',
+      taskRevision: 'revision-1',
+      status: 'succeeded',
+      version: 3,
+      eventSequence: 4,
+      priority: 0,
+      executionOrigin: 'manual',
+      executionOwner: 'runtime',
+      createdAtMs: 10,
+      queuedAtMs: 11,
+      startedAtMs: 12,
+      finishedAtMs: 13,
+    },
+    candidate: {
+      found: true,
+      id: 'run-2',
+      taskId: 'task-1',
+      taskRevision: 'revision-2',
+      status: 'succeeded',
+      version: 3,
+      eventSequence: 4,
+      priority: 1,
+      executionOrigin: 'manual',
+      executionOwner: 'runtime',
+      createdAtMs: 20,
+      queuedAtMs: 21,
+      startedAtMs: 24,
+      finishedAtMs: 30,
+    },
+    comparable: true,
+    sameTask: true,
+    sameTaskRevision: false,
+    changedFields: ['taskRevision', 'priority'],
+    queueDelayDeltaMs: 0,
+    executionDurationDeltaMs: 5,
+    totalDurationDeltaMs: 7,
+    consistency: 'ordered_independent_point_reads',
+  });
+  assert.deepEqual(value.permissions, [
+    'tool.call:qinglong.run.compare',
+    'run.read',
+  ]);
+  assert.deepEqual(value.events, [
+    'authenticate',
+    'policy:tool.call:qinglong.run.compare',
+    'policy:run.read',
+    'audit:allowed',
+    'confirm',
+    'read',
+    'read',
+  ]);
+  assert.deepEqual(value.audits[0].reasons, [
+    'tool_invocation_allowed',
+    'tool_qinglong_run_compare',
+  ]);
+  assert.deepEqual(value.counters(), {
+    reads: 2,
+    listReads: 0,
+    eventReads: 0,
+    taskListReads: 0,
+    triggerListReads: 0,
+    approvalListReads: 0,
+    approvalDetailReads: 0,
+    confirmations: 1,
+  });
+});
+
 test('discovers recent Project Runs through the same fenced admission', async (t) => {
   const value = fixture();
   const connected = await client(value.server, t);
@@ -461,17 +555,17 @@ test('discovers recent Project Runs through the same fenced admission', async (t
       {
         id: 'run-2',
         taskId: 'task-1',
-        taskRevision: 'revision-1',
+        taskRevision: 'revision-2',
         status: 'succeeded',
         version: 3,
         eventSequence: 4,
-        priority: 0,
+        priority: 1,
         executionOrigin: 'manual',
         executionOwner: 'runtime',
         createdAtMs: 20,
-        queuedAtMs: 11,
-        startedAtMs: 12,
-        finishedAtMs: 13,
+        queuedAtMs: 21,
+        startedAtMs: 24,
+        finishedAtMs: 30,
       },
     ],
     hasMore: true,

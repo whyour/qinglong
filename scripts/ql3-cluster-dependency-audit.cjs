@@ -1013,6 +1013,7 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/bounded-run-event-list-projection',
           '@qinglong/runtime-core/bounded-run-list-projection',
           '@qinglong/runtime-core/bounded-run-step-list-projection',
+          '@qinglong/runtime-core/builtin-run-compare-projection',
           '@qinglong/runtime-core/builtin-run-read-projection',
           '@qinglong/runtime-core/bounded-task-read-projection',
           '@qinglong/runtime-core/bounded-task-list-projection',

@@ -46,6 +46,11 @@ import {
   executeBuiltInRunStepListTool,
 } from '../tool-projection/runStepList';
 import {
+  BUILTIN_RUN_COMPARE_TOOL,
+  BUILTIN_RUN_COMPARE_TOOL_DEFINITION,
+  executeBuiltInRunCompareTool,
+} from '@qinglong/runtime-core/builtin-run-compare-projection';
+import {
   BUILTIN_RUN_READ_TOOL,
   BUILTIN_RUN_READ_TOOL_DEFINITION,
   executeBuiltInRunReadTool,
@@ -176,6 +181,18 @@ const LOCAL_MCP_READ_TOOLS: readonly LocalMcpReadToolDescriptor[] =
         projectId: string,
         input: ToolJsonValue,
       ) => executeBuiltInRunReadTool(authority.runs, projectId, input),
+    }),
+    Object.freeze({
+      tool: BUILTIN_RUN_COMPARE_TOOL,
+      definition: BUILTIN_RUN_COMPARE_TOOL_DEFINITION,
+      title: 'Compare QingLong Runs',
+      auditReason: 'tool_qinglong_run_compare',
+      unavailableCode: 'run_compare_unavailable',
+      execute: (
+        authority: LocalMcpReadAuthority,
+        projectId: string,
+        input: ToolJsonValue,
+      ) => executeBuiltInRunCompareTool(authority.runs, projectId, input),
     }),
     Object.freeze({
       tool: BUILTIN_RUN_EVENT_LIST_TOOL,

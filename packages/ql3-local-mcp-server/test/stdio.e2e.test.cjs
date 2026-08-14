@@ -74,6 +74,22 @@ async function fixture(t) {
       priority: 0,
       createdAtMs: NOW - 2_000,
     });
+    await transaction.insertRun({
+      id: 'run-mcp-e2e-candidate',
+      projectId: 'default',
+      taskId: 'task-mcp',
+      taskRevision: 'revision-2',
+      taskName: 'MCP test candidate',
+      triggerType: 'manual',
+      executionOrigin: 'manual',
+      executionOwner: 'runtime',
+      triggeredBy: 'user:mcp-owner',
+      status: 'created',
+      version: 0,
+      eventSequence: 0,
+      priority: 1,
+      createdAtMs: NOW - 3_000,
+    });
     await transaction.appendEvent({
       id: 'mcp-e2e-event-1',
       runId: 'run-mcp-e2e',
@@ -456,6 +472,7 @@ test('serves the authenticated Run Tool over the real stdio protocol and persist
     [
       'qinglong.run.list',
       'qinglong.run.get',
+      'qinglong.run.compare',
       'qinglong.run.events.list',
       'qinglong.run.steps.list',
       'qinglong.task.get',
@@ -602,7 +619,11 @@ test('serves the authenticated Run Tool over the real stdio protocol and persist
         createdAtMs: NOW - 2_000,
       },
     ],
-    hasMore: false,
+    hasMore: true,
+    next: {
+      createdAtMs: NOW - 2_000,
+      runId: 'run-mcp-e2e',
+    },
   });
   const called = await request('tools/call', {
     name: 'qinglong.run.get',
@@ -621,6 +642,47 @@ test('serves the authenticated Run Tool over the real stdio protocol and persist
     executionOrigin: 'manual',
     executionOwner: 'runtime',
     createdAtMs: NOW - 2_000,
+  });
+  const compared = await request('tools/call', {
+    name: 'qinglong.run.compare',
+    arguments: {
+      baselineRunId: 'run-mcp-e2e',
+      candidateRunId: 'run-mcp-e2e-candidate',
+    },
+  });
+  assert.equal(compared.result.isError, undefined, JSON.stringify(compared));
+  assert.deepEqual(compared.result.structuredContent, {
+    baseline: {
+      found: true,
+      id: 'run-mcp-e2e',
+      taskId: 'task-mcp',
+      taskRevision: 'revision-1',
+      status: 'created',
+      version: 0,
+      eventSequence: 2,
+      priority: 0,
+      executionOrigin: 'manual',
+      executionOwner: 'runtime',
+      createdAtMs: NOW - 2_000,
+    },
+    candidate: {
+      found: true,
+      id: 'run-mcp-e2e-candidate',
+      taskId: 'task-mcp',
+      taskRevision: 'revision-2',
+      status: 'created',
+      version: 0,
+      eventSequence: 0,
+      priority: 1,
+      executionOrigin: 'manual',
+      executionOwner: 'runtime',
+      createdAtMs: NOW - 3_000,
+    },
+    comparable: true,
+    sameTask: true,
+    sameTaskRevision: false,
+    changedFields: ['taskRevision', 'priority'],
+    consistency: 'ordered_independent_point_reads',
   });
   const events = await request('tools/call', {
     name: 'qinglong.run.events.list',
@@ -658,6 +720,11 @@ test('serves the authenticated Run Tool over the real stdio protocol and persist
     assert.deepEqual(
       audit.map((row) => ({ ...row })),
       [
+        {
+          operationId: 'mcp.tool.call',
+          outcome: 'allowed',
+          subjectId: 'mcp-user',
+        },
         {
           operationId: 'mcp.tool.call',
           outcome: 'allowed',
