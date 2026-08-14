@@ -63,13 +63,19 @@ ConfigMap 和数据库 head 之间会出现第二次分布式提交窗口，并�
 
 - Runtime Core 定向 21/21 通过，覆盖前置条件顺序、候选预物化、exact replay、无效语义拒绝、generation 1 B1 兼容和升级失败保留
   旧 `activeLockDigest`；拒绝路径的 activation publisher 调用次数为零。
-- Local Application 47 pass/4 条件 skip；Cluster Admin 347 pass/3 条件 skip。Cluster 首次在
-  沙箱内运行的 32 个失败均为回环监听 `EPERM`，在允许本机监听的环境重跑后全部通过。
-- 18-package clean build/test 退出 0；Runtime Core 548/548；backend 1196 项为
-  1194 pass/2 条件 skip/0 fail。package boundary 保持 18 个 package 且
+- PostgreSQL/OCI/Kubernetes 现场门已升级为 `qinglong/plugin-package-recovery-e2e-live-contract@v2`：先用真实 signed OCI package
+  激活 generation 1，再创建包含合法 Task 与循环 Workflow 的 generation 2；第一次 recovery 必须因 transition receipt 缺失而以
+  `ClusterPluginPackageRecoveryRequiredError` 失败并留下 `staged`，提交 content-free transition receipt 后，第二次 recovery 必须把升级写为
+  `failed(activation_fact_conflict)`，且 generation 2 materialized revision 数量仍为 0。现场门逐字比较 active ConfigMap 的 UID、
+  `resourceVersion` 与完整 `active.json`，因此不能用“错误切换后再补偿回来”冒充旧版本未移动；OCI v1 六个路径各读取一次，v2 六个路径
+  各读取两次，全部要求 HTTPS、exact Basic authentication、200 且无 redirect。最终 runtime rollout 仍只绑定最后一个成功 recovery Job，
+  recovery ServiceAccount 继续只有 ConfigMap `get|create|update`，runtime 角色仍不能读取安装 authority。
+- 18-package clean build/test 在允许 loopback TLS 的环境退出 0；backend 1196 项为
+  1194 pass/2 条件 skip/0 fail。新增/更新的 recovery E2E 源码契约 7/7，Runtime Core 定向 21/21。package boundary 保持 18 个 package 且
   `singleSourcePackages=[]`、`shallowSourcePackages=[]`；cluster dependency、cluster deployment
   与 edge import 审计均无 finding。
 - PostgreSQL `18.4` arm64 physical HA 通过 125 项门，timeline `1→2`，报告 SHA-256
-  `75d7a52be75c22b2aacf32f2d7e2c432a467ebaab4d639668ff3a4b98767a17e`，临时 Docker
-  资源已清理。真实 Kubernetes 失败升级未移动 active pointer/head 的现场门与固定物理低配设备
-  证据仍待完成，因此本 ADR 保持 Proposed。
+  `8560469694c67776e5e4c70977f8bde8d4f5635f8e7d1c293ef449dc6da59f72`，临时 Docker
+  资源已清理。本机已成功构建现场门所需 admin/control 镜像，但固定 `kindest/node:v1.32.8` 不在本地缓存，受限网络拉取数分钟无进度；
+  门在创建任何 Kind 节点前被中止，并确认没有遗留集群或容器。因此 v2 门的代码与离线契约已完成，但仍不能计为真实 Kubernetes
+  现场通过；远端 CI 成功记录与固定物理低配设备证据仍待完成，本 ADR 保持 Proposed。

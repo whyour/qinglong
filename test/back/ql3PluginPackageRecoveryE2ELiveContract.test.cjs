@@ -23,10 +23,7 @@ const workflow = yaml.load(
 );
 
 test('E2E live gate is opt-in and owns only one exact disposable Kind cluster', () => {
-  assert.match(
-    live,
-    /QL3_PLUGIN_PACKAGE_RECOVERY_E2E_LIVE !== '1'/,
-  );
+  assert.match(live, /QL3_PLUGIN_PACKAGE_RECOVERY_E2E_LIVE !== '1'/);
   assert.match(live, /\^ql3-plugin-recovery-e2e/);
   assert.match(live, /Refusing to reuse or delete pre-existing Kind cluster/);
   assert.match(live, /kind\(\['delete', 'cluster', '--name', clusterName\]/);
@@ -50,41 +47,59 @@ test('fixture uses a real HTTPS and content-addressed OCI Distribution surface',
   assert.match(live, /requestCount: packageRequests\.length/);
 });
 
-test('gate runs the committed migration and recovery binaries around a durable queued record', () => {
-  assert.match(
-    live,
-    /operations\/base\/migrate-job\.yaml/,
-  );
-  assert.match(
-    live,
-    /plugin-package-recovery\/base\/recover-job\.yaml/,
-  );
+test('gate runs migration, healthy activation and a durable rejected upgrade', () => {
+  assert.match(live, /operations\/base\/migrate-job\.yaml/);
+  assert.match(live, /plugin-package-recovery\/base\/recover-job\.yaml/);
   assert.match(fixture, /PostgresPluginPackageInstallRepository/);
+  assert.match(
+    fixture,
+    /PostgresPluginPackageSecretBindingTransitionRepository/,
+  );
   assert.match(fixture, /createPluginPackageInstall/);
   assert.match(fixture, /pluginPackageInstallCreate/);
-  assert.match(live, /seed\.state, 'queued'/);
-  assert.match(live, /value\.migrationCount, 22/);
-  assert.match(live, /value\.capabilityVersion, 21/);
+  assert.match(live, /initialSeed\.state, 'queued'/);
+  assert.match(live, /upgradeSeed\.state, 'queued'/);
+  assert.match(live, /value\.migrationCount, 65/);
+  assert.match(live, /value\.capabilityVersion, 64/);
   assert.match(live, /postgresEnvironment\(\s*'PACKAGE_EXECUTOR'/);
   assert.match(fixture, /assertPostgresPackageExecutorSchemaReady/);
-  assert.match(live, /value\.state, 'active'/);
+  assert.match(live, /value\.initialState, 'active'/);
+  assert.match(live, /value\.upgradeState, 'failed'/);
+  assert.match(live, /value\.upgradeFailureReason, 'activation_fact_conflict'/);
+  assert.match(live, /value\.upgradeRevisionCount, 0/);
   assert.match(live, /value\.recoverableCount, 0/);
 });
 
-test('deployment controller observes successful recovery before creating runtime', () => {
-  const recoveryWait = live.indexOf(
-    "waitForJob('ql3-plugin-package-recovery')",
+test('deployment controller rejects the upgrade before creating runtime', () => {
+  const failedStageWait = live.indexOf(
+    "waitForJob(UPGRADE_STAGE_JOB, 'failed')",
+  );
+  const transitionWait = live.indexOf('waitForJob(TRANSITION_JOB)');
+  const rejectionWait = live.indexOf('waitForJob(UPGRADE_REJECTION_JOB)');
+  const pointerProof = live.indexOf(
+    'assert.deepEqual(pointerAfterRejection, pointerBeforeUpgrade)',
   );
   const runtimeApply = live.indexOf(
-    'applyRuntimeAfterRecovery(recovered, migrated, secrets)',
+    'const runtime = applyRuntimeAfterRecovery(',
   );
-  assert.ok(recoveryWait > 0);
-  assert.ok(runtimeApply > recoveryWait);
+  assert.ok(failedStageWait > 0);
+  assert.ok(transitionWait > failedStageWait);
+  assert.ok(rejectionWait > transitionWait);
+  assert.ok(pointerProof > rejectionWait);
+  assert.ok(runtimeApply > pointerProof);
+  assert.match(live, /activePointerUnchanged: true/);
+  assert.match(
+    live,
+    /stageFailure\.name,[\s\S]*'ClusterPluginPackageRecoveryRequiredError'/,
+  );
   assert.match(live, /qinglong\.io\/plugin-recovery-job-uid/);
   assert.match(live, /qinglong\.io\/plugin-recovery-completed-at/);
   assert.match(live, /rollout[\s\S]*status/);
   assert.match(live, /availableReplicas, 2/);
-  assert.match(live, /new Set\(pods\.items\.map\(\(pod\) => pod\.spec\.nodeName\)\)/);
+  assert.match(
+    live,
+    /new Set\(pods\.items\.map\(\(pod\) => pod\.spec\.nodeName\)\)/,
+  );
 });
 
 test('recovery Job keeps exact ConfigMap-only RBAC and runtime cannot read install authority', () => {
@@ -95,10 +110,7 @@ test('recovery Job keeps exact ConfigMap-only RBAC and runtime cannot read insta
   assert.match(live, /listConfigMaps: false/);
   assert.match(live, /deleteConfigMaps: false/);
   assert.match(live, /getSecrets: false/);
-  assert.match(
-    live,
-    /SELECT count\(\*\) FROM ql3\.plugin_package_installs/,
-  );
+  assert.match(live, /SELECT count\(\*\) FROM ql3\.plugin_package_installs/);
   assert.match(live, /permission denied/i);
 });
 
@@ -112,8 +124,7 @@ test('package script and independent CI job execute the full gate', () => {
   assert.equal(job['timeout-minutes'], 35);
   assert.ok(
     job.steps.some(
-      (step) =>
-        step.run === 'pnpm test:plugin-package-recovery-e2e:ql3',
+      (step) => step.run === 'pnpm test:plugin-package-recovery-e2e:ql3',
     ),
   );
   assert.ok(
@@ -129,14 +140,8 @@ test('private Registry evidence uses one exact Secret file and authenticated req
   assert.match(fixture, /request\.headers\.authorization !== authorization/);
   assert.match(fixture, /www-authenticate/);
   assert.match(fixture, /authenticated,/);
-  assert.match(
-    live,
-    /QL3_PLUGIN_PACKAGE_REGISTRY_CREDENTIAL_FILE/,
-  );
-  assert.match(
-    live,
-    /qinglong\/plugin-package-registry-credentials@v1/,
-  );
+  assert.match(live, /QL3_PLUGIN_PACKAGE_REGISTRY_CREDENTIAL_FILE/);
+  assert.match(live, /qinglong\/plugin-package-registry-credentials@v1/);
   assert.match(live, /secretName: 'ql3-e2e-registry-auth'/);
   assert.match(live, /defaultMode: 288/);
   assert.match(live, /authentication: 'exact-registry-basic'/);
