@@ -1,0 +1,20 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: ql3-plugin-package-secret-action
+  labels:
+    app.kubernetes.io/name: ql3-plugin-package-secret-action
+    app.kubernetes.io/component: plugin-package-executor
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  policyName: ql3-plugin-package-secret-action
+  paramRef:
+    name: ql3-plugin-package-secret-action-admission
+    namespace: qinglong3-system
+    parameterNotFoundAction: Deny
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: qinglong3-system
+  validationActions:
+    - Deny

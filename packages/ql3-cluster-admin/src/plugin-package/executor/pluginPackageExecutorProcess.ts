@@ -15,6 +15,9 @@ import {
   isPostgresTlsDnsServername,
   loadPostgresCertificateAuthorityFile,
   loadPostgresConnectionEnvironment,
+  PostgresApprovedActionExecutionRepository,
+  PostgresPluginPackageSecretBindingApprovalPlanReader,
+  PostgresPluginPackageSecretBindingTransitionApprovalPlanReader,
   type PostgresConnectionOptions,
   type PostgresPoolOptions,
   type PostgresSchemaReadinessReport,
@@ -48,6 +51,12 @@ import { ProjectedPluginPackageSecretExistenceInspector } from '../secret-bindin
 import {
   runClusterPluginPackagePublisherRevocation,
 } from '../publisher/pluginPackagePublisherRevocation';
+import {
+  createClusterPluginPackageKubernetesSecretActionController,
+  type ClusterPluginPackageKubernetesSecretActionControllerResource,
+  type PluginPackageKubernetesSecretActionControllerSummary,
+} from './pluginPackageKubernetesSecretActionController';
+import type { PluginPackageKubernetesSecretActionJobOptions } from './pluginPackageKubernetesSecretActionJob';
 
 export type ClusterPluginPackageExecutorProcessEnvironment = Readonly<
   Record<string, string | undefined>
@@ -66,6 +75,11 @@ export type ClusterPluginPackageExecutorProcessConfig =
       revocationMaxPages: number;
       dispatchId: string | null;
       secretProjectionRoot: string | null;
+      kubernetesSecretActions: Readonly<{
+        enabled: true;
+        limit: number;
+        job: Readonly<PluginPackageKubernetesSecretActionJobOptions>;
+      }> | null;
       database: Readonly<{
         connection: PostgresConnectionOptions;
         pool: PostgresPoolOptions;
@@ -78,6 +92,7 @@ export interface ClusterPluginPackageExecutorBatchResult {
   readonly secretBindingApprovals: Readonly<ClusterPluginPackageSecretBindingApprovalSummary>;
   readonly secretBindingTransitionApprovals: Readonly<ClusterPluginPackageSecretBindingTransitionApprovalSummary>;
   readonly dispatch: Readonly<ApprovedActionDispatchBatchSummary>;
+  readonly secretActionJobs: Readonly<PluginPackageKubernetesSecretActionControllerSummary>;
 }
 
 export type ClusterPluginPackageExecutorProcessResult =
@@ -116,6 +131,13 @@ export interface RunClusterPluginPackageExecutorProcessOptions {
     pool: PostgresPool,
   ) => Promise<PostgresSchemaReadinessReport>;
   readonly now?: () => number;
+  readonly createSecretActionController?: (
+    options: Parameters<
+      typeof createClusterPluginPackageKubernetesSecretActionController
+    >[0],
+  ) => Promise<
+    Readonly<ClusterPluginPackageKubernetesSecretActionControllerResource>
+  >;
 }
 
 export class ClusterPluginPackageExecutorProcessConfigError extends TypeError {
@@ -131,6 +153,11 @@ export class ClusterPluginPackageExecutorProcessConfigError extends TypeError {
 
 const SAFE_OWNER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SAFE_DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const DNS_LABEL = /^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$/;
+const DNS_NAME = /^(?=.{1,253}$)[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/;
+const SECRET_KEY = /^[A-Za-z0-9._-]{1,253}$/;
+const IMAGE_DIGEST =
+  /^[a-z0-9](?:[a-z0-9._:/-]{0,510}[a-z0-9])?@sha256:[0-9a-f]{64}$/;
 
 function enabledValue(
   environment: ClusterPluginPackageExecutorProcessEnvironment,
@@ -307,6 +334,179 @@ function secretProjectionRoot(
   return value;
 }
 
+function requiredEnvironment(
+  environment: ClusterPluginPackageExecutorProcessEnvironment,
+  name: string,
+  maximumLength: number,
+): string {
+  const value = boundedValue(environment, name, maximumLength);
+  if (value === undefined) {
+    throw new ClusterPluginPackageExecutorProcessConfigError(
+      `${name} is required when the Kubernetes Secret action controller is enabled`,
+    );
+  }
+  return value;
+}
+
+function kubernetesSecretActions(
+  environment: ClusterPluginPackageExecutorProcessEnvironment,
+): Readonly<{
+  enabled: true;
+  limit: number;
+  job: Readonly<PluginPackageKubernetesSecretActionJobOptions>;
+}> | null {
+  const enabled = environment.QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_ENABLED;
+  if (enabled === undefined || enabled === '' || enabled === 'false') return null;
+  if (enabled !== 'true') {
+    throw new ClusterPluginPackageExecutorProcessConfigError(
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_ENABLED must be true or false',
+    );
+  }
+  const namespace =
+    boundedValue(environment, 'QL3_PLUGIN_PACKAGE_SECRET_ACTION_NAMESPACE', 63) ??
+    'qinglong3-system';
+  const serviceAccountName =
+    boundedValue(
+      environment,
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_SERVICE_ACCOUNT',
+      63,
+    ) ?? 'ql3-plugin-package-secret-action';
+  const sourceSecretName =
+    boundedValue(
+      environment,
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_SOURCE_SECRET',
+      63,
+    ) ?? 'ql3-cluster-plugin-package-values';
+  const image = requiredEnvironment(
+    environment,
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_IMAGE',
+    640,
+  );
+  const postgresCaSecretName = requiredEnvironment(
+    environment,
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_CA_SECRET',
+    63,
+  );
+  const postgresCaKey =
+    boundedValue(
+      environment,
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_CA_KEY',
+      253,
+    ) ?? 'ca.crt';
+  const servername = requiredEnvironment(
+    environment,
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_SERVERNAME',
+    253,
+  );
+  const urlSecretName = boundedValue(
+    environment,
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_SECRET',
+    63,
+  );
+  const urlSecretKey = boundedValue(
+    environment,
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_KEY',
+    253,
+  );
+  const fieldNames = [
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_AUTH_SECRET',
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_HOST',
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_PORT',
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_DATABASE',
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_USERNAME_KEY',
+    'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_PASSWORD_KEY',
+  ] as const;
+  const fields = fieldNames.map((name) => boundedValue(environment, name, 253));
+  const urlMode = urlSecretName !== undefined || urlSecretKey !== undefined;
+  const fieldMode = fields.some((value) => value !== undefined);
+  if (
+    !DNS_LABEL.test(namespace) ||
+    !DNS_LABEL.test(serviceAccountName) ||
+    !DNS_LABEL.test(sourceSecretName) ||
+    !IMAGE_DIGEST.test(image) ||
+    !DNS_LABEL.test(postgresCaSecretName) ||
+    !SECRET_KEY.test(postgresCaKey) ||
+    !DNS_NAME.test(servername) ||
+    urlMode === fieldMode
+  ) {
+    throw new ClusterPluginPackageExecutorProcessConfigError(
+      'Kubernetes Secret action Job identity is invalid',
+    );
+  }
+  let connection: PluginPackageKubernetesSecretActionJobOptions['postgres']['connection'];
+  if (urlMode) {
+    if (
+      urlSecretName === undefined ||
+      urlSecretKey === undefined ||
+      !DNS_LABEL.test(urlSecretName) ||
+      !SECRET_KEY.test(urlSecretKey)
+    ) {
+      throw new ClusterPluginPackageExecutorProcessConfigError(
+        'Kubernetes Secret action PostgreSQL URL reference is invalid',
+      );
+    }
+    connection = Object.freeze({
+      mode: 'url',
+      secretName: urlSecretName,
+      urlKey: urlSecretKey,
+    });
+  } else {
+    if (fields.some((value) => value === undefined)) {
+      throw new ClusterPluginPackageExecutorProcessConfigError(
+        'Kubernetes Secret action PostgreSQL field reference is incomplete',
+      );
+    }
+    const [authSecretName, host, portValue, database, usernameKey, passwordKey] =
+      fields as [string, string, string, string, string, string];
+    const port = Number(portValue);
+    if (
+      !DNS_LABEL.test(authSecretName) ||
+      !DNS_NAME.test(host) ||
+      !Number.isSafeInteger(port) ||
+      port < 1 ||
+      port > 65_535 ||
+      !/^[A-Za-z_][A-Za-z0-9_$-]{0,62}$/.test(database) ||
+      !SECRET_KEY.test(usernameKey) ||
+      !SECRET_KEY.test(passwordKey)
+    ) {
+      throw new ClusterPluginPackageExecutorProcessConfigError(
+        'Kubernetes Secret action PostgreSQL field reference is invalid',
+      );
+    }
+    connection = Object.freeze({
+      mode: 'fields',
+      authSecretName,
+      host,
+      port,
+      database,
+      usernameKey,
+      passwordKey,
+    });
+  }
+  return Object.freeze({
+    enabled: true,
+    limit: integerValue(
+      environment,
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_LIMIT',
+      8,
+      1,
+      32,
+    ),
+    job: Object.freeze({
+      namespace,
+      serviceAccountName,
+      sourceSecretName,
+      image,
+      postgres: Object.freeze({
+        connection,
+        caSecretName: postgresCaSecretName,
+        caKey: postgresCaKey,
+        servername,
+      }),
+    }),
+  });
+}
+
 export function loadClusterPluginPackageExecutorProcessConfig(
   environment: ClusterPluginPackageExecutorProcessEnvironment,
 ): ClusterPluginPackageExecutorProcessConfig {
@@ -382,6 +582,7 @@ export function loadClusterPluginPackageExecutorProcessConfig(
     ),
     dispatchId,
     secretProjectionRoot: secretProjectionRoot(environment),
+    kubernetesSecretActions: kubernetesSecretActions(environment),
     database: databaseConfig(environment),
   });
 }
@@ -424,6 +625,18 @@ function emptyApprovalSummary(): Readonly<{
   });
 }
 
+function emptySecretActionJobSummary(): Readonly<PluginPackageKubernetesSecretActionControllerSummary> {
+  return Object.freeze({
+    scanned: 0,
+    created: 0,
+    existing: 0,
+    active: 0,
+    recoveryRequired: 0,
+    unavailable: 0,
+    truncated: false,
+  });
+}
+
 export async function runClusterPluginPackageExecutorProcess(
   options: RunClusterPluginPackageExecutorProcessOptions,
 ): Promise<ClusterPluginPackageExecutorProcessResult> {
@@ -446,6 +659,8 @@ export async function runClusterPluginPackageExecutorProcess(
       typeof options.createDispatcher !== 'function') ||
     (options.assertReady !== undefined &&
       typeof options.assertReady !== 'function') ||
+    (options.createSecretActionController !== undefined &&
+      typeof options.createSecretActionController !== 'function') ||
     (options.now !== undefined && typeof options.now !== 'function')
   ) {
     throw new TypeError('Plugin Package executor process options are invalid');
@@ -464,6 +679,9 @@ export async function runClusterPluginPackageExecutorProcess(
     });
   const database = await openDatabase();
   let failure: unknown;
+  let secretActionControllerResource:
+    | Readonly<ClusterPluginPackageKubernetesSecretActionControllerResource>
+    | undefined;
   try {
     const evidence = await (
       options.assertReady ?? assertPostgresPackageExecutorSchemaReady
@@ -531,6 +749,7 @@ export async function runClusterPluginPackageExecutorProcess(
             secretBindingApprovals: emptyApprovalSummary(),
             secretBindingTransitionApprovals: emptyApprovalSummary(),
             dispatch,
+            secretActionJobs: emptySecretActionJobSummary(),
           }),
         ]),
       });
@@ -559,6 +778,32 @@ export async function runClusterPluginPackageExecutorProcess(
           limit: config.approvalBatchSize,
           ...(options.now ? { now: options.now } : {}),
         });
+      let secretActionJobs = emptySecretActionJobSummary();
+      if (config.kubernetesSecretActions !== null) {
+        if (!secretActionControllerResource) {
+          const createController =
+            options.createSecretActionController ??
+            createClusterPluginPackageKubernetesSecretActionController;
+          secretActionControllerResource = await createController({
+            executions: new PostgresApprovedActionExecutionRepository(
+              database.pool,
+            ),
+            bindingPlans:
+              new PostgresPluginPackageSecretBindingApprovalPlanReader(
+                database.pool,
+              ),
+            transitionPlans:
+              new PostgresPluginPackageSecretBindingTransitionApprovalPlanReader(
+                database.pool,
+              ),
+            job: config.kubernetesSecretActions.job,
+            ...(options.now ? { now: options.now } : {}),
+          });
+        }
+        secretActionJobs = await secretActionControllerResource.controller.reconcile({
+          limit: config.kubernetesSecretActions.limit,
+        });
+      }
       const dispatch = await dispatcher.dispatchBatch({
         limit: config.dispatchBatchSize,
       });
@@ -568,9 +813,10 @@ export async function runClusterPluginPackageExecutorProcess(
         secretBindingApprovals,
         secretBindingTransitionApprovals,
         dispatch,
+        secretActionJobs,
       });
       batches.push(batch);
-      if (isIdleBatch(batch)) break;
+      if (secretActionJobs.scanned > 0 || isIdleBatch(batch)) break;
     }
     return Object.freeze({
       status: 'completed',
@@ -581,16 +827,33 @@ export async function runClusterPluginPackageExecutorProcess(
     failure = error;
     throw error;
   } finally {
+    let disposeError: unknown;
+    try {
+      secretActionControllerResource?.dispose();
+    } catch (error) {
+      disposeError = error;
+    }
+    let closeError: unknown;
     try {
       await database.close();
-    } catch (closeError) {
+    } catch (error) {
+      closeError = error;
+    }
+    const cleanupErrors = [disposeError, closeError].filter(
+      (error) => error !== undefined,
+    );
+    if (cleanupErrors.length > 0) {
       if (failure !== undefined) {
         throw new AggregateError(
-          [failure, closeError],
-          'Plugin Package executor process failed and PostgreSQL did not close',
+          [failure, ...cleanupErrors],
+          'Plugin Package executor process and resource cleanup failed',
         );
       }
-      throw closeError;
+      if (cleanupErrors.length === 1) throw cleanupErrors[0];
+      throw new AggregateError(
+        cleanupErrors,
+        'Plugin Package executor resource cleanup failed',
+      );
     }
   }
 }

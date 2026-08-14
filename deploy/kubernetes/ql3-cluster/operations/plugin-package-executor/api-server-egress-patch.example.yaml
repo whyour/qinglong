@@ -1,0 +1,12 @@
+# Example only. Copy into a private overlay and replace the placeholder with
+# the exact Kubernetes API endpoint CIDR. The base policy intentionally has no
+# broad TCP/443 escape hatch, so the controller fails closed without this rule.
+- op: add
+  path: /spec/egress/-
+  value:
+    to:
+      - ipBlock:
+          cidr: REPLACE_WITH_API_SERVER_CIDR
+    ports:
+      - protocol: TCP
+        port: 443

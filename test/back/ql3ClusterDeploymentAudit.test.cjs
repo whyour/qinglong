@@ -64,6 +64,56 @@ test('requires every Cluster Admin Kubernetes workload to override the image com
   );
 });
 
+test('rejects widened Plugin Package Secret action Kubernetes authority', () => {
+  const widenedRole = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/operations/plugin-package-executor/base/role.yaml',
+      (source) => source.replace('      - get\n', '      - get\n      - list\n'),
+    ),
+  });
+  assert.equal(widenedRole.compatible, false);
+  assert.equal(
+    widenedRole.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_PLUGIN_EXECUTOR_KUBERNETES_AUTHORITY',
+    ),
+    true,
+  );
+
+  const ignoredAdmissionFailure = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/operations/plugin-package-executor/base/validating-admission-policy.yaml',
+      (source) => source.replace('failurePolicy: Fail', 'failurePolicy: Ignore'),
+    ),
+  });
+  assert.equal(ignoredAdmissionFailure.compatible, false);
+  assert.equal(
+    ignoredAdmissionFailure.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_PLUGIN_EXECUTOR_KUBERNETES_AUTHORITY',
+    ),
+    true,
+  );
+
+  const actionToken = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/operations/plugin-package-executor/base/secret-action-service-account.yaml',
+      (source) => source.replace(
+        'automountServiceAccountToken: false',
+        'automountServiceAccountToken: true',
+      ),
+    ),
+  });
+  assert.equal(actionToken.compatible, false);
+  assert.equal(
+    actionToken.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_PLUGIN_EXECUTOR_LIFECYCLE',
+    ),
+    true,
+  );
+});
+
 test('requires the bounded Cluster product facade and image entrypoint', () => {
   const missingBinary = auditClusterDeployment({
     root: ROOT,

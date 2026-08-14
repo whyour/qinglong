@@ -1,0 +1,163 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: ql3-plugin-package-secret-action
+  labels:
+    app.kubernetes.io/name: ql3-plugin-package-secret-action
+    app.kubernetes.io/component: plugin-package-executor
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+        resources:
+          - jobs
+        scope: Namespaced
+  matchConditions:
+    - name: exact-controller-identity
+      expression: request.userInfo.username == 'system:serviceaccount:qinglong3-system:ql3-plugin-package-executor'
+  variables:
+    - name: pod
+      expression: object.spec.template.spec
+    - name: executor
+      expression: variables.pod.containers[0]
+    - name: values
+      expression: variables.pod.volumes.filter(v, v.name == 'plugin-package-values')[0]
+    - name: ca
+      expression: variables.pod.volumes.filter(v, v.name == 'postgres-ca')[0]
+  validations:
+    - expression: >-
+        object.metadata.namespace == 'qinglong3-system' &&
+        object.metadata.name.matches('^ql3-package-secret-[0-9a-f]{32}$') &&
+        object.metadata.name == 'ql3-package-secret-' + object.metadata.annotations['qinglong.io/secret-action-job-digest'].substring(0, 32) &&
+        object.metadata.labels['app.kubernetes.io/name'] == 'ql3-plugin-package-secret-action' &&
+        object.metadata.labels['app.kubernetes.io/component'] == 'plugin-package-executor' &&
+        object.metadata.labels['app.kubernetes.io/part-of'] == 'qinglong3' &&
+        object.metadata.annotations['qinglong.io/secret-action-job-schema'] == 'qinglong/plugin-package-kubernetes-secret-action-job@v1' &&
+        object.metadata.annotations['qinglong.io/secret-action-job-digest'].matches('^[0-9a-f]{64}$') &&
+        object.metadata.annotations['qinglong.io/approved-action-digest'].matches('^[0-9a-f]{64}$') &&
+        object.metadata.annotations['qinglong.io/approved-action-type'] in ['plugin_package.secret_binding.bind', 'plugin_package.secret_binding.transition']
+      message: Secret action Job metadata is outside the reviewed contract
+    - expression: >-
+        object.spec.backoffLimit == 2 &&
+        object.spec.activeDeadlineSeconds == 600 &&
+        object.spec.ttlSecondsAfterFinished == 3600 &&
+        variables.pod.serviceAccountName == params.data.serviceAccountName &&
+        object.spec.template.metadata.labels['app.kubernetes.io/name'] == 'ql3-plugin-package-secret-action' &&
+        object.spec.template.metadata.labels['app.kubernetes.io/component'] == 'plugin-package-executor' &&
+        object.spec.template.metadata.labels['app.kubernetes.io/part-of'] == 'qinglong3' &&
+        object.spec.template.metadata.labels['qinglong.io/secret-action-job'] == object.metadata.name &&
+        variables.pod.automountServiceAccountToken == false &&
+        variables.pod.enableServiceLinks == false &&
+        variables.pod.restartPolicy == 'Never' &&
+        (!has(variables.pod.hostNetwork) || variables.pod.hostNetwork == false) &&
+        (!has(variables.pod.hostPID) || variables.pod.hostPID == false) &&
+        (!has(variables.pod.hostIPC) || variables.pod.hostIPC == false) &&
+        (!has(variables.pod.shareProcessNamespace) || variables.pod.shareProcessNamespace == false) &&
+        (!has(variables.pod.initContainers) || variables.pod.initContainers.size() == 0) &&
+        (!has(variables.pod.ephemeralContainers) || variables.pod.ephemeralContainers.size() == 0) &&
+        variables.pod.containers.size() == 1 &&
+        variables.pod.volumes.size() == 3
+      message: Secret action Job Pod authority is outside the reviewed contract
+    - expression: >-
+        variables.pod.securityContext.runAsNonRoot == true &&
+        variables.pod.securityContext.runAsUser == 10001 &&
+        variables.pod.securityContext.runAsGroup == 10001 &&
+        variables.pod.securityContext.fsGroup == 10001 &&
+        variables.pod.securityContext.seccompProfile.type == 'RuntimeDefault' &&
+        variables.executor.name == 'executor' &&
+        variables.executor.image == params.data.image &&
+        variables.executor.imagePullPolicy == 'IfNotPresent' &&
+        variables.executor.command == ['node', '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/plugin-package/executor/pluginPackageExecutorCli.js'] &&
+        variables.executor.securityContext.allowPrivilegeEscalation == false &&
+        variables.executor.securityContext.readOnlyRootFilesystem == true &&
+        variables.executor.securityContext.capabilities.drop == ['ALL'] &&
+        variables.executor.resources.requests.cpu == '25m' &&
+        variables.executor.resources.requests.memory == '48Mi' &&
+        variables.executor.resources.limits.cpu == '250m' &&
+        variables.executor.resources.limits.memory == '192Mi'
+      message: Secret action Job executor image, command or sandbox is outside the reviewed contract
+    - expression: >-
+        ((params.data.postgresConnectionMode == 'url' && variables.executor.env.size() == 11) ||
+         (params.data.postgresConnectionMode == 'fields' && variables.executor.env.size() == 15)) &&
+        variables.executor.env.all(e, e.name in [
+          'QL3_PLUGIN_PACKAGE_EXECUTOR_ENABLED',
+          'QL3_PLUGIN_PACKAGE_EXECUTOR_OWNER',
+          'QL3_PLUGIN_PACKAGE_EXECUTOR_DISPATCH_ID',
+          'QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT',
+          'QL3_PLUGIN_PACKAGE_EXECUTOR_LEASE_DURATION_MS',
+          'QL3_POSTGRES_TLS_MODE',
+          'QL3_POSTGRES_TLS_CA_FILE',
+          'QL3_POSTGRES_TLS_SERVERNAME',
+          'QL3_POSTGRES_APPLICATION_NAME',
+          'QL3_POSTGRES_MAX_CONNECTIONS',
+          'QL3_POSTGRES_PACKAGE_EXECUTOR_URL',
+          'QL3_POSTGRES_PACKAGE_EXECUTOR_HOST',
+          'QL3_POSTGRES_PACKAGE_EXECUTOR_PORT',
+          'QL3_POSTGRES_PACKAGE_EXECUTOR_DATABASE',
+          'QL3_POSTGRES_PACKAGE_EXECUTOR_USER',
+          'QL3_POSTGRES_PACKAGE_EXECUTOR_PASSWORD'
+        ]) &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_PLUGIN_PACKAGE_EXECUTOR_ENABLED' && e.value == 'true') &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_PLUGIN_PACKAGE_EXECUTOR_OWNER' && e.value.matches('^package_secret_[0-9a-f]{24}$')) &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_PLUGIN_PACKAGE_EXECUTOR_DISPATCH_ID' && e.value.matches('^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$')) &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT' && e.value == '/var/run/secrets/qinglong3/plugin-package-values') &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_PLUGIN_PACKAGE_EXECUTOR_LEASE_DURATION_MS' && e.value == '600000') &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_TLS_MODE' && e.value == 'verify-full') &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_TLS_CA_FILE' && e.value == '/var/run/secrets/qinglong3/postgres/ca.crt') &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_TLS_SERVERNAME' && e.value == params.data.postgresServerName) &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_APPLICATION_NAME' && e.value == 'qinglong3-package-secret-action') &&
+        variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_MAX_CONNECTIONS' && e.value == '1')
+      message: Secret action Job environment is outside the reviewed contract
+    - expression: >-
+        (params.data.postgresConnectionMode == 'url' &&
+          variables.executor.env.exists_one(e,
+            e.name == 'QL3_POSTGRES_PACKAGE_EXECUTOR_URL' &&
+            e.valueFrom.secretKeyRef.name == params.data.postgresUrlSecretName &&
+            e.valueFrom.secretKeyRef.key == params.data.postgresUrlSecretKey) &&
+          !variables.executor.env.exists(e, e.name in ['QL3_POSTGRES_PACKAGE_EXECUTOR_HOST', 'QL3_POSTGRES_PACKAGE_EXECUTOR_PORT', 'QL3_POSTGRES_PACKAGE_EXECUTOR_DATABASE', 'QL3_POSTGRES_PACKAGE_EXECUTOR_USER', 'QL3_POSTGRES_PACKAGE_EXECUTOR_PASSWORD'])) ||
+        (params.data.postgresConnectionMode == 'fields' &&
+          !variables.executor.env.exists(e, e.name == 'QL3_POSTGRES_PACKAGE_EXECUTOR_URL') &&
+          variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_PACKAGE_EXECUTOR_HOST' && e.value == params.data.postgresHost) &&
+          variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_PACKAGE_EXECUTOR_PORT' && e.value == params.data.postgresPort) &&
+          variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_PACKAGE_EXECUTOR_DATABASE' && e.value == params.data.postgresDatabase) &&
+          variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_PACKAGE_EXECUTOR_USER' && e.valueFrom.secretKeyRef.name == params.data.postgresAuthSecretName && e.valueFrom.secretKeyRef.key == params.data.postgresUsernameKey) &&
+          variables.executor.env.exists_one(e, e.name == 'QL3_POSTGRES_PACKAGE_EXECUTOR_PASSWORD' && e.valueFrom.secretKeyRef.name == params.data.postgresAuthSecretName && e.valueFrom.secretKeyRef.key == params.data.postgresPasswordKey))
+      message: Secret action Job database authority is outside the reviewed contract
+    - expression: >-
+        variables.executor.volumeMounts.size() == 3 &&
+        variables.executor.volumeMounts[0].name == 'tmp' &&
+        variables.executor.volumeMounts[0].mountPath == '/tmp' &&
+        (!has(variables.executor.volumeMounts[0].readOnly) || variables.executor.volumeMounts[0].readOnly == false) &&
+        variables.executor.volumeMounts[1].name == 'postgres-ca' &&
+        variables.executor.volumeMounts[1].mountPath == '/var/run/secrets/qinglong3/postgres' &&
+        variables.executor.volumeMounts[1].readOnly == true &&
+        variables.executor.volumeMounts[2].name == 'plugin-package-values' &&
+        variables.executor.volumeMounts[2].mountPath == '/var/run/secrets/qinglong3/plugin-package-values' &&
+        variables.executor.volumeMounts[2].readOnly == true &&
+        variables.pod.volumes.exists_one(v, v.name == 'tmp' && v.emptyDir.medium == 'Memory' && v.emptyDir.sizeLimit == '8Mi') &&
+        variables.ca.secret.secretName == params.data.postgresCaSecretName &&
+        variables.ca.secret.optional == false &&
+        variables.ca.secret.defaultMode == 292 &&
+        variables.ca.secret.items.size() == 1 &&
+        variables.ca.secret.items[0].key == params.data.postgresCaKey &&
+        variables.ca.secret.items[0].path == 'ca.crt' &&
+        ((has(variables.values.secret) &&
+          variables.values.secret.secretName == params.data.sourceSecretName &&
+          variables.values.secret.optional == false &&
+          variables.values.secret.defaultMode == 288 &&
+          variables.values.secret.items.size() >= 1 &&
+          variables.values.secret.items.size() <= 64 &&
+          variables.values.secret.items.all(i, i.key.matches('^[0-9a-f]{64}$') && i.path == i.key) &&
+          variables.values.secret.items.all(i, variables.values.secret.items.filter(j, j.key == i.key).size() == 1)) ||
+         (has(variables.values.emptyDir) && variables.values.emptyDir.sizeLimit == '1Ki'))
+      message: Secret action Job volumes are outside the exact-key projection contract

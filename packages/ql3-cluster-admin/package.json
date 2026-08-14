@@ -225,6 +225,11 @@
       "require": "./dist/plugin-package/executor/pluginPackageKubernetesSecretActionJob.js",
       "default": "./dist/plugin-package/executor/pluginPackageKubernetesSecretActionJob.js"
     },
+    "./plugin-package-kubernetes-secret-action-controller": {
+      "types": "./dist/plugin-package/executor/pluginPackageKubernetesSecretActionController.d.ts",
+      "require": "./dist/plugin-package/executor/pluginPackageKubernetesSecretActionController.js",
+      "default": "./dist/plugin-package/executor/pluginPackageKubernetesSecretActionController.js"
+    },
     "./prompt-output-gc-process": {
       "types": "./dist/prompt-output/retention/promptOutputGcProcess.d.ts",
       "require": "./dist/prompt-output/retention/promptOutputGcProcess.js",

@@ -41,6 +41,7 @@ export {
 
 export { PostgresPluginPackageMaterializedRevisionRepository } from '../plugin-package/installation/pluginPackageMaterializedRevisionRepository';
 export { PostgresApprovalRequestRepository } from '../approved-action/approvalRequestRepository';
+export { PostgresApprovedActionExecutionRepository } from '../approved-action/approvedActionExecutionRepository';
 export { PostgresProjectPolicyRepository } from '../security/projectPolicyRepository';
 export { PostgresPluginPackageSecretBindingRepository } from '../plugin-package/installation/pluginPackageSecretBindingRepository';
 export { PostgresPluginPackageSecretBindingActivationPrerequisite } from '../plugin-package/secret-binding/pluginPackageSecretBindingActivationPrerequisite';

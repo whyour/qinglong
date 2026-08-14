@@ -26,7 +26,7 @@ spec:
             app.kubernetes.io/part-of: qinglong3
         spec:
           serviceAccountName: ql3-plugin-package-executor
-          automountServiceAccountToken: false
+          automountServiceAccountToken: true
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
@@ -65,6 +65,82 @@ spec:
                   value: '16'
                 - name: QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_MAX_PAGES
                   value: '16'
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_ENABLED
+                  value: 'true'
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_LIMIT
+                  value: '8'
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_NAMESPACE
+                  value: qinglong3-system
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_SERVICE_ACCOUNT
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: serviceAccountName
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_SOURCE_SECRET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: sourceSecretName
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_IMAGE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: image
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_CA_SECRET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresCaSecretName
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_CA_KEY
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresCaKey
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_SERVERNAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresServerName
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_SECRET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresUrlSecretName
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_KEY
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresUrlSecretKey
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_AUTH_SECRET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresAuthSecretName
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresHost
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_PORT
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresPort
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_DATABASE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresDatabase
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_USERNAME_KEY
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresUsernameKey
+                - name: QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_PASSWORD_KEY
+                  valueFrom:
+                    configMapKeyRef:
+                      name: ql3-plugin-package-secret-action-admission
+                      key: postgresPasswordKey
                 - name: QL3_POSTGRES_TLS_MODE
                   value: verify-full
                 - name: QL3_POSTGRES_TLS_CA_FILE

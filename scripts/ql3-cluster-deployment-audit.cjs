@@ -3185,6 +3185,12 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
   const base = path.join(operationRoot, 'base');
   const expectedResources = [
     'service-account.yaml',
+    'secret-action-service-account.yaml',
+    'secret-action-admission-config.yaml',
+    'role.yaml',
+    'role-binding.yaml',
+    'validating-admission-policy.yaml',
+    'validating-admission-policy-binding.yaml',
     'cron-job.yaml',
     'network-policy.yaml',
   ];
@@ -3196,6 +3202,25 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
   );
   const name = 'ql3-plugin-package-executor';
   const serviceAccount = namedResource(resources, 'ServiceAccount', name);
+  const actionName = 'ql3-plugin-package-secret-action';
+  const actionServiceAccount = namedResource(
+    resources,
+    'ServiceAccount',
+    actionName,
+  );
+  const admissionConfig = namedResource(resources, 'ConfigMap', actionName + '-admission');
+  const role = namedResource(resources, 'Role', name);
+  const roleBinding = namedResource(resources, 'RoleBinding', name);
+  const admissionPolicy = namedResource(
+    resources,
+    'ValidatingAdmissionPolicy',
+    actionName,
+  );
+  const admissionBinding = namedResource(
+    resources,
+    'ValidatingAdmissionPolicyBinding',
+    actionName,
+  );
   const cronJob = namedResource(resources, 'CronJob', name);
   const networkPolicy = namedResource(resources, 'NetworkPolicy', name);
   const pod = objectAt(cronJob, [
@@ -3211,10 +3236,11 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     JSON.stringify(kustomization?.resources) !==
       JSON.stringify(expectedResources) ||
     serviceAccount?.automountServiceAccountToken !== false ||
+    actionServiceAccount?.automountServiceAccountToken !== false ||
     cronJob?.spec?.schedule !== '*/2 * * * *' ||
     cronJob?.spec?.concurrencyPolicy !== 'Forbid' ||
     pod?.serviceAccountName !== name ||
-    pod?.automountServiceAccountToken !== false ||
+    pod?.automountServiceAccountToken !== true ||
     pod?.restartPolicy !== 'Never' ||
     pod?.securityContext?.runAsNonRoot !== true ||
     pod?.securityContext?.seccompProfile?.type !== 'RuntimeDefault' ||
@@ -3227,7 +3253,71 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     findings.push(
       finding(
         'QL3_CLUSTER_PLUGIN_EXECUTOR_LIFECYCLE',
-        'Plugin Package executor must remain a bounded, tokenless, non-overlapping CronJob',
+        'Plugin Package executor must remain bounded and non-overlapping, with Kubernetes authority isolated from tokenless Secret action Jobs',
+      ),
+    );
+  }
+  const expectedRoleRules = [
+    {
+      apiGroups: ['batch'],
+      resources: ['jobs'],
+      verbs: ['create', 'get'],
+    },
+    {
+      apiGroups: [''],
+      resources: ['configmaps'],
+      resourceNames: ['ql3-plugin-package-secret-action-admission'],
+      verbs: ['get'],
+    },
+  ];
+  const admissionExpressions = (admissionPolicy?.spec?.validations ?? [])
+    .map((validation) => validation?.expression)
+    .join('\n');
+  if (
+    JSON.stringify(role?.rules) !== JSON.stringify(expectedRoleRules) ||
+    JSON.stringify(roleBinding?.subjects) !==
+      JSON.stringify([
+        {
+          kind: 'ServiceAccount',
+          name,
+          namespace: 'qinglong3-system',
+        },
+      ]) ||
+    JSON.stringify(roleBinding?.roleRef) !==
+      JSON.stringify({
+        apiGroup: 'rbac.authorization.k8s.io',
+        kind: 'Role',
+        name,
+      }) ||
+    admissionPolicy?.spec?.failurePolicy !== 'Fail' ||
+    admissionPolicy?.spec?.paramKind?.apiVersion !== 'v1' ||
+    admissionPolicy?.spec?.paramKind?.kind !== 'ConfigMap' ||
+    admissionPolicy?.spec?.matchConstraints?.resourceRules?.[0]?.operations?.[0] !==
+      'CREATE' ||
+    admissionPolicy?.spec?.matchConstraints?.resourceRules?.[0]?.resources?.[0] !==
+      'jobs' ||
+    admissionPolicy?.spec?.matchConditions?.[0]?.expression !==
+      "request.userInfo.username == 'system:serviceaccount:qinglong3-system:ql3-plugin-package-executor'" ||
+    !admissionExpressions.includes("variables.executor.image == params.data.image") ||
+    !admissionExpressions.includes('variables.pod.automountServiceAccountToken == false') ||
+    !admissionExpressions.includes('variables.values.secret.items.all') ||
+    admissionBinding?.spec?.policyName !== actionName ||
+    admissionBinding?.spec?.paramRef?.name !== actionName + '-admission' ||
+    admissionBinding?.spec?.paramRef?.namespace !== 'qinglong3-system' ||
+    admissionBinding?.spec?.paramRef?.parameterNotFoundAction !== 'Deny' ||
+    JSON.stringify(admissionBinding?.spec?.validationActions) !==
+      JSON.stringify(['Deny']) ||
+    admissionConfig?.data?.serviceAccountName !== actionName ||
+    admissionConfig?.data?.sourceSecretName !==
+      'ql3-cluster-plugin-package-values' ||
+    !String(admissionConfig?.data?.image).endsWith(
+      '@sha256:0000000000000000000000000000000000000000000000000000000000000000',
+    )
+  ) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_PLUGIN_EXECUTOR_KUBERNETES_AUTHORITY',
+        'Plugin Package controller must have create/get-only Job RBAC behind deny-on-error exact-contract admission and a tokenless action identity',
       ),
     );
   }
@@ -3254,6 +3344,9 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     ['QL3_PLUGIN_PACKAGE_EXECUTOR_LEASE_DURATION_MS', '600000'],
     ['QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_PAGE_SIZE', '16'],
     ['QL3_PLUGIN_PACKAGE_EXECUTOR_REVOCATION_MAX_PAGES', '16'],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_ENABLED', 'true'],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_LIMIT', '8'],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_NAMESPACE', 'qinglong3-system'],
     ['QL3_POSTGRES_TLS_MODE', 'verify-full'],
     [
       'QL3_POSTGRES_TLS_CA_FILE',
@@ -3266,6 +3359,50 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
         finding(
           'QL3_CLUSTER_PLUGIN_EXECUTOR_ENVIRONMENT',
           `${environmentName} must remain fixed to the reviewed bounded value`,
+        ),
+      );
+    }
+  }
+  for (const [environmentName, key] of [
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_SERVICE_ACCOUNT', 'serviceAccountName'],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_SOURCE_SECRET', 'sourceSecretName'],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_IMAGE', 'image'],
+    [
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_CA_SECRET',
+      'postgresCaSecretName',
+    ],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_CA_KEY', 'postgresCaKey'],
+    [
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_SERVERNAME',
+      'postgresServerName',
+    ],
+    [
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_SECRET',
+      'postgresUrlSecretName',
+    ],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_KEY', 'postgresUrlSecretKey'],
+    [
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_AUTH_SECRET',
+      'postgresAuthSecretName',
+    ],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_HOST', 'postgresHost'],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_PORT', 'postgresPort'],
+    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_DATABASE', 'postgresDatabase'],
+    [
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_USERNAME_KEY',
+      'postgresUsernameKey',
+    ],
+    [
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_PASSWORD_KEY',
+      'postgresPasswordKey',
+    ],
+  ]) {
+    const ref = env.get(environmentName)?.valueFrom?.configMapKeyRef;
+    if (ref?.name !== actionName + '-admission' || ref?.key !== key) {
+      findings.push(
+        finding(
+          'QL3_CLUSTER_PLUGIN_EXECUTOR_SECRET_ACTION_CONFIG',
+          `${environmentName} must come from the admission-bound ConfigMap`,
         ),
       );
     }
@@ -3348,6 +3485,38 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
       ),
     );
   }
+  const apiServerEgressExample = yaml.load(
+    readFile(
+      path.join(operationRoot, 'api-server-egress-patch.example.yaml'),
+      'utf8',
+    ),
+  );
+  if (
+    JSON.stringify(apiServerEgressExample) !==
+      JSON.stringify([
+        {
+          op: 'add',
+          path: '/spec/egress/-',
+          value: {
+            to: [
+              {
+                ipBlock: {
+                  cidr: 'REPLACE_WITH_API_SERVER_CIDR',
+                },
+              },
+            ],
+            ports: [{ protocol: 'TCP', port: 443 }],
+          },
+        },
+      ])
+  ) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_PLUGIN_EXECUTOR_API_EGRESS',
+        'Plugin Package controller API egress example must require one exact private-overlay CIDR and TCP 443',
+      ),
+    );
+  }
   const cloudNativeRoot = path.join(operationRoot, 'cloudnative-pg');
   const cloudNative = yaml.load(
     readFile(path.join(cloudNativeRoot, 'kustomization.yaml'), 'utf8'),
@@ -3364,12 +3533,21 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
       )
     : undefined;
   const cloudNativeEnv = environmentByName({ env: environmentPatch?.value });
+  const secretActionConfigPatch = yaml.load(
+    readFile(
+      path.join(cloudNativeRoot, 'secret-action-admission-config-patch.yaml'),
+      'utf8',
+    ),
+  );
+  const secretActionConfig = secretActionConfigPatch?.[0]?.value;
   const unreleasedDigest =
     'sha256:0000000000000000000000000000000000000000000000000000000000000000';
   if (
     JSON.stringify(cloudNative?.resources) !== JSON.stringify(['../base']) ||
     cloudNative?.patches?.[0]?.path !== 'cron-job-patch.yaml' ||
     cloudNative?.patches?.[1]?.path !== 'network-policy-patch.yaml' ||
+    cloudNative?.patches?.[2]?.path !==
+      'secret-action-admission-config-patch.yaml' ||
     JSON.stringify(cloudNative?.images) !==
       JSON.stringify([
         {
@@ -3387,6 +3565,19 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
       ?.secretKeyRef?.name !== 'ql3-postgres-package-executor-auth' ||
     cloudNativeEnv.get('QL3_POSTGRES_PACKAGE_EXECUTOR_PASSWORD')?.valueFrom
       ?.secretKeyRef?.name !== 'ql3-postgres-package-executor-auth' ||
+    secretActionConfigPatch?.[0]?.op !== 'replace' ||
+    secretActionConfigPatch?.[0]?.path !== '/data' ||
+    secretActionConfig?.postgresConnectionMode !== 'fields' ||
+    secretActionConfig?.postgresCaSecretName !== 'ql3-postgres-ca' ||
+    secretActionConfig?.postgresServerName !==
+      'ql3-postgres-rw.qinglong3-system.svc' ||
+    secretActionConfig?.postgresAuthSecretName !==
+      'ql3-postgres-package-executor-auth' ||
+    secretActionConfig?.postgresHost !==
+      'ql3-postgres-rw.qinglong3-system.svc' ||
+    secretActionConfig?.postgresPort !== '5432' ||
+    secretActionConfig?.postgresDatabase !== 'qinglong' ||
+    !String(secretActionConfig?.image).endsWith(`@${unreleasedDigest}`) ||
     !patch.some(
       (operation) =>
         operation?.path ===

@@ -21,3 +21,7 @@ metadata:
   namespace: qinglong3-system
 type: Opaque
 data: {}
+
+# The controller also needs one private-overlay NetworkPolicy patch containing
+# only the exact Kubernetes API endpoint CIDR and TCP port. Start from
+# api-server-egress-patch.example.yaml; do not permit arbitrary TCP/443 egress.

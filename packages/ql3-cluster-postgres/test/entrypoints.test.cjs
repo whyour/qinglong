@@ -367,11 +367,16 @@ test('Approved Action execution authority is isolated behind its explicit subpat
   const runtime = require('@qinglong/cluster-postgres/runtime');
   const admin = require('@qinglong/cluster-postgres/admin');
   const ingress = require('@qinglong/cluster-postgres/worker-ingress');
+  const packageExecutor = require('@qinglong/cluster-postgres/package-executor');
   const authority = require('@qinglong/cluster-postgres/approved-action-execution');
   assert.equal(root.PostgresApprovedActionExecutionRepository, undefined);
   assert.equal(runtime.PostgresApprovedActionExecutionRepository, undefined);
   assert.equal(admin.PostgresApprovedActionExecutionRepository, undefined);
   assert.equal(ingress.PostgresApprovedActionExecutionRepository, undefined);
+  assert.equal(
+    packageExecutor.PostgresApprovedActionExecutionRepository,
+    authority.PostgresApprovedActionExecutionRepository,
+  );
   assert.equal(
     typeof authority.PostgresApprovedActionExecutionRepository,
     'function',

@@ -17,6 +17,11 @@ patches:
       kind: NetworkPolicy
       name: ql3-plugin-package-executor
     path: network-policy-patch.yaml
+  - target:
+      version: v1
+      kind: ConfigMap
+      name: ql3-plugin-package-secret-action-admission
+    path: secret-action-admission-config-patch.yaml
 
 images:
   - name: qinglong3-cluster-admin

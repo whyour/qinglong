@@ -379,6 +379,62 @@ export class PostgresApprovedActionExecutionRepository
     }
   }
 
+  async listReconciliableExecutions(
+    query: Readonly<{
+      nowMs: number;
+      limit: number;
+      actionTypes: readonly string[];
+    }>,
+  ): Promise<Readonly<{
+    executions: readonly Readonly<ApprovedActionExecutionSnapshot>[];
+    truncated: boolean;
+  }>> {
+    assertPageSize(query.limit);
+    const handledActionTypes = actionTypes(query.actionTypes);
+    if (!Number.isSafeInteger(query.nowMs) || query.nowMs < 0) {
+      throw new ApprovedActionExecutionStateConflictError();
+    }
+    if (handledActionTypes.length === 0) {
+      return Object.freeze({ executions: Object.freeze([]), truncated: false });
+    }
+    try {
+      const result = await this.pool.query<Row>(
+        `SELECT execution.execution_json AS "executionJson",
+                execution.execution_digest AS "executionDigest",
+                dispatch.dispatch_json AS "dispatchJson"
+         FROM "ql3"."approved_action_executions" AS execution
+         JOIN "ql3"."approved_action_dispatches" AS dispatch
+           ON dispatch.dispatch_id = execution.dispatch_id
+         WHERE dispatch.action_type = ANY($1::varchar[])
+           AND (
+             (
+               execution.status IN ('pending','leased','retry_wait')
+               AND execution.eligible_at_ms <= $2
+             )
+             OR execution.status = 'executing'
+           )
+         ORDER BY execution.updated_at_ms, execution.dispatch_id
+         LIMIT $3`,
+        [handledActionTypes, query.nowMs, query.limit + 1],
+      );
+      const truncated = result.rows.length > query.limit;
+      const rows = truncated ? result.rows.slice(0, query.limit) : result.rows;
+      return Object.freeze({
+        executions: Object.freeze(
+          rows.map((row) =>
+            normalizeApprovedActionExecutionSnapshot({
+              dispatch: parseDispatch(row),
+              execution: parseExecution(row),
+            }),
+          ),
+        ),
+        truncated,
+      });
+    } catch (error) {
+      throw mappedError(error);
+    }
+  }
+
   claimExecution(
     command: ClaimApprovedActionExecutionCommand,
   ): Promise<ClaimApprovedActionExecutionResult> {

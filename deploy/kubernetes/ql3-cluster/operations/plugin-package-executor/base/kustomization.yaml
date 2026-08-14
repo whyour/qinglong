@@ -3,5 +3,11 @@ kind: Kustomization
 
 resources:
   - service-account.yaml
+  - secret-action-service-account.yaml
+  - secret-action-admission-config.yaml
+  - role.yaml
+  - role-binding.yaml
+  - validating-admission-policy.yaml
+  - validating-admission-policy-binding.yaml
   - cron-job.yaml
   - network-policy.yaml

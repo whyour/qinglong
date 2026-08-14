@@ -3581,6 +3581,22 @@ if (!migrationConnectionString) {
       const executions = new PostgresApprovedActionExecutionRepository(
         executorDatabase.pool,
       );
+      const pendingSecretActions =
+        await executions.listReconciliableExecutions({
+          nowMs: claimedAtMs,
+          limit: 1,
+          actionTypes: [consumed.dispatch.action.actionType],
+        });
+      assert.equal(pendingSecretActions.truncated, false);
+      assert.equal(pendingSecretActions.executions.length, 1);
+      assert.equal(
+        pendingSecretActions.executions[0].dispatch.id,
+        consumed.dispatch.id,
+      );
+      assert.equal(
+        pendingSecretActions.executions[0].execution.status,
+        'pending',
+      );
       const claimed = await executions.claimExecution({
         dispatchId: consumed.dispatch.id,
         owner: 'package_admission_dispatcher',
@@ -3598,6 +3614,22 @@ if (!migrationConnectionString) {
         expectedVersion: claimed.snapshot.execution.version,
         startedAtMs: admittedAtMs,
       });
+      const executingSecretActions =
+        await executions.listReconciliableExecutions({
+          nowMs: admittedAtMs,
+          limit: 1,
+          actionTypes: [consumed.dispatch.action.actionType],
+        });
+      assert.equal(executingSecretActions.truncated, false);
+      assert.equal(executingSecretActions.executions.length, 1);
+      assert.equal(
+        executingSecretActions.executions[0].dispatch.id,
+        consumed.dispatch.id,
+      );
+      assert.equal(
+        executingSecretActions.executions[0].execution.status,
+        'executing',
+      );
       const lock = resolvePluginPackageInstallProposal(
         proposal,
         consumed.dispatch,
