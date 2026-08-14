@@ -408,6 +408,8 @@
 | [ADR-0402](./ADR-0402-bounded-latest-task-run-outcome-comparison.md)                                    | 有界的 Task 最近成功/失败 Run 对比                                                                                                              | Accepted |
 | [ADR-0403](./ADR-0403-bounded-redacted-run-log-tail-tool.md)                                          | 有界、脱敏且不授予行动权的 Run 日志尾部 Tool                                                                                                      | Accepted |
 | [ADR-0404](./ADR-0404-optional-local-mcp-run-log-excerpt-surface.md)                                | 可选本机 MCP Run 日志摘录产品入口与私有文件边界                                                                                                      | Accepted |
+| [ADR-0405](./ADR-0405-bounded-failure-diagnosis-prompt-and-model-egress-policy.md)                | 有界故障诊断 Prompt 与显式模型出口策略                                                                                                                | Accepted |
+| [ADR-0406](./ADR-0406-cluster-projected-tool-result-key-authority.md)                              | Cluster Projected Tool Result Key Authority                                                                                                           | Accepted |
 
 ## 规则
 

@@ -120,6 +120,11 @@
       "require": "./dist/remote-execution/mountedSecretProvider.js",
       "default": "./dist/remote-execution/mountedSecretProvider.js"
     },
+    "./trusted-tool-result-keyring": {
+      "types": "./dist/trusted-tool/key-management/toolResultProjectedKeyring.d.ts",
+      "require": "./dist/trusted-tool/key-management/toolResultProjectedKeyring.js",
+      "default": "./dist/trusted-tool/key-management/toolResultProjectedKeyring.js"
+    },
     "./remote-completion": {
       "types": "./dist/remote-execution/remoteWorkerCompletionService.d.ts",
       "require": "./dist/remote-execution/remoteWorkerCompletionService.js",
