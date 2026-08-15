@@ -416,6 +416,9 @@
 | [ADR-0410](./ADR-0410-cluster-copilot-failure-diagnosis-output-key-authority.md)                   | Cluster Copilot Failure Diagnosis Output Projected Key Authority                                                                                        | Accepted |
 | [ADR-0411](./ADR-0411-default-off-cluster-copilot-composition.md)                                  | 默认关闭的 Cluster Copilot Failure Diagnosis Composition                                                                                                  | Accepted |
 | [ADR-0412](./ADR-0412-durable-copilot-pre-model-terminalization-and-unknown-resolution.md)         | 耐久 Copilot Pre-Model 终态化与 Model Unknown Resolution                                                                                                    | Accepted |
+| [ADR-0413](./ADR-0413-default-off-cluster-copilot-failure-diagnosis-api.md)                        | 默认关闭的 Cluster Copilot Failure Diagnosis API                                                                                                            | Accepted |
+| [ADR-0414](./ADR-0414-copilot-failure-diagnosis-read-model.md)                                    | Copilot 故障诊断请求键读模型                                                                                                                                | Accepted |
+| [ADR-0415](./ADR-0415-fenced-copilot-failure-diagnosis-cancellation.md)                            | 受围栏的 Copilot 故障诊断取消入口                                                                                                                            | Accepted |
 
 ## 规则
 

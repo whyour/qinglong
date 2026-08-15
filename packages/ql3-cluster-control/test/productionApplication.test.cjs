@@ -732,6 +732,7 @@ test('optionally exposes Prompt execution behind shared admission and policy', a
     'copilot.failure_diagnosis.execute',
     'copilot.failure_diagnosis.read',
     'copilot.failure_diagnosis.output.read',
+    'copilot.failure_diagnosis.cancel',
   ]);
   const response = await invoke(
     stack,
@@ -762,6 +763,7 @@ test('optionally exposes Prompt execution behind shared admission and policy', a
 test('optionally exposes Copilot diagnosis behind shared authentication, Policy and audit', async () => {
   const { events, input } = fixture();
   let command;
+  let cancellationCommand;
   const capability = {
     async execute(value) {
       command = value;
@@ -803,11 +805,30 @@ test('optionally exposes Copilot diagnosis behind shared authentication, Policy 
         requestId: value.requestId,
       };
     },
+    async cancel(value) {
+      cancellationCommand = value;
+      return {
+        schema: 'qinglong/copilot-failure-diagnosis-cancellation-result@v1',
+        status: 'accepted',
+        convergence: 'terminal',
+        projectId: value.projectId,
+        sourceRunId: value.sourceRunId,
+        requestId: value.requestId,
+        diagnosisRunId: 'diagnosis-run-1',
+        runStatus: 'cancelled',
+        outcome: 'cancelled',
+        runVersion: 7,
+        eventSequence: 7,
+        cancelRequestedAtMs: 2_000,
+        cancelReason: 'user',
+      };
+    },
   };
   const stack = createProductionClusterControlApplicationStack(input, {
     copilotFailureDiagnosis: {
       capability,
       readCapability: capability,
+      cancellationCapability: capability,
     },
   });
   const result = await invoke(
@@ -849,12 +870,35 @@ test('optionally exposes Copilot diagnosis behind shared authentication, Policy 
   );
   assert.equal(inspection.statusCode, 404);
   assert.equal(output.statusCode, 404);
+  const cancellation = await invoke(
+    stack,
+    metadata(
+      '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1/cancellation',
+      'POST',
+      {
+        schema: 'qinglong/run-cancellation@v1',
+        mutationId: '00000000-0000-4000-8000-000000000099',
+      },
+    ),
+  );
+  assert.equal(cancellation.statusCode, 202);
+  assert.equal(cancellationCommand.projectId, 'project-1');
+  assert.equal(cancellationCommand.sourceRunId, 'run-1');
+  assert.equal(cancellationCommand.requestId, 'diagnosis-request-1');
+  assert.deepEqual(cancellationCommand.policyFence, {
+    projectVersion: 3,
+    bindingVersion: 7,
+  });
   assert.equal(
     events.includes('audit:copilot.failure_diagnosis.read:allowed'),
     true,
   );
   assert.equal(
     events.includes('audit:copilot.failure_diagnosis.output.read:allowed'),
+    true,
+  );
+  assert.equal(
+    events.includes('audit:copilot.failure_diagnosis.cancel:allowed'),
     true,
   );
 });
@@ -879,6 +923,7 @@ test('keeps the Copilot route absent by default and never invokes it after Polic
   for (const path of [
     '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1',
     '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1/output',
+    '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1/cancellation',
   ]) {
     await assert.rejects(
       defaultStack.admission.prepare(metadata(path)),

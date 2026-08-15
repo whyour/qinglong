@@ -40,6 +40,11 @@
       "require": "./dist/application-runtime/copilot/failureDiagnosisComposition.js",
       "default": "./dist/application-runtime/copilot/failureDiagnosisComposition.js"
     },
+    "./copilot-cancellation-production": {
+      "types": "./dist/application-runtime/copilot/failureDiagnosisCancellationComposition.d.ts",
+      "require": "./dist/application-runtime/copilot/failureDiagnosisCancellationComposition.js",
+      "default": "./dist/application-runtime/copilot/failureDiagnosisCancellationComposition.js"
+    },
     "./failure-diagnosis-output-keyring": {
       "types": "./dist/copilot/failure-diagnosis/outputProjectedKeyring.d.ts",
       "require": "./dist/copilot/failure-diagnosis/outputProjectedKeyring.js",
@@ -54,6 +59,11 @@
       "types": "./dist/copilot/failure-diagnosis/failureDiagnosisReadRoutes.d.ts",
       "require": "./dist/copilot/failure-diagnosis/failureDiagnosisReadRoutes.js",
       "default": "./dist/copilot/failure-diagnosis/failureDiagnosisReadRoutes.js"
+    },
+    "./copilot-cancellation-route": {
+      "types": "./dist/copilot/failure-diagnosis/failureDiagnosisCancellationRoute.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/failureDiagnosisCancellationRoute.js",
+      "default": "./dist/copilot/failure-diagnosis/failureDiagnosisCancellationRoute.js"
     },
     "./http": {
       "types": "./dist/transport/httpSurface.d.ts",

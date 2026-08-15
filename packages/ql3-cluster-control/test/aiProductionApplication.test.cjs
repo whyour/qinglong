@@ -169,9 +169,11 @@ test('Copilot composition is explicit, shares the Prompt gateway and injects one
   const artifactStore = { put() {}, inspect() {}, readLogRange() {} };
   const copilot = Object.freeze({ execute() {} });
   const copilotRead = Object.freeze({ inspect() {}, readOutput() {} });
+  const copilotCancellation = Object.freeze({ cancel() {} });
   let registeredSink;
   let created;
   let createdRead;
+  let createdCancellation;
   let controlOptions;
   try {
     await Promise.all([
@@ -233,6 +235,10 @@ test('Copilot composition is explicit, shares the Prompt gateway and injects one
         createdRead = options;
         return copilotRead;
       },
+      createCopilotCancellation(options) {
+        createdCancellation = options;
+        return copilotCancellation;
+      },
       async startControl(options) {
         controlOptions = options;
         return {
@@ -257,10 +263,15 @@ test('Copilot composition is explicit, shares the Prompt gateway and injects one
     assert.equal(created.artifactStore, artifactStore);
     assert.equal(createdRead.pool, fakePool);
     assert.equal(typeof createdRead.prepared.outputKeys.resolve, 'function');
+    assert.equal(createdCancellation.pool, fakePool);
     assert.equal(controlOptions.copilotFailureDiagnosis.capability, copilot);
     assert.equal(
       controlOptions.copilotFailureDiagnosis.readCapability,
       copilotRead,
+    );
+    assert.equal(
+      controlOptions.copilotFailureDiagnosis.cancellationCapability,
+      copilotCancellation,
     );
     assert.equal(await application.stop(), 'stopped');
   } finally {

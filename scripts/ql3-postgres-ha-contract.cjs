@@ -89,6 +89,9 @@ const {
   CopilotFailureDiagnosisReadService,
 } = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/read-model/service.js');
 const {
+  CopilotFailureDiagnosisCancellationService,
+} = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/cancellation/service.js');
+const {
   BUILTIN_RUN_LOG_EXCERPT_TOOL,
   BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION,
   createBuiltInRunLogExcerptToolHandlerBinding,
@@ -1807,6 +1810,34 @@ async function copilotFailureDiagnosisTerminalizationFacts(pool, requestId) {
   };
 }
 
+async function copilotFailureDiagnosisCancellationFacts(pool, requestId) {
+  const terminalization = await copilotFailureDiagnosisTerminalizationFacts(
+    pool,
+    requestId,
+  );
+  const result = await pool.query(
+    `SELECT run.cancel_requested_at_ms AS "cancelRequestedAtMs",
+            run.cancel_reason AS "cancelReason",
+            (SELECT count(*)::integer FROM "ql3"."run_events"
+              WHERE run_id = admission.run_id
+                AND type = 'run.cancel_requested') AS "cancelEventCount",
+            (SELECT count(*)::integer
+               FROM "ql3_ai"."model_invocation_starts"
+              WHERE invocation_id = admission.plan_json->>'modelInvocationId')
+              AS "modelStartCount",
+            (SELECT count(*)::integer
+               FROM "ql3_ai"."model_invocation_completions"
+              WHERE invocation_id = admission.plan_json->>'modelInvocationId')
+              AS "modelCompletionCount"
+       FROM "ql3_ai"."copilot_failure_diagnosis_admissions" AS admission
+       JOIN "ql3"."runs" AS run ON run.id = admission.run_id
+      WHERE admission.request_id = $1`,
+    [requestId],
+  );
+  assert.equal(result.rowCount, 1);
+  return { ...terminalization, ...result.rows[0] };
+}
+
 async function copilotFailureDiagnosisModelResolutionFacts(pool, requestId) {
   const result = await pool.query(
     `SELECT admission.request_id AS "requestId",
@@ -2642,6 +2673,134 @@ async function terminalizeCopilotFailureDiagnosisLogUnavailableHaEvidence(
     }
     return facts;
   } finally {
+    await runtimeDatabase.close();
+  }
+}
+
+async function cancelCopilotFailureDiagnosisHaEvidence(options) {
+  const { port, report, fixture, expectedExisting = false } = options;
+  const runtimeDatabase = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, port),
+    expectedExisting
+      ? 'ql3-ha-copilot-cancellation-promoted'
+      : 'ql3-ha-copilot-cancellation-primary',
+  )();
+  let promotedClient;
+  try {
+    const pool = expectedExisting
+      ? await (async () => {
+          promotedClient = await runtimeDatabase.pool.connect();
+          await promotedClient.query(`SET synchronous_commit = 'local'`);
+          return {
+            query: promotedClient.query.bind(promotedClient),
+            async connect() {
+              return {
+                query: promotedClient.query.bind(promotedClient),
+                release() {},
+              };
+            },
+          };
+        })()
+      : runtimeDatabase.pool;
+    const admissions = new PostgresCopilotFailureDiagnosisAdmissionRepository(
+      pool,
+    );
+    const terminalizations =
+      new PostgresCopilotFailureDiagnosisPreModelTerminalizationRepository(
+        pool,
+      );
+    const service = new CopilotFailureDiagnosisCancellationService({
+      admissions,
+      cancellations: new PostgresClusterRunCancellationRepository(pool),
+      terminalizations: { repository: terminalizations },
+      terminalizeBeforeModel: terminalizeCopilotFailureDiagnosisBeforeModel,
+    });
+    const mutationId = report.cancellationMutationId ?? randomUUID();
+    const command = {
+      projectId: fixture.plan.projectId,
+      sourceRunId: fixture.plan.source.runId,
+      requestId: fixture.plan.requestId,
+      mutationId,
+      eventId: randomUUID(),
+      subject: fixture.principal.subject,
+      policyFence: fixture.plan.policyFence,
+    };
+    if (!expectedExisting) {
+      await assert.rejects(
+        service.cancel({ ...command, sourceRunId: 'other-source-run' }),
+        (error) =>
+          error?.code === 'COPILOT_FAILURE_DIAGNOSIS_CANCELLATION_NOT_FOUND',
+      );
+    }
+    const first = await service.cancel(command);
+    const replay = await service.cancel({ ...command, eventId: randomUUID() });
+    assert.equal(
+      first.status,
+      expectedExisting ? 'already_terminal' : 'accepted',
+    );
+    assert.equal(first.convergence, 'terminal');
+    assert.equal(first.runStatus, 'cancelled');
+    assert.equal(first.outcome, 'cancelled');
+    assert.equal(replay.status, 'already_terminal');
+    assert.equal(replay.convergence, 'terminal');
+    assert.equal(replay.runStatus, 'cancelled');
+    const facts = await copilotFailureDiagnosisCancellationFacts(
+      runtimeDatabase.pool,
+      report.requestId,
+    );
+    assert.deepEqual(
+      {
+        reason: facts.reason,
+        outcome: facts.outcome,
+        runStatus: facts.runStatus,
+        runVersion: facts.runVersion,
+        runEventSequence: facts.runEventSequence,
+        eventCount: facts.eventCount,
+        mutationCount: facts.mutationCount,
+        terminalizationCount: facts.terminalizationCount,
+        toolStatus: facts.toolStatus,
+        modelStatus: facts.modelStatus,
+        cancelReason: facts.cancelReason,
+        cancelEventCount: facts.cancelEventCount,
+        modelStartCount: facts.modelStartCount,
+        modelCompletionCount: facts.modelCompletionCount,
+        receiptContainsLogContent: facts.receiptContainsLogContent,
+      },
+      {
+        reason: 'cancellation_requested',
+        outcome: 'cancelled',
+        runStatus: 'cancelled',
+        runVersion: 7,
+        runEventSequence: 7,
+        eventCount: 7,
+        mutationCount: 4,
+        terminalizationCount: 1,
+        toolStatus: 'cancelled',
+        modelStatus: 'cancelled',
+        cancelReason: 'user',
+        cancelEventCount: 1,
+        modelStartCount: 0,
+        modelCompletionCount: 0,
+        receiptContainsLogContent: false,
+      },
+    );
+    if (expectedExisting) {
+      report.afterPromotion = facts;
+      report.survivedPromotion = true;
+      report.promotedExactReplay = true;
+      report.promotedProviderCalls = 0;
+    } else {
+      report.cancellationMutationId = mutationId;
+      report.beforePromotion = facts;
+      report.cancellationExactReplay = true;
+      report.crossTargetHidden = true;
+      report.providerCalls = 0;
+      report.contentFree = true;
+    }
+    return facts;
+  } finally {
+    promotedClient?.release();
     await runtimeDatabase.close();
   }
 }
@@ -11233,6 +11392,8 @@ async function main(argv = process.argv.slice(2)) {
   let copilotFailureDiagnosisModelResolutionFixture;
   let copilotFailureDiagnosisRead;
   let copilotFailureDiagnosisReadFixture;
+  let copilotFailureDiagnosisCancellation;
+  let copilotFailureDiagnosisCancellationFixture;
   let modelProviderCredentialCatalog;
   let modelProviderCredentialTestConnection;
   let runAttemptLogRetentionEvidence;
@@ -11449,6 +11610,13 @@ async function main(argv = process.argv.slice(2)) {
       });
       copilotFailureDiagnosisRead = copilotRead.report;
       copilotFailureDiagnosisReadFixture = copilotRead.fixture;
+      const copilotCancellation =
+        await runCopilotFailureDiagnosisAdmissionHaEvidence({
+          primaryPort,
+          migrationPool: migrationDatabase.pool,
+        });
+      copilotFailureDiagnosisCancellation = copilotCancellation.report;
+      copilotFailureDiagnosisCancellationFixture = copilotCancellation.fixture;
     } finally {
       await migrationDatabase.close();
     }
@@ -11901,6 +12069,26 @@ async function main(argv = process.argv.slice(2)) {
     copilotFailureDiagnosisTerminalization.replicatedBeforePromotion = true;
     timeline.push({
       state: 'copilot_failure_diagnosis_pre_model_terminalized',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    await cancelCopilotFailureDiagnosisHaEvidence({
+      port: primaryPort,
+      report: copilotFailureDiagnosisCancellation,
+      fixture: copilotFailureDiagnosisCancellationFixture,
+    });
+    await waitFor(async () => {
+      const replicated = await copilotFailureDiagnosisCancellationFacts(
+        standbyDatabase.pool,
+        copilotFailureDiagnosisCancellation.requestId,
+      );
+      return JSON.stringify(replicated) ===
+        JSON.stringify(copilotFailureDiagnosisCancellation.beforePromotion)
+        ? replicated
+        : null;
+    }, 'Copilot failure diagnosis cancellation WAL replay');
+    copilotFailureDiagnosisCancellation.replicatedBeforePromotion = true;
+    timeline.push({
+      state: 'copilot_failure_diagnosis_cancellation_terminalized',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     await resolveCopilotFailureDiagnosisUnknownModelHaEvidence({
@@ -12846,6 +13034,12 @@ async function main(argv = process.argv.slice(2)) {
       outputKeyByte: 0x74,
       expectedExisting: true,
     });
+    await cancelCopilotFailureDiagnosisHaEvidence({
+      port: standbyPort,
+      report: copilotFailureDiagnosisCancellation,
+      fixture: copilotFailureDiagnosisCancellationFixture,
+      expectedExisting: true,
+    });
     await verifyModelProviderCredentialCatalogAfterPromotion({
       promotedPort: standbyPort,
       promotedPool: promotedDatabase.pool,
@@ -13611,8 +13805,8 @@ async function main(argv = process.argv.slice(2)) {
     );
     assert.deepEqual(sideEffects.rows, [
       {
-        runs: 84,
-        runEvents: 209,
+        runs: 86,
+        runEvents: 216,
         diagnosisReadRuns: 2,
         diagnosisReadRunEvents: 9,
         credentialDeliveries: 4,
@@ -13734,6 +13928,7 @@ async function main(argv = process.argv.slice(2)) {
       copilotFailureDiagnosisTerminalization,
       copilotFailureDiagnosisModelResolution,
       copilotFailureDiagnosisRead,
+      copilotFailureDiagnosisCancellation,
       modelProviderCredentialCatalog,
       modelProviderCredentialTestConnection,
       runAttemptLogRetention,
@@ -13843,6 +14038,31 @@ async function main(argv = process.argv.slice(2)) {
           copilotFailureDiagnosisRead.promotedProviderCalls === 0 &&
           JSON.stringify(copilotFailureDiagnosisRead.afterPromotion) ===
             JSON.stringify(copilotFailureDiagnosisRead.beforePromotion),
+        copilotFailureDiagnosisCancellationExactlyReplaysWithoutProviderCall:
+          copilotFailureDiagnosisCancellation.cancellationExactReplay &&
+          copilotFailureDiagnosisCancellation.crossTargetHidden &&
+          copilotFailureDiagnosisCancellation.providerCalls === 0 &&
+          copilotFailureDiagnosisCancellation.beforePromotion
+            .cancelEventCount === 1 &&
+          copilotFailureDiagnosisCancellation.beforePromotion
+            .terminalizationCount === 1 &&
+          copilotFailureDiagnosisCancellation.beforePromotion
+            .modelStartCount === 0 &&
+          copilotFailureDiagnosisCancellation.beforePromotion
+            .modelCompletionCount === 0 &&
+          copilotFailureDiagnosisCancellation.beforePromotion.runStatus ===
+            'cancelled',
+        copilotFailureDiagnosisCancellationIsContentFree:
+          copilotFailureDiagnosisCancellation.contentFree &&
+          copilotFailureDiagnosisCancellation.beforePromotion
+            .receiptContainsLogContent === false,
+        copilotFailureDiagnosisCancellationReplicatesAndSurvivesPromotion:
+          copilotFailureDiagnosisCancellation.replicatedBeforePromotion &&
+          copilotFailureDiagnosisCancellation.survivedPromotion &&
+          copilotFailureDiagnosisCancellation.promotedExactReplay &&
+          copilotFailureDiagnosisCancellation.promotedProviderCalls === 0 &&
+          JSON.stringify(copilotFailureDiagnosisCancellation.afterPromotion) ===
+            JSON.stringify(copilotFailureDiagnosisCancellation.beforePromotion),
         modelProviderCredentialCatalogSurvivesPromotion:
           modelProviderCredentialCatalog.survivedPromotion,
         modelProviderCredentialManagementIdentityLedgerSurvivesPromotion:

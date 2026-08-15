@@ -71,6 +71,10 @@ import {
   type ClusterCopilotFailureDiagnosisInspectionCapability,
   type ClusterCopilotFailureDiagnosisOutputReadCapability,
 } from '../copilot/failure-diagnosis/failureDiagnosisReadRoutes';
+import {
+  createClusterControlCopilotFailureDiagnosisCancellationRoute,
+  type ClusterCopilotFailureDiagnosisCancellationCapability,
+} from '../copilot/failure-diagnosis/failureDiagnosisCancellationRoute';
 
 export const PRODUCTION_CLUSTER_CONTROL_ROUTE_OPERATIONS = Object.freeze([
   'task.get',
@@ -100,6 +104,7 @@ export const PRODUCTION_CLUSTER_CONTROL_OPTIONAL_ROUTE_OPERATIONS =
     'copilot.failure_diagnosis.execute',
     'copilot.failure_diagnosis.read',
     'copilot.failure_diagnosis.output.read',
+    'copilot.failure_diagnosis.cancel',
   ] as const);
 
 export interface ClusterCopilotFailureDiagnosisReadCapability
@@ -129,6 +134,7 @@ export interface ProductionClusterControlAssemblyOptions {
   readonly copilotFailureDiagnosis?: Readonly<{
     readonly capability: ClusterCopilotFailureDiagnosisCapability;
     readonly readCapability?: ClusterCopilotFailureDiagnosisReadCapability;
+    readonly cancellationCapability?: ClusterCopilotFailureDiagnosisCancellationCapability;
   }>;
   readonly workerIngress?: Readonly<{
     readonly config: EnabledClusterWorkerIngressConfig;
@@ -178,6 +184,7 @@ export interface ProductionClusterControlApplicationOptions
   readonly copilotFailureDiagnosis?: Readonly<{
     readonly capability: ClusterCopilotFailureDiagnosisCapability;
     readonly readCapability?: ClusterCopilotFailureDiagnosisReadCapability;
+    readonly cancellationCapability?: ClusterCopilotFailureDiagnosisCancellationCapability;
   }>;
   readonly workerIngress?: ProductionClusterWorkerIngressOptions;
 }
@@ -303,6 +310,14 @@ export function createProductionClusterControlApplicationStack(
             options.copilotFailureDiagnosis.readCapability,
           ),
         ]),
+    ...(options.copilotFailureDiagnosis?.cancellationCapability === undefined
+      ? []
+      : [
+          createClusterControlCopilotFailureDiagnosisCancellationRoute(
+            options.copilotFailureDiagnosis.cancellationCapability,
+            createEventId,
+          ),
+        ]),
   ];
   const routes = createClusterControlRouteRegistry(routeDefinitions);
   const expectedRouteCount =
@@ -313,7 +328,10 @@ export function createProductionClusterControlApplicationStack(
     (options.promptOutputRead === undefined ? 0 : 1) +
     (options.promptExecutionOutputRead === undefined ? 0 : 1) +
     (options.copilotFailureDiagnosis === undefined ? 0 : 1) +
-    (options.copilotFailureDiagnosis?.readCapability === undefined ? 0 : 2);
+    (options.copilotFailureDiagnosis?.readCapability === undefined ? 0 : 2) +
+    (options.copilotFailureDiagnosis?.cancellationCapability === undefined
+      ? 0
+      : 1);
   if (routes.size !== expectedRouteCount) {
     throw new Error('Production cluster-control route allowlist is incomplete');
   }

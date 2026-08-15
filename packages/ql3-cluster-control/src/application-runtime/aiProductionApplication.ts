@@ -2,6 +2,7 @@ import type { ModelGatewayProfileAudit } from '@qinglong/ai/profile';
 import type { DurableModelInvocationCoordinator } from '@qinglong/ai/durable-model-invocation';
 import { CopilotFailureDiagnosisModelCompletionCoordinator } from '@qinglong/ai/failure-diagnosis-model-execution';
 import type { CopilotFailureDiagnosisApplicationService } from '@qinglong/ai/failure-diagnosis-application';
+import type { CopilotFailureDiagnosisCancellationService } from '@qinglong/ai/failure-diagnosis-cancellation';
 import { BoundModelProviderCredentialProvider } from '@qinglong/ai/provider-credential';
 import { PostgresModelProviderCredentialReader } from '@qinglong/ai/postgres-model-provider-credential-storage';
 import { loadProjectedModelGatewayProviderAuthority } from '@qinglong/ai/projected-model-gateway-authority';
@@ -35,6 +36,10 @@ import {
   createProductionClusterCopilotFailureDiagnosisReadService,
   type CreateProductionClusterCopilotFailureDiagnosisReadServiceOptions,
 } from './copilot/failureDiagnosisReadComposition';
+import {
+  createProductionClusterCopilotFailureDiagnosisCancellation,
+  type CreateProductionClusterCopilotFailureDiagnosisCancellationOptions,
+} from './copilot/failureDiagnosisCancellationComposition';
 
 export interface EnabledProductionClusterAiConfig {
   readonly enabled: true;
@@ -63,6 +68,9 @@ export interface ProductionClusterAiControlApplicationOptions {
   ) => ReturnType<
     typeof createProductionClusterCopilotFailureDiagnosisReadService
   >;
+  readonly createCopilotCancellation?: (
+    options: CreateProductionClusterCopilotFailureDiagnosisCancellationOptions,
+  ) => Readonly<CopilotFailureDiagnosisCancellationService>;
   readonly openAiDatabase?: ReturnType<typeof createPostgresDatabaseOpener>;
 }
 
@@ -263,11 +271,15 @@ export async function startProductionClusterAiControlApplication(
   const createCopilotRead =
     options.createCopilotRead ??
     createProductionClusterCopilotFailureDiagnosisReadService;
+  const createCopilotCancellation =
+    options.createCopilotCancellation ??
+    createProductionClusterCopilotFailureDiagnosisCancellation;
   if (
     typeof startControl !== 'function' ||
     typeof bootstrapPrompt !== 'function' ||
     typeof createCopilot !== 'function' ||
     typeof createCopilotRead !== 'function' ||
+    typeof createCopilotCancellation !== 'function' ||
     (options.openAiDatabase !== undefined &&
       typeof options.openAiDatabase !== 'function')
   ) {
@@ -324,6 +336,9 @@ export async function startProductionClusterAiControlApplication(
     | ReturnType<
         typeof createProductionClusterCopilotFailureDiagnosisReadService
       >
+    | undefined;
+  let copilotCancellationApplication:
+    | Readonly<CopilotFailureDiagnosisCancellationService>
     | undefined;
   let copilotSuccessfulCompletion:
     | CopilotFailureDiagnosisModelCompletionCoordinator
@@ -455,6 +470,9 @@ export async function startProductionClusterAiControlApplication(
         pool: aiDatabase.pool,
         prepared: preparedCopilot,
       });
+      copilotCancellationApplication = createCopilotCancellation({
+        pool: aiDatabase.pool,
+      });
     }
     controlApplication = await startControl({
       ...options.control,
@@ -482,12 +500,14 @@ export async function startProductionClusterAiControlApplication(
             },
           }),
       ...(copilotApplication === undefined ||
-      copilotReadApplication === undefined
+      copilotReadApplication === undefined ||
+      copilotCancellationApplication === undefined
         ? {}
         : {
             copilotFailureDiagnosis: {
               capability: copilotApplication,
               readCapability: copilotReadApplication,
+              cancellationCapability: copilotCancellationApplication,
             },
           }),
     });

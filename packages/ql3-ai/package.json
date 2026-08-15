@@ -65,6 +65,11 @@
       "require": "./dist/copilot/failure-diagnosis/read-model/service.js",
       "default": "./dist/copilot/failure-diagnosis/read-model/service.js"
     },
+    "./failure-diagnosis-cancellation": {
+      "types": "./dist/copilot/failure-diagnosis/cancellation/service.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/cancellation/service.js",
+      "default": "./dist/copilot/failure-diagnosis/cancellation/service.js"
+    },
     "./failure-diagnosis-pre-model-terminalization": {
       "types": "./dist/copilot/failure-diagnosis/preModelTerminalization.d.ts",
       "require": "./dist/copilot/failure-diagnosis/preModelTerminalization.js",
