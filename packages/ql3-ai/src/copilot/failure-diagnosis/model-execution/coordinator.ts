@@ -5,7 +5,10 @@ import {
   type TrustedToolSuccessCompletionReadDependencies,
 } from '@qinglong/runtime-core/trusted-tool-completion';
 
-import { BoundedModelGateway } from '../../../model-gateway/gateway';
+import type {
+  BoundedModelGateway,
+  ModelInvocationSuccessfulCompletionSink,
+} from '../../../model-gateway/gateway';
 import type { ModelInvocationRepository } from '../../../model-invocation/modelInvocation';
 import type { CopilotFailureDiagnosisToolExecutionAdmissionReader } from '../tool-execution/contracts';
 import type { CopilotFailureDiagnosisToolUnlockRepository } from '../tool-execution/contracts';
@@ -36,20 +39,26 @@ export interface CopilotFailureDiagnosisModelExecutionDependencies {
     CopilotFailureDiagnosisOutputCompletionRepository,
     'findCopilotFailureDiagnosisOutput'
   >;
-  readonly gateway: BoundedModelGateway;
+  readonly gateway: Pick<
+    BoundedModelGateway,
+    'generate' | 'supportsSuccessfulCompletionSink'
+  >;
   readonly successfulCompletion: CopilotFailureDiagnosisModelCompletionCoordinator;
   readonly finalizations: CopilotFailureDiagnosisFinalizationRepository;
 }
 
 export interface CopilotFailureDiagnosisToolResultReader {
-  open(startId: string): Promise<Readonly<TrustedToolSuccessCompletionResult>>;
+  open(
+    requestId: string,
+    startId: string,
+  ): Promise<Readonly<TrustedToolSuccessCompletionResult>>;
 }
 
 export function createCopilotFailureDiagnosisToolResultReader(
   dependencies: TrustedToolSuccessCompletionReadDependencies,
 ): CopilotFailureDiagnosisToolResultReader {
   return Object.freeze({
-    open: (startId: string) =>
+    open: (_requestId: string, startId: string) =>
       openTrustedToolSuccessCompletion(startId, dependencies),
   });
 }
@@ -97,7 +106,8 @@ function assertDependencies(
     typeof value.modelInvocations?.findStart !== 'function' ||
     typeof value.modelInvocations?.findCompletion !== 'function' ||
     typeof value.outputs?.findCopilotFailureDiagnosisOutput !== 'function' ||
-    !(value.gateway instanceof BoundedModelGateway) ||
+    typeof value.gateway?.generate !== 'function' ||
+    typeof value.gateway?.supportsSuccessfulCompletionSink !== 'function' ||
     typeof value.successfulCompletion?.begin !== 'function' ||
     typeof value.successfulCompletion?.reference !== 'function' ||
     typeof value.successfulCompletion?.end !== 'function' ||
@@ -215,7 +225,7 @@ export async function executeCopilotFailureDiagnosisModel(
     );
   }
 
-  const tool = await dependencies.toolResults.open(unlock.startId);
+  const tool = await dependencies.toolResults.open(requestId, unlock.startId);
   if (
     tool.completion.completionDigest !== unlock.toolCompletionDigest ||
     tool.completion.runId !== plan.runId ||
@@ -241,7 +251,7 @@ export async function executeCopilotFailureDiagnosisModel(
   });
   if (
     !dependencies.gateway.supportsSuccessfulCompletionSink(
-      dependencies.successfulCompletion,
+      dependencies.successfulCompletion as ModelInvocationSuccessfulCompletionSink,
     )
   ) {
     throw new InvalidCopilotFailureDiagnosisModelExecutionError(

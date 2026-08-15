@@ -414,6 +414,7 @@
 | [ADR-0408](./ADR-0408-cluster-copilot-failure-diagnosis-tool-execution.md)                         | Cluster Copilot Failure Diagnosis Tool Execution 与原子 Model 解锁                                                                                    | Accepted |
 | [ADR-0409](./ADR-0409-cluster-copilot-failure-diagnosis-model-execution.md)                        | Cluster Copilot Failure Diagnosis Model Execution、密文输出与 Run 终态化                                                                               | Accepted |
 | [ADR-0410](./ADR-0410-cluster-copilot-failure-diagnosis-output-key-authority.md)                   | Cluster Copilot Failure Diagnosis Output Projected Key Authority                                                                                        | Accepted |
+| [ADR-0411](./ADR-0411-default-off-cluster-copilot-composition.md)                                  | 默认关闭的 Cluster Copilot Failure Diagnosis Composition                                                                                                  | Accepted |
 
 ## 规则
 

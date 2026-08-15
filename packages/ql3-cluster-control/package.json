@@ -35,6 +35,11 @@
       "require": "./dist/application-runtime/aiProductionApplication.js",
       "default": "./dist/application-runtime/aiProductionApplication.js"
     },
+    "./copilot-production": {
+      "types": "./dist/application-runtime/copilot/failureDiagnosisComposition.d.ts",
+      "require": "./dist/application-runtime/copilot/failureDiagnosisComposition.js",
+      "default": "./dist/application-runtime/copilot/failureDiagnosisComposition.js"
+    },
     "./failure-diagnosis-output-keyring": {
       "types": "./dist/copilot/failure-diagnosis/outputProjectedKeyring.d.ts",
       "require": "./dist/copilot/failure-diagnosis/outputProjectedKeyring.js",

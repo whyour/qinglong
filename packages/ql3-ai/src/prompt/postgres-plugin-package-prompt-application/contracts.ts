@@ -21,6 +21,8 @@ import type {
   ModelGatewayProfileAudit,
   ModelGatewayProviderAuthority,
 } from '../../profile/profileComposition';
+import type { DurableModelInvocationCoordinator } from '../../model-invocation/durableModelInvocationCoordinator';
+import type { ModelInvocationSuccessfulCompletionSink } from '../../model-gateway/gateway';
 import type { PluginPackagePromptCatalogCapability } from '../pluginPackagePromptCatalog';
 import type { PluginPackagePromptExecutionInspectionRepository } from '../pluginPackagePromptExecutionInspection';
 
@@ -80,6 +82,9 @@ export type BootstrapPostgresPluginPackagePromptApplicationOptions =
       maxConcurrent?: number;
       recoveryLimit?: number;
       now?: () => number;
+      createAdditionalSuccessfulCompletion?: (
+        coordinator: DurableModelInvocationCoordinator,
+      ) => ModelInvocationSuccessfulCompletionSink;
       promptOutputKeys?: PluginPackagePromptOutputArtifactKeyProvider;
       promptOutputRead?: Readonly<{
         authorizer: PluginPackagePromptOutputArtifactReadAuthorizer;

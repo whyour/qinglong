@@ -16,6 +16,10 @@ import type { PluginPackagePromptOutputReadService } from '../../prompt-output/p
 import type { PluginPackagePromptExecutionOutputReadService } from '../../prompt-output/pluginPackagePromptExecutionOutputRead';
 import { bootstrapModelGatewayProfile } from '../../profile/profileComposition';
 import {
+  ModelInvocationSuccessfulCompletionRouter,
+  type ModelInvocationSuccessfulCompletionSink,
+} from '../../model-gateway/gateway';
+import {
   PostgresPluginPackagePromptApplicationUnavailableError,
   unavailable,
   type BootstrapPostgresPluginPackagePromptApplicationOptions,
@@ -49,6 +53,8 @@ function assertEnabledOptions(
     (options.confirmActive !== undefined &&
       typeof options.confirmActive !== 'function') ||
     (options.now !== undefined && typeof options.now !== 'function') ||
+    (options.createAdditionalSuccessfulCompletion !== undefined &&
+      typeof options.createAdditionalSuccessfulCompletion !== 'function') ||
     (options.promptOutputKeys !== undefined &&
       (!options.promptOutputKeys ||
         typeof options.promptOutputKeys !== 'object' ||
@@ -118,17 +124,36 @@ export async function bootstrapPostgresPluginPackagePromptApplication(
         });
       },
       loadProviders: options.loadProviders,
-      ...(options.promptOutputKeys === undefined
+      ...(options.promptOutputKeys === undefined &&
+      options.createAdditionalSuccessfulCompletion === undefined
         ? {}
         : {
             createSuccessfulCompletion: (coordinator) => {
-              durableOutput =
-                new PluginPackagePromptOutputCompletionCoordinator({
+              const sinks: ModelInvocationSuccessfulCompletionSink[] = [];
+              if (options.promptOutputKeys !== undefined) {
+                durableOutput =
+                  new PluginPackagePromptOutputCompletionCoordinator({
                   coordinator,
                   keys: options.promptOutputKeys!,
                   ...(options.now === undefined ? {} : { now: options.now }),
                 });
-              return durableOutput;
+                sinks.push(durableOutput);
+              }
+              if (options.createAdditionalSuccessfulCompletion !== undefined) {
+                const additionalSuccessfulCompletion =
+                  options.createAdditionalSuccessfulCompletion(coordinator);
+                if (
+                  !additionalSuccessfulCompletion ||
+                  typeof additionalSuccessfulCompletion.record !== 'function'
+                ) {
+                  throw new TypeError(
+                    'PostgreSQL Package Prompt additional completion is invalid',
+                  );
+                }
+                sinks.push(additionalSuccessfulCompletion);
+              }
+              if (sinks.length === 1) return sinks[0]!;
+              return new ModelInvocationSuccessfulCompletionRouter(sinks);
             },
           }),
       audit: options.audit,

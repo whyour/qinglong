@@ -1,0 +1,16 @@
+# Example only. Copy into a private overlay, replace all example model policy
+# values and provision the three keyring Secrets out of band.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/cluster-ai
+  - ../../components/cluster-ai-copilot
+
+images:
+  - name: qinglong3-cluster-control-ai
+    newName: registry.example.com/qinglong/qinglong3-cluster-control-ai
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

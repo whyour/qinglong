@@ -1311,6 +1311,28 @@ function assertClusterAiComponent(readFile, root, findings) {
       'utf8',
     ),
   );
+  const copilotComponentDirectory = path.join(
+    root,
+    'deploy/kubernetes/ql3-cluster/components/cluster-ai-copilot',
+  );
+  const copilotComponent = yaml.load(
+    readFile(path.join(copilotComponentDirectory, 'kustomization.yaml'), 'utf8'),
+  );
+  const copilotPatch = yaml.load(
+    readFile(path.join(copilotComponentDirectory, 'deployment-patch.yaml'), 'utf8'),
+  );
+  const copilotConfig = yaml.load(
+    readFile(path.join(copilotComponentDirectory, 'copilot-configmap.yaml'), 'utf8'),
+  );
+  const copilotOverlay = yaml.load(
+    readFile(
+      path.join(
+        root,
+        'deploy/kubernetes/ql3-cluster/overlays/cluster-ai-copilot-example/kustomization.yaml',
+      ),
+      'utf8',
+    ),
+  );
   if (
     component?.kind !== 'Component' ||
     JSON.stringify(component?.resources) !==
@@ -1322,6 +1344,156 @@ function assertClusterAiComponent(readFile, root, findings) {
       finding(
         'QL3_CLUSTER_AI_COMPONENT_SCOPE',
         'Cluster AI must remain an explicit component containing only provider authority and one Deployment patch',
+      ),
+    );
+  }
+
+  const copilotPod = objectAt(copilotPatch, ['spec', 'template', 'spec']);
+  const copilotContainer = namedEntry(
+    copilotPod?.containers,
+    'cluster-control',
+  );
+  const copilotEnv = environmentByName(copilotContainer);
+  const copilotProjections = [
+    [
+      'cluster-ai-copilot-config',
+      '/var/run/qinglong3/ai/copilot-config',
+      'configMap',
+      'ql3-cluster-ai-copilot',
+      'config.json',
+    ],
+    [
+      'cluster-ai-copilot-invocation-keyring',
+      '/var/run/secrets/qinglong3/ai/copilot-invocation-keyring',
+      'secret',
+      'ql3-cluster-ai-copilot-invocation-keyring',
+      'keyring.json',
+    ],
+    [
+      'cluster-ai-copilot-result-keyring',
+      '/var/run/secrets/qinglong3/ai/copilot-result-keyring',
+      'secret',
+      'ql3-cluster-ai-copilot-result-keyring',
+      'keyring.json',
+    ],
+    [
+      'cluster-ai-copilot-output-keyring',
+      '/var/run/secrets/qinglong3/ai/copilot-output-keyring',
+      'secret',
+      'ql3-cluster-ai-copilot-output-keyring',
+      'keyring.json',
+    ],
+  ];
+  const copilotProjectionInvalid = copilotProjections.some(
+    ([name, mountPath, kind, authorityName, key]) => {
+      const mount = namedEntry(copilotContainer?.volumeMounts, name);
+      const volume = namedEntry(copilotPod?.volumes, name);
+      const projection = volume?.[kind];
+      return (
+        mount?.mountPath !== mountPath ||
+        mount?.readOnly !== true ||
+        projection?.name !== authorityName &&
+          projection?.secretName !== authorityName ||
+        projection?.defaultMode !== 0o440 ||
+        projection?.optional === true ||
+        JSON.stringify(projection?.items) !==
+          JSON.stringify([{ key, path: key }])
+      );
+    },
+  );
+  if (
+    copilotComponent?.kind !== 'Component' ||
+    JSON.stringify(copilotComponent?.resources) !==
+      JSON.stringify(['copilot-configmap.yaml']) ||
+    JSON.stringify(copilotComponent?.patches) !==
+      JSON.stringify([{ path: 'deployment-patch.yaml' }]) ||
+    copilotPatch?.kind !== 'Deployment' ||
+    copilotPatch?.metadata?.name !== 'ql3-cluster-control' ||
+    copilotPod?.serviceAccountName !== undefined ||
+    copilotPod?.automountServiceAccountToken !== undefined ||
+    copilotPod?.containers?.length !== 1 ||
+    copilotContainer?.image !== undefined ||
+    copilotContainer?.env?.length !== 5 ||
+    copilotContainer?.volumeMounts?.length !== 4 ||
+    copilotPod?.volumes?.length !== 4 ||
+    copilotProjectionInvalid
+  ) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_AI_COPILOT_PROJECTION',
+        'Cluster Copilot must remain an explicit component with one canonical ConfigMap and three independent required read-only 0440 keyring projections',
+      ),
+    );
+  }
+  for (const [name, expected] of [
+    ['QL3_CLUSTER_AI_COPILOT_ENABLED', 'true'],
+    [
+      'QL3_CLUSTER_AI_COPILOT_CONFIG_FILE',
+      '/var/run/qinglong3/ai/copilot-config/config.json',
+    ],
+    [
+      'QL3_CLUSTER_AI_COPILOT_INVOCATION_KEYRING_ROOT',
+      '/var/run/secrets/qinglong3/ai/copilot-invocation-keyring',
+    ],
+    [
+      'QL3_CLUSTER_AI_COPILOT_RESULT_KEYRING_ROOT',
+      '/var/run/secrets/qinglong3/ai/copilot-result-keyring',
+    ],
+    [
+      'QL3_CLUSTER_AI_COPILOT_OUTPUT_KEYRING_ROOT',
+      '/var/run/secrets/qinglong3/ai/copilot-output-keyring',
+    ],
+  ]) {
+    if (copilotEnv.get(name)?.value !== expected) {
+      findings.push(
+        finding(
+          'QL3_CLUSTER_AI_COPILOT_ENVIRONMENT',
+          `${name} must be fixed to the reviewed projected authority ${expected}`,
+        ),
+      );
+    }
+  }
+  const copilotConfigText = copilotConfig?.data?.['config.json'];
+  let parsedCopilotConfig;
+  try {
+    parsedCopilotConfig = JSON.parse(copilotConfigText);
+  } catch {
+    parsedCopilotConfig = undefined;
+  }
+  if (
+    copilotConfig?.kind !== 'ConfigMap' ||
+    copilotConfig?.metadata?.name !== 'ql3-cluster-ai-copilot' ||
+    typeof copilotConfigText !== 'string' ||
+    `${JSON.stringify(parsedCopilotConfig)}\n` !== copilotConfigText ||
+    parsedCopilotConfig?.schema !==
+      'qinglong/cluster-copilot-failure-diagnosis-config@v1' ||
+    parsedCopilotConfig?.egressPolicy?.schema !==
+      'qinglong/copilot-model-egress-policy@v1'
+  ) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_AI_COPILOT_CONFIG',
+        'Cluster Copilot configuration must remain canonical, bounded and explicitly versioned',
+      ),
+    );
+  }
+  const copilotOverlayImage = copilotOverlay?.images?.[0];
+  if (
+    JSON.stringify(copilotOverlay?.components) !==
+      JSON.stringify([
+        '../../components/cluster-ai',
+        '../../components/cluster-ai-copilot',
+      ]) ||
+    copilotOverlayImage?.name !== 'qinglong3-cluster-control-ai' ||
+    copilotOverlayImage?.newName !==
+      'registry.example.com/qinglong/qinglong3-cluster-control-ai' ||
+    !/^sha256:[0-9a-f]{64}$/.test(copilotOverlayImage?.digest ?? '') ||
+    'newTag' in (copilotOverlayImage ?? {})
+  ) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_AI_COPILOT_OVERLAY',
+        'The Copilot overlay must compose explicit AI and Copilot components and independently pin the Cluster AI image digest',
       ),
     );
   }
@@ -1564,7 +1736,11 @@ function assertClusterAiComponent(readFile, root, findings) {
     ) ||
     namedEntry(basePod?.volumes, 'cluster-ai-provider-authority') ||
     namedEntry(basePod?.volumes, 'cluster-ai-provider-secrets') ||
-    namedEntry(basePod?.volumes, 'cluster-ai-prompt-output-keyring')
+    namedEntry(basePod?.volumes, 'cluster-ai-prompt-output-keyring') ||
+    [...copilotProjections].some(([name]) =>
+      namedEntry(baseContainer?.volumeMounts, name) ||
+      namedEntry(basePod?.volumes, name),
+    )
   ) {
     findings.push(
       finding(

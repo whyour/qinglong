@@ -1163,6 +1163,9 @@ function auditSourceImports(root, packagePath, findings) {
         const clusterAiImports = Object.freeze({
           'src/aiCli.ts': Object.freeze(['@qinglong/ai/profile']),
           'src/application-runtime/aiProductionApplication.ts': Object.freeze([
+            '@qinglong/ai/durable-model-invocation',
+            '@qinglong/ai/failure-diagnosis-application',
+            '@qinglong/ai/failure-diagnosis-model-execution',
             '@qinglong/ai/plugin-package-prompt-output-projected-keyring',
             '@qinglong/ai/postgres-model-provider-credential-storage',
             '@qinglong/ai/postgres-plugin-package-prompt-application',
@@ -1171,6 +1174,17 @@ function auditSourceImports(root, packagePath, findings) {
             '@qinglong/ai/projected-model-provider-secret-material',
             '@qinglong/ai/provider-credential',
           ]),
+          'src/application-runtime/copilot/failureDiagnosisComposition.ts':
+            Object.freeze([
+              '@qinglong/ai/failure-diagnosis-application',
+              '@qinglong/ai/failure-diagnosis-execution-admission',
+              '@qinglong/ai/failure-diagnosis-model-execution',
+              '@qinglong/ai/failure-diagnosis-tool-execution',
+              '@qinglong/ai/postgres-failure-diagnosis-admission-storage',
+              '@qinglong/ai/postgres-failure-diagnosis-model-execution-storage',
+              '@qinglong/ai/postgres-failure-diagnosis-tool-execution-storage',
+              '@qinglong/ai/profile',
+            ]),
         });
         const sourceRelative = path.relative(packageDirectory, filePath);
         if (!clusterAiImports[sourceRelative]?.includes(specifier)) {

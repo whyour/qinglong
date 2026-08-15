@@ -1,4 +1,7 @@
 import type { ModelGatewayProfileAudit } from '@qinglong/ai/profile';
+import type { DurableModelInvocationCoordinator } from '@qinglong/ai/durable-model-invocation';
+import { CopilotFailureDiagnosisModelCompletionCoordinator } from '@qinglong/ai/failure-diagnosis-model-execution';
+import type { CopilotFailureDiagnosisApplicationService } from '@qinglong/ai/failure-diagnosis-application';
 import { BoundModelProviderCredentialProvider } from '@qinglong/ai/provider-credential';
 import { PostgresModelProviderCredentialReader } from '@qinglong/ai/postgres-model-provider-credential-storage';
 import { loadProjectedModelGatewayProviderAuthority } from '@qinglong/ai/projected-model-gateway-authority';
@@ -22,12 +25,19 @@ import {
   startProductionClusterControlApplication,
   type ProductionClusterControlApplicationOptions,
 } from './productionApplication';
+import {
+  createProductionClusterCopilotFailureDiagnosis,
+  prepareProductionClusterCopilotFailureDiagnosisProjection,
+  type ClusterCopilotFailureDiagnosisProjection,
+  type CreateProductionClusterCopilotFailureDiagnosisOptions,
+} from './copilot/failureDiagnosisComposition';
 
 export interface EnabledProductionClusterAiConfig {
   readonly enabled: true;
   readonly providerAuthorityFile: string;
   readonly secretRootDirectory: string;
   readonly promptOutputKeyringRootDirectory?: string;
+  readonly copilot?: Readonly<ClusterCopilotFailureDiagnosisProjection>;
   readonly maxConcurrent: number;
   readonly recoveryLimit: number;
   readonly databaseMaxConnections: number;
@@ -41,7 +51,17 @@ export interface ProductionClusterAiControlApplicationOptions {
   ) => void | Promise<void>;
   readonly startControl?: typeof startProductionClusterControlApplication;
   readonly bootstrapPrompt?: typeof bootstrapPostgresPluginPackagePromptApplication;
+  readonly createCopilot?: (
+    options: CreateProductionClusterCopilotFailureDiagnosisOptions,
+  ) => Promise<Readonly<CopilotFailureDiagnosisApplicationService>>;
+  readonly openAiDatabase?: ReturnType<typeof createPostgresDatabaseOpener>;
 }
+
+export type ProductionClusterAiControlApplicationResult = Extract<
+  ClusterControlApplicationResult,
+  { readonly status: 'active' }
+> &
+  Readonly<{ copilot?: Readonly<CopilotFailureDiagnosisApplicationService> }>;
 
 export class ProductionClusterAiConfigError extends TypeError {
   readonly code = 'QL3_CLUSTER_AI_CONFIG_INVALID';
@@ -121,6 +141,11 @@ export function loadProductionClusterAiConfig(
     'QL3_CLUSTER_AI_PROMPT_OUTPUT_ENABLED',
     false,
   );
+  const copilotEnabled = booleanValue(
+    environment,
+    'QL3_CLUSTER_AI_COPILOT_ENABLED',
+    false,
+  );
   return Object.freeze({
     enabled: true,
     providerAuthorityFile: requiredPath(
@@ -137,6 +162,28 @@ export function loadProductionClusterAiConfig(
             environment,
             'QL3_CLUSTER_AI_PROMPT_OUTPUT_KEYRING_ROOT',
           ),
+        }
+      : {}),
+    ...(copilotEnabled
+      ? {
+          copilot: Object.freeze({
+            configFile: requiredPath(
+              environment,
+              'QL3_CLUSTER_AI_COPILOT_CONFIG_FILE',
+            ),
+            invocationKeyringRootDirectory: requiredPath(
+              environment,
+              'QL3_CLUSTER_AI_COPILOT_INVOCATION_KEYRING_ROOT',
+            ),
+            resultKeyringRootDirectory: requiredPath(
+              environment,
+              'QL3_CLUSTER_AI_COPILOT_RESULT_KEYRING_ROOT',
+            ),
+            outputKeyringRootDirectory: requiredPath(
+              environment,
+              'QL3_CLUSTER_AI_COPILOT_OUTPUT_KEYRING_ROOT',
+            ),
+          }),
         }
       : {}),
     maxConcurrent: boundedInteger(
@@ -187,7 +234,7 @@ function aiDatabaseOpener(
  */
 export async function startProductionClusterAiControlApplication(
   options: ProductionClusterAiControlApplicationOptions,
-): Promise<ClusterControlApplicationResult> {
+): Promise<ProductionClusterAiControlApplicationResult> {
   if (
     !options ||
     typeof options !== 'object' ||
@@ -200,8 +247,25 @@ export async function startProductionClusterAiControlApplication(
     options.startControl ?? startProductionClusterControlApplication;
   const bootstrapPrompt =
     options.bootstrapPrompt ?? bootstrapPostgresPluginPackagePromptApplication;
-  if (typeof startControl !== 'function' || typeof bootstrapPrompt !== 'function') {
+  const createCopilot =
+    options.createCopilot ?? createProductionClusterCopilotFailureDiagnosis;
+  if (
+    typeof startControl !== 'function' ||
+    typeof bootstrapPrompt !== 'function' ||
+    typeof createCopilot !== 'function' ||
+    (options.openAiDatabase !== undefined &&
+      typeof options.openAiDatabase !== 'function')
+  ) {
     throw new TypeError('Production Cluster AI application factories are invalid');
+  }
+  const copilotArtifactStore = options.control.workerIngress?.artifactStore;
+  if (
+    options.ai.copilot !== undefined &&
+    typeof copilotArtifactStore?.readLogRange !== 'function'
+  ) {
+    throw new TypeError(
+      'Cluster Copilot requires the bounded Worker log Artifact read capability',
+    );
   }
   const secretMaterial =
     await createProjectedModelProviderSecretMaterialProvider({
@@ -213,6 +277,12 @@ export async function startProductionClusterAiControlApplication(
       : await createPluginPackagePromptOutputProjectedKeyring({
           rootDirectory: options.ai.promptOutputKeyringRootDirectory,
         });
+  const preparedCopilot =
+    options.ai.copilot === undefined
+      ? undefined
+      : await prepareProductionClusterCopilotFailureDiagnosisProjection(
+          options.ai.copilot,
+        );
   let aiDatabase:
     | Awaited<ReturnType<ReturnType<typeof createPostgresDatabaseOpener>>>
     | undefined;
@@ -230,6 +300,12 @@ export async function startProductionClusterAiControlApplication(
     | BootstrapPostgresPluginPackagePromptApplicationResult
     | undefined;
   let controlApplication: ClusterControlApplicationResult | undefined;
+  let copilotApplication:
+    | Readonly<CopilotFailureDiagnosisApplicationService>
+    | undefined;
+  let copilotSuccessfulCompletion:
+    | CopilotFailureDiagnosisModelCompletionCoordinator
+    | undefined;
   let stopPromise: Promise<ClusterControlStopResult> | undefined;
   let promptOutputPolicy: ProjectPolicyEngine | undefined;
   const promptOutputReadAuthorizer = Object.freeze({
@@ -271,11 +347,9 @@ export async function startProductionClusterAiControlApplication(
     return stopPromise;
   };
   try {
-    const openDatabase = aiDatabaseOpener(
-      options.control.config,
-      options.ai,
-      onAiUnavailable,
-    );
+    const openDatabase =
+      options.openAiDatabase ??
+      aiDatabaseOpener(options.control.config, options.ai, onAiUnavailable);
     promptApplication = await bootstrapPrompt({
       enabled: true,
       async openDatabase() {
@@ -311,9 +385,40 @@ export async function startProductionClusterAiControlApplication(
             promptOutputKeys,
             promptOutputRead: { authorizer: promptOutputReadAuthorizer },
           }),
+      ...(preparedCopilot === undefined
+        ? {}
+        : {
+            createAdditionalSuccessfulCompletion(
+              coordinator: DurableModelInvocationCoordinator,
+            ) {
+              if (copilotSuccessfulCompletion) {
+                throw new Error(
+                  'Cluster Copilot completion was created more than once',
+                );
+              }
+              copilotSuccessfulCompletion =
+                new CopilotFailureDiagnosisModelCompletionCoordinator({
+                  coordinator,
+                  keys: preparedCopilot.outputKeys,
+                });
+              return copilotSuccessfulCompletion;
+            },
+          }),
     });
     if (promptApplication.status !== 'active') {
       throw new Error('Cluster AI Prompt application did not activate');
+    }
+    if (preparedCopilot !== undefined) {
+      if (!copilotSuccessfulCompletion || !aiDatabase || !copilotArtifactStore) {
+        throw new Error('Cluster Copilot shared authorities did not activate');
+      }
+      copilotApplication = await createCopilot({
+        pool: aiDatabase.pool,
+        gateway: promptApplication.capability,
+        prepared: preparedCopilot,
+        successfulCompletion: copilotSuccessfulCompletion,
+        artifactStore: copilotArtifactStore,
+      });
     }
     controlApplication = await startControl({
       ...options.control,
@@ -356,6 +461,9 @@ export async function startProductionClusterAiControlApplication(
           ? 'unavailable'
           : activeControl.availabilityStatus();
       },
+      ...(copilotApplication === undefined
+        ? {}
+        : { copilot: copilotApplication }),
       stop,
     });
   } catch (error) {

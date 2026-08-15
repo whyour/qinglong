@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-cluster-control
+spec:
+  template:
+    spec:
+      containers:
+        - name: cluster-control
+          env:
+            - name: QL3_CLUSTER_AI_COPILOT_ENABLED
+              value: "true"
+            - name: QL3_CLUSTER_AI_COPILOT_CONFIG_FILE
+              value: /var/run/qinglong3/ai/copilot-config/config.json
+            - name: QL3_CLUSTER_AI_COPILOT_INVOCATION_KEYRING_ROOT
+              value: /var/run/secrets/qinglong3/ai/copilot-invocation-keyring
+            - name: QL3_CLUSTER_AI_COPILOT_RESULT_KEYRING_ROOT
+              value: /var/run/secrets/qinglong3/ai/copilot-result-keyring
+            - name: QL3_CLUSTER_AI_COPILOT_OUTPUT_KEYRING_ROOT
+              value: /var/run/secrets/qinglong3/ai/copilot-output-keyring
+          volumeMounts:
+            - name: cluster-ai-copilot-config
+              mountPath: /var/run/qinglong3/ai/copilot-config
+              readOnly: true
+            - name: cluster-ai-copilot-invocation-keyring
+              mountPath: /var/run/secrets/qinglong3/ai/copilot-invocation-keyring
+              readOnly: true
+            - name: cluster-ai-copilot-result-keyring
+              mountPath: /var/run/secrets/qinglong3/ai/copilot-result-keyring
+              readOnly: true
+            - name: cluster-ai-copilot-output-keyring
+              mountPath: /var/run/secrets/qinglong3/ai/copilot-output-keyring
+              readOnly: true
+      volumes:
+        - name: cluster-ai-copilot-config
+          configMap:
+            name: ql3-cluster-ai-copilot
+            defaultMode: 288
+            items:
+              - key: config.json
+                path: config.json
+        - name: cluster-ai-copilot-invocation-keyring
+          secret:
+            secretName: ql3-cluster-ai-copilot-invocation-keyring
+            defaultMode: 288
+            items:
+              - key: keyring.json
+                path: keyring.json
+        - name: cluster-ai-copilot-result-keyring
+          secret:
+            secretName: ql3-cluster-ai-copilot-result-keyring
+            defaultMode: 288
+            items:
+              - key: keyring.json
+                path: keyring.json
+        - name: cluster-ai-copilot-output-keyring
+          secret:
+            secretName: ql3-cluster-ai-copilot-output-keyring
+            defaultMode: 288
+            items:
+              - key: keyring.json
+                path: keyring.json

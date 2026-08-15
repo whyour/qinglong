@@ -39,6 +39,12 @@ import {
   type ModelPriceCatalogResolver,
 } from '../pricing/pricing';
 
+export {
+  InvalidModelInvocationSuccessfulCompletionRouterError,
+  MAX_MODEL_INVOCATION_SUCCESSFUL_COMPLETION_SINKS,
+  ModelInvocationSuccessfulCompletionRouter,
+} from './successfulCompletionRouter';
+
 export const MAX_MODEL_GATEWAY_CONCURRENCY = 64;
 
 export class ModelProviderUnavailableError extends Error {
@@ -126,6 +132,9 @@ export interface BoundedModelGatewayOptions {
 }
 
 export interface ModelInvocationSuccessfulCompletionSink {
+  supportsSuccessfulCompletionSink?(
+    sink: ModelInvocationSuccessfulCompletionSink,
+  ): boolean;
   record(
     audit: Readonly<ModelInvocationAuditRecord>,
     result: Readonly<GenerateResult>,
@@ -372,7 +381,11 @@ export class BoundedModelGateway {
   supportsSuccessfulCompletionSink(
     sink: ModelInvocationSuccessfulCompletionSink,
   ): boolean {
-    return this.#successfulCompletion === sink;
+    const configured = this.#successfulCompletion;
+    return (
+      configured === sink ||
+      configured?.supportsSuccessfulCompletionSink?.(sink) === true
+    );
   }
 
   async #prepare(
