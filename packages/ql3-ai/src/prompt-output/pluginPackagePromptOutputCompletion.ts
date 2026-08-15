@@ -9,6 +9,7 @@ import type {
 } from '../model-gateway/model';
 import type { ModelInvocationSuccessfulCompletionSink } from '../model-gateway/gateway';
 import type { DurableModelInvocationCoordinator } from '../model-invocation/durableModelInvocationCoordinator';
+import type { ModelInvocationAtomicSuccess } from '../model-invocation/modelInvocationAtomicSuccess';
 import {
   normalizePluginPackagePromptExecutionPlan,
   type PluginPackagePromptExecutionPlan,
@@ -113,6 +114,61 @@ export function assertPluginPackagePromptOutputCompletionBinding(
   });
 }
 
+function pluginPackagePromptOutputAtomicSuccess(
+  artifactValue: PluginPackagePromptOutputArtifact,
+): ModelInvocationAtomicSuccess<PluginPackagePromptOutputArtifactReference> {
+  const artifact = normalizePluginPackagePromptOutputArtifact(artifactValue);
+  const reference = pluginPackagePromptOutputArtifactReference(artifact);
+  const conflict = (): Error =>
+    new PluginPackagePromptOutputArtifactConflictError();
+  const extension: ModelInvocationAtomicSuccess<PluginPackagePromptOutputArtifactReference> = {
+    outputRef: artifact.artifactId,
+    assertAudit(audit: Readonly<ModelInvocationAuditRecord>): void {
+      if (
+        audit.phase !== 'completed' ||
+        audit.requestId !== artifact.invocationId ||
+        audit.projectId !== artifact.projectId ||
+        audit.runId !== artifact.runId ||
+        audit.stepRunId !== artifact.stepRunId ||
+        audit.provider !== artifact.provider ||
+        audit.model !== artifact.model ||
+        audit.outputBytes !== artifact.outputBytes
+      ) {
+        throw conflict();
+      }
+    },
+    async find(repository) {
+      if (!isPluginPackagePromptOutputCompletionRepository(repository)) {
+        throw conflict();
+      }
+      const stored = await repository.findPromptOutputArtifact(
+        artifact.artifactId,
+      );
+      if (!stored) return null;
+      if (JSON.stringify(stored) !== JSON.stringify(artifact)) throw conflict();
+      return pluginPackagePromptOutputArtifactReference(stored);
+    },
+    matches(stored): boolean {
+      return JSON.stringify(stored) === JSON.stringify(reference);
+    },
+    async commit(repository, command) {
+      if (!isPluginPackagePromptOutputCompletionRepository(repository)) {
+        throw conflict();
+      }
+      const result = await repository.completeWithPromptOutputArtifact(
+        command,
+        artifact,
+      );
+      return Object.freeze({
+        status: result.status,
+        reference: result.reference,
+      });
+    },
+    conflict,
+  };
+  return Object.freeze(extension);
+}
+
 interface ActiveCompletion {
   readonly lease: Readonly<PluginPackagePromptOutputCompletionLease>;
   readonly plan: Readonly<PluginPackagePromptExecutionPlan>;
@@ -149,7 +205,7 @@ export class PluginPackagePromptOutputCompletionCoordinator
       typeof options !== 'object' ||
       Array.isArray(options) ||
       !options.coordinator ||
-      typeof options.coordinator.recordWithPromptOutputArtifact !==
+      typeof options.coordinator.recordWithAtomicSuccess !==
         'function' ||
       !options.keys ||
       typeof options.keys.active !== 'function' ||
@@ -252,7 +308,10 @@ export class PluginPackagePromptOutputCompletionCoordinator
         this.#nonceFactory,
       );
       const disposition =
-        await this.#coordinator.recordWithPromptOutputArtifact(audit, artifact);
+        await this.#coordinator.recordWithAtomicSuccess(
+          audit,
+          pluginPackagePromptOutputAtomicSuccess(artifact),
+        );
       active.reference = disposition.reference;
       return Object.freeze({
         handled: true as const,

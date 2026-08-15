@@ -3,6 +3,7 @@ import type { PostgresQueryable } from '@qinglong/runtime-core';
 import {
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_SCHEMA,
 } from '../identities';
 import { defineSqlMigration } from '../shared';
@@ -11,6 +12,8 @@ const ADMISSION_TABLE = 'copilot_failure_diagnosis_admissions';
 const SOURCE_SNAPSHOT_FUNCTION =
   'copilot_failure_diagnosis_admission_source_snapshot';
 const TOOL_UNLOCK_TABLE = 'copilot_failure_diagnosis_tool_unlocks';
+const MODEL_OUTPUT_TABLE = 'copilot_failure_diagnosis_model_outputs';
+const FINALIZATION_TABLE = 'copilot_failure_diagnosis_finalizations';
 
 const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_TABLE_SQL = `
 CREATE TABLE "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${ADMISSION_TABLE}" (
@@ -319,7 +322,166 @@ const postgresCopilotFailureDiagnosisToolUnlockMigration =
     (context, statement) => context.query(statement).then(() => undefined),
   );
 
+const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_OUTPUT_TABLE_SQL = `
+CREATE TABLE "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${MODEL_OUTPUT_TABLE}" (
+  artifact_id varchar(128) PRIMARY KEY,
+  request_id varchar(128) NOT NULL UNIQUE,
+  plan_digest char(64) NOT NULL UNIQUE,
+  tool_completion_digest char(64) NOT NULL,
+  project_id varchar(128) NOT NULL,
+  run_id varchar(36) NOT NULL,
+  step_run_id varchar(128) NOT NULL UNIQUE,
+  invocation_id varchar(128) NOT NULL UNIQUE,
+  provider varchar(128) NOT NULL,
+  model varchar(256) NOT NULL,
+  egress_evidence_digest char(64) NOT NULL,
+  content_digest char(64) NOT NULL,
+  output_bytes integer NOT NULL,
+  key_id varchar(128) NOT NULL,
+  algorithm varchar(32) NOT NULL,
+  sealed_at_ms bigint NOT NULL,
+  artifact_digest char(64) NOT NULL UNIQUE,
+  artifact_json jsonb NOT NULL,
+  CONSTRAINT ql3_ai_copilot_diagnosis_model_output_admission_fk
+    FOREIGN KEY (request_id)
+    REFERENCES "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${ADMISSION_TABLE}"
+      (request_id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_model_output_unlock_fk
+    FOREIGN KEY (request_id)
+    REFERENCES "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${TOOL_UNLOCK_TABLE}"
+      (request_id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_model_output_completion_fk
+    FOREIGN KEY (invocation_id)
+    REFERENCES "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."model_invocation_completions"
+      (invocation_id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_model_output_step_fk
+    FOREIGN KEY (run_id, step_run_id)
+    REFERENCES "ql3"."step_runs" (run_id, id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_model_output_identity_check CHECK (
+    artifact_id ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' AND
+    request_id ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' AND
+    project_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND
+    run_id ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,35}$' AND
+    step_run_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND
+    invocation_id ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND
+    output_bytes BETWEEN 0 AND 1048576 AND sealed_at_ms >= 0
+  ),
+  CONSTRAINT ql3_ai_copilot_diagnosis_model_output_digest_check CHECK (
+    plan_digest ~ '^[0-9a-f]{64}$' AND
+    tool_completion_digest ~ '^[0-9a-f]{64}$' AND
+    egress_evidence_digest ~ '^[0-9a-f]{64}$' AND
+    content_digest ~ '^[0-9a-f]{64}$' AND
+    artifact_digest ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT ql3_ai_copilot_diagnosis_model_output_json_check CHECK (
+    jsonb_typeof(artifact_json) = 'object' AND
+    octet_length(artifact_json::text) BETWEEN 2 AND 1572864 AND
+    artifact_json @> jsonb_build_object(
+      'schema', 'qinglong/copilot-failure-diagnosis-output-artifact@v1',
+      'artifactId', artifact_id, 'requestId', request_id,
+      'planDigest', plan_digest,
+      'toolCompletionDigest', tool_completion_digest,
+      'projectId', project_id, 'runId', run_id,
+      'stepRunId', step_run_id, 'invocationId', invocation_id,
+      'provider', provider, 'model', model,
+      'egressEvidenceDigest', egress_evidence_digest,
+      'contentDigest', content_digest, 'outputBytes', output_bytes,
+      'keyId', key_id, 'algorithm', algorithm,
+      'sealedAtMs', sealed_at_ms, 'artifactDigest', artifact_digest
+    )
+  )
+)`;
+
+const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_FINALIZATION_TABLE_SQL = `
+CREATE TABLE "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${FINALIZATION_TABLE}" (
+  request_id varchar(128) PRIMARY KEY,
+  plan_digest char(64) NOT NULL UNIQUE,
+  run_id varchar(36) NOT NULL UNIQUE,
+  model_step_run_id varchar(128) NOT NULL UNIQUE,
+  invocation_id varchar(128) NOT NULL UNIQUE,
+  completion_digest char(64) NOT NULL UNIQUE,
+  outcome varchar(32) NOT NULL,
+  output_artifact_id varchar(128),
+  final_run_version integer NOT NULL,
+  final_run_event_sequence integer NOT NULL,
+  run_event_id varchar(36) NOT NULL UNIQUE,
+  finalized_at_ms bigint NOT NULL,
+  receipt_digest char(64) NOT NULL UNIQUE,
+  receipt_json jsonb NOT NULL,
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_admission_fk
+    FOREIGN KEY (request_id)
+    REFERENCES "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${ADMISSION_TABLE}"
+      (request_id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_completion_fk
+    FOREIGN KEY (invocation_id)
+    REFERENCES "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."model_invocation_completions"
+      (invocation_id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_output_fk
+    FOREIGN KEY (output_artifact_id)
+    REFERENCES "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${MODEL_OUTPUT_TABLE}"
+      (artifact_id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_run_fk
+    FOREIGN KEY (run_id) REFERENCES "ql3"."runs" (id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_step_fk
+    FOREIGN KEY (run_id, model_step_run_id)
+    REFERENCES "ql3"."step_runs" (run_id, id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_event_fk
+    FOREIGN KEY (run_event_id)
+    REFERENCES "ql3"."run_events" (id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_state_check CHECK (
+    outcome IN ('succeeded', 'failed', 'timed_out', 'cancelled') AND
+    ((outcome = 'succeeded' AND output_artifact_id IS NOT NULL) OR
+     (outcome <> 'succeeded' AND output_artifact_id IS NULL)) AND
+    final_run_version >= 1 AND
+    final_run_event_sequence = final_run_version AND
+    finalized_at_ms >= 0
+  ),
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_digest_check CHECK (
+    plan_digest ~ '^[0-9a-f]{64}$' AND
+    completion_digest ~ '^[0-9a-f]{64}$' AND
+    receipt_digest ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT ql3_ai_copilot_diagnosis_finalization_json_check CHECK (
+    jsonb_typeof(receipt_json) = 'object' AND
+    octet_length(receipt_json::text) BETWEEN 2 AND 16384 AND
+    receipt_json @> jsonb_build_object(
+      'schema', 'qinglong/copilot-failure-diagnosis-finalization-receipt@v1',
+      'requestId', request_id, 'planDigest', plan_digest,
+      'runId', run_id, 'modelStepRunId', model_step_run_id,
+      'invocationId', invocation_id,
+      'completionDigest', completion_digest, 'outcome', outcome,
+      'finalRunVersion', final_run_version,
+      'finalRunEventSequence', final_run_event_sequence,
+      'runEventId', run_event_id, 'finalizedAtMs', finalized_at_ms,
+      'receiptDigest', receipt_digest
+    )
+  )
+)`;
+
+const postgresCopilotFailureDiagnosisModelExecutionMigration =
+  defineSqlMigration<PostgresQueryable>(
+    POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
+    [
+      POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_OUTPUT_TABLE_SQL,
+      POSTGRES_COPILOT_FAILURE_DIAGNOSIS_FINALIZATION_TABLE_SQL,
+      `REVOKE ALL ON TABLE
+         "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${MODEL_OUTPUT_TABLE}"
+       FROM PUBLIC`,
+      `GRANT SELECT, INSERT ON TABLE
+         "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${MODEL_OUTPUT_TABLE}"
+       TO ql3_runtime`,
+      `REVOKE ALL ON TABLE
+         "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${FINALIZATION_TABLE}"
+       FROM PUBLIC`,
+      `GRANT SELECT, INSERT ON TABLE
+         "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${FINALIZATION_TABLE}"
+       TO ql3_runtime`,
+    ],
+    (context, statement) => context.query(statement).then(() => undefined),
+  );
+
 export const postgresCopilotMigrations = Object.freeze([
   postgresCopilotFailureDiagnosisAdmissionMigration,
   postgresCopilotFailureDiagnosisToolUnlockMigration,
+  postgresCopilotFailureDiagnosisModelExecutionMigration,
 ]);

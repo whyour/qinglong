@@ -60,15 +60,24 @@ export interface TrustedToolSuccessCompletionIdentityFactory {
 }
 
 export interface TrustedToolSuccessCompletionDependencies
-  extends TrustedToolExecutionDependencies {
-  readonly completions: ToolExecutionCompletionRepository;
+  extends TrustedToolExecutionDependencies,
+    TrustedToolSuccessCompletionReadDependencies {
   readonly stepRuns: Pick<StepRunRepository, 'findById'>;
   readonly runs: Pick<RunRepositoryReader, 'findRunById'>;
+  readonly identities: TrustedToolSuccessCompletionIdentityFactory;
+  readonly nonceFactory?: () => Uint8Array;
+}
+
+export interface TrustedToolSuccessCompletionReadDependencies {
+  readonly completions: ToolExecutionCompletionRepository;
+  readonly barriers: Pick<
+    TrustedToolExecutionDependencies['barriers'],
+    'findByStartId'
+  >;
   readonly resultKeyCatalog: ToolResultKeyCatalogReader;
   readonly resultRekeys: ToolExecutionResultRekeyReader;
   readonly resultKeys: Pick<ToolInvocationArtifactKeyProvider, 'resolve'>;
-  readonly identities: TrustedToolSuccessCompletionIdentityFactory;
-  readonly nonceFactory?: () => Uint8Array;
+  readonly adapters: TrustedToolExecutionAdapterRegistry;
 }
 
 export interface TrustedToolSuccessCompletionResult {
@@ -101,26 +110,15 @@ function sameValue(left: unknown, right: unknown): boolean {
 function validateDependencies(
   dependencies: TrustedToolSuccessCompletionDependencies,
 ): void {
+  validateReadDependencies(dependencies);
   if (
-    !dependencies ||
-    typeof dependencies !== 'object' ||
-    !dependencies.completions ||
-    typeof dependencies.completions.findByStartId !== 'function' ||
-    typeof dependencies.completions.findResultArtifact !== 'function' ||
     typeof dependencies.completions.commit !== 'function' ||
     !dependencies.stepRuns ||
     typeof dependencies.stepRuns.findById !== 'function' ||
     !dependencies.runs ||
     typeof dependencies.runs.findRunById !== 'function' ||
-    !dependencies.resultKeys ||
-    typeof dependencies.resultKeys.resolve !== 'function' ||
-    !dependencies.resultKeyCatalog ||
-    typeof dependencies.resultKeyCatalog.findCurrent !== 'function' ||
-    !dependencies.resultRekeys ||
-    typeof dependencies.resultRekeys.findHeadByArtifactId !== 'function' ||
     !dependencies.identities ||
     typeof dependencies.identities.create !== 'function' ||
-    !(dependencies.adapters instanceof TrustedToolExecutionAdapterRegistry) ||
     (dependencies.nonceFactory !== undefined &&
       typeof dependencies.nonceFactory !== 'function')
   ) {
@@ -128,9 +126,32 @@ function validateDependencies(
   }
 }
 
+function validateReadDependencies(
+  dependencies: TrustedToolSuccessCompletionReadDependencies,
+): void {
+  if (
+    !dependencies ||
+    typeof dependencies !== 'object' ||
+    !dependencies.completions ||
+    typeof dependencies.completions.findByStartId !== 'function' ||
+    typeof dependencies.completions.findResultArtifact !== 'function' ||
+    !dependencies.barriers ||
+    typeof dependencies.barriers.findByStartId !== 'function' ||
+    !dependencies.resultKeys ||
+    typeof dependencies.resultKeys.resolve !== 'function' ||
+    !dependencies.resultKeyCatalog ||
+    typeof dependencies.resultKeyCatalog.findCurrent !== 'function' ||
+    !dependencies.resultRekeys ||
+    typeof dependencies.resultRekeys.findHeadByArtifactId !== 'function' ||
+    !(dependencies.adapters instanceof TrustedToolExecutionAdapterRegistry)
+  ) {
+    unavailable();
+  }
+}
+
 async function findResultRekeyHead(
   artifactId: string,
-  dependencies: TrustedToolSuccessCompletionDependencies,
+  dependencies: TrustedToolSuccessCompletionReadDependencies,
 ): Promise<Readonly<ToolExecutionResultRekeyOverlay> | null> {
   try {
     const value = await dependencies.resultRekeys.findHeadByArtifactId(
@@ -145,7 +166,7 @@ async function findResultRekeyHead(
 }
 
 async function findResultKeyCatalog(
-  dependencies: TrustedToolSuccessCompletionDependencies,
+  dependencies: TrustedToolSuccessCompletionReadDependencies,
 ): Promise<Readonly<ToolResultKeyCatalogRecord>> {
   try {
     const value = await dependencies.resultKeyCatalog.findCurrent();
@@ -169,7 +190,7 @@ function validCatalogMaterial(
 
 async function findCompletion(
   startId: string,
-  dependencies: TrustedToolSuccessCompletionDependencies,
+  dependencies: TrustedToolSuccessCompletionReadDependencies,
 ): Promise<Readonly<ToolExecutionCompletionRecord> | null> {
   try {
     const value = await dependencies.completions.findByStartId(startId);
@@ -183,7 +204,7 @@ async function findCompletion(
 
 async function findBarrier(
   startId: string,
-  dependencies: TrustedToolSuccessCompletionDependencies,
+  dependencies: TrustedToolSuccessCompletionReadDependencies,
 ): Promise<Readonly<ToolExecutionStartBarrierRecord>> {
   try {
     const value = await dependencies.barriers.findByStartId(startId);
@@ -245,7 +266,7 @@ function completionMatches(
 
 async function openDurableCompletion(
   completion: Readonly<ToolExecutionCompletionRecord>,
-  dependencies: TrustedToolSuccessCompletionDependencies,
+  dependencies: TrustedToolSuccessCompletionReadDependencies,
 ): Promise<Readonly<TrustedToolSuccessCompletionResult>> {
   const barrier = await findBarrier(completion.startId, dependencies);
   let artifact: Readonly<ToolExecutionResultArtifact>;
@@ -307,6 +328,17 @@ async function openDurableCompletion(
   }
 }
 
+/** Reopens one exact encrypted Tool success without executing the Tool. */
+export async function openTrustedToolSuccessCompletion(
+  startId: string,
+  dependencies: TrustedToolSuccessCompletionReadDependencies,
+): Promise<Readonly<TrustedToolSuccessCompletionResult>> {
+  validateReadDependencies(dependencies);
+  const completion = await findCompletion(startId, dependencies);
+  if (!completion) return unavailable();
+  return openDurableCompletion(completion, dependencies);
+}
+
 async function findStepRun(
   barrier: Readonly<ToolExecutionStartBarrierRecord>,
   dependencies: TrustedToolSuccessCompletionDependencies,
@@ -351,7 +383,7 @@ export async function executeAndCompleteTrustedToolSuccess(
   validateDependencies(dependencies);
 
   const existing = await findCompletion(startId, dependencies);
-  if (existing) return openDurableCompletion(existing, dependencies);
+  if (existing) return openTrustedToolSuccessCompletion(startId, dependencies);
 
   const executionResult = await executeTrustedToolAfterStart(
     startId,
@@ -359,7 +391,9 @@ export async function executeAndCompleteTrustedToolSuccess(
   );
 
   const concurrent = await findCompletion(startId, dependencies);
-  if (concurrent) return openDurableCompletion(concurrent, dependencies);
+  if (concurrent) {
+    return openTrustedToolSuccessCompletion(startId, dependencies);
+  }
 
   const barrier = await findBarrier(startId, dependencies);
   const adapter = dependencies.adapters.resolve(barrier);
@@ -469,7 +503,9 @@ export async function executeAndCompleteTrustedToolSuccess(
     });
   } catch (cause) {
     const recovered = await findCompletion(startId, dependencies);
-    if (recovered) return openDurableCompletion(recovered, dependencies);
+    if (recovered) {
+      return openTrustedToolSuccessCompletion(startId, dependencies);
+    }
     throw cause;
   }
 }

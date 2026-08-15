@@ -1,4 +1,4 @@
-import type { PostgresPool } from '@qinglong/runtime-core';
+import type { PostgresClient, PostgresPool } from '@qinglong/runtime-core';
 
 import { createModelInvocationPriceSettlement } from '../../pricing/pricing';
 import { type PluginPackagePromptOutputArtifact } from '../../prompt-output/pluginPackagePromptOutputArtifact';
@@ -315,17 +315,36 @@ export async function completeWithPricingOperation(
   });
 }
 
-export async function completeWithPromptOutputArtifactOperation(
+export interface PostgresModelInvocationAtomicOutputBinding<
+  TArtifact,
+  TReference,
+> {
+  readonly artifact: Readonly<TArtifact>;
+  readonly reference: Readonly<TReference>;
+  read(client: PostgresClient): Promise<Readonly<TArtifact> | null>;
+  put(client: PostgresClient): Promise<Readonly<TArtifact>>;
+  matches(stored: Readonly<TArtifact>): boolean;
+}
+
+export interface CommitPostgresModelInvocationAtomicOutputResult<
+  TArtifact,
+  TReference,
+> extends CommitModelInvocationResult<ModelInvocationCompletionRecord> {
+  readonly artifact: Readonly<TArtifact>;
+  readonly reference: Readonly<TReference>;
+}
+
+export async function completeWithAtomicOutputOperation<TArtifact, TReference>(
   pool: PostgresPool,
   commandValue: ModelInvocationCompletionCommand,
-  artifactValue: PluginPackagePromptOutputArtifact,
-): Promise<Readonly<CommitPluginPackagePromptOutputResult>> {
+  binding: PostgresModelInvocationAtomicOutputBinding<TArtifact, TReference>,
+): Promise<
+  Readonly<
+    CommitPostgresModelInvocationAtomicOutputResult<TArtifact, TReference>
+  >
+> {
   const command = normalizeModelInvocationCompletionCommand(commandValue);
   const completion = command.completion;
-  const binding = assertPluginPackagePromptOutputCompletionBinding(
-    command,
-    artifactValue,
-  );
   const expectedUsage = createModelInvocationUsageLedgerRecord(
     command.start,
     completion,
@@ -377,10 +396,7 @@ export async function completeWithPromptOutputArtifactOperation(
     if (existing[0]) {
       const [storedArtifact, usage, priceSettlements, quotaSettlements] =
         await Promise.all([
-          readPostgresPluginPackagePromptOutputArtifactInTransaction(
-            client,
-            binding.artifact.artifactId,
-          ),
+          binding.read(client),
           usageRows(client, 'usage.invocation_id = $1', [
             completion.invocationId,
           ]),
@@ -395,7 +411,7 @@ export async function completeWithPromptOutputArtifactOperation(
       if (
         JSON.stringify(stored) !== JSON.stringify(completion) ||
         !storedArtifact ||
-        JSON.stringify(storedArtifact) !== JSON.stringify(binding.artifact) ||
+        !binding.matches(storedArtifact) ||
         usage.length !== (expectedUsage ? 1 : 0) ||
         (expectedUsage &&
           JSON.stringify(parseUsage(usage[0]!)) !==
@@ -434,12 +450,6 @@ export async function completeWithPromptOutputArtifactOperation(
       throw new ModelInvocationConflictError();
     }
     await assertCurrent(client, command.stepRunMutation, completion.projectId);
-    const artifact = (
-      await putPostgresPluginPackagePromptOutputArtifactInTransaction(
-        client,
-        binding.artifact,
-      )
-    ).artifact;
     await applyMutation(client, command.stepRunMutation);
     await insertCompletion(client, completion);
     if (expectedUsage) await insertUsage(client, expectedUsage);
@@ -449,11 +459,42 @@ export async function completeWithPromptOutputArtifactOperation(
     if (expectedQuotaSettlement) {
       await insertQuotaSettlement(client, expectedQuotaSettlement);
     }
+    const artifact = await binding.put(client);
     return Object.freeze({
       status: 'created' as const,
       record: completion,
       artifact,
       reference: binding.reference,
     });
+  });
+}
+
+export async function completeWithPromptOutputArtifactOperation(
+  pool: PostgresPool,
+  commandValue: ModelInvocationCompletionCommand,
+  artifactValue: PluginPackagePromptOutputArtifact,
+): Promise<Readonly<CommitPluginPackagePromptOutputResult>> {
+  const command = normalizeModelInvocationCompletionCommand(commandValue);
+  const binding = assertPluginPackagePromptOutputCompletionBinding(
+    command,
+    artifactValue,
+  );
+  return completeWithAtomicOutputOperation(pool, command, {
+    artifact: binding.artifact,
+    reference: binding.reference,
+    read: (client) =>
+      readPostgresPluginPackagePromptOutputArtifactInTransaction(
+        client,
+        binding.artifact.artifactId,
+      ),
+    put: async (client) =>
+      (
+        await putPostgresPluginPackagePromptOutputArtifactInTransaction(
+          client,
+          binding.artifact,
+        )
+      ).artifact,
+    matches: (stored) =>
+      JSON.stringify(stored) === JSON.stringify(binding.artifact),
   });
 }

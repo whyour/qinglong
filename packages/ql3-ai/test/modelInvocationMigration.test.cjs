@@ -21,6 +21,7 @@ const {
   LOCAL_MODEL_PRICE_CATALOG_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_MIGRATION_HISTORY_TABLE,
   POSTGRES_MODEL_INVOCATION_MIGRATION_STREAM_ID,
@@ -432,6 +433,10 @@ test('PostgreSQL AI schema is an independent reviewed feature stream', async () 
     'pg-9019-ai-copilot-failure-diagnosis-tool-unlocks',
   );
   assert.equal(
+    POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
+    'pg-9020-ai-copilot-failure-diagnosis-model-executions',
+  );
+  assert.equal(
     POSTGRES_MODEL_INVOCATION_MIGRATION_HISTORY_TABLE,
     'ai_schema_migrations',
   );
@@ -518,7 +523,7 @@ test('PostgreSQL AI schema is an independent reviewed feature stream', async () 
   );
   assert.equal(
     postgresModelInvocationMigrationDefinition.migrations.length,
-    19,
+    20,
   );
 
   const diagnosisAdmissionStatements = [];
@@ -564,6 +569,33 @@ test('PostgreSQL AI schema is an independent reviewed feature stream', async () 
   );
   assert.match(diagnosisToolUnlockSql, /TO ql3_runtime/);
   assert.doesNotMatch(diagnosisToolUnlockSql, /GRANT[^;]*(?:UPDATE|DELETE)/);
+
+  const diagnosisModelExecutionStatements = [];
+  await postgresModelInvocationMigrationDefinition.migrations[19].up({
+    async query(statement) {
+      diagnosisModelExecutionStatements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const diagnosisModelExecutionSql =
+    diagnosisModelExecutionStatements.join('\n');
+  assert.match(
+    diagnosisModelExecutionSql,
+    /CREATE TABLE "ql3_ai"\."copilot_failure_diagnosis_model_outputs"/,
+  );
+  assert.match(
+    diagnosisModelExecutionSql,
+    /CREATE TABLE "ql3_ai"\."copilot_failure_diagnosis_finalizations"/,
+  );
+  assert.match(
+    diagnosisModelExecutionSql,
+    /FOREIGN KEY \(invocation_id\)[\s\S]*model_invocation_completions/,
+  );
+  assert.match(diagnosisModelExecutionSql, /TO ql3_runtime/);
+  assert.doesNotMatch(
+    diagnosisModelExecutionSql,
+    /GRANT[^;]*(?:UPDATE|DELETE)/,
+  );
 
   const retirementStatements = [];
   await postgresModelInvocationMigrationDefinition.migrations[10].up({

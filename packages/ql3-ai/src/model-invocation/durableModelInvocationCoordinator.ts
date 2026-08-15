@@ -33,16 +33,9 @@ import {
   type ModelInvocationPriceQuote,
 } from '../pricing/pricing';
 import {
-  isPluginPackagePromptOutputCompletionRepository,
-  type PluginPackagePromptOutputCompletionRepository,
-} from '../prompt-output/pluginPackagePromptOutputCompletion';
-import {
-  PluginPackagePromptOutputArtifactConflictError,
-  normalizePluginPackagePromptOutputArtifact,
-  pluginPackagePromptOutputArtifactReference,
-  type PluginPackagePromptOutputArtifact,
-  type PluginPackagePromptOutputArtifactReference,
-} from '../prompt-output/pluginPackagePromptOutputArtifact';
+  normalizeModelInvocationAtomicSuccess,
+  type ModelInvocationAtomicSuccess,
+} from './modelInvocationAtomicSuccess';
 
 const MAX_COORDINATOR_ATTEMPTS = 3;
 
@@ -242,32 +235,21 @@ export class DurableModelInvocationCoordinator
     return this.#admit(record, admission, quote);
   }
 
-  async recordWithPromptOutputArtifact(
+  async recordWithAtomicSuccess<TReference>(
     record: Readonly<ModelInvocationAuditRecord>,
-    artifactValue: PluginPackagePromptOutputArtifact,
+    extensionValue: ModelInvocationAtomicSuccess<TReference>,
   ): Promise<
     Readonly<{
       status: 'created' | 'existing';
-      reference: Readonly<PluginPackagePromptOutputArtifactReference>;
+      reference: Readonly<TReference>;
     }>
   > {
-    const artifact = normalizePluginPackagePromptOutputArtifact(artifactValue);
-    if (
-      record.phase !== 'completed' ||
-      record.requestId !== artifact.invocationId ||
-      record.projectId !== artifact.projectId ||
-      record.runId !== artifact.runId ||
-      record.stepRunId !== artifact.stepRunId ||
-      record.provider !== artifact.provider ||
-      record.model !== artifact.model ||
-      record.outputBytes !== artifact.outputBytes ||
-      !isPluginPackagePromptOutputCompletionRepository(this.repository)
-    ) {
-      throw new PluginPackagePromptOutputArtifactConflictError();
-    }
-    const result = await this.#complete(record, artifact);
+    const extension = normalizeModelInvocationAtomicSuccess(extensionValue);
+    if (record.phase !== 'completed') throw extension.conflict();
+    extension.assertAudit(record);
+    const result = await this.#complete(record, extension);
     if (!result.reference) {
-      throw new PluginPackagePromptOutputArtifactConflictError();
+      throw extension.conflict();
     }
     return Object.freeze({
       status: result.status,
@@ -383,22 +365,18 @@ export class DurableModelInvocationCoordinator
     throw new ModelInvocationConflictError();
   }
 
-  async #complete(
+  async #complete<TReference = never>(
     audit: Readonly<ModelInvocationAuditRecord>,
-    artifactValue?: Readonly<PluginPackagePromptOutputArtifact>,
+    extensionValue?: ModelInvocationAtomicSuccess<TReference>,
   ): Promise<
     Readonly<
       ModelInvocationAuditDisposition & {
-        reference?: Readonly<PluginPackagePromptOutputArtifactReference>;
+        reference?: Readonly<TReference>;
       }
     >
   > {
-    const artifact = artifactValue
-      ? normalizePluginPackagePromptOutputArtifact(artifactValue)
-      : undefined;
-    const artifactRepository = artifact
-      ? (this.repository as ModelInvocationRepository &
-          PluginPackagePromptOutputCompletionRepository)
+    const extension = extensionValue
+      ? normalizeModelInvocationAtomicSuccess(extensionValue)
       : undefined;
     const startValue = await this.repository.findStart(audit.requestId);
     if (!startValue) throw new ModelInvocationConflictError();
@@ -406,16 +384,14 @@ export class DurableModelInvocationCoordinator
     const existing = await this.repository.findCompletion(audit.requestId);
     if (existing) {
       assertCompletionMatchesAudit(existing, start, audit);
-      if (artifact && artifactRepository) {
-        const stored = await artifactRepository.findPromptOutputArtifact(
-          artifact.artifactId,
-        );
-        if (!stored || JSON.stringify(stored) !== JSON.stringify(artifact)) {
-          throw new PluginPackagePromptOutputArtifactConflictError();
+      if (extension) {
+        const stored = await extension.find(this.repository);
+        if (!stored || !extension.matches(stored)) {
+          throw extension.conflict();
         }
         return Object.freeze({
           status: 'existing' as const,
-          reference: pluginPackagePromptOutputArtifactReference(stored),
+          reference: stored,
         });
       }
       return Object.freeze({ status: 'existing' as const });
@@ -430,7 +406,7 @@ export class DurableModelInvocationCoordinator
       ) {
         throw new ModelInvocationConflictError();
       }
-      const transition = completionTransition(audit, artifact?.artifactId);
+      const transition = completionTransition(audit, extension?.outputRef);
       const mutationIdentity = createModelInvocationMutationIdentity(
         audit.requestId,
         'completion',
@@ -464,7 +440,7 @@ export class DurableModelInvocationCoordinator
             actor: { type: 'executor', id: 'model-gateway' },
           },
         ),
-        artifact?.artifactId,
+        extension?.outputRef,
       );
       try {
         const pricingAware = isPricingAwareModelInvocationRepository(
@@ -479,42 +455,32 @@ export class DurableModelInvocationCoordinator
         const reservation = quotaAware
           ? await this.repository.findQuotaReservation(audit.requestId)
           : null;
-        const result =
-          artifactRepository && artifact
-            ? await artifactRepository.completeWithPromptOutputArtifact(
-                command,
-                artifact,
-              )
-            : pricingAware && quote
+        if (extension) {
+          const result = await extension.commit(this.repository, command);
+          return Object.freeze({
+            status: result.status,
+            reference: result.reference,
+          });
+        }
+        const result = pricingAware && quote
             ? await this.repository.completeWithPricing(command)
             : quotaAware && reservation
             ? await this.repository.completeWithQuota(command)
             : await this.repository.complete(command);
         return Object.freeze({
           status: result.status,
-          ...(artifact && artifactRepository
-            ? {
-                reference: pluginPackagePromptOutputArtifactReference(artifact),
-              }
-            : {}),
         });
       } catch (error) {
         const stored = await this.#completionAfterFailure(
           start,
           audit,
           error,
-          artifact,
-          artifactRepository,
+          extension,
         );
         if (stored) {
           return Object.freeze({
             status: 'existing' as const,
-            ...(artifact
-              ? {
-                  reference:
-                    pluginPackagePromptOutputArtifactReference(artifact),
-                }
-              : {}),
+            ...(extension ? { reference: stored.reference } : {}),
           });
         }
         if (
@@ -569,31 +535,29 @@ export class DurableModelInvocationCoordinator
     }
   }
 
-  async #completionAfterFailure(
+  async #completionAfterFailure<TReference = never>(
     start: Readonly<ModelInvocationStartRecord>,
     audit: Readonly<ModelInvocationAuditRecord>,
     original: unknown,
-    artifact?: Readonly<PluginPackagePromptOutputArtifact>,
-    artifactRepository?: PluginPackagePromptOutputCompletionRepository,
-  ): Promise<Readonly<ModelInvocationCompletionRecord> | null> {
+    extension?: ModelInvocationAtomicSuccess<TReference>,
+  ): Promise<
+    Readonly<{
+      completion: Readonly<ModelInvocationCompletionRecord>;
+      reference?: Readonly<TReference>;
+    }> | null
+  > {
     try {
       const stored = await this.repository.findCompletion(audit.requestId);
       if (!stored) return null;
       const completion = assertCompletionMatchesAudit(stored, start, audit);
-      if (artifact) {
-        if (!artifactRepository) throw original;
-        const storedArtifact =
-          await artifactRepository.findPromptOutputArtifact(
-            artifact.artifactId,
-          );
-        if (
-          !storedArtifact ||
-          JSON.stringify(storedArtifact) !== JSON.stringify(artifact)
-        ) {
+      if (extension) {
+        const reference = await extension.find(this.repository);
+        if (!reference || !extension.matches(reference)) {
           throw original;
         }
+        return Object.freeze({ completion, reference });
       }
-      return completion;
+      return Object.freeze({ completion });
     } catch {
       throw original;
     }

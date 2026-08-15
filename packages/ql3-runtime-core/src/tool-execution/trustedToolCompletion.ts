@@ -37,6 +37,12 @@ import {
 } from './trustedToolExecution';
 import type { ToolJsonValue } from './tool-registry/toolRegistry';
 
+export {
+  openTrustedToolSuccessCompletion,
+  type TrustedToolSuccessCompletionReadDependencies,
+  type TrustedToolSuccessCompletionResult,
+} from './trustedToolSuccessCompletion';
+
 export interface TrustedToolFailureCompletionIdentities {
   readonly mutationId: string;
   readonly eventId: string;

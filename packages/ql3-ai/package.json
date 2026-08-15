@@ -50,6 +50,16 @@
       "require": "./dist/copilot/failure-diagnosis/postgresToolExecutionRepository.js",
       "default": "./dist/copilot/failure-diagnosis/postgresToolExecutionRepository.js"
     },
+    "./failure-diagnosis-model-execution": {
+      "types": "./dist/copilot/failure-diagnosis/modelExecution.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/modelExecution.js",
+      "default": "./dist/copilot/failure-diagnosis/modelExecution.js"
+    },
+    "./postgres-failure-diagnosis-model-execution-storage": {
+      "types": "./dist/copilot/failure-diagnosis/postgresModelExecutionRepository.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/postgresModelExecutionRepository.js",
+      "default": "./dist/copilot/failure-diagnosis/postgresModelExecutionRepository.js"
+    },
     "./model-invocation": {
       "types": "./dist/model-invocation/modelInvocation.d.ts",
       "require": "./dist/model-invocation/modelInvocation.js",

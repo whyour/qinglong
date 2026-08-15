@@ -40,6 +40,13 @@ const {
   normalizeCopilotFailureDiagnosisToolUnlockCommand,
   restoreCopilotFailureDiagnosisTrustedToolAuthority,
 } = require('../dist/copilot/failure-diagnosis/toolExecution.js');
+const {
+  CopilotFailureDiagnosisOutputArtifactUnavailableError,
+  copilotFailureDiagnosisOutputReference,
+  createCopilotFailureDiagnosisFinalizationReceipt,
+  createCopilotFailureDiagnosisOutputArtifact,
+  openCopilotFailureDiagnosisOutputArtifact,
+} = require('../dist/copilot/failure-diagnosis/modelExecution.js');
 
 const DIGEST_A = 'a'.repeat(64);
 const DIGEST_B = 'b'.repeat(64);
@@ -424,4 +431,374 @@ test('fails closed on widened or digest-drifted durable plans', async () => {
       }),
     InvalidCopilotFailureDiagnosisExecutionPlanError,
   );
+});
+
+test('encrypts one Copilot diagnosis output and exposes only a content-free reference', async () => {
+  const current = await plan();
+  const prompt = require('../dist/copilot/failure-diagnosis/prompt.js')
+    .buildFailureDiagnosisPromptPlan({
+      provider: current.model.provider,
+      model: current.model.model,
+      modelBoundary: current.model.modelBoundary,
+      profile: 'cluster-control',
+      responseLanguage: current.model.responseLanguage,
+      projection: {
+        content: 'failure: connection refused',
+        sourceBytes: 27,
+        modelTextBytes: 27,
+        redaction: {
+          contract: 'recognized_credentials_v1',
+          residualSensitivity: 'potentially_sensitive',
+          replacements: 0,
+          categories: [],
+        },
+        normalization: {
+          invalidUtf8: false,
+          unsafeCodePointsReplaced: 0,
+        },
+        trust: {
+          classification: 'untrusted_execution_output',
+          instructionPolicy: 'data_only_never_execute',
+          actionAuthority: 'none',
+          suspectedPromptInjection: false,
+          signals: [],
+        },
+      },
+      maxOutputTokens: current.model.maxOutputTokens,
+      egressPolicy: current.model.egressPolicy,
+    });
+  const result = {
+    provider: current.model.provider,
+    model: current.model.model,
+    text: 'Likely a refused upstream connection.',
+    finishReason: 'stop',
+    usage: { inputTokens: 120, outputTokens: 8, totalTokens: 128 },
+  };
+  const artifact = createCopilotFailureDiagnosisOutputArtifact(
+    {
+      requestId: current.requestId,
+      planDigest: current.planDigest,
+      toolCompletionDigest: DIGEST_A,
+      projectId: current.projectId,
+      runId: current.runId,
+      stepRunId: current.modelStepRunId,
+      invocationId: current.modelInvocationId,
+      result,
+      egressEvidence: prompt.egressEvidence,
+      keyId: 'copilot-output-key-1',
+      key: Buffer.alloc(32, 0x61),
+      sealedAtMs: 4_000,
+    },
+    () => Buffer.alloc(12, 0x62),
+  );
+  assert.equal(JSON.stringify(artifact).includes(result.text), false);
+  assert.deepEqual(
+    openCopilotFailureDiagnosisOutputArtifact(
+      artifact,
+      Buffer.alloc(32, 0x61),
+    ),
+    result,
+  );
+  const reference = copilotFailureDiagnosisOutputReference(artifact);
+  assert.equal(reference.artifactId, artifact.artifactId);
+  assert.equal(JSON.stringify(reference).includes('ciphertext'), false);
+  assert.equal(JSON.stringify(reference).includes(result.text), false);
+  assert.throws(
+    () =>
+      openCopilotFailureDiagnosisOutputArtifact(
+        { ...artifact, ciphertext: `${artifact.ciphertext.slice(0, -1)}A` },
+        Buffer.alloc(32, 0x61),
+      ),
+    TypeError,
+  );
+  assert.throws(
+    () =>
+      openCopilotFailureDiagnosisOutputArtifact(
+        artifact,
+        Buffer.alloc(32, 0x63),
+      ),
+    CopilotFailureDiagnosisOutputArtifactUnavailableError,
+  );
+});
+
+test('binds a content-free diagnosis Run finalization receipt', async () => {
+  const current = await plan();
+  const receipt = createCopilotFailureDiagnosisFinalizationReceipt({
+    requestId: current.requestId,
+    planDigest: current.planDigest,
+    runId: current.runId,
+    modelStepRunId: current.modelStepRunId,
+    invocationId: current.modelInvocationId,
+    completionDigest: DIGEST_B,
+    outcome: 'succeeded',
+    outputArtifactId: 'cdo:diagnosis-output',
+    finalRunVersion: 9,
+    finalRunEventSequence: 9,
+    finalizedAtMs: 4_100,
+  });
+  assert.equal(receipt.runEventId.length, 36);
+  assert.equal(receipt.receiptDigest.length, 64);
+  assert.equal(JSON.stringify(receipt).includes('model output'), false);
+  assert.throws(
+    () =>
+      createCopilotFailureDiagnosisFinalizationReceipt({
+        ...receipt,
+        outcome: 'failed',
+      }),
+    /finalization conflicts/,
+  );
+});
+
+test('publishes Model execution through explicit AI subpaths only', () => {
+  const root = require('../dist');
+  const execution = require('@qinglong/ai/failure-diagnosis-model-execution');
+  const storage = require('@qinglong/ai/postgres-failure-diagnosis-model-execution-storage');
+  assert.equal(root.executeCopilotFailureDiagnosisModel, undefined);
+  assert.equal(
+    typeof execution.executeCopilotFailureDiagnosisModel,
+    'function',
+  );
+  assert.equal(
+    typeof storage.PostgresCopilotFailureDiagnosisModelRepository,
+    'function',
+  );
+});
+
+test('executes the unlocked Model once, commits ciphertext, and terminalizes replay', async () => {
+  const current = await plan();
+  const admission = createCopilotFailureDiagnosisAdmissionBundle(current);
+  const unlockCommand = createCopilotFailureDiagnosisToolUnlockCommand({
+    plan: current,
+    completion: successfulToolCompletion(current),
+    modelStepRun: admission.modelStepMutation.stepRun,
+    run: {
+      id: current.runId,
+      projectId: current.projectId,
+      status: 'running',
+      version: 5,
+      eventSequence: 5,
+    },
+  });
+  const {
+    DurableModelInvocationCoordinator,
+  } = require('../dist/model-invocation/durableModelInvocationCoordinator.js');
+  const { BoundedModelGateway } = require('../dist/model-gateway/gateway.js');
+  const {
+    CopilotFailureDiagnosisModelCompletionCoordinator,
+    assertCopilotFailureDiagnosisOutputCompletionBinding,
+    copilotFailureDiagnosisOutputReference,
+    executeCopilotFailureDiagnosisModel,
+  } = require('../dist/copilot/failure-diagnosis/modelExecution.js');
+
+  let stepRun = unlockCommand.modelStepRunMutation.stepRun;
+  let runVersion = unlockCommand.receipt.finalRunVersion;
+  let runEventSequence = unlockCommand.receipt.finalRunEventSequence;
+  let start = null;
+  let completion = null;
+  let outputArtifact = null;
+  let finalization = null;
+  const repository = {
+    async findStart() {
+      return start;
+    },
+    async findCompletion() {
+      return completion;
+    },
+    async readAuthority() {
+      return {
+        projectId: current.projectId,
+        runId: current.runId,
+        runVersion,
+        runEventSequence,
+        stepRun,
+      };
+    },
+    async listIncomplete() {
+      return { observedAtMs: 3_000, candidates: [], hasMore: false };
+    },
+    async admit(command) {
+      start = command.start;
+      stepRun = command.stepRunMutation.stepRun;
+      runVersion += 1;
+      runEventSequence += 1;
+      return { status: 'created', record: start };
+    },
+    async complete(command) {
+      completion = command.completion;
+      stepRun = command.stepRunMutation.stepRun;
+      runVersion += 1;
+      runEventSequence += 1;
+      return { status: 'created', record: completion };
+    },
+    async findCopilotFailureDiagnosisOutput() {
+      return outputArtifact;
+    },
+    async completeWithCopilotFailureDiagnosisOutput(command, artifact) {
+      const binding = assertCopilotFailureDiagnosisOutputCompletionBinding(
+        command,
+        artifact,
+      );
+      completion = command.completion;
+      outputArtifact = binding.artifact;
+      stepRun = command.stepRunMutation.stepRun;
+      runVersion += 1;
+      runEventSequence += 1;
+      return { status: 'created', reference: binding.reference };
+    },
+  };
+  const durable = new DurableModelInvocationCoordinator(repository);
+  const successfulCompletion =
+    new CopilotFailureDiagnosisModelCompletionCoordinator({
+      coordinator: durable,
+      keys: {
+        async active() {
+          return { keyId: 'copilot-output-key-1', key: Buffer.alloc(32, 7) };
+        },
+        async resolve(keyId) {
+          return keyId === 'copilot-output-key-1'
+            ? { keyId, key: Buffer.alloc(32, 7) }
+            : null;
+        },
+      },
+      now: () => 3_500,
+      nonceFactory: () => Buffer.alloc(12, 8),
+    });
+  let providerCalls = 0;
+  const gateway = new BoundedModelGateway({
+    providers: [
+      {
+        type: current.model.provider,
+        async listModels() {
+          return [{ id: current.model.model }];
+        },
+        async generate() {
+          providerCalls += 1;
+          return {
+            provider: current.model.provider,
+            model: current.model.model,
+            text: 'The upstream service refused the connection.',
+            finishReason: 'stop',
+            usage: { inputTokens: 100, outputTokens: 9, totalTokens: 109 },
+          };
+        },
+        async *stream() {},
+      },
+    ],
+    policies: {
+      async resolve() {
+        return {
+          revision: 'model-policy-1',
+          allowedProviders: [current.model.provider],
+          allowedModels: [current.model.model],
+          maxInputBytes: 64 * 1024,
+          maxOutputBytes: 64 * 1024,
+          maxOutputTokens: 1_024,
+          maxTotalTokens: 2_048,
+          maxCostMicros: null,
+          priceRevision: null,
+        };
+      },
+    },
+    pricing: { async resolve() { return null; } },
+    audit: durable,
+    successfulCompletion,
+    maxConcurrent: 1,
+    now: () => 3_100,
+  });
+  const finalizations = {
+    async findFinalization() {
+      return finalization;
+    },
+    async finalize() {
+      if (!finalization) {
+        finalization = createCopilotFailureDiagnosisFinalizationReceipt({
+          requestId: current.requestId,
+          planDigest: current.planDigest,
+          runId: current.runId,
+          modelStepRunId: current.modelStepRunId,
+          invocationId: current.modelInvocationId,
+          completionDigest: completion.completionDigest,
+          outcome: completion.outcome,
+          outputArtifactId: outputArtifact.artifactId,
+          finalRunVersion: runVersion + 1,
+          finalRunEventSequence: runEventSequence + 1,
+          finalizedAtMs: completion.completedAtMs,
+        });
+        return { status: 'created', receipt: finalization };
+      }
+      return { status: 'existing', receipt: finalization };
+    },
+  };
+  const dependencies = {
+    admissions: {
+      async findPlanByRequestId() {
+        return current;
+      },
+      async findByRequestId() {
+        return admission.receipt;
+      },
+    },
+    unlocks: {
+      async findByRequestId() {
+        return unlockCommand.receipt;
+      },
+    },
+    toolResults: {
+      async open() {
+        return {
+          status: 'existing',
+          completion: successfulToolCompletion(current),
+          output: {
+            status: 'available',
+            runId: current.source.runId,
+            attemptId: current.source.attemptId,
+            profile: 'cluster-control',
+            sourceWindowBytes: 16 * 1024,
+            content: 'connect ECONNREFUSED 127.0.0.1:5432',
+            sourceBytes: 35,
+            modelTextBytes: 35,
+            redaction: {
+              contract: 'recognized_credentials_v1',
+              residualSensitivity: 'potentially_sensitive',
+              replacements: 0,
+              categories: [],
+            },
+            normalization: {
+              invalidUtf8: false,
+              unsafeCodePointsReplaced: 0,
+            },
+            trust: {
+              classification: 'untrusted_execution_output',
+              instructionPolicy: 'data_only_never_execute',
+              actionAuthority: 'none',
+              suspectedPromptInjection: false,
+              signals: [],
+            },
+          },
+        };
+      },
+    },
+    modelInvocations: repository,
+    outputs: repository,
+    gateway,
+    successfulCompletion,
+    finalizations,
+  };
+  const created = await executeCopilotFailureDiagnosisModel(
+    current.requestId,
+    dependencies,
+  );
+  assert.equal(created.outcome, 'succeeded');
+  assert.equal(providerCalls, 1);
+  assert.equal(JSON.stringify(outputArtifact).includes('refused'), false);
+  assert.deepEqual(
+    created.output,
+    copilotFailureDiagnosisOutputReference(outputArtifact),
+  );
+  const replay = await executeCopilotFailureDiagnosisModel(
+    current.requestId,
+    dependencies,
+  );
+  assert.equal(replay.finalization.receiptDigest, created.finalization.receiptDigest);
+  assert.equal(providerCalls, 1);
 });

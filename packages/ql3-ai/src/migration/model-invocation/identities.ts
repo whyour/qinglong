@@ -65,6 +65,8 @@ export const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID =
   'pg-9018-ai-copilot-failure-diagnosis-admissions';
 export const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID =
   'pg-9019-ai-copilot-failure-diagnosis-tool-unlocks';
+export const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID =
+  'pg-9020-ai-copilot-failure-diagnosis-model-executions';
 export const POSTGRES_MODEL_INVOCATION_SCHEMA = 'ql3_ai';
 export const LOCAL_MODEL_INVOCATION_MIGRATION_HISTORY_TABLE =
   'QingLong3AiSchemaMigrations';

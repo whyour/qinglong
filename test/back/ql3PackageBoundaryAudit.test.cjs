@@ -268,10 +268,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
     {
       path: 'packages/ql3-ai',
       name: '@qinglong/ai',
-      sourceFiles: 175,
+      sourceFiles: 183,
       rootSourceFiles: 1,
       rootSourceLines: 16,
-      nestedSourceFiles: 174,
+      nestedSourceFiles: 182,
       rootSourceFileHardCap: 1,
       rootSourceLineHardCap: 16,
       rootSourceFileRoles: {

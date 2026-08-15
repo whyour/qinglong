@@ -175,7 +175,7 @@ test('readiness binds exact migration history and least-privilege primary author
   assert.equal(report.ready, true);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-9019-ai-copilot-failure-diagnosis-tool-unlocks',
+    'pg-9020-ai-copilot-failure-diagnosis-model-executions',
   );
   assert.match(
     queries[1],

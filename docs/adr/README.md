@@ -412,6 +412,7 @@
 | [ADR-0406](./ADR-0406-cluster-projected-tool-result-key-authority.md)                              | Cluster Projected Tool Result Key Authority                                                                                                           | Accepted |
 | [ADR-0407](./ADR-0407-cluster-copilot-failure-diagnosis-run-admission.md)                          | Cluster Copilot Failure Diagnosis Run Admission                                                                                                       | Accepted |
 | [ADR-0408](./ADR-0408-cluster-copilot-failure-diagnosis-tool-execution.md)                         | Cluster Copilot Failure Diagnosis Tool Execution 与原子 Model 解锁                                                                                    | Accepted |
+| [ADR-0409](./ADR-0409-cluster-copilot-failure-diagnosis-model-execution.md)                        | Cluster Copilot Failure Diagnosis Model Execution、密文输出与 Run 终态化                                                                               | Accepted |
 
 ## 规则
 

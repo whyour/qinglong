@@ -41,6 +41,7 @@ const {
 const {
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_PRICING_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_QUOTA_MIGRATION_ID,
@@ -1504,6 +1505,35 @@ async function modelInvocationFeatureFacts(pool) {
             'SELECT,INSERT,UPDATE,DELETE'
           )
        ) AS "copilotDiagnosisToolUnlockRuntimeOnly",
+       has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_model_outputs', 'SELECT,INSERT'
+       ) AND NOT has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_model_outputs', 'UPDATE,DELETE'
+       ) AND has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_finalizations', 'SELECT,INSERT'
+       ) AND NOT has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_finalizations', 'UPDATE,DELETE'
+       ) AND NOT EXISTS (
+         SELECT 1
+           FROM unnest(ARRAY[
+             'ql3_admin', 'ql3_package_manager', 'ql3_package_executor',
+             'ql3_worker_ingress', 'ql3_ai_maintenance',
+             'ql3_ai_credential_manager', 'ql3_ai_credential_tester'
+           ]::text[]) AS denied(role_name)
+          WHERE has_table_privilege(
+            denied.role_name,
+            'ql3_ai.copilot_failure_diagnosis_model_outputs',
+            'SELECT,INSERT,UPDATE,DELETE'
+          ) OR has_table_privilege(
+            denied.role_name,
+            'ql3_ai.copilot_failure_diagnosis_finalizations',
+            'SELECT,INSERT,UPDATE,DELETE'
+          )
+       ) AS "copilotDiagnosisModelExecutionRuntimeOnly",
        has_function_privilege(
          'ql3_runtime',
          'ql3_ai.copilot_failure_diagnosis_admission_source_snapshot(varchar,varchar,varchar,integer,integer,varchar,varchar)',
@@ -10666,6 +10696,8 @@ async function main(argv = process.argv.slice(2)) {
       );
       assert.deepEqual(beforePromotion.tables, [
         'copilot_failure_diagnosis_admissions',
+        'copilot_failure_diagnosis_finalizations',
+        'copilot_failure_diagnosis_model_outputs',
         'copilot_failure_diagnosis_tool_unlocks',
         'model_invocation_completions',
         'model_invocation_price_quotes',
@@ -10718,6 +10750,7 @@ async function main(argv = process.argv.slice(2)) {
           POSTGRES_PLUGIN_PACKAGE_PROMPT_PRODUCT_AUTHORIZATION_MIGRATION_ID,
           POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
           POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
+          POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
         ],
       );
       assert.deepEqual(beforePromotion.privileges, {
@@ -10743,6 +10776,7 @@ async function main(argv = process.argv.slice(2)) {
         promptSnapshotRuntimeOnly: true,
         copilotDiagnosisAdmissionRuntimeOnly: true,
         copilotDiagnosisToolUnlockRuntimeOnly: true,
+        copilotDiagnosisModelExecutionRuntimeOnly: true,
         copilotDiagnosisSnapshotRuntimeOnly: true,
         migrationHistoryRuntimeReadOnly: true,
         modelProviderCredentialManagementAuthoritySplit: true,
