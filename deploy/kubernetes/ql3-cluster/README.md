@@ -34,16 +34,18 @@ docker build \
 ```
 
 The admin image has its own builder and production locks. Its five production
-roots resolve to 84 external packages and it adds only `runtime-core`,
-`cluster-postgres` and `cluster-admin`. Kubernetes client code and the admin
-database role therefore exist only in an ephemeral Job image, never in
-`cluster-control`.
+roots resolve to 87 external packages and it adds only `runtime-core`, `ai`,
+`cluster-postgres` and `cluster-admin`. Kubernetes client code and admin
+database roles remain outside `cluster-control`; explicit operation commands
+stay short-lived, while the Copilot MCP subpath loads only its remote API
+client and stdio transport.
 
 Its default entrypoint is the bounded `ql3-cluster-admin` product facade. The
-facade exposes only seven operator-facing remote clients: `package`,
+facade exposes eight operator-facing remote clients: `copilot`, `package`,
 `package-kubernetes`, `worker-credential`, `approval`, `run`, `automation` and
-`model-credential`. It delegates with the current Node executable, an exact
-same-image target and `shell=false`; arguments remain opaque. Server
+`model-credential`, plus the bounded `copilot-mcp` stdio process. It delegates
+with the current Node executable, an exact same-image target and `shell=false`;
+arguments and MCP stdio remain opaque. Server
 `*-manage` processes, migration, recovery, executors, Prompt output key custody
 and garbage collection remain separate explicit binaries and Kubernetes
 operations. Existing Jobs continue to name their exact binary and do not
@@ -69,6 +71,14 @@ contents are deliberately forbidden. There is no home-directory, environment
 or ambient Kubernetes context discovery. Existing explicit `--config` calls
 remain supported when `--context` is absent.
 
+Cluster Copilot MCP is deployed by its external MCP host, not as a Kubernetes
+Deployment or Service. The reviewed digest-pinned Docker launcher, compact /
+standard / dense resource ceilings, private projection examples and one-shot
+readiness check live in
+[`deploy/mcp/ql3-cluster-copilot`](../../mcp/ql3-cluster-copilot). This host
+adapter is never composed into Edge/Standalone, Cluster Control, Cluster AI or
+the shared operations Kustomization.
+
 Validate the complete local operator context before a maintenance window:
 
 ```sh
@@ -78,7 +88,7 @@ ql3-cluster-admin context validate \
 
 This command reuses the production client parsers to validate every selected
 endpoint shape, CA, matching client certificate/private key and the bounded
-Kubernetes config. It also verifies that all seven facade targets exist in the
+Kubernetes config. It also verifies that all nine facade targets exist in the
 same installation. It does not read a command or assertion, open a network
 connection, query Kubernetes or mutate the cluster. Its JSON summary contains
 only command names and reviewed transport/authentication classes; paths,
@@ -99,7 +109,7 @@ pnpm sbom:cluster-image:ql3 --image=admin
 pnpm audit:image-release:ql3
 ```
 
-The admin image resolves 84 external plus 3 internal components. Its production
+The admin image resolves 87 external plus 4 internal components. Its production
 closure legitimately contains the upstream runtime dependency
 `@types/js-yaml` from `@kubernetes/client-node`; the exact production lock, not
 the package-name prefix, is authoritative. TypeScript, root devDependencies and

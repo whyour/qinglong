@@ -131,6 +131,105 @@ function assertClusterAdminImageCommands(readFile, root, findings) {
   return references;
 }
 
+function assertClusterCopilotMcpHostDeployment(readFile, root, findings) {
+  const directory = path.join(root, 'deploy/mcp/ql3-cluster-copilot');
+  const launcher = readFile(path.join(directory, 'docker-stdio.sh'), 'utf8');
+  const mcpConfig = readJson(
+    readFile,
+    path.join(directory, 'mcp-config.example.json'),
+  );
+  const clientConfig = readJson(
+    readFile,
+    path.join(directory, 'client-config.example.json'),
+  );
+  const hostConfig = readJson(
+    readFile,
+    path.join(directory, 'mcp-host.example.json'),
+  );
+  const host = hostConfig?.mcpServers?.['qinglong-cluster-copilot'];
+  const expectedHostEnvironment = {
+    QL3_COPILOT_MCP_IMAGE:
+      'ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:' + '0'.repeat(64),
+    QL3_COPILOT_MCP_PRIVATE_ROOT: '/absolute/private/qinglong3-cluster-copilot',
+    QL3_COPILOT_MCP_NETWORK: 'qinglong3-copilot-egress',
+    QL3_COPILOT_MCP_RESOURCE_CLASS: 'compact',
+  };
+  const requiredLauncherFragments = [
+    'docker run --rm -i --pull never --init --read-only',
+    '--network "$network"',
+    '--cap-drop ALL',
+    '--security-opt no-new-privileges',
+    '--user 10001:10001',
+    '--mount "type=bind,src=$private_root,dst=/var/run/secrets/qinglong3/copilot-mcp,readonly"',
+    'copilot-mcp',
+    '--check --config /var/run/secrets/qinglong3/copilot-mcp/mcp.json',
+    '--config /var/run/secrets/qinglong3/copilot-mcp/mcp.json',
+    'compact)',
+    'memory=192m',
+    'concurrency_ceiling=1',
+    'standard)',
+    'memory=512m',
+    'concurrency_ceiling=4',
+    'dense)',
+    'memory=1g',
+    'concurrency_ceiling=16',
+  ];
+  if (
+    !launcher.startsWith('#!/bin/sh\n\nset -eu\n') ||
+    requiredLauncherFragments.some(
+      (fragment) => !launcher.includes(fragment),
+    ) ||
+    ['--privileged', '--network host', '/var/run/docker.sock'].some(
+      (fragment) => launcher.includes(fragment),
+    ) ||
+    JSON.stringify(mcpConfig) !==
+      JSON.stringify({
+        schema: 'qinglong/cluster-copilot-mcp-server@v1',
+        clientConfigFile: '/var/run/secrets/qinglong3/copilot-mcp/client.json',
+        credentialFile: '/var/run/secrets/qinglong3/copilot-mcp/credential',
+        maxConcurrentRequests: 1,
+      }) ||
+    JSON.stringify(clientConfig) !==
+      JSON.stringify({
+        schema: 'qinglong/cluster-copilot-client-config@v1',
+        endpoint: 'https://replace-cluster-api.example.com:5800/',
+        servername: 'replace-cluster-api.example.com',
+        caFile: '/var/run/secrets/qinglong3/copilot-mcp/ca.pem',
+        requestTimeoutMs: 30_000,
+      }) ||
+    host?.command !== '/absolute/path/to/docker-stdio.sh' ||
+    JSON.stringify(host?.args) !== JSON.stringify(['serve']) ||
+    JSON.stringify(host?.env) !== JSON.stringify(expectedHostEnvironment) ||
+    JSON.stringify(Object.keys(hostConfig?.mcpServers ?? {})) !==
+      JSON.stringify(['qinglong-cluster-copilot']) ||
+    JSON.stringify(Object.keys(host ?? {}).sort()) !==
+      JSON.stringify(['args', 'command', 'env'])
+  ) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_COPILOT_MCP_HOST_CONTRACT_DRIFT',
+        'Cluster Copilot MCP must remain an explicit digest-pinned, non-root, read-only external stdio host process with bounded resource classes',
+      ),
+    );
+  }
+  for (const filePath of kubernetesYamlFiles(
+    path.join(root, 'deploy/kubernetes/ql3-cluster'),
+  )) {
+    if (readFile(filePath, 'utf8').includes('ql3-copilot-mcp')) {
+      findings.push(
+        finding(
+          'QL3_CLUSTER_COPILOT_MCP_KUBERNETES_RESIDENT',
+          `${path.relative(
+            root,
+            filePath,
+          )} must not deploy a parentless stdio MCP process`,
+        ),
+      );
+    }
+  }
+  return 'external-host-stdio';
+}
+
 function namedResource(resources, kind, name) {
   return resources.find(
     (resource) => resource?.kind === kind && resource?.metadata?.name === name,
@@ -5465,11 +5564,17 @@ function auditClusterDeployment(options = {}) {
   const readFile = options.readFile ?? fs.readFileSync;
   const findings = [];
   let clusterAdminImageReferences = 0;
+  let clusterCopilotMcpHost = 'unavailable';
   try {
     assertExactExternalClosure(readFile, root, findings);
     assertDockerfile(readFile, root, findings);
     assertKubernetes(readFile, root, findings);
     clusterAdminImageReferences = assertClusterAdminImageCommands(
+      readFile,
+      root,
+      findings,
+    );
+    clusterCopilotMcpHost = assertClusterCopilotMcpHostDeployment(
       readFile,
       root,
       findings,
@@ -5526,6 +5631,7 @@ function auditClusterDeployment(options = {}) {
     promptOutputKeyRotation: 'caller-driven-staged-material',
     clusterAi: 'optional-projected-authority',
     clusterAiPromptOutput: 'optional-read-only-projected-keyring',
+    clusterCopilotMcpHost,
     imageReleasePins: 'independent-fail-closed-digests',
     clusterAdminImageReferences,
     findings: Object.freeze(findings),

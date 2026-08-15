@@ -10,6 +10,14 @@ const ENTRYPOINT = [
 ];
 const COMMANDS = Object.freeze([
   Object.freeze({
+    name: 'copilot',
+    usage: 'Usage: ql3-copilot-client ',
+  }),
+  Object.freeze({
+    name: 'copilot-mcp',
+    usage: 'Usage: ql3-copilot-mcp --config ',
+  }),
+  Object.freeze({
     name: 'package',
     usage: 'Usage: ql3-plugin-package-client ',
   }),
@@ -125,7 +133,9 @@ const validated = spawnSync(process.execPath, [facade, 'context', 'validate', '-
 let validationFact;
 try { validationFact = JSON.parse(validated.stdout); } catch { process.exit(25); }
 if (validated.status !== 0 || validated.stderr !== '' || validationFact.event !== 'context_valid' || validationFact.commandCount !== 1 || validationFact.networkAccess !== false || validationFact.mutation !== false || JSON.stringify(validationFact.commands) !== JSON.stringify([{ name: 'package', transport: 'https', clientCertificate: 'forbidden' }]) || validated.stdout.includes('/tmp/') || validated.stdout.includes('manager.example.test')) process.exit(26);
-const readinessServer = spawn(process.execPath, ['-e', ${JSON.stringify(readinessServerSource)}], { stdio: 'ignore' });
+const readinessServer = spawn(process.execPath, ['-e', ${JSON.stringify(
+    readinessServerSource,
+  )}], { stdio: 'ignore' });
 const waitArray = new Int32Array(new SharedArrayBuffer(4));
 for (let attempt = 0; attempt < 200 && !existsSync('/tmp/readiness-port'); attempt += 1) Atomics.wait(waitArray, 0, 0, 10);
 if (!existsSync('/tmp/readiness-port')) process.exit(27);

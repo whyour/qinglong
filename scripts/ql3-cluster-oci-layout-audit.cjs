@@ -232,7 +232,7 @@ function expectedImageConfig(architecture, revision, image) {
           ? isControlAi
             ? '/opt/qinglong/node_modules/@qinglong/cluster-control/dist/aiCli.js'
             : '/opt/qinglong/node_modules/@qinglong/cluster-control/dist/cli.js'
-          : '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/plugin-package/recovery/pluginPackageRecoveryCli.js',
+          : '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js',
       ],
       WorkingDir: '/opt/qinglong',
       Labels: {
@@ -240,7 +240,7 @@ function expectedImageConfig(architecture, revision, image) {
           ? isControlAi
             ? 'Optional QingLong 3.0 AI-enabled cluster control plane'
             : 'QingLong 3.0 PostgreSQL-backed cluster control plane'
-          : 'QingLong 3.0 short-lived cluster administration jobs',
+          : 'QingLong 3.0 cluster operations and bounded stdio MCP',
         'org.opencontainers.image.licenses': 'Apache-2.0',
         'org.opencontainers.image.revision': revision,
         'org.opencontainers.image.source': 'https://github.com/whyour/qinglong',

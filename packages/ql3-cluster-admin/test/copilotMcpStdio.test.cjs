@@ -44,7 +44,7 @@ function jsonResponse(response, statusCode, requestId, body) {
   response.writeHead(statusCode, {
     'content-type': 'application/json; charset=utf-8',
     'content-length': String(bytes.length),
-    'x-request-id': requestId,
+    ...(requestId === undefined ? {} : { 'x-request-id': requestId }),
   });
   response.end(bytes);
 }
@@ -124,6 +124,7 @@ async function fixture(t) {
   );
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const requests = [];
+  const readiness = { value: 'ready' };
   const server = createServer(
     {
       key: fs.readFileSync(path.join(tlsFixture, 'server-key.pem')),
@@ -144,6 +145,15 @@ async function fixture(t) {
           peerCertificate: request.socket.getPeerCertificate(),
           body: chunks.length === 0 ? null : JSON.parse(Buffer.concat(chunks)),
         });
+        if (request.url === '/readyz') {
+          jsonResponse(
+            response,
+            readiness.value === 'ready' ? 200 : 503,
+            undefined,
+            { status: readiness.value },
+          );
+          return;
+        }
         jsonResponse(
           response,
           request.method === 'POST' && !request.url.endsWith('/cancellation') ? 201 : 200,
@@ -157,12 +167,17 @@ async function fixture(t) {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
   });
-  t.after(
-    () =>
-      new Promise((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-      }),
-  );
+  let closed = false;
+  const close = () =>
+    new Promise((resolve, reject) => {
+      if (closed) {
+        resolve();
+        return;
+      }
+      closed = true;
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  t.after(close);
   const caFile = privateFile(
     directory,
     'ca.pem',
@@ -190,7 +205,7 @@ async function fixture(t) {
       maxConcurrentRequests: 2,
     }),
   );
-  return { requests, credentialFile, serverConfigFile };
+  return { requests, readiness, close, credentialFile, serverConfigFile };
 }
 
 function startClient(t, configFile) {
@@ -271,7 +286,10 @@ function runCli(args) {
 }
 
 test('stdio CLI exposes deterministic help and low-sensitive startup failures', async () => {
-  const usage = 'Usage: ql3-copilot-mcp --config /absolute/private-config.json';
+  const usage = [
+    'Usage: ql3-copilot-mcp --config /absolute/private-config.json [--concurrency-ceiling=1..16]',
+    '       ql3-copilot-mcp --check --config /absolute/private-config.json [--concurrency-ceiling=1..16]',
+  ].join('\n');
   assert.deepEqual(await runCli(['--help']), {
     status: 0,
     signal: null,
@@ -296,6 +314,87 @@ test('stdio CLI exposes deterministic help and low-sensitive startup failures', 
     event: 'process_failed',
   });
   assert.doesNotMatch(failed.stderr, /secret-config-name/);
+});
+
+test('preflight validates mounted authority and probes readiness without authentication', async (t) => {
+  const value = await fixture(t);
+  const checked = await runCli([
+    '--check',
+    '--config',
+    value.serverConfigFile,
+    '--concurrency-ceiling=4',
+  ]);
+  assert.equal(checked.status, 0);
+  assert.equal(checked.signal, null);
+  assert.equal(checked.stderr, '');
+  assert.deepEqual(JSON.parse(checked.stdout), {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-copilot-mcp',
+    event: 'preflight_checked',
+    transport: 'https',
+    ready: true,
+    configuration: 'valid',
+    credential: 'valid',
+    maxConcurrentRequests: 2,
+    concurrencyCeiling: 4,
+    requestMethod: 'GET',
+    requestPath: '/readyz',
+    mutation: false,
+  });
+  assert.equal(value.requests.length, 1);
+  assert.deepEqual(value.requests[0], {
+    method: 'GET',
+    path: '/readyz',
+    authorization: undefined,
+    requestId: undefined,
+    tls: 'TLSv1.3',
+    peerCertificate: {},
+    body: null,
+  });
+
+  value.readiness.value = 'not_ready';
+  const notReady = await runCli([
+    '--check',
+    '--config',
+    value.serverConfigFile,
+    '--concurrency-ceiling=4',
+  ]);
+  assert.equal(notReady.status, 69);
+  assert.equal(notReady.stderr, '');
+  assert.equal(JSON.parse(notReady.stdout).ready, false);
+  assert.equal(value.requests.length, 2);
+
+  await value.close();
+  const unavailable = await runCli([
+    '--check',
+    '--config',
+    value.serverConfigFile,
+    '--concurrency-ceiling=4',
+  ]);
+  assert.equal(unavailable.status, 1);
+  assert.equal(unavailable.stdout, '');
+  assert.deepEqual(JSON.parse(unavailable.stderr), {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-copilot-mcp',
+    level: 'error',
+    event: 'process_failed',
+  });
+
+  const overCeiling = await runCli([
+    '--check',
+    '--config',
+    value.serverConfigFile,
+    '--concurrency-ceiling=1',
+  ]);
+  assert.equal(overCeiling.status, 1);
+  assert.equal(overCeiling.stdout, '');
+  assert.deepEqual(JSON.parse(overCeiling.stderr), {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-copilot-mcp',
+    level: 'error',
+    event: 'process_failed',
+  });
+  assert.equal(value.requests.length, 2);
 });
 
 test('stdio MCP uses direct TLS client, rotates credentials and labels untrusted output', async (t) => {

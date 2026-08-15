@@ -1,6 +1,9 @@
 {
   "schemaVersion": 1,
   "commands": {
+    "copilot": {
+      "configFile": "/secure/qinglong3/copilot-client.json"
+    },
     "package": {
       "configFile": "/secure/qinglong3/plugin-package-client.json"
     },

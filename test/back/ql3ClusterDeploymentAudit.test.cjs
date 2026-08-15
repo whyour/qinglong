@@ -28,6 +28,7 @@ test('accepts the exact locked non-root multi-replica cluster deployment', () =>
     report.clusterAiPromptOutput,
     'optional-read-only-projected-keyring',
   );
+  assert.equal(report.clusterCopilotMcpHost, 'external-host-stdio');
   assert.equal(report.promptOutputKeyRotation, 'caller-driven-staged-material');
   assert.equal(report.clusterAdminImageReferences, 24);
   assert.deepEqual(report.workspacePackages, [
@@ -40,6 +41,38 @@ test('accepts the exact locked non-root multi-replica cluster deployment', () =>
     '@qinglong/cluster-postgres',
     '@qinglong/cluster-admin',
   ]);
+});
+
+test('keeps Cluster Copilot MCP external, digest-pinned and resource-bounded', () => {
+  const widened = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/mcp/ql3-cluster-copilot/docker-stdio.sh',
+      (source) => source.replace('--network "$network"', '--network host'),
+    ),
+  });
+  assert.equal(widened.compatible, false);
+  assert.equal(
+    widened.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_COPILOT_MCP_HOST_CONTRACT_DRIFT',
+    ),
+    true,
+  );
+
+  const resident = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/base/deployment.yaml',
+      (source) => `${source}\n# ql3-copilot-mcp\n`,
+    ),
+  });
+  assert.equal(resident.compatible, false);
+  assert.equal(
+    resident.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_COPILOT_MCP_KUBERNETES_RESIDENT',
+    ),
+    true,
+  );
 });
 
 test('requires every Cluster Admin Kubernetes workload to override the image command', () => {
@@ -69,7 +102,8 @@ test('rejects widened Plugin Package Secret action Kubernetes authority', () => 
     root: ROOT,
     readFile: intercept(
       'deploy/kubernetes/ql3-cluster/operations/plugin-package-executor/base/role.yaml',
-      (source) => source.replace('      - get\n', '      - get\n      - list\n'),
+      (source) =>
+        source.replace('      - get\n', '      - get\n      - list\n'),
     ),
   });
   assert.equal(widenedRole.compatible, false);
@@ -84,7 +118,8 @@ test('rejects widened Plugin Package Secret action Kubernetes authority', () => 
     root: ROOT,
     readFile: intercept(
       'deploy/kubernetes/ql3-cluster/operations/plugin-package-executor/base/validating-admission-policy.yaml',
-      (source) => source.replace('failurePolicy: Fail', 'failurePolicy: Ignore'),
+      (source) =>
+        source.replace('failurePolicy: Fail', 'failurePolicy: Ignore'),
     ),
   });
   assert.equal(ignoredAdmissionFailure.compatible, false);
@@ -99,10 +134,11 @@ test('rejects widened Plugin Package Secret action Kubernetes authority', () => 
     root: ROOT,
     readFile: intercept(
       'deploy/kubernetes/ql3-cluster/operations/plugin-package-executor/base/secret-action-service-account.yaml',
-      (source) => source.replace(
-        'automountServiceAccountToken: false',
-        'automountServiceAccountToken: true',
-      ),
+      (source) =>
+        source.replace(
+          'automountServiceAccountToken: false',
+          'automountServiceAccountToken: true',
+        ),
     ),
   });
   assert.equal(actionToken.compatible, false);
@@ -166,6 +202,7 @@ test('ships a path-only Cluster operator context example without durable authori
   assert.deepEqual(Object.keys(example.commands).sort(), [
     'approval',
     'automation',
+    'copilot',
     'model-credential',
     'package',
     'package-kubernetes',

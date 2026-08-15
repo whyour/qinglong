@@ -1,8 +1,10 @@
 # `@qinglong/cluster-admin`
 
-This private QingLong 3.0 package is a short-lived cluster administration
-authority. It is intentionally separate from the resident `cluster-control`
-artifact and requires a distinct PostgreSQL role.
+This private QingLong 3.0 package owns explicit cluster operations and the
+bounded Cluster Copilot MCP product surface. Database/Kubernetes administration
+remains short-lived and requires distinct purpose-bound authority; the MCP
+subpath has only the remote API client, opens no database or Kubernetes
+authority, and is intentionally separate from resident `cluster-control`.
 
 The admin role can append Identity/API Credential mutations and their security
 audit in one serializable transaction, and can perform bounded read-only audit

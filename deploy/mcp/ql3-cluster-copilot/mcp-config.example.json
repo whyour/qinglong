@@ -1,0 +1,6 @@
+{
+  "schema": "qinglong/cluster-copilot-mcp-server@v1",
+  "clientConfigFile": "/var/run/secrets/qinglong3/copilot-mcp/client.json",
+  "credentialFile": "/var/run/secrets/qinglong3/copilot-mcp/credential",
+  "maxConcurrentRequests": 1
+}

@@ -421,6 +421,7 @@
 | [ADR-0415](./ADR-0415-fenced-copilot-failure-diagnosis-cancellation.md)                            | 受围栏的 Copilot 故障诊断取消入口                                                                                                                            | Accepted |
 | [ADR-0416](./ADR-0416-bounded-cluster-copilot-product-client.md)                                  | 有界 Cluster Copilot 产品客户端                                                                                                                              | Accepted |
 | [ADR-0417](./ADR-0417-bounded-cluster-copilot-mcp-stdio-surface.md)                               | 有界 Cluster Copilot MCP stdio 产品面                                                                                                                        | Accepted |
+| [ADR-0418](./ADR-0418-explicit-cluster-copilot-mcp-host-deployment.md)                           | 显式 Cluster Copilot MCP Host 部署与资源边界                                                                                                                 | Accepted |
 
 ## 规则
 

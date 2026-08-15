@@ -80,7 +80,7 @@ FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd3
 ARG SOURCE_REVISION=uncommitted
 
 LABEL org.opencontainers.image.title="QingLong 3.0 Cluster Admin" \
-  org.opencontainers.image.description="QingLong 3.0 short-lived cluster administration jobs" \
+  org.opencontainers.image.description="QingLong 3.0 cluster operations and bounded stdio MCP" \
   org.opencontainers.image.source="https://github.com/whyour/qinglong" \
   org.opencontainers.image.revision="${SOURCE_REVISION}" \
   org.opencontainers.image.licenses="Apache-2.0"

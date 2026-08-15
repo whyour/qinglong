@@ -41,6 +41,12 @@ export const QINGLONG3_CLUSTER_PRODUCT_COMMANDS: readonly QingLong3ClusterProduc
       description: 'diagnose, inspect, read or cancel Runs through the API',
     }),
     Object.freeze({
+      name: 'copilot-mcp',
+      binary: 'ql3-copilot-mcp',
+      target: 'copilot-mcp/cli.js',
+      description: 'serve the bounded Cluster Copilot MCP over stdio',
+    }),
+    Object.freeze({
       name: 'package',
       binary: 'ql3-plugin-package-client',
       target: 'plugin-package/management/pluginPackageManagementClientCli.js',
@@ -177,7 +183,7 @@ export function qingLong3ClusterProductHelp(): string {
   return [
     'Usage: ql3-cluster-admin <command> [arguments]',
     '',
-    'Remote client commands:',
+    'Cluster product commands:',
     commands,
     '',
     'Local operator commands:',
@@ -185,7 +191,8 @@ export function qingLong3ClusterProductHelp(): string {
     '  context probe    --context=/absolute/operator-context.json',
     '',
     'Use `ql3-cluster-admin <command> --help` for command-specific usage.',
-    'Use `--context=/absolute/operator-context.json` to inject only stable client paths.',
+    'Use `--context=/absolute/operator-context.json` only with remote client commands.',
+    'Keep the MCP config explicit; it contains stable paths to a separately rotated credential.',
     'Command and short-lived assertion files always remain explicit per invocation.',
     'Server, migration, recovery, executor and key-custody authorities remain isolated.',
   ].join('\n');

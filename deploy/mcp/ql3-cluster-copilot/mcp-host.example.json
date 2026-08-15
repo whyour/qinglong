@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "qinglong-cluster-copilot": {
+      "command": "/absolute/path/to/docker-stdio.sh",
+      "args": ["serve"],
+      "env": {
+        "QL3_COPILOT_MCP_IMAGE": "ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "QL3_COPILOT_MCP_PRIVATE_ROOT": "/absolute/private/qinglong3-cluster-copilot",
+        "QL3_COPILOT_MCP_NETWORK": "qinglong3-copilot-egress",
+        "QL3_COPILOT_MCP_RESOURCE_CLASS": "compact"
+      }
+    }
+  }
+}

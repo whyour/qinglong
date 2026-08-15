@@ -331,9 +331,9 @@ function validContextFixture(t) {
   };
 }
 
-test('catalog exposes only reviewed remote clients from the same package', () => {
+test('catalog exposes only reviewed product entrypoints from the same package', () => {
   assert.equal(manifest.bin['ql3-cluster-admin'], 'dist/product-cli/cli.js');
-  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 8);
+  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 9);
   assert.equal(
     new Set(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.map(({ name }) => name)).size,
     QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length,
@@ -349,7 +349,11 @@ test('catalog exposes only reviewed remote clients from the same package', () =>
       fs.lstatSync(path.join(packageRoot, 'dist', command.target)).isFile(),
       true,
     );
-    assert.equal(command.binary.includes('-client'), true);
+    assert.equal(
+      command.binary.includes('-client') ||
+        command.binary === 'ql3-copilot-mcp',
+      true,
+    );
   }
   for (const forbidden of [
     'ql3-cluster-migrate',
@@ -375,6 +379,7 @@ test('help and version are bounded installation-derived product facts', () => {
   assert.match(help, /^Usage: ql3-cluster-admin <command> \[arguments\]/);
   assert.match(help, /\n  run\s+retry or stop Runs/);
   assert.match(help, /\n  copilot\s+diagnose, inspect, read or cancel Runs/);
+  assert.match(help, /\n  copilot-mcp\s+serve the bounded Cluster Copilot MCP/);
   assert.match(help, /Server, migration, recovery, executor and key-custody/);
   assert.equal(help.includes('plugin-package-manage'), false);
   assert.equal(
