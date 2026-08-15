@@ -423,6 +423,7 @@
 | [ADR-0417](./ADR-0417-bounded-cluster-copilot-mcp-stdio-surface.md)                               | 有界 Cluster Copilot MCP stdio 产品面                                                                                                                        | Accepted |
 | [ADR-0418](./ADR-0418-explicit-cluster-copilot-mcp-host-deployment.md)                           | 显式 Cluster Copilot MCP Host 部署与资源边界                                                                                                                 | Accepted |
 | [ADR-0419](./ADR-0419-loopback-read-only-cluster-copilot-console.md)                            | Loopback-only Cluster Copilot 只读 Console                                                                                                                    | Accepted |
+| [ADR-0420](./ADR-0420-signed-admin-oci-console-workstation-distribution.md)                    | 以签名 Admin OCI 分发 Cluster Copilot 工作站 Console                                                                                                            | Accepted |
 
 ## 规则
 

@@ -1,6 +1,6 @@
 'use strict';
 
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const { resolve } = require('node:path');
 
 const IMAGE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}$/u;
@@ -61,6 +61,18 @@ function docker(args, options = {}) {
     stdio: ['ignore', 'pipe', 'pipe'],
     ...options,
   });
+}
+
+function dockerLogs(container) {
+  const result = spawnSync('docker', ['logs', container], {
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  if (result.error || result.status !== 0) {
+    fail('published Console logs are unavailable');
+  }
+  return `${result.stdout}${result.stderr}`;
 }
 
 function runImage(image, args) {
@@ -301,6 +313,174 @@ child.stdout.on('data', (chunk) => {
   }
 }
 
+function runPublishedConsoleContract(image) {
+  const suffix = `${process.pid}-${Date.now()}`;
+  const network = `ql3-console-live-${suffix}`;
+  const container = `ql3-console-live-${suffix}`;
+  const containerPort = Number(
+    execFileSync(
+      process.execPath,
+      [
+        '-e',
+        "const s=require('node:net').createServer();s.listen(0,'127.0.0.1',()=>{process.stdout.write(String(s.address().port));s.close();});",
+      ],
+      { encoding: 'utf8', timeout: 5_000 },
+    ),
+  );
+  if (!Number.isSafeInteger(containerPort) || containerPort < 1_024) {
+    fail('published Console test port is invalid');
+  }
+  const source = String.raw`
+const { spawn } = require('node:child_process');
+const { statSync, writeFileSync } = require('node:fs');
+const { rootCertificates } = require('node:tls');
+const facade = '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js';
+const share = '/opt/qinglong/share/ql3-copilot-console';
+for (const [file, mode] of [['docker-loopback.sh', 0o555], ['verify-release.sh', 0o555], ['README.md', 0o444], ['client-config.example.json', 0o444], ['host-environment.example.json', 0o444]]) {
+  if ((statSync(share + '/' + file).mode & 0o777) !== mode) process.exit(51);
+}
+writeFileSync('/tmp/ca.pem', rootCertificates[0], { mode: 0o600 });
+writeFileSync('/tmp/client.json', JSON.stringify({ schema: 'qinglong/cluster-copilot-client-config@v1', endpoint: 'https://localhost:65535/', servername: 'localhost', caFile: '/tmp/ca.pem', requestTimeoutMs: 1000 }), { mode: 0o600 });
+writeFileSync('/tmp/credential', 'ql3c_console_' + Buffer.alloc(32, 7).toString('base64url'), { mode: 0o600 });
+writeFileSync('/tmp/session', Buffer.alloc(32, 11).toString('base64url'), { mode: 0o600 });
+const child = spawn(process.execPath, [facade, 'copilot-console', '--container-published-loopback', '--port=${containerPort}', '--config', '/tmp/client.json', '--credential', '/tmp/credential', '--session', '/tmp/session'], { stdio: 'inherit' });
+child.once('exit', (code, signal) => {
+  if (signal) process.kill(process.pid, signal);
+  else process.exit(code ?? 1);
+});
+process.once('SIGTERM', () => child.kill('SIGTERM'));
+process.once('SIGINT', () => child.kill('SIGINT'));
+`;
+  let createdNetwork = false;
+  let createdContainer = false;
+  try {
+    docker(['network', 'create', '--driver', 'bridge', network]);
+    createdNetwork = true;
+    docker([
+      'run',
+      '--detach',
+      '--name',
+      container,
+      '--read-only',
+      '--network',
+      network,
+      '--cap-drop',
+      'ALL',
+      '--security-opt',
+      'no-new-privileges',
+      '--user',
+      '10001:10001',
+      '--pids-limit',
+      '32',
+      '--memory',
+      '192m',
+      '--cpus',
+      '0.25',
+      '--stop-timeout',
+      '3',
+      '--tmpfs',
+      '/tmp:rw,noexec,nosuid,nodev,size=8m,mode=700,uid=10001,gid=10001',
+      '--publish',
+      `127.0.0.1:${containerPort}:${containerPort}/tcp`,
+      '--entrypoint',
+      'node',
+      image,
+      '-e',
+      source,
+    ]);
+    createdContainer = true;
+
+    const waitArray = new Int32Array(new SharedArrayBuffer(4));
+    let logs = '';
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      logs = dockerLogs(container);
+      if (logs.includes('"event":"started"')) break;
+      Atomics.wait(waitArray, 0, 0, 25);
+    }
+    const startedLine = logs
+      .split('\n')
+      .find((line) => line.includes('"event":"started"'));
+    if (!startedLine) {
+      const state = JSON.parse(docker(['inspect', container]))[0]?.State;
+      let terminalCode = 'absent';
+      for (const line of logs.trim().split('\n').reverse()) {
+        try {
+          const fact = JSON.parse(line);
+          terminalCode = fact.code ?? fact.event ?? 'unknown';
+          break;
+        } catch {}
+      }
+      fail(
+        `published Console did not start (running=${String(state?.Running)}, exit=${String(state?.ExitCode)}, code=${terminalCode})`,
+      );
+    }
+    let started;
+    try {
+      started = JSON.parse(startedLine);
+    } catch {
+      fail('published Console start fact is invalid');
+    }
+    if (
+      started?.origin !== `http://127.0.0.1:${containerPort}` ||
+      started?.networkBoundary !== 'container-published-loopback' ||
+      started?.publishedHostAddress !== '127.0.0.1'
+    ) {
+      fail('published Console boundary fact drifted');
+    }
+
+    const published = docker([
+      'port',
+      container,
+      `${containerPort}/tcp`,
+    ]).trim();
+    const publishedMatch = /^127\.0\.0\.1:([1-9][0-9]{0,4})$/u.exec(
+      published,
+    );
+    if (!publishedMatch) fail('published Console escaped host loopback');
+    const origin = `http://127.0.0.1:${publishedMatch[1]}`;
+    const probe = execFileSync(
+      process.execPath,
+      [
+        '-e',
+        "require('node:http').get(process.argv[1],(r)=>{const c=[];r.on('data',(x)=>c.push(x));r.on('end',()=>{const b=Buffer.concat(c).toString('utf8');if(r.statusCode!==200||!b.includes('Cluster field console'))process.exit(2);process.stdout.write(JSON.stringify({status:r.statusCode,assets:b.includes('/app.css')&&b.includes('/app.js')}));});}).on('error',()=>process.exit(3));",
+        origin,
+      ],
+      { encoding: 'utf8', timeout: 5_000 },
+    );
+    const probeFact = JSON.parse(probe);
+    if (probeFact.status !== 200 || probeFact.assets !== true) {
+      fail('published Console host read drifted');
+    }
+
+    const inspected = JSON.parse(docker(['inspect', container]))[0];
+    const binding =
+      inspected?.HostConfig?.PortBindings?.[`${containerPort}/tcp`]?.[0];
+    if (
+      inspected?.HostConfig?.ReadonlyRootfs !== true ||
+      inspected?.HostConfig?.NetworkMode !== network ||
+      binding?.HostIp !== '127.0.0.1' ||
+      inspected?.HostConfig?.Privileged !== false ||
+      !inspected?.HostConfig?.CapDrop?.includes('ALL')
+    ) {
+      fail('published Console container authority drifted');
+    }
+  } finally {
+    if (createdContainer) {
+      try {
+        docker(['stop', '--time', '3', container]);
+      } catch {}
+      try {
+        docker(['rm', '--force', container]);
+      } catch {}
+    }
+    if (createdNetwork) {
+      try {
+        docker(['network', 'rm', network]);
+      } catch {}
+    }
+  }
+}
+
 function main() {
   if (process.env.QL3_CLUSTER_ADMIN_PRODUCT_LIVE !== '1') {
     fail('QL3_CLUSTER_ADMIN_PRODUCT_LIVE=1 is required');
@@ -341,6 +521,7 @@ function main() {
   if (version !== '3.0.0-alpha.0') fail('product version contract drifted');
   runOperatorContextContract(image);
   runConsoleContract(image);
+  runPublishedConsoleContract(image);
 
   process.stdout.write(
     `${JSON.stringify({
@@ -355,6 +536,8 @@ function main() {
       contextReadiness: true,
       consoleLoopback: true,
       consoleAssets: true,
+      consolePublishedHostAddress: '127.0.0.1',
+      consoleDistributionEmbedded: true,
       isolation: Object.freeze({
         readOnlyRoot: true,
         network: 'none',

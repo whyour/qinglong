@@ -49,7 +49,7 @@ test('fails closed before Docker without explicit opt-in', () => {
   assert.equal(result.stderr.includes('spawn'), false);
 });
 
-test('binds the live image gate to loopback Console assets and shutdown', () => {
+test('binds the live image gate to native and container-published loopback', () => {
   const source = fs.readFileSync(script, 'utf8');
   assert.match(source, /function runConsoleContract\(image\)/);
   assert.match(source, /\[facade, 'copilot-console'/);
@@ -57,4 +57,12 @@ test('binds the live image gate to loopback Console assets and shutdown', () => 
   assert.match(source, /runConsoleContract\(image\);/);
   assert.match(source, /consoleLoopback: true/);
   assert.match(source, /consoleAssets: true/);
+  assert.match(source, /function runPublishedConsoleContract\(image\)/);
+  assert.match(
+    source,
+    /127\.0\.0\.1:\$\{containerPort\}:\$\{containerPort\}\/tcp/,
+  );
+  assert.match(source, /runPublishedConsoleContract\(image\);/);
+  assert.match(source, /consolePublishedHostAddress: '127\.0\.0\.1'/);
+  assert.match(source, /consoleDistributionEmbedded: true/);
 });

@@ -106,7 +106,9 @@ function auditClusterCopilotConsole(options = {}) {
     'credential',
   ]);
   expectFragments(CONSOLE_ROOT + '/server.ts', [
-    "server.listen(record.port as number, '127.0.0.1'",
+    "networkBoundary === 'host-loopback' ? '127.0.0.1' : '0.0.0.0'",
+    "networkBoundary === 'container-published-loopback'",
+    'server.listen(record.port as number, listenAddress',
     'request.headers.origin !== expectedOrigin',
     "request.headers.host !== expectedOrigin.slice('http://'.length)",
     'maximumConcurrentRequests: 2',
@@ -117,7 +119,6 @@ function auditClusterCopilotConsole(options = {}) {
     "'cache-control': 'no-store'",
   ]);
   rejectFragments(CONSOLE_ROOT + '/server.ts', [
-    "'0.0.0.0'",
     'createSecureServer',
     'WebSocket',
     'set-cookie',
@@ -133,6 +134,8 @@ function auditClusterCopilotConsole(options = {}) {
     "'private'",
     'validateClusterCopilotClientCredentialFile',
     "clusterCredential: 'server_only'",
+    "networkBoundary: parsed.networkBoundary",
+    "publishedHostAddress: '127.0.0.1'",
     "operations: ['inspect', 'output']",
     'mutation: false',
   ]);
@@ -195,8 +198,12 @@ function auditClusterCopilotConsole(options = {}) {
     "started.event !== 'started'",
     "body.includes('Cluster field console')",
     'runConsoleContract(image);',
+    'function runPublishedConsoleContract(image)',
+    'runPublishedConsoleContract(image);',
     'consoleLoopback: true',
     'consoleAssets: true',
+    "consolePublishedHostAddress: '127.0.0.1'",
+    'consoleDistributionEmbedded: true',
   ]);
 
   let manifest;

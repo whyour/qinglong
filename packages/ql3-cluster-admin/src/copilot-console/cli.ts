@@ -18,8 +18,9 @@ const USAGE = [
   'Usage:',
   '  ql3-copilot-console --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--port=0..65535]',
   '  ql3-copilot-console --check --config /absolute/client.json --credential /absolute/credential --session /absolute/session',
+  '  ql3-copilot-console --container-published-loopback --port=1024..65535 --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--check]',
   '',
-  'The Console binds only 127.0.0.1 and exposes inspect/output reads.',
+  'Native mode binds 127.0.0.1. Container mode requires host-loopback port publication.',
   'The browser session key remains in a separate owner-private 0600 file.',
 ].join('\n');
 
@@ -27,6 +28,9 @@ interface ClusterCopilotConsoleCliArguments {
   readonly check: boolean;
   readonly configFile: string;
   readonly credentialFile: string;
+  readonly networkBoundary:
+    | 'host-loopback'
+    | 'container-published-loopback';
   readonly sessionFile: string;
   readonly port: number;
 }
@@ -71,10 +75,19 @@ export function parseClusterCopilotConsoleCliArguments(
   let sessionFile: string | undefined;
   let port = 0;
   let portSeen = false;
+  let containerPublishedLoopback = false;
   for (let index = 0; index < argv.length; ) {
     const current = argv[index];
     if (current === '--check' && !check) {
       check = true;
+      index += 1;
+      continue;
+    }
+    if (
+      current === '--container-published-loopback' &&
+      !containerPublishedLoopback
+    ) {
+      containerPublishedLoopback = true;
       index += 1;
       continue;
     }
@@ -121,7 +134,8 @@ export function parseClusterCopilotConsoleCliArguments(
     configFile === undefined ||
     credentialFile === undefined ||
     sessionFile === undefined ||
-    (check && port !== 0)
+    (containerPublishedLoopback && port === 0) ||
+    (!containerPublishedLoopback && check && port !== 0)
   ) {
     return usageFailure();
   }
@@ -129,6 +143,9 @@ export function parseClusterCopilotConsoleCliArguments(
     check,
     configFile,
     credentialFile,
+    networkBoundary: containerPublishedLoopback
+      ? 'container-published-loopback'
+      : 'host-loopback',
     sessionFile,
     port,
   });
@@ -178,7 +195,8 @@ async function main(): Promise<void> {
           component: 'qinglong3-cluster-copilot-console',
           event: 'preflight_checked',
           ready: readiness.ready,
-          listenAddress: '127.0.0.1',
+          networkBoundary: parsed.networkBoundary,
+          publishedHostAddress: '127.0.0.1',
           browserCredential: 'forbidden',
           clusterCredential: 'server_only',
           operations: ['inspect', 'output'],
@@ -203,6 +221,7 @@ async function main(): Promise<void> {
         });
       },
     }),
+    networkBoundary: parsed.networkBoundary,
     port: parsed.port,
     sessionDigest,
   });
@@ -213,7 +232,8 @@ async function main(): Promise<void> {
       component: 'qinglong3-cluster-copilot-console',
       event: 'started',
       origin: server.origin,
-      listenAddress: '127.0.0.1',
+      networkBoundary: parsed.networkBoundary,
+      publishedHostAddress: '127.0.0.1',
       browserCredential: 'forbidden',
       clusterCredential: 'server_only',
       operations: ['inspect', 'output'],

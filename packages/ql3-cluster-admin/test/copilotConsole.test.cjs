@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
-const { request: httpRequest } = require('node:http');
+const { createServer, request: httpRequest } = require('node:http');
 const { mkdtemp, mkdir, cp, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
@@ -19,6 +19,7 @@ const {
   normalizeClusterCopilotConsoleReadRequest,
 } = require('../dist/copilot-console/contracts.js');
 const {
+  ClusterCopilotConsoleConfigurationError,
   clusterCopilotConsoleSessionDigest,
   startClusterCopilotConsoleServer,
 } = require('../dist/copilot-console/server.js');
@@ -165,6 +166,20 @@ async function fixture(execute = async () => inspection()) {
   };
 }
 
+async function unusedPort() {
+  const probe = createServer();
+  await new Promise((resolve, reject) => {
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', resolve);
+  });
+  const address = probe.address();
+  assert.notEqual(typeof address, 'string');
+  assert.notEqual(address, null);
+  const port = address.port;
+  await new Promise((resolve) => probe.close(resolve));
+  return port;
+}
+
 test('normalizes only the two read operations into the shared client contract', () => {
   assert.deepEqual(
     clusterCopilotConsoleClientCommand(
@@ -242,6 +257,30 @@ test('serves an immutable same-origin shell with a closed browser policy', async
   assert.equal(css.statusCode, 200);
   assert.equal(javascript.statusCode, 200);
   assert.equal(javascript.headers['content-type'], 'text/javascript; charset=utf-8');
+});
+
+test('allows only an explicit fixed-port container listener behind host loopback publication', async (t) => {
+  const token = randomBytes(32).toString('base64url');
+  await assert.rejects(
+    startClusterCopilotConsoleServer({
+      assets: loadClusterCopilotConsoleAssets(moduleDirectory),
+      executor: { execute: async () => inspection() },
+      networkBoundary: 'container-published-loopback',
+      port: 0,
+      sessionDigest: clusterCopilotConsoleSessionDigest(token),
+    }),
+    ClusterCopilotConsoleConfigurationError,
+  );
+  const server = await startClusterCopilotConsoleServer({
+    assets: loadClusterCopilotConsoleAssets(moduleDirectory),
+    executor: { execute: async () => inspection() },
+    networkBoundary: 'container-published-loopback',
+    port: await unusedPort(),
+    sessionDigest: clusterCopilotConsoleSessionDigest(token),
+  });
+  t.after(() => server.close());
+  assert.match(server.origin, /^http:\/\/127\.0\.0\.1:[0-9]+$/);
+  assert.equal((await request(server.origin)).statusCode, 200);
 });
 
 test('keeps the Cluster credential server-side and forwards one exact inspect', async (t) => {

@@ -163,8 +163,9 @@ test('CLI exposes deterministic help and a low-sensitive failure surface', async
     'Usage:',
     '  ql3-copilot-console --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--port=0..65535]',
     '  ql3-copilot-console --check --config /absolute/client.json --credential /absolute/credential --session /absolute/session',
+    '  ql3-copilot-console --container-published-loopback --port=1024..65535 --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--check]',
     '',
-    'The Console binds only 127.0.0.1 and exposes inspect/output reads.',
+    'Native mode binds 127.0.0.1. Container mode requires host-loopback port publication.',
     'The browser session key remains in a separate owner-private 0600 file.',
   ].join('\n');
   assert.deepEqual(await runCli(['--help']), {
@@ -209,7 +210,8 @@ test('preflight proves private authority and unauthenticated TLS 1.3 readiness',
     component: 'qinglong3-cluster-copilot-console',
     event: 'preflight_checked',
     ready: true,
-    listenAddress: '127.0.0.1',
+    networkBoundary: 'host-loopback',
+    publishedHostAddress: '127.0.0.1',
     browserCredential: 'forbidden',
     clusterCredential: 'server_only',
     operations: ['inspect', 'output'],
@@ -249,6 +251,8 @@ test('serve mode starts an ephemeral loopback origin and shuts down cleanly', as
   assert.match(started.origin, /^http:\/\/127\.0\.0\.1:[0-9]+$/);
   assert.deepEqual(started.operations, ['inspect', 'output']);
   assert.equal(started.mutation, false);
+  assert.equal(started.networkBoundary, 'host-loopback');
+  assert.equal(started.publishedHostAddress, '127.0.0.1');
   const shell = await get(started.origin);
   assert.equal(shell.statusCode, 200);
   assert.match(shell.body, /Cluster field console/);
@@ -258,4 +262,20 @@ test('serve mode starts an ephemeral loopback origin and shuts down cleanly', as
     child.once('close', (status, signal) => resolve({ status, signal }));
   });
   assert.deepEqual(result, { status: 0, signal: null });
+});
+
+test('container mode requires an explicit publish port before any authority read', async () => {
+  const result = await runCli([
+    '--container-published-loopback',
+    '--config',
+    '/private/client.json',
+    '--credential',
+    '/private/credential',
+    '--session',
+    '/private/session',
+  ]);
+  assert.equal(result.status, 64);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /container-published-loopback/);
+  assert.doesNotMatch(result.stderr, /\/private\//);
 });

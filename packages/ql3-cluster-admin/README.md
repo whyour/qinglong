@@ -16,10 +16,13 @@ Host/Origin, no-store responses and a closed CSP, renders model text only via
 `textContent`, and keeps diagnose/cancel, polling, cache, WebSocket,
 ServiceWorker and legacy session authority absent.
 
-The reviewed operator-workstation setup, private-file ceremony, preflight and
-session lifecycle are documented in
-`deploy/console/ql3-cluster-copilot/README.md`. Do not expose the Console
-through a container port mapping, Kubernetes workload or shared network.
+The reviewed operator-workstation setup, private-file ceremony, release
+verification, preflight and session lifecycle are documented in
+`deploy/console/ql3-cluster-copilot/README.md`. Native execution binds host
+loopback directly. The signed Admin OCI also carries an exact launcher which
+uses a container-internal listener only with a fixed publication on host
+`127.0.0.1`; arbitrary port mappings, Kubernetes workloads and shared-network
+listeners remain forbidden.
 
 The admin role can append Identity/API Credential mutations and their security
 audit in one serializable transaction, and can perform bounded read-only audit

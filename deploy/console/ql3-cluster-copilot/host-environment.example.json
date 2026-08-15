@@ -1,0 +1,7 @@
+{
+  "QL3_COPILOT_CONSOLE_IMAGE": "ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "QL3_COPILOT_CONSOLE_PRIVATE_ROOT": "/absolute/private/ql3-copilot-console",
+  "QL3_COPILOT_CONSOLE_NETWORK": "qinglong3-copilot-console-egress",
+  "QL3_COPILOT_CONSOLE_PORT": "5701",
+  "QL3_COPILOT_CONSOLE_RESOURCE_CLASS": "compact"
+}

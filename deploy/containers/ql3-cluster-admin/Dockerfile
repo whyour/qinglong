@@ -76,6 +76,17 @@ COPY --from=workspace /workspace/packages/ql3-cluster-admin/dist \
   node_modules/@qinglong/cluster-admin/dist
 COPY --from=workspace /workspace/packages/ql3-cluster-admin/assets/copilot-console \
   node_modules/@qinglong/cluster-admin/assets/copilot-console
+RUN mkdir -p share/ql3-copilot-console
+COPY --chmod=0555 deploy/console/ql3-cluster-copilot/docker-loopback.sh \
+  share/ql3-copilot-console/docker-loopback.sh
+COPY --chmod=0555 deploy/console/ql3-cluster-copilot/verify-release.sh \
+  share/ql3-copilot-console/verify-release.sh
+COPY --chmod=0444 deploy/console/ql3-cluster-copilot/README.md \
+  share/ql3-copilot-console/README.md
+COPY --chmod=0444 deploy/console/ql3-cluster-copilot/client-config.example.json \
+  share/ql3-copilot-console/client-config.example.json
+COPY --chmod=0444 deploy/console/ql3-cluster-copilot/host-environment.example.json \
+  share/ql3-copilot-console/host-environment.example.json
 
 FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime
 

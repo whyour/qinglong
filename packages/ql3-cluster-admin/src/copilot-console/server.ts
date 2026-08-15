@@ -39,9 +39,14 @@ export interface ClusterCopilotConsoleExecutor {
 export interface ClusterCopilotConsoleServerOptions {
   readonly assets: Readonly<ClusterCopilotConsoleAssets>;
   readonly executor: ClusterCopilotConsoleExecutor;
+  readonly networkBoundary?: ClusterCopilotConsoleNetworkBoundary;
   readonly port: number;
   readonly sessionDigest: Buffer;
 }
+
+export type ClusterCopilotConsoleNetworkBoundary =
+  | 'host-loopback'
+  | 'container-published-loopback';
 
 export interface ClusterCopilotConsoleServer {
   readonly origin: string;
@@ -297,13 +302,16 @@ function remoteFailure(
 export async function startClusterCopilotConsoleServer(
   options: ClusterCopilotConsoleServerOptions,
 ): Promise<Readonly<ClusterCopilotConsoleServer>> {
-  const record = exactObject(options, [
-    'assets',
-    'executor',
-    'port',
-    'sessionDigest',
-  ]);
+  const optionKeys = ['assets', 'executor', 'port', 'sessionDigest'];
+  if (Object.hasOwn(options, 'networkBoundary')) {
+    optionKeys.push('networkBoundary');
+  }
+  const record = exactObject(options, optionKeys);
   const assets = exactObject(record.assets, ['css', 'html', 'javascript']);
+  const networkBoundary =
+    record.networkBoundary === undefined
+      ? 'host-loopback'
+      : record.networkBoundary;
   if (
     typeof assets.html !== 'string' ||
     assets.html.length < 1 ||
@@ -317,6 +325,10 @@ export async function startClusterCopilotConsoleServer(
     !Number.isSafeInteger(record.port) ||
     ((record.port as number) !== 0 &&
       ((record.port as number) < 1_024 || (record.port as number) > 65_535)) ||
+    (networkBoundary !== 'host-loopback' &&
+      networkBoundary !== 'container-published-loopback') ||
+    (networkBoundary === 'container-published-loopback' &&
+      (record.port as number) === 0) ||
     !Buffer.isBuffer(record.sessionDigest) ||
     (record.sessionDigest as Buffer).byteLength !== 32
   ) {
@@ -324,6 +336,8 @@ export async function startClusterCopilotConsoleServer(
   }
   const sessionDigest = Buffer.from(record.sessionDigest as Buffer);
   const executor = record.executor as ClusterCopilotConsoleExecutor;
+  const listenAddress =
+    networkBoundary === 'host-loopback' ? '127.0.0.1' : '0.0.0.0';
   let expectedOrigin = '';
   let inFlight = 0;
   let closed = false;
@@ -461,7 +475,7 @@ export async function startClusterCopilotConsoleServer(
   try {
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
-      server.listen(record.port as number, '127.0.0.1', () => {
+      server.listen(record.port as number, listenAddress, () => {
         server.off('error', reject);
         resolve();
       });

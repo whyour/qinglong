@@ -1,20 +1,50 @@
 # Cluster Copilot read-only Console
 
 This Console is an operator-workstation process, not a resident QingLong
-service. It serves digest-bound assets on an ephemeral `127.0.0.1` port and
+service. Native execution serves digest-bound assets on an ephemeral
+`127.0.0.1` port and
 forwards only `inspect` and explicit `output` reads to the existing Cluster
 Copilot API. Do not deploy it as a Kubernetes workload, Ingress, shared LAN
 listener, Edge component or legacy 2.x Web route.
 
 Use `ql3-cluster-admin` from the same independently verified Admin release as
-the Cluster deployment. The Console intentionally runs directly on the trusted
-operator workstation. A container port mapping is not a supported substitute:
-the process binds container loopback and must not be widened to `0.0.0.0`.
+the Cluster deployment. D-328 also supports the image-carried
+`docker-loopback.sh`: it uses an explicit container-only listener but publishes
+the same port exclusively on host `127.0.0.1`. Arbitrary `0.0.0.0`, host
+networking and LAN publication remain forbidden.
+
+## Verify the distribution
+
+The multi-architecture `qinglong3-cluster-admin@sha256:…` OCI image is the
+distribution artifact. It already carries the exact launcher, examples and
+this document under `/opt/qinglong/share/ql3-copilot-console/`; there is no
+second Node archive or package dependency graph to trust.
+
+From the exact reviewed source tag, run `verify-release.sh` with the immutable
+image digest, repository, 40-hex source revision and full tag ref. The verifier
+requires `cosign` and authenticated `gh`, then independently checks the keyless
+release-workflow identity, SLSA provenance, CycloneDX SBOM and digest-bound OS
+vulnerability evidence. It rejects tags and mutable image references.
+
+```sh
+deploy/console/ql3-cluster-copilot/verify-release.sh \
+  ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:REPLACE_64_HEX \
+  replace-owner/qinglong \
+  REPLACE_40_HEX_SOURCE_REVISION \
+  refs/tags/v3.0.0-alpha.0
+```
+
+After verification, pull that exact digest. The signature covers the embedded
+host launcher and templates as part of the image filesystem. Operators may
+either use the launcher from the matching reviewed tag or extract its exact
+image-carried copy with `docker create` plus `docker cp` before execution.
 
 ## Prepare private authority
 
-Create an absolute canonical directory owned by the current operator with mode
-`0700`. Copy `client-config.example.json` to `client.json`, install the reviewed
+Create an absolute canonical directory with mode `0700`. For native execution
+it is owned by the current operator; for the image-carried launcher it and all
+files are owned by UID/GID `10001:10001`. Copy `client-config.example.json` to
+`client.json`, install the reviewed
 Cluster API CA as `ca.pem`, and install a separately issued `ql3c_` Project API
 credential as `credential`. Give the credential only `run.read` and
 `artifact.read`; the Console has no route for diagnosis creation or
@@ -72,3 +102,37 @@ approximately 2 MiB, disables cache/cookies/frames/workers, and never polls.
 Model text is rendered as plain text and remains untrusted advice. These limits
 keep the workstation surface bounded, but this Cluster-only product is still
 excluded from small router Edge/Standalone artifacts.
+
+## Run the verified image
+
+Create a dedicated Docker network whose egress is restricted by the host
+firewall to DNS and the exact Cluster API destination. Copy
+`host-environment.example.json` values into the launcher environment, replacing
+the image with the verified digest and selecting one unused host port. The
+launcher rejects `bridge|default|host|none`, mutable tags, noncanonical private
+roots, ports outside `1024..65535` and unknown resource classes.
+
+| Resource class | Memory | CPU | PIDs | Console reads |
+| --- | ---: | ---: | ---: | ---: |
+| `compact` | 192 MiB | 0.25 | 32 | 2, no queue |
+| `standard` | 512 MiB | 1 | 64 | 2, no queue |
+
+Validate private authority and the upstream unauthenticated TLS 1.3 readiness
+route without opening or publishing a listener:
+
+```sh
+deploy/console/ql3-cluster-copilot/docker-loopback.sh check
+```
+
+Then start the foreground session:
+
+```sh
+deploy/console/ql3-cluster-copilot/docker-loopback.sh serve
+```
+
+The launcher fixes non-root UID, read-only root, no capabilities,
+no-new-privileges, bounded memory/CPU/PIDs, an 8 MiB noexec tmpfs, one read-only
+private mount and `--pull never`. `serve` alone adds
+`--publish 127.0.0.1:<port>:<port>/tcp`; `check` publishes nothing. The
+container listener is reachable only through this reviewed publication and
+continues to require the 256-bit browser session token plus exact Host/Origin.
