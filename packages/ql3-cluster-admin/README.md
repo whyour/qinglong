@@ -1,10 +1,25 @@
 # `@qinglong/cluster-admin`
 
 This private QingLong 3.0 package owns explicit cluster operations and the
-bounded Cluster Copilot MCP product surface. Database/Kubernetes administration
-remains short-lived and requires distinct purpose-bound authority; the MCP
-subpath has only the remote API client, opens no database or Kubernetes
-authority, and is intentionally separate from resident `cluster-control`.
+bounded Cluster Copilot MCP and Console product surfaces.
+Database/Kubernetes administration remains short-lived and requires distinct
+purpose-bound authority. The MCP subpath has only the remote API client; the
+Console is a loopback-only read BFF serving digest-bound static assets. Neither
+opens database or Kubernetes authority, enters the legacy 2.x Web application,
+or resides in `cluster-control`.
+
+The Console accepts only `inspect` and explicit `output` reads. Its Cluster
+API credential stays in a canonical owner-private file and is reread for each
+upstream request; browser JavaScript receives only a separate session token
+which cannot call Cluster APIs. It binds `127.0.0.1`, enforces exact
+Host/Origin, no-store responses and a closed CSP, renders model text only via
+`textContent`, and keeps diagnose/cancel, polling, cache, WebSocket,
+ServiceWorker and legacy session authority absent.
+
+The reviewed operator-workstation setup, private-file ceremony, preflight and
+session lifecycle are documented in
+`deploy/console/ql3-cluster-copilot/README.md`. Do not expose the Console
+through a container port mapping, Kubernetes workload or shared network.
 
 The admin role can append Identity/API Credential mutations and their security
 audit in one serializable transaction, and can perform bounded read-only audit

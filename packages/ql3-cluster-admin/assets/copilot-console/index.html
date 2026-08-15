@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="QingLong 3.0 Cluster Copilot 只读诊断台"
+    />
+    <title>QingLong 3.0 · Copilot 诊断台</title>
+    <link rel="stylesheet" href="/app.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">跳到诊断工作区</a>
+    <div class="shell">
+      <header class="masthead">
+        <div class="brand-lockup" aria-label="QingLong 3.0 Cluster Console">
+          <span class="brand-mark" aria-hidden="true">QL</span>
+          <div>
+            <p class="eyebrow">QingLong 3.0 / Cluster field console</p>
+            <h1>故障诊断，不替你执行。</h1>
+          </div>
+        </div>
+        <div class="boundary" aria-label="当前权限边界">
+          <span class="boundary-dot" aria-hidden="true"></span>
+          <span>只读边界</span>
+          <strong>inspect · output</strong>
+        </div>
+      </header>
+
+      <main id="workspace" class="workspace">
+        <section class="control-deck" aria-labelledby="target-title">
+          <div class="section-heading">
+            <p class="eyebrow">Target coordinates</p>
+            <h2 id="target-title">定位一次诊断</h2>
+            <p>
+              输入已存在的 Project、源 Run 和诊断请求。页面不会创建、取消或重试任何任务。
+            </p>
+          </div>
+
+          <form id="session-form" class="session-gate" autocomplete="off">
+            <label for="session-token">浏览器访问密钥</label>
+            <div class="inline-control">
+              <input
+                id="session-token"
+                name="sessionToken"
+                type="password"
+                inputmode="text"
+                spellcheck="false"
+                autocomplete="off"
+                required
+                pattern="[A-Za-z0-9_\-]{43}"
+                aria-describedby="session-note"
+              />
+              <button type="submit">解锁本次页面</button>
+            </div>
+            <p id="session-note" class="field-note">
+              从独立的 0600 session 文件读取并粘贴；仅保留在当前页面内存，不会发送到 Cluster API。
+            </p>
+          </form>
+
+          <form id="target-form" class="target-form" autocomplete="off" hidden>
+            <label for="project-id">Project</label>
+            <input
+              id="project-id"
+              name="projectId"
+              type="text"
+              maxlength="128"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="project-main"
+              required
+            />
+
+            <label for="run-id">源 Run</label>
+            <input
+              id="run-id"
+              name="sourceRunId"
+              type="text"
+              maxlength="36"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="run_..."
+              required
+            />
+
+            <label for="request-id">诊断请求</label>
+            <input
+              id="request-id"
+              name="requestId"
+              type="text"
+              maxlength="128"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="diag-request-..."
+              required
+            />
+
+            <div class="actions">
+              <button id="inspect-button" class="primary" type="submit">
+                读取诊断状态
+              </button>
+              <button id="output-button" type="button" disabled>
+                显式读取诊断内容
+              </button>
+            </div>
+          </form>
+
+          <aside class="trust-note">
+            <span>Authority note</span>
+            <p>
+              Cluster credential 只存在于本机 BFF 的私有文件中。浏览器不能读取它，也不能调用 diagnose 或 cancel。
+            </p>
+          </aside>
+        </section>
+
+        <section class="evidence-panel" aria-labelledby="evidence-title">
+          <div class="evidence-header">
+            <div>
+              <p class="eyebrow">Durable evidence</p>
+              <h2 id="evidence-title">诊断轨迹</h2>
+            </div>
+            <span id="status-chip" class="status-chip" data-tone="idle">等待目标</span>
+          </div>
+
+          <div id="empty-state" class="empty-state">
+            <div class="empty-glyph" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <h3>先读取状态，再决定是否查看内容</h3>
+            <p>
+              状态响应只包含有界、低敏的 durable facts。模型文本必须由你再次明确选择。
+            </p>
+          </div>
+
+          <div id="result-view" hidden>
+            <ol class="trace-rail" aria-label="诊断状态时间线">
+              <li>
+                <span class="trace-node"></span>
+                <div>
+                  <small>ADMITTED</small>
+                  <strong id="admitted-at">—</strong>
+                </div>
+              </li>
+              <li>
+                <span class="trace-node"></span>
+                <div>
+                  <small>STAGE</small>
+                  <strong id="stage">—</strong>
+                </div>
+              </li>
+              <li>
+                <span class="trace-node"></span>
+                <div>
+                  <small>OUTCOME</small>
+                  <strong id="outcome">—</strong>
+                </div>
+              </li>
+            </ol>
+
+            <dl class="fact-grid">
+              <div>
+                <dt>Diagnosis Run</dt>
+                <dd id="diagnosis-run">—</dd>
+              </div>
+              <div>
+                <dt>Reason</dt>
+                <dd id="reason">—</dd>
+              </div>
+              <div>
+                <dt>Tokens</dt>
+                <dd id="tokens">—</dd>
+              </div>
+              <div>
+                <dt>Settled cost</dt>
+                <dd id="cost">—</dd>
+              </div>
+            </dl>
+
+            <section id="output-panel" class="output-panel" hidden>
+              <div class="output-heading">
+                <div>
+                  <p class="eyebrow">Explicit content read</p>
+                  <h3>诊断内容</h3>
+                </div>
+                <span>不可信模型输出</span>
+              </div>
+              <pre id="output-text" tabindex="0"></pre>
+              <dl class="output-meta">
+                <div>
+                  <dt>Finish reason</dt>
+                  <dd id="finish-reason">—</dd>
+                </div>
+                <div>
+                  <dt>Output bytes</dt>
+                  <dd id="output-bytes">—</dd>
+                </div>
+                <div>
+                  <dt>Content digest</dt>
+                  <dd id="content-digest">—</dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+
+          <div id="message" class="message" role="status" aria-live="polite"></div>
+        </section>
+      </main>
+
+      <footer>
+        <span>Loopback only · no legacy session · no browser credential</span>
+        <span>QingLong 3.0 incubation / D-327</span>
+      </footer>
+    </div>
+  </body>
+</html>

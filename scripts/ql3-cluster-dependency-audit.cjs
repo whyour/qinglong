@@ -3101,6 +3101,9 @@ function auditPackageScripts(packagePath, manifest, findings) {
 
 function auditPackageFiles(packagePath, manifest, findings) {
   const expected = ['dist/**/*.js', 'dist/**/*.d.ts'];
+  if (packagePath === 'packages/ql3-cluster-admin') {
+    expected.push('assets/copilot-console/*');
+  }
   if (packagePath === 'packages/ql3-local-process') expected.push('assets');
   if (packagePath === 'packages/ql3-local-sqlite') expected.push('drizzle');
   if (JSON.stringify(manifest.files) !== JSON.stringify(expected)) {

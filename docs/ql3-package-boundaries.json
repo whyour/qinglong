@@ -55,11 +55,12 @@
       "authorities": [
         "Kubernetes mutation",
         "PostgreSQL management",
-        "optional mTLS/OIDC human Approval management",
-        "caller-driven Approval management client",
-        "one-shot maintenance"
+      "optional mTLS/OIDC human Approval management",
+      "caller-driven Approval management client",
+      "loopback-only read-only Copilot Console",
+      "one-shot maintenance"
       ],
-      "rationale": "独立管理进程与一次性高权限命令必须排除在常驻 cluster-control 之外；Approval 的 service/transport/process/client 属于同一 Cluster Admin 制品与强人类认证 authority，使用包内 approval-management 领域目录而不是新增微包。"
+    "rationale": "独立管理进程、一次性高权限命令和 operator-workstation Console 必须排除在常驻 cluster-control 之外；Approval 的 service/transport/process/client 与只读 Copilot Console 均属于同一 Cluster Admin 制品，分别使用内聚领域目录而不是新增微包。"
     },
     {
       "path": "packages/ql3-cluster-control",

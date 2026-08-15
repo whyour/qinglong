@@ -47,6 +47,12 @@ export const QINGLONG3_CLUSTER_PRODUCT_COMMANDS: readonly QingLong3ClusterProduc
       description: 'serve the bounded Cluster Copilot MCP over stdio',
     }),
     Object.freeze({
+      name: 'copilot-console',
+      binary: 'ql3-copilot-console',
+      target: 'copilot-console/cli.js',
+      description: 'open the loopback-only read-only Copilot Console',
+    }),
+    Object.freeze({
       name: 'package',
       binary: 'ql3-plugin-package-client',
       target: 'plugin-package/management/pluginPackageManagementClientCli.js',
@@ -192,7 +198,7 @@ export function qingLong3ClusterProductHelp(): string {
     '',
     'Use `ql3-cluster-admin <command> --help` for command-specific usage.',
     'Use `--context=/absolute/operator-context.json` only with remote client commands.',
-    'Keep the MCP config explicit; it contains stable paths to a separately rotated credential.',
+    'Keep MCP and Console authority explicit; neither belongs in operator context.',
     'Command and short-lived assertion files always remain explicit per invocation.',
     'Server, migration, recovery, executor and key-custody authorities remain isolated.',
   ].join('\n');

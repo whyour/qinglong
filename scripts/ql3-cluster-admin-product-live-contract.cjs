@@ -18,6 +18,10 @@ const COMMANDS = Object.freeze([
     usage: 'Usage: ql3-copilot-mcp --config ',
   }),
   Object.freeze({
+    name: 'copilot-console',
+    usage: 'Usage:\n  ql3-copilot-console --config ',
+  }),
+  Object.freeze({
     name: 'package',
     usage: 'Usage: ql3-plugin-package-client ',
   }),
@@ -206,6 +210,97 @@ process.stdout.write(JSON.stringify({ schemaVersion: 1, injected: true, contextP
   }
 }
 
+function runConsoleContract(image) {
+  const source = String.raw`
+const { spawn } = require('node:child_process');
+const { writeFileSync } = require('node:fs');
+const { get } = require('node:http');
+const { rootCertificates } = require('node:tls');
+const facade = '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js';
+const config = '/tmp/copilot-client.json';
+const credential = '/tmp/copilot-credential';
+const session = '/tmp/copilot-session';
+writeFileSync('/tmp/ca.pem', rootCertificates[0], { mode: 0o600 });
+writeFileSync(config, JSON.stringify({ schema: 'qinglong/cluster-copilot-client-config@v1', endpoint: 'https://localhost:65535/', servername: 'localhost', caFile: '/tmp/ca.pem', requestTimeoutMs: 1000 }), { mode: 0o600 });
+writeFileSync(credential, 'ql3c_console_' + Buffer.alloc(32, 9).toString('base64url'), { mode: 0o600 });
+writeFileSync(session, 'A'.repeat(43), { mode: 0o600 });
+const child = spawn(process.execPath, [facade, 'copilot-console', '--config', config, '--credential', credential, '--session', session, '--port=0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+let stdout = '';
+let settled = false;
+const timeout = setTimeout(() => finish(41), 5000);
+function finish(code) {
+  if (settled) return;
+  settled = true;
+  clearTimeout(timeout);
+  if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  process.exitCode = code;
+}
+child.once('error', () => finish(42));
+child.stdout.on('data', (chunk) => {
+  stdout += chunk.toString('utf8');
+  const newline = stdout.indexOf('\n');
+  if (newline === -1 || settled) return;
+  let started;
+  try { started = JSON.parse(stdout.slice(0, newline)); } catch { finish(43); return; }
+  if (started.event !== 'started' || !/^http:\/\/127\.0\.0\.1:[0-9]+$/.test(started.origin) || JSON.stringify(started.operations) !== JSON.stringify(['inspect', 'output']) || started.mutation !== false) { finish(44); return; }
+  get(started.origin, (response) => {
+    const chunks = [];
+    response.on('data', (chunk) => chunks.push(chunk));
+    response.once('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8');
+      if (response.statusCode !== 200 || !body.includes('Cluster field console') || !body.includes('/app.css') || !body.includes('/app.js')) { finish(45); return; }
+      child.once('close', (status, signal) => {
+        if (status !== 0 || signal !== null) { finish(46); return; }
+        settled = true;
+        clearTimeout(timeout);
+        process.stdout.write(JSON.stringify({ loopback: true, assets: true, cleanShutdown: true }));
+      });
+      child.kill('SIGTERM');
+    });
+  }).once('error', () => finish(47));
+});
+`;
+  const output = docker([
+    'run',
+    '--rm',
+    '--read-only',
+    '--network',
+    'none',
+    '--cap-drop',
+    'ALL',
+    '--security-opt',
+    'no-new-privileges',
+    '--user',
+    '10001:10001',
+    '--pids-limit',
+    '32',
+    '--memory',
+    '128m',
+    '--cpus',
+    '0.25',
+    '--tmpfs',
+    '/tmp:rw,noexec,nosuid,nodev,size=8m,mode=700,uid=10001,gid=10001',
+    '--entrypoint',
+    'node',
+    image,
+    '-e',
+    source,
+  ]);
+  let result;
+  try {
+    result = JSON.parse(output);
+  } catch {
+    fail('Console live result is invalid');
+  }
+  if (
+    result?.loopback !== true ||
+    result?.assets !== true ||
+    result?.cleanShutdown !== true
+  ) {
+    fail('Console live contract drifted');
+  }
+}
+
 function main() {
   if (process.env.QL3_CLUSTER_ADMIN_PRODUCT_LIVE !== '1') {
     fail('QL3_CLUSTER_ADMIN_PRODUCT_LIVE=1 is required');
@@ -245,6 +340,7 @@ function main() {
   const version = runImage(image, ['--version']).trim();
   if (version !== '3.0.0-alpha.0') fail('product version contract drifted');
   runOperatorContextContract(image);
+  runConsoleContract(image);
 
   process.stdout.write(
     `${JSON.stringify({
@@ -257,6 +353,8 @@ function main() {
       operatorContext: true,
       contextPreflight: true,
       contextReadiness: true,
+      consoleLoopback: true,
+      consoleAssets: true,
       isolation: Object.freeze({
         readOnlyRoot: true,
         network: 'none',

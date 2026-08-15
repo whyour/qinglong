@@ -1,0 +1,7 @@
+{
+  "schema": "qinglong/cluster-copilot-client-config@v1",
+  "endpoint": "https://replace-cluster-api.example.com:5800/",
+  "servername": "replace-cluster-api.example.com",
+  "caFile": "/absolute/private/ql3-copilot-console/ca.pem",
+  "requestTimeoutMs": 30000
+}

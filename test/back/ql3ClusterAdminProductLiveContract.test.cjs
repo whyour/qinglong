@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
 const {
@@ -46,4 +47,14 @@ test('fails closed before Docker without explicit opt-in', () => {
   assert.equal(result.stdout, '');
   assert.match(result.stderr, /QL3_CLUSTER_ADMIN_PRODUCT_LIVE=1 is required/);
   assert.equal(result.stderr.includes('spawn'), false);
+});
+
+test('binds the live image gate to loopback Console assets and shutdown', () => {
+  const source = fs.readFileSync(script, 'utf8');
+  assert.match(source, /function runConsoleContract\(image\)/);
+  assert.match(source, /\[facade, 'copilot-console'/);
+  assert.match(source, /body\.includes\('Cluster field console'\)/);
+  assert.match(source, /runConsoleContract\(image\);/);
+  assert.match(source, /consoleLoopback: true/);
+  assert.match(source, /consoleAssets: true/);
 });

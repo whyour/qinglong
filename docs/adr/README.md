@@ -422,6 +422,7 @@
 | [ADR-0416](./ADR-0416-bounded-cluster-copilot-product-client.md)                                  | 有界 Cluster Copilot 产品客户端                                                                                                                              | Accepted |
 | [ADR-0417](./ADR-0417-bounded-cluster-copilot-mcp-stdio-surface.md)                               | 有界 Cluster Copilot MCP stdio 产品面                                                                                                                        | Accepted |
 | [ADR-0418](./ADR-0418-explicit-cluster-copilot-mcp-host-deployment.md)                           | 显式 Cluster Copilot MCP Host 部署与资源边界                                                                                                                 | Accepted |
+| [ADR-0419](./ADR-0419-loopback-read-only-cluster-copilot-console.md)                            | Loopback-only Cluster Copilot 只读 Console                                                                                                                    | Accepted |
 
 ## 规则
 

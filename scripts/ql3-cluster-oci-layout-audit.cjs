@@ -240,7 +240,7 @@ function expectedImageConfig(architecture, revision, image) {
           ? isControlAi
             ? 'Optional QingLong 3.0 AI-enabled cluster control plane'
             : 'QingLong 3.0 PostgreSQL-backed cluster control plane'
-          : 'QingLong 3.0 cluster operations and bounded stdio MCP',
+          : 'QingLong 3.0 cluster operations and bounded Copilot surfaces',
         'org.opencontainers.image.licenses': 'Apache-2.0',
         'org.opencontainers.image.revision': revision,
         'org.opencontainers.image.source': 'https://github.com/whyour/qinglong',

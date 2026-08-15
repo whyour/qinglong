@@ -74,13 +74,15 @@ COPY --from=workspace /workspace/packages/ql3-cluster-admin/package.json \
   node_modules/@qinglong/cluster-admin/package.json
 COPY --from=workspace /workspace/packages/ql3-cluster-admin/dist \
   node_modules/@qinglong/cluster-admin/dist
+COPY --from=workspace /workspace/packages/ql3-cluster-admin/assets/copilot-console \
+  node_modules/@qinglong/cluster-admin/assets/copilot-console
 
 FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime
 
 ARG SOURCE_REVISION=uncommitted
 
 LABEL org.opencontainers.image.title="QingLong 3.0 Cluster Admin" \
-  org.opencontainers.image.description="QingLong 3.0 cluster operations and bounded stdio MCP" \
+  org.opencontainers.image.description="QingLong 3.0 cluster operations and bounded Copilot surfaces" \
   org.opencontainers.image.source="https://github.com/whyour/qinglong" \
   org.opencontainers.image.revision="${SOURCE_REVISION}" \
   org.opencontainers.image.licenses="Apache-2.0"
