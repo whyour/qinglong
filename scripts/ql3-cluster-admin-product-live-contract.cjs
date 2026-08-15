@@ -254,13 +254,13 @@ child.stdout.on('data', (chunk) => {
   if (newline === -1 || settled) return;
   let started;
   try { started = JSON.parse(stdout.slice(0, newline)); } catch { finish(43); return; }
-  if (started.event !== 'started' || !/^http:\/\/127\.0\.0\.1:[0-9]+$/.test(started.origin) || JSON.stringify(started.operations) !== JSON.stringify(['inspect', 'output']) || started.mutation !== false) { finish(44); return; }
+  if (started.event !== 'started' || !/^http:\/\/127\.0\.0\.1:[0-9]+$/.test(started.origin) || JSON.stringify(started.operations) !== JSON.stringify(['inspect', 'output', 'run_list', 'run_read', 'run_event_list', 'run_step_list', 'task_list', 'task_read', 'workflow_list', 'workflow_run_list', 'workflow_run_read', 'workflow_event_list', 'workflow_step_list']) || started.mutation !== false) { finish(44); return; }
   get(started.origin, (response) => {
     const chunks = [];
     response.on('data', (chunk) => chunks.push(chunk));
     response.once('end', () => {
       const body = Buffer.concat(chunks).toString('utf8');
-      if (response.statusCode !== 200 || !body.includes('Cluster field console') || !body.includes('/app.css') || !body.includes('/app.js')) { finish(45); return; }
+      if (response.statusCode !== 200 || !body.includes('Cluster field ledger') || !body.includes('/app.css') || !body.includes('/app.js')) { finish(45); return; }
       child.once('close', (status, signal) => {
         if (status !== 0 || signal !== null) { finish(46); return; }
         settled = true;
@@ -411,7 +411,9 @@ process.once('SIGINT', () => child.kill('SIGINT'));
         } catch {}
       }
       fail(
-        `published Console did not start (running=${String(state?.Running)}, exit=${String(state?.ExitCode)}, code=${terminalCode})`,
+        `published Console did not start (running=${String(
+          state?.Running,
+        )}, exit=${String(state?.ExitCode)}, code=${terminalCode})`,
       );
     }
     let started;
@@ -433,16 +435,14 @@ process.once('SIGINT', () => child.kill('SIGINT'));
       container,
       `${containerPort}/tcp`,
     ]).trim();
-    const publishedMatch = /^127\.0\.0\.1:([1-9][0-9]{0,4})$/u.exec(
-      published,
-    );
+    const publishedMatch = /^127\.0\.0\.1:([1-9][0-9]{0,4})$/u.exec(published);
     if (!publishedMatch) fail('published Console escaped host loopback');
     const origin = `http://127.0.0.1:${publishedMatch[1]}`;
     const probe = execFileSync(
       process.execPath,
       [
         '-e',
-        "require('node:http').get(process.argv[1],(r)=>{const c=[];r.on('data',(x)=>c.push(x));r.on('end',()=>{const b=Buffer.concat(c).toString('utf8');if(r.statusCode!==200||!b.includes('Cluster field console'))process.exit(2);process.stdout.write(JSON.stringify({status:r.statusCode,assets:b.includes('/app.css')&&b.includes('/app.js')}));});}).on('error',()=>process.exit(3));",
+        "require('node:http').get(process.argv[1],(r)=>{const c=[];r.on('data',(x)=>c.push(x));r.on('end',()=>{const b=Buffer.concat(c).toString('utf8');if(r.statusCode!==200||!b.includes('Cluster field ledger'))process.exit(2);process.stdout.write(JSON.stringify({status:r.statusCode,assets:b.includes('/app.css')&&b.includes('/app.js')}));});}).on('error',()=>process.exit(3));",
         origin,
       ],
       { encoding: 'utf8', timeout: 5_000 },

@@ -53,7 +53,7 @@ test('binds the live image gate to native and container-published loopback', () 
   const source = fs.readFileSync(script, 'utf8');
   assert.match(source, /function runConsoleContract\(image\)/);
   assert.match(source, /\[facade, 'copilot-console'/);
-  assert.match(source, /body\.includes\('Cluster field console'\)/);
+  assert.match(source, /body\.includes\('Cluster field ledger'\)/);
   assert.match(source, /runConsoleContract\(image\);/);
   assert.match(source, /consoleLoopback: true/);
   assert.match(source, /consoleAssets: true/);

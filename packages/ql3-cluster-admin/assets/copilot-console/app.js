@@ -1,190 +1,297 @@
-"use strict";
+'use strict';
 
 (function () {
-  const commandSchema = "qinglong/cluster-copilot-console-read-request@v1";
-  const sessionForm = document.getElementById("session-form");
-  const sessionInput = document.getElementById("session-token");
-  const targetForm = document.getElementById("target-form");
-  const inspectButton = document.getElementById("inspect-button");
-  const outputButton = document.getElementById("output-button");
-  const emptyState = document.getElementById("empty-state");
-  const resultView = document.getElementById("result-view");
-  const outputPanel = document.getElementById("output-panel");
-  const outputText = document.getElementById("output-text");
-  const message = document.getElementById("message");
-  const statusChip = document.getElementById("status-chip");
-  let sessionToken = "";
-  let currentTarget = null;
+  const schema = 'qinglong/cluster-copilot-console-read-request@v1';
+  const routes = Object.freeze({
+    inspect: '/api/v1/copilot/inspect',
+    output: '/api/v1/copilot/output',
+    run_list: '/api/v1/observe/run-list',
+    run_read: '/api/v1/observe/run',
+    run_event_list: '/api/v1/observe/run-events',
+    run_step_list: '/api/v1/observe/run-steps',
+    task_list: '/api/v1/observe/task-list',
+    task_read: '/api/v1/observe/task',
+    workflow_list: '/api/v1/observe/workflow-list',
+    workflow_run_list: '/api/v1/observe/workflow-run-list',
+    workflow_run_read: '/api/v1/observe/workflow-run',
+    workflow_event_list: '/api/v1/observe/workflow-events',
+    workflow_step_list: '/api/v1/observe/workflow-steps',
+  });
+  const labels = Object.freeze({
+    inspect: 'Copilot 诊断状态',
+    output: 'Copilot 诊断内容',
+    run_list: 'Run 目录',
+    run_read: 'Run 详情',
+    run_event_list: 'Run Events',
+    run_step_list: 'Run Steps',
+    task_list: 'Task 目录',
+    task_read: 'Task 当前修订',
+    workflow_list: 'Workflow 目录',
+    workflow_run_list: 'Workflow Run 目录',
+    workflow_run_read: 'Workflow Run 详情',
+    workflow_event_list: 'Workflow Run Events',
+    workflow_step_list: 'Workflow Run Steps',
+  });
+  const sessionForm = document.getElementById('session-form');
+  const sessionInput = document.getElementById('session-token');
+  const controls = document.getElementById('console-controls');
+  const ledger = document.getElementById('ledger');
+  const emptyState = document.getElementById('empty-state');
+  const message = document.getElementById('message');
+  const statusChip = document.getElementById('status-chip');
+  let sessionToken = '';
+  let busy = false;
 
-  const setText = function (id, value) {
-    document.getElementById(id).textContent =
-      value === null || value === undefined || value === "" ? "—" : String(value);
+  const value = function (id) {
+    return document.getElementById(id).value.trim();
   };
 
-  const setMessage = function (value, tone) {
-    message.textContent = value;
-    message.dataset.tone = tone || "neutral";
+  const requestId = function () {
+    return 'console-' + crypto.randomUUID();
   };
 
-  const dateTime = function (value) {
-    if (!Number.isSafeInteger(value)) return "—";
-    return new Intl.DateTimeFormat("zh-CN", {
-      dateStyle: "medium",
-      timeStyle: "medium",
-    }).format(new Date(value));
+  const setMessage = function (text, tone) {
+    message.textContent = text;
+    message.dataset.tone = tone || 'neutral';
   };
 
-  const setBusy = function (busy) {
-    inspectButton.disabled = busy;
-    outputButton.disabled =
-      busy || !currentTarget || currentTarget.outputAvailable !== true;
-  };
-
-  const request = async function (operation, target) {
-    const response = await fetch("/api/v1/copilot/" + operation, {
-      method: "POST",
-      cache: "no-store",
-      credentials: "omit",
-      redirect: "error",
-      referrerPolicy: "no-referrer",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json; charset=utf-8",
-        Authorization: "QL3-Console " + sessionToken,
-      },
-      body: JSON.stringify({
-        schema: commandSchema,
-        operation: operation,
-        projectId: target.projectId,
-        sourceRunId: target.sourceRunId,
-        requestId: target.requestId,
-      }),
+  const setBusy = function (next) {
+    busy = next;
+    document.querySelectorAll('[data-read]').forEach(function (button) {
+      button.disabled = next;
     });
-    const body = await response.json();
-    if (!response.ok) {
-      const error = new Error(
-        typeof body.code === "string" ? body.code : "console_request_failed",
-      );
-      error.code = typeof body.code === "string" ? body.code : "console_request_failed";
-      throw error;
+    if (next) {
+      statusChip.textContent = '读取中';
+      statusChip.dataset.tone = 'busy';
+    } else if (statusChip.dataset.tone === 'busy') {
+      statusChip.textContent = '只读就绪';
+      statusChip.dataset.tone = 'success';
     }
-    return body;
   };
 
-  const targetFromForm = function () {
-    const form = new FormData(targetForm);
+  const base = function (operation) {
+    const projectId = value('project-id');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(projectId)) {
+      throw new Error('project_id_invalid');
+    }
     return {
-      projectId: String(form.get("projectId") || "").trim(),
-      sourceRunId: String(form.get("sourceRunId") || "").trim(),
-      requestId: String(form.get("requestId") || "").trim(),
+      schema: schema,
+      operation: operation,
+      projectId: projectId,
+      requestId: requestId(),
     };
   };
 
-  const renderInspection = function (response) {
-    const result = response.result;
-    const fact = result.result;
-    currentTarget = {
-      projectId: fact.projectId,
-      sourceRunId: fact.sourceRunId,
-      requestId: fact.requestId,
-      outputAvailable: fact.outputAvailable,
-    };
-    emptyState.hidden = true;
-    resultView.hidden = false;
-    outputPanel.hidden = true;
-    outputText.textContent = "";
-    setText("admitted-at", dateTime(fact.admittedAtMs));
-    setText("stage", fact.stage || (fact.status === "running" ? "processing" : null));
-    setText("outcome", fact.outcome || fact.status);
-    setText("diagnosis-run", fact.diagnosisRunId);
-    setText("reason", fact.reason);
-    setText(
-      "tokens",
-      fact.usage === null ? null : fact.usage.totalTokens,
-    );
-    setText(
-      "cost",
-      fact.usage === null || fact.usage.costMicros === null
-        ? null
-        : "$" + (fact.usage.costMicros / 1000000).toFixed(6),
-    );
-    statusChip.textContent = fact.status === "running" ? "诊断进行中" : fact.outcome;
-    statusChip.dataset.tone =
-      fact.status === "running"
-        ? "running"
-        : fact.outcome === "succeeded"
-          ? "success"
-          : "failed";
-    outputButton.disabled = fact.outputAvailable !== true;
-    setMessage(
-      fact.outputAvailable
-        ? "状态已验证。诊断内容仍未读取。"
-        : "状态已验证；当前没有可读取的诊断内容。",
-    );
+  const payload = function (operation) {
+    const result = base(operation);
+    if (operation === 'inspect' || operation === 'output') {
+      result.sourceRunId = value('source-run-id');
+      result.requestId = value('diagnosis-request-id');
+    } else if (operation === 'run_list') {
+      result.afterCreatedAtMs = null;
+      result.afterRunId = null;
+      result.limit = 32;
+    } else if (operation === 'run_read') {
+      result.runId = value('run-id');
+    } else if (operation === 'run_event_list') {
+      result.runId = value('run-id');
+      result.afterSequence = 0;
+      result.limit = 32;
+    } else if (operation === 'run_step_list') {
+      result.runId = value('run-id');
+      result.afterStepKey = null;
+      result.afterStepRunId = null;
+      result.limit = 32;
+    } else if (operation === 'task_list') {
+      result.afterTaskId = null;
+      result.limit = 32;
+    } else if (operation === 'task_read') {
+      result.taskId = value('task-id');
+    } else if (operation === 'workflow_list') {
+      result.packageName = value('package-name');
+    } else {
+      result.packageName = value('package-name');
+      result.workflowId = value('workflow-id');
+      if (operation === 'workflow_run_list') {
+        result.afterAdmittedAtMs = null;
+        result.afterRunId = null;
+        result.limit = 32;
+      } else {
+        result.runId = value('workflow-run-id');
+        if (operation === 'workflow_event_list') {
+          result.afterSequence = 0;
+          result.limit = 32;
+        } else if (operation === 'workflow_step_list') {
+          result.afterStepKey = null;
+          result.afterStepRunId = null;
+          result.limit = 32;
+        }
+      }
+    }
+    return result;
   };
 
-  const renderOutput = function (response) {
+  const nextPage = function (operation, prior, fact) {
+    const next = Object.assign({}, prior, { requestId: requestId() });
+    if (operation === 'run_list' && fact.hasMore === true && fact.next) {
+      next.afterCreatedAtMs = fact.next.createdAtMs;
+      next.afterRunId = fact.next.runId;
+    } else if (
+      operation === 'task_list' &&
+      fact.hasMore === true &&
+      fact.next
+    ) {
+      next.afterTaskId = fact.next.taskId;
+    } else if (operation === 'run_event_list' && fact.hasMore === true) {
+      next.afterSequence = fact.nextAfterSequence;
+    } else if (
+      operation === 'run_step_list' &&
+      fact.hasMore === true &&
+      fact.next
+    ) {
+      next.afterStepKey = fact.next.stepKey;
+      next.afterStepRunId = fact.next.stepRunId;
+    } else if (
+      operation === 'workflow_run_list' &&
+      fact.truncated === true &&
+      fact.next
+    ) {
+      next.afterAdmittedAtMs = fact.next.admittedAtMs;
+      next.afterRunId = fact.next.runId;
+    } else if (
+      operation === 'workflow_event_list' &&
+      fact.truncated === true &&
+      fact.nextAfterSequence !== null
+    ) {
+      next.afterSequence = fact.nextAfterSequence;
+    } else if (
+      operation === 'workflow_step_list' &&
+      fact.truncated === true &&
+      fact.next
+    ) {
+      next.afterStepKey = fact.next.stepKey;
+      next.afterStepRunId = fact.next.id;
+    } else {
+      return null;
+    }
+    return next;
+  };
+
+  const appendEvidence = function (operation, request, response) {
     const fact = response.result.result;
-    outputPanel.hidden = false;
-    outputText.textContent = fact.result.text;
-    setText("finish-reason", fact.result.finishReason);
-    setText("output-bytes", fact.reference.outputBytes);
-    setText("content-digest", fact.reference.contentDigest);
-    setMessage("诊断内容已显式读取；请把它当作不可信建议进行复核。");
-    outputPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const entry = document.createElement('li');
+    entry.className = 'ledger-entry';
+    const header = document.createElement('header');
+    const title = document.createElement('h3');
+    const time = document.createElement('time');
+    const output = document.createElement('pre');
+    title.textContent = labels[operation];
+    time.textContent = new Intl.DateTimeFormat('zh-CN', {
+      dateStyle: 'short',
+      timeStyle: 'medium',
+    }).format(new Date());
+    output.tabIndex = 0;
+    output.textContent = JSON.stringify(fact, null, 2);
+    header.append(title, time);
+    entry.append(header, output);
+    const next = nextPage(operation, request, fact);
+    if (next) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = '显式读取下一页';
+      button.addEventListener('click', function () {
+        void execute(operation, next);
+      });
+      entry.append(button);
+    }
+    ledger.prepend(entry);
+    emptyState.hidden = true;
+    ledger.hidden = false;
   };
 
-  sessionForm.addEventListener("submit", function (event) {
+  const execute = async function (operation, prepared) {
+    if (busy) return;
+    setBusy(true);
+    setMessage('正在读取 ' + labels[operation] + '…');
+    try {
+      const body = prepared || payload(operation);
+      const response = await fetch(routes[operation], {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'error',
+        referrerPolicy: 'no-referrer',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          Authorization: 'QL3-Console ' + sessionToken,
+        },
+        body: JSON.stringify(body),
+      });
+      const responseBody = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          typeof responseBody.code === 'string'
+            ? responseBody.code
+            : 'console_request_failed',
+        );
+      }
+      appendEvidence(operation, body, responseBody);
+      setMessage(
+        labels[operation] + ' 已加入本页证据账本。刷新页面会清空。',
+        'success',
+      );
+    } catch (error) {
+      statusChip.textContent = '读取失败';
+      statusChip.dataset.tone = 'failed';
+      setMessage(
+        '无法读取：' +
+          (error instanceof Error ? error.message : 'console_request_failed'),
+        'error',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  sessionForm.addEventListener('submit', function (event) {
     event.preventDefault();
     const candidate = sessionInput.value.trim();
     if (!/^[A-Za-z0-9_-]{43}$/.test(candidate)) {
-      setMessage("浏览器访问密钥格式无效。", "error");
+      setMessage('浏览器访问密钥格式无效。', 'error');
       return;
     }
     sessionToken = candidate;
-    sessionInput.value = "";
+    sessionInput.value = '';
     sessionForm.hidden = true;
-    targetForm.hidden = false;
-    setMessage("本次页面已解锁。访问密钥只保留在内存中。");
-    document.getElementById("project-id").focus();
+    controls.hidden = false;
+    statusChip.textContent = '只读就绪';
+    statusChip.dataset.tone = 'success';
+    setMessage('本页已解锁；Cluster credential 仍只存在于服务端。', 'success');
+    document.getElementById('project-id').focus();
   });
 
-  targetForm.addEventListener("submit", async function (event) {
-    event.preventDefault();
-    const target = targetFromForm();
-    setBusy(true);
-    setMessage("正在读取 durable status…");
-    try {
-      const response = await request("inspect", target);
-      renderInspection(response);
-    } catch (error) {
-      currentTarget = null;
-      outputPanel.hidden = true;
-      statusChip.textContent = "读取失败";
-      statusChip.dataset.tone = "failed";
-      setMessage("无法读取诊断状态：" + error.code, "error");
-    } finally {
-      setBusy(false);
-    }
+  document.querySelectorAll('.mode-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.mode-tab').forEach(function (candidate) {
+        const selected = candidate === tab;
+        candidate.classList.toggle('active', selected);
+        candidate.setAttribute('aria-pressed', String(selected));
+      });
+      document.querySelectorAll('.mode-panel').forEach(function (panel) {
+        panel.hidden = panel.id !== tab.dataset.panel;
+      });
+    });
   });
 
-  outputButton.addEventListener("click", async function () {
-    if (!currentTarget || currentTarget.outputAvailable !== true) return;
-    setBusy(true);
-    setMessage("正在显式读取诊断内容…");
-    try {
-      const response = await request("output", currentTarget);
-      renderOutput(response);
-    } catch (error) {
-      setMessage("无法读取诊断内容：" + error.code, "error");
-    } finally {
-      setBusy(false);
-    }
+  document.querySelectorAll('[data-read]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      void execute(button.dataset.read);
+    });
   });
 
-  window.addEventListener("pagehide", function () {
-    sessionToken = "";
-    currentTarget = null;
-    outputText.textContent = "";
+  window.addEventListener('pagehide', function () {
+    sessionToken = '';
+    ledger.textContent = '';
   });
 })();

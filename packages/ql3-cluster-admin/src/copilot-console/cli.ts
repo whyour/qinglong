@@ -2,13 +2,19 @@
 
 import {
   executeClusterCopilotCommand,
+  executeClusterProjectApiRead,
   probeClusterCopilotClientReadiness,
   validateClusterCopilotClientConfiguration,
   validateClusterCopilotClientCredentialFile,
-  type ClusterCopilotClientCommand,
 } from '../copilot-client/client';
 import { readCanonicalFile } from '../management-support/managementClientConfiguration';
 import { loadClusterCopilotConsoleAssets } from './assets';
+import {
+  CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
+  clusterCopilotConsoleClientCommand,
+  clusterCopilotConsoleProjectReadPath,
+  type ClusterCopilotConsoleReadRequest,
+} from './contracts';
 import {
   clusterCopilotConsoleSessionDigest,
   startClusterCopilotConsoleServer,
@@ -28,9 +34,7 @@ interface ClusterCopilotConsoleCliArguments {
   readonly check: boolean;
   readonly configFile: string;
   readonly credentialFile: string;
-  readonly networkBoundary:
-    | 'host-loopback'
-    | 'container-published-loopback';
+  readonly networkBoundary: 'host-loopback' | 'container-published-loopback';
   readonly sessionFile: string;
   readonly port: number;
 }
@@ -154,11 +158,7 @@ export function parseClusterCopilotConsoleCliArguments(
 function readSessionDigest(sessionFile: string): Buffer {
   let bytes: Buffer | undefined;
   try {
-    bytes = readCanonicalFile(
-      sessionFile,
-      MAXIMUM_SESSION_BYTES,
-      'private',
-    );
+    bytes = readCanonicalFile(sessionFile, MAXIMUM_SESSION_BYTES, 'private');
     if (
       bytes.some((byte) => byte > 0x7f) ||
       !SESSION_TOKEN.test(bytes.toString('ascii'))
@@ -199,7 +199,7 @@ async function main(): Promise<void> {
           publishedHostAddress: '127.0.0.1',
           browserCredential: 'forbidden',
           clusterCredential: 'server_only',
-          operations: ['inspect', 'output'],
+          operations: CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
           mutation: false,
         }) + '\n',
       );
@@ -213,11 +213,19 @@ async function main(): Promise<void> {
   const server = await startClusterCopilotConsoleServer({
     assets,
     executor: Object.freeze({
-      execute(command: Readonly<ClusterCopilotClientCommand>) {
-        return executeClusterCopilotCommand({
+      execute(request: Readonly<ClusterCopilotConsoleReadRequest>) {
+        if (request.operation === 'inspect' || request.operation === 'output') {
+          return executeClusterCopilotCommand({
+            configFile: parsed.configFile,
+            credentialFile: parsed.credentialFile,
+            command: clusterCopilotConsoleClientCommand(request),
+          });
+        }
+        return executeClusterProjectApiRead({
           configFile: parsed.configFile,
           credentialFile: parsed.credentialFile,
-          command,
+          path: clusterCopilotConsoleProjectReadPath(request),
+          requestId: request.requestId,
         });
       },
     }),
@@ -236,7 +244,7 @@ async function main(): Promise<void> {
       publishedHostAddress: '127.0.0.1',
       browserCredential: 'forbidden',
       clusterCredential: 'server_only',
-      operations: ['inspect', 'output'],
+      operations: CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
       mutation: false,
     }) + '\n',
   );

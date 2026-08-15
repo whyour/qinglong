@@ -9,17 +9,14 @@ import {
   ClusterCopilotClientConfigurationError,
   ClusterCopilotClientRemoteError,
   ClusterCopilotClientRequestError,
-  type ClusterCopilotClientCommand,
-  type ClusterCopilotClientResult,
 } from '../copilot-client/client';
-import {
-  type ClusterCopilotConsoleAssets,
-} from './assets';
+import { type ClusterCopilotConsoleAssets } from './assets';
 import {
   CLUSTER_COPILOT_CONSOLE_READ_RESPONSE_SCHEMA,
   InvalidClusterCopilotConsoleReadRequestError,
-  clusterCopilotConsoleClientCommand,
   normalizeClusterCopilotConsoleReadRequest,
+  type ClusterCopilotConsoleReadOperation,
+  type ClusterCopilotConsoleReadRequest,
 } from './contracts';
 
 export const CLUSTER_COPILOT_CONSOLE_LIMITS = Object.freeze({
@@ -31,9 +28,13 @@ export const CLUSTER_COPILOT_CONSOLE_LIMITS = Object.freeze({
 });
 
 export interface ClusterCopilotConsoleExecutor {
-  execute(
-    command: Readonly<ClusterCopilotClientCommand>,
-  ): Promise<Readonly<ClusterCopilotClientResult>>;
+  execute(request: Readonly<ClusterCopilotConsoleReadRequest>): Promise<
+    Readonly<{
+      schemaVersion: 1;
+      requestId: string;
+      result: Readonly<Record<string, unknown>>;
+    }>
+  >;
 }
 
 export interface ClusterCopilotConsoleServerOptions {
@@ -111,10 +112,7 @@ export function clusterCopilotConsoleSessionDigest(value: string): Buffer {
     return invalid();
   }
   const decoded = Buffer.from(value, 'base64url');
-  if (
-    decoded.byteLength !== 32 ||
-    decoded.toString('base64url') !== value
-  ) {
+  if (decoded.byteLength !== 32 || decoded.toString('base64url') !== value) {
     decoded.fill(0);
     return invalid();
   }
@@ -125,7 +123,9 @@ export function clusterCopilotConsoleSessionDigest(value: string): Buffer {
     .digest();
 }
 
-function securityHeaders(contentType: string): Readonly<Record<string, string>> {
+function securityHeaders(
+  contentType: string,
+): Readonly<Record<string, string>> {
   return Object.freeze({
     'cache-control': 'no-store',
     'content-security-policy': CONTENT_SECURITY_POLICY,
@@ -181,11 +181,29 @@ function headerCount(request: IncomingMessage, name: string): number {
   return count;
 }
 
-function targetPath(request: IncomingMessage): 'inspect' | 'output' | null {
+const READ_ROUTES: Readonly<
+  Record<string, ClusterCopilotConsoleReadOperation>
+> = Object.freeze({
+  '/api/v1/copilot/inspect': 'inspect',
+  '/api/v1/copilot/output': 'output',
+  '/api/v1/observe/run-list': 'run_list',
+  '/api/v1/observe/run': 'run_read',
+  '/api/v1/observe/run-events': 'run_event_list',
+  '/api/v1/observe/run-steps': 'run_step_list',
+  '/api/v1/observe/task-list': 'task_list',
+  '/api/v1/observe/task': 'task_read',
+  '/api/v1/observe/workflow-list': 'workflow_list',
+  '/api/v1/observe/workflow-run-list': 'workflow_run_list',
+  '/api/v1/observe/workflow-run': 'workflow_run_read',
+  '/api/v1/observe/workflow-events': 'workflow_event_list',
+  '/api/v1/observe/workflow-steps': 'workflow_step_list',
+});
+
+function targetPath(
+  request: IncomingMessage,
+): ClusterCopilotConsoleReadOperation | null {
   if (request.method !== 'POST') return null;
-  if (request.url === '/api/v1/copilot/inspect') return 'inspect';
-  if (request.url === '/api/v1/copilot/output') return 'output';
-  return null;
+  return request.url === undefined ? null : READ_ROUTES[request.url] ?? null;
 }
 
 function authorize(
@@ -279,11 +297,7 @@ function remoteFailure(
   error: ClusterCopilotClientRemoteError,
 ): void {
   const statusCode =
-    error.statusCode === 404
-      ? 404
-      : error.statusCode === 429
-        ? 429
-        : 502;
+    error.statusCode === 404 ? 404 : error.statusCode === 429 ? 429 : 502;
   sendJson(
     response,
     statusCode,
@@ -377,9 +391,7 @@ export async function startClusterCopilotConsoleServer(
       request.resume();
       return;
     }
-    if (
-      inFlight >= CLUSTER_COPILOT_CONSOLE_LIMITS.maximumConcurrentRequests
-    ) {
+    if (inFlight >= CLUSTER_COPILOT_CONSOLE_LIMITS.maximumConcurrentRequests) {
       sendJson(
         response,
         429,
@@ -400,9 +412,7 @@ export async function startClusterCopilotConsoleServer(
       if (normalized.operation !== operation) {
         throw new InvalidClusterCopilotConsoleReadRequestError();
       }
-      const result = await executor.execute(
-        clusterCopilotConsoleClientCommand(normalized),
-      );
+      const result = await executor.execute(normalized);
       const envelope = Object.freeze({
         schema: CLUSTER_COPILOT_CONSOLE_READ_RESPONSE_SCHEMA,
         operation,
@@ -416,12 +426,7 @@ export async function startClusterCopilotConsoleServer(
       ) {
         throw new ClusterCopilotClientRequestError();
       }
-      send(
-        response,
-        200,
-        'application/json; charset=utf-8',
-        encoded,
-      );
+      send(response, 200, 'application/json; charset=utf-8', encoded);
     } catch (error) {
       if (response.headersSent) {
         response.destroy();

@@ -25,7 +25,21 @@ test('keeps the QingLong 3.0 Copilot Console independent and read-only', () => {
     component: 'cluster-copilot-console',
     owner: '@qinglong/cluster-admin',
     lifecycle: 'operator-workstation-loopback',
-    operations: ['inspect', 'output'],
+    operations: [
+      'inspect',
+      'output',
+      'run_list',
+      'run_read',
+      'run_event_list',
+      'run_step_list',
+      'task_list',
+      'task_read',
+      'workflow_list',
+      'workflow_run_list',
+      'workflow_run_read',
+      'workflow_event_list',
+      'workflow_step_list',
+    ],
     legacyUiCoupled: false,
     kubernetesResident: false,
     assetCount: 3,
@@ -47,11 +61,7 @@ test('rejects a remote listener or mutation vocabulary', () => {
     root,
     readFile: intercept(
       'packages/ql3-cluster-admin/src/copilot-console/contracts.ts',
-      (source) =>
-        source.replace(
-          "'inspect' | 'output'",
-          "'inspect' | 'output' | 'cancel'",
-        ),
+      (source) => source.replace("'output',", "'output', 'cancel',"),
     ),
   });
   assert.equal(listener.compatible, false);
@@ -127,8 +137,7 @@ test('rejects coupling into the legacy UI or Kubernetes workloads', () => {
       (source) => source + '\n// ql3-copilot-console\n',
     ),
   });
-  const kubernetesTarget =
-    'deploy/kubernetes/ql3-cluster/base/deployment.yaml';
+  const kubernetesTarget = 'deploy/kubernetes/ql3-cluster/base/deployment.yaml';
   const kubernetes = auditClusterCopilotConsole({
     root,
     readFile: intercept(

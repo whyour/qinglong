@@ -1,10 +1,10 @@
-# Cluster Copilot read-only Console
+# Cluster read-only field Console
 
 This Console is an operator-workstation process, not a resident QingLong
 service. Native execution serves digest-bound assets on an ephemeral
-`127.0.0.1` port and
-forwards only `inspect` and explicit `output` reads to the existing Cluster
-Copilot API. Do not deploy it as a Kubernetes workload, Ingress, shared LAN
+`127.0.0.1` port and forwards only a fixed vocabulary of Run, Task, Workflow
+and Copilot reads to existing Cluster APIs. It never accepts a browser-provided
+URL or method. Do not deploy it as a Kubernetes workload, Ingress, shared LAN
 listener, Edge component or legacy 2.x Web route.
 
 Use `ql3-cluster-admin` from the same independently verified Admin release as
@@ -46,9 +46,11 @@ it is owned by the current operator; for the image-carried launcher it and all
 files are owned by UID/GID `10001:10001`. Copy `client-config.example.json` to
 `client.json`, install the reviewed
 Cluster API CA as `ca.pem`, and install a separately issued `ql3c_` Project API
-credential as `credential`. Give the credential only `run.read` and
-`artifact.read`; the Console has no route for diagnosis creation or
-cancellation even if a wider credential is supplied.
+credential as `credential`. Give the credential only `run.read`, `task.read`
+and `artifact.read`; `run.read` covers Run and Workflow observations, while
+`task.read` covers Task list/detail and `artifact.read` covers an explicitly
+requested Copilot output. The Console has no route for Run/Workflow start,
+diagnosis creation or cancellation even if a wider credential is supplied.
 
 Create an independent 256-bit browser session key without placing its value in
 argv or an environment variable:
@@ -102,6 +104,13 @@ approximately 2 MiB, disables cache/cookies/frames/workers, and never polls.
 Model text is rendered as plain text and remains untrusted advice. These limits
 keep the workstation surface bounded, but this Cluster-only product is still
 excluded from small router Edge/Standalone artifacts.
+
+The page exposes thirteen exact operations: Copilot `inspect|output`; Run
+list/detail/events/steps; Task list/detail; and Workflow list plus Workflow Run
+list/detail/events/steps. List responses use 32-row pages and offer an explicit
+next-page read only when the upstream cursor says more data exists. There is no
+automatic cascade from a list to details, steps or events, so each authority
+read remains visible and intentional.
 
 ## Run the verified image
 

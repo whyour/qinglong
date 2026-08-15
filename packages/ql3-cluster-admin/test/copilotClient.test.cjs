@@ -20,6 +20,7 @@ const {
   CLUSTER_COPILOT_CLIENT_CONFIG_SCHEMA,
   ClusterCopilotClientRemoteError,
   executeClusterCopilotClient,
+  executeClusterProjectApiRead,
   probeClusterCopilotClientReadiness,
   validateClusterCopilotClientConfiguration,
 } = require('../dist/copilot-client/client.js');
@@ -35,7 +36,9 @@ const {
   validateClusterCopilotClientResponse,
 } = require('../dist/copilot-client/contracts.js');
 
-const credential = `ql3c_credential-1_${Buffer.alloc(32, 7).toString('base64url')}`;
+const credential = `ql3c_credential-1_${Buffer.alloc(32, 7).toString(
+  'base64url',
+)}`;
 const baseCommand = {
   schema: CLUSTER_COPILOT_CLIENT_COMMAND_SCHEMA,
   projectId: 'project-1',
@@ -58,11 +61,7 @@ function temporaryDirectory(t) {
 }
 
 function configuration(directory, port) {
-  const caFile = privateFile(
-    directory,
-    'ca.pem',
-    fs.readFileSync(caFixture),
-  );
+  const caFile = privateFile(directory, 'ca.pem', fs.readFileSync(caFixture));
   return privateFile(
     directory,
     'client.json',
@@ -113,9 +112,7 @@ async function startServer(handler) {
     port: server.address().port,
     close: () =>
       new Promise((resolvePromise, reject) => {
-        server.close((error) =>
-          error ? reject(error) : resolvePromise(),
-        );
+        server.close((error) => (error ? reject(error) : resolvePromise()));
       }),
   };
 }
@@ -266,7 +263,11 @@ test('normalizes only the four bounded commands and derives exact requests', () 
 });
 
 test('validates exact target-bound response state for every operation', () => {
-  const diagnose = { ...baseCommand, operation: 'diagnose', traceId: 'trace-1' };
+  const diagnose = {
+    ...baseCommand,
+    operation: 'diagnose',
+    traceId: 'trace-1',
+  };
   const inspect = { ...baseCommand, operation: 'inspect' };
   const output = { ...baseCommand, operation: 'output' };
   const cancel = {
@@ -307,8 +308,7 @@ test('validates exact target-bound response state for every operation', () => {
     'diagnosis',
   );
   assert.equal(
-    validateClusterCopilotClientResponse(cancellationResponse(), cancel)
-      .status,
+    validateClusterCopilotClientResponse(cancellationResponse(), cancel).status,
     'accepted',
   );
   assert.equal(
@@ -357,10 +357,10 @@ test('validates exact target-bound response state for every operation', () => {
     validateClusterCopilotClientResponse(invalidOutput, output),
   );
   assert.throws(() =>
-    validateClusterCopilotClientResponse(
-      cancellationResponse(),
-      { ...cancel, requestId: 'other-request' },
-    ),
+    validateClusterCopilotClientResponse(cancellationResponse(), {
+      ...cancel,
+      requestId: 'other-request',
+    }),
   );
 });
 
@@ -383,7 +383,10 @@ test('uses TLS 1.3, Bearer credential and exact request identities end to end', 
       if (request.url === '/readyz') {
         assert.equal(request.headers.authorization, undefined);
         jsonResponse(response, 200, null, { status: 'ready' });
-      } else if (request.method === 'POST' && request.url.endsWith('/cancellation')) {
+      } else if (
+        request.method === 'POST' &&
+        request.url.endsWith('/cancellation')
+      ) {
         jsonResponse(response, 202, requestId, cancellationResponse());
       } else if (request.method === 'POST') {
         jsonResponse(response, 201, requestId, diagnoseResponse());
@@ -448,6 +451,65 @@ test('uses TLS 1.3, Bearer credential and exact request identities end to end', 
   });
 });
 
+test('reuses the credential-safe TLS boundary for fixed Project API reads only', async (t) => {
+  const seen = [];
+  const server = await startServer((request, response) => {
+    const chunks = [];
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('end', () => {
+      seen.push({
+        method: request.method,
+        url: request.url,
+        authorization: request.headers.authorization,
+        requestId: request.headers['x-request-id'],
+        bodyBytes: Buffer.concat(chunks).byteLength,
+        tls: request.socket.getProtocol(),
+      });
+      jsonResponse(response, 200, request.headers['x-request-id'], {
+        runs: [],
+        hasMore: false,
+      });
+    });
+  });
+  t.after(() => server.close());
+  const directory = temporaryDirectory(t);
+  const execution = {
+    configFile: configuration(directory, server.port),
+    credentialFile: privateFile(directory, 'credential', credential),
+    path: '/api/v3/projects/project-1/runs?limit=32',
+    requestId: 'console-read-1',
+  };
+  assert.deepEqual(await executeClusterProjectApiRead(execution), {
+    schemaVersion: 1,
+    requestId: 'console-read-1',
+    result: { runs: [], hasMore: false },
+  });
+  assert.deepEqual(seen, [
+    {
+      method: 'GET',
+      url: '/api/v3/projects/project-1/runs?limit=32',
+      authorization: `Bearer ${credential}`,
+      requestId: 'console-read-1',
+      bodyBytes: 0,
+      tls: 'TLSv1.3',
+    },
+  ]);
+  await assert.rejects(
+    executeClusterProjectApiRead({
+      ...execution,
+      path: '/api/v3/projects/project-1/runs/run-1/cancellation',
+    }),
+    { code: 'QL3_CLUSTER_COPILOT_CLIENT_REQUEST_FAILED' },
+  );
+  await assert.rejects(
+    executeClusterProjectApiRead({
+      ...execution,
+      path: 'https://attacker.example/api/v3/projects/project-1/runs',
+    }),
+    { code: 'QL3_CLUSTER_COPILOT_CLIENT_REQUEST_FAILED' },
+  );
+});
+
 test('fails closed on weak files, request-id drift and low-sensitive remote errors', async (t) => {
   let mode = 'readiness-drift';
   const server = await startServer((request, response) => {
@@ -488,18 +550,15 @@ test('fails closed on weak files, request-id drift and low-sensitive remote erro
   });
 
   mode = 'remote';
-  await assert.rejects(
-    executeClusterCopilotClient(paths),
-    (error) => {
-      assert.equal(error instanceof ClusterCopilotClientRemoteError, true);
-      assert.equal(error.statusCode, 429);
-      assert.equal(error.responseCode, 'copilot_rate_limited');
-      assert.equal(error.requestId, baseCommand.requestId);
-      assert.equal(error.retryAfterSeconds, 30);
-      assert.equal(JSON.stringify(error).includes('private detail'), false);
-      return true;
-    },
-  );
+  await assert.rejects(executeClusterCopilotClient(paths), (error) => {
+    assert.equal(error instanceof ClusterCopilotClientRemoteError, true);
+    assert.equal(error.statusCode, 429);
+    assert.equal(error.responseCode, 'copilot_rate_limited');
+    assert.equal(error.requestId, baseCommand.requestId);
+    assert.equal(error.retryAfterSeconds, 30);
+    assert.equal(JSON.stringify(error).includes('private detail'), false);
+    return true;
+  });
 
   const cli = await runCli([
     `--config=${configFile}`,
@@ -602,11 +661,7 @@ test('rejects response framing drift, oversized bodies, aborts and timeouts', as
   });
   t.after(() => server.close());
   const directory = temporaryDirectory(t);
-  const caFile = privateFile(
-    directory,
-    'ca.pem',
-    fs.readFileSync(caFixture),
-  );
+  const caFile = privateFile(directory, 'ca.pem', fs.readFileSync(caFixture));
   const configFile = privateFile(
     directory,
     'client.json',
@@ -625,12 +680,7 @@ test('rejects response framing drift, oversized bodies, aborts and timeouts', as
     }),
     credentialFile: privateFile(directory, 'credential', credential),
   };
-  for (const failureMode of [
-    'content-type',
-    'oversized',
-    'abort',
-    'timeout',
-  ]) {
+  for (const failureMode of ['content-type', 'oversized', 'abort', 'timeout']) {
     mode = failureMode;
     await assert.rejects(executeClusterCopilotClient(paths), {
       code: 'QL3_CLUSTER_COPILOT_CLIENT_REQUEST_FAILED',

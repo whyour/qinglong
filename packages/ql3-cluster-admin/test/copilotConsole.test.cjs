@@ -16,6 +16,7 @@ const {
 const {
   CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
   clusterCopilotConsoleClientCommand,
+  clusterCopilotConsoleProjectReadPath,
   normalizeClusterCopilotConsoleReadRequest,
 } = require('../dist/copilot-console/contracts.js');
 const {
@@ -42,7 +43,8 @@ function inspection() {
     operation: 'inspect',
     requestId: 'transport-read-1',
     result: {
-      schema: 'qinglong/cluster-copilot-failure-diagnosis-inspection-response@v1',
+      schema:
+        'qinglong/cluster-copilot-failure-diagnosis-inspection-response@v1',
       status: 'terminal',
       projectId: 'project-main',
       sourceRunId: 'run-source-1',
@@ -72,7 +74,8 @@ function output() {
     operation: 'output',
     requestId: 'transport-read-2',
     result: {
-      schema: 'qinglong/cluster-copilot-failure-diagnosis-output-read-response@v1',
+      schema:
+        'qinglong/cluster-copilot-failure-diagnosis-output-read-response@v1',
       status: 'available',
       projectId: 'project-main',
       sourceRunId: 'run-source-1',
@@ -180,7 +183,7 @@ async function unusedPort() {
   return port;
 }
 
-test('normalizes only the two read operations into the shared client contract', () => {
+test('normalizes Copilot and fixed Project observation operations without arbitrary paths', () => {
   assert.deepEqual(
     clusterCopilotConsoleClientCommand(
       normalizeClusterCopilotConsoleReadRequest(target('inspect')),
@@ -197,6 +200,22 @@ test('normalizes only the two read operations into the shared client contract', 
     clusterCopilotConsoleClientCommand(target('output')).operation,
     'output',
   );
+  const runList = normalizeClusterCopilotConsoleReadRequest({
+    schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+    operation: 'run_list',
+    projectId: 'project-main',
+    requestId: 'console-read-1',
+    afterCreatedAtMs: 1_700_000_000_000,
+    afterRunId: 'run-9',
+    limit: 32,
+  });
+  assert.equal(
+    clusterCopilotConsoleProjectReadPath(runList),
+    '/api/v3/projects/project-main/runs?after_created_at_ms=1700000000000&after_run_id=run-9&limit=32',
+  );
+  assert.throws(() => clusterCopilotConsoleClientCommand(runList), {
+    code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID',
+  });
   assert.throws(
     () =>
       normalizeClusterCopilotConsoleReadRequest({
@@ -215,22 +234,162 @@ test('normalizes only the two read operations into the shared client contract', 
   );
 });
 
+test('maps every reviewed Project observation operation to one fixed GET path', () => {
+  const workflowRunId = '123e4567-e89b-42d3-a456-426614174000';
+  const workflowStepRunId = '123e4567-e89b-42d3-a456-426614174001';
+  const cases = [
+    [
+      {
+        operation: 'run_list',
+        afterCreatedAtMs: 1_700_000_000_000,
+        afterRunId: 'run-9',
+        limit: 32,
+      },
+      '/api/v3/projects/project-main/runs?after_created_at_ms=1700000000000&after_run_id=run-9&limit=32',
+    ],
+    [
+      { operation: 'run_read', runId: 'run-9' },
+      '/api/v3/projects/project-main/runs/run-9',
+    ],
+    [
+      {
+        operation: 'run_event_list',
+        runId: 'run-9',
+        afterSequence: 7,
+        limit: 16,
+      },
+      '/api/v3/projects/project-main/runs/run-9/events?after_sequence=7&limit=16',
+    ],
+    [
+      {
+        operation: 'run_step_list',
+        runId: 'run-9',
+        afterStepKey: 'model',
+        afterStepRunId: 'step-run-3',
+        limit: 8,
+      },
+      '/api/v3/projects/project-main/runs/run-9/steps?after_step_key=model&after_step_run_id=step-run-3&limit=8',
+    ],
+    [
+      { operation: 'task_list', afterTaskId: 'task-9', limit: 4 },
+      '/api/v3/projects/project-main/tasks?after_task_id=task-9&limit=4',
+    ],
+    [
+      { operation: 'task_read', taskId: 'task-9' },
+      '/api/v3/projects/project-main/tasks/task-9',
+    ],
+    [
+      { operation: 'workflow_list', packageName: 'ops-pack' },
+      '/api/v3/projects/project-main/packages/ops-pack/workflows',
+    ],
+    [
+      {
+        operation: 'workflow_run_list',
+        packageName: 'ops-pack',
+        workflowId: 'nightly-repair',
+        afterAdmittedAtMs: 1_700_000_000_000,
+        afterRunId: workflowRunId,
+        limit: 32,
+      },
+      '/api/v3/projects/project-main/packages/ops-pack/workflows/nightly-repair/runs?after_admitted_at_ms=1700000000000&after_run_id=123e4567-e89b-42d3-a456-426614174000&limit=32',
+    ],
+    [
+      {
+        operation: 'workflow_run_read',
+        packageName: 'ops-pack',
+        workflowId: 'nightly-repair',
+        runId: workflowRunId,
+      },
+      '/api/v3/projects/project-main/packages/ops-pack/workflows/nightly-repair/runs/123e4567-e89b-42d3-a456-426614174000',
+    ],
+    [
+      {
+        operation: 'workflow_event_list',
+        packageName: 'ops-pack',
+        workflowId: 'nightly-repair',
+        runId: workflowRunId,
+        afterSequence: 9,
+        limit: 16,
+      },
+      '/api/v3/projects/project-main/packages/ops-pack/workflows/nightly-repair/runs/123e4567-e89b-42d3-a456-426614174000/events?after_sequence=9&limit=16',
+    ],
+    [
+      {
+        operation: 'workflow_step_list',
+        packageName: 'ops-pack',
+        workflowId: 'nightly-repair',
+        runId: workflowRunId,
+        afterStepKey: 'publish',
+        afterStepRunId: workflowStepRunId,
+        limit: 8,
+      },
+      '/api/v3/projects/project-main/packages/ops-pack/workflows/nightly-repair/runs/123e4567-e89b-42d3-a456-426614174000/steps?after_step_key=publish&after_step_run_id=123e4567-e89b-42d3-a456-426614174001&limit=8',
+    ],
+  ];
+
+  for (const [requestFields, expectedPath] of cases) {
+    const normalized = normalizeClusterCopilotConsoleReadRequest({
+      schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+      projectId: 'project-main',
+      requestId: 'console-read-1',
+      ...requestFields,
+    });
+    assert.equal(
+      clusterCopilotConsoleProjectReadPath(normalized),
+      expectedPath,
+    );
+    assert.equal(Object.isFrozen(normalized), true);
+  }
+
+  assert.throws(
+    () =>
+      normalizeClusterCopilotConsoleReadRequest({
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'run_step_list',
+        projectId: 'project-main',
+        requestId: 'console-read-1',
+        runId: 'run-9',
+        afterStepKey: 'model',
+        afterStepRunId: null,
+        limit: 8,
+      }),
+    { code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID' },
+  );
+  assert.throws(
+    () =>
+      normalizeClusterCopilotConsoleReadRequest({
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'workflow_run_read',
+        projectId: 'project-main',
+        requestId: 'console-read-1',
+        packageName: 'ops-pack',
+        workflowId: 'nightly-repair',
+        runId: 'not-a-workflow-run-uuid',
+      }),
+    { code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID' },
+  );
+});
+
 test('loads only digest-bound packaged assets and rejects drift', async (t) => {
   const assets = loadClusterCopilotConsoleAssets(moduleDirectory);
-  assert.match(assets.html, /故障诊断，不替你执行/);
+  assert.match(assets.html, /沿着证据读，不替集群做决定/);
   assert.match(assets.css, /prefers-reduced-motion/);
-  assert.match(assets.javascript, /textContent = fact\.result\.text/);
-  assert.doesNotMatch(assets.javascript, /localStorage|sessionStorage|innerHTML/);
+  assert.match(assets.javascript, /output\.textContent = JSON\.stringify/);
+  assert.match(assets.javascript, /run_event_list/);
+  assert.doesNotMatch(
+    assets.javascript,
+    /localStorage|sessionStorage|innerHTML/,
+  );
 
   const root = await mkdtemp(join(tmpdir(), 'ql3-console-assets-'));
-  t.after(() => require('node:fs').rmSync(root, { recursive: true, force: true }));
+  t.after(() =>
+    require('node:fs').rmSync(root, { recursive: true, force: true }),
+  );
   const fakeModuleDirectory = join(root, 'dist', 'copilot-console');
   await mkdir(fakeModuleDirectory, { recursive: true });
-  await cp(
-    resolve(moduleDirectory, '../../assets'),
-    join(root, 'assets'),
-    { recursive: true },
-  );
+  await cp(resolve(moduleDirectory, '../../assets'), join(root, 'assets'), {
+    recursive: true,
+  });
   await writeFile(
     join(root, 'assets', 'copilot-console', 'app.js'),
     '"drift";\n',
@@ -250,13 +409,16 @@ test('serves an immutable same-origin shell with a closed browser policy', async
   assert.equal(html.headers['x-frame-options'], 'DENY');
   assert.match(html.headers['content-security-policy'], /default-src 'none'/);
   assert.match(html.headers['content-security-policy'], /connect-src 'self'/);
-  assert.match(html.text, /Cluster field console/);
+  assert.match(html.text, /Cluster field ledger/);
 
   const css = await request(server.origin, { path: '/app.css' });
   const javascript = await request(server.origin, { path: '/app.js' });
   assert.equal(css.statusCode, 200);
   assert.equal(javascript.statusCode, 200);
-  assert.equal(javascript.headers['content-type'], 'text/javascript; charset=utf-8');
+  assert.equal(
+    javascript.headers['content-type'],
+    'text/javascript; charset=utf-8',
+  );
 });
 
 test('allows only an explicit fixed-port container listener behind host loopback publication', async (t) => {
@@ -299,7 +461,7 @@ test('keeps the Cluster credential server-side and forwards one exact inspect', 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(commands, [
     {
-      schema: 'qinglong/cluster-copilot-client-command@v1',
+      schema: 'qinglong/cluster-copilot-console-read-request@v1',
       operation: 'inspect',
       projectId: 'project-main',
       sourceRunId: 'run-source-1',
@@ -312,6 +474,39 @@ test('keeps the Cluster credential server-side and forwards one exact inspect', 
   );
   assert.equal(response.body.result.result.outputAvailable, true);
   assert.doesNotMatch(response.text, /ql3c_|authorization|credential/i);
+});
+
+test('forwards one exact bounded Run list read and exposes no path field', async (t) => {
+  const requests = [];
+  const { server, headers } = await fixture(async (read) => {
+    requests.push(read);
+    return {
+      schemaVersion: 1,
+      requestId: read.requestId,
+      result: { runs: [], hasMore: false },
+    };
+  });
+  t.after(() => server.close());
+  const body = {
+    schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+    operation: 'run_list',
+    projectId: 'project-main',
+    requestId: 'console-read-2',
+    afterCreatedAtMs: null,
+    afterRunId: null,
+    limit: 32,
+  };
+  const response = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/observe/run-list',
+    headers,
+    body,
+  });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(requests, [body]);
+  assert.deepEqual(response.body.result.result, { runs: [], hasMore: false });
+  assert.equal(Object.hasOwn(requests[0], 'path'), false);
+  assert.equal(Object.hasOwn(requests[0], 'url'), false);
 });
 
 test('returns model text as JSON data only after an explicit output read', async (t) => {
@@ -331,7 +526,10 @@ test('returns model text as JSON data only after an explicit output read', async
     response.body.result.result.result.text,
     '<script>never execute</script>',
   );
-  assert.equal(response.headers['content-type'], 'application/json; charset=utf-8');
+  assert.equal(
+    response.headers['content-type'],
+    'application/json; charset=utf-8',
+  );
   assert.equal(response.headers['x-content-type-options'], 'nosniff');
 });
 
@@ -344,7 +542,10 @@ test('masks wrong Host, Origin, session and every non-read route', async (t) => 
   t.after(() => server.close());
   const cases = [
     { ...headers, origin: 'https://attacker.example' },
-    { ...headers, authorization: 'QL3-Console ' + randomBytes(32).toString('base64url') },
+    {
+      ...headers,
+      authorization: 'QL3-Console ' + randomBytes(32).toString('base64url'),
+    },
     { ...headers, host: 'attacker.example' },
   ];
   for (const candidate of cases) {

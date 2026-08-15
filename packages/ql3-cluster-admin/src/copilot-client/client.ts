@@ -75,6 +75,24 @@ export interface ClusterCopilotClientReadiness {
   readonly ready: boolean;
 }
 
+/**
+ * Package-internal read transport shared by the Copilot client and the
+ * loopback operator console. The caller owns the reviewed path vocabulary;
+ * this boundary still rejects non-Project, mutation and cross-origin targets.
+ */
+export interface ClusterProjectApiReadExecution {
+  readonly configFile: string;
+  readonly credentialFile: string;
+  readonly path: string;
+  readonly requestId: string;
+}
+
+export interface ClusterProjectApiReadResult {
+  readonly schemaVersion: 1;
+  readonly requestId: string;
+  readonly result: Readonly<Record<string, unknown>>;
+}
+
 interface PreparedClusterCopilotClientConfiguration {
   readonly endpoint: URL;
   readonly servername: string;
@@ -134,6 +152,163 @@ const DNS_NAME =
 const API_CREDENTIAL =
   /^ql3c_[A-Za-z0-9][A-Za-z0-9._:-]{0,63}_[A-Za-z0-9_-]{43}$/;
 const RESPONSE_CODE = /^[a-z][a-z0-9_]{0,127}$/;
+const TRANSPORT_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const PROJECT_SEGMENT = '[A-Za-z0-9][A-Za-z0-9._:-]{0,127}';
+const PACKAGE_SEGMENT = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
+const WORKFLOW_SEGMENT = '[a-z][a-z0-9-]{0,62}';
+const UUID_SEGMENT =
+  '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+const POSITIVE_LIMIT = '(?:[1-9]|[1-5][0-9]|6[0-4])';
+const NON_NEGATIVE_INTEGER = '(?:0|[1-9][0-9]{0,15})';
+const projectRoot = '/api/v3/projects/' + PROJECT_SEGMENT;
+const PROJECT_READ_PATHS = Object.freeze([
+  new RegExp('^' + projectRoot + '/runs\\?limit=' + POSITIVE_LIMIT + '$'),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/runs\\?after_created_at_ms=' +
+      NON_NEGATIVE_INTEGER +
+      '&after_run_id=' +
+      PROJECT_SEGMENT +
+      '&limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp('^' + projectRoot + '/runs/' + PROJECT_SEGMENT + '$'),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/runs/' +
+      PROJECT_SEGMENT +
+      '/events\\?after_sequence=' +
+      NON_NEGATIVE_INTEGER +
+      '&limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/runs/' +
+      PROJECT_SEGMENT +
+      '/steps\\?limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/runs/' +
+      PROJECT_SEGMENT +
+      '/steps\\?after_step_key=' +
+      PROJECT_SEGMENT +
+      '&after_step_run_id=' +
+      PROJECT_SEGMENT +
+      '&limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp('^' + projectRoot + '/tasks\\?limit=' + POSITIVE_LIMIT + '$'),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/tasks\\?after_task_id=' +
+      PROJECT_SEGMENT +
+      '&limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp('^' + projectRoot + '/tasks/' + PROJECT_SEGMENT + '$'),
+  new RegExp(
+    '^' + projectRoot + '/packages/' + PACKAGE_SEGMENT + '/workflows$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/packages/' +
+      PACKAGE_SEGMENT +
+      '/workflows/' +
+      WORKFLOW_SEGMENT +
+      '/runs\\?limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/packages/' +
+      PACKAGE_SEGMENT +
+      '/workflows/' +
+      WORKFLOW_SEGMENT +
+      '/runs\\?after_admitted_at_ms=' +
+      NON_NEGATIVE_INTEGER +
+      '&after_run_id=' +
+      UUID_SEGMENT +
+      '&limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/packages/' +
+      PACKAGE_SEGMENT +
+      '/workflows/' +
+      WORKFLOW_SEGMENT +
+      '/runs/' +
+      UUID_SEGMENT +
+      '$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/packages/' +
+      PACKAGE_SEGMENT +
+      '/workflows/' +
+      WORKFLOW_SEGMENT +
+      '/runs/' +
+      UUID_SEGMENT +
+      '/events\\?after_sequence=' +
+      NON_NEGATIVE_INTEGER +
+      '&limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/packages/' +
+      PACKAGE_SEGMENT +
+      '/workflows/' +
+      WORKFLOW_SEGMENT +
+      '/runs/' +
+      UUID_SEGMENT +
+      '/steps\\?limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+  new RegExp(
+    '^' +
+      projectRoot +
+      '/packages/' +
+      PACKAGE_SEGMENT +
+      '/workflows/' +
+      WORKFLOW_SEGMENT +
+      '/runs/' +
+      UUID_SEGMENT +
+      '/steps\\?after_step_key=' +
+      WORKFLOW_SEGMENT +
+      '&after_step_run_id=' +
+      UUID_SEGMENT +
+      '&limit=' +
+      POSITIVE_LIMIT +
+      '$',
+  ),
+]);
+
+function projectReadPathValid(value: string): boolean {
+  return PROJECT_READ_PATHS.some((pattern) => pattern.test(value));
+}
 
 function configurationFailure(): never {
   throw new ClusterCopilotClientConfigurationError();
@@ -413,10 +588,7 @@ function requestJson(
             } catch (cause) {
               throw new ClusterCopilotClientRequestError({ cause });
             }
-            finish(
-              undefined,
-              Object.freeze({ ...provisional, body }),
-            );
+            finish(undefined, Object.freeze({ ...provisional, body }));
           } catch (error) {
             finish(
               error instanceof ClusterCopilotClientRequestError
@@ -447,10 +619,7 @@ function requestJson(
   });
 }
 
-function responseRequestId(
-  response: JsonResponse,
-  expected: string,
-): string {
+function responseRequestId(response: JsonResponse, expected: string): string {
   const value = response.headers['x-request-id'];
   if (
     rawHeaderCount(response.rawHeaders, 'x-request-id') !== 1 ||
@@ -462,7 +631,9 @@ function responseRequestId(
   return value;
 }
 
-function retryAfterSeconds(value: string | string[] | undefined): number | null {
+function retryAfterSeconds(
+  value: string | string[] | undefined,
+): number | null {
   if (typeof value !== 'string' || !/^[1-9][0-9]{0,3}$/.test(value)) {
     return null;
   }
@@ -480,7 +651,9 @@ function remoteCode(value: unknown): string {
     keys.length < 1 ||
     keys.length > 3 ||
     keys[0] !== 'code' ||
-    keys.some((key) => key !== 'code' && key !== 'reason' && key !== 'schema') ||
+    keys.some(
+      (key) => key !== 'code' && key !== 'reason' && key !== 'schema',
+    ) ||
     typeof record.code !== 'string' ||
     !RESPONSE_CODE.test(record.code)
   ) {
@@ -521,9 +694,7 @@ function readCredentialBytes(credentialFile: string): Buffer {
     return bytes;
   } catch (error) {
     bytes?.fill(0);
-    if (
-      error instanceof ClusterCopilotClientConfigurationError
-    ) {
+    if (error instanceof ClusterCopilotClientConfigurationError) {
       throw error;
     }
     throw new ClusterCopilotClientConfigurationError();
@@ -552,8 +723,7 @@ export async function probeClusterCopilotClientReadiness(
     );
     const status = readinessStatus(response.body);
     const ready = response.statusCode === 200 && status === 'ready';
-    const notReady =
-      response.statusCode === 503 && status === 'not_ready';
+    const notReady = response.statusCode === 503 && status === 'not_ready';
     if (!ready && !notReady) throw new ClusterCopilotClientRequestError();
     return Object.freeze({ schemaVersion: 1, transport: 'https', ready });
   } catch (error) {
@@ -594,10 +764,7 @@ async function executeNormalizedClusterCopilotCommand(
     );
     if (request.body !== null) {
       bodyBytes = Buffer.from(JSON.stringify(request.body), 'utf8');
-      if (
-        bodyBytes.length < 2 ||
-        bodyBytes.length > MAXIMUM_COMMAND_BYTES
-      ) {
+      if (bodyBytes.length < 2 || bodyBytes.length > MAXIMUM_COMMAND_BYTES) {
         return configurationFailure();
       }
     }
@@ -661,11 +828,7 @@ export async function executeClusterCopilotCommand(
   options?: ClusterCopilotClientOptions,
 ): Promise<Readonly<ClusterCopilotClientResult>> {
   const normalizedOptions = validateOptions(options);
-  const record = exact(execution, [
-    'command',
-    'configFile',
-    'credentialFile',
-  ]);
+  const record = exact(execution, ['command', 'configFile', 'credentialFile']);
   const command = normalizeClusterCopilotClientCommand(record.command);
   return executeNormalizedClusterCopilotCommand(
     record.configFile as string,
@@ -680,11 +843,7 @@ export async function executeClusterCopilotClient(
   options?: ClusterCopilotClientOptions,
 ): Promise<Readonly<ClusterCopilotClientResult>> {
   const normalizedOptions = validateOptions(options);
-  const record = exact(paths, [
-    'commandFile',
-    'configFile',
-    'credentialFile',
-  ]);
+  const record = exact(paths, ['commandFile', 'configFile', 'credentialFile']);
   let commandBytes: Buffer | undefined;
   try {
     commandBytes = readCanonicalFile(
@@ -710,5 +869,91 @@ export async function executeClusterCopilotClient(
     throw error;
   } finally {
     commandBytes?.fill(0);
+  }
+}
+
+export async function executeClusterProjectApiRead(
+  execution: ClusterProjectApiReadExecution,
+  options?: ClusterCopilotClientOptions,
+): Promise<Readonly<ClusterProjectApiReadResult>> {
+  const normalizedOptions = validateOptions(options);
+  const record = exact(execution, [
+    'configFile',
+    'credentialFile',
+    'path',
+    'requestId',
+  ]);
+  if (
+    typeof record.path !== 'string' ||
+    record.path.length > 2_048 ||
+    !projectReadPathValid(record.path) ||
+    record.path.includes('..') ||
+    record.path.includes('//') ||
+    typeof record.requestId !== 'string' ||
+    !TRANSPORT_REQUEST_ID.test(record.requestId)
+  ) {
+    throw new ClusterCopilotClientRequestError();
+  }
+  let credentialBytes: Buffer | undefined;
+  let prepared: PreparedClusterCopilotClientConfiguration | undefined;
+  try {
+    prepared = prepareConfiguration(record.configFile as string);
+    credentialBytes = readCredentialBytes(record.credentialFile as string);
+    const response = await requestJson(
+      prepared,
+      Object.freeze({
+        method: 'GET',
+        path: record.path,
+        requestId: record.requestId,
+        authorization: `Bearer ${credentialBytes.toString('ascii')}`,
+      }),
+      MAXIMUM_RESPONSE_BYTES,
+      normalizedOptions,
+    );
+    const requestId = responseRequestId(response, record.requestId);
+    if (response.statusCode === 200) {
+      if (
+        !response.body ||
+        typeof response.body !== 'object' ||
+        Array.isArray(response.body)
+      ) {
+        throw new ClusterCopilotClientRequestError();
+      }
+      return Object.freeze({
+        schemaVersion: 1,
+        requestId,
+        result: Object.freeze({
+          ...(response.body as Record<string, unknown>),
+        }),
+      });
+    }
+    if (response.statusCode >= 400 && response.statusCode <= 599) {
+      throw new ClusterCopilotClientRemoteError(
+        response.statusCode,
+        remoteCode(response.body),
+        requestId,
+        retryAfterSeconds(response.headers['retry-after']),
+      );
+    }
+    throw new ClusterCopilotClientRequestError();
+  } catch (error) {
+    if (
+      error instanceof ClusterPluginPackageManagementClientConfigurationError
+    ) {
+      throw new ClusterCopilotClientConfigurationError();
+    }
+    if (
+      error instanceof ClusterCopilotClientConfigurationError ||
+      error instanceof ClusterCopilotClientRequestError ||
+      error instanceof ClusterCopilotClientRemoteError
+    ) {
+      throw error;
+    }
+    throw new ClusterCopilotClientRequestError({
+      cause: error instanceof Error ? error : undefined,
+    });
+  } finally {
+    credentialBytes?.fill(0);
+    prepared?.dispose();
   }
 }

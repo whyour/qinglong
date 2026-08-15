@@ -18,8 +18,22 @@ const tlsFixture = path.resolve(
   packageRoot,
   '../ql3-cluster-control/test/fixtures/mtls',
 );
-const credential =
-  'ql3c_console_' + Buffer.alloc(32, 9).toString('base64url');
+const credential = 'ql3c_console_' + Buffer.alloc(32, 9).toString('base64url');
+const consoleOperations = [
+  'inspect',
+  'output',
+  'run_list',
+  'run_read',
+  'run_event_list',
+  'run_step_list',
+  'task_list',
+  'task_read',
+  'workflow_list',
+  'workflow_run_list',
+  'workflow_run_read',
+  'workflow_event_list',
+  'workflow_step_list',
+];
 
 function privateFile(directory, name, contents) {
   const filePath = path.join(directory, name);
@@ -189,7 +203,10 @@ test('CLI exposes deterministic help and a low-sensitive failure surface', async
     component: 'qinglong3-cluster-copilot-console',
     event: 'process_failed',
   });
-  assert.doesNotMatch(failed.stderr, /client-secret|cluster-secret|browser-secret/);
+  assert.doesNotMatch(
+    failed.stderr,
+    /client-secret|cluster-secret|browser-secret/,
+  );
 });
 
 test('preflight proves private authority and unauthenticated TLS 1.3 readiness', async (t) => {
@@ -214,7 +231,7 @@ test('preflight proves private authority and unauthenticated TLS 1.3 readiness',
     publishedHostAddress: '127.0.0.1',
     browserCredential: 'forbidden',
     clusterCredential: 'server_only',
-    operations: ['inspect', 'output'],
+    operations: consoleOperations,
     mutation: false,
   });
   assert.deepEqual(value.requests, [
@@ -244,18 +261,19 @@ test('serve mode starts an ephemeral loopback origin and shuts down cleanly', as
     { cwd: packageRoot, stdio: ['ignore', 'pipe', 'pipe'] },
   );
   t.after(() => {
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill('SIGKILL');
   });
   const started = JSON.parse(await firstLine(child.stdout));
   assert.equal(started.event, 'started');
   assert.match(started.origin, /^http:\/\/127\.0\.0\.1:[0-9]+$/);
-  assert.deepEqual(started.operations, ['inspect', 'output']);
+  assert.deepEqual(started.operations, consoleOperations);
   assert.equal(started.mutation, false);
   assert.equal(started.networkBoundary, 'host-loopback');
   assert.equal(started.publishedHostAddress, '127.0.0.1');
   const shell = await get(started.origin);
   assert.equal(shell.statusCode, 200);
-  assert.match(shell.body, /Cluster field console/);
+  assert.match(shell.body, /Cluster field ledger/);
   child.kill('SIGTERM');
   const result = await new Promise((resolve, reject) => {
     child.once('error', reject);

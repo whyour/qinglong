@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const CONSOLE_ROOT = 'packages/ql3-cluster-admin/src/copilot-console';
+const CLIENT_FILE = 'packages/ql3-cluster-admin/src/copilot-client/client.ts';
 const ASSET_ROOT = 'packages/ql3-cluster-admin/assets/copilot-console';
 const DEPLOYMENT_ROOT = 'deploy/console/ql3-cluster-copilot';
 const REQUIRED_FILES = Object.freeze([
@@ -11,6 +12,7 @@ const REQUIRED_FILES = Object.freeze([
   CONSOLE_ROOT + '/cli.ts',
   CONSOLE_ROOT + '/contracts.ts',
   CONSOLE_ROOT + '/server.ts',
+  CLIENT_FILE,
   ASSET_ROOT + '/index.html',
   ASSET_ROOT + '/app.css',
   ASSET_ROOT + '/app.js',
@@ -93,18 +95,30 @@ function auditClusterCopilotConsole(options = {}) {
   };
 
   expectFragments(CONSOLE_ROOT + '/contracts.ts', [
-    "export type ClusterCopilotConsoleReadOperation = 'inspect' | 'output'",
+    'CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS',
     'CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA',
     'clusterCopilotConsoleClientCommand',
+    'clusterCopilotConsoleProjectReadPath',
+    "'run_event_list'",
+    "'task_read'",
+    "'workflow_step_list'",
   ]);
   rejectFragments(CONSOLE_ROOT + '/contracts.ts', [
     "| 'diagnose'",
-    "| 'cancel'",
+    "'cancel'",
     'mutationId',
     'traceId',
     'endpoint',
     'credential',
   ]);
+  expectFragments(CLIENT_FILE, [
+    'executeClusterProjectApiRead',
+    'PROJECT_READ_PATHS',
+    "method: 'GET'",
+    'readCredentialBytes(record.credentialFile as string)',
+    'credentialBytes?.fill(0)',
+  ]);
+  rejectFragments(CLIENT_FILE, ["method: 'DELETE'", "method: 'PATCH'"]);
   expectFragments(CONSOLE_ROOT + '/server.ts', [
     "networkBoundary === 'host-loopback' ? '127.0.0.1' : '0.0.0.0'",
     "networkBoundary === 'container-published-loopback'",
@@ -112,8 +126,10 @@ function auditClusterCopilotConsole(options = {}) {
     'request.headers.origin !== expectedOrigin',
     "request.headers.host !== expectedOrigin.slice('http://'.length)",
     'maximumConcurrentRequests: 2',
-    "request.url === '/api/v1/copilot/inspect'",
-    "request.url === '/api/v1/copilot/output'",
+    "'/api/v1/copilot/inspect': 'inspect'",
+    "'/api/v1/observe/run-list': 'run_list'",
+    "'/api/v1/observe/task-list': 'task_list'",
+    "'/api/v1/observe/workflow-list': 'workflow_list'",
     "default-src 'none'",
     "frame-ancestors 'none'",
     "'cache-control': 'no-store'",
@@ -134,9 +150,9 @@ function auditClusterCopilotConsole(options = {}) {
     "'private'",
     'validateClusterCopilotClientCredentialFile',
     "clusterCredential: 'server_only'",
-    "networkBoundary: parsed.networkBoundary",
+    'networkBoundary: parsed.networkBoundary',
     "publishedHostAddress: '127.0.0.1'",
-    "operations: ['inspect', 'output']",
+    'operations: CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS',
     'mutation: false',
   ]);
   rejectFragments(CONSOLE_ROOT + '/cli.ts', [
@@ -146,16 +162,19 @@ function auditClusterCopilotConsole(options = {}) {
     'cancel',
   ]);
   expectFragments(ASSET_ROOT + '/index.html', [
-    '故障诊断，不替你执行。',
-    '只读边界',
+    '沿着证据读，不替集群做决定。',
+    '本机只读 BFF',
+    '读取 Run 列表',
+    '读取 Workflow Runs',
     '显式读取诊断内容',
-    '不可信模型输出',
+    '模型文本是不可信内容',
   ]);
   expectFragments(ASSET_ROOT + '/app.js', [
-    'credentials: "omit"',
-    'cache: "no-store"',
-    'outputText.textContent = fact.result.text',
-    'sessionToken = ""',
+    "credentials: 'omit'",
+    "cache: 'no-store'",
+    'output.textContent = JSON.stringify(fact, null, 2)',
+    'nextPage(operation, request, fact)',
+    "sessionToken = ''",
   ]);
   rejectFragments(ASSET_ROOT + '/app.js', [
     'localStorage',
@@ -178,7 +197,8 @@ function auditClusterCopilotConsole(options = {}) {
   expectFragments(DEPLOYMENT_ROOT + '/README.md', [
     'operator-workstation process',
     'Do not deploy it as a Kubernetes workload',
-    'only `inspect` and explicit `output` reads',
+    'Run, Task, Workflow',
+    'thirteen exact operations',
     '--port=0',
     'TLS 1.3 `GET /readyz`',
     'excluded from small router Edge/Standalone artifacts',
@@ -196,7 +216,7 @@ function auditClusterCopilotConsole(options = {}) {
     'function runConsoleContract(image)',
     "[facade, 'copilot-console'",
     "started.event !== 'started'",
-    "body.includes('Cluster field console')",
+    "body.includes('Cluster field ledger')",
     'runConsoleContract(image);',
     'function runPublishedConsoleContract(image)',
     'runPublishedConsoleContract(image);',
@@ -219,8 +239,7 @@ function auditClusterCopilotConsole(options = {}) {
     );
   }
   if (
-    manifest?.bin?.['ql3-copilot-console'] !==
-      'dist/copilot-console/cli.js' ||
+    manifest?.bin?.['ql3-copilot-console'] !== 'dist/copilot-console/cli.js' ||
     manifest?.exports?.['./copilot-console']?.require !==
       './dist/copilot-console/server.js' ||
     !Array.isArray(manifest?.files) ||
@@ -305,7 +324,21 @@ function auditClusterCopilotConsole(options = {}) {
     component: 'cluster-copilot-console',
     owner: '@qinglong/cluster-admin',
     lifecycle: 'operator-workstation-loopback',
-    operations: Object.freeze(['inspect', 'output']),
+    operations: Object.freeze([
+      'inspect',
+      'output',
+      'run_list',
+      'run_read',
+      'run_event_list',
+      'run_step_list',
+      'task_list',
+      'task_read',
+      'workflow_list',
+      'workflow_run_list',
+      'workflow_run_read',
+      'workflow_event_list',
+      'workflow_step_list',
+    ]),
     legacyUiCoupled: false,
     kubernetesResident: false,
     assetCount: 3,

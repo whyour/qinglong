@@ -1,10 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-  lstatSync,
-  readFileSync,
-  realpathSync,
-  type PathLike,
-} from 'node:fs';
+import { lstatSync, readFileSync, realpathSync, type PathLike } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { TextDecoder } from 'node:util';
 
@@ -28,19 +23,19 @@ const ASSETS = Object.freeze([
     name: 'index.html',
     field: 'html',
     maximumBytes: 32 * 1024,
-    digest: 'f9fa959f30b92c6b000eecb744ce1d0a7fce822c62b3e17dcf10d4d579a072ac',
+    digest: 'ed8db5c26dec23e7a5237ef1cd4f5f9c3fc9f5a04a4751b7a3e0ed22dac54c42',
   }),
   Object.freeze({
     name: 'app.css',
     field: 'css',
     maximumBytes: 64 * 1024,
-    digest: '200c3405e1e12329fcfb50509b31b19f1567a91552865f039ce0c2de1530032c',
+    digest: '54234cbba7e110de2f68fad2abd657c334b7e3e80c5d9b4f59bda7e122b4b62f',
   }),
   Object.freeze({
     name: 'app.js',
     field: 'javascript',
     maximumBytes: 32 * 1024,
-    digest: 'd60913e725e767d9fa2cb65d60c0eae6d75d219f4bec8aad166bed8b6507fe02',
+    digest: '61811eac6a89b097b67823ccf49b0736af6494be7b187dbdcbecfc59adb3fce0',
   }),
 ] as const);
 
