@@ -385,10 +385,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterControl.rootSourceFileRoles,
     },
     {
-      sourceFiles: 56,
+      sourceFiles: 58,
       rootSourceFiles: 2,
       rootSourceLines: 195,
-      nestedSourceFiles: 54,
+      nestedSourceFiles: 56,
       rootSourceFileRoles: {
         'aiCli.ts': 'binary_entry',
         'cli.ts': 'binary_entry',
