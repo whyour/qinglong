@@ -45,6 +45,12 @@ export interface ClusterCopilotClientPaths {
   readonly credentialFile: string;
 }
 
+export interface ClusterCopilotCommandExecution {
+  readonly configFile: string;
+  readonly credentialFile: string;
+  readonly command: unknown;
+}
+
 export interface ClusterCopilotClientOptions {
   readonly createRequestId?: () => string;
   readonly lookup?: LookupFunction;
@@ -498,6 +504,39 @@ export function validateClusterCopilotClientConfiguration(
   }
 }
 
+function readCredentialBytes(credentialFile: string): Buffer {
+  let bytes: Buffer | undefined;
+  try {
+    bytes = readCanonicalFile(
+      credentialFile,
+      MAXIMUM_CREDENTIAL_BYTES,
+      'private',
+    );
+    if (
+      bytes.some((byte) => byte > 0x7f) ||
+      !API_CREDENTIAL.test(bytes.toString('ascii'))
+    ) {
+      return configurationFailure();
+    }
+    return bytes;
+  } catch (error) {
+    bytes?.fill(0);
+    if (
+      error instanceof ClusterCopilotClientConfigurationError
+    ) {
+      throw error;
+    }
+    throw new ClusterCopilotClientConfigurationError();
+  }
+}
+
+export function validateClusterCopilotClientCredentialFile(
+  credentialFile: string,
+): void {
+  const bytes = readCredentialBytes(credentialFile);
+  bytes.fill(0);
+}
+
 export async function probeClusterCopilotClientReadiness(
   configFile: string,
   options?: ClusterCopilotClientOptions,
@@ -532,39 +571,22 @@ export async function probeClusterCopilotClientReadiness(
   }
 }
 
-export async function executeClusterCopilotClient(
-  paths: ClusterCopilotClientPaths,
-  options?: ClusterCopilotClientOptions,
+async function executeNormalizedClusterCopilotCommand(
+  configFile: string,
+  credentialFile: string,
+  command: Readonly<ClusterCopilotClientCommand>,
+  options: Readonly<ClusterCopilotClientOptions>,
 ): Promise<Readonly<ClusterCopilotClientResult>> {
-  const normalizedOptions = validateOptions(options);
-  exact(paths, ['commandFile', 'configFile', 'credentialFile']);
-  let commandBytes: Buffer | undefined;
   let credentialBytes: Buffer | undefined;
   let bodyBytes: Buffer | undefined;
   let prepared: PreparedClusterCopilotClientConfiguration | undefined;
   try {
-    prepared = prepareConfiguration(paths.configFile);
-    commandBytes = readCanonicalFile(
-      paths.commandFile,
-      MAXIMUM_COMMAND_BYTES,
-      'private',
-    );
-    credentialBytes = readCanonicalFile(
-      paths.credentialFile,
-      MAXIMUM_CREDENTIAL_BYTES,
-      'private',
-    );
-    const command = normalizeClusterCopilotClientCommand(
-      decodeJson(commandBytes, 'command'),
-    );
-    if (credentialBytes.some((byte) => byte > 0x7f)) {
-      return configurationFailure();
-    }
+    prepared = prepareConfiguration(configFile);
+    credentialBytes = readCredentialBytes(credentialFile);
     const credential = credentialBytes.toString('ascii');
-    if (!API_CREDENTIAL.test(credential)) return configurationFailure();
     const transportRequestId =
       command.operation === 'inspect' || command.operation === 'output'
-        ? (normalizedOptions.createRequestId ?? randomUUID)()
+        ? (options.createRequestId ?? randomUUID)()
         : undefined;
     const request = prepareClusterCopilotClientRequest(
       command,
@@ -589,7 +611,7 @@ export async function executeClusterCopilotClient(
         ...(bodyBytes === undefined ? {} : { body: bodyBytes }),
       }),
       MAXIMUM_RESPONSE_BYTES,
-      normalizedOptions,
+      options,
     );
     const requestId = responseRequestId(response, request.requestId);
     if (request.acceptedStatusCodes.includes(response.statusCode)) {
@@ -629,8 +651,64 @@ export async function executeClusterCopilotClient(
     });
   } finally {
     bodyBytes?.fill(0);
-    commandBytes?.fill(0);
     credentialBytes?.fill(0);
     prepared?.dispose();
+  }
+}
+
+export async function executeClusterCopilotCommand(
+  execution: ClusterCopilotCommandExecution,
+  options?: ClusterCopilotClientOptions,
+): Promise<Readonly<ClusterCopilotClientResult>> {
+  const normalizedOptions = validateOptions(options);
+  const record = exact(execution, [
+    'command',
+    'configFile',
+    'credentialFile',
+  ]);
+  const command = normalizeClusterCopilotClientCommand(record.command);
+  return executeNormalizedClusterCopilotCommand(
+    record.configFile as string,
+    record.credentialFile as string,
+    command,
+    normalizedOptions,
+  );
+}
+
+export async function executeClusterCopilotClient(
+  paths: ClusterCopilotClientPaths,
+  options?: ClusterCopilotClientOptions,
+): Promise<Readonly<ClusterCopilotClientResult>> {
+  const normalizedOptions = validateOptions(options);
+  const record = exact(paths, [
+    'commandFile',
+    'configFile',
+    'credentialFile',
+  ]);
+  let commandBytes: Buffer | undefined;
+  try {
+    commandBytes = readCanonicalFile(
+      record.commandFile as string,
+      MAXIMUM_COMMAND_BYTES,
+      'private',
+    );
+    const command = normalizeClusterCopilotClientCommand(
+      decodeJson(commandBytes, 'command'),
+    );
+    return await executeNormalizedClusterCopilotCommand(
+      record.configFile as string,
+      record.credentialFile as string,
+      command,
+      normalizedOptions,
+    );
+  } catch (error) {
+    if (
+      error instanceof ClusterPluginPackageManagementClientConfigurationError
+    ) {
+      throw new ClusterCopilotClientConfigurationError();
+    }
+    throw error;
+  } finally {
+    commandBytes?.fill(0);
   }
 }

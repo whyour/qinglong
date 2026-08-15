@@ -420,6 +420,7 @@
 | [ADR-0414](./ADR-0414-copilot-failure-diagnosis-read-model.md)                                    | Copilot 故障诊断请求键读模型                                                                                                                                | Accepted |
 | [ADR-0415](./ADR-0415-fenced-copilot-failure-diagnosis-cancellation.md)                            | 受围栏的 Copilot 故障诊断取消入口                                                                                                                            | Accepted |
 | [ADR-0416](./ADR-0416-bounded-cluster-copilot-product-client.md)                                  | 有界 Cluster Copilot 产品客户端                                                                                                                              | Accepted |
+| [ADR-0417](./ADR-0417-bounded-cluster-copilot-mcp-stdio-surface.md)                               | 有界 Cluster Copilot MCP stdio 产品面                                                                                                                        | Accepted |
 
 ## 规则
 

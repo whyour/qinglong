@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@kubernetes/client-node": "1.4.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "drizzle-orm": "0.45.2",
     "pg": "8.22.0",
     "semver": "7.7.4"

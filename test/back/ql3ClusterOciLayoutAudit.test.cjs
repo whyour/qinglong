@@ -316,7 +316,7 @@ test('accepts the independent cluster-admin image and attestation closure', (t) 
   assert.equal(report.image, 'admin');
   assert.deepEqual(
     report.platforms.map((entry) => entry.spdxApplicationPackages),
-    [88, 88],
+    [91, 91],
   );
 });
 

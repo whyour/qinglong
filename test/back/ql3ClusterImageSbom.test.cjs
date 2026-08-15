@@ -72,15 +72,21 @@ test('generates the independent reviewed cluster-admin image closure', () => {
   assert.deepEqual(report, {
     image: 'admin',
     root: 'pkg:npm/%40qinglong/cluster-admin-image-dependencies@3.0.0-alpha.0',
-    components: 88,
-    externalComponents: 84,
+    components: 91,
+    externalComponents: 87,
     internalComponents: 4,
-    dependencyNodes: 89,
+    dependencyNodes: 92,
     inventoryVerified: false,
   });
   assert.equal(
     document.components.some(
       (component) => component.name === '@kubernetes/client-node',
+    ),
+    true,
+  );
+  assert.equal(
+    document.components.some(
+      (component) => component.name === '@modelcontextprotocol/server',
     ),
     true,
   );

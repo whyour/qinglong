@@ -245,6 +245,7 @@ const EXPECTED_PACKAGE_DEPENDENCIES = Object.freeze({
   }),
   'packages/ql3-cluster-admin': Object.freeze({
     dependencies: Object.freeze({
+      '@modelcontextprotocol/server': '2.0.0',
       '@qinglong/ai': 'workspace:*',
       '@qinglong/cluster-postgres': 'workspace:*',
       '@qinglong/runtime-core': 'workspace:*',

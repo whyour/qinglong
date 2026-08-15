@@ -15,6 +15,7 @@ const EXPECTED_EXTERNAL_DEPENDENCIES = Object.freeze({
 
 const EXPECTED_ADMIN_EXTERNAL_DEPENDENCIES = Object.freeze({
   '@kubernetes/client-node': '1.4.0',
+  '@modelcontextprotocol/server': '2.0.0',
   'drizzle-orm': '0.45.2',
   pg: '8.22.0',
   semver: '7.7.4',
@@ -357,6 +358,10 @@ function assertExactExternalClosure(readFile, root, findings) {
   );
   if (
     adminManifest.bin?.['ql3-cluster-admin'] !== 'dist/product-cli/cli.js' ||
+    adminManifest.bin?.['ql3-copilot-mcp'] !==
+      'dist/copilot-mcp/cli.js' ||
+    adminManifest.exports?.['./copilot-mcp']?.require !==
+      './dist/copilot-mcp/server.js' ||
     adminManifest.bin?.['ql3-plugin-package-recover'] !==
       'dist/plugin-package/recovery/pluginPackageRecoveryCli.js' ||
     adminManifest.bin?.['ql3-plugin-package-manage'] !==

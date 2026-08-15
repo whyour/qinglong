@@ -379,6 +379,11 @@
       "types": "./dist/copilot-client/client.d.ts",
       "require": "./dist/copilot-client/client.js",
       "default": "./dist/copilot-client/client.js"
+    },
+    "./copilot-mcp": {
+      "types": "./dist/copilot-mcp/server.d.ts",
+      "require": "./dist/copilot-mcp/server.js",
+      "default": "./dist/copilot-mcp/server.js"
     }
   },
   "files": [
@@ -394,6 +399,7 @@
   "bin": {
     "ql3-cluster-admin": "dist/product-cli/cli.js",
     "ql3-copilot-client": "dist/copilot-client/cli.js",
+    "ql3-copilot-mcp": "dist/copilot-mcp/cli.js",
     "ql3-plugin-package-recover": "dist/plugin-package/recovery/pluginPackageRecoveryCli.js",
     "ql3-plugin-package-manage": "dist/plugin-package/management/pluginPackageManagementCli.js",
     "ql3-plugin-package-client": "dist/plugin-package/management/pluginPackageManagementClientCli.js",
@@ -418,6 +424,7 @@
     "ql3-ai-feature-migrate": "dist/modelInvocationMigrationCli.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
     "@kubernetes/client-node": "1.4.0",
     "@qinglong/ai": "workspace:*",
     "@qinglong/cluster-postgres": "workspace:*",
