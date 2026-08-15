@@ -11,6 +11,10 @@ import { isAbsolute } from 'node:path';
 import { TextDecoder } from 'node:util';
 
 import {
+  probeClusterCopilotClientReadiness,
+  validateClusterCopilotClientConfiguration,
+} from '../copilot-client/client';
+import {
   validateClusterAuthenticatedManagementClientConfiguration,
 } from '../management-support/pluginPackageManagementClient';
 import type { ClusterAuthenticatedManagementClientKind } from '../management-support/pluginPackageManagementClient';
@@ -24,6 +28,7 @@ const MAXIMUM_CONTEXT_BYTES = 64 * 1024;
 const MAXIMUM_PATH_BYTES = 4_096;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
 const CONTEXT_COMMANDS = Object.freeze([
+  'copilot',
   'package',
   'package-kubernetes',
   'worker-credential',
@@ -80,7 +85,10 @@ export interface QingLong3ClusterProductContextProbe {
 }
 
 const CONTEXT_COMMAND_CLIENT_KINDS: Readonly<
-  Record<ContextCommandName, ClusterAuthenticatedManagementClientKind>
+  Record<
+    Exclude<ContextCommandName, 'copilot'>,
+    ClusterAuthenticatedManagementClientKind
+  >
 > = Object.freeze({
   package: 'package',
   'package-kubernetes': 'package',
@@ -317,12 +325,23 @@ export async function validateQingLong3ClusterProductContext(
     for (const name of CONTEXT_COMMANDS) {
       const command = context.commands[name];
       if (command === undefined) continue;
-      const clientKind = CONTEXT_COMMAND_CLIENT_KINDS[name];
-      const https = validateClusterAuthenticatedManagementClientConfiguration(
-        command.configFile,
-        clientKind,
-      );
-      if (name === 'package-kubernetes') {
+      if (name === 'copilot') {
+        const https = validateClusterCopilotClientConfiguration(
+          command.configFile,
+        );
+        commands.push(
+          Object.freeze({
+            name,
+            transport: https.transport,
+            clientCertificate: https.clientCertificate,
+          }),
+        );
+      } else if (name === 'package-kubernetes') {
+        const https =
+          validateClusterAuthenticatedManagementClientConfiguration(
+            command.configFile,
+            CONTEXT_COMMAND_CLIENT_KINDS[name],
+          );
         const kubernetes =
           await validateClusterPluginPackageManagementKubernetesConfiguration(
             command.kubernetesFile!,
@@ -336,6 +355,11 @@ export async function validateQingLong3ClusterProductContext(
           }),
         );
       } else {
+        const https =
+          validateClusterAuthenticatedManagementClientConfiguration(
+            command.configFile,
+            CONTEXT_COMMAND_CLIENT_KINDS[name],
+          );
         commands.push(
           Object.freeze({
             name,
@@ -378,6 +402,8 @@ export async function probeQingLong3ClusterProductContext(
               command.configFile,
               command.kubernetesFile!,
             )
+          : name === 'copilot'
+            ? await probeClusterCopilotClientReadiness(command.configFile)
           : await probeClusterAuthenticatedManagementClientReadiness(
               command.configFile,
               CONTEXT_COMMAND_CLIENT_KINDS[name],

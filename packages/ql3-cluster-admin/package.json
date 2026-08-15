@@ -374,6 +374,11 @@
       "types": "./dist/plugin-package/publisher/pluginPackagePublisherTrustManagement.d.ts",
       "require": "./dist/plugin-package/publisher/pluginPackagePublisherTrustManagement.js",
       "default": "./dist/plugin-package/publisher/pluginPackagePublisherTrustManagement.js"
+    },
+    "./copilot-client": {
+      "types": "./dist/copilot-client/client.d.ts",
+      "require": "./dist/copilot-client/client.js",
+      "default": "./dist/copilot-client/client.js"
     }
   },
   "files": [
@@ -388,6 +393,7 @@
   },
   "bin": {
     "ql3-cluster-admin": "dist/product-cli/cli.js",
+    "ql3-copilot-client": "dist/copilot-client/cli.js",
     "ql3-plugin-package-recover": "dist/plugin-package/recovery/pluginPackageRecoveryCli.js",
     "ql3-plugin-package-manage": "dist/plugin-package/management/pluginPackageManagementCli.js",
     "ql3-plugin-package-client": "dist/plugin-package/management/pluginPackageManagementClientCli.js",

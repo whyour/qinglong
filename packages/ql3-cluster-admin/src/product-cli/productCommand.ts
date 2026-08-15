@@ -35,6 +35,12 @@ const SEMVER_PATTERN =
 export const QINGLONG3_CLUSTER_PRODUCT_COMMANDS: readonly QingLong3ClusterProductCommandDefinition[] =
   Object.freeze([
     Object.freeze({
+      name: 'copilot',
+      binary: 'ql3-copilot-client',
+      target: 'copilot-client/cli.js',
+      description: 'diagnose, inspect, read or cancel Runs through the API',
+    }),
+    Object.freeze({
       name: 'package',
       binary: 'ql3-plugin-package-client',
       target: 'plugin-package/management/pluginPackageManagementClientCli.js',

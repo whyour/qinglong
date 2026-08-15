@@ -54,6 +54,9 @@ const {
 const {
   validateClusterAuthenticatedManagementClientConfiguration,
 } = require('../dist/management-support/pluginPackageManagementClient.js');
+const {
+  CLUSTER_COPILOT_CLIENT_CONFIG_SCHEMA,
+} = require('../dist/copilot-client/client.js');
 
 function runCli(args) {
   return spawnSync(process.execPath, [cliPath, ...args], {
@@ -99,6 +102,41 @@ async function startReadinessServer(status) {
       const body = Buffer.from(
         JSON.stringify({ schemaVersion: 1, status: status.value }),
       );
+      response.writeHead(status.value === 'ready' ? 200 : 503, {
+        'content-type': 'application/json; charset=utf-8',
+        'content-length': String(body.length),
+      });
+      response.end(body);
+    },
+  );
+  await new Promise((resolvePromise, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolvePromise);
+  });
+  return {
+    port: server.address().port,
+    close: () =>
+      new Promise((resolvePromise, reject) => {
+        server.close((error) =>
+          error ? reject(error) : resolvePromise(),
+        );
+      }),
+  };
+}
+
+async function startCopilotReadinessServer(status) {
+  const server = createServer(
+    {
+      key: fs.readFileSync(localhostPrivateKeyFixture),
+      cert: fs.readFileSync(localhostCertificateFixture),
+      minVersion: 'TLSv1.3',
+      maxVersion: 'TLSv1.3',
+    },
+    (request, response) => {
+      assert.equal(request.method, 'GET');
+      assert.equal(request.url, '/readyz');
+      assert.equal(request.headers.authorization, undefined);
+      const body = Buffer.from(JSON.stringify({ status: status.value }));
       response.writeHead(status.value === 'ready' ? 200 : 503, {
         'content-type': 'application/json; charset=utf-8',
         'content-length': String(body.length),
@@ -193,6 +231,17 @@ function validContextFixture(t) {
     '/api/v3/plugin-packages/management',
     'forbidden',
   );
+  const copilotConfig = privateFile(
+    directory,
+    'copilot-client.json',
+    JSON.stringify({
+      schema: CLUSTER_COPILOT_CLIENT_CONFIG_SCHEMA,
+      endpoint: 'https://copilot.example.test:8443/',
+      servername: 'copilot.example.test',
+      caFile,
+      requestTimeoutMs: 1_000,
+    }),
+  );
   const kubeconfigFile = privateFile(
     directory,
     'kubeconfig.json',
@@ -236,6 +285,7 @@ function validContextFixture(t) {
     }),
   );
   const commands = {
+    copilot: { configFile: copilotConfig },
     package: { configFile: packageConfig },
     'package-kubernetes': { configFile: packageConfig, kubernetesFile },
     'worker-credential': {
@@ -283,7 +333,7 @@ function validContextFixture(t) {
 
 test('catalog exposes only reviewed remote clients from the same package', () => {
   assert.equal(manifest.bin['ql3-cluster-admin'], 'dist/product-cli/cli.js');
-  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 7);
+  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 8);
   assert.equal(
     new Set(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.map(({ name }) => name)).size,
     QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length,
@@ -324,6 +374,7 @@ test('help and version are bounded installation-derived product facts', () => {
   const help = qingLong3ClusterProductHelp();
   assert.match(help, /^Usage: ql3-cluster-admin <command> \[arguments\]/);
   assert.match(help, /\n  run\s+retry or stop Runs/);
+  assert.match(help, /\n  copilot\s+diagnose, inspect, read or cancel Runs/);
   assert.match(help, /Server, migration, recovery, executor and key-custody/);
   assert.equal(help.includes('plugin-package-manage'), false);
   assert.equal(
@@ -558,8 +609,9 @@ test('validates the complete operator context offline without operational author
     schemaVersion: 1,
     component: 'qinglong3-cluster-product-cli',
     event: 'context_valid',
-    commandCount: 7,
+    commandCount: 8,
     commands: [
+      { name: 'copilot', transport: 'https', clientCertificate: 'forbidden' },
       { name: 'package', transport: 'https', clientCertificate: 'forbidden' },
       {
         name: 'package-kubernetes',
@@ -669,6 +721,68 @@ test('probes a context with fixed read-only readiness semantics and exit status'
   const fact = JSON.parse(notReady.stdout);
   assert.equal(fact.allReady, false);
   assert.equal(fact.commands[0].status, 'not_ready');
+});
+
+test('probes Copilot context through its separate unauthenticated readiness contract', async (t) => {
+  const status = { value: 'ready' };
+  const server = await startCopilotReadinessServer(status);
+  t.after(() => server.close());
+  const directory = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-copilot-probe-context-')),
+  );
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const caFile = privateFile(
+    directory,
+    'ca.pem',
+    fs.readFileSync(localhostCaFixture),
+  );
+  const configFile = privateFile(
+    directory,
+    'copilot.json',
+    JSON.stringify({
+      schema: CLUSTER_COPILOT_CLIENT_CONFIG_SCHEMA,
+      endpoint: `https://localhost:${server.port}/`,
+      servername: 'localhost',
+      caFile,
+      requestTimeoutMs: 1_000,
+    }),
+  );
+  const contextFile = privateFile(
+    directory,
+    'operator-context.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      commands: { copilot: { configFile } },
+    }),
+  );
+
+  const ready = await runCliAsync([
+    'context',
+    'probe',
+    `--context=${contextFile}`,
+  ]);
+  assert.equal(ready.status, 0, ready.stderr);
+  assert.equal(ready.stderr, '');
+  assert.deepEqual(JSON.parse(ready.stdout), {
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-product-cli',
+    event: 'context_probed',
+    commandCount: 1,
+    commands: [{ name: 'copilot', transport: 'https', status: 'ready' }],
+    allReady: true,
+    requestMethod: 'GET',
+    requestPath: '/readyz',
+    mutation: false,
+  });
+
+  status.value = 'not_ready';
+  const notReady = await runCliAsync([
+    'context',
+    'probe',
+    `--context=${contextFile}`,
+  ]);
+  assert.equal(notReady.status, 69);
+  assert.equal(JSON.parse(notReady.stdout).allReady, false);
 });
 
 test('context validation fails closed for invalid client configuration and syntax', (t) => {

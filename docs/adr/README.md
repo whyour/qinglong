@@ -419,6 +419,7 @@
 | [ADR-0413](./ADR-0413-default-off-cluster-copilot-failure-diagnosis-api.md)                        | 默认关闭的 Cluster Copilot Failure Diagnosis API                                                                                                            | Accepted |
 | [ADR-0414](./ADR-0414-copilot-failure-diagnosis-read-model.md)                                    | Copilot 故障诊断请求键读模型                                                                                                                                | Accepted |
 | [ADR-0415](./ADR-0415-fenced-copilot-failure-diagnosis-cancellation.md)                            | 受围栏的 Copilot 故障诊断取消入口                                                                                                                            | Accepted |
+| [ADR-0416](./ADR-0416-bounded-cluster-copilot-product-client.md)                                  | 有界 Cluster Copilot 产品客户端                                                                                                                              | Accepted |
 
 ## 规则
 
