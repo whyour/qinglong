@@ -6,6 +6,7 @@ import { TextDecoder } from 'node:util';
 export interface ClusterCopilotConsoleAssets {
   readonly html: string;
   readonly css: string;
+  readonly evidenceBundle: string;
   readonly javascript: string;
 }
 
@@ -23,19 +24,25 @@ const ASSETS = Object.freeze([
     name: 'index.html',
     field: 'html',
     maximumBytes: 32 * 1024,
-    digest: 'ed8db5c26dec23e7a5237ef1cd4f5f9c3fc9f5a04a4751b7a3e0ed22dac54c42',
+    digest: '5d452c947a9f1266e4920cf48e7d5116b3f5ef8f9120f681124ed61f0217f5ff',
   }),
   Object.freeze({
     name: 'app.css',
     field: 'css',
     maximumBytes: 64 * 1024,
-    digest: '54234cbba7e110de2f68fad2abd657c334b7e3e80c5d9b4f59bda7e122b4b62f',
+    digest: '5cf82b0a88920d106530603a7d407f852312138e5b7af5c422b3bccee785f144',
+  }),
+  Object.freeze({
+    name: 'evidence-bundle.js',
+    field: 'evidenceBundle',
+    maximumBytes: 32 * 1024,
+    digest: '6ecb14d2f59d872b889bb42c22bf0c0d2c150c90ea708fb1662d47f17f2e2095',
   }),
   Object.freeze({
     name: 'app.js',
     field: 'javascript',
     maximumBytes: 32 * 1024,
-    digest: '61811eac6a89b097b67823ccf49b0736af6494be7b187dbdcbecfc59adb3fce0',
+    digest: 'f109c5b0491ba9a473e3129e35773edf38ac745b403e1f547f8252aa2932cdff',
   }),
 ] as const);
 
@@ -131,6 +138,7 @@ export function loadClusterCopilotConsoleAssets(
   return Object.freeze({
     html: result.html!,
     css: result.css!,
+    evidenceBundle: result.evidenceBundle!,
     javascript: result.javascript!,
   });
 }

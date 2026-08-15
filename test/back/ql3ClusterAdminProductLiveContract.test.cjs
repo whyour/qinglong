@@ -57,6 +57,8 @@ test('binds the live image gate to native and container-published loopback', () 
   assert.match(source, /runConsoleContract\(image\);/);
   assert.match(source, /consoleLoopback: true/);
   assert.match(source, /consoleAssets: true/);
+  assert.match(source, /consoleEvidenceBundle: true/);
+  assert.match(source, /createClusterConsoleEvidenceBundle/);
   assert.match(source, /function runPublishedConsoleContract\(image\)/);
   assert.match(
     source,

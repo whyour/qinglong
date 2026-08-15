@@ -315,6 +315,25 @@ h3 {
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--line);
 }
+.evidence-actions {
+  display: grid;
+  justify-items: end;
+  gap: 0.55rem;
+}
+.ledger-meta {
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+.evidence-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, auto));
+  gap: 0.45rem;
+}
+.evidence-buttons button {
+  padding: 0.52rem 0.65rem;
+  font-size: 0.72rem;
+}
 .status-chip {
   border: 1px solid currentColor;
   border-radius: 999px;
@@ -482,6 +501,17 @@ footer {
   .control-deck,
   .evidence-panel {
     padding: 1.1rem;
+  }
+  .evidence-header {
+    flex-direction: column;
+  }
+  .evidence-actions {
+    width: 100%;
+    justify-items: start;
+  }
+  .evidence-buttons {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
   }
   .ledger-entry {
     padding-left: 2.8rem;

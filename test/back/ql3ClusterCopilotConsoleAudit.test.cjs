@@ -42,7 +42,16 @@ test('keeps the QingLong 3.0 Copilot Console independent and read-only', () => {
     ],
     legacyUiCoupled: false,
     kubernetesResident: false,
-    assetCount: 3,
+    assetCount: 4,
+    evidenceBundle: {
+      lifecycle: 'browser-local-explicit-export',
+      maximumRecords: 16,
+      maximumRawBytes: 8 * 1024 * 1024,
+      maximumBundleBytes: 512 * 1024,
+      upstreamReadsOnExport: 0,
+      attestation: 'none',
+      actionAuthority: 'none',
+    },
     sourceFileCount: 4,
     findings: [],
     compatible: true,
@@ -126,6 +135,29 @@ test('rejects browser persistence, dynamic rendering and product drift', () => {
         target === 'deploy/containers/ql3-cluster-admin/Dockerfile',
     ),
   );
+});
+
+test('rejects evidence export network, persistence and authority widening', () => {
+  for (const injected of [
+    'fetch(',
+    'navigator.share(',
+    'localStorage',
+    'setTimeout(',
+  ]) {
+    const report = auditClusterCopilotConsole({
+      root,
+      readFile: intercept(
+        'packages/ql3-cluster-admin/assets/copilot-console/evidence-bundle.js',
+        (source) => source + '\n// ' + injected + '\n',
+      ),
+    });
+    assert.equal(report.compatible, false);
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'CLUSTER_COPILOT_CONSOLE_AUTHORITY_WIDENED',
+      ),
+    );
+  }
 });
 
 test('rejects coupling into the legacy UI or Kubernetes workloads', () => {

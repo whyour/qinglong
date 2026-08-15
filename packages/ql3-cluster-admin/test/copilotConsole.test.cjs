@@ -374,8 +374,14 @@ test('loads only digest-bound packaged assets and rejects drift', async (t) => {
   const assets = loadClusterCopilotConsoleAssets(moduleDirectory);
   assert.match(assets.html, /沿着证据读，不替集群做决定/);
   assert.match(assets.css, /prefers-reduced-motion/);
+  assert.match(
+    assets.evidenceBundle,
+    /qinglong\/cluster-console-redacted-evidence-bundle@v1/,
+  );
+  assert.match(assets.evidenceBundle, /createClusterConsoleEvidenceBundle/);
   assert.match(assets.javascript, /output\.textContent = JSON\.stringify/);
   assert.match(assets.javascript, /run_event_list/);
+  assert.match(assets.javascript, /createClusterConsoleEvidenceBundle/);
   assert.doesNotMatch(
     assets.javascript,
     /localStorage|sessionStorage|innerHTML/,
@@ -412,9 +418,21 @@ test('serves an immutable same-origin shell with a closed browser policy', async
   assert.match(html.text, /Cluster field ledger/);
 
   const css = await request(server.origin, { path: '/app.css' });
+  const evidenceBundle = await request(server.origin, {
+    path: '/evidence-bundle.js',
+  });
   const javascript = await request(server.origin, { path: '/app.js' });
   assert.equal(css.statusCode, 200);
+  assert.equal(evidenceBundle.statusCode, 200);
   assert.equal(javascript.statusCode, 200);
+  assert.equal(
+    evidenceBundle.headers['content-type'],
+    'text/javascript; charset=utf-8',
+  );
+  assert.match(
+    evidenceBundle.text,
+    /qinglong\/cluster-console-redacted-evidence-bundle@v1/,
+  );
   assert.equal(
     javascript.headers['content-type'],
     'text/javascript; charset=utf-8',

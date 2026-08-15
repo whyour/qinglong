@@ -425,6 +425,7 @@
 | [ADR-0419](./ADR-0419-loopback-read-only-cluster-copilot-console.md)                            | Loopback-only Cluster Copilot 只读 Console                                                                                                                    | Accepted |
 | [ADR-0420](./ADR-0420-signed-admin-oci-console-workstation-distribution.md)                    | 以签名 Admin OCI 分发 Cluster Copilot 工作站 Console                                                                                                            | Accepted |
 | [ADR-0421](./ADR-0421-explicit-cluster-run-task-workflow-observation-console.md)              | 显式 Cluster Run、Task 与 Workflow 观察台                                                                                                                       | Accepted |
+| [ADR-0422](./ADR-0422-browser-local-redacted-cluster-evidence-bundle.md)                      | 浏览器本地生成的脱敏 Cluster Evidence Bundle                                                                                                                    | Accepted |
 
 ## 规则
 

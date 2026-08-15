@@ -321,7 +321,12 @@ export async function startClusterCopilotConsoleServer(
     optionKeys.push('networkBoundary');
   }
   const record = exactObject(options, optionKeys);
-  const assets = exactObject(record.assets, ['css', 'html', 'javascript']);
+  const assets = exactObject(record.assets, [
+    'css',
+    'evidenceBundle',
+    'html',
+    'javascript',
+  ]);
   const networkBoundary =
     record.networkBoundary === undefined
       ? 'host-loopback'
@@ -331,6 +336,8 @@ export async function startClusterCopilotConsoleServer(
     assets.html.length < 1 ||
     typeof assets.css !== 'string' ||
     assets.css.length < 1 ||
+    typeof assets.evidenceBundle !== 'string' ||
+    assets.evidenceBundle.length < 1 ||
     typeof assets.javascript !== 'string' ||
     assets.javascript.length < 1 ||
     !record.executor ||
@@ -376,6 +383,15 @@ export async function startClusterCopilotConsoleServer(
           200,
           'text/javascript; charset=utf-8',
           assets.javascript as string,
+        );
+        return;
+      }
+      if (request.url === '/evidence-bundle.js') {
+        send(
+          response,
+          200,
+          'text/javascript; charset=utf-8',
+          assets.evidenceBundle as string,
         );
         return;
       }

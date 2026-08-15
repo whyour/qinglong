@@ -260,14 +260,22 @@ child.stdout.on('data', (chunk) => {
     response.on('data', (chunk) => chunks.push(chunk));
     response.once('end', () => {
       const body = Buffer.concat(chunks).toString('utf8');
-      if (response.statusCode !== 200 || !body.includes('Cluster field ledger') || !body.includes('/app.css') || !body.includes('/app.js')) { finish(45); return; }
-      child.once('close', (status, signal) => {
-        if (status !== 0 || signal !== null) { finish(46); return; }
-        settled = true;
-        clearTimeout(timeout);
-        process.stdout.write(JSON.stringify({ loopback: true, assets: true, cleanShutdown: true }));
-      });
-      child.kill('SIGTERM');
+      if (response.statusCode !== 200 || !body.includes('Cluster field ledger') || !body.includes('/app.css') || !body.includes('/evidence-bundle.js') || !body.includes('/app.js')) { finish(45); return; }
+      get(started.origin + '/evidence-bundle.js', (assetResponse) => {
+        const assetChunks = [];
+        assetResponse.on('data', (chunk) => assetChunks.push(chunk));
+        assetResponse.once('end', () => {
+          const asset = Buffer.concat(assetChunks).toString('utf8');
+          if (assetResponse.statusCode !== 200 || !asset.includes('qinglong/cluster-console-redacted-evidence-bundle@v1') || !asset.includes('createClusterConsoleEvidenceBundle')) { finish(48); return; }
+          child.once('close', (status, signal) => {
+            if (status !== 0 || signal !== null) { finish(46); return; }
+            settled = true;
+            clearTimeout(timeout);
+            process.stdout.write(JSON.stringify({ loopback: true, assets: true, evidenceBundle: true, cleanShutdown: true }));
+          });
+          child.kill('SIGTERM');
+        });
+      }).once('error', () => finish(49));
     });
   }).once('error', () => finish(47));
 });
@@ -307,6 +315,7 @@ child.stdout.on('data', (chunk) => {
   if (
     result?.loopback !== true ||
     result?.assets !== true ||
+    result?.evidenceBundle !== true ||
     result?.cleanShutdown !== true
   ) {
     fail('Console live contract drifted');
@@ -442,13 +451,17 @@ process.once('SIGINT', () => child.kill('SIGINT'));
       process.execPath,
       [
         '-e',
-        "require('node:http').get(process.argv[1],(r)=>{const c=[];r.on('data',(x)=>c.push(x));r.on('end',()=>{const b=Buffer.concat(c).toString('utf8');if(r.statusCode!==200||!b.includes('Cluster field ledger'))process.exit(2);process.stdout.write(JSON.stringify({status:r.statusCode,assets:b.includes('/app.css')&&b.includes('/app.js')}));});}).on('error',()=>process.exit(3));",
+        "const h=require('node:http');h.get(process.argv[1],(r)=>{const c=[];r.on('data',(x)=>c.push(x));r.on('end',()=>{const b=Buffer.concat(c).toString('utf8');if(r.statusCode!==200||!b.includes('Cluster field ledger')||!b.includes('/evidence-bundle.js'))process.exit(2);h.get(process.argv[1]+'/evidence-bundle.js',(a)=>{const d=[];a.on('data',(x)=>d.push(x));a.on('end',()=>{const s=Buffer.concat(d).toString('utf8');if(a.statusCode!==200||!s.includes('createClusterConsoleEvidenceBundle'))process.exit(4);process.stdout.write(JSON.stringify({status:r.statusCode,assets:b.includes('/app.css')&&b.includes('/app.js'),evidenceBundle:true}));});}).on('error',()=>process.exit(5));});}).on('error',()=>process.exit(3));",
         origin,
       ],
       { encoding: 'utf8', timeout: 5_000 },
     );
     const probeFact = JSON.parse(probe);
-    if (probeFact.status !== 200 || probeFact.assets !== true) {
+    if (
+      probeFact.status !== 200 ||
+      probeFact.assets !== true ||
+      probeFact.evidenceBundle !== true
+    ) {
       fail('published Console host read drifted');
     }
 
@@ -536,6 +549,7 @@ function main() {
       contextReadiness: true,
       consoleLoopback: true,
       consoleAssets: true,
+      consoleEvidenceBundle: true,
       consolePublishedHostAddress: '127.0.0.1',
       consoleDistributionEmbedded: true,
       isolation: Object.freeze({

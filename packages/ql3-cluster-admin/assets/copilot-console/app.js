@@ -32,6 +32,7 @@
     workflow_event_list: 'Workflow Run Events',
     workflow_step_list: 'Workflow Run Steps',
   });
+  const bundleApi = globalThis.QingLongEvidenceBundle;
   const sessionForm = document.getElementById('session-form');
   const sessionInput = document.getElementById('session-token');
   const controls = document.getElementById('console-controls');
@@ -39,8 +40,14 @@
   const emptyState = document.getElementById('empty-state');
   const message = document.getElementById('message');
   const statusChip = document.getElementById('status-chip');
+  const ledgerMeta = document.getElementById('ledger-meta');
+  const exportButton = document.getElementById('export-evidence');
+  const clearButton = document.getElementById('clear-evidence');
+  const evidenceRecords = [];
   let sessionToken = '';
   let busy = false;
+  let exporting = false;
+  let evidenceBytes = 0;
 
   const value = function (id) {
     return document.getElementById(id).value.trim();
@@ -55,6 +62,21 @@
     message.dataset.tone = tone || 'neutral';
   };
 
+  const updateLedgerState = function () {
+    const count = evidenceRecords.length;
+    ledgerMeta.textContent =
+      String(count) +
+      '/' +
+      String(bundleApi.limits.maximumRecords) +
+      ' 条 · ' +
+      String(Math.ceil(evidenceBytes / 1024)) +
+      ' KiB 原始事实';
+    emptyState.hidden = count !== 0;
+    ledger.hidden = count === 0;
+    exportButton.disabled = busy || exporting || count === 0;
+    clearButton.disabled = busy || exporting || count === 0;
+  };
+
   const setBusy = function (next) {
     busy = next;
     document.querySelectorAll('[data-read]').forEach(function (button) {
@@ -67,6 +89,7 @@
       statusChip.textContent = '只读就绪';
       statusChip.dataset.tone = 'success';
     }
+    updateLedgerState();
   };
 
   const base = function (operation) {
@@ -179,6 +202,14 @@
 
   const appendEvidence = function (operation, request, response) {
     const fact = response.result.result;
+    const observedAtMs = Date.now();
+    const record = {
+      operation: operation,
+      observedAtMs: observedAtMs,
+      request: request,
+      fact: fact,
+    };
+    const recordBytes = bundleApi.measureClusterConsoleEvidenceRecord(record);
     const entry = document.createElement('li');
     entry.className = 'ledger-entry';
     const header = document.createElement('header');
@@ -189,7 +220,7 @@
     time.textContent = new Intl.DateTimeFormat('zh-CN', {
       dateStyle: 'short',
       timeStyle: 'medium',
-    }).format(new Date());
+    }).format(new Date(observedAtMs));
     output.tabIndex = 0;
     output.textContent = JSON.stringify(fact, null, 2);
     header.append(title, time);
@@ -205,8 +236,20 @@
       entry.append(button);
     }
     ledger.prepend(entry);
-    emptyState.hidden = true;
-    ledger.hidden = false;
+    evidenceRecords.push({ record: record, bytes: recordBytes, entry: entry });
+    evidenceBytes += recordBytes;
+    let evicted = 0;
+    while (
+      evidenceRecords.length > bundleApi.limits.maximumRecords ||
+      evidenceBytes > bundleApi.limits.maximumRawBytes
+    ) {
+      const oldest = evidenceRecords.shift();
+      evidenceBytes -= oldest.bytes;
+      oldest.entry.remove();
+      evicted += 1;
+    }
+    updateLedgerState();
+    return evicted;
   };
 
   const execute = async function (operation, prepared) {
@@ -236,9 +279,13 @@
             : 'console_request_failed',
         );
       }
-      appendEvidence(operation, body, responseBody);
+      const evicted = appendEvidence(operation, body, responseBody);
       setMessage(
-        labels[operation] + ' 已加入本页证据账本。刷新页面会清空。',
+        labels[operation] +
+          ' 已加入本页证据账本。' +
+          (evicted === 0
+            ? '刷新页面会清空。'
+            : '为保持容量上限，已淘汰最旧记录。'),
         'success',
       );
     } catch (error) {
@@ -251,6 +298,72 @@
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const clearEvidence = function () {
+    for (const evidence of evidenceRecords) evidence.entry.remove();
+    evidenceRecords.length = 0;
+    evidenceBytes = 0;
+    statusChip.textContent = '账本已清空';
+    statusChip.dataset.tone = 'success';
+    updateLedgerState();
+    setMessage('本页证据账本已清空；没有向服务端发送请求。', 'success');
+  };
+
+  const exportEvidence = async function () {
+    if (busy || exporting || evidenceRecords.length === 0) return;
+    exporting = true;
+    updateLedgerState();
+    setMessage('正在本页内存中生成脱敏证据包…');
+    try {
+      const generatedAtMs = Date.now();
+      const bundle = await bundleApi.createClusterConsoleEvidenceBundle(
+        evidenceRecords.map(function (evidence) {
+          return evidence.record;
+        }),
+        generatedAtMs,
+      );
+      const encoded = bundleApi.serializeClusterConsoleEvidenceBundle(bundle);
+      const blob = new Blob([encoded], {
+        type: 'application/json;charset=utf-8',
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const anchor = document.createElement('a');
+        anchor.download =
+          'qinglong-cluster-evidence-' +
+          new Date(generatedAtMs).toISOString().replaceAll(':', '-') +
+          '.json';
+        anchor.href = objectUrl;
+        anchor.rel = 'noopener';
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+      statusChip.textContent = '脱敏包已生成';
+      statusChip.dataset.tone = 'success';
+      setMessage(
+        '已下载 ' +
+          String(bundle.source.entryCount) +
+          ' 条脱敏事实；未发起额外 Cluster 读取。',
+        'success',
+      );
+    } catch (error) {
+      statusChip.textContent = '导出失败';
+      statusChip.dataset.tone = 'failed';
+      setMessage(
+        '无法导出：' +
+          (error instanceof Error
+            ? error.message
+            : 'cluster_evidence_bundle_failed'),
+        'error',
+      );
+    } finally {
+      exporting = false;
+      updateLedgerState();
     }
   };
 
@@ -290,8 +403,18 @@
     });
   });
 
+  exportButton.addEventListener('click', function () {
+    void exportEvidence();
+  });
+
+  clearButton.addEventListener('click', clearEvidence);
+
   window.addEventListener('pagehide', function () {
     sessionToken = '';
+    evidenceRecords.length = 0;
+    evidenceBytes = 0;
     ledger.textContent = '';
   });
+
+  updateLedgerState();
 })();

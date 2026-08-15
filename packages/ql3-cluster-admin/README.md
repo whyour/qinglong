@@ -18,6 +18,15 @@ responses and a closed CSP, renders all returned data only via `textContent`,
 and keeps start/diagnose/cancel, polling, cache, WebSocket, ServiceWorker and
 legacy session authority absent.
 
+The fourth digest-bound Console asset builds an explicit redacted evidence
+bundle from only the current page's completed reads. The in-memory ledger is
+bounded to the newest 16 entries and 8 MiB; export makes no network request and
+produces at most 512 KiB of UTF-8 JSON. Identifiers are correlated only through
+per-bundle typed aliases, while free text, names, paths, commands, inputs,
+outputs, environment, errors, credentials, unknown fields and Copilot model
+text are omitted. Per-fact and top-level SHA-256 values provide self-integrity,
+not a server signature, durable audit or action authority.
+
 The reviewed operator-workstation setup, private-file ceremony, release
 verification, preflight and session lifecycle are documented in
 `deploy/console/ql3-cluster-copilot/README.md`. Native execution binds host

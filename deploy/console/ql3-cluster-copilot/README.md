@@ -112,6 +112,30 @@ next-page read only when the upstream cursor says more data exists. There is no
 automatic cascade from a list to details, steps or events, so each authority
 read remains visible and intentional.
 
+## Export a redacted evidence bundle
+
+After at least one successful read, **Export redacted bundle** creates one
+UTF-8 JSON file entirely in browser memory. Export performs zero BFF or Cluster
+requests and includes only the evidence already visible in the current page.
+The ledger retains at most the newest sixteen entries and 8 MiB of canonical
+raw facts; reaching either limit removes the oldest visible and in-memory
+entry. The generated file is capped at 512 KiB.
+
+The fixed allowlist keeps operation, local observation time, reviewed status
+enums, bounded numeric/boolean facts, pagination state and typed aliases.
+Project, Run, Task, Workflow, Package, Step, Artifact, request and digest values
+become per-bundle aliases without an exported mapping. Free text, names,
+paths/URLs, commands, inputs/outputs, environment, errors/messages, credentials,
+tokens, authorization, unknown fields and Copilot model text are omitted. A
+canonical SHA-256 for each omitted raw fact allows a later local comparison
+without embedding that fact.
+
+The top-level SHA-256 detects changes to the redacted JSON, but it is not a
+server signature, durable audit, origin attestation or action authority. Review
+the file before sharing it. Generation uses no upload, clipboard/share API,
+browser storage, worker, timer or service-side temporary file. **Clear page**
+removes the current in-memory ledger without sending a request.
+
 ## Run the verified image
 
 Create a dedicated Docker network whose egress is restricted by the host

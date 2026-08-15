@@ -7,6 +7,7 @@
     <meta name="description" content="QingLong 3.0 Cluster 只读现场记录台" />
     <title>QingLong 3.0 · Cluster 现场记录台</title>
     <link rel="stylesheet" href="/app.css" />
+    <script src="/evidence-bundle.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
@@ -109,7 +110,7 @@
 
           <aside class="trust-note">
             <span>Authority boundary</span>
-            <p>Cluster credential 只由本机进程从私有文件读取。浏览器无法提交任意路径，也没有 start、cancel 或 diagnose 权限入口。</p>
+            <p>Cluster credential 只由本机进程从私有文件读取。浏览器无法提交任意路径，也没有 start、cancel 或 diagnose 权限入口。脱敏导出只处理本页已读事实，不补读或上传。</p>
           </aside>
         </aside>
 
@@ -119,12 +120,19 @@
               <p class="eyebrow">Explicit read ledger</p>
               <h2 id="evidence-title">本页证据账本</h2>
             </div>
-            <span id="status-chip" class="status-chip" data-tone="idle">等待读取</span>
+            <div class="evidence-actions">
+              <span id="status-chip" class="status-chip" data-tone="idle">等待读取</span>
+              <span id="ledger-meta" class="ledger-meta">0/16 条 · 0 KiB 原始事实</span>
+              <div class="evidence-buttons">
+                <button id="export-evidence" type="button" class="primary" disabled>导出脱敏包</button>
+                <button id="clear-evidence" type="button" disabled>清空本页</button>
+              </div>
+            </div>
           </div>
           <div id="empty-state" class="empty-state">
             <div class="evidence-rail" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
             <h3>一次读取，一条可复核事实</h3>
-            <p>先解锁页面并选择坐标。返回值按读取顺序保留在当前内存，reload 后清空。</p>
+            <p>先解锁页面并选择坐标。最近 16 条、最多 8 MiB 原始事实只保留在当前内存，reload 后清空。</p>
           </div>
           <ol id="ledger" class="ledger" aria-live="polite" hidden></ol>
           <div id="message" class="message" role="status" aria-live="polite"></div>
@@ -133,7 +141,7 @@
 
       <footer>
         <span>Loopback only · explicit reads · zero polling</span>
-        <span>QingLong 3.0 incubation / D-329</span>
+        <span>QingLong 3.0 incubation / D-330</span>
       </footer>
     </div>
   </body>
