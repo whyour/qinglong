@@ -31,6 +31,10 @@ import {
   type ClusterCopilotFailureDiagnosisProjection,
   type CreateProductionClusterCopilotFailureDiagnosisOptions,
 } from './copilot/failureDiagnosisComposition';
+import {
+  createProductionClusterCopilotFailureDiagnosisReadService,
+  type CreateProductionClusterCopilotFailureDiagnosisReadServiceOptions,
+} from './copilot/failureDiagnosisReadComposition';
 
 export interface EnabledProductionClusterAiConfig {
   readonly enabled: true;
@@ -54,6 +58,11 @@ export interface ProductionClusterAiControlApplicationOptions {
   readonly createCopilot?: (
     options: CreateProductionClusterCopilotFailureDiagnosisOptions,
   ) => Promise<Readonly<CopilotFailureDiagnosisApplicationService>>;
+  readonly createCopilotRead?: (
+    options: CreateProductionClusterCopilotFailureDiagnosisReadServiceOptions,
+  ) => ReturnType<
+    typeof createProductionClusterCopilotFailureDiagnosisReadService
+  >;
   readonly openAiDatabase?: ReturnType<typeof createPostgresDatabaseOpener>;
 }
 
@@ -241,7 +250,9 @@ export async function startProductionClusterAiControlApplication(
     Array.isArray(options) ||
     typeof options.audit !== 'function'
   ) {
-    throw new TypeError('Production Cluster AI application options are invalid');
+    throw new TypeError(
+      'Production Cluster AI application options are invalid',
+    );
   }
   const startControl =
     options.startControl ?? startProductionClusterControlApplication;
@@ -249,14 +260,20 @@ export async function startProductionClusterAiControlApplication(
     options.bootstrapPrompt ?? bootstrapPostgresPluginPackagePromptApplication;
   const createCopilot =
     options.createCopilot ?? createProductionClusterCopilotFailureDiagnosis;
+  const createCopilotRead =
+    options.createCopilotRead ??
+    createProductionClusterCopilotFailureDiagnosisReadService;
   if (
     typeof startControl !== 'function' ||
     typeof bootstrapPrompt !== 'function' ||
     typeof createCopilot !== 'function' ||
+    typeof createCopilotRead !== 'function' ||
     (options.openAiDatabase !== undefined &&
       typeof options.openAiDatabase !== 'function')
   ) {
-    throw new TypeError('Production Cluster AI application factories are invalid');
+    throw new TypeError(
+      'Production Cluster AI application factories are invalid',
+    );
   }
   const copilotArtifactStore = options.control.workerIngress?.artifactStore;
   if (
@@ -303,18 +320,27 @@ export async function startProductionClusterAiControlApplication(
   let copilotApplication:
     | Readonly<CopilotFailureDiagnosisApplicationService>
     | undefined;
+  let copilotReadApplication:
+    | ReturnType<
+        typeof createProductionClusterCopilotFailureDiagnosisReadService
+      >
+    | undefined;
   let copilotSuccessfulCompletion:
     | CopilotFailureDiagnosisModelCompletionCoordinator
     | undefined;
   let stopPromise: Promise<ClusterControlStopResult> | undefined;
   let promptOutputPolicy: ProjectPolicyEngine | undefined;
   const promptOutputReadAuthorizer = Object.freeze({
-    async authorize(request: Readonly<{
-      principal: Parameters<ProjectPolicyEngine['authorize']>[0];
-      projectId: string;
-    }>) {
+    async authorize(
+      request: Readonly<{
+        principal: Parameters<ProjectPolicyEngine['authorize']>[0];
+        projectId: string;
+      }>,
+    ) {
       if (!aiDatabase) {
-        throw new Error('Cluster AI database is unavailable during output read');
+        throw new Error(
+          'Cluster AI database is unavailable during output read',
+        );
       }
       promptOutputPolicy ??= new ProjectPolicyEngine(
         new PostgresProjectPolicyRepository(aiDatabase.pool),
@@ -361,7 +387,9 @@ export async function startProductionClusterAiControlApplication(
       },
       async loadProviders() {
         if (!aiDatabase) {
-          throw new Error('Cluster AI database is unavailable during provider load');
+          throw new Error(
+            'Cluster AI database is unavailable during provider load',
+          );
         }
         const credentialStorage = new PostgresModelProviderCredentialReader(
           aiDatabase.pool,
@@ -409,7 +437,11 @@ export async function startProductionClusterAiControlApplication(
       throw new Error('Cluster AI Prompt application did not activate');
     }
     if (preparedCopilot !== undefined) {
-      if (!copilotSuccessfulCompletion || !aiDatabase || !copilotArtifactStore) {
+      if (
+        !copilotSuccessfulCompletion ||
+        !aiDatabase ||
+        !copilotArtifactStore
+      ) {
         throw new Error('Cluster Copilot shared authorities did not activate');
       }
       copilotApplication = await createCopilot({
@@ -418,6 +450,10 @@ export async function startProductionClusterAiControlApplication(
         prepared: preparedCopilot,
         successfulCompletion: copilotSuccessfulCompletion,
         artifactStore: copilotArtifactStore,
+      });
+      copilotReadApplication = createCopilotRead({
+        pool: aiDatabase.pool,
+        prepared: preparedCopilot,
       });
     }
     controlApplication = await startControl({
@@ -445,11 +481,13 @@ export async function startProductionClusterAiControlApplication(
               capability: promptApplication.promptExecutionOutputs,
             },
           }),
-      ...(copilotApplication === undefined
+      ...(copilotApplication === undefined ||
+      copilotReadApplication === undefined
         ? {}
         : {
             copilotFailureDiagnosis: {
               capability: copilotApplication,
+              readCapability: copilotReadApplication,
             },
           }),
     });

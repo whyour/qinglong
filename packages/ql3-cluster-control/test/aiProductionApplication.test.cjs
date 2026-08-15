@@ -29,7 +29,8 @@ const {
 function enabledEnvironment(overrides = {}) {
   return {
     QL3_CLUSTER_AI_ENABLED: 'true',
-    QL3_CLUSTER_AI_PROVIDER_AUTHORITY_FILE: '/var/run/qinglong/ai/providers.json',
+    QL3_CLUSTER_AI_PROVIDER_AUTHORITY_FILE:
+      '/var/run/qinglong/ai/providers.json',
     QL3_CLUSTER_AI_SECRET_ROOT: '/var/run/qinglong/ai/provider-secrets',
     ...overrides,
   };
@@ -120,26 +121,30 @@ async function projectedFile(root, name, bytes) {
 test('Copilot composition is explicit, shares the Prompt gateway and injects one route capability', async () => {
   const secretRoot = await mkdtemp(join(tmpdir(), 'ql3-cluster-ai-secret-'));
   const configRoot = await mkdtemp(join(tmpdir(), 'ql3-copilot-config-'));
-  const invocationRoot = await mkdtemp(join(tmpdir(), 'ql3-copilot-invocation-'));
+  const invocationRoot = await mkdtemp(
+    join(tmpdir(), 'ql3-copilot-invocation-'),
+  );
   const resultRoot = await mkdtemp(join(tmpdir(), 'ql3-copilot-result-'));
   const outputRoot = await mkdtemp(join(tmpdir(), 'ql3-copilot-output-'));
   const key = Buffer.alloc(32, 0x55).toString('base64url');
-  const config = Buffer.from(`${JSON.stringify({
-    schema: 'qinglong/cluster-copilot-failure-diagnosis-config@v1',
-    provider: 'provider-primary',
-    model: 'model-diagnosis',
-    modelBoundary: 'external',
-    responseLanguage: 'zh-CN',
-    maxOutputTokens: 512,
-    executionTimeoutMs: 60_000,
-    egressPolicy: {
-      schema: 'qinglong/copilot-model-egress-policy@v1',
-      revision: 'cluster-copilot-v1',
-      potentiallySensitiveDataBoundaries: ['external'],
-      maxInputBytes: 64 * 1024,
-      maxOutputTokens: 1024,
-    },
-  })}\n`);
+  const config = Buffer.from(
+    `${JSON.stringify({
+      schema: 'qinglong/cluster-copilot-failure-diagnosis-config@v1',
+      provider: 'provider-primary',
+      model: 'model-diagnosis',
+      modelBoundary: 'external',
+      responseLanguage: 'zh-CN',
+      maxOutputTokens: 512,
+      executionTimeoutMs: 60_000,
+      egressPolicy: {
+        schema: 'qinglong/copilot-model-egress-policy@v1',
+        revision: 'cluster-copilot-v1',
+        potentiallySensitiveDataBoundaries: ['external'],
+        maxInputBytes: 64 * 1024,
+        maxOutputTokens: 1024,
+      },
+    })}\n`,
+  );
   const invocation = canonicalClusterToolInvocationKeyringManifest({
     schema: CLUSTER_TOOL_INVOCATION_KEYRING_MANIFEST_SCHEMA,
     activeKeyId: 'invocation-key-1',
@@ -163,8 +168,10 @@ test('Copilot composition is explicit, shares the Prompt gateway and injects one
   const fakePool = { query() {}, connect() {} };
   const artifactStore = { put() {}, inspect() {}, readLogRange() {} };
   const copilot = Object.freeze({ execute() {} });
+  const copilotRead = Object.freeze({ inspect() {}, readOutput() {} });
   let registeredSink;
   let created;
+  let createdRead;
   let controlOptions;
   try {
     await Promise.all([
@@ -205,22 +212,41 @@ test('Copilot composition is explicit, shares the Prompt gateway and injects one
           async recordWithAtomicSuccess() {},
         });
         return {
-          status: 'active', profile: 'cluster', readiness: {}, capability: gateway,
-          prompts: {}, promptCatalog: {}, promptExecutions: {},
-          promptExecutionInspections: {}, async stop() { return 'stopped'; },
+          status: 'active',
+          profile: 'cluster',
+          readiness: {},
+          capability: gateway,
+          prompts: {},
+          promptCatalog: {},
+          promptExecutions: {},
+          promptExecutionInspections: {},
+          async stop() {
+            return 'stopped';
+          },
         };
       },
       async createCopilot(options) {
         created = options;
         return copilot;
       },
+      createCopilotRead(options) {
+        createdRead = options;
+        return copilotRead;
+      },
       async startControl(options) {
         controlOptions = options;
         return {
-          status: 'active', address: { host: '127.0.0.1', port: 5800 },
-          evidence: {}, recovery: { safe: true, remaining: 0, failed: 0 },
-          unavailable: new Promise(() => {}), availabilityStatus() { return 'ready'; },
-          async stop() { return 'stopped'; },
+          status: 'active',
+          address: { host: '127.0.0.1', port: 5800 },
+          evidence: {},
+          recovery: { safe: true, remaining: 0, failed: 0 },
+          unavailable: new Promise(() => {}),
+          availabilityStatus() {
+            return 'ready';
+          },
+          async stop() {
+            return 'stopped';
+          },
         };
       },
     });
@@ -229,10 +255,19 @@ test('Copilot composition is explicit, shares the Prompt gateway and injects one
     assert.equal(created.gateway, gateway);
     assert.equal(created.successfulCompletion, registeredSink);
     assert.equal(created.artifactStore, artifactStore);
+    assert.equal(createdRead.pool, fakePool);
+    assert.equal(typeof createdRead.prepared.outputKeys.resolve, 'function');
     assert.equal(controlOptions.copilotFailureDiagnosis.capability, copilot);
+    assert.equal(
+      controlOptions.copilotFailureDiagnosis.readCapability,
+      copilotRead,
+    );
     assert.equal(await application.stop(), 'stopped');
   } finally {
-    config.fill(0); invocation.fill(0); result.fill(0); output.fill(0);
+    config.fill(0);
+    invocation.fill(0);
+    result.fill(0);
+    output.fill(0);
     await Promise.all([
       rm(secretRoot, { recursive: true, force: true }),
       rm(configRoot, { recursive: true, force: true }),
@@ -362,7 +397,9 @@ test('output-enabled AI composition wires exact and request-keyed protected read
           promptExecutionInspections: { inspectAuthorized() {} },
           promptOutputs,
           promptExecutionOutputs,
-          async stop() { return 'stopped'; },
+          async stop() {
+            return 'stopped';
+          },
         };
       },
       async startControl(options) {
@@ -373,8 +410,12 @@ test('output-enabled AI composition wires exact and request-keyed protected read
           evidence: {},
           recovery: { safe: true, remaining: 0, failed: 0 },
           unavailable: new Promise(() => {}),
-          availabilityStatus() { return 'ready'; },
-          async stop() { return 'stopped'; },
+          availabilityStatus() {
+            return 'ready';
+          },
+          async stop() {
+            return 'stopped';
+          },
         };
       },
     });

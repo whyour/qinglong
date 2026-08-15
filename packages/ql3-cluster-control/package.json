@@ -50,6 +50,11 @@
       "require": "./dist/copilot/failure-diagnosis/failureDiagnosisRoute.js",
       "default": "./dist/copilot/failure-diagnosis/failureDiagnosisRoute.js"
     },
+    "./copilot-read-routes": {
+      "types": "./dist/copilot/failure-diagnosis/failureDiagnosisReadRoutes.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/failureDiagnosisReadRoutes.js",
+      "default": "./dist/copilot/failure-diagnosis/failureDiagnosisReadRoutes.js"
+    },
     "./http": {
       "types": "./dist/transport/httpSurface.d.ts",
       "require": "./dist/transport/httpSurface.js",

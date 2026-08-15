@@ -730,6 +730,8 @@ test('optionally exposes Prompt execution behind shared admission and policy', a
     'prompt.execution.output.read',
     'prompt.output.read',
     'copilot.failure_diagnosis.execute',
+    'copilot.failure_diagnosis.read',
+    'copilot.failure_diagnosis.output.read',
   ]);
   const response = await invoke(
     stack,
@@ -783,9 +785,30 @@ test('optionally exposes Copilot diagnosis behind shared authentication, Policy 
         terminalizationRequired: false,
       };
     },
+    async inspect(value) {
+      return {
+        schema: 'qinglong/copilot-failure-diagnosis-inspection-result@v1',
+        status: 'not_found',
+        projectId: value.projectId,
+        sourceRunId: value.sourceRunId,
+        requestId: value.requestId,
+      };
+    },
+    async readOutput(value) {
+      return {
+        schema: 'qinglong/copilot-failure-diagnosis-output-read-result@v1',
+        status: 'not_found',
+        projectId: value.projectId,
+        sourceRunId: value.sourceRunId,
+        requestId: value.requestId,
+      };
+    },
   };
   const stack = createProductionClusterControlApplicationStack(input, {
-    copilotFailureDiagnosis: { capability },
+    copilotFailureDiagnosis: {
+      capability,
+      readCapability: capability,
+    },
   });
   const result = await invoke(
     stack,
@@ -811,6 +834,29 @@ test('optionally exposes Copilot diagnosis behind shared authentication, Policy 
     'audit:copilot.failure_diagnosis.execute:allowed',
     'diagnose:run-1',
   ]);
+
+  const inspection = await invoke(
+    stack,
+    metadata(
+      '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1',
+    ),
+  );
+  const output = await invoke(
+    stack,
+    metadata(
+      '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1/output',
+    ),
+  );
+  assert.equal(inspection.statusCode, 404);
+  assert.equal(output.statusCode, 404);
+  assert.equal(
+    events.includes('audit:copilot.failure_diagnosis.read:allowed'),
+    true,
+  );
+  assert.equal(
+    events.includes('audit:copilot.failure_diagnosis.output.read:allowed'),
+    true,
+  );
 });
 
 test('keeps the Copilot route absent by default and never invokes it after Policy denial', async () => {
@@ -830,6 +876,15 @@ test('keeps the Copilot route absent by default and never invokes it after Polic
     defaultStack.admission.prepare(request),
     (error) => error?.statusCode === 404 && error?.code === 'route_not_found',
   );
+  for (const path of [
+    '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1',
+    '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses/diagnosis-request-1/output',
+  ]) {
+    await assert.rejects(
+      defaultStack.admission.prepare(metadata(path)),
+      (error) => error?.statusCode === 404 && error?.code === 'route_not_found',
+    );
+  }
 
   let calls = 0;
   const deniedFixture = fixture({

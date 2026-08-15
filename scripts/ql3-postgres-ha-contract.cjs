@@ -82,6 +82,13 @@ const {
   PostgresCopilotFailureDiagnosisModelRepository,
 } = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/postgresModelExecutionRepository.js');
 const {
+  CopilotFailureDiagnosisModelCompletionCoordinator,
+  executeCopilotFailureDiagnosisModel,
+} = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/modelExecution.js');
+const {
+  CopilotFailureDiagnosisReadService,
+} = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/read-model/service.js');
+const {
   BUILTIN_RUN_LOG_EXCERPT_TOOL,
   BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION,
   createBuiltInRunLogExcerptToolHandlerBinding,
@@ -2281,6 +2288,254 @@ async function executeCopilotFailureDiagnosisToolHaEvidence(options) {
   } finally {
     fixture.invocationKey.fill(0);
     logContent.fill(0);
+    await runtimeDatabase.close();
+  }
+}
+
+async function copilotFailureDiagnosisReadFacts(pool, fixture, outputKeyByte) {
+  const admissions = new PostgresCopilotFailureDiagnosisAdmissionRepository(
+    pool,
+  );
+  const models = new PostgresCopilotFailureDiagnosisModelRepository(pool);
+  const terminalizations =
+    new PostgresCopilotFailureDiagnosisPreModelTerminalizationRepository(pool);
+  const permissions = [];
+  let resolvedKey;
+  const reader = new CopilotFailureDiagnosisReadService({
+    admissions,
+    terminalizations,
+    finalizations: models,
+    models,
+    authorizer: {
+      async authorize(_principal, projectId, permission) {
+        assert.equal(projectId, fixture.plan.projectId);
+        permissions.push(permission);
+        return {
+          effect: 'allow',
+          reasons: ['role_grant'],
+          fence: { projectVersion: 1, bindingVersion: 1 },
+        };
+      },
+    },
+    keys: {
+      async active() {
+        throw new Error('read path must not select the active output key');
+      },
+      async resolve(keyId) {
+        if (keyId !== 'ha-copilot-output-key-1') return null;
+        resolvedKey = Buffer.alloc(32, outputKeyByte);
+        return { keyId, key: resolvedKey };
+      },
+    },
+    now: () => fixture.baseTimeMs + 1_000,
+  });
+  const target = {
+    principal: fixture.principal,
+    projectId: fixture.plan.projectId,
+    sourceRunId: fixture.plan.source.runId,
+    requestId: fixture.plan.requestId,
+  };
+  const inspection = await reader.inspect(target);
+  const output = await reader.readOutput(target);
+  assert.equal(inspection.status, 'terminal');
+  assert.equal(inspection.outcome, 'succeeded');
+  assert.equal(inspection.stage, 'model');
+  assert.equal(inspection.outputAvailable, true);
+  assert.deepEqual(inspection.usage, {
+    inputTokens: 17,
+    outputTokens: 9,
+    totalTokens: 26,
+    currency: null,
+    costMicros: null,
+  });
+  assert.equal(output.status, 'available');
+  assert.equal(output.result.text, 'HA encrypted diagnosis output');
+  assert.equal('provider' in output.result, false);
+  assert.equal('model' in output.result, false);
+  assert.deepEqual(permissions, ['run.read', 'artifact.read']);
+  assert.ok(resolvedKey);
+  assert.equal(
+    resolvedKey.every((byte) => byte === 0),
+    true,
+  );
+  return {
+    inspection,
+    output: {
+      status: output.status,
+      diagnosisRunId: output.diagnosisRunId,
+      reference: output.reference,
+      finishReason: output.result.finishReason,
+      usage: output.result.usage,
+      textDigest: createHash('sha256')
+        .update(output.result.text, 'utf8')
+        .digest('hex'),
+      providerAbsent: !('provider' in output.result),
+      modelAbsent: !('model' in output.result),
+      resolvedKeyWiped: true,
+    },
+  };
+}
+
+async function executeCopilotFailureDiagnosisModelReadHaEvidence(options) {
+  const {
+    port,
+    report,
+    fixture,
+    toolExecution,
+    outputKeyByte,
+    expectedExisting = false,
+  } = options;
+  const runtimeDatabase = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, port),
+    expectedExisting
+      ? 'ql3-ha-copilot-read-promoted'
+      : 'ql3-ha-copilot-read-primary',
+  )();
+  const models = new PostgresCopilotFailureDiagnosisModelRepository(
+    runtimeDatabase.pool,
+  );
+  const durable = new DurableModelInvocationCoordinator(models);
+  const outputKeys = {
+    async active() {
+      return {
+        keyId: 'ha-copilot-output-key-1',
+        key: Buffer.alloc(32, outputKeyByte),
+      };
+    },
+    async resolve(keyId) {
+      return keyId === 'ha-copilot-output-key-1'
+        ? { keyId, key: Buffer.alloc(32, outputKeyByte) }
+        : null;
+    },
+  };
+  const successfulCompletion =
+    new CopilotFailureDiagnosisModelCompletionCoordinator({
+      coordinator: durable,
+      keys: outputKeys,
+      now: () => fixture.baseTimeMs + 700,
+      nonceFactory: () => Buffer.alloc(12, 0x73),
+    });
+  const result = Object.freeze({
+    provider: fixture.plan.model.provider,
+    model: fixture.plan.model.model,
+    text: 'HA encrypted diagnosis output',
+    finishReason: 'stop',
+    usage: Object.freeze({
+      inputTokens: 17,
+      outputTokens: 9,
+      totalTokens: 26,
+    }),
+  });
+  let providerCalls = 0;
+  const gateway = {
+    supportsSuccessfulCompletionSink(sink) {
+      return sink === successfulCompletion;
+    },
+    async generate(request, context) {
+      providerCalls += 1;
+      assert.equal(request.provider, fixture.plan.model.provider);
+      assert.equal(request.model, fixture.plan.model.model);
+      assert.equal(context.requestId, fixture.plan.modelInvocationId);
+      const requestDigest = `sha256:${createHash('sha256')
+        .update(JSON.stringify(request), 'utf8')
+        .digest('hex')}`;
+      const common = {
+        projectId: fixture.plan.projectId,
+        runId: fixture.plan.runId,
+        stepRunId: fixture.plan.modelStepRunId,
+        traceId: fixture.plan.traceId,
+        requestId: fixture.plan.modelInvocationId,
+        provider: fixture.plan.model.provider,
+        model: fixture.plan.model.model,
+        policyRevision: 'ha-diagnosis-model-policy-v1',
+        requestDigest,
+        deadlineAtMs: fixture.plan.deadlineAtMs,
+        inputBytes: Buffer.byteLength(JSON.stringify(request), 'utf8'),
+        maxOutputTokens: fixture.plan.model.maxOutputTokens,
+      };
+      await durable.record({
+        ...common,
+        phase: 'admitted',
+        outputBytes: 0,
+        usage: null,
+        errorCode: null,
+        occurredAtMs: fixture.baseTimeMs + 500,
+      });
+      const recorded = await successfulCompletion.record(
+        {
+          ...common,
+          phase: 'completed',
+          outputBytes: Buffer.byteLength(result.text, 'utf8'),
+          usage: result.usage,
+          errorCode: null,
+          occurredAtMs: fixture.baseTimeMs + 600,
+        },
+        result,
+      );
+      assert.equal(recorded.handled, true);
+      return result;
+    },
+  };
+  const dependencies = {
+    admissions: new PostgresCopilotFailureDiagnosisAdmissionRepository(
+      runtimeDatabase.pool,
+    ),
+    unlocks: new PostgresCopilotFailureDiagnosisToolUnlockRepository(
+      runtimeDatabase.pool,
+    ),
+    toolResults: {
+      async open() {
+        if (!toolExecution) {
+          throw new Error('promoted replay must not reopen Tool output');
+        }
+        return {
+          status: toolExecution.completionStatus,
+          completion: toolExecution.completion,
+          output: toolExecution.output,
+        };
+      },
+    },
+    modelInvocations: models,
+    outputs: models,
+    gateway,
+    successfulCompletion,
+    finalizations: models,
+  };
+  try {
+    const first = await executeCopilotFailureDiagnosisModel(
+      report.requestId,
+      dependencies,
+    );
+    assert.equal(first.outcome, 'succeeded');
+    assert.ok(first.output);
+    if (!expectedExisting) {
+      const replay = await executeCopilotFailureDiagnosisModel(
+        report.requestId,
+        dependencies,
+      );
+      assert.deepEqual(replay, first);
+      assert.equal(providerCalls, 1);
+    } else {
+      assert.equal(providerCalls, 0);
+    }
+    const facts = await copilotFailureDiagnosisReadFacts(
+      runtimeDatabase.pool,
+      fixture,
+      outputKeyByte,
+    );
+    if (expectedExisting) {
+      report.afterPromotion = facts;
+      report.promotedProviderCalls = providerCalls;
+      report.survivedPromotion = true;
+    } else {
+      report.beforePromotion = facts;
+      report.providerCalls = providerCalls;
+      report.exactReplay = true;
+      report.encryptedOutputReadable = true;
+    }
+    return facts;
+  } finally {
     await runtimeDatabase.close();
   }
 }
@@ -10976,6 +11231,8 @@ async function main(argv = process.argv.slice(2)) {
   let copilotFailureDiagnosisTerminalizationFixture;
   let copilotFailureDiagnosisModelResolution;
   let copilotFailureDiagnosisModelResolutionFixture;
+  let copilotFailureDiagnosisRead;
+  let copilotFailureDiagnosisReadFixture;
   let modelProviderCredentialCatalog;
   let modelProviderCredentialTestConnection;
   let runAttemptLogRetentionEvidence;
@@ -11186,6 +11443,12 @@ async function main(argv = process.argv.slice(2)) {
       copilotFailureDiagnosisModelResolution = copilotModelResolution.report;
       copilotFailureDiagnosisModelResolutionFixture =
         copilotModelResolution.fixture;
+      const copilotRead = await runCopilotFailureDiagnosisAdmissionHaEvidence({
+        primaryPort,
+        migrationPool: migrationDatabase.pool,
+      });
+      copilotFailureDiagnosisRead = copilotRead.report;
+      copilotFailureDiagnosisReadFixture = copilotRead.fixture;
     } finally {
       await migrationDatabase.close();
     }
@@ -11588,6 +11851,35 @@ async function main(argv = process.argv.slice(2)) {
     }, 'Copilot failure diagnosis Tool completion WAL replay');
     timeline.push({
       state: 'copilot_failure_diagnosis_tool_completed',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    const copilotReadTool = await executeCopilotFailureDiagnosisToolHaEvidence({
+      port: primaryPort,
+      report: copilotFailureDiagnosisRead,
+      fixture: copilotFailureDiagnosisReadFixture,
+      resultKeyFixture: toolResultKeyFixture,
+    });
+    await executeCopilotFailureDiagnosisModelReadHaEvidence({
+      port: primaryPort,
+      report: copilotFailureDiagnosisRead,
+      fixture: copilotFailureDiagnosisReadFixture,
+      toolExecution: copilotReadTool.execution,
+      outputKeyByte: 0x74,
+    });
+    await waitFor(async () => {
+      const replicated = await copilotFailureDiagnosisReadFacts(
+        standbyDatabase.pool,
+        copilotFailureDiagnosisReadFixture,
+        0x74,
+      );
+      return JSON.stringify(replicated) ===
+        JSON.stringify(copilotFailureDiagnosisRead.beforePromotion)
+        ? replicated
+        : null;
+    }, 'Copilot failure diagnosis request-keyed read WAL replay');
+    copilotFailureDiagnosisRead.replicatedBeforePromotion = true;
+    timeline.push({
+      state: 'copilot_failure_diagnosis_output_readable',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     await terminalizeCopilotFailureDiagnosisLogUnavailableHaEvidence({
@@ -12546,6 +12838,14 @@ async function main(argv = process.argv.slice(2)) {
       resultKeyFixture: toolResultKeyFixture,
       expectedExisting: true,
     });
+    await executeCopilotFailureDiagnosisModelReadHaEvidence({
+      port: standbyPort,
+      report: copilotFailureDiagnosisRead,
+      fixture: copilotFailureDiagnosisReadFixture,
+      toolExecution: null,
+      outputKeyByte: 0x74,
+      expectedExisting: true,
+    });
     await verifyModelProviderCredentialCatalogAfterPromotion({
       promotedPort: standbyPort,
       promotedPool: promotedDatabase.pool,
@@ -13297,10 +13597,26 @@ async function main(argv = process.argv.slice(2)) {
          (SELECT count(*)::integer FROM "ql3"."runs") AS runs,
          (SELECT count(*)::integer FROM "ql3"."run_events") AS "runEvents",
          (SELECT count(*)::integer
+            FROM "ql3"."runs"
+           WHERE id IN ($1, $2)) AS "diagnosisReadRuns",
+         (SELECT count(*)::integer
+            FROM "ql3"."run_events"
+           WHERE run_id = $2) AS "diagnosisReadRunEvents",
+         (SELECT count(*)::integer
             FROM "ql3"."worker_credential_deliveries") AS "credentialDeliveries"`,
+      [
+        copilotFailureDiagnosisRead.sourceRunId,
+        copilotFailureDiagnosisRead.runId,
+      ],
     );
     assert.deepEqual(sideEffects.rows, [
-      { runs: 82, runEvents: 200, credentialDeliveries: 4 },
+      {
+        runs: 84,
+        runEvents: 209,
+        diagnosisReadRuns: 2,
+        diagnosisReadRunEvents: 9,
+        credentialDeliveries: 4,
+      },
     ]);
     timeline.push({
       state: 'two_fresh_control_replicas_ready',
@@ -13417,6 +13733,7 @@ async function main(argv = process.argv.slice(2)) {
       copilotFailureDiagnosisAdmission,
       copilotFailureDiagnosisTerminalization,
       copilotFailureDiagnosisModelResolution,
+      copilotFailureDiagnosisRead,
       modelProviderCredentialCatalog,
       modelProviderCredentialTestConnection,
       runAttemptLogRetention,
@@ -13509,6 +13826,23 @@ async function main(argv = process.argv.slice(2)) {
             JSON.stringify(
               copilotFailureDiagnosisModelResolution.beforePromotion,
             ),
+        copilotFailureDiagnosisRequestKeyedReadDecryptsAndExactlyReplays:
+          copilotFailureDiagnosisRead.exactReplay &&
+          copilotFailureDiagnosisRead.encryptedOutputReadable &&
+          copilotFailureDiagnosisRead.providerCalls === 1 &&
+          copilotFailureDiagnosisRead.beforePromotion.inspection.status ===
+            'terminal' &&
+          copilotFailureDiagnosisRead.beforePromotion.inspection.outcome ===
+            'succeeded' &&
+          copilotFailureDiagnosisRead.beforePromotion.output.providerAbsent &&
+          copilotFailureDiagnosisRead.beforePromotion.output.modelAbsent &&
+          copilotFailureDiagnosisRead.beforePromotion.output.resolvedKeyWiped,
+        copilotFailureDiagnosisRequestKeyedReadReplicatesAndSurvivesPromotion:
+          copilotFailureDiagnosisRead.replicatedBeforePromotion &&
+          copilotFailureDiagnosisRead.survivedPromotion &&
+          copilotFailureDiagnosisRead.promotedProviderCalls === 0 &&
+          JSON.stringify(copilotFailureDiagnosisRead.afterPromotion) ===
+            JSON.stringify(copilotFailureDiagnosisRead.beforePromotion),
         modelProviderCredentialCatalogSurvivesPromotion:
           modelProviderCredentialCatalog.survivedPromotion,
         modelProviderCredentialManagementIdentityLedgerSurvivesPromotion:

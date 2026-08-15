@@ -1186,6 +1186,13 @@ function auditSourceImports(root, packagePath, findings) {
               '@qinglong/ai/postgres-failure-diagnosis-tool-execution-storage',
               '@qinglong/ai/profile',
             ]),
+          'src/application-runtime/copilot/failureDiagnosisReadComposition.ts':
+            Object.freeze([
+              '@qinglong/ai/failure-diagnosis-pre-model-terminalization',
+              '@qinglong/ai/failure-diagnosis-read-model',
+              '@qinglong/ai/postgres-failure-diagnosis-admission-storage',
+              '@qinglong/ai/postgres-failure-diagnosis-model-execution-storage',
+            ]),
         });
         const sourceRelative = path.relative(packageDirectory, filePath);
         if (!clusterAiImports[sourceRelative]?.includes(specifier)) {
