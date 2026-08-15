@@ -7,9 +7,7 @@ import {
 } from '@qinglong/runtime-core/builtin-run-log-excerpt-tool';
 import type { RunRepositoryReader } from '@qinglong/runtime-core/run-repository';
 import type { ToolPolicyAuthorizer } from '@qinglong/runtime-core/tool-registry';
-import {
-  prepareToolInvocation,
-} from '@qinglong/runtime-core/tool-registry';
+import { prepareToolInvocation } from '@qinglong/runtime-core/tool-registry';
 import type { ProjectToolDefinitionSnapshotRepository } from '@qinglong/runtime-core/project-tool-definition-snapshot';
 import { projectToolDefinitionRegistry } from '@qinglong/runtime-core/project-tool-definition-snapshot';
 import {
@@ -25,9 +23,7 @@ import {
 } from '@qinglong/runtime-core/trusted-tool-invocation';
 
 import { MAX_MODEL_INVOCATION_MS } from '../../../model-gateway/model';
-import {
-  prepareCopilotFailureDiagnosisExecution,
-} from '../admission/plan';
+import { prepareCopilotFailureDiagnosisExecution } from '../admission/plan';
 import type {
   CopilotFailureDiagnosisAdmissionRepository,
   CopilotFailureDiagnosisExecutionPlan,
@@ -38,9 +34,19 @@ import {
   type CopilotFailureDiagnosisToolExecutionDependencies,
 } from '../tool-execution/coordinator';
 import {
+  CopilotFailureDiagnosisToolExecutionDeadlineExceededError,
+  type CopilotFailureDiagnosisToolExecutionResult,
+} from '../tool-execution/contracts';
+import {
   executeCopilotFailureDiagnosisModel,
   type CopilotFailureDiagnosisModelExecutionDependencies,
 } from '../model-execution/coordinator';
+import {
+  terminalizeCopilotFailureDiagnosisBeforeModel,
+  type CopilotFailureDiagnosisPreModelTerminalizationDependencies,
+  type CopilotFailureDiagnosisPreModelTerminalizationTrigger,
+} from '../terminalization/coordinator';
+import { CopilotFailureDiagnosisPreModelTerminalizationNotReadyError } from '../terminalization/contracts';
 import {
   CopilotFailureDiagnosisApplicationBusyError,
   CopilotFailureDiagnosisApplicationConflictError,
@@ -64,7 +70,10 @@ const IDENTITY_DOMAIN = Buffer.from(
 
 export interface CopilotFailureDiagnosisApplicationDependencies {
   readonly admissions: CopilotFailureDiagnosisAdmissionRepository;
-  readonly snapshots: Pick<ProjectToolDefinitionSnapshotRepository, 'findCurrent'>;
+  readonly snapshots: Pick<
+    ProjectToolDefinitionSnapshotRepository,
+    'findCurrent'
+  >;
   readonly runs: Pick<
     RunRepositoryReader,
     'findRunById' | 'findLatestAttemptByRunId'
@@ -77,19 +86,23 @@ export interface CopilotFailureDiagnosisApplicationDependencies {
   readonly authorizer: ToolPolicyAuthorizer;
   readonly tool: CopilotFailureDiagnosisToolExecutionDependencies;
   readonly model: CopilotFailureDiagnosisModelExecutionDependencies;
+  readonly terminalizations: CopilotFailureDiagnosisPreModelTerminalizationDependencies;
   readonly executeTool: typeof executeCopilotFailureDiagnosisTool;
   readonly executeModel: typeof executeCopilotFailureDiagnosisModel;
+  readonly terminalizeBeforeModel: typeof terminalizeCopilotFailureDiagnosisBeforeModel;
   readonly modelIntent: Readonly<PrepareCopilotFailureDiagnosisModelIntent>;
   readonly executionTimeoutMs: number;
   readonly now?: () => number;
-  readonly nonceFactory?: (input: Readonly<{
-    key: Uint8Array;
-    keyId: string;
-    requestId: string;
-    projectId: string;
-    sourceRunId: string;
-    invocationActionDigest: string;
-  }>) => Uint8Array;
+  readonly nonceFactory?: (
+    input: Readonly<{
+      key: Uint8Array;
+      keyId: string;
+      requestId: string;
+      projectId: string;
+      sourceRunId: string;
+      invocationActionDigest: string;
+    }>,
+  ) => Uint8Array;
 }
 
 interface ActiveRequest {
@@ -146,14 +159,16 @@ function preview(
   });
 }
 
-function defaultNonce(input: Readonly<{
-  key: Uint8Array;
-  keyId: string;
-  requestId: string;
-  projectId: string;
-  sourceRunId: string;
-  invocationActionDigest: string;
-}>): Uint8Array {
+function defaultNonce(
+  input: Readonly<{
+    key: Uint8Array;
+    keyId: string;
+    requestId: string;
+    projectId: string;
+    sourceRunId: string;
+    invocationActionDigest: string;
+  }>,
+): Uint8Array {
   const derived = createHmac('sha256', Buffer.from(input.key))
     .update(NONCE_DOMAIN)
     .update(
@@ -224,6 +239,10 @@ function assertDependencies(
     typeof value.executeModel !== 'function' ||
     !value.tool ||
     !value.model ||
+    typeof value.terminalizations?.repository?.findByRequestId !== 'function' ||
+    typeof value.terminalizations?.repository?.readAuthority !== 'function' ||
+    typeof value.terminalizations?.repository?.commit !== 'function' ||
+    typeof value.terminalizeBeforeModel !== 'function' ||
     !value.modelIntent ||
     typeof value.modelIntent !== 'object' ||
     !Number.isSafeInteger(value.executionTimeoutMs) ||
@@ -359,21 +378,91 @@ export class CopilotFailureDiagnosisApplicationService {
         });
       }
     }
-    const tool = await this.#dependencies.executeTool(
-      {
-        requestId: plan.requestId,
-        principal: command.principal,
-        authorizer: this.#dependencies.authorizer,
-      },
-      this.#dependencies.tool,
-    );
+    const boundary = await this.#preModel(plan.requestId, { kind: 'boundary' });
+    if (boundary) {
+      return Object.freeze({
+        admissionStatus,
+        admission,
+        tool: null,
+        model: null,
+        terminalization: boundary,
+        terminalizationRequired: false,
+      });
+    }
+    let tool: Readonly<CopilotFailureDiagnosisToolExecutionResult>;
+    try {
+      tool = await this.#dependencies.executeTool(
+        {
+          requestId: plan.requestId,
+          principal: command.principal,
+          authorizer: this.#dependencies.authorizer,
+        },
+        this.#dependencies.tool,
+      );
+    } catch (cause) {
+      if (
+        !(
+          cause instanceof
+          CopilotFailureDiagnosisToolExecutionDeadlineExceededError
+        )
+      ) {
+        throw cause;
+      }
+      const terminalization = await this.#dependencies.terminalizeBeforeModel(
+        plan.requestId,
+        { kind: 'boundary' },
+        this.#dependencies.terminalizations,
+      );
+      return Object.freeze({
+        admissionStatus,
+        admission,
+        tool: null,
+        model: null,
+        terminalization: terminalization.receipt,
+        terminalizationRequired: false,
+      });
+    }
     if (tool.outcome !== 'succeeded') {
+      const terminalization = await this.#dependencies.terminalizeBeforeModel(
+        plan.requestId,
+        { kind: 'tool_failure', completion: tool.completion },
+        this.#dependencies.terminalizations,
+      );
       return Object.freeze({
         admissionStatus,
         admission,
         tool,
         model: null,
-        terminalizationRequired: true,
+        terminalization: terminalization.receipt,
+        terminalizationRequired: false,
+      });
+    }
+    const projection = await this.#preModel(plan.requestId, {
+      kind: 'tool_projection',
+      completion: tool.completion,
+      output: tool.output,
+    });
+    if (projection) {
+      return Object.freeze({
+        admissionStatus,
+        admission,
+        tool,
+        model: null,
+        terminalization: projection,
+        terminalizationRequired: false,
+      });
+    }
+    const afterToolBoundary = await this.#preModel(plan.requestId, {
+      kind: 'boundary',
+    });
+    if (afterToolBoundary) {
+      return Object.freeze({
+        admissionStatus,
+        admission,
+        tool,
+        model: null,
+        terminalization: afterToolBoundary,
+        terminalizationRequired: false,
       });
     }
     const model = await this.#dependencies.executeModel(
@@ -385,8 +474,31 @@ export class CopilotFailureDiagnosisApplicationService {
       admission,
       tool,
       model,
+      terminalization: null,
       terminalizationRequired: false,
     });
+  }
+
+  async #preModel(
+    requestId: string,
+    trigger: CopilotFailureDiagnosisPreModelTerminalizationTrigger,
+  ) {
+    try {
+      const result = await this.#dependencies.terminalizeBeforeModel(
+        requestId,
+        trigger,
+        this.#dependencies.terminalizations,
+      );
+      return result.receipt;
+    } catch (cause) {
+      if (
+        cause instanceof
+        CopilotFailureDiagnosisPreModelTerminalizationNotReadyError
+      ) {
+        return null;
+      }
+      throw cause;
+    }
   }
 
   async #prepare(
@@ -447,9 +559,7 @@ export class CopilotFailureDiagnosisApplicationService {
     const key = await this.#dependencies.invocationKeys.active();
     try {
       const baseIdentity = identity('cda', command.requestId);
-      const nonce = (
-        this.#dependencies.nonceFactory ?? defaultNonce
-      )({
+      const nonce = (this.#dependencies.nonceFactory ?? defaultNonce)({
         key: key.key,
         keyId: key.keyId,
         requestId: command.requestId,
@@ -507,9 +617,9 @@ export class CopilotFailureDiagnosisApplicationService {
       return unavailable();
     }
     try {
-      const nonce = (
-        this.#dependencies.nonceFactory ?? defaultNonce
-      )(nonceInput(plan, material.key));
+      const nonce = (this.#dependencies.nonceFactory ?? defaultNonce)(
+        nonceInput(plan, material.key),
+      );
       const inputArtifact = createToolInvocationInputArtifact(
         {
           artifactId: plan.tool.invocationArtifact.artifactId,
@@ -564,7 +674,10 @@ export class CopilotFailureDiagnosisApplicationService {
       return unavailable(cause);
     }
     if (!Number.isSafeInteger(value) || value < 0) return invalid('clock');
-    if (value + this.#dependencies.executionTimeoutMs > Number.MAX_SAFE_INTEGER) {
+    if (
+      value + this.#dependencies.executionTimeoutMs >
+      Number.MAX_SAFE_INTEGER
+    ) {
       return invalid('deadline overflows');
     }
     return value;

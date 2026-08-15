@@ -4,6 +4,7 @@ import {
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_SCHEMA,
 } from '../identities';
 import { defineSqlMigration } from '../shared';
@@ -14,6 +15,8 @@ const SOURCE_SNAPSHOT_FUNCTION =
 const TOOL_UNLOCK_TABLE = 'copilot_failure_diagnosis_tool_unlocks';
 const MODEL_OUTPUT_TABLE = 'copilot_failure_diagnosis_model_outputs';
 const FINALIZATION_TABLE = 'copilot_failure_diagnosis_finalizations';
+const PRE_MODEL_TERMINALIZATION_TABLE =
+  'copilot_failure_diagnosis_pre_model_terminalizations';
 
 const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_TABLE_SQL = `
 CREATE TABLE "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${ADMISSION_TABLE}" (
@@ -480,8 +483,102 @@ const postgresCopilotFailureDiagnosisModelExecutionMigration =
     (context, statement) => context.query(statement).then(() => undefined),
   );
 
+const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_TABLE_SQL = `
+CREATE TABLE "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${PRE_MODEL_TERMINALIZATION_TABLE}" (
+  request_id varchar(128) PRIMARY KEY,
+  plan_digest char(64) NOT NULL UNIQUE,
+  run_id varchar(36) NOT NULL UNIQUE,
+  stage varchar(16) NOT NULL,
+  reason varchar(32) NOT NULL,
+  outcome varchar(16) NOT NULL,
+  evidence_digest char(64) NOT NULL,
+  tool_start_id varchar(128),
+  tool_completion_digest char(64),
+  terminal_steps_json jsonb NOT NULL,
+  final_run_version integer NOT NULL,
+  final_run_event_sequence integer NOT NULL,
+  run_event_id varchar(36) NOT NULL UNIQUE,
+  finalized_at_ms bigint NOT NULL,
+  receipt_digest char(64) NOT NULL UNIQUE,
+  receipt_json jsonb NOT NULL,
+  CONSTRAINT ql3_ai_copilot_pre_model_terminalization_admission_fk
+    FOREIGN KEY (request_id)
+    REFERENCES "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${ADMISSION_TABLE}"
+      (request_id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_pre_model_terminalization_run_fk
+    FOREIGN KEY (run_id) REFERENCES "ql3"."runs" (id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_pre_model_terminalization_event_fk
+    FOREIGN KEY (run_event_id) REFERENCES "ql3"."run_events" (id) ON DELETE RESTRICT,
+  CONSTRAINT ql3_ai_copilot_pre_model_terminalization_state_check CHECK (
+    stage IN ('tool', 'log', 'deadline', 'cancellation') AND
+    reason IN (
+      'tool_failed', 'tool_timed_out', 'log_not_found', 'log_pending',
+      'log_missing', 'log_retired', 'tool_budget_exhausted',
+      'deadline_exceeded',
+      'cancellation_requested'
+    ) AND
+    outcome IN ('failed', 'timed_out', 'cancelled') AND
+    ((stage = 'tool' AND reason IN ('tool_failed', 'tool_timed_out')) OR
+     (stage = 'log' AND reason IN (
+       'log_not_found', 'log_pending', 'log_missing', 'log_retired'
+     )) OR
+     (stage = 'deadline' AND reason IN (
+       'tool_budget_exhausted', 'deadline_exceeded'
+     )) OR
+     (stage = 'cancellation' AND reason = 'cancellation_requested')) AND
+    ((stage IN ('tool', 'log') AND tool_start_id IS NOT NULL AND
+      tool_completion_digest IS NOT NULL) OR
+     (stage IN ('deadline', 'cancellation') AND tool_start_id IS NULL AND
+      tool_completion_digest IS NULL)) AND
+    final_run_version >= 1 AND
+    final_run_event_sequence = final_run_version AND
+    finalized_at_ms >= 0
+  ),
+  CONSTRAINT ql3_ai_copilot_pre_model_terminalization_digest_check CHECK (
+    plan_digest ~ '^[0-9a-f]{64}$' AND
+    evidence_digest ~ '^[0-9a-f]{64}$' AND
+    (tool_completion_digest IS NULL OR
+      tool_completion_digest ~ '^[0-9a-f]{64}$') AND
+    receipt_digest ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT ql3_ai_copilot_pre_model_terminalization_json_check CHECK (
+    jsonb_typeof(terminal_steps_json) = 'array' AND
+    jsonb_array_length(terminal_steps_json) BETWEEN 1 AND 2 AND
+    jsonb_typeof(receipt_json) = 'object' AND
+    octet_length(receipt_json::text) BETWEEN 2 AND 32768 AND
+    receipt_json @> jsonb_build_object(
+      'schema',
+      'qinglong/copilot-failure-diagnosis-pre-model-terminalization@v1',
+      'requestId', request_id, 'planDigest', plan_digest,
+      'runId', run_id, 'stage', stage, 'reason', reason,
+      'outcome', outcome, 'evidenceDigest', evidence_digest,
+      'terminalSteps', terminal_steps_json,
+      'finalRunVersion', final_run_version,
+      'finalRunEventSequence', final_run_event_sequence,
+      'runEventId', run_event_id, 'finalizedAtMs', finalized_at_ms,
+      'receiptDigest', receipt_digest
+    )
+  )
+)`;
+
+const postgresCopilotFailureDiagnosisPreModelTerminalizationMigration =
+  defineSqlMigration<PostgresQueryable>(
+    POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_MIGRATION_ID,
+    [
+      POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_TABLE_SQL,
+      `REVOKE ALL ON TABLE
+         "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${PRE_MODEL_TERMINALIZATION_TABLE}"
+       FROM PUBLIC`,
+      `GRANT SELECT, INSERT ON TABLE
+         "${POSTGRES_MODEL_INVOCATION_SCHEMA}"."${PRE_MODEL_TERMINALIZATION_TABLE}"
+       TO ql3_runtime`,
+    ],
+    (context, statement) => context.query(statement).then(() => undefined),
+  );
+
 export const postgresCopilotMigrations = Object.freeze([
   postgresCopilotFailureDiagnosisAdmissionMigration,
   postgresCopilotFailureDiagnosisToolUnlockMigration,
   postgresCopilotFailureDiagnosisModelExecutionMigration,
+  postgresCopilotFailureDiagnosisPreModelTerminalizationMigration,
 ]);

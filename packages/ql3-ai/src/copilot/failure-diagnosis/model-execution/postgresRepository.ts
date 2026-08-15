@@ -34,8 +34,7 @@ import {
 } from './finalization';
 
 const TABLE = '"ql3_ai"."copilot_failure_diagnosis_model_outputs"';
-const FINALIZATION_TABLE =
-  '"ql3_ai"."copilot_failure_diagnosis_finalizations"';
+const FINALIZATION_TABLE = '"ql3_ai"."copilot_failure_diagnosis_finalizations"';
 
 interface OutputRow extends Record<string, unknown> {
   readonly artifactJson: unknown;
@@ -79,7 +78,9 @@ function unavailable(cause?: unknown): never {
   });
 }
 
-function parse(row: OutputRow): Readonly<CopilotFailureDiagnosisOutputArtifact> {
+function parse(
+  row: OutputRow,
+): Readonly<CopilotFailureDiagnosisOutputArtifact> {
   try {
     return normalizeCopilotFailureDiagnosisOutputArtifact(
       row.artifactJson as CopilotFailureDiagnosisOutputArtifact,
@@ -119,7 +120,8 @@ async function put(
   client: PostgresClient,
   artifactValue: CopilotFailureDiagnosisOutputArtifact,
 ): Promise<Readonly<CopilotFailureDiagnosisOutputArtifact>> {
-  const artifact = normalizeCopilotFailureDiagnosisOutputArtifact(artifactValue);
+  const artifact =
+    normalizeCopilotFailureDiagnosisOutputArtifact(artifactValue);
   const existing = await read(client, artifact.artifactId);
   if (existing) {
     if (JSON.stringify(existing) !== JSON.stringify(artifact)) {
@@ -239,7 +241,9 @@ export class PostgresCopilotFailureDiagnosisModelRepository
       if (!result.rows[0]) return null;
       const row = result.rows[0];
       const receipt = normalizeCopilotFailureDiagnosisFinalizationReceipt(
-        object(row.receiptJson) as unknown as CopilotFailureDiagnosisFinalizationReceipt,
+        object(
+          row.receiptJson,
+        ) as unknown as CopilotFailureDiagnosisFinalizationReceipt,
       );
       if (
         receipt.requestId !== string(row.requestId) ||
@@ -268,7 +272,9 @@ export class PostgresCopilotFailureDiagnosisModelRepository
                 event.step_run_id AS "eventStepRunId",
                 event.payload, event.created_at_ms AS "eventCreatedAtMs",
                 completion.completion_digest AS "completionDigest",
-                completion.outcome AS "completionOutcome"
+                completion.outcome AS "completionOutcome",
+                resolution.decision AS "resolutionDecision",
+                resolution.resolved_at_ms AS "resolvedAtMs"
            FROM "ql3"."runs" AS run
            JOIN "ql3"."step_runs" AS step
              ON step.run_id = run.id AND step.id = $1
@@ -276,6 +282,8 @@ export class PostgresCopilotFailureDiagnosisModelRepository
              ON event.run_id = run.id AND event.id = $2
            JOIN "ql3_ai"."model_invocation_completions" AS completion
              ON completion.invocation_id = $3
+           LEFT JOIN "ql3_ai"."model_invocation_resolutions" AS resolution
+             ON resolution.invocation_id = completion.invocation_id
           WHERE run.id = $4`,
         [
           receipt.modelStepRunId,
@@ -301,7 +309,15 @@ export class PostgresCopilotFailureDiagnosisModelRepository
         string(proof.eventStepRunId) !== receipt.modelStepRunId ||
         integer(proof.eventCreatedAtMs) !== receipt.finalizedAtMs ||
         string(proof.completionDigest) !== receipt.completionDigest ||
-        string(proof.completionOutcome) !== receipt.outcome ||
+        !(
+          string(proof.completionOutcome) === receipt.outcome ||
+          (string(proof.completionOutcome) === 'outcome_unknown' &&
+            ((proof.resolutionDecision === 'fail' &&
+              receipt.outcome === 'failed') ||
+              (proof.resolutionDecision === 'cancel' &&
+                receipt.outcome === 'cancelled')) &&
+            integer(proof.resolvedAtMs) === receipt.finalizedAtMs)
+        ) ||
         payload.requestId !== receipt.requestId ||
         payload.planDigest !== receipt.planDigest ||
         payload.invocationId !== receipt.invocationId ||
@@ -320,10 +336,12 @@ export class PostgresCopilotFailureDiagnosisModelRepository
     }
   }
 
-  async finalize(requestId: string): Promise<Readonly<{
-    status: 'created' | 'existing';
-    receipt: Readonly<CopilotFailureDiagnosisFinalizationReceipt>;
-  }>> {
+  async finalize(requestId: string): Promise<
+    Readonly<{
+      status: 'created' | 'existing';
+      receipt: Readonly<CopilotFailureDiagnosisFinalizationReceipt>;
+    }>
+  > {
     const existing = await this.findFinalization(requestId);
     if (existing) {
       return Object.freeze({ status: 'existing' as const, receipt: existing });
@@ -333,7 +351,9 @@ export class PostgresCopilotFailureDiagnosisModelRepository
       try {
         client = await this.#pool.connect();
       } catch (cause) {
-        throw new CopilotFailureDiagnosisFinalizationUnavailableError({ cause });
+        throw new CopilotFailureDiagnosisFinalizationUnavailableError({
+          cause,
+        });
       }
       let began = false;
       try {
@@ -373,13 +393,17 @@ export class PostgresCopilotFailureDiagnosisModelRepository
         }
         if (
           cause instanceof CopilotFailureDiagnosisFinalizationConflictError ||
-          cause instanceof CopilotFailureDiagnosisModelExecutionInProgressError ||
-          cause instanceof CopilotFailureDiagnosisModelResolutionRequiredError ||
+          cause instanceof
+            CopilotFailureDiagnosisModelExecutionInProgressError ||
+          cause instanceof
+            CopilotFailureDiagnosisModelResolutionRequiredError ||
           cause instanceof CopilotFailureDiagnosisFinalizationUnavailableError
         ) {
           throw cause;
         }
-        throw new CopilotFailureDiagnosisFinalizationUnavailableError({ cause });
+        throw new CopilotFailureDiagnosisFinalizationUnavailableError({
+          cause,
+        });
       } finally {
         client.release();
       }
@@ -390,10 +414,12 @@ export class PostgresCopilotFailureDiagnosisModelRepository
   async #finalizeInTransaction(
     client: PostgresClient,
     requestId: string,
-  ): Promise<Readonly<{
-    status: 'created' | 'existing';
-    receipt: Readonly<CopilotFailureDiagnosisFinalizationReceipt>;
-  }>> {
+  ): Promise<
+    Readonly<{
+      status: 'created' | 'existing';
+      receipt: Readonly<CopilotFailureDiagnosisFinalizationReceipt>;
+    }>
+  > {
     const admission = await client.query<Record<string, unknown>>(
       `SELECT plan_json AS "planJson"
          FROM "ql3_ai"."copilot_failure_diagnosis_admissions"
@@ -404,19 +430,29 @@ export class PostgresCopilotFailureDiagnosisModelRepository
       throw new CopilotFailureDiagnosisFinalizationConflictError();
     }
     const plan = normalizeCopilotFailureDiagnosisExecutionPlan(
-      object(admission.rows[0]!.planJson) as unknown as CopilotFailureDiagnosisExecutionPlan,
+      object(
+        admission.rows[0]!.planJson,
+      ) as unknown as CopilotFailureDiagnosisExecutionPlan,
     );
     const durable = await client.query<Record<string, unknown>>(
       `SELECT run.status AS "runStatus", run.version AS "runVersion",
               run.event_sequence AS "runEventSequence",
               step.status AS "stepStatus",
               step.step_run_digest AS "stepRunDigest",
-              completion.record_json AS "completionJson"
+              completion.record_json AS "completionJson",
+              resolution.decision AS "resolutionDecision",
+              resolution.completion_digest AS "resolutionCompletionDigest",
+              resolution.resolved_at_ms AS "resolvedAtMs",
+              resolution_mutation.step_run_digest AS "resolutionStepRunDigest"
          FROM "ql3"."runs" AS run
          JOIN "ql3"."step_runs" AS step
            ON step.run_id = run.id AND step.id = $1
          LEFT JOIN "ql3_ai"."model_invocation_completions" AS completion
            ON completion.invocation_id = $2
+         LEFT JOIN "ql3_ai"."model_invocation_resolutions" AS resolution
+           ON resolution.invocation_id = $2
+         LEFT JOIN "ql3"."step_run_mutations" AS resolution_mutation
+           ON resolution_mutation.mutation_id = resolution.mutation_id
         WHERE run.id = $3
         FOR UPDATE OF run, step`,
       [plan.modelStepRunId, plan.modelInvocationId, plan.runId],
@@ -438,14 +474,41 @@ export class PostgresCopilotFailureDiagnosisModelRepository
       completion.stepRunId !== plan.modelStepRunId ||
       completion.traceId !== plan.traceId ||
       string(row.runStatus) !== 'running' ||
-      string(row.stepRunDigest) !== completion.completedStepRunDigest
+      (completion.outcome !== 'outcome_unknown' &&
+        string(row.stepRunDigest) !== completion.completedStepRunDigest)
     ) {
       throw new CopilotFailureDiagnosisFinalizationConflictError();
     }
+    let outcome: CopilotFailureDiagnosisFinalOutcome;
+    let finalizedAtMs = completion.completedAtMs;
     if (completion.outcome === 'outcome_unknown') {
-      throw new CopilotFailureDiagnosisModelResolutionRequiredError();
+      if (
+        row.resolutionDecision === null ||
+        row.resolutionDecision === undefined
+      ) {
+        throw new CopilotFailureDiagnosisModelResolutionRequiredError();
+      }
+      if (row.resolutionDecision === 'retry') {
+        throw new CopilotFailureDiagnosisModelExecutionInProgressError();
+      }
+      if (
+        row.resolutionDecision !== 'fail' &&
+        row.resolutionDecision !== 'cancel'
+      ) {
+        throw new CopilotFailureDiagnosisFinalizationConflictError();
+      }
+      if (
+        string(row.resolutionCompletionDigest) !==
+          completion.completionDigest ||
+        string(row.resolutionStepRunDigest) !== string(row.stepRunDigest)
+      ) {
+        throw new CopilotFailureDiagnosisFinalizationConflictError();
+      }
+      outcome = row.resolutionDecision === 'fail' ? 'failed' : 'cancelled';
+      finalizedAtMs = integer(row.resolvedAtMs);
+    } else {
+      outcome = completion.outcome;
     }
-    const outcome: CopilotFailureDiagnosisFinalOutcome = completion.outcome;
     if (string(row.stepStatus) !== outcome) {
       throw new CopilotFailureDiagnosisFinalizationConflictError();
     }
@@ -485,19 +548,25 @@ export class PostgresCopilotFailureDiagnosisModelRepository
       outputArtifactId: output?.artifactId ?? null,
       finalRunVersion: runVersion + 1,
       finalRunEventSequence: eventSequence + 1,
-      finalizedAtMs: completion.completedAtMs,
+      finalizedAtMs,
     });
-    const failure = outcome === 'succeeded'
-      ? { code: null, summary: null }
-      : outcome === 'timed_out'
-      ? {
-          code: 'COPILOT_FAILURE_DIAGNOSIS_TIMED_OUT',
-          summary: 'Copilot failure diagnosis timed out',
-        }
-      : {
-          code: 'COPILOT_FAILURE_DIAGNOSIS_FAILED',
-          summary: 'Copilot failure diagnosis failed',
-        };
+    const failure =
+      outcome === 'succeeded'
+        ? { code: null, summary: null }
+        : outcome === 'cancelled'
+        ? {
+            code: 'COPILOT_FAILURE_DIAGNOSIS_CANCELLED',
+            summary: 'Copilot failure diagnosis was cancelled',
+          }
+        : outcome === 'timed_out'
+        ? {
+            code: 'COPILOT_FAILURE_DIAGNOSIS_TIMED_OUT',
+            summary: 'Copilot failure diagnosis timed out',
+          }
+        : {
+            code: 'COPILOT_FAILURE_DIAGNOSIS_FAILED',
+            summary: 'Copilot failure diagnosis failed',
+          };
     const updated = await client.query(
       `UPDATE "ql3"."runs"
           SET status = $1, version = $2, event_sequence = $3,

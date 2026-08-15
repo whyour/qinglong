@@ -3,6 +3,7 @@ import type { SecurityPrincipal } from '@qinglong/runtime-core/security';
 import type { CopilotFailureDiagnosisAdmissionReceipt } from '../admission/contracts';
 import type { CopilotFailureDiagnosisModelExecutionResult } from '../model-execution/coordinator';
 import type { CopilotFailureDiagnosisToolExecutionResult } from '../tool-execution/contracts';
+import type { CopilotFailureDiagnosisPreModelTerminalizationReceipt } from '../terminalization/contracts';
 
 export const MAX_ACTIVE_COPILOT_FAILURE_DIAGNOSIS_APPLICATION_REQUESTS = 64;
 
@@ -17,8 +18,9 @@ export interface ExecuteCopilotFailureDiagnosisApplicationCommand {
 export interface ExecuteCopilotFailureDiagnosisApplicationResult {
   readonly admissionStatus: 'created' | 'existing';
   readonly admission: Readonly<CopilotFailureDiagnosisAdmissionReceipt>;
-  readonly tool: Readonly<CopilotFailureDiagnosisToolExecutionResult>;
+  readonly tool: Readonly<CopilotFailureDiagnosisToolExecutionResult> | null;
   readonly model: Readonly<CopilotFailureDiagnosisModelExecutionResult> | null;
+  readonly terminalization: Readonly<CopilotFailureDiagnosisPreModelTerminalizationReceipt> | null;
   readonly terminalizationRequired: boolean;
 }
 

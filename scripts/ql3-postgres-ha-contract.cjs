@@ -40,6 +40,7 @@ const {
 } = require('../packages/ql3-cluster-postgres/dist/migration/migration.js');
 const {
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_MIGRATION_ID,
@@ -73,6 +74,13 @@ const {
 const {
   PostgresCopilotFailureDiagnosisToolUnlockRepository,
 } = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/postgresToolExecutionRepository.js');
+const {
+  PostgresCopilotFailureDiagnosisPreModelTerminalizationRepository,
+  terminalizeCopilotFailureDiagnosisBeforeModel,
+} = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/preModelTerminalization.js');
+const {
+  PostgresCopilotFailureDiagnosisModelRepository,
+} = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/postgresModelExecutionRepository.js');
 const {
   BUILTIN_RUN_LOG_EXCERPT_TOOL,
   BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION,
@@ -137,6 +145,9 @@ const {
 const {
   DurableModelInvocationCoordinator,
 } = require('../packages/ql3-ai/dist/model-invocation/durableModelInvocationCoordinator.js');
+const {
+  DurableModelInvocationResolutionCoordinator,
+} = require('../packages/ql3-ai/dist/model-invocation/modelInvocationResolution.js');
 const {
   PostgresModelInvocationRepository,
 } = require('../packages/ql3-ai/dist/model-invocation/postgresModelInvocationRepository.js');
@@ -1534,6 +1545,27 @@ async function modelInvocationFeatureFacts(pool) {
             'SELECT,INSERT,UPDATE,DELETE'
           )
        ) AS "copilotDiagnosisModelExecutionRuntimeOnly",
+       has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_pre_model_terminalizations',
+         'SELECT,INSERT'
+       ) AND NOT has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_pre_model_terminalizations',
+         'UPDATE,DELETE'
+       ) AND NOT EXISTS (
+         SELECT 1
+           FROM unnest(ARRAY[
+             'ql3_admin', 'ql3_package_manager', 'ql3_package_executor',
+             'ql3_worker_ingress', 'ql3_ai_maintenance',
+             'ql3_ai_credential_manager', 'ql3_ai_credential_tester'
+           ]::text[]) AS denied(role_name)
+          WHERE has_table_privilege(
+            denied.role_name,
+            'ql3_ai.copilot_failure_diagnosis_pre_model_terminalizations',
+            'SELECT,INSERT,UPDATE,DELETE'
+          )
+       ) AS "copilotDiagnosisPreModelTerminalizationRuntimeOnly",
        has_function_privilege(
          'ql3_runtime',
          'ql3_ai.copilot_failure_diagnosis_admission_source_snapshot(varchar,varchar,varchar,integer,integer,varchar,varchar)',
@@ -1711,6 +1743,108 @@ async function copilotFailureDiagnosisAdmissionFacts(pool, requestId) {
       resultArtifactJson.includes('diagnosis-sensitive-line'),
     planJsonDigest: createHash('sha256').update(planJson).digest('hex'),
     receiptJsonDigest: createHash('sha256').update(receiptJson).digest('hex'),
+  };
+}
+
+async function copilotFailureDiagnosisTerminalizationFacts(pool, requestId) {
+  const result = await pool.query(
+    `SELECT terminalization.request_id AS "requestId",
+            terminalization.plan_digest AS "planDigest",
+            terminalization.stage, terminalization.reason,
+            terminalization.outcome,
+            terminalization.evidence_digest AS "evidenceDigest",
+            terminalization.receipt_digest AS "receiptDigest",
+            terminalization.final_run_version AS "finalRunVersion",
+            terminalization.final_run_event_sequence AS "finalRunEventSequence",
+            run.status AS "runStatus", run.version AS "runVersion",
+            run.event_sequence AS "runEventSequence",
+            tool.status AS "toolStatus", model.status AS "modelStatus",
+            (SELECT count(*)::integer FROM "ql3"."run_events"
+              WHERE run_id = terminalization.run_id) AS "eventCount",
+            (SELECT count(*)::integer FROM "ql3"."step_run_mutations"
+              WHERE run_id = terminalization.run_id) AS "mutationCount",
+            (SELECT count(*)::integer
+               FROM "ql3_ai"."copilot_failure_diagnosis_pre_model_terminalizations"
+              WHERE request_id = terminalization.request_id)
+              AS "terminalizationCount",
+            terminalization.receipt_json::text AS "receiptJson"
+       FROM "ql3_ai"."copilot_failure_diagnosis_pre_model_terminalizations"
+         AS terminalization
+       JOIN "ql3"."runs" AS run ON run.id = terminalization.run_id
+       JOIN "ql3"."step_runs" AS tool
+         ON tool.run_id = terminalization.run_id
+        AND tool.id = (
+          SELECT tool_step_run_id
+            FROM "ql3_ai"."copilot_failure_diagnosis_admissions"
+           WHERE request_id = terminalization.request_id
+        )
+       JOIN "ql3"."step_runs" AS model
+         ON model.run_id = terminalization.run_id
+        AND model.id = (
+          SELECT model_step_run_id
+            FROM "ql3_ai"."copilot_failure_diagnosis_admissions"
+           WHERE request_id = terminalization.request_id
+        )
+      WHERE terminalization.request_id = $1`,
+    [requestId],
+  );
+  assert.equal(result.rowCount, 1);
+  const { receiptJson, ...facts } = result.rows[0];
+  assert.equal(typeof receiptJson, 'string');
+  return {
+    ...facts,
+    receiptJsonDigest: createHash('sha256').update(receiptJson).digest('hex'),
+    receiptContainsLogContent:
+      receiptJson.includes('diagnosis-sensitive-line') ||
+      receiptJson.includes('must-be-redacted'),
+  };
+}
+
+async function copilotFailureDiagnosisModelResolutionFacts(pool, requestId) {
+  const result = await pool.query(
+    `SELECT admission.request_id AS "requestId",
+            run.status AS "runStatus", run.version AS "runVersion",
+            run.event_sequence AS "runEventSequence",
+            model.status AS "modelStatus", model.version AS "modelVersion",
+            completion.outcome AS "completionOutcome",
+            resolution.decision AS "resolutionDecision",
+            finalization.outcome AS "finalizationOutcome",
+            finalization.receipt_digest AS "finalizationReceiptDigest",
+            (SELECT count(*)::integer FROM "ql3"."run_events"
+              WHERE run_id = admission.run_id) AS "eventCount",
+            (SELECT count(*)::integer FROM "ql3"."step_run_mutations"
+              WHERE run_id = admission.run_id) AS "mutationCount",
+            (SELECT count(*)::integer
+               FROM "ql3_ai"."model_invocation_resolutions"
+              WHERE invocation_id = admission.plan_json->>'modelInvocationId')
+              AS "resolutionCount",
+            (SELECT count(*)::integer
+               FROM "ql3_ai"."copilot_failure_diagnosis_finalizations"
+              WHERE request_id = admission.request_id) AS "finalizationCount",
+            finalization.receipt_json::text AS "receiptJson"
+       FROM "ql3_ai"."copilot_failure_diagnosis_admissions" AS admission
+       JOIN "ql3"."runs" AS run ON run.id = admission.run_id
+       JOIN "ql3"."step_runs" AS model
+         ON model.run_id = admission.run_id
+        AND model.id = admission.model_step_run_id
+       JOIN "ql3_ai"."model_invocation_completions" AS completion
+         ON completion.invocation_id = admission.plan_json->>'modelInvocationId'
+       JOIN "ql3_ai"."model_invocation_resolutions" AS resolution
+         ON resolution.invocation_id = completion.invocation_id
+       JOIN "ql3_ai"."copilot_failure_diagnosis_finalizations" AS finalization
+         ON finalization.request_id = admission.request_id
+      WHERE admission.request_id = $1`,
+    [requestId],
+  );
+  assert.equal(result.rowCount, 1);
+  const { receiptJson, ...facts } = result.rows[0];
+  assert.equal(typeof receiptJson, 'string');
+  return {
+    ...facts,
+    receiptJsonDigest: createHash('sha256').update(receiptJson).digest('hex'),
+    receiptContainsModelContent:
+      receiptJson.includes('diagnosis-sensitive-line') ||
+      receiptJson.includes('must-be-redacted'),
   };
 }
 
@@ -1965,6 +2099,8 @@ async function executeCopilotFailureDiagnosisToolHaEvidence(options) {
     fixture,
     resultKeyFixture,
     expectedExisting = false,
+    expectedTerminalized = false,
+    logStatus = 'available',
   } = options;
   const runtimeDatabase = await databaseOpener(
     'runtime',
@@ -2030,6 +2166,8 @@ async function executeCopilotFailureDiagnosisToolHaEvidence(options) {
         assert.equal(request.projectId, fixture.plan.projectId);
         assert.equal(request.runId, report.sourceRunId);
         assert.equal(request.attemptId, report.sourceAttemptId);
+        if (logStatus === 'not_found') return { status: 'not_found' };
+        assert.equal(logStatus, 'available');
         const totalBytes = logContent.byteLength;
         const start = Math.min(request.range.offset, totalBytes);
         const endExclusive = Math.min(start + request.range.length, totalBytes);
@@ -2092,7 +2230,7 @@ async function executeCopilotFailureDiagnosisToolHaEvidence(options) {
       assert.equal(replay.unlockStatus, 'existing');
       assert.deepEqual(replay.completion, first.completion);
       assert.deepEqual(replay.unlock, first.unlock);
-      assert.equal(logReads, 2);
+      assert.equal(logReads, logStatus === 'not_found' ? 1 : 2);
     } else {
       assert.equal(logReads, 0);
     }
@@ -2116,16 +2254,16 @@ async function executeCopilotFailureDiagnosisToolHaEvidence(options) {
         resultArtifactContainsPlaintext: facts.resultArtifactContainsPlaintext,
       },
       {
-        status: 'running',
-        version: 6,
-        eventSequence: 6,
-        eventCount: 6,
-        mutationCount: 5,
+        status: expectedTerminalized ? 'failed' : 'running',
+        version: expectedTerminalized ? 8 : 6,
+        eventSequence: expectedTerminalized ? 8 : 6,
+        eventCount: expectedTerminalized ? 8 : 6,
+        mutationCount: expectedTerminalized ? 6 : 5,
         startCount: 1,
         completionCount: 1,
         unlockCount: 1,
         toolStatus: 'succeeded',
-        modelStatus: 'ready',
+        modelStatus: expectedTerminalized ? 'failed' : 'ready',
         resultArtifactPresent: true,
         resultArtifactContainsPlaintext: false,
       },
@@ -2139,10 +2277,246 @@ async function executeCopilotFailureDiagnosisToolHaEvidence(options) {
       report.promotedToolReplayReads = logReads;
       report.toolExecutionSurvivedPromotion = true;
     }
-    return facts;
+    return { facts, execution: first };
   } finally {
     fixture.invocationKey.fill(0);
     logContent.fill(0);
+    await runtimeDatabase.close();
+  }
+}
+
+async function terminalizeCopilotFailureDiagnosisLogUnavailableHaEvidence(
+  options,
+) {
+  const {
+    port,
+    report,
+    fixture,
+    resultKeyFixture,
+    expectedExisting = false,
+  } = options;
+  const tool = await executeCopilotFailureDiagnosisToolHaEvidence({
+    port,
+    report,
+    fixture,
+    resultKeyFixture,
+    expectedExisting,
+    expectedTerminalized: expectedExisting,
+    logStatus: 'not_found',
+  });
+  const runtimeDatabase = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, port),
+    expectedExisting
+      ? 'ql3-ha-copilot-terminalization-promoted'
+      : 'ql3-ha-copilot-terminalization-primary',
+  )();
+  try {
+    const repository =
+      new PostgresCopilotFailureDiagnosisPreModelTerminalizationRepository(
+        runtimeDatabase.pool,
+      );
+    const trigger = {
+      kind: 'tool_projection',
+      completion: tool.execution.completion,
+      output: tool.execution.output,
+    };
+    const first = await terminalizeCopilotFailureDiagnosisBeforeModel(
+      report.requestId,
+      trigger,
+      { repository },
+    );
+    const replay = await terminalizeCopilotFailureDiagnosisBeforeModel(
+      report.requestId,
+      trigger,
+      { repository },
+    );
+    assert.equal(first.status, expectedExisting ? 'existing' : 'created');
+    assert.equal(replay.status, 'existing');
+    assert.deepEqual(replay.receipt, first.receipt);
+    assert.equal(first.receipt.reason, 'log_not_found');
+    assert.equal(first.receipt.outcome, 'failed');
+    assert.equal(first.receipt.terminalSteps.length, 1);
+    assert.equal(
+      first.receipt.terminalSteps[0].stepRunId,
+      report.modelStepRunId,
+    );
+    assert.equal(first.receipt.terminalSteps[0].status, 'failed');
+    const facts = await copilotFailureDiagnosisTerminalizationFacts(
+      runtimeDatabase.pool,
+      report.requestId,
+    );
+    assert.deepEqual(
+      {
+        stage: facts.stage,
+        reason: facts.reason,
+        outcome: facts.outcome,
+        runStatus: facts.runStatus,
+        runVersion: facts.runVersion,
+        runEventSequence: facts.runEventSequence,
+        eventCount: facts.eventCount,
+        mutationCount: facts.mutationCount,
+        terminalizationCount: facts.terminalizationCount,
+        toolStatus: facts.toolStatus,
+        modelStatus: facts.modelStatus,
+        receiptContainsLogContent: facts.receiptContainsLogContent,
+      },
+      {
+        stage: 'log',
+        reason: 'log_not_found',
+        outcome: 'failed',
+        runStatus: 'failed',
+        runVersion: 8,
+        runEventSequence: 8,
+        eventCount: 8,
+        mutationCount: 6,
+        terminalizationCount: 1,
+        toolStatus: 'succeeded',
+        modelStatus: 'failed',
+        receiptContainsLogContent: false,
+      },
+    );
+    if (expectedExisting) {
+      report.afterPromotion = facts;
+      report.survivedPromotion = true;
+      report.promotedExactReplay = true;
+    } else {
+      report.beforePromotion = facts;
+      report.exactReplay = true;
+      report.contentFree = true;
+    }
+    return facts;
+  } finally {
+    await runtimeDatabase.close();
+  }
+}
+
+async function resolveCopilotFailureDiagnosisUnknownModelHaEvidence(options) {
+  const {
+    port,
+    report,
+    fixture,
+    resultKeyFixture,
+    expectedExisting = false,
+  } = options;
+  if (!expectedExisting) {
+    await executeCopilotFailureDiagnosisToolHaEvidence({
+      port,
+      report,
+      fixture,
+      resultKeyFixture,
+    });
+  }
+  const runtimeDatabase = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, port),
+    expectedExisting
+      ? 'ql3-ha-copilot-model-resolution-promoted'
+      : 'ql3-ha-copilot-model-resolution-primary',
+  )();
+  try {
+    const repository = new PostgresCopilotFailureDiagnosisModelRepository(
+      runtimeDatabase.pool,
+    );
+    const coordinator = new DurableModelInvocationCoordinator(repository);
+    const auditBase = {
+      projectId: fixture.plan.projectId,
+      runId: fixture.plan.runId,
+      stepRunId: fixture.plan.modelStepRunId,
+      traceId: fixture.plan.traceId,
+      requestId: fixture.plan.modelInvocationId,
+      provider: fixture.plan.model.provider,
+      model: fixture.plan.model.model,
+      policyRevision: 'ha-diagnosis-resolution-policy-v1',
+      requestDigest: `sha256:${'f'.repeat(64)}`,
+      deadlineAtMs: fixture.plan.deadlineAtMs,
+      inputBytes: 128,
+      maxOutputTokens: fixture.plan.model.maxOutputTokens,
+    };
+    const admitted = await coordinator.record({
+      ...auditBase,
+      phase: 'admitted',
+      outputBytes: 0,
+      usage: null,
+      errorCode: null,
+      occurredAtMs: fixture.baseTimeMs + 500,
+    });
+    const completed = await coordinator.record({
+      ...auditBase,
+      phase: 'failed',
+      outputBytes: 0,
+      usage: null,
+      errorCode: 'MODEL_INVOCATION_OUTCOME_UNKNOWN',
+      occurredAtMs: fixture.baseTimeMs + 600,
+    });
+    const resolution = await new DurableModelInvocationResolutionCoordinator(
+      repository,
+    ).resolve({
+      invocationId: fixture.plan.modelInvocationId,
+      decision: 'fail',
+      resolvedByUserId: fixture.plan.requestedBySubject.id,
+      resolvedAtMs: fixture.baseTimeMs + 700,
+    });
+    const finalization = await repository.finalize(report.requestId);
+    const replay = await repository.finalize(report.requestId);
+    assert.equal(admitted.status, expectedExisting ? 'existing' : 'created');
+    assert.equal(completed.status, expectedExisting ? 'existing' : 'created');
+    assert.equal(resolution.status, expectedExisting ? 'existing' : 'created');
+    assert.equal(
+      finalization.status,
+      expectedExisting ? 'existing' : 'created',
+    );
+    assert.equal(replay.status, 'existing');
+    assert.deepEqual(replay.receipt, finalization.receipt);
+    assert.equal(finalization.receipt.outcome, 'failed');
+    assert.equal(finalization.receipt.outputArtifactId, null);
+    const facts = await copilotFailureDiagnosisModelResolutionFacts(
+      runtimeDatabase.pool,
+      report.requestId,
+    );
+    assert.deepEqual(
+      {
+        runStatus: facts.runStatus,
+        runVersion: facts.runVersion,
+        runEventSequence: facts.runEventSequence,
+        modelStatus: facts.modelStatus,
+        modelVersion: facts.modelVersion,
+        completionOutcome: facts.completionOutcome,
+        resolutionDecision: facts.resolutionDecision,
+        finalizationOutcome: facts.finalizationOutcome,
+        eventCount: facts.eventCount,
+        mutationCount: facts.mutationCount,
+        resolutionCount: facts.resolutionCount,
+        finalizationCount: facts.finalizationCount,
+        receiptContainsModelContent: facts.receiptContainsModelContent,
+      },
+      {
+        runStatus: 'failed',
+        runVersion: 10,
+        runEventSequence: 10,
+        modelStatus: 'failed',
+        modelVersion: 5,
+        completionOutcome: 'outcome_unknown',
+        resolutionDecision: 'fail',
+        finalizationOutcome: 'failed',
+        eventCount: 10,
+        mutationCount: 8,
+        resolutionCount: 1,
+        finalizationCount: 1,
+        receiptContainsModelContent: false,
+      },
+    );
+    if (expectedExisting) {
+      report.afterPromotion = facts;
+      report.survivedPromotion = true;
+      report.promotedExactReplay = true;
+    } else {
+      report.beforePromotion = facts;
+      report.exactReplay = true;
+      report.contentFree = true;
+    }
+    return facts;
+  } finally {
     await runtimeDatabase.close();
   }
 }
@@ -10598,6 +10972,10 @@ async function main(argv = process.argv.slice(2)) {
   let modelInvocationFeaturePromotion;
   let copilotFailureDiagnosisAdmission;
   let copilotFailureDiagnosisToolFixture;
+  let copilotFailureDiagnosisTerminalization;
+  let copilotFailureDiagnosisTerminalizationFixture;
+  let copilotFailureDiagnosisModelResolution;
+  let copilotFailureDiagnosisModelResolutionFixture;
   let modelProviderCredentialCatalog;
   let modelProviderCredentialTestConnection;
   let runAttemptLogRetentionEvidence;
@@ -10698,6 +11076,7 @@ async function main(argv = process.argv.slice(2)) {
         'copilot_failure_diagnosis_admissions',
         'copilot_failure_diagnosis_finalizations',
         'copilot_failure_diagnosis_model_outputs',
+        'copilot_failure_diagnosis_pre_model_terminalizations',
         'copilot_failure_diagnosis_tool_unlocks',
         'model_invocation_completions',
         'model_invocation_price_quotes',
@@ -10751,6 +11130,7 @@ async function main(argv = process.argv.slice(2)) {
           POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
           POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
           POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
+          POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_MIGRATION_ID,
         ],
       );
       assert.deepEqual(beforePromotion.privileges, {
@@ -10777,6 +11157,7 @@ async function main(argv = process.argv.slice(2)) {
         copilotDiagnosisAdmissionRuntimeOnly: true,
         copilotDiagnosisToolUnlockRuntimeOnly: true,
         copilotDiagnosisModelExecutionRuntimeOnly: true,
+        copilotDiagnosisPreModelTerminalizationRuntimeOnly: true,
         copilotDiagnosisSnapshotRuntimeOnly: true,
         migrationHistoryRuntimeReadOnly: true,
         modelProviderCredentialManagementAuthoritySplit: true,
@@ -10789,6 +11170,22 @@ async function main(argv = process.argv.slice(2)) {
         });
       copilotFailureDiagnosisAdmission = copilotDiagnosis.report;
       copilotFailureDiagnosisToolFixture = copilotDiagnosis.fixture;
+      const copilotTerminalization =
+        await runCopilotFailureDiagnosisAdmissionHaEvidence({
+          primaryPort,
+          migrationPool: migrationDatabase.pool,
+        });
+      copilotFailureDiagnosisTerminalization = copilotTerminalization.report;
+      copilotFailureDiagnosisTerminalizationFixture =
+        copilotTerminalization.fixture;
+      const copilotModelResolution =
+        await runCopilotFailureDiagnosisAdmissionHaEvidence({
+          primaryPort,
+          migrationPool: migrationDatabase.pool,
+        });
+      copilotFailureDiagnosisModelResolution = copilotModelResolution.report;
+      copilotFailureDiagnosisModelResolutionFixture =
+        copilotModelResolution.fixture;
     } finally {
       await migrationDatabase.close();
     }
@@ -11191,6 +11588,48 @@ async function main(argv = process.argv.slice(2)) {
     }, 'Copilot failure diagnosis Tool completion WAL replay');
     timeline.push({
       state: 'copilot_failure_diagnosis_tool_completed',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    await terminalizeCopilotFailureDiagnosisLogUnavailableHaEvidence({
+      port: primaryPort,
+      report: copilotFailureDiagnosisTerminalization,
+      fixture: copilotFailureDiagnosisTerminalizationFixture,
+      resultKeyFixture: toolResultKeyFixture,
+    });
+    await waitFor(async () => {
+      const replicated = await copilotFailureDiagnosisTerminalizationFacts(
+        standbyDatabase.pool,
+        copilotFailureDiagnosisTerminalization.requestId,
+      );
+      return JSON.stringify(replicated) ===
+        JSON.stringify(copilotFailureDiagnosisTerminalization.beforePromotion)
+        ? replicated
+        : null;
+    }, 'Copilot failure diagnosis pre-Model terminalization WAL replay');
+    copilotFailureDiagnosisTerminalization.replicatedBeforePromotion = true;
+    timeline.push({
+      state: 'copilot_failure_diagnosis_pre_model_terminalized',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    await resolveCopilotFailureDiagnosisUnknownModelHaEvidence({
+      port: primaryPort,
+      report: copilotFailureDiagnosisModelResolution,
+      fixture: copilotFailureDiagnosisModelResolutionFixture,
+      resultKeyFixture: toolResultKeyFixture,
+    });
+    await waitFor(async () => {
+      const replicated = await copilotFailureDiagnosisModelResolutionFacts(
+        standbyDatabase.pool,
+        copilotFailureDiagnosisModelResolution.requestId,
+      );
+      return JSON.stringify(replicated) ===
+        JSON.stringify(copilotFailureDiagnosisModelResolution.beforePromotion)
+        ? replicated
+        : null;
+    }, 'Copilot failure diagnosis Model resolution WAL replay');
+    copilotFailureDiagnosisModelResolution.replicatedBeforePromotion = true;
+    timeline.push({
+      state: 'copilot_failure_diagnosis_model_resolution_finalized',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     await waitFor(async () => {
@@ -12093,6 +12532,20 @@ async function main(argv = process.argv.slice(2)) {
       resultKeyFixture: toolResultKeyFixture,
       expectedExisting: true,
     });
+    await terminalizeCopilotFailureDiagnosisLogUnavailableHaEvidence({
+      port: standbyPort,
+      report: copilotFailureDiagnosisTerminalization,
+      fixture: copilotFailureDiagnosisTerminalizationFixture,
+      resultKeyFixture: toolResultKeyFixture,
+      expectedExisting: true,
+    });
+    await resolveCopilotFailureDiagnosisUnknownModelHaEvidence({
+      port: standbyPort,
+      report: copilotFailureDiagnosisModelResolution,
+      fixture: copilotFailureDiagnosisModelResolutionFixture,
+      resultKeyFixture: toolResultKeyFixture,
+      expectedExisting: true,
+    });
     await verifyModelProviderCredentialCatalogAfterPromotion({
       promotedPort: standbyPort,
       promotedPool: promotedDatabase.pool,
@@ -12847,7 +13300,7 @@ async function main(argv = process.argv.slice(2)) {
             FROM "ql3"."worker_credential_deliveries") AS "credentialDeliveries"`,
     );
     assert.deepEqual(sideEffects.rows, [
-      { runs: 78, runEvents: 182, credentialDeliveries: 4 },
+      { runs: 82, runEvents: 200, credentialDeliveries: 4 },
     ]);
     timeline.push({
       state: 'two_fresh_control_replicas_ready',
@@ -12962,6 +13415,8 @@ async function main(argv = process.argv.slice(2)) {
       runDomainCommitResponseLoss: domainCommitResponseLoss.report,
       modelInvocationFeaturePromotion,
       copilotFailureDiagnosisAdmission,
+      copilotFailureDiagnosisTerminalization,
+      copilotFailureDiagnosisModelResolution,
       modelProviderCredentialCatalog,
       modelProviderCredentialTestConnection,
       runAttemptLogRetention,
@@ -12996,6 +13451,30 @@ async function main(argv = process.argv.slice(2)) {
         copilotFailureDiagnosisAdmissionReplicatesAndSurvivesPromotion:
           copilotFailureDiagnosisAdmission.replicatedBeforePromotion &&
           copilotFailureDiagnosisAdmission.survivedPromotion,
+        copilotFailureDiagnosisPreModelTerminalizationExactlyReplays:
+          copilotFailureDiagnosisTerminalization.exactReplay &&
+          copilotFailureDiagnosisTerminalization.beforePromotion
+            .terminalizationCount === 1 &&
+          copilotFailureDiagnosisTerminalization.beforePromotion.reason ===
+            'log_not_found' &&
+          copilotFailureDiagnosisTerminalization.beforePromotion.runStatus ===
+            'failed' &&
+          copilotFailureDiagnosisTerminalization.beforePromotion.modelStatus ===
+            'failed',
+        copilotFailureDiagnosisPreModelTerminalizationIsContentFree:
+          copilotFailureDiagnosisTerminalization.contentFree &&
+          copilotFailureDiagnosisTerminalization.beforePromotion
+            .receiptContainsLogContent === false,
+        copilotFailureDiagnosisPreModelTerminalizationReplicatesAndSurvivesPromotion:
+          copilotFailureDiagnosisTerminalization.replicatedBeforePromotion &&
+          copilotFailureDiagnosisTerminalization.survivedPromotion &&
+          copilotFailureDiagnosisTerminalization.promotedExactReplay &&
+          JSON.stringify(
+            copilotFailureDiagnosisTerminalization.afterPromotion,
+          ) ===
+            JSON.stringify(
+              copilotFailureDiagnosisTerminalization.beforePromotion,
+            ),
         copilotFailureDiagnosisAdmissionUsesLeastPrivilegeRuntime:
           modelInvocationFeaturePromotion.beforePromotion.privileges
             .copilotDiagnosisAdmissionRuntimeOnly &&
@@ -13003,6 +13482,33 @@ async function main(argv = process.argv.slice(2)) {
             .copilotDiagnosisToolUnlockRuntimeOnly &&
           modelInvocationFeaturePromotion.beforePromotion.privileges
             .copilotDiagnosisSnapshotRuntimeOnly,
+        copilotFailureDiagnosisTerminalizationUsesLeastPrivilegeRuntime:
+          modelInvocationFeaturePromotion.beforePromotion.privileges
+            .copilotDiagnosisPreModelTerminalizationRuntimeOnly,
+        copilotFailureDiagnosisUnknownModelResolutionExactlyReplays:
+          copilotFailureDiagnosisModelResolution.exactReplay &&
+          copilotFailureDiagnosisModelResolution.beforePromotion
+            .completionOutcome === 'outcome_unknown' &&
+          copilotFailureDiagnosisModelResolution.beforePromotion
+            .resolutionDecision === 'fail' &&
+          copilotFailureDiagnosisModelResolution.beforePromotion
+            .finalizationOutcome === 'failed' &&
+          copilotFailureDiagnosisModelResolution.beforePromotion
+            .finalizationCount === 1,
+        copilotFailureDiagnosisUnknownModelResolutionIsContentFree:
+          copilotFailureDiagnosisModelResolution.contentFree &&
+          copilotFailureDiagnosisModelResolution.beforePromotion
+            .receiptContainsModelContent === false,
+        copilotFailureDiagnosisUnknownModelResolutionReplicatesAndSurvivesPromotion:
+          copilotFailureDiagnosisModelResolution.replicatedBeforePromotion &&
+          copilotFailureDiagnosisModelResolution.survivedPromotion &&
+          copilotFailureDiagnosisModelResolution.promotedExactReplay &&
+          JSON.stringify(
+            copilotFailureDiagnosisModelResolution.afterPromotion,
+          ) ===
+            JSON.stringify(
+              copilotFailureDiagnosisModelResolution.beforePromotion,
+            ),
         modelProviderCredentialCatalogSurvivesPromotion:
           modelProviderCredentialCatalog.survivedPromotion,
         modelProviderCredentialManagementIdentityLedgerSurvivesPromotion:

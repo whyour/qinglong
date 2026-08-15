@@ -6,6 +6,9 @@ const {
   CopilotFailureDiagnosisApplicationUnavailableError,
 } = require('@qinglong/ai/failure-diagnosis-application');
 const {
+  CopilotFailureDiagnosisPreModelTerminalizationNotReadyError,
+} = require('@qinglong/ai/failure-diagnosis-pre-model-terminalization');
+const {
   BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION,
 } = require('@qinglong/runtime-core/builtin-run-log-excerpt-tool');
 const {
@@ -80,9 +83,12 @@ function fixture(options = {}) {
   let resolvedKeyCopies = [];
   let toolCalls = 0;
   let modelCalls = 0;
+  let terminalizationCalls = 0;
   let releaseTool;
   const toolGate = options.blockTool
-    ? new Promise((resolve) => { releaseTool = resolve; })
+    ? new Promise((resolve) => {
+        releaseTool = resolve;
+      })
     : Promise.resolve();
   const admissions = {
     async findByRequestId(requestId) {
@@ -108,20 +114,30 @@ function fixture(options = {}) {
     },
   };
   const snapshots = {
-    async findCurrent() { return { snapshot: snapshot(), committedAtMs: NOW }; },
+    async findCurrent() {
+      return { snapshot: snapshot(), committedAtMs: NOW };
+    },
   };
   const runs = {
     async findRunById() {
       return {
-        id: 'source-run-1', projectId: 'project-1', status: 'failed',
-        version: 8, eventSequence: 8,
+        id: 'source-run-1',
+        projectId: 'project-1',
+        status: 'failed',
+        version: 8,
+        eventSequence: 8,
       };
     },
     async findLatestAttemptByRunId() {
       return {
-        id: 'source-attempt-1', runId: 'source-run-1', attempt: 1,
-        status: 'failed', executorType: 'remote_worker', callbackSequence: 0,
-        createdAtMs: NOW - 3000, finishedAtMs: NOW - 1000,
+        id: 'source-attempt-1',
+        runId: 'source-run-1',
+        attempt: 1,
+        status: 'failed',
+        executorType: 'remote_worker',
+        callbackSequence: 0,
+        createdAtMs: NOW - 3000,
+        finishedAtMs: NOW - 1000,
         logArtifactId: `wlog-${'d'.repeat(30)}`,
       };
     },
@@ -140,8 +156,12 @@ function fixture(options = {}) {
       artifacts = { input, preview };
       return { status: 'inserted' };
     },
-    async findInput() { return artifacts?.input ?? null; },
-    async findPreview() { return artifacts?.preview ?? null; },
+    async findInput() {
+      return artifacts?.input ?? null;
+    },
+    async findPreview() {
+      return artifacts?.preview ?? null;
+    },
   };
   const invocationKeys = {
     async active() {
@@ -156,23 +176,58 @@ function fixture(options = {}) {
       return { keyId, key: copy };
     },
   };
-  const unlocks = { async findByRequestId() { return null; }, async commit() {} };
+  const unlocks = {
+    async findByRequestId() {
+      return null;
+    },
+    async commit() {},
+  };
   const tool = {
     admissions,
     snapshots,
     runs,
     artifacts: artifactRepository,
     invocationKeys,
-    resultKeys: { async resolve() { return null; } },
-    stepRuns: { async findById() { return null; } },
-    barriers: {}, completions: {}, failureCompletions: {},
-    resultKeyCatalog: {}, resultRekeys: {}, logs: {}, unlocks,
+    resultKeys: {
+      async resolve() {
+        return null;
+      },
+    },
+    stepRuns: {
+      async findById() {
+        return null;
+      },
+    },
+    barriers: {},
+    completions: {},
+    failureCompletions: {},
+    resultKeyCatalog: {},
+    resultRekeys: {},
+    logs: {},
+    unlocks,
   };
   const model = {
     admissions,
     unlocks,
-    toolResults: {}, modelInvocations: {}, outputs: {}, gateway: {},
-    successfulCompletion: {}, finalizations: {},
+    toolResults: {},
+    modelInvocations: {},
+    outputs: {},
+    gateway: {},
+    successfulCompletion: {},
+    finalizations: {},
+  };
+  const terminalizations = {
+    repository: {
+      async findByRequestId() {
+        return null;
+      },
+      async readAuthority() {
+        return {};
+      },
+      async commit() {
+        return {};
+      },
+    },
   };
   const service = new CopilotFailureDiagnosisApplicationService({
     admissions,
@@ -183,13 +238,15 @@ function fixture(options = {}) {
     authorizer: {
       async authorize() {
         return {
-          effect: 'allow', reasons: ['role_grant'],
+          effect: 'allow',
+          reasons: ['role_grant'],
           fence: { projectVersion: 1, bindingVersion: 1 },
         };
       },
     },
     tool,
     model,
+    terminalizations,
     modelIntent: MODEL,
     executionTimeoutMs: 60_000,
     now: () => NOW,
@@ -197,10 +254,24 @@ function fixture(options = {}) {
       toolCalls += 1;
       await toolGate;
       return options.toolFailure
-        ? { outcome: 'failed', completionStatus: 'created', unlockStatus: null }
+        ? {
+            outcome: 'failed',
+            completionStatus: 'created',
+            unlockStatus: null,
+            completion: { completionDigest: 'f'.repeat(64) },
+          }
         : {
-            outcome: 'succeeded', completionStatus: 'created',
-            unlockStatus: 'created', completion: {}, unlock: {},
+            outcome: 'succeeded',
+            completionStatus: 'created',
+            unlockStatus: 'created',
+            completion: { completionDigest: 'e'.repeat(64) },
+            output: {
+              status: 'available',
+              runId: 'source-run-1',
+              attemptId: 'source-attempt-1',
+              profile: 'cluster-control',
+            },
+            unlock: {},
           };
     },
     async executeModel() {
@@ -211,13 +282,36 @@ function fixture(options = {}) {
         finalization: { requestId: 'diagnosis-request-1' },
       };
     },
+    async terminalizeBeforeModel(_requestId, trigger) {
+      terminalizationCalls += 1;
+      if (
+        trigger.kind === 'boundary' ||
+        (trigger.kind === 'tool_projection' &&
+          trigger.output.status === 'available')
+      ) {
+        throw new CopilotFailureDiagnosisPreModelTerminalizationNotReadyError();
+      }
+      return {
+        status: 'created',
+        receipt: {
+          requestId: 'diagnosis-request-1',
+          reason: 'tool_failed',
+          outcome: 'failed',
+        },
+      };
+    },
   });
   return {
     service,
     releaseTool: () => releaseTool?.(),
     state: () => ({
-      plan, artifacts, toolCalls, modelCalls,
-      activeKeyCopies, resolvedKeyCopies,
+      plan,
+      artifacts,
+      toolCalls,
+      modelCalls,
+      terminalizationCalls,
+      activeKeyCopies,
+      resolvedKeyCopies,
     }),
   };
 }
@@ -228,6 +322,7 @@ test('application derives, admits and executes one server-owned diagnosis with e
   assert.equal(first.admissionStatus, 'created');
   assert.equal(first.tool.outcome, 'succeeded');
   assert.equal(first.model.outcome, 'succeeded');
+  assert.equal(first.terminalization, null);
   assert.equal(first.terminalizationRequired, false);
   const second = await testFixture.service.execute(command());
   assert.equal(second.admissionStatus, 'existing');
@@ -235,9 +330,18 @@ test('application derives, admits and executes one server-owned diagnosis with e
   assert.equal(state.toolCalls, 2);
   assert.equal(state.modelCalls, 2);
   assert.equal(state.plan.source.attemptId, 'source-attempt-1');
-  assert.equal(state.plan.tool.invocationArtifact.artifactId.startsWith('cdia:'), true);
-  assert.equal(state.activeKeyCopies[0].every((value) => value === 0), true);
-  assert.equal(state.resolvedKeyCopies[0].every((value) => value === 0), true);
+  assert.equal(
+    state.plan.tool.invocationArtifact.artifactId.startsWith('cdia:'),
+    true,
+  );
+  assert.equal(
+    state.activeKeyCopies[0].every((value) => value === 0),
+    true,
+  );
+  assert.equal(
+    state.resolvedKeyCopies[0].every((value) => value === 0),
+    true,
+  );
 });
 
 test('application repairs the durable admission-to-Artifact crash window', async () => {
@@ -253,7 +357,7 @@ test('application repairs the durable admission-to-Artifact crash window', async
   assert.ok(testFixture.state().artifacts);
 });
 
-test('application coalesces exact callers and exposes Tool terminalization debt', async () => {
+test('application coalesces exact callers and terminalizes Tool failure', async () => {
   const concurrent = fixture({ blockTool: true });
   const first = concurrent.service.execute(command());
   const second = concurrent.service.execute(command());
@@ -266,6 +370,7 @@ test('application coalesces exact callers and exposes Tool terminalization debt'
   const result = await failed.service.execute(command());
   assert.equal(result.tool.outcome, 'failed');
   assert.equal(result.model, null);
-  assert.equal(result.terminalizationRequired, true);
+  assert.equal(result.terminalization.reason, 'tool_failed');
+  assert.equal(result.terminalizationRequired, false);
   assert.equal(failed.state().modelCalls, 0);
 });

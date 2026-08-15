@@ -18,6 +18,10 @@ import {
 import { PostgresCopilotFailureDiagnosisAdmissionRepository } from '@qinglong/ai/postgres-failure-diagnosis-admission-storage';
 import { PostgresCopilotFailureDiagnosisModelRepository } from '@qinglong/ai/postgres-failure-diagnosis-model-execution-storage';
 import { PostgresCopilotFailureDiagnosisToolUnlockRepository } from '@qinglong/ai/postgres-failure-diagnosis-tool-execution-storage';
+import {
+  PostgresCopilotFailureDiagnosisPreModelTerminalizationRepository,
+  terminalizeCopilotFailureDiagnosisBeforeModel,
+} from '@qinglong/ai/failure-diagnosis-pre-model-terminalization';
 import type { ActiveModelGatewayCapability } from '@qinglong/ai/profile';
 import {
   PostgresProjectPolicyRepository,
@@ -33,9 +37,7 @@ import {
   PostgresToolResultRekeyReader,
   type QingLongPostgresPool,
 } from '@qinglong/cluster-postgres/runtime';
-import {
-  BuiltInRunLogExcerptToolAdapter,
-} from '@qinglong/runtime-core/builtin-run-log-excerpt-tool';
+import { BuiltInRunLogExcerptToolAdapter } from '@qinglong/runtime-core/builtin-run-log-excerpt-tool';
 import type { RunAttemptLogReadPort } from '@qinglong/runtime-core/builtin-run-log-excerpt-projection';
 import { ProjectPolicyEngine } from '@qinglong/runtime-core/project-policy';
 import { RunAttemptLogReadService } from '@qinglong/runtime-core/run-attempt-log-read';
@@ -92,7 +94,9 @@ export interface PreparedClusterCopilotFailureDiagnosisProjection {
     ReturnType<typeof createClusterToolResultProjectedKeyring>
   >;
   readonly outputKeys: Awaited<
-    ReturnType<typeof createClusterCopilotFailureDiagnosisOutputProjectedKeyring>
+    ReturnType<
+      typeof createClusterCopilotFailureDiagnosisOutputProjectedKeyring
+    >
   >;
 }
 
@@ -100,7 +104,10 @@ export class ClusterCopilotFailureDiagnosisCompositionError extends Error {
   readonly code = 'QL3_CLUSTER_COPILOT_FAILURE_DIAGNOSIS_COMPOSITION_INVALID';
 
   constructor(message: string, options?: ErrorOptions) {
-    super(`Cluster Copilot failure diagnosis composition is invalid: ${message}`, options);
+    super(
+      `Cluster Copilot failure diagnosis composition is invalid: ${message}`,
+      options,
+    );
     this.name = 'ClusterCopilotFailureDiagnosisCompositionError';
   }
 }
@@ -196,7 +203,8 @@ export function normalizeClusterCopilotFailureDiagnosisConfig(
     ],
     'egress policy',
   );
-  if (egress.schema !== EGRESS_SCHEMA) return invalid('egress schema is invalid');
+  if (egress.schema !== EGRESS_SCHEMA)
+    return invalid('egress schema is invalid');
   const selected = egress.potentiallySensitiveDataBoundaries;
   if (
     !Array.isArray(selected) ||
@@ -307,7 +315,11 @@ function modelIntent(
 export async function prepareProductionClusterCopilotFailureDiagnosisProjection(
   projection: ClusterCopilotFailureDiagnosisProjection,
 ): Promise<Readonly<PreparedClusterCopilotFailureDiagnosisProjection>> {
-  if (!projection || typeof projection !== 'object' || Array.isArray(projection)) {
+  if (
+    !projection ||
+    typeof projection !== 'object' ||
+    Array.isArray(projection)
+  ) {
     return invalid('projection is invalid');
   }
   const [config, invocationKeys, resultKeys, outputKeys] = await Promise.all([
@@ -360,8 +372,12 @@ export async function createProductionClusterCopilotFailureDiagnosis(
   const runs = new PostgresRunRepository(options.pool);
   const artifacts = new PostgresToolInvocationArtifactRepository(options.pool);
   const stepRuns = new PostgresStepRunRepository(options.pool);
-  const barriers = new PostgresToolExecutionStartBarrierRepository(options.pool);
-  const completions = new PostgresToolExecutionCompletionRepository(options.pool);
+  const barriers = new PostgresToolExecutionStartBarrierRepository(
+    options.pool,
+  );
+  const completions = new PostgresToolExecutionCompletionRepository(
+    options.pool,
+  );
   const failureCompletions =
     new PostgresToolExecutionFailureCompletionRepository(options.pool);
   const resultKeyCatalog = new PostgresToolResultKeyCatalogReader(options.pool);
@@ -369,7 +385,13 @@ export async function createProductionClusterCopilotFailureDiagnosis(
   const unlocks = new PostgresCopilotFailureDiagnosisToolUnlockRepository(
     options.pool,
   );
-  const models = new PostgresCopilotFailureDiagnosisModelRepository(options.pool);
+  const models = new PostgresCopilotFailureDiagnosisModelRepository(
+    options.pool,
+  );
+  const preModelTerminalizations =
+    new PostgresCopilotFailureDiagnosisPreModelTerminalizationRepository(
+      options.pool,
+    );
   const logReader = new RunAttemptLogReadService(
     runs,
     Object.freeze({
@@ -457,8 +479,12 @@ export async function createProductionClusterCopilotFailureDiagnosis(
     authorizer: policy,
     tool,
     model,
+    terminalizations: Object.freeze({
+      repository: preModelTerminalizations,
+    }),
     executeTool: executeCopilotFailureDiagnosisTool,
     executeModel: executeCopilotFailureDiagnosisModel,
+    terminalizeBeforeModel: terminalizeCopilotFailureDiagnosisBeforeModel,
     modelIntent: modelIntent(config),
     executionTimeoutMs: config.executionTimeoutMs,
   };

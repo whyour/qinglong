@@ -22,6 +22,7 @@ const {
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_MIGRATION_ID,
   POSTGRES_COPILOT_FAILURE_DIAGNOSIS_MODEL_EXECUTION_MIGRATION_ID,
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_MIGRATION_HISTORY_TABLE,
   POSTGRES_MODEL_INVOCATION_MIGRATION_STREAM_ID,
@@ -437,6 +438,10 @@ test('PostgreSQL AI schema is an independent reviewed feature stream', async () 
     'pg-9020-ai-copilot-failure-diagnosis-model-executions',
   );
   assert.equal(
+    POSTGRES_COPILOT_FAILURE_DIAGNOSIS_PRE_MODEL_TERMINALIZATION_MIGRATION_ID,
+    'pg-9021-ai-copilot-failure-diagnosis-pre-model-terminalizations',
+  );
+  assert.equal(
     POSTGRES_MODEL_INVOCATION_MIGRATION_HISTORY_TABLE,
     'ai_schema_migrations',
   );
@@ -523,7 +528,7 @@ test('PostgreSQL AI schema is an independent reviewed feature stream', async () 
   );
   assert.equal(
     postgresModelInvocationMigrationDefinition.migrations.length,
-    20,
+    21,
   );
 
   const diagnosisAdmissionStatements = [];
@@ -594,6 +599,29 @@ test('PostgreSQL AI schema is an independent reviewed feature stream', async () 
   assert.match(diagnosisModelExecutionSql, /TO ql3_runtime/);
   assert.doesNotMatch(
     diagnosisModelExecutionSql,
+    /GRANT[^;]*(?:UPDATE|DELETE)/,
+  );
+
+  const diagnosisPreModelTerminalizationStatements = [];
+  await postgresModelInvocationMigrationDefinition.migrations[20].up({
+    async query(statement) {
+      diagnosisPreModelTerminalizationStatements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const diagnosisPreModelTerminalizationSql =
+    diagnosisPreModelTerminalizationStatements.join('\n');
+  assert.match(
+    diagnosisPreModelTerminalizationSql,
+    /CREATE TABLE "ql3_ai"\."copilot_failure_diagnosis_pre_model_terminalizations"/,
+  );
+  assert.match(
+    diagnosisPreModelTerminalizationSql,
+    /jsonb_array_length\(terminal_steps_json\) BETWEEN 1 AND 2/,
+  );
+  assert.match(diagnosisPreModelTerminalizationSql, /TO ql3_runtime/);
+  assert.doesNotMatch(
+    diagnosisPreModelTerminalizationSql,
     /GRANT[^;]*(?:UPDATE|DELETE)/,
   );
 

@@ -5,6 +5,8 @@ import type {
   ToolExecutionCompletionRecord,
   ToolExecutionResultArtifactReference,
 } from '@qinglong/runtime-core/tool-execution-completion';
+import type { ToolJsonValue } from '@qinglong/runtime-core/tool-registry';
+import type { ToolExecutionFailureCompletionRecord } from '@qinglong/runtime-core/tool-execution-failure-completion';
 import type { ToolPolicyAuthorizer } from '@qinglong/runtime-core/tool-registry';
 
 import type {
@@ -76,12 +78,14 @@ export type CopilotFailureDiagnosisToolExecutionResult =
       completionStatus: 'created' | 'existing';
       unlockStatus: 'created' | 'existing';
       completion: Readonly<ToolExecutionCompletionRecord>;
+      output: ToolJsonValue;
       unlock: Readonly<CopilotFailureDiagnosisToolUnlockReceipt>;
     }>
   | Readonly<{
       outcome: 'failed' | 'timed_out';
       completionStatus: 'created' | 'existing';
       unlockStatus: null;
+      completion: Readonly<ToolExecutionFailureCompletionRecord>;
     }>;
 
 export class InvalidCopilotFailureDiagnosisToolExecutionError extends TypeError {

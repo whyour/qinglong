@@ -1179,6 +1179,7 @@ function auditSourceImports(root, packagePath, findings) {
               '@qinglong/ai/failure-diagnosis-application',
               '@qinglong/ai/failure-diagnosis-execution-admission',
               '@qinglong/ai/failure-diagnosis-model-execution',
+              '@qinglong/ai/failure-diagnosis-pre-model-terminalization',
               '@qinglong/ai/failure-diagnosis-tool-execution',
               '@qinglong/ai/postgres-failure-diagnosis-admission-storage',
               '@qinglong/ai/postgres-failure-diagnosis-model-execution-storage',

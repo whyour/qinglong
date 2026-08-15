@@ -60,6 +60,11 @@
       "require": "./dist/copilot/failure-diagnosis/failureDiagnosisApplication.js",
       "default": "./dist/copilot/failure-diagnosis/failureDiagnosisApplication.js"
     },
+    "./failure-diagnosis-pre-model-terminalization": {
+      "types": "./dist/copilot/failure-diagnosis/preModelTerminalization.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/preModelTerminalization.js",
+      "default": "./dist/copilot/failure-diagnosis/preModelTerminalization.js"
+    },
     "./postgres-failure-diagnosis-model-execution-storage": {
       "types": "./dist/copilot/failure-diagnosis/postgresModelExecutionRepository.d.ts",
       "require": "./dist/copilot/failure-diagnosis/postgresModelExecutionRepository.js",

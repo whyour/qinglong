@@ -586,6 +586,7 @@ export async function executeCopilotFailureDiagnosisTool(
       outcome: completed.outcome,
       completionStatus: completed.status,
       unlockStatus: null,
+      completion: completed.completion,
     });
   }
   const unlock = await unlockModel(plan, completed.completion, dependencies);
@@ -594,6 +595,7 @@ export async function executeCopilotFailureDiagnosisTool(
     completionStatus: completed.status,
     unlockStatus: unlock.status,
     completion: completed.completion,
+    output: completed.output,
     unlock: unlock.receipt,
   });
 }
