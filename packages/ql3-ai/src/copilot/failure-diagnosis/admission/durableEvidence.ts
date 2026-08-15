@@ -175,7 +175,7 @@ export function createCopilotFailureDiagnosisAdmissionBundle(
         runId: plan.runId,
         stepKey: 'collect-log',
         kind: 'tool',
-        definitionRef: `trusted-tool-plan:${plan.tool.planDigest}`,
+        definitionRef: 'tool:qinglong.run.log.excerpt@1.0.0',
         definitionDigest: plan.tool.definitionDigest,
         required: true,
         initialStatus: 'ready',

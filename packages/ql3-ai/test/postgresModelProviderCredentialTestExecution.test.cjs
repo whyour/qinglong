@@ -277,7 +277,7 @@ test('tester readiness freezes migration history and least privilege', async () 
   assert.equal(ready.ready, true);
   assert.equal(
     ready.migrationIds.at(-1),
-    'pg-9018-ai-copilot-failure-diagnosis-admissions',
+    'pg-9019-ai-copilot-failure-diagnosis-tool-unlocks',
   );
 
   await assert.rejects(

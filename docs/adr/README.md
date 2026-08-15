@@ -411,6 +411,7 @@
 | [ADR-0405](./ADR-0405-bounded-failure-diagnosis-prompt-and-model-egress-policy.md)                | 有界故障诊断 Prompt 与显式模型出口策略                                                                                                                | Accepted |
 | [ADR-0406](./ADR-0406-cluster-projected-tool-result-key-authority.md)                              | Cluster Projected Tool Result Key Authority                                                                                                           | Accepted |
 | [ADR-0407](./ADR-0407-cluster-copilot-failure-diagnosis-run-admission.md)                          | Cluster Copilot Failure Diagnosis Run Admission                                                                                                       | Accepted |
+| [ADR-0408](./ADR-0408-cluster-copilot-failure-diagnosis-tool-execution.md)                         | Cluster Copilot Failure Diagnosis Tool Execution 与原子 Model 解锁                                                                                    | Accepted |
 
 ## 规则
 

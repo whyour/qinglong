@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { test } = require('node:test');
 
 const {
@@ -33,6 +34,12 @@ const {
 const {
   storedJsonEquals,
 } = require('../dist/copilot/failure-diagnosis/admission/postgresRepository.js');
+const {
+  COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_RECEIPT_SCHEMA,
+  createCopilotFailureDiagnosisToolUnlockCommand,
+  normalizeCopilotFailureDiagnosisToolUnlockCommand,
+  restoreCopilotFailureDiagnosisTrustedToolAuthority,
+} = require('../dist/copilot/failure-diagnosis/toolExecution.js');
 
 const DIGEST_A = 'a'.repeat(64);
 const DIGEST_B = 'b'.repeat(64);
@@ -189,6 +196,40 @@ async function plan(options = {}) {
   });
 }
 
+function successfulToolCompletion(current) {
+  const unsigned = Object.freeze({
+    schema: 'qinglong/tool-execution-completion@v1',
+    startId: 'cds:diagnosis-tool-start',
+    projectId: current.projectId,
+    runId: current.runId,
+    stepRunId: current.toolStepRunId,
+    startedStepRunVersion: 2,
+    completedStepRunVersion: 3,
+    barrierDigest: DIGEST_A,
+    adapterDigest: DIGEST_B,
+    resultArtifact: Object.freeze({
+      artifactId: 'cdra:diagnosis-result',
+      artifactDigest: DIGEST_C,
+      outputDigest: DIGEST_A,
+      executionResultDigest: DIGEST_B,
+    }),
+    stepRunMutationId: 'cdscm:diagnosis-tool',
+    stepRunMutationDigest: DIGEST_C,
+    completedStepRunDigest: DIGEST_A,
+    runEventId: 'cdsce:diagnosis-tool',
+    completedAtMs: 3_000,
+  });
+  return Object.freeze({
+    ...unsigned,
+    completionDigest: createHash('sha256')
+      .update(
+        Buffer.from('qinglong/tool-execution-completion-digest@v1\0', 'utf8'),
+      )
+      .update(JSON.stringify(unsigned))
+      .digest('hex'),
+  });
+}
+
 test('creates one independent diagnosis Run with ready Tool and pending Model Steps', async () => {
   const current = await plan();
   assert.equal(current.schema, COPILOT_FAILURE_DIAGNOSIS_EXECUTION_PLAN_SCHEMA);
@@ -224,6 +265,10 @@ test('creates one independent diagnosis Run with ready Tool and pending Model St
     },
     { kind: 'tool', status: 'ready', sequence: 2 },
   );
+  assert.equal(
+    bundle.toolStepMutation.stepRun.definitionRef,
+    'tool:qinglong.run.log.excerpt@1.0.0',
+  );
   assert.deepEqual(
     {
       kind: bundle.modelStepMutation.stepRun.kind,
@@ -254,6 +299,63 @@ test('creates one independent diagnosis Run with ready Tool and pending Model St
       JSON.parse(JSON.stringify(bundle.receipt)),
     ),
     bundle.receipt,
+  );
+});
+
+test('restores the exact admitted Tool and binds success to one Model unlock mutation', async () => {
+  const current = await plan();
+  const admission = createCopilotFailureDiagnosisAdmissionBundle(current);
+  const authority = restoreCopilotFailureDiagnosisTrustedToolAuthority(
+    current,
+    snapshot(),
+  );
+  assert.equal(authority.plan.planDigest, current.tool.planDigest);
+  assert.equal(authority.binding.bindingDigest, current.tool.bindingDigest);
+
+  const command = createCopilotFailureDiagnosisToolUnlockCommand({
+    plan: current,
+    completion: successfulToolCompletion(current),
+    modelStepRun: admission.modelStepMutation.stepRun,
+    run: {
+      id: current.runId,
+      projectId: current.projectId,
+      status: 'running',
+      version: 5,
+      eventSequence: 5,
+    },
+  });
+  assert.equal(
+    command.receipt.schema,
+    COPILOT_FAILURE_DIAGNOSIS_TOOL_UNLOCK_RECEIPT_SCHEMA,
+  );
+  assert.equal(command.modelStepRunMutation.previousStatus, 'pending');
+  assert.equal(command.modelStepRunMutation.stepRun.status, 'ready');
+  assert.equal(command.receipt.finalRunVersion, 6);
+  assert.deepEqual(
+    normalizeCopilotFailureDiagnosisToolUnlockCommand(
+      JSON.parse(JSON.stringify(command)),
+    ),
+    command,
+  );
+  assert.throws(
+    () =>
+      normalizeCopilotFailureDiagnosisToolUnlockCommand({
+        ...command,
+        receipt: { ...command.receipt, finalRunVersion: 7 },
+      }),
+    TypeError,
+  );
+});
+
+test('publishes Tool execution only through explicit AI subpaths', () => {
+  const root = require('../dist');
+  const execution = require('@qinglong/ai/failure-diagnosis-tool-execution');
+  const storage = require('@qinglong/ai/postgres-failure-diagnosis-tool-execution-storage');
+  assert.equal(root.executeCopilotFailureDiagnosisTool, undefined);
+  assert.equal(typeof execution.executeCopilotFailureDiagnosisTool, 'function');
+  assert.equal(
+    typeof storage.PostgresCopilotFailureDiagnosisToolUnlockRepository,
+    'function',
   );
 });
 

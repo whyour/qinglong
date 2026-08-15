@@ -125,6 +125,11 @@
       "require": "./dist/trusted-tool/key-management/toolResultProjectedKeyring.js",
       "default": "./dist/trusted-tool/key-management/toolResultProjectedKeyring.js"
     },
+    "./trusted-tool-invocation-keyring": {
+      "types": "./dist/trusted-tool/key-management/toolInvocationProjectedKeyring.d.ts",
+      "require": "./dist/trusted-tool/key-management/toolInvocationProjectedKeyring.js",
+      "default": "./dist/trusted-tool/key-management/toolInvocationProjectedKeyring.js"
+    },
     "./remote-completion": {
       "types": "./dist/remote-execution/remoteWorkerCompletionService.d.ts",
       "require": "./dist/remote-execution/remoteWorkerCompletionService.js",

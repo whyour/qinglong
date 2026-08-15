@@ -268,10 +268,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
     {
       path: 'packages/ql3-ai',
       name: '@qinglong/ai',
-      sourceFiles: 168,
+      sourceFiles: 175,
       rootSourceFiles: 1,
       rootSourceLines: 16,
-      nestedSourceFiles: 167,
+      nestedSourceFiles: 174,
       rootSourceFileHardCap: 1,
       rootSourceLineHardCap: 16,
       rootSourceFileRoles: {
@@ -385,10 +385,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterControl.rootSourceFileRoles,
     },
     {
-      sourceFiles: 54,
+      sourceFiles: 56,
       rootSourceFiles: 2,
       rootSourceLines: 195,
-      nestedSourceFiles: 52,
+      nestedSourceFiles: 54,
       rootSourceFileRoles: {
         'aiCli.ts': 'binary_entry',
         'cli.ts': 'binary_entry',
