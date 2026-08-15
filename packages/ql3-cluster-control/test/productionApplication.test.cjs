@@ -729,6 +729,7 @@ test('optionally exposes Prompt execution behind shared admission and policy', a
     'prompt.execution.read',
     'prompt.execution.output.read',
     'prompt.output.read',
+    'copilot.failure_diagnosis.execute',
   ]);
   const response = await invoke(
     stack,
@@ -754,6 +755,134 @@ test('optionally exposes Prompt execution behind shared admission and policy', a
     bindingVersion: 7,
   });
   assert.equal(events.includes('audit:prompt.execute:allowed'), true);
+});
+
+test('optionally exposes Copilot diagnosis behind shared authentication, Policy and audit', async () => {
+  const { events, input } = fixture();
+  let command;
+  const capability = {
+    async execute(value) {
+      command = value;
+      events.push(`diagnose:${value.sourceRunId}`);
+      return {
+        admissionStatus: 'created',
+        admission: {
+          requestId: value.requestId,
+          runId: 'diagnosis-run-1',
+          sourceRunId: value.sourceRunId,
+        },
+        tool: { outcome: 'succeeded' },
+        model: {
+          outcome: 'succeeded',
+          output: {
+            artifactId: 'cdo:artifact-1',
+            artifactDigest: 'a'.repeat(64),
+          },
+        },
+        terminalization: null,
+        terminalizationRequired: false,
+      };
+    },
+  };
+  const stack = createProductionClusterControlApplicationStack(input, {
+    copilotFailureDiagnosis: { capability },
+  });
+  const result = await invoke(
+    stack,
+    metadata(
+      '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses',
+      'POST',
+      {
+        schema: 'qinglong/cluster-copilot-failure-diagnosis-request@v1',
+        traceId: 'trace-production-1',
+      },
+    ),
+  );
+
+  assert.equal(result.statusCode, 201);
+  assert.equal(command.requestId, 'request-production-1');
+  assert.equal(command.projectId, 'project-1');
+  assert.equal(command.sourceRunId, 'run-1');
+  assert.equal(command.principal.subject.id, 'app-production');
+  assert.equal('policyFence' in command, false);
+  assert.deepEqual(events.slice(-4), [
+    'authenticate',
+    'authorize',
+    'audit:copilot.failure_diagnosis.execute:allowed',
+    'diagnose:run-1',
+  ]);
+});
+
+test('keeps the Copilot route absent by default and never invokes it after Policy denial', async () => {
+  const defaultFixture = fixture();
+  const defaultStack = createProductionClusterControlApplicationStack(
+    defaultFixture.input,
+  );
+  const request = metadata(
+    '/api/v3/projects/project-1/runs/run-1/copilot/failure-diagnoses',
+    'POST',
+    {
+      schema: 'qinglong/cluster-copilot-failure-diagnosis-request@v1',
+      traceId: 'trace-production-1',
+    },
+  );
+  await assert.rejects(
+    defaultStack.admission.prepare(request),
+    (error) => error?.statusCode === 404 && error?.code === 'route_not_found',
+  );
+
+  let calls = 0;
+  const deniedFixture = fixture({
+    policies: {
+      async resolve() {
+        deniedFixture.events.push('authorize');
+        return {
+          project: {
+            id: 'project-1',
+            name: 'Denied Project',
+            slug: 'denied-project',
+            status: 'active',
+            version: 3,
+            createdAtMs: 1,
+            updatedAtMs: 2,
+          },
+          binding: {
+            projectId: 'project-1',
+            subject: { type: 'api_app', id: 'app-production' },
+            state: 'active',
+            role: 'viewer',
+            version: 7,
+            mutationId: 'binding-denied-1',
+            changedBy: { type: 'system', id: 'bootstrap' },
+            createdAtMs: 1,
+          },
+        };
+      },
+    },
+  });
+  const deniedStack = createProductionClusterControlApplicationStack(
+    deniedFixture.input,
+    {
+      copilotFailureDiagnosis: {
+        capability: {
+          async execute() {
+            calls += 1;
+          },
+        },
+      },
+    },
+  );
+  await assert.rejects(
+    deniedStack.admission.prepare(request),
+    (error) => error?.statusCode === 403 && error?.code === 'forbidden',
+  );
+  assert.equal(calls, 0);
+  assert.equal(
+    deniedFixture.events.includes(
+      'audit:copilot.failure_diagnosis.execute:denied',
+    ),
+    true,
+  );
 });
 
 test('optionally exposes the redacted Prompt catalog behind shared admission and policy', async () => {

@@ -117,7 +117,7 @@ async function projectedFile(root, name, bytes) {
   await chmod(join(root, name), 0o440);
 }
 
-test('Copilot composition is explicit, shares the Prompt gateway and exposes no route', async () => {
+test('Copilot composition is explicit, shares the Prompt gateway and injects one route capability', async () => {
   const secretRoot = await mkdtemp(join(tmpdir(), 'ql3-cluster-ai-secret-'));
   const configRoot = await mkdtemp(join(tmpdir(), 'ql3-copilot-config-'));
   const invocationRoot = await mkdtemp(join(tmpdir(), 'ql3-copilot-invocation-'));
@@ -229,7 +229,7 @@ test('Copilot composition is explicit, shares the Prompt gateway and exposes no 
     assert.equal(created.gateway, gateway);
     assert.equal(created.successfulCompletion, registeredSink);
     assert.equal(created.artifactStore, artifactStore);
-    assert.equal('copilot' in controlOptions, false);
+    assert.equal(controlOptions.copilotFailureDiagnosis.capability, copilot);
     assert.equal(await application.stop(), 'stopped');
   } finally {
     config.fill(0); invocation.fill(0); result.fill(0); output.fill(0);

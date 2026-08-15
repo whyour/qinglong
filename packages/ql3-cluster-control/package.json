@@ -45,6 +45,11 @@
       "require": "./dist/copilot/failure-diagnosis/outputProjectedKeyring.js",
       "default": "./dist/copilot/failure-diagnosis/outputProjectedKeyring.js"
     },
+    "./copilot-routes": {
+      "types": "./dist/copilot/failure-diagnosis/failureDiagnosisRoute.d.ts",
+      "require": "./dist/copilot/failure-diagnosis/failureDiagnosisRoute.js",
+      "default": "./dist/copilot/failure-diagnosis/failureDiagnosisRoute.js"
+    },
     "./http": {
       "types": "./dist/transport/httpSurface.d.ts",
       "require": "./dist/transport/httpSurface.js",

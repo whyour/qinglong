@@ -445,6 +445,13 @@ export async function startProductionClusterAiControlApplication(
               capability: promptApplication.promptExecutionOutputs,
             },
           }),
+      ...(copilotApplication === undefined
+        ? {}
+        : {
+            copilotFailureDiagnosis: {
+              capability: copilotApplication,
+            },
+          }),
     });
     if (controlApplication.status !== 'active') {
       throw new Error('AI-enabled cluster-control did not activate');
