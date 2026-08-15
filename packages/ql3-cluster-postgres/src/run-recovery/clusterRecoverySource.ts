@@ -34,7 +34,10 @@ WITH observation AS (
   FROM "ql3"."runs"
   CROSS JOIN observation
   WHERE execution_owner = 'runtime'
-    AND trigger_type <> 'plugin_package_workflow'
+    AND trigger_type NOT IN (
+      'plugin_package_workflow',
+      'copilot_failure_diagnosis'
+    )
     AND (
       status = 'created'
       OR (

@@ -127,7 +127,7 @@ test('unsafe recovery stops the stack before lifecycles and admission', async ()
         },
       }),
     ),
-    /did not converge safely/,
+    /did not converge safely \(remaining=1, failed=0\)/,
   );
   assert.equal(events.includes('start-lifecycles'), false);
   assert.equal(events.includes('install-admission'), false);

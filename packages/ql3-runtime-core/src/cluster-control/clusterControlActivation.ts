@@ -89,7 +89,10 @@ function assertSafeRecovery(
   recovery: ClusterControlStartupRecoverySummary,
 ): void {
   if (!recovery.safe || recovery.remaining !== 0 || recovery.failed !== 0) {
-    throw new Error('Cluster-control startup recovery did not converge safely');
+    throw new Error(
+      'Cluster-control startup recovery did not converge safely ' +
+        `(remaining=${recovery.remaining}, failed=${recovery.failed})`,
+    );
   }
 }
 

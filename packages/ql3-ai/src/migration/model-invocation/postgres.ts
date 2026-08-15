@@ -1,7 +1,4 @@
-import type {
-  PostgresPool,
-  PostgresQueryable,
-} from '@qinglong/runtime-core';
+import type { PostgresPool, PostgresQueryable } from '@qinglong/runtime-core';
 import {
   MigrationStreamHistoryCorruptionError,
   runMigrationStream,
@@ -30,11 +27,13 @@ import {
   POSTGRES_MODEL_PROVIDER_CREDENTIAL_TEST_CONNECTION_MIGRATION_ID,
   POSTGRES_PLUGIN_PACKAGE_PROMPT_OUTPUT_KEY_ROTATION_MIGRATION_ID,
   POSTGRES_PLUGIN_PACKAGE_PROMPT_PRODUCT_AUTHORIZATION_MIGRATION_ID,
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_SCHEMA,
   POSTGRES_MODEL_INVOCATION_MIGRATION_HISTORY_TABLE,
 } from './identities';
 
 import { postgresCatalogMigrations } from './postgres/catalog';
+import { postgresCopilotMigrations } from './postgres/copilot';
 import { postgresCoreMigrations } from './postgres/core';
 import { postgresCredentialMigrations } from './postgres/credential';
 import {
@@ -63,6 +62,7 @@ const POSTGRES_HISTORY_IDENTITY = Object.freeze({
     POSTGRES_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_IDENTITY_MIGRATION_ID,
     POSTGRES_MODEL_PROVIDER_CREDENTIAL_TEST_CONNECTION_MIGRATION_ID,
     POSTGRES_PLUGIN_PACKAGE_PROMPT_PRODUCT_AUTHORIZATION_MIGRATION_ID,
+    POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   ]),
   streamId: POSTGRES_MODEL_INVOCATION_MIGRATION_STREAM_ID,
   dialect: 'postgresql' as const,
@@ -246,6 +246,7 @@ export const postgresModelInvocationMigrationDefinition: MigrationStreamDefiniti
       ...postgresPromptBaseMigrations,
       ...postgresCredentialMigrations,
       ...postgresPromptExtensionMigrations,
+      ...postgresCopilotMigrations,
     ]),
   });
 

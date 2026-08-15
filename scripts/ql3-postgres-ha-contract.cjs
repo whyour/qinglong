@@ -21,6 +21,7 @@ const {
   createPostgresDatabaseOpener,
   PostgresClusterRunCancellationConvergenceRepository,
   PostgresClusterRunCancellationRepository,
+  PostgresClusterControlRecoverySource,
   PostgresClusterScheduleRepository,
   PostgresRemoteWorkerCompletionRepository,
   PostgresRemoteWorkerLeaseControlRepository,
@@ -32,6 +33,7 @@ const {
   runPostgresMigrations,
 } = require('../packages/ql3-cluster-postgres/dist/migration/migration.js');
 const {
+  POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_PRICING_MIGRATION_ID,
   POSTGRES_MODEL_INVOCATION_QUOTA_MIGRATION_ID,
@@ -51,6 +53,31 @@ const {
   POSTGRES_PLUGIN_PACKAGE_PROMPT_PRODUCT_AUTHORIZATION_MIGRATION_ID,
   migratePostgresModelInvocationFeature,
 } = require('../packages/ql3-ai/dist/migration/modelInvocationMigration.js');
+const {
+  prepareCopilotFailureDiagnosisExecution,
+} = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/executionAdmission.js');
+const {
+  PostgresCopilotFailureDiagnosisAdmissionRepository,
+} = require('../packages/ql3-ai/dist/copilot/failure-diagnosis/postgresAdmissionRepository.js');
+const {
+  BUILTIN_RUN_LOG_EXCERPT_TOOL,
+  BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION,
+  createBuiltInRunLogExcerptToolHandlerBinding,
+} = require('../packages/ql3-runtime-core/dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptTool.js');
+const {
+  createPluginPackageResourceGenerationFromReferences,
+} = require('../packages/ql3-runtime-core/dist/plugin-package/pluginPackageResourceGeneration.js');
+const {
+  createProjectToolDefinitionSnapshot,
+  projectToolDefinitionRegistry,
+} = require('../packages/ql3-runtime-core/dist/tool-execution/tool-registry/projectToolDefinitionSnapshot.js');
+const {
+  prepareToolInvocation,
+} = require('../packages/ql3-runtime-core/dist/tool-execution/tool-registry/toolRegistry.js');
+const {
+  TrustedToolHandlerBindingRegistry,
+  createTrustedToolInvocationPlan,
+} = require('../packages/ql3-runtime-core/dist/tool-execution/trustedToolInvocation.js');
 const {
   MODEL_PROVIDER_CREDENTIAL_TRANSITION_COMMAND_SCHEMA,
   ModelProviderCredentialCatalogUnavailableError,
@@ -902,6 +929,8 @@ async function modelInvocationFeatureFacts(pool) {
       FROM pg_tables
       WHERE schemaname = 'ql3_ai'
         AND (
+          tablename LIKE 'copilot_failure_diagnosis_%'
+          OR
           tablename LIKE 'model_invocation_%'
           OR tablename LIKE 'model_price_catalog_%'
           OR tablename LIKE 'model_provider_credential_%'
@@ -1425,6 +1454,42 @@ async function modelInvocationFeatureFacts(pool) {
          'EXECUTE'
        ) AS "promptSnapshotRuntimeOnly",
        has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_admissions', 'SELECT,INSERT'
+       ) AND NOT has_table_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_admissions', 'UPDATE,DELETE'
+       ) AND NOT EXISTS (
+         SELECT 1
+           FROM unnest(ARRAY[
+             'ql3_admin', 'ql3_package_manager', 'ql3_package_executor',
+             'ql3_worker_ingress', 'ql3_ai_maintenance',
+             'ql3_ai_credential_manager', 'ql3_ai_credential_tester'
+           ]::text[]) AS denied(role_name)
+          WHERE has_table_privilege(
+            denied.role_name,
+            'ql3_ai.copilot_failure_diagnosis_admissions',
+            'SELECT,INSERT,UPDATE,DELETE'
+          )
+       ) AS "copilotDiagnosisAdmissionRuntimeOnly",
+       has_function_privilege(
+         'ql3_runtime',
+         'ql3_ai.copilot_failure_diagnosis_admission_source_snapshot(varchar,varchar,varchar,integer,integer,varchar,varchar)',
+         'EXECUTE'
+       ) AND NOT EXISTS (
+         SELECT 1
+           FROM unnest(ARRAY[
+             'ql3_admin', 'ql3_package_manager', 'ql3_package_executor',
+             'ql3_worker_ingress', 'ql3_ai_maintenance',
+             'ql3_ai_credential_manager', 'ql3_ai_credential_tester'
+           ]::text[]) AS denied(role_name)
+          WHERE has_function_privilege(
+            denied.role_name,
+            'ql3_ai.copilot_failure_diagnosis_admission_source_snapshot(varchar,varchar,varchar,integer,integer,varchar,varchar)',
+            'EXECUTE'
+          )
+       ) AS "copilotDiagnosisSnapshotRuntimeOnly",
+       has_table_privilege(
          'ql3_runtime', 'ql3_ai.ai_schema_migrations', 'SELECT'
        ) AND NOT has_table_privilege(
          'ql3_runtime', 'ql3_ai.ai_schema_migrations', 'INSERT,UPDATE,DELETE'
@@ -1516,6 +1581,273 @@ async function modelInvocationFeatureFacts(pool) {
     history: history.rows,
     privileges: privileges.rows[0],
   };
+}
+
+async function copilotFailureDiagnosisAdmissionFacts(pool, requestId) {
+  const result = await pool.query(
+    `SELECT admission.request_id AS "requestId",
+            admission.plan_digest AS "planDigest",
+            admission.receipt_digest AS "receiptDigest",
+            admission.source_run_id AS "sourceRunId",
+            admission.source_attempt_id AS "sourceAttemptId",
+            admission.tool_step_run_id AS "toolStepRunId",
+            admission.model_step_run_id AS "modelStepRunId",
+            run.parent_run_id AS "parentRunId", run.status,
+            run.version, run.event_sequence AS "eventSequence",
+            (SELECT count(*)::integer FROM "ql3"."run_events"
+              WHERE run_id = admission.run_id) AS "eventCount",
+            (SELECT count(*)::integer FROM "ql3"."step_run_mutations"
+              WHERE run_id = admission.run_id) AS "mutationCount",
+            tool.status AS "toolStatus", tool.kind AS "toolKind",
+            model.status AS "modelStatus", model.kind AS "modelKind",
+            model.parent_step_run_id AS "modelParentStepRunId",
+            admission.plan_json::text AS "planJson",
+            admission.receipt_json::text AS "receiptJson"
+       FROM "ql3_ai"."copilot_failure_diagnosis_admissions" AS admission
+       JOIN "ql3"."runs" AS run ON run.id = admission.run_id
+       JOIN "ql3"."step_runs" AS tool
+         ON tool.run_id = admission.run_id
+        AND tool.id = admission.tool_step_run_id
+       JOIN "ql3"."step_runs" AS model
+         ON model.run_id = admission.run_id
+        AND model.id = admission.model_step_run_id
+      WHERE admission.request_id = $1`,
+    [requestId],
+  );
+  assert.equal(result.rowCount, 1);
+  const { planJson, receiptJson, ...facts } = result.rows[0];
+  assert.equal(typeof planJson, 'string');
+  assert.equal(typeof receiptJson, 'string');
+  return {
+    ...facts,
+    planJsonDigest: createHash('sha256').update(planJson).digest('hex'),
+    receiptJsonDigest: createHash('sha256').update(receiptJson).digest('hex'),
+  };
+}
+
+async function runCopilotFailureDiagnosisAdmissionHaEvidence(options) {
+  const { primaryPort, migrationPool } = options;
+  const baseTimeMs = Date.now();
+  const suffix = `${process.pid}-${randomBytes(3).toString('hex')}`;
+  const projectId = `diagnosis-${suffix}`;
+  const subjectId = `diagnosis-owner-${suffix}`;
+  const sourceRunId = `src-${randomBytes(10).toString('hex')}`;
+  const sourceAttemptId = `att-${randomBytes(10).toString('hex')}`;
+  const logArtifactId = `wlog-${createHash('sha256')
+    .update(suffix)
+    .digest('hex')
+    .slice(0, 30)}`;
+  const requestId = `diagnosis-request-${suffix}`;
+  const source = Object.freeze({
+    runId: sourceRunId,
+    runVersion: 8,
+    runStatus: 'failed',
+    attemptId: sourceAttemptId,
+    attemptStatus: 'failed',
+    attemptFinishedAtMs: baseTimeMs,
+    logArtifactId,
+  });
+  await migrationPool.query(
+    `INSERT INTO "ql3"."projects" (
+       id, name, slug, status, version, created_at_ms, updated_at_ms
+     ) VALUES ($1, $1, $2, 'active', 1, 1, 1)`,
+    [projectId, projectId],
+  );
+  await migrationPool.query(
+    `INSERT INTO "ql3"."project_role_bindings" (
+       project_id, subject_type, subject_id, version, state, role,
+       mutation_id, changed_by_type, changed_by_id, created_at_ms
+     ) VALUES ($1, 'user', $2, 1, 'active', 'owner', $3,
+               'system', 'ha-contract', 1)`,
+    [projectId, subjectId, `diagnosis-binding-${suffix}`],
+  );
+  await migrationPool.query(
+    `INSERT INTO "ql3"."runs" (
+       id, project_id, task_id, task_revision, trigger_type,
+       execution_origin, execution_owner, status, version, event_sequence,
+       created_at_ms, started_at_ms, finished_at_ms
+     ) VALUES ($1, $2, 'source-task', 'source-v1', 'manual', 'manual',
+               'runtime', 'failed', 8, 8, $3, $4, $5)`,
+    [
+      sourceRunId,
+      projectId,
+      baseTimeMs - 2_000,
+      baseTimeMs - 1_000,
+      baseTimeMs,
+    ],
+  );
+  await migrationPool.query(
+    `INSERT INTO "ql3"."run_attempts" (
+       id, run_id, attempt, status, executor_type, log_artifact_id,
+       callback_sequence, created_at_ms, started_at_ms, finished_at_ms,
+       error_code, error_summary
+     ) VALUES ($1, $2, 1, 'failed', 'remote_worker', $3, 0,
+               $4, $5, $6, 'exit_nonzero', 'bounded failure')`,
+    [
+      sourceAttemptId,
+      sourceRunId,
+      logArtifactId,
+      baseTimeMs - 2_000,
+      baseTimeMs - 1_000,
+      baseTimeMs,
+    ],
+  );
+
+  const generation = createPluginPackageResourceGenerationFromReferences({
+    installationId: `diagnosis-tool-${suffix}`,
+    projectId,
+    packageName: 'qinglong',
+    lockDigest: 'a'.repeat(64),
+    generation: 1,
+    previousActiveLockDigest: null,
+    contentDigest: 'b'.repeat(64),
+    resources: [],
+  });
+  const snapshot = createProjectToolDefinitionSnapshot({
+    projectId,
+    contributions: [
+      {
+        generation,
+        revisionDigest: 'c'.repeat(64),
+        definitions: [BUILTIN_RUN_LOG_EXCERPT_TOOL_DEFINITION],
+      },
+    ],
+  });
+  const principal = Object.freeze({
+    subject: { type: 'user', id: subjectId },
+    authenticationId: `diagnosis-auth-${suffix}`,
+    authenticatedAtMs: baseTimeMs - 1_000,
+    expiresAtMs: baseTimeMs + 60_000,
+    assurance: 'multi_factor',
+  });
+  const invocation = await prepareToolInvocation(
+    projectToolDefinitionRegistry(snapshot),
+    {
+      projectId,
+      principal,
+      nowMs: baseTimeMs + 100,
+      tool: BUILTIN_RUN_LOG_EXCERPT_TOOL,
+      input: { runId: sourceRunId, attemptId: sourceAttemptId },
+    },
+    {
+      async authorize() {
+        return {
+          effect: 'allow',
+          reasons: ['role_grant'],
+          fence: { projectVersion: 1, bindingVersion: 1 },
+        };
+      },
+    },
+  );
+  const bindings = new TrustedToolHandlerBindingRegistry(snapshot, [
+    createBuiltInRunLogExcerptToolHandlerBinding(snapshot, ['cluster-control']),
+  ]);
+  const toolPlan = createTrustedToolInvocationPlan(bindings, invocation, {
+    actionRef: `diagnosis-log-${suffix}`,
+    inputArtifactId: `diagnosis-input-${suffix}`,
+    previewArtifactId: `diagnosis-preview-${suffix}`,
+    artifactKeyId: `diagnosis-key-${suffix}`,
+    artifactKey: Buffer.alloc(32, 0x21),
+    artifactNonce: Buffer.alloc(12, 0x31),
+    profile: 'cluster-control',
+    preview: {
+      title: 'Read failed Run log',
+      summary: 'Reads one bounded redacted log excerpt',
+      fields: [
+        { kind: 'identifier', label: 'Run', value: sourceRunId },
+        { kind: 'identifier', label: 'Attempt', value: sourceAttemptId },
+      ],
+      warnings: ['potentially_sensitive_output'],
+    },
+    sealedAtMs: baseTimeMs + 200,
+  }).plan;
+  const plan = prepareCopilotFailureDiagnosisExecution({
+    requestId,
+    traceId: `diagnosis-trace-${suffix}`,
+    source,
+    toolPlan,
+    bindings,
+    model: {
+      provider: 'provider-primary',
+      model: 'model-diagnosis',
+      modelBoundary: 'external',
+      responseLanguage: 'zh-CN',
+      maxOutputTokens: 512,
+      egressPolicy: {
+        schema: 'qinglong/copilot-model-egress-policy@v1',
+        revision: 'ha-diagnosis-policy-v1',
+        potentiallySensitiveDataBoundaries: ['external'],
+        maxInputBytes: 64 * 1024,
+        maxOutputTokens: 1_024,
+      },
+    },
+    deadlineAtMs: baseTimeMs + 60_000,
+    plannedAtMs: baseTimeMs + 300,
+  });
+  const runtimeDatabase = await databaseOpener(
+    'runtime',
+    databaseUrl(RUNTIME_USER, RUNTIME_PASSWORD, primaryPort),
+    'ql3-ha-copilot-diagnosis-admission',
+  )();
+  try {
+    const repository = new PostgresCopilotFailureDiagnosisAdmissionRepository(
+      runtimeDatabase.pool,
+    );
+    const first = await repository.admit(plan);
+    const replay = await repository.admit(plan);
+    assert.equal(first.status, 'created');
+    assert.equal(replay.status, 'existing');
+    assert.deepEqual(replay.receipt, first.receipt);
+    assert.deepEqual(
+      await repository.findByRequestId(requestId),
+      first.receipt,
+    );
+    assert.deepEqual(await repository.findPlanByRequestId(requestId), plan);
+    const facts = await copilotFailureDiagnosisAdmissionFacts(
+      runtimeDatabase.pool,
+      requestId,
+    );
+    assert.deepEqual(
+      {
+        parentRunId: facts.parentRunId,
+        status: facts.status,
+        version: facts.version,
+        eventSequence: facts.eventSequence,
+        eventCount: facts.eventCount,
+        mutationCount: facts.mutationCount,
+        toolStatus: facts.toolStatus,
+        toolKind: facts.toolKind,
+        modelStatus: facts.modelStatus,
+        modelKind: facts.modelKind,
+        modelParentStepRunId: facts.modelParentStepRunId,
+      },
+      {
+        parentRunId: sourceRunId,
+        status: 'running',
+        version: 3,
+        eventSequence: 3,
+        eventCount: 3,
+        mutationCount: 2,
+        toolStatus: 'ready',
+        toolKind: 'tool',
+        modelStatus: 'pending',
+        modelKind: 'model',
+        modelParentStepRunId: plan.toolStepRunId,
+      },
+    );
+    return {
+      requestId,
+      sourceRunId,
+      sourceAttemptId,
+      runId: plan.runId,
+      toolStepRunId: plan.toolStepRunId,
+      modelStepRunId: plan.modelStepRunId,
+      exactReplay: true,
+      beforePromotion: facts,
+    };
+  } finally {
+    await runtimeDatabase.close();
+  }
 }
 
 async function runModelProviderCredentialCatalogMatrix(options) {
@@ -9967,6 +10299,7 @@ async function main(argv = process.argv.slice(2)) {
   let networkPartition;
   let oldPrimaryRejoin;
   let modelInvocationFeaturePromotion;
+  let copilotFailureDiagnosisAdmission;
   let modelProviderCredentialCatalog;
   let modelProviderCredentialTestConnection;
   let runAttemptLogRetentionEvidence;
@@ -10064,6 +10397,7 @@ async function main(argv = process.argv.slice(2)) {
         migrationDatabase.pool,
       );
       assert.deepEqual(beforePromotion.tables, [
+        'copilot_failure_diagnosis_admissions',
         'model_invocation_completions',
         'model_invocation_price_quotes',
         'model_invocation_price_settlements',
@@ -10113,6 +10447,7 @@ async function main(argv = process.argv.slice(2)) {
           POSTGRES_MODEL_PROVIDER_CREDENTIAL_TEST_CONNECTION_MIGRATION_ID,
           POSTGRES_PLUGIN_PACKAGE_PROMPT_OUTPUT_KEY_ROTATION_MIGRATION_ID,
           POSTGRES_PLUGIN_PACKAGE_PROMPT_PRODUCT_AUTHORIZATION_MIGRATION_ID,
+          POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID,
         ],
       );
       assert.deepEqual(beforePromotion.privileges, {
@@ -10136,10 +10471,17 @@ async function main(argv = process.argv.slice(2)) {
         promptOutputKeyRetirementAuthoritySplit: true,
         promptOutputKeyRotationAuthoritySplit: true,
         promptSnapshotRuntimeOnly: true,
+        copilotDiagnosisAdmissionRuntimeOnly: true,
+        copilotDiagnosisSnapshotRuntimeOnly: true,
         migrationHistoryRuntimeReadOnly: true,
         modelProviderCredentialManagementAuthoritySplit: true,
       });
       modelInvocationFeaturePromotion = { beforePromotion };
+      copilotFailureDiagnosisAdmission =
+        await runCopilotFailureDiagnosisAdmissionHaEvidence({
+          primaryPort,
+          migrationPool: migrationDatabase.pool,
+        });
     } finally {
       await migrationDatabase.close();
     }
@@ -10418,6 +10760,21 @@ async function main(argv = process.argv.slice(2)) {
     }, 'synchronous standby readiness');
     timeline.push({
       state: 'synchronous_remote_apply_ready',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    await waitFor(async () => {
+      const replicated = await copilotFailureDiagnosisAdmissionFacts(
+        standbyDatabase.pool,
+        copilotFailureDiagnosisAdmission.requestId,
+      );
+      return JSON.stringify(replicated) ===
+        JSON.stringify(copilotFailureDiagnosisAdmission.beforePromotion)
+        ? replicated
+        : null;
+    }, 'Copilot failure diagnosis admission WAL replay');
+    copilotFailureDiagnosisAdmission.replicatedBeforePromotion = true;
+    timeline.push({
+      state: 'copilot_failure_diagnosis_admission_replicated',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     manualRunRetry = await runManualRunRetryHaEvidence({
@@ -11013,6 +11370,16 @@ async function main(argv = process.argv.slice(2)) {
       String(schedulerDueAtMs),
     );
 
+    const recoveryBeforeControlActivation =
+      await new PostgresClusterControlRecoverySource(
+        primaryDatabase.pool,
+      ).listOutstanding(8);
+    assert.deepEqual(
+      recoveryBeforeControlActivation.candidates,
+      [],
+      'HA fixture must not leave generic Task recovery candidates before control activation',
+    );
+
     proxy = await startEndpointProxy(primaryPort);
     const stableDatabaseUrl = databaseUrl(
       RUNTIME_USER,
@@ -11380,6 +11747,18 @@ async function main(argv = process.argv.slice(2)) {
     modelInvocationFeaturePromotion.afterPromotion =
       promotedModelInvocationFeature;
     modelInvocationFeaturePromotion.survivedPromotion = true;
+    const promotedCopilotFailureDiagnosisAdmission =
+      await copilotFailureDiagnosisAdmissionFacts(
+        promotedDatabase.pool,
+        copilotFailureDiagnosisAdmission.requestId,
+      );
+    assert.deepEqual(
+      promotedCopilotFailureDiagnosisAdmission,
+      copilotFailureDiagnosisAdmission.beforePromotion,
+    );
+    copilotFailureDiagnosisAdmission.afterPromotion =
+      promotedCopilotFailureDiagnosisAdmission;
+    copilotFailureDiagnosisAdmission.survivedPromotion = true;
     await verifyModelProviderCredentialCatalogAfterPromotion({
       promotedPort: standbyPort,
       promotedPool: promotedDatabase.pool,
@@ -12134,7 +12513,7 @@ async function main(argv = process.argv.slice(2)) {
             FROM "ql3"."worker_credential_deliveries") AS "credentialDeliveries"`,
     );
     assert.deepEqual(sideEffects.rows, [
-      { runs: 76, runEvents: 176, credentialDeliveries: 4 },
+      { runs: 78, runEvents: 179, credentialDeliveries: 4 },
     ]);
     timeline.push({
       state: 'two_fresh_control_replicas_ready',
@@ -12248,6 +12627,7 @@ async function main(argv = process.argv.slice(2)) {
       workerCredentialDeliveryCommitResponseLoss: credentialDelivery.report,
       runDomainCommitResponseLoss: domainCommitResponseLoss.report,
       modelInvocationFeaturePromotion,
+      copilotFailureDiagnosisAdmission,
       modelProviderCredentialCatalog,
       modelProviderCredentialTestConnection,
       runAttemptLogRetention,
@@ -12262,6 +12642,18 @@ async function main(argv = process.argv.slice(2)) {
           runAttemptLogRetention.survivedPromotion,
         packageAuthoritySplitReadinessBeforeAndAfterPromotion: true,
         optionalAiFeatureSchemaSurvivesPromotion: true,
+        copilotFailureDiagnosisAdmissionExactlyReplays:
+          copilotFailureDiagnosisAdmission.exactReplay &&
+          copilotFailureDiagnosisAdmission.beforePromotion.eventCount === 3 &&
+          copilotFailureDiagnosisAdmission.beforePromotion.mutationCount === 2,
+        copilotFailureDiagnosisAdmissionReplicatesAndSurvivesPromotion:
+          copilotFailureDiagnosisAdmission.replicatedBeforePromotion &&
+          copilotFailureDiagnosisAdmission.survivedPromotion,
+        copilotFailureDiagnosisAdmissionUsesLeastPrivilegeRuntime:
+          modelInvocationFeaturePromotion.beforePromotion.privileges
+            .copilotDiagnosisAdmissionRuntimeOnly &&
+          modelInvocationFeaturePromotion.beforePromotion.privileges
+            .copilotDiagnosisSnapshotRuntimeOnly,
         modelProviderCredentialCatalogSurvivesPromotion:
           modelProviderCredentialCatalog.survivedPromotion,
         modelProviderCredentialManagementIdentityLedgerSurvivesPromotion:

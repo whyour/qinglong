@@ -410,6 +410,7 @@
 | [ADR-0404](./ADR-0404-optional-local-mcp-run-log-excerpt-surface.md)                                | 可选本机 MCP Run 日志摘录产品入口与私有文件边界                                                                                                      | Accepted |
 | [ADR-0405](./ADR-0405-bounded-failure-diagnosis-prompt-and-model-egress-policy.md)                | 有界故障诊断 Prompt 与显式模型出口策略                                                                                                                | Accepted |
 | [ADR-0406](./ADR-0406-cluster-projected-tool-result-key-authority.md)                              | Cluster Projected Tool Result Key Authority                                                                                                           | Accepted |
+| [ADR-0407](./ADR-0407-cluster-copilot-failure-diagnosis-run-admission.md)                          | Cluster Copilot Failure Diagnosis Run Admission                                                                                                       | Accepted |
 
 ## 规则
 

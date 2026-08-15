@@ -61,6 +61,8 @@ export const POSTGRES_PLUGIN_PACKAGE_PROMPT_OUTPUT_KEY_ROTATION_MIGRATION_ID =
   'pg-9016-ai-plugin-package-prompt-output-key-rotation';
 export const POSTGRES_PLUGIN_PACKAGE_PROMPT_PRODUCT_AUTHORIZATION_MIGRATION_ID =
   'pg-9017-ai-plugin-package-prompt-product-authorization';
+export const POSTGRES_COPILOT_FAILURE_DIAGNOSIS_ADMISSION_MIGRATION_ID =
+  'pg-9018-ai-copilot-failure-diagnosis-admissions';
 export const POSTGRES_MODEL_INVOCATION_SCHEMA = 'ql3_ai';
 export const LOCAL_MODEL_INVOCATION_MIGRATION_HISTORY_TABLE =
   'QingLong3AiSchemaMigrations';

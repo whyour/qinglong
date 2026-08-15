@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { PostgresClusterControlRecoverySource } = require('../dist/entrypoints/runtime');
+const {
+  PostgresClusterControlRecoverySource,
+} = require('../dist/entrypoints/runtime');
 
 function sourceWith(rows, observations = []) {
   return new PostgresClusterControlRecoverySource({
@@ -70,7 +72,7 @@ test('reads Run and Attempt recovery candidates through one bounded query', asyn
   assert.match(observations[0].text, /execution_owner = 'runtime'/);
   assert.match(
     observations[0].text,
-    /trigger_type <> 'plugin_package_workflow'/,
+    /trigger_type NOT IN \([\s\S]*'plugin_package_workflow',[\s\S]*'copilot_failure_diagnosis'[\s\S]*\)/,
   );
   assert.match(observations[0].text, /attempt_candidates/);
   assert.match(
@@ -81,10 +83,7 @@ test('reads Run and Attempt recovery candidates through one bounded query', asyn
     observations[0].text,
     /attempt_run\.trigger_type = 'plugin_package_workflow'/,
   );
-  assert.match(
-    observations[0].text,
-    /workflow_task\.attempt_id = attempt\.id/,
-  );
+  assert.match(observations[0].text, /workflow_task\.attempt_id = attempt\.id/);
   assert.match(
     observations[0].text,
     /lease_expires_at_ms > observation\.observed_at_ms/,

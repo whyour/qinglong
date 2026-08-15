@@ -173,7 +173,10 @@ test('readiness binds exact migration history and least-privilege primary author
     },
   });
   assert.equal(report.ready, true);
-  assert.equal(report.migrationIds.at(-1).startsWith('pg-9017-'), true);
+  assert.equal(
+    report.migrationIds.at(-1),
+    'pg-9018-ai-copilot-failure-diagnosis-admissions',
+  );
   assert.match(
     queries[1],
     /model_provider_credential_management_identity_keyset_ledger/,
