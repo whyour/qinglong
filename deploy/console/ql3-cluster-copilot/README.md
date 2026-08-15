@@ -136,6 +136,20 @@ the file before sharing it. Generation uses no upload, clipboard/share API,
 browser storage, worker, timer or service-side temporary file. **Clear page**
 removes the current in-memory ledger without sending a request.
 
+Verify the downloaded file independently with the same reviewed Admin release:
+
+```sh
+ql3-cluster-admin evidence-verify \
+  --bundle=/absolute/qinglong-cluster-evidence.json
+```
+
+The verifier performs one offline read-only file read, rejects noncanonical
+JSON and structural/redaction/typed-alias drift, and independently recomputes
+the bundle digest. Its output deliberately says that raw fact digests were not
+recomputed because those sensitive facts are absent; it does not claim a
+server signature, attestation, durable audit or action authority. The command
+does not upload, mutate or write the bundle.
+
 ## Run the verified image
 
 Create a dedicated Docker network whose egress is restricted by the host

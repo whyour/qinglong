@@ -407,6 +407,7 @@
     "ql3-copilot-client": "dist/copilot-client/cli.js",
     "ql3-copilot-mcp": "dist/copilot-mcp/cli.js",
     "ql3-copilot-console": "dist/copilot-console/cli.js",
+    "ql3-copilot-evidence-verify": "dist/copilot-console/evidenceVerifierCli.js",
     "ql3-plugin-package-recover": "dist/plugin-package/recovery/pluginPackageRecoveryCli.js",
     "ql3-plugin-package-manage": "dist/plugin-package/management/pluginPackageManagementCli.js",
     "ql3-plugin-package-client": "dist/plugin-package/management/pluginPackageManagementClientCli.js",

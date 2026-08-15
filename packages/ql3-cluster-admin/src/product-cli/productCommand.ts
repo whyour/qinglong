@@ -53,6 +53,12 @@ export const QINGLONG3_CLUSTER_PRODUCT_COMMANDS: readonly QingLong3ClusterProduc
       description: 'open the loopback-only read-only Copilot Console',
     }),
     Object.freeze({
+      name: 'evidence-verify',
+      binary: 'ql3-copilot-evidence-verify',
+      target: 'copilot-console/evidenceVerifierCli.js',
+      description: 'verify one redacted Console evidence bundle offline',
+    }),
+    Object.freeze({
       name: 'package',
       binary: 'ql3-plugin-package-client',
       target: 'plugin-package/management/pluginPackageManagementClientCli.js',

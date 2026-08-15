@@ -11,6 +11,8 @@ const REQUIRED_FILES = Object.freeze([
   CONSOLE_ROOT + '/assets.ts',
   CONSOLE_ROOT + '/cli.ts',
   CONSOLE_ROOT + '/contracts.ts',
+  CONSOLE_ROOT + '/evidenceVerifier.ts',
+  CONSOLE_ROOT + '/evidenceVerifierCli.ts',
   CONSOLE_ROOT + '/server.ts',
   CLIENT_FILE,
   ASSET_ROOT + '/index.html',
@@ -164,6 +166,48 @@ function auditClusterCopilotConsole(options = {}) {
     'diagnose',
     'cancel',
   ]);
+  expectFragments(CONSOLE_ROOT + '/evidenceVerifier.ts', [
+    'qinglong/cluster-console-evidence-verification@v1',
+    'maximumBundleBytes: 512 * 1024',
+    'maximumRawBytes: 8 * 1024 * 1024',
+    "rawFactDigests: 'not_recomputed_without_raw_facts'",
+    "serverSignature: 'not_verified'",
+    "attestation: 'not_verified'",
+    "durableAudit: 'not_verified'",
+    "actionAuthority: 'none'",
+    'networkAccess: false',
+    'mutation: false',
+    'fileWrites: false',
+    'constants.O_RDONLY',
+    'constants.O_NOFOLLOW',
+    "createHash('sha256')",
+  ]);
+  rejectFragments(CONSOLE_ROOT + '/evidenceVerifier.ts', [
+    'node:http',
+    'node:https',
+    'node:net',
+    'node:child_process',
+    'writeFile',
+    'appendFile',
+    'createWriteStream',
+    'process.env',
+    'process.stdin',
+    'fetch(',
+  ]);
+  expectFragments(CONSOLE_ROOT + '/evidenceVerifierCli.ts', [
+    'ql3-copilot-evidence-verify --bundle=/absolute/evidence.json',
+    'verifyClusterConsoleEvidenceBundleFile',
+    'process.exitCode = 64',
+    'process.exitCode = 65',
+    'Cluster Console evidence bundle verification failed',
+  ]);
+  rejectFragments(CONSOLE_ROOT + '/evidenceVerifierCli.ts', [
+    'process.env',
+    'process.stdin',
+    'node:http',
+    'node:https',
+    'writeFile',
+  ]);
   expectFragments(ASSET_ROOT + '/index.html', [
     '沿着证据读，不替集群做决定。',
     '本机只读 BFF',
@@ -265,6 +309,9 @@ function auditClusterCopilotConsole(options = {}) {
     'consoleLoopback: true',
     'consoleAssets: true',
     'consoleEvidenceBundle: true',
+    'evidenceVerifier: true',
+    'function runEvidenceVerifierContract(image)',
+    "[facade, 'evidence-verify', '--bundle=' + bundleFile]",
     "started.origin + '/evidence-bundle.js'",
     "consolePublishedHostAddress: '127.0.0.1'",
     'consoleDistributionEmbedded: true',
@@ -284,6 +331,8 @@ function auditClusterCopilotConsole(options = {}) {
   }
   if (
     manifest?.bin?.['ql3-copilot-console'] !== 'dist/copilot-console/cli.js' ||
+    manifest?.bin?.['ql3-copilot-evidence-verify'] !==
+      'dist/copilot-console/evidenceVerifierCli.js' ||
     manifest?.exports?.['./copilot-console']?.require !==
       './dist/copilot-console/server.js' ||
     !Array.isArray(manifest?.files) ||
@@ -307,7 +356,10 @@ function auditClusterCopilotConsole(options = {}) {
   if (
     !productCommand.includes("name: 'copilot-console'") ||
     !productCommand.includes("binary: 'ql3-copilot-console'") ||
-    !productCommand.includes("target: 'copilot-console/cli.js'")
+    !productCommand.includes("target: 'copilot-console/cli.js'") ||
+    !productCommand.includes("name: 'evidence-verify'") ||
+    !productCommand.includes("binary: 'ql3-copilot-evidence-verify'") ||
+    !productCommand.includes("target: 'copilot-console/evidenceVerifierCli.js'")
   ) {
     findings.push(
       finding(
@@ -395,7 +447,16 @@ function auditClusterCopilotConsole(options = {}) {
       attestation: 'none',
       actionAuthority: 'none',
     }),
-    sourceFileCount: 4,
+    offlineVerifier: Object.freeze({
+      lifecycle: 'operator-local-explicit-file-read',
+      bundleDigest: 'recomputed',
+      rawFactDigests: 'not_recomputed_without_raw_facts',
+      serverSignature: 'not_verified',
+      mutation: false,
+      networkAccess: false,
+      fileWrites: false,
+    }),
+    sourceFileCount: 6,
     findings: Object.freeze(findings),
     compatible: findings.length === 0,
   });

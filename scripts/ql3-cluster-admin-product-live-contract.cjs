@@ -22,6 +22,10 @@ const COMMANDS = Object.freeze([
     usage: 'Usage:\n  ql3-copilot-console --config ',
   }),
   Object.freeze({
+    name: 'evidence-verify',
+    usage: 'Usage: ql3-copilot-evidence-verify --bundle=',
+  }),
+  Object.freeze({
     name: 'package',
     usage: 'Usage: ql3-plugin-package-client ',
   }),
@@ -322,6 +326,79 @@ child.stdout.on('data', (chunk) => {
   }
 }
 
+function runEvidenceVerifierContract(image) {
+  const source = String.raw`
+const { spawnSync } = require('node:child_process');
+const { webcrypto } = require('node:crypto');
+const { readdirSync, readFileSync, writeFileSync } = require('node:fs');
+const facade = '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js';
+const bundleApi = require('/opt/qinglong/node_modules/@qinglong/cluster-admin/assets/copilot-console/evidence-bundle.js');
+const bundleFile = '/tmp/evidence.json';
+(async () => {
+  const bundle = await bundleApi.createClusterConsoleEvidenceBundle([{
+    operation: 'run_read',
+    observedAtMs: 1700000000000,
+    request: { schema: 'qinglong/cluster-copilot-console-read-request@v1', operation: 'run_read', projectId: 'private-project', requestId: 'private-request', runId: 'private-run' },
+    fact: { schema: 'qinglong/bounded-run-projection@v1', schemaVersion: 1, status: 'succeeded', projectId: 'private-project', runId: 'private-run', message: 'must-not-survive' },
+  }], 1700000001000, webcrypto);
+  writeFileSync(bundleFile, bundleApi.serializeClusterConsoleEvidenceBundle(bundle), { mode: 0o600 });
+  const before = readdirSync('/tmp').sort();
+  const verified = spawnSync(process.execPath, [facade, 'evidence-verify', '--bundle=' + bundleFile], { encoding: 'utf8' });
+  const after = readdirSync('/tmp').sort();
+  let fact;
+  try { fact = JSON.parse(verified.stdout); } catch { process.exit(71); }
+  if (verified.status !== 0 || verified.stderr !== '' || fact.status !== 'verified' || fact.integrity.bundleDigest !== 'verified' || fact.integrity.rawFactDigests !== 'not_recomputed_without_raw_facts' || fact.claims.serverSignature !== 'not_verified' || fact.claims.actionAuthority !== 'none' || fact.execution.networkAccess !== false || fact.execution.mutation !== false || fact.execution.fileWrites !== false || JSON.stringify(before) !== JSON.stringify(after) || verified.stdout.includes('private-project') || verified.stdout.includes(bundleFile)) process.exit(72);
+  const tampered = JSON.parse(readFileSync(bundleFile, 'utf8'));
+  tampered.entries[0].fact.status = 'failed';
+  writeFileSync(bundleFile, JSON.stringify(tampered, null, 2) + '\n', { mode: 0o600 });
+  const rejected = spawnSync(process.execPath, [facade, 'evidence-verify', '--bundle=' + bundleFile], { encoding: 'utf8' });
+  let failure;
+  try { failure = JSON.parse(rejected.stderr); } catch { process.exit(73); }
+  if (rejected.status !== 65 || rejected.stdout !== '' || failure.code !== 'QL3_CLUSTER_CONSOLE_EVIDENCE_VERIFICATION_INVALID' || rejected.stderr.includes(bundleFile) || rejected.stderr.includes('private-project')) process.exit(74);
+  process.stdout.write(JSON.stringify({ verified: true, tamperRejected: true, noVerifierWrites: true }));
+})().catch(() => process.exit(75));
+`;
+  const output = docker([
+    'run',
+    '--rm',
+    '--read-only',
+    '--network',
+    'none',
+    '--cap-drop',
+    'ALL',
+    '--security-opt',
+    'no-new-privileges',
+    '--user',
+    '10001:10001',
+    '--pids-limit',
+    '32',
+    '--memory',
+    '128m',
+    '--cpus',
+    '0.25',
+    '--tmpfs',
+    '/tmp:rw,noexec,nosuid,nodev,size=8m,mode=700,uid=10001,gid=10001',
+    '--entrypoint',
+    'node',
+    image,
+    '-e',
+    source,
+  ]);
+  let result;
+  try {
+    result = JSON.parse(output);
+  } catch {
+    fail('offline evidence verifier result is invalid');
+  }
+  if (
+    result?.verified !== true ||
+    result?.tamperRejected !== true ||
+    result?.noVerifierWrites !== true
+  ) {
+    fail('offline evidence verifier contract drifted');
+  }
+}
+
 function runPublishedConsoleContract(image) {
   const suffix = `${process.pid}-${Date.now()}`;
   const network = `ql3-console-live-${suffix}`;
@@ -534,6 +611,7 @@ function main() {
   if (version !== '3.0.0-alpha.0') fail('product version contract drifted');
   runOperatorContextContract(image);
   runConsoleContract(image);
+  runEvidenceVerifierContract(image);
   runPublishedConsoleContract(image);
 
   process.stdout.write(
@@ -550,6 +628,7 @@ function main() {
       consoleLoopback: true,
       consoleAssets: true,
       consoleEvidenceBundle: true,
+      evidenceVerifier: true,
       consolePublishedHostAddress: '127.0.0.1',
       consoleDistributionEmbedded: true,
       isolation: Object.freeze({

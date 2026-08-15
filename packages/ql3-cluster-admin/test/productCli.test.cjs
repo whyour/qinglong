@@ -117,9 +117,7 @@ async function startReadinessServer(status) {
     port: server.address().port,
     close: () =>
       new Promise((resolvePromise, reject) => {
-        server.close((error) =>
-          error ? reject(error) : resolvePromise(),
-        );
+        server.close((error) => (error ? reject(error) : resolvePromise()));
       }),
   };
 }
@@ -152,9 +150,7 @@ async function startCopilotReadinessServer(status) {
     port: server.address().port,
     close: () =>
       new Promise((resolvePromise, reject) => {
-        server.close((error) =>
-          error ? reject(error) : resolvePromise(),
-        );
+        server.close((error) => (error ? reject(error) : resolvePromise()));
       }),
   };
 }
@@ -333,7 +329,7 @@ function validContextFixture(t) {
 
 test('catalog exposes only reviewed product entrypoints from the same package', () => {
   assert.equal(manifest.bin['ql3-cluster-admin'], 'dist/product-cli/cli.js');
-  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 10);
+  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 11);
   assert.equal(
     new Set(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.map(({ name }) => name)).size,
     QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length,
@@ -352,7 +348,8 @@ test('catalog exposes only reviewed product entrypoints from the same package', 
     assert.equal(
       command.binary.includes('-client') ||
         command.binary === 'ql3-copilot-mcp' ||
-        command.binary === 'ql3-copilot-console',
+        command.binary === 'ql3-copilot-console' ||
+        command.binary === 'ql3-copilot-evidence-verify',
       true,
     );
   }
@@ -382,6 +379,10 @@ test('help and version are bounded installation-derived product facts', () => {
   assert.match(help, /\n  copilot\s+diagnose, inspect, read or cancel Runs/);
   assert.match(help, /\n  copilot-mcp\s+serve the bounded Cluster Copilot MCP/);
   assert.match(help, /\n  copilot-console\s+open the loopback-only read-only/);
+  assert.match(
+    help,
+    /\n  evidence-verify\s+verify one redacted Console evidence/,
+  );
   assert.match(help, /Server, migration, recovery, executor and key-custody/);
   assert.equal(help.includes('plugin-package-manage'), false);
   assert.equal(

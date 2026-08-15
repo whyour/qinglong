@@ -27,6 +27,19 @@ outputs, environment, errors, credentials, unknown fields and Copilot model
 text are omitted. Per-fact and top-level SHA-256 values provide self-integrity,
 not a server signature, durable audit or action authority.
 
+The same package provides an independently implemented offline verifier:
+
+```sh
+ql3-cluster-admin evidence-verify \
+  --bundle=/absolute/qinglong-cluster-evidence.json
+```
+
+It performs one read-only, no-follow file read, revalidates the complete fixed
+schema/redaction/alias contract and recomputes the top-level digest without a
+network request or file write. A verified result does not prove the server
+origin, attestation or durable audit, and cannot recompute the per-fact hashes
+because the deliberately omitted raw facts are not present.
+
 The reviewed operator-workstation setup, private-file ceremony, release
 verification, preflight and session lifecycle are documented in
 `deploy/console/ql3-cluster-copilot/README.md`. Native execution binds host

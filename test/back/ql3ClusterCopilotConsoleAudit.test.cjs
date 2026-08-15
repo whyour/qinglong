@@ -52,7 +52,16 @@ test('keeps the QingLong 3.0 Copilot Console independent and read-only', () => {
       attestation: 'none',
       actionAuthority: 'none',
     },
-    sourceFileCount: 4,
+    offlineVerifier: {
+      lifecycle: 'operator-local-explicit-file-read',
+      bundleDigest: 'recomputed',
+      rawFactDigests: 'not_recomputed_without_raw_facts',
+      serverSignature: 'not_verified',
+      mutation: false,
+      networkAccess: false,
+      fileWrites: false,
+    },
+    sourceFileCount: 6,
     findings: [],
     compatible: true,
   });
@@ -148,6 +157,30 @@ test('rejects evidence export network, persistence and authority widening', () =
       root,
       readFile: intercept(
         'packages/ql3-cluster-admin/assets/copilot-console/evidence-bundle.js',
+        (source) => source + '\n// ' + injected + '\n',
+      ),
+    });
+    assert.equal(report.compatible, false);
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'CLUSTER_COPILOT_CONSOLE_AUTHORITY_WIDENED',
+      ),
+    );
+  }
+});
+
+test('rejects offline verifier network, write and ambient authority widening', () => {
+  for (const injected of [
+    "require('node:https')",
+    'writeFileSync(',
+    'process.env',
+    'process.stdin',
+    'fetch(',
+  ]) {
+    const report = auditClusterCopilotConsole({
+      root,
+      readFile: intercept(
+        'packages/ql3-cluster-admin/src/copilot-console/evidenceVerifier.ts',
         (source) => source + '\n// ' + injected + '\n',
       ),
     });
