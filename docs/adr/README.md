@@ -436,6 +436,7 @@
 | [ADR-0430](./ADR-0430-auditable-release-catalog-consumption-ceremony.md)                       | 可审计的 Release Catalog 消费工作站 Ceremony                                                                                                                       | Accepted（真实公开 catalog 运行待实际 release tag） |
 | [ADR-0431](./ADR-0431-catalog-bound-deployment-lock-chain.md)                                  | Catalog-bound Deployment Lock 证据链                                                                                                                               | Accepted（真实公开 catalog 运行待实际 release tag） |
 | [ADR-0432](./ADR-0432-target-side-catalog-bound-local-compose-revisions.md)                     | 目标侧 Catalog-bound Local Compose 修订                                                                                                                            | Accepted |
+| [ADR-0433](./ADR-0433-catalog-bound-kubernetes-target-deployment-ceremony.md)                   | Catalog-bound Kubernetes 目标部署 Ceremony                                                                                                                         | Accepted |
 
 ## 规则
 

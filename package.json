@@ -115,6 +115,8 @@
     "audit:image-release:ql3": "node scripts/ql3-cluster-image-release-audit.cjs",
     "release-catalog-consumption:ql3": "node scripts/ql3-release-catalog-consumption-ceremony.cjs",
     "deployment-lock:ql3": "node scripts/ql3-deployment-lock-contract.cjs",
+    "cluster-deployment:ql3": "node scripts/ql3-kubernetes-deployment-ceremony.cjs",
+    "test:cluster-deployment-live:ql3": "node scripts/ql3-kubernetes-deployment-live-contract.cjs",
     "audit:deployment-lock-surfaces:ql3": "node scripts/ql3-deployment-lock-contract.cjs --mode=surfaces-audit",
     "audit:image-os-vulnerability-policy:ql3": "node scripts/ql3-image-os-vulnerability-policy.cjs",
     "audit:cluster-image-release:ql3": "node scripts/ql3-cluster-image-release-audit.cjs",

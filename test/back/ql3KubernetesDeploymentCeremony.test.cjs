@@ -1,0 +1,786 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const test = require('node:test');
+const yaml = require('js-yaml');
+const {
+  COMMAND_SCHEMA,
+  FIELD_MANAGER,
+  PREFLIGHT_SCHEMA,
+  RECEIPT_SCHEMA,
+  canonicalJson,
+  executeCommand,
+  parseCommand,
+  validateLockReport,
+} = require('../../scripts/lib/ql3-kubernetes-deployment-ceremony.cjs');
+const {
+  commandFile,
+} = require('../../scripts/ql3-kubernetes-deployment-ceremony.cjs');
+
+const CLUSTER_UID = '123e4567-e89b-42d3-a456-426614174000';
+const RELEASE_SET_DIGEST = digest('release-set');
+const CATALOG_MANIFEST_DIGEST = digest('catalog-manifest');
+const CATALOG_REPORT_DIGEST = digest('catalog-report');
+const SOURCE_REVISION = 'd'.repeat(40);
+const VERSION = '3.0.0-alpha.0';
+const CONTEXT = 'qinglong-production';
+const REFERENCES = Object.freeze({
+  control: image('qinglong3-cluster-control', '1'),
+  'control-ai': image('qinglong3-cluster-control-ai', '2'),
+  admin: image('qinglong3-cluster-admin', '3'),
+  worker: image('qinglong3-worker', '4'),
+});
+
+function digest(value) {
+  return `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
+}
+
+function image(repository, digit) {
+  return `ghcr.io/qinglong-release/${repository}@sha256:${digit.repeat(64)}`;
+}
+
+function annotations() {
+  return {
+    'qinglong.io/release-set-digest': RELEASE_SET_DIGEST,
+    'qinglong.io/release-catalog-manifest-digest': CATALOG_MANIFEST_DIGEST,
+    'qinglong.io/release-catalog-report-digest': CATALOG_REPORT_DIGEST,
+    'qinglong.io/release-source-revision': SOURCE_REVISION,
+    'qinglong.io/release-version': VERSION,
+  };
+}
+
+function manifest() {
+  const metadata = (name) => ({
+    name,
+    namespace: 'qinglong-system',
+    annotations: annotations(),
+  });
+  const deployment = (name, containerName, reference) => ({
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: metadata(name),
+    spec: {
+      selector: { matchLabels: { app: name } },
+      template: {
+        metadata: { labels: { app: name }, annotations: annotations() },
+        spec: { containers: [{ name: containerName, image: reference }] },
+      },
+    },
+  });
+  const resources = [
+    deployment('ql3-control', 'control', REFERENCES.control),
+    deployment('ql3-control-ai', 'control-ai', REFERENCES['control-ai']),
+    {
+      apiVersion: 'batch/v1',
+      kind: 'Job',
+      metadata: metadata('ql3-admin'),
+      spec: {
+        template: {
+          metadata: { annotations: annotations() },
+          spec: {
+            restartPolicy: 'Never',
+            containers: [{ name: 'admin', image: REFERENCES.admin }],
+          },
+        },
+      },
+    },
+    deployment('ql3-worker', 'worker', REFERENCES.worker),
+    {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: metadata('ql3-plugin-package-secret-action-admission'),
+      data: { image: REFERENCES.admin },
+    },
+  ];
+  return `${resources
+    .map((resource) => JSON.stringify(resource))
+    .join('\n---\n')}\n`;
+}
+
+function lockReport(manifestContents = manifest()) {
+  const unsigned = {
+    schemaVersion: 1,
+    schema: 'qinglong/kubernetes-deployment-lock@v2',
+    release: {
+      version: VERSION,
+      sourceRevision: SOURCE_REVISION,
+      sourceRef: `refs/tags/v${VERSION}`,
+      scope: 'cluster',
+    },
+    releaseSetDigest: RELEASE_SET_DIGEST,
+    catalog: {
+      schema: 'qinglong/release-catalog-consumption-ceremony@v1',
+      sourceRepository: 'qinglong-release/qinglong',
+      workflowIdentity: `https://github.com/qinglong-release/qinglong/.github/workflows/ql3-image-release.yml@refs/tags/v${VERSION}`,
+      immutableReference: `ghcr.io/qinglong-release/qinglong3-release-catalog@${CATALOG_MANIFEST_DIGEST}`,
+      manifestDigest: CATALOG_MANIFEST_DIGEST,
+      consumptionReportDigest: CATALOG_REPORT_DIGEST,
+      releaseSetDigest: RELEASE_SET_DIGEST,
+      discoveryTagAuthority: 'none',
+    },
+    deploymentFamily: 'cluster',
+    requiredImages: ['control', 'control-ai', 'admin', 'worker'],
+    imageOccurrences: [
+      { name: 'control', reference: REFERENCES.control, count: 1 },
+      {
+        name: 'control-ai',
+        reference: REFERENCES['control-ai'],
+        count: 1,
+      },
+      { name: 'admin', reference: REFERENCES.admin, count: 2 },
+      { name: 'worker', reference: REFERENCES.worker, count: 1 },
+    ],
+    manifest: {
+      inputDigest: digest('source-render'),
+      outputDigest: digest(manifestContents),
+      resources: 5,
+      changedResources: 5,
+      admissionAuthorityCount: 1,
+    },
+    verification: {
+      releaseSet: 'standalone_structure_identity_and_self_digest',
+      sourceRecordsReplayed: false,
+      catalogConsumption: 'offline_reconstructed',
+      externalToolResultsReplayed: false,
+      unknownImageAuthorities: 0,
+      mutableQingLongImages: 0,
+      networkAccess: false,
+      kubernetesMutation: false,
+    },
+  };
+  return {
+    ...unsigned,
+    lockDigest: digest(JSON.stringify(unsigned)),
+  };
+}
+
+function fixture(t) {
+  const directory = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-kubernetes-deployment-')),
+  );
+  fs.chmodSync(directory, 0o700);
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const lockedManifest = privateFile(directory, 'locked.yaml', manifest());
+  const report = lockReport();
+  const lockReportPath = privateFile(
+    directory,
+    'lock.json',
+    canonicalJson(report),
+  );
+  const kubectl = privateFile(
+    directory,
+    'kubectl',
+    '#!/bin/sh\nexit 97\n',
+    0o700,
+  );
+  const kubeconfig = privateFile(
+    directory,
+    'kubeconfig.yaml',
+    `apiVersion: v1
+kind: Config
+current-context: ${CONTEXT}
+clusters:
+  - name: ql3
+    cluster:
+      server: https://cluster.example.test
+      certificate-authority-data: Y2E=
+contexts:
+  - name: ${CONTEXT}
+    context:
+      cluster: ql3
+      user: operator
+users:
+  - name: operator
+    user:
+      token: bounded-test-token
+`,
+  );
+  return {
+    directory,
+    lockedManifest,
+    lockReportPath,
+    kubectl,
+    kubeconfig,
+    report,
+  };
+}
+
+function privateFile(directory, name, contents, mode = 0o600) {
+  const target = path.join(directory, name);
+  fs.writeFileSync(target, contents, { mode });
+  return target;
+}
+
+function fileDigest(filePath) {
+  return digest(fs.readFileSync(filePath));
+}
+
+function writeCommand(directory, name, operation, request) {
+  const value = {
+    schemaVersion: 1,
+    schema: COMMAND_SCHEMA,
+    operation,
+    request,
+  };
+  return privateFile(directory, name, canonicalJson(value));
+}
+
+function commonRequest(fixtureValue) {
+  return {
+    lockedManifest: {
+      path: fixtureValue.lockedManifest,
+      expectedDigest: fixtureValue.report.manifest.outputDigest,
+    },
+    lockReport: {
+      path: fixtureValue.lockReportPath,
+      expectedDigest: fixtureValue.report.lockDigest,
+    },
+    kubectl: {
+      path: fixtureValue.kubectl,
+      expectedDigest: fileDigest(fixtureValue.kubectl),
+    },
+    kubeconfig: {
+      path: fixtureValue.kubeconfig,
+      expectedDigest: fileDigest(fixtureValue.kubeconfig),
+    },
+    context: CONTEXT,
+    expectedClusterUid: CLUSTER_UID,
+  };
+}
+
+function successfulRunner(calls) {
+  return (_executable, args, input) => {
+    calls.push({ args: [...args], input });
+    if (args.includes('get') && args.includes('-f=-')) {
+      return { status: 0, stdout: convergenceList(), stderr: '' };
+    }
+    if (args.includes('get')) {
+      return { status: 0, stdout: CLUSTER_UID, stderr: '' };
+    }
+    if (args.includes('--dry-run=server')) {
+      return { status: 0, stdout: 'deployment.apps/ql3-control\n', stderr: '' };
+    }
+    return { status: 0, stdout: 'deployment.apps/ql3-control\n', stderr: '' };
+  };
+}
+
+function convergenceList() {
+  const resources = [];
+  yaml.loadAll(manifest(), (resource) => resources.push(resource));
+  return JSON.stringify({
+    apiVersion: 'v1',
+    kind: 'List',
+    items: resources.map((resource, index) => ({
+      ...resource,
+      metadata: {
+        ...resource.metadata,
+        uid: `123e4567-e89b-42d3-a456-4266141741${String(index).padStart(
+          2,
+          '0',
+        )}`,
+        resourceVersion: String(index + 1),
+        managedFields: [
+          {
+            manager: FIELD_MANAGER,
+            operation: 'Apply',
+            apiVersion: resource.apiVersion,
+          },
+        ],
+      },
+    })),
+  });
+}
+
+function prepare(t) {
+  const value = fixture(t);
+  const output = path.join(value.directory, 'preflight.json');
+  const command = writeCommand(
+    value.directory,
+    'preflight-command.json',
+    'cluster.deployment.preflight',
+    {
+      preflightId: '123e4567-e89b-42d3-a456-426614174001',
+      ...commonRequest(value),
+      output,
+    },
+  );
+  const calls = [];
+  const report = executeCommand(command, {
+    runProcess: successfulRunner(calls),
+  });
+  return {
+    ...value,
+    preflightCommand: command,
+    preflightPath: output,
+    preflight: report,
+    calls,
+  };
+}
+
+test('preflight binds one catalog lock to one Kubernetes target without mutation', (t) => {
+  const value = prepare(t);
+  assert.equal(value.preflight.schema, PREFLIGHT_SCHEMA);
+  assert.equal(value.preflight.lock.lockDigest, value.report.lockDigest);
+  assert.equal(
+    value.preflight.lock.manifestDigest,
+    value.report.manifest.outputDigest,
+  );
+  assert.equal(value.preflight.target.clusterUid, CLUSTER_UID);
+  assert.equal(value.preflight.target.fieldManager, FIELD_MANAGER);
+  assert.equal(value.preflight.verification.serverSideDryRun, true);
+  assert.equal(value.preflight.verification.kubernetesMutation, false);
+  assert.deepEqual(
+    value.preflight.steps.map(({ name }) => name),
+    ['cluster_identity_before', 'server_side_dry_run'],
+  );
+  assert.equal(fs.statSync(value.preflightPath).mode & 0o777, 0o600);
+  assert.equal(value.calls.length, 2);
+  assert.equal(value.calls[0].args.includes('get'), true);
+  assert.equal(value.calls[1].args.includes('--dry-run=server'), true);
+  assert.equal(
+    value.calls[1].args.includes(`--field-manager=${FIELD_MANAGER}`),
+    true,
+  );
+  assert.equal(value.calls[1].input, manifest());
+});
+
+test('preflight rejects lock, manifest and annotation drift before network access', (t) => {
+  const cases = [
+    (target) => fs.appendFileSync(target.lockedManifest, '\n'),
+    (target) => {
+      const drifted = { ...target.report, lockDigest: digest('forged') };
+      fs.writeFileSync(target.lockReportPath, canonicalJson(drifted));
+    },
+    (target) => {
+      const driftedManifest = manifest().replace(
+        CATALOG_REPORT_DIGEST,
+        digest('different-catalog-report'),
+      );
+      fs.writeFileSync(target.lockedManifest, driftedManifest);
+      const report = lockReport(driftedManifest);
+      fs.writeFileSync(target.lockReportPath, canonicalJson(report));
+      target.report = report;
+    },
+    (target) => {
+      const implicitNamespaceManifest = manifest().replace(
+        '"namespace":"qinglong-system",',
+        '',
+      );
+      fs.writeFileSync(target.lockedManifest, implicitNamespaceManifest);
+      const report = lockReport(implicitNamespaceManifest);
+      fs.writeFileSync(target.lockReportPath, canonicalJson(report));
+      target.report = report;
+    },
+  ];
+  for (const [index, mutate] of cases.entries()) {
+    const fresh = fixture(t);
+    mutate(fresh);
+    const output = path.join(fresh.directory, `rejected-${index}.json`);
+    const request = commonRequest(fresh);
+    request.lockedManifest.expectedDigest = fresh.report.manifest.outputDigest;
+    request.lockReport.expectedDigest = fresh.report.lockDigest;
+    const command = writeCommand(
+      fresh.directory,
+      `rejected-command-${index}.json`,
+      'cluster.deployment.preflight',
+      {
+        preflightId: `123e4567-e89b-42d3-a456-42661417400${index + 2}`,
+        ...request,
+        output,
+      },
+    );
+    let calls = 0;
+    assert.throws(
+      () =>
+        executeCommand(command, {
+          runProcess() {
+            calls += 1;
+            return { status: 0, stdout: CLUSTER_UID, stderr: '' };
+          },
+        }),
+      /deployment ceremony failed/,
+    );
+    assert.equal(calls, 0);
+    assert.equal(fs.existsSync(output), false);
+  }
+});
+
+test('preflight rejects the wrong cluster and rejected server dry-run', (t) => {
+  for (const failure of ['identity', 'dry-run']) {
+    const value = fixture(t);
+    const output = path.join(value.directory, `${failure}.json`);
+    const command = writeCommand(
+      value.directory,
+      `${failure}-command.json`,
+      'cluster.deployment.preflight',
+      {
+        preflightId:
+          failure === 'identity'
+            ? '123e4567-e89b-42d3-a456-426614174010'
+            : '123e4567-e89b-42d3-a456-426614174011',
+        ...commonRequest(value),
+        output,
+      },
+    );
+    assert.throws(() =>
+      executeCommand(command, {
+        runProcess(_executable, args) {
+          if (args.includes('get')) {
+            return {
+              status: 0,
+              stdout:
+                failure === 'identity' ? crypto.randomUUID() : CLUSTER_UID,
+              stderr: '',
+            };
+          }
+          return { status: 1, stdout: '', stderr: 'redacted admission error' };
+        },
+      }),
+    );
+    assert.equal(fs.existsSync(output), false);
+  }
+});
+
+test('kubeconfig executable authentication and weak private files fail closed', (t) => {
+  for (const mode of ['exec', 'public']) {
+    const value = fixture(t);
+    if (mode === 'exec') {
+      fs.writeFileSync(
+        value.kubeconfig,
+        fs
+          .readFileSync(value.kubeconfig, 'utf8')
+          .replace(
+            'token: bounded-test-token',
+            'exec:\n        command: owned',
+          ),
+      );
+    } else {
+      fs.chmodSync(value.kubeconfig, 0o644);
+    }
+    const output = path.join(value.directory, `${mode}.json`);
+    const command = writeCommand(
+      value.directory,
+      `${mode}-command.json`,
+      'cluster.deployment.preflight',
+      {
+        preflightId:
+          mode === 'exec'
+            ? '123e4567-e89b-42d3-a456-426614174020'
+            : '123e4567-e89b-42d3-a456-426614174021',
+        ...commonRequest(value),
+        output,
+      },
+    );
+    let calls = 0;
+    assert.throws(() =>
+      executeCommand(command, {
+        runProcess() {
+          calls += 1;
+          return { status: 0, stdout: CLUSTER_UID, stderr: '' };
+        },
+      }),
+    );
+    assert.equal(calls, 0);
+    assert.equal(fs.existsSync(output), false);
+  }
+});
+
+test('apply revalidates preflight, mutates explicitly and proves convergence', (t) => {
+  const value = prepare(t);
+  const receiptPath = path.join(value.directory, 'receipt.json');
+  const applyCommand = writeCommand(
+    value.directory,
+    'apply-command.json',
+    'cluster.deployment.apply',
+    {
+      mutationId: '123e4567-e89b-42d3-a456-426614174030',
+      preflight: {
+        path: value.preflightPath,
+        expectedDigest: value.preflight.preflightDigest,
+      },
+      ...commonRequest(value),
+      output: receiptPath,
+    },
+  );
+  const calls = [];
+  const receipt = executeCommand(applyCommand, {
+    runProcess: successfulRunner(calls),
+  });
+  assert.equal(receipt.schema, RECEIPT_SCHEMA);
+  assert.equal(receipt.preflightDigest, value.preflight.preflightDigest);
+  assert.equal(receipt.verification.kubernetesMutation, true);
+  assert.equal(receipt.verification.crossResourceAtomicity, false);
+  assert.equal(
+    receipt.verification.recovery,
+    'reapply_exact_lock_with_same_field_manager',
+  );
+  assert.deepEqual(
+    receipt.steps.map(({ name }) => name),
+    [
+      'cluster_identity_before',
+      'server_side_dry_run',
+      'server_side_apply',
+      'server_side_convergence_read',
+      'cluster_identity_after',
+    ],
+  );
+  assert.equal(calls.length, 5);
+  assert.equal(fs.statSync(receiptPath).mode & 0o777, 0o600);
+
+  const auditCommand = writeCommand(
+    value.directory,
+    'audit-command.json',
+    'cluster.deployment.receipt.audit',
+    {
+      applyCommand: {
+        path: applyCommand,
+        expectedDigest: fileDigest(applyCommand),
+      },
+      receipt: { path: receiptPath, expectedDigest: receipt.receiptDigest },
+    },
+  );
+  assert.deepEqual(executeCommand(auditCommand), {
+    compatible: true,
+    deploymentFamily: 'cluster',
+    mutationId: receipt.mutationId,
+    receiptDigest: receipt.receiptDigest,
+    preflightDigest: receipt.preflightDigest,
+    lockDigest: value.report.lockDigest,
+    manifestDigest: value.report.manifest.outputDigest,
+    clusterUid: CLUSTER_UID,
+    externalResultsReplayed: false,
+    kubernetesMutation: false,
+  });
+
+  let replayCalls = 0;
+  assert.equal(
+    executeCommand(applyCommand, {
+      runProcess() {
+        replayCalls += 1;
+        throw new Error('must not run');
+      },
+    }).receiptDigest,
+    receipt.receiptDigest,
+  );
+  assert.equal(replayCalls, 0);
+});
+
+test('apply failure or post-apply drift never publishes a success receipt', (t) => {
+  for (const failure of ['apply', 'convergence', 'identity-after']) {
+    const value = prepare(t);
+    const receiptPath = path.join(value.directory, `${failure}-receipt.json`);
+    const applyCommand = writeCommand(
+      value.directory,
+      `${failure}-apply-command.json`,
+      'cluster.deployment.apply',
+      {
+        mutationId:
+          failure === 'apply'
+            ? '123e4567-e89b-42d3-a456-426614174040'
+            : failure === 'convergence'
+            ? '123e4567-e89b-42d3-a456-426614174041'
+            : '123e4567-e89b-42d3-a456-426614174042',
+        preflight: {
+          path: value.preflightPath,
+          expectedDigest: value.preflight.preflightDigest,
+        },
+        ...commonRequest(value),
+        output: receiptPath,
+      },
+    );
+    let identityCount = 0;
+    assert.throws(() =>
+      executeCommand(applyCommand, {
+        runProcess(_executable, args) {
+          if (args.includes('get') && args.includes('-f=-')) {
+            return {
+              status: failure === 'convergence' ? 1 : 0,
+              stdout: failure === 'convergence' ? '' : convergenceList(),
+              stderr:
+                failure === 'convergence' ? 'redacted convergence error' : '',
+            };
+          }
+          if (args.includes('get')) {
+            identityCount += 1;
+            return {
+              status: 0,
+              stdout:
+                failure === 'identity-after' && identityCount === 2
+                  ? crypto.randomUUID()
+                  : CLUSTER_UID,
+              stderr: '',
+            };
+          }
+          if (args.includes('--dry-run=server')) {
+            return { status: 0, stdout: 'dry-run', stderr: '' };
+          }
+          return {
+            status: failure === 'apply' ? 1 : 0,
+            stdout: '',
+            stderr: failure === 'apply' ? 'redacted apply error' : '',
+          };
+        },
+      }),
+    );
+    assert.equal(fs.existsSync(receiptPath), false);
+  }
+});
+
+test('receipt audit rejects a different command or recomputed receipt', (t) => {
+  const value = prepare(t);
+  const receiptPath = path.join(value.directory, 'receipt.json');
+  const applyCommand = writeCommand(
+    value.directory,
+    'apply-command.json',
+    'cluster.deployment.apply',
+    {
+      mutationId: '123e4567-e89b-42d3-a456-426614174050',
+      preflight: {
+        path: value.preflightPath,
+        expectedDigest: value.preflight.preflightDigest,
+      },
+      ...commonRequest(value),
+      output: receiptPath,
+    },
+  );
+  const receipt = executeCommand(applyCommand, {
+    runProcess: successfulRunner([]),
+  });
+  const forged = { ...receipt, mutationId: crypto.randomUUID() };
+  const { receiptDigest: ignored, ...unsigned } = forged;
+  forged.receiptDigest = digest(JSON.stringify(unsigned));
+  fs.writeFileSync(receiptPath, canonicalJson(forged));
+  const auditCommand = writeCommand(
+    value.directory,
+    'audit-command.json',
+    'cluster.deployment.receipt.audit',
+    {
+      applyCommand: {
+        path: applyCommand,
+        expectedDigest: fileDigest(applyCommand),
+      },
+      receipt: { path: receiptPath, expectedDigest: receipt.receiptDigest },
+    },
+  );
+  assert.throws(() => executeCommand(auditCommand));
+});
+
+test('command surface is closed and lock reports require exact canonical identity', () => {
+  assert.equal(
+    commandFile(['--command-file=/private/command.json']),
+    '/private/command.json',
+  );
+  assert.throws(() => commandFile([]));
+  assert.throws(() => commandFile(['--command-file=a', '--extra=b']));
+  assert.throws(() =>
+    parseCommand({
+      schemaVersion: 1,
+      schema: COMMAND_SCHEMA,
+      operation: 'cluster.deployment.apply-now',
+      request: {},
+    }),
+  );
+  const report = lockReport();
+  assert.equal(validateLockReport(report).report.lockDigest, report.lockDigest);
+  const drifted = JSON.parse(JSON.stringify(report));
+  drifted.catalog.discoveryTagAuthority = 'fallback';
+  const { lockDigest: ignored, ...unsigned } = drifted;
+  drifted.lockDigest = digest(JSON.stringify(unsigned));
+  assert.throws(() => validateLockReport(drifted));
+});
+
+test('repository exposes the reviewed ceremony and removes the bare apply handoff', () => {
+  const root = path.resolve(__dirname, '../..');
+  const packageManifest = JSON.parse(
+    fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
+  );
+  assert.equal(
+    packageManifest.scripts['cluster-deployment:ql3'],
+    'node scripts/ql3-kubernetes-deployment-ceremony.cjs',
+  );
+  assert.equal(
+    packageManifest.scripts['test:cluster-deployment-live:ql3'],
+    'node scripts/ql3-kubernetes-deployment-live-contract.cjs',
+  );
+  const operations = fs.readFileSync(
+    path.join(root, 'docs/operations/ql3-release-set-deployment.md'),
+    'utf8',
+  );
+  assert.match(operations, /cluster\.deployment\.preflight/);
+  assert.match(operations, /cluster\.deployment\.apply/);
+  assert.match(operations, /cluster\.deployment\.receipt\.audit/);
+  assert.match(operations, /qinglong3-catalog-lock/);
+  assert.equal(
+    operations.includes('才由有权限的独立步骤执行 `kubectl apply'),
+    false,
+  );
+});
+
+test('thin CLI uses the pinned executable and keeps failures low-sensitive', (t) => {
+  const value = fixture(t);
+  fs.writeFileSync(
+    value.kubectl,
+    `#!${process.execPath}
+'use strict';
+const args = process.argv.slice(2);
+if (args.includes('get') && args.includes('-f=-')) process.stdout.write(${JSON.stringify(
+      convergenceList(),
+    )});
+else if (args.includes('get')) process.stdout.write(${JSON.stringify(
+      CLUSTER_UID,
+    )});
+else if (args.includes('--dry-run=server')) process.stdout.write('deployment.apps/ql3-control\\n');
+else process.exitCode = 91;
+`,
+    { mode: 0o700 },
+  );
+  const output = path.join(value.directory, 'cli-preflight.json');
+  const command = writeCommand(
+    value.directory,
+    'cli-command.json',
+    'cluster.deployment.preflight',
+    {
+      preflightId: '123e4567-e89b-42d3-a456-426614174060',
+      ...commonRequest(value),
+      output,
+    },
+  );
+  const cli = path.resolve(
+    __dirname,
+    '../../scripts/ql3-kubernetes-deployment-ceremony.cjs',
+  );
+  const accepted = spawnSync(
+    process.execPath,
+    [cli, `--command-file=${command}`],
+    { encoding: 'utf8' },
+  );
+  assert.equal(
+    accepted.status,
+    0,
+    JSON.stringify({ stdout: accepted.stdout, stderr: accepted.stderr }),
+  );
+  assert.equal(accepted.stderr, '');
+  assert.equal(JSON.parse(accepted.stdout).schema, PREFLIGHT_SCHEMA);
+
+  fs.chmodSync(value.kubeconfig, 0o644);
+  const rejected = spawnSync(
+    process.execPath,
+    [cli, `--command-file=${command}`],
+    { encoding: 'utf8' },
+  );
+  assert.equal(rejected.status, 1);
+  assert.equal(rejected.stdout, '');
+  assert.deepEqual(JSON.parse(rejected.stderr), {
+    schemaVersion: 1,
+    component: 'qinglong3-kubernetes-deployment-ceremony',
+    code: 'QL3_KUBERNETES_DEPLOYMENT_CEREMONY_FAILED',
+    message: 'QingLong 3 Kubernetes deployment ceremony failed',
+  });
+  assert.equal(rejected.stderr.includes(value.directory), false);
+  assert.equal(rejected.stderr.includes(CONTEXT), false);
+});

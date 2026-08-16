@@ -176,8 +176,111 @@ materializer 只改写 Pod、Deployment、StatefulSet、DaemonSet、ReplicaSet�
 manifest、consumption report digest、source revision 与 version annotation；未知位置的完整 QingLong role image authority、畸形
 已知 container image、缺少 required role、YAML alias/cycle/非 mapping、超限输入或已有输出文件都会失败关闭。
 
-审计成功并完成人工差异检查后，才由有权限的独立步骤执行 `kubectl apply -f "${locked}"`。不要直接 apply
-`${rendered}`，也不要使用 `kubectl apply -k` 绕过 deployment lock。
+审计成功并完成人工差异检查后，不要再直接执行裸 `kubectl apply -f "${locked}"`，也不要 apply `${rendered}` 或使用
+`kubectl apply -k` 绕过 deployment lock。目标侧必须使用下面的独立 preflight/apply ceremony。
+
+### Kubernetes 目标 preflight 与 apply
+
+先确认所有承载 QingLong image authority 的资源都显式填写 `metadata.namespace`，且目标 Namespace 已存在；禁止依赖 context 的
+ambient default namespace。server-side dry-run 不会持久化同一 multi-document 输入中排在前面的 Namespace，因此不能把“创建
+Namespace”和“在该 Namespace 内验证首批对象”混成一次隐式动作。取得并人工核对目标 cluster 的
+`kube-system` Namespace UID：
+
+```sh
+kubectl --kubeconfig="${kubeconfig}" --context="${context}" \
+  get namespace kube-system -o=jsonpath='{.metadata.uid}'
+```
+
+ceremony 目录必须为当前 UID 的 canonical `0700` 目录；command、locked manifest、lock report、kubeconfig、preflight 与 receipt
+都必须是单链接 `0600` 文件。kubectl 使用 realpath 后的 absolute executable，并记录其 SHA-256。kubeconfig 禁止 `exec` 与
+`auth-provider`。每个 kubectl 调用使用独立临时 HOME/XDG cache/TMPDIR，结束即清理，不读取 ambient HOME 或在当前目录创建
+`.kube/cache`。以下是 preflight command 的逻辑结构；实际文件必须用 `JSON.stringify(value) + "\n"` 写成单行 canonical JSON，
+并以 `0600` no-replace 创建：
+
+```json
+{
+  "schemaVersion": 1,
+  "schema": "qinglong/kubernetes-deployment-command@v1",
+  "operation": "cluster.deployment.preflight",
+  "request": {
+    "preflightId": "<new UUID>",
+    "lockedManifest": {
+      "path": "<canonical absolute locked.yaml>",
+      "expectedDigest": "<lock report manifest.outputDigest>"
+    },
+    "lockReport": {
+      "path": "<canonical absolute lock.json>",
+      "expectedDigest": "<lock report lockDigest>"
+    },
+    "kubectl": {
+      "path": "<canonical absolute kubectl>",
+      "expectedDigest": "<SHA-256 of kubectl bytes>"
+    },
+    "kubeconfig": {
+      "path": "<canonical absolute kubeconfig>",
+      "expectedDigest": "<SHA-256 of kubeconfig bytes>"
+    },
+    "context": "<explicit context>",
+    "expectedClusterUid": "<reviewed kube-system UID>",
+    "output": "<unused canonical absolute preflight.json>"
+  }
+}
+```
+
+运行：
+
+```sh
+pnpm cluster-deployment:ql3 -- --command-file="${preflight_command}"
+```
+
+成功后，人工核对返回的 `preflightDigest`、lock/catalog digest、cluster UID 和
+`kubernetesMutation:false`。apply 必须使用新的 mutation UUID，并精确复用所有 target/input authority：
+
+```json
+{
+  "schemaVersion": 1,
+  "schema": "qinglong/kubernetes-deployment-command@v1",
+  "operation": "cluster.deployment.apply",
+  "request": {
+    "mutationId": "<new UUID>",
+    "preflight": {
+      "path": "<canonical absolute preflight.json>",
+      "expectedDigest": "<preflightDigest>"
+    },
+    "lockedManifest": {
+      "path": "<same locked.yaml>",
+      "expectedDigest": "<same manifest.outputDigest>"
+    },
+    "lockReport": {
+      "path": "<same lock.json>",
+      "expectedDigest": "<same lockDigest>"
+    },
+    "kubectl": {
+      "path": "<same kubectl>",
+      "expectedDigest": "<same kubectl SHA-256>"
+    },
+    "kubeconfig": {
+      "path": "<same kubeconfig>",
+      "expectedDigest": "<same kubeconfig SHA-256>"
+    },
+    "context": "<same context>",
+    "expectedClusterUid": "<same cluster UID>",
+    "output": "<unused canonical absolute receipt.json>"
+  }
+}
+```
+
+同样通过 `cluster-deployment:ql3` 执行。apply 会重新完成 lock 检查、cluster identity 和 server-side dry-run，然后以固定
+`qinglong3-catalog-lock` field manager 执行 server-side apply，不使用 `--force-conflicts`；最后读取 live objects，验证
+UID/resourceVersion、完整期望字段、四类 immutable image/catalog annotations 和受影响资源的 managed-field ownership，再次确认
+cluster UID 后才发布 receipt。
+
+离线审计使用 `cluster.deployment.receipt.audit` command，其中 `applyCommand.expectedDigest` 是 apply command 文件完整字节的
+SHA-256，`receipt.expectedDigest` 是 receipt 内的 `receiptDigest`。审计不会访问 Kubernetes API，结果必须保持
+`externalResultsReplayed:false`、`kubernetesMutation:false`。
+
+多资源 apply 不是事务，也不提供自动删除式 rollback。失败或 receipt 响应丢失时保留原文件：同一 command/field manager 可安全
+重放并重新做 live convergence；需要回退时，以上一份 catalog-bound lock 创建新的显式 preflight/apply，而不是修改旧 receipt。
 
 ## 准入检查
 
@@ -189,8 +292,9 @@ manifest、consumption report digest、source revision 与 version annotation；
 4. Kubernetes 必须先渲染 overlay，再用离线 post-render materializer 生成和复验 v2 locked manifest；嵌套 overlay 的
    `newName`/digest 不是最终 authority。Local 必须生成并审计 v2 service selection。两族输出都必须绑定同一 catalog manifest、
    consumption report 与 release-set digest，并且只能消费 release set 中的 `@sha256:` reference。
-5. rollout 前再次确认 catalog receipt/immutable reference 与已检查文件一致。version/source/catalog tag 都只能用于
-   发现；部署始终以 release set 中的镜像 digest 为准。
+5. rollout 前再次确认 catalog receipt/immutable reference 与已检查文件一致。Kubernetes 必须把 locked manifest/report、pinned
+   kubectl/kubeconfig 和目标 cluster UID 绑定进 preflight/apply receipt；version/source/catalog tag 都只能用于发现，部署始终以
+   release set 中的镜像 digest 为准。
 
 ## 低资源设备
 
