@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -16,6 +17,17 @@ const {
   parseArguments,
   runCli,
 } = require('../../scripts/ql3-deployment-lock-contract.cjs');
+const {
+  ARTIFACT_TYPE,
+  FILE_MEDIA_TYPE,
+  OCI_EMPTY_CONFIG_DIGEST,
+  OCI_EMPTY_CONFIG_MEDIA_TYPE,
+  OCI_MANIFEST_MEDIA_TYPE,
+  createCatalogPlan,
+} = require('../../scripts/ql3-release-catalog-contract.cjs');
+const {
+  runCeremony,
+} = require('../../scripts/ql3-release-catalog-consumption-ceremony.cjs');
 const {
   createReleaseSet,
   createVerifiedImageRecord,
@@ -34,6 +46,7 @@ const identity = Object.freeze({
   sourceRevision: 'd'.repeat(40),
   sourceRef: `refs/tags/v${version}`,
   repositoryOwner: 'qinglong-release',
+  sourceRepository: 'qinglong-release/qinglong',
 });
 const roleOrder = Object.freeze(['control', 'control-ai', 'admin', 'worker']);
 
@@ -85,10 +98,35 @@ function releaseSet(scope) {
   });
 }
 
-function options(scope, extra = {}) {
+function sha256(value) {
+  return `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
+}
+
+function consumptionAuthority(set) {
+  const manifestDigest = sha256(
+    Buffer.from(`catalog:${set.release.scope}`, 'utf8'),
+  );
+  return Object.freeze({
+    compatible: true,
+    releaseScope: set.release.scope,
+    sourceRepository: identity.sourceRepository,
+    workflowIdentity: `https://github.com/${identity.sourceRepository}/.github/workflows/ql3-image-release.yml@${identity.sourceRef}`,
+    releaseSetDigest: set.releaseSetDigest,
+    catalogManifestDigest: manifestDigest,
+    immutableReference: `ghcr.io/${identity.repositoryOwner}/qinglong3-release-catalog@${manifestDigest}`,
+    imageCount: set.images.length,
+    discoveryTagAuthority: 'none',
+    externalToolResultsReplayed: false,
+    deploymentMutation: false,
+    contentDigest: sha256(Buffer.from(`report:${set.release.scope}`, 'utf8')),
+  });
+}
+
+function options(set, extra = {}) {
   return Object.freeze({
     ...identity,
-    releaseScope: scope,
+    releaseScope: set.release.scope,
+    consumption: consumptionAuthority(set),
     ...extra,
   });
 }
@@ -189,12 +227,88 @@ function temporaryDirectory(t) {
   return directory;
 }
 
-function writeCanonical(filePath, value) {
-  fs.writeFileSync(filePath, `${JSON.stringify(value)}\n`, { mode: 0o600 });
+function catalogManifest(set) {
+  const plan = createCatalogPlan(set, {
+    ...identity,
+    releaseScope: set.release.scope,
+  });
+  return {
+    schemaVersion: 2,
+    mediaType: OCI_MANIFEST_MEDIA_TYPE,
+    artifactType: ARTIFACT_TYPE,
+    config: {
+      mediaType: OCI_EMPTY_CONFIG_MEDIA_TYPE,
+      digest: OCI_EMPTY_CONFIG_DIGEST,
+      size: 2,
+    },
+    layers: [
+      {
+        mediaType: FILE_MEDIA_TYPE,
+        digest: plan.releaseSet.contentDigest,
+        size: plan.releaseSet.bytes,
+        annotations: {
+          'org.opencontainers.image.title': plan.releaseSet.fileName,
+        },
+      },
+    ],
+    annotations: { ...plan.catalog.annotations },
+  };
 }
 
-function kubernetesOptions(extra = {}) {
-  return options('cluster', {
+function consumptionBundle(t, parent, name, set) {
+  const toolRoot = path.join(parent, `${name}-tools`);
+  fs.mkdirSync(toolRoot, { mode: 0o700 });
+  const releaseText = `${JSON.stringify(set)}\n`;
+  const manifestText = JSON.stringify(catalogManifest(set));
+  const manifestDigest = sha256(Buffer.from(manifestText, 'utf8'));
+  const tools = {};
+  for (const toolName of ['regctl', 'cosign', 'gh']) {
+    const toolPath = path.join(toolRoot, toolName);
+    const behavior =
+      toolName === 'regctl'
+        ? `
+if (args[0] === 'image' && args[1] === 'digest') {
+  process.stdout.write(${JSON.stringify(`${manifestDigest}\n`)});
+} else if (args[0] === 'artifact' && args[1] === 'get') {
+  process.stdout.write(${JSON.stringify(releaseText)});
+} else if (args[0] === 'manifest' && args[1] === 'get') {
+  process.stdout.write(${JSON.stringify(manifestText)});
+} else {
+  process.exitCode = 7;
+}
+`
+        : '';
+    fs.writeFileSync(
+      toolPath,
+      `#!${process.execPath}\n'use strict';\nconst args = process.argv.slice(2);\n${behavior}`,
+      { mode: 0o700 },
+    );
+    tools[toolName] = toolPath;
+  }
+  const tokenFile = path.join(toolRoot, 'github-token');
+  fs.writeFileSync(tokenFile, 'github_pat_deployment_lock_fixture', {
+    mode: 0o600,
+  });
+  const outputDirectory = path.join(parent, `${name}-bundle`);
+  runCeremony({
+    ...identity,
+    releaseScope: set.release.scope,
+    outputDirectory,
+    regctl: tools.regctl,
+    cosign: tools.cosign,
+    gh: tools.gh,
+    githubTokenFile: tokenFile,
+  });
+  t.after(() => {
+    if (fs.existsSync(outputDirectory)) {
+      fs.rmSync(outputDirectory, { recursive: true, force: true });
+    }
+  });
+  return outputDirectory;
+}
+
+function kubernetesOptions(set, extra = {}) {
+  return options(set, {
     requiredImages: roleOrder.join(','),
     ...extra,
   });
@@ -205,21 +319,36 @@ test('selects one immutable Local Compose image without adding device work', () 
     const set = releaseSet(scope);
     const selection = createLocalSelection(
       set,
-      options(scope, { allowRootService: false }),
+      options(set, { allowRootService: false }),
     );
     assert.equal(selection.deploymentFamily, 'local');
+    assert.equal(selection.schema, 'qinglong/local-compose-release-image@v2');
     assert.equal(selection.releaseSetDigest, set.releaseSetDigest);
+    assert.equal(
+      selection.catalog.releaseSetDigest,
+      selection.releaseSetDigest,
+    );
+    assert.match(
+      selection.catalog.immutableReference,
+      /^ghcr\.io\/qinglong-release\/qinglong3-release-catalog@sha256:[a-f0-9]{64}$/u,
+    );
+    assert.equal(selection.catalog.discoveryTagAuthority, 'none');
     assert.equal(selection.service.kind, 'compose');
     assert.equal(selection.service.image, references(set).local);
     assert.equal(selection.service.allowRootService, false);
     assert.equal(selection.verification.networkAccess, false);
     assert.equal(selection.verification.deploymentMutation, false);
+    assert.equal(
+      selection.verification.catalogConsumption,
+      'offline_reconstructed',
+    );
+    assert.equal(selection.verification.externalToolResultsReplayed, false);
     assert.match(selection.selectionDigest, /^sha256:[a-f0-9]{64}$/u);
     assert.equal(
       auditLocalSelection(
         selection,
         set,
-        options(scope, { allowRootService: false }),
+        options(set, { allowRootService: false }),
       ).compatible,
       true,
     );
@@ -232,18 +361,18 @@ test('Local selection rejects cluster scope, implicit root policy and drift', ()
     () =>
       createLocalSelection(
         clusterSet,
-        options('cluster', { allowRootService: false }),
+        options(clusterSet, { allowRootService: false }),
       ),
     /local or all release set/,
   );
   const localSet = releaseSet('local');
   assert.throws(
-    () => createLocalSelection(localSet, options('local')),
+    () => createLocalSelection(localSet, options(localSet)),
     /explicit boolean/,
   );
   const selection = createLocalSelection(
     localSet,
-    options('local', { allowRootService: true }),
+    options(localSet, { allowRootService: true }),
   );
   const drifted = JSON.parse(JSON.stringify(selection));
   drifted.service.image = 'ghcr.io/example/qinglong3-local:latest';
@@ -252,9 +381,35 @@ test('Local selection rejects cluster scope, implicit root policy and drift', ()
       auditLocalSelection(
         drifted,
         localSet,
-        options('local', { allowRootService: true }),
+        options(localSet, { allowRootService: true }),
       ),
     /differs from the verified release set/,
+  );
+});
+
+test('deployment materialization rejects missing or mismatched catalog authority', () => {
+  const set = releaseSet('local');
+  assert.throws(
+    () =>
+      createLocalSelection(set, {
+        ...identity,
+        releaseScope: 'local',
+        allowRootService: false,
+      }),
+    /catalog consumption authority is invalid/,
+  );
+  const drifted = {
+    ...consumptionAuthority(set),
+    contentDigest: `sha256:${'0'.repeat(64)}`,
+    releaseSetDigest: `sha256:${'1'.repeat(64)}`,
+  };
+  assert.throws(
+    () =>
+      createLocalSelection(set, {
+        ...options(set, { allowRootService: false }),
+        consumption: drifted,
+      }),
+    /catalog consumption authority is invalid/,
   );
 });
 
@@ -264,7 +419,7 @@ test('materializes every supported Kubernetes image authority from one release s
   const created = createKubernetesLock(
     set,
     fixtureManifest(),
-    kubernetesOptions(),
+    kubernetesOptions(set),
   );
   const resources = [];
   yaml.loadAll(created.outputManifest, (resource) => resources.push(resource));
@@ -288,6 +443,8 @@ test('materializes every supported Kubernetes image authority from one release s
     ],
   );
   assert.equal(created.report.manifest.resources, 6);
+  assert.equal(created.report.schema, 'qinglong/kubernetes-deployment-lock@v2');
+  assert.equal(created.report.catalog.releaseSetDigest, set.releaseSetDigest);
   assert.equal(created.report.manifest.changedResources, 5);
   assert.equal(created.report.manifest.admissionAuthorityCount, 1);
   assert.equal(created.report.verification.unknownImageAuthorities, 0);
@@ -314,6 +471,18 @@ test('materializes every supported Kubernetes image authority from one release s
       resource.metadata.annotations['qinglong.io/release-set-digest'],
       set.releaseSetDigest,
     );
+    assert.equal(
+      resource.metadata.annotations[
+        'qinglong.io/release-catalog-manifest-digest'
+      ],
+      created.report.catalog.manifestDigest,
+    );
+    assert.equal(
+      resource.metadata.annotations[
+        'qinglong.io/release-catalog-report-digest'
+      ],
+      created.report.catalog.consumptionReportDigest,
+    );
   }
   assert.equal(
     created.outputManifest.includes('qinglong3-cluster-control:source'),
@@ -325,7 +494,7 @@ test('materializes every supported Kubernetes image authority from one release s
       created.report,
       set,
       fixtureManifest(),
-      kubernetesOptions(),
+      kubernetesOptions(set),
     ).compatible,
     true,
   );
@@ -336,7 +505,7 @@ test('Kubernetes materialization rejects unsupported scope and incomplete role c
   assert.throws(
     () =>
       createKubernetesLock(localSet, fixtureManifest(), {
-        ...options('local'),
+        ...options(localSet),
         requiredImages: 'control',
       }),
     /cluster or all release set/,
@@ -347,7 +516,12 @@ test('Kubernetes materialization rejects unsupported scope and incomplete role c
     '',
   );
   assert.throws(
-    () => createKubernetesLock(clusterSet, withoutWorker, kubernetesOptions()),
+    () =>
+      createKubernetesLock(
+        clusterSet,
+        withoutWorker,
+        kubernetesOptions(clusterSet),
+      ),
     /required image was not rendered: worker/,
   );
 });
@@ -358,7 +532,7 @@ test('rejects mutable, malformed and hidden QingLong image authorities', () => {
     references(set).control
   }\n`;
   assert.throws(
-    () => createKubernetesLock(set, hidden, kubernetesOptions()),
+    () => createKubernetesLock(set, hidden, kubernetesOptions(set)),
     /unhandled QingLong image authority: data.image/,
   );
   assert.throws(
@@ -369,7 +543,7 @@ test('rejects mutable, malformed and hidden QingLong image authorities', () => {
           'qinglong3-cluster-control@sha256:',
           'qinglong3-cluster-control-not-an-image@sha256:',
         ),
-        kubernetesOptions(),
+        kubernetesOptions(set),
       ),
     /unhandled QingLong image authority|container image is malformed/,
   );
@@ -381,7 +555,7 @@ test('rejects mutable, malformed and hidden QingLong image authorities', () => {
           'qinglong3-worker:source',
           'qinglong3-worker',
         ),
-        kubernetesOptions(),
+        kubernetesOptions(set),
       ),
     /container image is malformed/,
   );
@@ -394,7 +568,7 @@ test('rejects unsafe YAML structure and invalid admission authority', () => {
       createKubernetesLock(
         set,
         'apiVersion: v1\nkind: Pod\nkind: Job\n',
-        kubernetesOptions({ requiredImages: 'control' }),
+        kubernetesOptions(set, { requiredImages: 'control' }),
       ),
     /duplicate-free YAML/,
   );
@@ -403,7 +577,7 @@ test('rejects unsafe YAML structure and invalid admission authority', () => {
       createKubernetesLock(
         set,
         '- not\n- a\n- resource\n',
-        kubernetesOptions({ requiredImages: 'control' }),
+        kubernetesOptions(set, { requiredImages: 'control' }),
       ),
     /resource must be one mapping/,
   );
@@ -415,7 +589,7 @@ test('rejects unsafe YAML structure and invalid admission authority', () => {
           'data:\n  image: qinglong3-cluster-admin',
           'data:\n  image: busybox',
         ),
-        kubernetesOptions(),
+        kubernetesOptions(set),
       ),
     /admission image authority is invalid/,
   );
@@ -426,7 +600,7 @@ test('audit detects source, locked manifest and report drift', () => {
   const created = createKubernetesLock(
     set,
     fixtureManifest(),
-    kubernetesOptions(),
+    kubernetesOptions(set),
   );
   const report = JSON.parse(JSON.stringify(created.report));
   report.manifest.resources += 1;
@@ -437,7 +611,7 @@ test('audit detects source, locked manifest and report drift', () => {
         report,
         set,
         fixtureManifest(),
-        kubernetesOptions(),
+        kubernetesOptions(set),
       ),
     /differs from the verified release set/,
   );
@@ -448,7 +622,7 @@ test('audit detects source, locked manifest and report drift', () => {
         created.report,
         set,
         fixtureManifest(),
-        kubernetesOptions(),
+        kubernetesOptions(set),
       ),
     /differs from the verified release set/,
   );
@@ -459,7 +633,7 @@ test('audit detects source, locked manifest and report drift', () => {
         created.report,
         set,
         `${fixtureManifest()}\n`,
-        kubernetesOptions(),
+        kubernetesOptions(set),
       ),
     /differs from the verified release set/,
   );
@@ -469,16 +643,16 @@ test('CLI creates and audits no-replace Local and Kubernetes outputs', (t) => {
   const directory = temporaryDirectory(t);
   const output = { write() {} };
   const localSet = releaseSet('local');
-  const localSetPath = path.join(directory, 'local-set.json');
+  const localBundle = consumptionBundle(t, directory, 'local', localSet);
   const selectionPath = path.join(directory, 'selection.json');
-  writeCanonical(localSetPath, localSet);
   const localIdentity = [
     `--version=${version}`,
     `--source-revision=${identity.sourceRevision}`,
     `--source-ref=${identity.sourceRef}`,
     '--release-scope=local',
     `--repository-owner=${identity.repositoryOwner}`,
-    `--release-set=${localSetPath}`,
+    `--source-repository=${identity.sourceRepository}`,
+    `--consumption-bundle=${localBundle}`,
     '--allow-root-service=false',
   ];
   runCli(
@@ -506,11 +680,10 @@ test('CLI creates and audits no-replace Local and Kubernetes outputs', (t) => {
   );
 
   const clusterSet = releaseSet('cluster');
-  const clusterSetPath = path.join(directory, 'cluster-set.json');
+  const clusterBundle = consumptionBundle(t, directory, 'cluster', clusterSet);
   const sourcePath = path.join(directory, 'rendered.yaml');
   const lockedPath = path.join(directory, 'locked.yaml');
   const reportPath = path.join(directory, 'lock.json');
-  writeCanonical(clusterSetPath, clusterSet);
   fs.writeFileSync(sourcePath, fixtureManifest(), { mode: 0o600 });
   const clusterIdentity = [
     `--version=${version}`,
@@ -518,7 +691,8 @@ test('CLI creates and audits no-replace Local and Kubernetes outputs', (t) => {
     `--source-ref=${identity.sourceRef}`,
     '--release-scope=cluster',
     `--repository-owner=${identity.repositoryOwner}`,
-    `--release-set=${clusterSetPath}`,
+    `--source-repository=${identity.sourceRepository}`,
+    `--consumption-bundle=${clusterBundle}`,
     `--manifest=${sourcePath}`,
     `--required-images=${roleOrder.join(',')}`,
   ];
@@ -551,10 +725,10 @@ test('CLI creates and audits no-replace Local and Kubernetes outputs', (t) => {
 
 test('CLI rejects symlinks, open arguments, output aliasing and policy ambiguity', (t) => {
   const directory = temporaryDirectory(t);
-  const localSetPath = path.join(directory, 'local-set.json');
-  const linkedSetPath = path.join(directory, 'linked-set.json');
-  writeCanonical(localSetPath, releaseSet('local'));
-  fs.symlinkSync(localSetPath, linkedSetPath);
+  const localSet = releaseSet('local');
+  const localBundle = consumptionBundle(t, directory, 'local', localSet);
+  const linkedBundle = path.join(directory, 'linked-bundle');
+  fs.symlinkSync(localBundle, linkedBundle, 'dir');
   const base = [
     '--mode=local-create',
     `--version=${version}`,
@@ -562,13 +736,14 @@ test('CLI rejects symlinks, open arguments, output aliasing and policy ambiguity
     `--source-ref=${identity.sourceRef}`,
     '--release-scope=local',
     `--repository-owner=${identity.repositoryOwner}`,
-    `--release-set=${linkedSetPath}`,
+    `--source-repository=${identity.sourceRepository}`,
+    `--consumption-bundle=${linkedBundle}`,
     '--allow-root-service=false',
     `--output=${path.join(directory, 'selection.json')}`,
   ];
   assert.throws(
     () => runCli(base, root, { write() {} }),
-    /canonical regular file/,
+    /canonical directory/,
   );
   assert.throws(
     () => parseArguments([...base, '--extra=value']),
@@ -585,11 +760,22 @@ test('CLI rejects symlinks, open arguments, output aliasing and policy ambiguity
       ),
     /must be true or false/,
   );
+  assert.throws(
+    () =>
+      parseArguments(
+        base.map((argument) =>
+          argument.startsWith('--consumption-bundle=')
+            ? `--release-set=${path.join(directory, 'loose-release-set.json')}`
+            : argument,
+        ),
+      ),
+    /arguments are invalid/,
+  );
 
-  const clusterSetPath = path.join(directory, 'cluster-set.json');
+  const clusterSet = releaseSet('cluster');
+  const clusterBundle = consumptionBundle(t, directory, 'cluster', clusterSet);
   const sourcePath = path.join(directory, 'rendered.yaml');
   const aliasedOutput = path.join(directory, 'same-output');
-  writeCanonical(clusterSetPath, releaseSet('cluster'));
   fs.writeFileSync(sourcePath, fixtureManifest(), { mode: 0o600 });
   assert.throws(
     () =>
@@ -601,7 +787,8 @@ test('CLI rejects symlinks, open arguments, output aliasing and policy ambiguity
           `--source-ref=${identity.sourceRef}`,
           '--release-scope=cluster',
           `--repository-owner=${identity.repositoryOwner}`,
-          `--release-set=${clusterSetPath}`,
+          `--source-repository=${identity.sourceRepository}`,
+          `--consumption-bundle=${clusterBundle}`,
           `--manifest=${sourcePath}`,
           `--required-images=${roleOrder.join(',')}`,
           `--output-manifest=${aliasedOutput}`,
@@ -634,6 +821,19 @@ test('source-surface audit freezes every reviewed cluster and worker authority',
     runCli(['--mode=surfaces-audit'], root, { write() {} }),
     auditDeploymentImageSurfaces(root),
   );
+});
+
+test('deployment-lock CLI cannot regress to a loose release-set input', () => {
+  const source = fs.readFileSync(
+    path.join(root, 'scripts/ql3-deployment-lock-contract.cjs'),
+    'utf8',
+  );
+  assert.match(source, /auditCeremonyBundle\(/u);
+  assert.match(source, /'consumption-bundle'/u);
+  assert.match(source, /'source-repository'/u);
+  assert.doesNotMatch(source, /['"]release-set['"]/u);
+  assert.match(source, /qinglong\/local-compose-release-image@v2/u);
+  assert.match(source, /qinglong\/kubernetes-deployment-lock@v2/u);
 });
 
 test(
@@ -678,7 +878,7 @@ test(
       const created = createKubernetesLock(
         set,
         rendered.stdout,
-        kubernetesOptions({
+        kubernetesOptions(set, {
           requiredImages: entry.requiredImages.join(','),
         }),
       );

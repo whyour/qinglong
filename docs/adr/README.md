@@ -434,6 +434,7 @@
 | [ADR-0428](./ADR-0428-durable-oci-release-catalog.md)                                        | 持久化 OCI Release Catalog 与独立部署验真                                                                                                                          | Accepted |
 | [ADR-0429](./ADR-0429-offline-release-set-deployment-lock-materialization.md)                 | 离线 Release-set Deployment Lock 物化                                                                                                                             | Accepted |
 | [ADR-0430](./ADR-0430-auditable-release-catalog-consumption-ceremony.md)                       | 可审计的 Release Catalog 消费工作站 Ceremony                                                                                                                       | Accepted（真实公开 catalog 运行待实际 release tag） |
+| [ADR-0431](./ADR-0431-catalog-bound-deployment-lock-chain.md)                                  | Catalog-bound Deployment Lock 证据链                                                                                                                               | Accepted（真实公开 catalog 运行待实际 release tag） |
 
 ## 规则
 

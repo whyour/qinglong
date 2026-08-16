@@ -812,6 +812,8 @@ function auditCeremonyBundle(options) {
   return Object.freeze({
     compatible: true,
     releaseScope: identity.releaseScope,
+    sourceRepository: identity.sourceRepository,
+    workflowIdentity: catalog.workflowIdentity,
     releaseSetDigest: releaseSet.value.releaseSetDigest,
     catalogManifestDigest: manifestDigest,
     immutableReference: `${catalog.repository}@${manifestDigest}`,
@@ -820,6 +822,7 @@ function auditCeremonyBundle(options) {
     externalToolResultsReplayed: false,
     deploymentMutation: false,
     contentDigest: expected.contentDigest,
+    releaseSet: releaseSet.value,
   });
 }
 

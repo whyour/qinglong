@@ -6,11 +6,16 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const yaml = require('js-yaml');
+const {
+  SCHEMA: CATALOG_CONSUMPTION_SCHEMA,
+  auditCeremonyBundle,
+  catalogIdentity,
+} = require('./ql3-release-catalog-consumption-ceremony.cjs');
 const { inspectReleaseSet } = require('./ql3-release-set-contract.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const LOCAL_SELECTION_SCHEMA = 'qinglong/local-compose-release-image@v1';
-const KUBERNETES_LOCK_SCHEMA = 'qinglong/kubernetes-deployment-lock@v1';
+const LOCAL_SELECTION_SCHEMA = 'qinglong/local-compose-release-image@v2';
+const KUBERNETES_LOCK_SCHEMA = 'qinglong/kubernetes-deployment-lock@v2';
 const MAX_RELEASE_SET_BYTES = 1024 * 1024;
 const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
 const MAX_RESOURCE_COUNT = 2048;
@@ -137,6 +142,41 @@ function inspectInputReleaseSet(releaseSet, options) {
   });
 }
 
+function catalogAuthority(releaseSet, options) {
+  const consumption = options.consumption;
+  const manifestDigest = consumption?.catalogManifestDigest;
+  const expectedCatalog = catalogIdentity(options);
+  if (
+    consumption === null ||
+    typeof consumption !== 'object' ||
+    consumption.compatible !== true ||
+    consumption.releaseScope !== options.releaseScope ||
+    consumption.sourceRepository !== options.sourceRepository ||
+    consumption.workflowIdentity !== expectedCatalog.workflowIdentity ||
+    consumption.releaseSetDigest !== releaseSet.releaseSetDigest ||
+    !/^sha256:[a-f0-9]{64}$/u.test(manifestDigest || '') ||
+    consumption.immutableReference !==
+      `${expectedCatalog.repository}@${manifestDigest}` ||
+    consumption.imageCount !== releaseSet.images.length ||
+    consumption.discoveryTagAuthority !== 'none' ||
+    consumption.externalToolResultsReplayed !== false ||
+    consumption.deploymentMutation !== false ||
+    !/^sha256:[a-f0-9]{64}$/u.test(consumption.contentDigest || '')
+  ) {
+    fail('release catalog consumption authority is invalid');
+  }
+  return Object.freeze({
+    schema: CATALOG_CONSUMPTION_SCHEMA,
+    sourceRepository: consumption.sourceRepository,
+    workflowIdentity: consumption.workflowIdentity,
+    immutableReference: consumption.immutableReference,
+    manifestDigest,
+    consumptionReportDigest: consumption.contentDigest,
+    releaseSetDigest: consumption.releaseSetDigest,
+    discoveryTagAuthority: 'none',
+  });
+}
+
 function imageByName(releaseSet, name) {
   const matches = releaseSet.images.filter((entry) => entry.name === name);
   if (matches.length !== 1) fail(`release image is unavailable: ${name}`);
@@ -145,6 +185,7 @@ function imageByName(releaseSet, name) {
 
 function createLocalSelection(releaseSet, options) {
   const inspection = inspectInputReleaseSet(releaseSet, options);
+  const catalog = catalogAuthority(releaseSet, options);
   if (!['local', 'all'].includes(options.releaseScope)) {
     fail('local selection requires a local or all release set');
   }
@@ -157,6 +198,7 @@ function createLocalSelection(releaseSet, options) {
     schema: LOCAL_SELECTION_SCHEMA,
     release: { ...releaseSet.release },
     releaseSetDigest: releaseSet.releaseSetDigest,
+    catalog,
     deploymentFamily: 'local',
     service: {
       kind: 'compose',
@@ -166,6 +208,8 @@ function createLocalSelection(releaseSet, options) {
     verification: {
       releaseSet: inspection.verification,
       sourceRecordsReplayed: inspection.sourceRecordsReplayed,
+      catalogConsumption: 'offline_reconstructed',
+      externalToolResultsReplayed: false,
       networkAccess: false,
       deploymentMutation: false,
     },
@@ -186,6 +230,8 @@ function auditLocalSelection(actual, releaseSet, options) {
     deploymentFamily: 'local',
     releaseSetDigest: actual.releaseSetDigest,
     selectionDigest: actual.selectionDigest,
+    catalogManifestDigest: actual.catalog.manifestDigest,
+    immutableReference: actual.catalog.immutableReference,
     image: actual.service.image,
     networkAccess: false,
     deploymentMutation: false,
@@ -310,7 +356,7 @@ function podSpecFor(resource) {
   return undefined;
 }
 
-function ensureAnnotations(target, releaseSet) {
+function ensureAnnotations(target, releaseSet, catalog) {
   if (target === null || typeof target !== 'object' || Array.isArray(target)) {
     fail('rewritten resource metadata is invalid');
   }
@@ -329,6 +375,9 @@ function ensureAnnotations(target, releaseSet) {
   metadata.annotations = {
     ...(metadata.annotations ?? {}),
     'qinglong.io/release-set-digest': releaseSet.releaseSetDigest,
+    'qinglong.io/release-catalog-manifest-digest': catalog.manifestDigest,
+    'qinglong.io/release-catalog-report-digest':
+      catalog.consumptionReportDigest,
     'qinglong.io/release-source-revision': releaseSet.release.sourceRevision,
     'qinglong.io/release-version': releaseSet.release.version,
   };
@@ -407,7 +456,12 @@ function scanForUnhandledRoleImages(
   }
 }
 
-function rewriteKubernetesResources(resources, releaseSet, requiredImages) {
+function rewriteKubernetesResources(
+  resources,
+  releaseSet,
+  requiredImages,
+  catalog,
+) {
   const references = Object.fromEntries(
     ROLE_ORDER.map((role) => [role, imageByName(releaseSet, role).reference]),
   );
@@ -459,7 +513,7 @@ function rewriteKubernetesResources(resources, releaseSet, requiredImages) {
       changed += 1;
     }
     if (changed > 0) {
-      ensureAnnotations(resource, releaseSet);
+      ensureAnnotations(resource, releaseSet, catalog);
       const template =
         resource.kind === 'CronJob'
           ? resource.spec?.jobTemplate?.spec?.template
@@ -470,7 +524,7 @@ function rewriteKubernetesResources(resources, releaseSet, requiredImages) {
             )
           ? resource.spec?.template
           : undefined;
-      if (template) ensureAnnotations(template, releaseSet);
+      if (template) ensureAnnotations(template, releaseSet, catalog);
       changedResources += 1;
     }
   }
@@ -493,6 +547,7 @@ function rewriteKubernetesResources(resources, releaseSet, requiredImages) {
 
 function createKubernetesLock(releaseSet, manifestContents, options) {
   const inspection = inspectInputReleaseSet(releaseSet, options);
+  const catalog = catalogAuthority(releaseSet, options);
   if (!['cluster', 'all'].includes(options.releaseScope)) {
     fail('Kubernetes materialization requires a cluster or all release set');
   }
@@ -502,6 +557,7 @@ function createKubernetesLock(releaseSet, manifestContents, options) {
     parsed,
     releaseSet,
     requiredImages,
+    catalog,
   );
   const outputManifest = renderManifest(rewritten.resources);
   if (Buffer.byteLength(outputManifest, 'utf8') > MAX_MANIFEST_BYTES) {
@@ -512,6 +568,7 @@ function createKubernetesLock(releaseSet, manifestContents, options) {
     schema: KUBERNETES_LOCK_SCHEMA,
     release: { ...releaseSet.release },
     releaseSetDigest: releaseSet.releaseSetDigest,
+    catalog,
     deploymentFamily: 'cluster',
     requiredImages: [...requiredImages],
     imageOccurrences: ROLE_ORDER.map((name) => ({
@@ -529,6 +586,8 @@ function createKubernetesLock(releaseSet, manifestContents, options) {
     verification: {
       releaseSet: inspection.verification,
       sourceRecordsReplayed: inspection.sourceRecordsReplayed,
+      catalogConsumption: 'offline_reconstructed',
+      externalToolResultsReplayed: false,
       unknownImageAuthorities: 0,
       mutableQingLongImages: 0,
       networkAccess: false,
@@ -561,6 +620,8 @@ function auditKubernetesLock(
     deploymentFamily: 'cluster',
     releaseSetDigest: actualReport.releaseSetDigest,
     lockDigest: actualReport.lockDigest,
+    catalogManifestDigest: actualReport.catalog.manifestDigest,
+    immutableReference: actualReport.catalog.immutableReference,
     outputManifestDigest: actualReport.manifest.outputDigest,
     requiredImages: Object.freeze([...actualReport.requiredImages]),
     networkAccess: false,
@@ -642,12 +703,13 @@ function parseArguments(argv) {
   }
   const identity = [
     'mode',
+    'consumption-bundle',
     'release-scope',
     'repository-owner',
+    'source-repository',
     'source-ref',
     'source-revision',
     'version',
-    'release-set',
   ];
   const expected =
     values.mode === 'local-create'
@@ -685,7 +747,8 @@ function parseArguments(argv) {
     sourceRef: values['source-ref'],
     releaseScope: values['release-scope'],
     repositoryOwner: values['repository-owner'],
-    releaseSet: values['release-set'],
+    sourceRepository: values['source-repository'],
+    consumptionBundle: values['consumption-bundle'],
     ...(values['allow-root-service']
       ? {
           allowRootService:
@@ -722,13 +785,14 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
     output.write(canonicalJson(audit));
     return audit;
   }
-  const releaseSet = readCanonicalJson(
-    options.releaseSet,
-    'release set',
-    MAX_RELEASE_SET_BYTES,
-  ).value;
+  const consumption = auditCeremonyBundle({
+    ...options,
+    outputDirectory: options.consumptionBundle,
+  });
+  const releaseSet = consumption.releaseSet;
+  const boundOptions = Object.freeze({ ...options, consumption });
   if (options.mode === 'local-create') {
-    const selection = createLocalSelection(releaseSet, options);
+    const selection = createLocalSelection(releaseSet, boundOptions);
     const target = preflightOutput(options.output, 'output');
     writeNoReplace(target, canonicalJson(selection));
     output.write(canonicalJson(selection));
@@ -740,7 +804,7 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
       'local selection',
       MAX_RELEASE_SET_BYTES,
     ).value;
-    const audit = auditLocalSelection(selection, releaseSet, options);
+    const audit = auditLocalSelection(selection, releaseSet, boundOptions);
     output.write(canonicalJson(audit));
     return audit;
   }
@@ -758,7 +822,11 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
     if (manifestTarget === reportTarget) {
       fail('output manifest and report paths must differ');
     }
-    const created = createKubernetesLock(releaseSet, sourceManifest, options);
+    const created = createKubernetesLock(
+      releaseSet,
+      sourceManifest,
+      boundOptions,
+    );
     writeNoReplace(manifestTarget, created.outputManifest);
     writeNoReplace(reportTarget, canonicalJson(created.report));
     output.write(canonicalJson(created.report));
@@ -779,7 +847,7 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
     report,
     releaseSet,
     sourceManifest,
-    options,
+    boundOptions,
   );
   output.write(canonicalJson(audit));
   return audit;
