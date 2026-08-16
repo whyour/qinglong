@@ -13,6 +13,8 @@
 - 已安装 `ql3-local-deploy` 与 `ql3-local-application`；
 - 使用最终运行 QingLong 的同一个 POSIX 用户；
 - command file 的父目录为当前 UID 的 canonical `0700` 目录；
+- Compose 的 catalog-bound Local v2 selection 也必须位于当前 UID 的 canonical
+  `0700` 目录中，文件自身为 canonical、current-UID、单链接 `0600`；
 - 生产环境建议使用非 root 用户。只有 root-only 路由器才将
   `allowRootService` 明确设为 `true`。
 
@@ -502,15 +504,26 @@ sudo rc-service qinglong3 start
 
 ## 5. Rootless Compose
 
-Compose 命令只接受不可变 digest，不接受 `latest` 或普通 tag：
+Compose 命令不再接受裸 image 字段。先按
+[Release-set 部署流程](./ql3-release-set-deployment.md) 在可信工作站生成并审计
+catalog-bound Local v2 selection，再把该私有文件及 audit 返回的 exact
+`selectionDigest` 交给目标机：
 
 ```json
 {
   "kind": "compose",
-  "image": "registry.example/qinglong3-local@sha256:REPLACE_WITH_64_HEX_DIGEST",
+  "releaseSelection": {
+    "path": "/secure/operator/qinglong3-local-selection-3.0.0.json",
+    "expectedSelectionDigest": "sha256:REPLACE_WITH_64_HEX_DIGEST"
+  },
   "allowRootService": false
 }
 ```
+
+目标机只做一次有界私有 JSON 读取、canonical shape/self-digest/catalog binding
+校验并取出唯一 `ghcr.io/<owner>/qinglong3-local-application@sha256:...`。它不运行
+Cosign、GitHub CLI、regctl 或 Kustomize，不访问网络，也不会因此获得 rollout authority。
+旧 `image` 输入失败关闭，不提供手工复制旁路。
 
 它生成 `service/compose.yaml`，固定 numeric UID:GID、read-only rootfs、唯一 bind
 mount、无网络、drop all capabilities、no-new-privileges、16 MiB tmpfs 与
@@ -543,8 +556,10 @@ docker compose \
 输出必须精确等于已审核的 `@sha256` image。不得省略或调换第二个 override 文件，
 也不得另加第三个 Compose 文件覆盖 image。
 
-基础文件包含从 `instanceId` 派生的稳定 Compose project name；override 同时把
-generation/mutation 写入 container label。不要使用 `-p`、`COMPOSE_PROJECT_NAME`
+基础文件包含从 `instanceId` 派生的稳定 Compose project name；override 使用 v2
+revision 格式持久保存 selection/release-set/catalog manifest/catalog consumption report
+digest、release identity、immutable catalog reference 与 root policy，并把 generation、
+mutation 和核心 provenance 写入 container label。不要使用 `-p`、`COMPOSE_PROJECT_NAME`
 或第三个 override 改写这些身份。
 
 当前仓库仍没有可引用的本机远端 release digest。ADR-0195 已提供
@@ -574,15 +589,16 @@ pnpm sbom:local-image:ql3
 pnpm audit:image-release:ql3
 ```
 
-本地 tag/image ID 不是可发布 digest。只有 release workflow 返回的
-`ghcr.io/<owner>/qinglong3-local-application@sha256:...`，且同一 digest 的
-双架构 manifest、Cosign、SLSA、CycloneDX 远端 verify 全部成功后，才可写入
-D-184 Compose 私有输入；永远不得替换成 mutable tag。
+本地 tag/image ID 不是可发布 authority。只有 release workflow 返回的
+`ghcr.io/<owner>/qinglong3-local-application@sha256:...`，且同一 release-set 的
+双架构 manifest、Cosign、SLSA、CycloneDX、immutable catalog ceremony 与 deployment-lock
+audit 全部成功后，才可把 Local v2 selection 的路径和 digest 写入 Compose 私有输入；
+永远不得替换成裸 digest 或 mutable tag。
 
 ## 6. Compose 镜像升级和选择回退
 
-升级前先完成 D-186 的 digest/attestation/signature 回读，并把 exact image 预取到
-设备。随后创建新的私有 command file：
+升级前先完成 release catalog consumption ceremony 与 Local deployment-lock audit，并按
+独立下载策略把 selection 绑定的 exact image 预取到设备。随后创建新的私有 command file：
 
 ```json
 {
@@ -594,7 +610,10 @@ D-184 Compose 私有输入；永远不得替换成 mutable tag。
   },
   "request": {
     "expectedGeneration": 1,
-    "image": "registry.example/qinglong3-local@sha256:REPLACE_WITH_64_HEX_DIGEST",
+    "releaseSelection": {
+      "path": "/secure/operator/qinglong3-local-selection-3.0.1.json",
+      "expectedSelectionDigest": "sha256:REPLACE_WITH_64_HEX_DIGEST"
+    },
     "mutationId": "REPLACE_WITH_UUID_V4",
     "changedAtMs": 1785254500000
   }
@@ -607,8 +626,8 @@ ql3-local-deploy compose-revision \
   --command-file /secure/operator/qinglong3-compose-upgrade.json
 ```
 
-成功返回 generation 2。结果未知时原样重放同一文件；不要修改 mutation、时间或
-expected generation。再次用 `config --images` 检查 selection，再由 operator
+成功返回 generation 2，并把完整 catalog provenance 固化到 immutable revision。结果未知时原样重放同一文件；
+不要修改 selection path/digest、mutation、时间或 expected generation。再次用 `config --images` 检查 selection，再由 operator
 先执行 rollout preflight。Docker 路径和 socket 都必须使用 `realpath`；典型
 rootful Linux 分别为 `/usr/bin/docker` 与 `/var/run/docker.sock`，rootless socket
 通常位于 `/run/user/<uid>/docker.sock`：

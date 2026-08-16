@@ -11,8 +11,8 @@ import {
   currentIdentity,
   LocalDeploymentConfigurationError,
   normalizeLocalDeploymentComposePreflightCommand,
-  normalizeLocalDeploymentPrepareCommand,
   type LocalDeploymentComposePreflightResult,
+  type LocalDeploymentPrepareCommand,
   type LocalDeploymentProfile,
 } from '../foundation/contract';
 import { inspectActiveComposeImageSelection } from './composeRevision';
@@ -357,7 +357,7 @@ export async function preflightLocalDeploymentCompose(
     paths.applicationConfig,
     identity.uid,
   );
-  const syntheticPrepare = normalizeLocalDeploymentPrepareCommand({
+  const syntheticPrepare: Readonly<LocalDeploymentPrepareCommand> = {
     schemaVersion: 1,
     operation: 'local.deployment.prepare',
     options: {
@@ -369,7 +369,10 @@ export async function preflightLocalDeploymentCompose(
         : { busyTimeoutMs: application.busyTimeoutMs }),
       service: {
         kind: 'compose',
-        image: selection.image,
+        releaseSelection: {
+          path: paths.composeSelection,
+          expectedSelectionDigest: selection.selectionDigest,
+        },
         allowRootService: command.options.allowRootService,
       },
     },
@@ -380,7 +383,7 @@ export async function preflightLocalDeploymentCompose(
       registeredAtMs: 0,
       activatedAtMs: 0,
     },
-  });
+  };
   preflightPublishedFile(
     paths.applicationConfig,
     applicationConfiguration(syntheticPrepare, paths),

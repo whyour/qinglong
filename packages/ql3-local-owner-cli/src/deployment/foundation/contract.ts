@@ -2,6 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type { LocalSetupResult } from '../../lifecycle/localSetup';
+import {
+  LocalComposeReleaseSelectionError,
+  resolveLocalComposeReleaseSelection,
+  type LocalComposeReleaseSelectionInput,
+  type ResolvedLocalComposeReleaseSelection,
+} from '../compose/releaseSelection';
 
 const MAX_PATH_BYTES = 4_096;
 const SAFE_PATH_PATTERN = /^\/[A-Za-z0-9._/@-]+$/;
@@ -9,8 +15,6 @@ const INSTANCE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
 const KEY_ID_PATTERN = /^[a-z][a-z0-9._-]{0,63}$/;
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const IMAGE_DIGEST_PATTERN =
-  /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}@sha256:[0-9a-f]{64}$/;
 
 export type LocalDeploymentProfile = 'edge' | 'standalone';
 export type LocalDeploymentServiceKind = 'systemd' | 'openrc' | 'compose';
@@ -24,8 +28,13 @@ export interface LocalDeploymentProcessService {
 
 export interface LocalDeploymentComposeService {
   readonly kind: 'compose';
-  readonly image: string;
+  readonly releaseSelection: Readonly<LocalComposeReleaseSelectionInput>;
   readonly allowRootService: boolean;
+}
+
+export interface NormalizedLocalDeploymentComposeService
+  extends LocalDeploymentComposeService {
+  readonly releaseSelection: Readonly<ResolvedLocalComposeReleaseSelection>;
 }
 
 export type LocalDeploymentService =
@@ -49,6 +58,16 @@ export interface LocalDeploymentPrepareCommand {
     registeredAtMs: number;
     activatedAtMs: number;
   }>;
+}
+
+export interface NormalizedLocalDeploymentPrepareCommand
+  extends Omit<LocalDeploymentPrepareCommand, 'options'> {
+  readonly options: Omit<LocalDeploymentPrepareCommand['options'], 'service'> &
+    Readonly<{
+      service:
+        | Readonly<LocalDeploymentProcessService>
+        | Readonly<NormalizedLocalDeploymentComposeService>;
+    }>;
 }
 
 export interface LocalDeploymentPrepareResult {
@@ -121,10 +140,21 @@ export interface LocalDeploymentComposeUpgradeCommand {
   }>;
   readonly request: Readonly<{
     expectedGeneration: number;
-    image: string;
+    releaseSelection: Readonly<LocalComposeReleaseSelectionInput>;
     mutationId: string;
     changedAtMs: number;
   }>;
+}
+
+export interface NormalizedLocalDeploymentComposeUpgradeCommand
+  extends Omit<LocalDeploymentComposeUpgradeCommand, 'request'> {
+  readonly request: Omit<
+    LocalDeploymentComposeUpgradeCommand['request'],
+    'releaseSelection'
+  > &
+    Readonly<{
+      releaseSelection: Readonly<ResolvedLocalComposeReleaseSelection>;
+    }>;
 }
 
 export interface LocalDeploymentComposeRollbackCommand {
@@ -144,6 +174,10 @@ export interface LocalDeploymentComposeRollbackCommand {
 
 export type LocalDeploymentComposeRevisionCommand =
   | LocalDeploymentComposeUpgradeCommand
+  | LocalDeploymentComposeRollbackCommand;
+
+export type NormalizedLocalDeploymentComposeRevisionCommand =
+  | NormalizedLocalDeploymentComposeUpgradeCommand
   | LocalDeploymentComposeRollbackCommand;
 
 export interface LocalDeploymentComposeRevisionResult {
@@ -474,7 +508,9 @@ function validateExecutable(
 function normalizeService(
   value: unknown,
   uid: number,
-): Readonly<LocalDeploymentService> {
+):
+  | Readonly<LocalDeploymentProcessService>
+  | Readonly<NormalizedLocalDeploymentComposeService> {
   const service = object(value, 'service');
   if (service.kind === 'systemd' || service.kind === 'openrc') {
     exact(
@@ -503,25 +539,47 @@ function normalizeService(
     });
   }
   if (service.kind === 'compose') {
-    exact(service, ['allowRootService', 'image', 'kind'], 'service');
-    if (
-      typeof service.image !== 'string' ||
-      !IMAGE_DIGEST_PATTERN.test(service.image) ||
-      service.image.includes('..') ||
-      service.image.includes('//') ||
-      service.image.split('@').length !== 2
-    ) {
-      throw new LocalDeploymentConfigurationError(
-        'compose image must be an immutable sha256 reference',
+    exact(service, ['allowRootService', 'kind', 'releaseSelection'], 'service');
+    const allowRootService = validateRootAcknowledgement(
+      service.allowRootService,
+      uid,
+    );
+    const releaseSelection = object(
+      service.releaseSelection,
+      'releaseSelection',
+    );
+    exact(
+      releaseSelection,
+      ['expectedSelectionDigest', 'path'],
+      'releaseSelection',
+    );
+    let resolved: Readonly<ResolvedLocalComposeReleaseSelection>;
+    try {
+      resolved = resolveLocalComposeReleaseSelection(
+        {
+          path: safeAbsolutePath(
+            releaseSelection.path,
+            'releaseSelection.path',
+          ),
+          expectedSelectionDigest:
+            releaseSelection.expectedSelectionDigest as string,
+        },
+        uid,
+        allowRootService,
       );
+    } catch (error) {
+      if (error instanceof LocalComposeReleaseSelectionError) {
+        throw new LocalDeploymentConfigurationError(
+          'compose release selection is invalid',
+          { cause: error },
+        );
+      }
+      throw error;
     }
     return Object.freeze({
       kind: 'compose' as const,
-      image: service.image,
-      allowRootService: validateRootAcknowledgement(
-        service.allowRootService,
-        uid,
-      ),
+      releaseSelection: resolved,
+      allowRootService,
     });
   }
   throw new LocalDeploymentConfigurationError('service kind is invalid');
@@ -529,7 +587,7 @@ function normalizeService(
 
 export function normalizeLocalDeploymentPrepareCommand(
   value: unknown,
-): Readonly<LocalDeploymentPrepareCommand> {
+): Readonly<NormalizedLocalDeploymentPrepareCommand> {
   const command = object(value, 'command');
   exact(
     command,
@@ -659,7 +717,7 @@ export function normalizeLocalDeploymentStatusCommand(
 
 export function normalizeLocalDeploymentComposeRevisionCommand(
   value: unknown,
-): Readonly<LocalDeploymentComposeRevisionCommand> {
+): Readonly<NormalizedLocalDeploymentComposeRevisionCommand> {
   const command = object(value, 'command');
   exact(
     command,
@@ -689,17 +747,17 @@ export function normalizeLocalDeploymentComposeRevisionCommand(
   if (command.operation === 'local.deployment.compose.upgrade') {
     exact(
       request,
-      ['changedAtMs', 'expectedGeneration', 'image', 'mutationId'],
+      ['changedAtMs', 'expectedGeneration', 'mutationId', 'releaseSelection'],
       'request',
     );
     const service = normalizeService(
       {
         kind: 'compose',
-        image: request.image,
+        releaseSelection: request.releaseSelection,
         allowRootService: normalizedOptions.allowRootService,
       },
       identity.uid,
-    ) as Readonly<LocalDeploymentComposeService>;
+    ) as Readonly<NormalizedLocalDeploymentComposeService>;
     if (
       typeof request.mutationId !== 'string' ||
       !UUID_V4_PATTERN.test(request.mutationId)
@@ -719,7 +777,7 @@ export function normalizeLocalDeploymentComposeRevisionCommand(
           99_999,
           'expectedGeneration',
         ),
-        image: service.image,
+        releaseSelection: service.releaseSelection,
         mutationId: request.mutationId,
         changedAtMs: boundedInteger(
           request.changedAtMs,

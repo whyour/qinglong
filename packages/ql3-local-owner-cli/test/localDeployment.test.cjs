@@ -26,6 +26,67 @@ function rootAcknowledgement() {
   return typeof process.getuid === 'function' && process.getuid() === 0;
 }
 
+function sha256(value) {
+  return `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
+}
+
+function releaseSelectionForImage(managementRoot, image, allowRootService) {
+  const releaseSetDigest = sha256(`release-set:${image}`);
+  const manifestDigest = sha256(`catalog-manifest:${image}`);
+  const consumptionReportDigest = sha256(`catalog-report:${image}`);
+  const unsigned = {
+    schemaVersion: 1,
+    schema: 'qinglong/local-compose-release-image@v2',
+    release: {
+      version: '3.0.0-alpha.0',
+      sourceRevision: '3'.repeat(40),
+      sourceRef: 'refs/tags/v3.0.0-alpha.0',
+      scope: 'local',
+    },
+    releaseSetDigest,
+    catalog: {
+      schema: 'qinglong/release-catalog-consumption-ceremony@v1',
+      sourceRepository: 'example/qinglong',
+      workflowIdentity:
+        'https://github.com/example/qinglong/.github/workflows/ql3-image-release.yml@refs/tags/v3.0.0-alpha.0',
+      immutableReference: `ghcr.io/example/qinglong3-release-catalog@${manifestDigest}`,
+      manifestDigest,
+      consumptionReportDigest,
+      releaseSetDigest,
+      discoveryTagAuthority: 'none',
+    },
+    deploymentFamily: 'local',
+    service: {
+      kind: 'compose',
+      image,
+      allowRootService,
+    },
+    verification: {
+      releaseSet: 'standalone_structure_identity_and_self_digest',
+      sourceRecordsReplayed: false,
+      catalogConsumption: 'offline_reconstructed',
+      externalToolResultsReplayed: false,
+      networkAccess: false,
+      deploymentMutation: false,
+    },
+  };
+  const selectionDigest = sha256(JSON.stringify(unsigned));
+  const contents = `${JSON.stringify({ ...unsigned, selectionDigest })}\n`;
+  const filePath = path.join(
+    managementRoot,
+    `release-selection-${selectionDigest.slice(7)}.json`,
+  );
+  if (fs.existsSync(filePath)) {
+    assert.equal(fs.readFileSync(filePath, 'utf8'), contents);
+  } else {
+    fs.writeFileSync(filePath, contents, { mode: 0o600, flag: 'wx' });
+  }
+  return Object.freeze({
+    path: filePath,
+    expectedSelectionDigest: selectionDigest,
+  });
+}
+
 function fixture(t, kind = 'systemd') {
   const managementRoot = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-local-deployment-')),
@@ -36,11 +97,18 @@ function fixture(t, kind = 'systemd') {
   const applicationEntrypoint = fs.realpathSync(
     path.resolve(__dirname, '../../ql3-local-application/dist/cli.js'),
   );
+  const composeImage = `ghcr.io/example/qinglong3-local-application@sha256:${'a'.repeat(
+    64,
+  )}`;
   const service =
     kind === 'compose'
       ? {
           kind,
-          image: `registry.example/qinglong3-local@sha256:${'a'.repeat(64)}`,
+          releaseSelection: releaseSelectionForImage(
+            managementRoot,
+            composeImage,
+            rootAcknowledgement(),
+          ),
           allowRootService: rootAcknowledgement(),
         }
       : {
@@ -71,7 +139,13 @@ function fixture(t, kind = 'systemd') {
   fs.writeFileSync(commandFilePath, `${JSON.stringify(command)}\n`, {
     mode: 0o600,
   });
-  return { command, commandFilePath, deploymentRoot, managementRoot };
+  return {
+    command,
+    commandFilePath,
+    composeImage,
+    deploymentRoot,
+    managementRoot,
+  };
 }
 
 function mode(filePath) {
@@ -133,6 +207,18 @@ function legacyStopCommand(state, cutoverId = 'cutover-edge-1') {
 }
 
 function composeRevisionCommand(state, operation, request) {
+  let normalizedRequest = request;
+  if (operation === 'local.deployment.compose.upgrade' && request.image) {
+    const { image, ...rest } = request;
+    normalizedRequest = {
+      ...rest,
+      releaseSelection: releaseSelectionForImage(
+        state.managementRoot,
+        image,
+        rootAcknowledgement(),
+      ),
+    };
+  }
   return {
     schemaVersion: 1,
     operation,
@@ -140,7 +226,7 @@ function composeRevisionCommand(state, operation, request) {
       deploymentRoot: state.deploymentRoot,
       allowRootService: rootAcknowledgement(),
     },
-    request,
+    request: normalizedRequest,
   };
 }
 
@@ -250,7 +336,9 @@ async function createFailedRollbackRestoreState(state, suffix = '61') {
   await switchLocalDeploymentComposeRevision(
     composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
       expectedGeneration: 1,
-      image: `registry.example/qinglong3-local@sha256:${'f'.repeat(64)}`,
+      image: `ghcr.io/example/qinglong3-local-application@sha256:${'f'.repeat(
+        64,
+      )}`,
       mutationId: `00000000-0000-4000-8000-000000000d${suffix}`,
       changedAtMs: 6_900,
     }),
@@ -296,21 +384,41 @@ function composeSelection({
   mutationId,
   changedAtMs,
   image,
+  releaseSelection,
 }) {
+  const selected = JSON.parse(fs.readFileSync(releaseSelection.path, 'utf8'));
   return [
     'x-qinglong-image-selection:',
-    '  schema: qinglong/local-compose-image-selection@v1',
+    '  schema: qinglong/local-compose-image-selection@v2',
     `  generation: ${generation}`,
     `  previous_generation: ${previousGeneration}`,
     `  rollback_target_generation: ${rollbackTargetGeneration}`,
     `  mutation_id: ${mutationId}`,
     `  changed_at_ms: ${changedAtMs}`,
+    `  release_selection_digest: ${selected.selectionDigest}`,
+    `  release_set_digest: ${selected.releaseSetDigest}`,
+    `  release_version: ${selected.release.version}`,
+    `  release_source_revision: ${selected.release.sourceRevision}`,
+    `  release_source_ref: ${selected.release.sourceRef}`,
+    `  release_scope: ${selected.release.scope}`,
+    `  catalog_schema: ${selected.catalog.schema}`,
+    `  catalog_source_repository: ${selected.catalog.sourceRepository}`,
+    `  catalog_workflow_identity: ${selected.catalog.workflowIdentity}`,
+    `  catalog_immutable_reference: ${selected.catalog.immutableReference}`,
+    `  catalog_manifest_digest: ${selected.catalog.manifestDigest}`,
+    `  catalog_consumption_report_digest: ${selected.catalog.consumptionReportDigest}`,
+    `  catalog_discovery_tag_authority: ${selected.catalog.discoveryTagAuthority}`,
+    `  allow_root_service: ${selected.service.allowRootService}`,
     'services:',
     '  qinglong3:',
     `    image: ${image}`,
     '    labels:',
     `      io.qinglong.deployment.generation: "${generation}"`,
     `      io.qinglong.deployment.mutation: "${mutationId}"`,
+    `      io.qinglong.release.selection: "${selected.selectionDigest}"`,
+    `      io.qinglong.release.set: "${selected.releaseSetDigest}"`,
+    `      io.qinglong.release.catalog-manifest: "${selected.catalog.manifestDigest}"`,
+    `      io.qinglong.release.catalog-report: "${selected.catalog.consumptionReportDigest}"`,
     '',
   ].join('\n');
 }
@@ -784,7 +892,9 @@ test('observes Compose generation and recovery fences with low constant work', a
   await switchLocalDeploymentComposeRevision(
     composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
       expectedGeneration: 1,
-      image: `registry.example/qinglong3-local@sha256:${'b'.repeat(64)}`,
+      image: `ghcr.io/example/qinglong3-local-application@sha256:${'b'.repeat(
+        64,
+      )}`,
       mutationId: '00000000-0000-4000-8000-000000000d31',
       changedAtMs: 6_000,
     }),
@@ -919,6 +1029,18 @@ test('renders bounded OpenRC and immutable rootless Compose descriptors', async 
     fs.readFileSync(selectionPath, 'utf8'),
     /^    image: .*@sha256:[a-f0-9]{64}$/m,
   );
+  assert.match(
+    fs.readFileSync(selectionPath, 'utf8'),
+    /^  schema: qinglong\/local-compose-image-selection@v2$/m,
+  );
+  assert.match(
+    fs.readFileSync(selectionPath, 'utf8'),
+    /^  catalog_immutable_reference: ghcr\.io\/example\/qinglong3-release-catalog@sha256:[a-f0-9]{64}$/m,
+  );
+  assert.match(
+    fs.readFileSync(selectionPath, 'utf8'),
+    /^  release_selection_digest: sha256:[a-f0-9]{64}$/m,
+  );
   const config = JSON.parse(
     fs.readFileSync(
       path.join(compose.deploymentRoot, 'local-application.json'),
@@ -935,11 +1057,82 @@ test('renders bounded OpenRC and immutable rootless Compose descriptors', async 
   );
 });
 
+test('fails before deployment mutation on unbound or drifted release selections', async (t) => {
+  const state = fixture(t, 'compose');
+  const selectionPath = state.command.options.service.releaseSelection.path;
+  await assert.rejects(
+    prepareLocalDeployment({
+      ...state.command,
+      options: {
+        ...state.command.options,
+        service: {
+          kind: 'compose',
+          image: state.composeImage,
+          allowRootService: rootAcknowledgement(),
+        },
+      },
+    }),
+    LocalDeploymentConfigurationError,
+  );
+  assert.equal(fs.existsSync(state.deploymentRoot), false);
+
+  await assert.rejects(
+    prepareLocalDeployment({
+      ...state.command,
+      options: {
+        ...state.command.options,
+        service: {
+          ...state.command.options.service,
+          releaseSelection: {
+            path: selectionPath,
+            expectedSelectionDigest: `sha256:${'f'.repeat(64)}`,
+          },
+        },
+      },
+    }),
+    LocalDeploymentConfigurationError,
+  );
+  assert.equal(fs.existsSync(state.deploymentRoot), false);
+
+  fs.chmodSync(selectionPath, 0o644);
+  await assert.rejects(
+    prepareLocalDeployment(state.command),
+    LocalDeploymentConfigurationError,
+  );
+  assert.equal(fs.existsSync(state.deploymentRoot), false);
+
+  fs.chmodSync(selectionPath, 0o600);
+  const drifted = JSON.parse(fs.readFileSync(selectionPath, 'utf8'));
+  drifted.catalog.releaseSetDigest = `sha256:${'e'.repeat(64)}`;
+  delete drifted.selectionDigest;
+  drifted.selectionDigest = sha256(JSON.stringify(drifted));
+  fs.writeFileSync(selectionPath, `${JSON.stringify(drifted)}\n`, {
+    mode: 0o600,
+  });
+  await assert.rejects(
+    prepareLocalDeployment({
+      ...state.command,
+      options: {
+        ...state.command.options,
+        service: {
+          ...state.command.options.service,
+          releaseSelection: {
+            path: selectionPath,
+            expectedSelectionDigest: drifted.selectionDigest,
+          },
+        },
+      },
+    }),
+    LocalDeploymentConfigurationError,
+  );
+  assert.equal(fs.existsSync(state.deploymentRoot), false);
+});
+
 test('preflights exact local image, Compose merge and SQLite capability', async (t) => {
   const state = fixture(t, 'compose');
   await prepareLocalDeployment(state.command);
   const dockerSocketPath = path.join(state.managementRoot, 'docker.sock');
-  const image = state.command.options.service.image;
+  const image = state.composeImage;
   const composeSource = fs.readFileSync(
     path.join(state.deploymentRoot, 'service', 'compose.yaml'),
     'utf8',
@@ -1071,7 +1264,7 @@ test('Compose preflight rejects unproven image compatibility', async (t) => {
   const incompatibleImage = JSON.stringify([
     {
       Id: `sha256:${'1'.repeat(64)}`,
-      RepoDigests: [state.command.options.service.image],
+      RepoDigests: [state.composeImage],
       Architecture: 'amd64',
       Os: 'linux',
       Config: {
@@ -1201,7 +1394,7 @@ test('explicitly collects the oldest Compose backup and preserves exact rollout 
     await switchLocalDeploymentComposeRevision(
       composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
         expectedGeneration: generation - 1,
-        image: `registry.example/qinglong3-local@sha256:${imageCharacter.repeat(
+        image: `ghcr.io/example/qinglong3-local-application@sha256:${imageCharacter.repeat(
           64,
         )}`,
         mutationId: `00000000-0000-4000-8000-000000000d${generation}0`,
@@ -1260,7 +1453,9 @@ test('explicitly collects the oldest Compose backup and preserves exact rollout 
     switchLocalDeploymentComposeRevision(
       composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
         expectedGeneration: 4,
-        image: `registry.example/qinglong3-local@sha256:${'e'.repeat(64)}`,
+        image: `ghcr.io/example/qinglong3-local-application@sha256:${'e'.repeat(
+          64,
+        )}`,
         mutationId: '00000000-0000-4000-8000-000000000d45',
         changedAtMs: 7_200,
       }),
@@ -1377,7 +1572,9 @@ test('rolls a failed Compose candidate forward to a healthy prior digest', async
   await switchLocalDeploymentComposeRevision(
     composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
       expectedGeneration: 1,
-      image: `registry.example/qinglong3-local@sha256:${'b'.repeat(64)}`,
+      image: `ghcr.io/example/qinglong3-local-application@sha256:${'b'.repeat(
+        64,
+      )}`,
       mutationId: '00000000-0000-4000-8000-000000000d52',
       changedAtMs: 6_900,
     }),
@@ -1402,7 +1599,7 @@ test('rolls a failed Compose candidate forward to a healthy prior digest', async
   assert.match(selection, /^  rollback_target_generation: 1$/m);
   assert.match(
     selection,
-    new RegExp(`^    image: ${state.command.options.service.image}$`, 'm'),
+    new RegExp(`^    image: ${state.composeImage}$`, 'm'),
   );
   assert.equal(
     harness.calls.filter((args) => args[0] === 'compose' && args.includes('up'))
@@ -1440,7 +1637,9 @@ test('records an unhealthy candidate observation failure as recovery unknown', a
   await switchLocalDeploymentComposeRevision(
     composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
       expectedGeneration: 1,
-      image: `registry.example/qinglong3-local@sha256:${'b'.repeat(64)}`,
+      image: `ghcr.io/example/qinglong3-local-application@sha256:${'b'.repeat(
+        64,
+      )}`,
       mutationId: '00000000-0000-4000-8000-000000000d65',
       changedAtMs: 6_900,
     }),
@@ -1482,7 +1681,9 @@ test('resumes a rollback generation after response loss without restarting the f
   await switchLocalDeploymentComposeRevision(
     composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
       expectedGeneration: 1,
-      image: `registry.example/qinglong3-local@sha256:${'c'.repeat(64)}`,
+      image: `ghcr.io/example/qinglong3-local-application@sha256:${'c'.repeat(
+        64,
+      )}`,
       mutationId: '00000000-0000-4000-8000-000000000d55',
       changedAtMs: 6_950,
     }),
@@ -1869,7 +2070,9 @@ test('fails closed before Compose up when the rollout backup cannot be created',
   await switchLocalDeploymentComposeRevision(
     composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
       expectedGeneration: 1,
-      image: `registry.example/qinglong3-local@sha256:${'d'.repeat(64)}`,
+      image: `ghcr.io/example/qinglong3-local-application@sha256:${'d'.repeat(
+        64,
+      )}`,
       mutationId: '00000000-0000-4000-8000-000000000d57',
       changedAtMs: 6_975,
     }),
@@ -1939,7 +2142,7 @@ test('upgrades and rolls back Compose image selections with generation CAS', asy
   );
   const revisions = path.join(state.deploymentRoot, 'service', 'revisions');
   const stableDescriptor = fs.readFileSync(composePath, 'utf8');
-  const upgradedImage = `registry.example/qinglong3-local@sha256:${'b'.repeat(
+  const upgradedImage = `ghcr.io/example/qinglong3-local-application@sha256:${'b'.repeat(
     64,
   )}`;
   const upgrade = composeRevisionCommand(
@@ -1983,10 +2186,7 @@ test('upgrades and rolls back Compose image selections with generation CAS', asy
   const active = fs.readFileSync(selectionPath, 'utf8');
   assert.match(active, /^  generation: 3$/m);
   assert.match(active, /^  rollback_target_generation: 1$/m);
-  assert.match(
-    active,
-    new RegExp(`^    image: ${state.command.options.service.image}$`, 'm'),
-  );
+  assert.match(active, new RegExp(`^    image: ${state.composeImage}$`, 'm'));
   assert.equal(
     fs
       .readFileSync(path.join(revisions, '2.yaml'), 'utf8')
@@ -2028,7 +2228,9 @@ test('upgrades and rolls back Compose image selections with generation CAS', asy
 test('recovers Compose response-loss and deterministic stage windows', async (t) => {
   const state = fixture(t, 'compose');
   await prepareLocalDeployment(state.command);
-  const image = `registry.example/qinglong3-local@sha256:${'c'.repeat(64)}`;
+  const image = `ghcr.io/example/qinglong3-local-application@sha256:${'c'.repeat(
+    64,
+  )}`;
   const mutationId = '00000000-0000-4000-8000-000000000d21';
   const command = composeRevisionCommand(
     state,
@@ -2053,6 +2255,7 @@ test('recovers Compose response-loss and deterministic stage windows', async (t)
     mutationId,
     changedAtMs: 4_000,
     image,
+    releaseSelection: command.request.releaseSelection,
   });
   fs.writeFileSync(selectionStagePath, next, { mode: 0o600 });
   const recoveredStage = await switchLocalDeploymentComposeRevision(command);
@@ -2109,7 +2312,9 @@ test('fails closed on Compose revision drift and an unrelated in-flight lock', a
     switchLocalDeploymentComposeRevision(
       composeRevisionCommand(clean, 'local.deployment.compose.upgrade', {
         expectedGeneration: 1,
-        image: `registry.example/qinglong3-local@sha256:${'d'.repeat(64)}`,
+        image: `ghcr.io/example/qinglong3-local-application@sha256:${'d'.repeat(
+          64,
+        )}`,
         mutationId: '00000000-0000-4000-8000-000000000d32',
         changedAtMs: 5_001,
       }),
@@ -2131,7 +2336,9 @@ test('fails closed on Compose revision drift and an unrelated in-flight lock', a
         'local.deployment.compose.upgrade',
         {
           expectedGeneration: 1,
-          image: `registry.example/qinglong3-local@sha256:${'f'.repeat(64)}`,
+          image: `ghcr.io/example/qinglong3-local-application@sha256:${'f'.repeat(
+            64,
+          )}`,
           mutationId: '00000000-0000-4000-8000-000000000d57',
           changedAtMs: 5_002,
         },
@@ -2182,7 +2389,9 @@ test('Compose revision CLI emits only a low-sensitive generation result', async 
     'local.deployment.compose.upgrade',
     {
       expectedGeneration: 1,
-      image: `registry.example/qinglong3-local@sha256:${'e'.repeat(64)}`,
+      image: `ghcr.io/example/qinglong3-local-application@sha256:${'e'.repeat(
+        64,
+      )}`,
       mutationId: '00000000-0000-4000-8000-000000000d41',
       changedAtMs: 6_000,
     },
@@ -2233,7 +2442,11 @@ test('rejects drift, widening, mutable images and unacknowledged root', async (t
         ...mutable.command.options,
         service: {
           ...mutable.command.options.service,
-          image: 'registry.example/qinglong3-local:latest',
+          releaseSelection: releaseSelectionForImage(
+            mutable.managementRoot,
+            'ghcr.io/example/qinglong3-local-application:latest',
+            rootAcknowledgement(),
+          ),
         },
       },
     }),

@@ -122,9 +122,11 @@ node scripts/ql3-deployment-lock-contract.cjs \
   --selection="${selection}"
 ```
 
-v2 selection 同时绑定 catalog immutable reference、manifest digest、consumption report digest 与 release-set digest。把已审计的
-`service.image` 和 `service.allowRootService` 交给现有 Local private prepare/rollout 入口。selection 本身不修改 Compose 文件，
-也不启动容器。是否允许 root service 必须显式给出，不能由设备默认值推断。
+v2 selection 同时绑定 catalog immutable reference、manifest digest、consumption report digest 与 release-set digest。不要再手工复制
+`service.image`。把 selection 放入目标运行 UID 控制的 canonical `0700` 目录，保持文件为单链接 `0600`，然后把它的 absolute path 与
+`local-audit` 返回的 exact `selectionDigest` 写入 Local prepare/upgrade 的 `releaseSelection`。目标侧会再次验证 canonical JSON、
+self-digest、release/catalog identity、唯一 GHCR Local image 与 explicit root policy，再把完整 provenance 固化到 Compose v2 revision。
+selection 本身不修改 Compose 文件，也不启动容器；prepare/upgrade 仍不等于 preflight/apply authority。
 
 ### Kubernetes / Cluster / Worker
 

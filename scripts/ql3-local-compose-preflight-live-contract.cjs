@@ -4,6 +4,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const {
+  writeSyntheticLocalReleaseSelection,
+} = require('./lib/ql3-local-release-selection-test-fixture.cjs');
 
 const IMAGE_PATTERN =
   /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}@sha256:[0-9a-f]{64}$/;
@@ -74,6 +77,12 @@ async function main() {
   const deploymentRoot = path.join(temporaryRoot, 'deployment');
   const commandPath = path.join(temporaryRoot, 'preflight.json');
   const uid = process.getuid();
+  const releaseSelection = writeSyntheticLocalReleaseSelection({
+    directory: temporaryRoot,
+    image: input.image,
+    allowRootService: uid === 0,
+    sourceRevision: process.env.GITHUB_SHA,
+  });
 
   try {
     const setup = await prepareLocalDeployment({
@@ -86,7 +95,7 @@ async function main() {
         busyTimeoutMs: 100,
         service: {
           kind: 'compose',
-          image: input.image,
+          releaseSelection,
           allowRootService: uid === 0,
         },
       },

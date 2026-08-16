@@ -109,6 +109,10 @@ export {
   type LocalDeploymentStatusResult,
 } from './foundation/contract';
 export {
+  type LocalComposeReleaseAuthority,
+  type LocalComposeReleaseSelectionInput,
+} from './compose/releaseSelection';
+export {
   normalizeLocalDeploymentLegacyStopCommand,
   type LocalDeploymentLegacyStopCommand,
   type LocalDeploymentLegacyStopResult,

@@ -6,6 +6,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
+const {
+  writeSyntheticLocalReleaseSelection,
+} = require('./lib/ql3-local-release-selection-test-fixture.cjs');
 
 const MAX_OUTPUT_BYTES = 64 * 1024;
 const ACTIVE_TIMEOUT_MS = 45_000;
@@ -15,11 +18,7 @@ function fail(message) {
 }
 
 function imageArgument(argv) {
-  if (
-    argv.length < 1 ||
-    argv.length > 2 ||
-    !argv[0].startsWith('--image=')
-  ) {
+  if (argv.length < 1 || argv.length > 2 || !argv[0].startsWith('--image=')) {
     fail('usage: --image=immutable-local-image [--profile=edge|standalone]');
   }
   const image = argv[0].slice('--image='.length);
@@ -104,13 +103,7 @@ function parseLines(buffer, events) {
   return remaining;
 }
 
-async function runApplication(
-  image,
-  deploymentRoot,
-  uid,
-  gid,
-  profile,
-) {
+async function runApplication(image, deploymentRoot, uid, gid, profile) {
   const containerName = `ql3-local-image-${process.pid}-${crypto
     .randomUUID()
     .slice(0, 8)}`;
@@ -173,10 +166,7 @@ async function runApplication(
       return;
     }
     stdout = parseLines(stdout, events);
-    if (
-      !stopped &&
-      events.some(({ event }) => event === 'active')
-    ) {
+    if (!stopped && events.some(({ event }) => event === 'active')) {
       stopped = true;
       runDocker(['stop', '--time', '30', containerName]);
     }
@@ -254,20 +244,22 @@ async function main() {
   const profile = profileArgument(process.argv.slice(2));
   const imageIdentity = inspectImage(image);
   const root = path.resolve(__dirname, '..');
-  const {
-    prepareLocalDeployment,
-  } = require(path.join(
+  const { prepareLocalDeployment } = require(path.join(
     root,
     'packages/ql3-local-owner-cli/dist/deployment/localDeployment.js',
   ));
   const temporaryRoot = fs.realpathSync(
-    fs.mkdtempSync(
-      path.join(os.tmpdir(), 'ql3-local-image-live-'),
-    ),
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-local-image-live-')),
   );
+  fs.chmodSync(temporaryRoot, 0o700);
   const deploymentRoot = path.join(temporaryRoot, 'deployment');
   const uid = process.getuid();
   const gid = process.getgid();
+  const releaseSelection = writeSyntheticLocalReleaseSelection({
+    directory: temporaryRoot,
+    image: `ghcr.io/example/qinglong3-local-application@${imageIdentity.id}`,
+    allowRootService: uid === 0,
+  });
 
   try {
     const setup = await prepareLocalDeployment({
@@ -280,7 +272,7 @@ async function main() {
         busyTimeoutMs: 100,
         service: {
           kind: 'compose',
-          image: `local/qinglong3@${imageIdentity.id}`,
+          releaseSelection,
           allowRootService: uid === 0,
         },
       },
@@ -309,8 +301,9 @@ async function main() {
     );
     let integrity;
     try {
-      integrity = database.prepare('PRAGMA integrity_check').get()
-        .integrity_check;
+      integrity = database
+        .prepare('PRAGMA integrity_check')
+        .get().integrity_check;
     } finally {
       database.close();
     }
@@ -323,8 +316,7 @@ async function main() {
         architecture: imageIdentity.architecture,
         user: imageIdentity.user,
         profile,
-        memoryBytes:
-          (profile === 'edge' ? 128 : 256) * 1024 * 1024,
+        memoryBytes: (profile === 'edge' ? 128 : 256) * 1024 * 1024,
         pids: profile === 'edge' ? 64 : 256,
         network: 'none',
         readOnlyRoot: true,

@@ -13,6 +13,9 @@ const {
   mountForPath,
   parseMountTable,
 } = require('./ql3-physical-edge-evidence.cjs');
+const {
+  writeSyntheticLocalReleaseSelection,
+} = require('./lib/ql3-local-release-selection-test-fixture.cjs');
 
 const MIB = 1024 * 1024;
 const MAX_INPUT_BYTES = 256 * 1024;
@@ -792,7 +795,15 @@ async function preparePhase(options, manifest) {
     );
   }
   const timestamp = Date.now();
-  const image = `physical.invalid/qinglong3-local@sha256:${'a'.repeat(64)}`;
+  const image = `ghcr.io/example/qinglong3-local-application@sha256:${'a'.repeat(
+    64,
+  )}`;
+  fs.mkdirSync(deploymentRoot, { mode: 0o700 });
+  const releaseSelection = writeSyntheticLocalReleaseSelection({
+    directory: deploymentRoot,
+    image,
+    allowRootService: uid === 0,
+  });
   await products.deployment.prepareLocalDeployment({
     schemaVersion: 1,
     operation: 'local.deployment.prepare',
@@ -803,7 +814,7 @@ async function preparePhase(options, manifest) {
       busyTimeoutMs: 100,
       service: {
         kind: 'compose',
-        image,
+        releaseSelection,
         allowRootService: uid === 0,
       },
     },
@@ -829,7 +840,7 @@ async function preparePhase(options, manifest) {
       },
       request: {
         expectedGeneration: generation - 1,
-        image,
+        releaseSelection,
         mutationId: crypto.randomUUID(),
         changedAtMs: timestamp + generation,
       },

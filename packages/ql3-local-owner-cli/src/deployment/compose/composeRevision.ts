@@ -7,10 +7,11 @@ import {
   currentIdentity,
   LocalDeploymentConfigurationError,
   normalizeLocalDeploymentComposeRevisionCommand,
-  type LocalDeploymentComposeRevisionCommand,
   type LocalDeploymentComposeRevisionResult,
-  type LocalDeploymentPrepareCommand,
+  type NormalizedLocalDeploymentComposeRevisionCommand,
+  type NormalizedLocalDeploymentPrepareCommand,
 } from '../foundation/contract';
+import type { LocalComposeReleaseAuthority } from './releaseSelection';
 import {
   preflightPublishedFile,
   publishExactFile,
@@ -20,19 +21,23 @@ import {
 } from '../foundation/files';
 import { deploymentPaths } from '../foundation/render';
 
-const SELECTION_SCHEMA = 'qinglong/local-compose-image-selection@v1';
+const SELECTION_SCHEMA = 'qinglong/local-compose-image-selection@v2';
+const CATALOG_SCHEMA = 'qinglong/release-catalog-consumption-ceremony@v1';
+const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const IMAGE_PATTERN =
-  /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}@sha256:[0-9a-f]{64}$/;
+  /^ghcr\.io\/([a-z0-9](?:[a-z0-9-]{0,38}))\/qinglong3-local-application@sha256:[0-9a-f]{64}$/;
+const VERSION_PATTERN = /^3\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/;
+const SOURCE_REVISION_PATTERN = /^[a-f0-9]{40}$/;
+const SOURCE_REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-export interface ComposeImageSelection {
+export interface ComposeImageSelection extends LocalComposeReleaseAuthority {
   readonly generation: number;
   readonly previousGeneration: number;
   readonly rollbackTargetGeneration: number;
   readonly mutationId: string;
   readonly changedAtMs: number;
-  readonly image: string;
 }
 
 function selectionContents(selection: Readonly<ComposeImageSelection>): string {
@@ -44,12 +49,30 @@ function selectionContents(selection: Readonly<ComposeImageSelection>): string {
     `  rollback_target_generation: ${selection.rollbackTargetGeneration}`,
     `  mutation_id: ${selection.mutationId}`,
     `  changed_at_ms: ${selection.changedAtMs}`,
+    `  release_selection_digest: ${selection.selectionDigest}`,
+    `  release_set_digest: ${selection.releaseSetDigest}`,
+    `  release_version: ${selection.releaseVersion}`,
+    `  release_source_revision: ${selection.releaseSourceRevision}`,
+    `  release_source_ref: ${selection.releaseSourceRef}`,
+    `  release_scope: ${selection.releaseScope}`,
+    `  catalog_schema: ${selection.catalogSchema}`,
+    `  catalog_source_repository: ${selection.catalogSourceRepository}`,
+    `  catalog_workflow_identity: ${selection.catalogWorkflowIdentity}`,
+    `  catalog_immutable_reference: ${selection.catalogImmutableReference}`,
+    `  catalog_manifest_digest: ${selection.catalogManifestDigest}`,
+    `  catalog_consumption_report_digest: ${selection.catalogConsumptionReportDigest}`,
+    `  catalog_discovery_tag_authority: ${selection.catalogDiscoveryTagAuthority}`,
+    `  allow_root_service: ${selection.allowRootService}`,
     'services:',
     '  qinglong3:',
     `    image: ${selection.image}`,
     '    labels:',
     `      io.qinglong.deployment.generation: "${selection.generation}"`,
     `      io.qinglong.deployment.mutation: "${selection.mutationId}"`,
+    `      io.qinglong.release.selection: "${selection.selectionDigest}"`,
+    `      io.qinglong.release.set: "${selection.releaseSetDigest}"`,
+    `      io.qinglong.release.catalog-manifest: "${selection.catalogManifestDigest}"`,
+    `      io.qinglong.release.catalog-report: "${selection.catalogConsumptionReportDigest}"`,
     '',
   ].join('\n');
 }
@@ -70,7 +93,7 @@ function parseSelection(
   label: string,
 ): Readonly<ComposeImageSelection> {
   const match =
-    /^x-qinglong-image-selection:\n  schema: qinglong\/local-compose-image-selection@v1\n  generation: (0|[1-9][0-9]{0,5})\n  previous_generation: (0|[1-9][0-9]{0,5})\n  rollback_target_generation: (0|[1-9][0-9]{0,5})\n  mutation_id: ([0-9a-f-]+)\n  changed_at_ms: ([0-9]+)\nservices:\n  qinglong3:\n    image: ([^\n]+)\n    labels:\n      io\.qinglong\.deployment\.generation: "([0-9]+)"\n      io\.qinglong\.deployment\.mutation: "([0-9a-f-]+)"\n$/.exec(
+    /^x-qinglong-image-selection:\n  schema: qinglong\/local-compose-image-selection@v2\n  generation: (0|[1-9][0-9]{0,5})\n  previous_generation: (0|[1-9][0-9]{0,5})\n  rollback_target_generation: (0|[1-9][0-9]{0,5})\n  mutation_id: ([0-9a-f-]+)\n  changed_at_ms: ([0-9]+)\n  release_selection_digest: (sha256:[a-f0-9]{64})\n  release_set_digest: (sha256:[a-f0-9]{64})\n  release_version: ([^\n]+)\n  release_source_revision: ([a-f0-9]{40})\n  release_source_ref: ([^\n]+)\n  release_scope: (local|all)\n  catalog_schema: qinglong\/release-catalog-consumption-ceremony@v1\n  catalog_source_repository: ([^\n]+)\n  catalog_workflow_identity: ([^\n]+)\n  catalog_immutable_reference: ([^\n]+)\n  catalog_manifest_digest: (sha256:[a-f0-9]{64})\n  catalog_consumption_report_digest: (sha256:[a-f0-9]{64})\n  catalog_discovery_tag_authority: none\n  allow_root_service: (true|false)\nservices:\n  qinglong3:\n    image: ([^\n]+)\n    labels:\n      io\.qinglong\.deployment\.generation: "([0-9]+)"\n      io\.qinglong\.deployment\.mutation: "([0-9a-f-]+)"\n      io\.qinglong\.release\.selection: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.set: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.catalog-manifest: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.catalog-report: "(sha256:[a-f0-9]{64})"\n$/.exec(
       contents,
     );
   if (!match) {
@@ -87,9 +110,26 @@ function parseSelection(
   );
   const mutationId = match[4];
   const changedAtMs = Number(match[5]);
-  const image = match[6];
-  const labelGeneration = Number(match[7]);
-  const labelMutationId = match[8];
+  const selectionDigest = match[6]!;
+  const releaseSetDigest = match[7]!;
+  const releaseVersion = match[8]!;
+  const releaseSourceRevision = match[9]!;
+  const releaseSourceRef = match[10]!;
+  const releaseScope = match[11] as 'local' | 'all';
+  const catalogSourceRepository = match[12]!;
+  const catalogWorkflowIdentity = match[13]!;
+  const catalogImmutableReference = match[14]!;
+  const catalogManifestDigest = match[15]!;
+  const catalogConsumptionReportDigest = match[16]!;
+  const allowRootService = match[17] === 'true';
+  const image = match[18]!;
+  const labelGeneration = Number(match[19]);
+  const labelMutationId = match[20];
+  const labelSelectionDigest = match[21];
+  const labelReleaseSetDigest = match[22];
+  const labelCatalogManifestDigest = match[23];
+  const labelCatalogReportDigest = match[24];
+  const imageMatch = IMAGE_PATTERN.exec(image);
   if (
     generation < 1 ||
     previousGeneration !== generation - 1 ||
@@ -98,12 +138,25 @@ function parseSelection(
     changedAtMs < 0 ||
     !mutationId ||
     !UUID_V4_PATTERN.test(mutationId) ||
-    !image ||
-    !IMAGE_PATTERN.test(image) ||
-    image.includes('..') ||
-    image.includes('//') ||
+    !DIGEST_PATTERN.test(selectionDigest) ||
+    !DIGEST_PATTERN.test(releaseSetDigest) ||
+    !VERSION_PATTERN.test(releaseVersion) ||
+    !SOURCE_REVISION_PATTERN.test(releaseSourceRevision) ||
+    releaseSourceRef !== `refs/tags/v${releaseVersion}` ||
+    !SOURCE_REPOSITORY_PATTERN.test(catalogSourceRepository) ||
+    catalogWorkflowIdentity !==
+      `https://github.com/${catalogSourceRepository}/.github/workflows/ql3-image-release.yml@${releaseSourceRef}` ||
+    !DIGEST_PATTERN.test(catalogManifestDigest) ||
+    !DIGEST_PATTERN.test(catalogConsumptionReportDigest) ||
+    !imageMatch ||
+    catalogImmutableReference !==
+      `ghcr.io/${imageMatch?.[1]}/qinglong3-release-catalog@${catalogManifestDigest}` ||
     labelGeneration !== generation ||
-    labelMutationId !== mutationId
+    labelMutationId !== mutationId ||
+    labelSelectionDigest !== selectionDigest ||
+    labelReleaseSetDigest !== releaseSetDigest ||
+    labelCatalogManifestDigest !== catalogManifestDigest ||
+    labelCatalogReportDigest !== catalogConsumptionReportDigest
   ) {
     throw new LocalDeploymentConfigurationError(`${label} value is invalid`);
   }
@@ -114,6 +167,20 @@ function parseSelection(
     mutationId,
     changedAtMs,
     image,
+    allowRootService,
+    selectionDigest,
+    releaseSetDigest,
+    releaseVersion,
+    releaseSourceRevision,
+    releaseSourceRef,
+    releaseScope,
+    catalogSchema: CATALOG_SCHEMA,
+    catalogSourceRepository,
+    catalogWorkflowIdentity,
+    catalogImmutableReference,
+    catalogManifestDigest,
+    catalogConsumptionReportDigest,
+    catalogDiscoveryTagAuthority: 'none' as const,
   });
   if (selectionContents(selection) !== contents) {
     throw new LocalDeploymentConfigurationError(`${label} is not canonical`);
@@ -157,9 +224,31 @@ function revisionPath(root: string, generation: number): string {
 }
 
 function commandIntent(
-  command: Readonly<LocalDeploymentComposeRevisionCommand>,
+  command: Readonly<NormalizedLocalDeploymentComposeRevisionCommand>,
 ): string {
   return `${JSON.stringify(command, null, 2)}\n`;
+}
+
+function releaseAuthorityFromSelection(
+  selection: Readonly<ComposeImageSelection>,
+): Readonly<LocalComposeReleaseAuthority> {
+  return Object.freeze({
+    image: selection.image,
+    allowRootService: selection.allowRootService,
+    selectionDigest: selection.selectionDigest,
+    releaseSetDigest: selection.releaseSetDigest,
+    releaseVersion: selection.releaseVersion,
+    releaseSourceRevision: selection.releaseSourceRevision,
+    releaseSourceRef: selection.releaseSourceRef,
+    releaseScope: selection.releaseScope,
+    catalogSchema: selection.catalogSchema,
+    catalogSourceRepository: selection.catalogSourceRepository,
+    catalogWorkflowIdentity: selection.catalogWorkflowIdentity,
+    catalogImmutableReference: selection.catalogImmutableReference,
+    catalogManifestDigest: selection.catalogManifestDigest,
+    catalogConsumptionReportDigest: selection.catalogConsumptionReportDigest,
+    catalogDiscoveryTagAuthority: selection.catalogDiscoveryTagAuthority,
+  });
 }
 
 function releaseLock(lockPath: string, intent: string, uid: number): void {
@@ -169,7 +258,7 @@ function releaseLock(lockPath: string, intent: string, uid: number): void {
 }
 
 export function initialComposeImageSelection(
-  command: Readonly<LocalDeploymentPrepareCommand>,
+  command: Readonly<NormalizedLocalDeploymentPrepareCommand>,
 ): string {
   if (command.options.service.kind !== 'compose') {
     throw new LocalDeploymentConfigurationError(
@@ -182,7 +271,7 @@ export function initialComposeImageSelection(
     rollbackTargetGeneration: 0,
     mutationId: command.request.activateMutationId,
     changedAtMs: command.request.activatedAtMs,
-    image: command.options.service.image,
+    ...command.options.service.releaseSelection.authority,
   });
 }
 
@@ -314,10 +403,10 @@ export async function switchLocalDeploymentComposeRevision(
     'active compose selection',
   );
   const nextGeneration = command.request.expectedGeneration + 1;
-  let image: string;
+  let releaseAuthority: Readonly<LocalComposeReleaseAuthority>;
   let rollbackTargetGeneration = 0;
   if (command.operation === 'local.deployment.compose.upgrade') {
-    image = command.request.image;
+    releaseAuthority = command.request.releaseSelection.authority;
   } else {
     rollbackTargetGeneration = command.request.targetGeneration;
     const target = readSelectionFile(
@@ -330,7 +419,7 @@ export async function switchLocalDeploymentComposeRevision(
         'rollback target generation drifted',
       );
     }
-    image = target.selection.image;
+    releaseAuthority = releaseAuthorityFromSelection(target.selection);
   }
   const nextContents = selectionContents({
     generation: nextGeneration,
@@ -338,7 +427,7 @@ export async function switchLocalDeploymentComposeRevision(
     rollbackTargetGeneration,
     mutationId: command.request.mutationId,
     changedAtMs: command.request.changedAtMs,
-    image,
+    ...releaseAuthority,
   });
   if (command.request.changedAtMs < observed.selection.changedAtMs) {
     throw new LocalDeploymentConfigurationError(
