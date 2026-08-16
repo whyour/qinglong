@@ -274,13 +274,18 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs/,
-    'cluster image CI must run SBOM, candidate, release-set, durable catalog and workflow negative tests',
+    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
+    'cluster image CI must run SBOM, candidate, release-set, durable catalog, deployment-lock and workflow negative tests',
   );
   requirePattern(
     source,
     /pnpm audit:image-release:ql3/,
     'image CI must audit the shared release workflow contract',
+  );
+  requirePattern(
+    source,
+    /pnpm audit:deployment-lock-surfaces:ql3/,
+    'supply-chain CI must freeze the reviewed deployment image surfaces',
   );
   requirePattern(
     source,
@@ -386,6 +391,7 @@ function auditClusterImageCiWorkflow(
     clusterAdminContextPreflight: true,
     clusterAdminContextReadiness: true,
     releaseVersionAudit: true,
+    deploymentLockMaterialization: true,
     ociAttestations: true,
     osVulnerabilityScan: {
       scanner: 'trivy@0.70.0',

@@ -302,6 +302,7 @@ jobs:
           test/back/ql3ReleaseCandidateContract.test.cjs
           test/back/ql3ReleaseSetContract.test.cjs
           test/back/ql3ReleaseCatalogContract.test.cjs
+          test/back/ql3DeploymentLockContract.test.cjs
           test/back/ql3ImageOsVulnerabilityPolicy.test.cjs
           test/back/ql3LocalImageAudit.test.cjs
           test/back/ql3VersionTransition.test.cjs
@@ -309,6 +310,7 @@ jobs:
         run: |
           pnpm audit:release-version:ql3
           pnpm audit:image-release:ql3
+          pnpm audit:deployment-lock-surfaces:ql3
           pnpm audit:local-image:ql3
       - name: Reject high or critical advisories in 3.0 Profile importers
         run: pnpm audit:profiles:ql3

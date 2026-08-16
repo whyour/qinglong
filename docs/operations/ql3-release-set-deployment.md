@@ -88,6 +88,94 @@ gh attestation verify "${release_set}" \
 `inspect` 会重算 release-set self digest 并验证结构、身份、镜像闭包和 family，但不会重放发布时已经过期的 image
 records；其输出必须保持 `sourceRecordsReplayed:false`。
 
+## 生成离线 deployment lock
+
+`inspect` 成功后，不要手工复制 digest，也不要直接修改仓库中的 Kustomize 占位符。deployment-lock
+materializer 在可信工作站离线运行，只读取已经验证的 release set 与本地清单；它不访问 registry、不连接 Kubernetes
+API，也不会执行 `kubectl apply`。
+
+### Local / Compose
+
+对 `local` 或 `all` scope 生成一个 canonical、0600、no-replace 的 service selection：
+
+```sh
+selection="$(pwd)/qinglong3-local-selection-${version}.json"
+
+node scripts/ql3-deployment-lock-contract.cjs \
+  --mode=local-create \
+  --version="${version}" \
+  --source-revision="${source_revision}" \
+  --source-ref="${source_ref}" \
+  --release-scope="${scope}" \
+  --repository-owner="${owner}" \
+  --release-set="${release_set}" \
+  --allow-root-service=false \
+  --output="${selection}"
+
+node scripts/ql3-deployment-lock-contract.cjs \
+  --mode=local-audit \
+  --version="${version}" \
+  --source-revision="${source_revision}" \
+  --source-ref="${source_ref}" \
+  --release-scope="${scope}" \
+  --repository-owner="${owner}" \
+  --release-set="${release_set}" \
+  --allow-root-service=false \
+  --selection="${selection}"
+```
+
+把已审计的 `service.image` 和 `service.allowRootService` 交给现有 Local private prepare/rollout 入口。selection
+本身不修改 Compose 文件，也不启动容器。是否允许 root service 必须显式给出，不能由设备默认值推断。
+
+### Kubernetes / Cluster / Worker
+
+先用已审核 overlay 生成普通多文档 YAML，再把它作为 post-render 输入。以下是 Cluster Core 示例；AI、Worker、Admin
+清单分别把 `required-images` 设为 `control-ai`、`worker`、`admin`，组合清单则按发布顺序使用
+`control,control-ai,admin,worker`：
+
+```sh
+rendered="$(pwd)/ql3-cluster-rendered.yaml"
+locked="$(pwd)/ql3-cluster-locked.yaml"
+lock_report="$(pwd)/ql3-cluster-deployment-lock.json"
+
+kubectl kustomize deploy/kubernetes/ql3-cluster/overlays/cloudnative-pg > "${rendered}"
+
+node scripts/ql3-deployment-lock-contract.cjs \
+  --mode=kubernetes-create \
+  --version="${version}" \
+  --source-revision="${source_revision}" \
+  --source-ref="${source_ref}" \
+  --release-scope="${scope}" \
+  --repository-owner="${owner}" \
+  --release-set="${release_set}" \
+  --manifest="${rendered}" \
+  --required-images=control \
+  --output-manifest="${locked}" \
+  --output-report="${lock_report}"
+
+node scripts/ql3-deployment-lock-contract.cjs \
+  --mode=kubernetes-audit \
+  --version="${version}" \
+  --source-revision="${source_revision}" \
+  --source-ref="${source_ref}" \
+  --release-scope="${scope}" \
+  --repository-owner="${owner}" \
+  --release-set="${release_set}" \
+  --manifest="${rendered}" \
+  --locked-manifest="${locked}" \
+  --report="${lock_report}" \
+  --required-images=control
+```
+
+materializer 只改写 Pod、Deployment、StatefulSet、DaemonSet、ReplicaSet、Job、CronJob 的
+`containers`/`initContainers`/`ephemeralContainers`，以及固定名称
+`ql3-plugin-package-secret-action-admission` ConfigMap 的 `data.image`。每个改写资源及其 Pod template 都绑定
+release-set digest、source revision 与 version annotation；未知位置的完整 QingLong role image authority、畸形已知
+container image、缺少 required role、YAML alias/cycle/非 mapping、超限输入或已有输出文件都会失败关闭。
+
+审计成功并完成人工差异检查后，才由有权限的独立步骤执行 `kubectl apply -f "${locked}"`。不要直接 apply
+`${rendered}`，也不要使用 `kubectl apply -k` 绕过 deployment lock。
+
 ## 准入检查
 
 1. 只接受已验证 Cosign exact workflow identity 与 GitHub source tag/revision provenance 的 catalog immutable
@@ -95,15 +183,17 @@ records；其输出必须保持 `sourceRecordsReplayed:false`。
 2. `schema` 必须为 `qinglong/release-set@v1`；`release.version`、`release.sourceRef`、
    `release.sourceRevision`、`release.scope` 必须与变更单一致。
 3. 镜像集合必须与上表精确相等；每个 `reference` 必须是 digest reference，且 owner/repository 与部署目标一致。
-4. Kubernetes overlay 用 `newName` 加 digest 或等价的 immutable image reference；不得把生产 placeholder 改成
-   `newTag`。Local compose/rollout 同样固定 `@sha256:`。
+4. Kubernetes 必须先渲染 overlay，再用离线 post-render materializer 生成和复验 locked manifest；嵌套 overlay 的
+   `newName`/digest 不是最终 authority。Local 必须生成并审计 service selection。两族最终都只能消费 release set 中的
+   `@sha256:` reference。
 5. rollout 前再次确认 catalog receipt/immutable reference 与已检查文件一致。version/source/catalog tag 都只能用于
    发现；部署始终以 release set 中的镜像 digest 为准。
 
 ## 低资源设备
 
-路由器或其他低配 Edge 设备不需要安装 Node、regctl、Cosign 或 GitHub CLI。维护者在可信工作站完成上述 ceremony，
-再向设备传输已检查的 canonical JSON，并只把 `local` family 的 immutable image reference 写入 compose/rollout。
+路由器或其他低配 Edge 设备不需要安装 Node、regctl、Cosign、GitHub CLI、Kustomize 或 materializer。维护者在可信工作站
+完成上述 ceremony 和 Local selection 审计，再向设备传输已检查的 canonical JSON，并只把 `local` family 的 immutable
+image reference 写入 compose/rollout。
 设备不下载 Cluster 四镜像，也不加载 Kubernetes、CloudNativePG、PostgreSQL driver 或 Worker 私有发布证据。
 
 如果设备本身不运行容器 registry client，可由工作站按 digest 拉取并通过既有离线交付渠道传送镜像；离线包的哈希与

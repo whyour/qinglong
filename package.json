@@ -113,6 +113,8 @@
     "audit:worker-management-release:ql3": "node scripts/ql3-worker-credential-management-release-evidence-audit.cjs",
     "gate:worker-management-release:ql3": "node scripts/ql3-worker-credential-management-release-gate.cjs",
     "audit:image-release:ql3": "node scripts/ql3-cluster-image-release-audit.cjs",
+    "deployment-lock:ql3": "node scripts/ql3-deployment-lock-contract.cjs",
+    "audit:deployment-lock-surfaces:ql3": "node scripts/ql3-deployment-lock-contract.cjs --mode=surfaces-audit",
     "audit:image-os-vulnerability-policy:ql3": "node scripts/ql3-image-os-vulnerability-policy.cjs",
     "audit:cluster-image-release:ql3": "node scripts/ql3-cluster-image-release-audit.cjs",
     "audit:cluster-oci-layout:ql3": "node scripts/ql3-cluster-oci-layout-audit.cjs",

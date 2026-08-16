@@ -254,6 +254,7 @@ function createReleaseCandidateContract(options) {
       'digest-signature-and-attestations',
       'cross-image-release-set',
       'durable-oci-release-catalog',
+      'offline-deployment-lock-materialization',
       ...(options.releaseScope !== 'cluster'
         ? ['edge-and-standalone-rollout']
         : []),

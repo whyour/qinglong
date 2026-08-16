@@ -48,6 +48,10 @@ test('freezes an independent low-resource local release family', () => {
     /^sha256:[a-f0-9]{64}$/u,
   );
   assert.match(contract.contractDigest, /^sha256:[a-f0-9]{64}$/u);
+  assert.equal(
+    contract.requiredGates.includes('offline-deployment-lock-materialization'),
+    true,
+  );
   assert.deepEqual(
     auditReleaseCandidateContract(contract, {
       root,
@@ -107,6 +111,10 @@ test('combines local and cluster families without weakening either gate', () => 
   );
   assert.equal(
     contract.requiredGates.includes('durable-oci-release-catalog'),
+    true,
+  );
+  assert.equal(
+    contract.requiredGates.includes('offline-deployment-lock-materialization'),
     true,
   );
   assert.equal(

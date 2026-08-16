@@ -31,6 +31,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       clusterAdminContextPreflight: true,
       clusterAdminContextReadiness: true,
       releaseVersionAudit: true,
+      deploymentLockMaterialization: true,
       ociAttestations: true,
       osVulnerabilityScan: {
         scanner: 'trivy@0.70.0',
@@ -149,7 +150,29 @@ test('rejects removal of the durable release-catalog contract tests', () => {
   );
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
-    /durable catalog and workflow negative tests/,
+    /durable catalog, deployment-lock and workflow negative tests/,
+  );
+});
+
+test('rejects removal of the deployment-lock materialization contract tests', () => {
+  const mutated = ciSource.replace(
+    'test/back/ql3DeploymentLockContract.test.cjs',
+    'test/back/deployment-lock-tests-removed.test.cjs',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /deployment-lock and workflow negative tests/,
+  );
+});
+
+test('rejects removal of the deployment image surface audit', () => {
+  const mutated = ciSource.replace(
+    'pnpm audit:deployment-lock-surfaces:ql3',
+    'echo deployment-image-surfaces-removed',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /reviewed deployment image surfaces/,
   );
 });
 

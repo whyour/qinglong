@@ -161,21 +161,22 @@ pnpm audit:cluster-remote-manifest:ql3 \
 ```
 
 The existence of the workflow is not publication evidence. Before production
-rollout, obtain the `cluster` or `all` deployment release set from a successful
-release run, verify its file provenance, and pin the four control, control-ai,
-worker and admin `sha256:` references recorded in that one source-bound set.
-Never treat the version tag, a partial matrix run or one image's proof as
-authority for another role. The exact operator procedure and non-atomic tag
-recovery boundary are documented in
+rollout, obtain and verify the `cluster` or `all` deployment release set, render
+the selected overlay, and run the offline deployment-lock post-renderer. Apply
+only the audited locked manifest. Do not edit nested Kustomize image transforms
+by hand or apply the pre-lock render: an outer transform cannot reliably replace
+an image digest already selected by an inner overlay. The exact operator
+procedure and non-atomic tag recovery boundary are documented in
 [`docs/operations/ql3-release-set-deployment.md`](../../../docs/operations/ql3-release-set-deployment.md).
 
 The committed CloudNativePG control, migration and Plugin Package recovery overlays use
 an all-zero SHA-256 digest as an intentionally unpullable fail-closed
-placeholder. A private deployment overlay must replace the control placeholder
-with the verified `qinglong3-cluster-control` digest and the recovery
-placeholder with the independently verified `qinglong3-cluster-admin` digest.
-Static deployment audit rejects replacing either production-oriented reference
-with `newTag`.
+placeholder. The offline post-renderer must replace the control placeholder with
+the verified `qinglong3-cluster-control` digest and every Admin workload or
+admission ConfigMap authority with the independently verified
+`qinglong3-cluster-admin` digest from the same release set. Static deployment
+audit freezes the reviewed source image surfaces, and the materializer rejects
+unhandled role image authorities.
 
 ## CloudNativePG production profile
 
