@@ -59,7 +59,7 @@ const Log = () => {
       .get(
         `${config.apiPrefix}logs/detail?file=${node.title}&path=${
           node.parent || ''
-        }`,
+        }&tail=true&limit=${1024 * 1024}`,
       )
       .then(({ code, data }) => {
         if (code === 200) {

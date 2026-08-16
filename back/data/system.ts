@@ -41,6 +41,8 @@ export interface SystemConfigInfo {
   linuxMirror?: string;
   timezone?: string;
   globalSshKey?: string;
+  runningInstanceRetentionDays?: number;
+  cronStatRetentionDays?: number;
 }
 
 export interface LoginLogInfo {

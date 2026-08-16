@@ -307,13 +307,35 @@ export default (app: Router) => {
       params: Joi.object({
         id: Joi.number().required(),
       }),
+      query: Joi.object({
+        offset: Joi.number().integer().min(0).optional(),
+        limit: Joi.number()
+          .integer()
+          .min(1)
+          .max(1024 * 1024)
+          .optional(),
+        tail: Joi.boolean().optional(),
+        t: Joi.string().optional(),
+      }).unknown(true),
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const result = await cronService.log(req.params.id);
-        return res.send({ code: 200, data: result.content, logStatus: result.status });
+        const result = await cronService.log(req.params.id, {
+          offset: req.query.offset as unknown as number,
+          limit: req.query.limit as unknown as number,
+          tail: req.query.tail as unknown as boolean,
+        });
+        return res.send({
+          code: 200,
+          data: result.content,
+          logStatus: result.status,
+          offset: result.offset,
+          nextOffset: result.nextOffset,
+          total: result.total,
+          truncated: result.truncated,
+        });
       } catch (e) {
         return next(e);
       }

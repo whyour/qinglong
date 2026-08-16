@@ -69,8 +69,10 @@ RUN set -x && \
   git config --global user.name "qinglong" && \
   git config --global http.postBuffer 524288000 && \
   npm install -g pnpm@8.3.1 pm2 ts-node typescript@5 && \
+  npm cache clean --force && \
   rm -rf /root/.cache && \
   rm -rf /root/.npm && \
+  rm -rf /var/lib/apt/lists/* && \
   rm -rf /etc/apt/apt.conf.d/docker-clean && \
   ulimit -c 0
 

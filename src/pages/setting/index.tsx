@@ -51,7 +51,6 @@ const Setting = () => {
     reloadTheme,
     systemInfo,
   } = useOutletContext<SharedContext>();
-  console.log('user', user);
   const columns = [
     {
       title: intl.get('名称'),

@@ -148,13 +148,27 @@ export default (app: Router) => {
       params: Joi.object({
         id: Joi.number().required(),
       }),
+      query: Joi.object({
+        offset: Joi.number().integer().min(0).optional(),
+        limit: Joi.number()
+          .integer()
+          .min(1)
+          .max(1024 * 1024)
+          .optional(),
+        tail: Joi.boolean().optional(),
+        t: Joi.string().optional(),
+      }).unknown(true),
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const subscriptionService = Container.get(SubscriptionService);
-        const data = await subscriptionService.log(req.params.id);
-        return res.send({ code: 200, data });
+        const result = await subscriptionService.log(req.params.id, {
+          offset: req.query.offset as unknown as number,
+          limit: req.query.limit as unknown as number,
+          tail: req.query.tail as unknown as boolean,
+        });
+        return res.send({ code: 200, data: result.content, ...result });
       } catch (e) {
         return next(e);
       }

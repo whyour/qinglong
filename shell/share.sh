@@ -305,8 +305,13 @@ reload_pm2() {
     # Kill any existing node processes for qinglong
     pkill -f "node.*static/build/app.js" 2>/dev/null || true
 
-    # Start node directly in the background
-    nohup node static/build/app.js > $dir_log/qinglong.log 2>&1 &
+    # Start node directly in the background. In containers, keep application
+    # output on the container streams instead of duplicating Winston logs on disk.
+    if [[ "$QL_CONTAINER" == "true" ]]; then
+      nohup node static/build/app.js >/proc/1/fd/1 2>/proc/1/fd/2 &
+    else
+      nohup node static/build/app.js >$dir_log/qinglong.log 2>&1 &
+    fi
     local node_pid=$!
 
     t '已使用 Node.js 直接启动服务 (PID: %s)' "$node_pid"

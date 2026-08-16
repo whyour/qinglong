@@ -2,7 +2,6 @@ import { spawn } from 'cross-spawn';
 import { Response } from 'express';
 import fs from 'fs';
 import { Agent, request } from 'undici';
-import sum from 'lodash/sum';
 import path from 'path';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
@@ -467,6 +466,7 @@ export default class SystemService {
     query: {
       startTime?: string;
       endTime?: string;
+      limit?: number;
     },
   ) {
     const startTime = dayjs(query.startTime || undefined)
@@ -481,8 +481,30 @@ export default class SystemService {
       .filter((x) => x.title.endsWith('.log'))
       .filter((x) => x.createTime >= startTime && x.createTime <= endTime);
 
+    const limit = Math.min(
+      Math.max(Number(query.limit) || 1024 * 1024, 1),
+      1024 * 1024,
+    );
+    const total = logs.reduce((size, log) => size + (log.size || 0), 0);
+    let remaining = limit;
+    const selected: Array<
+      (typeof logs)[number] & { start: number; length: number }
+    > = [];
+    for (let index = logs.length - 1; index >= 0 && remaining > 0; index--) {
+      const log = logs[index];
+      const size = log.size || 0;
+      const length = Math.min(size, remaining);
+      if (length > 0) {
+        selected.unshift({ ...log, start: size - length, length });
+        remaining -= length;
+      }
+    }
+
+    const contentLength = selected.reduce((size, log) => size + log.length, 0);
     res.set({
-      'Content-Length': sum(logs.map((x) => x.size)),
+      'Content-Length': contentLength,
+      'X-QL-Log-Total': total,
+      'X-QL-Log-Truncated': total > contentLength ? 'true' : 'false',
     });
     (function sendFiles(res, fileNames) {
       if (fileNames.length === 0) {
@@ -494,13 +516,17 @@ export default class SystemService {
       if (currentLog) {
         const currentFileStream = fs.createReadStream(
           path.join(config.systemLogPath, currentLog.title),
+          {
+            start: currentLog.start,
+            end: currentLog.start + currentLog.length - 1,
+          },
         );
         currentFileStream.on('end', () => {
           sendFiles(res, fileNames);
         });
         currentFileStream.pipe(res, { end: false });
       }
-    })(res, logs);
+    })(res, selected);
   }
 
   public async deleteSystemLog() {

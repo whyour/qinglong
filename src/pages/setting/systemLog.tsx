@@ -29,7 +29,9 @@ const SystemLog = ({ height, theme }: any) => {
   const { loading, refresh } = useRequest(
     () => {
       return request.get<Blob>(
-        `${config.apiPrefix}system/log?startTime=${range[0]}&endTime=${range[1]}`,
+        `${config.apiPrefix}system/log?startTime=${range[0]}&endTime=${
+          range[1]
+        }&limit=${1024 * 1024}`,
         {
           responseType: 'blob',
         },

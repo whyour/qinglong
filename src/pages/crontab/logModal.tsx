@@ -16,11 +16,12 @@ import {
   CheckCircleOutlined,
 } from "@ant-design/icons";
 import { PageLoading } from "@ant-design/pro-layout";
-import { logEnded } from "@/utils";
 import { CrontabStatus } from "./type";
 import Ansi from "ansi-to-react";
 
 const { Countdown } = Statistic;
+const LOG_CHUNK_BYTES = 256 * 1024;
+const MAX_LOG_VIEW_CHARS = 1024 * 1024;
 
 const CronLogModal = ({
   cron,
@@ -38,35 +39,49 @@ const CronLogModal = ({
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
   const scrollInfoRef = useRef({ value: 0, down: true });
+  const logOffsetRef = useRef<number>();
+  const valueRef = useRef(value);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const uniqPath = logUrl ? logUrl : String(cron?.id);
 
   const getCronLog = (isFirst?: boolean) => {
     if (isFirst) {
       setLoading(true);
     }
+    const baseUrl = logUrl ? logUrl : `${config.apiPrefix}crons/${cron.id}/log`;
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    const offset = isFirst ? undefined : logOffsetRef.current;
+    const pagination = `${separator}limit=${LOG_CHUNK_BYTES}${
+      isFirst ? "&tail=true" : offset !== undefined ? `&offset=${offset}` : ""
+    }`;
     request
-      .get(logUrl ? logUrl : `${config.apiPrefix}crons/${cron.id}/log`)
-      .then(({ code, data, logStatus }) => {
-        if (
-          code === 200 &&
-          localStorage.getItem("logCron") === uniqPath &&
-          data !== value
-        ) {
-          const log = (data as string) || intl.get("暂无日志");
-          setValue(log);
-          const hasNext = logStatus === 'running';
-          if (!hasNext && !logEnded(value) && value !== intl.get("启动中...")) {
-            setTimeout(() => {
-              autoScroll();
-            });
-          }
-          setExecuting(hasNext);
-          if (hasNext) {
-            setTimeout(() => {
-              autoScroll();
-              getCronLog();
-            }, 2000);
-          }
+      .get(`${baseUrl}${pagination}`)
+      .then(({ code, data, logStatus, nextOffset }) => {
+        if (code !== 200 || localStorage.getItem("logCron") !== uniqPath) {
+          return;
+        }
+
+        const hasNext = logStatus === "running";
+        const chunk = (data as string) || "";
+        let log = isFirst ? chunk : `${valueRef.current}${chunk}`;
+        if (!log && !hasNext) {
+          log = intl.get("暂无日志");
+        }
+        if (log.length > MAX_LOG_VIEW_CHARS) {
+          log = log.slice(-MAX_LOG_VIEW_CHARS);
+        }
+        valueRef.current = log;
+        setValue(log);
+        if (typeof nextOffset === "number") {
+          logOffsetRef.current = nextOffset;
+        }
+        setExecuting(hasNext);
+
+        if (chunk || !hasNext) {
+          autoScroll();
+        }
+        if (hasNext) {
+          pollTimerRef.current = setTimeout(() => getCronLog(), 2000);
         }
       })
       .finally(() => {
@@ -89,6 +104,9 @@ const CronLogModal = ({
   };
 
   const cancel = () => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+    }
     localStorage.removeItem("logCron");
     handleCancel();
   };
@@ -117,12 +135,19 @@ const CronLogModal = ({
 
   useEffect(() => {
     if (cron && cron.id) {
+      logOffsetRef.current = undefined;
       getCronLog(true);
     }
+    return () => {
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
+      }
+    };
   }, [cron]);
 
   useEffect(() => {
     if (data) {
+      valueRef.current = data;
       setValue(data);
     }
   }, [data]);

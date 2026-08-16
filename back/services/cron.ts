@@ -32,6 +32,7 @@ import { t } from '../shared/i18n';
 import { ScheduleType } from '../interface/schedule';
 import { logStreamManager } from '../shared/logStreamManager';
 import { isEmpty } from 'lodash';
+import { LogReadOptions, readLogChunk } from '../shared/logReader';
 
 @Service()
 export default class CronService {
@@ -766,27 +767,63 @@ export default class CronService {
     await this.setCrontab();
   }
 
-  public async log(id: number): Promise<{ content: string; status: string }> {
+  public async log(
+    id: number,
+    options: LogReadOptions = {},
+  ): Promise<{
+    content: string;
+    status: string;
+    offset: number;
+    nextOffset: number;
+    total: number;
+    truncated: boolean;
+  }> {
     const doc = await this.getDb({ id });
     if (!doc) {
-      return { content: '', status: 'empty' };
+      return {
+        content: '',
+        status: 'empty',
+        offset: 0,
+        nextOffset: 0,
+        total: 0,
+        truncated: false,
+      };
     }
     if (doc.log_name === '/dev/null') {
-      return { content: t('日志设置为忽略'), status: 'ignored' };
+      return {
+        content: t('日志设置为忽略'),
+        status: 'ignored',
+        offset: 0,
+        nextOffset: 0,
+        total: 0,
+        truncated: false,
+      };
     }
     const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
     const logFileExist = doc.log_path && (await fileExist(absolutePath));
     if (logFileExist) {
-      const content = await getFileContentByName(`${absolutePath}`);
+      const chunk = await readLogChunk(`${absolutePath}`, options);
       const isRunning =
         typeof doc.status === 'number' &&
         [CrontabStatus.running, CrontabStatus.queued].includes(doc.status);
-      return { content, status: isRunning ? 'running' : 'completed' };
+      return {
+        ...chunk,
+        status: isRunning ? 'running' : 'completed',
+      };
     } else {
-      return typeof doc.status === 'number' &&
+      const status =
+        typeof doc.status === 'number' &&
         [CrontabStatus.queued, CrontabStatus.running].includes(doc.status)
-        ? { content: t('运行中...'), status: 'running' }
-        : { content: t('日志不存在...'), status: 'notFound' };
+          ? 'running'
+          : 'notFound';
+      return {
+        content: status === 'running' ? t('运行中...') : t('日志不存在...'),
+        status,
+        offset: 0,
+        nextOffset: 0,
+        total: 0,
+        truncated: false,
+      };
     }
   }
 

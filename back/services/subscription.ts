@@ -33,6 +33,7 @@ import { CrontabModel } from '../data/cron';
 import CrontabService from './cron';
 import taskLimit from '../shared/pLimit';
 import { logStreamManager } from '../shared/logStreamManager';
+import { LogReadOptions, readLogChunk } from '../shared/logReader';
 
 @Service()
 export default class SubscriptionService {
@@ -366,14 +367,20 @@ export default class SubscriptionService {
     }
   }
 
-  public async log(id: number) {
+  public async log(id: number, options: LogReadOptions = {}) {
     const doc = await this.getDb({ id });
     if (!doc || !doc.log_path) {
-      return '';
+      return {
+        content: '',
+        offset: 0,
+        nextOffset: 0,
+        total: 0,
+        truncated: false,
+      };
     }
 
     const absolutePath = await handleLogPath(doc.log_path as string);
-    return await getFileContentByName(absolutePath);
+    return await readLogChunk(absolutePath, options);
   }
 
   public async logs(id: number) {

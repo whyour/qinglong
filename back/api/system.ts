@@ -350,6 +350,11 @@ export default (app: Router) => {
       query: {
         startTime: Joi.string().allow('').optional(),
         endTime: Joi.string().allow('').optional(),
+        limit: Joi.number()
+          .integer()
+          .min(1)
+          .max(1024 * 1024)
+          .optional(),
         t: Joi.string().optional(),
       },
     }),
@@ -361,6 +366,7 @@ export default (app: Router) => {
           req.query as {
             startTime?: string;
             endTime?: string;
+            limit?: number;
           },
         );
       } catch (e) {
