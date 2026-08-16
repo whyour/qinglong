@@ -4,6 +4,7 @@
 - 日期：2026-08-01
 - 关联 RFC：QL-RFC-0001 D-235、D-236
 - 关联 ADR：ADR-0128、ADR-0196、ADR-0252
+- 后续修订：ADR-0425 已把本 ADR 的私有 Worker evidence gate 收窄到 `cluster|all` 发布族；`local` 发布不得等待该证据，Cluster 的 source/freshness/private-runner 约束继续有效。
 
 ## 背景
 

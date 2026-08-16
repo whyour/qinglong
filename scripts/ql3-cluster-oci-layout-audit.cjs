@@ -169,6 +169,38 @@ function createBlobReader(layoutRoot) {
 }
 
 function expectedImageConfig(architecture, revision, image) {
+  if (image === 'worker') {
+    return {
+      architecture,
+      os: 'linux',
+      config: {
+        User: '65532:65532',
+        Env: [
+          'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+          'NODE_VERSION=24.18.0',
+          'YARN_VERSION=1.22.22',
+          'NODE_ENV=production',
+        ],
+        Entrypoint: [
+          'node',
+          '/opt/qinglong/node_modules/@qinglong/worker-runtime/dist/process/workerProcessCli.js',
+        ],
+        WorkingDir: '/opt/qinglong',
+        Labels: {
+          'io.qinglong.profile': 'worker',
+          'io.qinglong.worker.capacity-profiles': 'edge,node',
+          'org.opencontainers.image.description':
+            'QingLong 3.0 headless Remote Worker runtime',
+          'org.opencontainers.image.licenses': 'Apache-2.0',
+          'org.opencontainers.image.revision': revision,
+          'org.opencontainers.image.source':
+            'https://github.com/whyour/qinglong',
+          'org.opencontainers.image.title': 'QingLong 3.0 Worker',
+          'org.opencontainers.image.version': '3.0.0-alpha.0',
+        },
+      },
+    };
+  }
   if (image === 'local') {
     return {
       architecture,
@@ -249,6 +281,7 @@ function expectedImageConfig(architecture, revision, image) {
             ? 'QingLong 3.0 Cluster Control AI'
             : 'QingLong 3.0 Cluster Control'
           : 'QingLong 3.0 Cluster Admin',
+        'org.opencontainers.image.version': '3.0.0-alpha.0',
       },
     },
   };

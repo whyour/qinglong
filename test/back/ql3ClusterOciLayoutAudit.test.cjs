@@ -25,6 +25,7 @@ function createFixture(t, options = {}) {
   const isControl = image === 'control' || image === 'control-ai';
   const isControlAi = image === 'control-ai';
   const isLocal = image === 'local';
+  const isWorker = image === 'worker';
   const layoutRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-oci-layout-'));
   t.after(() => fs.rmSync(layoutRoot, { recursive: true, force: true }));
   const blobDirectory = path.join(layoutRoot, 'blobs', 'sha256');
@@ -96,6 +97,8 @@ function createFixture(t, options = {}) {
           User:
             options.rootArm64 && architecture === 'arm64'
               ? '0:0'
+              : isWorker
+              ? '65532:65532'
               : isLocal
               ? '65532:65532'
               : '10001:10001',
@@ -108,7 +111,9 @@ function createFixture(t, options = {}) {
           ],
           Entrypoint: [
             'node',
-            isLocal
+            isWorker
+              ? '/opt/qinglong/node_modules/@qinglong/worker-runtime/dist/process/workerProcessCli.js'
+              : isLocal
               ? '/opt/qinglong/node_modules/@qinglong/local-application/dist/cli.js'
               : isControl
               ? isControlAi
@@ -118,6 +123,12 @@ function createFixture(t, options = {}) {
           ],
           WorkingDir: '/opt/qinglong',
           Labels: {
+            ...(isWorker
+              ? {
+                  'io.qinglong.profile': 'worker',
+                  'io.qinglong.worker.capacity-profiles': 'edge,node',
+                }
+              : {}),
             ...(isLocal
               ? {
                   'io.qinglong.ai': 'excluded',
@@ -131,6 +142,8 @@ function createFixture(t, options = {}) {
               : {}),
             'org.opencontainers.image.description': isLocal
               ? 'QingLong 3.0 AI-excluded Edge and Standalone runtime'
+              : isWorker
+              ? 'QingLong 3.0 headless Remote Worker runtime'
               : isControl
               ? isControlAi
                 ? 'Optional QingLong 3.0 AI-enabled cluster control plane'
@@ -142,12 +155,14 @@ function createFixture(t, options = {}) {
               'https://github.com/whyour/qinglong',
             'org.opencontainers.image.title': isLocal
               ? 'QingLong 3.0 Local Application'
+              : isWorker
+              ? 'QingLong 3.0 Worker'
               : isControl
               ? isControlAi
                 ? 'QingLong 3.0 Cluster Control AI'
                 : 'QingLong 3.0 Cluster Control'
               : 'QingLong 3.0 Cluster Admin',
-            ...(isLocal
+            ...(isLocal || isWorker || isControl || image === 'admin'
               ? {
                   'org.opencontainers.image.version': '3.0.0-alpha.0',
                 }
@@ -346,6 +361,20 @@ test('accepts the AI-excluded local image and attestation closure', (t) => {
   assert.deepEqual(
     report.platforms.map((entry) => entry.spdxApplicationPackages),
     [10, 10],
+  );
+});
+
+test('accepts the headless Worker image and attestation closure', (t) => {
+  const report = auditClusterOciLayout({
+    root,
+    layoutRoot: createFixture(t, { image: 'worker' }),
+    expectedRevision: revision,
+    image: 'worker',
+  });
+  assert.equal(report.image, 'worker');
+  assert.deepEqual(
+    report.platforms.map((platform) => platform.platform),
+    ['linux/amd64', 'linux/arm64'],
   );
 });
 

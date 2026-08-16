@@ -10,7 +10,9 @@ const verifier = path.join(
   ROOT,
   'deploy/console/ql3-cluster-copilot/verify-release.sh',
 );
-const image = `ghcr.io/example/qinglong3-cluster-admin@sha256:${'b'.repeat(64)}`;
+const image = `ghcr.io/example/qinglong3-cluster-admin@sha256:${'b'.repeat(
+  64,
+)}`;
 const revision = 'c'.repeat(40);
 
 function fixture(t) {
@@ -46,7 +48,7 @@ function invoke(args, env) {
   });
 }
 
-test('verifies one signature and three digest-bound GitHub attestations', (t) => {
+test('verifies one signature and four digest-bound GitHub attestations', (t) => {
   assert.equal(fs.statSync(verifier).mode & 0o777, 0o755);
   const value = fixture(t);
   const result = invoke(
@@ -61,11 +63,12 @@ test('verifies one signature and three digest-bound GitHub attestations', (t) =>
     provenance: true,
     sbom: true,
     osVulnerabilityEvidence: true,
+    releaseCandidateContract: true,
     compatible: true,
   });
   const calls = fs.readFileSync(value.capture, 'utf8');
   assert.equal((calls.match(/^cosign$/gmu) ?? []).length, 1);
-  assert.equal((calls.match(/^gh$/gmu) ?? []).length, 3);
+  assert.equal((calls.match(/^gh$/gmu) ?? []).length, 4);
   for (const required of [
     'arg=--certificate-identity',
     'arg=https://github.com/example/qinglong/.github/workflows/ql3-image-release.yml@refs/tags/v3.0.0-alpha.1',
@@ -83,17 +86,26 @@ test('verifies one signature and three digest-bound GitHub attestations', (t) =>
     'arg=refs/tags/v3.0.0-alpha.1',
     'arg=https://cyclonedx.org/bom',
     'arg=https://qinglong.dev/attestations/image-os-vulnerability/v1',
+    'arg=https://qinglong.dev/attestations/release-candidate-contract/v1',
     'arg=--deny-self-hosted-runners',
     'arg=--bundle-from-oci',
   ]) {
-    assert.match(calls, new RegExp(`^${required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'mu'));
+    assert.match(
+      calls,
+      new RegExp(`^${required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'mu'),
+    );
   }
 });
 
 test('rejects mutable or source-unbound inputs before invoking trust tools', (t) => {
   const value = fixture(t);
   for (const args of [
-    ['ghcr.io/example/qinglong3-cluster-admin:latest', 'example/qinglong', revision, 'refs/tags/v3.0.0'],
+    [
+      'ghcr.io/example/qinglong3-cluster-admin:latest',
+      'example/qinglong',
+      revision,
+      'refs/tags/v3.0.0',
+    ],
     [image, 'other/qinglong', revision, 'refs/tags/v3.0.0'],
     [image, 'example/qinglong', 'short', 'refs/tags/v3.0.0'],
     [image, 'example/qinglong', revision, 'refs/heads/next'],

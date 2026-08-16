@@ -7,6 +7,15 @@ on:
         description: Exact QingLong 3 SemVer tag without the v prefix
         required: true
         type: string
+      release_scope:
+        description: Deployment family to publish
+        required: true
+        default: all
+        type: choice
+        options:
+          - local
+          - cluster
+          - all
 
 permissions:
   contents: read
@@ -16,8 +25,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-candidate:
+    name: Freeze the source-derived release candidate contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      cluster-evidence-required: ${{ steps.contract.outputs.cluster-evidence-required }}
+      os-matrix: ${{ steps.contract.outputs.os-matrix }}
+      publish-matrix: ${{ steps.contract.outputs.publish-matrix }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.18.0'
+
+      - name: Derive the exact deployment-family release plan
+        id: contract
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+        run: |
+          set -euo pipefail
+          umask 077
+          report="${RUNNER_TEMP}/ql3-release-candidate-contract.json"
+          node scripts/ql3-release-candidate-contract.cjs \
+            --mode=create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --output="${report}"
+          REPORT="${report}" node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync(process.env.REPORT, 'utf8'));
+          const output = [
+            `cluster-evidence-required=${report.releasePlan.clusterEvidenceRequired}`,
+            `os-matrix=${JSON.stringify(report.releasePlan.osMatrix)}`,
+            `publish-matrix=${JSON.stringify(report.releasePlan.publishMatrix)}`,
+          ];
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `${output.join('\n')}\n`);
+          NODE
+
   worker-management-release-evidence:
     name: Audit private Worker management release evidence
+    needs: release-candidate
+    if: needs.release-candidate.outputs.cluster-evidence-required == 'true'
     runs-on: [self-hosted, linux, ql3-release-evidence-ephemeral]
     environment: ql3-production-release-evidence
     timeout-minutes: 10
@@ -62,6 +119,8 @@ jobs:
 
   cluster-dr-release-evidence:
     name: Audit private CloudNativePG disaster-recovery evidence
+    needs: release-candidate
+    if: needs.release-candidate.outputs.cluster-evidence-required == 'true'
     runs-on: [self-hosted, linux, ql3-release-evidence-ephemeral]
     environment: ql3-production-release-evidence
     timeout-minutes: 10
@@ -106,6 +165,7 @@ jobs:
 
   os-vulnerability:
     name: Scan ${{ matrix.image }} OS packages on ${{ matrix.image_arch }}
+    needs: release-candidate
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -113,55 +173,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: control
-            runner: ubuntu-24.04
-            node_arch: x64
-            image_arch: amd64
-            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
-            target: runtime
-          - image: control
-            runner: ubuntu-24.04-arm
-            node_arch: arm64
-            image_arch: arm64
-            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
-            target: runtime
-          - image: control-ai
-            runner: ubuntu-24.04
-            node_arch: x64
-            image_arch: amd64
-            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
-            target: runtime-ai
-          - image: control-ai
-            runner: ubuntu-24.04-arm
-            node_arch: arm64
-            image_arch: arm64
-            dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
-            target: runtime-ai
-          - image: admin
-            runner: ubuntu-24.04
-            node_arch: x64
-            image_arch: amd64
-            dockerfile: deploy/containers/ql3-cluster-admin/Dockerfile
-            target: runtime
-          - image: admin
-            runner: ubuntu-24.04-arm
-            node_arch: arm64
-            image_arch: arm64
-            dockerfile: deploy/containers/ql3-cluster-admin/Dockerfile
-            target: runtime
-          - image: local
-            runner: ubuntu-24.04
-            node_arch: x64
-            image_arch: amd64
-            dockerfile: deploy/containers/ql3-local-application/Dockerfile
-            target: runtime
-          - image: local
-            runner: ubuntu-24.04-arm
-            node_arch: arm64
-            image_arch: arm64
-            dockerfile: deploy/containers/ql3-local-application/Dockerfile
-            target: runtime
+        include: ${{ fromJSON(needs.release-candidate.outputs.os-matrix) }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -244,9 +256,21 @@ jobs:
   publish:
     name: Publish immutable multi-architecture ${{ matrix.image }} image
     needs:
+      - release-candidate
       - worker-management-release-evidence
       - cluster-dr-release-evidence
       - os-vulnerability
+    if: >-
+      always() &&
+      needs.release-candidate.result == 'success' &&
+      needs.os-vulnerability.result == 'success' &&
+      (
+        needs.release-candidate.outputs.cluster-evidence-required != 'true' ||
+        (
+          needs.worker-management-release-evidence.result == 'success' &&
+          needs.cluster-dr-release-evidence.result == 'success'
+        )
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -257,19 +281,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: control
-            repository: qinglong3-cluster-control
-            runtime_root: deploy/containers/ql3-cluster-control/runtime-dependencies
-          - image: control-ai
-            repository: qinglong3-cluster-control-ai
-            runtime_root: deploy/containers/ql3-cluster-control/runtime-dependencies
-          - image: admin
-            repository: qinglong3-cluster-admin
-            runtime_root: deploy/containers/ql3-cluster-admin/runtime-dependencies
-          - image: local
-            repository: qinglong3-local-application
-            runtime_root: deploy/containers/ql3-local-application/runtime-dependencies
+        include: ${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -278,6 +290,30 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.18.0'
+
+      - name: Recreate and audit the source-derived release candidate contract
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+        run: |
+          set -euo pipefail
+          umask 077
+          contract="${RUNNER_TEMP}/${{ matrix.repository }}-release-candidate-contract.json"
+          node scripts/ql3-release-candidate-contract.cjs \
+            --mode=create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --output="${contract}"
+          audit="${RUNNER_TEMP}/${{ matrix.repository }}-release-candidate-audit.json"
+          node scripts/ql3-release-candidate-contract.cjs \
+            --mode=audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --report="${contract}" > "${audit}"
 
       - name: Resolve and validate release identity
         id: identity
@@ -416,6 +452,15 @@ jobs:
           predicate-path: ${{ runner.temp }}/${{ matrix.repository }}-os-vulnerability.json
           push-to-registry: true
 
+      - name: Attest the source-derived release candidate contract
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-name: ${{ steps.identity.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          predicate-type: https://qinglong.dev/attestations/release-candidate-contract/v1
+          predicate-path: ${{ runner.temp }}/${{ matrix.repository }}-release-candidate-contract.json
+          push-to-registry: true
+
       - name: Verify the published manifest and attestation bindings
         env:
           IMAGE: ${{ steps.identity.outputs.image }}
@@ -509,6 +554,22 @@ jobs:
             --source-digest "${GITHUB_SHA}" \
             --source-ref "${GITHUB_REF}" \
             --predicate-type "https://qinglong.dev/attestations/image-os-vulnerability/v1" \
+            --deny-self-hosted-runners \
+            --bundle-from-oci
+
+      - name: Verify the release candidate contract from the OCI registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.identity.outputs.image }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          gh attestation verify "oci://${IMAGE}@${DIGEST}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/ql3-image-release.yml" \
+            --source-digest "${GITHUB_SHA}" \
+            --source-ref "${GITHUB_REF}" \
+            --predicate-type "https://qinglong.dev/attestations/release-candidate-contract/v1" \
             --deny-self-hosted-runners \
             --bundle-from-oci
 

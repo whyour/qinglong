@@ -13,6 +13,7 @@ const FILES = Object.freeze({
     'deploy/console/ql3-cluster-copilot/host-environment.example.json',
   image: 'deploy/containers/ql3-cluster-admin/Dockerfile',
   workflow: '.github/workflows/ql3-image-release.yml',
+  candidate: 'scripts/ql3-release-candidate-contract.cjs',
   cli: 'packages/ql3-cluster-admin/src/copilot-console/cli.ts',
   server: 'packages/ql3-cluster-admin/src/copilot-console/server.ts',
 });
@@ -105,6 +106,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       '--bundle-from-oci',
       'https://cyclonedx.org/bom',
       'https://qinglong.dev/attestations/image-os-vulnerability/v1',
+      'https://qinglong.dev/attestations/release-candidate-contract/v1',
     ],
     'QL3_CLUSTER_ADMIN_RELEASE_VERIFIER_DRIFT',
   );
@@ -134,6 +136,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       "'--bundle-from-oci'",
       "'https://cyclonedx.org/bom'",
       "'https://qinglong.dev/attestations/image-os-vulnerability/v1'",
+      "'https://qinglong.dev/attestations/release-candidate-contract/v1'",
       "'immutable_image_pull'",
       "'local_digest_inspection'",
       "'embedded_evidence_verifier'",
@@ -224,15 +227,29 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
     'QL3_COPILOT_CONSOLE_IMAGE_DISTRIBUTION_DRIFT',
   );
   requireFragments(
+    'candidate',
+    [
+      "image: 'admin'",
+      "repository: 'qinglong3-cluster-admin'",
+      "image: 'worker'",
+      "repository: 'qinglong3-worker'",
+      "profiles: ['edge', 'standalone']",
+      'requiresClusterPrivateEvidence: false',
+      'requiresClusterPrivateEvidence: true',
+    ],
+    'QL3_CLUSTER_ADMIN_RELEASE_CANDIDATE_DRIFT',
+  );
+  requireFragments(
     'workflow',
     [
-      'image: admin',
-      'image_arch: amd64',
-      'image_arch: arm64',
+      'fromJSON(needs.release-candidate.outputs.publish-matrix)',
+      'fromJSON(needs.release-candidate.outputs.os-matrix)',
       'cosign sign --yes "${IMAGE}@${DIGEST}"',
       'predicate-type: https://qinglong.dev/attestations/image-os-vulnerability/v1',
+      'predicate-type: https://qinglong.dev/attestations/release-candidate-contract/v1',
       'gh attestation verify "oci://${IMAGE}@${DIGEST}"',
       '--predicate-type "https://cyclonedx.org/bom"',
+      '--predicate-type "https://qinglong.dev/attestations/release-candidate-contract/v1"',
       '--deny-self-hosted-runners',
       '--bundle-from-oci',
       'Promote only the verified digest to immutable release tags',

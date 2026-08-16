@@ -481,6 +481,10 @@ async function runCeremony(options) {
       'os_vulnerability_attestation',
       'https://qinglong.dev/attestations/image-os-vulnerability/v1',
     );
+    attestation(
+      'release_candidate_attestation',
+      'https://qinglong.dev/attestations/release-candidate-contract/v1',
+    );
     discard(
       runStep(
         tools.docker,
@@ -583,6 +587,7 @@ async function runCeremony(options) {
         provenance: true,
         cyclonedxSbom: true,
         osVulnerabilityEvidence: true,
+        releaseCandidateContract: true,
         imagePulled: true,
         localRepoDigestBound: true,
         embeddedEvidenceVerifier: true,

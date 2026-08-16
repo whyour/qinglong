@@ -28,12 +28,13 @@ attestation service、transparency log、本地 Docker daemon 和短期 GitHub t
    `cosign`、`gh`、`docker`、短期 token file 和新 report path；mutable tag、branch
    ref、owner 漂移、symlink、group/other-writable executable 或已存在输出均失败关闭。
 2. 三个外部工具按绝对路径直接执行，不经 shell 或 ambient `PATH`。GitHub token
-   必须来自 current-owner `0600` bounded file，只注入三个 `gh attestation verify`
+   必须来自 current-owner `0600` bounded file，只注入四个 `gh attestation verify`
    子进程；不得进入 argv、`cosign`/`docker` 环境、报告或失败输出。工具在执行前后
    复验 device/inode/size/SHA-256，降低 ceremony 中途替换风险。
 3. ceremony 精确执行一次 keyless signature 验证，以及绑定 release workflow、
    source digest、source tag、非 self-hosted runner 和 OCI bundle 的 provenance、
-   CycloneDX、OS-vulnerability 三类 GitHub attestation 验证。随后拉取同一 digest，
+   CycloneDX、OS-vulnerability、source-derived release-candidate contract 四类 GitHub
+   attestation 验证。随后拉取同一 digest，
    要求本地 image inspection 的 Linux `amd64|arm64` `RepoDigests` 包含精确输入。
 4. ceremony 使用固定、非敏感、单条 `run_read` redacted evidence vector 检验最终
    release image 内的第 11 个 `evidence-verify` 产品命令。该容器使用 non-root
@@ -41,12 +42,12 @@ attestation service、transparency log、本地 Docker daemon 和短期 GitHub t
    128 MiB、0.25 CPU 与 32 PIDs，只读挂载 vector；输出必须与独立 verifier 的
    exact no-authority result 一致，vector inode/size/mtime/digest 前后不变。
 5. 成功只新建一个 current-owner `0600`、two-space canonical JSON 报告。报告保留
-   public release identity、工具 SHA-256/size、七步 argv/stdout/stderr digest 与字节数、
+   public release identity、工具 SHA-256/size、八步 argv/stdout/stderr digest 与字节数、
    verification/isolation 结果和自身 canonical SHA-256，不保留原始工具输出、token、
    executable path 或 workstation identity。它明确声明
    `reportAttestation=none`、`actionAuthority=none`。
 6. 独立 offline audit 使用 no-follow stable read 校验报告 canonical encoding、exact
-   shape、expected release identity、工具与七步 transcript digest、一致的 isolation/
+   shape、expected release identity、工具与八步 transcript digest、一致的 isolation/
    limitation 以及顶层 digest。其结果固定为 `externalResults=not_replayed`；离线审计
    不能证明外部命令确实运行，也不能重放某一历史时点的 registry、GitHub 或
    transparency-log 状态。

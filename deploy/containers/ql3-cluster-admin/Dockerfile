@@ -96,7 +96,8 @@ LABEL org.opencontainers.image.title="QingLong 3.0 Cluster Admin" \
   org.opencontainers.image.description="QingLong 3.0 cluster operations and bounded Copilot surfaces" \
   org.opencontainers.image.source="https://github.com/whyour/qinglong" \
   org.opencontainers.image.revision="${SOURCE_REVISION}" \
-  org.opencontainers.image.licenses="Apache-2.0"
+  org.opencontainers.image.licenses="Apache-2.0" \
+  org.opencontainers.image.version="3.0.0-alpha.0"
 
 ENV NODE_ENV=production
 

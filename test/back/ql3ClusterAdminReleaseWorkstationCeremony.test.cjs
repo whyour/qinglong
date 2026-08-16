@@ -118,7 +118,8 @@ test('runs the immutable release ceremony and writes only digest-level evidence'
   assert.equal(report.release.sourceRevision, revision);
   assert.equal(report.verification.embeddedEvidenceVerifier, true);
   assert.equal(report.evidenceVector.classification, 'synthetic_non_sensitive');
-  assert.equal(report.steps.length, 7);
+  assert.equal(report.steps.length, 8);
+  assert.equal(report.verification.releaseCandidateContract, true);
   assert.equal(report.claims.reportAttestation, 'none');
   assert.equal(reportText.includes(token), false);
   assert.equal(fs.statSync(value.output).mode & 0o777, 0o600);
@@ -136,11 +137,11 @@ test('runs the immutable release ceremony and writes only digest-level evidence'
     .map((line) => JSON.parse(line));
   assert.deepEqual(
     calls.map(({ name }) => name),
-    ['cosign', 'gh', 'gh', 'gh', 'docker', 'docker', 'docker'],
+    ['cosign', 'gh', 'gh', 'gh', 'gh', 'docker', 'docker', 'docker'],
   );
   assert.deepEqual(
     calls.map(({ tokenPresent }) => tokenPresent),
-    [false, true, true, true, false, false, false],
+    [false, true, true, true, true, false, false, false],
   );
   assert.deepEqual(calls[0].args, [
     'verify',
@@ -150,7 +151,7 @@ test('runs the immutable release ceremony and writes only digest-level evidence'
     'https://token.actions.githubusercontent.com',
     image,
   ]);
-  for (const call of calls.slice(1, 4)) {
+  for (const call of calls.slice(1, 5)) {
     for (const required of [
       'attestation',
       'verify',
@@ -176,7 +177,12 @@ test('runs the immutable release ceremony and writes only digest-level evidence'
       'https://qinglong.dev/attestations/image-os-vulnerability/v1',
     ),
   );
-  const dockerRun = calls[6].args;
+  assert.ok(
+    calls[4].args.includes(
+      'https://qinglong.dev/attestations/release-candidate-contract/v1',
+    ),
+  );
+  const dockerRun = calls[7].args;
   for (const required of [
     '--read-only',
     'none',

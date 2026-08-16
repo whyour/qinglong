@@ -23,7 +23,7 @@ const releaseSource = fs.readFileSync(
 test('accepts the reviewed native CI and digest release contracts', () => {
   assert.deepEqual(auditClusterImageRelease(root), {
     ci: {
-      images: ['control', 'control-ai', 'admin', 'local'],
+      images: ['control', 'control-ai', 'admin', 'local', 'worker'],
       nativeArchitectures: ['amd64', 'arm64'],
       runtimeInventory: true,
       clusterAdminProductFacade: true,
@@ -40,6 +40,14 @@ test('accepts the reviewed native CI and digest release contracts', () => {
     },
     release: {
       trigger: 'explicit protected v3 tag dispatch',
+      releaseCandidateContract: {
+        scopes: ['local', 'cluster', 'all'],
+        workspacePackages: 18,
+        sourceDerived: true,
+        digestAttested: true,
+        localClusterEvidenceRequired: false,
+        clusterPrivateEvidenceRequired: true,
+      },
       workerManagementEvidence: {
         sourceAware: true,
         privateEphemeralRunner: true,
@@ -65,11 +73,16 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         immutableArtifactRetentionDays: 1,
         attestedToPublishedDigest: true,
       },
-      images: ['control', 'control-ai', 'admin', 'local'],
+      images: ['control', 'control-ai', 'admin', 'worker', 'local'],
       platforms: ['linux/amd64', 'linux/arm64'],
       keylessSignature: true,
       buildkitAttestations: ['sbom', 'provenance'],
-      githubAttestations: ['provenance', 'sbom', 'os-vulnerability'],
+      githubAttestations: [
+        'provenance',
+        'sbom',
+        'os-vulnerability',
+        'release-candidate',
+      ],
       publication: {
         copier: 'regctl@0.11.5',
         copierSha256:
@@ -85,6 +98,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         'provenance',
         'cyclonedx',
         'os-vulnerability',
+        'release-candidate',
         'release-tags',
       ],
     },
@@ -175,6 +189,17 @@ test('rejects removal of the native cluster-admin image gate', () => {
   );
 });
 
+test('rejects removal of the native Worker image gate', () => {
+  const mutated = ciSource.replace(
+    '            image: worker\n            repository: qinglong3-worker\n            runtime_user: 65532:65532',
+    '            image: worker-disabled\n            repository: qinglong3-worker\n            runtime_user: 65532:65532',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /matrices must contain only exact/,
+  );
+});
+
 test('rejects an additional unreviewed CI image authority', () => {
   const mutated = ciSource.replace(
     '            target: runtime\n    steps:',
@@ -245,7 +270,7 @@ test('rejects release publication without the private evidence dependency', () =
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /depend on both protected ephemeral private evidence jobs/,
+    /always require candidate and OS gates/,
   );
 });
 
@@ -256,7 +281,7 @@ test('rejects release publication without the OS vulnerability dependency', () =
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /depend on both protected ephemeral private evidence jobs/,
+    /always require candidate and OS gates/,
   );
 });
 
@@ -267,7 +292,7 @@ test('rejects release publication without current disaster-recovery evidence', (
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /depend on both protected ephemeral private evidence jobs/,
+    /always require candidate and OS gates/,
   );
 });
 
@@ -289,12 +314,12 @@ test('rejects disaster-recovery evidence detached from the release source', () =
 
 test('rejects an incomplete native OS vulnerability architecture matrix', () => {
   const mutated = releaseSource.replace(
-    '          - image: local\n            runner: ubuntu-24.04-arm\n            node_arch: arm64\n            image_arch: arm64\n            dockerfile: deploy/containers/ql3-local-application/Dockerfile',
-    '          - image: local\n            runner: ubuntu-24.04-arm\n            node_arch: arm64\n            image_arch: disabled\n            dockerfile: deploy/containers/ql3-local-application/Dockerfile',
+    'include: ${{ fromJSON(needs.release-candidate.outputs.os-matrix) }}',
+    'include: []',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /OS vulnerability matrix must scan exact/,
+    /OS vulnerability matrix must come from/,
   );
 });
 
@@ -349,7 +374,7 @@ test('rejects a reusable private evidence runner', () => {
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /protected ephemeral private evidence job/,
+    /always require candidate and OS gates/,
   );
 });
 
@@ -404,34 +429,34 @@ test('rejects a release missing application SBOM attestation', () => {
 
 test('rejects a release missing the independent admin image', () => {
   const mutated = releaseSource.replace(
-    '- image: admin\n            repository: qinglong3-cluster-admin\n            runtime_root: deploy/containers/ql3-cluster-admin/runtime-dependencies',
-    '- image: admin-disabled\n            repository: qinglong3-cluster-admin\n            runtime_root: deploy/containers/ql3-cluster-admin/runtime-dependencies',
+    'include: ${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}',
+    'include: []',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /matrix must contain only exact/,
+    /matrix must come only from/,
   );
 });
 
 test('rejects a release missing the AI-excluded local image', () => {
   const mutated = releaseSource.replace(
-    '- image: local\n            repository: qinglong3-local-application\n            runtime_root: deploy/containers/ql3-local-application/runtime-dependencies',
-    '- image: local-disabled\n            repository: qinglong3-local-application\n            runtime_root: deploy/containers/ql3-local-application/runtime-dependencies',
+    '          - local\n          - cluster\n          - all',
+    '          - cluster\n          - all',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /matrix must contain only exact/,
+    /closed local, cluster or all/,
   );
 });
 
 test('rejects an additional repository in the privileged release matrix', () => {
   const mutated = releaseSource.replace(
-    '            runtime_root: deploy/containers/ql3-local-application/runtime-dependencies\n    steps:',
-    '            runtime_root: deploy/containers/ql3-local-application/runtime-dependencies\n          - image: unreviewed\n            repository: unreviewed\n            dockerfile: Dockerfile\n            runtime_root: unreviewed\n    steps:',
+    'include: ${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}',
+    'include:\n          - image: unreviewed\n            repository: unreviewed\n            runtime_root: unreviewed',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /matrix must contain only exact/,
+    /matrix must come only from/,
   );
 });
 
@@ -637,5 +662,38 @@ test('rejects removal of the digest-bound OS vulnerability attestation', () => {
   assert.throws(
     () => auditReleaseWorkflow(mutated),
     /digest-bound OS vulnerability evidence/,
+  );
+});
+
+test('rejects removal of the digest-bound release candidate attestation', () => {
+  const mutated = releaseSource.replace(
+    'predicate-type: https://qinglong.dev/attestations/release-candidate-contract/v1',
+    'predicate-type: https://example.invalid/not-a-candidate-contract',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /source-derived release candidate contract/,
+  );
+});
+
+test('rejects treating skipped private evidence as cluster success', () => {
+  const mutated = releaseSource.replace(
+    "needs.release-candidate.outputs.cluster-evidence-required != 'true' ||",
+    "needs.release-candidate.outputs.cluster-evidence-required == 'true' ||",
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /requiring private HA evidence only for a cluster family/,
+  );
+});
+
+test('rejects a publisher matrix detached from the source-derived contract', () => {
+  const mutated = releaseSource.replace(
+    'include: ${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}',
+    'include: ${{ fromJSON(inputs.publish_matrix) }}',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /matrix must come only from/,
   );
 });

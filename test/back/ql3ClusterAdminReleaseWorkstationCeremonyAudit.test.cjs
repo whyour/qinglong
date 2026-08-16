@@ -64,6 +64,7 @@ function validReport() {
     ['provenance_attestation', 'gh'],
     ['cyclonedx_sbom_attestation', 'gh'],
     ['os_vulnerability_attestation', 'gh'],
+    ['release_candidate_attestation', 'gh'],
     ['immutable_image_pull', 'docker'],
     ['local_digest_inspection', 'docker'],
     ['embedded_evidence_verifier', 'docker'],
@@ -89,6 +90,7 @@ function validReport() {
       provenance: true,
       cyclonedxSbom: true,
       osVulnerabilityEvidence: true,
+      releaseCandidateContract: true,
       imagePulled: true,
       localRepoDigestBound: true,
       embeddedEvidenceVerifier: true,
@@ -116,9 +118,9 @@ function validReport() {
       name,
       tool,
       executableSha256: toolDigest[tool],
-      argvSha256: `sha256:${'56789ab'[index].repeat(64)}`,
-      stdoutBytes: index === 6 ? 400 : 0,
-      stdoutSha256: index === 6 ? `sha256:${'d'.repeat(64)}` : emptyDigest,
+      argvSha256: `sha256:${'56789abc'[index].repeat(64)}`,
+      stdoutBytes: index === 7 ? 400 : 0,
+      stdoutSha256: index === 7 ? `sha256:${'d'.repeat(64)}` : emptyDigest,
       stderrBytes: 0,
       stderrSha256: emptyDigest,
       exitCode: 0,
@@ -166,7 +168,7 @@ test('accepts a canonical digest-bound ceremony report without replay claims', (
     compatible: true,
     reportContentDigest: report.contentDigest,
     releaseImage: image,
-    verificationSteps: 7,
+    verificationSteps: 8,
     externalResults: 'not_replayed',
     actionAuthority: 'none',
   });
@@ -187,7 +189,7 @@ test('accepts a canonical digest-bound ceremony report without replay claims', (
     compatible: true,
     reportContentDigest: report.contentDigest,
     releaseImage: image,
-    verificationSteps: 7,
+    verificationSteps: 8,
     externalResults: 'not_replayed',
     actionAuthority: 'none',
   });
@@ -205,7 +207,7 @@ test('rejects structural claim widening even after the report is re-digested', (
       report.isolation.network = 'default';
     },
     (report) => {
-      report.steps[6].stderrBytes = 1;
+      report.steps[7].stderrBytes = 1;
     },
     (report) => {
       report.secret = 'must-not-be-accepted';

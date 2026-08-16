@@ -37,7 +37,7 @@ deploy/console/ql3-cluster-copilot/verify-release.sh \
 For a release acceptance ceremony, prefer the source-tag workstation runner.
 Create a current-owner `0700` report directory and a canonical `0600` file
 containing only a short-lived GitHub token. Pass canonical absolute executable
-paths (resolve Homebrew symlinks first). The token is sent only to the three
+paths (resolve Homebrew symlinks first). The token is sent only to the four
 `gh attestation verify` children, never in argv, the report or the `cosign` and
 `docker` environments.
 
@@ -54,7 +54,8 @@ node scripts/ql3-cluster-admin-release-workstation-ceremony.cjs \
   --output=/absolute/private/release/admin-ceremony.json
 ```
 
-In addition to the signature, provenance, CycloneDX and OS-vulnerability
+In addition to the signature, provenance, CycloneDX, OS-vulnerability and
+source-derived release-candidate contract
 checks, the runner pulls the same immutable digest, confirms its local
 `RepoDigests` binding, and runs the image-carried `evidence-verify` command on
 a fixed non-sensitive vector with network disabled, a read-only root, no

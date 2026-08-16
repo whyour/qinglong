@@ -284,6 +284,7 @@ function auditReport(value, expected) {
       provenance: true,
       cyclonedxSbom: true,
       osVulnerabilityEvidence: true,
+      releaseCandidateContract: true,
       imagePulled: true,
       localRepoDigestBound: true,
       embeddedEvidenceVerifier: true,
@@ -333,6 +334,7 @@ function auditReport(value, expected) {
     ['provenance_attestation', 'gh'],
     ['cyclonedx_sbom_attestation', 'gh'],
     ['os_vulnerability_attestation', 'gh'],
+    ['release_candidate_attestation', 'gh'],
     ['immutable_image_pull', 'docker'],
     ['local_digest_inspection', 'docker'],
     ['embedded_evidence_verifier', 'docker'],
@@ -383,7 +385,7 @@ function auditReport(value, expected) {
       fail('step evidence is invalid');
     }
   });
-  const verifierStep = value.steps[6];
+  const verifierStep = value.steps[7];
   if (
     verifierStep.stdoutBytes < 2 ||
     verifierStep.stderrBytes !== 0 ||

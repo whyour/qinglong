@@ -124,6 +124,34 @@ test('generates the AI-excluded local application image closure', () => {
   );
 });
 
+test('generates the headless Worker image runtime closure', () => {
+  const document = createClusterImageSbom({ root, image: 'worker' });
+  const report = auditClusterImageSbom(document, {
+    root,
+    image: 'worker',
+  });
+
+  assert.deepEqual(report, {
+    image: 'worker',
+    root: 'pkg:npm/%40qinglong/worker-image-dependencies@3.0.0-alpha.0',
+    components: 27,
+    externalComponents: 24,
+    internalComponents: 3,
+    dependencyNodes: 28,
+    inventoryVerified: false,
+  });
+  assert.equal(
+    document.components.some(
+      (component) => component.name === '@qinglong/worker-runtime',
+    ),
+    true,
+  );
+  assert.equal(
+    document.components.some((component) => component.name === '@qinglong/ai'),
+    false,
+  );
+});
+
 test('rejects a control SBOM presented as cluster-admin evidence', () => {
   const document = createClusterImageSbom({ root });
   assert.throws(

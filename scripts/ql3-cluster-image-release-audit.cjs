@@ -57,6 +57,8 @@ function auditClusterImageCiWorkflow(
       node_arch: 'x64',
       image_arch: 'amd64',
       image: 'control',
+      repository: 'qinglong3-cluster-control',
+      runtime_user: '10001:10001',
       dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
       target: 'runtime',
     },
@@ -65,6 +67,8 @@ function auditClusterImageCiWorkflow(
       node_arch: 'arm64',
       image_arch: 'arm64',
       image: 'control',
+      repository: 'qinglong3-cluster-control',
+      runtime_user: '10001:10001',
       dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
       target: 'runtime',
     },
@@ -73,6 +77,8 @@ function auditClusterImageCiWorkflow(
       node_arch: 'x64',
       image_arch: 'amd64',
       image: 'control-ai',
+      repository: 'qinglong3-cluster-control-ai',
+      runtime_user: '10001:10001',
       dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
       target: 'runtime-ai',
     },
@@ -81,6 +87,8 @@ function auditClusterImageCiWorkflow(
       node_arch: 'arm64',
       image_arch: 'arm64',
       image: 'control-ai',
+      repository: 'qinglong3-cluster-control-ai',
+      runtime_user: '10001:10001',
       dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
       target: 'runtime-ai',
     },
@@ -89,6 +97,8 @@ function auditClusterImageCiWorkflow(
       node_arch: 'x64',
       image_arch: 'amd64',
       image: 'admin',
+      repository: 'qinglong3-cluster-admin',
+      runtime_user: '10001:10001',
       dockerfile: 'deploy/containers/ql3-cluster-admin/Dockerfile',
       target: 'runtime',
     },
@@ -97,7 +107,29 @@ function auditClusterImageCiWorkflow(
       node_arch: 'arm64',
       image_arch: 'arm64',
       image: 'admin',
+      repository: 'qinglong3-cluster-admin',
+      runtime_user: '10001:10001',
       dockerfile: 'deploy/containers/ql3-cluster-admin/Dockerfile',
+      target: 'runtime',
+    },
+    {
+      runner: 'ubuntu-24.04',
+      node_arch: 'x64',
+      image_arch: 'amd64',
+      image: 'worker',
+      repository: 'qinglong3-worker',
+      runtime_user: '65532:65532',
+      dockerfile: 'deploy/containers/ql3-worker/Dockerfile',
+      target: 'runtime',
+    },
+    {
+      runner: 'ubuntu-24.04-arm',
+      node_arch: 'arm64',
+      image_arch: 'arm64',
+      image: 'worker',
+      repository: 'qinglong3-worker',
+      runtime_user: '65532:65532',
+      dockerfile: 'deploy/containers/ql3-worker/Dockerfile',
       target: 'runtime',
     },
   ];
@@ -134,6 +166,11 @@ function auditClusterImageCiWorkflow(
       dockerfile: 'deploy/containers/ql3-local-application/Dockerfile',
       target: 'runtime',
     },
+    {
+      image: 'worker',
+      dockerfile: 'deploy/containers/ql3-worker/Dockerfile',
+      target: 'runtime',
+    },
   ];
   if (
     JSON.stringify(
@@ -146,7 +183,7 @@ function auditClusterImageCiWorkflow(
       JSON.stringify(expectedOciMatrix)
   ) {
     throw new Error(
-      'image CI matrices must contain only exact control/control-ai/admin/local amd64/arm64 evidence targets',
+      'image CI matrices must contain only exact control/control-ai/admin/local/worker amd64/arm64 evidence targets',
     );
   }
   const expectedTrivyInputs = {
@@ -170,7 +207,7 @@ function auditClusterImageCiWorkflow(
     ],
     [
       clusterImageJob,
-      'qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}',
+      '${{ matrix.repository }}:ci-${{ matrix.image_arch }}',
       '${{ runner.temp }}/ql3-${{ matrix.image }}-${{ matrix.image_arch }}.trivyignore.yaml',
       'cluster',
     ],
@@ -257,6 +294,8 @@ function auditClusterImageCiWorkflow(
     ['control-ai', 'ubuntu-24\\.04-arm', 'arm64', 'arm64'],
     ['admin', 'ubuntu-24\\.04', 'x64', 'amd64'],
     ['admin', 'ubuntu-24\\.04-arm', 'arm64', 'arm64'],
+    ['worker', 'ubuntu-24\\.04', 'x64', 'amd64'],
+    ['worker', 'ubuntu-24\\.04-arm', 'arm64', 'arm64'],
   ]) {
     requirePattern(
       source,
@@ -274,7 +313,7 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /--read-only[\s\S]*--user 10001:10001[\s\S]*--inventory-root=\/opt\/qinglong\/node_modules/,
+    /--read-only[\s\S]*--user \$\{\{ matrix\.runtime_user \}\}[\s\S]*--inventory-root=\/opt\/qinglong\/node_modules/,
     'cluster image CI must reconcile the SBOM with a read-only non-root image inventory',
   );
   requirePattern(
@@ -299,8 +338,8 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /- image: control\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime\s+- image: control-ai\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime-ai\s+- image: admin\s+dockerfile: deploy\/containers\/ql3-cluster-admin\/Dockerfile\s+target: runtime\s+- image: local\s+dockerfile: deploy\/containers\/ql3-local-application\/Dockerfile\s+target: runtime/,
-    'OCI evidence CI must build independent control, control-ai, admin and local images',
+    /- image: control\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime\s+- image: control-ai\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime-ai\s+- image: admin\s+dockerfile: deploy\/containers\/ql3-cluster-admin\/Dockerfile\s+target: runtime\s+- image: local\s+dockerfile: deploy\/containers\/ql3-local-application\/Dockerfile\s+target: runtime\s+- image: worker\s+dockerfile: deploy\/containers\/ql3-worker\/Dockerfile\s+target: runtime/,
+    'OCI evidence CI must build independent control, control-ai, admin, local and worker images',
   );
   requirePattern(
     source,
@@ -329,7 +368,7 @@ function auditClusterImageCiWorkflow(
     'local image CI must generate and inventory-check the exact local SBOM profile',
   );
   return {
-    images: ['control', 'control-ai', 'admin', 'local'],
+    images: ['control', 'control-ai', 'admin', 'local', 'worker'],
     nativeArchitectures: ['amd64', 'arm64'],
     runtimeInventory: true,
     clusterAdminProductFacade: true,
@@ -348,112 +387,23 @@ function auditClusterImageCiWorkflow(
 
 function auditReleaseWorkflow(source) {
   const workflow = yaml.load(source);
+  const candidateJob = workflow?.jobs?.['release-candidate'];
   const evidenceJob = workflow?.jobs?.['worker-management-release-evidence'];
   const drEvidenceJob = workflow?.jobs?.['cluster-dr-release-evidence'];
   const osVulnerabilityJob = workflow?.jobs?.['os-vulnerability'];
   const publishJob = workflow?.jobs?.publish;
-  const expectedReleaseMatrix = [
-    {
-      image: 'control',
-      repository: 'qinglong3-cluster-control',
-      runtime_root:
-        'deploy/containers/ql3-cluster-control/runtime-dependencies',
-    },
-    {
-      image: 'control-ai',
-      repository: 'qinglong3-cluster-control-ai',
-      runtime_root:
-        'deploy/containers/ql3-cluster-control/runtime-dependencies',
-    },
-    {
-      image: 'admin',
-      repository: 'qinglong3-cluster-admin',
-      runtime_root: 'deploy/containers/ql3-cluster-admin/runtime-dependencies',
-    },
-    {
-      image: 'local',
-      repository: 'qinglong3-local-application',
-      runtime_root:
-        'deploy/containers/ql3-local-application/runtime-dependencies',
-    },
-  ];
-  const expectedOsVulnerabilityMatrix = [
-    {
-      image: 'control',
-      runner: 'ubuntu-24.04',
-      node_arch: 'x64',
-      image_arch: 'amd64',
-      dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
-      target: 'runtime',
-    },
-    {
-      image: 'control',
-      runner: 'ubuntu-24.04-arm',
-      node_arch: 'arm64',
-      image_arch: 'arm64',
-      dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
-      target: 'runtime',
-    },
-    {
-      image: 'control-ai',
-      runner: 'ubuntu-24.04',
-      node_arch: 'x64',
-      image_arch: 'amd64',
-      dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
-      target: 'runtime-ai',
-    },
-    {
-      image: 'control-ai',
-      runner: 'ubuntu-24.04-arm',
-      node_arch: 'arm64',
-      image_arch: 'arm64',
-      dockerfile: 'deploy/containers/ql3-cluster-control/Dockerfile',
-      target: 'runtime-ai',
-    },
-    {
-      image: 'admin',
-      runner: 'ubuntu-24.04',
-      node_arch: 'x64',
-      image_arch: 'amd64',
-      dockerfile: 'deploy/containers/ql3-cluster-admin/Dockerfile',
-      target: 'runtime',
-    },
-    {
-      image: 'admin',
-      runner: 'ubuntu-24.04-arm',
-      node_arch: 'arm64',
-      image_arch: 'arm64',
-      dockerfile: 'deploy/containers/ql3-cluster-admin/Dockerfile',
-      target: 'runtime',
-    },
-    {
-      image: 'local',
-      runner: 'ubuntu-24.04',
-      node_arch: 'x64',
-      image_arch: 'amd64',
-      dockerfile: 'deploy/containers/ql3-local-application/Dockerfile',
-      target: 'runtime',
-    },
-    {
-      image: 'local',
-      runner: 'ubuntu-24.04-arm',
-      node_arch: 'arm64',
-      image_arch: 'arm64',
-      dockerfile: 'deploy/containers/ql3-local-application/Dockerfile',
-      target: 'runtime',
-    },
-  ];
   if (
-    JSON.stringify(publishJob?.strategy?.matrix?.include) !==
-    JSON.stringify(expectedReleaseMatrix)
+    publishJob?.strategy?.matrix?.include !==
+    '${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}'
   ) {
     throw new Error(
-      'release workflow matrix must contain only exact control, control-ai, admin and local image authorities',
+      'publisher matrix must come only from the source-derived release candidate contract',
     );
   }
   if (
-    JSON.stringify(osVulnerabilityJob?.strategy?.matrix?.include) !==
-      JSON.stringify(expectedOsVulnerabilityMatrix) ||
+    osVulnerabilityJob?.strategy?.matrix?.include !==
+      '${{ fromJSON(needs.release-candidate.outputs.os-matrix) }}' ||
+    osVulnerabilityJob?.needs !== 'release-candidate' ||
     osVulnerabilityJob?.strategy?.['fail-fast'] !== false ||
     osVulnerabilityJob?.['runs-on'] !== '${{ matrix.runner }}' ||
     osVulnerabilityJob?.['timeout-minutes'] !== 45 ||
@@ -461,13 +411,18 @@ function auditReleaseWorkflow(source) {
       JSON.stringify({ contents: 'read' })
   ) {
     throw new Error(
-      'release OS vulnerability matrix must scan exact control, control-ai, admin and local amd64/arm64 candidates with read-only authority',
+      'release OS vulnerability matrix must come from the source-derived deployment-family contract with read-only authority',
     );
   }
   requirePattern(
     source,
     /workflow_dispatch:\s*\n\s+inputs:\s*\n\s+version:/,
     'release workflow must support an explicit version input',
+  );
+  requirePattern(
+    source,
+    /release_scope:\s+description: Deployment family to publish\s+required: true\s+default: all\s+type: choice\s+options:\s+- local\s+- cluster\s+- all/,
+    'release workflow must select one closed local, cluster or all deployment family',
   );
   if (/^  (?:push|pull_request|schedule):/m.test(source)) {
     throw new Error(
@@ -476,6 +431,8 @@ function auditReleaseWorkflow(source) {
   }
   if (
     JSON.stringify(workflow?.permissions) !==
+      JSON.stringify({ contents: 'read' }) ||
+    JSON.stringify(candidateJob?.permissions) !==
       JSON.stringify({ contents: 'read' }) ||
     JSON.stringify(evidenceJob?.permissions) !==
       JSON.stringify({ contents: 'read' }) ||
@@ -495,6 +452,15 @@ function auditReleaseWorkflow(source) {
     );
   }
   if (
+    candidateJob?.['runs-on'] !== 'ubuntu-24.04' ||
+    candidateJob?.['timeout-minutes'] !== 5 ||
+    JSON.stringify(candidateJob?.outputs) !==
+      JSON.stringify({
+        'cluster-evidence-required':
+          '${{ steps.contract.outputs.cluster-evidence-required }}',
+        'os-matrix': '${{ steps.contract.outputs.os-matrix }}',
+        'publish-matrix': '${{ steps.contract.outputs.publish-matrix }}',
+      }) ||
     JSON.stringify(evidenceJob?.['runs-on']) !==
       JSON.stringify([
         'self-hosted',
@@ -511,16 +477,45 @@ function auditReleaseWorkflow(source) {
       ]) ||
     drEvidenceJob?.environment !== 'ql3-production-release-evidence' ||
     drEvidenceJob?.['timeout-minutes'] !== 10 ||
+    evidenceJob?.needs !== 'release-candidate' ||
+    drEvidenceJob?.needs !== 'release-candidate' ||
+    evidenceJob?.if !==
+      "needs.release-candidate.outputs.cluster-evidence-required == 'true'" ||
+    drEvidenceJob?.if !==
+      "needs.release-candidate.outputs.cluster-evidence-required == 'true'" ||
     JSON.stringify(publishJob?.needs) !==
       JSON.stringify([
+        'release-candidate',
         'worker-management-release-evidence',
         'cluster-dr-release-evidence',
         'os-vulnerability',
       ]) ||
-    publishJob?.if !== undefined
+    typeof publishJob?.if !== 'string' ||
+    !/always\(\)[\s\S]*release-candidate\.result == 'success'[\s\S]*os-vulnerability\.result == 'success'[\s\S]*cluster-evidence-required != 'true'[\s\S]*worker-management-release-evidence\.result == 'success'[\s\S]*cluster-dr-release-evidence\.result == 'success'/.test(
+      publishJob.if,
+    )
   ) {
     throw new Error(
-      'release publisher must depend on both protected ephemeral private evidence jobs',
+      'release publisher must always require candidate and OS gates while requiring private HA evidence only for a cluster family',
+    );
+  }
+  const candidateSteps = candidateJob?.steps;
+  if (
+    !Array.isArray(candidateSteps) ||
+    candidateSteps.length !== 3 ||
+    candidateSteps[0]?.uses !==
+      'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
+    candidateSteps[0]?.with?.['persist-credentials'] !== false ||
+    candidateSteps[1]?.uses !==
+      'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38' ||
+    candidateSteps[1]?.with?.['node-version'] !== '24.18.0' ||
+    candidateSteps[2]?.id !== 'contract' ||
+    !/ql3-release-candidate-contract\.cjs[\s\S]*--mode=create[\s\S]*--version="\$\{RELEASE_VERSION\}"[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--release-scope="\$\{RELEASE_SCOPE\}"[\s\S]*GITHUB_OUTPUT/.test(
+      candidateSteps[2]?.run ?? '',
+    )
+  ) {
+    throw new Error(
+      'release candidate job must derive bounded matrices from the exact tag, revision, version and deployment family',
     );
   }
   const osSteps = osVulnerabilityJob?.steps;
@@ -721,34 +716,19 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /uses: actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6/g,
-    4,
+    5,
     'all release jobs must pin the reviewed immutable checkout action',
   );
   requireOccurrences(
     source,
     /uses: actions\/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6/g,
-    4,
+    5,
     'all release jobs must pin the reviewed immutable Node setup action',
   );
   requirePattern(
     source,
-    /- image: control\s+repository: qinglong3-cluster-control\s+runtime_root: deploy\/containers\/ql3-cluster-control\/runtime-dependencies/,
-    'release workflow must publish the exact control image authority',
-  );
-  requirePattern(
-    source,
-    /- image: control-ai\s+repository: qinglong3-cluster-control-ai\s+runtime_root: deploy\/containers\/ql3-cluster-control\/runtime-dependencies/,
-    'release workflow must publish the exact optional control-ai image authority',
-  );
-  requirePattern(
-    source,
-    /- image: admin\s+repository: qinglong3-cluster-admin\s+runtime_root: deploy\/containers\/ql3-cluster-admin\/runtime-dependencies/,
-    'release workflow must publish the exact admin image authority',
-  );
-  requirePattern(
-    source,
-    /- image: local\s+repository: qinglong3-local-application\s+runtime_root: deploy\/containers\/ql3-local-application\/runtime-dependencies/,
-    'release workflow must publish the exact local image authority',
+    /name: Recreate and audit the source-derived release candidate contract[\s\S]*ql3-release-candidate-contract\.cjs[\s\S]*--mode=create[\s\S]*--version="\$\{RELEASE_VERSION\}"[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--release-scope="\$\{RELEASE_SCOPE\}"[\s\S]*ql3-release-candidate-contract\.cjs[\s\S]*--mode=audit[\s\S]*--report="\$\{contract\}"/,
+    'publisher must recreate and independently audit its exact source-derived candidate contract',
   );
   requirePattern(
     source,
@@ -798,13 +778,13 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /uses: actions\/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4/g,
-    3,
-    'release workflow must create provenance, SBOM and OS vulnerability attestations',
+    4,
+    'release workflow must create provenance, SBOM, OS vulnerability and release candidate attestations',
   );
   requireOccurrences(
     source,
     /push-to-registry: true/g,
-    3,
+    4,
     'all GitHub attestations must be pushed beside the OCI image',
   );
   requirePattern(
@@ -816,6 +796,11 @@ function auditReleaseWorkflow(source) {
     source,
     /predicate-type: https:\/\/qinglong\.dev\/attestations\/image-os-vulnerability\/v1\s+predicate-path: \$\{\{ runner\.temp \}\}\/\$\{\{ matrix\.repository \}\}-os-vulnerability\.json/,
     'release workflow must attest the digest-bound OS vulnerability evidence',
+  );
+  requirePattern(
+    source,
+    /predicate-type: https:\/\/qinglong\.dev\/attestations\/release-candidate-contract\/v1\s+predicate-path: \$\{\{ runner\.temp \}\}\/\$\{\{ matrix\.repository \}\}-release-candidate-contract\.json/,
+    'release workflow must attest the source-derived release candidate contract',
   );
   requirePattern(
     source,
@@ -840,8 +825,8 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /gh attestation verify "oci:\/\/\$\{IMAGE\}@\$\{DIGEST\}"/g,
-    3,
-    'release workflow must independently verify provenance, CycloneDX and OS vulnerability attestations',
+    4,
+    'release workflow must independently verify provenance, CycloneDX, OS vulnerability and candidate attestations',
   );
   for (const [pattern, finding] of [
     [
@@ -869,7 +854,7 @@ function auditReleaseWorkflow(source) {
       'GitHub attestation verification must read the published OCI bundle',
     ],
   ]) {
-    requireOccurrences(source, pattern, 3, finding);
+    requireOccurrences(source, pattern, 4, finding);
   }
   requirePattern(
     source,
@@ -883,11 +868,24 @@ function auditReleaseWorkflow(source) {
   );
   requirePattern(
     source,
+    /--predicate-type "https:\/\/qinglong\.dev\/attestations\/release-candidate-contract\/v1"/,
+    'release workflow must verify the release candidate predicate type explicitly',
+  );
+  requirePattern(
+    source,
     /name: Promote only the verified digest to immutable release tags[\s\S]*image copy "\$\{IMAGE\}@\$\{DIGEST\}" "\$\{IMAGE\}:\$\{VERSION\}"[\s\S]*image copy "\$\{IMAGE\}@\$\{DIGEST\}" "\$\{IMAGE\}:sha-\$\{GITHUB_SHA\}"[\s\S]*image digest "\$\{IMAGE\}:\$\{VERSION\}"[\s\S]*image digest "\$\{IMAGE\}:sha-\$\{GITHUB_SHA\}"/,
     'release tags must be promoted only after all digest verification succeeds',
   );
   return {
     trigger: 'explicit protected v3 tag dispatch',
+    releaseCandidateContract: {
+      scopes: ['local', 'cluster', 'all'],
+      workspacePackages: 18,
+      sourceDerived: true,
+      digestAttested: true,
+      localClusterEvidenceRequired: false,
+      clusterPrivateEvidenceRequired: true,
+    },
     workerManagementEvidence: {
       sourceAware: true,
       privateEphemeralRunner: true,
@@ -913,11 +911,16 @@ function auditReleaseWorkflow(source) {
       immutableArtifactRetentionDays: 1,
       attestedToPublishedDigest: true,
     },
-    images: ['control', 'control-ai', 'admin', 'local'],
+    images: ['control', 'control-ai', 'admin', 'worker', 'local'],
     platforms: ['linux/amd64', 'linux/arm64'],
     keylessSignature: true,
     buildkitAttestations: ['sbom', 'provenance'],
-    githubAttestations: ['provenance', 'sbom', 'os-vulnerability'],
+    githubAttestations: [
+      'provenance',
+      'sbom',
+      'os-vulnerability',
+      'release-candidate',
+    ],
     publication: {
       copier: 'regctl@0.11.5',
       copierSha256:
@@ -933,6 +936,7 @@ function auditReleaseWorkflow(source) {
       'provenance',
       'cyclonedx',
       'os-vulnerability',
+      'release-candidate',
       'release-tags',
     ],
   };

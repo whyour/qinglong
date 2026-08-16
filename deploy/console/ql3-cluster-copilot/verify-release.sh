@@ -54,5 +54,6 @@ verify_attestation() {
 verify_attestation ''
 verify_attestation https://cyclonedx.org/bom
 verify_attestation https://qinglong.dev/attestations/image-os-vulnerability/v1
+verify_attestation https://qinglong.dev/attestations/release-candidate-contract/v1
 
-printf '%s\n' '{"schemaVersion":1,"component":"qinglong3-cluster-admin-release-verifier","signature":true,"provenance":true,"sbom":true,"osVulnerabilityEvidence":true,"compatible":true}'
+printf '%s\n' '{"schemaVersion":1,"component":"qinglong3-cluster-admin-release-verifier","signature":true,"provenance":true,"sbom":true,"osVulnerabilityEvidence":true,"releaseCandidateContract":true,"compatible":true}'

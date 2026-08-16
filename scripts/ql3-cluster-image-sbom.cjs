@@ -9,10 +9,8 @@ const DEFAULT_ROOT = path.resolve(__dirname, '..');
 const IMAGE_PROFILES = Object.freeze({
   control: Object.freeze({
     id: 'control',
-    buildManifestPath:
-      'deploy/containers/ql3-cluster-control/package.json',
-    buildLockPath:
-      'deploy/containers/ql3-cluster-control/package-lock.json',
+    buildManifestPath: 'deploy/containers/ql3-cluster-control/package.json',
+    buildLockPath: 'deploy/containers/ql3-cluster-control/package-lock.json',
     imageManifestPath:
       'deploy/containers/ql3-cluster-control/runtime-dependencies/package.json',
     imageLockPath:
@@ -26,10 +24,8 @@ const IMAGE_PROFILES = Object.freeze({
   }),
   'control-ai': Object.freeze({
     id: 'control-ai',
-    buildManifestPath:
-      'deploy/containers/ql3-cluster-control/package.json',
-    buildLockPath:
-      'deploy/containers/ql3-cluster-control/package-lock.json',
+    buildManifestPath: 'deploy/containers/ql3-cluster-control/package.json',
+    buildLockPath: 'deploy/containers/ql3-cluster-control/package-lock.json',
     imageManifestPath:
       'deploy/containers/ql3-cluster-control/runtime-dependencies/package.json',
     imageLockPath:
@@ -44,10 +40,8 @@ const IMAGE_PROFILES = Object.freeze({
   }),
   admin: Object.freeze({
     id: 'admin',
-    buildManifestPath:
-      'deploy/containers/ql3-cluster-admin/package.json',
-    buildLockPath:
-      'deploy/containers/ql3-cluster-admin/package-lock.json',
+    buildManifestPath: 'deploy/containers/ql3-cluster-admin/package.json',
+    buildLockPath: 'deploy/containers/ql3-cluster-admin/package-lock.json',
     imageManifestPath:
       'deploy/containers/ql3-cluster-admin/runtime-dependencies/package.json',
     imageLockPath:
@@ -62,10 +56,8 @@ const IMAGE_PROFILES = Object.freeze({
   }),
   local: Object.freeze({
     id: 'local',
-    buildManifestPath:
-      'deploy/containers/ql3-local-application/package.json',
-    buildLockPath:
-      'deploy/containers/ql3-local-application/package-lock.json',
+    buildManifestPath: 'deploy/containers/ql3-local-application/package.json',
+    buildLockPath: 'deploy/containers/ql3-local-application/package-lock.json',
     imageManifestPath:
       'deploy/containers/ql3-local-application/runtime-dependencies/package.json',
     imageLockPath:
@@ -84,12 +76,28 @@ const IMAGE_PROFILES = Object.freeze({
       'drizzle-orm': '1.0.0-rc.4',
     }),
   }),
+  worker: Object.freeze({
+    id: 'worker',
+    buildManifestPath: 'deploy/containers/ql3-worker/package.json',
+    buildLockPath: 'deploy/containers/ql3-worker/package-lock.json',
+    imageManifestPath:
+      'deploy/containers/ql3-worker/runtime-dependencies/package.json',
+    imageLockPath:
+      'deploy/containers/ql3-worker/runtime-dependencies/package-lock.json',
+    internalManifestPaths: Object.freeze([
+      'packages/ql3-runtime-core/package.json',
+      'packages/ql3-local-process/package.json',
+      'packages/ql3-worker-runtime/package.json',
+    ]),
+    buildOnlyDependencies: Object.freeze({}),
+  }),
 });
 const INTERNAL_MANIFEST_PATHS = IMAGE_PROFILES.control.internalManifestPaths;
 const ALLOWED_LICENSE_IDS = Object.freeze([
   '0BSD',
   'Apache-2.0',
   'BSD-2-Clause',
+  'BSD-3-Clause',
   'ISC',
   'MIT',
   'Python-2.0',
@@ -102,7 +110,7 @@ function resolveImageProfile(value = 'control') {
   const profile = IMAGE_PROFILES[value];
   if (!profile) {
     throw new Error(
-      'image profile must be exactly control, control-ai, admin or local',
+      'image profile must be exactly control, control-ai, admin, local or worker',
     );
   }
   return profile;
@@ -167,7 +175,9 @@ function lockPackageName(location, lockPackage) {
   const marker = 'node_modules/';
   const index = location.lastIndexOf(marker);
   if (index === -1) {
-    throw new Error(`cannot derive package name from lock location: ${location}`);
+    throw new Error(
+      `cannot derive package name from lock location: ${location}`,
+    );
   }
   const tail = location.slice(index + marker.length);
   const parts = tail.split('/');
@@ -300,12 +310,8 @@ function exactDependencyRef(
 function createClusterImageSbom(options = {}) {
   const root = path.resolve(options.root || DEFAULT_ROOT);
   const profile = resolveImageProfile(options.image);
-  const imageManifest = readJson(
-    path.join(root, profile.imageManifestPath),
-  );
-  const buildManifest = readJson(
-    path.join(root, profile.buildManifestPath),
-  );
+  const imageManifest = readJson(path.join(root, profile.imageManifestPath));
+  const buildManifest = readJson(path.join(root, profile.buildManifestPath));
   const buildLock = readJson(path.join(root, profile.buildLockPath));
   const lock = readJson(path.join(root, profile.imageLockPath));
   for (const field of ['name', 'version']) {
@@ -319,9 +325,7 @@ function createClusterImageSbom(options = {}) {
     }
   }
   if (
-    JSON.stringify(
-      Object.entries(buildManifest.dependencies || {}).sort(),
-    ) !==
+    JSON.stringify(Object.entries(buildManifest.dependencies || {}).sort()) !==
     JSON.stringify(
       Object.entries({
         ...(imageManifest.dependencies || {}),
@@ -334,7 +338,9 @@ function createClusterImageSbom(options = {}) {
     );
   }
   if (imageManifest.devDependencies !== undefined) {
-    throw new Error('production image manifest must not declare devDependencies');
+    throw new Error(
+      'production image manifest must not declare devDependencies',
+    );
   }
   const lockRoot = lock.packages?.[''];
   if (
@@ -458,14 +464,14 @@ function createClusterImageSbom(options = {}) {
 
   const components = [
     ...externalComponents,
-    ...internalManifests.map((manifest) =>
-      componentFromManifest(manifest),
-    ),
+    ...internalManifests.map((manifest) => componentFromManifest(manifest)),
   ].sort((left, right) =>
     left['bom-ref'].localeCompare(right['bom-ref'], 'en'),
   );
 
-  const componentRefs = new Set(components.map((component) => component['bom-ref']));
+  const componentRefs = new Set(
+    components.map((component) => component['bom-ref']),
+  );
   if (componentRefs.size !== components.length) {
     throw new Error('runtime component name and version pairs must be unique');
   }
@@ -524,7 +530,9 @@ function componentMap(document) {
       throw new Error('SBOM component references must be unique strings');
     }
     if (component.name === 'typescript') {
-      throw new Error(`development component leaked into SBOM: ${component.name}`);
+      throw new Error(
+        `development component leaked into SBOM: ${component.name}`,
+      );
     }
     const licenseIds = (component.licenses || []).map(
       (entry) => entry?.license?.id,
@@ -599,9 +607,13 @@ function collectRuntimeInventory(nodeModulesRoot) {
   visitNodeModules(root);
   const refs = inventory.map((entry) => entry.ref).sort();
   if (new Set(refs).size !== refs.length) {
-    throw new Error('runtime inventory contains duplicate name/version packages');
+    throw new Error(
+      'runtime inventory contains duplicate name/version packages',
+    );
   }
-  return inventory.sort((left, right) => left.ref.localeCompare(right.ref, 'en'));
+  return inventory.sort((left, right) =>
+    left.ref.localeCompare(right.ref, 'en'),
+  );
 }
 
 function auditClusterImageSbom(document, options = {}) {
@@ -652,7 +664,10 @@ function auditClusterImageSbom(document, options = {}) {
     'SBOM component set',
   );
   for (const [ref, expectedComponent] of expectedComponents) {
-    if (JSON.stringify(actualComponents.get(ref)) !== JSON.stringify(expectedComponent)) {
+    if (
+      JSON.stringify(actualComponents.get(ref)) !==
+      JSON.stringify(expectedComponent)
+    ) {
       throw new Error(`SBOM component metadata differs for ${ref}`);
     }
   }

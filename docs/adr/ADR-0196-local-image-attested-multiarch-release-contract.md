@@ -7,6 +7,7 @@
   D-184、D-185、D-186
 - 关联 ADR：ADR-0042、ADR-0090、ADR-0128、ADR-0185、ADR-0194、
   ADR-0195
+- 后续修订：ADR-0425 已取代本 ADR 的固定三镜像矩阵；本 ADR 的 Local image identity、双架构、SBOM、签名与 digest rollout 约束继续有效。
 
 ## 背景
 

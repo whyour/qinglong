@@ -462,37 +462,65 @@ jobs:
             node_arch: x64
             image_arch: amd64
             image: control
+            repository: qinglong3-cluster-control
+            runtime_user: 10001:10001
             dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
             target: runtime
           - runner: ubuntu-24.04-arm
             node_arch: arm64
             image_arch: arm64
             image: control
+            repository: qinglong3-cluster-control
+            runtime_user: 10001:10001
             dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
             target: runtime
           - runner: ubuntu-24.04
             node_arch: x64
             image_arch: amd64
             image: control-ai
+            repository: qinglong3-cluster-control-ai
+            runtime_user: 10001:10001
             dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
             target: runtime-ai
           - runner: ubuntu-24.04-arm
             node_arch: arm64
             image_arch: arm64
             image: control-ai
+            repository: qinglong3-cluster-control-ai
+            runtime_user: 10001:10001
             dockerfile: deploy/containers/ql3-cluster-control/Dockerfile
             target: runtime-ai
           - runner: ubuntu-24.04
             node_arch: x64
             image_arch: amd64
             image: admin
+            repository: qinglong3-cluster-admin
+            runtime_user: 10001:10001
             dockerfile: deploy/containers/ql3-cluster-admin/Dockerfile
             target: runtime
           - runner: ubuntu-24.04-arm
             node_arch: arm64
             image_arch: arm64
             image: admin
+            repository: qinglong3-cluster-admin
+            runtime_user: 10001:10001
             dockerfile: deploy/containers/ql3-cluster-admin/Dockerfile
+            target: runtime
+          - runner: ubuntu-24.04
+            node_arch: x64
+            image_arch: amd64
+            image: worker
+            repository: qinglong3-worker
+            runtime_user: 65532:65532
+            dockerfile: deploy/containers/ql3-worker/Dockerfile
+            target: runtime
+          - runner: ubuntu-24.04-arm
+            node_arch: arm64
+            image_arch: arm64
+            image: worker
+            repository: qinglong3-worker
+            runtime_user: 65532:65532
+            dockerfile: deploy/containers/ql3-worker/Dockerfile
             target: runtime
     steps:
       - uses: actions/checkout@v6
@@ -509,7 +537,7 @@ jobs:
           pnpm audit:image-release:ql3
       - name: Build the native production image
         env:
-          IMAGE: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
+          IMAGE: ${{ matrix.repository }}:ci-${{ matrix.image_arch }}
         run: >-
           docker build
           --file ${{ matrix.dockerfile }}
@@ -526,7 +554,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: 'v0.70.0'
-          image-ref: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
+          image-ref: ${{ matrix.repository }}:ci-${{ matrix.image_arch }}
           scanners: 'vuln'
           vuln-type: 'os'
           severity: 'HIGH,CRITICAL'
@@ -539,8 +567,8 @@ jobs:
           trivyignores: ${{ runner.temp }}/ql3-${{ matrix.image }}-${{ matrix.image_arch }}.trivyignore.yaml
       - name: Verify architecture and non-root runtime identity
         env:
-          IMAGE: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
-          EXPECTED: ${{ matrix.image_arch }} 10001:10001
+          IMAGE: ${{ matrix.repository }}:ci-${{ matrix.image_arch }}
+          EXPECTED: ${{ matrix.image_arch }} ${{ matrix.runtime_user }}
         run: |
           set -euo pipefail
           actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}}' "${IMAGE}")"
@@ -561,11 +589,11 @@ jobs:
           --output=${{ runner.temp }}/ql3-cluster-${{ matrix.image }}.cdx.json
       - name: Reconcile SBOM with the actual read-only image inventory
         env:
-          IMAGE: qinglong3-cluster-${{ matrix.image }}:ci-${{ matrix.image_arch }}
+          IMAGE: ${{ matrix.repository }}:ci-${{ matrix.image_arch }}
         run: >-
           docker run --rm --read-only
           --security-opt no-new-privileges
-          --user 10001:10001
+          --user ${{ matrix.runtime_user }}
           --volume "${{ github.workspace }}:/audit:ro"
           --workdir /audit
           --entrypoint node
@@ -592,6 +620,9 @@ jobs:
             target: runtime
           - image: local
             dockerfile: deploy/containers/ql3-local-application/Dockerfile
+            target: runtime
+          - image: worker
+            dockerfile: deploy/containers/ql3-worker/Dockerfile
             target: runtime
     steps:
       - uses: actions/checkout@v6
