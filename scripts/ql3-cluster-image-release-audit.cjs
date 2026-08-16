@@ -274,8 +274,8 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
-    'cluster image CI must run SBOM, candidate, release-set, durable catalog, deployment-lock and workflow negative tests',
+    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
+    'cluster image CI must run SBOM, candidate, release-set, durable catalog, deployment-lock and workflow negative tests; catalog consumption ceremony is mandatory',
   );
   requirePattern(
     source,

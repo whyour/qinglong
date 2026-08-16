@@ -26,7 +26,9 @@ image 的证明替代任一角色镜像；尤其 Worker 与短生命周期 Admin
 
 ## 工作站验真
 
-以下命令应在可信维护工作站运行；先设置目标发布的显式值：
+以下命令应在可信维护工作站运行；先设置目标发布的显式值、三个经过 `realpath` 解析的工具路径，以及一个
+current-owner、无 group/other 权限、无换行的短期 GitHub token file。`output_parent` 必须是已有的 owner-private
+目录，`bundle` 必须尚不存在：
 
 ```sh
 owner='<lowercase-owner>'
@@ -35,58 +37,53 @@ version='<source-derived-version>'
 scope='local' # 或 cluster/all
 source_ref='refs/tags/v<version>'
 source_revision='<40-hex-git-revision>'
-catalog="ghcr.io/${owner}/qinglong3-release-catalog"
-discovery="${catalog}:v${version}-${scope}"
-digest="$(regctl image digest "${discovery}")"
-immutable="${catalog}@${digest}"
-release_set="$(pwd)/qinglong3-release-set-${version}-${scope}.json"
+regctl_path='<canonical-absolute-path>/regctl'
+cosign_path='<canonical-absolute-path>/cosign'
+gh_path='<canonical-absolute-path>/gh'
+token_file='<canonical-absolute-owner-private-token-file>'
+output_parent='<canonical-absolute-owner-private-directory>'
+bundle="${output_parent}/qinglong3-release-catalog-consumption-${version}-${scope}"
 ```
 
-要求 `digest` 精确匹配 `sha256:<64 lowercase hex>`，然后按 immutable reference 下载并验证：
+使用机器化 ceremony 完成 discovery 双次解析、immutable Cosign/GitHub provenance 验证、release-set 下载/inspection、raw
+manifest/plan/receipt reconstruction 和 no-replace bundle 发布：
 
 ```sh
-regctl artifact get \
-  --file "qinglong3-release-set-${version}-${scope}.json" \
-  "${immutable}" > "${release_set}"
-
-cosign verify \
-  --certificate-identity \
-  "https://github.com/${repository}/.github/workflows/ql3-image-release.yml@${source_ref}" \
-  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  "${immutable}"
-
-gh attestation verify "oci://${immutable}" \
-  --repo "${repository}" \
-  --signer-workflow "${repository}/.github/workflows/ql3-image-release.yml" \
-  --source-digest "${source_revision}" \
-  --source-ref "${source_ref}" \
-  --deny-self-hosted-runners \
-  --bundle-from-oci
-
-node scripts/ql3-release-set-contract.cjs \
-  --mode=inspect \
+node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+  --mode=create \
   --version="${version}" \
   --source-revision="${source_revision}" \
   --source-ref="${source_ref}" \
   --release-scope="${scope}" \
   --repository-owner="${owner}" \
-  --report="${release_set}"
+  --source-repository="${repository}" \
+  --regctl="${regctl_path}" \
+  --cosign="${cosign_path}" \
+  --gh="${gh_path}" \
+  --github-token-file="${token_file}" \
+  --output-directory="${bundle}"
+
+node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+  --mode=audit \
+  --version="${version}" \
+  --source-revision="${source_revision}" \
+  --source-ref="${source_ref}" \
+  --release-scope="${scope}" \
+  --repository-owner="${owner}" \
+  --source-repository="${repository}" \
+  --output-directory="${bundle}"
+
+release_set="${bundle}/qinglong3-release-set-${version}-${scope}.json"
+catalog_manifest="${bundle}/qinglong3-release-catalog-manifest-${version}-${scope}.json"
+consumption_report="${bundle}/qinglong3-release-catalog-consumption-${version}-${scope}.json"
 ```
 
-若使用 90 天 bundle 中的文件，还应验证文件 provenance；它是 OCI catalog 的补充证据，不替代上述 immutable
-catalog 验证：
+bundle 只能包含上面三项 `0600` 文件，目录自身为 `0700`。ceremony 不使用 shell 重定向、不覆盖文件，并在每一步前与
+结束前复验三个 executable；GitHub token 只进入一个 `gh attestation verify` 子进程。raw manifest 让离线 audit 能重建
+catalog plan/receipt，但它不会离线重放网络签名，因此 audit 输出必须保持 `externalToolResultsReplayed:false`。
 
-```sh
-gh attestation verify "${release_set}" \
-  --repo "${repository}" \
-  --signer-workflow "${repository}/.github/workflows/ql3-image-release.yml" \
-  --source-digest "${source_revision}" \
-  --source-ref "${source_ref}" \
-  --deny-self-hosted-runners
-```
-
-`inspect` 会重算 release-set self digest 并验证结构、身份、镜像闭包和 family，但不会重放发布时已经过期的 image
-records；其输出必须保持 `sourceRecordsReplayed:false`。
+若改用 90 天 Actions bundle 的 release-set 文件，仍需另行验证该文件的 provenance；它不能替代上述 immutable catalog
+ceremony，也不能与在线 ceremony 下载的文件混合后伪造成同一 three-file bundle。
 
 ## 生成离线 deployment lock
 
