@@ -90,6 +90,16 @@ test('accepts the reviewed native CI and digest release contracts', () => {
           'c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467',
         rebuildAfterScan: false,
         tagAfterVerification: true,
+        tagAfterCompleteReleaseSet: true,
+      },
+      releaseSet: {
+        sourceDerived: true,
+        sameRunRecords: true,
+        exactScopeClosure: true,
+        tagPromotionAuthority: 'complete_verified_release_set',
+        fileProvenanceAttested: true,
+        artifactRetentionDays: 90,
+        crossRepositoryAtomicity: false,
       },
       localRolloutPreflight: true,
       localRolloutApply: true,
@@ -100,6 +110,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         'cyclonedx',
         'os-vulnerability',
         'release-candidate',
+        'release-set',
         'release-tags',
       ],
     },
@@ -506,7 +517,7 @@ test('rejects a movable action tag in the privileged release job', () => {
   )}actions/checkout@v6${releaseSource.slice(offset + pinned.length)}`;
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /privileged publisher|immutable checkout action/,
+    /privileged publisher|immutable checkout action|release-set job/,
   );
 });
 
@@ -654,16 +665,60 @@ test('rejects an image tag created before digest verification completes', () => 
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /before final tag promotion/,
+    /without any rebuild or tag promotion before release-set closure/,
   );
 });
 
-test('rejects any publisher step after immutable tag promotion', () => {
+test('rejects any publisher step after the deployment lock is published', () => {
   const mutated = `${releaseSource}\n      - name: Post-promotion mutation\n        run: echo unsafe\n`;
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /before final tag promotion/,
+    /release-set job must download only same-run records/,
   );
+});
+
+test('rejects release-set closure before every image publisher succeeds', () => {
+  const mutated = releaseSource.replace(
+    "      needs.publish.result == 'success'",
+    "      needs.publish.result != 'success'",
+  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /complete publish matrix/);
+});
+
+test('rejects image records detached from the same workflow attempt', () => {
+  const mutated = releaseSource.replace(
+    'ql3-release-record-${{ github.run_id }}-${{ github.run_attempt }}-*',
+    'ql3-release-record-${{ github.run_id }}-*',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /download only same-run records/,
+  );
+});
+
+test('rejects release-set aggregation without independent audit', () => {
+  const releaseSetOffset = releaseSource.indexOf('\n  release-set:');
+  assert.notEqual(releaseSetOffset, -1);
+  const releaseSetSource = releaseSource.slice(releaseSetOffset);
+  const mutatedReleaseSet = releaseSetSource.replace(
+    '            --mode=audit \\',
+    '            --mode=aggregate \\',
+  );
+  const mutated = `${releaseSource.slice(
+    0,
+    releaseSetOffset,
+  )}${mutatedReleaseSet}`;
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /download only same-run records/,
+  );
+});
+
+test('rejects a short-lived deployment digest lock', () => {
+  const marker = '          retention-days: 90';
+  assert.equal(releaseSource.includes(marker), true);
+  const mutated = releaseSource.replace(marker, '          retention-days: 1');
+  assert.throws(() => auditReleaseWorkflow(mutated), /deployment lock/);
 });
 
 test('rejects removal of the digest-bound OS vulnerability attestation', () => {

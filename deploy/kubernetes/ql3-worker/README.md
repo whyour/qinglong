@@ -31,6 +31,12 @@ docker build \
   .
 ```
 
+Production rollout must take the Worker `@sha256:` reference from the same
+verified `cluster` or `all` release set as control, control-ai and admin. A
+version/source tag or a successful control image alone is not Worker release
+authority. See
+[`docs/operations/ql3-release-set-deployment.md`](../../../docs/operations/ql3-release-set-deployment.md).
+
 The builder and runtime dependency roots have separate npm v3 locks generated
 from the reviewed workspace `pnpm-lock.yaml`. The runtime image contains only
 `runtime-core`, `local-process`, `worker-runtime` and their 24 external runtime

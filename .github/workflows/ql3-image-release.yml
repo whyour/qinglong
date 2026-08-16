@@ -573,21 +573,187 @@ jobs:
             --deny-self-hosted-runners \
             --bundle-from-oci
 
-      - name: Promote only the verified digest to immutable release tags
+      - name: Record the fully verified image for release-set aggregation
         env:
-          IMAGE: ${{ steps.identity.outputs.image }}
-          VERSION: ${{ steps.identity.outputs.version }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
           DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          umask 077
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          mkdir "${RUNNER_TEMP}/release-record"
+          node scripts/ql3-release-set-contract.cjs \
+            --mode=record-image \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --candidate="${RUNNER_TEMP}/${{ matrix.repository }}-release-candidate-contract.json" \
+            --image="${{ matrix.image }}" \
+            --digest="${DIGEST}" \
+            --output="${RUNNER_TEMP}/release-record/${{ matrix.image }}.json"
+
+      - name: Upload the same-run verified image record
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-release-record-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.image }}
+          path: ${{ runner.temp }}/release-record/${{ matrix.image }}.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+
+  release-set:
+    name: Close and publish the complete deployment release set
+    needs:
+      - release-candidate
+      - publish
+    if: >-
+      always() &&
+      needs.release-candidate.result == 'success' &&
+      needs.publish.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.18.0'
+
+      - name: Download every same-run verified image record
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ql3-release-record-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/release-records
+          merge-multiple: true
+
+      - name: Aggregate and independently audit the complete release set
+        id: release-set
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+        run: |
+          set -euo pipefail
+          umask 077
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          candidate="${RUNNER_TEMP}/release-set-candidate.json"
+          report="${RUNNER_TEMP}/qinglong3-release-set-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          node scripts/ql3-release-candidate-contract.cjs \
+            --mode=create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --output="${candidate}"
+          node scripts/ql3-release-set-contract.cjs \
+            --mode=aggregate \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --candidate="${candidate}" \
+            --records="${RUNNER_TEMP}/release-records" \
+            --output="${report}"
+          node scripts/ql3-release-set-contract.cjs \
+            --mode=audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --candidate="${candidate}" \
+            --records="${RUNNER_TEMP}/release-records" \
+            --report="${report}" > "${RUNNER_TEMP}/release-set-audit.json"
+          echo "report=${report}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install the exact checksum-pinned OCI copier
+        env:
           REGCTL: ${{ runner.temp }}/regctl
         run: |
           set -euo pipefail
-          "${REGCTL}" image copy "${IMAGE}@${DIGEST}" "${IMAGE}:${VERSION}"
-          "${REGCTL}" image copy "${IMAGE}@${DIGEST}" "${IMAGE}:sha-${GITHUB_SHA}"
-          if [[ "$("${REGCTL}" image digest "${IMAGE}:${VERSION}")" != "${DIGEST}" ]]; then
-            echo "release version tag does not resolve to the verified digest" >&2
-            exit 1
-          fi
-          if [[ "$("${REGCTL}" image digest "${IMAGE}:sha-${GITHUB_SHA}")" != "${DIGEST}" ]]; then
-            echo "release source tag does not resolve to the verified digest" >&2
-            exit 1
-          fi
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "${REGCTL}" \
+            https://github.com/regclient/regclient/releases/download/v0.11.5/regctl-linux-amd64
+          echo "c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467  ${REGCTL}" | sha256sum --check --strict
+          chmod 0755 "${REGCTL}"
+          "${REGCTL}" version
+
+      - uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote tags only after the complete set is verified
+        env:
+          REGCTL: ${{ runner.temp }}/regctl
+          RELEASE_SET: ${{ steps.release-set.outputs.report }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { spawnSync } = require('node:child_process');
+          const report = JSON.parse(fs.readFileSync(process.env.RELEASE_SET, 'utf8'));
+          const regctl = process.env.REGCTL;
+          const run = (args, allowFailure = false) => {
+            const result = spawnSync(regctl, args, {
+              encoding: 'utf8',
+              maxBuffer: 1024 * 1024,
+            });
+            if (result.error) throw result.error;
+            if (!allowFailure && result.status !== 0) {
+              throw new Error(`regctl ${args.join(' ')} failed`);
+            }
+            return result;
+          };
+          const states = [];
+          for (const image of report.images) {
+            const source = run(['image', 'digest', image.reference]).stdout.trim();
+            if (source !== image.digest) throw new Error('source digest drifted before promotion');
+            for (const tag of [image.versionTag, image.sourceTag]) {
+              const current = run(['image', 'digest', tag], true);
+              if (current.status === 0 && current.stdout.trim() !== image.digest) {
+                throw new Error('release tag already points at another digest');
+              }
+              states.push({ image, tag, current: current.status === 0 });
+            }
+          }
+          for (const state of states) {
+            if (!state.current) {
+              run(['image', 'copy', state.image.reference, state.tag]);
+            }
+            const promoted = run(['image', 'digest', state.tag]).stdout.trim();
+            if (promoted !== state.image.digest) {
+              throw new Error('promoted tag does not resolve to the release-set digest');
+            }
+          }
+          NODE
+
+      - name: Attest the complete release-set file provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: ${{ steps.release-set.outputs.report }}
+
+      - name: Publish the deployment digest lock
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}
+          path: ${{ steps.release-set.outputs.report }}
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false

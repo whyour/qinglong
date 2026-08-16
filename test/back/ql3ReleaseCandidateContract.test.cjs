@@ -102,6 +102,10 @@ test('combines local and cluster families without weakening either gate', () => 
     true,
   );
   assert.equal(
+    contract.requiredGates.includes('cross-image-release-set'),
+    true,
+  );
+  assert.equal(
     contract.requiredGates.includes('worker-management-production-evidence'),
     true,
   );

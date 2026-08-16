@@ -427,6 +427,10 @@
 | [ADR-0421](./ADR-0421-explicit-cluster-run-task-workflow-observation-console.md)              | 显式 Cluster Run、Task 与 Workflow 观察台                                                                                                                       | Accepted |
 | [ADR-0422](./ADR-0422-browser-local-redacted-cluster-evidence-bundle.md)                      | 浏览器本地生成的脱敏 Cluster Evidence Bundle                                                                                                                    | Accepted |
 | [ADR-0423](./ADR-0423-independent-offline-cluster-evidence-verifier.md)                       | 独立、离线且无 Authority 的 Cluster Evidence Verifier                                                                                                            | Accepted |
+| [ADR-0424](./ADR-0424-external-cluster-admin-release-workstation-ceremony.md)                 | Cluster Admin 外部发布工作站 Ceremony                                                                                                                             | Proposed |
+| [ADR-0425](./ADR-0425-deployment-family-release-candidate-contract.md)                        | Deployment-family Release Candidate Contract                                                                                                                      | Accepted |
+| [ADR-0426](./ADR-0426-source-derived-release-version-transition.md)                           | Source-derived QingLong 3.0 Release Version Transition                                                                                                             | Accepted |
+| [ADR-0427](./ADR-0427-complete-cross-image-release-set.md)                                   | 完整跨镜像发布集与部署 Digest Lock                                                                                                                                 | Accepted |
 
 ## 规则
 

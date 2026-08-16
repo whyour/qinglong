@@ -252,6 +252,7 @@ function createReleaseCandidateContract(options) {
       'multiarch-oci-layout',
       'production-dependency-audit',
       'digest-signature-and-attestations',
+      'cross-image-release-set',
       ...(options.releaseScope !== 'cluster'
         ? ['edge-and-standalone-rollout']
         : []),

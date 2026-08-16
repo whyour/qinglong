@@ -252,7 +252,8 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       '--predicate-type "https://qinglong.dev/attestations/release-candidate-contract/v1"',
       '--deny-self-hosted-runners',
       '--bundle-from-oci',
-      'Promote only the verified digest to immutable release tags',
+      'Promote tags only after the complete set is verified',
+      'Attest the complete release-set file provenance',
     ],
     'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',
   );

@@ -274,8 +274,8 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /node --test test\/back\/ql3ClusterImageSbom\.test\.cjs test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs/,
-    'cluster image CI must run SBOM and release-contract negative tests',
+    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs/,
+    'cluster image CI must run SBOM, candidate, release-set and workflow negative tests',
   );
   requirePattern(
     source,
@@ -403,6 +403,7 @@ function auditReleaseWorkflow(source) {
   const drEvidenceJob = workflow?.jobs?.['cluster-dr-release-evidence'];
   const osVulnerabilityJob = workflow?.jobs?.['os-vulnerability'];
   const publishJob = workflow?.jobs?.publish;
+  const releaseSetJob = workflow?.jobs?.['release-set'];
   if (
     publishJob?.strategy?.matrix?.include !==
     '${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}'
@@ -456,10 +457,18 @@ function auditReleaseWorkflow(source) {
         'id-token': 'write',
         attestations: 'write',
         'artifact-metadata': 'write',
+      }) ||
+    JSON.stringify(releaseSetJob?.permissions) !==
+      JSON.stringify({
+        contents: 'read',
+        packages: 'write',
+        'id-token': 'write',
+        attestations: 'write',
+        'artifact-metadata': 'write',
       })
   ) {
     throw new Error(
-      'release permissions must keep evidence read-only and grant writes only to the gated publisher',
+      'release permissions must keep evidence read-only and grant writes only to gated image and release-set publishers',
     );
   }
   if (
@@ -504,10 +513,18 @@ function auditReleaseWorkflow(source) {
     typeof publishJob?.if !== 'string' ||
     !/always\(\)[\s\S]*release-candidate\.result == 'success'[\s\S]*os-vulnerability\.result == 'success'[\s\S]*cluster-evidence-required != 'true'[\s\S]*worker-management-release-evidence\.result == 'success'[\s\S]*cluster-dr-release-evidence\.result == 'success'/.test(
       publishJob.if,
+    ) ||
+    JSON.stringify(releaseSetJob?.needs) !==
+      JSON.stringify(['release-candidate', 'publish']) ||
+    releaseSetJob?.['runs-on'] !== 'ubuntu-24.04' ||
+    releaseSetJob?.['timeout-minutes'] !== 15 ||
+    typeof releaseSetJob?.if !== 'string' ||
+    !/always\(\)[\s\S]*release-candidate\.result == 'success'[\s\S]*publish\.result == 'success'/.test(
+      releaseSetJob.if,
     )
   ) {
     throw new Error(
-      'release publisher must always require candidate and OS gates while requiring private HA evidence only for a cluster family',
+      'release publisher must always require candidate and OS gates while requiring private HA evidence only for a cluster family; release-set closure must additionally require the complete publish matrix',
     );
   }
   const candidateSteps = candidateJob?.steps;
@@ -616,8 +633,14 @@ function auditReleaseWorkflow(source) {
   const importIndex = publishSteps?.findIndex(
     (step) => step.id === 'push' && /image import/.test(step.run || ''),
   );
-  const promotionIndex = publishSteps?.findIndex((step) =>
-    /Promote only the verified digest/.test(step.name || ''),
+  const recordIndex = publishSteps?.findIndex((step) =>
+    /Record the fully verified image/.test(step.name || ''),
+  );
+  const recordUploadIndex = publishSteps?.findIndex(
+    (step) =>
+      step.uses ===
+        'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' &&
+      /same-run verified image record/.test(step.name || ''),
   );
   if (
     !Array.isArray(publishSteps) ||
@@ -627,9 +650,9 @@ function auditReleaseWorkflow(source) {
     mergeIndex < 0 ||
     loginIndex <= mergeIndex ||
     importIndex <= loginIndex ||
-    promotionIndex !== publishSteps.length - 1 ||
-    publishSteps.filter((step) => /\bimage copy\b/.test(step.run || ''))
-      .length !== 1 ||
+    recordIndex !== publishSteps.length - 2 ||
+    recordUploadIndex !== publishSteps.length - 1 ||
+    publishSteps.some((step) => /\bimage copy\b/.test(step.run || '')) ||
     publishSteps.some(
       (step) =>
         step.uses?.startsWith('docker/build-push-action@') ||
@@ -637,7 +660,80 @@ function auditReleaseWorkflow(source) {
     )
   ) {
     throw new Error(
-      'privileged publisher must re-audit, import and verify the scanned bundle without any rebuild before final tag promotion',
+      'privileged image publisher must re-audit, import and verify the scanned bundle without any rebuild or tag promotion before release-set closure',
+    );
+  }
+  if (
+    !/ql3-release-set-contract\.cjs[\s\S]*--mode=record-image[\s\S]*--version="\$\{RELEASE_VERSION\}"[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--release-scope="\$\{RELEASE_SCOPE\}"[\s\S]*--repository-owner="\$\{owner\}"[\s\S]*--candidate="\$\{RUNNER_TEMP\}\/\$\{\{ matrix\.repository \}\}-release-candidate-contract\.json"[\s\S]*--image="\$\{\{ matrix\.image \}\}"[\s\S]*--digest="\$\{DIGEST\}"/.test(
+      publishSteps[recordIndex]?.run ?? '',
+    ) ||
+    JSON.stringify(publishSteps[recordUploadIndex]?.with) !==
+      JSON.stringify({
+        name: 'ql3-release-record-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.image }}',
+        path: '${{ runner.temp }}/release-record/${{ matrix.image }}.json',
+        'if-no-files-found': 'error',
+        'retention-days': 1,
+        'compression-level': 0,
+        overwrite: false,
+        'include-hidden-files': false,
+      })
+  ) {
+    throw new Error(
+      'each image publisher must upload one exact same-run digest record only after all image verification',
+    );
+  }
+  const releaseSetSteps = releaseSetJob?.steps;
+  if (
+    !Array.isArray(releaseSetSteps) ||
+    releaseSetSteps.length !== 9 ||
+    releaseSetSteps[0]?.uses !==
+      'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
+    releaseSetSteps[0]?.with?.['persist-credentials'] !== false ||
+    releaseSetSteps[1]?.uses !==
+      'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38' ||
+    releaseSetSteps[1]?.with?.['node-version'] !== '24.18.0' ||
+    releaseSetSteps[2]?.uses !==
+      'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' ||
+    JSON.stringify(releaseSetSteps[2]?.with) !==
+      JSON.stringify({
+        pattern:
+          'ql3-release-record-${{ github.run_id }}-${{ github.run_attempt }}-*',
+        path: '${{ runner.temp }}/release-records',
+        'merge-multiple': true,
+      }) ||
+    releaseSetSteps[3]?.id !== 'release-set' ||
+    !/ql3-release-candidate-contract\.cjs[\s\S]*--mode=create[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=aggregate[\s\S]*--records="\$\{RUNNER_TEMP\}\/release-records"[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=audit[\s\S]*--report="\$\{report\}"[\s\S]*GITHUB_OUTPUT/.test(
+      releaseSetSteps[3]?.run ?? '',
+    ) ||
+    !/v0\.11\.5\/regctl-linux-amd64[\s\S]*c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467[\s\S]*sha256sum --check --strict/.test(
+      releaseSetSteps[4]?.run ?? '',
+    ) ||
+    releaseSetSteps[5]?.uses !==
+      'docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c' ||
+    !/for \(const image of report\.images\)[\s\S]*image\.reference[\s\S]*image\.versionTag, image\.sourceTag[\s\S]*release tag already points at another digest[\s\S]*\['image', 'copy', state\.image\.reference, state\.tag\][\s\S]*promoted tag does not resolve to the release-set digest/.test(
+      releaseSetSteps[6]?.run ?? '',
+    ) ||
+    releaseSetSteps[7]?.uses !==
+      'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
+    JSON.stringify(releaseSetSteps[7]?.with) !==
+      JSON.stringify({
+        'subject-path': '${{ steps.release-set.outputs.report }}',
+      }) ||
+    releaseSetSteps[8]?.uses !==
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
+    JSON.stringify(releaseSetSteps[8]?.with) !==
+      JSON.stringify({
+        name: 'ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}',
+        path: '${{ steps.release-set.outputs.report }}',
+        'if-no-files-found': 'error',
+        'retention-days': 90,
+        'compression-level': 0,
+        overwrite: false,
+        'include-hidden-files': false,
+      })
+  ) {
+    throw new Error(
+      'release-set job must download only same-run records, independently attest and publish one no-overwrite deployment lock',
     );
   }
   if (
@@ -727,13 +823,13 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /uses: actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6/g,
-    5,
+    6,
     'all release jobs must pin the reviewed immutable checkout action',
   );
   requireOccurrences(
     source,
     /uses: actions\/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6/g,
-    5,
+    6,
     'all release jobs must pin the reviewed immutable Node setup action',
   );
   requirePattern(
@@ -771,6 +867,12 @@ function auditReleaseWorkflow(source) {
     /v0\.11\.5\/regctl-linux-amd64[\s\S]*c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467[\s\S]*sha256sum --check --strict/,
     'publisher must checksum-pin the exact regctl OCI copier',
   );
+  requireExactOccurrences(
+    source,
+    /c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467/g,
+    2,
+    'both image and release-set publishers must checksum-pin the exact regctl OCI copier',
+  );
   requirePattern(
     source,
     /regctl[\s\S]*image import "\$\{IMAGE\}@\$\{DIGEST\}" "\$\{ARCHIVE\}"[\s\S]*image digest "\$\{IMAGE\}@\$\{DIGEST\}"/,
@@ -789,8 +891,8 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /uses: actions\/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4/g,
-    4,
-    'release workflow must create provenance, SBOM, OS vulnerability and release candidate attestations',
+    5,
+    'release workflow must create four image attestations and one complete release-set provenance attestation',
   );
   requireOccurrences(
     source,
@@ -884,8 +986,8 @@ function auditReleaseWorkflow(source) {
   );
   requirePattern(
     source,
-    /name: Promote only the verified digest to immutable release tags[\s\S]*image copy "\$\{IMAGE\}@\$\{DIGEST\}" "\$\{IMAGE\}:\$\{VERSION\}"[\s\S]*image copy "\$\{IMAGE\}@\$\{DIGEST\}" "\$\{IMAGE\}:sha-\$\{GITHUB_SHA\}"[\s\S]*image digest "\$\{IMAGE\}:\$\{VERSION\}"[\s\S]*image digest "\$\{IMAGE\}:sha-\$\{GITHUB_SHA\}"/,
-    'release tags must be promoted only after all digest verification succeeds',
+    /release-set:\s+name: Close and publish the complete deployment release set[\s\S]*needs:[\s\S]*- publish[\s\S]*name: Promote tags only after the complete set is verified[\s\S]*for \(const image of report\.images\)[\s\S]*image\.versionTag, image\.sourceTag[\s\S]*image', 'copy'[\s\S]*name: Attest the complete release-set file provenance[\s\S]*name: Publish the deployment digest lock/,
+    'release tags and the deployment lock must be published only after every selected digest record is complete',
   );
   return {
     trigger: 'explicit protected v3 tag dispatch',
@@ -938,6 +1040,16 @@ function auditReleaseWorkflow(source) {
         'c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467',
       rebuildAfterScan: false,
       tagAfterVerification: true,
+      tagAfterCompleteReleaseSet: true,
+    },
+    releaseSet: {
+      sourceDerived: true,
+      sameRunRecords: true,
+      exactScopeClosure: true,
+      tagPromotionAuthority: 'complete_verified_release_set',
+      fileProvenanceAttested: true,
+      artifactRetentionDays: 90,
+      crossRepositoryAtomicity: false,
     },
     localRolloutPreflight: true,
     localRolloutApply: true,
@@ -948,6 +1060,7 @@ function auditReleaseWorkflow(source) {
       'cyclonedx',
       'os-vulnerability',
       'release-candidate',
+      'release-set',
       'release-tags',
     ],
   };
