@@ -2,6 +2,9 @@
 
 const { execFileSync, spawnSync } = require('node:child_process');
 const { resolve } = require('node:path');
+const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
+
+const QL3_VERSION = readReleaseIdentity(resolve(__dirname, '..')).version;
 
 const IMAGE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}$/u;
 const ENTRYPOINT = [
@@ -608,7 +611,7 @@ function main() {
     }
   }
   const version = runImage(image, ['--version']).trim();
-  if (version !== '3.0.0-alpha.0') fail('product version contract drifted');
+  if (version !== QL3_VERSION) fail('product version contract drifted');
   runOperatorContextContract(image);
   runConsoleContract(image);
   runEvidenceVerifierContract(image);

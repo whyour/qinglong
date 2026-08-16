@@ -5,8 +5,12 @@ const { test } = require('node:test');
 const {
   auditClusterDeployment,
 } = require('../../scripts/ql3-cluster-deployment-audit.cjs');
+const {
+  readReleaseIdentity,
+} = require('../../scripts/lib/ql3-release-identity.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
+const VERSION = readReleaseIdentity(ROOT).version;
 
 function intercept(relativePath, transform) {
   const target = path.join(ROOT, relativePath);
@@ -233,8 +237,8 @@ test('keeps Cluster AI optional with projected authority and an independent dige
       'deploy/kubernetes/ql3-cluster/base/deployment.yaml',
       (source) =>
         source.replace(
-          'image: qinglong3-cluster-control:3.0.0-alpha.0',
-          'image: qinglong3-cluster-control-ai:3.0.0-alpha.0',
+          `image: qinglong3-cluster-control:${VERSION}`,
+          `image: qinglong3-cluster-control-ai:${VERSION}`,
         ),
     ),
   });
@@ -263,8 +267,7 @@ test('keeps Cluster AI optional with projected authority and an independent dige
     root: ROOT,
     readFile: intercept(
       'deploy/kubernetes/ql3-cluster/overlays/cluster-ai-example/kustomization.yaml',
-      (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+      (source) => source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
     ),
   });
   assert.equal(tagBased.compatible, false);
@@ -600,8 +603,7 @@ test('rejects widened lifecycle, authority or public inputs in the Approval clie
     ],
     [
       'deploy/kubernetes/ql3-cluster/operations/approval-management-client/kustomization.yaml',
-      (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+      (source) => source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
       'QL3_CLUSTER_APPROVAL_MANAGEMENT_CLIENT_OPT_IN',
     ],
     [
@@ -654,8 +656,7 @@ test('rejects widened lifecycle, authority or public inputs in the automation cl
     ],
     [
       'deploy/kubernetes/ql3-cluster/operations/automation-management-client/kustomization.yaml',
-      (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+      (source) => source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
       'QL3_CLUSTER_AUTOMATION_MANAGEMENT_CLIENT_RELEASE_DIGEST_PIN',
     ],
     [
@@ -726,8 +727,7 @@ test('rejects widened authority or lifecycle in the Worker management client', (
     ],
     [
       'deploy/kubernetes/ql3-cluster/operations/worker-credential-management-client/kustomization.yaml',
-      (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+      (source) => source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
       'QL3_CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_CLIENT_RELEASE_DIGEST_PIN',
     ],
     [
@@ -840,8 +840,7 @@ test('rejects recurring, default-enabled or public-egress Worker execution', () 
     ],
     [
       'deploy/kubernetes/ql3-cluster/operations/worker-credential-executor/cloudnative-pg/kustomization.yaml',
-      (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+      (source) => source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
       'QL3_CLUSTER_WORKER_CREDENTIAL_EXECUTOR_CLOUDNATIVE_PG_AUTHORITY',
     ],
   ]) {
@@ -917,8 +916,7 @@ test('rejects default or tag-based Worker management rollout', () => {
     root: ROOT,
     readFile: intercept(
       'deploy/kubernetes/ql3-cluster/operations/worker-credential-management/cloudnative-pg/kustomization.yaml',
-      (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+      (source) => source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
     ),
   });
   assert.equal(tagBased.compatible, false);
@@ -1114,8 +1112,7 @@ test('rejects default enablement or tag-based Package management rollout', () =>
     root: ROOT,
     readFile: intercept(
       'deploy/kubernetes/ql3-cluster/operations/plugin-package-management/cloudnative-pg/kustomization.yaml',
-      (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+      (source) => source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
     ),
   });
   assert.equal(tagBased.compatible, false);
@@ -1424,7 +1421,7 @@ test('rejects tag-based production overlays for either cluster image', () => {
     const report = auditClusterDeployment({
       root: ROOT,
       readFile: intercept(relativePath, (source) =>
-        source.replace(/digest: sha256:0{64}/, 'newTag: 3.0.0-alpha.0'),
+        source.replace(/digest: sha256:0{64}/, `newTag: ${VERSION}`),
       ),
     });
     assert.equal(report.compatible, false);

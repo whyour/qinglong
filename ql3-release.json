@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "schema": "qinglong/release-identity@v1",
+  "product": "qinglong3",
+  "version": "3.0.0-alpha.0",
+  "node": {
+    "version": "24.18.0",
+    "engine": ">=24.18.0 <25"
+  },
+  "workspacePackageCount": 18,
+  "legacyRootPackageExcluded": true
+}

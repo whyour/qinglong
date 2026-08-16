@@ -2,8 +2,10 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const IMAGE_DIRECTORY = 'deploy/containers/ql3-local-application';
+const QL3_VERSION = readReleaseIdentity(path.resolve(__dirname, '..')).version;
 const NODE_IMAGE =
   'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
 const BUILD_DEPENDENCIES = Object.freeze({
@@ -56,7 +58,7 @@ function auditManifest(manifest, runtime, findings) {
   const expectedName = '@qinglong/local-application-image';
   if (
     manifest.name !== expectedName ||
-    manifest.version !== '3.0.0-alpha.0' ||
+    manifest.version !== QL3_VERSION ||
     manifest.private !== true ||
     manifest.license !== 'Apache-2.0' ||
     manifest.engines?.node !== '>=24.18.0 <25'

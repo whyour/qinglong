@@ -30,6 +30,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       clusterAdminOperatorContext: true,
       clusterAdminContextPreflight: true,
       clusterAdminContextReadiness: true,
+      releaseVersionAudit: true,
       ociAttestations: true,
       osVulnerabilityScan: {
         scanner: 'trivy@0.70.0',
@@ -103,6 +104,17 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       ],
     },
   });
+});
+
+test('rejects removal of the source-derived release version audit', () => {
+  const mutated = ciSource.replace(
+    'pnpm audit:release-version:ql3',
+    'echo release-version-audit-removed',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /source-derived release version identity/,
+  );
 });
 
 test('rejects removal of the native arm64 image gate', () => {

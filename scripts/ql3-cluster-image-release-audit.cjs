@@ -284,6 +284,16 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
+    /test\/back\/ql3VersionTransition\.test\.cjs/,
+    'supply-chain CI must run release version transition negative tests',
+  );
+  requirePattern(
+    source,
+    /pnpm audit:release-version:ql3/,
+    'supply-chain CI must audit the source-derived release version identity',
+  );
+  requirePattern(
+    source,
     /docker build[\s\S]*--file \$\{\{ matrix\.dockerfile \}\}[\s\S]*--target \$\{\{ matrix\.target \}\}/,
     'cluster image CI must build each exact selected Dockerfile target',
   );
@@ -375,6 +385,7 @@ function auditClusterImageCiWorkflow(
     clusterAdminOperatorContext: true,
     clusterAdminContextPreflight: true,
     clusterAdminContextReadiness: true,
+    releaseVersionAudit: true,
     ociAttestations: true,
     osVulnerabilityScan: {
       scanner: 'trivy@0.70.0',

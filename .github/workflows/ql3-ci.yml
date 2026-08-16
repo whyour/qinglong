@@ -301,8 +301,10 @@ jobs:
           test/back/ql3ClusterImageReleaseAudit.test.cjs
           test/back/ql3ImageOsVulnerabilityPolicy.test.cjs
           test/back/ql3LocalImageAudit.test.cjs
+          test/back/ql3VersionTransition.test.cjs
       - name: Audit cluster image release contract
         run: |
+          pnpm audit:release-version:ql3
           pnpm audit:image-release:ql3
           pnpm audit:local-image:ql3
       - name: Reject high or critical advisories in 3.0 Profile importers

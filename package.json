@@ -76,6 +76,7 @@
     "audit:edge-imports:ql3": "node scripts/ql3-edge-import-audit.cjs",
     "audit:cluster-dependencies:ql3": "node scripts/ql3-cluster-dependency-audit.cjs",
     "audit:package-boundaries:ql3": "node scripts/ql3-package-boundary-audit.cjs",
+    "audit:release-version:ql3": "node scripts/ql3-version-transition.cjs --mode=audit",
     "test:service-manager-bridge:ql3": "node scripts/ql3-service-manager-bridge-docker-gate.cjs",
     "audit:service-manager-bridge-imports:ql3": "node scripts/ql3-service-bridge-import-audit.cjs",
     "audit:prompt-output-external-recovery-deployment:ql3": "node scripts/ql3-prompt-output-external-recovery-deployment-audit.cjs",

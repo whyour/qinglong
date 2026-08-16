@@ -11,12 +11,16 @@ const {
   parseArguments,
   runCli,
 } = require('../../scripts/ql3-release-candidate-contract.cjs');
+const {
+  readReleaseIdentity,
+} = require('../../scripts/lib/ql3-release-identity.cjs');
 
 const root = path.resolve(__dirname, '../..');
+const version = readReleaseIdentity(root).version;
 const identity = Object.freeze({
-  version: '3.0.0-alpha.0',
+  version,
   sourceRevision: 'a'.repeat(40),
-  sourceRef: 'refs/tags/v3.0.0-alpha.0',
+  sourceRef: `refs/tags/v${version}`,
 });
 
 test('freezes an independent low-resource local release family', () => {
@@ -35,6 +39,14 @@ test('freezes an independent low-resource local release family', () => {
     'standalone',
   ]);
   assert.equal(contract.workspace.packageCount, 18);
+  assert.equal(
+    contract.compatibility.releaseIdentitySchema,
+    'qinglong/release-identity@v1',
+  );
+  assert.match(
+    contract.compatibility.releaseIdentityDigest,
+    /^sha256:[a-f0-9]{64}$/u,
+  );
   assert.match(contract.contractDigest, /^sha256:[a-f0-9]{64}$/u);
   assert.deepEqual(
     auditReleaseCandidateContract(contract, {
@@ -126,6 +138,18 @@ test('rejects tag, version and source identity drift', () => {
       }),
     /Git SHA-1/,
   );
+  const nextVersion = `${version.slice(0, version.lastIndexOf('.') + 1)}1`;
+  assert.throws(
+    () =>
+      createReleaseCandidateContract({
+        root,
+        ...identity,
+        version: nextVersion,
+        sourceRef: `refs/tags/v${nextVersion}`,
+        releaseScope: 'local',
+      }),
+    /repository release identity/,
+  );
 });
 
 test('rejects a source-derived report mutated after creation', () => {
@@ -153,9 +177,9 @@ test('writes once and independently audits the exact report through the CLI', (t
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const report = path.join(directory, 'contract.json');
   const common = [
-    '--version=3.0.0-alpha.0',
+    `--version=${version}`,
     `--source-revision=${identity.sourceRevision}`,
-    '--source-ref=refs/tags/v3.0.0-alpha.0',
+    `--source-ref=refs/tags/v${version}`,
     '--release-scope=local',
   ];
   const output = { write() {} };
@@ -168,20 +192,16 @@ test('writes once and independently audits the exact report through the CLI', (t
   );
   assert.throws(
     () =>
-      runCli(
-        ['--mode=create', ...common, `--output=${report}`],
-        root,
-        output,
-      ),
+      runCli(['--mode=create', ...common, `--output=${report}`], root, output),
     /output must be unused/,
   );
 });
 
 test('parses only exact closed create and audit modes', () => {
   const common = [
-    '--version=3.0.0-alpha.0',
+    `--version=${version}`,
     `--source-revision=${identity.sourceRevision}`,
-    '--source-ref=refs/tags/v3.0.0-alpha.0',
+    `--source-ref=refs/tags/v${version}`,
     '--release-scope=local',
   ];
   assert.equal(

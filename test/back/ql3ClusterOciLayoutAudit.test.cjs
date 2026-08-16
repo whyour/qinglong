@@ -16,8 +16,12 @@ const {
 const {
   createClusterImageSbom,
 } = require('../../scripts/ql3-cluster-image-sbom.cjs');
+const {
+  readReleaseIdentity,
+} = require('../../scripts/lib/ql3-release-identity.cjs');
 
 const root = path.resolve(__dirname, '../..');
+const version = readReleaseIdentity(root).version;
 const revision = 'fixture-revision';
 
 function createFixture(t, options = {}) {
@@ -164,7 +168,7 @@ function createFixture(t, options = {}) {
               : 'QingLong 3.0 Cluster Admin',
             ...(isLocal || isWorker || isControl || image === 'admin'
               ? {
-                  'org.opencontainers.image.version': '3.0.0-alpha.0',
+                  'org.opencontainers.image.version': version,
                 }
               : {}),
           },

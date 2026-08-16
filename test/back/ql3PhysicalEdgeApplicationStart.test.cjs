@@ -20,6 +20,11 @@ const {
 const {
   canonicalDigest,
 } = require('../../scripts/ql3-physical-edge-evidence.cjs');
+const {
+  readReleaseIdentity,
+} = require('../../scripts/lib/ql3-release-identity.cjs');
+
+const version = readReleaseIdentity(path.resolve(__dirname, '../..')).version;
 
 const packages = [
   '@qinglong/local-admin',
@@ -55,7 +60,7 @@ function artifactFixture(t) {
       packageName === '@qinglong/local-application'
         ? {
             name: packageName,
-            version: '3.0.0-alpha.0',
+            version,
             engines: { node: '>=24.18.0 <25' },
             bin: { 'ql3-local-application': 'dist/cli.js' },
           }

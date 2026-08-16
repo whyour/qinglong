@@ -1,6 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const yaml = require('js-yaml');
+const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
+
+const QL3_VERSION = readReleaseIdentity(path.resolve(__dirname, '..')).version;
 
 const OPERATION = path.join(
   'deploy',
@@ -130,7 +133,7 @@ function auditPromptOutputExternalRecoveryDeployment(options = {}) {
     !Array.isArray(containers) ||
     containers.length !== 1 ||
     container?.name !== 'verifier' ||
-    container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    container?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     JSON.stringify(container?.command) !==
       JSON.stringify([
         'node',

@@ -6,6 +6,10 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { auditPackageBoundaries } = require('./ql3-package-boundary-audit.cjs');
+const {
+  VERSION_PATTERN,
+  readReleaseIdentity,
+} = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 const SCHEMA = 'qinglong/release-candidate-contract@v1';
@@ -13,8 +17,6 @@ const PREDICATE_TYPE =
   'https://qinglong.dev/attestations/release-candidate-contract/v1';
 const MAX_REPORT_BYTES = 1024 * 1024;
 const RELEASE_SCOPES = Object.freeze(['all', 'cluster', 'local']);
-const NODE_ENGINE = '>=24.18.0 <25';
-const NODE_VERSION = '24.18.0';
 const LOCAL_IMAGES = Object.freeze([
   Object.freeze({
     image: 'local',
@@ -93,9 +95,7 @@ function selectedImages(scope) {
 function validateIdentity(options) {
   if (
     typeof options.version !== 'string' ||
-    !/^3\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$/u.test(
-      options.version,
-    )
+    !VERSION_PATTERN.test(options.version)
   ) {
     fail('version must be an exact QingLong 3 SemVer');
   }
@@ -113,11 +113,17 @@ function validateIdentity(options) {
 function createReleaseCandidateContract(options) {
   const root = path.resolve(options.root || DEFAULT_ROOT);
   validateIdentity(options);
+  const releaseIdentity = readReleaseIdentity(root);
+  if (options.version !== releaseIdentity.version) {
+    fail('requested version differs from the repository release identity');
+  }
   const boundaries = auditPackageBoundaries(root);
   if (
     !boundaries.compatible ||
-    boundaries.workspacePackageCount !== 18 ||
-    boundaries.workspacePackageHardCap !== 18 ||
+    boundaries.workspacePackageCount !==
+      releaseIdentity.workspacePackageCount ||
+    boundaries.workspacePackageHardCap !==
+      releaseIdentity.workspacePackageCount ||
     boundaries.singleSourcePackages.length !== 0 ||
     boundaries.shallowSourcePackages.length !== 0
   ) {
@@ -129,7 +135,7 @@ function createReleaseCandidateContract(options) {
       if (
         manifest.name !== entry.name ||
         manifest.version !== options.version ||
-        manifest.engines?.node !== NODE_ENGINE
+        manifest.engines?.node !== releaseIdentity.node.engine
       ) {
         fail(`workspace release identity differs: ${entry.path}`);
       }
@@ -147,7 +153,7 @@ function createReleaseCandidateContract(options) {
     );
     if (
       manifest.version !== options.version ||
-      manifest.engines?.node !== NODE_ENGINE
+      manifest.engines?.node !== releaseIdentity.node.engine
     ) {
       fail(`image release identity differs: ${image.runtime_root}`);
     }
@@ -156,7 +162,9 @@ function createReleaseCandidateContract(options) {
       'utf8',
     );
     if (
-      !dockerfile.includes(`node:${NODE_VERSION}-bookworm-slim@sha256:`) ||
+      !dockerfile.includes(
+        `node:${releaseIdentity.node.version}-bookworm-slim@sha256:`,
+      ) ||
       !dockerfile.includes(
         `org.opencontainers.image.version=\"${options.version}\"`,
       )
@@ -204,9 +212,14 @@ function createReleaseCandidateContract(options) {
     compatibility: {
       legacyRootPackageVersion: readJson(path.join(root, 'package.json'))
         .version,
-      legacyRootExcludedFromReleaseIdentity: true,
-      nodeVersion: NODE_VERSION,
-      nodeEngine: NODE_ENGINE,
+      legacyRootExcludedFromReleaseIdentity:
+        releaseIdentity.legacyRootPackageExcluded,
+      releaseIdentitySchema: releaseIdentity.schema,
+      releaseIdentityDigest: sha256(
+        Buffer.from(JSON.stringify(releaseIdentity)),
+      ),
+      nodeVersion: releaseIdentity.node.version,
+      nodeEngine: releaseIdentity.node.engine,
       platforms: ['linux/amd64', 'linux/arm64'],
     },
     workspace: {

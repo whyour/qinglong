@@ -8,12 +8,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
+const QL3_VERSION = readReleaseIdentity(ROOT).version;
 const NAMESPACE = 'qinglong3-system';
 const POSTGRES_CLUSTER = 'ql3-postgres';
-const APP_IMAGE =
-  'registry.example.com/qinglong/qinglong3-cluster-control:3.0.0-alpha.0';
+const APP_IMAGE = `registry.example.com/qinglong/qinglong3-cluster-control:${QL3_VERSION}`;
 const APP_IMAGE_PLACEHOLDER = `registry.example.com/qinglong/qinglong3-cluster-control@sha256:${'0'.repeat(
   64,
 )}`;

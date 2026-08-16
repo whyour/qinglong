@@ -16,8 +16,10 @@ const {
   parseProcStat,
   parseProcStatus,
 } = require('./ql3-physical-edge-idle-sampler.cjs');
+const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const MIB = 1024 * 1024;
+const QL3_VERSION = readReleaseIdentity(path.resolve(__dirname, '..')).version;
 const MAX_INPUT_BYTES = 256 * 1024;
 const MAX_OUTPUT_BYTES = 64 * 1024;
 const MAX_ARTIFACT_FILES = 768;
@@ -569,7 +571,7 @@ function collectArtifactIdentity(artifactRootInput) {
   const applicationEntrypoint = path.join(packageRoot, 'dist', 'cli.js');
   if (
     packageManifest.name !== '@qinglong/local-application' ||
-    packageManifest.version !== '3.0.0-alpha.0' ||
+    packageManifest.version !== QL3_VERSION ||
     packageManifest.bin?.['ql3-local-application'] !== 'dist/cli.js' ||
     packageManifest.engines?.node !== '>=24.18.0 <25' ||
     fs.realpathSync(applicationEntrypoint) !== applicationEntrypoint

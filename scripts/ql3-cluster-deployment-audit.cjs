@@ -4,6 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const yaml = require('js-yaml');
+const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
+
+const QL3_VERSION = readReleaseIdentity(path.resolve(__dirname, '..')).version;
 
 const EXPECTED_EXTERNAL_DEPENDENCIES = Object.freeze({
   '@aws-sdk/client-s3': '3.1093.0',
@@ -97,7 +100,7 @@ function assertClusterAdminImageCommands(readFile, root, findings) {
       const podSpec = podSpecFor(document);
       for (const section of ['initContainers', 'containers']) {
         for (const container of podSpec?.[section] ?? []) {
-          if (container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0') {
+          if (container?.image !== `qinglong3-cluster-admin:${QL3_VERSION}`) {
             continue;
           }
           references += 1;
@@ -457,8 +460,7 @@ function assertExactExternalClosure(readFile, root, findings) {
   );
   if (
     adminManifest.bin?.['ql3-cluster-admin'] !== 'dist/product-cli/cli.js' ||
-    adminManifest.bin?.['ql3-copilot-mcp'] !==
-      'dist/copilot-mcp/cli.js' ||
+    adminManifest.bin?.['ql3-copilot-mcp'] !== 'dist/copilot-mcp/cli.js' ||
     adminManifest.exports?.['./copilot-mcp']?.require !==
       './dist/copilot-mcp/server.js' ||
     adminManifest.bin?.['ql3-plugin-package-recover'] !==
@@ -1174,7 +1176,7 @@ function assertKubernetes(readFile, root, findings) {
     );
   }
   if (
-    recoveryContainer?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    recoveryContainer?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     JSON.stringify(recoveryContainer?.command) !==
       JSON.stringify([
         'node',
@@ -1420,13 +1422,22 @@ function assertClusterAiComponent(readFile, root, findings) {
     'deploy/kubernetes/ql3-cluster/components/cluster-ai-copilot',
   );
   const copilotComponent = yaml.load(
-    readFile(path.join(copilotComponentDirectory, 'kustomization.yaml'), 'utf8'),
+    readFile(
+      path.join(copilotComponentDirectory, 'kustomization.yaml'),
+      'utf8',
+    ),
   );
   const copilotPatch = yaml.load(
-    readFile(path.join(copilotComponentDirectory, 'deployment-patch.yaml'), 'utf8'),
+    readFile(
+      path.join(copilotComponentDirectory, 'deployment-patch.yaml'),
+      'utf8',
+    ),
   );
   const copilotConfig = yaml.load(
-    readFile(path.join(copilotComponentDirectory, 'copilot-configmap.yaml'), 'utf8'),
+    readFile(
+      path.join(copilotComponentDirectory, 'copilot-configmap.yaml'),
+      'utf8',
+    ),
   );
   const copilotOverlay = yaml.load(
     readFile(
@@ -1496,8 +1507,8 @@ function assertClusterAiComponent(readFile, root, findings) {
       return (
         mount?.mountPath !== mountPath ||
         mount?.readOnly !== true ||
-        projection?.name !== authorityName &&
-          projection?.secretName !== authorityName ||
+        (projection?.name !== authorityName &&
+          projection?.secretName !== authorityName) ||
         projection?.defaultMode !== 0o440 ||
         projection?.optional === true ||
         JSON.stringify(projection?.items) !==
@@ -1721,7 +1732,7 @@ function assertClusterAiComponent(readFile, root, findings) {
   if (
     patch?.kind !== 'Deployment' ||
     patch?.metadata?.name !== 'ql3-cluster-control' ||
-    patchContainer?.image !== 'qinglong3-cluster-control-ai:3.0.0-alpha.0' ||
+    patchContainer?.image !== `qinglong3-cluster-control-ai:${QL3_VERSION}` ||
     patchPod?.serviceAccountName !== undefined ||
     patchPod?.automountServiceAccountToken !== undefined ||
     authorityMount?.mountPath !== '/var/run/qinglong3/ai/provider-authority' ||
@@ -1830,7 +1841,7 @@ function assertClusterAiComponent(readFile, root, findings) {
   const baseContainer = namedEntry(basePod?.containers, 'cluster-control');
   const baseEnv = environmentByName(baseContainer);
   if (
-    baseContainer?.image !== 'qinglong3-cluster-control:3.0.0-alpha.0' ||
+    baseContainer?.image !== `qinglong3-cluster-control:${QL3_VERSION}` ||
     [...baseEnv.keys()].some((name) => name.startsWith('QL3_CLUSTER_AI_')) ||
     namedEntry(baseContainer?.volumeMounts, 'cluster-ai-provider-authority') ||
     namedEntry(baseContainer?.volumeMounts, 'cluster-ai-provider-secrets') ||
@@ -1841,9 +1852,10 @@ function assertClusterAiComponent(readFile, root, findings) {
     namedEntry(basePod?.volumes, 'cluster-ai-provider-authority') ||
     namedEntry(basePod?.volumes, 'cluster-ai-provider-secrets') ||
     namedEntry(basePod?.volumes, 'cluster-ai-prompt-output-keyring') ||
-    [...copilotProjections].some(([name]) =>
-      namedEntry(baseContainer?.volumeMounts, name) ||
-      namedEntry(basePod?.volumes, name),
+    [...copilotProjections].some(
+      ([name]) =>
+        namedEntry(baseContainer?.volumeMounts, name) ||
+        namedEntry(basePod?.volumes, name),
     )
   ) {
     findings.push(
@@ -1942,7 +1954,7 @@ function assertPluginPackageManagementDeployment(readFile, root, findings) {
     );
   }
   if (
-    container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    container?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     JSON.stringify(container?.command) !==
       JSON.stringify([
         'node',
@@ -2384,7 +2396,7 @@ function assertWorkerCredentialManagementDeployment(readFile, root, findings) {
     );
   }
   if (
-    container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    container?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     JSON.stringify(container?.command) !==
       JSON.stringify([
         'node',
@@ -2777,7 +2789,7 @@ function assertWorkerCredentialManagementClientOperation(
   const readinessScript = String(init?.args?.[0] ?? '');
   const clientScript = String(container?.args?.[0] ?? '');
   if (
-    init?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    init?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     init?.imagePullPolicy !== 'IfNotPresent' ||
     JSON.stringify(init?.command) !== JSON.stringify(['node', '-e']) ||
     !readinessScript.includes(
@@ -2790,7 +2802,7 @@ function assertWorkerCredentialManagementClientOperation(
     !readinessScript.includes('cert,') ||
     !readinessScript.includes('key,') ||
     !readinessScript.includes('attempt <= 30') ||
-    container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    container?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     container?.imagePullPolicy !== 'IfNotPresent' ||
     JSON.stringify(container?.command) !== JSON.stringify(['/bin/sh', '-c']) ||
     !clientScript.includes('set -eu') ||
@@ -3168,7 +3180,7 @@ function assertWorkerCredentialExecutorDeployment(readFile, root, findings) {
     );
   }
   if (
-    container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    container?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     JSON.stringify(container?.command) !==
       JSON.stringify([
         'node',
@@ -3488,7 +3500,11 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     'ServiceAccount',
     actionName,
   );
-  const admissionConfig = namedResource(resources, 'ConfigMap', actionName + '-admission');
+  const admissionConfig = namedResource(
+    resources,
+    'ConfigMap',
+    actionName + '-admission',
+  );
   const role = namedResource(resources, 'Role', name);
   const roleBinding = namedResource(resources, 'RoleBinding', name);
   const admissionPolicy = namedResource(
@@ -3572,14 +3588,18 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     admissionPolicy?.spec?.failurePolicy !== 'Fail' ||
     admissionPolicy?.spec?.paramKind?.apiVersion !== 'v1' ||
     admissionPolicy?.spec?.paramKind?.kind !== 'ConfigMap' ||
-    admissionPolicy?.spec?.matchConstraints?.resourceRules?.[0]?.operations?.[0] !==
-      'CREATE' ||
-    admissionPolicy?.spec?.matchConstraints?.resourceRules?.[0]?.resources?.[0] !==
-      'jobs' ||
+    admissionPolicy?.spec?.matchConstraints?.resourceRules?.[0]
+      ?.operations?.[0] !== 'CREATE' ||
+    admissionPolicy?.spec?.matchConstraints?.resourceRules?.[0]
+      ?.resources?.[0] !== 'jobs' ||
     admissionPolicy?.spec?.matchConditions?.[0]?.expression !==
       "request.userInfo.username == 'system:serviceaccount:qinglong3-system:ql3-plugin-package-executor'" ||
-    !admissionExpressions.includes("variables.executor.image == params.data.image") ||
-    !admissionExpressions.includes('variables.pod.automountServiceAccountToken == false') ||
+    !admissionExpressions.includes(
+      'variables.executor.image == params.data.image',
+    ) ||
+    !admissionExpressions.includes(
+      'variables.pod.automountServiceAccountToken == false',
+    ) ||
     !admissionExpressions.includes('variables.values.secret.items.all') ||
     admissionBinding?.spec?.policyName !== actionName ||
     admissionBinding?.spec?.paramRef?.name !== actionName + '-admission' ||
@@ -3602,7 +3622,7 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
     );
   }
   if (
-    container?.image !== 'qinglong3-cluster-admin:3.0.0-alpha.0' ||
+    container?.image !== `qinglong3-cluster-admin:${QL3_VERSION}` ||
     JSON.stringify(container?.command) !==
       JSON.stringify([
         'node',
@@ -3660,7 +3680,10 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
       'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_SECRET',
       'postgresUrlSecretName',
     ],
-    ['QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_KEY', 'postgresUrlSecretKey'],
+    [
+      'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_URL_KEY',
+      'postgresUrlSecretKey',
+    ],
     [
       'QL3_PLUGIN_PACKAGE_SECRET_ACTION_POSTGRES_AUTH_SECRET',
       'postgresAuthSecretName',
@@ -3773,22 +3796,22 @@ function assertPluginPackageExecutorDeployment(readFile, root, findings) {
   );
   if (
     JSON.stringify(apiServerEgressExample) !==
-      JSON.stringify([
-        {
-          op: 'add',
-          path: '/spec/egress/-',
-          value: {
-            to: [
-              {
-                ipBlock: {
-                  cidr: 'REPLACE_WITH_API_SERVER_CIDR',
-                },
+    JSON.stringify([
+      {
+        op: 'add',
+        path: '/spec/egress/-',
+        value: {
+          to: [
+            {
+              ipBlock: {
+                cidr: 'REPLACE_WITH_API_SERVER_CIDR',
               },
-            ],
-            ports: [{ protocol: 'TCP', port: 443 }],
-          },
+            },
+          ],
+          ports: [{ protocol: 'TCP', port: 443 }],
         },
-      ])
+      },
+    ])
   ) {
     findings.push(
       finding(

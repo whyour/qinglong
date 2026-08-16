@@ -10,8 +10,12 @@ const {
   componentRef,
   createClusterImageSbom,
 } = require('../../scripts/ql3-cluster-image-sbom.cjs');
+const {
+  readReleaseIdentity,
+} = require('../../scripts/lib/ql3-release-identity.cjs');
 
 const root = path.resolve(__dirname, '../..');
+const version = readReleaseIdentity(root).version;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -23,7 +27,7 @@ test('generates the exact reviewed cluster image runtime closure', () => {
 
   assert.deepEqual(report, {
     image: 'control',
-    root: 'pkg:npm/%40qinglong/cluster-control-image-dependencies@3.0.0-alpha.0',
+    root: `pkg:npm/%40qinglong/cluster-control-image-dependencies@${version}`,
     components: 46,
     externalComponents: 43,
     internalComponents: 3,
@@ -49,7 +53,7 @@ test('generates the optional Cluster AI image runtime closure', () => {
 
   assert.deepEqual(report, {
     image: 'control-ai',
-    root: 'pkg:npm/%40qinglong/cluster-control-image-dependencies@3.0.0-alpha.0',
+    root: `pkg:npm/%40qinglong/cluster-control-image-dependencies@${version}`,
     components: 47,
     externalComponents: 43,
     internalComponents: 4,
@@ -71,7 +75,7 @@ test('generates the independent reviewed cluster-admin image closure', () => {
 
   assert.deepEqual(report, {
     image: 'admin',
-    root: 'pkg:npm/%40qinglong/cluster-admin-image-dependencies@3.0.0-alpha.0',
+    root: `pkg:npm/%40qinglong/cluster-admin-image-dependencies@${version}`,
     components: 91,
     externalComponents: 87,
     internalComponents: 4,
@@ -107,7 +111,7 @@ test('generates the AI-excluded local application image closure', () => {
 
   assert.deepEqual(report, {
     image: 'local',
-    root: 'pkg:npm/%40qinglong/local-application-image@3.0.0-alpha.0',
+    root: `pkg:npm/%40qinglong/local-application-image@${version}`,
     components: 10,
     externalComponents: 2,
     internalComponents: 8,
@@ -133,7 +137,7 @@ test('generates the headless Worker image runtime closure', () => {
 
   assert.deepEqual(report, {
     image: 'worker',
-    root: 'pkg:npm/%40qinglong/worker-image-dependencies@3.0.0-alpha.0',
+    root: `pkg:npm/%40qinglong/worker-image-dependencies@${version}`,
     components: 27,
     externalComponents: 24,
     internalComponents: 3,
@@ -182,7 +186,7 @@ test('rejects widened metadata and root component drift', () => {
 
 test('rejects a missing internal dependency edge', () => {
   const document = createClusterImageSbom({ root });
-  const controlRef = componentRef('@qinglong/cluster-control', '3.0.0-alpha.0');
+  const controlRef = componentRef('@qinglong/cluster-control', version);
   const edge = document.dependencies.find((entry) => entry.ref === controlRef);
   edge.dependsOn = edge.dependsOn.slice(1);
 

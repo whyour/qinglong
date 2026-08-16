@@ -9,8 +9,10 @@ const {
   createClusterImageSbom,
   resolveImageProfile,
 } = require('./ql3-cluster-image-sbom.cjs');
+const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
+const QL3_VERSION = readReleaseIdentity(DEFAULT_ROOT).version;
 const OCI_INDEX_MEDIA_TYPE = 'application/vnd.oci.image.index.v1+json';
 const OCI_MANIFEST_MEDIA_TYPE = 'application/vnd.oci.image.manifest.v1+json';
 const OCI_CONFIG_MEDIA_TYPE = 'application/vnd.oci.image.config.v1+json';
@@ -196,7 +198,7 @@ function expectedImageConfig(architecture, revision, image) {
           'org.opencontainers.image.source':
             'https://github.com/whyour/qinglong',
           'org.opencontainers.image.title': 'QingLong 3.0 Worker',
-          'org.opencontainers.image.version': '3.0.0-alpha.0',
+          'org.opencontainers.image.version': QL3_VERSION,
         },
       },
     };
@@ -233,7 +235,7 @@ function expectedImageConfig(architecture, revision, image) {
           'org.opencontainers.image.source':
             'https://github.com/whyour/qinglong',
           'org.opencontainers.image.title': 'QingLong 3.0 Local Application',
-          'org.opencontainers.image.version': '3.0.0-alpha.0',
+          'org.opencontainers.image.version': QL3_VERSION,
         },
       },
     };
@@ -281,7 +283,7 @@ function expectedImageConfig(architecture, revision, image) {
             ? 'QingLong 3.0 Cluster Control AI'
             : 'QingLong 3.0 Cluster Control'
           : 'QingLong 3.0 Cluster Admin',
-        'org.opencontainers.image.version': '3.0.0-alpha.0',
+        'org.opencontainers.image.version': QL3_VERSION,
       },
     },
   };
