@@ -106,6 +106,10 @@ test('combines local and cluster families without weakening either gate', () => 
     true,
   );
   assert.equal(
+    contract.requiredGates.includes('durable-oci-release-catalog'),
+    true,
+  );
+  assert.equal(
     contract.requiredGates.includes('worker-management-production-evidence'),
     true,
   );

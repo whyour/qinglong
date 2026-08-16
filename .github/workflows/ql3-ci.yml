@@ -301,6 +301,7 @@ jobs:
           test/back/ql3ClusterImageReleaseAudit.test.cjs
           test/back/ql3ReleaseCandidateContract.test.cjs
           test/back/ql3ReleaseSetContract.test.cjs
+          test/back/ql3ReleaseCatalogContract.test.cjs
           test/back/ql3ImageOsVulnerabilityPolicy.test.cjs
           test/back/ql3LocalImageAudit.test.cjs
           test/back/ql3VersionTransition.test.cjs

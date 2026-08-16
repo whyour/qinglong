@@ -96,10 +96,23 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         sourceDerived: true,
         sameRunRecords: true,
         exactScopeClosure: true,
+        standaloneInspection: true,
         tagPromotionAuthority: 'complete_verified_release_set',
         fileProvenanceAttested: true,
         artifactRetentionDays: 90,
         crossRepositoryAtomicity: false,
+      },
+      durableCatalog: {
+        repository: 'qinglong3-release-catalog',
+        artifactType: 'application/vnd.qinglong.release-set.v1+json',
+        basenameOnly: true,
+        crossRunnerDeterministic: true,
+        byteExactRoundTrip: true,
+        keylessSignatureVerified: true,
+        githubProvenanceVerified: true,
+        discoveryTagAuthority: 'none',
+        immutableDigestAuthority: 'verified',
+        receiptAttested: true,
       },
       localRolloutPreflight: true,
       localRolloutApply: true,
@@ -111,6 +124,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         'os-vulnerability',
         'release-candidate',
         'release-set',
+        'durable-catalog',
         'release-tags',
       ],
     },
@@ -125,6 +139,17 @@ test('rejects removal of the source-derived release version audit', () => {
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
     /source-derived release version identity/,
+  );
+});
+
+test('rejects removal of the durable release-catalog contract tests', () => {
+  const mutated = ciSource.replace(
+    'test/back/ql3ReleaseCatalogContract.test.cjs',
+    'test/back/catalog-tests-removed.test.cjs',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /durable catalog and workflow negative tests/,
   );
 });
 
@@ -711,6 +736,78 @@ test('rejects release-set aggregation without independent audit', () => {
   assert.throws(
     () => auditReleaseWorkflow(mutated),
     /download only same-run records/,
+  );
+});
+
+test('rejects a deployment lock without standalone inspection', () => {
+  const releaseSetOffset = releaseSource.indexOf('\n  release-set:');
+  assert.notEqual(releaseSetOffset, -1);
+  const releaseSetSource = releaseSource.slice(releaseSetOffset);
+  const mutated = `${releaseSource.slice(
+    0,
+    releaseSetOffset,
+  )}${releaseSetSource.replace(
+    '            --mode=inspect \\',
+    '            --mode=audit \\',
+  )}`;
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects a catalog title that leaks the runner temporary path', () => {
+  const mutated = releaseSource.replace(
+    '            --strip-dirs \\',
+    '            --index \\',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects a catalog publication without byte-exact round trip', () => {
+  const mutated = releaseSource.replace(
+    '          cmp --silent "${RELEASE_SET}" "${roundtrip}"',
+    '          echo roundtrip-not-checked',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects using the mutable catalog discovery tag as deployment authority', () => {
+  const mutated = releaseSource.replace(
+    'artifact get --file "${file_name}" "${immutable_reference}"',
+    'artifact get --file "${file_name}" "${discovery_tag}"',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects durable catalog provenance detached from its manifest digest', () => {
+  const mutated = releaseSource.replace(
+    '          subject-digest: ${{ steps.catalog.outputs.digest }}',
+    '          subject-digest: ${{ github.sha }}',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects a release-catalog receipt without file provenance', () => {
+  const mutated = releaseSource.replace(
+    '          subject-path: ${{ steps.catalog-receipt.outputs.receipt }}',
+    '          subject-path: ${{ steps.release-set.outputs.report }}',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
   );
 });
 

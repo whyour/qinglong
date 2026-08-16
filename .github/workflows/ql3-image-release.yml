@@ -616,7 +616,7 @@ jobs:
       needs.release-candidate.result == 'success' &&
       needs.publish.result == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -648,8 +648,12 @@ jobs:
           set -euo pipefail
           umask 077
           owner="${GITHUB_REPOSITORY_OWNER,,}"
+          source_repository="${GITHUB_REPOSITORY,,}"
           candidate="${RUNNER_TEMP}/release-set-candidate.json"
-          report="${RUNNER_TEMP}/qinglong3-release-set-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          bundle="${RUNNER_TEMP}/release-catalog-bundle"
+          mkdir "${bundle}"
+          report="${bundle}/qinglong3-release-set-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          plan="${bundle}/qinglong3-release-catalog-plan-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
           node scripts/ql3-release-candidate-contract.cjs \
             --mode=create \
             --version="${RELEASE_VERSION}" \
@@ -677,7 +681,27 @@ jobs:
             --candidate="${candidate}" \
             --records="${RUNNER_TEMP}/release-records" \
             --report="${report}" > "${RUNNER_TEMP}/release-set-audit.json"
+          node scripts/ql3-release-set-contract.cjs \
+            --mode=inspect \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --report="${report}" > "${RUNNER_TEMP}/release-set-inspection.json"
+          node scripts/ql3-release-catalog-contract.cjs \
+            --mode=plan \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --release-set="${report}" \
+            --output="${plan}"
           echo "report=${report}" >> "${GITHUB_OUTPUT}"
+          echo "plan=${plan}" >> "${GITHUB_OUTPUT}"
+          echo "bundle=${bundle}" >> "${GITHUB_OUTPUT}"
 
       - name: Install the exact checksum-pinned OCI copier
         env:
@@ -690,6 +714,8 @@ jobs:
           echo "c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467  ${REGCTL}" | sha256sum --check --strict
           chmod 0755 "${REGCTL}"
           "${REGCTL}" version
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
         with:
@@ -747,11 +773,108 @@ jobs:
         with:
           subject-path: ${{ steps.release-set.outputs.report }}
 
+      - name: Publish and round-trip the durable OCI release catalog
+        id: catalog
+        env:
+          REGCTL: ${{ runner.temp }}/regctl
+          RELEASE_SET: ${{ steps.release-set.outputs.report }}
+          PLAN: ${{ steps.release-set.outputs.plan }}
+        run: |
+          set -euo pipefail
+          catalog_repository="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.catalog.registryRepository)' "${PLAN}")"
+          discovery_tag="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.catalog.discoveryTag)' "${PLAN}")"
+          artifact_type="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.catalog.artifactType)' "${PLAN}")"
+          file_media_type="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.catalog.fileMediaType)' "${PLAN}")"
+          file_name="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.releaseSet.fileName)' "${PLAN}")"
+          "${REGCTL}" artifact put \
+            --artifact-type "${artifact_type}" \
+            --file-media-type "${file_media_type}" \
+            --file "${RELEASE_SET}" \
+            --file-title \
+            --strip-dirs \
+            --annotation "dev.qinglong.release.scope=${{ inputs.release_scope }}" \
+            --annotation "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --annotation "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY,,}" \
+            --annotation "org.opencontainers.image.version=${{ inputs.version }}" \
+            "${discovery_tag}"
+          digest="$("${REGCTL}" image digest "${discovery_tag}")"
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "release catalog did not resolve to an immutable digest" >&2
+            exit 1
+          fi
+          immutable_reference="${catalog_repository}@${digest}"
+          roundtrip="${RUNNER_TEMP}/release-set-roundtrip.json"
+          manifest="${RUNNER_TEMP}/release-catalog-manifest.json"
+          "${REGCTL}" artifact get --file "${file_name}" "${immutable_reference}" > "${roundtrip}"
+          cmp --silent "${RELEASE_SET}" "${roundtrip}"
+          "${REGCTL}" manifest get "${immutable_reference}" --format raw-body > "${manifest}"
+          echo "repository=${catalog_repository}" >> "${GITHUB_OUTPUT}"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          echo "manifest=${manifest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Keylessly sign the immutable release-catalog digest
+        env:
+          CATALOG: ${{ steps.catalog.outputs.repository }}
+          DIGEST: ${{ steps.catalog.outputs.digest }}
+        run: cosign sign --yes "${CATALOG}@${DIGEST}"
+
+      - name: Attest durable release-catalog provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-name: ${{ steps.catalog.outputs.repository }}
+          subject-digest: ${{ steps.catalog.outputs.digest }}
+          push-to-registry: true
+
+      - name: Verify the durable catalog and create its immutable receipt
+        id: catalog-receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+          CATALOG: ${{ steps.catalog.outputs.repository }}
+          DIGEST: ${{ steps.catalog.outputs.digest }}
+          MANIFEST: ${{ steps.catalog.outputs.manifest }}
+          PLAN: ${{ steps.release-set.outputs.plan }}
+          BUNDLE: ${{ steps.release-set.outputs.bundle }}
+        run: |
+          set -euo pipefail
+          certificate_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ql3-image-release.yml@${GITHUB_REF}"
+          cosign verify \
+            --certificate-identity "${certificate_identity}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${CATALOG}@${DIGEST}"
+          gh attestation verify "oci://${CATALOG}@${DIGEST}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/ql3-image-release.yml" \
+            --source-digest "${GITHUB_SHA}" \
+            --source-ref "${GITHUB_REF}" \
+            --deny-self-hosted-runners \
+            --bundle-from-oci
+          receipt="${BUNDLE}/qinglong3-release-catalog-receipt-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          node scripts/ql3-release-catalog-contract.cjs \
+            --mode=receipt \
+            --plan="${PLAN}" \
+            --manifest="${MANIFEST}" \
+            --manifest-digest="${DIGEST}" \
+            --output="${receipt}"
+          node scripts/ql3-release-catalog-contract.cjs \
+            --mode=audit \
+            --plan="${PLAN}" \
+            --manifest="${MANIFEST}" \
+            --manifest-digest="${DIGEST}" \
+            --receipt="${receipt}" > "${RUNNER_TEMP}/release-catalog-audit.json"
+          echo "receipt=${receipt}" >> "${GITHUB_OUTPUT}"
+
+      - name: Attest the immutable release-catalog receipt
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: ${{ steps.catalog-receipt.outputs.receipt }}
+
       - name: Publish the deployment digest lock
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}
-          path: ${{ steps.release-set.outputs.report }}
+          path: ${{ steps.release-set.outputs.bundle }}
           if-no-files-found: error
           retention-days: 90
           compression-level: 0

@@ -9,6 +9,7 @@ const {
   auditReleaseSet,
   createReleaseSet,
   createVerifiedImageRecord,
+  inspectReleaseSet,
   parseArguments,
   runCli,
 } = require('../../scripts/ql3-release-set-contract.cjs');
@@ -216,6 +217,69 @@ test('rejects mutable identity, malformed owner and post-aggregate drift', () =>
   );
 });
 
+test('inspects a release set without short-lived candidate or image records', () => {
+  for (const scope of ['local', 'cluster', 'all']) {
+    const releaseCandidate = candidate(scope);
+    const releaseSet = createReleaseSet({
+      root,
+      candidate: releaseCandidate,
+      records: recordsFor(releaseCandidate),
+      ...identity,
+      releaseScope: scope,
+    });
+    const inspection = inspectReleaseSet(releaseSet, {
+      ...identity,
+      releaseScope: scope,
+    });
+    assert.equal(inspection.compatible, true);
+    assert.equal(inspection.imageCount, releaseCandidate.images.length);
+    assert.equal(inspection.sourceRecordsReplayed, false);
+  }
+});
+
+test('standalone inspection rejects image, family and self-digest drift', () => {
+  const releaseCandidate = candidate('cluster');
+  const releaseSet = createReleaseSet({
+    root,
+    candidate: releaseCandidate,
+    records: recordsFor(releaseCandidate),
+    ...identity,
+    releaseScope: 'cluster',
+  });
+  for (const mutate of [
+    (value) => {
+      value.images[0].repository = 'other';
+    },
+    (value) => {
+      value.deploymentFamilies.cluster.images.pop();
+    },
+    (value) => {
+      value.releaseSetDigest = `sha256:${'0'.repeat(64)}`;
+    },
+  ]) {
+    const drifted = JSON.parse(JSON.stringify(releaseSet));
+    mutate(drifted);
+    assert.throws(
+      () =>
+        inspectReleaseSet(drifted, {
+          ...identity,
+          releaseScope: 'cluster',
+        }),
+      /standalone release set/,
+    );
+  }
+  assert.throws(
+    () =>
+      inspectReleaseSet(releaseSet, {
+        ...identity,
+        version: '3.0.0+unreviewed',
+        sourceRef: 'refs/tags/v3.0.0+unreviewed',
+        releaseScope: 'cluster',
+      }),
+    /expected release identity is invalid/,
+  );
+});
+
 test('CLI records, aggregates and audits exact no-replace files', (t) => {
   const directory = temporaryDirectory(t);
   const recordsDirectory = path.join(directory, 'records');
@@ -268,6 +332,22 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
       output,
     ).compatible,
     true,
+  );
+  assert.equal(
+    runCli(
+      [
+        '--mode=inspect',
+        `--version=${version}`,
+        `--source-revision=${identity.sourceRevision}`,
+        `--source-ref=${identity.sourceRef}`,
+        '--release-scope=local',
+        `--repository-owner=${identity.repositoryOwner}`,
+        `--report=${setPath}`,
+      ],
+      root,
+      output,
+    ).verification,
+    'standalone_structure_identity_and_self_digest',
   );
   assert.throws(
     () =>

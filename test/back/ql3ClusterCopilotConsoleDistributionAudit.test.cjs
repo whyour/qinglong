@@ -89,6 +89,25 @@ test('rejects verifier, embedded artifact and release workflow drift', () => {
   }
 });
 
+test('rejects an Admin release without the durable OCI catalog', () => {
+  const result = auditClusterCopilotConsoleDistribution({
+    root: ROOT,
+    readFile: intercept('.github/workflows/ql3-image-release.yml', (source) =>
+      source.replace(
+        'Publish and round-trip the durable OCI release catalog',
+        'Durable catalog removed',
+      ),
+    ),
+  });
+  assert.equal(result.compatible, false);
+  assert.equal(
+    result.findings.some(
+      (entry) => entry.code === 'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',
+    ),
+    true,
+  );
+});
+
 test('rejects external workstation ceremony and offline audit widening', () => {
   const fixtures = [
     [

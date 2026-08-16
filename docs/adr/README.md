@@ -431,6 +431,7 @@
 | [ADR-0425](./ADR-0425-deployment-family-release-candidate-contract.md)                        | Deployment-family Release Candidate Contract                                                                                                                      | Accepted |
 | [ADR-0426](./ADR-0426-source-derived-release-version-transition.md)                           | Source-derived QingLong 3.0 Release Version Transition                                                                                                             | Accepted |
 | [ADR-0427](./ADR-0427-complete-cross-image-release-set.md)                                   | 完整跨镜像发布集与部署 Digest Lock                                                                                                                                 | Accepted |
+| [ADR-0428](./ADR-0428-durable-oci-release-catalog.md)                                        | 持久化 OCI Release Catalog 与独立部署验真                                                                                                                          | Accepted |
 
 ## 规则
 

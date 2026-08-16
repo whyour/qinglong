@@ -254,6 +254,8 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       '--bundle-from-oci',
       'Promote tags only after the complete set is verified',
       'Attest the complete release-set file provenance',
+      'Publish and round-trip the durable OCI release catalog',
+      'Attest durable release-catalog provenance',
     ],
     'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',
   );
