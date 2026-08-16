@@ -34,6 +34,50 @@ deploy/console/ql3-cluster-copilot/verify-release.sh \
   refs/tags/v3.0.0-alpha.0
 ```
 
+For a release acceptance ceremony, prefer the source-tag workstation runner.
+Create a current-owner `0700` report directory and a canonical `0600` file
+containing only a short-lived GitHub token. Pass canonical absolute executable
+paths (resolve Homebrew symlinks first). The token is sent only to the three
+`gh attestation verify` children, never in argv, the report or the `cosign` and
+`docker` environments.
+
+```sh
+node scripts/ql3-cluster-admin-release-workstation-ceremony.cjs \
+  --image=ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:REPLACE_64_HEX \
+  --repository=replace-owner/qinglong \
+  --source-revision=REPLACE_40_HEX_SOURCE_REVISION \
+  --source-ref=refs/tags/v3.0.0-alpha.0 \
+  --cosign=/canonical/absolute/cosign \
+  --gh=/canonical/absolute/gh \
+  --docker=/canonical/absolute/docker \
+  --github-token-file=/absolute/private/release/github-token \
+  --output=/absolute/private/release/admin-ceremony.json
+```
+
+In addition to the signature, provenance, CycloneDX and OS-vulnerability
+checks, the runner pulls the same immutable digest, confirms its local
+`RepoDigests` binding, and runs the image-carried `evidence-verify` command on
+a fixed non-sensitive vector with network disabled, a read-only root, no
+capabilities, no-new-privileges, 128 MiB, 0.25 CPU and 32 PIDs. It writes one
+new `0600` low-sensitive report and will not replace an existing file.
+
+Audit that report independently against the expected public release identity:
+
+```sh
+node scripts/ql3-cluster-admin-release-workstation-ceremony-audit.cjs \
+  --report=/absolute/private/release/admin-ceremony.json \
+  --image=ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:REPLACE_64_HEX \
+  --repository=replace-owner/qinglong \
+  --source-revision=REPLACE_40_HEX_SOURCE_REVISION \
+  --source-ref=refs/tags/v3.0.0-alpha.0
+```
+
+The offline audit verifies canonical encoding, exact structure, tool and
+transcript digests, isolation claims and expected release binding. It does not
+replay registry or transparency-log queries and cannot turn the unsigned local
+report into an attestation or action authority. Keep the report private even
+though it contains no credential or workstation identity.
+
 After verification, pull that exact digest. The signature covers the embedded
 host launcher and templates as part of the image filesystem. Operators may
 either use the launcher from the matching reviewed tag or extract its exact

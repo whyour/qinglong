@@ -6,6 +6,9 @@ const path = require('node:path');
 const FILES = Object.freeze({
   launcher: 'deploy/console/ql3-cluster-copilot/docker-loopback.sh',
   verifier: 'deploy/console/ql3-cluster-copilot/verify-release.sh',
+  ceremony: 'scripts/ql3-cluster-admin-release-workstation-ceremony.cjs',
+  ceremonyAudit:
+    'scripts/ql3-cluster-admin-release-workstation-ceremony-audit.cjs',
   environment:
     'deploy/console/ql3-cluster-copilot/host-environment.example.json',
   image: 'deploy/containers/ql3-cluster-admin/Dockerfile',
@@ -107,8 +110,70 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
   );
   rejectFragments(
     'verifier',
-    [':latest', 'refs/heads/', '--insecure-ignore-tlog', '--certificate-identity-regexp'],
+    [
+      ':latest',
+      'refs/heads/',
+      '--insecure-ignore-tlog',
+      '--certificate-identity-regexp',
+    ],
     'QL3_CLUSTER_ADMIN_RELEASE_VERIFIER_WIDENED',
+  );
+
+  requireFragments(
+    'ceremony',
+    [
+      "'qinglong/cluster-admin-release-workstation-ceremony@v1'",
+      'GH_TOKEN: token.token',
+      "'--certificate-identity'",
+      "'--certificate-oidc-issuer'",
+      "'https://token.actions.githubusercontent.com'",
+      "'--signer-workflow'",
+      "'--source-digest'",
+      "'--source-ref'",
+      "'--deny-self-hosted-runners'",
+      "'--bundle-from-oci'",
+      "'https://cyclonedx.org/bom'",
+      "'https://qinglong.dev/attestations/image-os-vulnerability/v1'",
+      "'immutable_image_pull'",
+      "'local_digest_inspection'",
+      "'embedded_evidence_verifier'",
+      "'--read-only'",
+      "'--network',\n          'none'",
+      "'--cap-drop'",
+      "'no-new-privileges'",
+      "'10001:10001'",
+      "'128m'",
+      "'0.25'",
+      "'evidence-verify'",
+      "reportAttestation: 'none'",
+      'writeNoReplace(options.output, report)',
+    ],
+    'QL3_CLUSTER_ADMIN_RELEASE_WORKSTATION_CEREMONY_DRIFT',
+  );
+  rejectFragments(
+    'ceremony',
+    [
+      'shell: true',
+      'env: process.env',
+      ':latest',
+      '--privileged',
+      'GH_TOKEN: token.token,\n    ...publicEnv',
+    ],
+    'QL3_CLUSTER_ADMIN_RELEASE_WORKSTATION_CEREMONY_WIDENED',
+  );
+  requireFragments(
+    'ceremonyAudit',
+    [
+      "'qinglong/cluster-admin-release-workstation-ceremony-audit@v1'",
+      'report must be one canonical owner-private bounded file',
+      "externalResults: 'not_replayed'",
+      "offlineAudit: 'structure_and_digest_only'",
+      "reportAttestation: 'none'",
+      "actionAuthority: 'none'",
+      'O_NOFOLLOW',
+      'canonicalize(unsigned)',
+    ],
+    'QL3_CLUSTER_ADMIN_RELEASE_WORKSTATION_AUDIT_DRIFT',
   );
 
   let environment;
@@ -128,8 +193,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
   const expectedEnvironment = {
     QL3_COPILOT_CONSOLE_IMAGE:
       'ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:' + '0'.repeat(64),
-    QL3_COPILOT_CONSOLE_PRIVATE_ROOT:
-      '/absolute/private/ql3-copilot-console',
+    QL3_COPILOT_CONSOLE_PRIVATE_ROOT: '/absolute/private/ql3-copilot-console',
     QL3_COPILOT_CONSOLE_NETWORK: 'qinglong3-copilot-console-egress',
     QL3_COPILOT_CONSOLE_PORT: '5701',
     QL3_COPILOT_CONSOLE_RESOURCE_CLASS: 'compact',
@@ -225,6 +289,8 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
     hostPublication: '127.0.0.1',
     kubernetesResident: false,
     additionalWorkspacePackages: 0,
+    externalWorkstationCeremony: 'source-tag-private-report',
+    ceremonyStatus: 'implementation-ready-public-release-pending',
     findings: Object.freeze(findings),
     compatible: findings.length === 0,
   });

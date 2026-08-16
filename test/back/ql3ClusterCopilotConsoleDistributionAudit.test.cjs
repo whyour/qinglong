@@ -27,6 +27,8 @@ test('accepts the signed multi-architecture Admin OCI workstation distribution',
     hostPublication: '127.0.0.1',
     kubernetesResident: false,
     additionalWorkspacePackages: 0,
+    externalWorkstationCeremony: 'source-tag-private-report',
+    ceremonyStatus: 'implementation-ready-public-release-pending',
     findings: [],
     compatible: true,
   });
@@ -34,7 +36,8 @@ test('accepts the signed multi-architecture Admin OCI workstation distribution',
 
 test('rejects remote publication and weakened image runtime authority', () => {
   for (const transform of [
-    (source) => source.replace('127.0.0.1:$port:$port/tcp', '0.0.0.0:$port:$port/tcp'),
+    (source) =>
+      source.replace('127.0.0.1:$port:$port/tcp', '0.0.0.0:$port:$port/tcp'),
     (source) => source.replace('--cap-drop ALL', '--privileged'),
     (source) => source.replace('--network "$network"', '--network host'),
   ]) {
@@ -68,11 +71,48 @@ test('rejects verifier, embedded artifact and release workflow drift', () => {
     ],
     [
       '.github/workflows/ql3-image-release.yml',
-      (source) => source.replace(
-        'Promote only the verified digest to immutable release tags',
-        'Promote mutable release tags',
-      ),
+      (source) =>
+        source.replace(
+          'Promote only the verified digest to immutable release tags',
+          'Promote mutable release tags',
+        ),
       'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',
+    ],
+  ];
+  for (const [target, transform, code] of fixtures) {
+    const report = auditClusterCopilotConsoleDistribution({
+      root: ROOT,
+      readFile: intercept(target, transform),
+    });
+    assert.equal(report.compatible, false);
+    assert.ok(report.findings.some((finding) => finding.code === code));
+  }
+});
+
+test('rejects external workstation ceremony and offline audit widening', () => {
+  const fixtures = [
+    [
+      'scripts/ql3-cluster-admin-release-workstation-ceremony.cjs',
+      (source) =>
+        source.replace(
+          "'--network',\n          'none'",
+          "'--network',\n          'default'",
+        ),
+      'QL3_CLUSTER_ADMIN_RELEASE_WORKSTATION_CEREMONY_DRIFT',
+    ],
+    [
+      'scripts/ql3-cluster-admin-release-workstation-ceremony.cjs',
+      (source) => source.replace('windowsHide: true', 'shell: true'),
+      'QL3_CLUSTER_ADMIN_RELEASE_WORKSTATION_CEREMONY_WIDENED',
+    ],
+    [
+      'scripts/ql3-cluster-admin-release-workstation-ceremony-audit.cjs',
+      (source) =>
+        source.replace(
+          "externalResults: 'not_replayed'",
+          "externalResults: 'verified'",
+        ),
+      'QL3_CLUSTER_ADMIN_RELEASE_WORKSTATION_AUDIT_DRIFT',
     ],
   ];
   for (const [target, transform, code] of fixtures) {
