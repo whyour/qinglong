@@ -50,6 +50,8 @@ function main() {
         'packages/ql3-local-owner-cli/dist/deployment/service-manager/',
       ) ||
       file ===
+        'packages/ql3-local-owner-cli/dist/deployment/foundation/error.js' ||
+      file ===
         'packages/ql3-local-owner-cli/dist/deployment/foundation/contract.js' ||
       file.startsWith('packages/ql3-local-command-file/dist/');
     if (!allowed) findings.push({ code: 'FORBIDDEN_BRIDGE_IMPORT', file });

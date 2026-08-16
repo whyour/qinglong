@@ -8,10 +8,8 @@ import {
   readPrivateLocalJsonFile,
 } from '@qinglong/local-command-file';
 
-import {
-  currentIdentity,
-  LocalDeploymentConfigurationError,
-} from '../foundation/contract';
+import { currentIdentity } from '../foundation/contract';
+import { LocalDeploymentConfigurationError } from '../foundation/error';
 import {
   advanceLocalCutoverInstanceHead,
   readLocalCutoverInstanceHead,

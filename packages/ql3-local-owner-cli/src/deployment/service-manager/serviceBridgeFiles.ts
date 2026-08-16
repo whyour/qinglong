@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { LocalDeploymentConfigurationError } from '../foundation/contract';
+import { LocalDeploymentConfigurationError } from '../foundation/error';
 
 const MAX_FILE_BYTES = 1024 * 1024;
 

@@ -8,6 +8,9 @@ import {
   type LocalComposeReleaseSelectionInput,
   type ResolvedLocalComposeReleaseSelection,
 } from '../compose/releaseSelection';
+import { LocalDeploymentConfigurationError } from './error';
+
+export { LocalDeploymentConfigurationError } from './error';
 
 const MAX_PATH_BYTES = 4_096;
 const SAFE_PATH_PATTERN = /^\/[A-Za-z0-9._/@-]+$/;
@@ -362,15 +365,6 @@ export interface LocalDeploymentComposeEvidenceCollectionResult {
     kind: 'compose';
     state: 'unchanged';
   }>;
-}
-
-export class LocalDeploymentConfigurationError extends TypeError {
-  readonly code = 'QL3_LOCAL_DEPLOYMENT_CONFIGURATION_INVALID';
-
-  constructor(message: string, options?: ErrorOptions) {
-    super(`Local deployment configuration is invalid: ${message}`, options);
-    this.name = 'LocalDeploymentConfigurationError';
-  }
 }
 
 function object(value: unknown, label: string): Record<string, unknown> {

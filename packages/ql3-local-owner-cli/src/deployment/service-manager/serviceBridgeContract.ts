@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 
-import { LocalDeploymentConfigurationError } from '../foundation/contract';
+import { LocalDeploymentConfigurationError } from '../foundation/error';
 
 const MAX_PATH_BYTES = 4_096;
 const SAFE_PATH_PATTERN = /^\/[A-Za-z0-9._/@-]+$/;

@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
 
-import { LocalDeploymentConfigurationError } from '../foundation/contract';
+import { LocalDeploymentConfigurationError } from '../foundation/error';
 import {
   normalizeLocalServiceBridgeCommand,
   normalizeLocalServiceManagerIntent,

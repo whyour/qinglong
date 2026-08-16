@@ -6,12 +6,16 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const yaml = require('js-yaml');
+const semver = require('semver');
 
-const COMMAND_SCHEMA = 'qinglong/kubernetes-deployment-command@v1';
+const COMMAND_SCHEMA = 'qinglong/kubernetes-deployment-command@v2';
 const LOCK_SCHEMA = 'qinglong/kubernetes-deployment-lock@v2';
 const CATALOG_SCHEMA = 'qinglong/release-catalog-consumption-ceremony@v1';
-const PREFLIGHT_SCHEMA = 'qinglong/kubernetes-deployment-preflight@v1';
-const RECEIPT_SCHEMA = 'qinglong/kubernetes-deployment-receipt@v1';
+const PREFLIGHT_SCHEMA = 'qinglong/kubernetes-deployment-preflight@v2';
+const RECEIPT_SCHEMA = 'qinglong/kubernetes-deployment-receipt@v2';
+const HEAD_SCHEMA = 'qinglong/kubernetes-deployment-head@v1';
+const HEAD_NAME = 'qinglong3-deployment-head';
+const HEAD_DATA_KEY = 'head.json';
 const FIELD_MANAGER = 'qinglong3-catalog-lock';
 const MAX_COMMAND_BYTES = 64 * 1024;
 const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
@@ -31,6 +35,7 @@ const CONTEXT_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,252})$/u;
 const REPOSITORY_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\/[a-z0-9._-]{1,100}$/u;
 const ROLE_ORDER = Object.freeze(['control', 'control-ai', 'admin', 'worker']);
+const TRANSITION_KINDS = Object.freeze(['install', 'upgrade', 'rollback']);
 const IMAGE_NAMES = Object.freeze({
   control: 'qinglong3-cluster-control',
   'control-ai': 'qinglong3-cluster-control-ai',
@@ -277,6 +282,44 @@ function writeNoReplace(target, value) {
   });
 }
 
+function expectedHead(value) {
+  if (
+    !exactKeys(value, [
+      'generation',
+      'deploymentDigest',
+      'lockDigest',
+      'stateDigest',
+    ]) ||
+    !Number.isSafeInteger(value.generation) ||
+    value.generation < 0 ||
+    (value.generation === 0 &&
+      (value.deploymentDigest !== null ||
+        value.lockDigest !== null ||
+        value.stateDigest !== null)) ||
+    (value.generation > 0 &&
+      (!DIGEST_PATTERN.test(value.deploymentDigest || '') ||
+        !DIGEST_PATTERN.test(value.lockDigest || '') ||
+        !DIGEST_PATTERN.test(value.stateDigest || '')))
+  ) {
+    fail('expected deployment head is invalid');
+  }
+  return Object.freeze({ ...value });
+}
+
+function transitionRequest(request) {
+  if (!TRANSITION_KINDS.includes(request.transitionKind)) {
+    fail('deployment transition kind is invalid');
+  }
+  const head = expectedHead(request.expectedHead);
+  if (
+    (request.transitionKind === 'install' && head.generation !== 0) ||
+    (request.transitionKind !== 'install' && head.generation === 0)
+  ) {
+    fail('deployment transition head is inconsistent');
+  }
+  return Object.freeze({ transitionKind: request.transitionKind, head });
+}
+
 function parseCommand(value) {
   if (
     !exactKeys(value, ['schemaVersion', 'schema', 'operation', 'request']) ||
@@ -296,6 +339,8 @@ function parseCommand(value) {
         'kubeconfig',
         'context',
         'expectedClusterUid',
+        'transitionKind',
+        'expectedHead',
         'output',
       ]) ||
       !UUID_PATTERN.test(request.preflightId || '') ||
@@ -305,6 +350,7 @@ function parseCommand(value) {
     ) {
       fail('preflight command is invalid');
     }
+    const transition = transitionRequest(request);
     return Object.freeze({
       schemaVersion: 1,
       schema: COMMAND_SCHEMA,
@@ -317,6 +363,8 @@ function parseCommand(value) {
         kubeconfig: artifact(request.kubeconfig, 'kubeconfig'),
         context: request.context,
         expectedClusterUid: request.expectedClusterUid,
+        transitionKind: transition.transitionKind,
+        expectedHead: transition.head,
         output: resolveCanonicalAbsolute(request.output, 'preflight output'),
       }),
     });
@@ -332,6 +380,8 @@ function parseCommand(value) {
         'kubeconfig',
         'context',
         'expectedClusterUid',
+        'transitionKind',
+        'expectedHead',
         'output',
       ]) ||
       !UUID_PATTERN.test(request.mutationId || '') ||
@@ -341,6 +391,7 @@ function parseCommand(value) {
     ) {
       fail('apply command is invalid');
     }
+    const transition = transitionRequest(request);
     return Object.freeze({
       schemaVersion: 1,
       schema: COMMAND_SCHEMA,
@@ -354,6 +405,8 @@ function parseCommand(value) {
         kubeconfig: artifact(request.kubeconfig, 'kubeconfig'),
         context: request.context,
         expectedClusterUid: request.expectedClusterUid,
+        transitionKind: transition.transitionKind,
+        expectedHead: transition.head,
         output: resolveCanonicalAbsolute(
           request.output,
           'apply receipt output',
@@ -809,6 +862,70 @@ function resourceIdentity(resource) {
   }`;
 }
 
+function resourceInventory(resources) {
+  const inventory = resources
+    .map((resource) => {
+      const namespace = resource.metadata?.namespace ?? null;
+      const item = {
+        apiVersion: resource.apiVersion,
+        kind: resource.kind,
+        namespace,
+        name: resource.metadata?.name,
+      };
+      if (
+        Object.values(item).some(
+          (entry) => entry !== null && (typeof entry !== 'string' || !entry),
+        )
+      ) {
+        fail('deployment resource inventory is invalid');
+      }
+      return Object.freeze(item);
+    })
+    .sort((left, right) => {
+      const leftIdentity = JSON.stringify(left);
+      const rightIdentity = JSON.stringify(right);
+      return leftIdentity < rightIdentity
+        ? -1
+        : leftIdentity > rightIdentity
+        ? 1
+        : 0;
+    });
+  const identities = inventory.map((item) => JSON.stringify(item));
+  if (new Set(identities).size !== identities.length) {
+    fail('deployment resource inventory is duplicated');
+  }
+  return Object.freeze(inventory);
+}
+
+function containsExactString(value, expected, depth = 0) {
+  if (depth > MAX_STRUCTURE_DEPTH) fail('locked manifest is too deep');
+  if (typeof value === 'string') return value === expected;
+  if (value === null || typeof value !== 'object') return false;
+  if (Array.isArray(value)) {
+    return value.some((entry) =>
+      containsExactString(entry, expected, depth + 1),
+    );
+  }
+  return Object.values(value).some((entry) =>
+    containsExactString(entry, expected, depth + 1),
+  );
+}
+
+function deploymentHeadNamespace(resources, authority) {
+  const namespaces = new Set(
+    resources
+      .filter((resource) =>
+        containsExactString(resource, authority.references.control),
+      )
+      .map((resource) => resource.metadata?.namespace)
+      .filter((namespace) => typeof namespace === 'string'),
+  );
+  if (namespaces.size !== 1) {
+    fail('deployment control namespace authority is invalid');
+  }
+  return [...namespaces][0];
+}
+
 function containsQingLongAuthority(value, references) {
   if (typeof value === 'string') {
     const role = roleFromImage(value);
@@ -950,9 +1067,30 @@ function inspectInputs(request) {
     fail('lock report digest changed');
   }
   const manifestContents = utf8(manifest, 'locked manifest');
-  inspectLockedManifest(manifestContents, authority);
+  const inspection = inspectLockedManifest(manifestContents, authority);
   if (manifest.digest !== authority.report.manifest.outputDigest) {
     fail('locked manifest and report digest differ');
+  }
+  if (
+    JSON.stringify(authority.report.requiredImages) !==
+    JSON.stringify(ROLE_ORDER)
+  ) {
+    fail('cluster deployment requires the complete role surface');
+  }
+  const headNamespace = deploymentHeadNamespace(
+    inspection.resources,
+    authority,
+  );
+  if (
+    inspection.resources.some(
+      (resource) =>
+        resource.apiVersion === 'v1' &&
+        resource.kind === 'ConfigMap' &&
+        resource.metadata?.namespace === headNamespace &&
+        resource.metadata?.name === HEAD_NAME,
+    )
+  ) {
+    fail('locked manifest cannot own the deployment head');
   }
   const executable = verifyExpected(
     readStableFile(request.kubectl.path, 'kubectl', MAX_EXECUTABLE_BYTES, {
@@ -973,6 +1111,9 @@ function inspectInputs(request) {
     manifestContents,
     reportFile,
     authority,
+    resources: inspection.resources,
+    resourceInventory: resourceInventory(inspection.resources),
+    headNamespace,
     executable,
     kubeconfig,
   });
@@ -1005,14 +1146,21 @@ function defaultRunProcess(executable, args, input) {
   }
 }
 
-function runStep(inputs, request, name, argumentsAfterTarget, runner) {
+function runStep(
+  inputs,
+  request,
+  name,
+  argumentsAfterTarget,
+  runner,
+  input = inputs.manifestContents,
+) {
   const args = [
     `--kubeconfig=${inputs.kubeconfig.path}`,
     `--context=${request.context}`,
     '--request-timeout=60s',
     ...argumentsAfterTarget,
   ];
-  const result = runner(inputs.executable.path, args, inputs.manifestContents);
+  const result = runner(inputs.executable.path, args, input);
   const stdout = typeof result.stdout === 'string' ? result.stdout : '';
   const stderr = typeof result.stderr === 'string' ? result.stderr : '';
   if (
@@ -1146,6 +1294,420 @@ function toolSummary(inputs) {
   });
 }
 
+function validateResourceInventory(value) {
+  if (
+    !Array.isArray(value) ||
+    value.length < 1 ||
+    value.length > MAX_RESOURCE_COUNT
+  ) {
+    fail('deployment resource inventory is invalid');
+  }
+  const serialized = [];
+  for (const item of value) {
+    if (
+      !exactKeys(item, ['apiVersion', 'kind', 'namespace', 'name']) ||
+      typeof item.apiVersion !== 'string' ||
+      !item.apiVersion ||
+      typeof item.kind !== 'string' ||
+      !item.kind ||
+      (item.namespace !== null &&
+        (typeof item.namespace !== 'string' || !item.namespace)) ||
+      typeof item.name !== 'string' ||
+      !item.name
+    ) {
+      fail('deployment resource inventory is invalid');
+    }
+    serialized.push(JSON.stringify(item));
+  }
+  if (
+    new Set(serialized).size !== serialized.length ||
+    JSON.stringify([...serialized].sort()) !== JSON.stringify(serialized)
+  ) {
+    fail('deployment resource inventory ordering is invalid');
+  }
+}
+
+function deploymentPlan(inputs) {
+  return Object.freeze({
+    lock: lockSummary(inputs),
+    resources: inputs.resourceInventory,
+  });
+}
+
+function validateDeploymentPlan(value) {
+  if (!exactKeys(value, ['lock', 'resources'])) {
+    fail('deployment plan is invalid');
+  }
+  validateLockSummary(value.lock);
+  validateResourceInventory(value.resources);
+}
+
+function validateDeploymentSummary(value) {
+  if (!exactKeys(value, ['deploymentDigest', 'lock', 'resources'])) {
+    fail('deployment summary is invalid');
+  }
+  if (!DIGEST_PATTERN.test(value.deploymentDigest || '')) {
+    fail('deployment summary digest is invalid');
+  }
+  validateLockSummary(value.lock);
+  validateResourceInventory(value.resources);
+}
+
+function headSnapshot(namespace, state) {
+  if (state === null) {
+    return Object.freeze({
+      namespace,
+      name: HEAD_NAME,
+      generation: 0,
+      deploymentDigest: null,
+      lockDigest: null,
+      stateDigest: null,
+    });
+  }
+  if (state.phase !== 'committed') {
+    fail('deployment head is not committed');
+  }
+  return Object.freeze({
+    namespace,
+    name: HEAD_NAME,
+    generation: state.generation,
+    deploymentDigest: state.deployment.deploymentDigest,
+    lockDigest: state.deployment.lock.lockDigest,
+    stateDigest: state.stateDigest,
+  });
+}
+
+function validateHeadSnapshot(value) {
+  if (
+    !exactKeys(value, [
+      'namespace',
+      'name',
+      'generation',
+      'deploymentDigest',
+      'lockDigest',
+      'stateDigest',
+    ]) ||
+    !CONTEXT_PATTERN.test(value.namespace || '') ||
+    value.name !== HEAD_NAME
+  ) {
+    fail('deployment head snapshot is invalid');
+  }
+  expectedHead({
+    generation: value.generation,
+    deploymentDigest: value.deploymentDigest,
+    lockDigest: value.lockDigest,
+    stateDigest: value.stateDigest,
+  });
+}
+
+function expectedSnapshot(request, namespace) {
+  return Object.freeze({
+    namespace,
+    name: HEAD_NAME,
+    ...request.expectedHead,
+  });
+}
+
+function validateTransition(current, request, planned) {
+  const expected = expectedSnapshot(request, current.namespace);
+  if (JSON.stringify(expected) !== JSON.stringify(current.snapshot)) {
+    fail('deployment head compare-and-swap authority changed');
+  }
+  if (request.transitionKind === 'install') {
+    if (current.state !== null)
+      fail('deployment install requires an empty head');
+    return;
+  }
+  if (current.state === null || current.state.phase !== 'committed') {
+    fail('deployment transition requires a committed head');
+  }
+  const active = current.state.deployment;
+  const activeVersion = active.lock.release.version;
+  const plannedVersion = planned.lock.release.version;
+  if (request.transitionKind === 'upgrade') {
+    if (!semver.gt(plannedVersion, activeVersion)) {
+      fail('deployment upgrade version must increase');
+    }
+    const plannedResources = new Set(
+      planned.resources.map((item) => JSON.stringify(item)),
+    );
+    if (
+      active.resources.some(
+        (item) => !plannedResources.has(JSON.stringify(item)),
+      )
+    ) {
+      fail('deployment upgrade cannot retire resources implicitly');
+    }
+    return;
+  }
+  if (
+    current.state.previous === null ||
+    !semver.lt(plannedVersion, activeVersion) ||
+    JSON.stringify(planned.lock) !==
+      JSON.stringify(current.state.previous.lock) ||
+    JSON.stringify(planned.resources) !==
+      JSON.stringify(current.state.previous.resources) ||
+    JSON.stringify(planned.resources) !== JSON.stringify(active.resources)
+  ) {
+    fail('deployment rollback must restore the exact previous resource set');
+  }
+}
+
+function validateHeadTransition(value) {
+  if (
+    !exactKeys(value, [
+      'kind',
+      'mutationId',
+      'commandDigest',
+      'preflightDigest',
+      'expectedHead',
+    ]) ||
+    !TRANSITION_KINDS.includes(value.kind) ||
+    !UUID_PATTERN.test(value.mutationId || '') ||
+    !DIGEST_PATTERN.test(value.commandDigest || '') ||
+    !DIGEST_PATTERN.test(value.preflightDigest || '')
+  ) {
+    fail('deployment head transition is invalid');
+  }
+  validateHeadSnapshot(value.expectedHead);
+}
+
+function deploymentEvidence(state) {
+  return Object.freeze({
+    schemaVersion: 1,
+    schema: 'qinglong/kubernetes-deployment-evidence@v1',
+    generation: state.generation,
+    transition: state.transition,
+    previous: state.previous,
+    planned: state.planned,
+    target: state.target,
+    tool: state.tool,
+    steps: state.steps,
+  });
+}
+
+function validateHeadState(value) {
+  if (
+    !exactKeys(value, [
+      'schemaVersion',
+      'schema',
+      'phase',
+      'generation',
+      'transition',
+      'previous',
+      'planned',
+      'target',
+      'tool',
+      'steps',
+      'deployment',
+      'stateDigest',
+    ]) ||
+    value.schemaVersion !== 1 ||
+    value.schema !== HEAD_SCHEMA ||
+    !['applying', 'committed'].includes(value.phase) ||
+    !Number.isSafeInteger(value.generation) ||
+    value.generation < 1 ||
+    !DIGEST_PATTERN.test(value.stateDigest || '') ||
+    !Array.isArray(value.steps)
+  ) {
+    fail('deployment head state is invalid');
+  }
+  validateHeadTransition(value.transition);
+  if (value.previous !== null) validateDeploymentSummary(value.previous);
+  validateDeploymentPlan(value.planned);
+  validateTargetSummary(value.target);
+  validateToolSummary(value.tool);
+  for (const step of value.steps) validateStepRecord(step);
+  if (value.steps.some((step) => step.status !== 0)) {
+    fail('deployment head contains a failed step');
+  }
+  if (value.phase === 'applying') {
+    if (value.steps.length !== 0 || value.deployment !== null) {
+      fail('applying deployment head is invalid');
+    }
+  } else {
+    if (
+      value.steps.length !== 5 ||
+      JSON.stringify(value.steps.map((step) => step.name)) !==
+        JSON.stringify([
+          'cluster_identity_before',
+          'server_side_dry_run',
+          'server_side_apply',
+          'server_side_convergence_read',
+          'cluster_identity_after',
+        ]) ||
+      value.deployment === null ||
+      JSON.stringify(value.deployment.lock) !==
+        JSON.stringify(value.planned.lock) ||
+      JSON.stringify(value.deployment.resources) !==
+        JSON.stringify(value.planned.resources)
+    ) {
+      fail('committed deployment head is invalid');
+    }
+    validateDeploymentSummary(value.deployment);
+    const expectedDigest = sha256(
+      Buffer.from(JSON.stringify(deploymentEvidence(value)), 'utf8'),
+    );
+    if (value.deployment.deploymentDigest !== expectedDigest) {
+      fail('deployment evidence digest is invalid');
+    }
+  }
+  const { stateDigest, ...unsigned } = value;
+  if (stateDigest !== sha256(Buffer.from(JSON.stringify(unsigned), 'utf8'))) {
+    fail('deployment head self digest is invalid');
+  }
+  return value;
+}
+
+function headReadStep(inputs, request, runner) {
+  const step = runStep(
+    inputs,
+    request,
+    'deployment_head_read',
+    [
+      'get',
+      'configmap',
+      HEAD_NAME,
+      `--namespace=${inputs.headNamespace}`,
+      '--ignore-not-found=true',
+      '-o=json',
+    ],
+    runner,
+    '',
+  );
+  if (step.status !== 0) fail('deployment head read failed');
+  const { stdout: _stdout, ...record } = step;
+  if (!step.stdout.trim()) {
+    return Object.freeze({
+      state: null,
+      resourceVersion: null,
+      namespace: inputs.headNamespace,
+      snapshot: headSnapshot(inputs.headNamespace, null),
+      record: Object.freeze(record),
+    });
+  }
+  let configMap;
+  let state;
+  try {
+    configMap = JSON.parse(step.stdout);
+    state = JSON.parse(configMap?.data?.[HEAD_DATA_KEY]);
+  } catch {
+    fail('deployment head response is invalid');
+  }
+  if (
+    configMap?.apiVersion !== 'v1' ||
+    configMap?.kind !== 'ConfigMap' ||
+    configMap?.metadata?.name !== HEAD_NAME ||
+    configMap?.metadata?.namespace !== inputs.headNamespace ||
+    typeof configMap?.metadata?.resourceVersion !== 'string' ||
+    !configMap.metadata.resourceVersion
+  ) {
+    fail('deployment head identity is invalid');
+  }
+  validateHeadState(state);
+  return Object.freeze({
+    state,
+    resourceVersion: configMap.metadata.resourceVersion,
+    namespace: inputs.headNamespace,
+    snapshot:
+      state.phase === 'committed'
+        ? headSnapshot(inputs.headNamespace, state)
+        : null,
+    record: Object.freeze(record),
+  });
+}
+
+function headConfigMap(inputs, state, resourceVersion) {
+  return JSON.stringify({
+    apiVersion: 'v1',
+    kind: 'ConfigMap',
+    metadata: {
+      name: HEAD_NAME,
+      namespace: inputs.headNamespace,
+      labels: { 'app.kubernetes.io/managed-by': FIELD_MANAGER },
+      ...(resourceVersion === null ? {} : { resourceVersion }),
+    },
+    data: { [HEAD_DATA_KEY]: JSON.stringify(state) },
+  });
+}
+
+function writeHead(inputs, request, runner, state, resourceVersion, name) {
+  const operation = resourceVersion === null ? 'create' : 'replace';
+  const step = runStep(
+    inputs,
+    request,
+    name,
+    [operation, '--validate=strict', '-f=-', '-o=json'],
+    runner,
+    headConfigMap(inputs, state, resourceVersion),
+  );
+  if (step.status !== 0) fail(`deployment head ${operation} was rejected`);
+  let written;
+  try {
+    written = JSON.parse(step.stdout);
+  } catch {
+    fail('deployment head write response is invalid');
+  }
+  if (
+    typeof written?.metadata?.resourceVersion !== 'string' ||
+    !written.metadata.resourceVersion ||
+    written?.data?.[HEAD_DATA_KEY] !== JSON.stringify(state)
+  ) {
+    fail('deployment head write did not converge');
+  }
+  const { stdout, ...record } = step;
+  return Object.freeze({
+    record: Object.freeze(record),
+    resourceVersion: written.metadata.resourceVersion,
+  });
+}
+
+function applyingHead(commandState, preflight, inputs, current) {
+  const unsigned = {
+    schemaVersion: 1,
+    schema: HEAD_SCHEMA,
+    phase: 'applying',
+    generation: current.state === null ? 1 : current.state.generation + 1,
+    transition: {
+      kind: commandState.command.request.transitionKind,
+      mutationId: commandState.command.request.mutationId,
+      commandDigest: commandState.commandDigest,
+      preflightDigest: preflight.report.preflightDigest,
+      expectedHead: current.snapshot,
+    },
+    previous:
+      current.state === null
+        ? null
+        : Object.freeze({ ...current.state.deployment }),
+    planned: deploymentPlan(inputs),
+    target: targetSummary(inputs, commandState.command.request),
+    tool: toolSummary(inputs),
+    steps: [],
+    deployment: null,
+  };
+  return Object.freeze({
+    ...unsigned,
+    stateDigest: sha256(Buffer.from(JSON.stringify(unsigned), 'utf8')),
+  });
+}
+
+function committedHead(applying, steps) {
+  const evidenceState = { ...applying, phase: 'committed', steps };
+  delete evidenceState.stateDigest;
+  const deployment = Object.freeze({
+    deploymentDigest: sha256(
+      Buffer.from(JSON.stringify(deploymentEvidence(evidenceState)), 'utf8'),
+    ),
+    lock: applying.planned.lock,
+    resources: applying.planned.resources,
+  });
+  const unsigned = { ...evidenceState, deployment };
+  return Object.freeze({
+    ...unsigned,
+    stateDigest: sha256(Buffer.from(JSON.stringify(unsigned), 'utf8')),
+  });
+}
+
 function validatePreflight(value) {
   if (
     !exactKeys(value, [
@@ -1153,7 +1715,10 @@ function validatePreflight(value) {
       'schema',
       'preflightId',
       'commandDigest',
+      'transitionKind',
       'lock',
+      'resourceInventory',
+      'deploymentHead',
       'target',
       'tool',
       'steps',
@@ -1165,14 +1730,18 @@ function validatePreflight(value) {
     !UUID_PATTERN.test(value.preflightId || '') ||
     !DIGEST_PATTERN.test(value.commandDigest || '') ||
     !DIGEST_PATTERN.test(value.preflightDigest || '') ||
+    !TRANSITION_KINDS.includes(value.transitionKind) ||
     !Array.isArray(value.steps) ||
-    value.steps.length !== 2 ||
+    value.steps.length !== 3 ||
     value.steps[0]?.name !== 'cluster_identity_before' ||
-    value.steps[1]?.name !== 'server_side_dry_run' ||
+    value.steps[1]?.name !== 'deployment_head_read' ||
+    value.steps[2]?.name !== 'server_side_dry_run' ||
     !exactKeys(value.verification, [
       'catalogBoundLock',
       'clusterIdentityBound',
       'serverSideDryRun',
+      'deploymentHeadCompared',
+      'resourceInventoryClosed',
       'networkAccess',
       'kubernetesMutation',
       'externalResultsReplayed',
@@ -1184,6 +1753,8 @@ function validatePreflight(value) {
         catalogBoundLock: true,
         clusterIdentityBound: true,
         serverSideDryRun: true,
+        deploymentHeadCompared: true,
+        resourceInventoryClosed: true,
         networkAccess: true,
         kubernetesMutation: false,
         externalResultsReplayed: false,
@@ -1194,6 +1765,8 @@ function validatePreflight(value) {
     fail('deployment preflight report is invalid');
   }
   validateLockSummary(value.lock);
+  validateResourceInventory(value.resourceInventory);
+  validateHeadSnapshot(value.deploymentHead);
   validateTargetSummary(value.target);
   validateToolSummary(value.tool);
   for (const step of value.steps) validateStepRecord(step);
@@ -1307,17 +1880,28 @@ function createPreflight(commandState, dependencies = {}) {
   const output = outputTarget(request.output, 'preflight output');
   const inputs = inspectInputs(request);
   const runner = dependencies.runProcess ?? defaultRunProcess;
-  const steps = [
-    identityStep(inputs, request, runner, 'cluster_identity_before'),
-    dryRunStep(inputs, request, runner),
-  ];
+  const identity = identityStep(
+    inputs,
+    request,
+    runner,
+    'cluster_identity_before',
+  );
+  const current = headReadStep(inputs, request, runner);
+  if (current.state !== null && current.state.phase !== 'committed') {
+    fail('deployment head contains an unfinished transition');
+  }
+  validateTransition(current, request, deploymentPlan(inputs));
+  const steps = [identity, current.record, dryRunStep(inputs, request, runner)];
   revalidateStableInputs(inputs, request);
   const unsigned = {
     schemaVersion: 1,
     schema: PREFLIGHT_SCHEMA,
     preflightId: request.preflightId,
     commandDigest: commandState.commandDigest,
+    transitionKind: request.transitionKind,
     lock: lockSummary(inputs),
+    resourceInventory: inputs.resourceInventory,
+    deploymentHead: current.snapshot,
     target: targetSummary(inputs, request),
     tool: toolSummary(inputs),
     steps,
@@ -1325,6 +1909,8 @@ function createPreflight(commandState, dependencies = {}) {
       catalogBoundLock: true,
       clusterIdentityBound: true,
       serverSideDryRun: true,
+      deploymentHeadCompared: true,
+      resourceInventoryClosed: true,
       networkAccess: true,
       kubernetesMutation: false,
       externalResultsReplayed: false,
@@ -1349,7 +1935,12 @@ function readAndValidatePreflight(request, inputs) {
   const report = validatePreflight(file.value);
   if (
     report.preflightDigest !== request.preflight.expectedDigest ||
+    report.transitionKind !== request.transitionKind ||
     JSON.stringify(report.lock) !== JSON.stringify(lockSummary(inputs)) ||
+    JSON.stringify(report.resourceInventory) !==
+      JSON.stringify(inputs.resourceInventory) ||
+    JSON.stringify(report.deploymentHead) !==
+      JSON.stringify(expectedSnapshot(request, inputs.headNamespace)) ||
     JSON.stringify(report.target) !==
       JSON.stringify(targetSummary(inputs, request)) ||
     JSON.stringify(report.tool) !== JSON.stringify(toolSummary(inputs))
@@ -1357,6 +1948,46 @@ function readAndValidatePreflight(request, inputs) {
     fail('deployment preflight binding changed');
   }
   return Object.freeze({ file, report });
+}
+
+function receiptFromCommitted(state, namespace) {
+  if (state.phase !== 'committed') {
+    fail('deployment receipt requires a committed head');
+  }
+  const unsigned = {
+    schemaVersion: 1,
+    schema: RECEIPT_SCHEMA,
+    mutationId: state.transition.mutationId,
+    commandDigest: state.transition.commandDigest,
+    preflightDigest: state.transition.preflightDigest,
+    transitionKind: state.transition.kind,
+    lock: state.deployment.lock,
+    resourceInventory: state.deployment.resources,
+    deploymentHead: headSnapshot(namespace, state),
+    target: state.target,
+    tool: state.tool,
+    steps: state.steps,
+    verification: {
+      catalogBoundLock: true,
+      clusterIdentityBound: true,
+      serverSideDryRun: true,
+      serverSideApply: true,
+      convergenceRead: true,
+      deploymentHeadCas: true,
+      resourceInventoryClosed: true,
+      networkAccess: true,
+      kubernetesMutation: true,
+      crossResourceAtomicity: false,
+      externalResultsReplayed: false,
+      recovery: 'resume_exact_transition_from_target_head',
+      ambientHome: false,
+      ephemeralCache: true,
+    },
+  };
+  return Object.freeze({
+    ...unsigned,
+    receiptDigest: sha256(Buffer.from(JSON.stringify(unsigned), 'utf8')),
+  });
 }
 
 function validateReceipt(value, expectedCommandDigest) {
@@ -1367,7 +1998,10 @@ function validateReceipt(value, expectedCommandDigest) {
       'mutationId',
       'commandDigest',
       'preflightDigest',
+      'transitionKind',
       'lock',
+      'resourceInventory',
+      'deploymentHead',
       'target',
       'tool',
       'steps',
@@ -1380,6 +2014,7 @@ function validateReceipt(value, expectedCommandDigest) {
     value.commandDigest !== expectedCommandDigest ||
     !DIGEST_PATTERN.test(value.preflightDigest || '') ||
     !DIGEST_PATTERN.test(value.receiptDigest || '') ||
+    !TRANSITION_KINDS.includes(value.transitionKind) ||
     !Array.isArray(value.steps) ||
     JSON.stringify(value.steps.map((step) => step.name)) !==
       JSON.stringify([
@@ -1395,6 +2030,8 @@ function validateReceipt(value, expectedCommandDigest) {
       'serverSideDryRun',
       'serverSideApply',
       'convergenceRead',
+      'deploymentHeadCas',
+      'resourceInventoryClosed',
       'networkAccess',
       'kubernetesMutation',
       'crossResourceAtomicity',
@@ -1410,11 +2047,13 @@ function validateReceipt(value, expectedCommandDigest) {
         serverSideDryRun: true,
         serverSideApply: true,
         convergenceRead: true,
+        deploymentHeadCas: true,
+        resourceInventoryClosed: true,
         networkAccess: true,
         kubernetesMutation: true,
         crossResourceAtomicity: false,
         externalResultsReplayed: false,
-        recovery: 'reapply_exact_lock_with_same_field_manager',
+        recovery: 'resume_exact_transition_from_target_head',
         ambientHome: false,
         ephemeralCache: true,
       })
@@ -1422,6 +2061,8 @@ function validateReceipt(value, expectedCommandDigest) {
     fail('deployment receipt is invalid');
   }
   validateLockSummary(value.lock);
+  validateResourceInventory(value.resourceInventory);
+  validateHeadSnapshot(value.deploymentHead);
   validateTargetSummary(value.target);
   validateToolSummary(value.tool);
   for (const step of value.steps) validateStepRecord(step);
@@ -1452,28 +2093,91 @@ function existingReceipt(request, commandDigest) {
   return receipt;
 }
 
+function assertTransitionBinding(state, commandState, preflight, inputs) {
+  const request = commandState.command.request;
+  if (
+    state.transition.kind !== request.transitionKind ||
+    state.transition.mutationId !== request.mutationId ||
+    state.transition.commandDigest !== commandState.commandDigest ||
+    state.transition.preflightDigest !== preflight.report.preflightDigest ||
+    JSON.stringify(state.transition.expectedHead) !==
+      JSON.stringify(preflight.report.deploymentHead) ||
+    JSON.stringify(state.planned) !== JSON.stringify(deploymentPlan(inputs)) ||
+    JSON.stringify(state.target) !==
+      JSON.stringify(targetSummary(inputs, request)) ||
+    JSON.stringify(state.tool) !== JSON.stringify(toolSummary(inputs))
+  ) {
+    fail('deployment head transition binding changed');
+  }
+}
+
 function applyDeployment(commandState, dependencies = {}) {
   const request = commandState.command.request;
   const resumed = existingReceipt(request, commandState.commandDigest);
+  const output =
+    resumed === null
+      ? outputTarget(request.output, 'apply receipt output')
+      : request.output;
+  const inputs = inspectInputs(request);
+  const preflight = readAndValidatePreflight(request, inputs);
+  const runner = dependencies.runProcess ?? defaultRunProcess;
+  const current = headReadStep(inputs, request, runner);
   if (resumed !== null) {
-    const inputs = inspectInputs(request);
-    const preflight = readAndValidatePreflight(request, inputs);
     if (
+      current.state === null ||
+      current.state.phase !== 'committed' ||
       resumed.preflightDigest !== preflight.report.preflightDigest ||
       JSON.stringify(resumed.lock) !== JSON.stringify(lockSummary(inputs)) ||
+      JSON.stringify(resumed.resourceInventory) !==
+        JSON.stringify(inputs.resourceInventory) ||
+      JSON.stringify(resumed.deploymentHead) !==
+        JSON.stringify(headSnapshot(inputs.headNamespace, current.state)) ||
       JSON.stringify(resumed.target) !==
         JSON.stringify(targetSummary(inputs, request)) ||
       JSON.stringify(resumed.tool) !== JSON.stringify(toolSummary(inputs))
     ) {
       fail('existing deployment receipt authority changed');
     }
+    assertTransitionBinding(current.state, commandState, preflight, inputs);
     revalidateStableInputs(inputs, request);
     return resumed;
   }
-  const output = outputTarget(request.output, 'apply receipt output');
-  const inputs = inspectInputs(request);
-  const preflight = readAndValidatePreflight(request, inputs);
-  const runner = dependencies.runProcess ?? defaultRunProcess;
+  if (
+    current.state !== null &&
+    current.state.phase === 'committed' &&
+    current.state.transition.commandDigest === commandState.commandDigest
+  ) {
+    assertTransitionBinding(current.state, commandState, preflight, inputs);
+    const recovered = receiptFromCommitted(current.state, inputs.headNamespace);
+    writeNoReplace(output, recovered);
+    revalidateStableInputs(inputs, request);
+    return recovered;
+  }
+  let applying;
+  let headResourceVersion;
+  if (current.state !== null && current.state.phase === 'applying') {
+    assertTransitionBinding(current.state, commandState, preflight, inputs);
+    applying = current.state;
+    headResourceVersion = current.resourceVersion;
+  } else {
+    if (
+      JSON.stringify(current.snapshot) !==
+      JSON.stringify(preflight.report.deploymentHead)
+    ) {
+      fail('deployment head changed after preflight');
+    }
+    validateTransition(current, request, deploymentPlan(inputs));
+    applying = applyingHead(commandState, preflight, inputs, current);
+    const acquired = writeHead(
+      inputs,
+      request,
+      runner,
+      applying,
+      current.resourceVersion,
+      'deployment_head_acquire',
+    );
+    headResourceVersion = acquired.resourceVersion;
+  }
   const steps = [
     identityStep(inputs, request, runner, 'cluster_identity_before'),
     dryRunStep(inputs, request, runner),
@@ -1498,35 +2202,16 @@ function applyDeployment(commandState, dependencies = {}) {
   steps.push(convergenceReadStep(inputs, request, runner));
   steps.push(identityStep(inputs, request, runner, 'cluster_identity_after'));
   revalidateStableInputs(inputs, request);
-  const unsigned = {
-    schemaVersion: 1,
-    schema: RECEIPT_SCHEMA,
-    mutationId: request.mutationId,
-    commandDigest: commandState.commandDigest,
-    preflightDigest: preflight.report.preflightDigest,
-    lock: lockSummary(inputs),
-    target: targetSummary(inputs, request),
-    tool: toolSummary(inputs),
-    steps,
-    verification: {
-      catalogBoundLock: true,
-      clusterIdentityBound: true,
-      serverSideDryRun: true,
-      serverSideApply: true,
-      convergenceRead: true,
-      networkAccess: true,
-      kubernetesMutation: true,
-      crossResourceAtomicity: false,
-      externalResultsReplayed: false,
-      recovery: 'reapply_exact_lock_with_same_field_manager',
-      ambientHome: false,
-      ephemeralCache: true,
-    },
-  };
-  const receipt = Object.freeze({
-    ...unsigned,
-    receiptDigest: sha256(Buffer.from(JSON.stringify(unsigned), 'utf8')),
-  });
+  const committed = committedHead(applying, Object.freeze(steps));
+  writeHead(
+    inputs,
+    request,
+    runner,
+    committed,
+    headResourceVersion,
+    'deployment_head_commit',
+  );
+  const receipt = receiptFromCommitted(committed, inputs.headNamespace);
   writeNoReplace(output, receipt);
   return receipt;
 }
@@ -1555,6 +2240,7 @@ function auditReceipt(command) {
     receipt.receiptDigest !== command.request.receipt.expectedDigest ||
     receipt.mutationId !== applyCommand.request.mutationId ||
     receipt.preflightDigest !== applyCommand.request.preflight.expectedDigest ||
+    receipt.transitionKind !== applyCommand.request.transitionKind ||
     applyCommand.request.output !== command.request.receipt.path
   ) {
     fail('deployment receipt command binding changed');
@@ -1565,8 +2251,13 @@ function auditReceipt(command) {
     mutationId: receipt.mutationId,
     receiptDigest: receipt.receiptDigest,
     preflightDigest: receipt.preflightDigest,
+    transitionKind: receipt.transitionKind,
     lockDigest: receipt.lock.lockDigest,
     manifestDigest: receipt.lock.manifestDigest,
+    deploymentGeneration: receipt.deploymentHead.generation,
+    deploymentDigest: receipt.deploymentHead.deploymentDigest,
+    deploymentHeadStateDigest: receipt.deploymentHead.stateDigest,
+    resourceCount: receipt.resourceInventory.length,
     clusterUid: receipt.target.clusterUid,
     externalResultsReplayed: false,
     kubernetesMutation: false,
@@ -1587,6 +2278,9 @@ function executeCommand(commandFile, dependencies = {}) {
 module.exports = Object.freeze({
   COMMAND_SCHEMA,
   FIELD_MANAGER,
+  HEAD_DATA_KEY,
+  HEAD_NAME,
+  HEAD_SCHEMA,
   LOCK_SCHEMA,
   PREFLIGHT_SCHEMA,
   RECEIPT_SCHEMA,

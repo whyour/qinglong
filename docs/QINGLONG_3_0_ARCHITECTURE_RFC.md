@@ -11,6 +11,29 @@
 
 最新增量证据（2026-08-16）：
 
+- D-342/ADR-0434（已接受；资源退休 ceremony 与真实公开 catalog 运行仍待后续 Gate）：Cluster deployment command、preflight 与
+  receipt 在尚未发布前直接升为 v2，并以目标 namespace 中唯一 `qinglong3-deployment-head` ConfigMap 建立部署顺序 authority。每次
+  `install|upgrade|rollback` 都必须绑定 exact expected Head generation/deployment/lock/state digest；preflight 读取当前 Head，apply
+  再用 API Server 返回的 opaque `resourceVersion` 执行 create/replace CAS，先取得 `applying`，完成五步 server-side apply/convergence
+  后再提交 `committed`。相同意图可从 applying 或已提交但丢失本地 receipt 的窗口确定性恢复，陈旧 preflight、并发不同意图、Head
+  漂移与本地 receipt 对已前进 Head 的重放全部失败关闭。locked manifest 必须完整覆盖 `control|control-ai|admin|worker`，自动推导并
+  排序唯一 resource inventory；upgrade 不能省略现存对象，rollback 必须与上一 deployment 使用相同 inventory，避免把普通 apply 不会
+  删除的残留对象冒充成功。删除仍保留给后续绑定 UID/resourceVersion 的独立 retirement ceremony，不采用 alpha prune。Head 只增加一个
+  小 ConfigMap 和 preflight 一次 GET、apply 两次 CAS；没有 controller、CRD、webhook、Pod、listener、timer、数据库、migration、Pool、
+  新 package 或第三方依赖，Local/Edge/Standalone 零导入、零制品增量。Service Bridge 审计同时发现其仅为错误类型而加载完整 foundation
+  contract；已把同一 class identity 下沉到既有 `local-owner-cli/deployment/foundation/error` 内部模块，各 importer 改用叶子入口，未拆出
+  浅 package。定向 deployment ceremony 14/14、Local Owner 171 项为 166 pass/5 条件 skip、完整 backend 1,331 项为 1,329 pass/2 条件
+  skip/0 fail、18-package clean build/test 退出 0。10 项架构/部署审计与 14 档 Local artifact 全部 compatible，package boundary 仍为
+  18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner 的 107 个源码中 106 个位于领域目录。默认
+  Edge/Standalone 保持 2,589,890/2,589,968 bytes，MCP 保持 7,315,930/7,316,038 bytes；Cluster Admin dry-run pack 保持 250 files、
+  271,238-byte tarball、1,690,196-byte unpacked。隔离三节点 K3s `v1.34.3+k3s1`/arm64 真实运行 6 个 release resource、4 个零副本
+  Deployment 和 generation 1 committed Head，deployment/preflight/receipt digest 分别为
+  `sha256:f911cda19195735d00fcc6317db2c22794855e5eb5795696b19a4239fb68a263`、
+  `sha256:574f80dde330c5b4fe41c681906a67ffd6e4b608dedc6d955574771b2bd5c711`、
+  `sha256:0f2edd2037a4df7ae6eb28616aa38a280498660443d0f091e1fac5c1ff532258`，资源清理完成。经允许重跑 PostgreSQL 18.6
+  arm64 physical HA，142/142、timeline `1→2`，报告 SHA-256
+  `8ba0b130100b48e19c602546b63844903e567d6997630f8c950b51cf41ee70ea`，独立证据审计通过且容器、卷、网络零残留。live 使用 synthetic
+  lock，只证明部署状态机和目标 API CAS，不冒充尚未产生的公开 GHCR catalog。
 - D-341/ADR-0433（已接受；真实公开 catalog 运行待实际 release tag）：Cluster 最后一跳不再交给裸
   `kubectl apply -f locked.yaml`。新增工作站级 `cluster.deployment.preflight|apply|receipt.audit`，从 owner-private canonical
   command 出发独立复验 Kubernetes v2 lock/report、locked manifest、release-set/catalog/workflow/image/annotation 闭包，并固定

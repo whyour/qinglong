@@ -207,10 +207,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localOwnerCli.rootSourceFileRoles,
     },
     {
-      sourceFiles: 106,
+      sourceFiles: 107,
       rootSourceFiles: 1,
       rootSourceLines: 50,
-      nestedSourceFiles: 105,
+      nestedSourceFiles: 106,
       rootSourceFileRoles: { 'cli.ts': 'binary_entry' },
     },
   );

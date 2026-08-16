@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
 
-import { LocalDeploymentConfigurationError } from '../foundation/contract';
+import { LocalDeploymentConfigurationError } from '../foundation/error';
 import { preflightPublishedFile, publishExactFile } from '../foundation/files';
 import { cutoverDigest } from '../cutover/targetEvidence';
 import type {

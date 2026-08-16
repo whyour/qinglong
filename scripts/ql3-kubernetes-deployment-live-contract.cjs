@@ -8,6 +8,8 @@ const path = require('node:path');
 const {
   COMMAND_SCHEMA,
   FIELD_MANAGER,
+  HEAD_DATA_KEY,
+  HEAD_NAME,
   canonicalJson,
   executeCommand,
 } = require('./lib/ql3-kubernetes-deployment-ceremony.cjs');
@@ -74,9 +76,9 @@ function references() {
 }
 
 function lockedArtifacts() {
-  const releaseSetDigest = digest('d341-live-release-set');
-  const catalogManifestDigest = digest('d341-live-catalog-manifest');
-  const catalogReportDigest = digest('d341-live-catalog-report');
+  const releaseSetDigest = digest('d342-live-release-set');
+  const catalogManifestDigest = digest('d342-live-catalog-manifest');
+  const catalogReportDigest = digest('d342-live-catalog-report');
   const imageReferences = references();
   const annotations = {
     'qinglong.io/release-set-digest': releaseSetDigest,
@@ -162,7 +164,7 @@ function lockedArtifacts() {
       count: role === 'admin' ? 2 : 1,
     })),
     manifest: {
-      inputDigest: digest('d341-live-source-render'),
+      inputDigest: digest('d342-live-source-render'),
       outputDigest: digest(manifest),
       resources: resources.length,
       changedResources: 5,
@@ -256,6 +258,13 @@ async function main() {
       },
       context: CONTEXT,
       expectedClusterUid: clusterUid,
+      transitionKind: 'install',
+      expectedHead: {
+        generation: 0,
+        deploymentDigest: null,
+        lockDigest: null,
+        stateDigest: null,
+      },
     };
     const preflightPath = path.join(ceremonyDirectory, 'preflight.json');
     const preflightCommand = writeCommand(
@@ -298,6 +307,25 @@ async function main() {
       },
     );
     const audit = executeCommand(auditCommand);
+    const deploymentHeadConfigMap = fixture.kubectlJson([
+      'get',
+      'configmap',
+      HEAD_NAME,
+      '-n',
+      NAMESPACE,
+    ]);
+    const deploymentHead = JSON.parse(
+      deploymentHeadConfigMap.data?.[HEAD_DATA_KEY],
+    );
+    if (
+      deploymentHead.phase !== 'committed' ||
+      deploymentHead.generation !== 1 ||
+      deploymentHead.stateDigest !== receipt.deploymentHead.stateDigest ||
+      deploymentHead.deployment?.deploymentDigest !==
+        receipt.deploymentHead.deploymentDigest
+    ) {
+      fail('committed deployment head is invalid');
+    }
     const deployments = fixture.kubectlJson([
       'get',
       'deployments',
@@ -345,6 +373,11 @@ async function main() {
         replicas: 0,
         fieldManager: FIELD_MANAGER,
         immutableImages: true,
+        headName: HEAD_NAME,
+        headPhase: deploymentHead.phase,
+        headGeneration: deploymentHead.generation,
+        deploymentDigest: deploymentHead.deployment.deploymentDigest,
+        resourceInventoryCount: deploymentHead.deployment.resources.length,
       },
       preflightDigest: preflight.preflightDigest,
       receiptDigest: receipt.receiptDigest,
@@ -352,6 +385,8 @@ async function main() {
       serverSideDryRun: preflight.verification.serverSideDryRun,
       serverSideApply: receipt.verification.serverSideApply,
       convergenceRead: receipt.verification.convergenceRead,
+      deploymentHeadCas: receipt.verification.deploymentHeadCas,
+      resourceInventoryClosed: receipt.verification.resourceInventoryClosed,
       crossResourceAtomicity: receipt.verification.crossResourceAtomicity,
     });
   } finally {

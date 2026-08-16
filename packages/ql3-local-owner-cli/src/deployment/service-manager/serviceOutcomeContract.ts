@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { LocalDeploymentConfigurationError } from '../foundation/contract';
+import { LocalDeploymentConfigurationError } from '../foundation/error';
 import type {
   LocalServiceManagerAction,
   LocalServiceManagerKind,

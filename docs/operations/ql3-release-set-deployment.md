@@ -194,13 +194,16 @@ kubectl --kubeconfig="${kubeconfig}" --context="${context}" \
 ceremony 目录必须为当前 UID 的 canonical `0700` 目录；command、locked manifest、lock report、kubeconfig、preflight 与 receipt
 都必须是单链接 `0600` 文件。kubectl 使用 realpath 后的 absolute executable，并记录其 SHA-256。kubeconfig 禁止 `exec` 与
 `auth-provider`。每个 kubectl 调用使用独立临时 HOME/XDG cache/TMPDIR，结束即清理，不读取 ambient HOME 或在当前目录创建
-`.kube/cache`。以下是 preflight command 的逻辑结构；实际文件必须用 `JSON.stringify(value) + "\n"` 写成单行 canonical JSON，
-并以 `0600` no-replace 创建：
+`.kube/cache`。目标 Namespace 还承载固定名称 `qinglong3-deployment-head` 的小型 ConfigMap。它不属于应用 manifest，也不由
+server-side apply 接管；ceremony 只通过 API Server 返回的 opaque `resourceVersion` 执行 create/replace CAS。第一次安装使用
+`install` 和空 Head；后续 `upgrade`/`rollback` 必须从上一份 receipt 的 `deploymentHead` 复制 generation、deployment/lock/state
+digest，不能自行推测。以下是第一次安装的 preflight command 逻辑结构；实际文件必须用 `JSON.stringify(value) + "\n"` 写成单行
+canonical JSON，并以 `0600` no-replace 创建：
 
 ```json
 {
   "schemaVersion": 1,
-  "schema": "qinglong/kubernetes-deployment-command@v1",
+  "schema": "qinglong/kubernetes-deployment-command@v2",
   "operation": "cluster.deployment.preflight",
   "request": {
     "preflightId": "<new UUID>",
@@ -222,6 +225,13 @@ ceremony 目录必须为当前 UID 的 canonical `0700` 目录；command、locke
     },
     "context": "<explicit context>",
     "expectedClusterUid": "<reviewed kube-system UID>",
+    "transitionKind": "install",
+    "expectedHead": {
+      "generation": 0,
+      "deploymentDigest": null,
+      "lockDigest": null,
+      "stateDigest": null
+    },
     "output": "<unused canonical absolute preflight.json>"
   }
 }
@@ -233,13 +243,14 @@ ceremony 目录必须为当前 UID 的 canonical `0700` 目录；command、locke
 pnpm cluster-deployment:ql3 -- --command-file="${preflight_command}"
 ```
 
-成功后，人工核对返回的 `preflightDigest`、lock/catalog digest、cluster UID 和
-`kubernetesMutation:false`。apply 必须使用新的 mutation UUID，并精确复用所有 target/input authority：
+成功后，人工核对返回的 `preflightDigest`、lock/catalog digest、cluster UID、完整 resource inventory、`deploymentHead` 和
+`kubernetesMutation:false`。apply 必须使用新的 mutation UUID，并精确复用 transition、expected Head 与所有 target/input
+authority：
 
 ```json
 {
   "schemaVersion": 1,
-  "schema": "qinglong/kubernetes-deployment-command@v1",
+  "schema": "qinglong/kubernetes-deployment-command@v2",
   "operation": "cluster.deployment.apply",
   "request": {
     "mutationId": "<new UUID>",
@@ -265,22 +276,36 @@ pnpm cluster-deployment:ql3 -- --command-file="${preflight_command}"
     },
     "context": "<same context>",
     "expectedClusterUid": "<same cluster UID>",
+    "transitionKind": "install",
+    "expectedHead": {
+      "generation": 0,
+      "deploymentDigest": null,
+      "lockDigest": null,
+      "stateDigest": null
+    },
     "output": "<unused canonical absolute receipt.json>"
   }
 }
 ```
 
-同样通过 `cluster-deployment:ql3` 执行。apply 会重新完成 lock 检查、cluster identity 和 server-side dry-run，然后以固定
-`qinglong3-catalog-lock` field manager 执行 server-side apply，不使用 `--force-conflicts`；最后读取 live objects，验证
+同样通过 `cluster-deployment:ql3` 执行。apply 先重读 Head 并以 create/resourceVersion replace 把唯一意图置为 `applying`，再重新
+完成 lock 检查、cluster identity 和 server-side dry-run，然后以固定 `qinglong3-catalog-lock` field manager 执行 server-side
+apply，不使用 `--force-conflicts`；最后读取 live objects，验证
 UID/resourceVersion、完整期望字段、四类 immutable image/catalog annotations 和受影响资源的 managed-field ownership，再次确认
-cluster UID 后才发布 receipt。
+cluster UID，最后以同一 ConfigMap 的新 resourceVersion 提交 `committed` Head 后才发布 receipt。Head 保存当前与前一 deployment
+摘要、完整有序 resource inventory、五个 workload step digest 和 self digest；它不保存 credential、token 或 manifest 正文。
+
+`upgrade` 只接受严格递增 SemVer，且 active inventory 必须是目标 inventory 的子集；遗漏对象不会借助隐式 prune 删除，而是在
+mutation 前失败关闭。`rollback` 只接受 Head 中精确的上一部署 lock，且当前/目标 inventory 必须完全相同；涉及资源退休时须等待
+独立的 UID/resourceVersion-precondition retirement ceremony，不能把遗留对象伪装成回滚成功。
 
 离线审计使用 `cluster.deployment.receipt.audit` command，其中 `applyCommand.expectedDigest` 是 apply command 文件完整字节的
 SHA-256，`receipt.expectedDigest` 是 receipt 内的 `receiptDigest`。审计不会访问 Kubernetes API，结果必须保持
 `externalResultsReplayed:false`、`kubernetesMutation:false`。
 
-多资源 apply 不是事务，也不提供自动删除式 rollback。失败或 receipt 响应丢失时保留原文件：同一 command/field manager 可安全
-重放并重新做 live convergence；需要回退时，以上一份 catalog-bound lock 创建新的显式 preflight/apply，而不是修改旧 receipt。
+多资源 apply 不是事务，也不提供自动删除式 rollback。失败或 receipt 响应丢失时保留原文件：只有相同 command/mutation/preflight
+意图能从 `applying` Head 重做 live convergence；不同意图和陈旧 preflight 都失败关闭。若 Head 已 `committed` 但本地 receipt 丢失，
+同一 command 可从目标 Head 确定性重建 receipt。已有本地 receipt 的重放也会联网确认 Head 尚未前进，不能离线冒充当前部署。
 
 ## 准入检查
 

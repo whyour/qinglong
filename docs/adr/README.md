@@ -437,6 +437,7 @@
 | [ADR-0431](./ADR-0431-catalog-bound-deployment-lock-chain.md)                                  | Catalog-bound Deployment Lock 证据链                                                                                                                               | Accepted（真实公开 catalog 运行待实际 release tag） |
 | [ADR-0432](./ADR-0432-target-side-catalog-bound-local-compose-revisions.md)                     | 目标侧 Catalog-bound Local Compose 修订                                                                                                                            | Accepted |
 | [ADR-0433](./ADR-0433-catalog-bound-kubernetes-target-deployment-ceremony.md)                   | Catalog-bound Kubernetes 目标部署 Ceremony                                                                                                                         | Accepted |
+| [ADR-0434](./ADR-0434-resource-inventory-closed-kubernetes-deployment-head.md)                   | Resource-inventory-closed Kubernetes Deployment Head                                                                                                                | Accepted |
 
 ## 规则
 
