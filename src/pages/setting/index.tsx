@@ -35,6 +35,7 @@ import './index.less';
 import useResizeObserver from '@react-hook/resize-observer';
 import SystemLog from './systemLog';
 import Dependence from './dependence';
+import ClientIp from './clientIp';
 
 const { Text } = Typography;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
@@ -50,7 +51,7 @@ const Setting = () => {
     reloadTheme,
     systemInfo,
   } = useOutletContext<SharedContext>();
-  console.log('user',user)
+  console.log('user', user);
   const columns = [
     {
       title: intl.get('名称'),
@@ -344,6 +345,11 @@ const Setting = () => {
               key: 'login',
               label: intl.get('登录日志'),
               children: <LoginLog height={height} data={loginLogData} />,
+            },
+            {
+              key: 'client-ip',
+              label: intl.get('客户端 IP'),
+              children: <ClientIp />,
             },
             {
               key: 'dependence',

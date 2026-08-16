@@ -190,6 +190,59 @@ export default (app: Router) => {
   );
 
   route.get(
+    '/ip-blacklist',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userService = Container.get(UserService);
+        const data = await userService.getIpBlacklist();
+        res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/ip-blacklist',
+    celebrate({
+      body: Joi.object({
+        ip: Joi.string()
+          .ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' })
+          .required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userService = Container.get(UserService);
+        const data = await userService.blockIp(req.body.ip);
+        res.send({ code: 200, data, message: t('已加入 IP 黑名单') });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/ip-blacklist',
+    celebrate({
+      body: Joi.object({
+        ip: Joi.string()
+          .ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' })
+          .required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userService = Container.get(UserService);
+        const data = await userService.unblockIp(req.body.ip);
+        res.send({ code: 200, data, message: t('已移出 IP 黑名单') });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
     '/notification',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');

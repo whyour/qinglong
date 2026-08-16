@@ -15,11 +15,25 @@ import path from 'path';
 import { t } from '../shared/i18n';
 import { AppScope } from '../data/open';
 
+function resolveTrustProxy(value = process.env.QL_TRUST_PROXY) {
+  const setting = value?.trim();
+  if (!setting) {
+    return 'loopback';
+  }
+  if (setting === 'true' || setting === 'false') {
+    return setting === 'true';
+  }
+  if (/^\d+$/.test(setting)) {
+    return Number(setting);
+  }
+  return setting;
+}
+
 export default ({ app }: { app: Application }) => {
   // Security: Enable strict routing to prevent case-insensitive path bypass
   app.set('case sensitive routing', true);
   app.set('strict routing', true);
-  app.set('trust proxy', 'loopback');
+  app.set('trust proxy', resolveTrustProxy());
   app.use(cors());
 
   // Security: Path normalization middleware to prevent case variation attacks
@@ -28,11 +42,14 @@ export default ({ app }: { app: Application }) => {
     const normalizedPath = originalPath.toLowerCase();
 
     // Block requests with case variations on protected paths
-    if (originalPath !== normalizedPath &&
-      (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/open/'))) {
+    if (
+      originalPath !== normalizedPath &&
+      (normalizedPath.startsWith('/api/') ||
+        normalizedPath.startsWith('/open/'))
+    ) {
       return res.status(400).json({
         code: 400,
-        message: 'Invalid path format'
+        message: 'Invalid path format',
       });
     }
 
@@ -97,7 +114,10 @@ export default ({ app }: { app: Application }) => {
           return next(err);
         }
 
-        if (!currentToken || currentToken.expiration < Math.round(Date.now() / 1000)) {
+        if (
+          !currentToken ||
+          currentToken.expiration < Math.round(Date.now() / 1000)
+        ) {
           const err = new UnauthorizedError('invalid_token', {
             message: t('Token 已失效'),
           });
@@ -123,9 +143,7 @@ export default ({ app }: { app: Application }) => {
     }
 
     const errorCode = headerToken ? 'invalid_token' : 'credentials_required';
-    const errorMessage = headerToken
-      ? t('Token 已失效')
-      : t('请先登录');
+    const errorMessage = headerToken ? t('Token 已失效') : t('请先登录');
     const err = new UnauthorizedError(errorCode, { message: errorMessage });
     next(err);
   });
@@ -142,8 +160,7 @@ export default ({ app }: { app: Application }) => {
     ) {
       return next();
     }
-    const authInfo =
-      (await shareStore.getAuthInfo()) || ({} as AuthInfo);
+    const authInfo = (await shareStore.getAuthInfo()) || ({} as AuthInfo);
 
     let isInitialized = !isDefaultAuthInfo(authInfo);
 

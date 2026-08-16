@@ -78,6 +78,7 @@ export interface AuthInfo {
   twoFactorActivated: boolean;
   twoFactorSecret: string;
   avatar: string;
+  blockedIps?: string[];
 }
 
 export type SystemModelInfo = SystemConfigInfo &

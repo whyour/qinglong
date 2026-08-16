@@ -6,6 +6,7 @@ import { Application } from 'express';
 import linkDeps from './deps';
 import initTask from './initTask';
 import initFile from './initFile';
+import { initializeTrustProxy } from '../shared/trustProxy';
 
 export default async ({ app }: { app: Application }) => {
   depInjectorLoader();
@@ -24,5 +25,6 @@ export default async ({ app }: { app: Application }) => {
   Logger.info('[boot] Init task loaded');
 
   expressLoader({ app });
+  await initializeTrustProxy(app);
   Logger.info('[boot] Express loaded');
 };

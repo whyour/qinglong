@@ -20,12 +20,12 @@ import ScheduleService from './schedule';
 import SockService from './sock';
 import dayjs from 'dayjs';
 import IP2Region from 'ip2region';
-import requestIp from 'request-ip';
 import uniq from 'lodash/uniq';
 import pickBy from 'lodash/pickBy';
 import isNil from 'lodash/isNil';
 import { shareStore } from '../shared/store';
 import { t, tf } from '../shared/i18n';
+import { getClientIp, normalizeClientIp } from '../shared/clientIp';
 
 @Service()
 export default class UserService {
@@ -49,6 +49,14 @@ export default class UserService {
     let { username, password } = payloads;
     const content = await this.getAuthInfo();
     const timestamp = Date.now();
+    const ip = getClientIp(req);
+    const query = new IP2Region();
+    const ipAddress = query.search(ip);
+    let address = '';
+    if (ipAddress) {
+      const { country, province, city, isp } = ipAddress;
+      address = uniq([country, province, city, isp]).filter(Boolean).join(' ');
+    }
     let {
       username: cUsername,
       password: cPassword,
@@ -59,7 +67,27 @@ export default class UserService {
       twoFactorActivated,
       tokens = {},
       platform,
+      blockedIps = [],
     } = content;
+
+    if (
+      ip &&
+      blockedIps.some((blockedIp) => normalizeClientIp(blockedIp) === ip)
+    ) {
+      await this.insertDb({
+        type: AuthDataType.loginLog,
+        info: {
+          timestamp,
+          address,
+          ip,
+          platform: req.platform,
+          status: LoginStatus.fail,
+        },
+      });
+      this.getLoginLog();
+      return { code: 403, message: t('该 IP 已被列入黑名单') };
+    }
+
     const retriesTime = Math.pow(3, retries) * 1000;
     if (retries > 2 && timestamp - lastlogon < retriesTime) {
       const waitTime = Math.ceil(
@@ -87,14 +115,6 @@ export default class UserService {
       };
     }
 
-    const ip = requestIp.getClientIp(req) || '';
-    const query = new IP2Region();
-    const ipAddress = query.search(ip);
-    let address = '';
-    if (ipAddress) {
-      const { country, province, city, isp } = ipAddress;
-      address = uniq([country, province, city, isp]).filter(Boolean).join(' ');
-    }
     if (username === cUsername && password === cPassword) {
       const data = createRandomString(50, 100);
       const expiration = twoFactorActivated ? '60d' : '20d';
@@ -264,6 +284,33 @@ export default class UserService {
     return [];
   }
 
+  public async getIpBlacklist(): Promise<string[]> {
+    const authInfo = await this.getAuthInfo();
+    return uniq((authInfo.blockedIps || []).map(normalizeClientIp)).filter(
+      Boolean,
+    );
+  }
+
+  public async blockIp(ip: string): Promise<string[]> {
+    const authInfo = await this.getAuthInfo();
+    const blockedIps = uniq([
+      ...(authInfo.blockedIps || []).map(normalizeClientIp),
+      normalizeClientIp(ip),
+    ]).filter(Boolean);
+    await this.updateAuthInfo(authInfo, { blockedIps });
+    return blockedIps;
+  }
+
+  public async unblockIp(ip: string): Promise<string[]> {
+    const authInfo = await this.getAuthInfo();
+    const normalizedIp = normalizeClientIp(ip);
+    const blockedIps = (authInfo.blockedIps || [])
+      .map(normalizeClientIp)
+      .filter((blockedIp) => blockedIp && blockedIp !== normalizedIp);
+    await this.updateAuthInfo(authInfo, { blockedIps });
+    return blockedIps;
+  }
+
   private async insertDb(payload: SystemInfo): Promise<SystemInfo> {
     const doc = await SystemModel.create({ ...payload }, { returning: true });
     return doc;
@@ -330,7 +377,7 @@ export default class UserService {
     if (isValid) {
       return this.login({ username, password }, req, false);
     } else {
-      const ip = requestIp.getClientIp(req) || '';
+      const ip = getClientIp(req);
       const query = new IP2Region();
       const ipAddress = query.search(ip);
       let address = '';
