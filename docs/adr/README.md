@@ -450,6 +450,7 @@
 | [ADR-0444](./ADR-0444-fail-closed-release-tag-finalizer-and-replay-rehearsal.md)                         | Fail-closed Release Tag Finalizer 与重放演练                                                                                                                                | Accepted（首份真实 GHCR response-loss 重放待实际 release tag） |
 | [ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)                                    | ScheduleService 执行来源的 Shadow Run 覆盖                                                                                                                                  | Accepted（`scheduled_system` 后续由 ADR-0446 完成） |
 | [ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)                                            | System Crond 稳定 Shadow 准入与回调重放                                                                                                                                      | Accepted |
+| [ADR-0447](./ADR-0447-boot-shadow-and-non-origin-boundaries.md)                                           | Boot Shadow 准入与 once/gRPC 非 Origin 边界                                                                                                                                   | Accepted |
 
 ## 规则
 

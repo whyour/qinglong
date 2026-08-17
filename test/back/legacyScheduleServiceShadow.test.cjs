@@ -45,7 +45,7 @@ function successfulCommand() {
   return `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
 }
 
-test('admits the reviewed schedule and system-crond origins through the environment boundary', () => {
+test('admits only reviewed execution origins through the environment boundary', () => {
   const source = `
     const bridge = require('./back/runtime/compatibility/legacyExecutionBridge');
     const fact = (origin) => ({
@@ -56,11 +56,11 @@ test('admits the reviewed schedule and system-crond origins through the environm
       triggerType: origin,
       acceptedAtMs: 1,
     });
-    const result = ['subscription', 'system', 'script', 'scheduled_system', 'boot'].map((origin) =>
+    const result = ['subscription', 'system', 'script', 'scheduled_system', 'boot', 'once', 'grpc'].map((origin) =>
       Boolean(bridge.observeLegacyExecution(origin, () => fact(origin))),
     );
     process.stdout.write(JSON.stringify(result));
-    process.exit(result.join(',') === 'true,true,true,true,false' ? 0 : 1);
+    process.exit(result.join(',') === 'true,true,true,true,true,false,false' ? 0 : 1);
   `;
   const child = spawnSync(
     process.execPath,
@@ -69,7 +69,8 @@ test('admits the reviewed schedule and system-crond origins through the environm
       cwd: path.resolve(__dirname, '../..'),
       env: {
         ...process.env,
-        QL3_SHADOW_ORIGINS: 'subscription,system,script,scheduled_system',
+        QL3_SHADOW_ORIGINS:
+          'subscription,system,script,scheduled_system,boot,once,grpc',
       },
       encoding: 'utf8',
       timeout: 10_000,
@@ -77,7 +78,10 @@ test('admits the reviewed schedule and system-crond origins through the environm
   );
 
   assert.equal(child.status, 0, child.stderr);
-  assert.equal(child.stdout, '[true,true,true,true,false]');
+  assert.equal(
+    child.stdout.trim().split('\n').at(-1),
+    '[true,true,true,true,true,false,false]',
+  );
 });
 
 test('observes subscription, system and script children without replacing legacy execution', async () => {

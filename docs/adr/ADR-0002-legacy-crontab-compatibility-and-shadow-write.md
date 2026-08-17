@@ -5,7 +5,7 @@
 - 决策者：QingLong Maintainers
 - 关联 RFC：[QL-RFC-0001](../QINGLONG_3_0_ARCHITECTURE_RFC.md)
 - 前置决策：[ADR-0001](./ADR-0001-run-state-and-transaction-boundaries.md)
-- Amended by：[ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)、[ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)
+- Amended by：[ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)、[ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)、[ADR-0447](./ADR-0447-boot-shadow-and-non-origin-boundaries.md)
 
 ## 1. 决策摘要
 
@@ -17,7 +17,8 @@ QingLong 3.0 采用按执行来源渐进切换的三态兼容模式：
 - shadow：2.x 的 Crontab、RunningInstance、Shell 回调和日志仍是用户可见事实源；系统旁路创建 Run、RunAttempt 和 RunEvent，用于验证，不参与调度与结果判定。
 - primary：Run 聚合成为事实源，2.x 字段变为兼容投影；所有外部副作用由新 Runtime 发起，Legacy 路径不得再次执行同一任务。
 
-切换按 manual、scheduled、once、boot、grpc 等 execution origin 独立进行，不允许一次性全局切换。任何单次执行在被接受时即固定 owner 为 legacy 或 runtime，运行中不得切换执行引擎。
+切换按已被入口事实证明的 manual、scheduled、boot 与内部任务 execution origin 独立进行，不允许一次性全局切换。`once`、`grpc` 等保留值只有在未来具备独立
+trigger/admission identity 后才形成切换单元，不能由 schedule 或 transport 名称推导。任何单次执行在被接受时即固定 owner 为 legacy 或 runtime，运行中不得切换执行引擎。
 
 Shadow 写入必须 fail-open：新模型写入失败只产生有界日志、指标和对账记录，不改变 2.x 的执行结果。Primary 路径在产生 spawn、派发或其他外部副作用前必须 fail-closed；只有能够证明外部副作用尚未发生时，才允许受控回退到 Legacy。
 
@@ -145,18 +146,19 @@ owner 在接受触发时写入执行上下文，并贯穿日志、指标和回�
 
 当前孵化实现只开放观察型 Shadow，不通过该环境变量提供 primary：
 
-    QL3_SHADOW_ORIGINS=manual,scheduled_node,scheduled_system,subscription,system,script
+    QL3_SHADOW_ORIGINS=manual,scheduled_node,scheduled_system,boot,subscription,system,script
 
 - 未设置或设置为空时全部为 off。
-- ADR-0446 后当前接受 `manual`、`scheduled_node`、`scheduled_system`、`subscription`、`system` 与 `script`；未知 origin 被忽略并记录
-  有界配置告警，`once`、`boot` 与 `grpc` 仍不开放。
+- ADR-0447 后当前接受 `manual`、`scheduled_node`、`scheduled_system`、`boot`、`subscription`、`system` 与 `script`；未知 origin 被忽略并记录
+  有界配置告警。`once` 与 `grpc` 仍是保留领域值：现有 `@once` 只是 schedule 标记，gRPC 只是传输入口，两者都不能单凭该字段推导 execution origin。
 - 配置在进程内首次使用时读取；edge 不启动 watcher，变更后需要通过既有进程重启或未来的显式 reload 生效。
 - 兼容观察器在实际 HTTP/gRPC worker 中按需加载；关闭时不构造 Shadow 事实或任务摘要、不增加 ChildProcess 监听器、不初始化 Repository、不创建后台任务，也不引入额外数据库写入。
-- `manual/scheduled_node/subscription/system/script` 只监听 Legacy 已创建的同一个 ChildProcess。`scheduled_system` 不持有 Node ChildProcess，
+- `manual/scheduled_node/boot/subscription/system/script` 只监听 Legacy 已创建的同一个 ChildProcess。`scheduled_system` 不持有 Node ChildProcess，
   只接受 system crond 显式标记后由 Shell start/finish 共用的稳定 execution ID；finish-only 回调可以幂等补齐 accepted→terminal 聚合。Shadow
   代码不得调用 Executor 或第二次 spawn；`subscription/system/script` 仅在 `ScheduleService` 已选中执行且 `onBefore` 成功后 accepted。
 - 任意初始化、接受或后续写入失败都退化为 no-op，只记录不含命令、环境变量和 Secret 的稳定错误类型与有界计数。
-- `boot` 虽复用 `runSingle`，仍携带独立 origin，当前不在允许列表中，不能被误记为 manual。
+- `bootTask` 只把启用的 `@boot` 条目以固定 `boot` origin 交给 `runSingle`；普通 HTTP/gRPC `run` 仍使用 `manual`。`@once` 不会因 schedule
+  字符串被改记为 `once`，gRPC 请求也不会因 transport 被改记为 `grpc`。
 
 该环境变量是 Alpha 兼容桥，不替代最终可审计的 `RuntimeRolloutConfig`。进入 primary 前必须改用具备配置校验、审计和 owner 固化语义的正式配置面。
 
@@ -488,12 +490,13 @@ Shadow 阶段至少记录：
     2. manual shadow
     3. scheduled_node shadow
     4. scheduled_system shadow
-    5. once/boot/grpc shadow
-    6. manual primary for opt-in users
-    7. manual primary default
-    8. scheduled_node primary
-    9. scheduled_system primary
-    10. remove Legacy as execution owner
+    5. boot shadow
+    6. future source-proven trigger shadow（只有独立 once/grpc trigger 存在时）
+    7. manual primary for opt-in users
+    8. manual primary default
+    9. scheduled_node primary
+    10. scheduled_system primary
+    11. remove Legacy as execution owner
 
 每一步必须独立通过门禁，不能因为 manual 路径稳定就直接切换 scheduled/system crontab。
 

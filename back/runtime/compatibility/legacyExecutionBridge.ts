@@ -20,6 +20,7 @@ import { LegacyExecutionRegistry } from './legacyExecutionRegistry';
 
 const SHADOW_ORIGINS_ENV = 'QL3_SHADOW_ORIGINS';
 const SUPPORTED_SHADOW_ORIGINS = new Set<ExecutionOrigin>([
+  'boot',
   'manual',
   'scheduled_node',
   'scheduled_system',
@@ -85,7 +86,7 @@ function readConfiguredOrigins(): ReadonlySet<ExecutionOrigin> {
         incrementFailure('configuration:unsupported_origin');
         try {
           Logger.warn(
-            '[ql3-shadow] ignored unsupported origin; this slice supports manual,scheduled_node,scheduled_system,script,subscription,system',
+            '[ql3-shadow] ignored unsupported origin; this slice supports boot,manual,scheduled_node,scheduled_system,script,subscription,system',
           );
         } catch {
           // Invalid compatibility configuration must not affect legacy paths.
