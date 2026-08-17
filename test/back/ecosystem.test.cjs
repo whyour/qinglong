@@ -13,10 +13,10 @@ function loadConfig(containerValue) {
   return require(configPath).apps[0];
 }
 
-test('container logging relies on pm2-runtime stdout without persistent copies', () => {
+test('container logging discards stdout and forwards startup errors without persistent copies', () => {
   const app = loadConfig('true');
   assert.equal(app.out_file, '/dev/null');
-  assert.equal(app.error_file, '/dev/null');
+  assert.equal(app.error_file, '/proc/1/fd/2');
   assert.equal(app.time, false);
 });
 
