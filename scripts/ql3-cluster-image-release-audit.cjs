@@ -1303,6 +1303,7 @@ function auditReleaseWorkflow(source) {
       sourceDerived: true,
       sameRunRecords: true,
       sameRunPrivateEvidenceReceipts: true,
+      deterministicPrivateEvidenceReceipts: true,
       exactScopeClosure: true,
       standaloneInspection: true,
       tagPromotionAuthority: 'complete_verified_release_set',
@@ -1312,7 +1313,7 @@ function auditReleaseWorkflow(source) {
     },
     durableCatalog: {
       repository: 'qinglong3-release-catalog',
-      artifactType: 'application/vnd.qinglong.release-set.v2+json',
+      artifactType: 'application/vnd.qinglong.release-set.v3+json',
       basenameOnly: true,
       crossRunnerDeterministic: true,
       byteExactRoundTrip: true,

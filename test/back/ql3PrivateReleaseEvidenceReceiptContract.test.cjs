@@ -119,6 +119,70 @@ test('rejects publishing private material in an otherwise re-digested receipt', 
   );
 });
 
+test('omits the ephemeral validation clock and replays identical source evidence byte-for-byte', (t) => {
+  const directory = temporaryDirectory(t);
+  const reportPath = path.join(directory, 'private-report.json');
+  fs.writeFileSync(
+    reportPath,
+    `${JSON.stringify({ observedAt: '2026-08-18T00:00:00.000Z' })}\n`,
+    { mode: 0o600 },
+  );
+  const createAt = (validationTime, outputFile) =>
+    createWorkerReceipt(
+      {
+        root: path.resolve(__dirname, '../..'),
+        version: RELEASE.version,
+        sourceRevision: RELEASE.sourceRevision,
+        sourceRef: RELEASE.sourceRef,
+        releaseScope: RELEASE.scope,
+        reportFile: reportPath,
+        ceremonyReportFile: path.join(directory, 'private-ceremony.json'),
+        durableAuditReportFile: path.join(directory, 'private-durable.json'),
+        pkiRotationReportFile: path.join(directory, 'private-pki.json'),
+        caRolloverReportFile: path.join(directory, 'private-ca.json'),
+        outputFile,
+      },
+      {
+        now: () => Date.parse(validationTime),
+        auditGate(_options, dependencies) {
+          assert.equal(dependencies.now(), Date.parse(validationTime));
+          return {
+            fixture: 'qinglong/worker-credential-management-release-gate@v1',
+            evidenceReportSha256: `sha256:${'5'.repeat(64)}`,
+          };
+        },
+      },
+    );
+  const firstPath = path.join(directory, 'first.json');
+  const secondPath = path.join(directory, 'second.json');
+  const first = createAt('2026-08-18T00:05:00.000Z', firstPath);
+  const second = createAt('2026-08-18T00:15:00.000Z', secondPath);
+  assert.deepEqual(second, first);
+  assert.equal(
+    fs.readFileSync(secondPath, 'utf8'),
+    fs.readFileSync(firstPath, 'utf8'),
+  );
+  assert.equal(Object.hasOwn(first.evidence, 'validatedAt'), false);
+  assert.equal(first.verification.freshnessValidatedAtCreation, true);
+  assert.equal(first.verification.durableValidationClockPublished, false);
+  assert.throws(
+    () =>
+      createAt('2026-08-19T00:00:01.000Z', path.join(directory, 'stale.json')),
+    /freshness window/,
+  );
+
+  const widened = JSON.parse(JSON.stringify(first));
+  widened.evidence.validatedAt = '2026-08-18T00:05:00.000Z';
+  assert.throws(
+    () =>
+      inspectPrivateReleaseEvidenceReceipt(
+        widened,
+        options('worker-management'),
+      ),
+    /receipt shape/,
+  );
+});
+
 test('audit CLI accepts a canonical receipt and rejects open argument shapes', (t) => {
   const directory = temporaryDirectory(t);
   const receiptPath = path.join(directory, 'worker-management.json');

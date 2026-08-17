@@ -21,7 +21,7 @@ const {
   auditCertManagerSelection,
 } = require('./ql3-cert-manager-selection-audit.cjs');
 
-const RECEIPT_SCHEMA = 'qinglong/private-release-evidence-receipt@v1';
+const RECEIPT_SCHEMA = 'qinglong/private-release-evidence-receipt@v2';
 const EVIDENCE_KINDS = Object.freeze([
   'worker-management',
   'cloudnativepg-disaster-recovery',
@@ -182,12 +182,12 @@ function assembleReceipt(options) {
     fail('private evidence report digest is invalid');
   }
   const observedAtMs = Date.parse(options.observedAt);
-  const validatedAtMs = options.nowMs;
+  const validationClockMs = options.nowMs;
   if (
-    !Number.isSafeInteger(validatedAtMs) ||
+    !Number.isSafeInteger(validationClockMs) ||
     !Number.isFinite(observedAtMs) ||
-    observedAtMs > validatedAtMs + MAX_FUTURE_SKEW_MS ||
-    validatedAtMs - observedAtMs > MAX_EVIDENCE_AGE_SECONDS * 1000
+    observedAtMs > validationClockMs + MAX_FUTURE_SKEW_MS ||
+    validationClockMs - observedAtMs > MAX_EVIDENCE_AGE_SECONDS * 1000
   ) {
     fail('private evidence is outside the release freshness window');
   }
@@ -196,7 +196,7 @@ function assembleReceipt(options) {
       ? staticAuditReceipts(options.root)
       : Object.freeze([]);
   const unsigned = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     schema: RECEIPT_SCHEMA,
     release: {
       version: options.version,
@@ -208,7 +208,6 @@ function assembleReceipt(options) {
     evidence: {
       fixture: options.fixture,
       observedAt: options.observedAt,
-      validatedAt: new Date(validatedAtMs).toISOString(),
       maximumAgeSeconds: MAX_EVIDENCE_AGE_SECONDS,
       reportDigest: options.reportDigest,
       sourceReportsUploaded: false,
@@ -217,6 +216,8 @@ function assembleReceipt(options) {
     verification: {
       sourceAwareAudit: true,
       privateEvidenceReplayed: true,
+      freshnessValidatedAtCreation: true,
+      durableValidationClockPublished: false,
       publicConsumerReplay: 'not_possible_without_private_reports',
       privateReportContentPublished: false,
       compatible: true,
@@ -323,7 +324,7 @@ function inspectPrivateReleaseEvidenceReceipt(actual, options) {
       'verification',
       'receiptDigest',
     ]) ||
-    actual.schemaVersion !== 1 ||
+    actual.schemaVersion !== 2 ||
     actual.schema !== RECEIPT_SCHEMA ||
     !exactKeys(actual.release, [
       'version',
@@ -342,7 +343,6 @@ function inspectPrivateReleaseEvidenceReceipt(actual, options) {
     !exactKeys(actual.evidence, [
       'fixture',
       'observedAt',
-      'validatedAt',
       'maximumAgeSeconds',
       'reportDigest',
       'sourceReportsUploaded',
@@ -363,6 +363,8 @@ function inspectPrivateReleaseEvidenceReceipt(actual, options) {
     !exactKeys(actual.verification, [
       'sourceAwareAudit',
       'privateEvidenceReplayed',
+      'freshnessValidatedAtCreation',
+      'durableValidationClockPublished',
       'publicConsumerReplay',
       'privateReportContentPublished',
       'compatible',
@@ -371,6 +373,8 @@ function inspectPrivateReleaseEvidenceReceipt(actual, options) {
       JSON.stringify({
         sourceAwareAudit: true,
         privateEvidenceReplayed: true,
+        freshnessValidatedAtCreation: true,
+        durableValidationClockPublished: false,
         publicConsumerReplay: 'not_possible_without_private_reports',
         privateReportContentPublished: false,
         compatible: true,
@@ -378,14 +382,7 @@ function inspectPrivateReleaseEvidenceReceipt(actual, options) {
   ) {
     fail('receipt shape or release binding is invalid');
   }
-  const observedAtMs = Date.parse(actual.evidence.observedAt);
-  const validatedAtMs = Date.parse(actual.evidence.validatedAt);
-  if (
-    !Number.isFinite(observedAtMs) ||
-    !Number.isFinite(validatedAtMs) ||
-    observedAtMs > validatedAtMs + MAX_FUTURE_SKEW_MS ||
-    validatedAtMs - observedAtMs > MAX_EVIDENCE_AGE_SECONDS * 1000
-  ) {
+  if (!Number.isFinite(Date.parse(actual.evidence.observedAt))) {
     fail('receipt freshness binding is invalid');
   }
   const { receiptDigest, ...unsigned } = actual;

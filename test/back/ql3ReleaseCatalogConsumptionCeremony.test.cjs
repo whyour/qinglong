@@ -79,7 +79,7 @@ function releaseSet(scope) {
   const names = images.map((entry) => entry.name);
   const unsigned = {
     schemaVersion: 1,
-    schema: 'qinglong/release-set@v2',
+    schema: 'qinglong/release-set@v3',
     release,
     candidate: {
       schema: 'qinglong/release-candidate-contract@v1',

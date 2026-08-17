@@ -11,6 +11,24 @@
 
 最新增量证据（2026-08-18）：
 
+- D-347/ADR-0439（已接受；首份真实线上重放待实际 release tag）：修正 D-346 收据把私有 runner `validatedAt` wall-clock 写入 durable
+  JSON 导致同一 source/report 在 workflow 重跑时产生第二个 release identity 的问题。私有收据升为
+  `qinglong/private-release-evidence-receipt@v2`：创建时仍以当前私有时钟执行 source-aware gate 和 24 小时 freshness 双重验证，但 durable
+  projection 只保留不可变报告自身的 `observedAt`、report/static-lock/self digest，并显式声明 `freshnessValidatedAtCreation=true`、
+  `durableValidationClockPublished=false` 与公开 consumer 不能重放现场报告。相同 release identity、相同私有报告字节和相同 source-controlled
+  static locks 在不同有效运行时间必须生成逐字节相同收据。由于嵌入协议发生不兼容变化，release-set/OCI artifact media type 同步升为
+  `qinglong/release-set@v3`/`application/vnd.qinglong.release-set.v3+json`，不在 v2 下偷换语义；catalog recovery 收紧为
+  `republish_deterministic_content_then_verify_digest`，只允许相同不可变输入的同内容重放。Local 仍为零私有收据，新增工作只在短生命周期
+  release runner 发生，不新增 package、依赖、数据库、migration、Pod、controller、listener、timer、设备工具或稳态资源。定向发布链
+  135/135；完整 backend 1,363 项为 1,361 pass/2 条件 skip/0 fail，18-package clean build/test 退出 0。12 项 package boundary、Cluster
+  dependency、Edge import、Cluster/Worker/CloudNativePG 部署、backup、Barman/cert-manager selection、image release、deployment-lock
+  surface 与 release-version 审计全部 compatible；14 档 Local artifact 与既有字节基线完全一致：默认 Edge/Standalone 为
+  2,589,890/2,589,968 bytes，adopted 为 2,809,185/2,809,308 bytes，application 为 3,632,769/3,632,889 bytes，application-api 为
+  3,800,322/3,800,466 bytes，AI 为 3,069,143/3,069,233 bytes，application+AI 为 4,493,043/4,493,175 bytes，MCP 为
+  7,315,930/7,316,038 bytes。阶段完整性 PostgreSQL HA 以 18.6/arm64 重跑 142/142 gates、timeline `1→2`，独立 evidence audit
+  compatible，mode-0600 报告 SHA-256 为 `db72086e971fc91c25a4a482af6634acbf4d463e567c44f42af0e7d0cc24fca2`，
+  container/network/volume 残留为 0。真实线上 response-loss 重放仍只能由实际受保护 `v3` release tag 取得。
+
 - D-346/ADR-0438（已接受；首份真实公开收据待实际 release tag）：Cluster/All 发布不再只通过 GitHub `needs` 保存“两个私有 evidence job
   成功”的瞬时调度事实。Worker management 与 CloudNativePG DR 私有 runner 在 source-aware gate 成功后，各自产生一个
   `qinglong/private-release-evidence-receipt@v1`：只投影 exact version/source tag/revision/scope、evidence kind、24 小时 freshness、

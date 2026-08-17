@@ -442,6 +442,7 @@
 | [ADR-0436](./ADR-0436-post-publication-catalog-bound-kubernetes-release-gate.md)                    | 发布后 Catalog-bound Kubernetes Release Gate                                                                                                                          | Accepted（首份真实公开 catalog evidence 待实际 release tag） |
 | [ADR-0437](./ADR-0437-post-publication-catalog-bound-local-release-gate.md)                         | 发布后 Catalog-bound Local Release Gate                                                                                                                               | Accepted（首份真实公开 catalog evidence 待实际 release tag） |
 | [ADR-0438](./ADR-0438-content-free-private-release-evidence-receipt-chain.md)                       | 内容无关的私有发布证据收据链                                                                                                                                            | Accepted（首份真实公开收据待实际 release tag） |
+| [ADR-0439](./ADR-0439-deterministic-private-evidence-receipts-and-release-set-replay.md)             | 确定性私有证据收据与 Release-set 重放                                                                                                                                     | Accepted（首份真实线上重放待实际 release tag） |
 
 ## 规则
 

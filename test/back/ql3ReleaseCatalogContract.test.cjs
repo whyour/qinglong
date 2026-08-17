@@ -122,6 +122,10 @@ test('plans deterministic Local, Cluster and All OCI catalog entries', () => {
     );
     assert.equal(plan.catalog.artifactType, ARTIFACT_TYPE);
     assert.equal(
+      plan.publicationPolicy.recovery,
+      'republish_deterministic_content_then_verify_digest',
+    );
+    assert.equal(
       plan.releaseSet.bytes,
       Buffer.byteLength(`${JSON.stringify(set)}\n`),
     );

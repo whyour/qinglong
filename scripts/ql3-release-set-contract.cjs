@@ -20,7 +20,7 @@ const { VERSION_PATTERN } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 const IMAGE_RECORD_SCHEMA = 'qinglong/release-set-image-record@v1';
-const RELEASE_SET_SCHEMA = 'qinglong/release-set@v2';
+const RELEASE_SET_SCHEMA = 'qinglong/release-set@v3';
 const MAX_JSON_BYTES = 1024 * 1024;
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const OWNER_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/u;

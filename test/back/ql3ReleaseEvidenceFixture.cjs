@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 
-const RECEIPT_SCHEMA = 'qinglong/private-release-evidence-receipt@v1';
+const RECEIPT_SCHEMA = 'qinglong/private-release-evidence-receipt@v2';
 const FIXTURES = Object.freeze({
   'worker-management': 'qinglong/worker-credential-management-release-gate@v1',
   'cloudnativepg-disaster-recovery':
@@ -28,14 +28,13 @@ function privateReleaseEvidenceReceipt(release, evidenceKind) {
         }))
       : [];
   const unsigned = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     schema: RECEIPT_SCHEMA,
     release: { ...release },
     evidenceKind,
     evidence: {
       fixture: FIXTURES[evidenceKind],
       observedAt: '2026-08-18T00:00:00.000Z',
-      validatedAt: '2026-08-18T00:05:00.000Z',
       maximumAgeSeconds: 86_400,
       reportDigest: `sha256:${
         evidenceKind === 'worker-management' ? '5' : '6'
@@ -46,6 +45,8 @@ function privateReleaseEvidenceReceipt(release, evidenceKind) {
     verification: {
       sourceAwareAudit: true,
       privateEvidenceReplayed: true,
+      freshnessValidatedAtCreation: true,
+      durableValidationClockPublished: false,
       publicConsumerReplay: 'not_possible_without_private_reports',
       privateReportContentPublished: false,
       compatible: true,

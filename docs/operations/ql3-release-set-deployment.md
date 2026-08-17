@@ -15,14 +15,16 @@ ghcr.io/<owner>/qinglong3-release-catalog:v<version>-<scope>
 
 ## 私有发布证据收据链
 
-当前长期 authority 是 `qinglong/release-set@v2`。`local` scope 的 `evidenceReceipts` 必须为空；`cluster|all` 必须按顺序恰好包含
-`worker-management` 与 `cloudnativepg-disaster-recovery` 两份 `qinglong/private-release-evidence-receipt@v1`。每份收据绑定同一
+当前长期 authority 是 `qinglong/release-set@v3`。`local` scope 的 `evidenceReceipts` 必须为空；`cluster|all` 必须按顺序恰好包含
+`worker-management` 与 `cloudnativepg-disaster-recovery` 两份 `qinglong/private-release-evidence-receipt@v2`。每份收据绑定同一
 version/source tag/revision/scope、24 小时 freshness、私有报告 digest 和自身 digest；DR 收据还绑定 CloudNativePG backup、Barman Cloud 与
-cert-manager 三项静态审计摘要。
+cert-manager 三项静态审计摘要。v2 收据不持久化私有 runner 的 wall-clock：创建时仍必须以当前时钟完成 freshness gate，但 durable JSON 只绑定
+不可变报告的 `observedAt`。因此相同 source/report/static-lock 在 workflow 重跑时逐字节相同，不会仅因重跑时间变化而生成第二个 catalog identity。
 
 这些收据不包含原始生产报告、路径、credential、token、Kubernetes object 或 transcript。公开 consumer 可以重算收据和 release-set digest，
 但必须保持 `publicConsumerReplay=not_possible_without_private_reports`；它不能声称重放了私有现场结果。原始报告不上传，只有收据以 1 天 artifact
-从私有 job 交给 release-set job，随后完整嵌入 release-set v2 并由 durable catalog 长期保护。
+从私有 job 交给 release-set job，随后完整嵌入 release-set v3 并由 durable catalog 长期保护。公开收据同时声明
+`freshnessValidatedAtCreation=true` 与 `durableValidationClockPublished=false`，避免把未发布的临时时钟伪装成可离线重放的现场证据。
 
 ## 发布流水线内置 Local 与 Cluster 下游门
 
@@ -404,7 +406,7 @@ SHA-256，`receipt.expectedDigest` 是 receipt 内的 `receiptDigest`。审计�
 1. 只接受已验证 Cosign exact workflow identity 与 GitHub source tag/revision provenance 的 catalog immutable
    reference；discovery tag 无 authority。
 2. materializer 只能接受完整 `qinglong/release-catalog-consumption-ceremony@v1` bundle，不能接受旧的松散 `--release-set`；其中
-   `qinglong/release-set@v2` 的 `release.version`、`release.sourceRef`、`release.sourceRevision`、`release.scope` 必须与变更单一致。
+   `qinglong/release-set@v3` 的 `release.version`、`release.sourceRef`、`release.sourceRevision`、`release.scope` 必须与变更单一致。
 3. 镜像集合必须与上表精确相等；每个 `reference` 必须是 digest reference，且 owner/repository 与部署目标一致。
 4. Local scope 必须为零私有收据；Cluster/All 必须精确包含两份同 source、同 scope、自摘要有效且 freshness 闭合的 content-free 收据。
    static lock compatible 不等于现场证据已公开重放，任何 consumer 都必须保留该限制。
