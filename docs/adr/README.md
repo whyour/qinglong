@@ -438,6 +438,7 @@
 | [ADR-0432](./ADR-0432-target-side-catalog-bound-local-compose-revisions.md)                     | 目标侧 Catalog-bound Local Compose 修订                                                                                                                            | Accepted |
 | [ADR-0433](./ADR-0433-catalog-bound-kubernetes-target-deployment-ceremony.md)                   | Catalog-bound Kubernetes 目标部署 Ceremony                                                                                                                         | Accepted |
 | [ADR-0434](./ADR-0434-resource-inventory-closed-kubernetes-deployment-head.md)                   | Resource-inventory-closed Kubernetes Deployment Head                                                                                                                | Accepted |
+| [ADR-0435](./ADR-0435-uid-resource-version-fenced-kubernetes-resource-retirement.md)              | UID/resourceVersion 围栏的 Kubernetes 资源退役 Ceremony                                                                                                              | Accepted |
 
 ## 规则
 

@@ -6,10 +6,32 @@
 - 目标版本：QingLong 3.x
 - 作者：QingLong Maintainers
 - 创建日期：2026-07-17
-- 最后更新：2026-08-16
+- 最后更新：2026-08-17
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-16）：
+最新增量证据（2026-08-17）：
+
+- D-343/ADR-0435（已接受；真实公开 catalog 运行仍待 release Gate）：在 D-342 的 resource-inventory-closed Head 上增加独立
+  `cluster.deployment.retirement.preflight|apply|receipt.audit`。退役目标只能来自 current locked manifest 与 committed active inventory，
+  最多 64 个显式 namespaced resource；固定 Head、cluster-scoped resource 以及 Secret/PVC/ServiceAccount 均拒绝进入通用删除面，survivor
+  inventory 必须非空并继续覆盖 `control|control-ai|admin|worker` 四类 authority。preflight 通过 API discovery 绑定每个对象的 exact
+  UID/resourceVersion、desired subset 与 `qinglong3-catalog-lock` Apply ownership，再发送带同一 Preconditions 的服务端 DeleteOptions
+  dry-run；apply 在删除前复验 observation，以 Head resourceVersion CAS 取得唯一 `applying` 意图，逐对象使用 Background DELETE 并确认
+  old UID absent，之后才提交缩小 inventory 的下一代 committed Head 与 no-replace receipt。替换 UID、resourceVersion/字段漂移、
+  terminating/finalizer、Head 冲突均失败关闭；DELETE 已生效但响应丢失时，只允许相同 command/mutation/preflight 从 durable applying
+  Head 和 absent target 恢复。同版本 rollback 可精确恢复 retirement 前一个 inventory，仍走完整 server-side apply/convergence。
+  pinned kubectl 只在 ceremony 期间启动 owner-private Unix socket proxy，由 pinned curl 发送带 body 的 DELETE；不开放 TCP，不读取
+  ambient HOME，完成即清理。没有新增 package、第三方依赖、controller、CRD、webhook、ServiceAccount、Pod、数据库、migration、Pool、
+  watcher、timer 或常驻进程，Local/Edge/Standalone 零导入、零稳态成本。独立 GitHub Actions job 固定 kubectl/K3s 版本并验证真实
+  install、退役、Head 收敛、content-free evidence 与隔离清理；定向 deployment ceremony 22/22，完整 backend 1,339 项为 1,337 pass/
+  2 条件 skip/0 fail，18-package clean build/test 退出 0。架构/部署审计保持 compatible，package boundary 为 18 packages 且
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`；14 档 Local artifact 全部 compatible 且字节数与 D-342 完全一致。三节点 K3s
+  live 使用 digest-reviewed `rancher/k3s:v1.34.3-k3s1`，在 linux/arm64 上得到 3 个 Ready node，真实 install 后 Head generation
+  `1→2`、inventory `7→6`、目标 absent，server-side dry-run/apply、UID/resourceVersion DELETE preconditions、Unix socket proxy、Head
+  CAS 与两个 receipt audit 均通过，`cleanupComplete=true` 且 Docker container/network 残留为 0；最终 retirement receipt digest 为
+  `sha256:d3145b3fee7a1191458b5c3a930c0063a0e1e446d3a196565bcdd20d9da06ec5`。PostgreSQL HA 在 18.6/arm64 上完成
+  142/142 gates、timeline `1→2` 与独立 evidence audit，mode-0600 报告 SHA-256 为
+  `89fd4fb47f82f35d3819d1fd9540cf3764f65fa68ac6561effd16778bee4ab8a`，container/network/volume 残留为 0。
 
 - D-342/ADR-0434（已接受；资源退休 ceremony 与真实公开 catalog 运行仍待后续 Gate）：Cluster deployment command、preflight 与
   receipt 在尚未发布前直接升为 v2，并以目标 namespace 中唯一 `qinglong3-deployment-head` ConfigMap 建立部署顺序 authority。每次

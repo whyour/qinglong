@@ -15,6 +15,8 @@ const {
   HEAD_NAME,
   PREFLIGHT_SCHEMA,
   RECEIPT_SCHEMA,
+  RETIREMENT_PREFLIGHT_SCHEMA,
+  RETIREMENT_RECEIPT_SCHEMA,
   canonicalJson,
   executeCommand,
   parseCommand,
@@ -198,6 +200,7 @@ function fixture(t, options = {}) {
     '#!/bin/sh\nexit 97\n',
     0o700,
   );
+  const curl = privateFile(directory, 'curl', '#!/bin/sh\nexit 96\n', 0o700);
   const kubeconfig = privateFile(
     directory,
     'kubeconfig.yaml',
@@ -225,6 +228,7 @@ users:
     lockedManifest,
     lockReportPath,
     kubectl,
+    curl,
     kubeconfig,
     report,
     manifestContents,
@@ -443,6 +447,168 @@ function performTransition(
     receiptPath,
     receipt: executeCommand(applyCommand, { runProcess: runner }),
   };
+}
+
+const RETIREMENT_TARGET = Object.freeze({
+  apiVersion: 'v1',
+  kind: 'ConfigMap',
+  namespace: 'qinglong-system',
+  name: 'ql3-extra-release-resource',
+});
+
+function retirementRequest(value, expectedHead) {
+  return {
+    lockedManifest: {
+      path: value.lockedManifest,
+      expectedDigest: value.report.manifest.outputDigest,
+    },
+    lockReport: {
+      path: value.lockReportPath,
+      expectedDigest: value.report.lockDigest,
+    },
+    kubectl: {
+      path: value.kubectl,
+      expectedDigest: fileDigest(value.kubectl),
+    },
+    curl: {
+      path: value.curl,
+      expectedDigest: fileDigest(value.curl),
+    },
+    kubeconfig: {
+      path: value.kubeconfig,
+      expectedDigest: fileDigest(value.kubeconfig),
+    },
+    context: CONTEXT,
+    expectedClusterUid: CLUSTER_UID,
+    expectedHead,
+    targets: [RETIREMENT_TARGET],
+  };
+}
+
+function apiObjectPath(resource) {
+  const namespace = encodeURIComponent(resource.metadata.namespace);
+  const name = encodeURIComponent(resource.metadata.name);
+  if (resource.apiVersion === 'v1' && resource.kind === 'ConfigMap') {
+    return `/api/v1/namespaces/${namespace}/configmaps/${name}`;
+  }
+  throw new Error('unsupported fake API resource');
+}
+
+class FakeRetirementApi {
+  constructor(manifestContents) {
+    this.objects = new Map();
+    this.requests = [];
+    this.loseNextDeleteResponse = false;
+    const list = JSON.parse(convergenceList(manifestContents));
+    for (const resource of list.items) {
+      if (resource.apiVersion === 'v1' && resource.kind === 'ConfigMap') {
+        this.objects.set(apiObjectPath(resource), resource);
+      }
+    }
+  }
+
+  request(method, requestPath, body) {
+    this.requests.push({ method, requestPath, body });
+    if (method === 'GET' && requestPath === '/api/v1') {
+      return {
+        status: 200,
+        body: JSON.stringify({
+          groupVersion: 'v1',
+          resources: [
+            {
+              name: 'configmaps',
+              namespaced: true,
+              kind: 'ConfigMap',
+              verbs: ['delete', 'get', 'list'],
+            },
+          ],
+        }),
+      };
+    }
+    const live = this.objects.get(requestPath);
+    if (method === 'GET') {
+      return live === undefined
+        ? { status: 404, body: JSON.stringify({ kind: 'Status' }) }
+        : { status: 200, body: JSON.stringify(live) };
+    }
+    if (method !== 'DELETE') throw new Error('unexpected fake API method');
+    if (live === undefined) {
+      return { status: 404, body: JSON.stringify({ kind: 'Status' }) };
+    }
+    if (
+      body?.preconditions?.uid !== live.metadata.uid ||
+      body?.preconditions?.resourceVersion !== live.metadata.resourceVersion
+    ) {
+      return { status: 409, body: JSON.stringify({ kind: 'Status' }) };
+    }
+    if (body.dryRun?.includes('All')) {
+      return { status: 200, body: JSON.stringify({ kind: 'Status' }) };
+    }
+    this.objects.delete(requestPath);
+    if (this.loseNextDeleteResponse) {
+      this.loseNextDeleteResponse = false;
+      throw new Error('simulated response loss');
+    }
+    return { status: 200, body: JSON.stringify({ kind: 'Status' }) };
+  }
+}
+
+function prepareRetirement(t) {
+  const value = fixture(t, { extraResource: true });
+  const runner = successfulRunner([], {}, value.manifestContents);
+  const installed = performTransition(
+    value,
+    runner,
+    'install',
+    commonRequest(value).expectedHead,
+    'retirement-install',
+  );
+  const expectedHead = expectedFromReceipt(installed.receipt);
+  const api = new FakeRetirementApi(value.manifestContents);
+  const preflightPath = path.join(value.directory, 'retirement-preflight.json');
+  const preflightCommand = writeCommand(
+    value.directory,
+    'retirement-preflight-command.json',
+    'cluster.deployment.retirement.preflight',
+    {
+      preflightId: crypto.randomUUID(),
+      ...retirementRequest(value, expectedHead),
+      output: preflightPath,
+    },
+  );
+  const preflight = executeCommand(preflightCommand, {
+    runProcess: runner,
+    retirementApi: api,
+  });
+  return {
+    ...value,
+    runner,
+    installed,
+    expectedHead,
+    api,
+    preflight,
+    preflightPath,
+    preflightCommand,
+  };
+}
+
+function retirementApplyCommand(value, suffix = 'retirement') {
+  const receiptPath = path.join(value.directory, `${suffix}-receipt.json`);
+  const applyCommand = writeCommand(
+    value.directory,
+    `${suffix}-apply-command.json`,
+    'cluster.deployment.retirement.apply',
+    {
+      mutationId: crypto.randomUUID(),
+      preflight: {
+        path: value.preflightPath,
+        expectedDigest: value.preflight.preflightDigest,
+      },
+      ...retirementRequest(value, value.expectedHead),
+      output: receiptPath,
+    },
+  );
+  return { applyCommand, receiptPath };
 }
 
 test('preflight binds one catalog lock to one Kubernetes target without mutation', (t) => {
@@ -1017,6 +1183,168 @@ test('receipt audit rejects a different command or recomputed receipt', (t) => {
   assert.throws(() => executeCommand(auditCommand));
 });
 
+test('retirement preflight binds exact UID and resourceVersion without mutation', (t) => {
+  const value = prepareRetirement(t);
+  assert.equal(value.preflight.schema, RETIREMENT_PREFLIGHT_SCHEMA);
+  assert.deepEqual(value.preflight.activeResourceInventory.length, 6);
+  assert.deepEqual(value.preflight.survivorResourceInventory.length, 5);
+  assert.deepEqual(value.preflight.retirementTargets[0], {
+    ...RETIREMENT_TARGET,
+    uid: '123e4567-e89b-42d3-a456-426614174105',
+    resourceVersion: '6',
+  });
+  assert.equal(value.preflight.verification.kubernetesMutation, false);
+  const deletes = value.api.requests.filter(
+    (request) => request.method === 'DELETE',
+  );
+  assert.equal(deletes.length, 1);
+  assert.deepEqual(deletes[0].body.preconditions, {
+    uid: value.preflight.retirementTargets[0].uid,
+    resourceVersion: value.preflight.retirementTargets[0].resourceVersion,
+  });
+  assert.deepEqual(deletes[0].body.dryRun, ['All']);
+  assert.equal(
+    value.api.objects.has(
+      apiObjectPath({
+        ...RETIREMENT_TARGET,
+        metadata: {
+          namespace: RETIREMENT_TARGET.namespace,
+          name: RETIREMENT_TARGET.name,
+        },
+      }),
+    ),
+    true,
+  );
+});
+
+test('retirement applies preconditioned deletion, closes inventory and audits receipt', (t) => {
+  const value = prepareRetirement(t);
+  const { applyCommand, receiptPath } = retirementApplyCommand(value);
+  const receipt = executeCommand(applyCommand, {
+    runProcess: value.runner,
+    retirementApi: value.api,
+  });
+  assert.equal(receipt.schema, RETIREMENT_RECEIPT_SCHEMA);
+  assert.equal(receipt.resourceInventory.length, 5);
+  assert.equal(receipt.retiredResources.length, 1);
+  assert.equal(
+    receipt.verification.uidResourceVersionDeletePreconditions,
+    true,
+  );
+  assert.equal(receipt.verification.deletionAbsenceConfirmed, true);
+  assert.equal(receipt.deploymentHead.generation, 2);
+  assert.equal(
+    JSON.parse(value.runner.server.head.data[HEAD_DATA_KEY]).transition.kind,
+    'retire',
+  );
+  const actualDelete = value.api.requests.find(
+    (request) =>
+      request.method === 'DELETE' && request.body?.dryRun === undefined,
+  );
+  assert.deepEqual(actualDelete.body.preconditions, {
+    uid: receipt.retiredResources[0].uid,
+    resourceVersion: receipt.retiredResources[0].resourceVersion,
+  });
+
+  const auditCommand = writeCommand(
+    value.directory,
+    'retirement-audit-command.json',
+    'cluster.deployment.retirement.receipt.audit',
+    {
+      applyCommand: {
+        path: applyCommand,
+        expectedDigest: fileDigest(applyCommand),
+      },
+      receipt: { path: receiptPath, expectedDigest: receipt.receiptDigest },
+    },
+  );
+  const audit = executeCommand(auditCommand);
+  assert.equal(audit.compatible, true);
+  assert.equal(audit.transitionKind, 'retire');
+  assert.equal(audit.retiredResourceCount, 1);
+  assert.equal(audit.resourceCount, 5);
+  assert.equal(audit.kubernetesMutation, false);
+});
+
+test('retirement rejects a replacement UID before acquiring the deployment head', (t) => {
+  const value = prepareRetirement(t);
+  const { applyCommand, receiptPath } = retirementApplyCommand(
+    value,
+    'replacement',
+  );
+  const requestPath = [...value.api.objects.keys()].find((candidate) =>
+    candidate.endsWith('/ql3-extra-release-resource'),
+  );
+  const live = value.api.objects.get(requestPath);
+  value.api.objects.set(requestPath, {
+    ...live,
+    metadata: { ...live.metadata, uid: crypto.randomUUID() },
+  });
+  assert.throws(() =>
+    executeCommand(applyCommand, {
+      runProcess: value.runner,
+      retirementApi: value.api,
+    }),
+  );
+  assert.equal(fs.existsSync(receiptPath), false);
+  const head = JSON.parse(value.runner.server.head.data[HEAD_DATA_KEY]);
+  assert.equal(head.phase, 'committed');
+  assert.equal(head.generation, 1);
+});
+
+test('retirement resumes exact intent after a lost delete response', (t) => {
+  const value = prepareRetirement(t);
+  const { applyCommand, receiptPath } = retirementApplyCommand(
+    value,
+    'response-loss',
+  );
+  value.api.loseNextDeleteResponse = true;
+  assert.throws(() =>
+    executeCommand(applyCommand, {
+      runProcess: value.runner,
+      retirementApi: value.api,
+    }),
+  );
+  assert.equal(fs.existsSync(receiptPath), false);
+  assert.equal(
+    JSON.parse(value.runner.server.head.data[HEAD_DATA_KEY]).phase,
+    'applying',
+  );
+  const receipt = executeCommand(applyCommand, {
+    runProcess: value.runner,
+    retirementApi: value.api,
+  });
+  assert.equal(receipt.deploymentHead.generation, 2);
+  assert.equal(receipt.resourceInventory.length, 5);
+  assert.equal(
+    JSON.parse(value.runner.server.head.data[HEAD_DATA_KEY]).phase,
+    'committed',
+  );
+});
+
+test('rollback may restore the exact inventory retired at the same release version', (t) => {
+  const value = prepareRetirement(t);
+  const { applyCommand } = retirementApplyCommand(value, 'restore-source');
+  const retired = executeCommand(applyCommand, {
+    runProcess: value.runner,
+    retirementApi: value.api,
+  });
+  const restored = performTransition(
+    value,
+    value.runner,
+    'rollback',
+    expectedFromReceipt(retired),
+    'retirement-restore',
+  );
+  assert.equal(restored.receipt.transitionKind, 'rollback');
+  assert.equal(restored.receipt.deploymentHead.generation, 3);
+  assert.equal(restored.receipt.resourceInventory.length, 6);
+  assert.deepEqual(
+    restored.receipt.resourceInventory,
+    value.installed.receipt.resourceInventory,
+  );
+});
+
 test('command surface is closed and lock reports require exact canonical identity', () => {
   assert.equal(
     commandFile(['--command-file=/private/command.json']),
@@ -1066,6 +1394,56 @@ test('repository exposes the reviewed ceremony and removes the bare apply handof
     operations.includes('才由有权限的独立步骤执行 `kubectl apply'),
     false,
   );
+});
+
+test('CI runs the isolated deployment and retirement live contract', () => {
+  const root = path.resolve(__dirname, '../..');
+  const workflowPath = path.join(
+    root,
+    '.github/workflows/ql3-kubernetes-deployment-live.yml',
+  );
+  const workflowSource = fs.readFileSync(workflowPath, 'utf8');
+  const workflow = yaml.load(workflowSource);
+  const job = workflow.jobs?.['kubernetes-deployment-live'];
+  assert.equal(job?.['runs-on'], 'ubuntu-24.04');
+  assert.equal(job?.['timeout-minutes'], 25);
+  assert.match(workflowSource, /rancher\/k3s:v1\.34\.3-k3s1/u);
+  assert.match(workflowSource, /kubectl v1\.34\.3/u);
+  assert.match(
+    workflowSource,
+    /node --test test\/back\/ql3KubernetesDeploymentCeremony\.test\.cjs/u,
+  );
+  assert.match(
+    workflowSource,
+    /node scripts\/ql3-kubernetes-deployment-live-contract\.cjs/u,
+  );
+  assert.match(workflowSource, /uidResourceVersionDeletePreconditions/u);
+  assert.match(workflowSource, /ql3-deploy-live-/u);
+});
+
+test('live contract never resolves curl through the Docker kubectl fallback', function liveToolResolutionKeepsCurlDistinct() {
+  const root = path.resolve(__dirname, '../..');
+  const source = fs.readFileSync(
+    path.join(root, 'scripts/ql3-kubernetes-deployment-live-contract.cjs'),
+    'utf8',
+  );
+  assert.match(
+    source,
+    /const candidates = \[\s*input,\s*\.\.\.\(input === 'kubectl'\s*\? \['\/Applications\/Docker\.app\/Contents\/Resources\/bin\/kubectl'\]\s*: \[\]\),\s*\.\.\.\(process\.env\.PATH/u,
+  );
+});
+
+test('private retirement proxy rejects every unrelated mutation method', function privateRetirementProxyRejectsUnrelatedMutations() {
+  const root = path.resolve(__dirname, '../..');
+  const source = fs.readFileSync(
+    path.join(root, 'scripts/lib/ql3-kubernetes-deployment-ceremony.cjs'),
+    'utf8',
+  );
+  assert.match(
+    source,
+    /--reject-methods=\^\(POST\|PUT\|PATCH\|CONNECT\|OPTIONS\|TRACE\)\$/u,
+  );
+  assert.equal(source.includes('--reject-methods=POST,PUT,PATCH'), false);
 });
 
 test('thin CLI uses the pinned executable and keeps failures low-sensitive', (t) => {

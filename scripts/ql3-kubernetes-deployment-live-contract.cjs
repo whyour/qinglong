@@ -49,7 +49,9 @@ function privateFile(directory, name, contents) {
 function executablePath(input) {
   const candidates = [
     input,
-    '/Applications/Docker.app/Contents/Resources/bin/kubectl',
+    ...(input === 'kubectl'
+      ? ['/Applications/Docker.app/Contents/Resources/bin/kubectl']
+      : []),
     ...(process.env.PATH ?? '')
       .split(path.delimiter)
       .filter(Boolean)
@@ -76,9 +78,9 @@ function references() {
 }
 
 function lockedArtifacts() {
-  const releaseSetDigest = digest('d342-live-release-set');
-  const catalogManifestDigest = digest('d342-live-catalog-manifest');
-  const catalogReportDigest = digest('d342-live-catalog-report');
+  const releaseSetDigest = digest('d343-live-release-set');
+  const catalogManifestDigest = digest('d343-live-catalog-manifest');
+  const catalogReportDigest = digest('d343-live-catalog-report');
   const imageReferences = references();
   const annotations = {
     'qinglong.io/release-set-digest': releaseSetDigest,
@@ -132,6 +134,16 @@ function lockedArtifacts() {
       },
       data: { image: imageReferences.admin },
     },
+    {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: {
+        name: 'ql3-retirement-live-target',
+        namespace: NAMESPACE,
+        annotations,
+      },
+      data: { purpose: 'uid-resource-version-retirement-live-contract' },
+    },
   ];
   const manifest = `${resources
     .map((resource) => JSON.stringify(resource))
@@ -164,7 +176,7 @@ function lockedArtifacts() {
       count: role === 'admin' ? 2 : 1,
     })),
     manifest: {
-      inputDigest: digest('d342-live-source-render'),
+      inputDigest: digest('d343-live-source-render'),
       outputDigest: digest(manifest),
       resources: resources.length,
       changedResources: 5,
@@ -217,6 +229,7 @@ async function main() {
     const ceremonyDirectory = fs.realpathSync(fixture.temporary);
     const kubeconfig = fs.realpathSync(fixture.kubeconfig);
     const kubectl = executablePath(fixture.kubectlBinary);
+    const curl = executablePath('curl');
     const clusterUid = fixture
       .kubectl(
         ['get', 'namespace', 'kube-system', '-o=jsonpath={.metadata.uid}'],
@@ -307,21 +320,21 @@ async function main() {
       },
     );
     const audit = executeCommand(auditCommand);
-    const deploymentHeadConfigMap = fixture.kubectlJson([
+    const installedHeadConfigMap = fixture.kubectlJson([
       'get',
       'configmap',
       HEAD_NAME,
       '-n',
       NAMESPACE,
     ]);
-    const deploymentHead = JSON.parse(
-      deploymentHeadConfigMap.data?.[HEAD_DATA_KEY],
+    const installedHead = JSON.parse(
+      installedHeadConfigMap.data?.[HEAD_DATA_KEY],
     );
     if (
-      deploymentHead.phase !== 'committed' ||
-      deploymentHead.generation !== 1 ||
-      deploymentHead.stateDigest !== receipt.deploymentHead.stateDigest ||
-      deploymentHead.deployment?.deploymentDigest !==
+      installedHead.phase !== 'committed' ||
+      installedHead.generation !== 1 ||
+      installedHead.stateDigest !== receipt.deploymentHead.stateDigest ||
+      installedHead.deployment?.deploymentDigest !==
         receipt.deploymentHead.deploymentDigest
     ) {
       fail('committed deployment head is invalid');
@@ -350,6 +363,117 @@ async function main() {
       ) {
         fail('server-side apply field manager is unavailable');
       }
+    }
+    const retirementTarget = {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      namespace: NAMESPACE,
+      name: 'ql3-retirement-live-target',
+    };
+    const retirementCommon = {
+      lockedManifest: common.lockedManifest,
+      lockReport: common.lockReport,
+      kubectl: common.kubectl,
+      curl: {
+        path: curl,
+        expectedDigest: digest(fs.readFileSync(curl)),
+      },
+      kubeconfig: common.kubeconfig,
+      context: CONTEXT,
+      expectedClusterUid: clusterUid,
+      expectedHead: {
+        generation: receipt.deploymentHead.generation,
+        deploymentDigest: receipt.deploymentHead.deploymentDigest,
+        lockDigest: receipt.deploymentHead.lockDigest,
+        stateDigest: receipt.deploymentHead.stateDigest,
+      },
+      targets: [retirementTarget],
+    };
+    const retirementPreflightPath = path.join(
+      ceremonyDirectory,
+      'retirement-preflight.json',
+    );
+    const retirementPreflightCommand = writeCommand(
+      ceremonyDirectory,
+      'retirement-preflight-command.json',
+      'cluster.deployment.retirement.preflight',
+      {
+        preflightId: crypto.randomUUID(),
+        ...retirementCommon,
+        output: retirementPreflightPath,
+      },
+    );
+    const retirementPreflight = executeCommand(retirementPreflightCommand);
+    const retirementReceiptPath = path.join(
+      ceremonyDirectory,
+      'retirement-receipt.json',
+    );
+    const retirementApplyCommand = writeCommand(
+      ceremonyDirectory,
+      'retirement-apply-command.json',
+      'cluster.deployment.retirement.apply',
+      {
+        mutationId: crypto.randomUUID(),
+        preflight: {
+          path: retirementPreflightPath,
+          expectedDigest: retirementPreflight.preflightDigest,
+        },
+        ...retirementCommon,
+        output: retirementReceiptPath,
+      },
+    );
+    const retirementReceipt = executeCommand(retirementApplyCommand);
+    const retirementAuditCommand = writeCommand(
+      ceremonyDirectory,
+      'retirement-audit-command.json',
+      'cluster.deployment.retirement.receipt.audit',
+      {
+        applyCommand: {
+          path: retirementApplyCommand,
+          expectedDigest: digest(fs.readFileSync(retirementApplyCommand)),
+        },
+        receipt: {
+          path: retirementReceiptPath,
+          expectedDigest: retirementReceipt.receiptDigest,
+        },
+      },
+    );
+    const retirementAudit = executeCommand(retirementAuditCommand);
+    const retiredName = fixture
+      .kubectl(
+        [
+          'get',
+          'configmap',
+          retirementTarget.name,
+          '-n',
+          NAMESPACE,
+          '--ignore-not-found=true',
+          '-o=name',
+        ],
+        { capture: true, quiet: true },
+      )
+      .stdout.trim();
+    const deploymentHeadConfigMap = fixture.kubectlJson([
+      'get',
+      'configmap',
+      HEAD_NAME,
+      '-n',
+      NAMESPACE,
+    ]);
+    const deploymentHead = JSON.parse(
+      deploymentHeadConfigMap.data?.[HEAD_DATA_KEY],
+    );
+    if (
+      retiredName !== '' ||
+      deploymentHead.phase !== 'committed' ||
+      deploymentHead.generation !== 2 ||
+      deploymentHead.transition.kind !== 'retire' ||
+      deploymentHead.stateDigest !==
+        retirementReceipt.deploymentHead.stateDigest ||
+      deploymentHead.deployment.resources.length !==
+        artifacts.report.manifest.resources - 1
+    ) {
+      fail('committed resource retirement head is invalid');
     }
     const version = JSON.parse(
       fixture.kubectl(['version', '-o=json'], {
@@ -382,6 +506,18 @@ async function main() {
       preflightDigest: preflight.preflightDigest,
       receiptDigest: receipt.receiptDigest,
       receiptAuditCompatible: audit.compatible,
+      retirement: {
+        preflightDigest: retirementPreflight.preflightDigest,
+        receiptDigest: retirementReceipt.receiptDigest,
+        receiptAuditCompatible: retirementAudit.compatible,
+        targetCount: retirementReceipt.retiredResources.length,
+        targetAbsent: retiredName === '',
+        uidResourceVersionDeletePreconditions:
+          retirementReceipt.verification.uidResourceVersionDeletePreconditions,
+        deploymentHeadCas: retirementReceipt.verification.deploymentHeadCas,
+        inventoryCount: retirementReceipt.resourceInventory.length,
+        unixSocketProxy: retirementReceipt.verification.unixSocketProxy,
+      },
       serverSideDryRun: preflight.verification.serverSideDryRun,
       serverSideApply: receipt.verification.serverSideApply,
       convergenceRead: receipt.verification.convergenceRead,

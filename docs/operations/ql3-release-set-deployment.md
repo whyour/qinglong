@@ -299,6 +299,62 @@ cluster UID，最后以同一 ConfigMap 的新 resourceVersion 提交 `committed
 mutation 前失败关闭。`rollback` 只接受 Head 中精确的上一部署 lock，且当前/目标 inventory 必须完全相同；涉及资源退休时须等待
 独立的 UID/resourceVersion-precondition retirement ceremony，不能把遗留对象伪装成回滚成功。
 
+### Kubernetes 资源退役
+
+缩小 active inventory 必须显式使用 `cluster.deployment.retirement.preflight`，不能先手工删除，也不能使用 `kubectl delete -f`、
+`kubectl apply --prune`、force delete 或 `--grace-period=0`。只允许退役 current locked manifest 与 committed Head inventory 中的
+namespaced 非 credential/data 对象；`Secret`、`PersistentVolumeClaim`、`ServiceAccount`、cluster-scoped resource 和固定 Head
+ConfigMap 均须走专用运维流程。survivor inventory 必须仍包含 control、control-ai、admin、worker 四类 authority。
+
+除上文相同的 locked manifest、lock report、kubectl、kubeconfig、context、cluster UID 与 expected Head 外，retirement command
+还必须固定 realpath 后的 curl executable digest，并提交至多 64 个按 `apiVersion/kind/namespace/name` 排序的 target：
+
+```json
+{
+  "schemaVersion": 1,
+  "schema": "qinglong/kubernetes-deployment-command@v2",
+  "operation": "cluster.deployment.retirement.preflight",
+  "request": {
+    "preflightId": "<new UUID>",
+    "lockedManifest": "<same path/digest object>",
+    "lockReport": "<same path/digest object>",
+    "kubectl": "<same path/digest object>",
+    "curl": {
+      "path": "<canonical absolute curl>",
+      "expectedDigest": "<SHA-256 of curl bytes>"
+    },
+    "kubeconfig": "<same path/digest object>",
+    "context": "<same context>",
+    "expectedClusterUid": "<same cluster UID>",
+    "expectedHead": "<exact current committed Head fields>",
+    "targets": [
+      {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "namespace": "qinglong-system",
+        "name": "obsolete-release-resource"
+      }
+    ],
+    "output": "<unused canonical absolute retirement-preflight.json>"
+  }
+}
+```
+
+示例中的 `"<same path/digest object>"` 与 `"<exact current committed Head fields>"` 是文档占位符，实际 command 必须展开为上文
+展示的 JSON object，且仍须是单行 canonical JSON。运行同一个 `pnpm cluster-deployment:ql3 -- --command-file=...` 入口。preflight
+逐对象读取 exact UID/resourceVersion 与 Apply ownership，并向 API Server 发送带 Preconditions 的 `DeleteOptions` dry-run；成功报告
+保持 `kubernetesMutation:false`。人工核对 active/survivor inventory、target observation 和两个 tool digest 后，生成
+`cluster.deployment.retirement.apply` command：把 `preflightId` 改为新 `mutationId`，增加
+`preflight={path,expectedDigest}`，其余 authority 与 targets 必须逐字一致，output 改为新的 retirement receipt 路径。
+
+apply 在删除前再次读取对象并 CAS Head 为 `applying`，随后通过 owner-private Unix socket proxy 发送带同一 UID/resourceVersion
+preconditions 和 Background propagation 的 DELETE。只有 old UID 已确认 absent 才会提交缩小 inventory 的下一代 Head。若 DELETE
+响应丢失，保留 command 与 preflight 原文件并原样重跑；只有相同 applying intent 且对象已经 absent 才可恢复。对象被新 UID 替换、
+resourceVersion 漂移、处于 terminating 或 Head 已被其他意图推进时必须人工处理，不能改 command 绕过围栏。
+
+退役收据使用 `cluster.deployment.retirement.receipt.audit` 离线审计，结构与普通 audit 相同，但 applyCommand 必须指向 retirement
+apply command。成功 audit 只证明 command/receipt digest 闭包，不重放外部删除结果。
+
 离线审计使用 `cluster.deployment.receipt.audit` command，其中 `applyCommand.expectedDigest` 是 apply command 文件完整字节的
 SHA-256，`receipt.expectedDigest` 是 receipt 内的 `receiptDigest`。审计不会访问 Kubernetes API，结果必须保持
 `externalResultsReplayed:false`、`kubernetesMutation:false`。

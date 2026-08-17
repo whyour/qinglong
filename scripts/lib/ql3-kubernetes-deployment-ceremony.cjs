@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const yaml = require('js-yaml');
 const semver = require('semver');
 
@@ -13,7 +13,11 @@ const LOCK_SCHEMA = 'qinglong/kubernetes-deployment-lock@v2';
 const CATALOG_SCHEMA = 'qinglong/release-catalog-consumption-ceremony@v1';
 const PREFLIGHT_SCHEMA = 'qinglong/kubernetes-deployment-preflight@v2';
 const RECEIPT_SCHEMA = 'qinglong/kubernetes-deployment-receipt@v2';
-const HEAD_SCHEMA = 'qinglong/kubernetes-deployment-head@v1';
+const RETIREMENT_PREFLIGHT_SCHEMA =
+  'qinglong/kubernetes-resource-retirement-preflight@v1';
+const RETIREMENT_RECEIPT_SCHEMA =
+  'qinglong/kubernetes-resource-retirement-receipt@v1';
+const HEAD_SCHEMA = 'qinglong/kubernetes-deployment-head@v2';
 const HEAD_NAME = 'qinglong3-deployment-head';
 const HEAD_DATA_KEY = 'head.json';
 const FIELD_MANAGER = 'qinglong3-catalog-lock';
@@ -24,6 +28,7 @@ const MAX_KUBECONFIG_BYTES = 1024 * 1024;
 const MAX_EXECUTABLE_BYTES = 256 * 1024 * 1024;
 const MAX_PROCESS_OUTPUT_BYTES = 4 * 1024 * 1024;
 const MAX_RESOURCE_COUNT = 2048;
+const MAX_RETIREMENT_COUNT = 64;
 const MAX_STRUCTURE_DEPTH = 64;
 const PROCESS_TIMEOUT_MS = 60_000;
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
@@ -36,6 +41,12 @@ const REPOSITORY_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\/[a-z0-9._-]{1,100}$/u;
 const ROLE_ORDER = Object.freeze(['control', 'control-ai', 'admin', 'worker']);
 const TRANSITION_KINDS = Object.freeze(['install', 'upgrade', 'rollback']);
+const HEAD_TRANSITION_KINDS = Object.freeze([...TRANSITION_KINDS, 'retire']);
+const FORBIDDEN_RETIREMENT_IDENTITIES = Object.freeze([
+  'v1\u0000PersistentVolumeClaim',
+  'v1\u0000Secret',
+  'v1\u0000ServiceAccount',
+]);
 const IMAGE_NAMES = Object.freeze({
   control: 'qinglong3-cluster-control',
   'control-ai': 'qinglong3-cluster-control-ai',
@@ -320,6 +331,45 @@ function transitionRequest(request) {
   return Object.freeze({ transitionKind: request.transitionKind, head });
 }
 
+function retirementTargets(value) {
+  validateResourceInventory(value);
+  if (value.length > MAX_RETIREMENT_COUNT) {
+    fail('deployment retirement target count is invalid');
+  }
+  for (const target of value) {
+    if (
+      target.namespace === null ||
+      FORBIDDEN_RETIREMENT_IDENTITIES.includes(
+        `${target.apiVersion}\u0000${target.kind}`,
+      ) ||
+      (target.apiVersion === 'v1' &&
+        target.kind === 'ConfigMap' &&
+        target.name === HEAD_NAME)
+    ) {
+      fail('deployment retirement target requires a dedicated ceremony');
+    }
+  }
+  return Object.freeze(value.map((target) => Object.freeze({ ...target })));
+}
+
+function retirementRequest(request) {
+  const head = expectedHead(request.expectedHead);
+  if (head.generation === 0) {
+    fail('deployment retirement requires a committed head');
+  }
+  return Object.freeze({
+    lockedManifest: artifact(request.lockedManifest, 'locked manifest'),
+    lockReport: artifact(request.lockReport, 'lock report'),
+    kubectl: artifact(request.kubectl, 'kubectl'),
+    curl: artifact(request.curl, 'curl'),
+    kubeconfig: artifact(request.kubeconfig, 'kubeconfig'),
+    context: request.context,
+    expectedClusterUid: request.expectedClusterUid,
+    expectedHead: head,
+    targets: retirementTargets(request.targets),
+  });
+}
+
 function parseCommand(value) {
   if (
     !exactKeys(value, ['schemaVersion', 'schema', 'operation', 'request']) ||
@@ -411,6 +461,97 @@ function parseCommand(value) {
           request.output,
           'apply receipt output',
         ),
+      }),
+    });
+  }
+  if (value.operation === 'cluster.deployment.retirement.preflight') {
+    if (
+      !exactKeys(request, [
+        'preflightId',
+        'lockedManifest',
+        'lockReport',
+        'kubectl',
+        'curl',
+        'kubeconfig',
+        'context',
+        'expectedClusterUid',
+        'expectedHead',
+        'targets',
+        'output',
+      ]) ||
+      !UUID_PATTERN.test(request.preflightId || '') ||
+      !CONTEXT_PATTERN.test(request.context || '') ||
+      !UUID_PATTERN.test(request.expectedClusterUid || '') ||
+      typeof request.output !== 'string'
+    ) {
+      fail('retirement preflight command is invalid');
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      schema: COMMAND_SCHEMA,
+      operation: value.operation,
+      request: Object.freeze({
+        preflightId: request.preflightId,
+        ...retirementRequest(request),
+        output: resolveCanonicalAbsolute(
+          request.output,
+          'retirement preflight output',
+        ),
+      }),
+    });
+  }
+  if (value.operation === 'cluster.deployment.retirement.apply') {
+    if (
+      !exactKeys(request, [
+        'mutationId',
+        'preflight',
+        'lockedManifest',
+        'lockReport',
+        'kubectl',
+        'curl',
+        'kubeconfig',
+        'context',
+        'expectedClusterUid',
+        'expectedHead',
+        'targets',
+        'output',
+      ]) ||
+      !UUID_PATTERN.test(request.mutationId || '') ||
+      !CONTEXT_PATTERN.test(request.context || '') ||
+      !UUID_PATTERN.test(request.expectedClusterUid || '') ||
+      typeof request.output !== 'string'
+    ) {
+      fail('retirement apply command is invalid');
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      schema: COMMAND_SCHEMA,
+      operation: value.operation,
+      request: Object.freeze({
+        mutationId: request.mutationId,
+        preflight: artifact(request.preflight, 'retirement preflight report'),
+        ...retirementRequest(request),
+        output: resolveCanonicalAbsolute(
+          request.output,
+          'retirement receipt output',
+        ),
+      }),
+    });
+  }
+  if (value.operation === 'cluster.deployment.retirement.receipt.audit') {
+    if (!exactKeys(request, ['applyCommand', 'receipt'])) {
+      fail('retirement receipt audit command is invalid');
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      schema: COMMAND_SCHEMA,
+      operation: value.operation,
+      request: Object.freeze({
+        applyCommand: artifact(
+          request.applyCommand,
+          'retirement apply command',
+        ),
+        receipt: artifact(request.receipt, 'retirement receipt'),
       }),
     });
   }
@@ -1119,6 +1260,19 @@ function inspectInputs(request) {
   });
 }
 
+function inspectRetirementInputs(request) {
+  const inputs = inspectInputs(request);
+  const curl = verifyExpected(
+    readStableFile(request.curl.path, 'curl', MAX_EXECUTABLE_BYTES, {
+      privateFile: false,
+      executable: true,
+    }),
+    request.curl.expectedDigest,
+    'curl',
+  );
+  return Object.freeze({ ...inputs, curl });
+}
+
 function defaultRunProcess(executable, args, input) {
   const privateHome = fs.mkdtempSync(
     path.join(os.tmpdir(), 'ql3-kubectl-home-'),
@@ -1144,6 +1298,198 @@ function defaultRunProcess(executable, args, input) {
   } finally {
     fs.rmSync(privateHome, { recursive: true, force: true });
   }
+}
+
+function waitForProxySocket(socketPath, child) {
+  const deadline = Date.now() + 5_000;
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  while (Date.now() < deadline) {
+    try {
+      if (fs.lstatSync(socketPath).isSocket()) return;
+    } catch {}
+    if (child.exitCode !== null) break;
+    Atomics.wait(sleeper, 0, 0, 25);
+  }
+  fail('private Kubernetes API proxy did not become ready');
+}
+
+function curlUnixRequest(inputs, socketPath, method, requestPath, body) {
+  const args = [
+    '--silent',
+    '--show-error',
+    '--unix-socket',
+    socketPath,
+    '--request',
+    method,
+    '--header',
+    'Accept: application/json',
+    '--max-time',
+    '60',
+    '--output',
+    '-',
+    '--write-out',
+    '\n%{http_code}',
+  ];
+  let input = '';
+  if (body !== null) {
+    args.push(
+      '--header',
+      'Content-Type: application/json',
+      '--data-binary',
+      '@-',
+    );
+    input = JSON.stringify(body);
+  }
+  args.push(`http://localhost${requestPath}`);
+  const result = spawnSync(inputs.curl.path, args, {
+    input,
+    encoding: 'utf8',
+    timeout: PROCESS_TIMEOUT_MS,
+    maxBuffer: MAX_PROCESS_OUTPUT_BYTES,
+    shell: false,
+    windowsHide: true,
+  });
+  if (
+    result.error ||
+    result.status !== 0 ||
+    typeof result.stdout !== 'string'
+  ) {
+    fail('private Kubernetes API request could not complete safely');
+  }
+  const boundary = result.stdout.lastIndexOf('\n');
+  const statusText = result.stdout.slice(boundary + 1);
+  const responseBody = result.stdout.slice(0, boundary);
+  if (
+    boundary < 0 ||
+    !/^\d{3}$/u.test(statusText) ||
+    Buffer.byteLength(responseBody, 'utf8') > MAX_PROCESS_OUTPUT_BYTES
+  ) {
+    fail('private Kubernetes API response is invalid');
+  }
+  return Object.freeze({ status: Number(statusText), body: responseBody });
+}
+
+function defaultRetirementApi(inputs, request, callback) {
+  const privateHome = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-kubectl-retirement-'),
+  );
+  fs.chmodSync(privateHome, 0o700);
+  const socketPath = path.join(privateHome, 'api.sock');
+  const args = [
+    `--kubeconfig=${inputs.kubeconfig.path}`,
+    `--context=${request.context}`,
+    '--request-timeout=60s',
+    'proxy',
+    `--unix-socket=${socketPath}`,
+    '--api-prefix=/',
+    '--www=',
+    '--accept-paths=^/(api|apis)/.*$',
+    '--reject-methods=^(POST|PUT|PATCH|CONNECT|OPTIONS|TRACE)$',
+    '--keepalive=0s',
+  ];
+  let child;
+  try {
+    child = spawn(inputs.executable.path, args, {
+      stdio: 'ignore',
+      shell: false,
+      windowsHide: true,
+      env: Object.freeze({
+        HOME: privateHome,
+        XDG_CACHE_HOME: privateHome,
+        TMPDIR: privateHome,
+        LANG: 'C',
+        LC_ALL: 'C',
+        NO_COLOR: '1',
+      }),
+    });
+    waitForProxySocket(socketPath, child);
+    return callback(
+      Object.freeze({
+        request(method, requestPath, body = null) {
+          return curlUnixRequest(inputs, socketPath, method, requestPath, body);
+        },
+      }),
+    );
+  } finally {
+    if (child?.pid) child.kill('SIGTERM');
+    try {
+      fs.rmSync(privateHome, { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+function withRetirementApi(inputs, request, dependencies, callback) {
+  if (dependencies.retirementApi !== undefined) {
+    if (typeof dependencies.retirementApi?.request !== 'function') {
+      fail('retirement API dependency is invalid');
+    }
+    return callback(dependencies.retirementApi);
+  }
+  return defaultRetirementApi(inputs, request, callback);
+}
+
+function recordedApiRequest(records, api, name, method, requestPath, body) {
+  const response = api.request(method, requestPath, body);
+  if (
+    !Number.isInteger(response?.status) ||
+    response.status < 100 ||
+    response.status > 599 ||
+    typeof response.body !== 'string' ||
+    Buffer.byteLength(response.body, 'utf8') > MAX_PROCESS_OUTPUT_BYTES
+  ) {
+    fail('retirement API dependency response is invalid');
+  }
+  records.push(
+    Object.freeze({
+      name,
+      method,
+      requestPathDigest: sha256(Buffer.from(requestPath, 'utf8')),
+      requestDigest: sha256(
+        Buffer.from(body === null ? '' : JSON.stringify(body), 'utf8'),
+      ),
+      status: response.status,
+      responseDigest: sha256(Buffer.from(response.body, 'utf8')),
+      responseBytes: Buffer.byteLength(response.body, 'utf8'),
+    }),
+  );
+  return response;
+}
+
+function aggregateRequestStep(name, records) {
+  const stdoutBytes = records.reduce(
+    (total, record) => total + record.responseBytes,
+    0,
+  );
+  if (records.length < 1 || stdoutBytes > MAX_PROCESS_OUTPUT_BYTES) {
+    fail('retirement API transcript exceeds its bound');
+  }
+  return Object.freeze({
+    name,
+    status: 0,
+    argvDigest: sha256(
+      Buffer.from(
+        JSON.stringify(
+          records.map((record) => ({
+            name: record.name,
+            method: record.method,
+            requestPathDigest: record.requestPathDigest,
+            requestDigest: record.requestDigest,
+            status: record.status,
+          })),
+        ),
+        'utf8',
+      ),
+    ),
+    stdoutDigest: sha256(
+      Buffer.from(
+        JSON.stringify(records.map((record) => record.responseDigest)),
+        'utf8',
+      ),
+    ),
+    stdoutBytes,
+    stderrDigest: sha256(Buffer.alloc(0)),
+    stderrBytes: 0,
+  });
 }
 
 function runStep(
@@ -1263,6 +1609,23 @@ function revalidateStableInputs(inputs, request) {
   }
 }
 
+function revalidateRetirementInputs(inputs, request) {
+  revalidateStableInputs(inputs, request);
+  const current = readStableFile(
+    inputs.curl.path,
+    'curl',
+    MAX_EXECUTABLE_BYTES,
+    { privateFile: false, executable: true },
+  );
+  if (
+    current.digest !== inputs.curl.digest ||
+    !sameIdentity(current.identity, inputs.curl.identity) ||
+    current.digest !== request.curl.expectedDigest
+  ) {
+    fail('curl changed during the retirement ceremony');
+  }
+}
+
 function lockSummary(inputs) {
   const report = inputs.authority.report;
   return Object.freeze({
@@ -1291,6 +1654,241 @@ function toolSummary(inputs) {
   return Object.freeze({
     name: 'kubectl',
     executableDigest: inputs.executable.digest,
+  });
+}
+
+function retirementToolSummary(inputs) {
+  return Object.freeze({
+    kubectl: toolSummary(inputs),
+    curl: Object.freeze({
+      name: 'curl',
+      executableDigest: inputs.curl.digest,
+    }),
+    transport: 'owner_private_unix_socket_proxy',
+  });
+}
+
+function validateRetirementToolSummary(value) {
+  if (
+    !exactKeys(value, ['kubectl', 'curl', 'transport']) ||
+    value.transport !== 'owner_private_unix_socket_proxy' ||
+    !exactKeys(value.curl, ['name', 'executableDigest']) ||
+    value.curl.name !== 'curl' ||
+    !DIGEST_PATTERN.test(value.curl.executableDigest || '')
+  ) {
+    fail('retirement tool summary is invalid');
+  }
+  validateToolSummary(value.kubectl);
+}
+
+function inventoryKey(value) {
+  return JSON.stringify({
+    apiVersion: value.apiVersion,
+    kind: value.kind,
+    namespace: value.namespace ?? value.metadata?.namespace ?? null,
+    name: value.name ?? value.metadata?.name,
+  });
+}
+
+function retirementPlan(inputs, current, targets) {
+  if (current.state === null || current.state.phase !== 'committed') {
+    fail('deployment retirement requires a committed head');
+  }
+  const currentDeployment = current.state.deployment;
+  if (
+    JSON.stringify(currentDeployment.lock) !==
+    JSON.stringify(lockSummary(inputs))
+  ) {
+    fail('deployment retirement lock is not the active lock');
+  }
+  const manifestByIdentity = new Map(
+    inputs.resources.map((resource) => [inventoryKey(resource), resource]),
+  );
+  const activeKeys = new Set(
+    currentDeployment.resources.map((resource) => inventoryKey(resource)),
+  );
+  if (
+    activeKeys.size !== currentDeployment.resources.length ||
+    [...activeKeys].some((identity) => !manifestByIdentity.has(identity))
+  ) {
+    fail('active deployment inventory is not backed by its lock');
+  }
+  const retiredKeys = new Set(targets.map((target) => inventoryKey(target)));
+  if ([...retiredKeys].some((identity) => !activeKeys.has(identity))) {
+    fail('deployment retirement target is not active');
+  }
+  const survivors = Object.freeze(
+    currentDeployment.resources.filter(
+      (resource) => !retiredKeys.has(inventoryKey(resource)),
+    ),
+  );
+  if (survivors.length < 1) {
+    fail('deployment retirement cannot empty the active inventory');
+  }
+  const survivorResources = survivors.map((item) =>
+    manifestByIdentity.get(inventoryKey(item)),
+  );
+  for (const role of ROLE_ORDER) {
+    if (
+      !survivorResources.some((resource) =>
+        containsExactString(resource, inputs.authority.references[role]),
+      )
+    ) {
+      fail(`deployment retirement would remove the last ${role} authority`);
+    }
+  }
+  return Object.freeze({
+    active: currentDeployment.resources,
+    survivors,
+    resources: Object.freeze(
+      targets.map((target) => manifestByIdentity.get(inventoryKey(target))),
+    ),
+  });
+}
+
+function apiVersionBase(apiVersion) {
+  if (apiVersion === 'v1') return '/api/v1';
+  const segments = apiVersion.split('/');
+  if (
+    segments.length !== 2 ||
+    segments.some(
+      (segment) => !segment || /[\u0000-\u001f\u007f]/u.test(segment),
+    )
+  ) {
+    fail('retirement API version is invalid');
+  }
+  return `/apis/${encodeURIComponent(segments[0])}/${encodeURIComponent(
+    segments[1],
+  )}`;
+}
+
+function apiResourcePath(api, item, cache, records) {
+  const base = apiVersionBase(item.apiVersion);
+  let resources = cache.get(base);
+  if (resources === undefined) {
+    const response = recordedApiRequest(
+      records,
+      api,
+      'api_discovery',
+      'GET',
+      base,
+      null,
+    );
+    if (response.status !== 200) fail('Kubernetes API discovery failed');
+    let discovery;
+    try {
+      discovery = JSON.parse(response.body);
+    } catch {
+      fail('Kubernetes API discovery response is invalid');
+    }
+    if (!Array.isArray(discovery?.resources)) {
+      fail('Kubernetes API discovery response is invalid');
+    }
+    resources = discovery.resources;
+    cache.set(base, resources);
+  }
+  const candidates = resources.filter(
+    (resource) =>
+      resource?.kind === item.kind &&
+      typeof resource?.name === 'string' &&
+      !resource.name.includes('/') &&
+      Array.isArray(resource.verbs) &&
+      resource.verbs.includes('get') &&
+      resource.verbs.includes('delete') &&
+      resource.namespaced === (item.namespace !== null),
+  );
+  if (
+    candidates.length !== 1 ||
+    !/^[a-z0-9](?:[a-z0-9.-]{0,252})$/u.test(candidates[0].name)
+  ) {
+    fail('retirement API resource mapping is ambiguous');
+  }
+  const collection =
+    item.namespace === null
+      ? `${base}/${candidates[0].name}`
+      : `${base}/namespaces/${encodeURIComponent(item.namespace)}/${
+          candidates[0].name
+        }`;
+  return `${collection}/${encodeURIComponent(item.name)}`;
+}
+
+function parseRetirementObject(response, desired, expected = null) {
+  let live;
+  try {
+    live = JSON.parse(response.body);
+  } catch {
+    fail('retirement target response is invalid');
+  }
+  if (
+    response.status !== 200 ||
+    inventoryKey(live) !== inventoryKey(desired) ||
+    !UUID_PATTERN.test(live.metadata?.uid || '') ||
+    typeof live.metadata?.resourceVersion !== 'string' ||
+    !live.metadata.resourceVersion ||
+    live.metadata.deletionTimestamp !== undefined ||
+    !Array.isArray(live.metadata.managedFields) ||
+    !live.metadata.managedFields.some(
+      (entry) =>
+        entry?.manager === FIELD_MANAGER && entry?.operation === 'Apply',
+    )
+  ) {
+    fail('retirement target authority is invalid');
+  }
+  assertDesiredSubset(desired, live);
+  const observation = Object.freeze({
+    apiVersion: desired.apiVersion,
+    kind: desired.kind,
+    namespace: desired.metadata.namespace,
+    name: desired.metadata.name,
+    uid: live.metadata.uid,
+    resourceVersion: live.metadata.resourceVersion,
+  });
+  if (
+    expected !== null &&
+    JSON.stringify(observation) !== JSON.stringify(expected)
+  ) {
+    fail('retirement target changed after preflight');
+  }
+  return observation;
+}
+
+function readRetirementTargets(api, resources, records) {
+  const cache = new Map();
+  return Object.freeze(
+    resources.map((desired) => {
+      const item = {
+        apiVersion: desired.apiVersion,
+        kind: desired.kind,
+        namespace: desired.metadata?.namespace ?? null,
+        name: desired.metadata?.name,
+      };
+      const requestPath = apiResourcePath(api, item, cache, records);
+      const response = recordedApiRequest(
+        records,
+        api,
+        'retirement_target_get',
+        'GET',
+        requestPath,
+        null,
+      );
+      return Object.freeze({
+        observation: parseRetirementObject(response, desired),
+        requestPath,
+      });
+    }),
+  );
+}
+
+function deleteOptions(observation, dryRun) {
+  return Object.freeze({
+    apiVersion: 'v1',
+    kind: 'DeleteOptions',
+    ...(dryRun ? { dryRun: Object.freeze(['All']) } : {}),
+    propagationPolicy: 'Background',
+    preconditions: Object.freeze({
+      uid: observation.uid,
+      resourceVersion: observation.resourceVersion,
+    }),
   });
 }
 
@@ -1324,6 +1922,50 @@ function validateResourceInventory(value) {
     JSON.stringify([...serialized].sort()) !== JSON.stringify(serialized)
   ) {
     fail('deployment resource inventory ordering is invalid');
+  }
+}
+
+function validateRetirementObservations(value) {
+  if (
+    !Array.isArray(value) ||
+    value.length < 1 ||
+    value.length > MAX_RETIREMENT_COUNT
+  ) {
+    fail('deployment retirement observations are invalid');
+  }
+  const identities = [];
+  for (const item of value) {
+    if (
+      !exactKeys(item, [
+        'apiVersion',
+        'kind',
+        'namespace',
+        'name',
+        'uid',
+        'resourceVersion',
+      ]) ||
+      item.namespace === null ||
+      !UUID_PATTERN.test(item.uid || '') ||
+      typeof item.resourceVersion !== 'string' ||
+      !item.resourceVersion
+    ) {
+      fail('deployment retirement observation is invalid');
+    }
+    retirementTargets([
+      {
+        apiVersion: item.apiVersion,
+        kind: item.kind,
+        namespace: item.namespace,
+        name: item.name,
+      },
+    ]);
+    identities.push(inventoryKey(item));
+  }
+  if (
+    new Set(identities).size !== identities.length ||
+    JSON.stringify([...identities].sort()) !== JSON.stringify(identities)
+  ) {
+    fail('deployment retirement observation ordering is invalid');
   }
 }
 
@@ -1440,20 +2082,25 @@ function validateTransition(current, request, planned) {
     }
     return;
   }
+  const previous = current.state.previous;
+  const versionRollback = semver.lt(plannedVersion, activeVersion);
+  const retirementRestore =
+    current.state.transition.kind === 'retire' &&
+    plannedVersion === activeVersion &&
+    previous !== null &&
+    previous.lock.release.version === activeVersion;
   if (
-    current.state.previous === null ||
-    !semver.lt(plannedVersion, activeVersion) ||
-    JSON.stringify(planned.lock) !==
-      JSON.stringify(current.state.previous.lock) ||
-    JSON.stringify(planned.resources) !==
-      JSON.stringify(current.state.previous.resources) ||
-    JSON.stringify(planned.resources) !== JSON.stringify(active.resources)
+    previous === null ||
+    (!versionRollback && !retirementRestore) ||
+    JSON.stringify(planned.lock) !== JSON.stringify(previous.lock) ||
+    JSON.stringify(planned.resources) !== JSON.stringify(previous.resources)
   ) {
     fail('deployment rollback must restore the exact previous resource set');
   }
 }
 
 function validateHeadTransition(value) {
+  const retirement = value?.kind === 'retire';
   if (
     !exactKeys(value, [
       'kind',
@@ -1461,15 +2108,18 @@ function validateHeadTransition(value) {
       'commandDigest',
       'preflightDigest',
       'expectedHead',
+      ...(retirement ? ['retirements', 'curlExecutableDigest'] : []),
     ]) ||
-    !TRANSITION_KINDS.includes(value.kind) ||
+    !HEAD_TRANSITION_KINDS.includes(value.kind) ||
     !UUID_PATTERN.test(value.mutationId || '') ||
     !DIGEST_PATTERN.test(value.commandDigest || '') ||
-    !DIGEST_PATTERN.test(value.preflightDigest || '')
+    !DIGEST_PATTERN.test(value.preflightDigest || '') ||
+    (retirement && !DIGEST_PATTERN.test(value.curlExecutableDigest || ''))
   ) {
     fail('deployment head transition is invalid');
   }
   validateHeadSnapshot(value.expectedHead);
+  if (retirement) validateRetirementObservations(value.retirements);
 }
 
 function deploymentEvidence(state) {
@@ -1526,16 +2176,25 @@ function validateHeadState(value) {
       fail('applying deployment head is invalid');
     }
   } else {
+    const expectedStepNames =
+      value.transition.kind === 'retire'
+        ? [
+            'cluster_identity_before',
+            'resource_precondition_delete',
+            'retirement_absence_read',
+            'cluster_identity_after',
+          ]
+        : [
+            'cluster_identity_before',
+            'server_side_dry_run',
+            'server_side_apply',
+            'server_side_convergence_read',
+            'cluster_identity_after',
+          ];
     if (
-      value.steps.length !== 5 ||
+      value.steps.length !== expectedStepNames.length ||
       JSON.stringify(value.steps.map((step) => step.name)) !==
-        JSON.stringify([
-          'cluster_identity_before',
-          'server_side_dry_run',
-          'server_side_apply',
-          'server_side_convergence_read',
-          'cluster_identity_after',
-        ]) ||
+        JSON.stringify(expectedStepNames) ||
       value.deployment === null ||
       JSON.stringify(value.deployment.lock) !==
         JSON.stringify(value.planned.lock) ||
@@ -1951,7 +2610,7 @@ function readAndValidatePreflight(request, inputs) {
 }
 
 function receiptFromCommitted(state, namespace) {
-  if (state.phase !== 'committed') {
+  if (state.phase !== 'committed' || state.transition.kind === 'retire') {
     fail('deployment receipt requires a committed head');
   }
   const unsigned = {
@@ -2074,6 +2733,705 @@ function validateReceipt(value, expectedCommandDigest) {
     fail('deployment receipt self digest is invalid');
   }
   return value;
+}
+
+function retirementDeleteDryRun(api, targets) {
+  const dryRunRecords = [];
+  for (const target of targets) {
+    const response = recordedApiRequest(
+      dryRunRecords,
+      api,
+      'retirement_delete_dry_run',
+      'DELETE',
+      target.requestPath,
+      deleteOptions(target.observation, true),
+    );
+    if (![200, 201, 202].includes(response.status)) {
+      fail('Kubernetes retirement dry-run was rejected');
+    }
+  }
+  return aggregateRequestStep('server_side_delete_dry_run', dryRunRecords);
+}
+
+function retirementRecheck(api, resources, targets) {
+  const records = [];
+  const cache = new Map();
+  for (let index = 0; index < resources.length; index += 1) {
+    const desired = resources[index];
+    const observation = targets[index].observation;
+    const requestPath = apiResourcePath(api, observation, cache, records);
+    const response = recordedApiRequest(
+      records,
+      api,
+      'retirement_target_recheck',
+      'GET',
+      requestPath,
+      null,
+    );
+    parseRetirementObject(response, desired, observation);
+  }
+  return aggregateRequestStep('retirement_target_recheck', records);
+}
+
+function validateRetirementPreflight(value) {
+  if (
+    !exactKeys(value, [
+      'schemaVersion',
+      'schema',
+      'preflightId',
+      'commandDigest',
+      'lock',
+      'activeResourceInventory',
+      'survivorResourceInventory',
+      'retirementTargets',
+      'deploymentHead',
+      'target',
+      'tools',
+      'steps',
+      'verification',
+      'preflightDigest',
+    ]) ||
+    value.schemaVersion !== 1 ||
+    value.schema !== RETIREMENT_PREFLIGHT_SCHEMA ||
+    !UUID_PATTERN.test(value.preflightId || '') ||
+    !DIGEST_PATTERN.test(value.commandDigest || '') ||
+    !DIGEST_PATTERN.test(value.preflightDigest || '') ||
+    !Array.isArray(value.steps) ||
+    JSON.stringify(value.steps.map((step) => step.name)) !==
+      JSON.stringify([
+        'cluster_identity_before',
+        'deployment_head_read',
+        'retirement_target_read',
+        'server_side_delete_dry_run',
+        'retirement_target_recheck',
+      ]) ||
+    !exactKeys(value.verification, [
+      'catalogBoundLock',
+      'clusterIdentityBound',
+      'deploymentHeadCompared',
+      'uidResourceVersionObserved',
+      'serverSideDeleteDryRun',
+      'survivorRoleClosure',
+      'resourceInventoryClosed',
+      'networkAccess',
+      'kubernetesMutation',
+      'unixSocketProxy',
+      'ambientHome',
+      'ephemeralCache',
+    ]) ||
+    JSON.stringify(value.verification) !==
+      JSON.stringify({
+        catalogBoundLock: true,
+        clusterIdentityBound: true,
+        deploymentHeadCompared: true,
+        uidResourceVersionObserved: true,
+        serverSideDeleteDryRun: true,
+        survivorRoleClosure: true,
+        resourceInventoryClosed: true,
+        networkAccess: true,
+        kubernetesMutation: false,
+        unixSocketProxy: true,
+        ambientHome: false,
+        ephemeralCache: true,
+      })
+  ) {
+    fail('retirement preflight report is invalid');
+  }
+  validateLockSummary(value.lock);
+  validateResourceInventory(value.activeResourceInventory);
+  validateResourceInventory(value.survivorResourceInventory);
+  validateRetirementObservations(value.retirementTargets);
+  validateHeadSnapshot(value.deploymentHead);
+  validateTargetSummary(value.target);
+  validateRetirementToolSummary(value.tools);
+  for (const step of value.steps) validateStepRecord(step);
+  if (value.steps.some((step) => step.status !== 0)) {
+    fail('retirement preflight contains a failed step');
+  }
+  const retired = new Set(
+    value.retirementTargets.map((target) => inventoryKey(target)),
+  );
+  if (
+    JSON.stringify(
+      value.activeResourceInventory.filter(
+        (resource) => !retired.has(inventoryKey(resource)),
+      ),
+    ) !== JSON.stringify(value.survivorResourceInventory)
+  ) {
+    fail('retirement preflight inventory closure is invalid');
+  }
+  const { preflightDigest, ...unsigned } = value;
+  if (
+    preflightDigest !== sha256(Buffer.from(JSON.stringify(unsigned), 'utf8'))
+  ) {
+    fail('retirement preflight self digest is invalid');
+  }
+  return value;
+}
+
+function createRetirementPreflight(commandState, dependencies = {}) {
+  const request = commandState.command.request;
+  const output = outputTarget(request.output, 'retirement preflight output');
+  const inputs = inspectRetirementInputs(request);
+  const runner = dependencies.runProcess ?? defaultRunProcess;
+  const identity = identityStep(
+    inputs,
+    request,
+    runner,
+    'cluster_identity_before',
+  );
+  const current = headReadStep(inputs, request, runner);
+  if (
+    current.state === null ||
+    current.state.phase !== 'committed' ||
+    JSON.stringify(current.snapshot) !==
+      JSON.stringify(expectedSnapshot(request, inputs.headNamespace))
+  ) {
+    fail('deployment retirement head authority changed');
+  }
+  const plan = retirementPlan(inputs, current, request.targets);
+  const apiEvidence = withRetirementApi(
+    inputs,
+    request,
+    dependencies,
+    (api) => {
+      const readRecords = [];
+      const targets = readRetirementTargets(api, plan.resources, readRecords);
+      return Object.freeze({
+        targets,
+        read: aggregateRequestStep('retirement_target_read', readRecords),
+        dryRun: retirementDeleteDryRun(api, targets),
+        recheck: retirementRecheck(api, plan.resources, targets),
+      });
+    },
+  );
+  revalidateRetirementInputs(inputs, request);
+  const unsigned = {
+    schemaVersion: 1,
+    schema: RETIREMENT_PREFLIGHT_SCHEMA,
+    preflightId: request.preflightId,
+    commandDigest: commandState.commandDigest,
+    lock: lockSummary(inputs),
+    activeResourceInventory: plan.active,
+    survivorResourceInventory: plan.survivors,
+    retirementTargets: Object.freeze(
+      apiEvidence.targets.map((target) => target.observation),
+    ),
+    deploymentHead: current.snapshot,
+    target: targetSummary(inputs, request),
+    tools: retirementToolSummary(inputs),
+    steps: Object.freeze([
+      identity,
+      current.record,
+      apiEvidence.read,
+      apiEvidence.dryRun,
+      apiEvidence.recheck,
+    ]),
+    verification: {
+      catalogBoundLock: true,
+      clusterIdentityBound: true,
+      deploymentHeadCompared: true,
+      uidResourceVersionObserved: true,
+      serverSideDeleteDryRun: true,
+      survivorRoleClosure: true,
+      resourceInventoryClosed: true,
+      networkAccess: true,
+      kubernetesMutation: false,
+      unixSocketProxy: true,
+      ambientHome: false,
+      ephemeralCache: true,
+    },
+  };
+  const result = Object.freeze({
+    ...unsigned,
+    preflightDigest: sha256(Buffer.from(JSON.stringify(unsigned), 'utf8')),
+  });
+  writeNoReplace(output, result);
+  return result;
+}
+
+function readAndValidateRetirementPreflight(request, inputs) {
+  const file = readCanonicalJson(
+    request.preflight.path,
+    'retirement preflight report',
+    MAX_REPORT_BYTES,
+  );
+  const report = validateRetirementPreflight(file.value);
+  if (
+    report.preflightDigest !== request.preflight.expectedDigest ||
+    JSON.stringify(report.lock) !== JSON.stringify(lockSummary(inputs)) ||
+    JSON.stringify(report.deploymentHead) !==
+      JSON.stringify(expectedSnapshot(request, inputs.headNamespace)) ||
+    JSON.stringify(
+      report.retirementTargets.map(
+        ({ uid: _uid, resourceVersion: _resourceVersion, ...item }) => item,
+      ),
+    ) !== JSON.stringify(request.targets) ||
+    JSON.stringify(report.target) !==
+      JSON.stringify(targetSummary(inputs, request)) ||
+    JSON.stringify(report.tools) !==
+      JSON.stringify(retirementToolSummary(inputs))
+  ) {
+    fail('retirement preflight binding changed');
+  }
+  return Object.freeze({ file, report });
+}
+
+function retirementApplyingHead(commandState, preflight, inputs, current) {
+  const unsigned = {
+    schemaVersion: 1,
+    schema: HEAD_SCHEMA,
+    phase: 'applying',
+    generation: current.state.generation + 1,
+    transition: {
+      kind: 'retire',
+      mutationId: commandState.command.request.mutationId,
+      commandDigest: commandState.commandDigest,
+      preflightDigest: preflight.report.preflightDigest,
+      expectedHead: current.snapshot,
+      retirements: preflight.report.retirementTargets,
+      curlExecutableDigest: inputs.curl.digest,
+    },
+    previous: Object.freeze({ ...current.state.deployment }),
+    planned: Object.freeze({
+      lock: current.state.deployment.lock,
+      resources: preflight.report.survivorResourceInventory,
+    }),
+    target: targetSummary(inputs, commandState.command.request),
+    tool: toolSummary(inputs),
+    steps: [],
+    deployment: null,
+  };
+  return Object.freeze({
+    ...unsigned,
+    stateDigest: sha256(Buffer.from(JSON.stringify(unsigned), 'utf8')),
+  });
+}
+
+function assertRetirementBinding(state, commandState, preflight, inputs) {
+  const request = commandState.command.request;
+  if (
+    state.transition.kind !== 'retire' ||
+    state.transition.mutationId !== request.mutationId ||
+    state.transition.commandDigest !== commandState.commandDigest ||
+    state.transition.preflightDigest !== preflight.report.preflightDigest ||
+    state.transition.curlExecutableDigest !== inputs.curl.digest ||
+    JSON.stringify(state.transition.expectedHead) !==
+      JSON.stringify(preflight.report.deploymentHead) ||
+    JSON.stringify(state.transition.retirements) !==
+      JSON.stringify(preflight.report.retirementTargets) ||
+    JSON.stringify(state.planned) !==
+      JSON.stringify({
+        lock: preflight.report.lock,
+        resources: preflight.report.survivorResourceInventory,
+      }) ||
+    JSON.stringify(state.target) !==
+      JSON.stringify(targetSummary(inputs, request)) ||
+    JSON.stringify(state.tool) !== JSON.stringify(toolSummary(inputs))
+  ) {
+    fail('retirement head transition binding changed');
+  }
+}
+
+function retirementObjectState(response, desired, expected) {
+  if (response.status === 404) return Object.freeze({ kind: 'absent' });
+  if (response.status !== 200) {
+    fail('retirement target inspection failed');
+  }
+  let live;
+  try {
+    live = JSON.parse(response.body);
+  } catch {
+    fail('retirement target response is invalid');
+  }
+  if (
+    inventoryKey(live) !== inventoryKey(expected) ||
+    typeof live.metadata?.uid !== 'string' ||
+    typeof live.metadata?.resourceVersion !== 'string'
+  ) {
+    fail('retirement target identity changed');
+  }
+  if (live.metadata.uid !== expected.uid) {
+    fail('retirement target was replaced by a different UID');
+  }
+  assertDesiredSubset(desired, live);
+  if (live.metadata.deletionTimestamp !== undefined) {
+    return Object.freeze({ kind: 'terminating' });
+  }
+  if (live.metadata.resourceVersion !== expected.resourceVersion) {
+    fail('retirement target resourceVersion changed');
+  }
+  return Object.freeze({ kind: 'current' });
+}
+
+function recoveredDeleteRecord(observation, requestPath) {
+  const body = deleteOptions(observation, false);
+  return Object.freeze({
+    name: 'retirement_delete_recovered',
+    method: 'DELETE',
+    requestPathDigest: sha256(Buffer.from(requestPath, 'utf8')),
+    requestDigest: sha256(Buffer.from(JSON.stringify(body), 'utf8')),
+    status: 404,
+    responseDigest: sha256(Buffer.from('recovered_absent', 'utf8')),
+    responseBytes: 0,
+  });
+}
+
+function executeRetirementDeletes(api, inputs, preflight, resumed) {
+  const desiredByIdentity = new Map(
+    inputs.resources.map((resource) => [inventoryKey(resource), resource]),
+  );
+  const cache = new Map();
+  const deleteRecords = [];
+  const absenceRecords = [];
+  for (const observation of preflight.retirementTargets) {
+    const desired = desiredByIdentity.get(inventoryKey(observation));
+    if (desired === undefined) {
+      fail('retirement target is no longer in the locked manifest');
+    }
+    const requestPath = apiResourcePath(api, observation, cache, deleteRecords);
+    const before = recordedApiRequest(
+      deleteRecords,
+      api,
+      'retirement_target_before_delete',
+      'GET',
+      requestPath,
+      null,
+    );
+    const beforeState = retirementObjectState(before, desired, observation);
+    if (beforeState.kind === 'absent') {
+      if (!resumed) fail('retirement target disappeared before deletion');
+      deleteRecords.push(recoveredDeleteRecord(observation, requestPath));
+    } else if (beforeState.kind === 'terminating') {
+      fail('retirement target deletion is not complete');
+    } else {
+      const response = recordedApiRequest(
+        deleteRecords,
+        api,
+        'retirement_target_delete',
+        'DELETE',
+        requestPath,
+        deleteOptions(observation, false),
+      );
+      if (![200, 201, 202].includes(response.status)) {
+        fail('Kubernetes retirement delete was rejected');
+      }
+    }
+    const after = recordedApiRequest(
+      absenceRecords,
+      api,
+      'retirement_target_absence',
+      'GET',
+      requestPath,
+      null,
+    );
+    const afterState = retirementObjectState(after, desired, observation);
+    if (afterState.kind === 'terminating') {
+      fail('retirement target deletion is not complete');
+    }
+    if (afterState.kind !== 'absent') {
+      fail('retirement target remains after deletion');
+    }
+  }
+  return Object.freeze({
+    deletion: aggregateRequestStep(
+      'resource_precondition_delete',
+      deleteRecords,
+    ),
+    absence: aggregateRequestStep('retirement_absence_read', absenceRecords),
+  });
+}
+
+function retirementReceiptFromCommitted(state, namespace, inputs) {
+  if (state.phase !== 'committed' || state.transition.kind !== 'retire') {
+    fail('retirement receipt requires a committed retirement head');
+  }
+  const unsigned = {
+    schemaVersion: 1,
+    schema: RETIREMENT_RECEIPT_SCHEMA,
+    mutationId: state.transition.mutationId,
+    commandDigest: state.transition.commandDigest,
+    preflightDigest: state.transition.preflightDigest,
+    lock: state.deployment.lock,
+    retiredResources: state.transition.retirements,
+    resourceInventory: state.deployment.resources,
+    deploymentHead: headSnapshot(namespace, state),
+    target: state.target,
+    tools: retirementToolSummary(inputs),
+    steps: state.steps,
+    verification: {
+      catalogBoundLock: true,
+      clusterIdentityBound: true,
+      uidResourceVersionDeletePreconditions: true,
+      deploymentHeadCas: true,
+      resourceInventoryClosed: true,
+      survivorRoleClosure: true,
+      deletionAbsenceConfirmed: true,
+      networkAccess: true,
+      kubernetesMutation: true,
+      crossResourceAtomicity: false,
+      externalResultsReplayed: false,
+      recovery: 'resume_exact_retirement_from_target_head',
+      unixSocketProxy: true,
+      ambientHome: false,
+      ephemeralCache: true,
+    },
+  };
+  return Object.freeze({
+    ...unsigned,
+    receiptDigest: sha256(Buffer.from(JSON.stringify(unsigned), 'utf8')),
+  });
+}
+
+function validateRetirementReceipt(value, expectedCommandDigest) {
+  if (
+    !exactKeys(value, [
+      'schemaVersion',
+      'schema',
+      'mutationId',
+      'commandDigest',
+      'preflightDigest',
+      'lock',
+      'retiredResources',
+      'resourceInventory',
+      'deploymentHead',
+      'target',
+      'tools',
+      'steps',
+      'verification',
+      'receiptDigest',
+    ]) ||
+    value.schemaVersion !== 1 ||
+    value.schema !== RETIREMENT_RECEIPT_SCHEMA ||
+    !UUID_PATTERN.test(value.mutationId || '') ||
+    value.commandDigest !== expectedCommandDigest ||
+    !DIGEST_PATTERN.test(value.preflightDigest || '') ||
+    !DIGEST_PATTERN.test(value.receiptDigest || '') ||
+    !Array.isArray(value.steps) ||
+    JSON.stringify(value.steps.map((step) => step.name)) !==
+      JSON.stringify([
+        'cluster_identity_before',
+        'resource_precondition_delete',
+        'retirement_absence_read',
+        'cluster_identity_after',
+      ]) ||
+    !exactKeys(value.verification, [
+      'catalogBoundLock',
+      'clusterIdentityBound',
+      'uidResourceVersionDeletePreconditions',
+      'deploymentHeadCas',
+      'resourceInventoryClosed',
+      'survivorRoleClosure',
+      'deletionAbsenceConfirmed',
+      'networkAccess',
+      'kubernetesMutation',
+      'crossResourceAtomicity',
+      'externalResultsReplayed',
+      'recovery',
+      'unixSocketProxy',
+      'ambientHome',
+      'ephemeralCache',
+    ]) ||
+    JSON.stringify(value.verification) !==
+      JSON.stringify({
+        catalogBoundLock: true,
+        clusterIdentityBound: true,
+        uidResourceVersionDeletePreconditions: true,
+        deploymentHeadCas: true,
+        resourceInventoryClosed: true,
+        survivorRoleClosure: true,
+        deletionAbsenceConfirmed: true,
+        networkAccess: true,
+        kubernetesMutation: true,
+        crossResourceAtomicity: false,
+        externalResultsReplayed: false,
+        recovery: 'resume_exact_retirement_from_target_head',
+        unixSocketProxy: true,
+        ambientHome: false,
+        ephemeralCache: true,
+      })
+  ) {
+    fail('retirement receipt is invalid');
+  }
+  validateLockSummary(value.lock);
+  validateRetirementObservations(value.retiredResources);
+  validateResourceInventory(value.resourceInventory);
+  validateHeadSnapshot(value.deploymentHead);
+  validateTargetSummary(value.target);
+  validateRetirementToolSummary(value.tools);
+  for (const step of value.steps) validateStepRecord(step);
+  if (value.steps.some((step) => step.status !== 0)) {
+    fail('retirement receipt contains a failed step');
+  }
+  const { receiptDigest, ...unsigned } = value;
+  if (receiptDigest !== sha256(Buffer.from(JSON.stringify(unsigned), 'utf8'))) {
+    fail('retirement receipt self digest is invalid');
+  }
+  return value;
+}
+
+function existingRetirementReceipt(request, commandDigest) {
+  if (!fs.existsSync(request.output)) return null;
+  const file = readCanonicalJson(
+    request.output,
+    'existing retirement receipt',
+    MAX_REPORT_BYTES,
+  );
+  const receipt = validateRetirementReceipt(file.value, commandDigest);
+  if (
+    receipt.mutationId !== request.mutationId ||
+    receipt.preflightDigest !== request.preflight.expectedDigest
+  ) {
+    fail('existing retirement receipt binding changed');
+  }
+  return receipt;
+}
+
+function applyRetirement(commandState, dependencies = {}) {
+  const request = commandState.command.request;
+  const resumedReceipt = existingRetirementReceipt(
+    request,
+    commandState.commandDigest,
+  );
+  const output =
+    resumedReceipt === null
+      ? outputTarget(request.output, 'retirement receipt output')
+      : request.output;
+  const inputs = inspectRetirementInputs(request);
+  const preflight = readAndValidateRetirementPreflight(request, inputs);
+  const runner = dependencies.runProcess ?? defaultRunProcess;
+  const current = headReadStep(inputs, request, runner);
+
+  if (resumedReceipt !== null) {
+    if (
+      current.state === null ||
+      current.state.phase !== 'committed' ||
+      resumedReceipt.preflightDigest !== preflight.report.preflightDigest ||
+      JSON.stringify(resumedReceipt.lock) !==
+        JSON.stringify(preflight.report.lock) ||
+      JSON.stringify(resumedReceipt.resourceInventory) !==
+        JSON.stringify(preflight.report.survivorResourceInventory) ||
+      JSON.stringify(resumedReceipt.deploymentHead) !==
+        JSON.stringify(headSnapshot(inputs.headNamespace, current.state)) ||
+      JSON.stringify(resumedReceipt.target) !==
+        JSON.stringify(targetSummary(inputs, request)) ||
+      JSON.stringify(resumedReceipt.tools) !==
+        JSON.stringify(retirementToolSummary(inputs))
+    ) {
+      fail('existing retirement receipt authority changed');
+    }
+    assertRetirementBinding(current.state, commandState, preflight, inputs);
+    revalidateRetirementInputs(inputs, request);
+    return resumedReceipt;
+  }
+
+  if (
+    current.state !== null &&
+    current.state.phase === 'committed' &&
+    current.state.transition.kind === 'retire' &&
+    current.state.transition.commandDigest === commandState.commandDigest
+  ) {
+    assertRetirementBinding(current.state, commandState, preflight, inputs);
+    const recovered = retirementReceiptFromCommitted(
+      current.state,
+      inputs.headNamespace,
+      inputs,
+    );
+    writeNoReplace(output, recovered);
+    revalidateRetirementInputs(inputs, request);
+    return recovered;
+  }
+
+  let applying;
+  let headResourceVersion;
+  let resumedHead = false;
+  if (current.state !== null && current.state.phase === 'applying') {
+    assertRetirementBinding(current.state, commandState, preflight, inputs);
+    applying = current.state;
+    headResourceVersion = current.resourceVersion;
+    resumedHead = true;
+  } else {
+    if (
+      JSON.stringify(current.snapshot) !==
+      JSON.stringify(preflight.report.deploymentHead)
+    ) {
+      fail('deployment retirement head changed after preflight');
+    }
+    const plan = retirementPlan(inputs, current, request.targets);
+    if (
+      JSON.stringify(plan.active) !==
+        JSON.stringify(preflight.report.activeResourceInventory) ||
+      JSON.stringify(plan.survivors) !==
+        JSON.stringify(preflight.report.survivorResourceInventory)
+    ) {
+      fail('deployment retirement inventory changed after preflight');
+    }
+    withRetirementApi(inputs, request, dependencies, (api) => {
+      const records = [];
+      const observations = readRetirementTargets(
+        api,
+        plan.resources,
+        records,
+      ).map((target) => target.observation);
+      if (
+        JSON.stringify(observations) !==
+        JSON.stringify(preflight.report.retirementTargets)
+      ) {
+        fail('deployment retirement target changed after preflight');
+      }
+    });
+    applying = retirementApplyingHead(commandState, preflight, inputs, current);
+    const acquired = writeHead(
+      inputs,
+      request,
+      runner,
+      applying,
+      current.resourceVersion,
+      'deployment_head_acquire',
+    );
+    headResourceVersion = acquired.resourceVersion;
+  }
+
+  const beforeIdentity = identityStep(
+    inputs,
+    request,
+    runner,
+    'cluster_identity_before',
+  );
+  const deletion = withRetirementApi(inputs, request, dependencies, (api) =>
+    executeRetirementDeletes(api, inputs, preflight.report, resumedHead),
+  );
+  const afterIdentity = identityStep(
+    inputs,
+    request,
+    runner,
+    'cluster_identity_after',
+  );
+  revalidateRetirementInputs(inputs, request);
+  const committed = committedHead(
+    applying,
+    Object.freeze([
+      beforeIdentity,
+      deletion.deletion,
+      deletion.absence,
+      afterIdentity,
+    ]),
+  );
+  writeHead(
+    inputs,
+    request,
+    runner,
+    committed,
+    headResourceVersion,
+    'deployment_head_commit',
+  );
+  const receipt = retirementReceiptFromCommitted(
+    committed,
+    inputs.headNamespace,
+    inputs,
+  );
+  writeNoReplace(output, receipt);
+  return receipt;
 }
 
 function existingReceipt(request, commandDigest) {
@@ -2264,6 +3622,57 @@ function auditReceipt(command) {
   });
 }
 
+function auditRetirementReceipt(command) {
+  const applyFile = verifyExpected(
+    readCanonicalJson(
+      command.request.applyCommand.path,
+      'retirement apply command',
+      MAX_COMMAND_BYTES,
+    ),
+    command.request.applyCommand.expectedDigest,
+    'retirement apply command',
+  );
+  const applyCommand = parseCommand(applyFile.value);
+  if (applyCommand.operation !== 'cluster.deployment.retirement.apply') {
+    fail('retirement receipt audit requires a retirement apply command');
+  }
+  const receiptFile = readCanonicalJson(
+    command.request.receipt.path,
+    'retirement receipt',
+    MAX_REPORT_BYTES,
+  );
+  const receipt = validateRetirementReceipt(
+    receiptFile.value,
+    applyFile.digest,
+  );
+  if (
+    receipt.receiptDigest !== command.request.receipt.expectedDigest ||
+    receipt.mutationId !== applyCommand.request.mutationId ||
+    receipt.preflightDigest !== applyCommand.request.preflight.expectedDigest ||
+    applyCommand.request.output !== command.request.receipt.path
+  ) {
+    fail('retirement receipt command binding changed');
+  }
+  return Object.freeze({
+    compatible: true,
+    deploymentFamily: 'cluster',
+    mutationId: receipt.mutationId,
+    receiptDigest: receipt.receiptDigest,
+    preflightDigest: receipt.preflightDigest,
+    transitionKind: 'retire',
+    lockDigest: receipt.lock.lockDigest,
+    manifestDigest: receipt.lock.manifestDigest,
+    deploymentGeneration: receipt.deploymentHead.generation,
+    deploymentDigest: receipt.deploymentHead.deploymentDigest,
+    deploymentHeadStateDigest: receipt.deploymentHead.stateDigest,
+    retiredResourceCount: receipt.retiredResources.length,
+    resourceCount: receipt.resourceInventory.length,
+    clusterUid: receipt.target.clusterUid,
+    externalResultsReplayed: false,
+    kubernetesMutation: false,
+  });
+}
+
 function executeCommand(commandFile, dependencies = {}) {
   const commandState = readCommand(commandFile);
   if (commandState.command.operation === 'cluster.deployment.preflight') {
@@ -2271,6 +3680,22 @@ function executeCommand(commandFile, dependencies = {}) {
   }
   if (commandState.command.operation === 'cluster.deployment.apply') {
     return applyDeployment(commandState, dependencies);
+  }
+  if (
+    commandState.command.operation === 'cluster.deployment.retirement.preflight'
+  ) {
+    return createRetirementPreflight(commandState, dependencies);
+  }
+  if (
+    commandState.command.operation === 'cluster.deployment.retirement.apply'
+  ) {
+    return applyRetirement(commandState, dependencies);
+  }
+  if (
+    commandState.command.operation ===
+    'cluster.deployment.retirement.receipt.audit'
+  ) {
+    return auditRetirementReceipt(commandState.command);
   }
   return auditReceipt(commandState.command);
 }
@@ -2284,6 +3709,8 @@ module.exports = Object.freeze({
   LOCK_SCHEMA,
   PREFLIGHT_SCHEMA,
   RECEIPT_SCHEMA,
+  RETIREMENT_PREFLIGHT_SCHEMA,
+  RETIREMENT_RECEIPT_SCHEMA,
   QingLong3KubernetesDeploymentCeremonyError,
   canonicalJson,
   executeCommand,
@@ -2291,4 +3718,6 @@ module.exports = Object.freeze({
   validateLockReport,
   validatePreflight,
   validateReceipt,
+  validateRetirementPreflight,
+  validateRetirementReceipt,
 });

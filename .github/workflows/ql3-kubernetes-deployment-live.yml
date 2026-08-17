@@ -1,0 +1,90 @@
+name: QingLong 3.0 Kubernetes deployment live contract
+
+on:
+  push:
+    branches:
+      - next
+  pull_request:
+    branches:
+      - next
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ql3-kubernetes-deployment-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kubernetes-deployment-live:
+    name: Deployment Head and fenced resource retirement
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install verified kubectl v1.34.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl" \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl.sha256" \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl.sha256
+          test "$(cat "${RUNNER_TEMP}/kubectl.sha256")" = \
+            "$(sha256sum "${RUNNER_TEMP}/kubectl" | cut -d ' ' -f 1)"
+          chmod 0755 "${RUNNER_TEMP}/kubectl"
+
+      - name: Preload the digest-reviewed K3s distribution
+        run: docker pull rancher/k3s:v1.34.3-k3s1
+
+      - name: Recheck the closed deployment ceremony contract
+        run: node --test test/back/ql3KubernetesDeploymentCeremony.test.cjs
+
+      - name: Prove install, UID/resourceVersion retirement and Head convergence
+        env:
+          QL3_KUBECTL_BIN: ${{ runner.temp }}/kubectl
+          QL3_DEPLOYMENT_LIVE_REPORT: ${{ runner.temp }}/ql3-kubernetes-deployment/report.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 0700 "$(dirname "${QL3_DEPLOYMENT_LIVE_REPORT}")"
+          node scripts/ql3-kubernetes-deployment-live-contract.cjs > \
+            "${QL3_DEPLOYMENT_LIVE_REPORT}"
+          node -e \
+            "const fs=require('node:fs');const report=JSON.parse(fs.readFileSync(process.env.QL3_DEPLOYMENT_LIVE_REPORT,'utf8'));if(report.cleanupComplete!==true||report.receiptAuditCompatible!==true||report.retirement?.receiptAuditCompatible!==true||report.retirement?.targetAbsent!==true||report.retirement?.uidResourceVersionDeletePreconditions!==true||report.retirement?.deploymentHeadCas!==true||report.retirement?.unixSocketProxy!==true)process.exit(1)"
+
+      - name: Verify isolated cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(docker ps -aq --filter name=ql3-deploy-live-)"
+          test -z "$(docker network ls -q --filter name=ql3-deploy-live-)"
+
+      - name: Upload content-free deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-kubernetes-deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-kubernetes-deployment/report.json
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
