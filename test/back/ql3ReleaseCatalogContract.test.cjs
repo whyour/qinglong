@@ -70,6 +70,7 @@ function releaseSet(scope) {
     records,
     evidenceReceipts: privateReleaseEvidenceReceipts(candidate.release),
     ...identity,
+    validationClockMs: Date.parse('2026-08-18T00:05:00.000Z'),
     releaseScope: scope,
   });
 }

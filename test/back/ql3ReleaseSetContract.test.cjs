@@ -30,6 +30,7 @@ const identity = Object.freeze({
   sourceRevision: 'b'.repeat(40),
   sourceRef: `refs/tags/v${version}`,
   repositoryOwner: 'qinglong-release',
+  validationClockMs: Date.parse('2026-08-18T00:05:00.000Z'),
 });
 
 function candidate(scope) {
@@ -74,12 +75,13 @@ function writeCanonical(filePath, value) {
 test('aggregates the independent Local image into one immutable release set', () => {
   const releaseCandidate = candidate('local');
   const records = recordsFor(releaseCandidate);
+  const { validationClockMs: _unused, ...localIdentity } = identity;
   const releaseSet = createReleaseSet({
     root,
     candidate: releaseCandidate,
     records,
     evidenceReceipts: evidenceFor(releaseCandidate),
-    ...identity,
+    ...localIdentity,
     releaseScope: 'local',
   });
   assert.deepEqual(
@@ -97,7 +99,7 @@ test('aggregates the independent Local image into one immutable release set', ()
       candidate: releaseCandidate,
       records,
       evidenceReceipts: evidenceFor(releaseCandidate),
-      ...identity,
+      ...localIdentity,
       releaseScope: 'local',
     }).compatible,
     true,
@@ -184,6 +186,66 @@ test('requires exact private evidence receipts only for Cluster-capable scopes',
         releaseScope: 'local',
       }),
     /receipt count differs/,
+  );
+});
+
+test('revalidates private evidence freshness at closure without changing release-set bytes', () => {
+  const releaseCandidate = candidate('cluster');
+  const records = recordsFor(releaseCandidate);
+  const evidenceReceipts = evidenceFor(releaseCandidate);
+  const createAt = (validationClockMs) =>
+    createReleaseSet({
+      root,
+      candidate: releaseCandidate,
+      records,
+      evidenceReceipts,
+      ...identity,
+      validationClockMs,
+      releaseScope: 'cluster',
+    });
+  const first = createAt(Date.parse('2026-08-18T00:05:00.000Z'));
+  const second = createAt(Date.parse('2026-08-18T00:15:00.000Z'));
+  assert.deepEqual(second, first);
+  assert.throws(
+    () => createAt(Date.parse('2026-08-19T00:00:01.000Z')),
+    /release freshness window/,
+  );
+  assert.throws(
+    () => createAt(Date.parse('2026-08-17T23:54:59.000Z')),
+    /release freshness window/,
+  );
+  assert.throws(
+    () =>
+      createReleaseSet({
+        root,
+        candidate: releaseCandidate,
+        records,
+        evidenceReceipts,
+        version: identity.version,
+        sourceRevision: identity.sourceRevision,
+        sourceRef: identity.sourceRef,
+        repositoryOwner: identity.repositoryOwner,
+        releaseScope: 'cluster',
+      }),
+    /closure validation clock/,
+  );
+  assert.equal(
+    auditReleaseSet(first, {
+      root,
+      candidate: releaseCandidate,
+      records,
+      evidenceReceipts,
+      ...identity,
+      releaseScope: 'cluster',
+    }).privateEvidenceFreshnessRevalidatedAtClosure,
+    true,
+  );
+  assert.equal(
+    inspectReleaseSet(first, {
+      ...identity,
+      releaseScope: 'cluster',
+    }).privateEvidenceReplayed,
+    false,
   );
 });
 
@@ -438,6 +500,70 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
       ),
     /output must be unused/,
   );
+});
+
+test('CLI rejects stale private receipts at closure and keeps valid retries byte-identical', (t) => {
+  const directory = temporaryDirectory(t);
+  const recordsDirectory = path.join(directory, 'records');
+  const evidenceDirectory = path.join(directory, 'evidence');
+  fs.mkdirSync(recordsDirectory);
+  fs.mkdirSync(evidenceDirectory);
+  const releaseCandidate = candidate('cluster');
+  const candidatePath = path.join(directory, 'candidate.json');
+  writeCanonical(candidatePath, releaseCandidate);
+  for (const record of recordsFor(releaseCandidate)) {
+    writeCanonical(
+      path.join(recordsDirectory, `${record.image.name}.json`),
+      record,
+    );
+  }
+  for (const receipt of evidenceFor(releaseCandidate)) {
+    writeCanonical(
+      path.join(evidenceDirectory, `${receipt.evidenceKind}.json`),
+      receipt,
+    );
+  }
+  const common = [
+    '--mode=aggregate',
+    `--version=${version}`,
+    `--source-revision=${identity.sourceRevision}`,
+    `--source-ref=${identity.sourceRef}`,
+    '--release-scope=cluster',
+    `--repository-owner=${identity.repositoryOwner}`,
+    `--candidate=${candidatePath}`,
+    `--records=${recordsDirectory}`,
+    `--evidence-receipts=${evidenceDirectory}`,
+  ];
+  const firstPath = path.join(directory, 'first.json');
+  const secondPath = path.join(directory, 'second.json');
+  runCli(
+    [...common, `--output=${firstPath}`],
+    root,
+    { write() {} },
+    { now: () => Date.parse('2026-08-18T00:05:00.000Z') },
+  );
+  runCli(
+    [...common, `--output=${secondPath}`],
+    root,
+    { write() {} },
+    { now: () => Date.parse('2026-08-18T00:15:00.000Z') },
+  );
+  assert.equal(
+    fs.readFileSync(secondPath, 'utf8'),
+    fs.readFileSync(firstPath, 'utf8'),
+  );
+  const stalePath = path.join(directory, 'stale.json');
+  assert.throws(
+    () =>
+      runCli(
+        [...common, `--output=${stalePath}`],
+        root,
+        { write() {} },
+        { now: () => Date.parse('2026-08-19T00:00:01.000Z') },
+      ),
+    /release freshness window/,
+  );
+  assert.equal(fs.existsSync(stalePath), false);
 });
 
 test('CLI rejects extra records, symlinks and open argument shapes', (t) => {

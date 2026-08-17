@@ -11,6 +11,24 @@
 
 最新增量证据（2026-08-18）：
 
+- D-348/ADR-0440（已接受；首份真实线上闭合待实际 release tag）：补齐 D-347 确定性收据与实际 tag promotion 之间的 freshness 窗口。此前私有
+  job 在收据创建时验证 24 小时 freshness，但 release-set aggregate 只检查 `observedAt` 可解析与 receipt digest；镜像构建、扫描和 attestation
+  延迟后，创建时有效的收据可能在闭合时已经过期。现在 `cluster|all` aggregate 与紧随其后的 source-record audit 必须各自取得 runner-owned 当前
+  时钟，对两份 receipt 公开的 `observedAt` 重新执行 24 小时最大年龄和五分钟未来偏差门；缺失/非安全整数/过期/未来漂移均在 release-set 写文件、
+  tag promotion 和 catalog publication 前失败关闭。当前时钟没有 CLI 参数、环境变量或 durable 字段，只参与瞬时准入；因此同一 source evidence 在
+  两个有效闭合时钟下仍生成逐字节相同的 receipt v2、release-set v3 与 catalog identity。Local scope 保持零私有收据且该门为
+  `not_applicable`；历史 standalone inspection 继续验证结构/identity/self-digest 而不以今天的时钟淘汰合法 catalog，并诚实声明未重放 source
+  records/private reports。本 Gate 不修改 durable schema/media type，不新增 package、生产依赖、数据库、migration、Pod、controller、RBAC、
+  listener、timer、设备工具或稳态资源。定向 release receipt/set/catalog/consumption/deployment-lock/image audit 回归 137/137；完整 backend
+  1,365 项为 1,363 pass/2 条件 skip/0 fail，18-package clean build/test 退出 0。12 项 package boundary、Cluster dependency、Edge
+  import、Cluster/Worker/CloudNativePG 部署、backup、Barman/cert-manager selection、image release、deployment-lock surface 与
+  release-version 审计全部 compatible；14 档 Local artifact 全部 compatible 且保持既有字节基线：默认 Edge/Standalone 为
+  2,589,890/2,589,968 bytes，adopted 为 2,809,185/2,809,308 bytes，application 为 3,632,769/3,632,889 bytes，
+  application-api 为 3,800,322/3,800,466 bytes，AI 为 3,069,143/3,069,233 bytes，application+AI 为
+  4,493,043/4,493,175 bytes，MCP 为 7,315,930/7,316,038 bytes。真实 PostgreSQL 18.6 arm64 physical HA 再次通过 142/142、
+  timeline `1→2`，报告 SHA-256 为 `7566a54f86f3e4e0fee2096a49ea2877d827595575c7075bc44b65314cb2ba19`，离线审计通过且无
+  `ql3-ha-*` Docker 容器、卷或网络残留；真实线上 closure 仍只能由实际受保护 `v3` release tag 取得。
+
 - D-347/ADR-0439（已接受；首份真实线上重放待实际 release tag）：修正 D-346 收据把私有 runner `validatedAt` wall-clock 写入 durable
   JSON 导致同一 source/report 在 workflow 重跑时产生第二个 release identity 的问题。私有收据升为
   `qinglong/private-release-evidence-receipt@v2`：创建时仍以当前私有时钟执行 source-aware gate 和 24 小时 freshness 双重验证，但 durable

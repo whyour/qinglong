@@ -245,11 +245,14 @@ function expectedEvidenceKinds(releaseScope) {
   return releaseScope === 'local' ? [] : [...EVIDENCE_KINDS];
 }
 
-function validateEvidenceReceipts(receipts, candidate) {
+function validateEvidenceReceipts(receipts, candidate, validationClockMs) {
   if (!Array.isArray(receipts)) {
     fail('private release evidence receipts must be an array');
   }
   const expectedKinds = expectedEvidenceKinds(candidate.release.scope);
+  if (expectedKinds.length > 0 && !Number.isSafeInteger(validationClockMs)) {
+    fail('private evidence closure validation clock is invalid');
+  }
   if (receipts.length !== expectedKinds.length) {
     fail('private release evidence receipt count differs from release scope');
   }
@@ -268,6 +271,7 @@ function validateEvidenceReceipts(receipts, candidate) {
       sourceRef: candidate.release.sourceRef,
       releaseScope: candidate.release.scope,
       evidenceKind,
+      validationClockMs,
     });
     receiptsByKind.set(evidenceKind, receipt);
   }
@@ -282,6 +286,7 @@ function createReleaseSet(options) {
   const evidenceReceipts = validateEvidenceReceipts(
     options.evidenceReceipts,
     candidate,
+    options.validationClockMs,
   );
   if (!Array.isArray(options.records)) fail('image records must be an array');
   if (options.records.length !== candidate.images.length) {
@@ -363,6 +368,8 @@ function auditReleaseSet(actual, options) {
     evidenceReceiptDigests: Object.freeze(
       actual.evidenceReceipts.map((entry) => entry.receiptDigest),
     ),
+    privateEvidenceFreshnessRevalidatedAtClosure:
+      actual.evidenceReceipts.length === 0 ? 'not_applicable' : true,
     tagPromotionAuthority: actual.promotion.authority,
   });
 }
@@ -646,7 +653,12 @@ function parseArguments(argv) {
   });
 }
 
-function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
+function runCli(
+  argv,
+  root = DEFAULT_ROOT,
+  output = process.stdout,
+  dependencies = { now: Date.now },
+) {
   const options = parseArguments(argv);
   if (options.mode === 'inspect') {
     const report = readCanonicalJson(options.report, 'release set');
@@ -666,12 +678,20 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
     options.evidenceReceipts,
     candidate,
   );
+  let validationClockMs;
+  if (candidate.release.scope !== 'local') {
+    if (typeof dependencies?.now !== 'function') {
+      fail('release closure clock dependency is invalid');
+    }
+    validationClockMs = dependencies.now();
+  }
   if (options.mode === 'aggregate') {
     const releaseSet = createReleaseSet({
       ...options,
       candidate,
       records,
       evidenceReceipts,
+      validationClockMs,
       root,
     });
     writeNoReplace(options.output, releaseSet);
@@ -684,6 +704,7 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
     candidate,
     records,
     evidenceReceipts,
+    validationClockMs,
     root,
   });
   output.write(canonicalJson(audit));

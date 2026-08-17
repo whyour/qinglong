@@ -1304,6 +1304,7 @@ function auditReleaseWorkflow(source) {
       sameRunRecords: true,
       sameRunPrivateEvidenceReceipts: true,
       deterministicPrivateEvidenceReceipts: true,
+      privateEvidenceFreshnessRevalidatedAtClosure: true,
       exactScopeClosure: true,
       standaloneInspection: true,
       tagPromotionAuthority: 'complete_verified_release_set',

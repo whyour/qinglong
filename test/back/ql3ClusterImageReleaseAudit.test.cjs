@@ -100,6 +100,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         sameRunRecords: true,
         sameRunPrivateEvidenceReceipts: true,
         deterministicPrivateEvidenceReceipts: true,
+        privateEvidenceFreshnessRevalidatedAtClosure: true,
         exactScopeClosure: true,
         standaloneInspection: true,
         tagPromotionAuthority: 'complete_verified_release_set',

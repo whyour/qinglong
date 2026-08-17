@@ -26,6 +26,14 @@ cert-manager 三项静态审计摘要。v2 收据不持久化私有 runner 的 w
 从私有 job 交给 release-set job，随后完整嵌入 release-set v3 并由 durable catalog 长期保护。公开收据同时声明
 `freshnessValidatedAtCreation=true` 与 `durableValidationClockPublished=false`，避免把未发布的临时时钟伪装成可离线重放的现场证据。
 
+创建时通过不等于可以无限期等待再闭合发布。`cluster|all` 的 release-set aggregate 与紧随其后的 independent audit 会各自从 runner 内部取得当前
+时钟，并对两份收据公开的 `observedAt` 重新执行同一 24 小时最大年龄和五分钟未来偏差门；当前时钟没有 CLI 参数、环境变量或 durable JSON 字段。
+任一收据在闭合时已过期，release-set 文件会在写入、tag promotion 与 catalog publication 前失败关闭。`local` scope 没有私有收据，因此该门为
+`not_applicable`，不会把 Cluster 私有证据成本带到 Local 发布。
+
+长期 catalog 的 standalone inspection 故意不以“今天的时钟”拒绝历史发布；它验证 receipt/release/source/self-digest 闭包，但诚实返回私有现场
+证据未重放。发布时 freshness 由受保护 workflow 的 aggregate/audit 与 provenance 约束，历史 consumer 不得把当前年龄检查冒充当时的现场验证。
+
 ## 发布流水线内置 Local 与 Cluster 下游门
 
 `local|all` scope 在 durable catalog 发布后启动独立 `release-catalog-local-deployment-live`。它与 publisher 权限隔离，从公开 catalog

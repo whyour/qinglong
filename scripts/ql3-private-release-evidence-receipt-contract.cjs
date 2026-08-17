@@ -382,8 +382,19 @@ function inspectPrivateReleaseEvidenceReceipt(actual, options) {
   ) {
     fail('receipt shape or release binding is invalid');
   }
-  if (!Number.isFinite(Date.parse(actual.evidence.observedAt))) {
+  const observedAtMs = Date.parse(actual.evidence.observedAt);
+  if (!Number.isFinite(observedAtMs)) {
     fail('receipt freshness binding is invalid');
+  }
+  if (options.validationClockMs !== undefined) {
+    const validationClockMs = options.validationClockMs;
+    if (
+      !Number.isSafeInteger(validationClockMs) ||
+      observedAtMs > validationClockMs + MAX_FUTURE_SKEW_MS ||
+      validationClockMs - observedAtMs > MAX_EVIDENCE_AGE_SECONDS * 1000
+    ) {
+      fail('receipt is outside the release freshness window');
+    }
   }
   const { receiptDigest, ...unsigned } = actual;
   if (
