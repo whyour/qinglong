@@ -10,8 +10,12 @@ const {
   inspectReleaseSet,
 } = require('./ql3-release-set-contract.cjs');
 
-const CATALOG_PLAN_SCHEMA = 'qinglong/release-catalog-plan@v1';
-const CATALOG_RECEIPT_SCHEMA = 'qinglong/release-catalog-receipt@v1';
+const CATALOG_PLAN_SCHEMA = 'qinglong/release-catalog-plan@v2';
+const CATALOG_PUBLICATION_DECISION_SCHEMA =
+  'qinglong/release-catalog-publication-decision@v1';
+const CATALOG_RECEIPT_SCHEMA = 'qinglong/release-catalog-receipt@v2';
+const CATALOG_TAG_INVENTORY_DECISION_SCHEMA =
+  'qinglong/release-catalog-tag-inventory-decision@v1';
 const ARTIFACT_TYPE = 'application/vnd.qinglong.release-set.v3+json';
 const FILE_MEDIA_TYPE = ARTIFACT_TYPE;
 const OCI_MANIFEST_MEDIA_TYPE = 'application/vnd.oci.image.manifest.v1+json';
@@ -19,9 +23,20 @@ const OCI_EMPTY_CONFIG_MEDIA_TYPE = 'application/vnd.oci.empty.v1+json';
 const OCI_EMPTY_CONFIG_DIGEST =
   'sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a';
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
+const OCI_TAG_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/u;
 const SOURCE_REPOSITORY_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\/[a-z0-9._-]{1,100}$/u;
 const MAX_FILE_BYTES = 1024 * 1024;
+const PUBLICATION_POLICY = Object.freeze({
+  title: 'basename_only',
+  crossRunnerDeterministic: true,
+  stagingTagAuthority: 'none',
+  discoveryTagAuthority: 'none',
+  immutableDigestAuthority: 'required',
+  roundTrip: 'byte_exact',
+  conflict: 'fail_closed_before_discovery_tag_mutation',
+  recovery: 'reuse_exact_manifest_digest_only',
+});
 
 class QingLong3ReleaseCatalogError extends Error {
   constructor(message) {
@@ -167,14 +182,7 @@ function createCatalogPlan(releaseSet, options) {
         'org.opencontainers.image.version': options.version,
       },
     },
-    publicationPolicy: {
-      title: 'basename_only',
-      crossRunnerDeterministic: true,
-      discoveryTagAuthority: 'none',
-      immutableDigestAuthority: 'required',
-      roundTrip: 'byte_exact',
-      recovery: 'republish_deterministic_content_then_verify_digest',
-    },
+    publicationPolicy: { ...PUBLICATION_POLICY },
   };
   return Object.freeze({
     ...unsigned,
@@ -204,6 +212,8 @@ function validatePlanShape(plan) {
     ]) ||
     plan.schemaVersion !== 1 ||
     plan.schema !== CATALOG_PLAN_SCHEMA ||
+    JSON.stringify(plan.publicationPolicy) !==
+      JSON.stringify(PUBLICATION_POLICY) ||
     !DIGEST_PATTERN.test(plan.planDigest || '')
   ) {
     fail('catalog plan shape is invalid');
@@ -262,6 +272,93 @@ function validateManifest(plan, manifestContents, manifestDigest) {
   return manifest;
 }
 
+function createCatalogPublicationDecision(
+  plan,
+  manifestContents,
+  manifestDigest,
+  observedDiscoveryDigest,
+) {
+  validatePlanShape(plan);
+  validateManifest(plan, manifestContents, manifestDigest);
+  if (
+    observedDiscoveryDigest !== 'absent' &&
+    !DIGEST_PATTERN.test(observedDiscoveryDigest || '')
+  ) {
+    fail('observed discovery tag digest is invalid');
+  }
+  if (
+    observedDiscoveryDigest !== 'absent' &&
+    observedDiscoveryDigest !== manifestDigest
+  ) {
+    fail('discovery tag already points at another catalog manifest');
+  }
+  const action =
+    observedDiscoveryDigest === 'absent'
+      ? 'publish_if_absent'
+      : 'reuse_exact_digest';
+  const unsigned = {
+    schemaVersion: 1,
+    schema: CATALOG_PUBLICATION_DECISION_SCHEMA,
+    planDigest: plan.planDigest,
+    catalog: {
+      discoveryTag: plan.catalog.discoveryTag,
+      manifestDigest,
+      immutableReference: `${plan.catalog.registryRepository}@${manifestDigest}`,
+    },
+    observation:
+      observedDiscoveryDigest === 'absent' ? 'absent' : 'exact_manifest_digest',
+    action,
+    guards: {
+      stagingTagAuthority: 'none',
+      discoveryTagAuthority: 'none',
+      overwriteConflicts: false,
+      verifyAfterPublication: true,
+    },
+  };
+  return Object.freeze({
+    ...unsigned,
+    decisionDigest: sha256(JSON.stringify(unsigned)),
+  });
+}
+
+function createCatalogTagInventoryDecision(plan, inventoryContents) {
+  validatePlanShape(plan);
+  if (
+    typeof inventoryContents !== 'string' ||
+    Buffer.byteLength(inventoryContents) > MAX_FILE_BYTES ||
+    (inventoryContents.length > 0 && !inventoryContents.endsWith('\n'))
+  ) {
+    fail('catalog tag inventory is invalid or unbounded');
+  }
+  const tags =
+    inventoryContents.length === 0
+      ? []
+      : inventoryContents.slice(0, -1).split('\n');
+  if (
+    tags.some((value) => !OCI_TAG_PATTERN.test(value)) ||
+    new Set(tags).size !== tags.length
+  ) {
+    fail('catalog tag inventory is malformed');
+  }
+  const separator = plan.catalog.discoveryTag.lastIndexOf(':');
+  const discoveryTagName = plan.catalog.discoveryTag.slice(separator + 1);
+  const unsigned = {
+    schemaVersion: 1,
+    schema: CATALOG_TAG_INVENTORY_DECISION_SCHEMA,
+    planDigest: plan.planDigest,
+    discoveryTag: plan.catalog.discoveryTag,
+    inventory: {
+      count: tags.length,
+      contentDigest: sha256(inventoryContents),
+    },
+    observation: tags.includes(discoveryTagName) ? 'present' : 'absent',
+  };
+  return Object.freeze({
+    ...unsigned,
+    decisionDigest: sha256(JSON.stringify(unsigned)),
+  });
+}
+
 function createCatalogReceipt(plan, manifestContents, manifestDigest) {
   validatePlanShape(plan);
   validateManifest(plan, manifestContents, manifestDigest);
@@ -285,6 +382,8 @@ function createCatalogReceipt(plan, manifestContents, manifestDigest) {
       githubProvenance: 'source_tag_and_revision_bound',
       discoveryTagAuthority: 'none',
       immutableDigestAuthority: 'verified',
+      discoveryTagConflictPolicy: 'fail_closed_before_mutation',
+      responseLossRecovery: 'reuse_exact_manifest_digest_only',
     },
   };
   return Object.freeze({
@@ -305,6 +404,7 @@ function auditCatalogReceipt(actual, plan, manifestContents, manifestDigest) {
     catalogManifestDigest: actual.catalog.manifestDigest,
     immutableReference: actual.catalog.immutableReference,
     discoveryTagAuthority: actual.verification.discoveryTagAuthority,
+    discoveryTagConflictPolicy: actual.verification.discoveryTagConflictPolicy,
   });
 }
 
@@ -328,6 +428,17 @@ function parseArguments(argv) {
   const expected =
     values.mode === 'plan'
       ? [...identity, 'output', 'release-set']
+      : values.mode === 'tag-inventory'
+      ? ['mode', 'output', 'plan', 'tag-inventory']
+      : values.mode === 'publication-decision'
+      ? [
+          'manifest',
+          'manifest-digest',
+          'mode',
+          'observed-discovery-digest',
+          'output',
+          'plan',
+        ]
       : values.mode === 'receipt'
       ? ['manifest', 'manifest-digest', 'mode', 'output', 'plan']
       : values.mode === 'audit'
@@ -362,7 +473,13 @@ function parseArguments(argv) {
     ...(values['manifest-digest']
       ? { manifestDigest: values['manifest-digest'] }
       : {}),
+    ...(values['observed-discovery-digest']
+      ? { observedDiscoveryDigest: values['observed-discovery-digest'] }
+      : {}),
     ...(values.receipt ? { receipt: values.receipt } : {}),
+    ...(values['tag-inventory']
+      ? { tagInventory: values['tag-inventory'] }
+      : {}),
     ...(values.output ? { output: values.output } : {}),
   });
 }
@@ -383,7 +500,42 @@ function runCli(argv, output = process.stdout) {
     return plan;
   }
   const plan = readCanonicalJson(options.plan, 'catalog plan').value;
+  if (options.mode === 'tag-inventory') {
+    const inventoryPath = resolveCanonicalAbsolute(
+      options.tagInventory,
+      'catalog tag inventory',
+    );
+    const stat = fs.lstatSync(inventoryPath);
+    if (
+      !stat.isFile() ||
+      stat.isSymbolicLink() ||
+      stat.size > MAX_FILE_BYTES ||
+      fs.realpathSync(inventoryPath) !== inventoryPath ||
+      fs.realpathSync(path.dirname(inventoryPath)) !==
+        path.dirname(inventoryPath)
+    ) {
+      fail('catalog tag inventory must be one bounded canonical regular file');
+    }
+    const decision = createCatalogTagInventoryDecision(
+      plan,
+      fs.readFileSync(inventoryPath, 'utf8'),
+    );
+    writeNoReplace(options.output, decision);
+    output.write(canonicalJson(decision));
+    return decision;
+  }
   const manifest = readBoundedFile(options.manifest, 'catalog manifest');
+  if (options.mode === 'publication-decision') {
+    const decision = createCatalogPublicationDecision(
+      plan,
+      manifest.contents,
+      options.manifestDigest,
+      options.observedDiscoveryDigest,
+    );
+    writeNoReplace(options.output, decision);
+    output.write(canonicalJson(decision));
+    return decision;
+  }
   if (options.mode === 'receipt') {
     const receipt = createCatalogReceipt(
       plan,
@@ -419,7 +571,9 @@ if (require.main === module) {
 module.exports = Object.freeze({
   ARTIFACT_TYPE,
   CATALOG_PLAN_SCHEMA,
+  CATALOG_PUBLICATION_DECISION_SCHEMA,
   CATALOG_RECEIPT_SCHEMA,
+  CATALOG_TAG_INVENTORY_DECISION_SCHEMA,
   FILE_MEDIA_TYPE,
   OCI_EMPTY_CONFIG_DIGEST,
   OCI_EMPTY_CONFIG_MEDIA_TYPE,
@@ -428,7 +582,9 @@ module.exports = Object.freeze({
   auditCatalogPlan,
   auditCatalogReceipt,
   createCatalogPlan,
+  createCatalogPublicationDecision,
   createCatalogReceipt,
+  createCatalogTagInventoryDecision,
   parseArguments,
   runCli,
 });

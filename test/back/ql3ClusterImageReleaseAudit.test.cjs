@@ -111,12 +111,22 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       durableCatalog: {
         repository: 'qinglong3-release-catalog',
         artifactType: 'application/vnd.qinglong.release-set.v3+json',
+        planSchema: 'qinglong/release-catalog-plan@v2',
+        receiptSchema: 'qinglong/release-catalog-receipt@v2',
+        tagInventoryDecisionSchema:
+          'qinglong/release-catalog-tag-inventory-decision@v1',
+        publicationDecisionSchema:
+          'qinglong/release-catalog-publication-decision@v1',
         basenameOnly: true,
         crossRunnerDeterministic: true,
         byteExactRoundTrip: true,
         keylessSignatureVerified: true,
         githubProvenanceVerified: true,
+        deterministicStagingTag: true,
         discoveryTagAuthority: 'none',
+        discoveryTagConflictPolicy: 'fail_closed_without_overwrite',
+        responseLossRecovery: 'reuse_exact_manifest_digest_only',
+        registryTagCas: false,
         immutableDigestAuthority: 'verified',
         receiptAttested: true,
       },
@@ -975,6 +985,50 @@ test('rejects a catalog publication without byte-exact round trip', () => {
   const mutated = releaseSource.replace(
     '          cmp --silent "${RELEASE_SET}" "${roundtrip}"',
     '          echo roundtrip-not-checked',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects direct overwrite publication to the catalog discovery tag', () => {
+  const mutated = releaseSource.replace(
+    '            "${local_tag}"',
+    '            "${discovery_tag}"',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects catalog publication without a conflict-aware decision', () => {
+  const mutated = releaseSource.replace(
+    '--mode=publication-decision',
+    '--mode=receipt',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects catalog publication without bounded tag inventory classification', () => {
+  const mutated = releaseSource.replace(
+    '--mode=tag-inventory',
+    '--mode=publication-decision',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /independently inspect, durably publish/,
+  );
+});
+
+test('rejects response-loss recovery that cannot reuse an exact catalog digest', () => {
+  const mutated = releaseSource.replace(
+    '          elif [[ "${action}" != "reuse_exact_digest" ]]; then',
+    '          elif [[ "${action}" != "publish_if_absent" ]]; then',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),

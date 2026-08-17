@@ -445,6 +445,20 @@ release-set、catalog immutable digest、两类 provenance 与 receipt 全部生
 consumer 失败时不能宣布 Cluster release。不要给 consumer 临时增加写权限“修复”可见性或 tag，应修正 GHCR package visibility/retention
 或发布配置后，对同一受保护 tag 重跑完整工作流并重新验证 exact digest。
 
+catalog discovery tag 另有独立的无覆盖协议。publisher 先在 runner 私有 `ocidir://` 中生成 exact manifest；不得直接向
+`v<version>-<scope>` 执行 `artifact put`。远端 repository 不存在时只允许创建
+`staging-<catalog-plan-digest>` 非权威 tag，以便重新取得不超过 1 MiB 的完整 tag inventory；inventory 必须先通过
+`qinglong/release-catalog-tag-inventory-decision@v1` 的 canonical line、OCI tag 字符集和无重复检查。随后：
+
+- discovery 缺失：publication decision 为 `publish_if_absent`，从本地 immutable reference copy 后立即回读；
+- discovery 已是 exact manifest digest：decision 为 `reuse_exact_digest`，不写 registry，继续 immutable 验证；
+- discovery 是其他 digest、inventory 无界/重复/畸形，或 repository 建立后仍无法读取：在覆盖前失败。
+
+catalog plan/receipt 因此分别为 v2，receipt 固定声明 `fail_closed_before_mutation` 与
+`reuse_exact_manifest_digest_only`。GHCR tag 没有 CAS，组织仍必须限制 package writer；workflow 的同 ref concurrency 只能串行受保护
+tag 的本仓库 run。最终 digest/manifest 回读用于发现发布期间竞争，deployment consumer 仍只接受已签名和 attested 的 immutable reference，
+绝不能因为 discovery 当前“看起来正确”而把 tag 写入 rollout。
+
 workflow bundle 当前保留 90 天；长期入口是 OCI catalog 的 immutable digest。GHCR 并非 WORM，release owner 仍须维护
 package 可见性、读取权限和满足组织要求的 retention/备份策略。任何归档或镜像过程都不得改写 canonical JSON，并须保留
 原 catalog manifest digest、receipt 与 provenance 关联。

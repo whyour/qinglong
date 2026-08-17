@@ -8,13 +8,19 @@ const path = require('node:path');
 const test = require('node:test');
 const {
   ARTIFACT_TYPE,
+  CATALOG_PLAN_SCHEMA,
+  CATALOG_PUBLICATION_DECISION_SCHEMA,
+  CATALOG_RECEIPT_SCHEMA,
+  CATALOG_TAG_INVENTORY_DECISION_SCHEMA,
   OCI_EMPTY_CONFIG_DIGEST,
   OCI_EMPTY_CONFIG_MEDIA_TYPE,
   OCI_MANIFEST_MEDIA_TYPE,
   auditCatalogPlan,
   auditCatalogReceipt,
   createCatalogPlan,
+  createCatalogPublicationDecision,
   createCatalogReceipt,
+  createCatalogTagInventoryDecision,
   parseArguments,
   runCli,
 } = require('../../scripts/ql3-release-catalog-contract.cjs');
@@ -122,9 +128,15 @@ test('plans deterministic Local, Cluster and All OCI catalog entries', () => {
       `ghcr.io/qinglong-release/qinglong3-release-catalog:v${version}-${scope}`,
     );
     assert.equal(plan.catalog.artifactType, ARTIFACT_TYPE);
+    assert.equal(plan.schema, CATALOG_PLAN_SCHEMA);
+    assert.equal(plan.publicationPolicy.stagingTagAuthority, 'none');
+    assert.equal(
+      plan.publicationPolicy.conflict,
+      'fail_closed_before_discovery_tag_mutation',
+    );
     assert.equal(
       plan.publicationPolicy.recovery,
-      'republish_deterministic_content_then_verify_digest',
+      'reuse_exact_manifest_digest_only',
     );
     assert.equal(
       plan.releaseSet.bytes,
@@ -147,14 +159,128 @@ test('creates one digest-addressed receipt from the exact OCI manifest', () => {
   const manifest = manifestFor(plan);
   const manifestDigest = sha256(manifest);
   const receipt = createCatalogReceipt(plan, manifest, manifestDigest);
+  assert.equal(receipt.schema, CATALOG_RECEIPT_SCHEMA);
   assert.equal(
     receipt.catalog.immutableReference,
     `ghcr.io/qinglong-release/qinglong3-release-catalog@${manifestDigest}`,
   );
   assert.equal(receipt.verification.discoveryTagAuthority, 'none');
   assert.equal(
+    receipt.verification.discoveryTagConflictPolicy,
+    'fail_closed_before_mutation',
+  );
+  assert.equal(
+    receipt.verification.responseLossRecovery,
+    'reuse_exact_manifest_digest_only',
+  );
+  assert.equal(
     auditCatalogReceipt(receipt, plan, manifest, manifestDigest).compatible,
     true,
+  );
+});
+
+test('publishes only an absent discovery tag and exactly reuses response-loss recovery', () => {
+  const set = releaseSet('cluster');
+  const plan = createCatalogPlan(set, {
+    ...identity,
+    releaseScope: 'cluster',
+  });
+  const manifest = manifestFor(plan);
+  const manifestDigest = sha256(manifest);
+  const first = createCatalogPublicationDecision(
+    plan,
+    manifest,
+    manifestDigest,
+    'absent',
+  );
+  assert.equal(first.schema, CATALOG_PUBLICATION_DECISION_SCHEMA);
+  assert.equal(first.observation, 'absent');
+  assert.equal(first.action, 'publish_if_absent');
+  assert.equal(first.guards.overwriteConflicts, false);
+  const recovered = createCatalogPublicationDecision(
+    plan,
+    manifest,
+    manifestDigest,
+    manifestDigest,
+  );
+  assert.equal(recovered.observation, 'exact_manifest_digest');
+  assert.equal(recovered.action, 'reuse_exact_digest');
+  assert.deepEqual(recovered.catalog, first.catalog);
+  assert.throws(
+    () =>
+      createCatalogPublicationDecision(
+        plan,
+        manifest,
+        manifestDigest,
+        `sha256:${'f'.repeat(64)}`,
+      ),
+    /already points at another catalog manifest/,
+  );
+  assert.throws(
+    () =>
+      createCatalogPublicationDecision(
+        plan,
+        manifest,
+        manifestDigest,
+        'missing',
+      ),
+    /observed discovery tag digest is invalid/,
+  );
+  const weakenedPlan = JSON.parse(JSON.stringify(plan));
+  weakenedPlan.publicationPolicy.recovery =
+    'republish_deterministic_content_then_verify_digest';
+  const { planDigest: ignored, ...unsigned } = weakenedPlan;
+  weakenedPlan.planDigest = sha256(JSON.stringify(unsigned));
+  assert.throws(
+    () =>
+      createCatalogPublicationDecision(
+        weakenedPlan,
+        manifest,
+        manifestDigest,
+        'absent',
+      ),
+    /catalog plan shape is invalid/,
+  );
+});
+
+test('classifies one bounded exact catalog tag inventory before mutation', () => {
+  const set = releaseSet('cluster');
+  const plan = createCatalogPlan(set, {
+    ...identity,
+    releaseScope: 'cluster',
+  });
+  const absent = createCatalogTagInventoryDecision(
+    plan,
+    'staging-' + 'a'.repeat(64) + '\n',
+  );
+  assert.equal(absent.schema, CATALOG_TAG_INVENTORY_DECISION_SCHEMA);
+  assert.equal(absent.observation, 'absent');
+  assert.equal(absent.inventory.count, 1);
+  const present = createCatalogTagInventoryDecision(
+    plan,
+    `staging-${'a'.repeat(64)}\nv${version}-cluster\n`,
+  );
+  assert.equal(present.observation, 'present');
+  assert.equal(present.inventory.count, 2);
+  assert.throws(
+    () =>
+      createCatalogTagInventoryDecision(
+        plan,
+        `v${version}-cluster\nv${version}-cluster\n`,
+      ),
+    /inventory is malformed/,
+  );
+  assert.throws(
+    () => createCatalogTagInventoryDecision(plan, 'not a tag\n'),
+    /inventory is malformed/,
+  );
+  assert.throws(
+    () => createCatalogTagInventoryDecision(plan, 'missing-newline'),
+    /inventory is invalid or unbounded/,
+  );
+  assert.throws(
+    () => createCatalogTagInventoryDecision(plan, 'a'.repeat(1024 * 1024 + 1)),
+    /inventory is invalid or unbounded/,
   );
 });
 
@@ -241,10 +367,56 @@ test('CLI plans, receipts and audits canonical no-replace evidence', (t) => {
   const output = { write() {} };
   const plan = runCli(planArgs, output);
   assert.equal(fs.statSync(planPath).mode & 0o777, 0o600);
+  const tagInventoryPath = path.join(directory, 'tags.txt');
+  fs.writeFileSync(tagInventoryPath, `v${version}-local\n`, { mode: 0o600 });
+  assert.equal(
+    runCli(
+      [
+        '--mode=tag-inventory',
+        `--plan=${planPath}`,
+        `--tag-inventory=${tagInventoryPath}`,
+        `--output=${path.join(directory, 'tag-inventory-decision.json')}`,
+      ],
+      output,
+    ).observation,
+    'present',
+  );
   const manifest = manifestFor(plan);
   const manifestPath = path.join(directory, 'manifest.json');
   fs.writeFileSync(manifestPath, manifest, { mode: 0o600 });
   const manifestDigest = sha256(manifest);
+  const decisionPath = path.join(directory, 'decision.json');
+  assert.equal(
+    runCli(
+      [
+        '--mode=publication-decision',
+        `--plan=${planPath}`,
+        `--manifest=${manifestPath}`,
+        `--manifest-digest=${manifestDigest}`,
+        '--observed-discovery-digest=absent',
+        `--output=${decisionPath}`,
+      ],
+      output,
+    ).action,
+    'publish_if_absent',
+  );
+  const conflictDecisionPath = path.join(directory, 'conflict-decision.json');
+  assert.throws(
+    () =>
+      runCli(
+        [
+          '--mode=publication-decision',
+          '--plan=' + planPath,
+          '--manifest=' + manifestPath,
+          '--manifest-digest=' + manifestDigest,
+          '--observed-discovery-digest=sha256:' + 'f'.repeat(64),
+          '--output=' + conflictDecisionPath,
+        ],
+        output,
+      ),
+    /already points at another catalog manifest/,
+  );
+  assert.equal(fs.existsSync(conflictDecisionPath), false);
   const receiptPath = path.join(directory, 'receipt.json');
   runCli(
     [

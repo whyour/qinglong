@@ -760,7 +760,19 @@ function auditReleaseWorkflow(source) {
         'subject-path': '${{ steps.release-set.outputs.report }}',
       }) ||
     releaseSetSteps[10]?.id !== 'catalog' ||
-    !/artifact put[\s\S]*--artifact-type "\$\{artifact_type\}"[\s\S]*--file-media-type "\$\{file_media_type\}"[\s\S]*--file "\$\{RELEASE_SET\}"[\s\S]*--file-title[\s\S]*--strip-dirs[\s\S]*dev\.qinglong\.release\.scope[\s\S]*org\.opencontainers\.image\.revision[\s\S]*org\.opencontainers\.image\.source[\s\S]*org\.opencontainers\.image\.version[\s\S]*image digest "\$\{discovery_tag\}"[\s\S]*artifact get --file "\$\{file_name\}" "\$\{immutable_reference\}"[\s\S]*cmp --silent "\$\{RELEASE_SET\}" "\$\{roundtrip\}"[\s\S]*manifest get "\$\{immutable_reference\}" --format raw-body[\s\S]*GITHUB_OUTPUT/.test(
+    !/local_tag="ocidir:\/\/\$\{local_layout\}:candidate"[\s\S]*artifact put[\s\S]*--artifact-type "\$\{artifact_type\}"[\s\S]*--file-media-type "\$\{file_media_type\}"[\s\S]*--file "\$\{RELEASE_SET\}"[\s\S]*--file-title[\s\S]*--strip-dirs[\s\S]*dev\.qinglong\.release\.scope[\s\S]*org\.opencontainers\.image\.revision[\s\S]*org\.opencontainers\.image\.source[\s\S]*org\.opencontainers\.image\.version[\s\S]*"\$\{local_tag\}"[\s\S]*expected_digest=.*image digest "\$\{local_tag\}"[\s\S]*local_immutable="ocidir:\/\/\$\{local_layout\}@\$\{expected_digest\}"/.test(
+      releaseSetSteps[10]?.run ?? '',
+    ) ||
+    !/tag ls "\$\{catalog_repository\}" --format '\{\{ range \.Tags \}\}\{\{ println \. \}\}\{\{ end \}\}'[\s\S]*staging_tag="\$\{catalog_repository\}:staging-\$\{plan_digest#sha256:\}"[\s\S]*image copy "\$\{local_immutable\}" "\$\{staging_tag\}"[\s\S]*tag ls "\$\{catalog_repository\}" --format '\{\{ range \.Tags \}\}\{\{ println \. \}\}\{\{ end \}\}'[\s\S]*--mode=tag-inventory[\s\S]*--plan="\$\{PLAN\}"[\s\S]*--tag-inventory="\$\{tags\}"[\s\S]*--output="\$\{inventory_decision\}"[\s\S]*tag_state=.*p\.observation/.test(
+      releaseSetSteps[10]?.run ?? '',
+    ) ||
+    !/--mode=publication-decision[\s\S]*--manifest="\$\{local_manifest\}"[\s\S]*--manifest-digest="\$\{expected_digest\}"[\s\S]*--observed-discovery-digest="\$\{observed_digest\}"[\s\S]*action=.*p\.action[\s\S]*publish_if_absent[\s\S]*image copy "\$\{local_immutable\}" "\$\{discovery_tag\}"[\s\S]*reuse_exact_digest[\s\S]*digest=.*image digest "\$\{discovery_tag\}"[\s\S]*"\$\{digest\}" != "\$\{expected_digest\}"/.test(
+      releaseSetSteps[10]?.run ?? '',
+    ) ||
+    !/artifact get --file "\$\{file_name\}" "\$\{immutable_reference\}"[\s\S]*cmp --silent "\$\{RELEASE_SET\}" "\$\{roundtrip\}"[\s\S]*manifest get "\$\{immutable_reference\}" --format raw-body[\s\S]*cmp --silent "\$\{local_manifest\}" "\$\{manifest\}"[\s\S]*GITHUB_OUTPUT/.test(
+      releaseSetSteps[10]?.run ?? '',
+    ) ||
+    /artifact put[\s\S]{0,1200}"\$\{discovery_tag\}"/.test(
       releaseSetSteps[10]?.run ?? '',
     ) ||
     !/cosign sign --yes "\$\{CATALOG\}@\$\{DIGEST\}"/.test(
@@ -1315,12 +1327,22 @@ function auditReleaseWorkflow(source) {
     durableCatalog: {
       repository: 'qinglong3-release-catalog',
       artifactType: 'application/vnd.qinglong.release-set.v3+json',
+      planSchema: 'qinglong/release-catalog-plan@v2',
+      receiptSchema: 'qinglong/release-catalog-receipt@v2',
+      tagInventoryDecisionSchema:
+        'qinglong/release-catalog-tag-inventory-decision@v1',
+      publicationDecisionSchema:
+        'qinglong/release-catalog-publication-decision@v1',
       basenameOnly: true,
       crossRunnerDeterministic: true,
       byteExactRoundTrip: true,
       keylessSignatureVerified: true,
       githubProvenanceVerified: true,
+      deterministicStagingTag: true,
       discoveryTagAuthority: 'none',
+      discoveryTagConflictPolicy: 'fail_closed_without_overwrite',
+      responseLossRecovery: 'reuse_exact_manifest_digest_only',
+      registryTagCas: false,
       immutableDigestAuthority: 'verified',
       receiptAttested: true,
     },

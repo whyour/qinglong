@@ -873,6 +873,10 @@ jobs:
           artifact_type="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.catalog.artifactType)' "${PLAN}")"
           file_media_type="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.catalog.fileMediaType)' "${PLAN}")"
           file_name="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.releaseSet.fileName)' "${PLAN}")"
+          plan_digest="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.planDigest)' "${PLAN}")"
+          local_layout="${RUNNER_TEMP}/release-catalog-layout"
+          local_tag="ocidir://${local_layout}:candidate"
+          mkdir "${local_layout}"
           "${REGCTL}" artifact put \
             --artifact-type "${artifact_type}" \
             --file-media-type "${file_media_type}" \
@@ -883,20 +887,66 @@ jobs:
             --annotation "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --annotation "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY,,}" \
             --annotation "org.opencontainers.image.version=${{ inputs.version }}" \
-            "${discovery_tag}"
-          digest="$("${REGCTL}" image digest "${discovery_tag}")"
-          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "release catalog did not resolve to an immutable digest" >&2
+            "${local_tag}"
+          expected_digest="$("${REGCTL}" image digest "${local_tag}")"
+          if [[ ! "${expected_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "local release catalog did not resolve to an immutable digest" >&2
             exit 1
           fi
-          immutable_reference="${catalog_repository}@${digest}"
+          local_immutable="ocidir://${local_layout}@${expected_digest}"
+          local_manifest="${RUNNER_TEMP}/release-catalog-local-manifest.json"
+          "${REGCTL}" manifest get "${local_immutable}" --format raw-body > "${local_manifest}"
+          tags="${RUNNER_TEMP}/release-catalog-tags"
+          if ! "${REGCTL}" tag ls "${catalog_repository}" --format '{{ range .Tags }}{{ println . }}{{ end }}' > "${tags}"; then
+            staging_tag="${catalog_repository}:staging-${plan_digest#sha256:}"
+            "${REGCTL}" image copy "${local_immutable}" "${staging_tag}"
+            staged_digest="$("${REGCTL}" image digest "${staging_tag}")"
+            if [[ "${staged_digest}" != "${expected_digest}" ]]; then
+              echo "release catalog staging tag did not preserve the manifest digest" >&2
+              exit 1
+            fi
+            "${REGCTL}" tag ls "${catalog_repository}" --format '{{ range .Tags }}{{ println . }}{{ end }}' > "${tags}"
+          fi
+          inventory_decision="${RUNNER_TEMP}/release-catalog-tag-inventory-decision.json"
+          node scripts/ql3-release-catalog-contract.cjs \
+            --mode=tag-inventory \
+            --plan="${PLAN}" \
+            --tag-inventory="${tags}" \
+            --output="${inventory_decision}" > /dev/null
+          tag_state="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.observation)' "${inventory_decision}")"
+          observed_digest="absent"
+          if [[ "${tag_state}" == "present" ]]; then
+            observed_digest="$("${REGCTL}" image digest "${discovery_tag}")"
+          fi
+          decision="${RUNNER_TEMP}/release-catalog-publication-decision.json"
+          node scripts/ql3-release-catalog-contract.cjs \
+            --mode=publication-decision \
+            --plan="${PLAN}" \
+            --manifest="${local_manifest}" \
+            --manifest-digest="${expected_digest}" \
+            --observed-discovery-digest="${observed_digest}" \
+            --output="${decision}" > /dev/null
+          action="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p.action)' "${decision}")"
+          if [[ "${action}" == "publish_if_absent" ]]; then
+            "${REGCTL}" image copy "${local_immutable}" "${discovery_tag}"
+          elif [[ "${action}" != "reuse_exact_digest" ]]; then
+            echo "release catalog publication action is invalid" >&2
+            exit 1
+          fi
+          digest="$("${REGCTL}" image digest "${discovery_tag}")"
+          if [[ "${digest}" != "${expected_digest}" ]]; then
+            echo "release catalog discovery tag does not resolve to the planned digest" >&2
+            exit 1
+          fi
+          immutable_reference="${catalog_repository}@${expected_digest}"
           roundtrip="${RUNNER_TEMP}/release-set-roundtrip.json"
           manifest="${RUNNER_TEMP}/release-catalog-manifest.json"
           "${REGCTL}" artifact get --file "${file_name}" "${immutable_reference}" > "${roundtrip}"
           cmp --silent "${RELEASE_SET}" "${roundtrip}"
           "${REGCTL}" manifest get "${immutable_reference}" --format raw-body > "${manifest}"
+          cmp --silent "${local_manifest}" "${manifest}"
           echo "repository=${catalog_repository}" >> "${GITHUB_OUTPUT}"
-          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          echo "digest=${expected_digest}" >> "${GITHUB_OUTPUT}"
           echo "manifest=${manifest}" >> "${GITHUB_OUTPUT}"
 
       - name: Keylessly sign the immutable release-catalog digest

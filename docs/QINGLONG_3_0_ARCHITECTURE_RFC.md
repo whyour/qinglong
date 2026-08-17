@@ -11,6 +11,27 @@
 
 最新增量证据（2026-08-18）：
 
+- D-349/ADR-0441（已接受；首份真实 GHCR conflict/reuse 证据待实际 release tag）：关闭 durable catalog discovery tag 的覆盖窗口。
+  之前 workflow 虽声明 `v<version>-<scope>` 无部署 authority，却直接对该 tag 执行 `artifact put`；已有不同 digest 会先被覆盖，
+  response-loss 重跑也没有“相同复用、冲突拒绝”的可执行分支。catalog plan/receipt 现升级为 v2，publisher 必须先在 runner 私有
+  `ocidir://` 生成 exact manifest；远端 repository 不存在时仅以 `staging-<plan-digest>` 非权威 tag 建立可读 inventory。
+  `qinglong/release-catalog-tag-inventory-decision@v1` 先执行 1 MiB、canonical line、OCI tag 字符集和无重复约束，随后
+  `qinglong/release-catalog-publication-decision@v1` 将 absent 映射为 `publish_if_absent`、exact digest 映射为
+  `reuse_exact_digest`，其他 digest 或无界/畸形 inventory 均在 discovery mutation 前失败。两条成功路径都按 immutable reference
+  回读 release-set 和 raw manifest；receipt 明确绑定 `fail_closed_before_mutation` 与
+  `reuse_exact_manifest_digest_only`。OCI registry 仍无 tag CAS，因此诚实保留 `registryTagCas=false`：同 ref concurrency 与组织
+  package 权限限制外部 writer，最终回读检测发布期间竞争，consumer 永远只信任签名/attested immutable digest。本 Gate 不修改
+  release-set v3/OCI media、package、生产依赖、数据库、Kubernetes object 或设备运行时。定向 receipt/set/catalog/consumption/
+  deployment-lock/image-release 回归 143/143；完整 backend 1,371 项为 1,369 pass/2 条件 skip/0 fail，18-package clean
+  build/test 退出 0。12 项 package boundary、Cluster dependency、Edge import、Cluster/Worker/CloudNativePG 部署、backup、
+  Barman/cert-manager selection、image release、deployment-lock surface 与 release-version 审计全部 compatible；14 档 Local
+  artifact 全部 compatible 且保持既有字节基线：默认 Edge/Standalone 为 2,589,890/2,589,968 bytes，adopted 为
+  2,809,185/2,809,308 bytes，application 为 3,632,769/3,632,889 bytes，application-api 为
+  3,800,322/3,800,466 bytes，AI 为 3,069,143/3,069,233 bytes，application+AI 为 4,493,043/4,493,175 bytes，
+  MCP 为 7,315,930/7,316,038 bytes。真实 PostgreSQL 18.6 arm64 physical HA 再次通过 142/142、timeline `1→2`，报告
+  SHA-256 为 `13e2f3793d7f418f0c1cc3b05206b393c4f09a45e1b9a5783219c12fb930b3dd`，离线审计通过且无 `ql3-ha-*`
+  Docker 容器、卷或网络残留。首份真实 GHCR conflict/reuse 结果仍只能由实际受保护 `v3` release tag 取得。
+
 - D-348/ADR-0440（已接受；首份真实线上闭合待实际 release tag）：补齐 D-347 确定性收据与实际 tag promotion 之间的 freshness 窗口。此前私有
   job 在收据创建时验证 24 小时 freshness，但 release-set aggregate 只检查 `observedAt` 可解析与 receipt digest；镜像构建、扫描和 attestation
   延迟后，创建时有效的收据可能在闭合时已经过期。现在 `cluster|all` aggregate 与紧随其后的 source-record audit 必须各自取得 runner-owned 当前
