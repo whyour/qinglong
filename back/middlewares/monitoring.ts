@@ -3,46 +3,34 @@ import Logger from '../loaders/logger';
 import { performance } from 'perf_hooks';
 import { metricsService } from '../services/metrics';
 
-interface RequestMetrics {
-  method: string;
-  path: string;
-  duration: number;
-  statusCode: number;
-  timestamp: number;
-  platform?: string;
-}
-
-const requestMetrics: RequestMetrics[] = [];
+const UNMONITORED_PATH_SUFFIXES = ['/api/health', '/open/health'];
+const HTTP_METRIC_SAMPLE_INTERVAL = 10;
+let requestSampleOffset = 0;
 
 export const monitoringMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
+  if (UNMONITORED_PATH_SUFFIXES.some((path) => req.path.endsWith(path))) {
+    return next();
+  }
+
   const start = performance.now();
   const originalEnd = res.end;
 
   res.end = function (chunk?: any, encoding?: any, cb?: any) {
     const duration = performance.now() - start;
-    const metric: RequestMetrics = {
-      method: req.method,
-      path: req.path,
-      duration,
-      statusCode: res.statusCode,
-      timestamp: Date.now(),
-      platform: req.platform,
-    };
-
-    requestMetrics.push(metric);
-    metricsService.record('http_request', duration, {
-      method: req.method,
-      path: req.path,
-      statusCode: res.statusCode.toString(),
-      ...(req.platform && { platform: req.platform }),
-    });
-
-    if (requestMetrics.length > 1000) {
-      requestMetrics.shift();
+    const shouldSample = requestSampleOffset === 0;
+    requestSampleOffset =
+      (requestSampleOffset + 1) % HTTP_METRIC_SAMPLE_INTERVAL;
+    if (shouldSample) {
+      metricsService.record('http_request', duration, {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode.toString(),
+        ...(req.platform && { platform: req.platform }),
+      });
     }
 
     if (duration > 1000) {
@@ -57,24 +45,4 @@ export const monitoringMiddleware = (
   };
 
   next();
-};
-
-export const getMetrics = () => {
-  return {
-    totalRequests: requestMetrics.length,
-    averageDuration:
-      requestMetrics.reduce((acc, curr) => acc + curr.duration, 0) /
-      requestMetrics.length,
-    requestsByMethod: requestMetrics.reduce((acc, curr) => {
-      acc[curr.method] = (acc[curr.method] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>),
-    requestsByPlatform: requestMetrics.reduce((acc, curr) => {
-      if (curr.platform) {
-        acc[curr.platform] = (acc[curr.platform] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<string, number>),
-    recentRequests: requestMetrics.slice(-10),
-  };
 };

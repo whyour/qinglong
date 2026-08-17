@@ -80,8 +80,8 @@ export default (app: Router) => {
           return res.send({ code: 450, message: t('未知错误') });
         }
         const userService = Container.get(UserService);
-        await userService.updateUsernameAndPassword(req.body);
-        res.send({ code: 200, message: t('更新成功') });
+        const result = await userService.updateUsernameAndPassword(req.body);
+        res.send(result);
       } catch (e) {
         return next(e);
       }
@@ -282,8 +282,8 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
-        await userService.updateUsernameAndPassword(req.body);
-        res.send({ code: 200, message: t('更新成功') });
+        const result = await userService.updateUsernameAndPassword(req.body);
+        res.send(result);
       } catch (e) {
         return next(e);
       }
