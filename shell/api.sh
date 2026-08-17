@@ -142,10 +142,14 @@ update_cron() {
   local lastExecutingTime="${5:-0}"
   local runningTime="${6:-0}"
   local exitCode="${7:-}"
+  local executionId="${8:-}"
   local currentTimeStamp=$(date +%s)
   local dataRaw="{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime"
   if [[ -n $exitCode ]]; then
     dataRaw="${dataRaw},\"exit_code\":$exitCode"
+  fi
+  if [[ -n $executionId ]]; then
+    dataRaw="${dataRaw},\"execution_id\":\"$executionId\""
   fi
   dataRaw="${dataRaw}}"
   local api=$(
@@ -164,6 +168,27 @@ update_cron() {
     fi
     echo -e "${message}"
   fi
+}
+
+create_legacy_system_execution_id() {
+  local startedAt="$1"
+  local uuid=""
+  if [[ "${QL_EXECUTION_ORIGIN:-}" != "scheduled_system" ]] ||
+    [[ ! "$startedAt" =~ ^[0-9]{1,13}$ ]]; then
+    return 0
+  fi
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    IFS= read -r uuid </proc/sys/kernel/random/uuid
+  elif command -v uuidgen >/dev/null 2>&1; then
+    uuid=$(uuidgen)
+  elif command -v node >/dev/null 2>&1; then
+    uuid=$(node -e "process.stdout.write(require('node:crypto').randomUUID())")
+  fi
+  uuid=$(printf '%s' "$uuid" | tr '[:upper:]' '[:lower:]')
+  if [[ ! "$uuid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+    return 0
+  fi
+  printf 'legacy-system:%s:%s' "$startedAt" "$uuid"
 }
 
 notify_api() {

@@ -488,6 +488,7 @@ main() {
   local time_format="%Y-%m-%d %H:%M:%S"
   local time=$(date "+$time_format")
   local begin_timestamp=$(format_timestamp "$time_format" "$time")
+  local execution_id=$(create_legacy_system_execution_id "$begin_timestamp")
 
   local begin_time=$(format_time "$time_format" "$time")
 
@@ -495,7 +496,7 @@ main() {
     eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
   fi
 
-  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
+  [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp" "" "" "$execution_id"
 
   case $p1 in
   update)
@@ -558,7 +559,7 @@ main() {
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time"
+  [[ $ID ]] && update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "" "$execution_id"
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒　　　　　" $cmd

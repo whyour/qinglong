@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { v7 as uuidV7 } from 'uuid';
 import type {
   RunAttemptRecord,
@@ -43,6 +44,38 @@ export interface LegacyShadowRunReference {
 
 export type ShadowIdFactory = () => string;
 
+function deterministicShadowId(
+  requestId: string,
+  acceptedAtMs: number,
+  domain: 'run' | 'attempt',
+): string {
+  if (
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(requestId) ||
+    !Number.isSafeInteger(acceptedAtMs) ||
+    acceptedAtMs < 0 ||
+    acceptedAtMs > 0xffffffffffff
+  ) {
+    throw new TypeError('Invalid deterministic Legacy Shadow identity');
+  }
+  const bytes = createHash('sha256')
+    .update(`qinglong:legacy-shadow:${domain}:`)
+    .update(requestId)
+    .digest()
+    .subarray(0, 16);
+  let timestamp = acceptedAtMs;
+  for (let index = 5; index >= 0; index -= 1) {
+    bytes[index] = timestamp & 0xff;
+    timestamp = Math.floor(timestamp / 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const value = bytes.toString('hex');
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(
+    12,
+    16,
+  )}-${value.slice(16, 20)}-${value.slice(20)}`;
+}
+
 export class LegacyShadowRunWriter {
   constructor(
     private readonly repository: RunRepository,
@@ -52,10 +85,25 @@ export class LegacyShadowRunWriter {
   async accept(
     fact: LegacyExecutionAcceptedFact,
   ): Promise<LegacyShadowRunReference> {
-    const reference = {
-      runId: this.createId(),
-      attemptId: this.createId(),
-    };
+    const reference =
+      fact.requestId === undefined
+        ? { runId: this.createId(), attemptId: this.createId() }
+        : {
+            runId: deterministicShadowId(
+              fact.requestId,
+              fact.acceptedAtMs,
+              'run',
+            ),
+            attemptId: deterministicShadowId(
+              fact.requestId,
+              fact.acceptedAtMs,
+              'attempt',
+            ),
+          };
+    const idempotencyKey =
+      fact.requestId === undefined
+        ? undefined
+        : `legacy-shadow:${fact.origin}:${fact.requestId}`;
     const initialRun: RunRecord = {
       id: reference.runId,
       projectId: fact.projectId,
@@ -79,6 +127,7 @@ export class LegacyShadowRunWriter {
       version: 0,
       eventSequence: 0,
       priority: 0,
+      ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
       createdAtMs: fact.acceptedAtMs,
     };
     const initialAttempt: RunAttemptRecord = {
@@ -91,46 +140,98 @@ export class LegacyShadowRunWriter {
       createdAtMs: fact.acceptedAtMs,
     };
 
-    await this.repository.transaction(async (transaction) => {
-      await transaction.insertRun(initialRun);
-      await transaction.insertAttempt(initialAttempt);
+    try {
+      await this.repository.transaction(async (transaction) => {
+        await transaction.insertRun(initialRun);
+        await transaction.insertAttempt(initialAttempt);
 
-      const created = reserveRunEvent(initialRun, 0);
-      const createdRun = created.run;
-      const createdUpdated = await transaction.compareAndSetRun(createdRun, 0);
-      if (!createdUpdated) {
-        throw new RunVersionConflictError(initialRun.id, 0, initialRun.version);
-      }
-      await transaction.appendEvent(
-        this.event(
+        const created = reserveRunEvent(initialRun, 0);
+        const createdRun = created.run;
+        const createdUpdated = await transaction.compareAndSetRun(
           createdRun,
-          {
-            sequence: created.sequence,
-            type: 'run.created',
-            payload: {
-              status: 'created',
-              version: createdRun.version,
-              execution_owner: 'legacy',
-              shadow: true,
+          0,
+        );
+        if (!createdUpdated) {
+          throw new RunVersionConflictError(
+            initialRun.id,
+            0,
+            initialRun.version,
+          );
+        }
+        await transaction.appendEvent(
+          this.event(
+            createdRun,
+            {
+              sequence: created.sequence,
+              type: 'run.created',
+              payload: {
+                status: 'created',
+                version: createdRun.version,
+                execution_owner: 'legacy',
+                shadow: true,
+              },
             },
-          },
-          fact.acceptedAtMs,
-        ),
-      );
+            fact.acceptedAtMs,
+          ),
+        );
 
-      const queued = transitionRun(createdRun, {
-        to: 'queued',
-        expectedVersion: createdRun.version,
-        atMs: fact.acceptedAtMs,
+        const queued = transitionRun(createdRun, {
+          to: 'queued',
+          expectedVersion: createdRun.version,
+          atMs: fact.acceptedAtMs,
+        });
+        await this.persistRunDecision(
+          transaction,
+          createdRun,
+          queued,
+          fact.acceptedAtMs,
+        );
       });
-      await this.persistRunDecision(
-        transaction,
-        createdRun,
-        queued,
-        fact.acceptedAtMs,
-      );
-    });
+    } catch (error) {
+      if (
+        fact.requestId === undefined ||
+        !(await this.isExactReplay(
+          reference,
+          initialRun,
+          initialAttempt,
+          idempotencyKey!,
+        ))
+      ) {
+        throw error;
+      }
+    }
     return reference;
+  }
+
+  private async isExactReplay(
+    reference: LegacyShadowRunReference,
+    expectedRun: RunRecord,
+    expectedAttempt: RunAttemptRecord,
+    idempotencyKey: string,
+  ): Promise<boolean> {
+    const [run, attempt] = await Promise.all([
+      this.repository.findRunById(reference.runId),
+      this.repository.findAttemptById(reference.attemptId),
+    ]);
+    if (!run || !attempt) return false;
+    return (
+      run.projectId === expectedRun.projectId &&
+      run.taskId === expectedRun.taskId &&
+      run.taskRevision === expectedRun.taskRevision &&
+      run.taskName === expectedRun.taskName &&
+      run.legacyCronId === expectedRun.legacyCronId &&
+      run.triggerType === expectedRun.triggerType &&
+      run.executionOrigin === expectedRun.executionOrigin &&
+      run.executionOwner === 'legacy' &&
+      run.triggeredBy === expectedRun.triggeredBy &&
+      run.requestId === expectedRun.requestId &&
+      run.idempotencyKey === idempotencyKey &&
+      run.createdAtMs === expectedRun.createdAtMs &&
+      attempt.runId === run.id &&
+      attempt.attempt === 1 &&
+      attempt.executorType === 'legacy_local' &&
+      attempt.createdAtMs === expectedAttempt.createdAtMs
+    );
   }
 
   async spawned(

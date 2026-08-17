@@ -126,6 +126,7 @@ format_params() {
 init_begin_time() {
   begin_time=$(format_time "$time_format" "$time")
   begin_timestamp=$(format_timestamp "$time_format" "$time")
+  execution_id=$(create_legacy_system_execution_id "$begin_timestamp")
 }
 
 import_config "$@"

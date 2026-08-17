@@ -377,7 +377,7 @@ clear_env() {
 handle_task_start() {
   local error_message=""
   if [[ $ID ]]; then
-    local error=$(update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp")
+    local error=$(update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp" "" "" "$execution_id")
     if [[ $error ]]; then
       error_message=", 任务状态更新失败(${error})"
     fi
@@ -414,7 +414,7 @@ handle_task_end() {
   [[ "$diff_time" == 0 ]] && diff_time=1
 
   if [[ $ID ]]; then
-    local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "$exit_code")
+    local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "$exit_code" "$execution_id")
     if [[ $error ]]; then
       error_message=", 状态更新失败(${error})"
     fi

@@ -5,6 +5,7 @@
 - 关联 RFC：QL-RFC-0001 D-02、D-353、PR-4
 - 关联 ADR：ADR-0001、ADR-0002、ADR-0003
 - Amends：ADR-0002 的当前 Alpha Shadow origin allowlist，不改变 Legacy owner 或 Primary 门禁
+- Follow-up：[ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md) 已完成本文保留的 `scheduled_system` 稳定准入 Gate
 
 ## 上下文
 

@@ -22,6 +22,7 @@ const SHADOW_ORIGINS_ENV = 'QL3_SHADOW_ORIGINS';
 const SUPPORTED_SHADOW_ORIGINS = new Set<ExecutionOrigin>([
   'manual',
   'scheduled_node',
+  'scheduled_system',
   'script',
   'subscription',
   'system',
@@ -84,7 +85,7 @@ function readConfiguredOrigins(): ReadonlySet<ExecutionOrigin> {
         incrementFailure('configuration:unsupported_origin');
         try {
           Logger.warn(
-            '[ql3-shadow] ignored unsupported origin; this slice supports manual,scheduled_node,script,subscription,system',
+            '[ql3-shadow] ignored unsupported origin; this slice supports manual,scheduled_node,scheduled_system,script,subscription,system',
           );
         } catch {
           // Invalid compatibility configuration must not affect legacy paths.
@@ -267,6 +268,57 @@ export function observeLegacyExecution(
         deferredObservation(getDefaultObserver(), fact),
       )
     : NOOP_OBSERVATION;
+}
+
+export interface LegacyShellExecutionCallbackInput {
+  pid?: number;
+  logPath?: string;
+  atMs: number;
+  phase: 'running' | 'finished';
+  exitCode?: number;
+}
+
+/**
+ * Observes one callback-owned execution without registering an in-memory
+ * ChildProcess correlation entry. The accepted fact must carry a durable
+ * requestId so callback replay can converge in the Shadow writer.
+ */
+export function observeLegacyShellExecutionCallback(
+  createFact: LegacyExecutionAcceptedFactFactory,
+  input: LegacyShellExecutionCallbackInput,
+): LegacyExecutionObservation | undefined {
+  const origin: ExecutionOrigin = 'scheduled_system';
+  let observation: LegacyExecutionObservation;
+  if (override) {
+    if (!override.origins.has(origin)) return undefined;
+    const fact = createAcceptedFactFailOpen(origin, createFact);
+    observation = fact
+      ? beginFailOpen(override.observer, fact)
+      : NOOP_OBSERVATION;
+  } else {
+    if (!readConfiguredOrigins().has(origin)) return undefined;
+    const fact = createAcceptedFactFailOpen(origin, createFact);
+    observation = fact
+      ? deferredObservation(getDefaultObserver(), fact)
+      : NOOP_OBSERVATION;
+  }
+
+  observation.spawned({
+    atMs: input.atMs,
+    ...(input.pid === undefined ? {} : { pid: input.pid }),
+    ...(input.logPath === undefined
+      ? {}
+      : { logArtifactId: createLegacyLogArtifactId(input.logPath) }),
+  });
+  if (input.phase === 'running') {
+    observation.running({ atMs: input.atMs });
+  } else {
+    observation.exited({
+      atMs: input.atMs,
+      exitCode: input.exitCode ?? 0,
+    });
+  }
+  return observation;
 }
 
 export interface LegacyExecutionCancellationInput {

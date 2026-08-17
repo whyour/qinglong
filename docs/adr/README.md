@@ -448,7 +448,8 @@
 | [ADR-0442](./ADR-0442-catalog-ready-terminal-release-tag-publication.md)                                | Catalog-ready 的终态 Release Tag 发布与闭合收据                                                                                                                             | Superseded by ADR-0443（bounded promotion/closure 机制保留） |
 | [ADR-0443](./ADR-0443-deployment-ready-terminal-release-finalization.md)                                | Deployment-ready 的终态 Release Finalization                                                                                                                               | Accepted（首份真实 GHCR deployment-ready finalization 待实际 release tag） |
 | [ADR-0444](./ADR-0444-fail-closed-release-tag-finalizer-and-replay-rehearsal.md)                         | Fail-closed Release Tag Finalizer 与重放演练                                                                                                                                | Accepted（首份真实 GHCR response-loss 重放待实际 release tag） |
-| [ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)                                    | ScheduleService 执行来源的 Shadow Run 覆盖                                                                                                                                  | Accepted（`scheduled_system` 幂等准入待独立 Gate） |
+| [ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)                                    | ScheduleService 执行来源的 Shadow Run 覆盖                                                                                                                                  | Accepted（`scheduled_system` 后续由 ADR-0446 完成） |
+| [ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)                                            | System Crond 稳定 Shadow 准入与回调重放                                                                                                                                      | Accepted |
 
 ## 规则
 

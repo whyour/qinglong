@@ -5,10 +5,7 @@ import CronService from '../services/cron';
 import CronViewService from '../services/cronView';
 import { celebrate, Joi } from 'celebrate';
 import { commonCronSchema } from '../validation/schedule';
-import {
-  RunningInstanceModel,
-  InstanceStatus,
-} from '../data/runningInstance';
+import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
 import { t } from '../shared/i18n';
 
 const route = Router();
@@ -313,7 +310,11 @@ export default (app: Router) => {
       try {
         const cronService = Container.get(CronService);
         const result = await cronService.log(req.params.id);
-        return res.send({ code: 200, data: result.content, logStatus: result.status });
+        return res.send({
+          code: 200,
+          data: result.content,
+          logStatus: result.status,
+        });
       } catch (e) {
         return next(e);
       }
@@ -435,6 +436,11 @@ export default (app: Router) => {
         last_running_time: Joi.number().optional().allow(null),
         last_execution_time: Joi.number().optional().allow(null),
         exit_code: Joi.number().optional().allow(null),
+        execution_id: Joi.string()
+          .pattern(
+            /^legacy-system:[1-9][0-9]{0,12}:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+          )
+          .optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -483,7 +489,11 @@ export default (app: Router) => {
         instanceId: Joi.number().required(),
       }),
     }),
-    async (req: Request<{ id: number; instanceId: number }>, res: Response, next: NextFunction) => {
+    async (
+      req: Request<{ id: number; instanceId: number }>,
+      res: Response,
+      next: NextFunction,
+    ) => {
       try {
         const cronService = Container.get(CronService);
         const data = await cronService.stopInstance(req.params.instanceId);

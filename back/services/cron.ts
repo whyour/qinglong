@@ -40,6 +40,10 @@ import {
   createLegacyTaskRevision,
 } from '../runtime/compatibility/legacyTaskRevision';
 import {
+  decorateScheduledSystemCronCommand,
+  observeLegacyScheduledSystemExecution,
+} from '../runtime/compatibility/legacyScheduledSystemExecution';
+import {
   selectManualPrimaryExecutionRouter,
   stopManualPrimaryAttempt,
   stopManualPrimaryCron,
@@ -233,6 +237,7 @@ export default class CronService {
     last_running_time = 0,
     last_execution_time = 0,
     exit_code,
+    execution_id,
   }: {
     ids: number[];
     status: CrontabStatus;
@@ -241,6 +246,7 @@ export default class CronService {
     last_running_time: number;
     last_execution_time: number;
     exit_code?: number;
+    execution_id?: string;
   }) {
     let options: any = {
       status,
@@ -261,14 +267,26 @@ export default class CronService {
         continue;
       }
       if (status === CrontabStatus.running || status === CrontabStatus.idle) {
-        observeLegacyExecutionCallback({
-          legacyCronId: id,
-          ...(pid ? { pid } : {}),
-          ...(log_path ? { logPath: log_path } : {}),
-          atMs: Date.now(),
-          phase: status === CrontabStatus.running ? 'running' : 'finished',
-          ...(exit_code === undefined ? {} : { exitCode: exit_code }),
-        });
+        const observedAtMs = Date.now();
+        if (execution_id) {
+          observeLegacyScheduledSystemExecution(cron, {
+            executionId: execution_id,
+            ...(pid ? { pid } : {}),
+            ...(log_path ? { logPath: log_path } : {}),
+            observedAtMs,
+            phase: status === CrontabStatus.running ? 'running' : 'finished',
+            ...(exit_code === undefined ? {} : { exitCode: exit_code }),
+          });
+        } else {
+          observeLegacyExecutionCallback({
+            legacyCronId: id,
+            ...(pid ? { pid } : {}),
+            ...(log_path ? { logPath: log_path } : {}),
+            atMs: observedAtMs,
+            phase: status === CrontabStatus.running ? 'running' : 'finished',
+            ...(exit_code === undefined ? {} : { exitCode: exit_code }),
+          });
+        }
       }
       if (status === CrontabStatus.idle && log_path !== cron.log_path) {
         options = omit(options, ['status', 'log_path', 'pid']);
@@ -1046,6 +1064,7 @@ export default class CronService {
 
   private async setCrontab(data?: { data: Crontab[]; total: number }) {
     const tabs = data ?? (await this.crontabs());
+    const systemScheduler = this.schedulerMode === 'system';
     var crontab_string = '';
     tabs.data.forEach((tab) => {
       if (
@@ -1056,19 +1075,25 @@ export default class CronService {
         crontab_string += '# ';
         crontab_string += tab.schedule;
         crontab_string += ' ';
-        crontab_string += this.makeCommand(tab);
+        crontab_string += decorateScheduledSystemCronCommand(
+          this.makeCommand(tab),
+          systemScheduler,
+        );
         crontab_string += '\n';
       } else {
         crontab_string += tab.schedule;
         crontab_string += ' ';
-        crontab_string += this.makeCommand(tab);
+        crontab_string += decorateScheduledSystemCronCommand(
+          this.makeCommand(tab),
+          systemScheduler,
+        );
         crontab_string += '\n';
       }
     });
 
     await writeFileWithLock(config.crontabFile, crontab_string);
 
-    if (this.schedulerMode === 'system') {
+    if (systemScheduler) {
       try {
         execSync(`crontab ${config.crontabFile}`);
       } catch (error: any) {
