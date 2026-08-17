@@ -11,6 +11,28 @@
 
 最新增量证据（2026-08-18）：
 
+- D-346/ADR-0438（已接受；首份真实公开收据待实际 release tag）：Cluster/All 发布不再只通过 GitHub `needs` 保存“两个私有 evidence job
+  成功”的瞬时调度事实。Worker management 与 CloudNativePG DR 私有 runner 在 source-aware gate 成功后，各自产生一个
+  `qinglong/private-release-evidence-receipt@v1`：只投影 exact version/source tag/revision/scope、evidence kind、24 小时 freshness、
+  原报告 SHA-256、可选静态审计摘要和自身 digest，显式禁止原始报告、路径、credential、token、Kubernetes object 与 transcript 发布，并声明
+  公开消费者不能在缺少私有报告时重放现场结果。两个 1 天 artifact 均绑定同一 `run_id/run_attempt`，只作为跨 job 交接；长期 authority 升为
+  `qinglong/release-set@v2`，其 digest 对完整收据对象做闭包。Local 必须零收据且不运行私有 evidence job；Cluster/All 必须按固定顺序恰好包含
+  Worker 与 DR 两份同 identity 收据，缺失、重复、额外 kind、source/scope/freshness/static audit/self-digest 漂移均在 tag promotion 前失败关闭。
+  OCI artifact/file media type同步升为 `application/vnd.qinglong.release-set.v2+json`，不在 v1 下偷换语义。Barman/cert-manager 静态 lock 继续
+  保持 `releaseReady=false`：它们只证明供应链选择，某次发布的现场 ready 结论由 freshness-bound 收据链给出。实现不新增 package、生产依赖、
+  数据库、migration、Pod、controller、listener、timer、设备工具或稳态资源；低配设备仍只消费可信工作站生成的 Local selection 与 immutable
+  image。定向 receipt/release-set/catalog/部署锁/workflow 契约 134/134；完整 backend 1,362 项为 1,360 pass/2 条件 skip/0 fail，
+  18-package clean build/test 退出 0。12 项 package boundary、Cluster dependency、Edge import、Cluster/Worker/CloudNativePG 部署、backup、
+  Barman/cert-manager selection、image release、deployment-lock surface 与 release-version 审计全部 compatible；package boundary 保持
+  18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`。14 档 Local artifact 全部 compatible 且与 D-345 字节基线完全一致：默认
+  Edge/Standalone 为 2,589,890/2,589,968 bytes，adopted 为 2,809,185/2,809,308 bytes，application 为
+  3,632,769/3,632,889 bytes，application-api 为 3,800,322/3,800,466 bytes，AI 为 3,069,143/3,069,233 bytes，
+  application+AI 为 4,493,043/4,493,175 bytes，MCP 为 7,315,930/7,316,038 bytes。阶段完整性 PostgreSQL HA 在 Docker Engine
+  恢复后以 18.6/arm64 重跑 142/142 gates、timeline `1→2`，独立 evidence audit compatible，mode-0600 报告 SHA-256 为
+  `1e7c31cc6c7aa3e1e0398eb51696b6054850d5fc25910a08d6faffc9a75f1c6f`，container/network/volume 残留为 0。以上证明实现、
+  失败关闭与本地/HA 回归边界；第一份线上公开收据及其 catalog 闭包仍只能由实际受保护 `v3` release tag dispatch 产生，不能由单测、
+  workflow 静态审计或本地 fixture 冒充。
+
 - D-345/ADR-0437（已接受；首份真实公开 catalog evidence 待实际 release tag）：Local 发布不再只依赖 image publisher 在完整
   release-set/catalog 形成前直接掌握 digest 的 Compose rollout。`release-set` 成功后新增只读
   `release-catalog-local-deployment-live`，仅在 `local|all` scope 运行；它从公开 discovery ref 独立消费 immutable catalog，重建并审计

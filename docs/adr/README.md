@@ -441,6 +441,7 @@
 | [ADR-0435](./ADR-0435-uid-resource-version-fenced-kubernetes-resource-retirement.md)              | UID/resourceVersion 围栏的 Kubernetes 资源退役 Ceremony                                                                                                              | Accepted |
 | [ADR-0436](./ADR-0436-post-publication-catalog-bound-kubernetes-release-gate.md)                    | 发布后 Catalog-bound Kubernetes Release Gate                                                                                                                          | Accepted（首份真实公开 catalog evidence 待实际 release tag） |
 | [ADR-0437](./ADR-0437-post-publication-catalog-bound-local-release-gate.md)                         | 发布后 Catalog-bound Local Release Gate                                                                                                                               | Accepted（首份真实公开 catalog evidence 待实际 release tag） |
+| [ADR-0438](./ADR-0438-content-free-private-release-evidence-receipt-chain.md)                       | 内容无关的私有发布证据收据链                                                                                                                                            | Accepted（首份真实公开收据待实际 release tag） |
 
 ## 规则
 

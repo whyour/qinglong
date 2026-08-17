@@ -42,6 +42,9 @@ const {
   catalogLockedArtifacts,
   deploymentArtifacts,
 } = require('../../scripts/ql3-kubernetes-deployment-live-contract.cjs');
+const {
+  privateReleaseEvidenceReceipts,
+} = require('./ql3ReleaseEvidenceFixture.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const version = readReleaseIdentity(root).version;
@@ -97,6 +100,7 @@ function releaseSet(scope) {
     root,
     candidate,
     records,
+    evidenceReceipts: privateReleaseEvidenceReceipts(candidate.release),
     ...identity,
     releaseScope: scope,
   });

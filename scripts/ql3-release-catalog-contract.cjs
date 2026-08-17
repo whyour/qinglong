@@ -12,7 +12,7 @@ const {
 
 const CATALOG_PLAN_SCHEMA = 'qinglong/release-catalog-plan@v1';
 const CATALOG_RECEIPT_SCHEMA = 'qinglong/release-catalog-receipt@v1';
-const ARTIFACT_TYPE = 'application/vnd.qinglong.release-set.v1+json';
+const ARTIFACT_TYPE = 'application/vnd.qinglong.release-set.v2+json';
 const FILE_MEDIA_TYPE = ARTIFACT_TYPE;
 const OCI_MANIFEST_MEDIA_TYPE = 'application/vnd.oci.image.manifest.v1+json';
 const OCI_EMPTY_CONFIG_MEDIA_TYPE = 'application/vnd.oci.empty.v1+json';

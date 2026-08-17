@@ -13,6 +13,17 @@ ghcr.io/<owner>/qinglong3-release-catalog:v<version>-<scope>
 `ghcr.io/<owner>/qinglong3-release-catalog@sha256:<manifest-digest>`，验证这个 immutable reference 后，再从 JSON 的
 `images[].reference` 读取完整 `ghcr.io/<owner>/<repository>@sha256:<digest>`。
 
+## 私有发布证据收据链
+
+当前长期 authority 是 `qinglong/release-set@v2`。`local` scope 的 `evidenceReceipts` 必须为空；`cluster|all` 必须按顺序恰好包含
+`worker-management` 与 `cloudnativepg-disaster-recovery` 两份 `qinglong/private-release-evidence-receipt@v1`。每份收据绑定同一
+version/source tag/revision/scope、24 小时 freshness、私有报告 digest 和自身 digest；DR 收据还绑定 CloudNativePG backup、Barman Cloud 与
+cert-manager 三项静态审计摘要。
+
+这些收据不包含原始生产报告、路径、credential、token、Kubernetes object 或 transcript。公开 consumer 可以重算收据和 release-set digest，
+但必须保持 `publicConsumerReplay=not_possible_without_private_reports`；它不能声称重放了私有现场结果。原始报告不上传，只有收据以 1 天 artifact
+从私有 job 交给 release-set job，随后完整嵌入 release-set v2 并由 durable catalog 长期保护。
+
 ## 发布流水线内置 Local 与 Cluster 下游门
 
 `local|all` scope 在 durable catalog 发布后启动独立 `release-catalog-local-deployment-live`。它与 publisher 权限隔离，从公开 catalog
@@ -393,12 +404,14 @@ SHA-256，`receipt.expectedDigest` 是 receipt 内的 `receiptDigest`。审计�
 1. 只接受已验证 Cosign exact workflow identity 与 GitHub source tag/revision provenance 的 catalog immutable
    reference；discovery tag 无 authority。
 2. materializer 只能接受完整 `qinglong/release-catalog-consumption-ceremony@v1` bundle，不能接受旧的松散 `--release-set`；其中
-   `qinglong/release-set@v1` 的 `release.version`、`release.sourceRef`、`release.sourceRevision`、`release.scope` 必须与变更单一致。
+   `qinglong/release-set@v2` 的 `release.version`、`release.sourceRef`、`release.sourceRevision`、`release.scope` 必须与变更单一致。
 3. 镜像集合必须与上表精确相等；每个 `reference` 必须是 digest reference，且 owner/repository 与部署目标一致。
-4. Kubernetes 必须先渲染 overlay，再用离线 post-render materializer 生成和复验 v2 locked manifest；嵌套 overlay 的
+4. Local scope 必须为零私有收据；Cluster/All 必须精确包含两份同 source、同 scope、自摘要有效且 freshness 闭合的 content-free 收据。
+   static lock compatible 不等于现场证据已公开重放，任何 consumer 都必须保留该限制。
+5. Kubernetes 必须先渲染 overlay，再用离线 post-render materializer 生成和复验 v2 locked manifest；嵌套 overlay 的
    `newName`/digest 不是最终 authority。Local 必须生成并审计 v2 service selection。两族输出都必须绑定同一 catalog manifest、
    consumption report 与 release-set digest，并且只能消费 release set 中的 `@sha256:` reference。
-5. rollout 前再次确认 catalog receipt/immutable reference 与已检查文件一致。Kubernetes 必须把 locked manifest/report、pinned
+6. rollout 前再次确认 catalog receipt/immutable reference 与已检查文件一致。Kubernetes 必须把 locked manifest/report、pinned
    kubectl/kubeconfig 和目标 cluster UID 绑定进 preflight/apply receipt；version/source/catalog tag 都只能用于发现，部署始终以
    release set 中的镜像 digest 为准。
 

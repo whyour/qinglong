@@ -92,6 +92,7 @@ jobs:
       - name: Re-audit commit-scoped private production evidence
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
         run: |
           set -euo pipefail
           umask 077
@@ -116,6 +117,40 @@ jobs:
             --ca-rollover-report="${evidence_dir}/worker-management-ca-rollover.json" \
             --source-commit="${GITHUB_SHA}" \
             --release-version="${RELEASE_VERSION}"
+          receipt_root="${RUNNER_TEMP}/ql3-private-release-evidence-receipts"
+          install -d -m 0700 "${receipt_root}"
+          receipt="${receipt_root}/worker-management.json"
+          node scripts/ql3-private-release-evidence-receipt-contract.cjs \
+            --mode=worker-create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --report="${evidence_dir}/worker-management-release-evidence.json" \
+            --ceremony-report="${evidence_dir}/worker-management-ceremony.json" \
+            --durable-audit-report="${evidence_dir}/worker-management-durable-audit.json" \
+            --pki-rotation-report="${evidence_dir}/worker-management-pki-rotation-v2.json" \
+            --ca-rollover-report="${evidence_dir}/worker-management-ca-rollover.json" \
+            --output="${receipt}" > /dev/null
+          node scripts/ql3-private-release-evidence-receipt-contract.cjs \
+            --mode=audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --evidence-kind=worker-management \
+            --receipt="${receipt}" > /dev/null
+
+      - name: Upload only the content-free Worker evidence receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-private-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-worker-management
+          path: ${{ runner.temp }}/ql3-private-release-evidence-receipts/worker-management.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
 
   cluster-dr-release-evidence:
     name: Audit private CloudNativePG disaster-recovery evidence
@@ -138,6 +173,7 @@ jobs:
       - name: Re-audit commit-scoped private disaster-recovery evidence
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
         run: |
           set -euo pipefail
           umask 077
@@ -162,6 +198,36 @@ jobs:
             --report="${report}" \
             --source-commit="${GITHUB_SHA}" \
             --release-version="${RELEASE_VERSION}"
+          receipt_root="${RUNNER_TEMP}/ql3-private-release-evidence-receipts"
+          install -d -m 0700 "${receipt_root}"
+          receipt="${receipt_root}/cloudnativepg-disaster-recovery.json"
+          node scripts/ql3-private-release-evidence-receipt-contract.cjs \
+            --mode=dr-create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --report="${report}" \
+            --output="${receipt}" > /dev/null
+          node scripts/ql3-private-release-evidence-receipt-contract.cjs \
+            --mode=audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --evidence-kind=cloudnativepg-disaster-recovery \
+            --receipt="${receipt}" > /dev/null
+
+      - name: Upload only the content-free disaster-recovery evidence receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-private-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-cloudnativepg-disaster-recovery
+          path: ${{ runner.temp }}/ql3-private-release-evidence-receipts/cloudnativepg-disaster-recovery.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
 
   os-vulnerability:
     name: Scan ${{ matrix.image }} OS packages on ${{ matrix.image_arch }}
@@ -610,11 +676,20 @@ jobs:
     name: Close and publish the complete deployment release set
     needs:
       - release-candidate
+      - worker-management-release-evidence
+      - cluster-dr-release-evidence
       - publish
     if: >-
       always() &&
       needs.release-candidate.result == 'success' &&
-      needs.publish.result == 'success'
+      needs.publish.result == 'success' &&
+      (
+        needs.release-candidate.outputs.cluster-evidence-required != 'true' ||
+        (
+          needs.worker-management-release-evidence.result == 'success' &&
+          needs.cluster-dr-release-evidence.result == 'success'
+        )
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -639,6 +714,14 @@ jobs:
           path: ${{ runner.temp }}/release-records
           merge-multiple: true
 
+      - name: Download the same-run content-free private evidence receipts
+        if: needs.release-candidate.outputs.cluster-evidence-required == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ql3-private-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/private-release-evidence-receipts
+          merge-multiple: true
+
       - name: Aggregate and independently audit the complete release set
         id: release-set
         env:
@@ -650,7 +733,9 @@ jobs:
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           source_repository="${GITHUB_REPOSITORY,,}"
           candidate="${RUNNER_TEMP}/release-set-candidate.json"
+          evidence_receipts="${RUNNER_TEMP}/private-release-evidence-receipts"
           bundle="${RUNNER_TEMP}/release-catalog-bundle"
+          install -d -m 0700 "${evidence_receipts}"
           mkdir "${bundle}"
           report="${bundle}/qinglong3-release-set-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
           plan="${bundle}/qinglong3-release-catalog-plan-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
@@ -670,6 +755,7 @@ jobs:
             --repository-owner="${owner}" \
             --candidate="${candidate}" \
             --records="${RUNNER_TEMP}/release-records" \
+            --evidence-receipts="${evidence_receipts}" \
             --output="${report}"
           node scripts/ql3-release-set-contract.cjs \
             --mode=audit \
@@ -680,6 +766,7 @@ jobs:
             --repository-owner="${owner}" \
             --candidate="${candidate}" \
             --records="${RUNNER_TEMP}/release-records" \
+            --evidence-receipts="${evidence_receipts}" \
             --report="${report}" > "${RUNNER_TEMP}/release-set-audit.json"
           node scripts/ql3-release-set-contract.cjs \
             --mode=inspect \

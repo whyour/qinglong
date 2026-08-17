@@ -12,11 +12,15 @@ const {
   SCHEMA: RELEASE_CANDIDATE_SCHEMA,
   auditReleaseCandidateContract,
 } = require('./ql3-release-candidate-contract.cjs');
+const {
+  EVIDENCE_KINDS,
+  inspectPrivateReleaseEvidenceReceipt,
+} = require('./ql3-private-release-evidence-receipt-contract.cjs');
 const { VERSION_PATTERN } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 const IMAGE_RECORD_SCHEMA = 'qinglong/release-set-image-record@v1';
-const RELEASE_SET_SCHEMA = 'qinglong/release-set@v1';
+const RELEASE_SET_SCHEMA = 'qinglong/release-set@v2';
 const MAX_JSON_BYTES = 1024 * 1024;
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const OWNER_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/u;
@@ -237,9 +241,48 @@ function deploymentFamily(candidate, family, imageNames) {
   });
 }
 
+function expectedEvidenceKinds(releaseScope) {
+  return releaseScope === 'local' ? [] : [...EVIDENCE_KINDS];
+}
+
+function validateEvidenceReceipts(receipts, candidate) {
+  if (!Array.isArray(receipts)) {
+    fail('private release evidence receipts must be an array');
+  }
+  const expectedKinds = expectedEvidenceKinds(candidate.release.scope);
+  if (receipts.length !== expectedKinds.length) {
+    fail('private release evidence receipt count differs from release scope');
+  }
+  const receiptsByKind = new Map();
+  for (const receipt of receipts) {
+    const evidenceKind = receipt?.evidenceKind;
+    if (
+      !expectedKinds.includes(evidenceKind) ||
+      receiptsByKind.has(evidenceKind)
+    ) {
+      fail('private release evidence receipts must be exact and unique');
+    }
+    inspectPrivateReleaseEvidenceReceipt(receipt, {
+      version: candidate.release.version,
+      sourceRevision: candidate.release.sourceRevision,
+      sourceRef: candidate.release.sourceRef,
+      releaseScope: candidate.release.scope,
+      evidenceKind,
+    });
+    receiptsByKind.set(evidenceKind, receipt);
+  }
+  return Object.freeze(
+    expectedKinds.map((evidenceKind) => receiptsByKind.get(evidenceKind)),
+  );
+}
+
 function createReleaseSet(options) {
   const candidate = verifyCandidate(options.candidate, options);
   const repositoryOwner = normalizeRepositoryOwner(options.repositoryOwner);
+  const evidenceReceipts = validateEvidenceReceipts(
+    options.evidenceReceipts,
+    candidate,
+  );
   if (!Array.isArray(options.records)) fail('image records must be an array');
   if (options.records.length !== candidate.images.length) {
     fail('image record count differs from the release candidate');
@@ -281,6 +324,7 @@ function createReleaseSet(options) {
       local: deploymentFamily(candidate, 'local', localImages),
       cluster: deploymentFamily(candidate, 'cluster', clusterImages),
     },
+    evidenceReceipts,
     images,
     promotion: {
       authority: 'complete_verified_release_set',
@@ -292,6 +336,9 @@ function createReleaseSet(options) {
     requiredVerification: {
       imageKeylessSignature: true,
       imageAttestations: [...REQUIRED_IMAGE_ATTESTATIONS],
+      privateReleaseEvidenceReceipts: expectedEvidenceKinds(
+        candidate.release.scope,
+      ),
       releaseSetBuildProvenance: true,
     },
   };
@@ -313,6 +360,9 @@ function auditReleaseSet(actual, options) {
     imageCount: actual.images.length,
     images: Object.freeze(actual.images.map((entry) => entry.name)),
     references: Object.freeze(actual.images.map((entry) => entry.reference)),
+    evidenceReceiptDigests: Object.freeze(
+      actual.evidenceReceipts.map((entry) => entry.receiptDigest),
+    ),
     tagPromotionAuthority: actual.promotion.authority,
   });
 }
@@ -337,6 +387,7 @@ function inspectReleaseSet(actual, options) {
       'repositoryOwner',
       'platforms',
       'deploymentFamilies',
+      'evidenceReceipts',
       'images',
       'promotion',
       'requiredVerification',
@@ -361,6 +412,7 @@ function inspectReleaseSet(actual, options) {
     JSON.stringify(actual.platforms) !==
       JSON.stringify(['linux/amd64', 'linux/arm64']) ||
     !exactKeys(actual.deploymentFamilies, ['local', 'cluster']) ||
+    !Array.isArray(actual.evidenceReceipts) ||
     !Array.isArray(actual.images) ||
     !exactKeys(actual.promotion, [
       'authority',
@@ -380,12 +432,16 @@ function inspectReleaseSet(actual, options) {
     !exactKeys(actual.requiredVerification, [
       'imageKeylessSignature',
       'imageAttestations',
+      'privateReleaseEvidenceReceipts',
       'releaseSetBuildProvenance',
     ]) ||
     JSON.stringify(actual.requiredVerification) !==
       JSON.stringify({
         imageKeylessSignature: true,
         imageAttestations: [...REQUIRED_IMAGE_ATTESTATIONS],
+        privateReleaseEvidenceReceipts: expectedEvidenceKinds(
+          options.releaseScope,
+        ),
         releaseSetBuildProvenance: true,
       })
   ) {
@@ -448,6 +504,20 @@ function inspectReleaseSet(actual, options) {
   ) {
     fail('standalone release set deployment families are invalid');
   }
+  const expectedReceiptKinds = expectedEvidenceKinds(options.releaseScope);
+  if (actual.evidenceReceipts.length !== expectedReceiptKinds.length) {
+    fail('standalone release set evidence receipt count is invalid');
+  }
+  for (let index = 0; index < expectedReceiptKinds.length; index += 1) {
+    const evidenceKind = expectedReceiptKinds[index];
+    inspectPrivateReleaseEvidenceReceipt(actual.evidenceReceipts[index], {
+      version: options.version,
+      sourceRevision: options.sourceRevision,
+      sourceRef: options.sourceRef,
+      releaseScope: options.releaseScope,
+      evidenceKind,
+    });
+  }
   const { releaseSetDigest, ...unsigned } = actual;
   if (
     !DIGEST_PATTERN.test(releaseSetDigest || '') ||
@@ -462,8 +532,12 @@ function inspectReleaseSet(actual, options) {
     imageCount: actual.images.length,
     images: Object.freeze([...expectedNames]),
     references: Object.freeze(actual.images.map((entry) => entry.reference)),
+    evidenceReceiptDigests: Object.freeze(
+      actual.evidenceReceipts.map((entry) => entry.receiptDigest),
+    ),
     verification: 'standalone_structure_identity_and_self_digest',
     sourceRecordsReplayed: false,
+    privateEvidenceReplayed: false,
   });
 }
 
@@ -492,6 +566,33 @@ function readRecordDirectory(directoryPath, candidate) {
   );
 }
 
+function readEvidenceReceiptDirectory(directoryPath, candidate) {
+  const resolved = resolveCanonicalAbsolute(
+    directoryPath,
+    'private evidence receipts',
+  );
+  const stat = fs.lstatSync(resolved);
+  if (
+    !stat.isDirectory() ||
+    stat.isSymbolicLink() ||
+    fs.realpathSync(resolved) !== resolved
+  ) {
+    fail('private evidence receipts must be one canonical directory');
+  }
+  const expectedNames = expectedEvidenceKinds(candidate.release.scope).map(
+    (kind) => `${kind}.json`,
+  );
+  const actualNames = fs.readdirSync(resolved).sort();
+  if (
+    JSON.stringify(actualNames) !== JSON.stringify([...expectedNames].sort())
+  ) {
+    fail('private evidence receipt directory differs from release scope');
+  }
+  return expectedNames.map((name) =>
+    readCanonicalJson(path.join(resolved, name), 'private evidence receipt'),
+  );
+}
+
 function parseArguments(argv) {
   const values = {};
   for (const argument of argv) {
@@ -513,9 +614,9 @@ function parseArguments(argv) {
     values.mode === 'record-image'
       ? [...common, 'digest', 'image', 'output']
       : values.mode === 'aggregate'
-      ? [...common, 'output', 'records']
+      ? [...common, 'evidence-receipts', 'output', 'records']
       : values.mode === 'audit'
-      ? [...common, 'records', 'report']
+      ? [...common, 'evidence-receipts', 'records', 'report']
       : values.mode === 'inspect'
       ? [...identity, 'report']
       : [];
@@ -537,6 +638,9 @@ function parseArguments(argv) {
     ...(values.image ? { image: values.image } : {}),
     ...(values.digest ? { digest: values.digest } : {}),
     ...(values.records ? { records: values.records } : {}),
+    ...(values['evidence-receipts']
+      ? { evidenceReceipts: values['evidence-receipts'] }
+      : {}),
     ...(values.output ? { output: values.output } : {}),
     ...(values.report ? { report: values.report } : {}),
   });
@@ -558,11 +662,16 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
     return record;
   }
   const records = readRecordDirectory(options.records, candidate);
+  const evidenceReceipts = readEvidenceReceiptDirectory(
+    options.evidenceReceipts,
+    candidate,
+  );
   if (options.mode === 'aggregate') {
     const releaseSet = createReleaseSet({
       ...options,
       candidate,
       records,
+      evidenceReceipts,
       root,
     });
     writeNoReplace(options.output, releaseSet);
@@ -574,6 +683,7 @@ function runCli(argv, root = DEFAULT_ROOT, output = process.stdout) {
     ...options,
     candidate,
     records,
+    evidenceReceipts,
     root,
   });
   output.write(canonicalJson(audit));

@@ -54,13 +54,15 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         sourceAware: true,
         privateEphemeralRunner: true,
         maximumAgeSeconds: 86400,
-        artifactUpload: false,
+        privateReportUpload: false,
+        contentFreeReceiptPublished: true,
       },
       cloudNativePgDisasterRecoveryEvidence: {
         sourceAware: true,
         privateEphemeralRunner: true,
         maximumAgeSeconds: 86400,
-        artifactUpload: false,
+        privateReportUpload: false,
+        contentFreeReceiptPublished: true,
         staticLocksReaudited: true,
       },
       osVulnerabilityScan: {
@@ -96,6 +98,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       releaseSet: {
         sourceDerived: true,
         sameRunRecords: true,
+        sameRunPrivateEvidenceReceipts: true,
         exactScopeClosure: true,
         standaloneInspection: true,
         tagPromotionAuthority: 'complete_verified_release_set',
@@ -105,7 +108,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       },
       durableCatalog: {
         repository: 'qinglong3-release-catalog',
-        artifactType: 'application/vnd.qinglong.release-set.v1+json',
+        artifactType: 'application/vnd.qinglong.release-set.v2+json',
         basenameOnly: true,
         crossRunnerDeterministic: true,
         byteExactRoundTrip: true,
@@ -172,6 +175,17 @@ test('rejects removal of the durable release-catalog contract tests', () => {
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
     /durable catalog, deployment-lock and workflow negative tests/,
+  );
+});
+
+test('rejects removal of the private release evidence receipt contract tests', () => {
+  const mutated = ciSource.replace(
+    'test/back/ql3PrivateReleaseEvidenceReceiptContract.test.cjs',
+    'test/back/private-receipt-tests-removed.test.cjs',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /private evidence receipt/,
   );
 });
 
@@ -470,14 +484,14 @@ test('rejects a reusable private evidence runner', () => {
   );
 });
 
-test('rejects private evidence uploaded as a workflow artifact', () => {
+test('rejects private report content uploaded instead of its digest-only receipt', () => {
   const mutated = releaseSource.replace(
-    '      - name: Re-audit commit-scoped private production evidence',
-    '      - uses: actions/upload-artifact@v4\n      - name: Re-audit commit-scoped private production evidence',
+    'path: ${{ runner.temp }}/ql3-private-release-evidence-receipts/worker-management.json',
+    'path: /run/qinglong3-release-evidence/${{ github.sha }}/worker-management-release-evidence.json',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /only the reviewed|never persist private evidence/,
+    /content-free receipt and upload steps/,
   );
 });
 
@@ -655,8 +669,8 @@ test('rejects scanning a daemon tag instead of the exact OCI tar', () => {
 
 test('rejects retaining scanned native release artifacts for more than one day', () => {
   const mutated = releaseSource.replace(
-    '          retention-days: 1',
-    '          retention-days: 2',
+    'name: ql3-release-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.image }}-${{ matrix.image_arch }}\n          path: ${{ runner.temp }}/ql3-native\n          if-no-files-found: error\n          retention-days: 1',
+    'name: ql3-release-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.image }}-${{ matrix.image_arch }}\n          path: ${{ runner.temp }}/ql3-native\n          if-no-files-found: error\n          retention-days: 2',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
@@ -666,8 +680,8 @@ test('rejects retaining scanned native release artifacts for more than one day',
 
 test('rejects overwrite authority on a scanned native artifact', () => {
   const mutated = releaseSource.replace(
-    '          overwrite: false',
-    '          overwrite: true',
+    'path: ${{ runner.temp }}/ql3-native\n          if-no-files-found: error\n          retention-days: 1\n          compression-level: 0\n          overwrite: false',
+    'path: ${{ runner.temp }}/ql3-native\n          if-no-files-found: error\n          retention-days: 1\n          compression-level: 0\n          overwrite: true',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
@@ -676,10 +690,16 @@ test('rejects overwrite authority on a scanned native artifact', () => {
 });
 
 test('rejects a movable upload-artifact action', () => {
-  const mutated = releaseSource.replace(
-    'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1',
-    'actions/upload-artifact@v7.0.1',
-  );
+  const marker =
+    '      - name: Upload the scanned immutable native OCI artifact';
+  const offset = releaseSource.indexOf(marker);
+  assert.notEqual(offset, -1);
+  const mutated = `${releaseSource.slice(0, offset)}${releaseSource
+    .slice(offset)
+    .replace(
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1',
+      'actions/upload-artifact@v7.0.1',
+    )}`;
   assert.throws(
     () => auditReleaseWorkflow(mutated),
     /upload only bound immutable evidence/,
@@ -862,6 +882,34 @@ test('rejects release-set closure before every image publisher succeeds', () => 
     "      needs.publish.result != 'success'",
   );
   assert.throws(() => auditReleaseWorkflow(mutated), /complete publish matrix/);
+});
+
+test('rejects release-set closure detached from same-run private evidence receipts', () => {
+  const mutated = releaseSource.replace(
+    'ql3-private-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-*',
+    'ql3-private-release-evidence-${{ github.run_id }}-*',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release-set job must download only same-run records/,
+  );
+});
+
+test('rejects release-set aggregation that ignores private evidence receipts', () => {
+  const marker =
+    '      - name: Aggregate and independently audit the complete release set';
+  const offset = releaseSource.indexOf(marker);
+  assert.notEqual(offset, -1);
+  const mutated = `${releaseSource.slice(0, offset)}${releaseSource
+    .slice(offset)
+    .replace(
+      '            --evidence-receipts="${evidence_receipts}" \\',
+      '            --evidence-receipts="${RUNNER_TEMP}/empty" \\',
+    )}`;
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release-set job must download only same-run records/,
+  );
 });
 
 test('rejects image records detached from the same workflow attempt', () => {

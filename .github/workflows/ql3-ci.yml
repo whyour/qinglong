@@ -300,6 +300,7 @@ jobs:
           test/back/ql3ClusterImageSbom.test.cjs
           test/back/ql3ClusterImageReleaseAudit.test.cjs
           test/back/ql3ReleaseCandidateContract.test.cjs
+          test/back/ql3PrivateReleaseEvidenceReceiptContract.test.cjs
           test/back/ql3ReleaseSetContract.test.cjs
           test/back/ql3ReleaseCatalogContract.test.cjs
           test/back/ql3ReleaseCatalogConsumptionCeremony.test.cjs

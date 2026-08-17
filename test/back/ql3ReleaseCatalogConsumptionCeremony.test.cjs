@@ -19,6 +19,9 @@ const {
 const {
   auditClusterImageCiWorkflow,
 } = require('../../scripts/ql3-cluster-image-release-audit.cjs');
+const {
+  privateReleaseEvidenceReceipts,
+} = require('./ql3ReleaseEvidenceFixture.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = path.join(
@@ -53,6 +56,12 @@ function selectedImages(scope) {
 
 function releaseSet(scope) {
   const selected = selectedImages(scope);
+  const release = {
+    version: VERSION,
+    sourceRevision: REVISION,
+    sourceRef: SOURCE_REF,
+    scope,
+  };
   const images = selected.map(([name, repository], index) => {
     const digest = `sha256:${(index + 1).toString(16).repeat(64)}`;
     const reference = `ghcr.io/${OWNER}/${repository}`;
@@ -70,13 +79,8 @@ function releaseSet(scope) {
   const names = images.map((entry) => entry.name);
   const unsigned = {
     schemaVersion: 1,
-    schema: 'qinglong/release-set@v1',
-    release: {
-      version: VERSION,
-      sourceRevision: REVISION,
-      sourceRef: SOURCE_REF,
-      scope,
-    },
+    schema: 'qinglong/release-set@v2',
+    release,
     candidate: {
       schema: 'qinglong/release-candidate-contract@v1',
       contractDigest: `sha256:${'b'.repeat(64)}`,
@@ -95,6 +99,7 @@ function releaseSet(scope) {
         images: names.filter((name) => name !== 'local'),
       },
     },
+    evidenceReceipts: privateReleaseEvidenceReceipts(release),
     images,
     promotion: {
       authority: 'complete_verified_release_set',
@@ -111,6 +116,10 @@ function releaseSet(scope) {
         'os-vulnerability',
         'release-candidate-contract',
       ],
+      privateReleaseEvidenceReceipts:
+        scope === 'local'
+          ? []
+          : ['worker-management', 'cloudnativepg-disaster-recovery'],
       releaseSetBuildProvenance: true,
     },
   };

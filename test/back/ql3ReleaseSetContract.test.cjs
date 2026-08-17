@@ -19,6 +19,9 @@ const {
 const {
   readReleaseIdentity,
 } = require('../../scripts/lib/ql3-release-identity.cjs');
+const {
+  privateReleaseEvidenceReceipts,
+} = require('./ql3ReleaseEvidenceFixture.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const version = readReleaseIdentity(root).version;
@@ -52,6 +55,10 @@ function recordsFor(releaseCandidate) {
   );
 }
 
+function evidenceFor(releaseCandidate) {
+  return privateReleaseEvidenceReceipts(releaseCandidate.release);
+}
+
 function temporaryDirectory(t) {
   const directory = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-release-set-')),
@@ -71,6 +78,7 @@ test('aggregates the independent Local image into one immutable release set', ()
     root,
     candidate: releaseCandidate,
     records,
+    evidenceReceipts: evidenceFor(releaseCandidate),
     ...identity,
     releaseScope: 'local',
   });
@@ -88,6 +96,7 @@ test('aggregates the independent Local image into one immutable release set', ()
       root,
       candidate: releaseCandidate,
       records,
+      evidenceReceipts: evidenceFor(releaseCandidate),
       ...identity,
       releaseScope: 'local',
     }).compatible,
@@ -101,6 +110,7 @@ test('closes cluster and all scopes over the exact candidate image order', () =>
     root,
     candidate: clusterCandidate,
     records: recordsFor(clusterCandidate).reverse(),
+    evidenceReceipts: evidenceFor(clusterCandidate),
     ...identity,
     releaseScope: 'cluster',
   });
@@ -114,17 +124,67 @@ test('closes cluster and all scopes over the exact candidate image order', () =>
     'admin',
     'worker',
   ]);
+  assert.deepEqual(
+    clusterSet.evidenceReceipts.map((entry) => entry.evidenceKind),
+    ['worker-management', 'cloudnativepg-disaster-recovery'],
+  );
 
   const allCandidate = candidate('all');
   const allSet = createReleaseSet({
     root,
     candidate: allCandidate,
     records: recordsFor(allCandidate),
+    evidenceReceipts: evidenceFor(allCandidate),
     ...identity,
     releaseScope: 'all',
   });
   assert.equal(allSet.images.length, 5);
   assert.deepEqual(allSet.deploymentFamilies.local.images, ['local']);
+});
+
+test('requires exact private evidence receipts only for Cluster-capable scopes', () => {
+  const releaseCandidate = candidate('cluster');
+  const records = recordsFor(releaseCandidate);
+  const receipts = evidenceFor(releaseCandidate);
+  assert.throws(
+    () =>
+      createReleaseSet({
+        root,
+        candidate: releaseCandidate,
+        records,
+        evidenceReceipts: receipts.slice(1),
+        ...identity,
+        releaseScope: 'cluster',
+      }),
+    /receipt count differs/,
+  );
+  const drifted = JSON.parse(JSON.stringify(receipts));
+  drifted[0].release.sourceRevision = 'c'.repeat(40);
+  assert.throws(
+    () =>
+      createReleaseSet({
+        root,
+        candidate: releaseCandidate,
+        records,
+        evidenceReceipts: drifted,
+        ...identity,
+        releaseScope: 'cluster',
+      }),
+    /receipt shape|release binding/,
+  );
+  const localCandidate = candidate('local');
+  assert.throws(
+    () =>
+      createReleaseSet({
+        root,
+        candidate: localCandidate,
+        records: recordsFor(localCandidate),
+        evidenceReceipts: [receipts[0]],
+        ...identity,
+        releaseScope: 'local',
+      }),
+    /receipt count differs/,
+  );
 });
 
 test('rejects missing, duplicate and cross-candidate image evidence', () => {
@@ -136,6 +196,7 @@ test('rejects missing, duplicate and cross-candidate image evidence', () => {
         root,
         candidate: releaseCandidate,
         records: records.slice(1),
+        evidenceReceipts: evidenceFor(releaseCandidate),
         ...identity,
         releaseScope: 'cluster',
       }),
@@ -147,6 +208,7 @@ test('rejects missing, duplicate and cross-candidate image evidence', () => {
         root,
         candidate: releaseCandidate,
         records: [records[0], records[0], records[2], records[3]],
+        evidenceReceipts: evidenceFor(releaseCandidate),
         ...identity,
         releaseScope: 'cluster',
       }),
@@ -160,6 +222,7 @@ test('rejects missing, duplicate and cross-candidate image evidence', () => {
         root,
         candidate: releaseCandidate,
         records: [mutated, ...records.slice(1)],
+        evidenceReceipts: evidenceFor(releaseCandidate),
         ...identity,
         releaseScope: 'cluster',
       }),
@@ -199,6 +262,7 @@ test('rejects mutable identity, malformed owner and post-aggregate drift', () =>
     root,
     candidate: releaseCandidate,
     records,
+    evidenceReceipts: evidenceFor(releaseCandidate),
     ...identity,
     releaseScope: 'local',
   });
@@ -210,6 +274,7 @@ test('rejects mutable identity, malformed owner and post-aggregate drift', () =>
         root,
         candidate: releaseCandidate,
         records,
+        evidenceReceipts: evidenceFor(releaseCandidate),
         ...identity,
         releaseScope: 'local',
       }),
@@ -224,6 +289,7 @@ test('inspects a release set without short-lived candidate or image records', ()
       root,
       candidate: releaseCandidate,
       records: recordsFor(releaseCandidate),
+      evidenceReceipts: evidenceFor(releaseCandidate),
       ...identity,
       releaseScope: scope,
     });
@@ -243,6 +309,7 @@ test('standalone inspection rejects image, family and self-digest drift', () => 
     root,
     candidate: releaseCandidate,
     records: recordsFor(releaseCandidate),
+    evidenceReceipts: evidenceFor(releaseCandidate),
     ...identity,
     releaseScope: 'cluster',
   });
@@ -256,6 +323,9 @@ test('standalone inspection rejects image, family and self-digest drift', () => 
     (value) => {
       value.releaseSetDigest = `sha256:${'0'.repeat(64)}`;
     },
+    (value) => {
+      value.evidenceReceipts[0].receiptDigest = `sha256:${'0'.repeat(64)}`;
+    },
   ]) {
     const drifted = JSON.parse(JSON.stringify(releaseSet));
     mutate(drifted);
@@ -265,7 +335,7 @@ test('standalone inspection rejects image, family and self-digest drift', () => 
           ...identity,
           releaseScope: 'cluster',
         }),
-      /standalone release set/,
+      /standalone release set|receipt digest/,
     );
   }
   assert.throws(
@@ -283,7 +353,9 @@ test('standalone inspection rejects image, family and self-digest drift', () => 
 test('CLI records, aggregates and audits exact no-replace files', (t) => {
   const directory = temporaryDirectory(t);
   const recordsDirectory = path.join(directory, 'records');
+  const evidenceDirectory = path.join(directory, 'evidence');
   fs.mkdirSync(recordsDirectory);
+  fs.mkdirSync(evidenceDirectory);
   const releaseCandidate = candidate('local');
   const candidatePath = path.join(directory, 'candidate.json');
   writeCanonical(candidatePath, releaseCandidate);
@@ -315,6 +387,7 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
       '--mode=aggregate',
       ...common,
       `--records=${recordsDirectory}`,
+      `--evidence-receipts=${evidenceDirectory}`,
       `--output=${setPath}`,
     ],
     root,
@@ -326,6 +399,7 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
         '--mode=audit',
         ...common,
         `--records=${recordsDirectory}`,
+        `--evidence-receipts=${evidenceDirectory}`,
         `--report=${setPath}`,
       ],
       root,
@@ -356,6 +430,7 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
           '--mode=aggregate',
           ...common,
           `--records=${recordsDirectory}`,
+          `--evidence-receipts=${evidenceDirectory}`,
           `--output=${setPath}`,
         ],
         root,
@@ -368,7 +443,9 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
 test('CLI rejects extra records, symlinks and open argument shapes', (t) => {
   const directory = temporaryDirectory(t);
   const recordsDirectory = path.join(directory, 'records');
+  const evidenceDirectory = path.join(directory, 'evidence');
   fs.mkdirSync(recordsDirectory);
+  fs.mkdirSync(evidenceDirectory);
   const releaseCandidate = candidate('local');
   const candidatePath = path.join(directory, 'candidate.json');
   writeCanonical(candidatePath, releaseCandidate);
@@ -392,6 +469,7 @@ test('CLI rejects extra records, symlinks and open argument shapes', (t) => {
           '--mode=aggregate',
           ...common,
           `--records=${recordsDirectory}`,
+          `--evidence-receipts=${evidenceDirectory}`,
           `--output=${path.join(directory, 'set.json')}`,
         ],
         root,
@@ -409,6 +487,7 @@ test('CLI rejects extra records, symlinks and open argument shapes', (t) => {
           '--mode=aggregate',
           ...common,
           `--records=${recordsDirectory}`,
+          `--evidence-receipts=${evidenceDirectory}`,
           `--output=${path.join(directory, 'set.json')}`,
         ],
         root,

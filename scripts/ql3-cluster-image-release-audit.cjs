@@ -274,8 +274,8 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
-    'cluster image CI must run SBOM, candidate, release-set, durable catalog, deployment-lock and workflow negative tests; catalog consumption ceremony is mandatory',
+    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3PrivateReleaseEvidenceReceiptContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
+    'cluster image CI must run SBOM, candidate, private evidence receipt, release-set, durable catalog, deployment-lock and workflow negative tests; catalog consumption ceremony is mandatory',
   );
   requirePattern(
     source,
@@ -537,11 +537,16 @@ function auditReleaseWorkflow(source) {
       publishJob.if,
     ) ||
     JSON.stringify(releaseSetJob?.needs) !==
-      JSON.stringify(['release-candidate', 'publish']) ||
+      JSON.stringify([
+        'release-candidate',
+        'worker-management-release-evidence',
+        'cluster-dr-release-evidence',
+        'publish',
+      ]) ||
     releaseSetJob?.['runs-on'] !== 'ubuntu-24.04' ||
     releaseSetJob?.['timeout-minutes'] !== 20 ||
     typeof releaseSetJob?.if !== 'string' ||
-    !/always\(\)[\s\S]*release-candidate\.result == 'success'[\s\S]*publish\.result == 'success'/.test(
+    !/always\(\)[\s\S]*release-candidate\.result == 'success'[\s\S]*publish\.result == 'success'[\s\S]*cluster-evidence-required != 'true'[\s\S]*worker-management-release-evidence\.result == 'success'[\s\S]*cluster-dr-release-evidence\.result == 'success'/.test(
       releaseSetJob.if,
     )
   ) {
@@ -630,7 +635,7 @@ function auditReleaseWorkflow(source) {
   }
   if (
     !Array.isArray(drEvidenceJob?.steps) ||
-    drEvidenceJob.steps.length !== 3 ||
+    drEvidenceJob.steps.length !== 4 ||
     drEvidenceJob.steps[0]?.uses !==
       'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
     drEvidenceJob.steps[0]?.with?.['persist-credentials'] !== false ||
@@ -640,7 +645,7 @@ function auditReleaseWorkflow(source) {
     typeof drEvidenceJob.steps[2]?.run !== 'string'
   ) {
     throw new Error(
-      'private disaster-recovery evidence job must contain only the reviewed credential-free checkout, Node setup and audit steps',
+      'private disaster-recovery evidence job must contain only the reviewed checkout, audit, content-free receipt and upload steps',
     );
   }
   const publishSteps = publishJob?.steps;
@@ -707,7 +712,7 @@ function auditReleaseWorkflow(source) {
   const releaseSetSteps = releaseSetJob?.steps;
   if (
     !Array.isArray(releaseSetSteps) ||
-    releaseSetSteps.length !== 15 ||
+    releaseSetSteps.length !== 16 ||
     releaseSetSteps[0]?.uses !==
       'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
     releaseSetSteps[0]?.with?.['persist-credentials'] !== false ||
@@ -723,54 +728,65 @@ function auditReleaseWorkflow(source) {
         path: '${{ runner.temp }}/release-records',
         'merge-multiple': true,
       }) ||
-    releaseSetSteps[3]?.id !== 'release-set' ||
-    !/ql3-release-candidate-contract\.cjs[\s\S]*--mode=create[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=aggregate[\s\S]*--records="\$\{RUNNER_TEMP\}\/release-records"[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=audit[\s\S]*--report="\$\{report\}"[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=inspect[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=plan[\s\S]*--source-repository="\$\{source_repository\}"[\s\S]*--release-set="\$\{report\}"[\s\S]*GITHUB_OUTPUT/.test(
-      releaseSetSteps[3]?.run ?? '',
-    ) ||
-    !/v0\.11\.5\/regctl-linux-amd64[\s\S]*c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467[\s\S]*sha256sum --check --strict/.test(
+    releaseSetSteps[3]?.if !==
+      "needs.release-candidate.outputs.cluster-evidence-required == 'true'" ||
+    releaseSetSteps[3]?.uses !==
+      'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' ||
+    JSON.stringify(releaseSetSteps[3]?.with) !==
+      JSON.stringify({
+        pattern:
+          'ql3-private-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-*',
+        path: '${{ runner.temp }}/private-release-evidence-receipts',
+        'merge-multiple': true,
+      }) ||
+    releaseSetSteps[4]?.id !== 'release-set' ||
+    !/evidence_receipts="\$\{RUNNER_TEMP\}\/private-release-evidence-receipts"[\s\S]*install -d -m 0700 "\$\{evidence_receipts\}"[\s\S]*ql3-release-candidate-contract\.cjs[\s\S]*--mode=create[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=aggregate[\s\S]*--records="\$\{RUNNER_TEMP\}\/release-records"[\s\S]*--evidence-receipts="\$\{evidence_receipts\}"[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=audit[\s\S]*--evidence-receipts="\$\{evidence_receipts\}"[\s\S]*--report="\$\{report\}"[\s\S]*ql3-release-set-contract\.cjs[\s\S]*--mode=inspect[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=plan[\s\S]*--source-repository="\$\{source_repository\}"[\s\S]*--release-set="\$\{report\}"[\s\S]*GITHUB_OUTPUT/.test(
       releaseSetSteps[4]?.run ?? '',
     ) ||
-    releaseSetSteps[5]?.uses !==
-      'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6' ||
+    !/v0\.11\.5\/regctl-linux-amd64[\s\S]*c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467[\s\S]*sha256sum --check --strict/.test(
+      releaseSetSteps[5]?.run ?? '',
+    ) ||
     releaseSetSteps[6]?.uses !==
+      'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6' ||
+    releaseSetSteps[7]?.uses !==
       'docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c' ||
     !/for \(const image of report\.images\)[\s\S]*image\.reference[\s\S]*image\.versionTag, image\.sourceTag[\s\S]*release tag already points at another digest[\s\S]*\['image', 'copy', state\.image\.reference, state\.tag\][\s\S]*promoted tag does not resolve to the release-set digest/.test(
-      releaseSetSteps[7]?.run ?? '',
+      releaseSetSteps[8]?.run ?? '',
     ) ||
-    releaseSetSteps[8]?.uses !==
+    releaseSetSteps[9]?.uses !==
       'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
-    JSON.stringify(releaseSetSteps[8]?.with) !==
+    JSON.stringify(releaseSetSteps[9]?.with) !==
       JSON.stringify({
         'subject-path': '${{ steps.release-set.outputs.report }}',
       }) ||
-    releaseSetSteps[9]?.id !== 'catalog' ||
+    releaseSetSteps[10]?.id !== 'catalog' ||
     !/artifact put[\s\S]*--artifact-type "\$\{artifact_type\}"[\s\S]*--file-media-type "\$\{file_media_type\}"[\s\S]*--file "\$\{RELEASE_SET\}"[\s\S]*--file-title[\s\S]*--strip-dirs[\s\S]*dev\.qinglong\.release\.scope[\s\S]*org\.opencontainers\.image\.revision[\s\S]*org\.opencontainers\.image\.source[\s\S]*org\.opencontainers\.image\.version[\s\S]*image digest "\$\{discovery_tag\}"[\s\S]*artifact get --file "\$\{file_name\}" "\$\{immutable_reference\}"[\s\S]*cmp --silent "\$\{RELEASE_SET\}" "\$\{roundtrip\}"[\s\S]*manifest get "\$\{immutable_reference\}" --format raw-body[\s\S]*GITHUB_OUTPUT/.test(
-      releaseSetSteps[9]?.run ?? '',
-    ) ||
-    !/cosign sign --yes "\$\{CATALOG\}@\$\{DIGEST\}"/.test(
       releaseSetSteps[10]?.run ?? '',
     ) ||
-    releaseSetSteps[11]?.uses !==
+    !/cosign sign --yes "\$\{CATALOG\}@\$\{DIGEST\}"/.test(
+      releaseSetSteps[11]?.run ?? '',
+    ) ||
+    releaseSetSteps[12]?.uses !==
       'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
-    JSON.stringify(releaseSetSteps[11]?.with) !==
+    JSON.stringify(releaseSetSteps[12]?.with) !==
       JSON.stringify({
         'subject-name': '${{ steps.catalog.outputs.repository }}',
         'subject-digest': '${{ steps.catalog.outputs.digest }}',
         'push-to-registry': true,
       }) ||
-    releaseSetSteps[12]?.id !== 'catalog-receipt' ||
+    releaseSetSteps[13]?.id !== 'catalog-receipt' ||
     !/cosign verify[\s\S]*--certificate-identity "\$\{certificate_identity\}"[\s\S]*--certificate-oidc-issuer "https:\/\/token\.actions\.githubusercontent\.com"[\s\S]*"\$\{CATALOG\}@\$\{DIGEST\}"[\s\S]*gh attestation verify "oci:\/\/\$\{CATALOG\}@\$\{DIGEST\}"[\s\S]*--source-digest "\$\{GITHUB_SHA\}"[\s\S]*--source-ref "\$\{GITHUB_REF\}"[\s\S]*--deny-self-hosted-runners[\s\S]*--bundle-from-oci[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=receipt[\s\S]*--manifest-digest="\$\{DIGEST\}"[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=audit[\s\S]*GITHUB_OUTPUT/.test(
-      releaseSetSteps[12]?.run ?? '',
+      releaseSetSteps[13]?.run ?? '',
     ) ||
-    releaseSetSteps[13]?.uses !==
+    releaseSetSteps[14]?.uses !==
       'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
-    JSON.stringify(releaseSetSteps[13]?.with) !==
+    JSON.stringify(releaseSetSteps[14]?.with) !==
       JSON.stringify({
         'subject-path': '${{ steps.catalog-receipt.outputs.receipt }}',
       }) ||
-    releaseSetSteps[14]?.uses !==
+    releaseSetSteps[15]?.uses !==
       'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
-    JSON.stringify(releaseSetSteps[14]?.with) !==
+    JSON.stringify(releaseSetSteps[15]?.with) !==
       JSON.stringify({
         name: 'ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}',
         path: '${{ steps.release-set.outputs.bundle }}',
@@ -928,17 +944,50 @@ function auditReleaseWorkflow(source) {
   }
   if (
     !Array.isArray(evidenceJob?.steps) ||
-    evidenceJob.steps.length !== 3 ||
+    evidenceJob.steps.length !== 4 ||
     evidenceJob.steps[0]?.uses !==
       'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
     evidenceJob.steps[0]?.with?.['persist-credentials'] !== false ||
     evidenceJob.steps[1]?.uses !==
       'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38' ||
     evidenceJob.steps[1]?.with?.['node-version'] !== '24.18.0' ||
-    typeof evidenceJob.steps[2]?.run !== 'string'
+    typeof evidenceJob.steps[2]?.run !== 'string' ||
+    evidenceJob.steps[3]?.uses !==
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
+    JSON.stringify(evidenceJob.steps[3]?.with) !==
+      JSON.stringify({
+        name: 'ql3-private-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-worker-management',
+        path: '${{ runner.temp }}/ql3-private-release-evidence-receipts/worker-management.json',
+        'if-no-files-found': 'error',
+        'retention-days': 1,
+        'compression-level': 9,
+        overwrite: false,
+        'include-hidden-files': false,
+      }) ||
+    !Array.isArray(drEvidenceJob?.steps) ||
+    drEvidenceJob.steps.length !== 4 ||
+    drEvidenceJob.steps[0]?.uses !==
+      'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
+    drEvidenceJob.steps[0]?.with?.['persist-credentials'] !== false ||
+    drEvidenceJob.steps[1]?.uses !==
+      'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38' ||
+    drEvidenceJob.steps[1]?.with?.['node-version'] !== '24.18.0' ||
+    typeof drEvidenceJob.steps[2]?.run !== 'string' ||
+    drEvidenceJob.steps[3]?.uses !==
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
+    JSON.stringify(drEvidenceJob.steps[3]?.with) !==
+      JSON.stringify({
+        name: 'ql3-private-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-cloudnativepg-disaster-recovery',
+        path: '${{ runner.temp }}/ql3-private-release-evidence-receipts/cloudnativepg-disaster-recovery.json',
+        'if-no-files-found': 'error',
+        'retention-days': 1,
+        'compression-level': 9,
+        overwrite: false,
+        'include-hidden-files': false,
+      })
   ) {
     throw new Error(
-      'private evidence job must contain only the reviewed credential-free checkout, Node setup and audit steps',
+      'private evidence jobs must contain only reviewed credential-free checkout, audit, content-free receipt and upload steps',
     );
   }
   if (/actions\/cache@/.test(source)) {
@@ -950,6 +999,16 @@ function auditReleaseWorkflow(source) {
     source,
     /GITHUB_REF_TYPE}" != "tag"[\s\S]*GITHUB_REF_NAME}" != "v\$\{RELEASE_VERSION\}"/,
     'private evidence gate must bind dispatch version to the exact tag',
+  );
+  requirePattern(
+    source,
+    /ql3-private-release-evidence-receipt-contract\.cjs[\s\S]*--mode=worker-create[\s\S]*--release-scope="\$\{RELEASE_SCOPE\}"[\s\S]*--output="\$\{receipt\}"[\s\S]*--mode=audit[\s\S]*--evidence-kind=worker-management[\s\S]*--receipt="\$\{receipt\}"/,
+    'Worker evidence job must create and audit only one content-free source-bound receipt',
+  );
+  requirePattern(
+    source,
+    /ql3-private-release-evidence-receipt-contract\.cjs[\s\S]*--mode=dr-create[\s\S]*--release-scope="\$\{RELEASE_SCOPE\}"[\s\S]*--report="\$\{report\}"[\s\S]*--output="\$\{receipt\}"[\s\S]*--mode=audit[\s\S]*--evidence-kind=cloudnativepg-disaster-recovery[\s\S]*--receipt="\$\{receipt\}"/,
+    'disaster-recovery evidence job must create and audit only one content-free source-bound receipt',
   );
   requireExactOccurrences(
     source,
@@ -1199,13 +1258,15 @@ function auditReleaseWorkflow(source) {
       sourceAware: true,
       privateEphemeralRunner: true,
       maximumAgeSeconds: 86400,
-      artifactUpload: false,
+      privateReportUpload: false,
+      contentFreeReceiptPublished: true,
     },
     cloudNativePgDisasterRecoveryEvidence: {
       sourceAware: true,
       privateEphemeralRunner: true,
       maximumAgeSeconds: 86400,
-      artifactUpload: false,
+      privateReportUpload: false,
+      contentFreeReceiptPublished: true,
       staticLocksReaudited: true,
     },
     osVulnerabilityScan: {
@@ -1241,6 +1302,7 @@ function auditReleaseWorkflow(source) {
     releaseSet: {
       sourceDerived: true,
       sameRunRecords: true,
+      sameRunPrivateEvidenceReceipts: true,
       exactScopeClosure: true,
       standaloneInspection: true,
       tagPromotionAuthority: 'complete_verified_release_set',
@@ -1250,7 +1312,7 @@ function auditReleaseWorkflow(source) {
     },
     durableCatalog: {
       repository: 'qinglong3-release-catalog',
-      artifactType: 'application/vnd.qinglong.release-set.v1+json',
+      artifactType: 'application/vnd.qinglong.release-set.v2+json',
       basenameOnly: true,
       crossRunnerDeterministic: true,
       byteExactRoundTrip: true,

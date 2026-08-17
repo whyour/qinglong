@@ -28,6 +28,9 @@ const {
 const {
   readReleaseIdentity,
 } = require('../../scripts/lib/ql3-release-identity.cjs');
+const {
+  privateReleaseEvidenceReceipts,
+} = require('./ql3ReleaseEvidenceFixture.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const version = readReleaseIdentity(root).version;
@@ -65,6 +68,7 @@ function releaseSet(scope) {
     root,
     candidate,
     records,
+    evidenceReceipts: privateReleaseEvidenceReceipts(candidate.release),
     ...identity,
     releaseScope: scope,
   });
