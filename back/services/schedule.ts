@@ -11,6 +11,10 @@ import {
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
+import { createHash } from 'crypto';
+import { observeLegacyExecution } from '../runtime/compatibility/legacyExecutionBridge';
+import { observeLegacyChildProcess } from '../runtime/compatibility/observeLegacyChildProcess';
+import { createLegacyTaskRevision } from '../runtime/compatibility/legacyTaskRevision';
 
 export interface ScheduleTaskType {
   id?: number;
@@ -33,6 +37,14 @@ export interface TaskCallbacks {
   ) => Promise<void>;
   onLog?: (message: string) => Promise<void>;
   onError?: (message: string) => Promise<void>;
+}
+
+function opaqueLegacyTaskId(
+  runOrigin: ScheduleTaskType['runOrigin'],
+  id: string,
+): string {
+  const digest = createHash('sha256').update(id).digest('hex').slice(0, 25);
+  return `legacy-schedule:${runOrigin}:${digest}`;
 }
 
 @Service()
@@ -76,7 +88,26 @@ export default class ScheduleService {
           const startTime = dayjs();
           await callbacks.onBefore?.(startTime);
 
+          const observation = observeLegacyExecution(runOrigin, () => {
+            const taskRevision = createLegacyTaskRevision({
+              command: others.command ?? command,
+              ...(others.schedule === undefined
+                ? {}
+                : { schedule: others.schedule }),
+            });
+            return {
+              origin: runOrigin,
+              projectId: 'default',
+              taskId: opaqueLegacyTaskId(runOrigin, others.id),
+              taskRevision,
+              ...(others.name === undefined ? {} : { taskName: others.name }),
+              triggerType: runOrigin,
+              triggeredBy: 'legacy:schedule-service',
+              acceptedAtMs: Date.now(),
+            };
+          });
           const cp = spawn(command, { shell: '/bin/bash' });
+          if (observation) observeLegacyChildProcess(cp, observation);
 
           callbacks.onStart?.(cp, startTime);
           completionTime === 'start' && resolve(cp.pid);

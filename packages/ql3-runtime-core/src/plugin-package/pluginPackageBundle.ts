@@ -4,6 +4,7 @@ import {
   verify,
   type KeyObject,
 } from 'node:crypto';
+import { TextDecoder } from 'node:util';
 
 import {
   MAX_PLUGIN_PACKAGE_CONTENT_ENTRIES,

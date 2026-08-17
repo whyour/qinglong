@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { TextDecoder } from 'node:util';
 
 import {
   MAX_PLUGIN_PACKAGE_MANIFEST_BYTES,

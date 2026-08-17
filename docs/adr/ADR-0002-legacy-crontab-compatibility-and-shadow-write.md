@@ -5,6 +5,7 @@
 - 决策者：QingLong Maintainers
 - 关联 RFC：[QL-RFC-0001](../QINGLONG_3_0_ARCHITECTURE_RFC.md)
 - 前置决策：[ADR-0001](./ADR-0001-run-state-and-transaction-boundaries.md)
+- Amended by：[ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)
 
 ## 1. 决策摘要
 
@@ -144,13 +145,15 @@ owner 在接受触发时写入执行上下文，并贯穿日志、指标和回�
 
 当前孵化实现只开放观察型 Shadow，不通过该环境变量提供 primary：
 
-    QL3_SHADOW_ORIGINS=manual,scheduled_node
+    QL3_SHADOW_ORIGINS=manual,scheduled_node,subscription,system,script
 
 - 未设置或设置为空时全部为 off。
-- 当前只接受 `manual` 与 `scheduled_node`；未知 origin 被忽略并记录有界配置告警，不扩大到通用调度入口。
+- ADR-0445 后当前只接受 `manual`、`scheduled_node`、`subscription`、`system` 与 `script`；未知 origin 被忽略并记录有界配置告警，
+  `scheduled_system`、`once`、`boot` 与 `grpc` 仍不开放。
 - 配置在进程内首次使用时读取；edge 不启动 watcher，变更后需要通过既有进程重启或未来的显式 reload 生效。
 - 兼容观察器在实际 HTTP/gRPC worker 中按需加载；关闭时不构造 Shadow 事实或任务摘要、不增加 ChildProcess 监听器、不初始化 Repository、不创建后台任务，也不引入额外数据库写入。
-- `manual` 与 `scheduled_node` 都只监听 Legacy 已创建的同一个 ChildProcess。Shadow 代码不得调用 Executor 或第二次 spawn。
+- 所有已开放 origin 都只监听 Legacy 已创建的同一个 ChildProcess。Shadow 代码不得调用 Executor 或第二次 spawn；
+  `subscription/system/script` 仅在 `ScheduleService` 已选中执行且 `onBefore` 成功后 accepted。
 - 任意初始化、接受或后续写入失败都退化为 no-op，只记录不含命令、环境变量和 Secret 的稳定错误类型与有界计数。
 - `boot` 虽复用 `runSingle`，仍携带独立 origin，当前不在允许列表中，不能被误记为 manual。
 
