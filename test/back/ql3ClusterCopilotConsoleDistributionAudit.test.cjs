@@ -73,7 +73,7 @@ test('rejects verifier, embedded artifact and release workflow drift', () => {
       '.github/workflows/ql3-image-release.yml',
       (source) =>
         source.replace(
-          'Promote tags only after the complete set is verified',
+          'Promote final tags only after the catalog receipt is attested',
           'Promote mutable release tags',
         ),
       'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',

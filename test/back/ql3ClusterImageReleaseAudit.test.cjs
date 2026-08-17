@@ -94,6 +94,10 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         rebuildAfterScan: false,
         tagAfterVerification: true,
         tagAfterCompleteReleaseSet: true,
+        tagAfterVerifiedCatalog: true,
+        boundedRepositoryTagInventory: true,
+        allTagConflictsCheckedBeforeMutation: true,
+        responseLossRecovery: 'reuse_exact_digest_only',
       },
       releaseSet: {
         sourceDerived: true,
@@ -103,7 +107,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         privateEvidenceFreshnessRevalidatedAtClosure: true,
         exactScopeClosure: true,
         standaloneInspection: true,
-        tagPromotionAuthority: 'complete_verified_release_set',
+        tagPromotionAuthority: 'verified_immutable_catalog',
         fileProvenanceAttested: true,
         artifactRetentionDays: 90,
         crossRepositoryAtomicity: false,
@@ -128,6 +132,19 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         responseLossRecovery: 'reuse_exact_manifest_digest_only',
         registryTagCas: false,
         immutableDigestAuthority: 'verified',
+        receiptAttested: true,
+      },
+      finalPublicationClosure: {
+        planSchema: 'qinglong/release-publication-plan@v1',
+        tagObservationSchema: 'qinglong/release-publication-tag-observation@v1',
+        receiptSchema: 'qinglong/release-publication-closure-receipt@v1',
+        catalogReadyBeforeTagMutation: true,
+        allTagsExactDigest: true,
+        tagsPerImage: 2,
+        conflictPolicy: 'fail_closed_before_any_tag_mutation',
+        responseLossRecovery: 'reuse_exact_digest_only',
+        crossRepositoryAtomicity: false,
+        registryTagCas: false,
         receiptAttested: true,
       },
       catalogDeploymentGate: {
@@ -163,6 +180,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         'catalog-bound-local-compose-deployment',
         'catalog-bound-k3s-deployment',
         'release-tags',
+        'release-publication-closure',
       ],
     },
   });
@@ -183,6 +201,17 @@ test('rejects removal of the durable release-catalog contract tests', () => {
   const mutated = ciSource.replace(
     'test/back/ql3ReleaseCatalogContract.test.cjs',
     'test/back/catalog-tests-removed.test.cjs',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /durable catalog, deployment-lock and workflow negative tests/,
+  );
+});
+
+test('rejects removal of the final publication closure contract tests', () => {
+  const mutated = ciSource.replace(
+    'test/back/ql3ReleasePublicationClosureContract.test.cjs',
+    'test/back/publication-closure-tests-removed.test.cjs',
   );
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
@@ -1066,6 +1095,61 @@ test('rejects a release-catalog receipt without file provenance', () => {
   assert.throws(
     () => auditReleaseWorkflow(mutated),
     /independently inspect, durably publish/,
+  );
+});
+
+test('rejects final tag publication before catalog receipt attestation', () => {
+  const mutated = releaseSource.replace(
+    'Promote final tags only after the catalog receipt is attested',
+    'Promote tags after release-set audit only',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release tags and the final closure receipt|release-set job must download/,
+  );
+});
+
+test('rejects final tag promotion without bounded repository inventory', () => {
+  const mutated = releaseSource.replace(
+    "              'tag',\n              'ls',\n              image.registryRepository,",
+    "              'image',\n              'digest',\n              image.registryRepository,",
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release-set job must download only same-run records/,
+  );
+});
+
+test('rejects omission of the final publication closure audit', () => {
+  const mutated = releaseSource.replace(
+    '            --mode=close \\',
+    '            --mode=audit \\',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release-set job must download only same-run records/,
+  );
+});
+
+test('rejects omitting tag observations from the durable closure bundle', () => {
+  const mutated = releaseSource.replace(
+    'observations="${BUNDLE}/qinglong3-release-publication-tag-observation-',
+    'observations="${RUNNER_TEMP}/qinglong3-release-publication-tag-observation-',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release-set job must download only same-run records/,
+  );
+});
+
+test('rejects a final closure receipt without its own attestation', () => {
+  const mutated = releaseSource.replace(
+    '          subject-path: ${{ steps.final-publication.outputs.receipt }}',
+    '          subject-path: ${{ steps.catalog-receipt.outputs.receipt }}',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release-set job must download only same-run records/,
   );
 });
 

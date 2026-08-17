@@ -274,7 +274,7 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3PrivateReleaseEvidenceReceiptContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
+    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3PrivateReleaseEvidenceReceiptContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleasePublicationClosureContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
     'cluster image CI must run SBOM, candidate, private evidence receipt, release-set, durable catalog, deployment-lock and workflow negative tests; catalog consumption ceremony is mandatory',
   );
   requirePattern(
@@ -712,7 +712,7 @@ function auditReleaseWorkflow(source) {
   const releaseSetSteps = releaseSetJob?.steps;
   if (
     !Array.isArray(releaseSetSteps) ||
-    releaseSetSteps.length !== 16 ||
+    releaseSetSteps.length !== 19 ||
     releaseSetSteps[0]?.uses !==
       'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
     releaseSetSteps[0]?.with?.['persist-credentials'] !== false ||
@@ -750,55 +750,68 @@ function auditReleaseWorkflow(source) {
       'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6' ||
     releaseSetSteps[7]?.uses !==
       'docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c' ||
-    !/for \(const image of report\.images\)[\s\S]*image\.reference[\s\S]*image\.versionTag, image\.sourceTag[\s\S]*release tag already points at another digest[\s\S]*\['image', 'copy', state\.image\.reference, state\.tag\][\s\S]*promoted tag does not resolve to the release-set digest/.test(
-      releaseSetSteps[8]?.run ?? '',
-    ) ||
-    releaseSetSteps[9]?.uses !==
+    releaseSetSteps[8]?.uses !==
       'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
-    JSON.stringify(releaseSetSteps[9]?.with) !==
+    JSON.stringify(releaseSetSteps[8]?.with) !==
       JSON.stringify({
         'subject-path': '${{ steps.release-set.outputs.report }}',
       }) ||
-    releaseSetSteps[10]?.id !== 'catalog' ||
+    releaseSetSteps[9]?.id !== 'catalog' ||
     !/local_tag="ocidir:\/\/\$\{local_layout\}:candidate"[\s\S]*artifact put[\s\S]*--artifact-type "\$\{artifact_type\}"[\s\S]*--file-media-type "\$\{file_media_type\}"[\s\S]*--file "\$\{RELEASE_SET\}"[\s\S]*--file-title[\s\S]*--strip-dirs[\s\S]*dev\.qinglong\.release\.scope[\s\S]*org\.opencontainers\.image\.revision[\s\S]*org\.opencontainers\.image\.source[\s\S]*org\.opencontainers\.image\.version[\s\S]*"\$\{local_tag\}"[\s\S]*expected_digest=.*image digest "\$\{local_tag\}"[\s\S]*local_immutable="ocidir:\/\/\$\{local_layout\}@\$\{expected_digest\}"/.test(
-      releaseSetSteps[10]?.run ?? '',
+      releaseSetSteps[9]?.run ?? '',
     ) ||
     !/tag ls "\$\{catalog_repository\}" --format '\{\{ range \.Tags \}\}\{\{ println \. \}\}\{\{ end \}\}'[\s\S]*staging_tag="\$\{catalog_repository\}:staging-\$\{plan_digest#sha256:\}"[\s\S]*image copy "\$\{local_immutable\}" "\$\{staging_tag\}"[\s\S]*tag ls "\$\{catalog_repository\}" --format '\{\{ range \.Tags \}\}\{\{ println \. \}\}\{\{ end \}\}'[\s\S]*--mode=tag-inventory[\s\S]*--plan="\$\{PLAN\}"[\s\S]*--tag-inventory="\$\{tags\}"[\s\S]*--output="\$\{inventory_decision\}"[\s\S]*tag_state=.*p\.observation/.test(
-      releaseSetSteps[10]?.run ?? '',
+      releaseSetSteps[9]?.run ?? '',
     ) ||
     !/--mode=publication-decision[\s\S]*--manifest="\$\{local_manifest\}"[\s\S]*--manifest-digest="\$\{expected_digest\}"[\s\S]*--observed-discovery-digest="\$\{observed_digest\}"[\s\S]*action=.*p\.action[\s\S]*publish_if_absent[\s\S]*image copy "\$\{local_immutable\}" "\$\{discovery_tag\}"[\s\S]*reuse_exact_digest[\s\S]*digest=.*image digest "\$\{discovery_tag\}"[\s\S]*"\$\{digest\}" != "\$\{expected_digest\}"/.test(
-      releaseSetSteps[10]?.run ?? '',
+      releaseSetSteps[9]?.run ?? '',
     ) ||
     !/artifact get --file "\$\{file_name\}" "\$\{immutable_reference\}"[\s\S]*cmp --silent "\$\{RELEASE_SET\}" "\$\{roundtrip\}"[\s\S]*manifest get "\$\{immutable_reference\}" --format raw-body[\s\S]*cmp --silent "\$\{local_manifest\}" "\$\{manifest\}"[\s\S]*GITHUB_OUTPUT/.test(
-      releaseSetSteps[10]?.run ?? '',
+      releaseSetSteps[9]?.run ?? '',
     ) ||
     /artifact put[\s\S]{0,1200}"\$\{discovery_tag\}"/.test(
-      releaseSetSteps[10]?.run ?? '',
+      releaseSetSteps[9]?.run ?? '',
     ) ||
     !/cosign sign --yes "\$\{CATALOG\}@\$\{DIGEST\}"/.test(
-      releaseSetSteps[11]?.run ?? '',
+      releaseSetSteps[10]?.run ?? '',
     ) ||
-    releaseSetSteps[12]?.uses !==
+    releaseSetSteps[11]?.uses !==
       'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
-    JSON.stringify(releaseSetSteps[12]?.with) !==
+    JSON.stringify(releaseSetSteps[11]?.with) !==
       JSON.stringify({
         'subject-name': '${{ steps.catalog.outputs.repository }}',
         'subject-digest': '${{ steps.catalog.outputs.digest }}',
         'push-to-registry': true,
       }) ||
-    releaseSetSteps[13]?.id !== 'catalog-receipt' ||
+    releaseSetSteps[12]?.id !== 'catalog-receipt' ||
     !/cosign verify[\s\S]*--certificate-identity "\$\{certificate_identity\}"[\s\S]*--certificate-oidc-issuer "https:\/\/token\.actions\.githubusercontent\.com"[\s\S]*"\$\{CATALOG\}@\$\{DIGEST\}"[\s\S]*gh attestation verify "oci:\/\/\$\{CATALOG\}@\$\{DIGEST\}"[\s\S]*--source-digest "\$\{GITHUB_SHA\}"[\s\S]*--source-ref "\$\{GITHUB_REF\}"[\s\S]*--deny-self-hosted-runners[\s\S]*--bundle-from-oci[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=receipt[\s\S]*--manifest-digest="\$\{DIGEST\}"[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=audit[\s\S]*GITHUB_OUTPUT/.test(
-      releaseSetSteps[13]?.run ?? '',
+      releaseSetSteps[12]?.run ?? '',
     ) ||
-    releaseSetSteps[14]?.uses !==
+    releaseSetSteps[13]?.uses !==
       'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
-    JSON.stringify(releaseSetSteps[14]?.with) !==
+    JSON.stringify(releaseSetSteps[13]?.with) !==
       JSON.stringify({
         'subject-path': '${{ steps.catalog-receipt.outputs.receipt }}',
       }) ||
-    releaseSetSteps[15]?.uses !==
+    releaseSetSteps[14]?.id !== 'final-publication' ||
+    !/plan="\$\{BUNDLE\}\/qinglong3-release-publication-plan-[^\n]+[\s\S]*observations="\$\{BUNDLE\}\/qinglong3-release-publication-tag-observation-[^\n]+[\s\S]*receipt="\$\{BUNDLE\}\/qinglong3-release-publication-closure-receipt-[^\n]+[\s\S]*ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=plan[\s\S]*--release-set="\$\{RELEASE_SET\}"[\s\S]*--catalog-plan="\$\{CATALOG_PLAN\}"[\s\S]*--catalog-manifest="\$\{CATALOG_MANIFEST\}"[\s\S]*--catalog-manifest-digest="\$\{CATALOG_MANIFEST_DIGEST\}"[\s\S]*--catalog-receipt="\$\{CATALOG_RECEIPT\}"[\s\S]*GITHUB_OUTPUT/.test(
+      releaseSetSteps[14]?.run ?? '',
+    ) ||
+    !/createPublicationTagObservation[\s\S]*maxInventoryBytes = 1024 \* 1024[\s\S]*tagPattern[\s\S]*for \(const image of plan\.images\)[\s\S]*image\.immutableReference[\s\S]*'tag',[\s\S]*'ls',[\s\S]*image\.registryRepository[\s\S]*inventoryContents\.endsWith\('\\n'\)[\s\S]*new Set\(inventory\)\.size !== inventory\.length[\s\S]*release tag already points at another digest[\s\S]*for \(const state of states\)[\s\S]*'image',[\s\S]*'copy',[\s\S]*state\.image\.immutableReference[\s\S]*promoted tag does not resolve to the release-set digest[\s\S]*createPublicationTagObservation\(plan, observedTags\)[\s\S]*fs\.openSync\(process\.env\.TAG_OBSERVATIONS, 'wx', 0o600\)/.test(
+      releaseSetSteps[15]?.run ?? '',
+    ) ||
+    !/ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=close[\s\S]*--plan="\$\{PUBLICATION_PLAN\}"[\s\S]*--observations="\$\{TAG_OBSERVATIONS\}"[\s\S]*--output="\$\{CLOSURE_RECEIPT\}"[\s\S]*ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=audit[\s\S]*--receipt="\$\{CLOSURE_RECEIPT\}"/.test(
+      releaseSetSteps[16]?.run ?? '',
+    ) ||
+    releaseSetSteps[17]?.uses !==
+      'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
+    JSON.stringify(releaseSetSteps[17]?.with) !==
+      JSON.stringify({
+        'subject-path': '${{ steps.final-publication.outputs.receipt }}',
+      }) ||
+    releaseSetSteps[18]?.uses !==
       'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
-    JSON.stringify(releaseSetSteps[15]?.with) !==
+    JSON.stringify(releaseSetSteps[18]?.with) !==
       JSON.stringify({
         name: 'ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}',
         path: '${{ steps.release-set.outputs.bundle }}',
@@ -1253,8 +1266,8 @@ function auditReleaseWorkflow(source) {
   );
   requirePattern(
     source,
-    /release-set:\s+name: Close and publish the complete deployment release set[\s\S]*needs:[\s\S]*- publish[\s\S]*name: Promote tags only after the complete set is verified[\s\S]*for \(const image of report\.images\)[\s\S]*image\.versionTag, image\.sourceTag[\s\S]*image', 'copy'[\s\S]*name: Attest the complete release-set file provenance[\s\S]*name: Publish and round-trip the durable OCI release catalog[\s\S]*name: Keylessly sign the immutable release-catalog digest[\s\S]*name: Attest durable release-catalog provenance[\s\S]*name: Verify the durable catalog and create its immutable receipt[\s\S]*name: Attest the immutable release-catalog receipt[\s\S]*name: Publish the deployment digest lock/,
-    'release tags, durable OCI catalog and deployment bundle must be published only after every selected digest record is complete',
+    /release-set:\s+name: Close and publish the complete deployment release set[\s\S]*needs:[\s\S]*- publish[\s\S]*name: Attest the complete release-set file provenance[\s\S]*name: Publish and round-trip the durable OCI release catalog[\s\S]*name: Keylessly sign the immutable release-catalog digest[\s\S]*name: Attest durable release-catalog provenance[\s\S]*name: Verify the durable catalog and create its immutable receipt[\s\S]*name: Attest the immutable release-catalog receipt[\s\S]*name: Materialize the catalog-authorized final tag publication plan[\s\S]*name: Promote final tags only after the catalog receipt is attested[\s\S]*name: Close and audit the final public tag set[\s\S]*name: Attest the immutable release publication closure receipt[\s\S]*name: Publish the deployment digest lock/,
+    'release tags and the final closure receipt must be published only after the durable catalog is verified and its receipt is attested',
   );
   return {
     trigger: 'explicit protected v3 tag dispatch',
@@ -1310,6 +1323,10 @@ function auditReleaseWorkflow(source) {
       rebuildAfterScan: false,
       tagAfterVerification: true,
       tagAfterCompleteReleaseSet: true,
+      tagAfterVerifiedCatalog: true,
+      boundedRepositoryTagInventory: true,
+      allTagConflictsCheckedBeforeMutation: true,
+      responseLossRecovery: 'reuse_exact_digest_only',
     },
     releaseSet: {
       sourceDerived: true,
@@ -1319,7 +1336,7 @@ function auditReleaseWorkflow(source) {
       privateEvidenceFreshnessRevalidatedAtClosure: true,
       exactScopeClosure: true,
       standaloneInspection: true,
-      tagPromotionAuthority: 'complete_verified_release_set',
+      tagPromotionAuthority: 'verified_immutable_catalog',
       fileProvenanceAttested: true,
       artifactRetentionDays: 90,
       crossRepositoryAtomicity: false,
@@ -1344,6 +1361,19 @@ function auditReleaseWorkflow(source) {
       responseLossRecovery: 'reuse_exact_manifest_digest_only',
       registryTagCas: false,
       immutableDigestAuthority: 'verified',
+      receiptAttested: true,
+    },
+    finalPublicationClosure: {
+      planSchema: 'qinglong/release-publication-plan@v1',
+      tagObservationSchema: 'qinglong/release-publication-tag-observation@v1',
+      receiptSchema: 'qinglong/release-publication-closure-receipt@v1',
+      catalogReadyBeforeTagMutation: true,
+      allTagsExactDigest: true,
+      tagsPerImage: 2,
+      conflictPolicy: 'fail_closed_before_any_tag_mutation',
+      responseLossRecovery: 'reuse_exact_digest_only',
+      crossRepositoryAtomicity: false,
+      registryTagCas: false,
       receiptAttested: true,
     },
     catalogDeploymentGate: {
@@ -1379,6 +1409,7 @@ function auditReleaseWorkflow(source) {
       'catalog-bound-local-compose-deployment',
       'catalog-bound-k3s-deployment',
       'release-tags',
+      'release-publication-closure',
     ],
   };
 }

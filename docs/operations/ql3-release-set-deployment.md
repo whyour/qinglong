@@ -437,10 +437,16 @@ immutable image reference 写入 compose/rollout。
 
 ## 发布失败与恢复
 
-GHCR 不提供跨 repository tag 事务，release set 明确记录 `crossRepositoryAtomicity=false`。如果 promotion 中途
-失败，不删除已经正确的 tag，也不重新构建镜像。使用原 source tag/revision 重跑 release workflow：它会先验证
-每个 source digest 和既有 tag；既有 tag 指向同一 digest 时继续，指向其他 digest 时立即失败。只有
-release-set、catalog immutable digest、两类 provenance 与 receipt 全部生成并验证后，才能宣布该 deployment family
+GHCR 不提供跨 repository tag 事务，release set 与最终 closure receipt 都明确记录 `crossRepositoryAtomicity=false`。正式
+`versionTag/sourceTag` 只能在 release-set file provenance、catalog immutable digest、catalog signature/provenance、catalog receipt
+及其 attestation 全部成功后开始。publisher 随后必须为每个 image repository 取得不超过 1 MiB 的完整 tag inventory；读取失败、非
+canonical line、非法 OCI tag 或重复项均失败关闭，不能把任意 `image digest` 错误当作 tag absent。它会在任何 mutation 前验证全部
+immutable source 与全部既有目标 tag，任一不同 digest 都使本轮零 tag 写入。
+
+如果 promotion 中途失败，不删除已经正确的 tag，也不重新构建镜像。使用原 source tag/revision 重跑 release workflow：它会复用 exact
+tag，只补 absent tag；全部 tag 最终回读后生成 `qinglong/release-publication-tag-observation@v1` 与
+`qinglong/release-publication-closure-receipt@v1`。closure receipt 绑定 release-set、catalog plan/manifest/receipt 和每个最终 tag，
+与 plan、observation 一起进入 90 天 bundle；receipt 再次审计、attest 后，下载者可离线重放 closure audit。只有这条闭合链全部生成并验证后，才能宣布该 deployment family
 可部署。对于 `cluster|all`，还必须等待只读 catalog consumer 与 catalog-bound K3s deployment/retirement Gate 成功；publisher 成功而
 consumer 失败时不能宣布 Cluster release。不要给 consumer 临时增加写权限“修复”可见性或 tag，应修正 GHCR package visibility/retention
 或发布配置后，对同一受保护 tag 重跑完整工作流并重新验证 exact digest。

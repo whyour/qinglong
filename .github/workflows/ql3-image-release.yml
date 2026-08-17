@@ -810,51 +810,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Promote tags only after the complete set is verified
-        env:
-          REGCTL: ${{ runner.temp }}/regctl
-          RELEASE_SET: ${{ steps.release-set.outputs.report }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('node:fs');
-          const { spawnSync } = require('node:child_process');
-          const report = JSON.parse(fs.readFileSync(process.env.RELEASE_SET, 'utf8'));
-          const regctl = process.env.REGCTL;
-          const run = (args, allowFailure = false) => {
-            const result = spawnSync(regctl, args, {
-              encoding: 'utf8',
-              maxBuffer: 1024 * 1024,
-            });
-            if (result.error) throw result.error;
-            if (!allowFailure && result.status !== 0) {
-              throw new Error(`regctl ${args.join(' ')} failed`);
-            }
-            return result;
-          };
-          const states = [];
-          for (const image of report.images) {
-            const source = run(['image', 'digest', image.reference]).stdout.trim();
-            if (source !== image.digest) throw new Error('source digest drifted before promotion');
-            for (const tag of [image.versionTag, image.sourceTag]) {
-              const current = run(['image', 'digest', tag], true);
-              if (current.status === 0 && current.stdout.trim() !== image.digest) {
-                throw new Error('release tag already points at another digest');
-              }
-              states.push({ image, tag, current: current.status === 0 });
-            }
-          }
-          for (const state of states) {
-            if (!state.current) {
-              run(['image', 'copy', state.image.reference, state.tag]);
-            }
-            const promoted = run(['image', 'digest', state.tag]).stdout.trim();
-            if (promoted !== state.image.digest) {
-              throw new Error('promoted tag does not resolve to the release-set digest');
-            }
-          }
-          NODE
-
       - name: Attest the complete release-set file provenance
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
         with:
@@ -1006,6 +961,168 @@ jobs:
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
         with:
           subject-path: ${{ steps.catalog-receipt.outputs.receipt }}
+
+      - name: Materialize the catalog-authorized final tag publication plan
+        id: final-publication
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+          RELEASE_SET: ${{ steps.release-set.outputs.report }}
+          CATALOG_PLAN: ${{ steps.release-set.outputs.plan }}
+          CATALOG_MANIFEST: ${{ steps.catalog.outputs.manifest }}
+          CATALOG_MANIFEST_DIGEST: ${{ steps.catalog.outputs.digest }}
+          CATALOG_RECEIPT: ${{ steps.catalog-receipt.outputs.receipt }}
+          BUNDLE: ${{ steps.release-set.outputs.bundle }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          source_repository="${GITHUB_REPOSITORY,,}"
+          plan="${BUNDLE}/qinglong3-release-publication-plan-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          observations="${BUNDLE}/qinglong3-release-publication-tag-observation-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          receipt="${BUNDLE}/qinglong3-release-publication-closure-receipt-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          node scripts/ql3-release-publication-closure-contract.cjs \
+            --mode=plan \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --release-set="${RELEASE_SET}" \
+            --catalog-plan="${CATALOG_PLAN}" \
+            --catalog-manifest="${CATALOG_MANIFEST}" \
+            --catalog-manifest-digest="${CATALOG_MANIFEST_DIGEST}" \
+            --catalog-receipt="${CATALOG_RECEIPT}" \
+            --output="${plan}" > /dev/null
+          echo "plan=${plan}" >> "${GITHUB_OUTPUT}"
+          echo "observations=${observations}" >> "${GITHUB_OUTPUT}"
+          echo "receipt=${receipt}" >> "${GITHUB_OUTPUT}"
+
+      - name: Promote final tags only after the catalog receipt is attested
+        env:
+          REGCTL: ${{ runner.temp }}/regctl
+          PUBLICATION_PLAN: ${{ steps.final-publication.outputs.plan }}
+          TAG_OBSERVATIONS: ${{ steps.final-publication.outputs.observations }}
+        run: |
+          set -euo pipefail
+          umask 077
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { spawnSync } = require('node:child_process');
+          const {
+            createPublicationTagObservation,
+          } = require('./scripts/ql3-release-publication-closure-contract.cjs');
+          const plan = JSON.parse(fs.readFileSync(process.env.PUBLICATION_PLAN, 'utf8'));
+          const regctl = process.env.REGCTL;
+          const maxInventoryBytes = 1024 * 1024;
+          const tagPattern = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/u;
+          const run = (args) => {
+            const result = spawnSync(regctl, args, {
+              encoding: 'utf8',
+              maxBuffer: maxInventoryBytes,
+            });
+            if (result.error) throw result.error;
+            if (result.status !== 0) {
+              throw new Error(`regctl ${args.join(' ')} failed`);
+            }
+            return result.stdout;
+          };
+          const states = [];
+          for (const image of plan.images) {
+            const source = run(['image', 'digest', image.immutableReference]).trim();
+            if (source !== image.digest) {
+              throw new Error('source digest drifted before promotion');
+            }
+            const inventoryContents = run([
+              'tag',
+              'ls',
+              image.registryRepository,
+              '--format',
+              '{{ range .Tags }}{{ println . }}{{ end }}',
+            ]);
+            if (
+              Buffer.byteLength(inventoryContents) > maxInventoryBytes ||
+              (inventoryContents.length > 0 && !inventoryContents.endsWith('\n'))
+            ) {
+              throw new Error('release tag inventory is invalid or unbounded');
+            }
+            const inventory = inventoryContents.length === 0
+              ? []
+              : inventoryContents.slice(0, -1).split('\n');
+            if (
+              inventory.some((tag) => !tagPattern.test(tag)) ||
+              new Set(inventory).size !== inventory.length
+            ) {
+              throw new Error('release tag inventory is malformed');
+            }
+            const inventorySet = new Set(inventory);
+            for (const tag of image.tags) {
+              const tagName = tag.reference.slice(image.registryRepository.length + 1);
+              const present = inventorySet.has(tagName);
+              if (present) {
+                const current = run(['image', 'digest', tag.reference]).trim();
+                if (current !== image.digest) {
+                  throw new Error('release tag already points at another digest');
+                }
+              }
+              states.push({ image, tag, present });
+            }
+          }
+          for (const state of states) {
+            if (!state.present) {
+              run([
+                'image',
+                'copy',
+                state.image.immutableReference,
+                state.tag.reference,
+              ]);
+            }
+          }
+          const observedTags = [];
+          for (const state of states) {
+            const promoted = run(['image', 'digest', state.tag.reference]).trim();
+            if (promoted !== state.image.digest) {
+              throw new Error('promoted tag does not resolve to the release-set digest');
+            }
+            observedTags.push({
+              image: state.image.name,
+              kind: state.tag.kind,
+              reference: state.tag.reference,
+              digest: promoted,
+            });
+          }
+          const observation = createPublicationTagObservation(plan, observedTags);
+          const descriptor = fs.openSync(process.env.TAG_OBSERVATIONS, 'wx', 0o600);
+          try {
+            fs.writeFileSync(descriptor, `${JSON.stringify(observation)}\n`);
+            fs.fsyncSync(descriptor);
+          } finally {
+            fs.closeSync(descriptor);
+          }
+          NODE
+
+      - name: Close and audit the final public tag set
+        env:
+          PUBLICATION_PLAN: ${{ steps.final-publication.outputs.plan }}
+          TAG_OBSERVATIONS: ${{ steps.final-publication.outputs.observations }}
+          CLOSURE_RECEIPT: ${{ steps.final-publication.outputs.receipt }}
+        run: |
+          set -euo pipefail
+          node scripts/ql3-release-publication-closure-contract.cjs \
+            --mode=close \
+            --plan="${PUBLICATION_PLAN}" \
+            --observations="${TAG_OBSERVATIONS}" \
+            --output="${CLOSURE_RECEIPT}" > /dev/null
+          node scripts/ql3-release-publication-closure-contract.cjs \
+            --mode=audit \
+            --plan="${PUBLICATION_PLAN}" \
+            --observations="${TAG_OBSERVATIONS}" \
+            --receipt="${CLOSURE_RECEIPT}" > "${RUNNER_TEMP}/release-publication-closure-audit.json"
+
+      - name: Attest the immutable release publication closure receipt
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: ${{ steps.final-publication.outputs.receipt }}
 
       - name: Publish the deployment digest lock
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -445,6 +445,7 @@
 | [ADR-0439](./ADR-0439-deterministic-private-evidence-receipts-and-release-set-replay.md)             | 确定性私有证据收据与 Release-set 重放                                                                                                                                     | Accepted（首份真实线上重放待实际 release tag） |
 | [ADR-0440](./ADR-0440-release-set-closure-private-evidence-freshness.md)                               | Release-set 闭合时私有证据 Freshness 重验证                                                                                                                               | Accepted（首份真实线上闭合待实际 release tag） |
 | [ADR-0441](./ADR-0441-no-overwrite-release-catalog-discovery-publication.md)                            | Release Catalog Discovery Tag 无覆盖发布                                                                                                                                    | Accepted（首份真实 GHCR conflict/reuse 证据待实际 release tag） |
+| [ADR-0442](./ADR-0442-catalog-ready-terminal-release-tag-publication.md)                                | Catalog-ready 的终态 Release Tag 发布与闭合收据                                                                                                                             | Accepted（首份真实 GHCR 部分 promotion/replay 证据待实际 release tag） |
 
 ## 规则
 

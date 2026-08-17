@@ -11,6 +11,26 @@
 
 最新增量证据（2026-08-18）：
 
+- D-350/ADR-0442（已接受；首份真实 GHCR 部分 promotion/replay 证据待实际 release tag）：正式 image tag 不再在完整
+  release-set 审计后、durable catalog 建立前提前公开。`versionTag/sourceTag` mutation 现位于 release-set provenance、catalog
+  immutable round-trip、catalog signature/provenance 验证、catalog receipt 审计及其 attestation 全部成功之后。新的
+  `qinglong/release-publication-plan@v1` 联合复验 exact release-set、catalog plan/raw manifest/manifest digest/receipt，并只列出每个
+  image 的 immutable source 与两个目标 tag。publisher 对每个已存在 image repository 取得最大 1 MiB 的 canonical tag inventory，
+  严格检查 OCI tag 字符集与无重复；auth/network/registry error 不再被任意 `image digest` 非零退出降级成 absent。所有 immutable source
+  和既有目标 tag 必须在任何 mutation 前完成全量预检，冲突保持零 tag 写；随后只 copy absent tag，exact tag 用于 response-loss 重放。
+  最终逐 tag 回读形成 `qinglong/release-publication-tag-observation@v1`，再与上游闭包组成自摘要
+  `qinglong/release-publication-closure-receipt@v1`，本地复审并独立 attested 后才上传 deployment bundle。receipt 诚实保留
+  `crossRepositoryAtomicity=false` 与 `registryTagCas=false`；immutable catalog digest 仍是唯一部署 authority。实现不新增 package、
+  生产依赖、数据库、migration、Kubernetes object、设备工具或常驻资源；所有 inventory 与收据只存在于短生命周期 release runner，
+  Edge/Standalone/路由设备和 Cluster 节点稳态成本均为零。阶段门已重跑：专项 closure/workflow 96/96、完整 backend 1382 pass +
+  2 条条件 skip、18-package clean build/test 全通过、14/14 静态审计与 14/14 artifact 档位通过；artifact 实际字节依次为基础
+  Edge/Standalone `2589890/2589968`、adopted `2809185/2809308`、application `3632769/3632889`、application-api
+  `3800322/3800466`、AI `3069143/3069233`、application+AI `4493043/4493175`、MCP `7315930/7316038`，均低于各自硬上限。
+  PostgreSQL HA Docker 门以 PostgreSQL 18.6/arm64 完成 142/142、timeline `1→2`，私有报告 SHA-256 为
+  `c8c5cad7a7feb6db066b14efcc241f33ed574c3d80b909014bc894d8f9cb7cbf`，证据复审通过且临时容器/卷/网络残留均为零。Barman
+  live object-store 恢复与 cert-manager 在线轮换仍诚实保持外部 release blocker。真实 GHCR 部分 promotion/response-loss 仍只能由
+  受保护 `v3` tag 或受控 release repository 演练证明。
+
 - D-349/ADR-0441（已接受；首份真实 GHCR conflict/reuse 证据待实际 release tag）：关闭 durable catalog discovery tag 的覆盖窗口。
   之前 workflow 虽声明 `v<version>-<scope>` 无部署 authority，却直接对该 tag 执行 `artifact put`；已有不同 digest 会先被覆盖，
   response-loss 重跑也没有“相同复用、冲突拒绝”的可执行分支。catalog plan/receipt 现升级为 v2，publisher 必须先在 runner 私有
