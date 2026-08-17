@@ -36,28 +36,50 @@ cert-manager 三项静态审计摘要。v2 收据不持久化私有 runner 的 w
 
 ## 发布流水线内置 Local 与 Cluster 下游门
 
+durable catalog 建立只表示候选发布材料可独立验证，不再直接授予最终 image tag 发布权。最终
+`versionTag/sourceTag` 只能由 `release-finalization` 在当前 scope 的全部下游门成功、deployment readiness receipt 已复审并单独
+attested 后写入。catalog 先存在而部署门失败时，不会产生正式 image tag；运维者不得把 discovery tag 或未闭合 catalog 当作
+deployment-ready 版本公告。
+
 `local|all` scope 在 durable catalog 发布后启动独立 `release-catalog-local-deployment-live`。它与 publisher 权限隔离，从公开 catalog
 重新完成发现、Cosign/GitHub provenance 验证和 three-file bundle audit，随后物化唯一 Local v2 selection。该 selection 不是只做 JSON
 检查：同一个 immutable Local image 与 selection 会依次进入 Edge、Standalone 的正式 Compose rollout、SQLite backup/restore、evidence
 collection 和 graceful stop。两个 content-free report 必须绑定同一 release-set、catalog manifest、consumption report 与 selection digest；
 任一 Profile 失败都会阻断 Local release。
 
-该 job 只有 `contents|packages|attestations:read`，不执行 Docker login、签名、tag promotion 或 catalog mutation。regctl、Cosign、GitHub CLI、
-Node workspace、token 和原始 bundle 仅存在于短生命周期 release runner；路由设备/NAS/单机用户不安装这些发布工具，也不增加常驻 updater、
-listener 或 timer。第一份真实证据仍必须由受保护 release tag 产生；PR fixture 只验证失败关闭与产品 rollout 路径。
+该 job 只有 `contents|packages|attestations:read`，不执行 Docker login、签名、tag promotion 或 catalog mutation。成功 artifact 精确保存
+owner-private catalog consumption 三文件、`edge.json` 和 `standalone.json`，供终态 finalizer 复审；token 与命令材料不上传。regctl、Cosign、
+GitHub CLI、Node workspace 和原始 bundle 仅存在于短生命周期 release runner；路由设备/NAS/单机用户不安装这些发布工具，也不增加常驻
+updater、listener 或 timer。第一份真实证据仍必须由受保护 release tag 产生；PR fixture 只验证失败关闭与产品 rollout 路径。
 
 ## 发布流水线内置 Cluster 下游门
 
-`ql3-image-release.yml` 在 durable catalog、签名、provenance、receipt 和 90 天便利 bundle 全部发布后，才启动独立
+`ql3-image-release.yml` 在 durable catalog、签名、provenance 与 receipt 全部发布后，才启动独立
 `release-catalog-deployment-live`。该 job 只处理 `cluster|all`；Local-only 发布不会启动 K3s。它没有 publisher 的 package/attestation
 写权限或 registry 登录态，而是按下文工作站协议重新消费公开 catalog，离线重建 deployment lock，并在隔离三节点 K3s 上完成 install、
 Head commit、一个显式 ConfigMap 的 UID/resourceVersion 围栏退役和两个 receipt audit。任何公开读取、exact workflow identity、source
 tag/revision、digest、scope、角色闭包、server-side apply/Head 或清理失败都会让 Cluster release 失败。
 
 该门的四个业务 Deployment 都为零副本：它证明真实 catalog image authority 已进入目标 API、lock、Head 与 receipt 闭包，不重复下载和启动
-完整业务数据面。应用启动、数据库、Secret、Worker 与 AI lifecycle 继续由各自 live/release gate 负责。成功 artifact 只保存 content-free
-JSON evidence；consumption bundle、token、kubeconfig 和 command 文件不上传。首份真实成功记录必须来自实际受保护 release tag，普通 PR 中的
-synthetic live fixture 不能替代它。
+完整业务数据面。应用启动、数据库、Secret、Worker 与 AI lifecycle 继续由各自 live/release gate 负责。成功 artifact 精确保存
+owner-private catalog consumption 三文件和 `report.json`；token、kubeconfig 与 command 文件不上传。首份真实成功记录必须来自实际受保护
+release tag，普通 PR 中的 synthetic live fixture 不能替代它。
+
+## Deployment-ready 终态发布
+
+`release-finalization` 是唯一具有 `packages:write` 与 `attestations:write` 的最终 tag 写者。它使用严格 scope 真值表：`local` 要求 Local
+成功且 Cluster 跳过，`cluster` 要求 Cluster 成功且 Local 跳过，`all` 要求两者都成功。下载的 Local evidence 必须精确为五个文件，Cluster
+evidence 必须精确为四个文件；目录重新设为 `0700`、文件为 `0600`，缺失、额外、synthetic、未完成或未清理报告均失败关闭。
+
+finalizer 随后独立重新消费公开 immutable catalog，而不是复用 publisher 的临时输出。`qinglong/release-deployment-readiness-receipt@v1`
+把 finalizer consumption、scope 要求的每个 deployment consumption/report、immutable catalog、release-set 和清理结果闭合为一份
+self-digest receipt。只有该 receipt 完成本地 audit 和独立 attestation，`qinglong/release-publication-plan@v2` 才能进入 bounded tag
+inventory、全量冲突预检与 promotion；`qinglong/release-publication-closure-receipt@v2` 最终绑定同一 readiness。90 天 bundle 包含 finalizer
+consumption、部署 evidence、readiness、plan、tag observation 和 closure，能够离线复查“哪个 catalog、哪些部署族、哪些终态 tag”。
+
+readiness 是本次 release workflow 的操作证据，不是新的镜像内容 identity。同一 protected source tag 因失败而重跑时，新的真实部署报告可使
+readiness digest 不同；release-set 与 immutable catalog digest 仍必须相同，既有 exact tag 只能复用，不同 digest 继续失败。OCI registry
+没有跨 repository 事务或 tag CAS，因此 closure 证明的是观测到的终态，不是原子提交。
 
 ## 选择 scope
 

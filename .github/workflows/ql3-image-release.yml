@@ -673,7 +673,7 @@ jobs:
           include-hidden-files: false
 
   release-set:
-    name: Close and publish the complete deployment release set
+    name: Close the release set and publish its immutable catalog
     needs:
       - release-candidate
       - worker-management-release-evidence
@@ -962,172 +962,10 @@ jobs:
         with:
           subject-path: ${{ steps.catalog-receipt.outputs.receipt }}
 
-      - name: Materialize the catalog-authorized final tag publication plan
-        id: final-publication
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
-          RELEASE_SCOPE: ${{ inputs.release_scope }}
-          RELEASE_SET: ${{ steps.release-set.outputs.report }}
-          CATALOG_PLAN: ${{ steps.release-set.outputs.plan }}
-          CATALOG_MANIFEST: ${{ steps.catalog.outputs.manifest }}
-          CATALOG_MANIFEST_DIGEST: ${{ steps.catalog.outputs.digest }}
-          CATALOG_RECEIPT: ${{ steps.catalog-receipt.outputs.receipt }}
-          BUNDLE: ${{ steps.release-set.outputs.bundle }}
-        run: |
-          set -euo pipefail
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          source_repository="${GITHUB_REPOSITORY,,}"
-          plan="${BUNDLE}/qinglong3-release-publication-plan-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
-          observations="${BUNDLE}/qinglong3-release-publication-tag-observation-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
-          receipt="${BUNDLE}/qinglong3-release-publication-closure-receipt-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
-          node scripts/ql3-release-publication-closure-contract.cjs \
-            --mode=plan \
-            --version="${RELEASE_VERSION}" \
-            --source-revision="${GITHUB_SHA}" \
-            --source-ref="${GITHUB_REF}" \
-            --release-scope="${RELEASE_SCOPE}" \
-            --repository-owner="${owner}" \
-            --source-repository="${source_repository}" \
-            --release-set="${RELEASE_SET}" \
-            --catalog-plan="${CATALOG_PLAN}" \
-            --catalog-manifest="${CATALOG_MANIFEST}" \
-            --catalog-manifest-digest="${CATALOG_MANIFEST_DIGEST}" \
-            --catalog-receipt="${CATALOG_RECEIPT}" \
-            --output="${plan}" > /dev/null
-          echo "plan=${plan}" >> "${GITHUB_OUTPUT}"
-          echo "observations=${observations}" >> "${GITHUB_OUTPUT}"
-          echo "receipt=${receipt}" >> "${GITHUB_OUTPUT}"
-
-      - name: Promote final tags only after the catalog receipt is attested
-        env:
-          REGCTL: ${{ runner.temp }}/regctl
-          PUBLICATION_PLAN: ${{ steps.final-publication.outputs.plan }}
-          TAG_OBSERVATIONS: ${{ steps.final-publication.outputs.observations }}
-        run: |
-          set -euo pipefail
-          umask 077
-          node <<'NODE'
-          const fs = require('node:fs');
-          const { spawnSync } = require('node:child_process');
-          const {
-            createPublicationTagObservation,
-          } = require('./scripts/ql3-release-publication-closure-contract.cjs');
-          const plan = JSON.parse(fs.readFileSync(process.env.PUBLICATION_PLAN, 'utf8'));
-          const regctl = process.env.REGCTL;
-          const maxInventoryBytes = 1024 * 1024;
-          const tagPattern = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/u;
-          const run = (args) => {
-            const result = spawnSync(regctl, args, {
-              encoding: 'utf8',
-              maxBuffer: maxInventoryBytes,
-            });
-            if (result.error) throw result.error;
-            if (result.status !== 0) {
-              throw new Error(`regctl ${args.join(' ')} failed`);
-            }
-            return result.stdout;
-          };
-          const states = [];
-          for (const image of plan.images) {
-            const source = run(['image', 'digest', image.immutableReference]).trim();
-            if (source !== image.digest) {
-              throw new Error('source digest drifted before promotion');
-            }
-            const inventoryContents = run([
-              'tag',
-              'ls',
-              image.registryRepository,
-              '--format',
-              '{{ range .Tags }}{{ println . }}{{ end }}',
-            ]);
-            if (
-              Buffer.byteLength(inventoryContents) > maxInventoryBytes ||
-              (inventoryContents.length > 0 && !inventoryContents.endsWith('\n'))
-            ) {
-              throw new Error('release tag inventory is invalid or unbounded');
-            }
-            const inventory = inventoryContents.length === 0
-              ? []
-              : inventoryContents.slice(0, -1).split('\n');
-            if (
-              inventory.some((tag) => !tagPattern.test(tag)) ||
-              new Set(inventory).size !== inventory.length
-            ) {
-              throw new Error('release tag inventory is malformed');
-            }
-            const inventorySet = new Set(inventory);
-            for (const tag of image.tags) {
-              const tagName = tag.reference.slice(image.registryRepository.length + 1);
-              const present = inventorySet.has(tagName);
-              if (present) {
-                const current = run(['image', 'digest', tag.reference]).trim();
-                if (current !== image.digest) {
-                  throw new Error('release tag already points at another digest');
-                }
-              }
-              states.push({ image, tag, present });
-            }
-          }
-          for (const state of states) {
-            if (!state.present) {
-              run([
-                'image',
-                'copy',
-                state.image.immutableReference,
-                state.tag.reference,
-              ]);
-            }
-          }
-          const observedTags = [];
-          for (const state of states) {
-            const promoted = run(['image', 'digest', state.tag.reference]).trim();
-            if (promoted !== state.image.digest) {
-              throw new Error('promoted tag does not resolve to the release-set digest');
-            }
-            observedTags.push({
-              image: state.image.name,
-              kind: state.tag.kind,
-              reference: state.tag.reference,
-              digest: promoted,
-            });
-          }
-          const observation = createPublicationTagObservation(plan, observedTags);
-          const descriptor = fs.openSync(process.env.TAG_OBSERVATIONS, 'wx', 0o600);
-          try {
-            fs.writeFileSync(descriptor, `${JSON.stringify(observation)}\n`);
-            fs.fsyncSync(descriptor);
-          } finally {
-            fs.closeSync(descriptor);
-          }
-          NODE
-
-      - name: Close and audit the final public tag set
-        env:
-          PUBLICATION_PLAN: ${{ steps.final-publication.outputs.plan }}
-          TAG_OBSERVATIONS: ${{ steps.final-publication.outputs.observations }}
-          CLOSURE_RECEIPT: ${{ steps.final-publication.outputs.receipt }}
-        run: |
-          set -euo pipefail
-          node scripts/ql3-release-publication-closure-contract.cjs \
-            --mode=close \
-            --plan="${PUBLICATION_PLAN}" \
-            --observations="${TAG_OBSERVATIONS}" \
-            --output="${CLOSURE_RECEIPT}" > /dev/null
-          node scripts/ql3-release-publication-closure-contract.cjs \
-            --mode=audit \
-            --plan="${PUBLICATION_PLAN}" \
-            --observations="${TAG_OBSERVATIONS}" \
-            --receipt="${CLOSURE_RECEIPT}" > "${RUNNER_TEMP}/release-publication-closure-audit.json"
-
-      - name: Attest the immutable release publication closure receipt
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
-        with:
-          subject-path: ${{ steps.final-publication.outputs.receipt }}
-
-      - name: Publish the deployment digest lock
+      - name: Upload same-run catalog publisher evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}
+          name: ql3-release-catalog-publisher-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.release-set.outputs.bundle }}
           if-no-files-found: error
           retention-days: 90
@@ -1191,8 +1029,8 @@ jobs:
           umask 077
           owner="${REPOSITORY_OWNER,,}"
           source_repository="${SOURCE_REPOSITORY,,}"
-          private_root="${RUNNER_TEMP}/ql3-release-catalog-local-consumer"
-          bundle="${private_root}/bundle"
+          private_root="${RUNNER_TEMP}/ql3-release-catalog-local-deployment"
+          bundle="${private_root}/consumption"
           token="${private_root}/github-token"
           install -d -m 0700 "${private_root}"
           install -m 0600 /dev/null "${token}"
@@ -1393,8 +1231,8 @@ jobs:
           umask 077
           owner="${REPOSITORY_OWNER,,}"
           source_repository="${SOURCE_REPOSITORY,,}"
-          private_root="${RUNNER_TEMP}/ql3-release-catalog-consumer"
-          bundle="${private_root}/bundle"
+          private_root="${RUNNER_TEMP}/ql3-release-catalog-deployment"
+          bundle="${private_root}/consumption"
           token="${private_root}/github-token"
           install -d -m 0700 "${private_root}"
           install -m 0600 /dev/null "${token}"
@@ -1473,9 +1311,399 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ql3-release-catalog-deployment-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ql3-release-catalog-deployment/report.json
+          path: ${{ runner.temp }}/ql3-release-catalog-deployment
           if-no-files-found: warn
           retention-days: 90
           compression-level: 9
+          overwrite: false
+          include-hidden-files: false
+
+  release-finalization:
+    name: Publish final tags only after catalog-bound deployment readiness
+    needs:
+      - release-set
+      - release-catalog-local-deployment-live
+      - release-catalog-deployment-live
+    if: >-
+      always() &&
+      needs.release-set.result == 'success' &&
+      (
+        (
+          inputs.release_scope == 'local' &&
+          needs.release-catalog-local-deployment-live.result == 'success' &&
+          needs.release-catalog-deployment-live.result == 'skipped'
+        ) ||
+        (
+          inputs.release_scope == 'cluster' &&
+          needs.release-catalog-local-deployment-live.result == 'skipped' &&
+          needs.release-catalog-deployment-live.result == 'success'
+        ) ||
+        (
+          inputs.release_scope == 'all' &&
+          needs.release-catalog-local-deployment-live.result == 'success' &&
+          needs.release-catalog-deployment-live.result == 'success'
+        )
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.18.0'
+
+      - name: Install the frozen workspace without lifecycle scripts
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@8.3.1 --activate
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Download same-run Local deployment evidence
+        if: inputs.release_scope != 'cluster'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-release-catalog-local-deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-release-finalization/deployment-evidence/local
+
+      - name: Download same-run Cluster deployment evidence
+        if: inputs.release_scope != 'local'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-release-catalog-deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-release-finalization/deployment-evidence/cluster
+
+      - name: Normalize and close the downloaded evidence inventory
+        env:
+          FINALIZATION_ROOT: ${{ runner.temp }}/ql3-release-finalization
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          while IFS= read -r -d '' directory; do
+            chmod 0700 "${directory}"
+          done < <(find "${FINALIZATION_ROOT}" -type d -print0)
+          while IFS= read -r -d '' file; do
+            chmod 0600 "${file}"
+          done < <(find "${FINALIZATION_ROOT}" -type f -print0)
+          if [[ "${RELEASE_SCOPE}" != 'cluster' ]]; then
+            test -f "${FINALIZATION_ROOT}/deployment-evidence/local/edge.json"
+            test -f "${FINALIZATION_ROOT}/deployment-evidence/local/standalone.json"
+            test "$(find "${FINALIZATION_ROOT}/deployment-evidence/local" -type f | wc -l | tr -d ' ')" = 5
+          fi
+          if [[ "${RELEASE_SCOPE}" != 'local' ]]; then
+            test -f "${FINALIZATION_ROOT}/deployment-evidence/cluster/report.json"
+            test "$(find "${FINALIZATION_ROOT}/deployment-evidence/cluster" -type f | wc -l | tr -d ' ')" = 4
+          fi
+
+      - name: Install the exact checksum-pinned catalog reader
+        env:
+          REGCTL: ${{ runner.temp }}/regctl
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "${REGCTL}" \
+            https://github.com/regclient/regclient/releases/download/v0.11.5/regctl-linux-amd64
+          echo "c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467  ${REGCTL}" | sha256sum --check --strict
+          chmod 0755 "${REGCTL}"
+          "${REGCTL}" version
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Independently consume the catalog in the finalizer
+        id: finalizer-consumption
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          REGCTL: ${{ runner.temp }}/regctl
+          FINALIZATION_ROOT: ${{ runner.temp }}/ql3-release-finalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          owner="${REPOSITORY_OWNER,,}"
+          source_repository="${SOURCE_REPOSITORY,,}"
+          bundle="${FINALIZATION_ROOT}/catalog-consumption"
+          token="${FINALIZATION_ROOT}/github-token"
+          install -m 0600 /dev/null "${token}"
+          printf '%s' "${GH_TOKEN}" > "${token}"
+          trap 'rm -f "${token}"' EXIT
+          cosign="$(readlink -f "$(command -v cosign)")"
+          gh="$(readlink -f "$(command -v gh)")"
+          node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+            --mode=create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --output-directory="${bundle}" \
+            --regctl="${REGCTL}" \
+            --cosign="${cosign}" \
+            --gh="${gh}" \
+            --github-token-file="${token}" > /dev/null
+          node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+            --mode=audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --output-directory="${bundle}" > /dev/null
+          rm -f "${token}"
+          trap - EXIT
+          echo "bundle=${bundle}" >> "${GITHUB_OUTPUT}"
+          echo "repository-owner=${owner}" >> "${GITHUB_OUTPUT}"
+          echo "source-repository=${source_repository}" >> "${GITHUB_OUTPUT}"
+
+      - name: Materialize and audit deployment readiness and publication plan
+        id: final-publication
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+          REPOSITORY_OWNER: ${{ steps.finalizer-consumption.outputs.repository-owner }}
+          SOURCE_REPOSITORY: ${{ steps.finalizer-consumption.outputs.source-repository }}
+          FINALIZER_CONSUMPTION: ${{ steps.finalizer-consumption.outputs.bundle }}
+          FINALIZATION_ROOT: ${{ runner.temp }}/ql3-release-finalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          release_set="${FINALIZER_CONSUMPTION}/qinglong3-release-set-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          manifest="${FINALIZER_CONSUMPTION}/qinglong3-release-catalog-manifest-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          manifest_digest="sha256:$(sha256sum "${manifest}" | cut -d ' ' -f 1)"
+          catalog_plan="${FINALIZATION_ROOT}/qinglong3-release-catalog-plan-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          catalog_receipt="${FINALIZATION_ROOT}/qinglong3-release-catalog-receipt-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          readiness="${FINALIZATION_ROOT}/qinglong3-release-deployment-readiness-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          publication_plan="${FINALIZATION_ROOT}/qinglong3-release-publication-plan-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          observations="${FINALIZATION_ROOT}/qinglong3-release-publication-tag-observation-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          closure="${FINALIZATION_ROOT}/qinglong3-release-publication-closure-receipt-${RELEASE_VERSION}-${RELEASE_SCOPE}.json"
+          node scripts/ql3-release-catalog-contract.cjs \
+            --mode=plan \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${REPOSITORY_OWNER}" \
+            --source-repository="${SOURCE_REPOSITORY}" \
+            --release-set="${release_set}" \
+            --output="${catalog_plan}" > /dev/null
+          node scripts/ql3-release-catalog-contract.cjs \
+            --mode=receipt \
+            --plan="${catalog_plan}" \
+            --manifest="${manifest}" \
+            --manifest-digest="${manifest_digest}" \
+            --output="${catalog_receipt}" > /dev/null
+          readiness_args=(
+            --version="${RELEASE_VERSION}"
+            --source-revision="${GITHUB_SHA}"
+            --source-ref="${GITHUB_REF}"
+            --release-scope="${RELEASE_SCOPE}"
+            --repository-owner="${REPOSITORY_OWNER}"
+            --source-repository="${SOURCE_REPOSITORY}"
+            --finalizer-consumption-bundle="${FINALIZER_CONSUMPTION}"
+          )
+          if [[ "${RELEASE_SCOPE}" != 'cluster' ]]; then
+            readiness_args+=(
+              --local-consumption-bundle="${FINALIZATION_ROOT}/deployment-evidence/local/consumption"
+              --edge-report="${FINALIZATION_ROOT}/deployment-evidence/local/edge.json"
+              --standalone-report="${FINALIZATION_ROOT}/deployment-evidence/local/standalone.json"
+            )
+          fi
+          if [[ "${RELEASE_SCOPE}" != 'local' ]]; then
+            readiness_args+=(
+              --cluster-consumption-bundle="${FINALIZATION_ROOT}/deployment-evidence/cluster/consumption"
+              --cluster-report="${FINALIZATION_ROOT}/deployment-evidence/cluster/report.json"
+            )
+          fi
+          node scripts/ql3-release-deployment-readiness-contract.cjs \
+            --mode=create \
+            "${readiness_args[@]}" \
+            --output="${readiness}" > /dev/null
+          node scripts/ql3-release-deployment-readiness-contract.cjs \
+            --mode=audit \
+            "${readiness_args[@]}" \
+            --receipt="${readiness}" > "${RUNNER_TEMP}/release-deployment-readiness-audit.json"
+          node scripts/ql3-release-publication-closure-contract.cjs \
+            --mode=plan \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${REPOSITORY_OWNER}" \
+            --source-repository="${SOURCE_REPOSITORY}" \
+            --release-set="${release_set}" \
+            --catalog-plan="${catalog_plan}" \
+            --catalog-manifest="${manifest}" \
+            --catalog-manifest-digest="${manifest_digest}" \
+            --catalog-receipt="${catalog_receipt}" \
+            --deployment-readiness="${readiness}" \
+            --output="${publication_plan}" > /dev/null
+          echo "plan=${publication_plan}" >> "${GITHUB_OUTPUT}"
+          echo "observations=${observations}" >> "${GITHUB_OUTPUT}"
+          echo "closure=${closure}" >> "${GITHUB_OUTPUT}"
+          echo "readiness=${readiness}" >> "${GITHUB_OUTPUT}"
+          echo "root=${FINALIZATION_ROOT}" >> "${GITHUB_OUTPUT}"
+
+      - name: Attest deployment readiness before any final tag mutation
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: ${{ steps.final-publication.outputs.readiness }}
+
+      - uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote final tags only after every required deployment gate
+        env:
+          REGCTL: ${{ runner.temp }}/regctl
+          PUBLICATION_PLAN: ${{ steps.final-publication.outputs.plan }}
+          TAG_OBSERVATIONS: ${{ steps.final-publication.outputs.observations }}
+        run: |
+          set -euo pipefail
+          umask 077
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { spawnSync } = require('node:child_process');
+          const {
+            createPublicationTagObservation,
+          } = require('./scripts/ql3-release-publication-closure-contract.cjs');
+          const plan = JSON.parse(fs.readFileSync(process.env.PUBLICATION_PLAN, 'utf8'));
+          const regctl = process.env.REGCTL;
+          const maxInventoryBytes = 1024 * 1024;
+          const tagPattern = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/u;
+          const run = (args) => {
+            const result = spawnSync(regctl, args, {
+              encoding: 'utf8',
+              maxBuffer: maxInventoryBytes,
+            });
+            if (result.error) throw result.error;
+            if (result.status !== 0) {
+              throw new Error(`regctl ${args.join(' ')} failed`);
+            }
+            return result.stdout;
+          };
+          const states = [];
+          for (const image of plan.images) {
+            const source = run(['image', 'digest', image.immutableReference]).trim();
+            if (source !== image.digest) {
+              throw new Error('source digest drifted before promotion');
+            }
+            const inventoryContents = run([
+              'tag',
+              'ls',
+              image.registryRepository,
+              '--format',
+              '{{ range .Tags }}{{ println . }}{{ end }}',
+            ]);
+            if (
+              Buffer.byteLength(inventoryContents) > maxInventoryBytes ||
+              (inventoryContents.length > 0 && !inventoryContents.endsWith('\n'))
+            ) {
+              throw new Error('release tag inventory is invalid or unbounded');
+            }
+            const inventory = inventoryContents.length === 0
+              ? []
+              : inventoryContents.slice(0, -1).split('\n');
+            if (
+              inventory.some((tag) => !tagPattern.test(tag)) ||
+              new Set(inventory).size !== inventory.length
+            ) {
+              throw new Error('release tag inventory is malformed');
+            }
+            const inventorySet = new Set(inventory);
+            for (const tag of image.tags) {
+              const tagName = tag.reference.slice(image.registryRepository.length + 1);
+              const present = inventorySet.has(tagName);
+              if (present) {
+                const current = run(['image', 'digest', tag.reference]).trim();
+                if (current !== image.digest) {
+                  throw new Error('release tag already points at another digest');
+                }
+              }
+              states.push({ image, tag, present });
+            }
+          }
+          for (const state of states) {
+            if (!state.present) {
+              run([
+                'image',
+                'copy',
+                state.image.immutableReference,
+                state.tag.reference,
+              ]);
+            }
+          }
+          const observedTags = [];
+          for (const state of states) {
+            const promoted = run(['image', 'digest', state.tag.reference]).trim();
+            if (promoted !== state.image.digest) {
+              throw new Error('promoted tag does not resolve to the release-set digest');
+            }
+            observedTags.push({
+              image: state.image.name,
+              kind: state.tag.kind,
+              reference: state.tag.reference,
+              digest: promoted,
+            });
+          }
+          const observation = createPublicationTagObservation(plan, observedTags);
+          const descriptor = fs.openSync(process.env.TAG_OBSERVATIONS, 'wx', 0o600);
+          try {
+            fs.writeFileSync(descriptor, `${JSON.stringify(observation)}\n`);
+            fs.fsyncSync(descriptor);
+          } finally {
+            fs.closeSync(descriptor);
+          }
+          NODE
+
+      - name: Close and audit the deployment-ready public tag set
+        env:
+          PUBLICATION_PLAN: ${{ steps.final-publication.outputs.plan }}
+          TAG_OBSERVATIONS: ${{ steps.final-publication.outputs.observations }}
+          CLOSURE_RECEIPT: ${{ steps.final-publication.outputs.closure }}
+        run: |
+          set -euo pipefail
+          node scripts/ql3-release-publication-closure-contract.cjs \
+            --mode=close \
+            --plan="${PUBLICATION_PLAN}" \
+            --observations="${TAG_OBSERVATIONS}" \
+            --output="${CLOSURE_RECEIPT}" > /dev/null
+          node scripts/ql3-release-publication-closure-contract.cjs \
+            --mode=audit \
+            --plan="${PUBLICATION_PLAN}" \
+            --observations="${TAG_OBSERVATIONS}" \
+            --receipt="${CLOSURE_RECEIPT}" > "${RUNNER_TEMP}/release-publication-closure-audit.json"
+
+      - name: Attest the deployment-ready release publication closure receipt
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: ${{ steps.final-publication.outputs.closure }}
+
+      - name: Upload the final deployment-ready release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}
+          path: ${{ steps.final-publication.outputs.root }}
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
           overwrite: false
           include-hidden-files: false

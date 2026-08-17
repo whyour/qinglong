@@ -257,9 +257,10 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       'Attest durable release-catalog provenance',
       'Verify the durable catalog and create its immutable receipt',
       'Attest the immutable release-catalog receipt',
-      'Promote final tags only after the catalog receipt is attested',
-      'Close and audit the final public tag set',
-      'Attest the immutable release publication closure receipt',
+      'Attest deployment readiness before any final tag mutation',
+      'Promote final tags only after every required deployment gate',
+      'Close and audit the deployment-ready public tag set',
+      'Attest the deployment-ready release publication closure receipt',
     ],
     'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',
   );

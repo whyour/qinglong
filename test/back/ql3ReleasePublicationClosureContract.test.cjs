@@ -36,6 +36,9 @@ const {
   readReleaseIdentity,
 } = require('../../scripts/lib/ql3-release-identity.cjs');
 const {
+  createDeploymentReadinessReceipt,
+} = require('../../scripts/ql3-release-deployment-readiness-contract.cjs');
+const {
   privateReleaseEvidenceReceipts,
 } = require('./ql3ReleaseEvidenceFixture.cjs');
 
@@ -106,6 +109,145 @@ function manifestFor(plan) {
   });
 }
 
+function catalogConsumption(set, manifestDigest, marker) {
+  return {
+    compatible: true,
+    releaseScope: set.release.scope,
+    sourceRepository: identity.sourceRepository,
+    workflowIdentity: `https://github.com/${identity.sourceRepository}/.github/workflows/ql3-image-release.yml@${identity.sourceRef}`,
+    releaseSetDigest: set.releaseSetDigest,
+    catalogManifestDigest: manifestDigest,
+    immutableReference: `ghcr.io/${identity.repositoryOwner}/qinglong3-release-catalog@${manifestDigest}`,
+    imageCount: set.images.length,
+    discoveryTagAuthority: 'none',
+    externalToolResultsReplayed: false,
+    deploymentMutation: false,
+    contentDigest: sha256(marker),
+    releaseSet: set,
+  };
+}
+
+function localReport(profile, consumption, marker) {
+  return {
+    value: {
+      schemaVersion: 1,
+      profile,
+      generation: 2,
+      exactRepoDigest: true,
+      composeMerge: true,
+      rolloutActive: true,
+      durableReceipt: true,
+      sqliteWriteContract: 37,
+      sqliteBackup: true,
+      sqliteWriteObservation: { rows: 1 },
+      sqliteRestorePrepared: true,
+      sqliteRestoreCommitted: true,
+      sqliteRestoreRolloutRecovered: true,
+      sqliteRestoreReplayUnchanged: true,
+      sqliteEvidenceCollected: true,
+      sqliteCollectedRolloutReplayUnchanged: true,
+      gracefulCleanup: true,
+      releaseAuthority: {
+        mode: 'verified_release_catalog',
+        sourceRevision: identity.sourceRevision,
+        sourceRef: identity.sourceRef,
+        scope: consumption.releaseScope,
+        releaseSetDigest: consumption.releaseSetDigest,
+        catalogManifestDigest: consumption.catalogManifestDigest,
+        catalogConsumptionDigest: consumption.contentDigest,
+        selectionDigest: sha256('local-selection'),
+      },
+      compatible: true,
+    },
+    digest: sha256(marker),
+  };
+}
+
+function clusterReport(consumption) {
+  return {
+    value: {
+      schemaVersion: 1,
+      schema: 'qinglong/kubernetes-deployment-live-evidence@v1',
+      kubernetes: {
+        serverVersion: 'v1.34.3+k3s1',
+        architecture: 'linux/amd64',
+        nodeCount: 3,
+        clusterUid: 'cluster-fixture',
+      },
+      deployment: {
+        replicas: 0,
+        immutableImages: true,
+        headPhase: 'committed',
+        headGeneration: 2,
+        deploymentDigest: sha256('deployment'),
+      },
+      releaseAuthority: {
+        mode: 'verified_release_catalog',
+        version,
+        sourceRevision: identity.sourceRevision,
+        sourceRef: identity.sourceRef,
+        scope: consumption.releaseScope,
+        releaseSetDigest: consumption.releaseSetDigest,
+        catalogManifestDigest: consumption.catalogManifestDigest,
+        catalogConsumptionDigest: consumption.contentDigest,
+        immutableReference: consumption.immutableReference,
+      },
+      preflightDigest: sha256('preflight'),
+      receiptDigest: sha256('deployment-receipt'),
+      receiptAuditCompatible: true,
+      retirement: {
+        receiptAuditCompatible: true,
+        targetAbsent: true,
+        uidResourceVersionDeletePreconditions: true,
+        deploymentHeadCas: true,
+        unixSocketProxy: true,
+      },
+      serverSideDryRun: true,
+      serverSideApply: true,
+      convergenceRead: true,
+      deploymentHeadCas: true,
+      resourceInventoryClosed: true,
+      crossResourceAtomicity: false,
+      cleanupComplete: true,
+    },
+    digest: sha256('cluster-report'),
+  };
+}
+
+function deploymentReadiness(set, manifestDigest) {
+  const scope = set.release.scope;
+  const finalizerConsumption = catalogConsumption(
+    set,
+    manifestDigest,
+    'finalizer-consumption',
+  );
+  const input = {
+    identity: { ...identity, releaseScope: scope },
+    finalizerConsumption,
+  };
+  if (scope !== 'cluster') {
+    const consumption = catalogConsumption(
+      set,
+      manifestDigest,
+      'local-consumption',
+    );
+    input.local = {
+      consumption,
+      edge: localReport('edge', consumption, 'edge-report'),
+      standalone: localReport('standalone', consumption, 'standalone-report'),
+    };
+  }
+  if (scope !== 'local') {
+    const consumption = catalogConsumption(
+      set,
+      manifestDigest,
+      'cluster-consumption',
+    );
+    input.cluster = { consumption, report: clusterReport(consumption) };
+  }
+  return createDeploymentReadinessReceipt(input);
+}
+
 function fixture(scope = 'all') {
   const set = releaseSet(scope);
   const options = { ...identity, releaseScope: scope };
@@ -117,10 +259,12 @@ function fixture(scope = 'all') {
     manifest,
     manifestDigest,
   );
+  const readiness = deploymentReadiness(set, manifestDigest);
   const publicationPlan = createPublicationPlan(
     set,
     catalogPlan,
     catalogReceipt,
+    readiness,
     manifest,
     manifestDigest,
     options,
@@ -141,6 +285,7 @@ function fixture(scope = 'all') {
     manifest,
     manifestDigest,
     catalogReceipt,
+    readiness,
     publicationPlan,
     observation,
   };
@@ -164,11 +309,11 @@ test('plans tag publication only from a verified immutable catalog', () => {
     assert.equal(publicationPlan.schema, PUBLICATION_PLAN_SCHEMA);
     assert.equal(
       publicationPlan.promotionPolicy.authority,
-      'verified_immutable_catalog',
+      'verified_catalog_bound_deployments',
     );
     assert.equal(
-      publicationPlan.requiredPrerequisites.catalogReceipt,
-      'attested_before_tag_promotion',
+      publicationPlan.requiredPrerequisites.deploymentReadiness,
+      'scope_exact_receipt_attested_before_tag_promotion',
     );
     assert.equal(publicationPlan.promotionPolicy.registryTagCas, false);
     assert.equal(publicationPlan.images.length, set.images.length);
@@ -188,6 +333,7 @@ test('creates a deterministic final closure receipt for every exact tag', () => 
   assert.deepEqual(first, replay);
   assert.equal(first.publishedTags.length, publicationPlan.images.length * 2);
   assert.equal(first.verification.catalogReadyBeforeTagMutation, true);
+  assert.equal(first.verification.deploymentReadyBeforeTagMutation, true);
   assert.equal(first.verification.allTagsExactDigest, true);
   assert.equal(first.verification.registryTagCas, false);
   assert.equal(
@@ -223,6 +369,7 @@ test('rejects a publication plan detached from release-set or catalog evidence',
         current.set,
         other.catalogPlan,
         other.catalogReceipt,
+        current.readiness,
         other.manifest,
         other.manifestDigest,
         current.options,
@@ -237,6 +384,7 @@ test('rejects a publication plan detached from release-set or catalog evidence',
         current.set,
         current.catalogPlan,
         weakenedReceipt,
+        current.readiness,
         current.manifest,
         current.manifestDigest,
         current.options,
@@ -286,6 +434,7 @@ test('runs plan, close and audit as canonical no-replace CLI stages', (t) => {
     releaseSet: path.join(directory, 'release-set.json'),
     catalogPlan: path.join(directory, 'catalog-plan.json'),
     catalogReceipt: path.join(directory, 'catalog-receipt.json'),
+    readiness: path.join(directory, 'deployment-readiness.json'),
     manifest: path.join(directory, 'manifest.json'),
     publicationPlan: path.join(directory, 'publication-plan.json'),
     observation: path.join(directory, 'observation.json'),
@@ -294,6 +443,7 @@ test('runs plan, close and audit as canonical no-replace CLI stages', (t) => {
   writeCanonical(files.releaseSet, value.set);
   writeCanonical(files.catalogPlan, value.catalogPlan);
   writeCanonical(files.catalogReceipt, value.catalogReceipt);
+  writeCanonical(files.readiness, value.readiness);
   fs.writeFileSync(files.manifest, value.manifest, { mode: 0o600 });
   writeCanonical(files.observation, value.observation);
   const planArgs = [
@@ -307,6 +457,7 @@ test('runs plan, close and audit as canonical no-replace CLI stages', (t) => {
     `--release-set=${files.releaseSet}`,
     `--catalog-plan=${files.catalogPlan}`,
     `--catalog-receipt=${files.catalogReceipt}`,
+    `--deployment-readiness=${files.readiness}`,
     `--catalog-manifest=${files.manifest}`,
     `--catalog-manifest-digest=${value.manifestDigest}`,
     `--output=${files.publicationPlan}`,

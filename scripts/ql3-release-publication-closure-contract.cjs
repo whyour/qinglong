@@ -13,12 +13,16 @@ const {
   auditCatalogPlan,
   auditCatalogReceipt,
 } = require('./ql3-release-catalog-contract.cjs');
+const {
+  SCHEMA: DEPLOYMENT_READINESS_SCHEMA,
+  validateDeploymentReadinessReceipt,
+} = require('./ql3-release-deployment-readiness-contract.cjs');
 
-const PUBLICATION_PLAN_SCHEMA = 'qinglong/release-publication-plan@v1';
+const PUBLICATION_PLAN_SCHEMA = 'qinglong/release-publication-plan@v2';
 const TAG_OBSERVATION_SCHEMA =
   'qinglong/release-publication-tag-observation@v1';
 const CLOSURE_RECEIPT_SCHEMA =
-  'qinglong/release-publication-closure-receipt@v1';
+  'qinglong/release-publication-closure-receipt@v2';
 const MAX_JSON_BYTES = 1024 * 1024;
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const SOURCE_REVISION_PATTERN = /^[a-f0-9]{40}$/u;
@@ -28,10 +32,11 @@ const REQUIRED_PREREQUISITES = Object.freeze({
   releaseSetProvenance: 'attested_before_catalog_publication',
   catalogSignature: 'verified_exact_workflow_identity',
   catalogProvenance: 'verified_source_tag_and_revision',
-  catalogReceipt: 'attested_before_tag_promotion',
+  catalogReceipt: 'attested_before_deployment_gates',
+  deploymentReadiness: 'scope_exact_receipt_attested_before_tag_promotion',
 });
 const PROMOTION_POLICY = Object.freeze({
-  authority: 'verified_immutable_catalog',
+  authority: 'verified_catalog_bound_deployments',
   inventory: 'bounded_exact_repository_tags',
   conflict: 'fail_closed_before_any_tag_mutation',
   recovery: 'reuse_exact_digest_only',
@@ -40,8 +45,9 @@ const PROMOTION_POLICY = Object.freeze({
   registryTagCas: false,
 });
 const CLOSURE_VERIFICATION = Object.freeze({
-  authority: 'verified_immutable_catalog',
+  authority: 'verified_catalog_bound_deployments',
   catalogReadyBeforeTagMutation: true,
+  deploymentReadyBeforeTagMutation: true,
   allTagsExactDigest: true,
   inventory: 'bounded_exact_repository_tags',
   conflict: 'fail_closed_before_any_tag_mutation',
@@ -159,6 +165,7 @@ function createPublicationPlan(
   releaseSet,
   catalogPlan,
   catalogReceipt,
+  deploymentReadiness,
   catalogManifestContents,
   catalogManifestDigest,
   options,
@@ -172,6 +179,13 @@ function createPublicationPlan(
     catalogManifestContents,
     catalogManifestDigest,
   );
+  validateDeploymentReadinessReceipt(deploymentReadiness, {
+    release: releaseSet.release,
+    sourceRepository: options.sourceRepository,
+    releaseSetDigest: releaseSet.releaseSetDigest,
+    catalogManifestDigest,
+    immutableReference: catalogReceipt.catalog.immutableReference,
+  });
   const images = releaseSet.images.map((image) => {
     const registryRepository = image.reference.slice(
       0,
@@ -203,6 +217,15 @@ function createPublicationPlan(
       manifestDigest: catalogManifestDigest,
       immutableReference: catalogReceipt.catalog.immutableReference,
     },
+    deploymentReadiness: {
+      schema: DEPLOYMENT_READINESS_SCHEMA,
+      receiptDigest: deploymentReadiness.receiptDigest,
+      finalizerConsumptionDigest:
+        deploymentReadiness.catalog.finalizerConsumptionDigest,
+      requiredDeploymentFamilies: [
+        ...deploymentReadiness.requiredDeploymentFamilies,
+      ],
+    },
     requiredPrerequisites: { ...REQUIRED_PREREQUISITES },
     promotionPolicy: { ...PROMOTION_POLICY },
     images,
@@ -221,6 +244,7 @@ function validatePublicationPlan(plan) {
       'release',
       'releaseSet',
       'catalog',
+      'deploymentReadiness',
       'requiredPrerequisites',
       'promotionPolicy',
       'images',
@@ -262,6 +286,25 @@ function validatePublicationPlan(plan) {
     !plan.catalog.immutableReference.endsWith(
       `@${plan.catalog.manifestDigest}`,
     ) ||
+    !exactKeys(plan.deploymentReadiness, [
+      'schema',
+      'receiptDigest',
+      'finalizerConsumptionDigest',
+      'requiredDeploymentFamilies',
+    ]) ||
+    plan.deploymentReadiness.schema !== DEPLOYMENT_READINESS_SCHEMA ||
+    !DIGEST_PATTERN.test(plan.deploymentReadiness.receiptDigest || '') ||
+    !DIGEST_PATTERN.test(
+      plan.deploymentReadiness.finalizerConsumptionDigest || '',
+    ) ||
+    JSON.stringify(plan.deploymentReadiness.requiredDeploymentFamilies) !==
+      JSON.stringify(
+        plan.release.scope === 'local'
+          ? ['local']
+          : plan.release.scope === 'cluster'
+          ? ['cluster']
+          : ['local', 'cluster'],
+      ) ||
     JSON.stringify(plan.requiredPrerequisites) !==
       JSON.stringify(REQUIRED_PREREQUISITES) ||
     JSON.stringify(plan.promotionPolicy) !== JSON.stringify(PROMOTION_POLICY) ||
@@ -394,6 +437,12 @@ function createClosureReceipt(plan, observation) {
     planDigest: plan.planDigest,
     releaseSet: { ...plan.releaseSet },
     catalog: { ...plan.catalog },
+    deploymentReadiness: {
+      ...plan.deploymentReadiness,
+      requiredDeploymentFamilies: [
+        ...plan.deploymentReadiness.requiredDeploymentFamilies,
+      ],
+    },
     tagObservationDigest: observation.observationDigest,
     publishedTags: observation.tags.map((entry) => ({ ...entry })),
     verification: { ...CLOSURE_VERIFICATION },
@@ -414,6 +463,7 @@ function auditClosureReceipt(actual, plan, observation) {
     releaseSetDigest: actual.releaseSet.releaseSetDigest,
     releaseScope: actual.release.scope,
     catalogManifestDigest: actual.catalog.manifestDigest,
+    deploymentReadinessReceiptDigest: actual.deploymentReadiness.receiptDigest,
     publishedTagCount: actual.publishedTags.length,
     allTagsExactDigest: actual.verification.allTagsExactDigest,
     registryTagCas: actual.verification.registryTagCas,
@@ -444,6 +494,7 @@ function parseArguments(argv) {
           'catalog-manifest-digest',
           'catalog-plan',
           'catalog-receipt',
+          'deployment-readiness',
           'mode',
           'output',
           'release-set',
@@ -470,6 +521,7 @@ function parseArguments(argv) {
     releaseSet: values['release-set'],
     catalogPlan: values['catalog-plan'],
     catalogReceipt: values['catalog-receipt'],
+    deploymentReadiness: values['deployment-readiness'],
     catalogManifest: values['catalog-manifest'],
     catalogManifestDigest: values['catalog-manifest-digest'],
     version: values.version,
@@ -490,6 +542,10 @@ function runCli(argv, output = process.stdout) {
       options.catalogReceipt,
       'catalog receipt',
     );
+    const deploymentReadiness = readCanonicalJson(
+      options.deploymentReadiness,
+      'deployment readiness receipt',
+    );
     const manifest = readBoundedFile(
       options.catalogManifest,
       'catalog manifest',
@@ -498,6 +554,7 @@ function runCli(argv, output = process.stdout) {
       releaseSet,
       catalogPlan,
       catalogReceipt,
+      deploymentReadiness,
       manifest,
       options.catalogManifestDigest,
       options,

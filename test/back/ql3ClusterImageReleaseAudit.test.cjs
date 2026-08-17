@@ -95,6 +95,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         tagAfterVerification: true,
         tagAfterCompleteReleaseSet: true,
         tagAfterVerifiedCatalog: true,
+        tagAfterRequiredDeploymentGates: true,
         boundedRepositoryTagInventory: true,
         allTagConflictsCheckedBeforeMutation: true,
         responseLossRecovery: 'reuse_exact_digest_only',
@@ -107,7 +108,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         privateEvidenceFreshnessRevalidatedAtClosure: true,
         exactScopeClosure: true,
         standaloneInspection: true,
-        tagPromotionAuthority: 'verified_immutable_catalog',
+        tagPromotionAuthority: 'verified_catalog_bound_deployments',
         fileProvenanceAttested: true,
         artifactRetentionDays: 90,
         crossRepositoryAtomicity: false,
@@ -135,10 +136,11 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         receiptAttested: true,
       },
       finalPublicationClosure: {
-        planSchema: 'qinglong/release-publication-plan@v1',
+        planSchema: 'qinglong/release-publication-plan@v2',
         tagObservationSchema: 'qinglong/release-publication-tag-observation@v1',
-        receiptSchema: 'qinglong/release-publication-closure-receipt@v1',
+        receiptSchema: 'qinglong/release-publication-closure-receipt@v2',
         catalogReadyBeforeTagMutation: true,
+        deploymentReadyBeforeTagMutation: true,
         allTagsExactDigest: true,
         tagsPerImage: 2,
         conflictPolicy: 'fail_closed_before_any_tag_mutation',
@@ -146,6 +148,16 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         crossRepositoryAtomicity: false,
         registryTagCas: false,
         receiptAttested: true,
+      },
+      deploymentReadiness: {
+        receiptSchema: 'qinglong/release-deployment-readiness-receipt@v1',
+        scopes: ['local', 'cluster', 'all'],
+        localProfiles: ['edge', 'standalone'],
+        clusterNodes: 3,
+        independentFinalizerCatalogConsumption: true,
+        exactEvidenceBytesAudited: true,
+        jobResultOnlyAuthority: false,
+        receiptAttestedBeforeTagMutation: true,
       },
       catalogDeploymentGate: {
         scopes: ['cluster', 'all'],
@@ -155,6 +167,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         installReceiptAudited: true,
         fencedRetirementReceiptAudited: true,
         publicationAuthority: false,
+        requiredForFinalization: true,
       },
       localCatalogDeploymentGate: {
         scopes: ['local', 'all'],
@@ -164,6 +177,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         rolloutReceiptAudited: true,
         gracefulCleanup: true,
         publicationAuthority: false,
+        requiredForFinalization: true,
       },
       localRolloutPreflight: true,
       localRolloutApply: true,
@@ -179,6 +193,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         'catalog-consumption',
         'catalog-bound-local-compose-deployment',
         'catalog-bound-k3s-deployment',
+        'deployment-readiness',
         'release-tags',
         'release-publication-closure',
       ],
@@ -212,6 +227,17 @@ test('rejects removal of the final publication closure contract tests', () => {
   const mutated = ciSource.replace(
     'test/back/ql3ReleasePublicationClosureContract.test.cjs',
     'test/back/publication-closure-tests-removed.test.cjs',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /durable catalog, deployment-lock and workflow negative tests/,
+  );
+});
+
+test('rejects removal of the deployment readiness contract tests', () => {
+  const mutated = ciSource.replace(
+    'test/back/ql3ReleaseDeploymentReadinessContract.test.cjs',
+    'test/back/deployment-readiness-tests-removed.test.cjs',
   );
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
@@ -641,7 +667,7 @@ test('rejects a movable action tag in the privileged release job', () => {
   )}actions/checkout@v6${releaseSource.slice(offset + pinned.length)}`;
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /privileged publisher|immutable checkout action|release-set job|cluster release must read/,
+    /privileged publisher|immutable checkout action|release-set job|cluster release must read|release finalization/,
   );
 });
 
@@ -995,7 +1021,7 @@ test('rejects a deployment lock without standalone inspection', () => {
   )}`;
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1006,7 +1032,7 @@ test('rejects a catalog title that leaks the runner temporary path', () => {
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1017,7 +1043,7 @@ test('rejects a catalog publication without byte-exact round trip', () => {
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1028,7 +1054,7 @@ test('rejects direct overwrite publication to the catalog discovery tag', () => 
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1039,7 +1065,7 @@ test('rejects catalog publication without a conflict-aware decision', () => {
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1050,7 +1076,7 @@ test('rejects catalog publication without bounded tag inventory classification',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1061,7 +1087,7 @@ test('rejects response-loss recovery that cannot reuse an exact catalog digest',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1072,7 +1098,7 @@ test('rejects using the mutable catalog discovery tag as deployment authority', 
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1083,7 +1109,7 @@ test('rejects durable catalog provenance detached from its manifest digest', () 
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
@@ -1094,19 +1120,54 @@ test('rejects a release-catalog receipt without file provenance', () => {
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /independently inspect, durably publish/,
+    /independently inspect and durably publish/,
   );
 });
 
-test('rejects final tag publication before catalog receipt attestation', () => {
+test('rejects final tag publication before deployment readiness', () => {
   const mutated = releaseSource.replace(
-    'Promote final tags only after the catalog receipt is attested',
-    'Promote tags after release-set audit only',
+    'Promote final tags only after every required deployment gate',
+    'Promote tags before deployment readiness',
   );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /release tags and the final closure receipt|release-set job must download/,
+    /release finalization|release tags and the final closure receipt/,
   );
+});
+
+test('rejects finalization that ignores a required deployment job result', () => {
+  const mutated = releaseSource.replace(
+    "needs.release-catalog-local-deployment-live.result == 'success'",
+    "needs.release-catalog-local-deployment-live.result != 'failure'",
+  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
+});
+
+test('rejects deployment readiness without exact downloaded evidence bundles', () => {
+  const mutated = releaseSource.replace(
+    '          path: ${{ runner.temp }}/ql3-release-catalog-deployment',
+    '          path: ${{ runner.temp }}/ql3-release-catalog-deployment/report.json',
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /cluster release must read the newly published immutable catalog/,
+  );
+});
+
+test('rejects a publication plan detached from deployment readiness', () => {
+  const mutated = releaseSource.replace(
+    '            --deployment-readiness="${readiness}" \\',
+    '            --deployment-readiness="${catalog_receipt}" \\',
+  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
+});
+
+test('rejects deployment readiness without its own pre-promotion attestation', () => {
+  const mutated = releaseSource.replace(
+    '          subject-path: ${{ steps.final-publication.outputs.readiness }}',
+    '          subject-path: ${{ steps.final-publication.outputs.plan }}',
+  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
 });
 
 test('rejects final tag promotion without bounded repository inventory', () => {
@@ -1114,10 +1175,7 @@ test('rejects final tag promotion without bounded repository inventory', () => {
     "              'tag',\n              'ls',\n              image.registryRepository,",
     "              'image',\n              'digest',\n              image.registryRepository,",
   );
-  assert.throws(
-    () => auditReleaseWorkflow(mutated),
-    /release-set job must download only same-run records/,
-  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
 });
 
 test('rejects omission of the final publication closure audit', () => {
@@ -1125,39 +1183,33 @@ test('rejects omission of the final publication closure audit', () => {
     '            --mode=close \\',
     '            --mode=audit \\',
   );
-  assert.throws(
-    () => auditReleaseWorkflow(mutated),
-    /release-set job must download only same-run records/,
-  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
 });
 
 test('rejects omitting tag observations from the durable closure bundle', () => {
   const mutated = releaseSource.replace(
-    'observations="${BUNDLE}/qinglong3-release-publication-tag-observation-',
+    'observations="${FINALIZATION_ROOT}/qinglong3-release-publication-tag-observation-',
     'observations="${RUNNER_TEMP}/qinglong3-release-publication-tag-observation-',
   );
-  assert.throws(
-    () => auditReleaseWorkflow(mutated),
-    /release-set job must download only same-run records/,
-  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
 });
 
 test('rejects a final closure receipt without its own attestation', () => {
   const mutated = releaseSource.replace(
-    '          subject-path: ${{ steps.final-publication.outputs.receipt }}',
-    '          subject-path: ${{ steps.catalog-receipt.outputs.receipt }}',
+    '          subject-path: ${{ steps.final-publication.outputs.closure }}',
+    '          subject-path: ${{ steps.final-publication.outputs.readiness }}',
   );
-  assert.throws(
-    () => auditReleaseWorkflow(mutated),
-    /release-set job must download only same-run records/,
-  );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
 });
 
 test('rejects a short-lived deployment digest lock', () => {
   const marker = '          retention-days: 90';
   assert.equal(releaseSource.includes(marker), true);
   const mutated = releaseSource.replace(marker, '          retention-days: 1');
-  assert.throws(() => auditReleaseWorkflow(mutated), /deployment lock/);
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /release-set job|release finalization/,
+  );
 });
 
 test('rejects removal of the digest-bound OS vulnerability attestation', () => {

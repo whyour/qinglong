@@ -1,10 +1,11 @@
 # ADR-0442：Catalog-ready 的终态 Release Tag 发布与闭合收据
 
-- 状态：Accepted
+- 状态：Superseded by ADR-0443（bounded promotion/closure 机制继续有效，发布前置顺序被收紧）
 - 日期：2026-08-18
 - 关联 RFC：QL-RFC-0001 D-03、D-14、D-336、D-349、D-350
 - 关联 ADR：ADR-0427、ADR-0428、ADR-0439、ADR-0441
 - Supersedes：ADR-0427 中“完整 release-set 审计后即可 promotion”的最早发布顺序
+- Superseded by：ADR-0443 将最终 tag mutation 继续后移到 scope-exact deployment readiness attestation 之后
 
 ## 上下文
 

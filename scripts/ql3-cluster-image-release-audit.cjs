@@ -274,7 +274,7 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3PrivateReleaseEvidenceReceiptContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleasePublicationClosureContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
+    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3PrivateReleaseEvidenceReceiptContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseDeploymentReadinessContract\.test\.cjs[\s\S]*test\/back\/ql3ReleasePublicationClosureContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
     'cluster image CI must run SBOM, candidate, private evidence receipt, release-set, durable catalog, deployment-lock and workflow negative tests; catalog consumption ceremony is mandatory',
   );
   requirePattern(
@@ -414,6 +414,7 @@ function auditReleaseWorkflow(source) {
     workflow?.jobs?.['release-catalog-local-deployment-live'];
   const catalogDeploymentJob =
     workflow?.jobs?.['release-catalog-deployment-live'];
+  const finalizationJob = workflow?.jobs?.['release-finalization'];
   if (
     publishJob?.strategy?.matrix?.include !==
     '${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}'
@@ -487,6 +488,14 @@ function auditReleaseWorkflow(source) {
         contents: 'read',
         packages: 'read',
         attestations: 'read',
+      }) ||
+    JSON.stringify(finalizationJob?.permissions) !==
+      JSON.stringify({
+        contents: 'read',
+        packages: 'write',
+        'id-token': 'write',
+        attestations: 'write',
+        'artifact-metadata': 'write',
       })
   ) {
     throw new Error(
@@ -712,7 +721,7 @@ function auditReleaseWorkflow(source) {
   const releaseSetSteps = releaseSetJob?.steps;
   if (
     !Array.isArray(releaseSetSteps) ||
-    releaseSetSteps.length !== 19 ||
+    releaseSetSteps.length !== 15 ||
     releaseSetSteps[0]?.uses !==
       'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
     releaseSetSteps[0]?.with?.['persist-credentials'] !== false ||
@@ -793,27 +802,11 @@ function auditReleaseWorkflow(source) {
       JSON.stringify({
         'subject-path': '${{ steps.catalog-receipt.outputs.receipt }}',
       }) ||
-    releaseSetSteps[14]?.id !== 'final-publication' ||
-    !/plan="\$\{BUNDLE\}\/qinglong3-release-publication-plan-[^\n]+[\s\S]*observations="\$\{BUNDLE\}\/qinglong3-release-publication-tag-observation-[^\n]+[\s\S]*receipt="\$\{BUNDLE\}\/qinglong3-release-publication-closure-receipt-[^\n]+[\s\S]*ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=plan[\s\S]*--release-set="\$\{RELEASE_SET\}"[\s\S]*--catalog-plan="\$\{CATALOG_PLAN\}"[\s\S]*--catalog-manifest="\$\{CATALOG_MANIFEST\}"[\s\S]*--catalog-manifest-digest="\$\{CATALOG_MANIFEST_DIGEST\}"[\s\S]*--catalog-receipt="\$\{CATALOG_RECEIPT\}"[\s\S]*GITHUB_OUTPUT/.test(
-      releaseSetSteps[14]?.run ?? '',
-    ) ||
-    !/createPublicationTagObservation[\s\S]*maxInventoryBytes = 1024 \* 1024[\s\S]*tagPattern[\s\S]*for \(const image of plan\.images\)[\s\S]*image\.immutableReference[\s\S]*'tag',[\s\S]*'ls',[\s\S]*image\.registryRepository[\s\S]*inventoryContents\.endsWith\('\\n'\)[\s\S]*new Set\(inventory\)\.size !== inventory\.length[\s\S]*release tag already points at another digest[\s\S]*for \(const state of states\)[\s\S]*'image',[\s\S]*'copy',[\s\S]*state\.image\.immutableReference[\s\S]*promoted tag does not resolve to the release-set digest[\s\S]*createPublicationTagObservation\(plan, observedTags\)[\s\S]*fs\.openSync\(process\.env\.TAG_OBSERVATIONS, 'wx', 0o600\)/.test(
-      releaseSetSteps[15]?.run ?? '',
-    ) ||
-    !/ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=close[\s\S]*--plan="\$\{PUBLICATION_PLAN\}"[\s\S]*--observations="\$\{TAG_OBSERVATIONS\}"[\s\S]*--output="\$\{CLOSURE_RECEIPT\}"[\s\S]*ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=audit[\s\S]*--receipt="\$\{CLOSURE_RECEIPT\}"/.test(
-      releaseSetSteps[16]?.run ?? '',
-    ) ||
-    releaseSetSteps[17]?.uses !==
-      'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
-    JSON.stringify(releaseSetSteps[17]?.with) !==
-      JSON.stringify({
-        'subject-path': '${{ steps.final-publication.outputs.receipt }}',
-      }) ||
-    releaseSetSteps[18]?.uses !==
+    releaseSetSteps[14]?.uses !==
       'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
-    JSON.stringify(releaseSetSteps[18]?.with) !==
+    JSON.stringify(releaseSetSteps[14]?.with) !==
       JSON.stringify({
-        name: 'ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}',
+        name: 'ql3-release-catalog-publisher-${{ github.run_id }}-${{ github.run_attempt }}',
         path: '${{ steps.release-set.outputs.bundle }}',
         'if-no-files-found': 'error',
         'retention-days': 90,
@@ -823,7 +816,7 @@ function auditReleaseWorkflow(source) {
       })
   ) {
     throw new Error(
-      'release-set job must download only same-run records, independently inspect, durably publish and attest one no-overwrite deployment lock bundle',
+      'release-set job must download only same-run records, independently inspect and durably publish one attested immutable catalog without final tag authority',
     );
   }
   const localCatalogDeploymentSteps = localCatalogDeploymentJob?.steps;
@@ -850,7 +843,7 @@ function auditReleaseWorkflow(source) {
     localCatalogDeploymentSteps[4]?.uses !==
       'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6' ||
     localCatalogDeploymentSteps[5]?.id !== 'local-catalog-consumption' ||
-    !/install -d -m 0700[\s\S]*install -m 0600 \/dev\/null[\s\S]*printf '%s' "\$\{GH_TOKEN\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=create[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--output-directory="\$\{bundle\}"[\s\S]*--github-token-file="\$\{token\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=audit[\s\S]*rm -f "\$\{token\}"/u.test(
+    !/private_root="\$\{RUNNER_TEMP\}\/ql3-release-catalog-local-deployment"[\s\S]*bundle="\$\{private_root\}\/consumption"[\s\S]*install -d -m 0700[\s\S]*install -m 0600 \/dev\/null[\s\S]*printf '%s' "\$\{GH_TOKEN\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=create[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--output-directory="\$\{bundle\}"[\s\S]*--github-token-file="\$\{token\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=audit[\s\S]*rm -f "\$\{token\}"/u.test(
       localCatalogDeploymentSteps[5]?.run ?? '',
     ) ||
     localCatalogDeploymentSteps[6]?.id !== 'local-selection' ||
@@ -915,7 +908,7 @@ function auditReleaseWorkflow(source) {
       catalogDeploymentSteps[5]?.run ?? '',
     ) ||
     catalogDeploymentSteps[6]?.id !== 'catalog-consumption' ||
-    !/install -d -m 0700[\s\S]*install -m 0600 \/dev\/null[\s\S]*printf '%s' "\$\{GH_TOKEN\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=create[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--output-directory="\$\{bundle\}"[\s\S]*--github-token-file="\$\{token\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=audit[\s\S]*rm -f "\$\{token\}"/u.test(
+    !/private_root="\$\{RUNNER_TEMP\}\/ql3-release-catalog-deployment"[\s\S]*bundle="\$\{private_root\}\/consumption"[\s\S]*install -d -m 0700[\s\S]*install -m 0600 \/dev\/null[\s\S]*printf '%s' "\$\{GH_TOKEN\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=create[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--output-directory="\$\{bundle\}"[\s\S]*--github-token-file="\$\{token\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=audit[\s\S]*rm -f "\$\{token\}"/u.test(
       catalogDeploymentSteps[6]?.run ?? '',
     ) ||
     !/docker pull[\s\S]*rancher\/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c[\s\S]*docker tag[\s\S]*rancher\/k3s:v1\.34\.3-k3s1/u.test(
@@ -949,7 +942,7 @@ function auditReleaseWorkflow(source) {
     JSON.stringify(catalogDeploymentSteps[10]?.with) !==
       JSON.stringify({
         name: 'ql3-release-catalog-deployment-${{ github.run_id }}-${{ github.run_attempt }}',
-        path: '${{ runner.temp }}/ql3-release-catalog-deployment/report.json',
+        path: '${{ runner.temp }}/ql3-release-catalog-deployment',
         'if-no-files-found': 'warn',
         'retention-days': 90,
         'compression-level': 9,
@@ -965,6 +958,102 @@ function auditReleaseWorkflow(source) {
   ) {
     throw new Error(
       'cluster release must read the newly published immutable catalog, reconstruct its deployment lock and prove install plus fenced retirement on isolated K3s without publication authority',
+    );
+  }
+  const finalizationSteps = finalizationJob?.steps;
+  if (
+    JSON.stringify(finalizationJob?.needs) !==
+      JSON.stringify([
+        'release-set',
+        'release-catalog-local-deployment-live',
+        'release-catalog-deployment-live',
+      ]) ||
+    !/always\(\)[\s\S]*needs\.release-set\.result == 'success'[\s\S]*inputs\.release_scope == 'local'[\s\S]*release-catalog-local-deployment-live\.result == 'success'[\s\S]*release-catalog-deployment-live\.result == 'skipped'[\s\S]*inputs\.release_scope == 'cluster'[\s\S]*release-catalog-local-deployment-live\.result == 'skipped'[\s\S]*release-catalog-deployment-live\.result == 'success'[\s\S]*inputs\.release_scope == 'all'[\s\S]*release-catalog-local-deployment-live\.result == 'success'[\s\S]*release-catalog-deployment-live\.result == 'success'/u.test(
+      finalizationJob?.if ?? '',
+    ) ||
+    finalizationJob?.['runs-on'] !== 'ubuntu-24.04' ||
+    finalizationJob?.['timeout-minutes'] !== 30 ||
+    !Array.isArray(finalizationSteps) ||
+    finalizationSteps.length !== 16 ||
+    finalizationSteps[0]?.uses !==
+      'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
+    finalizationSteps[0]?.with?.['persist-credentials'] !== false ||
+    finalizationSteps[1]?.uses !==
+      'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38' ||
+    finalizationSteps[1]?.with?.['node-version'] !== '24.18.0' ||
+    !/corepack prepare pnpm@8\.3\.1 --activate[\s\S]*pnpm install --frozen-lockfile --ignore-scripts/u.test(
+      finalizationSteps[2]?.run ?? '',
+    ) ||
+    finalizationSteps[3]?.if !== "inputs.release_scope != 'cluster'" ||
+    finalizationSteps[3]?.uses !==
+      'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' ||
+    JSON.stringify(finalizationSteps[3]?.with) !==
+      JSON.stringify({
+        name: 'ql3-release-catalog-local-deployment-${{ github.run_id }}-${{ github.run_attempt }}',
+        path: '${{ runner.temp }}/ql3-release-finalization/deployment-evidence/local',
+      }) ||
+    finalizationSteps[4]?.if !== "inputs.release_scope != 'local'" ||
+    finalizationSteps[4]?.uses !==
+      'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c' ||
+    JSON.stringify(finalizationSteps[4]?.with) !==
+      JSON.stringify({
+        name: 'ql3-release-catalog-deployment-${{ github.run_id }}-${{ github.run_attempt }}',
+        path: '${{ runner.temp }}/ql3-release-finalization/deployment-evidence/cluster',
+      }) ||
+    !/chmod 0700 "\$\{directory\}"[\s\S]*find "\$\{FINALIZATION_ROOT\}" -type d[\s\S]*chmod 0600 "\$\{file\}"[\s\S]*find "\$\{FINALIZATION_ROOT\}" -type f[\s\S]*local\/edge\.json[\s\S]*local\/standalone\.json[\s\S]*cluster\/report\.json/u.test(
+      finalizationSteps[5]?.run ?? '',
+    ) ||
+    !/v0\.11\.5\/regctl-linux-amd64[\s\S]*c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467[\s\S]*sha256sum --check --strict/u.test(
+      finalizationSteps[6]?.run ?? '',
+    ) ||
+    finalizationSteps[7]?.uses !==
+      'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6' ||
+    finalizationSteps[8]?.id !== 'finalizer-consumption' ||
+    !/ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=create[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--output-directory="\$\{bundle\}"[\s\S]*--github-token-file="\$\{token\}"[\s\S]*--mode=audit[\s\S]*rm -f "\$\{token\}"/u.test(
+      finalizationSteps[8]?.run ?? '',
+    ) ||
+    finalizationSteps[9]?.id !== 'final-publication' ||
+    !/observations="\$\{FINALIZATION_ROOT\}\/qinglong3-release-publication-tag-observation-[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=plan[\s\S]*--release-set="\$\{release_set\}"[\s\S]*ql3-release-catalog-contract\.cjs[\s\S]*--mode=receipt[\s\S]*readiness_args=\([\s\S]*--finalizer-consumption-bundle="\$\{FINALIZER_CONSUMPTION\}"[\s\S]*--local-consumption-bundle=[\s\S]*--edge-report=[\s\S]*--standalone-report=[\s\S]*--cluster-consumption-bundle=[\s\S]*--cluster-report=[\s\S]*ql3-release-deployment-readiness-contract\.cjs[\s\S]*--mode=create[\s\S]*--output="\$\{readiness\}"[\s\S]*ql3-release-deployment-readiness-contract\.cjs[\s\S]*--mode=audit[\s\S]*--receipt="\$\{readiness\}"[\s\S]*ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=plan[\s\S]*--deployment-readiness="\$\{readiness\}"[\s\S]*GITHUB_OUTPUT/u.test(
+      finalizationSteps[9]?.run ?? '',
+    ) ||
+    finalizationSteps[10]?.uses !==
+      'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
+    JSON.stringify(finalizationSteps[10]?.with) !==
+      JSON.stringify({
+        'subject-path': '${{ steps.final-publication.outputs.readiness }}',
+      }) ||
+    finalizationSteps[11]?.uses !==
+      'docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c' ||
+    !/createPublicationTagObservation[\s\S]*maxInventoryBytes = 1024 \* 1024[\s\S]*tagPattern[\s\S]*for \(const image of plan\.images\)[\s\S]*image\.immutableReference[\s\S]*'tag',[\s\S]*'ls',[\s\S]*image\.registryRepository[\s\S]*inventoryContents\.endsWith\('\\n'\)[\s\S]*new Set\(inventory\)\.size !== inventory\.length[\s\S]*release tag already points at another digest[\s\S]*for \(const state of states\)[\s\S]*'image',[\s\S]*'copy',[\s\S]*state\.image\.immutableReference[\s\S]*promoted tag does not resolve to the release-set digest[\s\S]*createPublicationTagObservation\(plan, observedTags\)[\s\S]*fs\.openSync\(process\.env\.TAG_OBSERVATIONS, 'wx', 0o600\)/u.test(
+      finalizationSteps[12]?.run ?? '',
+    ) ||
+    !/ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=close[\s\S]*--plan="\$\{PUBLICATION_PLAN\}"[\s\S]*--observations="\$\{TAG_OBSERVATIONS\}"[\s\S]*--output="\$\{CLOSURE_RECEIPT\}"[\s\S]*--mode=audit[\s\S]*--receipt="\$\{CLOSURE_RECEIPT\}"/u.test(
+      finalizationSteps[13]?.run ?? '',
+    ) ||
+    finalizationSteps[14]?.uses !==
+      'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6' ||
+    JSON.stringify(finalizationSteps[14]?.with) !==
+      JSON.stringify({
+        'subject-path': '${{ steps.final-publication.outputs.closure }}',
+      }) ||
+    finalizationSteps[15]?.uses !==
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
+    JSON.stringify(finalizationSteps[15]?.with) !==
+      JSON.stringify({
+        name: 'ql3-release-set-${{ inputs.version }}-${{ inputs.release_scope }}',
+        path: '${{ steps.final-publication.outputs.root }}',
+        'if-no-files-found': 'error',
+        'retention-days': 90,
+        'compression-level': 0,
+        overwrite: false,
+        'include-hidden-files': false,
+      }) ||
+    finalizationSteps
+      .slice(0, 12)
+      .some((step) => /\bimage copy\b/u.test(step.run ?? ''))
+  ) {
+    throw new Error(
+      'release finalization must independently verify exact scope deployment evidence, attest readiness and only then publish and close final tags',
     );
   }
   if (
@@ -1097,20 +1186,20 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /uses: actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6/g,
-    8,
+    9,
     'all release jobs must pin the reviewed immutable checkout action',
   );
   requireOccurrences(
     source,
     /uses: actions\/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6/g,
-    8,
+    9,
     'all release jobs must pin the reviewed immutable Node setup action',
   );
   requireOccurrences(
     source,
     /uses: sigstore\/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4\.1\.2/g,
-    4,
-    'image publisher, catalog publisher and both catalog consumers must pin the reviewed Cosign installer',
+    5,
+    'image publisher, catalog publisher, both deployment consumers and the finalizer must pin the reviewed Cosign installer',
   );
   requirePattern(
     source,
@@ -1150,8 +1239,8 @@ function auditReleaseWorkflow(source) {
   requireExactOccurrences(
     source,
     /c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467/g,
-    4,
-    'image publisher, release-set publisher and both catalog consumers must checksum-pin the exact regctl OCI copier and reader',
+    5,
+    'image publisher, release-set publisher, both deployment consumers and the finalizer must checksum-pin the exact regctl OCI copier and reader',
   );
   requirePattern(
     source,
@@ -1171,8 +1260,8 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /uses: actions\/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4/g,
-    7,
-    'release workflow must create four image attestations plus release-set, durable catalog and receipt provenance',
+    9,
+    'release workflow must create four image attestations plus release-set, durable catalog, catalog receipt, deployment readiness and final closure provenance',
   );
   requireOccurrences(
     source,
@@ -1266,8 +1355,8 @@ function auditReleaseWorkflow(source) {
   );
   requirePattern(
     source,
-    /release-set:\s+name: Close and publish the complete deployment release set[\s\S]*needs:[\s\S]*- publish[\s\S]*name: Attest the complete release-set file provenance[\s\S]*name: Publish and round-trip the durable OCI release catalog[\s\S]*name: Keylessly sign the immutable release-catalog digest[\s\S]*name: Attest durable release-catalog provenance[\s\S]*name: Verify the durable catalog and create its immutable receipt[\s\S]*name: Attest the immutable release-catalog receipt[\s\S]*name: Materialize the catalog-authorized final tag publication plan[\s\S]*name: Promote final tags only after the catalog receipt is attested[\s\S]*name: Close and audit the final public tag set[\s\S]*name: Attest the immutable release publication closure receipt[\s\S]*name: Publish the deployment digest lock/,
-    'release tags and the final closure receipt must be published only after the durable catalog is verified and its receipt is attested',
+    /release-set:\s+name: Close the release set and publish its immutable catalog[\s\S]*needs:[\s\S]*- publish[\s\S]*name: Attest the complete release-set file provenance[\s\S]*name: Publish and round-trip the durable OCI release catalog[\s\S]*name: Keylessly sign the immutable release-catalog digest[\s\S]*name: Attest durable release-catalog provenance[\s\S]*name: Verify the durable catalog and create its immutable receipt[\s\S]*name: Attest the immutable release-catalog receipt[\s\S]*name: Upload same-run catalog publisher evidence[\s\S]*release-catalog-local-deployment-live:[\s\S]*name: Prove catalog-bound Edge and Standalone rollout[\s\S]*release-catalog-deployment-live:[\s\S]*name: Prove catalog-bound install and fenced retirement on three K3s nodes[\s\S]*release-finalization:[\s\S]*name: Attest deployment readiness before any final tag mutation[\s\S]*name: Promote final tags only after every required deployment gate[\s\S]*name: Close and audit the deployment-ready public tag set[\s\S]*name: Attest the deployment-ready release publication closure receipt[\s\S]*name: Upload the final deployment-ready release bundle/,
+    'release tags and the final closure receipt must be published only after the durable catalog and every required catalog-bound deployment gate are verified',
   );
   return {
     trigger: 'explicit protected v3 tag dispatch',
@@ -1324,6 +1413,7 @@ function auditReleaseWorkflow(source) {
       tagAfterVerification: true,
       tagAfterCompleteReleaseSet: true,
       tagAfterVerifiedCatalog: true,
+      tagAfterRequiredDeploymentGates: true,
       boundedRepositoryTagInventory: true,
       allTagConflictsCheckedBeforeMutation: true,
       responseLossRecovery: 'reuse_exact_digest_only',
@@ -1336,7 +1426,7 @@ function auditReleaseWorkflow(source) {
       privateEvidenceFreshnessRevalidatedAtClosure: true,
       exactScopeClosure: true,
       standaloneInspection: true,
-      tagPromotionAuthority: 'verified_immutable_catalog',
+      tagPromotionAuthority: 'verified_catalog_bound_deployments',
       fileProvenanceAttested: true,
       artifactRetentionDays: 90,
       crossRepositoryAtomicity: false,
@@ -1364,10 +1454,11 @@ function auditReleaseWorkflow(source) {
       receiptAttested: true,
     },
     finalPublicationClosure: {
-      planSchema: 'qinglong/release-publication-plan@v1',
+      planSchema: 'qinglong/release-publication-plan@v2',
       tagObservationSchema: 'qinglong/release-publication-tag-observation@v1',
-      receiptSchema: 'qinglong/release-publication-closure-receipt@v1',
+      receiptSchema: 'qinglong/release-publication-closure-receipt@v2',
       catalogReadyBeforeTagMutation: true,
+      deploymentReadyBeforeTagMutation: true,
       allTagsExactDigest: true,
       tagsPerImage: 2,
       conflictPolicy: 'fail_closed_before_any_tag_mutation',
@@ -1375,6 +1466,16 @@ function auditReleaseWorkflow(source) {
       crossRepositoryAtomicity: false,
       registryTagCas: false,
       receiptAttested: true,
+    },
+    deploymentReadiness: {
+      receiptSchema: 'qinglong/release-deployment-readiness-receipt@v1',
+      scopes: ['local', 'cluster', 'all'],
+      localProfiles: ['edge', 'standalone'],
+      clusterNodes: 3,
+      independentFinalizerCatalogConsumption: true,
+      exactEvidenceBytesAudited: true,
+      jobResultOnlyAuthority: false,
+      receiptAttestedBeforeTagMutation: true,
     },
     catalogDeploymentGate: {
       scopes: ['cluster', 'all'],
@@ -1384,6 +1485,7 @@ function auditReleaseWorkflow(source) {
       installReceiptAudited: true,
       fencedRetirementReceiptAudited: true,
       publicationAuthority: false,
+      requiredForFinalization: true,
     },
     localCatalogDeploymentGate: {
       scopes: ['local', 'all'],
@@ -1393,6 +1495,7 @@ function auditReleaseWorkflow(source) {
       rolloutReceiptAudited: true,
       gracefulCleanup: true,
       publicationAuthority: false,
+      requiredForFinalization: true,
     },
     localRolloutPreflight: true,
     localRolloutApply: true,
@@ -1408,6 +1511,7 @@ function auditReleaseWorkflow(source) {
       'catalog-consumption',
       'catalog-bound-local-compose-deployment',
       'catalog-bound-k3s-deployment',
+      'deployment-readiness',
       'release-tags',
       'release-publication-closure',
     ],

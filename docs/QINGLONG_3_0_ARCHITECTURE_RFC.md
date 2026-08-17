@@ -11,6 +11,28 @@
 
 最新增量证据（2026-08-18）：
 
+- D-351/ADR-0443（已接受；首份真实 GHCR deployment-ready finalization 待实际 release tag）：D-350 的 catalog-ready
+  publication 继续收紧为 deployment-ready publication。`release-set` job 只发布、验签并 attested immutable catalog，不再登录 registry
+  或修改最终 image tag；`local|all` 必须先完成 Edge 与 Standalone 的 catalog-bound 正式 Compose rollout，`cluster|all` 必须先完成三节点
+  K3s install、Head 与 UID/resourceVersion fenced retirement。两个只读部署 job 现在连同 content-free report 保存各自 exact-three-file
+  catalog consumption bundle；终态 `release-finalization` 按 scope 强制精确 success/skipped 真值表、下载并复验 exact 文件集合，再第三次独立消费
+  公开 immutable catalog。新增 `qinglong/release-deployment-readiness-receipt@v1` 联合绑定 finalizer consumption、要求的部署族、每个
+  consumption/report digest、release-set/catalog identity 与清理结果，拒绝 synthetic/incomplete/unclean、跨 scope 或 catalog-detached
+  evidence，并在任何 Docker login/tag mutation 前本地复审和单独 attested。publication plan/closure receipt 升为 v2，发布 authority 为
+  `verified_catalog_bound_deployments`；D-350 的 bounded inventory、零写 conflict preflight、exact reuse、absent copy、终态 tag 回读和
+  `crossRepositoryAtomicity=false`/`registryTagCas=false` 均保留。最终 90 天 bundle 闭合 finalizer catalog、部署 evidence、readiness、plan、
+  observation 与 closure。该变化不新增 package、生产依赖、数据库、migration、Kubernetes object 或设备常驻资源；Local 不承担 K3s 门，
+  Cluster 不承担 Compose 门，Edge/Standalone/路由设备与集群节点稳态成本仍为零。阶段门已重跑：readiness/publication/workflow/Console
+  distribution 聚焦测试 112/112，完整 backend 1,393 pass + 2 条条件 skip/0 fail，18-package clean build/test 退出 0，14/14 静态审计与
+  14/14 artifact 档位全部 compatible；artifact 字节保持基础 Edge/Standalone `2589890/2589968`、adopted
+  `2809185/2809308`、application `3632769/3632889`、application-api `3800322/3800466`、AI `3069143/3069233`、
+  application+AI `4493043/4493175`、MCP `7315930/7316038`。真实 Docker 三节点 K3s v1.34.3/arm64 fixture 完成 install、Head、
+  UID/resourceVersion fenced retirement、receipt audit 与零残留；fixture 明确保持 `synthetic_live_fixture`，不冒充公开 catalog 证据。
+  PostgreSQL 18.6/arm64 HA 再次通过 142/142、timeline `1→2`，报告 SHA-256 为
+  `d7bb8164b46c1392518eb08bea338640639fe5eca71a7401d98d98ea94146fd2`，离线复审通过且容器/卷/网络残留为零。本机成功构建 exact Local
+  image，但 Local selection 有意只接受真实 `ghcr.io/<owner>/...@sha256`，因此本地 loopback registry 和 image-id 伪装均失败关闭；首份真实
+  Local catalog-bound rollout 与完整 deployment-ready finalization 仍只能由受保护 release tag 产生。
+
 - D-350/ADR-0442（已接受；首份真实 GHCR 部分 promotion/replay 证据待实际 release tag）：正式 image tag 不再在完整
   release-set 审计后、durable catalog 建立前提前公开。`versionTag/sourceTag` mutation 现位于 release-set provenance、catalog
   immutable round-trip、catalog signature/provenance 验证、catalog receipt 审计及其 attestation 全部成功之后。新的
