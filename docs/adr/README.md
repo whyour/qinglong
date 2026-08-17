@@ -439,6 +439,7 @@
 | [ADR-0433](./ADR-0433-catalog-bound-kubernetes-target-deployment-ceremony.md)                   | Catalog-bound Kubernetes 目标部署 Ceremony                                                                                                                         | Accepted |
 | [ADR-0434](./ADR-0434-resource-inventory-closed-kubernetes-deployment-head.md)                   | Resource-inventory-closed Kubernetes Deployment Head                                                                                                                | Accepted |
 | [ADR-0435](./ADR-0435-uid-resource-version-fenced-kubernetes-resource-retirement.md)              | UID/resourceVersion 围栏的 Kubernetes 资源退役 Ceremony                                                                                                              | Accepted |
+| [ADR-0436](./ADR-0436-post-publication-catalog-bound-kubernetes-release-gate.md)                    | 发布后 Catalog-bound Kubernetes Release Gate                                                                                                                          | Accepted（首份真实公开 catalog evidence 待实际 release tag） |
 
 ## 规则
 

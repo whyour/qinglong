@@ -115,6 +115,15 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         immutableDigestAuthority: 'verified',
         receiptAttested: true,
       },
+      catalogDeploymentGate: {
+        scopes: ['cluster', 'all'],
+        catalogAuthority: 'immutable_digest_after_public_consumption',
+        deploymentLockReconstructed: true,
+        k3sNodes: 3,
+        installReceiptAudited: true,
+        fencedRetirementReceiptAudited: true,
+        publicationAuthority: false,
+      },
       localRolloutPreflight: true,
       localRolloutApply: true,
       postPublishVerification: [
@@ -126,6 +135,8 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         'release-candidate',
         'release-set',
         'durable-catalog',
+        'catalog-consumption',
+        'catalog-bound-k3s-deployment',
         'release-tags',
       ],
     },
@@ -565,7 +576,7 @@ test('rejects a movable action tag in the privileged release job', () => {
   )}actions/checkout@v6${releaseSource.slice(offset + pinned.length)}`;
   assert.throws(
     () => auditReleaseWorkflow(mutated),
-    /privileged publisher|immutable checkout action|release-set job/,
+    /privileged publisher|immutable checkout action|release-set job|cluster release must read/,
   );
 });
 
@@ -718,10 +729,50 @@ test('rejects an image tag created before digest verification completes', () => 
 });
 
 test('rejects any publisher step after the deployment lock is published', () => {
-  const mutated = `${releaseSource}\n      - name: Post-promotion mutation\n        run: echo unsafe\n`;
+  const marker = '\n  release-catalog-deployment-live:';
+  assert.equal(releaseSource.includes(marker), true);
+  const mutated = releaseSource.replace(
+    marker,
+    '\n      - name: Post-promotion mutation\n        run: echo unsafe\n' +
+      marker,
+  );
   assert.throws(
     () => auditReleaseWorkflow(mutated),
     /release-set job must download only same-run records/,
+  );
+});
+
+test('rejects removal of the downstream catalog deployment release gate', function rejectsMissingCatalogDeploymentGate() {
+  const marker = '\n  release-catalog-deployment-live:';
+  const offset = releaseSource.indexOf(marker);
+  assert.notEqual(offset, -1);
+  assert.throws(
+    () => auditReleaseWorkflow(releaseSource.slice(0, offset)),
+    /keep evidence read-only|cluster release must read the newly published immutable catalog/,
+  );
+});
+
+test('rejects running the cluster deployment gate for Local-only releases', function rejectsLocalCatalogDeploymentGate() {
+  const mutated = releaseSource.replace(
+    "inputs.release_scope != 'local'",
+    "inputs.release_scope == 'local'",
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /cluster release must read the newly published immutable catalog/,
+  );
+});
+
+test('rejects publication authority in the post-publish catalog consumer', function rejectsCatalogConsumerPublicationAuthority() {
+  const marker = '\n  release-catalog-deployment-live:';
+  const offset = releaseSource.indexOf(marker);
+  assert.notEqual(offset, -1);
+  const mutated = `${releaseSource.slice(0, offset)}${releaseSource
+    .slice(offset)
+    .replace('packages: read', 'packages: write')}`;
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /keep evidence read-only|without publication authority/,
   );
 });
 

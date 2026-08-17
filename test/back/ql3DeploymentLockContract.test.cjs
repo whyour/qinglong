@@ -38,6 +38,10 @@ const {
 const {
   readReleaseIdentity,
 } = require('../../scripts/lib/ql3-release-identity.cjs');
+const {
+  catalogLockedArtifacts,
+  deploymentArtifacts,
+} = require('../../scripts/ql3-kubernetes-deployment-live-contract.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const version = readReleaseIdentity(root).version;
@@ -313,6 +317,112 @@ function kubernetesOptions(set, extra = {}) {
     ...extra,
   });
 }
+
+test('materializes the Kubernetes live lock from one audited catalog consumption bundle', function materializesCatalogBoundLiveLock() {
+  const set = releaseSet('cluster');
+  const consumption = Object.freeze({
+    ...consumptionAuthority(set),
+    releaseSet: set,
+  });
+  const consumptionBundle = '/private/ql3-release-catalog-consumption';
+  let auditedOptions;
+  const artifacts = catalogLockedArtifacts(
+    {
+      ...identity,
+      releaseScope: 'cluster',
+      consumptionBundle,
+    },
+    {
+      auditCeremonyBundle(options) {
+        auditedOptions = options;
+        return consumption;
+      },
+    },
+  );
+  assert.deepEqual(auditedOptions, {
+    ...identity,
+    releaseScope: 'cluster',
+    outputDirectory: consumptionBundle,
+  });
+  assert.equal(artifacts.report.releaseSetDigest, set.releaseSetDigest);
+  assert.equal(
+    artifacts.report.catalog.manifestDigest,
+    consumption.catalogManifestDigest,
+  );
+  assert.equal(artifacts.releaseAuthority.mode, 'verified_release_catalog');
+  assert.equal(
+    artifacts.releaseAuthority.catalogConsumptionDigest,
+    consumption.contentDigest,
+  );
+  assert.deepEqual(artifacts.imageReferences, references(set));
+  assert.equal(artifacts.report.manifest.resources, 7);
+  assert.equal(artifacts.report.manifest.changedResources, 5);
+  assert.equal(artifacts.report.manifest.admissionAuthorityCount, 1);
+  const resources = [];
+  yaml.loadAll(artifacts.manifest, (resource) => resources.push(resource));
+  assert.equal(resources.length, 7);
+  assert.equal(
+    resources.find(
+      (resource) => resource.metadata?.name === 'ql3-retirement-live-target',
+    )?.data?.purpose,
+    'catalog-bound-retirement-live-contract',
+  );
+  for (const resource of resources.filter(
+    (entry) => entry.kind === 'Deployment',
+  )) {
+    assert.equal(
+      resource.metadata.annotations['qinglong.io/release-set-digest'],
+      set.releaseSetDigest,
+    );
+    assert.match(
+      resource.spec.template.spec.containers[0].image,
+      /^ghcr\.io\/qinglong-release\/qinglong3-[a-z-]+@sha256:[a-f0-9]{64}$/u,
+    );
+  }
+});
+
+test('selects catalog-backed live artifacts only for one complete environment', function selectsCompleteCatalogLiveEnvironment() {
+  assert.equal(
+    deploymentArtifacts({}).releaseAuthority.mode,
+    'synthetic_live_fixture',
+  );
+  assert.throws(
+    () =>
+      deploymentArtifacts({
+        QL3_RELEASE_CATALOG_CONSUMPTION_BUNDLE: '/private/bundle',
+      }),
+    /configuration is incomplete/u,
+  );
+  assert.throws(
+    () =>
+      catalogLockedArtifacts({
+        ...identity,
+        releaseScope: 'local',
+        consumptionBundle: '/private/bundle',
+      }),
+    /requires cluster or all scope/u,
+  );
+  const set = releaseSet('all');
+  const consumption = Object.freeze({
+    ...consumptionAuthority(set),
+    releaseSet: set,
+  });
+  const environment = {
+    QL3_RELEASE_CATALOG_CONSUMPTION_BUNDLE: '/private/bundle',
+    QL3_RELEASE_SOURCE_REVISION: identity.sourceRevision,
+    QL3_RELEASE_SOURCE_REF: identity.sourceRef,
+    QL3_RELEASE_SCOPE: 'all',
+    QL3_RELEASE_REPOSITORY_OWNER: identity.repositoryOwner,
+    QL3_RELEASE_SOURCE_REPOSITORY: identity.sourceRepository,
+  };
+  const artifacts = deploymentArtifacts(environment, {
+    auditCeremonyBundle: () => consumption,
+  });
+  assert.equal(artifacts.releaseAuthority.mode, 'verified_release_catalog');
+  assert.equal(artifacts.releaseAuthority.scope, 'all');
+  assert.equal(artifacts.report.release.scope, 'all');
+  assert.equal(artifacts.report.requiredImages.length, 4);
+});
 
 test('selects one immutable Local Compose image without adding device work', () => {
   for (const scope of ['local', 'all']) {

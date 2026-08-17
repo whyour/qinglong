@@ -6,10 +6,35 @@
 - 目标版本：QingLong 3.x
 - 作者：QingLong Maintainers
 - 创建日期：2026-07-17
-- 最后更新：2026-08-17
+- 最后更新：2026-08-18
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-17）：
+最新增量证据（2026-08-18）：
+
+- D-344/ADR-0436（已接受；首份真实公开 catalog evidence 待实际 release tag）：镜像发布流水线不再停在 durable catalog 与
+  receipt。`release-set` 成功后新增独立只读 `release-catalog-deployment-live`，仅在 `cluster|all` scope 运行；它不继承 publisher
+  文件或登录态，而是从公开 discovery ref 重新解析稳定 digest，以 exact Cosign workflow identity 和 GitHub source tag/revision
+  provenance 验证 immutable catalog，下载并离线重审 exact-three-file consumption bundle，再把同一次 audit 得到的 release-set 对象
+  交给 deployment-lock materializer。生成的 Kubernetes v2 lock 绑定真实 release-set、catalog manifest 与 consumption report digest，
+  随后在 digest-reviewed 三节点 K3s 上执行 7-resource、四角色零副本 install、Head commit、UID/resourceVersion 围栏 ConfigMap 退役与两个
+  receipt audit。consumer 只有 `contents|packages|attestations:read`，无 Docker login、package/tag/attestation write 或签名 authority；
+  regctl/Cosign 使用公开读取，package visibility 错误会阻断发布。配置必须一次给齐 bundle/source revision/ref/scope/owner/repository 六项，
+  缺一项或 Local scope 都在 K3s 启动前失败关闭；普通 PR live 保留显式 `synthetic_live_fixture`，不混淆为公开发布证据。新增工作只存在于
+  Cluster release runner，没有新增 package、生产依赖、controller、CRD、RBAC、Pod、数据库、migration、listener、timer 或常驻进程；
+  Local/Edge/Standalone 发布、制品与稳态资源保持不变。定向发布/部署契约 109/109；完整 backend 1,344 项为 1,342 pass/
+  2 条件 skip/0 fail，18-package clean build/test 退出 0。14 项有效架构/发布/部署审计 compatible，package boundary 仍为 18 packages、
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`；14 档 Local artifact 全部 compatible 且字节数与 D-343 完全一致。catalog-bound
+  三节点 K3s live 在 linux/arm64 上得到 3 个 Ready node，以一份真实执行六步 ceremony、可完整离线重审的 fixture bundle 物化同一
+  release-set；Head generation `1→2`、inventory `7→6`，install/retirement receipt audit、UID/resourceVersion DELETE preconditions、
+  Unix socket proxy、server-side dry-run/apply、目标 absent 与清理全部通过。release-set/catalog manifest/consumption report digest 分别为
+  `sha256:e407cddb6348f96a8fef0822589c73415912be7397205669f2072d70c5bda035`、
+  `sha256:74abea141364570ac803bdc9dd6da1dcbe10ea694e6b7e0f3f7a56a2f84ba55a`、
+  `sha256:2a9b93dcf19984c90a628b8987a04620f31ec0acb62c672bfe912c19bc458b2b`，最终 retirement receipt digest 为
+  `sha256:e20532f2f2cd3fce3e7985e4bb3b4b75dc87ca3b59d7f9530ad9d8e02694d1f3`，Docker container/network 残留为 0。
+  PostgreSQL 18.6/arm64 HA 为 142/142 gates、timeline `1→2`，独立 evidence audit compatible；mode-0600 报告 SHA-256 为
+  `796e4b85a9f45c3b63537010057c1c91c6011ecfab2f2f289763b4915037d9dd`，container/network/volume 残留为 0。仓库 fixture 证明代码路径与
+  真实 Kubernetes mutation，但不能冒充 GHCR 在线验签；第一份公开 GHCR/Cosign/GitHub 成功记录仍必须由实际受保护 `v3` release tag
+  dispatch 产生。
 
 - D-343/ADR-0435（已接受；真实公开 catalog 运行仍待 release Gate）：在 D-342 的 resource-inventory-closed Head 上增加独立
   `cluster.deployment.retirement.preflight|apply|receipt.audit`。退役目标只能来自 current locked manifest 与 committed active inventory，

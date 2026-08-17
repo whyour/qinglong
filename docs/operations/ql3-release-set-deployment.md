@@ -13,6 +13,19 @@ ghcr.io/<owner>/qinglong3-release-catalog:v<version>-<scope>
 `ghcr.io/<owner>/qinglong3-release-catalog@sha256:<manifest-digest>`，验证这个 immutable reference 后，再从 JSON 的
 `images[].reference` 读取完整 `ghcr.io/<owner>/<repository>@sha256:<digest>`。
 
+## 发布流水线内置 Cluster 下游门
+
+`ql3-image-release.yml` 在 durable catalog、签名、provenance、receipt 和 90 天便利 bundle 全部发布后，才启动独立
+`release-catalog-deployment-live`。该 job 只处理 `cluster|all`；Local-only 发布不会启动 K3s。它没有 publisher 的 package/attestation
+写权限或 registry 登录态，而是按下文工作站协议重新消费公开 catalog，离线重建 deployment lock，并在隔离三节点 K3s 上完成 install、
+Head commit、一个显式 ConfigMap 的 UID/resourceVersion 围栏退役和两个 receipt audit。任何公开读取、exact workflow identity、source
+tag/revision、digest、scope、角色闭包、server-side apply/Head 或清理失败都会让 Cluster release 失败。
+
+该门的四个业务 Deployment 都为零副本：它证明真实 catalog image authority 已进入目标 API、lock、Head 与 receipt 闭包，不重复下载和启动
+完整业务数据面。应用启动、数据库、Secret、Worker 与 AI lifecycle 继续由各自 live/release gate 负责。成功 artifact 只保存 content-free
+JSON evidence；consumption bundle、token、kubeconfig 和 command 文件不上传。首份真实成功记录必须来自实际受保护 release tag，普通 PR 中的
+synthetic live fixture 不能替代它。
+
 ## 选择 scope
 
 | 部署类型 | release scope | 必须出现的镜像 |
@@ -393,7 +406,9 @@ GHCR 不提供跨 repository tag 事务，release set 明确记录 `crossReposit
 失败，不删除已经正确的 tag，也不重新构建镜像。使用原 source tag/revision 重跑 release workflow：它会先验证
 每个 source digest 和既有 tag；既有 tag 指向同一 digest 时继续，指向其他 digest 时立即失败。只有
 release-set、catalog immutable digest、两类 provenance 与 receipt 全部生成并验证后，才能宣布该 deployment family
-可部署。
+可部署。对于 `cluster|all`，还必须等待只读 catalog consumer 与 catalog-bound K3s deployment/retirement Gate 成功；publisher 成功而
+consumer 失败时不能宣布 Cluster release。不要给 consumer 临时增加写权限“修复”可见性或 tag，应修正 GHCR package visibility/retention
+或发布配置后，对同一受保护 tag 重跑完整工作流并重新验证 exact digest。
 
 workflow bundle 当前保留 90 天；长期入口是 OCI catalog 的 immutable digest。GHCR 并非 WORM，release owner 仍须维护
 package 可见性、读取权限和满足组织要求的 retention/备份策略。任何归档或镜像过程都不得改写 canonical JSON，并须保留

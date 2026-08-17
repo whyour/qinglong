@@ -15,6 +15,10 @@ const {
 } = require('./lib/ql3-kubernetes-deployment-ceremony.cjs');
 const { K3sDockerLiveFixture } = require('./lib/ql3-k3s-docker-live.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
+const { createKubernetesLock } = require('./ql3-deployment-lock-contract.cjs');
+const {
+  auditCeremonyBundle,
+} = require('./ql3-release-catalog-consumption-ceremony.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const VERSION = readReleaseIdentity(ROOT).version;
@@ -203,6 +207,162 @@ function lockedArtifacts() {
   });
 }
 
+function catalogSourceManifest(imageReferences) {
+  const annotations = {
+    'qinglong.io/live-contract': 'verified-release-catalog',
+  };
+  const deployment = (role) => ({
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: `ql3-${role}`,
+      namespace: NAMESPACE,
+      annotations,
+    },
+    spec: {
+      replicas: 0,
+      selector: { matchLabels: { 'app.kubernetes.io/name': `ql3-${role}` } },
+      template: {
+        metadata: {
+          labels: { 'app.kubernetes.io/name': `ql3-${role}` },
+          annotations,
+        },
+        spec: {
+          containers: [
+            {
+              name: role,
+              image: imageReferences[role],
+              command: ['/bin/false'],
+            },
+          ],
+        },
+      },
+    },
+  });
+  return `${[
+    {
+      apiVersion: 'v1',
+      kind: 'Namespace',
+      metadata: { name: NAMESPACE },
+    },
+    ...ROLE_ORDER.map(deployment),
+    {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: {
+        name: 'ql3-plugin-package-secret-action-admission',
+        namespace: NAMESPACE,
+        annotations,
+      },
+      data: { image: imageReferences.admin },
+    },
+    {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: {
+        name: 'ql3-retirement-live-target',
+        namespace: NAMESPACE,
+        annotations,
+      },
+      data: { purpose: 'catalog-bound-retirement-live-contract' },
+    },
+  ]
+    .map((resource) => JSON.stringify(resource))
+    .join('\n---\n')}\n`;
+}
+
+function catalogLockedArtifacts(options, dependencies = {}) {
+  const audit = dependencies.auditCeremonyBundle ?? auditCeremonyBundle;
+  const materialize = dependencies.createKubernetesLock ?? createKubernetesLock;
+  const identity = Object.freeze({
+    version: VERSION,
+    sourceRevision: options?.sourceRevision,
+    sourceRef: options?.sourceRef,
+    releaseScope: options?.releaseScope,
+    repositoryOwner: options?.repositoryOwner,
+    sourceRepository: options?.sourceRepository,
+  });
+  if (!['cluster', 'all'].includes(identity.releaseScope)) {
+    fail('release catalog live deployment requires cluster or all scope');
+  }
+  const consumption = audit({
+    ...identity,
+    outputDirectory: options?.consumptionBundle,
+  });
+  const imageReferences = Object.freeze(
+    Object.fromEntries(
+      ROLE_ORDER.map((role) => {
+        const images = consumption.releaseSet?.images?.filter(
+          (image) => image.name === role,
+        );
+        if (images?.length !== 1) {
+          fail(`verified release catalog is missing one ${role} image`);
+        }
+        return [role, images[0].reference];
+      }),
+    ),
+  );
+  const sourceManifest = catalogSourceManifest(imageReferences);
+  const created = materialize(consumption.releaseSet, sourceManifest, {
+    ...identity,
+    consumption,
+    requiredImages: ROLE_ORDER.join(','),
+  });
+  return Object.freeze({
+    manifest: created.outputManifest,
+    report: created.report,
+    imageReferences,
+    releaseAuthority: Object.freeze({
+      mode: 'verified_release_catalog',
+      version: VERSION,
+      sourceRevision: identity.sourceRevision,
+      sourceRef: identity.sourceRef,
+      scope: identity.releaseScope,
+      releaseSetDigest: consumption.releaseSetDigest,
+      catalogManifestDigest: consumption.catalogManifestDigest,
+      catalogConsumptionDigest: consumption.contentDigest,
+      immutableReference: consumption.immutableReference,
+    }),
+  });
+}
+
+function deploymentArtifacts(environment = process.env, dependencies = {}) {
+  const configuration = {
+    consumptionBundle: environment.QL3_RELEASE_CATALOG_CONSUMPTION_BUNDLE,
+    sourceRevision: environment.QL3_RELEASE_SOURCE_REVISION,
+    sourceRef: environment.QL3_RELEASE_SOURCE_REF,
+    releaseScope: environment.QL3_RELEASE_SCOPE,
+    repositoryOwner: environment.QL3_RELEASE_REPOSITORY_OWNER,
+    sourceRepository: environment.QL3_RELEASE_SOURCE_REPOSITORY,
+  };
+  const values = Object.values(configuration);
+  const configured = values.filter(
+    (value) => typeof value === 'string' && value.length > 0,
+  ).length;
+  if (configured === 0) {
+    const artifacts = lockedArtifacts();
+    return Object.freeze({
+      ...artifacts,
+      releaseAuthority: Object.freeze({
+        mode: 'synthetic_live_fixture',
+        version: artifacts.report.release.version,
+        sourceRevision: artifacts.report.release.sourceRevision,
+        sourceRef: artifacts.report.release.sourceRef,
+        scope: artifacts.report.release.scope,
+        releaseSetDigest: artifacts.report.releaseSetDigest,
+        catalogManifestDigest: artifacts.report.catalog.manifestDigest,
+        catalogConsumptionDigest:
+          artifacts.report.catalog.consumptionReportDigest,
+        immutableReference: artifacts.report.catalog.immutableReference,
+      }),
+    });
+  }
+  if (configured !== values.length) {
+    fail('release catalog live deployment configuration is incomplete');
+  }
+  return catalogLockedArtifacts(configuration, dependencies);
+}
+
 function writeCommand(directory, name, operation, request) {
   return privateFile(
     directory,
@@ -216,10 +376,10 @@ function writeCommand(directory, name, operation, request) {
   );
 }
 
-async function main() {
+async function main(environment = process.env) {
   const fixture = new K3sDockerLiveFixture({
     prefix: 'ql3-deploy-live',
-    kubectl: process.env.QL3_KUBECTL_BIN,
+    kubectl: environment.QL3_KUBECTL_BIN,
   });
   let evidence;
   let cleanupComplete = false;
@@ -241,7 +401,7 @@ async function main() {
       kind: 'Namespace',
       metadata: { name: NAMESPACE },
     });
-    const artifacts = lockedArtifacts();
+    const artifacts = deploymentArtifacts(environment);
     const manifestPath = privateFile(
       ceremonyDirectory,
       'locked.yaml',
@@ -503,6 +663,7 @@ async function main() {
         deploymentDigest: deploymentHead.deployment.deploymentDigest,
         resourceInventoryCount: deploymentHead.deployment.resources.length,
       },
+      releaseAuthority: artifacts.releaseAuthority,
       preflightDigest: preflight.preflightDigest,
       receiptDigest: receipt.receiptDigest,
       receiptAuditCompatible: audit.compatible,
@@ -545,4 +706,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = Object.freeze({ lockedArtifacts, main });
+module.exports = Object.freeze({
+  catalogLockedArtifacts,
+  deploymentArtifacts,
+  lockedArtifacts,
+  main,
+});

@@ -410,6 +410,8 @@ function auditReleaseWorkflow(source) {
   const osVulnerabilityJob = workflow?.jobs?.['os-vulnerability'];
   const publishJob = workflow?.jobs?.publish;
   const releaseSetJob = workflow?.jobs?.['release-set'];
+  const catalogDeploymentJob =
+    workflow?.jobs?.['release-catalog-deployment-live'];
   if (
     publishJob?.strategy?.matrix?.include !==
     '${{ fromJSON(needs.release-candidate.outputs.publish-matrix) }}'
@@ -471,6 +473,12 @@ function auditReleaseWorkflow(source) {
         'id-token': 'write',
         attestations: 'write',
         'artifact-metadata': 'write',
+      }) ||
+    JSON.stringify(catalogDeploymentJob?.permissions) !==
+      JSON.stringify({
+        contents: 'read',
+        packages: 'read',
+        attestations: 'read',
       })
   ) {
     throw new Error(
@@ -769,6 +777,85 @@ function auditReleaseWorkflow(source) {
       'release-set job must download only same-run records, independently inspect, durably publish and attest one no-overwrite deployment lock bundle',
     );
   }
+  const catalogDeploymentSteps = catalogDeploymentJob?.steps;
+  if (
+    catalogDeploymentJob?.needs !== 'release-set' ||
+    catalogDeploymentJob?.if !==
+      "always() && needs.release-set.result == 'success' && inputs.release_scope != 'local'" ||
+    catalogDeploymentJob?.['runs-on'] !== 'ubuntu-24.04' ||
+    catalogDeploymentJob?.['timeout-minutes'] !== 30 ||
+    !Array.isArray(catalogDeploymentSteps) ||
+    catalogDeploymentSteps.length !== 11 ||
+    catalogDeploymentSteps[0]?.uses !==
+      'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803' ||
+    catalogDeploymentSteps[0]?.with?.['persist-credentials'] !== false ||
+    catalogDeploymentSteps[1]?.uses !==
+      'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38' ||
+    catalogDeploymentSteps[1]?.with?.['node-version'] !== '24.18.0' ||
+    !/corepack prepare pnpm@8\.3\.1 --activate[\s\S]*pnpm install --frozen-lockfile --ignore-scripts/u.test(
+      catalogDeploymentSteps[2]?.run ?? '',
+    ) ||
+    !/v0\.11\.5\/regctl-linux-amd64[\s\S]*c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467[\s\S]*sha256sum --check --strict/u.test(
+      catalogDeploymentSteps[3]?.run ?? '',
+    ) ||
+    catalogDeploymentSteps[4]?.uses !==
+      'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6' ||
+    !/v1\.34\.3\/bin\/linux\/amd64\/kubectl[\s\S]*kubectl\.sha256[\s\S]*sha256sum/u.test(
+      catalogDeploymentSteps[5]?.run ?? '',
+    ) ||
+    catalogDeploymentSteps[6]?.id !== 'catalog-consumption' ||
+    !/install -d -m 0700[\s\S]*install -m 0600 \/dev\/null[\s\S]*printf '%s' "\$\{GH_TOKEN\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=create[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--output-directory="\$\{bundle\}"[\s\S]*--github-token-file="\$\{token\}"[\s\S]*ql3-release-catalog-consumption-ceremony\.cjs[\s\S]*--mode=audit[\s\S]*rm -f "\$\{token\}"/u.test(
+      catalogDeploymentSteps[6]?.run ?? '',
+    ) ||
+    !/docker pull[\s\S]*rancher\/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c[\s\S]*docker tag[\s\S]*rancher\/k3s:v1\.34\.3-k3s1/u.test(
+      catalogDeploymentSteps[7]?.run ?? '',
+    ) ||
+    JSON.stringify(catalogDeploymentSteps[8]?.env) !==
+      JSON.stringify({
+        QL3_KUBECTL_BIN: '${{ runner.temp }}/kubectl',
+        QL3_DEPLOYMENT_LIVE_REPORT:
+          '${{ runner.temp }}/ql3-release-catalog-deployment/report.json',
+        QL3_RELEASE_CATALOG_CONSUMPTION_BUNDLE:
+          '${{ steps.catalog-consumption.outputs.bundle }}',
+        QL3_RELEASE_SOURCE_REVISION: '${{ github.sha }}',
+        QL3_RELEASE_SOURCE_REF: '${{ github.ref }}',
+        QL3_RELEASE_SCOPE: '${{ inputs.release_scope }}',
+        QL3_RELEASE_REPOSITORY_OWNER:
+          '${{ steps.catalog-consumption.outputs.repository-owner }}',
+        QL3_RELEASE_SOURCE_REPOSITORY:
+          '${{ steps.catalog-consumption.outputs.source-repository }}',
+      }) ||
+    !/ql3-kubernetes-deployment-live-contract\.cjs[\s\S]*verified_release_catalog[\s\S]*releaseSetDigest[\s\S]*catalogManifestDigest[\s\S]*catalogConsumptionDigest/u.test(
+      catalogDeploymentSteps[8]?.run ?? '',
+    ) ||
+    catalogDeploymentSteps[9]?.if !== 'always()' ||
+    !/docker ps -aq --filter name=ql3-deploy-live-[\s\S]*docker network ls -q --filter name=ql3-deploy-live-/u.test(
+      catalogDeploymentSteps[9]?.run ?? '',
+    ) ||
+    catalogDeploymentSteps[10]?.if !== 'always()' ||
+    catalogDeploymentSteps[10]?.uses !==
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
+    JSON.stringify(catalogDeploymentSteps[10]?.with) !==
+      JSON.stringify({
+        name: 'ql3-release-catalog-deployment-${{ github.run_id }}-${{ github.run_attempt }}',
+        path: '${{ runner.temp }}/ql3-release-catalog-deployment/report.json',
+        'if-no-files-found': 'warn',
+        'retention-days': 90,
+        'compression-level': 9,
+        overwrite: false,
+        'include-hidden-files': false,
+      }) ||
+    catalogDeploymentSteps.some(
+      (step) =>
+        /(?:artifact put|\bimage copy\b|cosign sign)/u.test(step.run ?? '') ||
+        step.uses?.startsWith('actions/attest@') ||
+        step.uses?.startsWith('docker/login-action@'),
+    )
+  ) {
+    throw new Error(
+      'cluster release must read the newly published immutable catalog, reconstruct its deployment lock and prove install plus fenced retirement on isolated K3s without publication authority',
+    );
+  }
   if (
     !Array.isArray(evidenceJob?.steps) ||
     evidenceJob.steps.length !== 3 ||
@@ -856,20 +943,20 @@ function auditReleaseWorkflow(source) {
   requireOccurrences(
     source,
     /uses: actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6/g,
-    6,
+    7,
     'all release jobs must pin the reviewed immutable checkout action',
   );
   requireOccurrences(
     source,
     /uses: actions\/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6/g,
-    6,
+    7,
     'all release jobs must pin the reviewed immutable Node setup action',
   );
   requireOccurrences(
     source,
     /uses: sigstore\/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4\.1\.2/g,
-    2,
-    'image and release-catalog publishers must both pin the reviewed Cosign installer',
+    3,
+    'image publisher, catalog publisher and catalog consumer must pin the reviewed Cosign installer',
   );
   requirePattern(
     source,
@@ -909,8 +996,8 @@ function auditReleaseWorkflow(source) {
   requireExactOccurrences(
     source,
     /c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467/g,
-    2,
-    'both image and release-set publishers must checksum-pin the exact regctl OCI copier',
+    3,
+    'image publisher, release-set publisher and catalog consumer must checksum-pin the exact regctl OCI copier and reader',
   );
   requirePattern(
     source,
@@ -1103,6 +1190,15 @@ function auditReleaseWorkflow(source) {
       immutableDigestAuthority: 'verified',
       receiptAttested: true,
     },
+    catalogDeploymentGate: {
+      scopes: ['cluster', 'all'],
+      catalogAuthority: 'immutable_digest_after_public_consumption',
+      deploymentLockReconstructed: true,
+      k3sNodes: 3,
+      installReceiptAudited: true,
+      fencedRetirementReceiptAudited: true,
+      publicationAuthority: false,
+    },
     localRolloutPreflight: true,
     localRolloutApply: true,
     postPublishVerification: [
@@ -1114,6 +1210,8 @@ function auditReleaseWorkflow(source) {
       'release-candidate',
       'release-set',
       'durable-catalog',
+      'catalog-consumption',
+      'catalog-bound-k3s-deployment',
       'release-tags',
     ],
   };

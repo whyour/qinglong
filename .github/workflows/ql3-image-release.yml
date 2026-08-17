@@ -880,3 +880,159 @@ jobs:
           compression-level: 0
           overwrite: false
           include-hidden-files: false
+
+  release-catalog-deployment-live:
+    name: Consume the public catalog and prove the cluster release on K3s
+    needs: release-set
+    if: always() && needs.release-set.result == 'success' && inputs.release_scope != 'local'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.18.0'
+
+      - name: Install the frozen workspace without lifecycle scripts
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@8.3.1 --activate
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install the exact checksum-pinned catalog reader
+        env:
+          REGCTL: ${{ runner.temp }}/regctl
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "${REGCTL}" \
+            https://github.com/regclient/regclient/releases/download/v0.11.5/regctl-linux-amd64
+          echo "c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467  ${REGCTL}" | sha256sum --check --strict
+          chmod 0755 "${REGCTL}"
+          "${REGCTL}" version
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Install verified kubectl v1.34.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl" \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl.sha256" \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl.sha256
+          test "$(cat "${RUNNER_TEMP}/kubectl.sha256")" = \
+            "$(sha256sum "${RUNNER_TEMP}/kubectl" | cut -d ' ' -f 1)"
+          chmod 0755 "${RUNNER_TEMP}/kubectl"
+
+      - name: Consume and independently audit the published OCI catalog
+        id: catalog-consumption
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          REGCTL: ${{ runner.temp }}/regctl
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          owner="${REPOSITORY_OWNER,,}"
+          source_repository="${SOURCE_REPOSITORY,,}"
+          private_root="${RUNNER_TEMP}/ql3-release-catalog-consumer"
+          bundle="${private_root}/bundle"
+          token="${private_root}/github-token"
+          install -d -m 0700 "${private_root}"
+          install -m 0600 /dev/null "${token}"
+          printf '%s' "${GH_TOKEN}" > "${token}"
+          trap 'rm -f "${token}"' EXIT
+          cosign="$(readlink -f "$(command -v cosign)")"
+          gh="$(readlink -f "$(command -v gh)")"
+          node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+            --mode=create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --output-directory="${bundle}" \
+            --regctl="${REGCTL}" \
+            --cosign="${cosign}" \
+            --gh="${gh}" \
+            --github-token-file="${token}"
+          node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+            --mode=audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --output-directory="${bundle}"
+          rm -f "${token}"
+          trap - EXIT
+          echo "bundle=${bundle}" >> "${GITHUB_OUTPUT}"
+          echo "repository-owner=${owner}" >> "${GITHUB_OUTPUT}"
+          echo "source-repository=${source_repository}" >> "${GITHUB_OUTPUT}"
+
+      - name: Preload the digest-reviewed K3s distribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull \
+            rancher/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c
+          docker tag \
+            rancher/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c \
+            rancher/k3s:v1.34.3-k3s1
+
+      - name: Prove catalog-bound install and fenced retirement on three K3s nodes
+        env:
+          QL3_KUBECTL_BIN: ${{ runner.temp }}/kubectl
+          QL3_DEPLOYMENT_LIVE_REPORT: ${{ runner.temp }}/ql3-release-catalog-deployment/report.json
+          QL3_RELEASE_CATALOG_CONSUMPTION_BUNDLE: ${{ steps.catalog-consumption.outputs.bundle }}
+          QL3_RELEASE_SOURCE_REVISION: ${{ github.sha }}
+          QL3_RELEASE_SOURCE_REF: ${{ github.ref }}
+          QL3_RELEASE_SCOPE: ${{ inputs.release_scope }}
+          QL3_RELEASE_REPOSITORY_OWNER: ${{ steps.catalog-consumption.outputs.repository-owner }}
+          QL3_RELEASE_SOURCE_REPOSITORY: ${{ steps.catalog-consumption.outputs.source-repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 0700 "$(dirname "${QL3_DEPLOYMENT_LIVE_REPORT}")"
+          node scripts/ql3-kubernetes-deployment-live-contract.cjs > \
+            "${QL3_DEPLOYMENT_LIVE_REPORT}"
+          node -e \
+            "const fs=require('node:fs');const r=JSON.parse(fs.readFileSync(process.env.QL3_DEPLOYMENT_LIVE_REPORT,'utf8'));const d=/^sha256:[a-f0-9]{64}$/;if(r.cleanupComplete!==true||r.receiptAuditCompatible!==true||r.retirement?.receiptAuditCompatible!==true||r.retirement?.targetAbsent!==true||r.retirement?.uidResourceVersionDeletePreconditions!==true||r.releaseAuthority?.mode!=='verified_release_catalog'||r.releaseAuthority?.sourceRevision!==process.env.GITHUB_SHA||r.releaseAuthority?.sourceRef!==process.env.GITHUB_REF||r.releaseAuthority?.scope!==process.env.QL3_RELEASE_SCOPE||!d.test(r.releaseAuthority?.releaseSetDigest||'')||!d.test(r.releaseAuthority?.catalogManifestDigest||'')||!d.test(r.releaseAuthority?.catalogConsumptionDigest||''))process.exit(1)"
+
+      - name: Verify isolated release-gate cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(docker ps -aq --filter name=ql3-deploy-live-)"
+          test -z "$(docker network ls -q --filter name=ql3-deploy-live-)"
+
+      - name: Upload content-free catalog deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-release-catalog-deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-release-catalog-deployment/report.json
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
