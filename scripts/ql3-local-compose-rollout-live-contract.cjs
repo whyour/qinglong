@@ -2,6 +2,7 @@
 
 'use strict';
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -13,6 +14,8 @@ const {
 
 const IMAGE_PATTERN =
   /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}@sha256:[0-9a-f]{64}$/;
+const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const MAX_RELEASE_SELECTION_BYTES = 1024 * 1024;
 
 function fail(message) {
   throw new Error(`QingLong local Compose rollout failed: ${message}`);
@@ -28,15 +31,30 @@ function argumentsValue(argv) {
       return [argument.slice(2, separator), argument.slice(separator + 1)];
     }),
   );
+  const keys = Object.keys(values).sort();
+  const baseKeys = [
+    'docker-executable',
+    'docker-socket',
+    'image',
+    'profile',
+  ].sort();
+  const catalogKeys = [
+    ...baseKeys,
+    'expected-selection-digest',
+    'release-selection',
+  ].sort();
+  const syntheticInput = JSON.stringify(keys) === JSON.stringify(baseKeys);
+  const catalogInput = JSON.stringify(keys) === JSON.stringify(catalogKeys);
   if (
     Object.keys(values).length !== argv.length ||
+    (!syntheticInput && !catalogInput) ||
     !IMAGE_PATTERN.test(values.image ?? '') ||
     (values.profile !== 'edge' && values.profile !== 'standalone') ||
     typeof values['docker-executable'] !== 'string' ||
     typeof values['docker-socket'] !== 'string'
   ) {
     fail(
-      'usage: --image=repository@sha256:digest --docker-executable=/absolute/docker --docker-socket=/absolute/docker.sock --profile=edge|standalone',
+      'usage: --image=repository@sha256:digest --docker-executable=/absolute/docker --docker-socket=/absolute/docker.sock --profile=edge|standalone [--release-selection=/canonical/selection.json --expected-selection-digest=sha256:digest]',
     );
   }
   const dockerExecutable = fs.realpathSync(values['docker-executable']);
@@ -47,11 +65,114 @@ function argumentsValue(argv) {
   ) {
     fail('Docker executable and socket must be canonical paths');
   }
+  let releaseSelection;
+  if (catalogInput) {
+    if (
+      !path.isAbsolute(values['release-selection']) ||
+      !DIGEST_PATTERN.test(values['expected-selection-digest'])
+    ) {
+      fail('catalog selection path and digest are invalid');
+    }
+    const selectionPath = fs.realpathSync(values['release-selection']);
+    if (selectionPath !== values['release-selection']) {
+      fail('catalog selection path must be canonical');
+    }
+    releaseSelection = Object.freeze({
+      path: selectionPath,
+      expectedSelectionDigest: values['expected-selection-digest'],
+    });
+  }
   return Object.freeze({
     image: values.image,
     profile: values.profile,
     dockerExecutable,
     dockerSocket,
+    ...(releaseSelection ? { releaseSelection } : {}),
+  });
+}
+
+function sha256(value) {
+  return `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
+}
+
+function resolveReleaseSelection(input, temporaryRoot, uid) {
+  if (!input.releaseSelection) {
+    const releaseSelection = writeSyntheticLocalReleaseSelection({
+      directory: temporaryRoot,
+      image: input.image,
+      allowRootService: uid === 0,
+      sourceRevision: process.env.GITHUB_SHA,
+    });
+    return Object.freeze({
+      releaseSelection,
+      authority: Object.freeze({ mode: 'synthetic_live_fixture' }),
+    });
+  }
+  const selectionPath = input.releaseSelection.path;
+  const stat = fs.lstatSync(selectionPath);
+  const contents = fs.readFileSync(selectionPath, 'utf8');
+  let selection;
+  try {
+    selection = JSON.parse(contents);
+  } catch {
+    fail('catalog selection must be canonical JSON');
+  }
+  const unsigned = { ...selection };
+  delete unsigned.selectionDigest;
+  const computedDigest = sha256(JSON.stringify(unsigned));
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.nlink !== 1 ||
+    stat.uid !== uid ||
+    (stat.mode & 0o777) !== 0o600 ||
+    stat.size < 2 ||
+    stat.size > MAX_RELEASE_SELECTION_BYTES ||
+    fs.realpathSync(selectionPath) !== selectionPath ||
+    fs.realpathSync(path.dirname(selectionPath)) !==
+      path.dirname(selectionPath) ||
+    contents !== `${JSON.stringify(selection)}\n` ||
+    computedDigest !== input.releaseSelection.expectedSelectionDigest ||
+    selection.selectionDigest !== computedDigest ||
+    selection.schemaVersion !== 1 ||
+    selection.schema !== 'qinglong/local-compose-release-image@v2' ||
+    !/^3\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/u.test(
+      selection.release?.version ?? '',
+    ) ||
+    !/^[a-f0-9]{40}$/u.test(selection.release?.sourceRevision ?? '') ||
+    selection.release?.sourceRef !==
+      `refs/tags/v${selection.release?.version}` ||
+    !['local', 'all'].includes(selection.release?.scope) ||
+    !DIGEST_PATTERN.test(selection.releaseSetDigest ?? '') ||
+    selection.deploymentFamily !== 'local' ||
+    selection.service?.kind !== 'compose' ||
+    selection.service?.image !== input.image ||
+    selection.service?.allowRootService !== (uid === 0) ||
+    selection.catalog?.schema !==
+      'qinglong/release-catalog-consumption-ceremony@v1' ||
+    !DIGEST_PATTERN.test(selection.catalog?.manifestDigest ?? '') ||
+    !DIGEST_PATTERN.test(selection.catalog?.consumptionReportDigest ?? '') ||
+    selection.catalog?.releaseSetDigest !== selection.releaseSetDigest ||
+    selection.catalog?.discoveryTagAuthority !== 'none' ||
+    selection.verification?.catalogConsumption !== 'offline_reconstructed' ||
+    selection.verification?.externalToolResultsReplayed !== false ||
+    selection.verification?.networkAccess !== false ||
+    selection.verification?.deploymentMutation !== false
+  ) {
+    fail('catalog-bound release selection is incompatible');
+  }
+  return Object.freeze({
+    releaseSelection: input.releaseSelection,
+    authority: Object.freeze({
+      mode: 'verified_release_catalog',
+      sourceRevision: selection.release.sourceRevision,
+      sourceRef: selection.release.sourceRef,
+      scope: selection.release.scope,
+      releaseSetDigest: selection.releaseSetDigest,
+      catalogManifestDigest: selection.catalog.manifestDigest,
+      catalogConsumptionDigest: selection.catalog.consumptionReportDigest,
+      selectionDigest: selection.selectionDigest,
+    }),
   });
 }
 
@@ -181,12 +302,8 @@ async function main() {
   const deploymentRoot = path.join(temporaryRoot, 'deployment');
   const commandPath = path.join(temporaryRoot, 'rollout.json');
   const uid = process.getuid();
-  const releaseSelection = writeSyntheticLocalReleaseSelection({
-    directory: temporaryRoot,
-    image: input.image,
-    allowRootService: uid === 0,
-    sourceRevision: process.env.GITHUB_SHA,
-  });
+  const selection = resolveReleaseSelection(input, temporaryRoot, uid);
+  const releaseSelection = selection.releaseSelection;
   let composeResourcesPresent = false;
 
   try {
@@ -852,6 +969,7 @@ async function main() {
         sqliteEvidenceCollected: true,
         sqliteCollectedRolloutReplayUnchanged: true,
         gracefulCleanup: true,
+        releaseAuthority: selection.authority,
         compatible: true,
       })}\n`,
     );
@@ -867,9 +985,16 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
-  );
-  process.exitCode = 1;
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  });
+}
+
+module.exports = Object.freeze({
+  argumentsValue,
+  resolveReleaseSelection,
 });

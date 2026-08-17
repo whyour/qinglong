@@ -11,6 +11,26 @@
 
 最新增量证据（2026-08-18）：
 
+- D-345/ADR-0437（已接受；首份真实公开 catalog evidence 待实际 release tag）：Local 发布不再只依赖 image publisher 在完整
+  release-set/catalog 形成前直接掌握 digest 的 Compose rollout。`release-set` 成功后新增只读
+  `release-catalog-local-deployment-live`，仅在 `local|all` scope 运行；它从公开 discovery ref 独立消费 immutable catalog，重建并审计
+  exact-three-file bundle，再以 `local-create|local-audit` 物化唯一 catalog-bound v2 selection。Edge 与 Standalone 必须顺序消费同一 selection，
+  进入正式 deployment prepare、Compose revision/apply、SQLite backup/restore、evidence collection 与 graceful stop 链；真实模式在创建部署目录前
+  重验 selection canonical path/owner/`0600`/单链接/大小、自摘要、source tag/revision/scope、catalog 三摘要、image 与 root policy。普通 PR
+  rollout 保留显式 `synthetic_live_fixture`，不能混同公开发布。consumer 仅有 `contents|packages|attestations:read`，无 Docker login、package/
+  tag/attestation write、签名或 catalog mutation；设备侧不安装 regctl、Cosign、GitHub CLI、Node workspace 或发布 credential。新增工作只在
+  Local/All release runner 短生命周期运行，不新增 package、生产依赖、数据库、migration、listener、timer、watcher、updater 或稳态资源。
+  定向发布/selection/部署锁契约 116/116；完整 backend 1,353 项为 1,351 pass/2 条件 skip/0 fail，18-package clean build/test
+  退出 0。package boundary 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Cluster dependency、Edge import、
+  image release、deployment-lock surface 与 release-version 审计全部 compatible。14 档 Local artifact 全部 compatible 且与 D-344 字节
+  基线完全一致：默认 Edge/Standalone 为 2,589,890/2,589,968 bytes，application 为 3,632,769/3,632,889 bytes，
+  application-api 为 3,800,322/3,800,466 bytes，AI 为 3,069,143/3,069,233 bytes，application+AI 为
+  4,493,043/4,493,175 bytes，MCP 为 7,315,930/7,316,038 bytes。阶段完整性 PostgreSQL HA 在 18.6/arm64 上重跑
+  142/142 gates、timeline `1→2`，独立 evidence audit 通过，mode-0600 报告 SHA-256 为
+  `555b31757194379f1a44bdfbb1ef78549ed6b6787781e5fffeada852d26dcd9d`，container/network/volume 残留为 0。本机没有可供
+  独立消费者拉取的公开 QingLong 3 Local immutable GHCR image，因此不把 fixture、selection 单测或 workflow 静态审计写成真实公开
+  catalog-bound Compose 成功；第一份端到端线上成功仍只能由实际受保护 `v3` release tag dispatch 产生。
+
 - D-344/ADR-0436（已接受；首份真实公开 catalog evidence 待实际 release tag）：镜像发布流水线不再停在 durable catalog 与
   receipt。`release-set` 成功后新增独立只读 `release-catalog-deployment-live`，仅在 `cluster|all` scope 运行；它不继承 publisher
   文件或登录态，而是从公开 discovery ref 重新解析稳定 digest，以 exact Cosign workflow identity 和 GitHub source tag/revision

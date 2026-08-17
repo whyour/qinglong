@@ -124,6 +124,15 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         fencedRetirementReceiptAudited: true,
         publicationAuthority: false,
       },
+      localCatalogDeploymentGate: {
+        scopes: ['local', 'all'],
+        catalogAuthority: 'immutable_digest_after_public_consumption',
+        selectionReconstructed: true,
+        profiles: ['edge', 'standalone'],
+        rolloutReceiptAudited: true,
+        gracefulCleanup: true,
+        publicationAuthority: false,
+      },
       localRolloutPreflight: true,
       localRolloutApply: true,
       postPublishVerification: [
@@ -136,6 +145,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         'release-set',
         'durable-catalog',
         'catalog-consumption',
+        'catalog-bound-local-compose-deployment',
         'catalog-bound-k3s-deployment',
         'release-tags',
       ],
@@ -729,7 +739,7 @@ test('rejects an image tag created before digest verification completes', () => 
 });
 
 test('rejects any publisher step after the deployment lock is published', () => {
-  const marker = '\n  release-catalog-deployment-live:';
+  const marker = '\n  release-catalog-local-deployment-live:';
   assert.equal(releaseSource.includes(marker), true);
   const mutated = releaseSource.replace(
     marker,
@@ -739,6 +749,76 @@ test('rejects any publisher step after the deployment lock is published', () => 
   assert.throws(
     () => auditReleaseWorkflow(mutated),
     /release-set job must download only same-run records/,
+  );
+});
+
+test('rejects removal of the downstream Local catalog deployment gate', function rejectsMissingLocalCatalogDeploymentGate() {
+  const localMarker = '\n  release-catalog-local-deployment-live:';
+  const clusterMarker = '\n  release-catalog-deployment-live:';
+  const localOffset = releaseSource.indexOf(localMarker);
+  const clusterOffset = releaseSource.indexOf(clusterMarker);
+  assert.notEqual(localOffset, -1);
+  assert.equal(clusterOffset > localOffset, true);
+  const mutated = `${releaseSource.slice(0, localOffset)}${releaseSource.slice(
+    clusterOffset,
+  )}`;
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /keep evidence read-only|Local release must independently consume/,
+  );
+});
+
+test('rejects running the Local catalog gate for Cluster-only releases', function rejectsClusterLocalCatalogDeploymentGate() {
+  const mutated = releaseSource.replace(
+    "inputs.release_scope != 'cluster'",
+    "inputs.release_scope == 'cluster'",
+  );
+  assert.throws(
+    () => auditReleaseWorkflow(mutated),
+    /Local release must independently consume/,
+  );
+});
+
+test('rejects a Local rollout detached from the audited catalog selection', function rejectsDetachedLocalCatalogSelection() {
+  const localMarker = '\n  release-catalog-local-deployment-live:';
+  const clusterMarker = '\n  release-catalog-deployment-live:';
+  const localOffset = releaseSource.indexOf(localMarker);
+  const clusterOffset = releaseSource.indexOf(clusterMarker);
+  const mutatedLocal = releaseSource
+    .slice(localOffset, clusterOffset)
+    .replace(
+      '--release-selection="${RELEASE_SELECTION}"',
+      '--release-selection="/tmp/unreviewed.json"',
+    );
+  assert.throws(
+    () =>
+      auditReleaseWorkflow(
+        `${releaseSource.slice(
+          0,
+          localOffset,
+        )}${mutatedLocal}${releaseSource.slice(clusterOffset)}`,
+      ),
+    /Local release must independently consume/,
+  );
+});
+
+test('rejects publication authority in the post-publish Local catalog consumer', function rejectsLocalCatalogConsumerPublicationAuthority() {
+  const localMarker = '\n  release-catalog-local-deployment-live:';
+  const clusterMarker = '\n  release-catalog-deployment-live:';
+  const localOffset = releaseSource.indexOf(localMarker);
+  const clusterOffset = releaseSource.indexOf(clusterMarker);
+  const mutatedLocal = releaseSource
+    .slice(localOffset, clusterOffset)
+    .replace('packages: read', 'packages: write');
+  assert.throws(
+    () =>
+      auditReleaseWorkflow(
+        `${releaseSource.slice(
+          0,
+          localOffset,
+        )}${mutatedLocal}${releaseSource.slice(clusterOffset)}`,
+      ),
+    /keep evidence read-only|without publication authority/,
   );
 });
 

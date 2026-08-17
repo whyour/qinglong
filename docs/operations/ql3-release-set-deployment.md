@@ -13,6 +13,18 @@ ghcr.io/<owner>/qinglong3-release-catalog:v<version>-<scope>
 `ghcr.io/<owner>/qinglong3-release-catalog@sha256:<manifest-digest>`，验证这个 immutable reference 后，再从 JSON 的
 `images[].reference` 读取完整 `ghcr.io/<owner>/<repository>@sha256:<digest>`。
 
+## 发布流水线内置 Local 与 Cluster 下游门
+
+`local|all` scope 在 durable catalog 发布后启动独立 `release-catalog-local-deployment-live`。它与 publisher 权限隔离，从公开 catalog
+重新完成发现、Cosign/GitHub provenance 验证和 three-file bundle audit，随后物化唯一 Local v2 selection。该 selection 不是只做 JSON
+检查：同一个 immutable Local image 与 selection 会依次进入 Edge、Standalone 的正式 Compose rollout、SQLite backup/restore、evidence
+collection 和 graceful stop。两个 content-free report 必须绑定同一 release-set、catalog manifest、consumption report 与 selection digest；
+任一 Profile 失败都会阻断 Local release。
+
+该 job 只有 `contents|packages|attestations:read`，不执行 Docker login、签名、tag promotion 或 catalog mutation。regctl、Cosign、GitHub CLI、
+Node workspace、token 和原始 bundle 仅存在于短生命周期 release runner；路由设备/NAS/单机用户不安装这些发布工具，也不增加常驻 updater、
+listener 或 timer。第一份真实证据仍必须由受保护 release tag 产生；PR fixture 只验证失败关闭与产品 rollout 路径。
+
 ## 发布流水线内置 Cluster 下游门
 
 `ql3-image-release.yml` 在 durable catalog、签名、provenance、receipt 和 90 天便利 bundle 全部发布后，才启动独立

@@ -881,6 +881,195 @@ jobs:
           overwrite: false
           include-hidden-files: false
 
+  release-catalog-local-deployment-live:
+    name: Consume the public catalog and prove both Local profiles
+    needs: release-set
+    if: always() && needs.release-set.result == 'success' && inputs.release_scope != 'cluster'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.18.0'
+
+      - name: Install the frozen workspace without lifecycle scripts
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@8.3.1 --activate
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm --filter @qinglong/local-owner-cli check
+
+      - name: Install the exact checksum-pinned catalog reader
+        env:
+          REGCTL: ${{ runner.temp }}/regctl
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "${REGCTL}" \
+            https://github.com/regclient/regclient/releases/download/v0.11.5/regctl-linux-amd64
+          echo "c93aa7638749f5aaac1a8e01787321889c78f0101809bb2880343478d0ba0467  ${REGCTL}" | sha256sum --check --strict
+          chmod 0755 "${REGCTL}"
+          "${REGCTL}" version
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Consume and independently audit the published OCI catalog
+        id: local-catalog-consumption
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          REGCTL: ${{ runner.temp }}/regctl
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          owner="${REPOSITORY_OWNER,,}"
+          source_repository="${SOURCE_REPOSITORY,,}"
+          private_root="${RUNNER_TEMP}/ql3-release-catalog-local-consumer"
+          bundle="${private_root}/bundle"
+          token="${private_root}/github-token"
+          install -d -m 0700 "${private_root}"
+          install -m 0600 /dev/null "${token}"
+          printf '%s' "${GH_TOKEN}" > "${token}"
+          trap 'rm -f "${token}"' EXIT
+          cosign="$(readlink -f "$(command -v cosign)")"
+          gh="$(readlink -f "$(command -v gh)")"
+          node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+            --mode=create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --output-directory="${bundle}" \
+            --regctl="${REGCTL}" \
+            --cosign="${cosign}" \
+            --gh="${gh}" \
+            --github-token-file="${token}"
+          node scripts/ql3-release-catalog-consumption-ceremony.cjs \
+            --mode=audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${owner}" \
+            --source-repository="${source_repository}" \
+            --output-directory="${bundle}"
+          rm -f "${token}"
+          trap - EXIT
+          echo "bundle=${bundle}" >> "${GITHUB_OUTPUT}"
+          echo "repository-owner=${owner}" >> "${GITHUB_OUTPUT}"
+          echo "source-repository=${source_repository}" >> "${GITHUB_OUTPUT}"
+
+      - name: Materialize and audit the catalog-bound Local selection
+        id: local-selection
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+          CONSUMPTION_BUNDLE: ${{ steps.local-catalog-consumption.outputs.bundle }}
+          REPOSITORY_OWNER: ${{ steps.local-catalog-consumption.outputs.repository-owner }}
+          SOURCE_REPOSITORY: ${{ steps.local-catalog-consumption.outputs.source-repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          private_root="${RUNNER_TEMP}/ql3-release-catalog-local-selection"
+          selection="${private_root}/selection.json"
+          install -d -m 0700 "${private_root}"
+          node scripts/ql3-deployment-lock-contract.cjs \
+            --mode=local-create \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${REPOSITORY_OWNER}" \
+            --source-repository="${SOURCE_REPOSITORY}" \
+            --consumption-bundle="${CONSUMPTION_BUNDLE}" \
+            --allow-root-service=false \
+            --output="${selection}" > /dev/null
+          node scripts/ql3-deployment-lock-contract.cjs \
+            --mode=local-audit \
+            --version="${RELEASE_VERSION}" \
+            --source-revision="${GITHUB_SHA}" \
+            --source-ref="${GITHUB_REF}" \
+            --release-scope="${RELEASE_SCOPE}" \
+            --repository-owner="${REPOSITORY_OWNER}" \
+            --source-repository="${SOURCE_REPOSITORY}" \
+            --consumption-bundle="${CONSUMPTION_BUNDLE}" \
+            --allow-root-service=false \
+            --selection="${selection}" > /dev/null
+          SELECTION="${selection}" node - <<'NODE' >> "${GITHUB_OUTPUT}"
+          const fs = require('node:fs');
+          const selection = JSON.parse(fs.readFileSync(process.env.SELECTION, 'utf8'));
+          if (!/^sha256:[a-f0-9]{64}$/.test(selection.selectionDigest || '') ||
+              !/^ghcr\.io\/[a-z0-9._-]+\/qinglong3-local-application@sha256:[a-f0-9]{64}$/.test(selection.service?.image || '')) process.exit(1);
+          process.stdout.write(`selection=${process.env.SELECTION}\nselection-digest=${selection.selectionDigest}\nimage=${selection.service.image}\n`);
+          NODE
+
+      - name: Prove catalog-bound Edge and Standalone rollout
+        env:
+          IMAGE: ${{ steps.local-selection.outputs.image }}
+          RELEASE_SELECTION: ${{ steps.local-selection.outputs.selection }}
+          SELECTION_DIGEST: ${{ steps.local-selection.outputs.selection-digest }}
+          EVIDENCE_ROOT: ${{ runner.temp }}/ql3-release-catalog-local-deployment
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 0700 "${EVIDENCE_ROOT}"
+          docker pull "${IMAGE}"
+          docker_executable="$(realpath "$(command -v docker)")"
+          docker_socket="$(realpath /var/run/docker.sock)"
+          for profile in edge standalone; do
+            node scripts/ql3-local-compose-rollout-live-contract.cjs \
+              --image="${IMAGE}" \
+              --docker-executable="${docker_executable}" \
+              --docker-socket="${docker_socket}" \
+              --profile="${profile}" \
+              --release-selection="${RELEASE_SELECTION}" \
+              --expected-selection-digest="${SELECTION_DIGEST}" > \
+              "${EVIDENCE_ROOT}/${profile}.json"
+          done
+          node -e \
+            "const fs=require('node:fs');const p=process.env.EVIDENCE_ROOT;const d=/^sha256:[a-f0-9]{64}$/;for(const n of ['edge','standalone']){const r=JSON.parse(fs.readFileSync(p+'/'+n+'.json','utf8'));if(r.profile!==n||r.compatible!==true||r.rolloutActive!==true||r.gracefulCleanup!==true||r.releaseAuthority?.mode!=='verified_release_catalog'||r.releaseAuthority?.sourceRevision!==process.env.GITHUB_SHA||r.releaseAuthority?.sourceRef!==process.env.GITHUB_REF||r.releaseAuthority?.scope!==process.env.RELEASE_SCOPE||r.releaseAuthority?.selectionDigest!==process.env.SELECTION_DIGEST||!d.test(r.releaseAuthority?.releaseSetDigest||'')||!d.test(r.releaseAuthority?.catalogManifestDigest||'')||!d.test(r.releaseAuthority?.catalogConsumptionDigest||''))process.exit(1)}"
+
+      - name: Verify isolated Local release-gate cleanup
+        if: always()
+        env:
+          IMAGE: ${{ steps.local-selection.outputs.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${IMAGE}" ]]; then
+            test -z "$(docker ps -aq --filter ancestor="${IMAGE}")"
+          fi
+
+      - name: Upload content-free catalog Local deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-release-catalog-local-deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-release-catalog-local-deployment
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
+
   release-catalog-deployment-live:
     name: Consume the public catalog and prove the cluster release on K3s
     needs: release-set
