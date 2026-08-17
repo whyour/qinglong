@@ -81,6 +81,21 @@ readiness 是本次 release workflow 的操作证据，不是新的镜像内容 
 readiness digest 不同；release-set 与 immutable catalog digest 仍必须相同，既有 exact tag 只能复用，不同 digest 继续失败。OCI registry
 没有跨 repository 事务或 tag CAS，因此 closure 证明的是观测到的终态，不是原子提交。
 
+### Fail-closed tag finalizer
+
+最终 tag writer 不再由 workflow 内联脚本实现。`ql3-release-tag-finalizer.cjs --mode=finalize` 必须先从 owner-private `0700` 目录稳定读取
+`0600` canonical publication plan，完整验证 plan self-digest、deployment readiness 和 exact repository/tag，再固定 checksum-verified
+`regctl` 的文件 identity。任何 registry mutation 前，它会遍历所有 image repository，验证 immutable source、最大 1 MiB 的合法无重复 tag
+inventory，以及每个已存在目标 tag 的 exact digest；任一冲突时 copy 次数为零。
+
+promotion 只填补 absent tag，不重写 exact tag。若 `regctl image copy` 在远端提交后丢失响应，本轮不会生成 observation；同一 protected
+source tag 重跑会重新 inventory，复用已存在 exact tag并只补缺失项。不得手工删除“可能已成功”的 tag，也不得把任意 registry error 降级为
+absent。全部 tag 最终回读后，observation 以 `0600` no-replace 生成；紧接着的 `--mode=audit` 再次只读验证 source、inventory、live tag 与
+observation，成功后才允许 closure。
+
+hermetic response-loss rehearsal 只证明状态机和零写/精确重放性质，不是 GHCR 在线证据。真实组织权限、网络响应丢失、并发 writer 与 GitHub
+attestation 仍必须通过受保护 release tag 或受控 release repository 演练取得。
+
 ## 选择 scope
 
 | 部署类型 | release scope | 必须出现的镜像 |

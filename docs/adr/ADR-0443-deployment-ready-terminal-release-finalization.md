@@ -5,6 +5,7 @@
 - 关联 RFC：QL-RFC-0001 D-03、D-14、D-336、D-344、D-345、D-350、D-351
 - 关联 ADR：ADR-0436、ADR-0437、ADR-0441、ADR-0442
 - Supersedes：ADR-0442 中“catalog receipt attested 后即可 mutation 最终 image tag”的发布顺序
+- Amended by：ADR-0444 将最终 tag mutation 从 YAML heredoc 收敛为 pre-registry validated、可重放演练的独立 finalizer
 
 ## 上下文
 

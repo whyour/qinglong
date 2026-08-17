@@ -304,6 +304,7 @@ jobs:
           test/back/ql3ReleaseSetContract.test.cjs
           test/back/ql3ReleaseCatalogContract.test.cjs
           test/back/ql3ReleaseDeploymentReadinessContract.test.cjs
+          test/back/ql3ReleaseTagFinalizer.test.cjs
           test/back/ql3ReleasePublicationClosureContract.test.cjs
           test/back/ql3ReleaseCatalogConsumptionCeremony.test.cjs
           test/back/ql3DeploymentLockContract.test.cjs

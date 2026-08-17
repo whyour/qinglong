@@ -11,6 +11,24 @@
 
 最新增量证据（2026-08-18）：
 
+- D-352/ADR-0444（已接受；首份真实 GHCR response-loss 重放待实际 release tag）：修复 D-351 终态 finalizer 中仍残留的
+  mutation-before-validation 风险。原 workflow 内联 Node publisher 直接解析 plan 并执行 registry copy，直到生成 observation 时才间接验证
+  plan self-digest；篡改 plan 可能先产生错误副作用。promotion 现唯一进入 `scripts/ql3-release-tag-finalizer.cjs`：只读取 current-user
+  `0700/0600` canonical plan，在第一条 registry command 前完整验证 publication plan v2、deployment readiness、repository、immutable
+  source 和 exact tags；固定 `regctl` dev/inode/size/uid/mode/time identity 并在每条命令前后复验。所有 repository 的 source digest、最大
+  1 MiB canonical inventory 与既有目标 tag 必须在首次 copy 前全量通过，最后一个冲突同样保持零 mutation；copy-after-write response loss
+  不猜测结果，同 source 重跑复用 exact tag 并只补 absent。最终 observation 以 `0600` no-replace 发布，closure 前再执行一次
+  `registryMutation=false` 的 live terminal audit。hermetic registry 已覆盖 plan 篡改零调用、全局 conflict 零写、response-loss 重放、畸形/
+  超限 inventory、错误终态 digest、no-replace CLI 与 executable drift；workflow 不再保留高权限 Node heredoc。publication/observation/
+  closure schema 和无 CAS/跨仓库事务声明不变，不新增 package、生产依赖、数据库、Kubernetes object 或设备常驻资源。阶段门已重跑：finalizer/
+  publication/workflow/Console distribution 聚焦测试 116/116，完整 backend 1,403 pass + 2 条条件 skip/0 fail，18-package clean
+  build/test 退出 0，14/14 静态审计与 14/14 artifact 档位全部 compatible。artifact 保持 D-351 字节基线：基础 Edge/Standalone
+  `2589890/2589968`、adopted `2809185/2809308`、application `3632769/3632889`、application-api
+  `3800322/3800466`、AI `3069143/3069233`、application+AI `4493043/4493175`、MCP `7315930/7316038`。D-352 不修改
+  package/runtime、数据库/schema、镜像内容或 Kubernetes/Compose 部署面，因而没有制造新的 PostgreSQL HA/K3s 物理环境证据；本阶段复用紧邻
+  D-351 已通过的 PostgreSQL 18.6 arm64 142/142、timeline `1→2` 与三节点 K3s v1.34.3/arm64 synthetic fixture 作为未变部署面的基线，
+  不把它们冒充 D-352 新运行的证据。真实 GHCR response-loss 仍只能由受保护 release tag 或受控 release repository 演练产生。
+
 - D-351/ADR-0443（已接受；首份真实 GHCR deployment-ready finalization 待实际 release tag）：D-350 的 catalog-ready
   publication 继续收紧为 deployment-ready publication。`release-set` job 只发布、验签并 attested immutable catalog，不再登录 registry
   或修改最终 image tag；`local|all` 必须先完成 Edge 与 Standalone 的 catalog-bound 正式 Compose rollout，`cluster|all` 必须先完成三节点

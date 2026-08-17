@@ -258,6 +258,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       'Verify the durable catalog and create its immutable receipt',
       'Attest the immutable release-catalog receipt',
       'Attest deployment readiness before any final tag mutation',
+      'scripts/ql3-release-tag-finalizer.cjs',
       'Promote final tags only after every required deployment gate',
       'Close and audit the deployment-ready public tag set',
       'Attest the deployment-ready release publication closure receipt',

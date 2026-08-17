@@ -606,4 +606,6 @@ module.exports = Object.freeze({
   createPublicationTagObservation,
   parseArguments,
   runCli,
+  validatePublicationPlan,
+  validateTagObservation,
 });

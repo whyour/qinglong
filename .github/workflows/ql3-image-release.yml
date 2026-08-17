@@ -1579,100 +1579,17 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          node <<'NODE'
-          const fs = require('node:fs');
-          const { spawnSync } = require('node:child_process');
-          const {
-            createPublicationTagObservation,
-          } = require('./scripts/ql3-release-publication-closure-contract.cjs');
-          const plan = JSON.parse(fs.readFileSync(process.env.PUBLICATION_PLAN, 'utf8'));
-          const regctl = process.env.REGCTL;
-          const maxInventoryBytes = 1024 * 1024;
-          const tagPattern = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/u;
-          const run = (args) => {
-            const result = spawnSync(regctl, args, {
-              encoding: 'utf8',
-              maxBuffer: maxInventoryBytes,
-            });
-            if (result.error) throw result.error;
-            if (result.status !== 0) {
-              throw new Error(`regctl ${args.join(' ')} failed`);
-            }
-            return result.stdout;
-          };
-          const states = [];
-          for (const image of plan.images) {
-            const source = run(['image', 'digest', image.immutableReference]).trim();
-            if (source !== image.digest) {
-              throw new Error('source digest drifted before promotion');
-            }
-            const inventoryContents = run([
-              'tag',
-              'ls',
-              image.registryRepository,
-              '--format',
-              '{{ range .Tags }}{{ println . }}{{ end }}',
-            ]);
-            if (
-              Buffer.byteLength(inventoryContents) > maxInventoryBytes ||
-              (inventoryContents.length > 0 && !inventoryContents.endsWith('\n'))
-            ) {
-              throw new Error('release tag inventory is invalid or unbounded');
-            }
-            const inventory = inventoryContents.length === 0
-              ? []
-              : inventoryContents.slice(0, -1).split('\n');
-            if (
-              inventory.some((tag) => !tagPattern.test(tag)) ||
-              new Set(inventory).size !== inventory.length
-            ) {
-              throw new Error('release tag inventory is malformed');
-            }
-            const inventorySet = new Set(inventory);
-            for (const tag of image.tags) {
-              const tagName = tag.reference.slice(image.registryRepository.length + 1);
-              const present = inventorySet.has(tagName);
-              if (present) {
-                const current = run(['image', 'digest', tag.reference]).trim();
-                if (current !== image.digest) {
-                  throw new Error('release tag already points at another digest');
-                }
-              }
-              states.push({ image, tag, present });
-            }
-          }
-          for (const state of states) {
-            if (!state.present) {
-              run([
-                'image',
-                'copy',
-                state.image.immutableReference,
-                state.tag.reference,
-              ]);
-            }
-          }
-          const observedTags = [];
-          for (const state of states) {
-            const promoted = run(['image', 'digest', state.tag.reference]).trim();
-            if (promoted !== state.image.digest) {
-              throw new Error('promoted tag does not resolve to the release-set digest');
-            }
-            observedTags.push({
-              image: state.image.name,
-              kind: state.tag.kind,
-              reference: state.tag.reference,
-              digest: promoted,
-            });
-          }
-          const observation = createPublicationTagObservation(plan, observedTags);
-          const descriptor = fs.openSync(process.env.TAG_OBSERVATIONS, 'wx', 0o600);
-          try {
-            fs.writeFileSync(descriptor, `${JSON.stringify(observation)}\n`);
-            fs.fsyncSync(descriptor);
-          } finally {
-            fs.closeSync(descriptor);
-          }
-          NODE
+          node scripts/ql3-release-tag-finalizer.cjs \
+            --mode=finalize \
+            --plan="${PUBLICATION_PLAN}" \
+            --regctl="${REGCTL}" \
+            --output="${TAG_OBSERVATIONS}" > /dev/null
+          node scripts/ql3-release-tag-finalizer.cjs \
+            --mode=audit \
+            --plan="${PUBLICATION_PLAN}" \
+            --regctl="${REGCTL}" \
+            --observation="${TAG_OBSERVATIONS}" > \
+            "${RUNNER_TEMP}/release-tag-finalization-audit.json"
 
       - name: Close and audit the deployment-ready public tag set
         env:

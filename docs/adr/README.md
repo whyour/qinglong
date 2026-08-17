@@ -447,6 +447,7 @@
 | [ADR-0441](./ADR-0441-no-overwrite-release-catalog-discovery-publication.md)                            | Release Catalog Discovery Tag 无覆盖发布                                                                                                                                    | Accepted（首份真实 GHCR conflict/reuse 证据待实际 release tag） |
 | [ADR-0442](./ADR-0442-catalog-ready-terminal-release-tag-publication.md)                                | Catalog-ready 的终态 Release Tag 发布与闭合收据                                                                                                                             | Superseded by ADR-0443（bounded promotion/closure 机制保留） |
 | [ADR-0443](./ADR-0443-deployment-ready-terminal-release-finalization.md)                                | Deployment-ready 的终态 Release Finalization                                                                                                                               | Accepted（首份真实 GHCR deployment-ready finalization 待实际 release tag） |
+| [ADR-0444](./ADR-0444-fail-closed-release-tag-finalizer-and-replay-rehearsal.md)                         | Fail-closed Release Tag Finalizer 与重放演练                                                                                                                                | Accepted（首份真实 GHCR response-loss 重放待实际 release tag） |
 
 ## 规则
 

@@ -136,9 +136,13 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         receiptAttested: true,
       },
       finalPublicationClosure: {
+        finalizer: 'scripts/ql3-release-tag-finalizer.cjs',
         planSchema: 'qinglong/release-publication-plan@v2',
         tagObservationSchema: 'qinglong/release-publication-tag-observation@v1',
         receiptSchema: 'qinglong/release-publication-closure-receipt@v2',
+        planValidatedBeforeRegistryAccess: true,
+        hermeticResponseLossRehearsal: true,
+        liveTerminalAuditBeforeClosure: true,
         catalogReadyBeforeTagMutation: true,
         deploymentReadyBeforeTagMutation: true,
         allTagsExactDigest: true,
@@ -219,7 +223,7 @@ test('rejects removal of the durable release-catalog contract tests', () => {
   );
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
-    /durable catalog, deployment-lock and workflow negative tests/,
+    /durable catalog, deployment-lock.*workflow negative tests/,
   );
 });
 
@@ -230,7 +234,7 @@ test('rejects removal of the final publication closure contract tests', () => {
   );
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
-    /durable catalog, deployment-lock and workflow negative tests/,
+    /durable catalog, deployment-lock.*workflow negative tests/,
   );
 });
 
@@ -241,7 +245,18 @@ test('rejects removal of the deployment readiness contract tests', () => {
   );
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
-    /durable catalog, deployment-lock and workflow negative tests/,
+    /durable catalog, deployment-lock.*workflow negative tests/,
+  );
+});
+
+test('rejects removal of the fail-closed tag finalizer tests', () => {
+  const mutated = ciSource.replace(
+    'test/back/ql3ReleaseTagFinalizer.test.cjs',
+    'test/back/tag-finalizer-tests-removed.test.cjs',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /tag finalizer.*workflow negative tests/,
   );
 });
 
@@ -263,7 +278,7 @@ test('rejects removal of the deployment-lock materialization contract tests', ()
   );
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
-    /deployment-lock and workflow negative tests/,
+    /deployment-lock.*workflow negative tests/,
   );
 });
 
@@ -1170,11 +1185,26 @@ test('rejects deployment readiness without its own pre-promotion attestation', (
   assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
 });
 
-test('rejects final tag promotion without bounded repository inventory', () => {
+test('rejects final tag promotion that bypasses the validated finalizer', () => {
   const mutated = releaseSource.replace(
-    "              'tag',\n              'ls',\n              image.registryRepository,",
-    "              'image',\n              'digest',\n              image.registryRepository,",
+    '            --mode=finalize \\',
+    '            --mode=audit \\',
   );
+  assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
+});
+
+test('rejects final tag promotion without a live read-only terminal audit', () => {
+  const audited = [
+    '            --mode=audit \\',
+    '            --plan="${PUBLICATION_PLAN}" \\',
+    '            --regctl="${REGCTL}"',
+  ].join('\n');
+  const unaudited = [
+    '            --mode=finalize \\',
+    '            --plan="${PUBLICATION_PLAN}" \\',
+    '            --regctl="${REGCTL}"',
+  ].join('\n');
+  const mutated = releaseSource.replace(audited, unaudited);
   assert.throws(() => auditReleaseWorkflow(mutated), /release finalization/);
 });
 

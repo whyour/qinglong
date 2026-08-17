@@ -274,8 +274,8 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3PrivateReleaseEvidenceReceiptContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseDeploymentReadinessContract\.test\.cjs[\s\S]*test\/back\/ql3ReleasePublicationClosureContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
-    'cluster image CI must run SBOM, candidate, private evidence receipt, release-set, durable catalog, deployment-lock and workflow negative tests; catalog consumption ceremony is mandatory',
+    /node --test[\s\S]*test\/back\/ql3ClusterImageSbom\.test\.cjs[\s\S]*test\/back\/ql3ClusterImageReleaseAudit\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCandidateContract\.test\.cjs[\s\S]*test\/back\/ql3PrivateReleaseEvidenceReceiptContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseSetContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseDeploymentReadinessContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseTagFinalizer\.test\.cjs[\s\S]*test\/back\/ql3ReleasePublicationClosureContract\.test\.cjs[\s\S]*test\/back\/ql3ReleaseCatalogConsumptionCeremony\.test\.cjs[\s\S]*test\/back\/ql3DeploymentLockContract\.test\.cjs/,
+    'cluster image CI must run SBOM, candidate, private evidence receipt, release-set, durable catalog, deployment-lock, tag finalizer and workflow negative tests; catalog consumption ceremony is mandatory',
   );
   requirePattern(
     source,
@@ -1024,9 +1024,10 @@ function auditReleaseWorkflow(source) {
       }) ||
     finalizationSteps[11]?.uses !==
       'docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c' ||
-    !/createPublicationTagObservation[\s\S]*maxInventoryBytes = 1024 \* 1024[\s\S]*tagPattern[\s\S]*for \(const image of plan\.images\)[\s\S]*image\.immutableReference[\s\S]*'tag',[\s\S]*'ls',[\s\S]*image\.registryRepository[\s\S]*inventoryContents\.endsWith\('\\n'\)[\s\S]*new Set\(inventory\)\.size !== inventory\.length[\s\S]*release tag already points at another digest[\s\S]*for \(const state of states\)[\s\S]*'image',[\s\S]*'copy',[\s\S]*state\.image\.immutableReference[\s\S]*promoted tag does not resolve to the release-set digest[\s\S]*createPublicationTagObservation\(plan, observedTags\)[\s\S]*fs\.openSync\(process\.env\.TAG_OBSERVATIONS, 'wx', 0o600\)/u.test(
+    !/ql3-release-tag-finalizer\.cjs[\s\S]*--mode=finalize[\s\S]*--plan="\$\{PUBLICATION_PLAN\}"[\s\S]*--regctl="\$\{REGCTL\}"[\s\S]*--output="\$\{TAG_OBSERVATIONS\}"[\s\S]*ql3-release-tag-finalizer\.cjs[\s\S]*--mode=audit[\s\S]*--plan="\$\{PUBLICATION_PLAN\}"[\s\S]*--regctl="\$\{REGCTL\}"[\s\S]*--observation="\$\{TAG_OBSERVATIONS\}"[\s\S]*release-tag-finalization-audit\.json/u.test(
       finalizationSteps[12]?.run ?? '',
     ) ||
+    /node\s+<<['"]?NODE/u.test(finalizationSteps[12]?.run ?? '') ||
     !/ql3-release-publication-closure-contract\.cjs[\s\S]*--mode=close[\s\S]*--plan="\$\{PUBLICATION_PLAN\}"[\s\S]*--observations="\$\{TAG_OBSERVATIONS\}"[\s\S]*--output="\$\{CLOSURE_RECEIPT\}"[\s\S]*--mode=audit[\s\S]*--receipt="\$\{CLOSURE_RECEIPT\}"/u.test(
       finalizationSteps[13]?.run ?? '',
     ) ||
@@ -1454,9 +1455,13 @@ function auditReleaseWorkflow(source) {
       receiptAttested: true,
     },
     finalPublicationClosure: {
+      finalizer: 'scripts/ql3-release-tag-finalizer.cjs',
       planSchema: 'qinglong/release-publication-plan@v2',
       tagObservationSchema: 'qinglong/release-publication-tag-observation@v1',
       receiptSchema: 'qinglong/release-publication-closure-receipt@v2',
+      planValidatedBeforeRegistryAccess: true,
+      hermeticResponseLossRehearsal: true,
+      liveTerminalAuditBeforeClosure: true,
       catalogReadyBeforeTagMutation: true,
       deploymentReadyBeforeTagMutation: true,
       allTagsExactDigest: true,

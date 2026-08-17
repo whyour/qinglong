@@ -78,6 +78,15 @@ test('rejects verifier, embedded artifact and release workflow drift', () => {
         ),
       'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',
     ],
+    [
+      '.github/workflows/ql3-image-release.yml',
+      (source) =>
+        source.replaceAll(
+          'scripts/ql3-release-tag-finalizer.cjs',
+          'scripts/unvalidated-inline-publisher.cjs',
+        ),
+      'QL3_CLUSTER_ADMIN_RELEASE_WORKFLOW_DRIFT',
+    ],
   ];
   for (const [target, transform, code] of fixtures) {
     const report = auditClusterCopilotConsoleDistribution({
