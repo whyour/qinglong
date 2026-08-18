@@ -117,9 +117,20 @@ pnpm audit:manual-primary-canary:ql3 -- \
 ```
 
 正确状态是 `activation_approved`/`rolloutMode=primary_selected`，不是 `primary_active`；`requiresRestart=true` 且 `runtimeActivationObserved=false`。随后重启应用，并在结构化启动审计中依次确认
-同一 revision 的 `selected`、`reconciled`、`activated`。缺少任一项都不能宣称运行态 Primary 已激活。
+同一 revision 的 `selected`、`reconciled`、`activated`，再执行：
 
-审批过期后 loader 自动 fail-closed 为 off，不会续期。不要修改原 manifest 时间；创建新 session 重新采样。
+```sh
+pnpm audit:manual-primary-canary:ql3 -- \
+  --root=/ql/data/config \
+  --session=edge-20260819-a \
+  --require=active
+```
+
+只有 `runtimeActivationObserved=true`、`runtimeActivationCurrent=true`、`runtimeReceiptState=active` 和 `runtimeProcessState=running` 同时成立，才能宣称当前 Linux worker 已激活。
+receipt 文件固定为 owner-private `qinglong3-manual-primary-runtime.json`，不要复制到公开 artifact。非 Linux portable receipt 只能证明写入发生过，不能通过 `active` 门。
+
+审批过期后 loader 对下一次 bootstrap 自动 fail-closed 为 off，不会续期；已经运行的 worker 没有 watcher，不会仅凭磁盘过期自动卸载 router。必须停止/重启并通过
+`--require=off`，不要修改原 manifest 时间；需要重新启用时创建新 session 重新采样。
 
 ## 7. 回滚并重启
 
@@ -141,5 +152,6 @@ pnpm audit:manual-primary-canary:ql3 -- \
 
 支持的 reason 只有 `operator_request`、`runtime_failure`、`gate_rejected`、`approval_expired`。rollback 先发布 intent，再摘要复核并原子替换 live manifest，最后发布 completion；响应丢失时使用完全相同的参数重跑。
 
-`rolled-back` 比普通 `off` 更严格：后者在初始 disabled 或审批过期时也成立，前者还要求本 session 的 intent/completion 摘要链完整。完成后重启应用，确认 rollout loader 返回
-disabled/off，Legacy manual 执行继续可用且 Shadow/Primary 不再接管。保留整个 session 的 `0600` 文件和启动审计用于发布复核，不要覆盖或编辑。
+`rolled-back` 比普通 `off` 更严格：后者在初始 disabled 或审批过期时也成立，前者还要求本 session 的 intent/completion 摘要链完整；两者现在都拒绝仍存活的 current
+Primary receipt。rollback 写盘后先停止/重启应用，再运行上面的 `--require=rolled-back`，确认 loader 返回 disabled/off、receipt 为 stopped/failed 或旧 Linux identity 已退出，
+Legacy manual 执行继续可用且 Primary 不再接管。保留整个 session 的 `0600` 文件和启动审计用于发布复核，不要覆盖或编辑。

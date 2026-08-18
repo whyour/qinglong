@@ -4,6 +4,7 @@ import type {
   RuntimeRolloutLoadAudit,
   RuntimeRolloutLoadResult,
 } from '../ports/runtimeRolloutLoader';
+import type { ManualPrimaryRuntimeReceiptLifecycle } from '../ports/manualPrimaryRuntimeReceipt';
 import type { PrimaryCancellationStopResult } from './primaryCancellationLifecycle';
 import type { PrimaryCompletionReceiptStopResult } from './primaryCompletionReceiptLifecycle';
 import type { PrimaryRunStartupSummary } from './primaryRunStartupSupervisor';
@@ -46,6 +47,7 @@ export interface ManualPrimaryRuntimeActivationOptions {
   create(policy: RuntimeRolloutPolicy): ManualPrimaryActivationStack;
   install(router: ManualPrimaryExecutionRouter): () => void;
   audit(record: ManualPrimaryActivationAudit): void | Promise<void>;
+  receipt?: ManualPrimaryRuntimeReceiptLifecycle;
 }
 
 export interface ManualPrimaryRuntimeActivationResult {
@@ -155,36 +157,65 @@ export async function activateManualPrimaryRuntime(
       throw new Error('Primary cancellation lifecycle did not start');
     }
     dispose = options.install(stack.router);
+    await options.receipt?.activated(load.audit);
     await options.audit({
       ...load.audit,
       activation: 'activated',
       recovery: recoveryAudit(recovery),
     });
 
-    let stopped = false;
+    let stopPromise: Promise<PrimaryCancellationStopResult> | undefined;
     return {
       load,
       active: true,
       recovery,
       async stop() {
-        if (stopped) return 'drained';
-        stopped = true;
-        dispose?.();
-        const result = await stopLifecycles(stack!, {
-          completion: completionStarted,
-          timeout: timeoutStarted,
-          cancellation: cancellationStarted,
-        });
-        try {
-          await options.audit({
-            ...load.audit,
-            activation: 'stopped',
-            recovery: recoveryAudit(recovery),
-          });
-        } catch {
-          // Cleanup must not be reversed by a diagnostic failure.
-        }
-        return result;
+        stopPromise ??= (async () => {
+          let receiptError: unknown;
+          try {
+            await options.receipt?.stopping();
+          } catch (error) {
+            receiptError = error;
+          }
+          dispose?.();
+          let result: PrimaryCancellationStopResult = 'drained';
+          let lifecycleError: unknown;
+          try {
+            result = await stopLifecycles(stack!, {
+              completion: completionStarted,
+              timeout: timeoutStarted,
+              cancellation: cancellationStarted,
+            });
+          } catch (error) {
+            lifecycleError = error;
+          }
+          if (receiptError === undefined && lifecycleError === undefined) {
+            try {
+              await options.receipt?.stopped();
+            } catch (error) {
+              receiptError = error;
+            }
+          }
+          if (receiptError !== undefined || lifecycleError !== undefined) {
+            try {
+              await options.receipt?.failed();
+            } catch {
+              // Preserve the first stop failure; a non-active receipt is best effort.
+            }
+            throw receiptError ?? lifecycleError;
+          }
+          try {
+            await options.audit({
+              ...load.audit,
+              activation: 'stopped',
+              recovery: recoveryAudit(recovery),
+            });
+          } catch {
+            // Cleanup must not be reversed by a diagnostic failure.
+          }
+          return result;
+        })();
+        return stopPromise;
       },
     };
   } catch (error) {
@@ -199,6 +230,11 @@ export async function activateManualPrimaryRuntime(
       } catch {
         // Preserve the activation error after best-effort cleanup.
       }
+    }
+    try {
+      await options.receipt?.failed();
+    } catch {
+      // Preserve the activation failure; liveness checks still reject stale state.
     }
     try {
       await options.audit({ ...load.audit, activation: 'failed' });

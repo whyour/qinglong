@@ -5,6 +5,7 @@
 - 关联 RFC：QL-RFC-0001 D-361、PR-4、PR-5
 - 关联 ADR：ADR-0002、ADR-0449、ADR-0450、ADR-0451、ADR-0453
 - Amends：ADR-0453 的首次目标实例 canary 操作缺口
+- Amended by：ADR-0455 的 Profile-bounded durable runtime activation receipt
 
 ## 上下文
 
@@ -36,13 +37,12 @@ Edge 可能是 128 MiB 路由设备，不能为 canary 新增 daemon、watcher�
 7. `approve` 是唯一写 live manifest 的操作。它要求显式 `approvedBy`，审批最短一分钟、最长 24 小时；先复核 plan 时的 absent/disabled 基线，disabled 基线先
    no-replace 归档，再以同目录 fsync 临时文件和最终摘要复核发布 schema v2 manifest。结果状态固定为 `activation_approved`/`primary_selected`，并明确
    `requiresRestart=true`、`runtimeActivationObserved=false`；配置选择不得冒充 HTTP worker 已完成 startup reconciliation 和 router activation。
-8. 应用重启后，实际运行态仍由现有 bootstrap 的 `selected → reconciled → activated` audit 证明。独立 `audit:manual-primary-canary:ql3` 只读复核 plan、source、gate、
-   qualification、selection receipt 与 live manifest，可要求 `prepared|qualified|selected|off|rolled-back`；`off` 只证明 loader 当前关闭，`rolled-back` 还要求本 session 的
-   intent/completion 摘要链完整。auditor 刻意不提供 `primary_active` 结论。
+8. 应用重启后，实际运行态由 bootstrap 的 `selected → reconciled → durable active receipt → activated` 证明。ADR-0455 已让独立 auditor 复核 receipt 与 Linux
+   boot/PID/start-time 联合身份，并新增 `active` 要求；`off|rolled-back` 同时要求不存在仍 current 的 runtime。非 Linux portable receipt 不能获得 current 结论。
 9. `rollback` 只接受四个固定 reason 与有界 operator。它先 no-replace 发布 intent，绑定当前 enabled manifest SHA-256 和目标 disabled SHA-256，再复核当前摘要并原子替换
    live manifest，最后发布 completion；intent 或 completion response loss 可用相同参数重放。disabled 已有效但不同于本 session 的目标时拒绝覆盖。
-10. 审批过期后，既有 loader 必须立即 fail-closed 为 off；状态/auditor 报 `approvalExpired=true` 和 `rolloutMode=off`。operator 仍应执行显式 rollback，把磁盘事实
-    收敛为 schema v2 disabled manifest，然后重启应用；过期不能被当作自动续期或自动删除 authority。
+10. 审批过期后，loader 对下一次 bootstrap 必须 fail-closed 为 off；状态/auditor 报 `approvalExpired=true` 和 `rolloutMode=off`。无 watcher 的既有进程不会仅因磁盘
+    审批过期而自动卸载 router，故 `off` 审计会在 current receipt 仍存活时失败。operator 必须显式 rollback 并停止/重启应用；过期不能被当作自动续期、自动删除或已停止证明。
 
 ## 被拒绝的替代方案
 
@@ -87,4 +87,4 @@ Edge 可能是 128 MiB 路由设备，不能为 canary 新增 daemon、watcher�
 
 维护者仍需在一台真实目标 Edge 或 Standalone 实例执行 [Manual Primary Canary 操作手册](../operations/ql3-manual-primary-canary.md)，并保留 capture、terminal、resource、
 gate、qualification、selection、bootstrap activated audit 与 rollback completion。其他 origin 必须建立自己的 admission authority 与 gate；固定物理路由/flash/断电、
-运行态 durable activation receipt 和多写者 config authority 仍是独立后续工作。
+多写者 config authority 仍是独立后续工作；运行态 durable activation receipt 已由 ADR-0455 补齐，但首次真实目标实例执行仍待运维。

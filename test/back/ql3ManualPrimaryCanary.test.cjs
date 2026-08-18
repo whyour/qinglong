@@ -9,6 +9,10 @@ const {
   manualPrimaryCanaryFileSet,
 } = require('../../back/runtime/domain/manualPrimaryCanaryCeremony');
 const {
+  createManualPrimaryRuntimeReceipt,
+  MANUAL_PRIMARY_RUNTIME_RECEIPT_FILE,
+} = require('../../back/runtime/domain/manualPrimaryRuntimeReceipt');
+const {
   parseArguments,
   readPrivateJson,
   run,
@@ -273,6 +277,35 @@ test('qualifies, explicitly approves, audits and rolls back one target session',
       .runtimeActivationObserved,
     false,
   );
+  const rolloutSha256 = readPrivateJson(
+    path.join(root, files.rollout),
+    64 * 1024,
+  ).sha256;
+  writeJson(
+    path.join(root, MANUAL_PRIMARY_RUNTIME_RECEIPT_FILE),
+    createManualPrimaryRuntimeReceipt({
+      activationId: '1'.repeat(32),
+      profile: 'edge',
+      revision: `manual-primary-${SESSION}`,
+      rolloutSourceSha256: rolloutSha256,
+      activatedAtMs: activatedAt + 1,
+      process: {
+        kind: 'linux-proc',
+        platform: 'linux',
+        pid: 999_999,
+        processGroupId: 999_999,
+        bootId: '11111111-2222-3333-4444-555555555555',
+        startTimeTicks: '123456',
+      },
+    }),
+  );
+  const active = audit(
+    { root, sessionId: SESSION, require: 'active' },
+    { inspectRuntimeProcess: () => 'running' },
+  );
+  assert.equal(active.runtimeActivationObserved, true);
+  assert.equal(active.runtimeActivationCurrent, true);
+  assert.equal(active.runtimeReceiptState, 'active');
   assert.equal(
     run(
       { mode: 'status', root, sessionId: SESSION },
@@ -322,6 +355,40 @@ test('qualifies, explicitly approves, audits and rolls back one target session',
       { clock: { now: () => activatedAt + 4 } },
     ).publication,
     'existing',
+  );
+  assert.throws(
+    () =>
+      audit(
+        { root, sessionId: SESSION, require: 'rolled-back' },
+        { inspectRuntimeProcess: () => 'running' },
+      ),
+    /not satisfied/,
+  );
+  writeJson(
+    path.join(root, MANUAL_PRIMARY_RUNTIME_RECEIPT_FILE),
+    createManualPrimaryRuntimeReceipt({
+      activationId: '2'.repeat(32),
+      profile: 'edge',
+      revision: 'manual-primary-another-session',
+      rolloutSourceSha256: 'b'.repeat(64),
+      activatedAtMs: activatedAt + 3,
+      process: {
+        kind: 'linux-proc',
+        platform: 'linux',
+        pid: 999_998,
+        processGroupId: 999_998,
+        bootId: '11111111-2222-3333-4444-555555555555',
+        startTimeTicks: '123457',
+      },
+    }),
+  );
+  assert.throws(
+    () =>
+      audit(
+        { root, sessionId: SESSION, require: 'rolled-back' },
+        { inspectRuntimeProcess: () => 'running' },
+      ),
+    /not satisfied/,
   );
   assert.equal(
     audit({ root, sessionId: SESSION, require: 'rolled-back' }).rolloutMode,

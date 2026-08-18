@@ -19,6 +19,11 @@ const {
   parseRuntimeRolloutManifest,
 } = require('../back/runtime/domain/runtimeRolloutManifest');
 const {
+  MANUAL_PRIMARY_RUNTIME_RECEIPT_FILE,
+  MAX_MANUAL_PRIMARY_RUNTIME_RECEIPT_BYTES,
+  parseManualPrimaryRuntimeReceipt,
+} = require('../back/runtime/domain/manualPrimaryRuntimeReceipt');
+const {
   readPrivateJson,
   serialized,
 } = require('./ql3-manual-primary-canary.cjs');
@@ -27,6 +32,7 @@ const REQUIREMENTS = new Set([
   'prepared',
   'qualified',
   'selected',
+  'active',
   'off',
   'rolled-back',
 ]);
@@ -85,7 +91,44 @@ function regularFile(target) {
   }
 }
 
-function run(options) {
+function inspectRuntimeProcess(identity) {
+  if (identity.kind !== 'linux-proc' || process.platform !== 'linux') {
+    return 'unsupported';
+  }
+  let bootId;
+  try {
+    bootId = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+  } catch (error) {
+    if (error?.code === 'ENOENT') return 'unsupported';
+    throw error;
+  }
+  if (bootId !== identity.bootId) return 'identity_mismatch';
+  let stat;
+  try {
+    stat = fs.readFileSync(`/proc/${identity.pid}/stat`, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ESRCH') return 'exited';
+    throw error;
+  }
+  const close = stat.lastIndexOf(')');
+  const fields =
+    close < 1
+      ? []
+      : stat
+          .slice(close + 1)
+          .trim()
+          .split(/\s+/u);
+  if (
+    fields.length < 20 ||
+    Number(fields[2]) !== identity.processGroupId ||
+    fields[19] !== identity.startTimeTicks
+  ) {
+    return 'identity_mismatch';
+  }
+  return ['Z', 'X', 'x'].includes(fields[0]) ? 'exited' : 'running';
+}
+
+function run(options, dependencies = {}) {
   const rootStat = fs.lstatSync(options.root);
   if (
     !rootStat.isDirectory() ||
@@ -274,12 +317,55 @@ function run(options) {
     }
     rolloutMode = 'off';
   }
+  let runtimeActivationObserved = false;
+  let runtimeActivationCurrent = false;
+  let runtimeReceiptState = 'missing';
+  let runtimeProcessState = 'missing';
+  const runtimeReceiptPath = path.join(
+    options.root,
+    MANUAL_PRIMARY_RUNTIME_RECEIPT_FILE,
+  );
+  if (regularFile(runtimeReceiptPath)) {
+    const receipt = parseManualPrimaryRuntimeReceipt(
+      readPrivateJson(
+        runtimeReceiptPath,
+        MAX_MANUAL_PRIMARY_RUNTIME_RECEIPT_BYTES,
+      ).value,
+    );
+    runtimeReceiptState = receipt.state;
+    const selectionPath = resolve('selection');
+    if (regularFile(selectionPath)) {
+      const selection = readPrivateJson(selectionPath, 64 * 1024).value;
+      runtimeActivationObserved =
+        receipt.revision === `manual-primary-${plan.sessionId}` &&
+        receipt.profile === plan.profile &&
+        selection?.schema === 'qinglong/manual-primary-canary-selection@v1' &&
+        selection.sessionId === plan.sessionId &&
+        selection.profile === plan.profile &&
+        selection.manifestSha256 === receipt.rolloutSourceSha256;
+    }
+    if (receipt.state === 'active') {
+      runtimeProcessState = (
+        dependencies.inspectRuntimeProcess ?? inspectRuntimeProcess
+      )(receipt.process);
+      runtimeActivationCurrent = runtimeProcessState === 'running';
+    }
+  }
   const compatible =
     options.require === 'prepared' ||
     (options.require === 'qualified' && eligible) ||
     (options.require === 'selected' && rolloutMode === 'primary_selected') ||
-    (options.require === 'off' && rolloutMode === 'off') ||
-    (options.require === 'rolled-back' && rolloutMode === 'off' && rolledBack);
+    (options.require === 'active' &&
+      rolloutMode === 'primary_selected' &&
+      runtimeActivationObserved &&
+      runtimeActivationCurrent) ||
+    (options.require === 'off' &&
+      rolloutMode === 'off' &&
+      !runtimeActivationCurrent) ||
+    (options.require === 'rolled-back' &&
+      rolloutMode === 'off' &&
+      rolledBack &&
+      !runtimeActivationCurrent);
   const report = {
     schema: 'qinglong/manual-primary-canary-audit@v1',
     schemaVersion: 1,
@@ -289,7 +375,10 @@ function run(options) {
     eligible,
     rolloutMode,
     approvalExpired,
-    runtimeActivationObserved: false,
+    runtimeActivationObserved,
+    runtimeActivationCurrent,
+    runtimeReceiptState,
+    runtimeProcessState,
     rolledBack,
     planSha256: planRead.sha256,
     ...(rolloutSha256 === undefined ? {} : { rolloutSha256 }),

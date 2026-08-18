@@ -458,6 +458,7 @@
 | [ADR-0452](./ADR-0452-atomic-flattened-backend-build-publication.md)                                        | 原子且扁平兼容的 Backend 构建发布                                                                                                                                                 | Accepted |
 | [ADR-0453](./ADR-0453-origin-scoped-legacy-shadow-capture-authority-and-primary-gate.md)                     | Origin-scoped Legacy Shadow 捕获权威与 Primary 门禁                                                                                                                               | Accepted（首次真实目标实例 manual canary 待执行） |
 | [ADR-0454](./ADR-0454-target-instance-manual-primary-canary-ceremony.md)                                      | 目标实例 Manual Primary Canary 与显式回滚仪式                                                                                                                                      | Accepted（首次真实用户目标实例执行待运维） |
+| [ADR-0455](./ADR-0455-profile-bounded-manual-primary-runtime-activation-receipt.md)                             | Profile-bounded Manual Primary 运行态激活凭据                                                                                                                                       | Accepted（首次真实目标实例执行待运维） |
 
 ## 规则
 

@@ -25,6 +25,7 @@ function loadResult(status, mode = 'off') {
       sourcePath: '/data/config/qinglong3-rollout.json',
       status,
       revision: 'canary-1',
+      sourceSha256: 'a'.repeat(64),
     },
   };
 }
@@ -168,6 +169,138 @@ test('activation reconciles before starting lifecycle and installing ownership',
     'stop-cancellation',
     'stop-completion',
     'audit:stopped',
+  ]);
+});
+
+test('activation publishes durable state around ownership and lifecycle shutdown', async () => {
+  const calls = [];
+  const result = await activateManualPrimaryRuntime({
+    load: async () => loadResult('accepted', 'primary'),
+    create() {
+      return {
+        router: router(),
+        ...completionLifecycle(calls),
+        async reconcile() {
+          return cleanRecovery();
+        },
+        startTimeout() {
+          calls.push('start-timeout');
+          return true;
+        },
+        async stopTimeout() {
+          calls.push('stop-timeout');
+          return 'drained';
+        },
+        startCancellation() {
+          calls.push('start-cancellation');
+          return true;
+        },
+        async stopCancellation() {
+          calls.push('stop-cancellation');
+          return 'drained';
+        },
+      };
+    },
+    install() {
+      calls.push('install');
+      return () => calls.push('dispose');
+    },
+    receipt: {
+      async activated() {
+        calls.push('receipt:active');
+      },
+      async stopping() {
+        calls.push('receipt:stopping');
+      },
+      async stopped() {
+        calls.push('receipt:stopped');
+      },
+      async failed() {
+        calls.push('receipt:failed');
+      },
+    },
+    audit(record) {
+      calls.push(`audit:${record.activation}`);
+    },
+  });
+
+  assert.deepEqual(calls.slice(-4), [
+    'start-cancellation',
+    'install',
+    'receipt:active',
+    'audit:activated',
+  ]);
+  await result.stop();
+  assert.deepEqual(calls.slice(-7), [
+    'receipt:stopping',
+    'dispose',
+    'stop-timeout',
+    'stop-cancellation',
+    'stop-completion',
+    'receipt:stopped',
+    'audit:stopped',
+  ]);
+});
+
+test('activation rolls ownership back when durable receipt publication fails', async () => {
+  const calls = [];
+  await assert.rejects(
+    activateManualPrimaryRuntime({
+      load: async () => loadResult('accepted', 'primary'),
+      create() {
+        return {
+          router: router(),
+          ...completionLifecycle(calls),
+          async reconcile() {
+            return cleanRecovery();
+          },
+          startTimeout() {
+            calls.push('start-timeout');
+            return true;
+          },
+          async stopTimeout() {
+            calls.push('stop-timeout');
+            return 'drained';
+          },
+          startCancellation() {
+            calls.push('start-cancellation');
+            return true;
+          },
+          async stopCancellation() {
+            calls.push('stop-cancellation');
+            return 'drained';
+          },
+        };
+      },
+      install() {
+        calls.push('install');
+        return () => calls.push('dispose');
+      },
+      receipt: {
+        async activated() {
+          calls.push('receipt:active');
+          throw new Error('receipt unavailable');
+        },
+        async stopping() {},
+        async stopped() {},
+        async failed() {
+          calls.push('receipt:failed');
+        },
+      },
+      audit(record) {
+        calls.push(`audit:${record.activation}`);
+      },
+    }),
+    /receipt unavailable/,
+  );
+  assert.deepEqual(calls.slice(-7), [
+    'receipt:active',
+    'dispose',
+    'stop-timeout',
+    'stop-cancellation',
+    'stop-completion',
+    'receipt:failed',
+    'audit:failed',
   ]);
 });
 

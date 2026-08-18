@@ -10,6 +10,7 @@ import { installManualPrimaryExecutionRouter } from '../../compatibility/manualP
 import type { RuntimeRolloutPolicy } from '../../domain/runtimeRollout';
 import { parseDeploymentProfile } from '../../domain/deploymentProfile';
 import type { RuntimeRolloutLoadResult } from '../../ports/runtimeRolloutLoader';
+import type { ManualPrimaryRuntimeReceiptLifecycle } from '../../ports/manualPrimaryRuntimeReceipt';
 import { loadRuntimeRolloutManifest } from '../fs/runtimeRolloutManifestLoader';
 import type { DefaultManualPrimaryActivationOptions } from './defaultManualPrimaryActivation';
 
@@ -28,6 +29,7 @@ export interface BootstrapDefaultManualPrimaryRuntimeOptions
   loadStack?: () => Promise<DefaultManualPrimaryStackModule>;
   install?: typeof installManualPrimaryExecutionRouter;
   audit?: (record: ManualPrimaryActivationAudit) => void | Promise<void>;
+  receipt?: ManualPrimaryRuntimeReceiptLifecycle;
 }
 
 /**
@@ -52,6 +54,7 @@ export async function bootstrapDefaultManualPrimaryRuntime(
       Logger.info(`[runtime-activation] ${JSON.stringify(record)}`);
     });
   let stackModule: DefaultManualPrimaryStackModule | undefined;
+  let receipt: ManualPrimaryRuntimeReceiptLifecycle | undefined;
   let selectedProfile: 'edge' | 'standalone' | undefined;
   if (selected) {
     try {
@@ -71,9 +74,23 @@ export async function bootstrapDefaultManualPrimaryRuntime(
         );
       }
       selectedProfile = profile;
-      stackModule = await (
-        options.loadStack ?? (() => import('./defaultManualPrimaryActivation'))
-      )();
+      const [loadedStack, loadedReceipt] = await Promise.all([
+        (
+          options.loadStack ??
+          (() => import('./defaultManualPrimaryActivation'))
+        )(),
+        options.receipt === undefined
+          ? import('../fs/manualPrimaryRuntimeReceiptStore').then(
+              ({ ManualPrimaryRuntimeReceiptStore }) =>
+                new ManualPrimaryRuntimeReceiptStore(
+                  config.configPath,
+                  selectedProfile!,
+                ),
+            )
+          : Promise.resolve(options.receipt),
+      ]);
+      stackModule = loadedStack;
+      receipt = loadedReceipt;
     } catch (error) {
       try {
         await audit({ ...load.audit, activation: 'failed' });
@@ -109,5 +126,6 @@ export async function bootstrapDefaultManualPrimaryRuntime(
     },
     install: options.install ?? installManualPrimaryExecutionRouter,
     audit,
+    receipt,
   });
 }

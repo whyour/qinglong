@@ -24,6 +24,8 @@ function loadResult(status, mode = 'off') {
       evaluatedAtMs: NOW,
       sourcePath: '/data/config/qinglong3-rollout.json',
       status,
+      revision: 'manual-primary-test',
+      sourceSha256: 'a'.repeat(64),
     },
     ...(status === 'accepted'
       ? {
@@ -150,6 +152,20 @@ test('accepted bootstrap lazily loads the stack and delegates activation', async
       calls.push('install');
       return () => calls.push('dispose');
     },
+    receipt: {
+      async activated() {
+        calls.push('receipt:active');
+      },
+      async stopping() {
+        calls.push('receipt:stopping');
+      },
+      async stopped() {
+        calls.push('receipt:stopped');
+      },
+      async failed() {
+        calls.push('receipt:failed');
+      },
+    },
     audit(record) {
       calls.push(`audit:${record.activation}`);
     },
@@ -168,11 +184,14 @@ test('accepted bootstrap lazily loads the stack and delegates activation', async
     'start-timeout',
     'start-cancellation',
     'install',
+    'receipt:active',
     'audit:activated',
+    'receipt:stopping',
     'dispose',
     'stop-timeout',
     'stop-cancellation',
     'stop-completion',
+    'receipt:stopped',
     'audit:stopped',
   ]);
 });
