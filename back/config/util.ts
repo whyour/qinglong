@@ -214,48 +214,105 @@ export function dirSort(a: IFile, b: IFile): number {
   }
 }
 
+const FILE_SYSTEM_READ_CONCURRENCY = 32;
+
+type FileSystemTaskRunner = <T>(task: () => Promise<T>) => Promise<T>;
+
+function createFileSystemTaskRunner(concurrency: number): FileSystemTaskRunner {
+  let activeCount = 0;
+  const queue: Array<() => void> = [];
+
+  const runNext = () => {
+    while (activeCount < concurrency && queue.length > 0) {
+      activeCount += 1;
+      queue.shift()?.();
+    }
+  };
+
+  return <T>(task: () => Promise<T>) =>
+    new Promise<T>((resolve, reject) => {
+      queue.push(() => {
+        task()
+          .then(resolve, reject)
+          .finally(() => {
+            activeCount -= 1;
+            runNext();
+          });
+      });
+      runNext();
+    });
+}
+
+async function readDirsWithRunner(
+  dir: string,
+  baseDir: string,
+  blacklist: string[],
+  sort: (a: IFile, b: IFile) => number,
+  runFileSystemTask: FileSystemTaskRunner,
+): Promise<IFile[]> {
+  const relativePath = path.relative(baseDir, dir);
+  const entries = await runFileSystemTask(() =>
+    fs.readdir(dir, { withFileTypes: true }),
+  );
+
+  const items = await Promise.all(
+    entries.map(async (entry): Promise<IFile | undefined> => {
+      if (blacklist.includes(entry.name) || entry.isSymbolicLink()) {
+        return undefined;
+      }
+
+      const subPath = path.join(dir, entry.name);
+      const stats = await runFileSystemTask(() => fs.lstat(subPath));
+      if (stats.isSymbolicLink()) {
+        return undefined;
+      }
+      const key = path.join(relativePath, entry.name);
+
+      if (stats.isDirectory()) {
+        const children = await readDirsWithRunner(
+          subPath,
+          baseDir,
+          blacklist,
+          sort,
+          runFileSystemTask,
+        );
+        return {
+          title: entry.name,
+          key,
+          type: 'directory',
+          parent: relativePath,
+          createTime: stats.birthtime.getTime(),
+          children,
+        };
+      }
+
+      return {
+        title: entry.name,
+        type: 'file',
+        key,
+        parent: relativePath,
+        size: stats.size,
+        createTime: stats.birthtime.getTime(),
+      };
+    }),
+  );
+
+  return items.filter((item): item is IFile => Boolean(item)).sort(sort);
+}
+
 export async function readDirs(
   dir: string,
   baseDir: string = '',
   blacklist: string[] = [],
   sort: (a: IFile, b: IFile) => number = dirSort,
 ): Promise<IFile[]> {
-  const relativePath = path.relative(baseDir, dir);
-  const files = await fs.readdir(dir);
-  const result: IFile[] = [];
-
-  for (const file of files) {
-    const subPath = path.join(dir, file);
-    const stats = await fs.lstat(subPath);
-    const key = path.join(relativePath, file);
-
-    if (blacklist.includes(file) || stats.isSymbolicLink()) {
-      continue;
-    }
-
-    if (stats.isDirectory()) {
-      const children = await readDirs(subPath, baseDir, blacklist, sort);
-      result.push({
-        title: file,
-        key,
-        type: 'directory',
-        parent: relativePath,
-        createTime: stats.birthtime.getTime(),
-        children: children.sort(sort),
-      });
-    } else {
-      result.push({
-        title: file,
-        type: 'file',
-        key,
-        parent: relativePath,
-        size: stats.size,
-        createTime: stats.birthtime.getTime(),
-      });
-    }
-  }
-
-  return result.sort(sort);
+  return readDirsWithRunner(
+    dir,
+    baseDir,
+    blacklist,
+    sort,
+    createFileSystemTaskRunner(FILE_SYSTEM_READ_CONCURRENCY),
+  );
 }
 
 export async function readDir(
