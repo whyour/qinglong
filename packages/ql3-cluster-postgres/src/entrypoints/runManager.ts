@@ -1,5 +1,17 @@
 export { PostgresRunManualRetryRepository } from '../run-management/runManualRetryRepository';
 export {
+  InvalidRunCancellationDispatchManagementError,
+  PostgresRunCancellationDispatchManagementRepository,
+  RunCancellationDispatchManagementConflictError,
+  RunCancellationDispatchManagementNotFoundError,
+  RunCancellationDispatchManagementUnavailableError,
+  type BlockingCancellationDispatchResult,
+  type PostgresRunCancellationDispatchInspectCommand,
+  type PostgresRunCancellationDispatchRearmCommand,
+  type RunCancellationDispatchDiagnostic,
+  type RunCancellationDispatchRearmReceipt,
+} from '../run-management/runCancellationDispatchManagementRepository';
+export {
   PostgresClusterRunCancellationRepository,
   type PostgresRunManagementCancellationCommand,
 } from '../run-recovery/clusterRunCancellationRepository';

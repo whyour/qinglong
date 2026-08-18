@@ -12,12 +12,22 @@ import {
   normalizeSecurityPrincipal,
   type SecurityPrincipal,
 } from '@qinglong/runtime-core/security';
+import { CANCELLATION_DISPATCH_BLOCKING_RESULTS } from '@qinglong/runtime-core/cancellation-dispatch';
 import type { ClusterRunManagementService } from './runManagement';
 
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const STRONG_ASSURANCES = new Set(['multi_factor', 'hardware']);
+
+export const RUN_CANCELLATION_DISPATCH_INSPECT_REQUEST_SCHEMA =
+  'qinglong/run-cancellation-dispatch-inspect@v1';
+export const RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA =
+  'qinglong/run-cancellation-dispatch-diagnostic@v1';
+export const RUN_CANCELLATION_DISPATCH_REARM_REQUEST_SCHEMA =
+  'qinglong/run-cancellation-dispatch-rearm-request@v1';
+export const RUN_CANCELLATION_DISPATCH_REARM_RECEIPT_SCHEMA =
+  'qinglong/run-cancellation-dispatch-rearm-receipt@v1';
 
 export type ClusterRunManagementRetryCommand = Readonly<{
   schemaVersion: 1;
@@ -53,9 +63,49 @@ export type ClusterRunManagementStopCommand = Readonly<{
   }>;
 }>;
 
+export type ClusterRunManagementCancellationInspectCommand = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.cancellation.inspect';
+  request: Readonly<{
+    projectId: string;
+    runId: string;
+    requestId: string;
+    auditEventId: string;
+    failureAuditEventId: string;
+    body: Readonly<{
+      schema: typeof RUN_CANCELLATION_DISPATCH_INSPECT_REQUEST_SCHEMA;
+    }>;
+  }>;
+}>;
+
+export type ClusterRunManagementCancellationRearmCommand = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.cancellation.rearm';
+  request: Readonly<{
+    projectId: string;
+    runId: string;
+    requestId: string;
+    auditEventId: string;
+    failureAuditEventId: string;
+    body: Readonly<{
+      schema: typeof RUN_CANCELLATION_DISPATCH_REARM_REQUEST_SCHEMA;
+      mutationId: string;
+      expectedDispatchVersion: number;
+      expectedLastResult:
+        | 'identity_mismatch'
+        | 'pid_mismatch'
+        | 'unsupported'
+        | 'invalid';
+      retryDelayMs: number;
+    }>;
+  }>;
+}>;
+
 export type ClusterRunManagementCommand =
   | ClusterRunManagementRetryCommand
-  | ClusterRunManagementStopCommand;
+  | ClusterRunManagementStopCommand
+  | ClusterRunManagementCancellationInspectCommand
+  | ClusterRunManagementCancellationRearmCommand;
 
 export type ClusterRunManagementRetryTransportResult = Readonly<{
   schemaVersion: 1;
@@ -69,9 +119,31 @@ export type ClusterRunManagementStopTransportResult = Readonly<{
   stop: Readonly<RunCancellationResponseBody>;
 }>;
 
+export type ClusterRunManagementCancellationInspectTransportResult = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.cancellation.inspect';
+  diagnostic: Readonly<
+    Awaited<ReturnType<ClusterRunManagementService['inspectCancellation']>> & {
+      schema: typeof RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA;
+    }
+  >;
+}>;
+
+export type ClusterRunManagementCancellationRearmTransportResult = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.cancellation.rearm';
+  rearm: Readonly<
+    Awaited<ReturnType<ClusterRunManagementService['rearmCancellation']>> & {
+      schema: typeof RUN_CANCELLATION_DISPATCH_REARM_RECEIPT_SCHEMA;
+    }
+  >;
+}>;
+
 export type ClusterRunManagementTransportResult =
   | ClusterRunManagementRetryTransportResult
-  | ClusterRunManagementStopTransportResult;
+  | ClusterRunManagementStopTransportResult
+  | ClusterRunManagementCancellationInspectTransportResult
+  | ClusterRunManagementCancellationRearmTransportResult;
 
 export interface ClusterRunManagementAuthentication {
   authenticate(): Promise<Readonly<SecurityPrincipal> | null>;
@@ -152,7 +224,14 @@ export function normalizeClusterRunManagementCommand(
   const envelope = exact(value, ['schemaVersion', 'operation', 'request']);
   if (envelope.schemaVersion !== 1) invalid();
   const operation = envelope.operation;
-  if (operation !== 'run.retry' && operation !== 'run.stop') invalid();
+  if (
+    operation !== 'run.retry' &&
+    operation !== 'run.stop' &&
+    operation !== 'run.cancellation.inspect' &&
+    operation !== 'run.cancellation.rearm'
+  ) {
+    invalid();
+  }
   const request = exact(
     envelope.request,
     operation === 'run.retry'
@@ -196,6 +275,70 @@ export function normalizeClusterRunManagementCommand(
       }),
     });
   }
+  if (operation === 'run.cancellation.inspect') {
+    const body = exact(request.body, ['schema']);
+    if (body.schema !== RUN_CANCELLATION_DISPATCH_INSPECT_REQUEST_SCHEMA) {
+      invalid();
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      operation,
+      request: Object.freeze({
+        projectId: identifier(request.projectId),
+        runId: identifier(request.runId),
+        requestId: identifier(request.requestId),
+        auditEventId,
+        failureAuditEventId,
+        body: Object.freeze({
+          schema: RUN_CANCELLATION_DISPATCH_INSPECT_REQUEST_SCHEMA,
+        }),
+      }),
+    });
+  }
+  if (operation === 'run.cancellation.rearm') {
+    const body = exact(request.body, [
+      'schema',
+      'mutationId',
+      'expectedDispatchVersion',
+      'expectedLastResult',
+      'retryDelayMs',
+    ]);
+    if (
+      body.schema !== RUN_CANCELLATION_DISPATCH_REARM_REQUEST_SCHEMA ||
+      !CANCELLATION_DISPATCH_BLOCKING_RESULTS.includes(
+        body.expectedLastResult as never,
+      ) ||
+      typeof body.expectedDispatchVersion !== 'number' ||
+      !Number.isSafeInteger(body.expectedDispatchVersion) ||
+      body.expectedDispatchVersion < 1 ||
+      body.expectedDispatchVersion >= 2_147_483_647 ||
+      typeof body.retryDelayMs !== 'number' ||
+      !Number.isSafeInteger(body.retryDelayMs) ||
+      body.retryDelayMs < 1_000 ||
+      body.retryDelayMs > 24 * 60 * 60_000
+    ) {
+      invalid();
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      operation,
+      request: Object.freeze({
+        projectId: identifier(request.projectId),
+        runId: identifier(request.runId),
+        requestId: identifier(request.requestId),
+        auditEventId,
+        failureAuditEventId,
+        body: Object.freeze({
+          schema: RUN_CANCELLATION_DISPATCH_REARM_REQUEST_SCHEMA,
+          mutationId: uuid(body.mutationId),
+          expectedDispatchVersion: body.expectedDispatchVersion,
+          expectedLastResult: body.expectedLastResult as
+            ClusterRunManagementCancellationRearmCommand['request']['body']['expectedLastResult'],
+          retryDelayMs: body.retryDelayMs,
+        }),
+      }),
+    });
+  }
   let body: ReturnType<typeof parseRunCancellationRequestBody>;
   try {
     body = parseRunCancellationRequestBody(request.body);
@@ -231,6 +374,8 @@ export function createClusterRunManagementTransport(
     !options.service ||
     typeof options.service.retry !== 'function' ||
     typeof options.service.stop !== 'function' ||
+    typeof options.service.inspectCancellation !== 'function' ||
+    typeof options.service.rearmCancellation !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function')
   ) {
     throw new ClusterRunManagementTransportConfigurationError();
@@ -288,6 +433,47 @@ export function createClusterRunManagementTransport(
           schemaVersion: 1,
           operation: command.operation,
           retry: createRunManualRetryResponseBody(result),
+        });
+      }
+      if (command.operation === 'run.cancellation.inspect') {
+        const result = await options.service.inspectCancellation({
+          projectId: command.request.projectId,
+          runId: command.request.runId,
+          requestId: command.request.requestId,
+          auditEventId: command.request.auditEventId,
+          failureAuditEventId: command.request.failureAuditEventId,
+          principal,
+        });
+        return Object.freeze({
+          schemaVersion: 1,
+          operation: command.operation,
+          diagnostic: Object.freeze({
+            schema: RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA,
+            ...result,
+          }),
+        });
+      }
+      if (command.operation === 'run.cancellation.rearm') {
+        const result = await options.service.rearmCancellation({
+          projectId: command.request.projectId,
+          runId: command.request.runId,
+          requestId: command.request.requestId,
+          auditEventId: command.request.auditEventId,
+          failureAuditEventId: command.request.failureAuditEventId,
+          principal,
+          mutationId: command.request.body.mutationId,
+          expectedDispatchVersion:
+            command.request.body.expectedDispatchVersion,
+          expectedLastResult: command.request.body.expectedLastResult,
+          retryDelayMs: command.request.body.retryDelayMs,
+        });
+        return Object.freeze({
+          schemaVersion: 1,
+          operation: command.operation,
+          rearm: Object.freeze({
+            schema: RUN_CANCELLATION_DISPATCH_REARM_RECEIPT_SCHEMA,
+            ...result,
+          }),
         });
       }
       const result = await options.service.stop({

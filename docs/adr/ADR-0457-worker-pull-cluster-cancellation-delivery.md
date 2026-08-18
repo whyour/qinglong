@@ -59,4 +59,4 @@ Run 取消与 Workflow Task timeout 还存在语义差异：前者具有 `Run.ca
 
 ## 后续
 
-仍需用户可见的 blocked/availability 指标、诊断与人工处置入口，以及 CloudNativePG live failover、多副本容量压力、固定 Linux x64/arm64 与物理 Edge 资源门。Local legacy raw-token 存量迁移继续保持独立议题。
+ADR-0458 已在既有 Run management plane 实现低敏 blocked 诊断与人工 rearm，不新增第二个 cancellation worker。仍需用户可见的聚合 blocked/availability 指标、告警与产品 UI，以及 CloudNativePG live failover、多副本容量压力、固定 Linux x64/arm64 与物理 Edge 资源门。Local legacy raw-token 存量迁移继续保持独立议题。

@@ -5,6 +5,9 @@ const {
   PostgresCancellationDispatchRepository,
 } = require('../packages/ql3-cluster-postgres/dist/entrypoints/runtime.js');
 const {
+  PostgresRunCancellationDispatchManagementRepository,
+} = require('../packages/ql3-cluster-postgres/dist/entrypoints/runManager.js');
+const {
   CancellationDispatchFenceRejectedError,
   digestCancellationDispatchLeaseToken,
 } = require('../packages/ql3-runtime-core/dist/run/cancellation-dispatch/cancellationDispatch.js');
@@ -13,12 +16,19 @@ const {
 } = require('../packages/ql3-cluster-control/dist/remote-execution/remoteWorkerCancellationDispatchControl.js');
 
 const FIXTURE = Object.freeze({
+  projectId: 'ha-cancel-project-d365',
+  actorId: 'ha-cancel-operator-d365',
   runId: 'ha-cancel-run-d363',
   attemptId: 'ha-cancel-attempt-d363',
   requestedAtMs: 1_750_000_000_100,
   retryEventId: 'ha-cancel-retry-event-d363',
   terminalEventId: 'ha-cancel-terminal-event-d363',
   settledEventId: 'ha-cancel-settled-event-d363',
+  blockedEventId: 'ha-cancel-blocked-event-d365',
+  inspectAuditEventId: '019f9700-0000-4000-8000-000000000001',
+  rearmAuditEventId: '019f9700-0000-4000-8000-000000000002',
+  rearmMutationId: '019f9700-0000-4000-8000-000000000003',
+  rearmEventId: '019f9700-0000-4000-8000-000000000004',
 });
 
 async function openRuntime(connectionString, applicationName) {
@@ -26,6 +36,17 @@ async function openRuntime(connectionString, applicationName) {
     role: 'runtime',
     connection: { connectionString, tls: { mode: 'disable' } },
     pool: { maxConnections: 2, applicationName },
+    onPoolError(error) {
+      throw error;
+    },
+  })();
+}
+
+async function openRunManager(connectionString, applicationName) {
+  return createPostgresDatabaseOpener({
+    role: 'run-manager',
+    connection: { connectionString, tls: { mode: 'disable' } },
+    pool: { maxConnections: 1, applicationName },
     onPoolError(error) {
       throw error;
     },
@@ -53,10 +74,29 @@ async function cancellationDispatchFacts(pool) {
 }
 
 async function persistCancellationDispatchHaFixture(options) {
-  const { migrationPool, runtimeConnectionString } = options;
+  const {
+    migrationPool,
+    runtimeConnectionString,
+    runManagerConnectionString,
+  } = options;
   const beforeClock = await migrationPool.query(
     `SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint
             AS "nowMs"`,
+  );
+  const observedAtMs = Number(beforeClock.rows[0].nowMs);
+  await migrationPool.query(
+    `INSERT INTO "ql3"."projects" (
+       id, name, slug, status, version, created_at_ms, updated_at_ms
+     ) VALUES ($1, 'HA cancellation dispatch', $1, 'active', 1, $2, $2)`,
+    [FIXTURE.projectId, observedAtMs],
+  );
+  await migrationPool.query(
+    `INSERT INTO "ql3"."project_role_bindings" (
+       project_id, subject_type, subject_id, version, state, role,
+       mutation_id, changed_by_type, changed_by_id, created_at_ms
+     ) VALUES ($1, 'user', $2, 1, 'active', 'operator',
+               'ha-cancel-binding-d365', 'system', 'ha-contract', $3)`,
+    [FIXTURE.projectId, FIXTURE.actorId, observedAtMs],
   );
   await migrationPool.query(
     `INSERT INTO "ql3"."runs" (
@@ -64,10 +104,15 @@ async function persistCancellationDispatchHaFixture(options) {
        execution_origin, execution_owner, status, version, event_sequence,
        created_at_ms, started_at_ms, cancel_requested_at_ms, cancel_reason
      ) VALUES (
-       $1, 'default', 'ha-cancel-task', 'v1', 'manual', 'api', 'runtime',
-       'running', 2, 0, $2, $2, $3, 'user'
+       $1, $2, 'ha-cancel-task', 'v1', 'manual', 'api', 'runtime',
+       'running', 2, 0, $3, $3, $4, 'user'
      )`,
-    [FIXTURE.runId, FIXTURE.requestedAtMs - 100, FIXTURE.requestedAtMs],
+    [
+      FIXTURE.runId,
+      FIXTURE.projectId,
+      FIXTURE.requestedAtMs - 100,
+      FIXTURE.requestedAtMs,
+    ],
   );
   await migrationPool.query(
     `INSERT INTO "ql3"."run_attempts" (
@@ -174,9 +219,90 @@ async function persistCancellationDispatchHaFixture(options) {
           SET next_attempt_at_ms = 0 WHERE run_id = $1`,
       [FIXTURE.runId],
     );
+    const blockingClaim = await second.claim({
+      ...candidate,
+      owner: 'ha-cancel-blocker',
+      leaseToken: 'ha-cancel-blocker-token',
+    });
+    assert.equal(blockingClaim.status, 'claimed');
+    assert.equal(blockingClaim.dispatch.version, 4);
+    const blocked = await second.recordResult({
+      runId: FIXTURE.runId,
+      attemptId: FIXTURE.attemptId,
+      owner: 'ha-cancel-blocker',
+      leaseToken: 'ha-cancel-blocker-token',
+      expectedVersion: blockingClaim.dispatch.version,
+      result: 'identity_mismatch',
+      eventId: FIXTURE.blockedEventId,
+    });
+    assert.equal(blocked.dispatch.status, 'blocked');
+    assert.equal(blocked.dispatch.version, 5);
+
+    const runManagerDatabase = await openRunManager(
+      runManagerConnectionString,
+      'ql3-ha-cancel-run-manager',
+    );
+    try {
+      const management =
+        new PostgresRunCancellationDispatchManagementRepository(
+          runManagerDatabase.pool,
+        );
+      const principal = Object.freeze({
+        subject: Object.freeze({ type: 'user', id: FIXTURE.actorId }),
+        authenticationId: 'oidc:ha-cancel-d365',
+        authenticatedAtMs: observedAtMs - 1_000,
+        expiresAtMs: observedAtMs + 5 * 60_000,
+        assurance: 'multi_factor',
+      });
+      const authority = Object.freeze({
+        projectId: FIXTURE.projectId,
+        runId: FIXTURE.runId,
+        requestId: 'ha-cancel-inspect-d365',
+        auditEventId: FIXTURE.inspectAuditEventId,
+        principal,
+        policyFence: Object.freeze({ projectVersion: 1, bindingVersion: 1 }),
+      });
+      const diagnostic = await management.inspect(authority);
+      assert.equal(diagnostic.operatorAction, 'rearm');
+      assert.equal(diagnostic.dispatch?.status, 'blocked');
+      assert.equal(diagnostic.dispatch?.version, 5);
+      assert.equal(diagnostic.dispatch?.lastResult, 'identity_mismatch');
+      assert.equal(JSON.stringify(diagnostic).includes('leaseOwner'), false);
+      assert.equal(JSON.stringify(diagnostic).includes('leaseToken'), false);
+      const rearm = await management.rearm({
+        ...authority,
+        requestId: 'ha-cancel-rearm-d365',
+        auditEventId: FIXTURE.rearmAuditEventId,
+        mutationId: FIXTURE.rearmMutationId,
+        eventId: FIXTURE.rearmEventId,
+        expectedDispatchVersion: 5,
+        expectedLastResult: 'identity_mismatch',
+        retryDelayMs: 60_000,
+      });
+      assert.equal(rearm.status, 'rearmed');
+      assert.equal(rearm.dispatchVersion, 6);
+      assert.equal(rearm.previousResult, 'identity_mismatch');
+      assert.equal(rearm.runVersion, 5);
+      assert.equal(rearm.eventSequence, 3);
+    } finally {
+      await runManagerDatabase.close();
+    }
+    assert.equal(
+      (await first.claim({
+        ...candidate,
+        owner: 'ha-cancel-rearm-early',
+        leaseToken: 'ha-cancel-rearm-early-token',
+      })).status,
+      'not_due',
+    );
+    await migrationPool.query(
+      `UPDATE "ql3"."run_cancellation_dispatches"
+          SET next_attempt_at_ms = 0 WHERE run_id = $1`,
+      [FIXTURE.runId],
+    );
     const stopRequested = Object.freeze({
       status: 'stop_requested',
-      projectId: 'default',
+      projectId: FIXTURE.projectId,
       runId: FIXTURE.runId,
       attemptId: FIXTURE.attemptId,
       offerId: 'ha-cancel-offer-d364',
@@ -236,13 +362,13 @@ async function persistCancellationDispatchHaFixture(options) {
     const beforePromotion = await cancellationDispatchFacts(migrationPool);
     assert.deepEqual(beforePromotion, {
       status: 'dispatched',
-      version: 5,
-      dispatchCount: 3,
+      version: 8,
+      dispatchCount: 4,
       leaseTokenDigest: null,
       lastResult: 'termination_requested',
-      runVersion: 5,
-      eventSequence: 3,
-      eventCount: 3,
+      runVersion: 7,
+      eventSequence: 5,
+      eventCount: 5,
     });
     return {
       fixture: FIXTURE,
@@ -253,6 +379,9 @@ async function persistCancellationDispatchHaFixture(options) {
       expiredLeaseTakenOver: true,
       staleLeaseFenced: true,
       retryDeferredUntilDue: true,
+      operatorDiagnosticLowSensitive: true,
+      manualBlockedRearmExact: true,
+      manualRearmDeferredUntilDue: true,
       productionDeliverySettledBeforeStop: true,
       replicatedBeforePromotion: false,
       survivedPromotion: false,
@@ -278,7 +407,7 @@ async function verifyPromotedCancellationDispatchHaFixture(options) {
       runtimeDatabase.pool,
     ).findByRunId(FIXTURE.runId);
     assert.equal(dispatch?.status, 'dispatched');
-    assert.equal(dispatch?.dispatchCount, 3);
+    assert.equal(dispatch?.dispatchCount, 4);
     assert.equal(dispatch?.leaseTokenDigest, undefined);
   } finally {
     await runtimeDatabase.close();

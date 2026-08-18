@@ -11785,6 +11785,11 @@ async function main(argv = process.argv.slice(2)) {
         RUNTIME_PASSWORD,
         primaryPort,
       ),
+      runManagerConnectionString: databaseUrl(
+        RUN_MANAGER_USER,
+        RUN_MANAGER_PASSWORD,
+        primaryPort,
+      ),
     });
     timeline.push({
       state: 'cancellation_dispatch_fenced_on_primary',

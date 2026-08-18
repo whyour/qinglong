@@ -1485,6 +1485,8 @@ const REQUIRED_RUN_MANAGER_PRIVILEGES: RequiredPrivileges = Object.freeze(
             name === 'run_events' ||
             name === 'security_audit_events'
           ? { ...NO_TABLE_PRIVILEGES, select: true, insert: true }
+          : name === 'run_cancellation_dispatches'
+          ? { ...NO_TABLE_PRIVILEGES, select: true }
           : name === 'plugin_package_identity_keyset_ledger'
           ? {
               ...NO_TABLE_PRIVILEGES,
@@ -2237,6 +2239,14 @@ async function assertRunManagerColumnPrivileges(
       'missing-runs-contract',
     ]);
   }
+  const dispatch = contract.tables.find(
+    ({ name }) => name === 'run_cancellation_dispatches',
+  );
+  if (!dispatch) {
+    throw new PostgresSchemaReadinessError('run_manager_role_invalid', [
+      'missing-run-cancellation-dispatch-contract',
+    ]);
+  }
   const result = await queryable.query<ColumnPrivilegeRow>(
     `
 SELECT
@@ -2268,6 +2278,41 @@ ORDER BY requested.column_name
   }
   if (actual.size !== run.columns.length) {
     findings.push('column-privilege-row-count:runs');
+  }
+  const dispatchResult = await queryable.query<ColumnPrivilegeRow>(
+    `
+SELECT
+  requested.column_name AS "columnName",
+  has_column_privilege(
+    current_user,
+    format('%I.%I', $1::text, 'run_cancellation_dispatches'),
+    requested.column_name,
+    'UPDATE'
+  ) AS "updateAllowed"
+FROM unnest($2::text[]) AS requested(column_name)
+ORDER BY requested.column_name
+    `.trim(),
+    [contract.schema, dispatch.columns],
+  );
+  const allowedDispatch = new Set([
+    'status',
+    'version',
+    'next_attempt_at_ms',
+    'updated_at_ms',
+  ]);
+  const actualDispatch = new Map(
+    dispatchResult.rows.map((row) => [row.columnName, row]),
+  );
+  for (const columnName of dispatch.columns) {
+    const row = actualDispatch.get(columnName);
+    if (!row || row.updateAllowed !== allowedDispatch.has(columnName)) {
+      findings.push(
+        `column-update-privilege:run_cancellation_dispatches.${columnName}`,
+      );
+    }
+  }
+  if (actualDispatch.size !== dispatch.columns.length) {
+    findings.push('column-privilege-row-count:run_cancellation_dispatches');
   }
   if (findings.length > 0) {
     throw new PostgresSchemaReadinessError(

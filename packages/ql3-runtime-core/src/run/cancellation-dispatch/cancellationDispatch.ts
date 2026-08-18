@@ -40,6 +40,13 @@ export const CANCELLATION_DISPATCH_BLOCKING_RESULTS = Object.freeze([
   'invalid',
 ] as const satisfies readonly CancellationDispatchResult[]);
 
+const CANCELLATION_DISPATCH_RETRY_HISTORY_RESULTS = new Set<
+  CancellationDispatchResult
+>([
+  ...CANCELLATION_DISPATCH_RETRYABLE_RESULTS,
+  ...CANCELLATION_DISPATCH_BLOCKING_RESULTS,
+]);
+
 export const MAX_CANCELLATION_DISPATCH_LEASE_MS = 5 * 60_000;
 export const MAX_CANCELLATION_DISPATCH_RETRY_DELAY_MS = 24 * 60 * 60_000;
 
@@ -421,13 +428,10 @@ export function normalizeCancellationDispatchRecord(
     version < dispatchCount ||
     (status === 'leased' &&
       lastResult !== undefined &&
-      !CANCELLATION_DISPATCH_RETRYABLE_RESULTS.includes(
-        lastResult as (typeof CANCELLATION_DISPATCH_RETRYABLE_RESULTS)[number],
-      )) ||
+      !CANCELLATION_DISPATCH_RETRY_HISTORY_RESULTS.has(lastResult)) ||
     (status === 'retry_wait' &&
-      !CANCELLATION_DISPATCH_RETRYABLE_RESULTS.includes(
-        lastResult as (typeof CANCELLATION_DISPATCH_RETRYABLE_RESULTS)[number],
-      )) ||
+      (lastResult === undefined ||
+        !CANCELLATION_DISPATCH_RETRY_HISTORY_RESULTS.has(lastResult))) ||
     (status === 'dispatched' &&
       lastResult !== 'termination_requested' &&
       lastResult !== 'already_exited') ||

@@ -97,6 +97,84 @@ function stopResult() {
   };
 }
 
+function diagnosticResult() {
+  return {
+    projectId: 'project-1',
+    runId: 'run-1',
+    runStatus: 'running',
+    runVersion: 6,
+    eventSequence: 8,
+    cancelRequestedAtMs: NOW - 1_000,
+    cancelReason: 'user',
+    operatorAction: 'rearm',
+    dispatch: {
+      attemptId: 'attempt-1',
+      status: 'blocked',
+      version: 3,
+      dispatchCount: 1,
+      lastResult: 'identity_mismatch',
+      createdAtMs: NOW - 900,
+      updatedAtMs: NOW - 800,
+    },
+  };
+}
+
+function rearmResult() {
+  return {
+    status: 'rearmed',
+    projectId: 'project-1',
+    runId: 'run-1',
+    attemptId: 'attempt-1',
+    previousDispatchVersion: 3,
+    dispatchVersion: 4,
+    previousResult: 'identity_mismatch',
+    retryDelayMs: 5_000,
+    nextAttemptAtMs: NOW + 5_000,
+    runVersion: 7,
+    eventSequence: 9,
+  };
+}
+
+function inspectCommand(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    operation: 'run.cancellation.inspect',
+    request: {
+      projectId: 'project-1',
+      runId: 'run-1',
+      requestId: 'request-inspect-1',
+      auditEventId: '019f9300-0000-4000-8000-000000000031',
+      failureAuditEventId: '019f9300-0000-4000-8000-000000000032',
+      body: {
+        schema: 'qinglong/run-cancellation-dispatch-inspect@v1',
+      },
+      ...overrides,
+    },
+  };
+}
+
+function rearmCommand(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    operation: 'run.cancellation.rearm',
+    request: {
+      projectId: 'project-1',
+      runId: 'run-1',
+      requestId: 'request-rearm-1',
+      auditEventId: '019f9300-0000-4000-8000-000000000041',
+      failureAuditEventId: '019f9300-0000-4000-8000-000000000042',
+      body: {
+        schema: 'qinglong/run-cancellation-dispatch-rearm-request@v1',
+        mutationId: '019f9300-0000-4000-8000-000000000043',
+        expectedDispatchVersion: 3,
+        expectedLastResult: 'identity_mismatch',
+        retryDelayMs: 5_000,
+      },
+      ...overrides,
+    },
+  };
+}
+
 test('routes one exact strong User retry and emits the shared response', async () => {
   const calls = [];
   const transport = createClusterRunManagementTransport({
@@ -108,6 +186,12 @@ test('routes one exact strong User retry and emits the shared response', async (
       },
       async stop() {
         return stopResult();
+      },
+      async inspectCancellation() {
+        return diagnosticResult();
+      },
+      async rearmCancellation() {
+        return rearmResult();
       },
     },
   });
@@ -139,6 +223,12 @@ test('routes one exact strong User stop and emits the shared response', async ()
         calls.push(request);
         return stopResult();
       },
+      async inspectCancellation() {
+        return diagnosticResult();
+      },
+      async rearmCancellation() {
+        return rearmResult();
+      },
     },
   });
   const result = await transport.execute(stopCommand(), {
@@ -169,6 +259,12 @@ test('rejects weak or non-User identity before service authority', async () => {
       async stop() {
         return stopResult();
       },
+      async inspectCancellation() {
+        return diagnosticResult();
+      },
+      async rearmCancellation() {
+        return rearmResult();
+      },
     },
   });
   await assert.rejects(
@@ -185,6 +281,65 @@ test('rejects weak or non-User identity before service authority', async () => {
     ClusterRunManagementTransportAuthenticationError,
   );
   assert.equal(called, false);
+});
+
+test('routes bounded cancellation inspection without lease capability data', async () => {
+  const calls = [];
+  const transport = createClusterRunManagementTransport({
+    now: () => NOW,
+    service: {
+      async retry() { return retryResult(); },
+      async stop() { return stopResult(); },
+      async inspectCancellation(request) {
+        calls.push(request);
+        return diagnosticResult();
+      },
+      async rearmCancellation() { return rearmResult(); },
+    },
+  });
+  const result = await transport.execute(inspectCommand(), {
+    authenticate: async () => principal(),
+  });
+  assert.equal(calls[0].runId, 'run-1');
+  assert.deepEqual(result, {
+    schemaVersion: 1,
+    operation: 'run.cancellation.inspect',
+    diagnostic: {
+      schema: 'qinglong/run-cancellation-dispatch-diagnostic@v1',
+      ...diagnosticResult(),
+    },
+  });
+  assert.equal(JSON.stringify(result).includes('leaseOwner'), false);
+  assert.equal(JSON.stringify(result).includes('leaseToken'), false);
+});
+
+test('routes an exact blocked cancellation rearm receipt', async () => {
+  const calls = [];
+  const transport = createClusterRunManagementTransport({
+    now: () => NOW,
+    service: {
+      async retry() { return retryResult(); },
+      async stop() { return stopResult(); },
+      async inspectCancellation() { return diagnosticResult(); },
+      async rearmCancellation(request) {
+        calls.push(request);
+        return rearmResult();
+      },
+    },
+  });
+  const result = await transport.execute(rearmCommand(), {
+    authenticate: async () => principal({ assurance: 'hardware' }),
+  });
+  assert.equal(calls[0].expectedDispatchVersion, 3);
+  assert.equal(calls[0].expectedLastResult, 'identity_mismatch');
+  assert.deepEqual(result, {
+    schemaVersion: 1,
+    operation: 'run.cancellation.rearm',
+    rearm: {
+      schema: 'qinglong/run-cancellation-dispatch-rearm-receipt@v1',
+      ...rearmResult(),
+    },
+  });
 });
 
 test('rejects widened commands and ambiguous audit identity', () => {

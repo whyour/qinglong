@@ -61,7 +61,7 @@ function policyRow(role = 'operator') {
   };
 }
 
-function fixture(role = 'operator') {
+function fixture(role = 'operator', options = {}) {
   const calls = [];
   const pool = {
     async query(sql, params = []) {
@@ -86,13 +86,30 @@ function fixture(role = 'operator') {
             text.startsWith('SELECT set_config')
           )
             return { rows: [], rowCount: 0 };
-          if (text.includes('statement_timestamp()')) {
+          if (
+            text.includes('statement_timestamp()') ||
+            text.includes('transaction_timestamp()')
+          ) {
             return { rows: [{ nowMs: NOW }], rowCount: 1 };
           }
           if (text.includes('lock_run_management_policy_fence')) {
             return { rows: [{ matches: true }], rowCount: 1 };
           }
           if (text.includes('FROM "ql3"."runs" WHERE id = $1 FOR UPDATE')) {
+            if (!text.includes('cancel_reason AS "cancelReason"')) {
+              return {
+                rows: [
+                  {
+                    projectId: 'project-1',
+                    runStatus: 'running',
+                    runVersion: 6,
+                    eventSequence: 8,
+                    cancelRequestedAtMs: NOW - 2_000,
+                  },
+                ],
+                rowCount: 1,
+              };
+            }
             return {
               rows: [
                 {
@@ -123,12 +140,37 @@ function fixture(role = 'operator') {
             };
           }
           if (
-            text.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
-            text.includes('RETURNING event_id')
+            text.includes('FROM "ql3"."runs" WHERE id = $1') &&
+            !text.includes('FOR UPDATE')
           ) {
-            return { rows: [{ eventId: request().auditEventId }], rowCount: 1 };
+            return {
+              rows: [
+                {
+                  projectId: 'project-1',
+                  runStatus: 'running',
+                  runVersion: 6,
+                  eventSequence: 8,
+                  cancelRequestedAtMs: NOW - 2_000,
+                  cancelReason: 'user',
+                },
+              ],
+              rowCount: 1,
+            };
           }
-          if (text.includes('idempotency_key = $2')) return { rows: [] };
+          if (
+            text.includes('FROM "ql3"."run_events"') &&
+            text.includes('dedupe_key = $2')
+          ) {
+            return { rows: [], rowCount: 0 };
+          }
+          if (
+            text.startsWith('SELECT attempt_id AS "attemptId"') &&
+            text.includes('FROM "ql3"."run_cancellation_dispatches"') &&
+            !text.includes('dispatchStatus') &&
+            !text.includes('FOR UPDATE')
+          ) {
+            return { rows: [{ attemptId: 'attempt-1' }], rowCount: 1 };
+          }
           if (text.includes('WHERE run.id = $1')) {
             return {
               rows: [
@@ -150,6 +192,58 @@ function fixture(role = 'operator') {
               ],
             };
           }
+          if (text.includes('FROM "ql3"."run_attempts"')) {
+            return { rows: [{ attemptStatus: 'running' }], rowCount: 1 };
+          }
+          if (
+            text.includes('FROM "ql3"."run_cancellation_dispatches"') &&
+            text.includes('FOR UPDATE')
+          ) {
+            return {
+              rows: [
+                {
+                  attemptId: 'attempt-1',
+                  dispatchStatus: 'blocked',
+                  dispatchVersion: 3,
+                  lastResult: options.lastResult ?? 'identity_mismatch',
+                },
+              ],
+              rowCount: 1,
+            };
+          }
+          if (text.includes('FROM "ql3"."run_cancellation_dispatches"')) {
+            return {
+              rows: [
+                {
+                  attemptId: 'attempt-1',
+                  dispatchStatus: 'blocked',
+                  dispatchVersion: 3,
+                  dispatchCount: 1,
+                  nextAttemptAtMs: null,
+                  leaseExpiresAtMs: null,
+                  lastResult: options.lastResult ?? 'identity_mismatch',
+                  lastDispatchedAtMs: NOW - 1_500,
+                  dispatchCreatedAtMs: NOW - 1_900,
+                  dispatchUpdatedAtMs: NOW - 1_500,
+                },
+              ],
+              rowCount: 1,
+            };
+          }
+          if (
+            text.startsWith(
+              'UPDATE "ql3"."run_cancellation_dispatches"',
+            )
+          ) {
+            return { rows: [], rowCount: 1 };
+          }
+          if (
+            text.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
+            text.includes('RETURNING event_id')
+          ) {
+            return { rows: [{ eventId: request().auditEventId }], rowCount: 1 };
+          }
+          if (text.includes('idempotency_key = $2')) return { rows: [] };
           if (text.includes('FROM "ql3"."task_definitions"')) {
             return { rows: [{ enabled: true }] };
           }
@@ -250,5 +344,106 @@ test('authorizes run.stop and commits intent plus allowed audit together', async
   assert.ok(
     calls.findIndex(({ sql }) => sql.includes("'run.stop'")) <
       calls.findIndex(({ sql }) => sql === 'COMMIT'),
+  );
+});
+
+test('allows a viewer to inspect only low-sensitive cancellation state', async () => {
+  const { calls, service } = fixture('viewer');
+  const inspectRequest = {
+    projectId: 'project-1',
+    runId: 'run-1',
+    requestId: 'request-inspect-1',
+    auditEventId: '019f9500-0000-4000-8000-000000000031',
+    failureAuditEventId: '019f9500-0000-4000-8000-000000000032',
+    principal: request().principal,
+  };
+  const result = await service.inspectCancellation(inspectRequest);
+  assert.equal(result.operatorAction, 'rearm');
+  assert.equal(result.dispatch.lastResult, 'identity_mismatch');
+  assert.equal(JSON.stringify(result).includes('leaseOwner'), false);
+  assert.equal(JSON.stringify(result).includes('leaseToken'), false);
+  const audit = calls.find(
+    ({ sql, params }) =>
+      sql.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
+      params[2] === 'run.cancellation.inspect',
+  );
+  assert.equal(audit.params[0], inspectRequest.auditEventId);
+});
+
+test('authorizes exact cancellation rearm and keeps the event identity server-side', async () => {
+  const { calls, service } = fixture();
+  const rearmRequest = {
+    projectId: 'project-1',
+    runId: 'run-1',
+    mutationId: '019f9500-0000-4000-8000-000000000041',
+    expectedDispatchVersion: 3,
+    expectedLastResult: 'identity_mismatch',
+    retryDelayMs: 5_000,
+    requestId: 'request-rearm-1',
+    auditEventId: '019f9500-0000-4000-8000-000000000042',
+    failureAuditEventId: '019f9500-0000-4000-8000-000000000043',
+    principal: request().principal,
+  };
+  const result = await service.rearmCancellation(rearmRequest);
+  assert.equal(result.status, 'rearmed');
+  assert.equal(result.dispatchVersion, 4);
+  const event = calls.find(({ sql }) =>
+    sql.startsWith('INSERT INTO "ql3"."run_events"'),
+  );
+  assert.equal(event.params[0], GENERATED[0]);
+  assert.equal(event.params.includes(rearmRequest.mutationId), false);
+  const allowedAudit = calls.find(
+    ({ sql, params }) =>
+      sql.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
+      params[2] === 'run.cancellation.rearm',
+  );
+  assert.equal(allowedAudit.params[0], rearmRequest.auditEventId);
+  assert.ok(
+    calls.indexOf(allowedAudit) < calls.findIndex(({ sql }) => sql === 'COMMIT'),
+  );
+});
+
+test('denies viewer rearm and records stale dispatch conflicts outside the transaction', async () => {
+  const rearmRequest = {
+    projectId: 'project-1',
+    runId: 'run-1',
+    mutationId: '019f9500-0000-4000-8000-000000000051',
+    expectedDispatchVersion: 3,
+    expectedLastResult: 'identity_mismatch',
+    retryDelayMs: 5_000,
+    requestId: 'request-rearm-conflict-1',
+    auditEventId: '019f9500-0000-4000-8000-000000000052',
+    failureAuditEventId: '019f9500-0000-4000-8000-000000000053',
+    principal: request().principal,
+  };
+
+  const viewer = fixture('viewer');
+  await assert.rejects(
+    viewer.service.rearmCancellation(rearmRequest),
+    ClusterRunManagementAuthorizationError,
+  );
+  assert.equal(
+    viewer.calls.some(({ scope }) => scope === 'client'),
+    false,
+  );
+
+  const stale = fixture('operator', { lastResult: 'pid_mismatch' });
+  await assert.rejects(
+    stale.service.rearmCancellation(rearmRequest),
+    { code: 'CLUSTER_RUN_MANAGEMENT_CONFLICT' },
+  );
+  const failureAudit = stale.calls.find(
+    ({ scope, sql }) =>
+      scope === 'pool' &&
+      sql.startsWith('INSERT INTO "ql3"."security_audit_events"'),
+  );
+  assert.equal(failureAudit.params[0], rearmRequest.failureAuditEventId);
+  assert.equal(
+    failureAudit.params.some(
+      (value) =>
+        typeof value === 'string' &&
+        value.includes('dispatch_result_changed'),
+    ),
+    true,
   );
 });

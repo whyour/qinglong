@@ -21,13 +21,14 @@ export interface PostgresSchemaContractTrigger {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 65;
-  readonly migrationId: 'pg-0066-cancellation-dispatch';
+  readonly contractVersion: 66;
+  readonly migrationId: 'pg-0067-cancellation-dispatch-management';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
     run_core: 1;
     run_cancellation_dispatch: 1;
+    run_cancellation_dispatch_management: 1;
     run_attempt_log_retention: 1;
     run_management_boundary: 1;
     run_management_stop: 1;
@@ -119,8 +120,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 65,
-    migrationId: 'pg-0066-cancellation-dispatch',
+    contractVersion: 66,
+    migrationId: 'pg-0067-cancellation-dispatch-management',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -169,6 +170,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       project_tool_definition_snapshot: 1,
       run_core: 1,
       run_cancellation_dispatch: 1,
+      run_cancellation_dispatch_management: 1,
       run_attempt_log_retention: 1,
       run_management_boundary: 1,
       run_management_stop: 1,

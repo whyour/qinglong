@@ -117,6 +117,40 @@ const stopCommand = normalizeClusterRunManagementCommand({
   },
 });
 
+const inspectCommand = normalizeClusterRunManagementCommand({
+  schemaVersion: 1,
+  operation: 'run.cancellation.inspect',
+  request: {
+    projectId: 'project-1',
+    runId: 'run-1',
+    requestId: 'request-inspect-1',
+    auditEventId: '019f9400-0000-4000-8000-000000000031',
+    failureAuditEventId: '019f9400-0000-4000-8000-000000000032',
+    body: {
+      schema: 'qinglong/run-cancellation-dispatch-inspect@v1',
+    },
+  },
+});
+
+const rearmCommand = normalizeClusterRunManagementCommand({
+  schemaVersion: 1,
+  operation: 'run.cancellation.rearm',
+  request: {
+    projectId: 'project-1',
+    runId: 'run-1',
+    requestId: 'request-rearm-1',
+    auditEventId: '019f9400-0000-4000-8000-000000000041',
+    failureAuditEventId: '019f9400-0000-4000-8000-000000000042',
+    body: {
+      schema: 'qinglong/run-cancellation-dispatch-rearm-request@v1',
+      mutationId: '019f9400-0000-4000-8000-000000000043',
+      expectedDispatchVersion: 3,
+      expectedLastResult: 'identity_mismatch',
+      retryDelayMs: 5_000,
+    },
+  },
+});
+
 function response(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -210,6 +244,108 @@ test('validates one low-sensitive stop response against the request target', () 
   ]) {
     assert.throws(
       () => validateClusterRunManagementClientResult(drift, stopCommand),
+      ClusterPluginPackageManagementClientRequestError,
+    );
+  }
+});
+
+test('validates a low-sensitive cancellation diagnostic and rejects capability leakage', () => {
+  const value = {
+    schemaVersion: 1,
+    operation: 'run.cancellation.inspect',
+    diagnostic: {
+      schema: 'qinglong/run-cancellation-dispatch-diagnostic@v1',
+      projectId: 'project-1',
+      runId: 'run-1',
+      runStatus: 'running',
+      runVersion: 6,
+      eventSequence: 8,
+      cancelRequestedAtMs: 999_000,
+      cancelReason: 'user',
+      operatorAction: 'rearm',
+      dispatch: {
+        attemptId: 'attempt-1',
+        status: 'blocked',
+        version: 3,
+        dispatchCount: 1,
+        lastResult: 'identity_mismatch',
+        createdAtMs: 999_100,
+        updatedAtMs: 999_200,
+      },
+    },
+  };
+  assert.deepEqual(
+    validateClusterRunManagementClientResult(value, inspectCommand),
+    value,
+  );
+  for (const drift of [
+    { ...value, diagnostic: { ...value.diagnostic, projectId: 'project-2' } },
+    { ...value, diagnostic: { ...value.diagnostic, runId: 'run-2' } },
+    {
+      ...value,
+      diagnostic: { ...value.diagnostic, operatorAction: 'none' },
+    },
+    {
+      ...value,
+      diagnostic: {
+        ...value.diagnostic,
+        dispatch: { ...value.diagnostic.dispatch, leaseOwner: 'worker-1' },
+      },
+    },
+    {
+      ...value,
+      diagnostic: {
+        ...value.diagnostic,
+        dispatch: {
+          ...value.diagnostic.dispatch,
+          leaseTokenDigest: 'a'.repeat(64),
+        },
+      },
+    },
+  ]) {
+    assert.throws(
+      () => validateClusterRunManagementClientResult(drift, inspectCommand),
+      ClusterPluginPackageManagementClientRequestError,
+    );
+  }
+});
+
+test('binds a rearm receipt to the exact dispatch version, result and delay fences', () => {
+  const value = {
+    schemaVersion: 1,
+    operation: 'run.cancellation.rearm',
+    rearm: {
+      schema: 'qinglong/run-cancellation-dispatch-rearm-receipt@v1',
+      status: 'rearmed',
+      projectId: 'project-1',
+      runId: 'run-1',
+      attemptId: 'attempt-1',
+      previousDispatchVersion: 3,
+      dispatchVersion: 4,
+      previousResult: 'identity_mismatch',
+      retryDelayMs: 5_000,
+      nextAttemptAtMs: 1_005_000,
+      runVersion: 7,
+      eventSequence: 9,
+    },
+  };
+  assert.deepEqual(
+    validateClusterRunManagementClientResult(value, rearmCommand),
+    value,
+  );
+  for (const rearm of [
+    { ...value.rearm, previousDispatchVersion: 4 },
+    { ...value.rearm, dispatchVersion: 5 },
+    { ...value.rearm, previousResult: 'pid_mismatch' },
+    { ...value.rearm, retryDelayMs: 6_000 },
+    { ...value.rearm, runId: 'run-2' },
+  ]) {
+    assert.throws(
+      () =>
+        validateClusterRunManagementClientResult(
+          { ...value, rearm },
+          rearmCommand,
+        ),
       ClusterPluginPackageManagementClientRequestError,
     );
   }

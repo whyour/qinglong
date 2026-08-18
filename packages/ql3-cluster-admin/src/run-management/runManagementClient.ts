@@ -6,6 +6,11 @@ import {
   RUN_CANCELLATION_SCHEMA,
   normalizeRunCancellationResult,
 } from '@qinglong/runtime-core/run-cancellation';
+import { RUN_STATUSES } from '@qinglong/runtime-core/run';
+import {
+  CANCELLATION_DISPATCH_RESULTS,
+  CANCELLATION_DISPATCH_STATUSES,
+} from '@qinglong/runtime-core/cancellation-dispatch';
 import {
   ClusterPluginPackageManagementClientRequestError,
   executeClusterAuthenticatedManagementClient,
@@ -14,6 +19,8 @@ import {
   type ClusterPluginPackageManagementClientPaths,
 } from '../management-support/pluginPackageManagementClient';
 import {
+  RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA,
+  RUN_CANCELLATION_DISPATCH_REARM_RECEIPT_SCHEMA,
   normalizeClusterRunManagementCommand,
   type ClusterRunManagementCommand,
   type ClusterRunManagementTransportResult,
@@ -46,6 +53,14 @@ function exact(
     invalid();
   }
   return value as Record<string, unknown>;
+}
+
+function safeInteger(value: unknown, minimum = 0): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= minimum
+  );
 }
 
 export function validateClusterRunManagementClientResult(
@@ -94,6 +109,151 @@ export function validateClusterRunManagementClientResult(
         invalid();
       }
     } catch {
+      invalid();
+    }
+    return Object.freeze(
+      envelope as unknown as ClusterRunManagementTransportResult,
+    );
+  }
+  if (command.operation === 'run.cancellation.inspect') {
+    const envelope = exact(value, [
+      'schemaVersion',
+      'operation',
+      'diagnostic',
+    ]);
+    if (
+      envelope.schemaVersion !== 1 ||
+      envelope.operation !== command.operation
+    ) {
+      invalid();
+    }
+    const diagnostic = exact(envelope.diagnostic, [
+      'schema',
+      'projectId',
+      'runId',
+      'runStatus',
+      'runVersion',
+      'eventSequence',
+      ...(Object.hasOwn(envelope.diagnostic as object, 'cancelRequestedAtMs')
+        ? ['cancelRequestedAtMs', 'cancelReason']
+        : []),
+      'operatorAction',
+      'dispatch',
+    ]);
+    if (
+      diagnostic.schema !== RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA ||
+      diagnostic.projectId !== command.request.projectId ||
+      diagnostic.runId !== command.request.runId ||
+      !RUN_STATUSES.includes(diagnostic.runStatus as never) ||
+      !safeInteger(diagnostic.runVersion, 1) ||
+      !safeInteger(diagnostic.eventSequence) ||
+      !['none', 'wait', 'rearm'].includes(diagnostic.operatorAction as string) ||
+      (Object.hasOwn(diagnostic, 'cancelRequestedAtMs') &&
+        (!safeInteger(diagnostic.cancelRequestedAtMs) ||
+          !['user', 'policy', 'shutdown', 'reconcile', 'timeout'].includes(
+            diagnostic.cancelReason as string,
+          )))
+    ) {
+      invalid();
+    }
+    let dispatchStatus: string | null = null;
+    if (diagnostic.dispatch !== null) {
+      const dispatch = exact(diagnostic.dispatch, [
+        'attemptId',
+        'status',
+        'version',
+        'dispatchCount',
+        ...(Object.hasOwn(diagnostic.dispatch as object, 'nextAttemptAtMs')
+          ? ['nextAttemptAtMs']
+          : []),
+        ...(Object.hasOwn(diagnostic.dispatch as object, 'leaseExpiresAtMs')
+          ? ['leaseExpiresAtMs']
+          : []),
+        ...(Object.hasOwn(diagnostic.dispatch as object, 'lastResult')
+          ? ['lastResult']
+          : []),
+        ...(Object.hasOwn(
+          diagnostic.dispatch as object,
+          'lastDispatchedAtMs',
+        )
+          ? ['lastDispatchedAtMs']
+          : []),
+        'createdAtMs',
+        'updatedAtMs',
+      ]);
+      if (
+        typeof dispatch.attemptId !== 'string' ||
+        dispatch.attemptId.length < 1 ||
+        !CANCELLATION_DISPATCH_STATUSES.includes(dispatch.status as never) ||
+        !safeInteger(dispatch.version) ||
+        !safeInteger(dispatch.dispatchCount) ||
+        !safeInteger(dispatch.createdAtMs) ||
+        !safeInteger(dispatch.updatedAtMs) ||
+        (Object.hasOwn(dispatch, 'nextAttemptAtMs') &&
+          !safeInteger(dispatch.nextAttemptAtMs)) ||
+        (Object.hasOwn(dispatch, 'leaseExpiresAtMs') &&
+          !safeInteger(dispatch.leaseExpiresAtMs)) ||
+        (Object.hasOwn(dispatch, 'lastDispatchedAtMs') &&
+          !safeInteger(dispatch.lastDispatchedAtMs)) ||
+        (Object.hasOwn(dispatch, 'lastResult') &&
+          !CANCELLATION_DISPATCH_RESULTS.includes(dispatch.lastResult as never))
+      ) {
+        invalid();
+      }
+      dispatchStatus = dispatch.status as string;
+    }
+    const expectedOperatorAction =
+      dispatchStatus === 'blocked'
+        ? 'rearm'
+        : dispatchStatus !== null && dispatchStatus !== 'dispatched'
+          ? 'wait'
+          : dispatchStatus === null &&
+              Object.hasOwn(diagnostic, 'cancelRequestedAtMs')
+            ? 'wait'
+            : 'none';
+    if (diagnostic.operatorAction !== expectedOperatorAction) invalid();
+    return Object.freeze(
+      envelope as unknown as ClusterRunManagementTransportResult,
+    );
+  }
+  if (command.operation === 'run.cancellation.rearm') {
+    const envelope = exact(value, ['schemaVersion', 'operation', 'rearm']);
+    if (
+      envelope.schemaVersion !== 1 ||
+      envelope.operation !== command.operation
+    ) {
+      invalid();
+    }
+    const rearm = exact(envelope.rearm, [
+      'schema',
+      'status',
+      'projectId',
+      'runId',
+      'attemptId',
+      'previousDispatchVersion',
+      'dispatchVersion',
+      'previousResult',
+      'retryDelayMs',
+      'nextAttemptAtMs',
+      'runVersion',
+      'eventSequence',
+    ]);
+    if (
+      rearm.schema !== RUN_CANCELLATION_DISPATCH_REARM_RECEIPT_SCHEMA ||
+      rearm.status !== 'rearmed' ||
+      rearm.projectId !== command.request.projectId ||
+      rearm.runId !== command.request.runId ||
+      typeof rearm.attemptId !== 'string' ||
+      rearm.attemptId.length < 1 ||
+      rearm.previousDispatchVersion !==
+        command.request.body.expectedDispatchVersion ||
+      rearm.dispatchVersion !== rearm.previousDispatchVersion + 1 ||
+      rearm.previousResult !== command.request.body.expectedLastResult ||
+      rearm.retryDelayMs !== command.request.body.retryDelayMs ||
+      !safeInteger(rearm.nextAttemptAtMs) ||
+      !safeInteger(rearm.runVersion, 1) ||
+      !safeInteger(rearm.eventSequence, 1)
+    ) {
       invalid();
     }
     return Object.freeze(

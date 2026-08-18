@@ -11,6 +11,20 @@
 
 最新增量证据（2026-08-19）：
 
+- D-365/ADR-0458（已接受；聚合指标与产品 UI 待完成）：在既有隔离 `cluster-admin` Run management plane 上增加
+  `run.cancellation.inspect` 与 `run.cancellation.rearm`，不新建 package、服务、端口、timer、连接池或 Kubernetes 对象。inspect 要求强认证 User
+  与 `run.read`，viewer 可读取 Run/dispatch 的固定低敏投影，但永不返回 lease owner、raw token 或 token digest；rearm 要求 `run.stop`，只接受
+  `blocked + expected dispatch version + expected blocking result` 的精确 CAS，retry delay 固定为 1 秒至 24 小时并由 PostgreSQL
+  `transaction_timestamp()` 计算绝对到期时间。成功事务同时推进 Run version/event sequence、保留 blocking result 作为历史、追加
+  `run.cancel_dispatch_rearmed` 与 allowed audit；mutation replay 返回同一不可变 receipt，stale result/version、终态 Run、非活跃 Attempt 或 authorization
+  drift 均失败关闭。`pg-0067-cancellation-dispatch-management` 把 capability 提升至 v66，只给 `ql3_run_manager` 增加 dispatch SELECT 与
+  `status/version/next_attempt_at_ms/updated_at_ms` 四列 UPDATE。真实 HA 首跑发现 `FOR KEY SHARE` 会隐含要求 Attempt UPDATE 权限，最终以既有
+  SERIALIZABLE 事务、Run 行锁和普通 Attempt 读取修复，没有扩权。完整 backend `1,487 pass / 0 fail / 2 conditional skip`，18-package clean
+  build/test、四项架构审计与 `14/14` Local artifact audit 通过；workspace 仍为 18 包，`cluster-postgres` 为 172 个 source（171 nested），基础
+  Edge/Standalone 仍为 `2,589,998 / 2,590,076` bytes，Application+AI 为 `4,493,151 / 4,493,283` bytes。PostgreSQL 18.6 arm64 HA
+  `144/144` 真实执行 blocked→低敏 inspect→CAS rearm→not-due→生产交付→WAL→promotion；timeline `1→2`，报告 SHA-256 为
+  `58f43327f426c286aaa1764aa6dd9f5963a462304716e09b933f326991442b8a`。
+
 - D-364/ADR-0457（已接受；运维可见性与实机容量门待完成）：把 PostgreSQL CancellationDispatch 接入既有 caller-driven Remote Worker
   lease-control 生产路径，没有新建扫描 timer 或第二调度 authority。只有已有 Session/RunDispatchLease/Attempt fence 产生 `stop_requested` 后才 claim；
   `claimed` 必须先以 `termination_requested` 原子结算 dispatch 与 `run.cancel_dispatched`，验证 durable 结果后才向 Worker 释放停止响应；`dispatched`

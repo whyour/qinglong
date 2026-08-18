@@ -1,12 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  InvalidRunCancellationDispatchManagementError,
   PostgresClusterRunCancellationRepository,
   PostgresProjectPolicyRepository,
+  PostgresRunCancellationDispatchManagementRepository,
   PostgresRunManualRetryRepository,
   PostgresSecurityAuditRepository,
+  RunCancellationDispatchManagementConflictError,
+  RunCancellationDispatchManagementNotFoundError,
+  RunCancellationDispatchManagementUnavailableError,
+  type BlockingCancellationDispatchResult,
+  type RunCancellationDispatchDiagnostic,
+  type RunCancellationDispatchRearmReceipt,
 } from '@qinglong/cluster-postgres/run-manager';
 import type { PostgresPool } from '@qinglong/runtime-core';
+import { CANCELLATION_DISPATCH_BLOCKING_RESULTS } from '@qinglong/runtime-core/cancellation-dispatch';
 import { ProjectPolicyEngine } from '@qinglong/runtime-core/project-policy';
 import {
   ClusterRunCancellationFenceRejectedError,
@@ -57,6 +66,23 @@ export interface ClusterRunManagementStopRequest {
   readonly principal: Readonly<SecurityPrincipal>;
 }
 
+export interface ClusterRunManagementCancellationInspectRequest {
+  readonly projectId: string;
+  readonly runId: string;
+  readonly requestId: string;
+  readonly auditEventId: string;
+  readonly failureAuditEventId: string;
+  readonly principal: Readonly<SecurityPrincipal>;
+}
+
+export interface ClusterRunManagementCancellationRearmRequest
+  extends ClusterRunManagementCancellationInspectRequest {
+  readonly mutationId: string;
+  readonly expectedDispatchVersion: number;
+  readonly expectedLastResult: BlockingCancellationDispatchResult;
+  readonly retryDelayMs: number;
+}
+
 export interface ClusterRunManagementService {
   retry(
     request: Readonly<ClusterRunManagementRetryRequest>,
@@ -64,6 +90,12 @@ export interface ClusterRunManagementService {
   stop(
     request: Readonly<ClusterRunManagementStopRequest>,
   ): Promise<Readonly<ClusterRunCancellationResult>>;
+  inspectCancellation(
+    request: Readonly<ClusterRunManagementCancellationInspectRequest>,
+  ): Promise<Readonly<RunCancellationDispatchDiagnostic>>;
+  rearmCancellation(
+    request: Readonly<ClusterRunManagementCancellationRearmRequest>,
+  ): Promise<Readonly<RunCancellationDispatchRearmReceipt>>;
 }
 
 export interface ClusterRunManagementOptions {
@@ -178,6 +210,56 @@ function exactStopRequest(
   }
 }
 
+function exactCancellationInspectRequest(
+  value: unknown,
+): asserts value is Readonly<ClusterRunManagementCancellationInspectRequest> {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join('\0') !==
+      [
+        'auditEventId',
+        'failureAuditEventId',
+        'principal',
+        'projectId',
+        'requestId',
+        'runId',
+      ]
+        .sort()
+        .join('\0')
+  ) {
+    throw new ClusterRunManagementRequestError();
+  }
+}
+
+function exactCancellationRearmRequest(
+  value: unknown,
+): asserts value is Readonly<ClusterRunManagementCancellationRearmRequest> {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join('\0') !==
+      [
+        'auditEventId',
+        'expectedDispatchVersion',
+        'expectedLastResult',
+        'failureAuditEventId',
+        'mutationId',
+        'principal',
+        'projectId',
+        'requestId',
+        'retryDelayMs',
+        'runId',
+      ]
+        .sort()
+        .join('\0')
+  ) {
+    throw new ClusterRunManagementRequestError();
+  }
+}
+
 function validUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value);
 }
@@ -193,6 +275,12 @@ function failureReason(error: unknown): string {
     return 'run_not_found';
   }
   if (error instanceof ClusterRunCancellationFenceRejectedError) {
+    return error.reason;
+  }
+  if (error instanceof RunCancellationDispatchManagementNotFoundError) {
+    return 'run_not_found';
+  }
+  if (error instanceof RunCancellationDispatchManagementConflictError) {
     return error.reason;
   }
   return 'management_unavailable';
@@ -227,6 +315,8 @@ export function createClusterRunManagementService(
   const cancellations = new PostgresClusterRunCancellationRepository(
     options.pool,
   );
+  const cancellationDispatches =
+    new PostgresRunCancellationDispatchManagementRepository(options.pool);
   const audit = new PostgresSecurityAuditRepository(options.pool);
 
   return Object.freeze({
@@ -407,6 +497,189 @@ export function createClusterRunManagementService(
           throw new ClusterRunManagementConflictError();
         }
         if (error instanceof ClusterRunCancellationUnavailableError) {
+          throw new ClusterRunManagementUnavailableError({ cause: error });
+        }
+        throw new ClusterRunManagementUnavailableError({ cause: error });
+      }
+    },
+    async inspectCancellation(
+      requestValue: Readonly<ClusterRunManagementCancellationInspectRequest>,
+    ) {
+      exactCancellationInspectRequest(requestValue);
+      const observedAtMs = now();
+      let principal: Readonly<SecurityPrincipal>;
+      if (
+        !Number.isSafeInteger(observedAtMs) ||
+        observedAtMs < 0 ||
+        !IDENTIFIER_PATTERN.test(requestValue.projectId) ||
+        !IDENTIFIER_PATTERN.test(requestValue.runId) ||
+        !IDENTIFIER_PATTERN.test(requestValue.requestId) ||
+        !validUuid(requestValue.auditEventId) ||
+        !validUuid(requestValue.failureAuditEventId) ||
+        requestValue.auditEventId === requestValue.failureAuditEventId
+      ) {
+        throw new ClusterRunManagementRequestError();
+      }
+      try {
+        principal = normalizeSecurityPrincipal(
+          requestValue.principal,
+          observedAtMs,
+        );
+      } catch {
+        throw new ClusterRunManagementRequestError();
+      }
+      let fence: Readonly<SecurityPolicyFence> | null = null;
+      try {
+        const decision = await policy.authorize(
+          principal,
+          requestValue.projectId,
+          'run.read',
+        );
+        fence = decision.fence;
+        if (
+          decision.effect !== 'allow' ||
+          !fence ||
+          fence.bindingVersion === null
+        ) {
+          throw new ClusterRunManagementAuthorizationError();
+        }
+        return await cancellationDispatches.inspect({
+          projectId: requestValue.projectId,
+          runId: requestValue.runId,
+          requestId: requestValue.requestId,
+          auditEventId: requestValue.auditEventId,
+          principal,
+          policyFence: fence,
+        });
+      } catch (error) {
+        try {
+          await audit.record(
+            normalizeSecurityAuditRecord({
+              eventId: requestValue.failureAuditEventId,
+              requestId: requestValue.requestId,
+              operationId: 'run.cancellation.inspect',
+              projectId: requestValue.projectId,
+              subject: principal.subject,
+              authenticationId: principal.authenticationId,
+              outcome: 'denied',
+              reasons: [failureReason(error)],
+              fence,
+              occurredAtMs: observedAtMs,
+            }),
+          );
+        } catch (auditError) {
+          throw new ClusterRunManagementUnavailableError({ cause: auditError });
+        }
+        if (error instanceof ClusterRunManagementAuthorizationError) throw error;
+        if (error instanceof InvalidRunCancellationDispatchManagementError) {
+          throw new ClusterRunManagementRequestError();
+        }
+        if (error instanceof RunCancellationDispatchManagementNotFoundError) {
+          throw new ClusterRunManagementTargetUnavailableError();
+        }
+        if (error instanceof RunCancellationDispatchManagementConflictError) {
+          throw new ClusterRunManagementConflictError();
+        }
+        if (error instanceof RunCancellationDispatchManagementUnavailableError) {
+          throw new ClusterRunManagementUnavailableError({ cause: error });
+        }
+        throw new ClusterRunManagementUnavailableError({ cause: error });
+      }
+    },
+    async rearmCancellation(
+      requestValue: Readonly<ClusterRunManagementCancellationRearmRequest>,
+    ) {
+      exactCancellationRearmRequest(requestValue);
+      const observedAtMs = now();
+      let principal: Readonly<SecurityPrincipal>;
+      if (
+        !Number.isSafeInteger(observedAtMs) ||
+        observedAtMs < 0 ||
+        !IDENTIFIER_PATTERN.test(requestValue.projectId) ||
+        !IDENTIFIER_PATTERN.test(requestValue.runId) ||
+        !IDENTIFIER_PATTERN.test(requestValue.requestId) ||
+        !validUuid(requestValue.mutationId) ||
+        !validUuid(requestValue.auditEventId) ||
+        !validUuid(requestValue.failureAuditEventId) ||
+        requestValue.auditEventId === requestValue.failureAuditEventId ||
+        !Number.isSafeInteger(requestValue.expectedDispatchVersion) ||
+        requestValue.expectedDispatchVersion < 1 ||
+        requestValue.expectedDispatchVersion >= 2_147_483_647 ||
+        !CANCELLATION_DISPATCH_BLOCKING_RESULTS.includes(
+          requestValue.expectedLastResult,
+        ) ||
+        !Number.isSafeInteger(requestValue.retryDelayMs) ||
+        requestValue.retryDelayMs < 1_000 ||
+        requestValue.retryDelayMs > 24 * 60 * 60_000
+      ) {
+        throw new ClusterRunManagementRequestError();
+      }
+      try {
+        principal = normalizeSecurityPrincipal(
+          requestValue.principal,
+          observedAtMs,
+        );
+      } catch {
+        throw new ClusterRunManagementRequestError();
+      }
+      let fence: Readonly<SecurityPolicyFence> | null = null;
+      try {
+        const decision = await policy.authorize(
+          principal,
+          requestValue.projectId,
+          'run.stop',
+        );
+        fence = decision.fence;
+        if (
+          decision.effect !== 'allow' ||
+          !fence ||
+          fence.bindingVersion === null
+        ) {
+          throw new ClusterRunManagementAuthorizationError();
+        }
+        return await cancellationDispatches.rearm({
+          projectId: requestValue.projectId,
+          runId: requestValue.runId,
+          requestId: requestValue.requestId,
+          auditEventId: requestValue.auditEventId,
+          principal,
+          policyFence: fence,
+          mutationId: requestValue.mutationId,
+          eventId: createId(),
+          expectedDispatchVersion: requestValue.expectedDispatchVersion,
+          expectedLastResult: requestValue.expectedLastResult,
+          retryDelayMs: requestValue.retryDelayMs,
+        });
+      } catch (error) {
+        try {
+          await audit.record(
+            normalizeSecurityAuditRecord({
+              eventId: requestValue.failureAuditEventId,
+              requestId: requestValue.requestId,
+              operationId: 'run.cancellation.rearm',
+              projectId: requestValue.projectId,
+              subject: principal.subject,
+              authenticationId: principal.authenticationId,
+              outcome: 'denied',
+              reasons: [failureReason(error)],
+              fence,
+              occurredAtMs: observedAtMs,
+            }),
+          );
+        } catch (auditError) {
+          throw new ClusterRunManagementUnavailableError({ cause: auditError });
+        }
+        if (error instanceof ClusterRunManagementAuthorizationError) throw error;
+        if (error instanceof InvalidRunCancellationDispatchManagementError) {
+          throw new ClusterRunManagementRequestError();
+        }
+        if (error instanceof RunCancellationDispatchManagementNotFoundError) {
+          throw new ClusterRunManagementTargetUnavailableError();
+        }
+        if (error instanceof RunCancellationDispatchManagementConflictError) {
+          throw new ClusterRunManagementConflictError();
+        }
+        if (error instanceof RunCancellationDispatchManagementUnavailableError) {
           throw new ClusterRunManagementUnavailableError({ cause: error });
         }
         throw new ClusterRunManagementUnavailableError({ cause: error });

@@ -117,6 +117,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0064-plugin-package-secret-binding-transition-approval-plans',
       'pg-0065-approved-action-manual-recovery',
       'pg-0066-cancellation-dispatch',
+      'pg-0067-cancellation-dispatch-management',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -584,6 +585,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0066-cancellation-dispatch',
       checksum:
         'b6d7ac81b5f75530df05f8ef05878fa30aa0f4418363973ded89d14ffce151b2',
+    },
+    {
+      id: 'pg-0067-cancellation-dispatch-management',
+      checksum:
+        'e78e24a06dc4c4dbdd859685f28b4bc837a8cfb279eb3512e0a57dc6d27eaaaa',
     },
   ];
   assert.deepEqual(
@@ -2328,4 +2334,42 @@ test('advances capability v65 with database-timed fenced cancellation dispatch',
     sql,
     /migration_id = 'pg-0065-approved-action-manual-recovery'/,
   );
+});
+
+test('advances capability v66 with least-privilege cancellation diagnostics and rearm', async () => {
+  const migration = migrationById(
+    'pg-0067-cancellation-dispatch-management',
+  );
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(
+    sql,
+    /DROP CONSTRAINT ql3_run_cancellation_dispatch_result_state_check/,
+  );
+  assert.match(
+    sql,
+    /status IN \('leased', 'retry_wait'\)[\s\S]+identity_mismatch[\s\S]+dispatch_error/,
+  );
+  assert.match(
+    sql,
+    /GRANT SELECT ON "ql3"\."run_cancellation_dispatches" TO ql3_run_manager/,
+  );
+  assert.match(
+    sql,
+    /GRANT UPDATE \(status, version, next_attempt_at_ms, updated_at_ms\) ON "ql3"\."run_cancellation_dispatches" TO ql3_run_manager/,
+  );
+  assert.doesNotMatch(
+    sql,
+    /GRANT (?:INSERT|DELETE|TRUNCATE)[^;]+run_cancellation_dispatches[^;]+ql3_run_manager/,
+  );
+  assert.match(sql, /contract_version = 66/);
+  assert.match(sql, /"run_cancellation_dispatch_management":1/);
+  assert.match(sql, /contract_version = 65/);
+  assert.match(sql, /migration_id = 'pg-0066-cancellation-dispatch'/);
 });

@@ -61,4 +61,4 @@ QingLong 3.0 还必须同时服务低配路由和集群节点。公共协议需�
 
 ## 后续
 
-ADR-0457 已把 PostgreSQL CancellationDispatch Repository 接入既有 caller-driven Worker lease-control 生产 composition：它刻意不新增扫描 cadence，并复用 ingress drain 与数据库 shutdown 顺序。尚需用户可见的 availability/blocked 指标、诊断和人工处置面，以及 CloudNativePG live failover、多副本压力、固定 x64/arm64 资源门。Local 侧如需消除 legacy raw-token 存量，另开兼容迁移 ADR，不与 Cluster rollout 混合。
+ADR-0457 已把 PostgreSQL CancellationDispatch Repository 接入既有 caller-driven Worker lease-control 生产 composition：它刻意不新增扫描 cadence，并复用 ingress drain 与数据库 shutdown 顺序。ADR-0458 又通过 v66 migration 和既有 Run management plane 实现无 lease capability 的诊断与 exact-CAS rearm；没有新增连接、进程或部署对象。尚需用户可见的聚合 availability/blocked 指标、告警 UI，以及 CloudNativePG live failover、多副本压力、固定 x64/arm64 资源门。Local 侧如需消除 legacy raw-token 存量，另开兼容迁移 ADR，不与 Cluster rollout 混合。
