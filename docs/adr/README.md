@@ -453,6 +453,7 @@
 | [ADR-0447](./ADR-0447-boot-shadow-and-non-origin-boundaries.md)                                           | Boot Shadow 准入与 once/gRPC 非 Origin 边界                                                                                                                                   | Accepted |
 | [ADR-0448](./ADR-0448-bounded-legacy-shadow-startup-reconciliation.md)                                    | 有界 Legacy Shadow 启动恢复                                                                                                                                                    | Accepted |
 | [ADR-0449](./ADR-0449-versioned-legacy-shadow-startup-difference-report-and-metrics.md)                    | 版本化 Legacy Shadow 启动差异报告与指标批次                                                                                                                                      | Accepted |
+| [ADR-0450](./ADR-0450-closed-window-legacy-shadow-terminal-difference-audit.md)                             | 闭合窗口的 Legacy Shadow 终态差异审计                                                                                                                                            | Accepted |
 
 ## 规则
 
