@@ -5,7 +5,7 @@
 - 决策者：QingLong Maintainers
 - 关联 RFC：[QL-RFC-0001](../QINGLONG_3_0_ARCHITECTURE_RFC.md)
 - 前置决策：[ADR-0001](./ADR-0001-run-state-and-transaction-boundaries.md)
-- Amended by：[ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)、[ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)、[ADR-0447](./ADR-0447-boot-shadow-and-non-origin-boundaries.md)、[ADR-0448](./ADR-0448-bounded-legacy-shadow-startup-reconciliation.md)
+- Amended by：[ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)、[ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)、[ADR-0447](./ADR-0447-boot-shadow-and-non-origin-boundaries.md)、[ADR-0448](./ADR-0448-bounded-legacy-shadow-startup-reconciliation.md)、[ADR-0449](./ADR-0449-versioned-legacy-shadow-startup-difference-report-and-metrics.md)
 
 ## 1. 决策摘要
 
@@ -239,7 +239,7 @@ Shadow Adapter 不得：
 
 Shadow 转换仍必须遵守 ADR-0001。无法合法映射时追加 compat.transition_mismatch，不能强行覆盖终态。
 
-当前 Alpha 切片对已审 Node worker origin 直接观察同一 ChildProcess 的 spawn、error 和 exit 事件，因此不依赖 Shell callback 才能形成基本终态。下述两级关联已补充 Shell callback、stop/cancel 和乱序/迟到回调；ADR-0448 又补充了监听前一次性启动恢复。差异对账、可采集指标与 Primary gate 仍不能由进程内观察或启动 summary 替代。
+当前 Alpha 切片对已审 Node worker origin 直接观察同一 ChildProcess 的 spawn、error 和 exit 事件，因此不依赖 Shell callback 才能形成基本终态。下述两级关联已补充 Shell callback、stop/cancel 和乱序/迟到回调；ADR-0448 又补充了监听前一次性启动恢复，ADR-0449 将其投影为 origin-bounded、版本化的差异报告与固定字段 metric batch。该 startup snapshot 仍不能替代跨测量窗口的历史终态对账与正式 Primary gate。
 
 ### 9.4 `next` Alpha callback 与 stop 关联
 
@@ -253,7 +253,7 @@ Shadow 转换仍必须遵守 ADR-0001。无法合法映射时追加 compat.trans
 6. 取消事实在 Legacy kill 前投递；同 worker 的后续 exit 排在取消之后。跨 worker 使用持久化定位器尽力关联，任何查询或写入失败都不能阻断 kill 或改变 2.x API 响应。
 7. 乱序 finished 可以从 queued/claimed 补齐 dispatching、starting、running 和终态；重复终态 callback、取消后的迟到成功 callback 不覆盖终态，也不追加重复完成事件。
 
-这仍不是完整的 Shadow→Primary 门禁：ADR-0448 已提供启动后有界批量扫描、终态证据补齐、lost/abandoned 收敛和两事务 response-loss 修复；当前仍没有公开指标采集器、Shadow/Legacy 差异报表与正式 Primary gate。后续能力不得让 edge 增加常驻 watcher 或无界内存队列。
+这仍不是完整的 Shadow→Primary 门禁：ADR-0448 已提供启动后有界批量扫描、终态证据补齐、lost/abandoned 收敛和两事务 response-loss 修复；ADR-0449 已增加 startup 差异报表、固定低基数 metric batch 与可注入单次 collector，但尚未完成跨窗口终态差异查询、具体 exporter、资源/回滚演练和正式 Primary gate。后续能力不得让 edge 增加常驻 watcher 或无界内存队列。
 
 ### 9.3 Shadow 写失败
 

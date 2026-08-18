@@ -281,6 +281,50 @@ test('keeps system-crond pending without terminal callback evidence', async () =
   );
 });
 
+test('keeps a bounded per-origin outcome matrix for later ownership gates', async () => {
+  const { database, writer, reconciler } = await createStack();
+  await activeShadow(writer, { legacyCronId: 15, pid: 4311 });
+  await activeShadow(writer, {
+    origin: 'scheduled_system',
+    legacyCronId: 16,
+    pid: 4312,
+  });
+  await insertInstance(database, {
+    cron_id: 15,
+    pid: 4311,
+    status: 2,
+    finished_at: null,
+  });
+  await insertInstance(database, {
+    cron_id: 16,
+    pid: 4312,
+    status: 2,
+    finished_at: null,
+  });
+
+  const summary = await reconciler.reconcileBatch({
+    origins: ['manual', 'scheduled_system'],
+  });
+
+  assert.deepEqual(
+    summary.byOrigin.map(({ origin, scanned, markedLost, pending }) => ({
+      origin,
+      scanned,
+      markedLost,
+      pending,
+    })),
+    [
+      { origin: 'manual', scanned: 1, markedLost: 1, pending: 0 },
+      {
+        origin: 'scheduled_system',
+        scanned: 1,
+        markedLost: 0,
+        pending: 1,
+      },
+    ],
+  );
+});
+
 test('refuses ambiguous duplicate identity evidence instead of guessing a terminal result', async () => {
   const { database, repository, writer, reconciler } = await createStack();
   const logPath = 'cron/ambiguous.log';
@@ -349,6 +393,21 @@ test('supervisor preserves a stable cursor when its Profile budget is exhausted'
         ambiguous: 0,
         skipped: 0,
         failed: 0,
+        byOrigin: [
+          {
+            origin: 'manual',
+            scanned: 1,
+            completed: 0,
+            cancelled: 0,
+            abandoned: 0,
+            markedLost: 1,
+            repaired: 0,
+            pending: 0,
+            ambiguous: 0,
+            skipped: 0,
+            failed: 0,
+          },
+        ],
         truncated: true,
         nextCursor: { createdAtMs: 10, runId: 'run-10' },
       };

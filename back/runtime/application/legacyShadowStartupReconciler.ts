@@ -23,40 +23,85 @@ export interface LegacyShadowStartupClock {
   now(): number;
 }
 
-export interface LegacyShadowStartupReconcileSummary {
-  scanned: number;
-  completed: number;
-  cancelled: number;
-  abandoned: number;
-  markedLost: number;
-  repaired: number;
-  pending: number;
-  ambiguous: number;
-  skipped: number;
-  failed: number;
-  truncated: boolean;
-  nextCursor?: LegacyShadowStartupCursor;
-}
+export const LEGACY_SHADOW_STARTUP_OUTCOMES = Object.freeze([
+  'completed',
+  'cancelled',
+  'abandoned',
+  'markedLost',
+  'repaired',
+  'pending',
+  'ambiguous',
+  'skipped',
+  'failed',
+] as const);
+
+export type LegacyShadowStartupOutcome =
+  (typeof LEGACY_SHADOW_STARTUP_OUTCOMES)[number];
+
+export type LegacyShadowStartupOutcomeCounts = Record<
+  LegacyShadowStartupOutcome,
+  number
+>;
+
+export type LegacyShadowStartupOriginSummary =
+  LegacyShadowStartupOutcomeCounts & {
+    origin: RunRecord['executionOrigin'];
+    scanned: number;
+  };
+
+export type LegacyShadowStartupReconcileSummary =
+  LegacyShadowStartupOutcomeCounts & {
+    scanned: number;
+    byOrigin: readonly LegacyShadowStartupOriginSummary[];
+    truncated: boolean;
+    nextCursor?: LegacyShadowStartupCursor;
+  };
 
 export type LegacyShadowStartupStopReason =
   | 'complete'
   | 'page_limit'
   | 'cursor_stalled';
 
-export interface LegacyShadowStartupSummary
-  extends Omit<
-    LegacyShadowStartupReconcileSummary,
-    'truncated' | 'nextCursor'
-  > {
+export type LegacyShadowStartupSummary = Omit<
+  LegacyShadowStartupReconcileSummary,
+  'truncated' | 'nextCursor'
+> & {
   pages: number;
   stopReason: LegacyShadowStartupStopReason;
   remaining: boolean;
   nextCursor?: LegacyShadowStartupCursor;
-}
+};
 
 type EvidenceSelection =
   | { status: 'matched'; evidence: LegacyRunningInstanceEvidence }
   | { status: 'none' | 'ambiguous' };
+
+function emptyOutcomeCounts(): LegacyShadowStartupOutcomeCounts {
+  return {
+    completed: 0,
+    cancelled: 0,
+    abandoned: 0,
+    markedLost: 0,
+    repaired: 0,
+    pending: 0,
+    ambiguous: 0,
+    skipped: 0,
+    failed: 0,
+  };
+}
+
+function originSummary(
+  origin: RunRecord['executionOrigin'],
+): LegacyShadowStartupOriginSummary {
+  return { origin, scanned: 0, ...emptyOutcomeCounts() };
+}
+
+function incrementOutcome(
+  target: LegacyShadowStartupOutcomeCounts,
+  outcome: LegacyShadowStartupOutcome,
+): void {
+  target[outcome] += 1;
+}
 
 function sameCursor(
   left: LegacyShadowStartupCursor | undefined,
@@ -168,27 +213,34 @@ export class LegacyShadowStartupReconciler {
       ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
       ...(options.limit === undefined ? {} : { limit: options.limit }),
     });
+    const originSummaries = new Map(
+      enabledOrigins.map((origin) => [origin, originSummary(origin)]),
+    );
     const summary: LegacyShadowStartupReconcileSummary = {
       scanned: page.candidates.length,
-      completed: 0,
-      cancelled: 0,
-      abandoned: 0,
-      markedLost: 0,
-      repaired: 0,
-      pending: 0,
-      ambiguous: 0,
-      skipped: 0,
-      failed: 0,
+      ...emptyOutcomeCounts(),
+      byOrigin: [...originSummaries.values()],
       truncated: page.truncated,
       ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
     };
     const origins = new Set(enabledOrigins);
     for (const candidate of page.candidates) {
-      try {
-        await this.reconcileCandidate(candidate, origins, summary);
-      } catch {
-        summary.failed += 1;
+      const perOrigin =
+        originSummaries.get(candidate.origin) ??
+        originSummary(candidate.origin);
+      if (!originSummaries.has(candidate.origin)) {
+        originSummaries.set(candidate.origin, perOrigin);
+        summary.byOrigin = [...originSummaries.values()];
       }
+      perOrigin.scanned += 1;
+      let outcome: LegacyShadowStartupOutcome;
+      try {
+        outcome = await this.reconcileCandidate(candidate, origins);
+      } catch {
+        outcome = 'failed';
+      }
+      incrementOutcome(summary, outcome);
+      incrementOutcome(perOrigin, outcome);
     }
     return summary;
   }
@@ -196,26 +248,23 @@ export class LegacyShadowStartupReconciler {
   private async reconcileCandidate(
     candidate: LegacyShadowStartupCandidate,
     origins: ReadonlySet<RunRecord['executionOrigin']>,
-    summary: LegacyShadowStartupReconcileSummary,
-  ): Promise<void> {
+  ): Promise<LegacyShadowStartupOutcome> {
     const run = await this.repository.findRunById(candidate.runId);
     if (
       !run ||
       run.executionOwner !== 'legacy' ||
       !origins.has(run.executionOrigin) ||
+      run.executionOrigin !== candidate.origin ||
       isTerminalRunStatus(run.status) ||
       run.status === 'lost'
     ) {
-      summary.skipped += 1;
-      return;
+      return 'skipped';
     }
     if (candidate.activeAttemptCount === 0) {
-      await this.repairTerminalAttempt(run, summary);
-      return;
+      return this.repairTerminalAttempt(run);
     }
     if (candidate.activeAttemptCount !== 1 || !candidate.attempt) {
-      summary.ambiguous += 1;
-      return;
+      return 'ambiguous';
     }
     const attempt = await this.repository.findAttemptById(
       candidate.attempt.attemptId,
@@ -225,8 +274,7 @@ export class LegacyShadowStartupReconciler {
       attempt.runId !== run.id ||
       isTerminalRunAttemptStatus(attempt.status)
     ) {
-      summary.skipped += 1;
-      return;
+      return 'skipped';
     }
 
     const evidence =
@@ -236,13 +284,11 @@ export class LegacyShadowStartupReconciler {
             legacyCronId: candidate.legacyCronId,
           });
     if (evidence.truncated) {
-      summary.ambiguous += 1;
-      return;
+      return 'ambiguous';
     }
     const selected = selectEvidence(attempt, evidence.evidence);
     if (selected.status === 'ambiguous') {
-      summary.ambiguous += 1;
-      return;
+      return 'ambiguous';
     }
     if (
       selected.status === 'matched' &&
@@ -254,8 +300,7 @@ export class LegacyShadowStartupReconciler {
           { runId: run.id, attemptId: attempt.id },
           { atMs, reason: 'reconcile' },
         );
-        summary.cancelled += 1;
-        return;
+        return 'cancelled';
       }
       if (
         selected.evidence.outcome === 'succeeded' ||
@@ -274,35 +319,30 @@ export class LegacyShadowStartupReconciler {
               : selected.evidence.exitCode,
           },
         );
-        summary.completed += 1;
-        return;
+        return 'completed';
       }
     }
 
     if (run.executionOrigin === 'scheduled_system') {
-      summary.pending += 1;
-      return;
+      return 'pending';
     }
     if (run.status === 'queued' && attempt.status === 'claimed') {
       await this.abandon(run, attempt);
-      summary.abandoned += 1;
-      return;
+      return 'abandoned';
     }
     if (
       (run.status === 'dispatching' || run.status === 'running') &&
       ['claimed', 'starting', 'running'].includes(attempt.status)
     ) {
       await this.markLost(run, attempt);
-      summary.markedLost += 1;
-      return;
+      return 'markedLost';
     }
-    summary.ambiguous += 1;
+    return 'ambiguous';
   }
 
   private async repairTerminalAttempt(
     run: RunRecord,
-    summary: LegacyShadowStartupReconcileSummary,
-  ): Promise<void> {
+  ): Promise<'repaired' | 'ambiguous'> {
     const attempt = await this.repository.findLatestAttemptByRunId(run.id);
     const target = attempt ? terminalRunTarget(attempt) : undefined;
     if (
@@ -310,8 +350,7 @@ export class LegacyShadowStartupReconciler {
       target === undefined ||
       !RUN_TRANSITIONS[run.status].includes(target)
     ) {
-      summary.ambiguous += 1;
-      return;
+      return 'ambiguous';
     }
     await this.commands.transitionRun({
       runId: run.id,
@@ -327,7 +366,7 @@ export class LegacyShadowStartupReconciler {
       actor: { type: 'reconciler' },
       dedupeKey: `legacy-startup-repair:${attempt.id}:${target}`,
     });
-    summary.repaired += 1;
+    return 'repaired';
   }
 
   private async abandon(
@@ -438,18 +477,17 @@ export class LegacyShadowStartupSupervisor {
       );
     }
 
+    const originSummaries = new Map(
+      [...new Set(options.origins)].map((origin) => [
+        origin,
+        originSummary(origin),
+      ]),
+    );
     const total: LegacyShadowStartupSummary = {
       pages: 0,
       scanned: 0,
-      completed: 0,
-      cancelled: 0,
-      abandoned: 0,
-      markedLost: 0,
-      repaired: 0,
-      pending: 0,
-      ambiguous: 0,
-      skipped: 0,
-      failed: 0,
+      ...emptyOutcomeCounts(),
+      byOrigin: [...originSummaries.values()],
       stopReason: 'complete',
       remaining: false,
     };
@@ -471,6 +509,19 @@ export class LegacyShadowStartupSupervisor {
       total.ambiguous += page.ambiguous;
       total.skipped += page.skipped;
       total.failed += page.failed;
+      for (const pageOrigin of page.byOrigin) {
+        const aggregate =
+          originSummaries.get(pageOrigin.origin) ??
+          originSummary(pageOrigin.origin);
+        if (!originSummaries.has(pageOrigin.origin)) {
+          originSummaries.set(pageOrigin.origin, aggregate);
+          total.byOrigin = [...originSummaries.values()];
+        }
+        aggregate.scanned += pageOrigin.scanned;
+        for (const outcome of LEGACY_SHADOW_STARTUP_OUTCOMES) {
+          aggregate[outcome] += pageOrigin[outcome];
+        }
+      }
       if (!page.truncated) return total;
       if (!page.nextCursor || sameCursor(cursor, page.nextCursor)) {
         total.stopReason = 'cursor_stalled';

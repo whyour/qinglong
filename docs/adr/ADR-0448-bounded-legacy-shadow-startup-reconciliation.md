@@ -5,6 +5,7 @@
 - 关联 RFC：QL-RFC-0001 D-02、D-356、PR-4
 - 关联 ADR：ADR-0001、ADR-0002、ADR-0445、ADR-0446、ADR-0447
 - Amends：ADR-0002 的 Shadow 启动与恢复边界
+- Amended by：ADR-0449
 
 ## 上下文
 
