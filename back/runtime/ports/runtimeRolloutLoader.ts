@@ -1,5 +1,6 @@
 import type { RuntimeRolloutPolicy } from '../domain/runtimeRollout';
 import type { RuntimeRolloutManifest } from '../domain/runtimeRolloutManifest';
+import type { LegacyShadowPrimaryGateReceipt } from '../domain/legacyShadowPrimaryGate';
 
 export type RuntimeRolloutLoadStatus =
   | 'missing'
@@ -19,7 +20,9 @@ export interface RuntimeRolloutLoadAudit {
     | 'FILE_READ_FAILED'
     | 'FILE_TOO_LARGE'
     | 'INVALID_JSON'
-    | 'INVALID_MANIFEST';
+    | 'INVALID_MANIFEST'
+    | 'PRIMARY_GATE_READ_FAILED'
+    | 'PRIMARY_GATE_INVALID';
 }
 
 export interface RuntimeRolloutLoadResult {
@@ -27,6 +30,7 @@ export interface RuntimeRolloutLoadResult {
   policy: RuntimeRolloutPolicy;
   audit: RuntimeRolloutLoadAudit;
   manifest?: RuntimeRolloutManifest;
+  primaryGateReceipt?: LegacyShadowPrimaryGateReceipt;
 }
 
 export interface RuntimeRolloutLoader {

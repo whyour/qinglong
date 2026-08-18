@@ -319,6 +319,9 @@ test('HTTP startup orders Shadow recovery after Legacy normalization and before 
   const shadowRecovery = source.indexOf(
     'await bootstrapLegacyShadowStartupReconciliation()',
   );
+  const captureEvidence = source.indexOf(
+    'await bootstrapLegacyShadowCaptureEvidence({',
+  );
   const primaryActivation = source.indexOf(
     'await bootstrapDefaultManualPrimaryRuntime()',
   );
@@ -328,6 +331,7 @@ test('HTTP startup orders Shadow recovery after Legacy normalization and before 
 
   assert.equal(legacyNormalization >= 0, true);
   assert.equal(legacyNormalization < shadowRecovery, true);
-  assert.equal(shadowRecovery < primaryActivation, true);
+  assert.equal(shadowRecovery < captureEvidence, true);
+  assert.equal(captureEvidence < primaryActivation, true);
   assert.equal(primaryActivation < listen, true);
 });

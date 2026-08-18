@@ -456,6 +456,7 @@
 | [ADR-0450](./ADR-0450-closed-window-legacy-shadow-terminal-difference-audit.md)                             | 闭合窗口的 Legacy Shadow 终态差异审计                                                                                                                                            | Accepted |
 | [ADR-0451](./ADR-0451-profile-bounded-legacy-shadow-resource-and-off-rollback-evidence.md)                  | 按 Profile 有界的 Legacy Shadow 资源与关闭回滚证据                                                                                                                               | Accepted |
 | [ADR-0452](./ADR-0452-atomic-flattened-backend-build-publication.md)                                        | 原子且扁平兼容的 Backend 构建发布                                                                                                                                                 | Accepted |
+| [ADR-0453](./ADR-0453-origin-scoped-legacy-shadow-capture-authority-and-primary-gate.md)                     | Origin-scoped Legacy Shadow 捕获权威与 Primary 门禁                                                                                                                               | Accepted（首次真实目标实例 manual canary 待执行） |
 
 ## 规则
 

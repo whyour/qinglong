@@ -1,5 +1,10 @@
 import Logger from '../../loaders/logger';
 import type { LegacyShadowRunCorrelator } from '../application/legacyShadowRunCorrelator';
+import {
+  LegacyShadowCaptureAuthority,
+  type LegacyShadowCaptureAdmission,
+  type LegacyShadowCaptureSnapshot,
+} from '../application/legacyShadowCaptureAuthority';
 import type { ExecutionOrigin } from '../domain/run';
 import type {
   LegacyExecutionCallbackFact,
@@ -51,6 +56,12 @@ let configuredOrigins: ReadonlySet<ExecutionOrigin> | undefined;
 let defaultObserver: Promise<LegacyExecutionObserver> | undefined;
 let defaultCorrelator: Promise<LegacyShadowRunCorrelator> | undefined;
 const failureCounters = new Map<string, number>();
+let captureAuthority: LegacyShadowCaptureAuthority | undefined;
+
+function getCaptureAuthority(): LegacyShadowCaptureAuthority {
+  captureAuthority ??= new LegacyShadowCaptureAuthority();
+  return captureAuthority;
+}
 const localRegistry = new LegacyExecutionRegistry({
   onOverflow() {
     incrementFailure('registry:capacity_exceeded');
@@ -185,10 +196,27 @@ function getDefaultCorrelator(): Promise<LegacyShadowRunCorrelator> {
 function beginFailOpen(
   observer: LegacyExecutionObserver,
   accepted: LegacyExecutionAcceptedFact,
+  capture?: LegacyShadowCaptureAdmission,
 ): LegacyExecutionObservation {
   try {
-    return observer.begin(accepted);
+    const observation = observer.begin(accepted);
+    if (capture) {
+      const settled = observation.captureSettled?.();
+      if (!settled) {
+        capture.failed('observer');
+      } else {
+        void settled.then(
+          (outcome) =>
+            outcome === 'captured'
+              ? capture.captured()
+              : capture.failed('accept'),
+          () => capture.failed('accept'),
+        );
+      }
+    }
+    return observation;
   } catch {
+    capture?.failed('observer');
     incrementFailure(`${accepted.origin}:begin:failed`);
     try {
       Logger.warn(
@@ -204,6 +232,7 @@ function beginFailOpen(
 function createAcceptedFactFailOpen(
   origin: ExecutionOrigin,
   createFact: LegacyExecutionAcceptedFactFactory,
+  capture?: LegacyShadowCaptureAdmission,
 ): LegacyExecutionAcceptedFact | null {
   try {
     const fact = createFact();
@@ -212,6 +241,7 @@ function createAcceptedFactFailOpen(
     }
     return fact;
   } catch {
+    capture?.failed('fact');
     incrementFailure(`${origin}:fact:failed`);
     try {
       Logger.warn(`[ql3-shadow] fact creation failed origin=${origin}`);
@@ -225,10 +255,14 @@ function createAcceptedFactFailOpen(
 function deferredObservation(
   observer: Promise<LegacyExecutionObserver>,
   accepted: LegacyExecutionAcceptedFact,
+  capture: LegacyShadowCaptureAdmission,
 ): LegacyExecutionObservation {
   const delegate = observer
-    .then((value) => beginFailOpen(value, accepted))
-    .catch(() => NOOP_OBSERVATION);
+    .then((value) => beginFailOpen(value, accepted, capture))
+    .catch(() => {
+      capture.failed('initialization');
+      return NOOP_OBSERVATION;
+    });
   const enqueue = <T>(
     operation: (observation: LegacyExecutionObservation, fact: T) => void,
     fact: T,
@@ -266,11 +300,12 @@ export function observeLegacyExecution(
       : NOOP_OBSERVATION;
   }
   if (!readConfiguredOrigins().has(origin)) return undefined;
-  const fact = createAcceptedFactFailOpen(origin, createFact);
+  const capture = getCaptureAuthority().admit(origin);
+  const fact = createAcceptedFactFailOpen(origin, createFact, capture);
   return fact
     ? localRegistry.register(
         fact,
-        deferredObservation(getDefaultObserver(), fact),
+        deferredObservation(getDefaultObserver(), fact, capture),
       )
     : NOOP_OBSERVATION;
 }
@@ -302,9 +337,10 @@ export function observeLegacyShellExecutionCallback(
       : NOOP_OBSERVATION;
   } else {
     if (!readConfiguredOrigins().has(origin)) return undefined;
-    const fact = createAcceptedFactFailOpen(origin, createFact);
+    const capture = getCaptureAuthority().admit(origin);
+    const fact = createAcceptedFactFailOpen(origin, createFact, capture);
     observation = fact
-      ? deferredObservation(getDefaultObserver(), fact)
+      ? deferredObservation(getDefaultObserver(), fact, capture)
       : NOOP_OBSERVATION;
   }
 
@@ -414,4 +450,10 @@ export function shadowBridgeFailureSnapshot(): Readonly<
   Record<string, number>
 > {
   return Object.fromEntries(failureCounters);
+}
+
+export function legacyShadowCaptureSnapshot(
+  origins: readonly ExecutionOrigin[] = configuredLegacyShadowOrigins(),
+): LegacyShadowCaptureSnapshot {
+  return getCaptureAuthority().snapshot(origins);
 }

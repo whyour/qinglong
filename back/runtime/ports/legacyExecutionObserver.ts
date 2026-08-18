@@ -42,6 +42,7 @@ export interface LegacyExecutionCancelledFact {
 }
 
 export interface LegacyExecutionObservation {
+  captureSettled?(): Promise<'captured' | 'failed'>;
   spawned(fact: LegacyExecutionSpawnedFact): void;
   running(fact: LegacyExecutionRunningFact): void;
   startFailed(fact: LegacyExecutionStartFailedFact): void;

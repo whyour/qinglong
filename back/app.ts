@@ -26,6 +26,9 @@ class Application {
   private manualPrimaryRuntime?: {
     stop(): Promise<'drained' | 'timed_out'>;
   };
+  private legacyShadowCaptureEvidence?: {
+    close(): Promise<unknown>;
+  };
   private isShuttingDown = false;
   private workerMetadataMap = new Map<number, WorkerMetadata>();
   private httpWorker?: Worker;
@@ -248,7 +251,16 @@ class Application {
     const { bootstrapLegacyShadowStartupReconciliation } = await import(
       './runtime/adapters/legacy/bootstrapLegacyShadowStartupReconciliation'
     );
-    await bootstrapLegacyShadowStartupReconciliation();
+    const legacyShadowStartup =
+      await bootstrapLegacyShadowStartupReconciliation();
+
+    const { bootstrapLegacyShadowCaptureEvidence } = await import(
+      './runtime/adapters/legacy/bootstrapLegacyShadowCaptureEvidence'
+    );
+    this.legacyShadowCaptureEvidence =
+      await bootstrapLegacyShadowCaptureEvidence({
+        startup: legacyShadowStartup,
+      });
 
     const { bootstrapDefaultManualPrimaryRuntime } = await import(
       './runtime/adapters/legacy/bootstrapDefaultManualPrimaryRuntime'
@@ -260,6 +272,7 @@ class Application {
       server = await this.httpServerService.initialize(this.app, config.port);
     } catch (error) {
       await this.stopManualPrimaryRuntime();
+      await this.closeLegacyShadowCaptureEvidence();
       throw error;
     }
 
@@ -307,6 +320,7 @@ class Application {
       if (serviceType === 'http') {
         await this.stopManualPrimaryRuntime();
         await this.httpServerService?.shutdown();
+        await this.closeLegacyShadowCaptureEvidence();
       } else {
         await this.grpcServerService?.shutdown();
       }
@@ -329,6 +343,13 @@ class Application {
     } catch {
       Logger.error('[runtime-activation] shutdown failed');
     }
+  }
+
+  private async closeLegacyShadowCaptureEvidence(): Promise<void> {
+    const evidence = this.legacyShadowCaptureEvidence;
+    this.legacyShadowCaptureEvidence = undefined;
+    if (!evidence) return;
+    await evidence.close();
   }
 }
 

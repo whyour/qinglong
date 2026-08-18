@@ -64,6 +64,7 @@ function classifyError(error: unknown): string {
 class SerialLegacyExecutionObservation
   implements TrackedLegacyExecutionObservation
 {
+  private readonly capture: Promise<LegacyShadowRunReference | null>;
   private chain: Promise<LegacyShadowRunReference | null>;
 
   constructor(
@@ -72,10 +73,15 @@ class SerialLegacyExecutionObservation
     accepted: LegacyExecutionAcceptedFact,
     private readonly reporter: ShadowObservationReporter,
   ) {
-    this.chain = writer.accept(accepted).catch((error) => {
+    this.capture = writer.accept(accepted).catch((error) => {
       this.report('accept', error);
       return null;
     });
+    this.chain = this.capture;
+  }
+
+  async captureSettled(): Promise<'captured' | 'failed'> {
+    return (await this.capture) === null ? 'failed' : 'captured';
   }
 
   spawned(fact: LegacyExecutionSpawnedFact): void {

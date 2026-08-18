@@ -15,13 +15,19 @@ const NOW = 1_750_000_000_000;
 
 function enabledManifest(overrides = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: 'manual-primary-canary-1',
     enabled: true,
     approvedBy: 'operator:admin',
     approvedAtMs: NOW - 1_000,
     expiresAtMs: NOW + 60_000,
     rollbackPlanRef: 'docs/runbooks/disable-primary.md',
+    primaryGate: {
+      schema: 'qinglong/legacy-shadow-primary-gate-reference@v1',
+      origin: 'manual',
+      receiptFile: 'manual-primary-gate.json',
+      receiptSha256: 'a'.repeat(64),
+    },
     rollout: {
       defaultMode: 'off',
       origins: { manual: 'primary' },
@@ -120,7 +126,7 @@ test('parses a time-bounded, manual-only rollout manifest', () => {
   );
 
   const disabled = parseRuntimeRolloutManifest(
-    { schemaVersion: 1, revision: 'disabled-1', enabled: false },
+    { schemaVersion: 2, revision: 'disabled-1', enabled: false },
     NOW,
   );
   assert.equal(disabled.policy.modeFor('manual'), 'off');
@@ -128,11 +134,20 @@ test('parses a time-bounded, manual-only rollout manifest', () => {
 
 test('rejects broad, stale, incomplete, and extensible rollout manifests', () => {
   const cases = [
+    enabledManifest({ schemaVersion: 1 }),
     enabledManifest({
       rollout: {
         defaultMode: 'primary',
         origins: { manual: 'primary' },
         allowLegacyFallbackBeforeStart: false,
+      },
+    }),
+    enabledManifest({
+      primaryGate: {
+        schema: 'qinglong/legacy-shadow-primary-gate-reference@v1',
+        origin: 'manual',
+        receiptFile: '../escaped.json',
+        receiptSha256: 'a'.repeat(64),
       },
     }),
     enabledManifest({

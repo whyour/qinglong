@@ -369,7 +369,7 @@ async function runSummary(database) {
   });
 }
 
-async function rollbackChild(mode, expectedBefore) {
+async function rollbackChild(mode, expectedBefore, profile) {
   const databasePath = process.env.QL3_SHADOW_DRILL_DATABASE;
   if (!path.isAbsolute(databasePath ?? '')) {
     throw new QingLong3LegacyShadowResourceRollbackError(
@@ -380,10 +380,17 @@ async function rollbackChild(mode, expectedBefore) {
   await taskLimit.setCustomLimit();
   const ScheduleService = fromRuntime('services/schedule').default;
   const bridge = fromRuntime('runtime/compatibility/legacyExecutionBridge');
+  const { createLegacyShadowCaptureReport } = fromRuntime(
+    'runtime/application/legacyShadowCaptureAuthority',
+  );
   const { sequelize } = fromRuntime('data');
   let shortCircuitFactCalls = 0;
   try {
     const configuredOrigins = bridge.configuredLegacyShadowOrigins();
+    const captureBefore =
+      mode === 'enabled'
+        ? bridge.legacyShadowCaptureSnapshot(['system'])
+        : undefined;
     if (mode === 'off') {
       const observation = bridge.observeLegacyExecution('system', () => {
         shortCircuitFactCalls += 1;
@@ -434,6 +441,15 @@ async function rollbackChild(mode, expectedBefore) {
         `${mode} restart did not preserve the expected Legacy result`,
       );
     }
+    const capture =
+      mode === 'enabled'
+        ? createLegacyShadowCaptureReport(
+            profile,
+            ['system'],
+            captureBefore,
+            bridge.legacyShadowCaptureSnapshot(['system']),
+          )
+        : undefined;
     return Object.freeze({
       mode,
       configuredOrigins,
@@ -445,6 +461,7 @@ async function rollbackChild(mode, expectedBefore) {
       shortCircuitFactCalls,
       defaultObserverLoaded,
       repositoryLoaded,
+      ...(capture === undefined ? {} : { capture }),
       peakProcessRssBytes: process.resourceUsage().maxRSS * 1024,
     });
   } finally {
@@ -558,6 +575,7 @@ async function runEvidence(options) {
             [
               '--internal-child=rollback-enabled',
               `--expected-before=${fixtureRunCount}`,
+              `--profile=${options.profile}`,
             ],
             { ...childEnvironment, QL3_SHADOW_ORIGINS: 'system' },
           )
@@ -568,6 +586,7 @@ async function runEvidence(options) {
             [
               '--internal-child=rollback-off',
               `--expected-before=${fixtureRunCount + 1}`,
+              `--profile=${options.profile}`,
             ],
             { ...childEnvironment, QL3_SHADOW_ORIGINS: '' },
           )
@@ -653,6 +672,7 @@ async function runEvidence(options) {
                 runDelta: enabled.runDelta,
                 defaultObserverLoaded: enabled.defaultObserverLoaded,
                 repositoryLoaded: enabled.repositoryLoaded,
+                capture: enabled.capture,
                 peakProcessRssBytes: enabled.peakProcessRssBytes,
               }),
               off: Object.freeze({
@@ -729,6 +749,7 @@ async function main() {
       report = await rollbackChild(
         mode === 'rollback-enabled' ? 'enabled' : 'off',
         expectedBefore,
+        profile,
       );
     } else {
       throw new QingLong3LegacyShadowResourceRollbackError(

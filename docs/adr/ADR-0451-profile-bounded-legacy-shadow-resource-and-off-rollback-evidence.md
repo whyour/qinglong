@@ -73,5 +73,6 @@ ADR-0450 已冻结闭合窗口的 Shadow→Legacy 终态审计语义，但只证
 
 ## 后续
 
-D-360 仍须建立可信的 origin-scoped Legacy→Shadow capture authority，组合 observer failure/capture evidence 与本 ADR/ADR-0450 的结果，再定义正式 Primary gate。
+D-360/ADR-0453 已建立 origin-scoped Legacy→Shadow capture authority，并把 observer capture/failure、startup、ADR-0450 terminal 与本 ADR resource/rollback
+组合为可由 rollout v2 loader 独立重放的 manual Primary gate bundle；首次目标实例 manual canary bundle 仍必须在实际启用前产生。
 固定物理 edge、真实 flash 写放大和断电演练必须作为独立现场证据，不能由本 ADR 的 Docker arm64 结果替代。

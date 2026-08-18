@@ -125,6 +125,7 @@ test('serializes a successful observed process lifecycle without starting it', a
     failure: (failure) => failures.push(failure),
   });
   const observation = observer.begin(acceptedFact());
+  assert.equal(await observation.captureSettled(), 'captured');
   observation.spawned({
     atMs: ACCEPTED_AT_MS + 1,
     pid: 4242,
@@ -231,6 +232,7 @@ test('is default-off, fail-open, and rejects primary ownership', async () => {
     failure: (failure) => failures.push(failure),
   });
   const failed = shadow.begin(acceptedFact());
+  assert.equal(await failed.captureSettled(), 'failed');
   failed.spawned({ atMs: ACCEPTED_AT_MS + 1 });
   failed.exited({ atMs: ACCEPTED_AT_MS + 2, exitCode: 0 });
   await failed.settled();

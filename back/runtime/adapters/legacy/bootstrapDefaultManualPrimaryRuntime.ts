@@ -52,8 +52,25 @@ export async function bootstrapDefaultManualPrimaryRuntime(
       Logger.info(`[runtime-activation] ${JSON.stringify(record)}`);
     });
   let stackModule: DefaultManualPrimaryStackModule | undefined;
+  let selectedProfile: 'edge' | 'standalone' | undefined;
   if (selected) {
     try {
+      const profile =
+        options.deploymentProfile ??
+        parseDeploymentProfile(process.env.QL_DEPLOYMENT_PROFILE);
+      if (profile === 'cluster-control' || profile === 'worker') {
+        throw new Error('Local Primary requires edge or standalone Profile');
+      }
+      if (
+        load.primaryGateReceipt?.assessment !== 'eligible' ||
+        load.primaryGateReceipt.origin !== 'manual' ||
+        load.primaryGateReceipt.profile !== profile
+      ) {
+        throw new Error(
+          'Primary gate receipt does not authorize this deployment Profile',
+        );
+      }
+      selectedProfile = profile;
       stackModule = await (
         options.loadStack ?? (() => import('./defaultManualPrimaryActivation'))
       )();
@@ -87,9 +104,7 @@ export async function bootstrapDefaultManualPrimaryRuntime(
       }
       return stackModule.createDefaultManualPrimaryActivationStack(rollout, {
         ...activationOptions,
-        deploymentProfile:
-          options.deploymentProfile ??
-          parseDeploymentProfile(process.env.QL_DEPLOYMENT_PROFILE),
+        deploymentProfile: selectedProfile!,
       });
     },
     install: options.install ?? installManualPrimaryExecutionRouter,

@@ -146,6 +146,12 @@ test(
     assert.equal(report.rollback.enabled.runDelta, 1);
     assert.equal(report.rollback.enabled.defaultObserverLoaded, true);
     assert.equal(report.rollback.enabled.repositoryLoaded, true);
+    assert.equal(report.rollback.enabled.capture.assessment, 'captured');
+    assert.equal(report.rollback.enabled.capture.totals.admitted, 1);
+    assert.equal(report.rollback.enabled.capture.totals.captured, 1);
+    assert.equal(report.rollback.enabled.capture.totals.failed, 0);
+    assert.equal(report.rollback.enabled.capture.totals.pending, 0);
+    assert.equal(report.rollback.enabled.capture.byOrigin[0].origin, 'system');
     assert.deepEqual(report.rollback.off.configuredOrigins, []);
     assert.equal(report.rollback.off.legacyExitCode, 0);
     assert.equal(report.rollback.off.runDelta, 0);

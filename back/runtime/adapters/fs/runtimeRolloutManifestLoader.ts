@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { constants } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
 import {
@@ -9,6 +10,10 @@ import type {
   RuntimeRolloutLoadAudit,
   RuntimeRolloutLoadResult,
 } from '../../ports/runtimeRolloutLoader';
+import {
+  parseLegacyShadowPrimaryGateReceipt,
+  type LegacyShadowPrimaryGateReceipt,
+} from '../../domain/legacyShadowPrimaryGate';
 
 export type {
   RuntimeRolloutLoadAudit,
@@ -17,6 +22,7 @@ export type {
 } from '../../ports/runtimeRolloutLoader';
 
 export const MAX_RUNTIME_ROLLOUT_MANIFEST_BYTES = 64 * 1024;
+export const MAX_RUNTIME_PRIMARY_GATE_RECEIPT_BYTES = 64 * 1024;
 
 export interface RuntimeRolloutManifestLoaderOptions {
   clock?: { now(): number };
@@ -32,6 +38,47 @@ function rejected(
     policy: defaultOffRuntimeRolloutPolicy(),
     audit: { ...audit, status: 'rejected', reasonCode },
   };
+}
+
+async function loadPrimaryGateReceipt(
+  manifestPath: string,
+  receiptFile: string,
+  expectedSha256: string,
+  approvedAtMs: number,
+): Promise<LegacyShadowPrimaryGateReceipt> {
+  const receiptPath = path.join(path.dirname(manifestPath), receiptFile);
+  let handle;
+  try {
+    handle = await fs.open(
+      receiptPath,
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+    );
+    const stat = await handle.stat();
+    if (
+      !stat.isFile() ||
+      (stat.mode & 0o077) !== 0 ||
+      stat.size < 2 ||
+      stat.size > MAX_RUNTIME_PRIMARY_GATE_RECEIPT_BYTES
+    ) {
+      throw new TypeError('Primary gate receipt file shape is invalid');
+    }
+    const bytes = await handle.readFile();
+    if (createHash('sha256').update(bytes).digest('hex') !== expectedSha256) {
+      throw new TypeError('Primary gate receipt digest does not match');
+    }
+    const receipt = parseLegacyShadowPrimaryGateReceipt(
+      JSON.parse(bytes.toString('utf8')),
+    );
+    if (
+      receipt.assessment !== 'eligible' ||
+      receipt.generatedAtMs > approvedAtMs
+    ) {
+      throw new TypeError('Primary gate receipt is not eligible for approval');
+    }
+    return receipt;
+  } finally {
+    await handle?.close();
+  }
 }
 
 export async function loadRuntimeRolloutManifest(
@@ -90,10 +137,29 @@ export async function loadRuntimeRolloutManifest(
   try {
     const decision = parseRuntimeRolloutManifest(value, evaluatedAtMs);
     const status = decision.manifest.enabled ? 'accepted' : 'disabled';
+    let primaryGateReceipt: LegacyShadowPrimaryGateReceipt | undefined;
+    if (decision.manifest.enabled) {
+      try {
+        primaryGateReceipt = await loadPrimaryGateReceipt(
+          sourcePath,
+          decision.manifest.primaryGate.receiptFile,
+          decision.manifest.primaryGate.receiptSha256,
+          decision.manifest.approvedAtMs,
+        );
+      } catch (error) {
+        return rejected(
+          hashedAudit,
+          (error as NodeJS.ErrnoException).code === 'ENOENT'
+            ? 'PRIMARY_GATE_READ_FAILED'
+            : 'PRIMARY_GATE_INVALID',
+        );
+      }
+    }
     return {
       status,
       policy: decision.policy,
       manifest: decision.manifest,
+      ...(primaryGateReceipt === undefined ? {} : { primaryGateReceipt }),
       audit: {
         ...hashedAudit,
         status,

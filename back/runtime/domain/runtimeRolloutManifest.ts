@@ -5,7 +5,7 @@ import {
   type RuntimeRolloutConfig,
 } from './runtimeRollout';
 
-export const RUNTIME_ROLLOUT_MANIFEST_VERSION = 1;
+export const RUNTIME_ROLLOUT_MANIFEST_VERSION = 2;
 export const MAX_RUNTIME_ROLLOUT_APPROVAL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const REQUIRED_RUNTIME_ROLLOUT_GATES = [
@@ -33,6 +33,12 @@ export interface EnabledRuntimeRolloutManifest {
   approvedAtMs: number;
   expiresAtMs: number;
   rollbackPlanRef: string;
+  primaryGate: {
+    schema: 'qinglong/legacy-shadow-primary-gate-reference@v1';
+    origin: 'manual';
+    receiptFile: string;
+    receiptSha256: string;
+  };
   rollout: RuntimeRolloutConfig;
   gates: Record<RuntimeRolloutGate, 'passed'>;
 }
@@ -46,12 +52,15 @@ export interface RuntimeRolloutManifestDecision {
   policy: RuntimeRolloutPolicy;
 }
 
-const MANUAL_ORIGIN: ExecutionOrigin = 'manual';
+const MANUAL_ORIGIN = 'manual' as const satisfies ExecutionOrigin;
 const ALLOWED_MANUAL_MODES = new Set<CompatibilityMode>([
   'off',
   'shadow',
   'primary',
 ]);
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+const RECEIPT_FILE_PATTERN =
+  /^(?=.{1,128}$)(?!\.)(?!.*\.\.)(?:[A-Za-z0-9][A-Za-z0-9._-]*)\.json$/u;
 
 function asObject(value: unknown, name: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -139,6 +148,7 @@ export function parseRuntimeRolloutManifest(
       'approvedAtMs',
       'expiresAtMs',
       'rollbackPlanRef',
+      'primaryGate',
       'rollout',
       'gates',
     ],
@@ -201,6 +211,39 @@ export function parseRuntimeRolloutManifest(
     }
   }
 
+  const primaryGateObject = asObject(
+    object.primaryGate,
+    'manifest.primaryGate',
+  );
+  assertExactKeys(
+    primaryGateObject,
+    ['schema', 'origin', 'receiptFile', 'receiptSha256'],
+    'manifest.primaryGate',
+  );
+  if (
+    primaryGateObject.schema !==
+      'qinglong/legacy-shadow-primary-gate-reference@v1' ||
+    primaryGateObject.origin !== MANUAL_ORIGIN
+  ) {
+    throw new TypeError('manifest.primaryGate authority is invalid');
+  }
+  const receiptFile = boundedString(
+    primaryGateObject.receiptFile,
+    'manifest.primaryGate.receiptFile',
+    128,
+  );
+  if (!RECEIPT_FILE_PATTERN.test(receiptFile)) {
+    throw new TypeError('manifest.primaryGate.receiptFile is invalid');
+  }
+  const receiptSha256 = boundedString(
+    primaryGateObject.receiptSha256,
+    'manifest.primaryGate.receiptSha256',
+    64,
+  );
+  if (!SHA256_PATTERN.test(receiptSha256)) {
+    throw new TypeError('manifest.primaryGate.receiptSha256 is invalid');
+  }
+
   const rollout: RuntimeRolloutConfig = {
     defaultMode: 'off',
     origins: { manual: origins.manual as CompatibilityMode },
@@ -218,6 +261,12 @@ export function parseRuntimeRolloutManifest(
       'manifest.rollbackPlanRef',
       512,
     ),
+    primaryGate: {
+      schema: 'qinglong/legacy-shadow-primary-gate-reference@v1',
+      origin: MANUAL_ORIGIN,
+      receiptFile,
+      receiptSha256,
+    },
     rollout,
     gates: Object.fromEntries(
       REQUIRED_RUNTIME_ROLLOUT_GATES.map((gate) => [gate, 'passed']),

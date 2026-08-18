@@ -25,6 +25,34 @@ function loadResult(status, mode = 'off') {
       sourcePath: '/data/config/qinglong3-rollout.json',
       status,
     },
+    ...(status === 'accepted'
+      ? {
+          primaryGateReceipt: {
+            schema: 'qinglong/legacy-shadow-primary-gate@v1',
+            schemaVersion: 1,
+            profile: 'standalone',
+            origin: 'manual',
+            generatedAtMs: NOW - 2_000,
+            assessment: 'eligible',
+            window: {
+              startInclusiveMs: NOW - 10_000,
+              endExclusiveMs: NOW - 5_000,
+            },
+            counts: {
+              admitted: 32,
+              captured: 32,
+              terminalScanned: 32,
+              terminalMatched: 32,
+            },
+            evidence: {
+              captureSha256: 'a'.repeat(64),
+              terminalSha256: 'b'.repeat(64),
+              resourceSha256: 'c'.repeat(64),
+            },
+            violations: [],
+          },
+        }
+      : {}),
   };
 }
 
@@ -171,6 +199,27 @@ test('accepted bootstrap audits a lazy stack import failure without installing',
   assert.deepEqual(calls, ['load-stack', 'audit:failed']);
 });
 
+test('accepted bootstrap rejects a Primary receipt for another Profile before loading', async () => {
+  const calls = [];
+  const load = loadResult('accepted', 'primary');
+  load.primaryGateReceipt.profile = 'edge';
+  await assert.rejects(
+    bootstrapDefaultManualPrimaryRuntime({
+      load: async () => load,
+      deploymentProfile: 'standalone',
+      async loadStack() {
+        calls.push('load-stack');
+        throw new Error('must remain lazy');
+      },
+      audit(record) {
+        calls.push(`audit:${record.activation}`);
+      },
+    }),
+    /does not authorize this deployment Profile/,
+  );
+  assert.deepEqual(calls, ['audit:failed']);
+});
+
 test('disabled bootstrap stays inert even with an invalid deployment profile', async () => {
   const previous = process.env.QL_DEPLOYMENT_PROFILE;
   process.env.QL_DEPLOYMENT_PROFILE = 'invalid-profile';
@@ -219,7 +268,7 @@ test('accepted bootstrap rejects and audits an invalid deployment profile', asyn
       }),
       /QL_DEPLOYMENT_PROFILE is invalid/,
     );
-    assert.deepEqual(calls, ['load-stack', 'audit:selected', 'audit:failed']);
+    assert.deepEqual(calls, ['audit:failed']);
   } finally {
     if (previous === undefined) delete process.env.QL_DEPLOYMENT_PROFILE;
     else process.env.QL_DEPLOYMENT_PROFILE = previous;
