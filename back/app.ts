@@ -245,6 +245,11 @@ class Application {
     const appLoader = await import('./loaders/app');
     await appLoader.default({ app: this.app });
 
+    const { bootstrapLegacyShadowStartupReconciliation } = await import(
+      './runtime/adapters/legacy/bootstrapLegacyShadowStartupReconciliation'
+    );
+    await bootstrapLegacyShadowStartupReconciliation();
+
     const { bootstrapDefaultManualPrimaryRuntime } = await import(
       './runtime/adapters/legacy/bootstrapDefaultManualPrimaryRuntime'
     );

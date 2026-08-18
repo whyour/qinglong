@@ -5,7 +5,7 @@
 - 决策者：QingLong Maintainers
 - 关联 RFC：[QL-RFC-0001](../QINGLONG_3_0_ARCHITECTURE_RFC.md)
 - 前置决策：[ADR-0001](./ADR-0001-run-state-and-transaction-boundaries.md)
-- Amended by：[ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)、[ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)、[ADR-0447](./ADR-0447-boot-shadow-and-non-origin-boundaries.md)
+- Amended by：[ADR-0445](./ADR-0445-schedule-service-origin-shadow-run-coverage.md)、[ADR-0446](./ADR-0446-system-crond-stable-shadow-admission.md)、[ADR-0447](./ADR-0447-boot-shadow-and-non-origin-boundaries.md)、[ADR-0448](./ADR-0448-bounded-legacy-shadow-startup-reconciliation.md)
 
 ## 1. 决策摘要
 
@@ -239,7 +239,7 @@ Shadow Adapter 不得：
 
 Shadow 转换仍必须遵守 ADR-0001。无法合法映射时追加 compat.transition_mismatch，不能强行覆盖终态。
 
-当前 Alpha 切片对 `manual` 与 `scheduled_node` 直接观察 Node ChildProcess 的 spawn、error 和 exit 事件，因此不依赖 Shell callback 才能形成基本终态。下述两级关联已补充 Shell callback、stop/cancel 和乱序/迟到回调，但启动后协调与差异对账仍是进入 Primary 前的门禁，不能由进程内观察能力替代。
+当前 Alpha 切片对已审 Node worker origin 直接观察同一 ChildProcess 的 spawn、error 和 exit 事件，因此不依赖 Shell callback 才能形成基本终态。下述两级关联已补充 Shell callback、stop/cancel 和乱序/迟到回调；ADR-0448 又补充了监听前一次性启动恢复。差异对账、可采集指标与 Primary gate 仍不能由进程内观察或启动 summary 替代。
 
 ### 9.4 `next` Alpha callback 与 stop 关联
 
@@ -253,7 +253,7 @@ Shadow 转换仍必须遵守 ADR-0001。无法合法映射时追加 compat.trans
 6. 取消事实在 Legacy kill 前投递；同 worker 的后续 exit 排在取消之后。跨 worker 使用持久化定位器尽力关联，任何查询或写入失败都不能阻断 kill 或改变 2.x API 响应。
 7. 乱序 finished 可以从 queued/claimed 补齐 dispatching、starting、running 和终态；重复终态 callback、取消后的迟到成功 callback 不覆盖终态，也不追加重复完成事件。
 
-这仍不是完整 Reconciler：当前没有启动后批量扫描、缺失事实修复、公开指标采集器或 Shadow/Legacy 差异报表。上述能力必须在 Primary 门禁前补齐，但 edge 默认不得因此增加常驻 watcher 或无界内存队列。
+这仍不是完整的 Shadow→Primary 门禁：ADR-0448 已提供启动后有界批量扫描、终态证据补齐、lost/abandoned 收敛和两事务 response-loss 修复；当前仍没有公开指标采集器、Shadow/Legacy 差异报表与正式 Primary gate。后续能力不得让 edge 增加常驻 watcher 或无界内存队列。
 
 ### 9.3 Shadow 写失败
 
@@ -445,11 +445,13 @@ Run 使用创建时的 task revision/snapshot。更新 Crontab 只影响后续 R
 
 ### 15.1 off/shadow
 
-Legacy 启动行为暂时保持。Shadow Reconciler 在有界批次内扫描非终态 Shadow Run：
+Legacy 启动归一行为保持。HTTP worker 在归一之后、Primary activation 与 listen 之前运行一次 Shadow Reconciler：
 
-- 根据唯一 RunningInstance/PID/log path 证据更新。
-- 无法确认时标记 Attempt lost 或写 mismatch，不把 Legacy 任务强制改状态。
-- edge Profile 默认低频、有限批次运行，禁止全表高频扫描。
+- 使用 `(created_at_ms, run_id)` keyset，只扫描 enabled origin 的 queued/dispatching/running legacy-owned Run；单页最多 64。
+- 每个 Cron 最多读取 8 条 RunningInstance，只有唯一 PID/log/实例终态证据才补齐 succeeded/failed/cancelled；冲突与截断保持 ambiguous。
+- Node worker-owned dispatching/running 在 owner 重启且无终态证据时标记 lost；queued/claimed 收敛为 abandoned cancellation。
+- scheduled_system 无终态证据时保持 pending，等待稳定 execution ID callback，不把 HTTP worker 生命周期误当成 system crond 生命周期。
+- edge 每次启动最多 `8 × 1 page`，standalone 最多 `32 × 4 pages`，不启动 timer/watcher；cluster-control/worker 拒绝本机 SQLite 装配。
 
 ### 15.2 primary
 

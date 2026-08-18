@@ -98,6 +98,10 @@ function readConfiguredOrigins(): ReadonlySet<ExecutionOrigin> {
   return configuredOrigins;
 }
 
+export function configuredLegacyShadowOrigins(): readonly ExecutionOrigin[] {
+  return [...readConfiguredOrigins()];
+}
+
 async function createDefaultObserver(): Promise<LegacyExecutionObserver> {
   const [data, repositoryModule, observerModule, writerModule, rolloutModule] =
     await Promise.all([
