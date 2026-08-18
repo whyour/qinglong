@@ -239,7 +239,7 @@ Shadow Adapter 不得：
 
 Shadow 转换仍必须遵守 ADR-0001。无法合法映射时追加 compat.transition_mismatch，不能强行覆盖终态。
 
-当前 Alpha 切片对已审 Node worker origin 直接观察同一 ChildProcess 的 spawn、error 和 exit 事件，因此不依赖 Shell callback 才能形成基本终态。下述两级关联已补充 Shell callback、stop/cancel 和乱序/迟到回调；ADR-0448 又补充了监听前一次性启动恢复，ADR-0449 将其投影为 origin-bounded、版本化的差异报告与固定字段 metric batch。ADR-0450 再提供显式、只读、Profile-bounded 的闭合窗口终态审计；但 2.x RunningInstance 缺少可信 origin，因此它只证明已写 Shadow Run 到 Legacy evidence 的一致性，不能单独证明 Legacy→Shadow 捕获率或替代正式 Primary gate。
+当前 Alpha 切片对已审 Node worker origin 直接观察同一 ChildProcess 的 spawn、error 和 exit 事件，因此不依赖 Shell callback 才能形成基本终态。下述两级关联已补充 Shell callback、stop/cancel 和乱序/迟到回调；ADR-0448 又补充了监听前一次性启动恢复，ADR-0449 将其投影为 origin-bounded、版本化的差异报告与固定字段 metric batch。ADR-0450 再提供显式、只读、Profile-bounded 的闭合窗口终态审计；ADR-0451 已在 128 MiB router stress 与 256 MiB Edge release cgroup 中证明有界查询、SQLite 零增长和进程重启后的 Shadow-off 回滚。但 2.x RunningInstance 缺少可信 origin，因此这些证据只覆盖已写 Shadow Run 到 Legacy evidence 的一致性，不能单独证明 Legacy→Shadow 捕获率或替代正式 Primary gate。
 
 ### 9.4 `next` Alpha callback 与 stop 关联
 
@@ -253,7 +253,7 @@ Shadow 转换仍必须遵守 ADR-0001。无法合法映射时追加 compat.trans
 6. 取消事实在 Legacy kill 前投递；同 worker 的后续 exit 排在取消之后。跨 worker 使用持久化定位器尽力关联，任何查询或写入失败都不能阻断 kill 或改变 2.x API 响应。
 7. 乱序 finished 可以从 queued/claimed 补齐 dispatching、starting、running 和终态；重复终态 callback、取消后的迟到成功 callback 不覆盖终态，也不追加重复完成事件。
 
-这仍不是完整的 Shadow→Primary 门禁：ADR-0448 已提供启动后有界批量扫描、终态证据补齐、lost/abandoned 收敛和两事务 response-loss 修复；ADR-0449 已增加 startup 差异报表、固定低基数 metric batch 与可注入单次 collector；ADR-0450 已完成不伪造反向捕获率的闭合窗口 Shadow→Legacy 终态差异查询。具体 exporter、Legacy→Shadow capture authority、资源/回滚演练和正式 Primary gate 尚未完成。后续能力不得让 edge 增加常驻 watcher 或无界内存队列。
+这仍不是完整的 Shadow→Primary 门禁：ADR-0448 已提供启动后有界批量扫描、终态证据补齐、lost/abandoned 收敛和两事务 response-loss 修复；ADR-0449 已增加 startup 差异报表、固定低基数 metric batch 与可注入单次 collector；ADR-0450 已完成不伪造反向捕获率的闭合窗口 Shadow→Legacy 终态差异查询；ADR-0451 已完成 Profile-aware 资源压力和 Shadow-off 进程重启回滚。具体 exporter、Legacy→Shadow capture authority 和正式 Primary gate 尚未完成。后续能力不得让 edge 增加常驻 watcher 或无界内存队列。
 
 ### 9.3 Shadow 写失败
 

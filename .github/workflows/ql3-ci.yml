@@ -143,7 +143,7 @@ jobs:
           pnpm build:back
           pnpm run build:packages:ql3
       - name: Test fail-closed Linux resource gate
-        run: node --test test/back/ql3LinuxResourceGate.test.cjs test/back/ql3LinuxResourceWorkflow.test.cjs test/back/ql3PhysicalEdgeEvidence.test.cjs test/back/ql3PhysicalEdgeIdleSampler.test.cjs test/back/ql3PhysicalEdgeFaultProbe.test.cjs test/back/ql3PhysicalEdgeTaskScale.test.cjs
+        run: node --test test/back/ql3LinuxResourceGate.test.cjs test/back/ql3LinuxResourceWorkflow.test.cjs test/back/ql3LegacyShadowResourceRollback.test.cjs test/back/ql3PhysicalEdgeEvidence.test.cjs test/back/ql3PhysicalEdgeIdleSampler.test.cjs test/back/ql3PhysicalEdgeFaultProbe.test.cjs test/back/ql3PhysicalEdgeTaskScale.test.cjs
       - name: Prepare architecture evidence directory
         run: mkdir -p "${RUNNER_TEMP}/ql3-linux-resource-evidence"
       - name: Stress router headroom without claiming a supported minimum

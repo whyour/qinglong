@@ -3,6 +3,8 @@ const { test } = require('node:test');
 const {
   RESOURCE_TIERS,
   createWorkloadPlans,
+  isPathTreeReadOnly,
+  mountOptionsForPath,
   parseArguments,
   parseCpuMax,
   parseKeyValueFile,
@@ -69,6 +71,11 @@ test('parses bounded cgroup v2 and mount evidence', () => {
   assert.deepEqual(mounts.get('/'), ['ro', 'relatime']);
   assert.deepEqual(mounts.get('/tmp'), ['rw', 'nosuid', 'nodev']);
   assert.deepEqual(mounts.get('/workspace'), ['ro', 'nodev']);
+  assert.deepEqual(mountOptionsForPath(mounts, '/workspace/cache'), [
+    'ro',
+    'nodev',
+  ]);
+  assert.equal(isPathTreeReadOnly(mounts, '/workspace'), true);
 });
 
 test('fails open hosts, root execution and a widened resource envelope', () => {
@@ -80,6 +87,31 @@ test('fails open hosts, root execution and a widened resource envelope', () => {
       uid: 65532,
     }),
     [],
+  );
+  const inheritedWorkspace = {
+    ...valid,
+    mounts: new Map([
+      ['/', ['ro']],
+      ['/tmp', ['rw']],
+    ]),
+  };
+  assert.deepEqual(
+    validateEnvelope('router-stress-ci', inheritedWorkspace, {
+      platform: 'linux',
+      architecture: 'arm64',
+      uid: 65532,
+    }),
+    [],
+  );
+  assert.equal(
+    isPathTreeReadOnly(
+      new Map([
+        ['/', ['ro']],
+        ['/workspace/cache', ['rw']],
+      ]),
+      '/workspace',
+    ),
+    false,
   );
   const widened = {
     ...valid,
@@ -115,23 +147,32 @@ test('builds tier-specific workload plans without shell commands', () => {
       'node-sqlite',
       'local-workflow-product',
       'local-workflow-sqlite-lock',
-      'local-workflow-admission-crash-recovery',
-      'local-workflow-control-crash-recovery',
       'plugin-package-failed-upgrade',
+      'legacy-shadow-terminal-edge',
     ],
   );
   assert.match(edge[0].script, /ql3-edge-benchmark\.cjs$/);
   assert.ok(edge[0].args.includes('--max-rss-delta-mb=64'));
-  assert.equal(edge[2].format, 'node_test');
+  const edgeShadow = edge.find(
+    ({ name }) => name === 'legacy-shadow-terminal-edge',
+  );
+  assert.match(edgeShadow.script, /ql3-legacy-shadow-resource-rollback\.cjs$/);
+  assert.ok(edgeShadow.args.includes('--profile=edge'));
+  assert.ok(edgeShadow.args.includes('--mode=audit-only'));
+  assert.ok(edgeShadow.args.includes('--samples=8'));
+  const edgeWorkflow = edge.find(
+    ({ name }) => name === 'local-workflow-product',
+  );
+  assert.equal(edgeWorkflow.format, 'node_test');
   assert.ok(
-    edge[2].nodeArgs.some((argument) =>
+    edgeWorkflow.nodeArgs.some((argument) =>
       /ql3-local-application\/test\/activation\.test\.cjs$/.test(argument),
     ),
   );
-  assert.equal(edge[2].maxProcessRssBytes, 96 * 1024 * 1024);
-  assert.equal(edge[2].contract, undefined);
+  assert.equal(edgeWorkflow.maxProcessRssBytes, 96 * 1024 * 1024);
+  assert.equal(edgeWorkflow.contract, undefined);
   assert.equal(
-    edge[2].nodeArgs.includes(
+    edgeWorkflow.nodeArgs.includes(
       '--test-name-pattern=executes one admitted Workflow',
     ),
     true,
@@ -151,15 +192,20 @@ test('builds tier-specific workload plans without shell commands', () => {
       'local-ai-prompt-model-invocation-crash-recovery',
       'local-ai-prompt-outer-transaction-crash-recovery',
       'plugin-package-failed-upgrade',
+      'legacy-shadow-terminal-edge',
+      'legacy-shadow-terminal-standalone',
     ],
   );
+  const releaseWorkflow = edgeRelease.find(
+    ({ name }) => name === 'local-workflow-product',
+  );
   assert.equal(
-    edgeRelease[2].nodeArgs.includes(
+    releaseWorkflow.nodeArgs.includes(
       '--test-name-pattern=executes one admitted Workflow|stops one running Workflow Task',
     ),
     true,
   );
-  assert.deepEqual(edgeRelease[2].contract, {
+  assert.deepEqual(releaseWorkflow.contract, {
     kind: 'local_workflow_product_lifecycle',
     profile: 'edge',
     completedWorkflowSteps: 2,
@@ -175,51 +221,99 @@ test('builds tier-specific workload plans without shell commands', () => {
     cancelAudits: 1,
     physicalPowerLossProven: false,
   });
-  assert.equal(edgeRelease[3].maxProcessRssBytes, 192 * 1024 * 1024);
-  assert.deepEqual(edgeRelease[3].env, {
+  const releaseEdgeShadow = edgeRelease.find(
+    ({ name }) => name === 'legacy-shadow-terminal-edge',
+  );
+  const releaseStandaloneShadow = edgeRelease.find(
+    ({ name }) => name === 'legacy-shadow-terminal-standalone',
+  );
+  assert.ok(releaseEdgeShadow.args.includes('--mode=full'));
+  assert.ok(releaseStandaloneShadow.args.includes('--profile=standalone'));
+  assert.ok(releaseStandaloneShadow.args.includes('--mode=audit-only'));
+  const edgePrompt = edgeRelease.find(
+    ({ name }) => name === 'local-ai-prompt-durable-output-edge',
+  );
+  const standalonePrompt = edgeRelease.find(
+    ({ name }) => name === 'local-ai-prompt-durable-output-standalone',
+  );
+  assert.equal(edgePrompt.maxProcessRssBytes, 192 * 1024 * 1024);
+  assert.deepEqual(edgePrompt.env, {
     QL3_PROMPT_RESOURCE_PROFILE: 'edge',
     QL3_PROMPT_RESOURCE_OUTPUT_BYTES: String(512 * 1024),
   });
-  assert.equal(edgeRelease[3].contract.providerCalls, 2);
-  assert.equal(edgeRelease[3].contract.exactReplay, true);
-  assert.equal(edgeRelease[3].contract.contentFree, true);
-  assert.equal(edgeRelease[3].contract.durableOutputBytes, 512 * 1024);
-  assert.equal(edgeRelease[3].contract.maxWalWriteAmplificationPermille, 0);
-  assert.equal(edgeRelease[4].contract.profile, 'standalone');
-  assert.equal(edgeRelease[4].contract.journalMode, 'wal');
-  assert.equal(edgeRelease[4].contract.requireWalGrowth, true);
-  assert.match(edge[3].script, /ql3-local-workflow-resource-benchmark\.cjs$/);
-  assert.ok(edge[3].args.includes('--lock-samples=16'));
-  assert.ok(edge[3].args.includes('--max-lock-p95-ms=500'));
-  assert.equal(edge[4].contract.scenarios, 16);
-  assert.equal(edge[4].contract.physicalPowerLossProven, false);
-  assert.equal(edge[5].contract.scenarios, 16);
-  assert.equal(edge[5].contract.conclusiveStopObserved, true);
-  assert.equal(edge[5].contract.physicalPowerLossProven, false);
-  assert.equal(edgeRelease[8].contract.scenarios, 14);
-  assert.deepEqual(edgeRelease[8].contract.boundaries, [
+  assert.equal(edgePrompt.contract.providerCalls, 2);
+  assert.equal(edgePrompt.contract.keyLoads, 1);
+  assert.equal(edgePrompt.contract.keyResolutions, 2);
+  assert.equal(edgePrompt.contract.exactReplay, true);
+  assert.equal(edgePrompt.contract.contentFree, true);
+  assert.equal(edgePrompt.contract.durableOutputBytes, 512 * 1024);
+  assert.equal(edgePrompt.contract.maxWalWriteAmplificationPermille, 0);
+  assert.equal(standalonePrompt.contract.profile, 'standalone');
+  assert.equal(standalonePrompt.contract.journalMode, 'wal');
+  assert.equal(standalonePrompt.contract.requireWalGrowth, true);
+  const workflowLock = edge.find(
+    ({ name }) => name === 'local-workflow-sqlite-lock',
+  );
+  assert.match(
+    workflowLock.script,
+    /ql3-local-workflow-resource-benchmark\.cjs$/,
+  );
+  assert.ok(workflowLock.args.includes('--lock-samples=16'));
+  assert.ok(workflowLock.args.includes('--max-lock-p95-ms=500'));
+  const releaseAdmissionCrash = edgeRelease.find(
+    ({ name }) => name === 'local-workflow-admission-crash-recovery',
+  );
+  const releaseControlCrash = edgeRelease.find(
+    ({ name }) => name === 'local-workflow-control-crash-recovery',
+  );
+  assert.equal(releaseAdmissionCrash.env, undefined);
+  assert.deepEqual(releaseAdmissionCrash.contract.profiles, [
+    'edge',
+    'standalone',
+  ]);
+  assert.equal(releaseAdmissionCrash.contract.scenarios, 16);
+  assert.equal(releaseControlCrash.env, undefined);
+  assert.deepEqual(releaseControlCrash.contract.profiles, [
+    'edge',
+    'standalone',
+  ]);
+  assert.equal(releaseControlCrash.contract.scenarios, 16);
+  const modelCrash = edgeRelease.find(
+    ({ name }) => name === 'local-ai-prompt-model-invocation-crash-recovery',
+  );
+  const transactionCrash = edgeRelease.find(
+    ({ name }) => name === 'local-ai-prompt-outer-transaction-crash-recovery',
+  );
+  assert.equal(modelCrash.contract.scenarios, 14);
+  assert.deepEqual(modelCrash.contract.boundaries, [
     'model_start',
     'model_completion',
   ]);
-  assert.equal(edgeRelease[8].contract.physicalPowerLossProven, false);
-  assert.equal(edgeRelease[9].contract.scenarios, 20);
-  assert.deepEqual(edgeRelease[9].contract.operations, [
+  assert.equal(modelCrash.contract.physicalPowerLossProven, false);
+  assert.equal(transactionCrash.contract.scenarios, 20);
+  assert.deepEqual(transactionCrash.contract.operations, [
     'admission',
     'finalization',
   ]);
-  assert.equal(edgeRelease[9].contract.exactReplay, true);
-  assert.equal(edgeRelease[9].contract.contentFree, true);
+  assert.equal(transactionCrash.contract.exactReplay, true);
+  assert.equal(transactionCrash.contract.contentFree, true);
   assert.equal(
-    edgeRelease[9].contract.promptAdmissionFinalizationCrashProven,
+    transactionCrash.contract.promptAdmissionFinalizationCrashProven,
     true,
   );
-  assert.equal(edgeRelease[9].contract.physicalPowerLossProven, false);
+  assert.equal(transactionCrash.contract.physicalPowerLossProven, false);
+  const edgeUpgrade = edge.find(
+    ({ name }) => name === 'plugin-package-failed-upgrade',
+  );
+  const releaseUpgrade = edgeRelease.find(
+    ({ name }) => name === 'plugin-package-failed-upgrade',
+  );
   assert.match(
-    edge.at(-1).script,
+    edgeUpgrade.script,
     /ql3-plugin-package-recovery-edge-benchmark\.cjs$/,
   );
-  assert.ok(edge.at(-1).args.includes('--max-rss-delta-mb=64'));
-  assert.ok(edgeRelease.at(-1).args.includes('--max-rss-delta-mb=96'));
+  assert.ok(edgeUpgrade.args.includes('--max-rss-delta-mb=64'));
+  assert.ok(releaseUpgrade.args.includes('--max-rss-delta-mb=96'));
   const cluster = createWorkloadPlans('/workspace', 'cluster-control-ci');
   assert.deepEqual(
     cluster.map(({ name }) => name),
@@ -256,7 +350,7 @@ test('fails closed when durable Prompt resource evidence drifts', () => {
     durableOutputBytes: 512 * 1024,
     providerCalls: 2,
     keyLoads: 1,
-    keyResolutions: 1,
+    keyResolutions: 2,
     liveOnlyKeyLoads: 0,
     exactReplay: true,
     contentFree: true,

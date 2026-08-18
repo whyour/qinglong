@@ -22,6 +22,9 @@ const RESOURCE_TIERS = Object.freeze({
     sqliteMaxTransactionP95Ms: 500,
     sqliteMaxBatchStallMs: 5_000,
     sqliteMaxRssDeltaMb: 32,
+    shadowAuditSamples: 8,
+    shadowAuditMaxP95Ms: 1_500,
+    shadowAuditMaxRssDeltaMb: 32,
     workflowLockSamples: 16,
     workflowMaxLockP95Ms: 500,
     workflowMaxProcessRssMb: 96,
@@ -41,6 +44,9 @@ const RESOURCE_TIERS = Object.freeze({
     sqliteMaxTransactionP95Ms: 250,
     sqliteMaxBatchStallMs: 2_500,
     sqliteMaxRssDeltaMb: 64,
+    shadowAuditSamples: 8,
+    shadowAuditMaxP95Ms: 1_000,
+    shadowAuditMaxRssDeltaMb: 64,
     workflowLockSamples: 32,
     workflowMaxLockP95Ms: 250,
     workflowMaxProcessRssMb: 160,
@@ -164,6 +170,33 @@ function parseMountOptions(raw) {
   return mounts;
 }
 
+function mountOptionsForPath(mounts, targetPath) {
+  let selectedPath;
+  let selectedOptions;
+  for (const [mountPath, options] of mounts) {
+    const containsTarget =
+      mountPath === targetPath ||
+      (mountPath === '/' && targetPath.startsWith('/')) ||
+      (mountPath !== '/' && targetPath.startsWith(`${mountPath}/`));
+    if (
+      containsTarget &&
+      (selectedPath === undefined || mountPath.length > selectedPath.length)
+    ) {
+      selectedPath = mountPath;
+      selectedOptions = options;
+    }
+  }
+  return selectedOptions;
+}
+
+function isPathTreeReadOnly(mounts, targetPath) {
+  if (!mountOptionsForPath(mounts, targetPath)?.includes('ro')) return false;
+  return [...mounts].every(
+    ([mountPath, options]) =>
+      !mountPath.startsWith(`${targetPath}/`) || !options.includes('rw'),
+  );
+}
+
 function readLinuxEnvelope(root = '/') {
   const read = (relativePath) =>
     fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -219,12 +252,13 @@ function validateEnvelope(tierName, envelope, identity) {
     violations.push(`architecture ${identity.architecture} is unsupported`);
   }
   if (identity.uid === 0) violations.push('resource workload must be non-root');
-  for (const mountPath of ['/', '/workspace']) {
-    if (!envelope.mounts.get(mountPath)?.includes('ro')) {
-      violations.push(`${mountPath} must be mounted read-only`);
-    }
+  if (!mountOptionsForPath(envelope.mounts, '/')?.includes('ro')) {
+    violations.push('/ must be mounted read-only');
   }
-  if (!envelope.mounts.get('/tmp')?.includes('rw')) {
+  if (!isPathTreeReadOnly(envelope.mounts, '/workspace')) {
+    violations.push('/workspace must be mounted read-only');
+  }
+  if (!mountOptionsForPath(envelope.mounts, '/tmp')?.includes('rw')) {
     violations.push('/tmp must be a writable bounded tmpfs');
   }
   return Object.freeze(violations);
@@ -319,7 +353,7 @@ function createWorkloadPlans(root, tierName) {
                 durableOutputBytes: PROMPT_RESOURCE_OUTPUT_BYTES,
                 providerCalls: 2,
                 keyLoads: 1,
-                keyResolutions: 1,
+                keyResolutions: 2,
                 exactReplay: true,
                 contentFree: true,
                 maxLogicalWriteAmplificationPermille: 3_000,
@@ -346,40 +380,44 @@ function createWorkloadPlans(root, tierName) {
           `--max-lock-p95-ms=${tier.workflowMaxLockP95Ms}`,
         ]),
       }),
-      Object.freeze({
-        name: 'local-workflow-admission-crash-recovery',
-        format: 'node_test',
-        nodeArgs: Object.freeze([
-          path.join(
-            root,
-            'packages/ql3-local-sqlite/test/pluginPackageWorkflowAdmissionCrashMatrix.test.cjs',
-          ),
-        ]),
-        contract: Object.freeze({
-          profiles: Object.freeze(['edge', 'standalone']),
-          crashPointsPerProfile: 8,
-          scenarios: 16,
-          mechanism: 'process_sigkill_then_database_reopen',
-          physicalPowerLossProven: false,
-        }),
-      }),
-      Object.freeze({
-        name: 'local-workflow-control-crash-recovery',
-        format: 'node_test',
-        nodeArgs: Object.freeze([
-          path.join(
-            root,
-            'packages/ql3-local-sqlite/test/pluginPackageWorkflowTaskControlCrashMatrix.test.cjs',
-          ),
-        ]),
-        contract: Object.freeze({
-          profiles: Object.freeze(['edge', 'standalone']),
-          crashPointsPerProfile: 8,
-          scenarios: 16,
-          conclusiveStopObserved: true,
-          physicalPowerLossProven: false,
-        }),
-      }),
+      ...(tierName === 'edge-release-ci'
+        ? [
+            Object.freeze({
+              name: 'local-workflow-admission-crash-recovery',
+              format: 'node_test',
+              nodeArgs: Object.freeze([
+                path.join(
+                  root,
+                  'packages/ql3-local-sqlite/test/pluginPackageWorkflowAdmissionCrashMatrix.test.cjs',
+                ),
+              ]),
+              contract: Object.freeze({
+                profiles: Object.freeze(['edge', 'standalone']),
+                crashPointsPerProfile: 8,
+                scenarios: 16,
+                mechanism: 'process_sigkill_then_database_reopen',
+                physicalPowerLossProven: false,
+              }),
+            }),
+            Object.freeze({
+              name: 'local-workflow-control-crash-recovery',
+              format: 'node_test',
+              nodeArgs: Object.freeze([
+                path.join(
+                  root,
+                  'packages/ql3-local-sqlite/test/pluginPackageWorkflowTaskControlCrashMatrix.test.cjs',
+                ),
+              ]),
+              contract: Object.freeze({
+                profiles: Object.freeze(['edge', 'standalone']),
+                crashPointsPerProfile: 8,
+                scenarios: 16,
+                conclusiveStopObserved: true,
+                physicalPowerLossProven: false,
+              }),
+            }),
+          ]
+        : []),
       ...(tierName === 'edge-release-ci'
         ? [
             Object.freeze({
@@ -437,6 +475,42 @@ function createWorkloadPlans(root, tierName) {
           `--max-database-growth-bytes=${4 * MIB}`,
         ]),
       }),
+      Object.freeze({
+        name: 'legacy-shadow-terminal-edge',
+        script: path.join(
+          root,
+          'scripts/ql3-legacy-shadow-resource-rollback.cjs',
+        ),
+        args: Object.freeze([
+          '--json',
+          '--require-compiled',
+          '--profile=edge',
+          `--mode=${tierName === 'edge-release-ci' ? 'full' : 'audit-only'}`,
+          `--samples=${tier.shadowAuditSamples}`,
+          `--max-audit-p95-ms=${tier.shadowAuditMaxP95Ms}`,
+          `--max-rss-delta-mb=${tier.shadowAuditMaxRssDeltaMb}`,
+        ]),
+      }),
+      ...(tierName === 'edge-release-ci'
+        ? [
+            Object.freeze({
+              name: 'legacy-shadow-terminal-standalone',
+              script: path.join(
+                root,
+                'scripts/ql3-legacy-shadow-resource-rollback.cjs',
+              ),
+              args: Object.freeze([
+                '--json',
+                '--require-compiled',
+                '--profile=standalone',
+                '--mode=audit-only',
+                `--samples=${tier.shadowAuditSamples}`,
+                `--max-audit-p95-ms=${tier.shadowAuditMaxP95Ms}`,
+                `--max-rss-delta-mb=${tier.shadowAuditMaxRssDeltaMb}`,
+              ]),
+            }),
+          ]
+        : []),
     ]);
   }
   return Object.freeze([
@@ -656,10 +730,11 @@ function main() {
       pidsMax: after.pidsMax,
       noNewPrivileges: after.noNewPrivileges,
       seccompMode: after.seccompMode,
-      rootReadOnly: after.mounts.get('/')?.includes('ro') ?? false,
-      workspaceReadOnly:
-        after.mounts.get('/workspace')?.includes('ro') ?? false,
-      tmpWritable: after.mounts.get('/tmp')?.includes('rw') ?? false,
+      rootReadOnly:
+        mountOptionsForPath(after.mounts, '/')?.includes('ro') ?? false,
+      workspaceReadOnly: isPathTreeReadOnly(after.mounts, '/workspace'),
+      tmpWritable:
+        mountOptionsForPath(after.mounts, '/tmp')?.includes('rw') ?? false,
       memoryEventsBefore: before.memoryEvents,
       memoryEventsAfter: after.memoryEvents,
     },
@@ -679,6 +754,8 @@ module.exports = {
   RESOURCE_TIERS,
   QingLong3LinuxResourceGateError,
   createWorkloadPlans,
+  isPathTreeReadOnly,
+  mountOptionsForPath,
   parseArguments,
   parseCpuMax,
   parseKeyValueFile,
