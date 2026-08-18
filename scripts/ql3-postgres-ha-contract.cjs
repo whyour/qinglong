@@ -375,6 +375,11 @@ const {
   verifyPromotedNonEmptyToolResult,
 } = require('./ql3-postgres-ha-tool-result-fixture.cjs');
 const {
+  cancellationDispatchFacts,
+  persistCancellationDispatchHaFixture,
+  verifyPromotedCancellationDispatchHaFixture,
+} = require('./ql3-postgres-ha-cancellation-dispatch-fixture.cjs');
+const {
   activateInstall,
   pluginPackageTaskReconciliationFixture,
   publisherProvenanceInstallRepository,
@@ -11399,6 +11404,7 @@ async function main(argv = process.argv.slice(2)) {
   let runAttemptLogRetentionEvidence;
   let runAttemptLogRetention;
   let manualRunRetry;
+  let cancellationDispatch;
   const startedAt = performance.now();
   const timeline = [];
   let report;
@@ -11770,6 +11776,18 @@ async function main(argv = process.argv.slice(2)) {
     });
     timeline.push({
       state: 'durable_identity_keyset_ledger_verified',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    cancellationDispatch = await persistCancellationDispatchHaFixture({
+      migrationPool: primaryDatabase.pool,
+      runtimeConnectionString: databaseUrl(
+        RUNTIME_USER,
+        RUNTIME_PASSWORD,
+        primaryPort,
+      ),
+    });
+    timeline.push({
+      state: 'cancellation_dispatch_fenced_on_primary',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     await primaryDatabase.pool.query(
@@ -12409,6 +12427,14 @@ async function main(argv = process.argv.slice(2)) {
       );
       return marker.rows[0]?.count === 1 ? marker.rows[0] : null;
     }, 'pre-promotion marker WAL replay');
+    await waitFor(async () => {
+      const facts = await cancellationDispatchFacts(standbyDatabase.pool);
+      return JSON.stringify(facts) ===
+        JSON.stringify(cancellationDispatch.beforePromotion)
+        ? facts
+        : null;
+    }, 'cancellation dispatch WAL replay');
+    cancellationDispatch.replicatedBeforePromotion = true;
     const projectToolSnapshotProjectId = 'ha-tool-snapshot';
     await primaryDatabase.pool.query(
       `INSERT INTO "ql3"."projects" (
@@ -12993,6 +13019,15 @@ async function main(argv = process.argv.slice(2)) {
     modelInvocationFeaturePromotion.afterPromotion =
       promotedModelInvocationFeature;
     modelInvocationFeaturePromotion.survivedPromotion = true;
+    await verifyPromotedCancellationDispatchHaFixture({
+      promotedPool: promotedDatabase.pool,
+      runtimeConnectionString: databaseUrl(
+        RUNTIME_USER,
+        RUNTIME_PASSWORD,
+        standbyPort,
+      ),
+      evidence: cancellationDispatch,
+    });
     const promotedCopilotFailureDiagnosisAdmission =
       await copilotFailureDiagnosisAdmissionFacts(
         promotedDatabase.pool,
@@ -13788,8 +13823,10 @@ async function main(argv = process.argv.slice(2)) {
     ]);
     const sideEffects = await promotedDatabase.pool.query(
       `SELECT
-         (SELECT count(*)::integer FROM "ql3"."runs") AS runs,
-         (SELECT count(*)::integer FROM "ql3"."run_events") AS "runEvents",
+         (SELECT count(*)::integer FROM "ql3"."runs"
+           WHERE id <> $3) AS runs,
+         (SELECT count(*)::integer FROM "ql3"."run_events"
+           WHERE run_id <> $3) AS "runEvents",
          (SELECT count(*)::integer
             FROM "ql3"."runs"
            WHERE id IN ($1, $2)) AS "diagnosisReadRuns",
@@ -13801,6 +13838,7 @@ async function main(argv = process.argv.slice(2)) {
       [
         copilotFailureDiagnosisRead.sourceRunId,
         copilotFailureDiagnosisRead.runId,
+        cancellationDispatch.fixture.runId,
       ],
     );
     assert.deepEqual(sideEffects.rows, [
@@ -13879,6 +13917,7 @@ async function main(argv = process.argv.slice(2)) {
         unexpectedDomainSideEffects: 0,
       },
       manualRunRetry: manualRunRetry.report,
+      cancellationDispatch,
       transactionWindows: {
         ambiguousCommit: {
           clientObservedFailure: ambiguousCommitClientRejected,
@@ -13934,6 +13973,16 @@ async function main(argv = process.argv.slice(2)) {
       runAttemptLogRetention,
       timeline,
       gates: {
+        cancellationDispatchUsesDatabaseTimeAndExactFences:
+          cancellationDispatch.databaseTimed &&
+          cancellationDispatch.crossPoolClaimExactlyOnce &&
+          cancellationDispatch.rawLeaseTokenNeverStored &&
+          cancellationDispatch.expiredLeaseTakenOver &&
+          cancellationDispatch.staleLeaseFenced &&
+          cancellationDispatch.retryDeferredUntilDue,
+        cancellationDispatchReplicatesAndSurvivesPromotion:
+          cancellationDispatch.replicatedBeforePromotion &&
+          cancellationDispatch.survivedPromotion,
         runAttemptLogRetentionLeaseTakeoverAndTombstoneConverge:
           runAttemptLogRetention.replicatedBeforePromotion &&
           runAttemptLogRetention.stalePrimarySettlementFenced &&

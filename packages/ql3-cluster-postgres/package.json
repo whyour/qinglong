@@ -85,6 +85,11 @@
       "require": "./dist/entrypoints/runManager.js",
       "default": "./dist/entrypoints/runManager.js"
     },
+    "./cancellation-dispatch": {
+      "types": "./dist/run/cancellationDispatchRepository.d.ts",
+      "require": "./dist/run/cancellationDispatchRepository.js",
+      "default": "./dist/run/cancellationDispatchRepository.js"
+    },
     "./approval-manager": {
       "types": "./dist/approval-management/index.d.ts",
       "require": "./dist/approval-management/index.js",

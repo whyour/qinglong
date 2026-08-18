@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import {
   DataTypes,
   Model,
@@ -55,6 +56,19 @@ const BLOCKING_RESULTS: readonly CancellationDispatchResult[] = [
   'unsupported',
   'invalid',
 ];
+const MAX_LEASE_DURATION_MS = 5 * 60_000;
+const MAX_RETRY_DELAY_MS = 24 * 60 * 60_000;
+
+export interface LegacySequelizeCancellationDispatchRepositoryOptions {
+  clock?: () => number;
+}
+
+function digestLeaseToken(value: string): string {
+  return createHash('sha256')
+    .update('qinglong.cancellation-dispatch-lease.v1\0', 'utf8')
+    .update(value, 'utf8')
+    .digest('hex');
+}
 
 interface CancellationDispatchRow {
   runId: string;
@@ -287,18 +301,13 @@ function assertClaim(command: ClaimCancellationDispatchCommand): void {
   assertId('owner', command.owner, 128);
   assertId('leaseToken', command.leaseToken, 128);
   assertTimestamp('requestedAtMs', command.requestedAtMs);
-  assertTimestamp('nowMs', command.nowMs);
   if (
     !Number.isSafeInteger(command.leaseDurationMs) ||
-    command.leaseDurationMs < 1
+    command.leaseDurationMs < 1 ||
+    command.leaseDurationMs > MAX_LEASE_DURATION_MS
   ) {
     throw new InvalidCancellationDispatchCommandError(
-      'leaseDurationMs must be a positive safe integer',
-    );
-  }
-  if (!Number.isSafeInteger(command.nowMs + command.leaseDurationMs)) {
-    throw new InvalidCancellationDispatchCommandError(
-      'lease expiry exceeds the supported range',
+      `leaseDurationMs must be between 1 and ${MAX_LEASE_DURATION_MS}`,
     );
   }
 }
@@ -311,7 +320,6 @@ function assertRecordResult(
   assertId('owner', command.owner, 128);
   assertId('leaseToken', command.leaseToken, 128);
   assertId('eventId', command.eventId);
-  assertTimestamp('atMs', command.atMs);
   if (
     !Number.isSafeInteger(command.expectedVersion) ||
     command.expectedVersion < 1
@@ -327,17 +335,18 @@ function assertRecordResult(
   }
   if (RETRYABLE_RESULTS.includes(command.result)) {
     if (
-      command.nextAttemptAtMs === undefined ||
-      !Number.isSafeInteger(command.nextAttemptAtMs) ||
-      command.nextAttemptAtMs <= command.atMs
+      command.retryDelayMs === undefined ||
+      !Number.isSafeInteger(command.retryDelayMs) ||
+      command.retryDelayMs < 1 ||
+      command.retryDelayMs > MAX_RETRY_DELAY_MS
     ) {
       throw new InvalidCancellationDispatchCommandError(
-        'retryable results require nextAttemptAtMs greater than atMs',
+        `retryable results require retryDelayMs between 1 and ${MAX_RETRY_DELAY_MS}`,
       );
     }
-  } else if (command.nextAttemptAtMs !== undefined) {
+  } else if (command.retryDelayMs !== undefined) {
     throw new InvalidCancellationDispatchCommandError(
-      'terminal results must not include nextAttemptAtMs',
+      'terminal results must not include retryDelayMs',
     );
   }
 }
@@ -417,7 +426,9 @@ function rowToDispatch(
       ? {}
       : { nextAttemptAtMs: Number(row.nextAttemptAtMs) }),
     ...(row.leaseOwner === null ? {} : { leaseOwner: row.leaseOwner }),
-    ...(row.leaseToken === null ? {} : { leaseToken: row.leaseToken }),
+    ...(row.leaseToken === null
+      ? {}
+      : { leaseTokenDigest: digestLeaseToken(row.leaseToken) }),
     ...(row.leaseExpiresAtMs === null
       ? {}
       : { leaseExpiresAtMs: Number(row.leaseExpiresAtMs) }),
@@ -447,12 +458,15 @@ function withoutScheduleAndLease(
   dispatch: CancellationDispatchRecord,
 ): Omit<
   CancellationDispatchRecord,
-  'nextAttemptAtMs' | 'leaseOwner' | 'leaseToken' | 'leaseExpiresAtMs'
+  | 'nextAttemptAtMs'
+  | 'leaseOwner'
+  | 'leaseTokenDigest'
+  | 'leaseExpiresAtMs'
 > {
   const {
     nextAttemptAtMs: _nextAttemptAtMs,
     leaseOwner: _leaseOwner,
-    leaseToken: _leaseToken,
+    leaseTokenDigest: _leaseTokenDigest,
     leaseExpiresAtMs: _leaseExpiresAtMs,
     ...rest
   } = dispatch;
@@ -466,12 +480,17 @@ export class LegacySequelizeCancellationDispatchRepository
   private readonly run: ModelStatic<CancellationDispatchRunInstance>;
   private readonly attempt: ModelStatic<CancellationDispatchAttemptInstance>;
   private readonly event: ModelStatic<CancellationDispatchEventInstance>;
+  private readonly clock: () => number;
 
-  constructor(private readonly database: Sequelize) {
+  constructor(
+    private readonly database: Sequelize,
+    options: LegacySequelizeCancellationDispatchRepositoryOptions = {},
+  ) {
     this.dispatch = defineDispatchModel(database);
     this.run = defineRunModel(database);
     this.attempt = defineAttemptModel(database);
     this.event = defineEventModel(database);
+    this.clock = options.clock ?? Date.now;
   }
 
   async findByRunId(runId: string): Promise<CancellationDispatchRecord | null> {
@@ -489,6 +508,7 @@ export class LegacySequelizeCancellationDispatchRepository
     return this.database.transaction(
       { type: Transaction.TYPES.IMMEDIATE },
       async (transaction) => {
+        const nowMs = this.now();
         const [run, attempt] = await Promise.all([
           this.run.findByPk(command.runId, { raw: true, transaction }),
           this.attempt.findByPk(command.attemptId, { raw: true, transaction }),
@@ -530,8 +550,8 @@ export class LegacySequelizeCancellationDispatchRepository
                 leaseExpiresAtMs: null,
                 lastResult: null,
                 lastDispatchedAtMs: null,
-                createdAtMs: command.nowMs,
-                updatedAtMs: command.nowMs,
+                createdAtMs: nowMs,
+                updatedAtMs: nowMs,
               },
               { transaction },
             );
@@ -556,21 +576,26 @@ export class LegacySequelizeCancellationDispatchRepository
         if (
           dispatch.status === 'leased' &&
           dispatch.leaseExpiresAtMs !== undefined &&
-          dispatch.leaseExpiresAtMs > command.nowMs
+          dispatch.leaseExpiresAtMs > nowMs
         ) {
           return { status: 'leased', dispatch };
         }
         if (
           dispatch.status !== 'leased' &&
           dispatch.nextAttemptAtMs !== undefined &&
-          dispatch.nextAttemptAtMs > command.nowMs
+          dispatch.nextAttemptAtMs > nowMs
         ) {
           return { status: 'not_due', dispatch };
         }
 
         const nextVersion = dispatch.version + 1;
         const nextCount = dispatch.dispatchCount + 1;
-        const leaseExpiresAtMs = command.nowMs + command.leaseDurationMs;
+        const leaseExpiresAtMs = nowMs + command.leaseDurationMs;
+        if (!Number.isSafeInteger(leaseExpiresAtMs)) {
+          throw new CancellationDispatchRepositoryError(
+            new Error('Cancellation dispatch lease expiry overflowed'),
+          );
+        }
         const [affected] = await this.dispatch.update(
           {
             status: 'leased',
@@ -580,7 +605,7 @@ export class LegacySequelizeCancellationDispatchRepository
             leaseOwner: command.owner,
             leaseToken: command.leaseToken,
             leaseExpiresAtMs,
-            updatedAtMs: command.nowMs,
+            updatedAtMs: nowMs,
           },
           {
             where: { runId: command.runId, version: dispatch.version },
@@ -592,15 +617,16 @@ export class LegacySequelizeCancellationDispatchRepository
         }
         return {
           status: 'claimed',
+          leaseToken: command.leaseToken,
           dispatch: {
             ...withoutScheduleAndLease(dispatch),
             status: 'leased',
             version: nextVersion,
             dispatchCount: nextCount,
             leaseOwner: command.owner,
-            leaseToken: command.leaseToken,
+            leaseTokenDigest: digestLeaseToken(command.leaseToken),
             leaseExpiresAtMs,
-            updatedAtMs: command.nowMs,
+            updatedAtMs: nowMs,
           },
         };
       },
@@ -614,6 +640,7 @@ export class LegacySequelizeCancellationDispatchRepository
     return this.database.transaction(
       { type: Transaction.TYPES.IMMEDIATE },
       async (transaction) => {
+        const atMs = this.now();
         const row = (await this.dispatch.findByPk(command.runId, {
           raw: true,
           transaction,
@@ -644,6 +671,18 @@ export class LegacySequelizeCancellationDispatchRepository
         ].includes(command.result);
         const nextVersion = row.version + 1;
         const nextSequence = Number(run.eventSequence) + 1;
+        const nextAttemptAtMs =
+          command.retryDelayMs === undefined
+            ? undefined
+            : atMs + command.retryDelayMs;
+        if (
+          nextAttemptAtMs !== undefined &&
+          !Number.isSafeInteger(nextAttemptAtMs)
+        ) {
+          throw new CancellationDispatchRepositoryError(
+            new Error('Cancellation dispatch retry deadline overflowed'),
+          );
+        }
         const [runAffected] = await this.run.update(
           { version: Number(run.version) + 1, eventSequence: nextSequence },
           { where: { id: command.runId, version: run.version }, transaction },
@@ -655,15 +694,15 @@ export class LegacySequelizeCancellationDispatchRepository
           {
             status: state.status,
             version: nextVersion,
-            nextAttemptAtMs: command.nextAttemptAtMs ?? null,
+            nextAttemptAtMs: nextAttemptAtMs ?? null,
             leaseOwner: null,
             leaseToken: null,
             leaseExpiresAtMs: null,
             lastResult: command.result,
             lastDispatchedAtMs: controllerInvoked
-              ? command.atMs
+              ? atMs
               : row.lastDispatchedAtMs,
-            updatedAtMs: command.atMs,
+            updatedAtMs: atMs,
           },
           {
             where: {
@@ -694,7 +733,7 @@ export class LegacySequelizeCancellationDispatchRepository
             dispatch_count: row.dispatchCount,
             result: command.result,
           },
-          createdAtMs: command.atMs,
+          createdAtMs: atMs,
         };
         await this.event.create(
           {
@@ -716,20 +755,30 @@ export class LegacySequelizeCancellationDispatchRepository
             ...withoutScheduleAndLease(rowToDispatch(row)),
             status: state.status,
             version: nextVersion,
-            ...(command.nextAttemptAtMs === undefined
+            ...(nextAttemptAtMs === undefined
               ? {}
-              : { nextAttemptAtMs: command.nextAttemptAtMs }),
+              : { nextAttemptAtMs }),
             lastResult: command.result,
             ...(controllerInvoked
-              ? { lastDispatchedAtMs: command.atMs }
+              ? { lastDispatchedAtMs: atMs }
               : row.lastDispatchedAtMs === null
               ? {}
               : { lastDispatchedAtMs: Number(row.lastDispatchedAtMs) }),
-            updatedAtMs: command.atMs,
+            updatedAtMs: atMs,
           },
           event,
         };
       },
     );
+  }
+
+  private now(): number {
+    const nowMs = this.clock();
+    if (!Number.isSafeInteger(nowMs) || nowMs < 0) {
+      throw new CancellationDispatchRepositoryError(
+        new Error('Cancellation dispatch repository clock is invalid'),
+      );
+    }
+    return nowMs;
   }
 }

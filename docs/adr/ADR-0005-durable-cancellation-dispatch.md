@@ -1,6 +1,6 @@
 # ADR-0005：Durable Cancellation Dispatch、Lease 与 Fencing
 
-- 状态：Proposed
+- 状态：Accepted（Local 与 PostgreSQL Repository 已实现；Cluster 生产启动拓扑待接入）
 - 日期：2026-07-18
 - 决策范围：跨进程取消派发、崩溃恢复、并发 Worker、退避和审计事件
 - 关联：QL-RFC-0001、ADR-0001、ADR-0003、ADR-0004
@@ -30,7 +30,7 @@ version                 non-negative integer
 dispatch_count          non-negative integer
 next_attempt_at_ms      nullable
 lease_owner             nullable
-lease_token             nullable
+lease_token_digest      nullable
 lease_expires_at_ms     nullable
 last_result             nullable
 last_dispatched_at_ms   nullable
@@ -49,9 +49,9 @@ Worker 对唯一 active Attempt 执行原子 claim：
 3. 不存在 dispatch 时创建 `pending`，绑定该 Attempt。
 4. 既有记录绑定其他 Attempt 时 fail closed，不重新绑定或选择“最新 PID”。
 5. `dispatched`、`blocked` 不再 claim；未到 `next_attempt_at_ms` 返回 not-due；未过期 lease 返回 leased。
-6. 到期或可派发时，以 version CAS 更新为 leased，递增 version 和 dispatch_count，写入新的 owner、不可预测 token 和 expiry。
+6. 到期或可派发时，以 version CAS 更新为 leased，递增 version 和 dispatch_count，写入新的 owner、domain-separated SHA-256 token digest 和 expiry；原始 token 只随成功 claim 返回给当前调用者，不进入 durable record。
 
-SQLite adapter 使用短 `IMMEDIATE` 事务串行化写竞争。PostgreSQL adapter 必须提供等价的行锁或条件更新语义；实现方式可以不同，行为契约不得改变。
+Repository 是租约、到期与退避的时间 authority。调用方只提交已有 `cancel_requested_at_ms` 事实、lease duration 或 retry delay，不得提交“当前时间”、lease expiry 或绝对 retry timestamp。SQLite adapter 使用注入 clock 与短 `IMMEDIATE` 事务串行化写竞争；PostgreSQL adapter 使用 `transaction_timestamp()`，按 Run→Attempt→CancellationDispatch 顺序取行锁。实现方式可以不同，行为契约不得改变。
 
 ### 2.3 发出副作用
 
@@ -67,7 +67,7 @@ SQLite adapter 使用短 `IMMEDIATE` 事务串行化写竞争。PostgreSQL adapt
 
 ### 2.4 Result 事务与 fencing
 
-结果提交必须同时匹配 run ID、attempt ID、lease owner、lease token 和 expected dispatch version。任何一项过期都拒绝写入。
+结果提交必须同时匹配 run ID、attempt ID、lease owner、原始 lease token 的 digest 和 expected dispatch version。任何一项过期都拒绝写入。
 
 同一事务中：
 
@@ -99,7 +99,7 @@ lease 到期后其他 Worker 可以重新 claim。重试仍必须执行完整身
 
 ### 2.6 退避与 Supervisor
 
-首版退避为 `min(max, base * 2^(dispatch_count-1))`，指数有上限。Repository 持久化绝对 `next_attempt_at_ms`，进程重启不会清空退避。
+首版退避为 `min(max, base * 2^(dispatch_count-1))`，指数有上限。调用方只提交有硬上限的 `retryDelayMs`，Repository 依据自身时间计算并持久化绝对 `next_attempt_at_ms`，进程重启不会清空退避。
 
 Supervisor 一次只执行有界 cycle：
 
@@ -151,15 +151,14 @@ PID 可复用，可能终止无关进程，禁止。
 
 ## 5. 当前孵化边界
 
-`next` 已实现 `0005-run-cancellation-dispatch`、Repository 端口、临时 Sequelize/SQLite adapter、lease expiry 接管、fencing、退避、结果事件、Dispatcher、有界 Supervisor 和默认惰性的 lifecycle runner，并覆盖双 Worker、崩溃接管、事务回滚、无重叠调度和有界 shutdown 测试。
+`next` 已实现 profile-neutral canonical contract、`0005-run-cancellation-dispatch`、legacy Sequelize/SQLite adapter、PostgreSQL `pg-0066-cancellation-dispatch`/capability v65 adapter、lease expiry 接管、fencing、退避、结果事件、Dispatcher、有界 Supervisor 和默认惰性的 lifecycle runner。PostgreSQL 结果事务按 Run→Attempt→dispatch 锁序完成 dispatch 更新、Run version CAS 与 RunEvent 追加；runtime 角色只取得新表的 SELECT/INSERT/UPDATE。
 
-HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入该 Supervisor：只有 accepted 且全部 gate 通过时才启动，失败或 shutdown 时有界停止。以下工作仍未完成，因此它仍只允许显式 canary，不得扩大到默认生产流量：
+HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入 Local Supervisor：只有 accepted 且全部 gate 通过时才启动，失败或 shutdown 时有界停止。以下工作仍未完成，因此它仍只允许显式 canary，不得扩大到默认生产流量：
 
-- PostgreSQL adapter 与真实多连接并发压力测试。
-- ADR-0007 的 completion receipt、direct-file log、CompletionService 与周期 completion supervisor（timeout lifecycle 已接入）。
 - 用户可见的运行指标、blocked 诊断和处置入口。
 - 固定 edge 设备的数据库写放大、RSS、时延和磁盘基准。
-- 与 rollout manifest、回滚 runbook 和运维告警的最终接线。
+- cluster-control 对 PostgreSQL CancellationDispatch 的生产启动/停止拓扑与运维告警接线。
+- 首次真实目标实例完整激活/回滚仪式与共享 config 多写者 authority。
 
 ## 6. 验证门禁
 
@@ -173,3 +172,5 @@ HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入该 Su
 8. identity/PID/process-group 不一致时零 signal。
 9. page、cycle 和退避均有硬上限。
 10. Event 与日志不包含 handle、命令、环境和 Secret。
+11. PostgreSQL 双连接只能产生一个 claim winner，raw token 不落库，数据库时间决定 lease/retry 到期。
+12. v65 事实经 WAL 到达 standby，提升为新 Primary 后仍可读取；旧 owner/token/version 继续被 fencing。

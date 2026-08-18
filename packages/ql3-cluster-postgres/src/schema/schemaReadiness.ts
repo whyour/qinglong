@@ -588,6 +588,12 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: true,
     delete: false,
   }),
+  run_cancellation_dispatches: Object.freeze({
+    select: true,
+    insert: true,
+    update: true,
+    delete: false,
+  }),
   run_attempt_log_retention_controls: Object.freeze({
     select: true,
     insert: true,
@@ -1126,6 +1132,12 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     delete: false,
   }),
   run_attempts: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  run_cancellation_dispatches: Object.freeze({
     select: false,
     insert: false,
     update: false,

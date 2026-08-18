@@ -39,6 +39,7 @@ function fakeDispatchRepository(overrides = {}) {
       if (overrides.claim) return overrides.claim(command);
       return {
         status: 'claimed',
+        leaseToken: command.leaseToken,
         dispatch: {
           runId: command.runId,
           attemptId: command.attemptId,
@@ -46,10 +47,10 @@ function fakeDispatchRepository(overrides = {}) {
           version: 1,
           dispatchCount: 1,
           leaseOwner: command.owner,
-          leaseToken: command.leaseToken,
-          leaseExpiresAtMs: command.nowMs + command.leaseDurationMs,
-          createdAtMs: command.nowMs,
-          updatedAtMs: command.nowMs,
+          leaseTokenDigest: 'a'.repeat(64),
+          leaseExpiresAtMs: NOW_MS + command.leaseDurationMs,
+          createdAtMs: NOW_MS,
+          updatedAtMs: NOW_MS,
         },
       };
     },
@@ -60,12 +61,12 @@ function fakeDispatchRepository(overrides = {}) {
         dispatch: {
           runId: command.runId,
           attemptId: command.attemptId,
-          status: command.nextAttemptAtMs ? 'retry_wait' : 'dispatched',
+          status: command.retryDelayMs ? 'retry_wait' : 'dispatched',
           version: command.expectedVersion + 1,
           dispatchCount: 1,
           lastResult: command.result,
           createdAtMs: NOW_MS,
-          updatedAtMs: command.atMs,
+          updatedAtMs: NOW_MS,
         },
         event: {
           id: command.eventId,
@@ -74,7 +75,7 @@ function fakeDispatchRepository(overrides = {}) {
           type: 'fixture',
           actorType: 'worker',
           payload: {},
-          createdAtMs: command.atMs,
+          createdAtMs: NOW_MS,
         },
       };
     },
@@ -88,7 +89,6 @@ function dispatcherOptions(overrides = {}) {
     leaseDurationMs: 100,
     retryBaseMs: 1_000,
     retryMaxMs: 8_000,
-    clock: () => NOW_MS,
     createId: () => `019f71d0-0000-7000-8000-${String(++id).padStart(12, '0')}`,
     ...overrides,
   };
@@ -149,7 +149,7 @@ test('leases before signalling and durably classifies every controller result', 
             version: 3,
             dispatchCount: 2,
             leaseOwner: 'worker-b',
-            leaseToken: 'other-lease',
+            leaseTokenDigest: 'b'.repeat(64),
             leaseExpiresAtMs: NOW_MS + 1_000,
             createdAtMs: NOW_MS - 5_000,
             updatedAtMs: NOW_MS - 100,
@@ -158,6 +158,7 @@ test('leases before signalling and durably classifies every controller result', 
       }
       return {
         status: 'claimed',
+        leaseToken: command.leaseToken,
         dispatch: {
           runId: command.runId,
           attemptId: command.attemptId,
@@ -165,10 +166,10 @@ test('leases before signalling and durably classifies every controller result', 
           version: 1,
           dispatchCount: 1,
           leaseOwner: command.owner,
-          leaseToken: command.leaseToken,
-          leaseExpiresAtMs: command.nowMs + command.leaseDurationMs,
-          createdAtMs: command.nowMs,
-          updatedAtMs: command.nowMs,
+          leaseTokenDigest: 'a'.repeat(64),
+          leaseExpiresAtMs: NOW_MS + command.leaseDurationMs,
+          createdAtMs: NOW_MS,
+          updatedAtMs: NOW_MS,
         },
       };
     },
@@ -243,8 +244,8 @@ test('leases before signalling and durably classifies every controller result', 
   );
   assert.equal(
     dispatches.results.find((result) => result.result === 'dispatch_error')
-      .nextAttemptAtMs,
-    NOW_MS + 1_000,
+      .retryDelayMs,
+    1_000,
   );
 });
 

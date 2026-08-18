@@ -219,6 +219,7 @@ function runtimePrivileges() {
     plugin_package_workflow_task_attempt_admissions: [true, true, false, false],
     worker_execution_attestations: [true, false, false, false],
     run_events: [true, true, false, false],
+    run_cancellation_dispatches: [true, true, true, false],
     run_retry_policies: [true, true, true, false],
   };
   return Object.entries(privileges).map(

@@ -35,7 +35,6 @@ export interface PrimaryCancellationDispatcherOptions {
   leaseDurationMs?: number;
   retryBaseMs?: number;
   retryMaxMs?: number;
-  clock?: () => number;
   createId?: () => string;
 }
 
@@ -55,7 +54,6 @@ export class PrimaryCancellationDispatcher {
   private readonly leaseDurationMs: number;
   private readonly retryBaseMs: number;
   private readonly retryMaxMs: number;
-  private readonly clock: () => number;
   private readonly createId: () => string;
 
   constructor(
@@ -71,7 +69,6 @@ export class PrimaryCancellationDispatcher {
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
     this.retryBaseMs = options.retryBaseMs ?? DEFAULT_RETRY_BASE_MS;
     this.retryMaxMs = options.retryMaxMs ?? DEFAULT_RETRY_MAX_MS;
-    this.clock = options.clock ?? Date.now;
     this.createId = options.createId ?? uuidV7;
     assertPositiveInteger('leaseDurationMs', this.leaseDurationMs);
     assertPositiveInteger('retryBaseMs', this.retryBaseMs);
@@ -130,7 +127,6 @@ export class PrimaryCancellationDispatcher {
       }
 
       const attempt = candidate.attempts[0];
-      const claimedAtMs = this.now();
       let claim;
       try {
         claim = await this.dispatches.claim({
@@ -139,7 +135,6 @@ export class PrimaryCancellationDispatcher {
           requestedAtMs: candidate.requestedAtMs,
           owner: this.owner,
           leaseToken: this.createId(),
-          nowMs: claimedAtMs,
           leaseDurationMs: this.leaseDurationMs,
         });
       } catch {
@@ -165,6 +160,11 @@ export class PrimaryCancellationDispatcher {
         summary.blocked += 1;
         continue;
       }
+      if (claim.status !== 'claimed') {
+        summary.failed += 1;
+        summary.pending += 1;
+        continue;
+      }
 
       summary.claimed += 1;
       await this.dispatchClaimed(
@@ -172,6 +172,7 @@ export class PrimaryCancellationDispatcher {
         candidate.requestedAtMs,
         attempt,
         claim.dispatch,
+        claim.leaseToken,
         summary,
       );
     }
@@ -186,15 +187,28 @@ export class PrimaryCancellationDispatcher {
       Awaited<ReturnType<CancellationDispatchRepository['claim']>>,
       { status: 'claimed' }
     >['dispatch'],
+    leaseToken: string,
     summary: PrimaryCancellationDispatchSummary,
   ): Promise<void> {
     const controller = this.controllers.get(attempt.executorType);
     if (!controller) {
-      await this.record(attempt, dispatch, 'controller_missing', summary);
+      await this.record(
+        attempt,
+        dispatch,
+        leaseToken,
+        'controller_missing',
+        summary,
+      );
       return;
     }
     if (!attempt.executorHandle) {
-      await this.record(attempt, dispatch, 'handle_missing', summary);
+      await this.record(
+        attempt,
+        dispatch,
+        leaseToken,
+        'handle_missing',
+        summary,
+      );
       return;
     }
 
@@ -207,7 +221,7 @@ export class PrimaryCancellationDispatcher {
           requestedAtMs,
         },
       });
-      await this.record(attempt, dispatch, result.status, summary);
+      await this.record(attempt, dispatch, leaseToken, result.status, summary);
       if (result.status === 'termination_requested') {
         summary.terminationRequested += 1;
       } else if (result.status === 'already_exited') {
@@ -217,7 +231,13 @@ export class PrimaryCancellationDispatcher {
       }
     } catch {
       summary.failed += 1;
-      await this.record(attempt, dispatch, 'dispatch_error', summary);
+      await this.record(
+        attempt,
+        dispatch,
+        leaseToken,
+        'dispatch_error',
+        summary,
+      );
     }
   }
 
@@ -227,10 +247,10 @@ export class PrimaryCancellationDispatcher {
       Awaited<ReturnType<CancellationDispatchRepository['claim']>>,
       { status: 'claimed' }
     >['dispatch'],
+    leaseToken: string,
     result: CancellationDispatchResult,
     summary: PrimaryCancellationDispatchSummary,
   ): Promise<void> {
-    const atMs = this.now();
     const retryable = [
       'controller_missing',
       'handle_missing',
@@ -241,12 +261,11 @@ export class PrimaryCancellationDispatcher {
         runId: dispatch.runId,
         attemptId: attempt.attemptId,
         owner: this.owner,
-        leaseToken: dispatch.leaseToken!,
+        leaseToken,
         expectedVersion: dispatch.version,
         result,
-        atMs,
         ...(retryable
-          ? { nextAttemptAtMs: this.nextRetryAt(atMs, dispatch.dispatchCount) }
+          ? { retryDelayMs: this.nextRetryDelay(dispatch.dispatchCount) }
           : {}),
         eventId: this.createId(),
       });
@@ -257,17 +276,8 @@ export class PrimaryCancellationDispatcher {
     }
   }
 
-  private nextRetryAt(atMs: number, dispatchCount: number): number {
+  private nextRetryDelay(dispatchCount: number): number {
     const exponent = Math.max(0, Math.min(dispatchCount - 1, 30));
-    const delay = Math.min(this.retryMaxMs, this.retryBaseMs * 2 ** exponent);
-    return Math.min(Number.MAX_SAFE_INTEGER, atMs + delay);
-  }
-
-  private now(): number {
-    const nowMs = this.clock();
-    if (!Number.isSafeInteger(nowMs) || nowMs < 0) {
-      throw new RangeError('clock must return a non-negative safe integer');
-    }
-    return nowMs;
+    return Math.min(this.retryMaxMs, this.retryBaseMs * 2 ** exponent);
   }
 }

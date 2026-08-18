@@ -32,7 +32,7 @@ export interface CancellationDispatchRecord {
   dispatchCount: number;
   nextAttemptAtMs?: number;
   leaseOwner?: string;
-  leaseToken?: string;
+  leaseTokenDigest?: string;
   leaseExpiresAtMs?: number;
   lastResult?: CancellationDispatchResult;
   lastDispatchedAtMs?: number;

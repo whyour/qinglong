@@ -116,6 +116,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0063-plugin-package-secret-binding-transition-receipts',
       'pg-0064-plugin-package-secret-binding-transition-approval-plans',
       'pg-0065-approved-action-manual-recovery',
+      'pg-0066-cancellation-dispatch',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -578,6 +579,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0065-approved-action-manual-recovery',
       checksum:
         '95387c5b40659490dbcb7626ecd15bacf6412360752bef88873bde57c43e0185',
+    },
+    {
+      id: 'pg-0066-cancellation-dispatch',
+      checksum:
+        'b6d7ac81b5f75530df05f8ef05878fa30aa0f4418363973ded89d14ffce151b2',
     },
   ];
   assert.deepEqual(
@@ -2280,5 +2286,46 @@ test('advances capability v64 with atomic least-privilege manual recovery', asyn
   assert.match(
     sql,
     /migration_id = 'pg-0064-plugin-package-secret-binding-transition-approval-plans'/,
+  );
+});
+
+test('advances capability v65 with database-timed fenced cancellation dispatch', async () => {
+  const migration = migrationById('pg-0066-cancellation-dispatch');
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(
+    sql,
+    /CREATE UNIQUE INDEX ql3_run_attempts_run_id_uidx ON "ql3"\."run_attempts" \(run_id, id\)/,
+  );
+  assert.match(
+    sql,
+    /CREATE TABLE "ql3"\."run_cancellation_dispatches"/,
+  );
+  assert.match(
+    sql,
+    /FOREIGN KEY \(run_id, attempt_id\)[\s\S]+REFERENCES "ql3"\."run_attempts" \(run_id, id\)/,
+  );
+  assert.match(sql, /lease_token_digest char\(64\)/);
+  assert.doesNotMatch(sql, /lease_token varchar/);
+  assert.match(
+    sql,
+    /GRANT SELECT, INSERT, UPDATE ON "ql3"\."run_cancellation_dispatches" TO ql3_runtime/,
+  );
+  assert.doesNotMatch(
+    sql,
+    /GRANT (?:SELECT|INSERT|UPDATE|DELETE)[^;]+run_cancellation_dispatches[^;]+ql3_admin/,
+  );
+  assert.match(sql, /contract_version = 65/);
+  assert.match(sql, /"run_cancellation_dispatch":1/);
+  assert.match(sql, /contract_version = 64/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0065-approved-action-manual-recovery'/,
   );
 });

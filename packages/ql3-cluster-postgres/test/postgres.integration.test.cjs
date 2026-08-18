@@ -33,6 +33,7 @@ const {
   PostgresClusterControlRecoveryResolutionRepository,
   PostgresClusterControlRecoverySource,
   PostgresClusterRunCancellationConvergenceRepository,
+  PostgresCancellationDispatchRepository,
   PostgresClusterScheduleRepository,
   PostgresProjectPolicyRepository,
   PostgresRunRepository,
@@ -41,6 +42,11 @@ const {
   PostgresWorkerSessionRepository,
   PostgresRemoteWorkerAttestationEvidenceProvider,
 } = require('../dist/entrypoints/runtime');
+const {
+  CancellationDispatchBindingConflictError,
+  CancellationDispatchFenceRejectedError,
+  digestCancellationDispatchLeaseToken,
+} = require('@qinglong/runtime-core/cancellation-dispatch');
 const {
   PostgresTaskDefinitionRepository,
   PostgresTriggerRepository,
@@ -787,6 +793,251 @@ if (!migrationConnectionString) {
         close: () => runtimeDatabase.close(),
       };
     },
+  });
+
+  test('PostgreSQL cancellation dispatch fences replicas with database time and atomic events', async () => {
+    const runId = '019f7300-0000-7000-8000-000000000901';
+    const attemptId = '019f7300-0000-7000-8000-000000000902';
+    const secondAttemptId = '019f7300-0000-7000-8000-000000000903';
+    const duplicateEventId = '019f7300-0000-7000-8000-000000000904';
+    const retryEventId = '019f7300-0000-7000-8000-000000000905';
+    const terminalEventId = '019f7300-0000-7000-8000-000000000906';
+    const requestedAtMs = 1_750_000_000_100;
+    const migrationDatabase = await open('migration');
+    let firstDatabase;
+    let secondDatabase;
+    try {
+      await runPostgresMigrations({ pool: migrationDatabase.pool });
+      await migrationDatabase.pool.query(
+        'TRUNCATE TABLE "ql3"."run_events", "ql3"."run_retry_policies", "ql3"."run_attempts", "ql3"."runs" CASCADE',
+      );
+      const before = await migrationDatabase.pool.query(
+        `SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint
+                AS "nowMs"`,
+      );
+      await migrationDatabase.pool.query(
+        `INSERT INTO "ql3"."runs" (
+           id, project_id, task_id, task_revision, trigger_type,
+           execution_origin, execution_owner, status, version,
+           event_sequence, created_at_ms, started_at_ms,
+           cancel_requested_at_ms, cancel_reason
+         ) VALUES (
+           $1, 'default', 'cancellation-integration', 'v1', 'manual',
+           'api', 'runtime', 'running', 2, 0, $2, $2, $3, 'user'
+         )`,
+        [runId, requestedAtMs - 100, requestedAtMs],
+      );
+      await migrationDatabase.pool.query(
+        `INSERT INTO "ql3"."run_attempts" (
+           id, run_id, attempt, status, executor_type, callback_sequence,
+           created_at_ms
+         ) VALUES ($1, $2, 1, 'running', 'local_process', 0, $3)`,
+        [attemptId, runId, requestedAtMs - 50],
+      );
+
+      [firstDatabase, secondDatabase] = await Promise.all([
+        open('runtime'),
+        open('runtime'),
+      ]);
+      const firstRepository = new PostgresCancellationDispatchRepository(
+        firstDatabase.pool,
+      );
+      const secondRepository = new PostgresCancellationDispatchRepository(
+        secondDatabase.pool,
+      );
+      const candidate = {
+        runId,
+        attemptId,
+        requestedAtMs,
+        leaseDurationMs: 10_000,
+      };
+      const [firstClaim, secondClaim] = await Promise.all([
+        firstRepository.claim({
+          ...candidate,
+          owner: 'primary-a',
+          leaseToken: 'lease-a',
+        }),
+        secondRepository.claim({
+          ...candidate,
+          owner: 'primary-b',
+          leaseToken: 'lease-b',
+        }),
+      ]);
+      const claimed = [firstClaim, secondClaim].find(
+        (result) => result.status === 'claimed',
+      );
+      const competing = [firstClaim, secondClaim].find(
+        (result) => result.status !== 'claimed',
+      );
+      assert.equal(claimed?.status, 'claimed');
+      assert.equal(competing?.status, 'leased');
+      assert.equal(claimed.dispatch.version, 1);
+      assert.equal(claimed.dispatch.dispatchCount, 1);
+      assert.equal(claimed.dispatch.createdAtMs >= Number(before.rows[0].nowMs), true);
+      const rawLeaseToken = claimed.leaseToken;
+      const stored = await migrationDatabase.pool.query(
+        `SELECT lease_token_digest AS "leaseTokenDigest",
+                lease_owner AS "leaseOwner", version, dispatch_count
+                AS "dispatchCount"
+           FROM "ql3"."run_cancellation_dispatches" WHERE run_id = $1`,
+        [runId],
+      );
+      assert.equal(
+        stored.rows[0].leaseTokenDigest,
+        digestCancellationDispatchLeaseToken(rawLeaseToken),
+      );
+      assert.notEqual(stored.rows[0].leaseTokenDigest, rawLeaseToken);
+
+      await migrationDatabase.pool.query(
+        `UPDATE "ql3"."run_cancellation_dispatches"
+            SET lease_expires_at_ms = 0 WHERE run_id = $1`,
+        [runId],
+      );
+      const takeover = await secondRepository.claim({
+        ...candidate,
+        owner: 'primary-takeover',
+        leaseToken: 'lease-takeover',
+      });
+      assert.equal(takeover.status, 'claimed');
+      assert.equal(takeover.dispatch.version, 2);
+      assert.equal(takeover.dispatch.dispatchCount, 2);
+      await assert.rejects(
+        firstRepository.recordResult({
+          runId,
+          attemptId,
+          owner: claimed.dispatch.leaseOwner,
+          leaseToken: rawLeaseToken,
+          expectedVersion: claimed.dispatch.version,
+          result: 'already_exited',
+          eventId: terminalEventId,
+        }),
+        CancellationDispatchFenceRejectedError,
+      );
+
+      await migrationDatabase.pool.query(
+        `INSERT INTO "ql3"."run_events" (
+           id, run_id, sequence, type, dedupe_key, actor_type, payload,
+           created_at_ms
+         ) VALUES ($1, $2, 99, 'fixture.event', 'fixture-event', 'system',
+                   '{}'::jsonb, $3)`,
+        [duplicateEventId, runId, requestedAtMs],
+      );
+      await assert.rejects(
+        secondRepository.recordResult({
+          runId,
+          attemptId,
+          owner: 'primary-takeover',
+          leaseToken: 'lease-takeover',
+          expectedVersion: takeover.dispatch.version,
+          result: 'dispatch_error',
+          retryDelayMs: 1_000,
+          eventId: duplicateEventId,
+        }),
+      );
+      const rolledBack = await migrationDatabase.pool.query(
+        `SELECT dispatch.status, dispatch.version, run.version AS "runVersion",
+                run.event_sequence AS "eventSequence"
+           FROM "ql3"."run_cancellation_dispatches" dispatch
+           JOIN "ql3"."runs" run ON run.id = dispatch.run_id
+          WHERE dispatch.run_id = $1`,
+        [runId],
+      );
+      assert.deepEqual(rolledBack.rows, [
+        { status: 'leased', version: 2, runVersion: 2, eventSequence: 0 },
+      ]);
+
+      const retry = await secondRepository.recordResult({
+        runId,
+        attemptId,
+        owner: 'primary-takeover',
+        leaseToken: 'lease-takeover',
+        expectedVersion: takeover.dispatch.version,
+        result: 'dispatch_error',
+        retryDelayMs: 60_000,
+        eventId: retryEventId,
+      });
+      assert.equal(retry.dispatch.status, 'retry_wait');
+      assert.equal(retry.event.type, 'run.cancel_dispatch_failed');
+      assert.equal(
+        (await firstRepository.claim({
+          ...candidate,
+          owner: 'primary-a',
+          leaseToken: 'lease-a-retry',
+        })).status,
+        'not_due',
+      );
+      await migrationDatabase.pool.query(
+        `UPDATE "ql3"."run_cancellation_dispatches"
+            SET next_attempt_at_ms = 0 WHERE run_id = $1`,
+        [runId],
+      );
+      const finalLease = await firstRepository.claim({
+        ...candidate,
+        owner: 'primary-final',
+        leaseToken: 'lease-final',
+      });
+      assert.equal(finalLease.status, 'claimed');
+      assert.equal(finalLease.dispatch.dispatchCount, 3);
+
+      await migrationDatabase.pool.query(
+        `INSERT INTO "ql3"."run_attempts" (
+           id, run_id, attempt, status, executor_type, callback_sequence,
+           created_at_ms
+         ) VALUES ($1, $2, 2, 'running', 'local_process', 0, $3)`,
+        [secondAttemptId, runId, requestedAtMs],
+      );
+      await assert.rejects(
+        secondRepository.claim({
+          ...candidate,
+          attemptId: secondAttemptId,
+          owner: 'primary-conflict',
+          leaseToken: 'lease-conflict',
+        }),
+        CancellationDispatchBindingConflictError,
+      );
+
+      const terminal = await firstRepository.recordResult({
+        runId,
+        attemptId,
+        owner: 'primary-final',
+        leaseToken: 'lease-final',
+        expectedVersion: finalLease.dispatch.version,
+        result: 'already_exited',
+        eventId: terminalEventId,
+      });
+      assert.equal(terminal.dispatch.status, 'dispatched');
+      assert.equal(terminal.event.sequence, 2);
+      assert.deepEqual(terminal.event.payload, {
+        attempt_id: attemptId,
+        dispatch_count: 3,
+        result: 'already_exited',
+      });
+      const durable = await migrationDatabase.pool.query(
+        `SELECT dispatch.status, dispatch.lease_token_digest AS "leaseDigest",
+                dispatch.dispatch_count AS "dispatchCount",
+                run.version AS "runVersion",
+                run.event_sequence AS "eventSequence"
+           FROM "ql3"."run_cancellation_dispatches" dispatch
+           JOIN "ql3"."runs" run ON run.id = dispatch.run_id
+          WHERE dispatch.run_id = $1`,
+        [runId],
+      );
+      assert.deepEqual(durable.rows, [
+        {
+          status: 'dispatched',
+          leaseDigest: null,
+          dispatchCount: 3,
+          runVersion: 4,
+          eventSequence: 2,
+        },
+      ]);
+    } finally {
+      await Promise.allSettled([
+        firstDatabase?.close(),
+        secondDatabase?.close(),
+      ]);
+      await migrationDatabase.close();
+    }
   });
 
   test('PostgreSQL Task Start atomically persists and exactly replays one Run aggregate', async () => {

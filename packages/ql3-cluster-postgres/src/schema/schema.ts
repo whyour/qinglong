@@ -4810,6 +4810,7 @@ export const runAttempts = ql3Schema.table(
       table.runId,
       table.attempt,
     ),
+    uniqueIndex('ql3_run_attempts_run_id_uidx').on(table.runId, table.id),
     index('ql3_run_attempts_dispatch_candidates_idx').on(
       table.status,
       table.runId,
@@ -4827,6 +4828,75 @@ export const runAttempts = ql3Schema.table(
       .where(
         sql`${table.executorType} = 'remote_worker' and ${table.logArtifactId} is not null and ${table.status} in ('succeeded', 'failed', 'cancelled', 'timed_out')`,
       ),
+  ],
+);
+
+export const runCancellationDispatches = ql3Schema.table(
+  'run_cancellation_dispatches',
+  {
+    runId: varchar('run_id', { length: 36 }).primaryKey(),
+    attemptId: varchar('attempt_id', { length: 36 }).notNull(),
+    status: varchar('status', { length: 32 }).notNull(),
+    version: integer('version').notNull(),
+    dispatchCount: integer('dispatch_count').notNull(),
+    nextAttemptAtMs: bigint('next_attempt_at_ms', { mode: 'number' }),
+    leaseOwner: varchar('lease_owner', { length: 128 }),
+    leaseTokenDigest: char('lease_token_digest', { length: 64 }),
+    leaseExpiresAtMs: bigint('lease_expires_at_ms', { mode: 'number' }),
+    lastResult: varchar('last_result', { length: 32 }),
+    lastDispatchedAtMs: bigint('last_dispatched_at_ms', { mode: 'number' }),
+    createdAtMs: bigint('created_at_ms', { mode: 'number' }).notNull(),
+    updatedAtMs: bigint('updated_at_ms', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'ql3_run_cancellation_dispatch_run_fk',
+      columns: [table.runId],
+      foreignColumns: [runs.id],
+    })
+      .onDelete('cascade')
+      .onUpdate('restrict'),
+    foreignKey({
+      name: 'ql3_run_cancellation_dispatch_attempt_fk',
+      columns: [table.runId, table.attemptId],
+      foreignColumns: [runAttempts.runId, runAttempts.id],
+    })
+      .onDelete('cascade')
+      .onUpdate('restrict'),
+    check(
+      'ql3_run_cancellation_dispatch_status_check',
+      sql`${table.status} in ('pending', 'leased', 'retry_wait', 'dispatched', 'blocked')`,
+    ),
+    check(
+      'ql3_run_cancellation_dispatch_result_check',
+      sql`${table.lastResult} is null or ${table.lastResult} in ('termination_requested', 'already_exited', 'identity_mismatch', 'pid_mismatch', 'unsupported', 'invalid', 'controller_missing', 'handle_missing', 'dispatch_error')`,
+    ),
+    check(
+      'ql3_run_cancellation_dispatch_counter_check',
+      sql`${table.version} between 0 and 2147483647 and ${table.dispatchCount} between 0 and 2147483647 and ${table.version} >= ${table.dispatchCount} and ((${table.status} = 'pending' and ${table.version} = 0 and ${table.dispatchCount} = 0) or (${table.status} <> 'pending' and ${table.dispatchCount} >= 1))`,
+    ),
+    check(
+      'ql3_run_cancellation_dispatch_time_check',
+      sql`(${table.nextAttemptAtMs} is null or ${table.nextAttemptAtMs} >= 0) and (${table.leaseExpiresAtMs} is null or ${table.leaseExpiresAtMs} >= 0) and (${table.lastDispatchedAtMs} is null or ${table.lastDispatchedAtMs} >= 0) and ${table.createdAtMs} >= 0 and ${table.updatedAtMs} >= ${table.createdAtMs}`,
+    ),
+    check(
+      'ql3_run_cancellation_dispatch_lease_digest_check',
+      sql`${table.leaseTokenDigest} is null or ${table.leaseTokenDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'ql3_run_cancellation_dispatch_shape_check',
+      sql`(${table.status} = 'leased' and ${table.nextAttemptAtMs} is null and ${table.leaseOwner} is not null and octet_length(${table.leaseOwner}) between 1 and 128 and ${table.leaseOwner} !~ '[[:cntrl:]]' and ${table.leaseTokenDigest} is not null and ${table.leaseExpiresAtMs} is not null) or (${table.status} in ('pending', 'retry_wait') and ${table.nextAttemptAtMs} is not null and ${table.leaseOwner} is null and ${table.leaseTokenDigest} is null and ${table.leaseExpiresAtMs} is null) or (${table.status} in ('dispatched', 'blocked') and ${table.nextAttemptAtMs} is null and ${table.leaseOwner} is null and ${table.leaseTokenDigest} is null and ${table.leaseExpiresAtMs} is null and ${table.lastResult} is not null)`,
+    ),
+    check(
+      'ql3_run_cancellation_dispatch_result_state_check',
+      sql`(${table.status} = 'pending' and ${table.lastResult} is null) or (${table.status} in ('leased', 'retry_wait') and (${table.lastResult} is null or ${table.lastResult} in ('controller_missing', 'handle_missing', 'dispatch_error'))) or (${table.status} = 'dispatched' and ${table.lastResult} in ('termination_requested', 'already_exited')) or (${table.status} = 'blocked' and ${table.lastResult} in ('identity_mismatch', 'pid_mismatch', 'unsupported', 'invalid'))`,
+    ),
+    index('ql3_run_cancellation_dispatch_due_idx')
+      .on(table.nextAttemptAtMs, table.runId)
+      .where(sql`${table.status} in ('pending', 'retry_wait')`),
+    index('ql3_run_cancellation_dispatch_lease_expiry_idx')
+      .on(table.leaseExpiresAtMs, table.runId)
+      .where(sql`${table.status} = 'leased'`),
   ],
 );
 
@@ -6211,6 +6281,7 @@ export const ql3PostgresTables = [
   toolExecutionResultRekeyHeads,
   toolResultKeyRetirementReceipts,
   runAttempts,
+  runCancellationDispatches,
   runAttemptLogRetentionControls,
   runAttemptLogArtifactTombstones,
   workerSessions,

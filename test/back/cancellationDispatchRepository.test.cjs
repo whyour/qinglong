@@ -61,9 +61,15 @@ async function createRepository() {
     logger: { info() {} },
   });
   databases.push(database);
+  let nowMs = 1_750_000_000_100;
   return {
     database,
-    repository: new LegacySequelizeCancellationDispatchRepository(database),
+    repository: new LegacySequelizeCancellationDispatchRepository(database, {
+      clock: () => nowMs,
+    }),
+    setNow(value) {
+      nowMs = value;
+    },
   };
 }
 
@@ -113,7 +119,6 @@ function claim(candidate, overrides = {}) {
     ...candidate,
     owner: 'worker-a',
     leaseToken: 'lease-a',
-    nowMs: candidate.requestedAtMs,
     leaseDurationMs: 50,
     ...overrides,
   };
@@ -124,7 +129,7 @@ afterEach(async () => {
 });
 
 test('fences two workers and lets a second worker recover an expired lease', async () => {
-  const { database, repository } = await createRepository();
+  const { database, repository, setNow } = await createRepository();
   const candidate = await insertCandidate(database);
 
   const first = await repository.claim(claim(candidate));
@@ -133,21 +138,21 @@ test('fences two workers and lets a second worker recover an expired lease', asy
   assert.equal(first.dispatch.dispatchCount, 1);
   assert.equal(first.dispatch.leaseOwner, 'worker-a');
 
+  setNow(candidate.requestedAtMs + 25);
   const competing = await repository.claim(
     claim(candidate, {
       owner: 'worker-b',
       leaseToken: 'lease-b',
-      nowMs: candidate.requestedAtMs + 25,
     }),
   );
   assert.equal(competing.status, 'leased');
   assert.equal(competing.dispatch.leaseOwner, 'worker-a');
 
+  setNow(candidate.requestedAtMs + 50);
   const recovered = await repository.claim(
     claim(candidate, {
       owner: 'worker-b',
       leaseToken: 'lease-b',
-      nowMs: candidate.requestedAtMs + 50,
     }),
   );
   assert.equal(recovered.status, 'claimed');
@@ -155,6 +160,7 @@ test('fences two workers and lets a second worker recover an expired lease', asy
   assert.equal(recovered.dispatch.dispatchCount, 2);
   assert.equal(recovered.dispatch.leaseOwner, 'worker-b');
 
+  setNow(candidate.requestedAtMs + 51);
   await assert.rejects(
     repository.recordResult({
       runId: candidate.runId,
@@ -163,12 +169,12 @@ test('fences two workers and lets a second worker recover an expired lease', asy
       leaseToken: 'lease-a',
       expectedVersion: 1,
       result: 'termination_requested',
-      atMs: candidate.requestedAtMs + 51,
       eventId: nextId(),
     }),
     CancellationDispatchFenceRejectedError,
   );
 
+  setNow(candidate.requestedAtMs + 52);
   const recorded = await repository.recordResult({
     runId: candidate.runId,
     attemptId: candidate.attemptId,
@@ -176,7 +182,6 @@ test('fences two workers and lets a second worker recover an expired lease', asy
     leaseToken: 'lease-b',
     expectedVersion: recovered.dispatch.version,
     result: 'termination_requested',
-    atMs: candidate.requestedAtMs + 52,
     eventId: nextId(),
   });
   assert.equal(recorded.dispatch.status, 'dispatched');
@@ -188,22 +193,23 @@ test('fences two workers and lets a second worker recover an expired lease', asy
     result: 'termination_requested',
   });
 
+  setNow(candidate.requestedAtMs + 100);
   const terminal = await repository.claim(
     claim(candidate, {
       owner: 'worker-c',
       leaseToken: 'lease-c',
-      nowMs: candidate.requestedAtMs + 100,
     }),
   );
   assert.equal(terminal.status, 'dispatched');
 });
 
 test('persists retry backoff and only reclaims when it becomes due', async () => {
-  const { database, repository } = await createRepository();
+  const { database, repository, setNow } = await createRepository();
   const candidate = await insertCandidate(database);
   const leased = await repository.claim(claim(candidate));
   const retryAtMs = candidate.requestedAtMs + 1_000;
 
+  setNow(candidate.requestedAtMs + 1);
   const failed = await repository.recordResult({
     runId: candidate.runId,
     attemptId: candidate.attemptId,
@@ -211,33 +217,33 @@ test('persists retry backoff and only reclaims when it becomes due', async () =>
     leaseToken: 'lease-a',
     expectedVersion: leased.dispatch.version,
     result: 'dispatch_error',
-    atMs: candidate.requestedAtMs + 1,
-    nextAttemptAtMs: retryAtMs,
+    retryDelayMs: retryAtMs - (candidate.requestedAtMs + 1),
     eventId: nextId(),
   });
   assert.equal(failed.dispatch.status, 'retry_wait');
   assert.equal(failed.dispatch.nextAttemptAtMs, retryAtMs);
   assert.equal(failed.event.type, 'run.cancel_dispatch_failed');
 
+  setNow(retryAtMs - 1);
   const early = await repository.claim(
     claim(candidate, {
       owner: 'worker-b',
       leaseToken: 'lease-b',
-      nowMs: retryAtMs - 1,
     }),
   );
   assert.equal(early.status, 'not_due');
 
+  setNow(retryAtMs);
   const retry = await repository.claim(
     claim(candidate, {
       owner: 'worker-b',
       leaseToken: 'lease-b',
-      nowMs: retryAtMs,
     }),
   );
   assert.equal(retry.status, 'claimed');
   assert.equal(retry.dispatch.dispatchCount, 2);
 
+  setNow(retryAtMs + 1);
   const missingController = await repository.recordResult({
     runId: candidate.runId,
     attemptId: candidate.attemptId,
@@ -245,8 +251,7 @@ test('persists retry backoff and only reclaims when it becomes due', async () =>
     leaseToken: 'lease-b',
     expectedVersion: retry.dispatch.version,
     result: 'controller_missing',
-    atMs: retryAtMs + 1,
-    nextAttemptAtMs: retryAtMs + 2_000,
+    retryDelayMs: 1_999,
     eventId: nextId(),
   });
   assert.equal(missingController.dispatch.status, 'retry_wait');
@@ -257,7 +262,7 @@ test('persists retry backoff and only reclaims when it becomes due', async () =>
 });
 
 test('fails closed for stale candidates and conflicting Attempt bindings', async () => {
-  const { database, repository } = await createRepository();
+  const { database, repository, setNow } = await createRepository();
   const stale = await insertCandidate(database, { runStatus: 'succeeded' });
   assert.deepEqual(await repository.claim(claim(stale)), {
     status: 'not_eligible',
@@ -278,6 +283,7 @@ test('fails closed for stale candidates and conflicting Attempt bindings', async
       created_at_ms: candidate.requestedAtMs + 1,
     },
   ]);
+  setNow(candidate.requestedAtMs + 50);
   await assert.rejects(
     repository.claim(
       claim(
@@ -285,7 +291,6 @@ test('fails closed for stale candidates and conflicting Attempt bindings', async
         {
           owner: 'worker-b',
           leaseToken: 'lease-b',
-          nowMs: candidate.requestedAtMs + 50,
         },
       ),
     ),
@@ -294,7 +299,7 @@ test('fails closed for stale candidates and conflicting Attempt bindings', async
 });
 
 test('rolls back dispatch state and Run version when event append fails', async () => {
-  const { database, repository } = await createRepository();
+  const { database, repository, setNow } = await createRepository();
   const candidate = await insertCandidate(database);
   const leased = await repository.claim(claim(candidate));
   const duplicateEventId = nextId();
@@ -311,6 +316,7 @@ test('rolls back dispatch state and Run version when event append fails', async 
     },
   ]);
 
+  setNow(candidate.requestedAtMs + 1);
   await assert.rejects(
     repository.recordResult({
       runId: candidate.runId,
@@ -319,7 +325,6 @@ test('rolls back dispatch state and Run version when event append fails', async 
       leaseToken: 'lease-a',
       expectedVersion: leased.dispatch.version,
       result: 'already_exited',
-      atMs: candidate.requestedAtMs + 1,
       eventId: duplicateEventId,
     }),
   );
@@ -336,6 +341,7 @@ test('rolls back dispatch state and Run version when event append fails', async 
   );
   assert.deepEqual(run, { version: 2, event_sequence: 0 });
 
+  setNow(candidate.requestedAtMs + 2);
   const recovered = await repository.recordResult({
     runId: candidate.runId,
     attemptId: candidate.attemptId,
@@ -343,7 +349,6 @@ test('rolls back dispatch state and Run version when event append fails', async 
     leaseToken: 'lease-a',
     expectedVersion: leased.dispatch.version,
     result: 'already_exited',
-    atMs: candidate.requestedAtMs + 2,
     eventId: nextId(),
   });
   assert.equal(recovered.dispatch.status, 'dispatched');
@@ -439,7 +444,6 @@ test('fails closed instead of reclaiming a corrupt persisted lease', async () =>
       claim(candidate, {
         owner: 'worker-b',
         leaseToken: 'lease-b',
-        nowMs: candidate.requestedAtMs,
       }),
     ),
     CancellationDispatchRepositoryError,

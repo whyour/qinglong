@@ -10,12 +10,15 @@ export interface ClaimCancellationDispatchCommand {
   requestedAtMs: number;
   owner: string;
   leaseToken: string;
-  nowMs: number;
   leaseDurationMs: number;
 }
 
 export type ClaimCancellationDispatchResult =
-  | { status: 'claimed'; dispatch: CancellationDispatchRecord }
+  | {
+      status: 'claimed';
+      dispatch: CancellationDispatchRecord;
+      leaseToken: string;
+    }
   | { status: 'not_eligible' }
   | {
       status: 'not_due' | 'leased' | 'dispatched' | 'blocked';
@@ -29,8 +32,7 @@ export interface RecordCancellationDispatchResultCommand {
   leaseToken: string;
   expectedVersion: number;
   result: CancellationDispatchResult;
-  atMs: number;
-  nextAttemptAtMs?: number;
+  retryDelayMs?: number;
   eventId: string;
 }
 

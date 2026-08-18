@@ -61,6 +61,7 @@ function validPrivileges() {
     tool_invocation_input_artifacts: [true, true, false, false],
     tool_invocation_preview_artifacts: [true, true, false, false],
     run_attempts: [true, true, true, false],
+    run_cancellation_dispatches: [true, true, true, false],
     run_attempt_log_retention_controls: [true, true, true, true],
     run_attempt_log_artifact_tombstones: [true, true, false, false],
     worker_sessions: [true, true, true, false],
@@ -194,6 +195,7 @@ function validAdminPrivileges() {
     tool_invocation_input_artifacts: [false, false, false, false],
     tool_invocation_preview_artifacts: [false, false, false, false],
     run_attempts: [false, false, false, false],
+    run_cancellation_dispatches: [false, false, false, false],
     run_attempt_log_retention_controls: [false, false, false, false],
     run_attempt_log_artifact_tombstones: [false, false, false, false],
     worker_sessions: [false, false, false, false],
@@ -815,7 +817,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 64,
+    contractVersion: 65,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -882,6 +884,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0063-plugin-package-secret-binding-transition-receipts',
       'pg-0064-plugin-package-secret-binding-transition-approval-plans',
       'pg-0065-approved-action-manual-recovery',
+      'pg-0066-cancellation-dispatch',
     ],
   });
 });
@@ -912,10 +915,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 64);
+  assert.equal(report.contractVersion, 65);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0065-approved-action-manual-recovery',
+    'pg-0066-cancellation-dispatch',
   );
 });
 
@@ -928,10 +931,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 64);
+  assert.equal(report.contractVersion, 65);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0065-approved-action-manual-recovery',
+    'pg-0066-cancellation-dispatch',
   );
 
   const widened = automationManagerPrivileges();
@@ -960,10 +963,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 64);
+  assert.equal(report.contractVersion, 65);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0065-approved-action-manual-recovery',
+    'pg-0066-cancellation-dispatch',
   );
 
   const widened = approvalManagerPrivileges();
@@ -994,10 +997,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 64);
+  assert.equal(report.contractVersion, 65);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0065-approved-action-manual-recovery',
+    'pg-0066-cancellation-dispatch',
   );
 
   const widened = runManagerPrivileges();
@@ -1129,10 +1132,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 64);
+  assert.equal(report.contractVersion, 65);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0065-approved-action-manual-recovery',
+    'pg-0066-cancellation-dispatch',
   );
 });
 

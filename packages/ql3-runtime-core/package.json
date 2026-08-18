@@ -41,6 +41,9 @@
       "run-cancellation": [
         "dist/run/clusterRunCancellation.d.ts"
       ],
+      "cancellation-dispatch": [
+        "dist/run/cancellation-dispatch/cancellationDispatch.d.ts"
+      ],
       "task-start": [
         "dist/task-start/taskStart.d.ts"
       ],
@@ -775,6 +778,11 @@
       "types": "./dist/run/clusterRunCancellation.d.ts",
       "require": "./dist/run/clusterRunCancellation.js",
       "default": "./dist/run/clusterRunCancellation.js"
+    },
+    "./cancellation-dispatch": {
+      "types": "./dist/run/cancellation-dispatch/cancellationDispatch.d.ts",
+      "require": "./dist/run/cancellation-dispatch/cancellationDispatch.js",
+      "default": "./dist/run/cancellation-dispatch/cancellationDispatch.js"
     },
     "./task-start": {
       "types": "./dist/task-start/taskStart.d.ts",
