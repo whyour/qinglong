@@ -95,6 +95,7 @@ fail-closed 还会改变 Legacy 可用性。
 
 ## 后续
 
-正式启用 manual Primary 前，维护者必须在目标 edge/standalone 实例完成一次真实、干净关闭的 manual canary，等待 settling 后运行 terminal audit，组合与同版本
-resource report 生成 bundle，再由 v2 loader 重放。固定物理路由、flash 写放大、断电、非干净退出和 config-root 签名/备份仍是独立发布证据；其他 origin 必须分别建立
-自己的 admission authority、样本预算和 rollback gate，不能复用 manual receipt。
+ADR-0454 已把目标实例的 prepare、observe、resource、qualify、显式短期 approve、只读 audit 与 crash-replay rollback 固化为一次性状态机，并明确
+`primary_selected` 不等于运行态 activated。正式启用 manual Primary 前，维护者仍必须在目标 edge/standalone 实例实际执行该仪式并保留 bootstrap activated audit；
+仓库内 synthetic fixture 或 compiled resource child 不能替代真实产品入口的八/三十二条 admission。固定物理路由、flash 写放大、断电、非干净退出和 config-root
+签名/备份仍是独立发布证据；其他 origin 必须分别建立自己的 admission authority、样本预算和 rollback gate，不能复用 manual receipt。

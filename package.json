@@ -76,6 +76,8 @@
     "audit:receipts:ql3": "node scripts/ql3-receipt-audit.cjs",
     "audit:legacy-shadow-terminal:ql3": "node scripts/ql3-legacy-shadow-terminal-audit.cjs",
     "gate:legacy-shadow-primary:ql3": "node scripts/ql3-legacy-shadow-primary-gate.cjs",
+    "canary:manual-primary:ql3": "node scripts/ql3-manual-primary-canary.cjs",
+    "audit:manual-primary-canary:ql3": "node scripts/ql3-manual-primary-canary-audit.cjs",
     "audit:edge-imports:ql3": "node scripts/ql3-edge-import-audit.cjs",
     "audit:cluster-dependencies:ql3": "node scripts/ql3-cluster-dependency-audit.cjs",
     "audit:package-boundaries:ql3": "node scripts/ql3-package-boundary-audit.cjs",

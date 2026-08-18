@@ -170,10 +170,13 @@ owner 在接受触发时写入执行上下文，并贯穿日志、指标和回�
 - `defaultMode` 固定为 off，当前只允许 `origins.manual`；Primary 不得通过环境变量、通配 origin 或隐式默认值开启。
 - enabled manifest 必须记录 revision、approvedBy、approvedAtMs、expiresAtMs 和 rollbackPlanRef；审批窗口最长 30 天。
 - `durableCancellation`、`startupReconciliation`、`atomicLegacyProjection`、`rollbackDrill`、`edgeBudget` 必须全部为 passed。
+- ADR-0453 后 enabled manifest 还必须绑定可由 loader 独立重算的 manual capture/terminal/resource Primary gate bundle；ADR-0454 的一次性目标实例仪式进一步绑定
+  exact Profile/admission 计划、原始文件摘要、短期审批、selection receipt 与 rollback intent/completion。配置选择只表示 `primary_selected`，不能冒充当前 worker
+  已经完成 `selected → reconciled → activated`。
 - 审计只包含 source path/hash、revision、时间和稳定判定。接受审计先于 router 安装；安装后审计失败立即调用 disposer，恢复原 owner。
 - edge 不启动 watcher；当前 bootstrap 只在 HTTP worker 启动时读取一次，未来显式 reload 必须复用同一校验和审计边界。
 
-bootstrap 接入不代表 Primary 已默认开放。文件缺失、disabled、rejected 或 `manual` 非 primary 时保持 Legacy，且不加载完整 Runtime stack、不创建 router 或 timer。只有 accepted 且全部 gate 通过的 manifest 才按 startup reconciliation、cancel lifecycle、router 的顺序激活；任一步失败都会撤销 router 并停止 lifecycle。ADR-0007 定义的 completion/log supervisor、固定 edge 基准、部署配置写入与用户可见状态、操作回滚演练仍需再次评审。
+bootstrap 接入不代表 Primary 已默认开放。文件缺失、disabled、rejected 或 `manual` 非 primary 时保持 Legacy，且不加载完整 Runtime stack、不创建 router 或 timer。只有 accepted 且全部 gate 通过的 manifest 才按 startup reconciliation、cancel lifecycle、router 的顺序激活；任一步失败都会撤销 router 并停止 lifecycle。ADR-0454 已提供部署配置写入、只读选择状态与操作回滚仪式，但首次真实目标实例执行、运行态 durable activation receipt、固定 edge 基准和 ADR-0007 的完整实机恢复仍需继续评审。
 
 ## 8. Legacy 到 Run 的身份映射
 
