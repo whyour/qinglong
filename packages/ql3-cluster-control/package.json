@@ -175,6 +175,11 @@
       "require": "./dist/remote-execution/remoteWorkerLeaseControlService.js",
       "default": "./dist/remote-execution/remoteWorkerLeaseControlService.js"
     },
+    "./cancellation-dispatch-control": {
+      "types": "./dist/remote-execution/remoteWorkerCancellationDispatchControl.d.ts",
+      "require": "./dist/remote-execution/remoteWorkerCancellationDispatchControl.js",
+      "default": "./dist/remote-execution/remoteWorkerCancellationDispatchControl.js"
+    },
     "./workflow-scheduler": {
       "types": "./dist/scheduling/workflowScheduler.d.ts",
       "require": "./dist/scheduling/workflowScheduler.js",

@@ -75,6 +75,7 @@ import {
   createClusterControlCopilotFailureDiagnosisCancellationRoute,
   type ClusterCopilotFailureDiagnosisCancellationCapability,
 } from '../copilot/failure-diagnosis/failureDiagnosisCancellationRoute';
+import type { ClusterRemoteWorkerCancellationDispatchObservation } from '../remote-execution/remoteWorkerCancellationDispatchControl';
 
 export const PRODUCTION_CLUSTER_CONTROL_ROUTE_OPERATIONS = Object.freeze([
   'task.get',
@@ -150,6 +151,12 @@ export interface ProductionClusterWorkerIngressOptions {
   readonly artifactStore: ClusterRemoteWorkerArtifactStore;
   readonly secretProvider?: RemoteWorkerSecretValueProvider;
   readonly onDiagnostic?: (error: unknown) => void | Promise<void>;
+  readonly onCancellationDispatch?: (
+    observation: ClusterRemoteWorkerCancellationDispatchObservation,
+  ) => void | Promise<void>;
+  readonly onCancellationDispatchDiagnostic?: (
+    error: unknown,
+  ) => void | Promise<void>;
 }
 
 export interface ProductionClusterControlApplicationOptions
@@ -439,6 +446,28 @@ export function startProductionClusterControlApplication(
             ...(workerIngress.secretProvider === undefined
               ? {}
               : { secretProvider: workerIngress.secretProvider }),
+            ...(
+              workerIngress.onCancellationDispatch === undefined &&
+              workerIngress.onCancellationDispatchDiagnostic === undefined
+                ? {}
+                : {
+                    cancellationDispatch: {
+                      ...(workerIngress.onCancellationDispatch === undefined
+                        ? {}
+                        : {
+                            onObservation:
+                              workerIngress.onCancellationDispatch,
+                          }),
+                      ...(workerIngress.onCancellationDispatchDiagnostic ===
+                      undefined
+                        ? {}
+                        : {
+                            onDiagnostic:
+                              workerIngress.onCancellationDispatchDiagnostic,
+                          }),
+                    },
+                  }
+            ),
           },
         }),
     ...database,

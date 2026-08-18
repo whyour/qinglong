@@ -151,13 +151,13 @@ PID 可复用，可能终止无关进程，禁止。
 
 ## 5. 当前孵化边界
 
-`next` 已实现 profile-neutral canonical contract、`0005-run-cancellation-dispatch`、legacy Sequelize/SQLite adapter、PostgreSQL `pg-0066-cancellation-dispatch`/capability v65 adapter、lease expiry 接管、fencing、退避、结果事件、Dispatcher、有界 Supervisor 和默认惰性的 lifecycle runner。PostgreSQL 结果事务按 Run→Attempt→dispatch 锁序完成 dispatch 更新、Run version CAS 与 RunEvent 追加；runtime 角色只取得新表的 SELECT/INSERT/UPDATE。
+`next` 已实现 profile-neutral canonical contract、`0005-run-cancellation-dispatch`、legacy Sequelize/SQLite adapter、PostgreSQL `pg-0066-cancellation-dispatch`/capability v65 adapter、lease expiry 接管、fencing、退避、结果事件、Dispatcher、有界 Supervisor 和默认惰性的 lifecycle runner。PostgreSQL 结果事务按 Run→Attempt→dispatch 锁序完成 dispatch 更新、Run version CAS 与 RunEvent 追加；runtime 角色只取得新表的 SELECT/INSERT/UPDATE。Cluster 生产交付已由 ADR-0457 接入既有 caller-driven Worker lease-control：Run-level stop 必须先结算 durable dispatch 再返回，Workflow Task timeout 则保持 `untracked`，不伪造父 Run 取消。
 
 HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入 Local Supervisor：只有 accepted 且全部 gate 通过时才启动，失败或 shutdown 时有界停止。以下工作仍未完成，因此它仍只允许显式 canary，不得扩大到默认生产流量：
 
 - 用户可见的运行指标、blocked 诊断和处置入口。
 - 固定 edge 设备的数据库写放大、RSS、时延和磁盘基准。
-- cluster-control 对 PostgreSQL CancellationDispatch 的生产启动/停止拓扑与运维告警接线。
+- cluster-control 对 PostgreSQL CancellationDispatch 的用户可见 availability/blocked 指标、诊断与人工处置入口。
 - 首次真实目标实例完整激活/回滚仪式与共享 config 多写者 authority。
 
 ## 6. 验证门禁
@@ -174,3 +174,4 @@ HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入 Local
 10. Event 与日志不包含 handle、命令、环境和 Secret。
 11. PostgreSQL 双连接只能产生一个 claim winner，raw token 不落库，数据库时间决定 lease/retry 到期。
 12. v65 事实经 WAL 到达 standby，提升为新 Primary 后仍可读取；旧 owner/token/version 继续被 fencing。
+13. Cluster Worker lease-control 只在 durable dispatch 已结算或已重放时释放 Run-level stop；Workflow Task timeout 不写父 Run 取消事实。

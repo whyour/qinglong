@@ -8,6 +8,9 @@ const {
   CancellationDispatchFenceRejectedError,
   digestCancellationDispatchLeaseToken,
 } = require('../packages/ql3-runtime-core/dist/run/cancellation-dispatch/cancellationDispatch.js');
+const {
+  ClusterRemoteWorkerCancellationDispatchControl,
+} = require('../packages/ql3-cluster-control/dist/remote-execution/remoteWorkerCancellationDispatchControl.js');
 
 const FIXTURE = Object.freeze({
   runId: 'ha-cancel-run-d363',
@@ -171,24 +174,35 @@ async function persistCancellationDispatchHaFixture(options) {
           SET next_attempt_at_ms = 0 WHERE run_id = $1`,
       [FIXTURE.runId],
     );
-    const finalLease = await first.claim({
-      ...candidate,
-      owner: 'ha-cancel-final',
-      leaseToken: 'ha-cancel-final-token',
-    });
-    assert.equal(finalLease.status, 'claimed');
-    assert.equal(finalLease.dispatch.dispatchCount, 3);
-    const terminal = await first.recordResult({
+    const stopRequested = Object.freeze({
+      status: 'stop_requested',
+      projectId: 'default',
       runId: FIXTURE.runId,
       attemptId: FIXTURE.attemptId,
-      owner: 'ha-cancel-final',
-      leaseToken: 'ha-cancel-final-token',
-      expectedVersion: finalLease.dispatch.version,
-      result: 'already_exited',
-      eventId: FIXTURE.terminalEventId,
+      offerId: 'ha-cancel-offer-d364',
+      leaseGeneration: 1,
+      leaseVersion: 2,
+      renewedAtMs: FIXTURE.requestedAtMs,
+      expiresAtMs: FIXTURE.requestedAtMs + 30_000,
+      stop: Object.freeze({
+        reason: 'user',
+        requestedAtMs: FIXTURE.requestedAtMs,
+      }),
     });
-    assert.equal(terminal.dispatch.status, 'dispatched');
-    assert.equal(terminal.event.sequence, 2);
+    const deliveryObservations = [];
+    const delivery = new ClusterRemoteWorkerCancellationDispatchControl(
+      { async control() { return stopRequested; } },
+      first,
+      {
+        ownerId: 'ha-cancel-final',
+        leaseDurationMs: 30_000,
+        createLeaseToken: () => 'ha-cancel-final-token',
+        createEventId: () => FIXTURE.terminalEventId,
+        onObservation: (observation) => deliveryObservations.push(observation),
+      },
+    );
+    assert.equal(await delivery.control({}), stopRequested);
+    assert.deepEqual(deliveryObservations, [{ status: 'dispatched' }]);
     await migrationPool.query(
       `WITH observed AS (
          SELECT floor(extract(epoch FROM transaction_timestamp()) * 1000)::bigint
@@ -225,7 +239,7 @@ async function persistCancellationDispatchHaFixture(options) {
       version: 5,
       dispatchCount: 3,
       leaseTokenDigest: null,
-      lastResult: 'already_exited',
+      lastResult: 'termination_requested',
       runVersion: 5,
       eventSequence: 3,
       eventCount: 3,
@@ -239,6 +253,7 @@ async function persistCancellationDispatchHaFixture(options) {
       expiredLeaseTakenOver: true,
       staleLeaseFenced: true,
       retryDeferredUntilDue: true,
+      productionDeliverySettledBeforeStop: true,
       replicatedBeforePromotion: false,
       survivedPromotion: false,
     };

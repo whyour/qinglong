@@ -21,6 +21,7 @@ import {
 } from '../worker-ingress/workerIngressConfig';
 import type { ClusterWorkerArtifactBinding } from '../artifact/workerArtifactBinding';
 import type { RemoteWorkerSecretValueProvider } from '@qinglong/runtime-core/remote-secret-delivery';
+import type { ClusterRemoteWorkerCancellationDispatchObservation } from '../remote-execution/remoteWorkerCancellationDispatchControl';
 
 export type ClusterControlProcessSignal = 'SIGINT' | 'SIGTERM';
 
@@ -34,10 +35,12 @@ export interface ClusterControlProcessEvent {
   readonly stopResult?: ClusterControlStopResult;
   readonly address?: Readonly<{ host: string; port: number }>;
   readonly activation?: ClusterControlActivationAudit;
+  readonly cancellationDispatch?: ClusterRemoteWorkerCancellationDispatchObservation;
   readonly diagnostic?: Readonly<{
     scope:
       | 'scheduler'
       | 'cancellation-convergence'
+      | 'cancellation-dispatch'
       | 'log-retention'
       | 'database'
       | 'worker-ingress';
@@ -329,6 +332,32 @@ export async function runProductionClusterControlProcess(
                       level: 'error',
                       event: 'runtime_diagnostic',
                       diagnostic: diagnosticFact('worker-ingress', error),
+                    }),
+                  ),
+                ).catch(() => undefined);
+              },
+              onCancellationDispatch(observation) {
+                void Promise.resolve(
+                  options.emit(
+                    event(replicaId, {
+                      level:
+                        observation.status === 'blocked' ? 'error' : 'info',
+                      event: 'cancellation_dispatch',
+                      cancellationDispatch: observation,
+                    }),
+                  ),
+                ).catch(() => undefined);
+              },
+              onCancellationDispatchDiagnostic(error: unknown) {
+                void Promise.resolve(
+                  options.emit(
+                    event(replicaId, {
+                      level: 'error',
+                      event: 'runtime_diagnostic',
+                      diagnostic: diagnosticFact(
+                        'cancellation-dispatch',
+                        error,
+                      ),
                     }),
                   ),
                 ).catch(() => undefined);

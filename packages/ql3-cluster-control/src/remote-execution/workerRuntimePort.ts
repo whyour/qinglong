@@ -4,6 +4,7 @@ import type { RemoteWorkerSecretValueProvider } from '@qinglong/runtime-core/rem
 import type { RunAttemptLogRangeReader } from '@qinglong/runtime-core/run-attempt-log-read';
 import {
   PostgresClusterDispatchSource,
+  PostgresCancellationDispatchRepository,
   PostgresRemoteRunActivationRepository,
   PostgresRemoteWorkerCompletionRepository,
   PostgresRemoteWorkerLeaseControlRepository,
@@ -21,11 +22,23 @@ import {
   type ClusterRemoteWorkerArtifactStore,
 } from './remoteWorkerCompletionService';
 import { ClusterRemoteWorkerLeaseControlService } from './remoteWorkerLeaseControlService';
+import {
+  ClusterRemoteWorkerCancellationDispatchControl,
+  type ClusterRemoteWorkerCancellationDispatchControlOptions,
+} from './remoteWorkerCancellationDispatchControl';
 import type { WorkerIngressPipelineOptions } from '../worker-ingress/workerIngressPipeline';
 
 export interface ClusterWorkerRuntimeDependencies {
   readonly artifactStore: ClusterRemoteWorkerArtifactStore;
   readonly secretProvider?: RemoteWorkerSecretValueProvider;
+  readonly cancellationDispatch?: Readonly<{
+    readonly onObservation?: ClusterRemoteWorkerCancellationDispatchControlOptions['onObservation'];
+    readonly onDiagnostic?: ClusterRemoteWorkerCancellationDispatchControlOptions['onDiagnostic'];
+  }>;
+}
+
+export interface ClusterWorkerRuntimePortOptions {
+  readonly cancellationDispatchOwnerId: string;
 }
 
 /**
@@ -48,6 +61,7 @@ export interface ClusterWorkerRuntimePort {
 export function createClusterWorkerRuntimePort(
   pool: PostgresPool,
   dependencies: ClusterWorkerRuntimeDependencies,
+  options: ClusterWorkerRuntimePortOptions,
 ): Readonly<ClusterWorkerRuntimePort> {
   if (!pool || typeof pool.query !== 'function') {
     throw new TypeError('Cluster Worker runtime Pool is invalid');
@@ -58,6 +72,15 @@ export function createClusterWorkerRuntimePort(
     Array.isArray(dependencies)
   ) {
     throw new TypeError('Cluster Worker runtime dependencies are invalid');
+  }
+  if (
+    !options ||
+    typeof options !== 'object' ||
+    Array.isArray(options) ||
+    Object.keys(options).length !== 1 ||
+    typeof options.cancellationDispatchOwnerId !== 'string'
+  ) {
+    throw new TypeError('Cluster Worker runtime options are invalid');
   }
 
   const workerSessions = new PostgresWorkerSessionRepository(pool);
@@ -92,8 +115,25 @@ export function createClusterWorkerRuntimePort(
       completionRepository,
       dependencies.artifactStore,
     ),
-    leaseControl: new ClusterRemoteWorkerLeaseControlService(
-      new PostgresRemoteWorkerLeaseControlRepository(pool),
+    leaseControl: new ClusterRemoteWorkerCancellationDispatchControl(
+      new ClusterRemoteWorkerLeaseControlService(
+        new PostgresRemoteWorkerLeaseControlRepository(pool),
+      ),
+      new PostgresCancellationDispatchRepository(pool),
+      {
+        ownerId: options.cancellationDispatchOwnerId,
+        ...(dependencies.cancellationDispatch?.onObservation === undefined
+          ? {}
+          : {
+              onObservation:
+                dependencies.cancellationDispatch.onObservation,
+            }),
+        ...(dependencies.cancellationDispatch?.onDiagnostic === undefined
+          ? {}
+          : {
+              onDiagnostic: dependencies.cancellationDispatch.onDiagnostic,
+            }),
+      },
     ),
     ...(readLogRange === undefined
       ? {}

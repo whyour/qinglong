@@ -206,6 +206,12 @@ test('starts the optional Worker listener and closes its lazy Artifact binding',
           code: 'S3Unavailable',
         }),
       );
+      options.workerIngress.onCancellationDispatch({ status: 'dispatched' });
+      options.workerIngress.onCancellationDispatchDiagnostic(
+        Object.assign(new Error('must-not-be-logged'), {
+          code: 'CANCEL_DISPATCH_UNAVAILABLE',
+        }),
+      );
       return {
         status: 'active',
         address: { host: '0.0.0.0', port: 5800 },
@@ -244,6 +250,25 @@ test('starts the optional Worker listener and closes its lazy Artifact binding',
         fact.event === 'runtime_diagnostic' &&
         fact.diagnostic.scope === 'log-retention' &&
         fact.diagnostic.code === 'S3Unavailable' &&
+        JSON.stringify(fact).includes('must-not-be-logged') === false,
+    ),
+    true,
+  );
+  assert.equal(
+    facts.some(
+      (fact) =>
+        fact.event === 'cancellation_dispatch' &&
+        fact.level === 'info' &&
+        fact.cancellationDispatch.status === 'dispatched',
+    ),
+    true,
+  );
+  assert.equal(
+    facts.some(
+      (fact) =>
+        fact.event === 'runtime_diagnostic' &&
+        fact.diagnostic.scope === 'cancellation-dispatch' &&
+        fact.diagnostic.code === 'CANCEL_DISPATCH_UNAVAILABLE' &&
         JSON.stringify(fact).includes('must-not-be-logged') === false,
     ),
     true,

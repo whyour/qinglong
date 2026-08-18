@@ -903,6 +903,9 @@ export async function bootstrapClusterControlRuntime(
                 workerRuntime: createClusterWorkerRuntimePort(
                   database.pool,
                   options.workerRuntime,
+                  {
+                    cancellationDispatchOwnerId: recoveryRuntime.ownerId,
+                  },
                 ),
               }),
         });
