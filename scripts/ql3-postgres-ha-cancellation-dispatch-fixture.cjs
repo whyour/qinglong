@@ -25,6 +25,7 @@ const FIXTURE = Object.freeze({
   terminalEventId: 'ha-cancel-terminal-event-d363',
   settledEventId: 'ha-cancel-settled-event-d363',
   blockedEventId: 'ha-cancel-blocked-event-d365',
+  blockedListAuditEventId: '019f9700-0000-4000-8000-000000000006',
   summaryAuditEventId: '019f9700-0000-4000-8000-000000000005',
   inspectAuditEventId: '019f9700-0000-4000-8000-000000000001',
   rearmAuditEventId: '019f9700-0000-4000-8000-000000000002',
@@ -263,6 +264,59 @@ async function persistCancellationDispatchHaFixture(options) {
         principal,
         policyFence: Object.freeze({ projectVersion: 1, bindingVersion: 1 }),
       });
+      const blockedPage = await management.listBlocked({
+        projectId: FIXTURE.projectId,
+        requestId: 'ha-cancel-blocked-list-d368',
+        auditEventId: FIXTURE.blockedListAuditEventId,
+        principal,
+        policyFence: authority.policyFence,
+      });
+      assert.equal(blockedPage.projectId, FIXTURE.projectId);
+      assert.equal(blockedPage.snapshotAtMs, blockedPage.observedAtMs);
+      assert.deepEqual(blockedPage.items, [
+        {
+          runId: FIXTURE.runId,
+          blockedAtMs: blocked.dispatch.updatedAtMs,
+        },
+      ]);
+      assert.equal(blockedPage.truncated, false);
+      assert.equal(Object.hasOwn(blockedPage, 'nextCursor'), false);
+      assert.equal(JSON.stringify(blockedPage).includes('attemptId'), false);
+      assert.equal(JSON.stringify(blockedPage).includes('lastResult'), false);
+      assert.equal(JSON.stringify(blockedPage).includes('leaseOwner'), false);
+      assert.equal(JSON.stringify(blockedPage).includes('leaseToken'), false);
+      const blockedListAudit = await migrationPool.query(
+        `SELECT operation_id AS "operationId", outcome
+           FROM "ql3"."security_audit_events" WHERE event_id = $1`,
+        [FIXTURE.blockedListAuditEventId],
+      );
+      assert.deepEqual(blockedListAudit.rows, [
+        {
+          operationId: 'run.cancellation.blocked.list',
+          outcome: 'allowed',
+        },
+      ]);
+      await migrationPool.query('BEGIN');
+      let blockedListPlan;
+      try {
+        await migrationPool.query('SET LOCAL enable_seqscan = off');
+        blockedListPlan = await migrationPool.query(
+          `EXPLAIN (FORMAT JSON, COSTS OFF)
+           SELECT run_id, updated_at_ms
+             FROM "ql3"."run_cancellation_dispatches"
+            WHERE project_id = $1 AND status = 'blocked'
+              AND updated_at_ms <= $2
+            ORDER BY updated_at_ms ASC, run_id ASC
+            LIMIT 17`,
+          [FIXTURE.projectId, blockedPage.snapshotAtMs],
+        );
+      } finally {
+        await migrationPool.query('ROLLBACK');
+      }
+      assert.match(
+        JSON.stringify(blockedListPlan.rows),
+        /ql3_run_cancellation_dispatch_project_blocked_idx/,
+      );
       const summary = await management.summary({
         projectId: FIXTURE.projectId,
         requestId: 'ha-cancel-summary-d366',
@@ -398,6 +452,8 @@ async function persistCancellationDispatchHaFixture(options) {
       retryDeferredUntilDue: true,
       operatorDiagnosticLowSensitive: true,
       operatorSummaryLowSensitiveAndActionable: true,
+      blockedListLowSensitiveAndSnapshotBound: true,
+      blockedListUsesProjectKeysetIndex: true,
       manualBlockedRearmExact: true,
       manualRearmDeferredUntilDue: true,
       productionDeliverySettledBeforeStop: true,

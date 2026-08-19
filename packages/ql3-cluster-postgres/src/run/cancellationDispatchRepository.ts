@@ -180,7 +180,7 @@ export class PostgresCancellationDispatchRepository
     return this.transaction(async (client) => {
       const nowMs = await databaseNow(client);
       const run = await client.query<Row>(
-        `SELECT execution_owner AS "executionOwner", status,
+        `SELECT project_id AS "projectId", execution_owner AS "executionOwner", status,
                 cancel_requested_at_ms AS "cancelRequestedAtMs"
            FROM "ql3"."runs" WHERE id = $1 FOR UPDATE`,
         [command.runId],
@@ -222,11 +222,17 @@ export class PostgresCancellationDispatchRepository
       if (dispatchResult.rows.length === 0) {
         dispatchResult = await client.query<Row>(
           `INSERT INTO "ql3"."run_cancellation_dispatches" (
-             run_id, attempt_id, status, version, dispatch_count,
+             project_id, run_id, attempt_id, status, version, dispatch_count,
              next_attempt_at_ms, created_at_ms, updated_at_ms
-           ) VALUES ($1, $2, 'pending', 0, 0, $3, $4, $4)
+           ) VALUES ($5, $1, $2, 'pending', 0, 0, $3, $4, $4)
            RETURNING ${DISPATCH_COLUMNS}`,
-          [command.runId, command.attemptId, command.requestedAtMs, nowMs],
+          [
+            command.runId,
+            command.attemptId,
+            command.requestedAtMs,
+            nowMs,
+            text(runRow, 'projectId'),
+          ],
         );
       }
       if (dispatchResult.rows.length !== 1) {

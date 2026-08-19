@@ -47,6 +47,16 @@ function summaryCommand(overrides = {}) {
   return { ...authority, ...overrides };
 }
 
+function blockedListCommand(after) {
+  return {
+    ...summaryCommand({
+      requestId: 'request-blocked-1',
+      auditEventId: '019f9600-0000-4000-8000-000000000021',
+    }),
+    ...(after === undefined ? {} : { after }),
+  };
+}
+
 function runRow() {
   return {
     projectId: 'project-1',
@@ -132,6 +142,13 @@ function fixture(options = {}) {
           ],
           rowCount: 1,
         };
+      }
+      if (
+        text.startsWith(
+          'SELECT run_id AS "runId", updated_at_ms AS "blockedAtMs"',
+        )
+      ) {
+        return { rows: options.blockedRows ?? [], rowCount: 0 };
       }
       if (
         text.startsWith('SELECT attempt_id AS "attemptId"') &&
@@ -294,6 +311,70 @@ test('derives clear and converging assessments from fixed status counts', async 
   const result = await converging.repository.summary(summaryCommand());
   assert.equal(result.assessment, 'converging');
   assert.equal(result.operatorAction, 'wait');
+});
+
+test('lists one fixed oldest-first blocked page with a snapshot cursor', async () => {
+  const blockedRows = Array.from({ length: 17 }, (_, index) => ({
+    runId: `run-${String(index + 1).padStart(2, '0')}`,
+    blockedAtMs: String(NOW - 100 + index),
+  }));
+  const { calls, repository } = fixture({ blockedRows });
+  const result = await repository.listBlocked(blockedListCommand());
+  assert.equal(result.projectId, 'project-1');
+  assert.equal(result.snapshotAtMs, NOW);
+  assert.equal(result.observedAtMs, NOW);
+  assert.equal(result.items.length, 16);
+  assert.equal(result.items[0].runId, 'run-01');
+  assert.equal(result.items[15].runId, 'run-16');
+  assert.equal(result.truncated, true);
+  assert.deepEqual(result.nextCursor, {
+    snapshotAtMs: NOW,
+    blockedAtMs: NOW - 85,
+    runId: 'run-16',
+  });
+  const read = calls.find(({ sql }) =>
+    sql.startsWith(
+      'SELECT run_id AS "runId", updated_at_ms AS "blockedAtMs"',
+    ),
+  );
+  assert.deepEqual(read.params, ['project-1', NOW, null, '', 17]);
+  assert.match(
+    read.sql,
+    /project_id = \$1 AND status = 'blocked'[\s\S]+ORDER BY updated_at_ms ASC, run_id ASC/,
+  );
+  const audit = calls.find(
+    ({ sql, params }) =>
+      sql.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
+      params[2] === 'run.cancellation.blocked.list',
+  );
+  assert.equal(audit.params[0], blockedListCommand().auditEventId);
+});
+
+test('continues only inside the original blocked snapshot', async () => {
+  const after = {
+    snapshotAtMs: NOW - 50,
+    blockedAtMs: NOW - 80,
+    runId: 'run-03',
+  };
+  const { calls, repository } = fixture({
+    blockedRows: [{ runId: 'run-04', blockedAtMs: String(NOW - 79) }],
+  });
+  const result = await repository.listBlocked(blockedListCommand(after));
+  assert.equal(result.snapshotAtMs, NOW - 50);
+  assert.equal(result.truncated, false);
+  assert.equal(Object.hasOwn(result, 'nextCursor'), false);
+  const read = calls.find(({ sql }) =>
+    sql.startsWith(
+      'SELECT run_id AS "runId", updated_at_ms AS "blockedAtMs"',
+    ),
+  );
+  assert.deepEqual(read.params, [
+    'project-1',
+    NOW - 50,
+    NOW - 80,
+    'run-03',
+    17,
+  ]);
 });
 
 test('rearms an exact blocked dispatch with one event and allowed audit', async () => {

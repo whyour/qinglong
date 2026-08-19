@@ -8,6 +8,7 @@ import {
 } from '@qinglong/runtime-core/run-cancellation';
 import { RUN_STATUSES } from '@qinglong/runtime-core/run';
 import {
+  CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT,
   CANCELLATION_DISPATCH_RESULTS,
   CANCELLATION_DISPATCH_STATUSES,
 } from '@qinglong/runtime-core/cancellation-dispatch';
@@ -21,6 +22,7 @@ import {
 } from '../management-support/pluginPackageManagementClient';
 import {
   RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA,
+  RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_SCHEMA,
   RUN_CANCELLATION_DISPATCH_REARM_RECEIPT_SCHEMA,
   RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA,
   normalizeClusterRunManagementCommand,
@@ -29,6 +31,7 @@ import {
 } from './runManagementTransport';
 
 const MANAGEMENT_PATH = '/api/v3/runs/management';
+const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export type ClusterRunManagementClientPaths =
   ClusterPluginPackageManagementClientPaths;
@@ -226,6 +229,86 @@ export function validateClusterRunManagementClientResult(
       summary.operatorAction !== expectedOperatorAction
     ) {
       invalid();
+    }
+    return Object.freeze(
+      envelope as unknown as ClusterRunManagementTransportResult,
+    );
+  }
+  if (command.operation === 'run.cancellation.blocked.list') {
+    const envelope = exact(value, ['schemaVersion', 'operation', 'page']);
+    if (
+      envelope.schemaVersion !== 1 ||
+      envelope.operation !== command.operation
+    ) {
+      invalid();
+    }
+    const page = exact(envelope.page, [
+      'schema',
+      'projectId',
+      'snapshotAtMs',
+      'observedAtMs',
+      'items',
+      'truncated',
+      ...(Object.hasOwn(envelope.page as object, 'nextCursor')
+        ? ['nextCursor']
+        : []),
+    ]);
+    if (
+      page.schema !== RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_SCHEMA ||
+      page.projectId !== command.request.projectId ||
+      !safeInteger(page.snapshotAtMs) ||
+      !safeInteger(page.observedAtMs) ||
+      (page.snapshotAtMs as number) > (page.observedAtMs as number) ||
+      (command.request.body.after === null &&
+        page.snapshotAtMs !== page.observedAtMs) ||
+      (command.request.body.after !== null &&
+        page.snapshotAtMs !== command.request.body.after.snapshotAtMs) ||
+      !Array.isArray(page.items) ||
+      page.items.length > CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT ||
+      typeof page.truncated !== 'boolean' ||
+      page.truncated !== Object.hasOwn(page, 'nextCursor') ||
+      (page.truncated &&
+        page.items.length !== CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT)
+    ) {
+      invalid();
+    }
+    const items = page.items as unknown[];
+    let previous = command.request.body.after;
+    for (const value of items) {
+      const item = exact(value, ['runId', 'blockedAtMs']);
+      if (
+        typeof item.runId !== 'string' ||
+        !IDENTIFIER_PATTERN.test(item.runId) ||
+        !safeInteger(item.blockedAtMs) ||
+        (item.blockedAtMs as number) > (page.snapshotAtMs as number) ||
+        (previous !== null &&
+          ((item.blockedAtMs as number) < previous.blockedAtMs ||
+            ((item.blockedAtMs as number) === previous.blockedAtMs &&
+              item.runId <= previous.runId)))
+      ) {
+        invalid();
+      }
+      previous = {
+        snapshotAtMs: page.snapshotAtMs as number,
+        blockedAtMs: item.blockedAtMs as number,
+        runId: item.runId,
+      };
+    }
+    if (page.truncated) {
+      const cursor = exact(page.nextCursor, [
+        'snapshotAtMs',
+        'blockedAtMs',
+        'runId',
+      ]);
+      const last = previous;
+      if (
+        last === null ||
+        cursor.snapshotAtMs !== page.snapshotAtMs ||
+        cursor.blockedAtMs !== last.blockedAtMs ||
+        cursor.runId !== last.runId
+      ) {
+        invalid();
+      }
     }
     return Object.freeze(
       envelope as unknown as ClusterRunManagementTransportResult,

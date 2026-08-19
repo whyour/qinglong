@@ -91,11 +91,27 @@ test('status mode calls only the summary operation and emits an alert exit', asy
           authorized: request.socket.authorized,
           command,
         });
-        const bytes = Buffer.from(
-          JSON.stringify({
-            schemaVersion: 1,
-            requestId: command.request.requestId,
-            result: {
+        const managementResult =
+          command.operation === 'run.cancellation.blocked.list'
+            ? {
+                schemaVersion: 1,
+                operation: 'run.cancellation.blocked.list',
+                page: {
+                  schema:
+                    'qinglong/run-cancellation-dispatch-blocked-page@v1',
+                  projectId: 'project-1',
+                  snapshotAtMs: 1_700_000_000_000,
+                  observedAtMs: 1_700_000_000_000,
+                  items: [
+                    {
+                      runId: 'run-1',
+                      blockedAtMs: 1_699_999_999_000,
+                    },
+                  ],
+                  truncated: false,
+                },
+              }
+            : {
               schemaVersion: 1,
               operation: 'run.cancellation.summary',
               summary: {
@@ -121,7 +137,12 @@ test('status mode calls only the summary operation and emits an alert exit', asy
                 },
                 oldestBlockedAtMs: 1_699_999_999_000,
               },
-            },
+            };
+        const bytes = Buffer.from(
+          JSON.stringify({
+            schemaVersion: 1,
+            requestId: command.request.requestId,
+            result: managementResult,
           }),
           'utf8',
         );
@@ -192,12 +213,37 @@ test('status mode calls only the summary operation and emits an alert exit', asy
     schema: 'qinglong/run-cancellation-dispatch-summary-request@v1',
   });
   assert.equal(Object.hasOwn(requests[0].command.request, 'runId'), false);
+
+  const blocked = await runCli([
+    'blocked',
+    `--config=${configFile}`,
+    `--assertion=${assertionFile}`,
+    '--project=project-1',
+    '--format=json',
+  ]);
+  assert.equal(blocked.status, 0, blocked.stderr);
+  assert.equal(blocked.stderr, '');
+  const blockedOutput = JSON.parse(blocked.stdout);
+  assert.equal(
+    blockedOutput.schema,
+    'qinglong/run-cancellation-blocked-list@v1',
+  );
+  assert.deepEqual(blockedOutput.items, [
+    { runId: 'run-1', blockedAtMs: 1_699_999_999_000 },
+  ]);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].command.operation, 'run.cancellation.blocked.list');
+  assert.deepEqual(requests[1].command.request.body, {
+    schema: 'qinglong/run-cancellation-dispatch-blocked-list-request@v1',
+    after: null,
+  });
 });
 
 test('help documents status routing and invalid projects fail before I/O', async () => {
   const help = await runCli(['--help']);
   assert.equal(help.status, 0);
   assert.match(help.stdout, /ql3-run-client status/);
+  assert.match(help.stdout, /ql3-run-client blocked/);
   assert.match(help.stdout, /0=clear, 10=converging, 20=attention_required/);
 
   const rejected = await runCli([
@@ -214,4 +260,14 @@ test('help documents status routing and invalid projects fail before I/O', async
     event: 'usage_invalid',
     code: 'QL3_RUN_MANAGEMENT_CLIENT_USAGE_INVALID',
   });
+
+  const invalidCursor = await runCli([
+    'blocked',
+    '--config=/private/client.json',
+    '--assertion=/private/assertion.jwt',
+    '--project=project-1',
+    '--cursor=v1.***',
+  ]);
+  assert.equal(invalidCursor.status, 64);
+  assert.equal(invalidCursor.stdout, '');
 });

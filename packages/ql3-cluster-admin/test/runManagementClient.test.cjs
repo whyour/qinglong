@@ -147,6 +147,21 @@ const summaryCommand = normalizeClusterRunManagementCommand({
   },
 });
 
+const blockedListCommand = normalizeClusterRunManagementCommand({
+  schemaVersion: 1,
+  operation: 'run.cancellation.blocked.list',
+  request: {
+    projectId: 'project-1',
+    requestId: 'request-blocked-1',
+    auditEventId: '019f9400-0000-4000-8000-000000000061',
+    failureAuditEventId: '019f9400-0000-4000-8000-000000000062',
+    body: {
+      schema: 'qinglong/run-cancellation-dispatch-blocked-list-request@v1',
+      after: null,
+    },
+  },
+});
+
 const rearmCommand = normalizeClusterRunManagementCommand({
   schemaVersion: 1,
   operation: 'run.cancellation.rearm',
@@ -406,6 +421,54 @@ test('validates the fixed low-sensitive Project cancellation summary', () => {
         validateClusterRunManagementClientResult(
           { ...value, summary },
           summaryCommand,
+        ),
+      ClusterPluginPackageManagementClientRequestError,
+    );
+  }
+});
+
+test('validates one snapshot-bound low-sensitive blocked page', () => {
+  const value = {
+    schemaVersion: 1,
+    operation: 'run.cancellation.blocked.list',
+    page: {
+      schema: 'qinglong/run-cancellation-dispatch-blocked-page@v1',
+      projectId: 'project-1',
+      snapshotAtMs: 1_000_000,
+      observedAtMs: 1_000_000,
+      items: [
+        { runId: 'run-1', blockedAtMs: 999_100 },
+        { runId: 'run-2', blockedAtMs: 999_200 },
+      ],
+      truncated: false,
+    },
+  };
+  assert.deepEqual(
+    validateClusterRunManagementClientResult(value, blockedListCommand),
+    value,
+  );
+  for (const page of [
+    { ...value.page, projectId: 'project-2' },
+    { ...value.page, snapshotAtMs: 999_999 },
+    {
+      ...value.page,
+      items: [value.page.items[1], value.page.items[0]],
+    },
+    {
+      ...value.page,
+      items: [{ ...value.page.items[0], attemptId: 'attempt-1' }],
+    },
+    {
+      ...value.page,
+      items: [{ ...value.page.items[0], lastResult: 'identity_mismatch' }],
+    },
+    { ...value.page, truncated: true },
+  ]) {
+    assert.throws(
+      () =>
+        validateClusterRunManagementClientResult(
+          { ...value, page },
+          blockedListCommand,
         ),
       ClusterPluginPackageManagementClientRequestError,
     );

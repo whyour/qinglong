@@ -835,7 +835,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 66,
+    contractVersion: 67,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -904,6 +904,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0065-approved-action-manual-recovery',
       'pg-0066-cancellation-dispatch',
       'pg-0067-cancellation-dispatch-management',
+      'pg-0068-cancellation-dispatch-project-keyset',
     ],
   });
 });
@@ -934,10 +935,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 66);
+  assert.equal(report.contractVersion, 67);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0067-cancellation-dispatch-management',
+    'pg-0068-cancellation-dispatch-project-keyset',
   );
 });
 
@@ -950,10 +951,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 66);
+  assert.equal(report.contractVersion, 67);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0067-cancellation-dispatch-management',
+    'pg-0068-cancellation-dispatch-project-keyset',
   );
 
   const widened = automationManagerPrivileges();
@@ -982,10 +983,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 66);
+  assert.equal(report.contractVersion, 67);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0067-cancellation-dispatch-management',
+    'pg-0068-cancellation-dispatch-project-keyset',
   );
 
   const widened = approvalManagerPrivileges();
@@ -1016,10 +1017,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 66);
+  assert.equal(report.contractVersion, 67);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0067-cancellation-dispatch-management',
+    'pg-0068-cancellation-dispatch-project-keyset',
   );
 
   const widened = runManagerPrivileges();
@@ -1180,10 +1181,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 66);
+  assert.equal(report.contractVersion, 67);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0067-cancellation-dispatch-management',
+    'pg-0068-cancellation-dispatch-project-keyset',
   );
 });
 

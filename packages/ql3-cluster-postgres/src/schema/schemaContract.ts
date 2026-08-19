@@ -21,13 +21,14 @@ export interface PostgresSchemaContractTrigger {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 66;
-  readonly migrationId: 'pg-0067-cancellation-dispatch-management';
+  readonly contractVersion: 67;
+  readonly migrationId: 'pg-0068-cancellation-dispatch-project-keyset';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
     run_core: 1;
     run_cancellation_dispatch: 1;
+    run_cancellation_dispatch_blocked_list: 1;
     run_cancellation_dispatch_management: 1;
     run_attempt_log_retention: 1;
     run_management_boundary: 1;
@@ -120,8 +121,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 66,
-    migrationId: 'pg-0067-cancellation-dispatch-management',
+    contractVersion: 67,
+    migrationId: 'pg-0068-cancellation-dispatch-project-keyset',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -170,6 +171,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       project_tool_definition_snapshot: 1,
       run_core: 1,
       run_cancellation_dispatch: 1,
+      run_cancellation_dispatch_blocked_list: 1,
       run_cancellation_dispatch_management: 1,
       run_attempt_log_retention: 1,
       run_management_boundary: 1,
@@ -1294,6 +1296,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         'error_summary',
       ]),
       table('run_cancellation_dispatches', [
+        'project_id',
         'run_id',
         'attempt_id',
         'status',
@@ -1718,6 +1721,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_api_credential_mutations_actor_idx',
       'runs_pkey',
       'ql3_runs_project_idempotency_uidx',
+      'ql3_runs_project_id_uidx',
       'ql3_runs_project_created_idx',
       'ql3_runs_task_created_idx',
       'ql3_runs_dispatch_candidates_idx',
@@ -1796,6 +1800,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'run_cancellation_dispatches_pkey',
       'ql3_run_cancellation_dispatch_due_idx',
       'ql3_run_cancellation_dispatch_lease_expiry_idx',
+      'ql3_run_cancellation_dispatch_project_blocked_idx',
       'run_attempt_log_retention_controls_pkey',
       'ql3_run_log_retention_control_artifact_key',
       'ql3_run_log_retention_retry_idx',

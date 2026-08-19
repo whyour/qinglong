@@ -26,6 +26,10 @@ export const RUN_CANCELLATION_DISPATCH_SUMMARY_REQUEST_SCHEMA =
   'qinglong/run-cancellation-dispatch-summary-request@v1';
 export const RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA =
   'qinglong/run-cancellation-dispatch-summary@v1';
+export const RUN_CANCELLATION_DISPATCH_BLOCKED_LIST_REQUEST_SCHEMA =
+  'qinglong/run-cancellation-dispatch-blocked-list-request@v1';
+export const RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_SCHEMA =
+  'qinglong/run-cancellation-dispatch-blocked-page@v1';
 export const RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA =
   'qinglong/run-cancellation-dispatch-diagnostic@v1';
 export const RUN_CANCELLATION_DISPATCH_REARM_REQUEST_SCHEMA =
@@ -96,6 +100,25 @@ export type ClusterRunManagementCancellationSummaryCommand = Readonly<{
   }>;
 }>;
 
+export type ClusterRunManagementCancellationBlockedListCommand = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.cancellation.blocked.list';
+  request: Readonly<{
+    projectId: string;
+    requestId: string;
+    auditEventId: string;
+    failureAuditEventId: string;
+    body: Readonly<{
+      schema: typeof RUN_CANCELLATION_DISPATCH_BLOCKED_LIST_REQUEST_SCHEMA;
+      after: Readonly<{
+        snapshotAtMs: number;
+        blockedAtMs: number;
+        runId: string;
+      }> | null;
+    }>;
+  }>;
+}>;
+
 export type ClusterRunManagementCancellationRearmCommand = Readonly<{
   schemaVersion: 1;
   operation: 'run.cancellation.rearm';
@@ -123,6 +146,7 @@ export type ClusterRunManagementCommand =
   | ClusterRunManagementRetryCommand
   | ClusterRunManagementStopCommand
   | ClusterRunManagementCancellationSummaryCommand
+  | ClusterRunManagementCancellationBlockedListCommand
   | ClusterRunManagementCancellationInspectCommand
   | ClusterRunManagementCancellationRearmCommand;
 
@@ -158,6 +182,19 @@ export type ClusterRunManagementCancellationSummaryTransportResult = Readonly<{
   >;
 }>;
 
+export type ClusterRunManagementCancellationBlockedListTransportResult =
+  Readonly<{
+    schemaVersion: 1;
+    operation: 'run.cancellation.blocked.list';
+    page: Readonly<
+      Awaited<
+        ReturnType<ClusterRunManagementService['listBlockedCancellations']>
+      > & {
+        schema: typeof RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_SCHEMA;
+      }
+    >;
+  }>;
+
 export type ClusterRunManagementCancellationRearmTransportResult = Readonly<{
   schemaVersion: 1;
   operation: 'run.cancellation.rearm';
@@ -172,6 +209,7 @@ export type ClusterRunManagementTransportResult =
   | ClusterRunManagementRetryTransportResult
   | ClusterRunManagementStopTransportResult
   | ClusterRunManagementCancellationSummaryTransportResult
+  | ClusterRunManagementCancellationBlockedListTransportResult
   | ClusterRunManagementCancellationInspectTransportResult
   | ClusterRunManagementCancellationRearmTransportResult;
 
@@ -258,6 +296,7 @@ export function normalizeClusterRunManagementCommand(
     operation !== 'run.retry' &&
     operation !== 'run.stop' &&
     operation !== 'run.cancellation.summary' &&
+    operation !== 'run.cancellation.blocked.list' &&
     operation !== 'run.cancellation.inspect' &&
     operation !== 'run.cancellation.rearm'
   ) {
@@ -274,7 +313,8 @@ export function normalizeClusterRunManagementCommand(
           'failureAuditEventId',
           'body',
         ]
-      : operation === 'run.cancellation.summary'
+      : operation === 'run.cancellation.summary' ||
+          operation === 'run.cancellation.blocked.list'
         ? [
             'projectId',
             'requestId',
@@ -329,6 +369,51 @@ export function normalizeClusterRunManagementCommand(
         failureAuditEventId,
         body: Object.freeze({
           schema: RUN_CANCELLATION_DISPATCH_SUMMARY_REQUEST_SCHEMA,
+        }),
+      }),
+    });
+  }
+  if (operation === 'run.cancellation.blocked.list') {
+    const body = exact(request.body, ['schema', 'after']);
+    if (body.schema !== RUN_CANCELLATION_DISPATCH_BLOCKED_LIST_REQUEST_SCHEMA) {
+      invalid();
+    }
+    let after: ClusterRunManagementCancellationBlockedListCommand['request']['body']['after'] =
+      null;
+    if (body.after !== null) {
+      const cursor = exact(body.after, [
+        'snapshotAtMs',
+        'blockedAtMs',
+        'runId',
+      ]);
+      if (
+        typeof cursor.snapshotAtMs !== 'number' ||
+        !Number.isSafeInteger(cursor.snapshotAtMs) ||
+        cursor.snapshotAtMs < 0 ||
+        typeof cursor.blockedAtMs !== 'number' ||
+        !Number.isSafeInteger(cursor.blockedAtMs) ||
+        cursor.blockedAtMs < 0 ||
+        cursor.blockedAtMs > cursor.snapshotAtMs
+      ) {
+        invalid();
+      }
+      after = Object.freeze({
+        snapshotAtMs: cursor.snapshotAtMs,
+        blockedAtMs: cursor.blockedAtMs,
+        runId: identifier(cursor.runId),
+      });
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      operation,
+      request: Object.freeze({
+        projectId: identifier(request.projectId),
+        requestId: identifier(request.requestId),
+        auditEventId,
+        failureAuditEventId,
+        body: Object.freeze({
+          schema: RUN_CANCELLATION_DISPATCH_BLOCKED_LIST_REQUEST_SCHEMA,
+          after,
         }),
       }),
     });
@@ -433,6 +518,7 @@ export function createClusterRunManagementTransport(
     typeof options.service.retry !== 'function' ||
     typeof options.service.stop !== 'function' ||
     typeof options.service.summarizeCancellation !== 'function' ||
+    typeof options.service.listBlockedCancellations !== 'function' ||
     typeof options.service.inspectCancellation !== 'function' ||
     typeof options.service.rearmCancellation !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function')
@@ -507,6 +593,26 @@ export function createClusterRunManagementTransport(
           operation: command.operation,
           summary: Object.freeze({
             schema: RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA,
+            ...result,
+          }),
+        });
+      }
+      if (command.operation === 'run.cancellation.blocked.list') {
+        const result = await options.service.listBlockedCancellations({
+          projectId: command.request.projectId,
+          requestId: command.request.requestId,
+          auditEventId: command.request.auditEventId,
+          failureAuditEventId: command.request.failureAuditEventId,
+          principal,
+          ...(command.request.body.after === null
+            ? {}
+            : { after: command.request.body.after }),
+        });
+        return Object.freeze({
+          schemaVersion: 1,
+          operation: command.operation,
+          page: Object.freeze({
+            schema: RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_SCHEMA,
             ...result,
           }),
         });

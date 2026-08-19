@@ -3592,6 +3592,7 @@ export const runs = ql3Schema.table(
     uniqueIndex('ql3_runs_project_idempotency_uidx')
       .on(table.projectId, table.idempotencyKey)
       .where(sql`${table.idempotencyKey} is not null`),
+    uniqueIndex('ql3_runs_project_id_uidx').on(table.projectId, table.id),
     index('ql3_runs_project_created_idx').on(
       table.projectId,
       table.createdAtMs,
@@ -4834,6 +4835,7 @@ export const runAttempts = ql3Schema.table(
 export const runCancellationDispatches = ql3Schema.table(
   'run_cancellation_dispatches',
   {
+    projectId: varchar('project_id', { length: 128 }).notNull(),
     runId: varchar('run_id', { length: 36 }).primaryKey(),
     attemptId: varchar('attempt_id', { length: 36 }).notNull(),
     status: varchar('status', { length: 32 }).notNull(),
@@ -4851,8 +4853,8 @@ export const runCancellationDispatches = ql3Schema.table(
   (table) => [
     foreignKey({
       name: 'ql3_run_cancellation_dispatch_run_fk',
-      columns: [table.runId],
-      foreignColumns: [runs.id],
+      columns: [table.projectId, table.runId],
+      foreignColumns: [runs.projectId, runs.id],
     })
       .onDelete('cascade')
       .onUpdate('restrict'),
@@ -4897,6 +4899,9 @@ export const runCancellationDispatches = ql3Schema.table(
     index('ql3_run_cancellation_dispatch_lease_expiry_idx')
       .on(table.leaseExpiresAtMs, table.runId)
       .where(sql`${table.status} = 'leased'`),
+    index('ql3_run_cancellation_dispatch_project_blocked_idx')
+      .on(table.projectId, table.updatedAtMs, table.runId)
+      .where(sql`${table.status} = 'blocked'`),
   ],
 );
 

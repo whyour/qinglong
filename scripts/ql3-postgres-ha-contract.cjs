@@ -13987,6 +13987,9 @@ async function main(argv = process.argv.slice(2)) {
           cancellationDispatch.retryDeferredUntilDue,
         cancellationDispatchSummaryIsLowSensitiveAndActionable:
           cancellationDispatch.operatorSummaryLowSensitiveAndActionable,
+        cancellationDispatchBlockedListIsBoundedAndProjectIndexed:
+          cancellationDispatch.blockedListLowSensitiveAndSnapshotBound &&
+          cancellationDispatch.blockedListUsesProjectKeysetIndex,
         cancellationDispatchReplicatesAndSurvivesPromotion:
           cancellationDispatch.replicatedBeforePromotion &&
           cancellationDispatch.survivedPromotion,

@@ -188,6 +188,18 @@ function fixture(role = 'operator', options = {}) {
             };
           }
           if (
+            text.startsWith(
+              'SELECT run_id AS "runId", updated_at_ms AS "blockedAtMs"',
+            )
+          ) {
+            return {
+              rows: [
+                { runId: 'run-1', blockedAtMs: String(NOW - 1_500) },
+              ],
+              rowCount: 1,
+            };
+          }
+          if (
             text.startsWith('SELECT attempt_id AS "attemptId"') &&
             text.includes('FROM "ql3"."run_cancellation_dispatches"') &&
             !text.includes('dispatchStatus') &&
@@ -423,6 +435,35 @@ test('allows a viewer to summarize Project cancellation availability atomically'
   assert.ok(
     calls.indexOf(audit) < calls.findIndex(({ sql }) => sql === 'COMMIT'),
   );
+});
+
+test('allows a viewer to page blocked Run identities under run.read', async () => {
+  const { calls, service } = fixture('viewer');
+  const listRequest = {
+    projectId: 'project-1',
+    requestId: 'request-blocked-1',
+    auditEventId: '019f9500-0000-4000-8000-000000000071',
+    failureAuditEventId: '019f9500-0000-4000-8000-000000000072',
+    principal: request().principal,
+  };
+  const result = await service.listBlockedCancellations(listRequest);
+  assert.deepEqual(result.items, [
+    { runId: 'run-1', blockedAtMs: NOW - 1_500 },
+  ]);
+  assert.equal(result.snapshotAtMs, NOW);
+  assert.equal(result.truncated, false);
+  const list = calls.find(({ sql }) =>
+    sql.startsWith(
+      'SELECT run_id AS "runId", updated_at_ms AS "blockedAtMs"',
+    ),
+  );
+  assert.deepEqual(list.params, ['project-1', NOW, null, '', 17]);
+  const audit = calls.find(
+    ({ sql, params }) =>
+      sql.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
+      params[2] === 'run.cancellation.blocked.list',
+  );
+  assert.equal(audit.params[0], listRequest.auditEventId);
 });
 
 test('authorizes exact cancellation rearm and keeps the event identity server-side', async () => {

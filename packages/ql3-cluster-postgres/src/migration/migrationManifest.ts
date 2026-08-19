@@ -343,5 +343,10 @@ export const postgresqlMainMigrationManifest: MigrationStreamManifest =
         checksum:
           'e78e24a06dc4c4dbdd859685f28b4bc837a8cfb279eb3512e0a57dc6d27eaaaa',
       }),
+      Object.freeze({
+        id: 'pg-0068-cancellation-dispatch-project-keyset',
+        checksum:
+          '2fcac38386581189db63faacff325356f11c4529a8db9cef6be1a1ca706aaf10',
+      }),
     ]),
   });

@@ -340,10 +340,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterAdmin.rootSourceFileRoles,
     },
     {
-      sourceFiles: 123,
+      sourceFiles: 124,
       rootSourceFiles: 1,
       rootSourceLines: 61,
-      nestedSourceFiles: 122,
+      nestedSourceFiles: 123,
       rootSourceFileRoles: {
         'modelInvocationMigrationCli.ts': 'binary_entry',
       },
@@ -421,10 +421,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterPostgres.rootSourceFileRoles,
     },
     {
-      sourceFiles: 172,
+      sourceFiles: 173,
       rootSourceFiles: 1,
       rootSourceLines: 126,
-      nestedSourceFiles: 171,
+      nestedSourceFiles: 172,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

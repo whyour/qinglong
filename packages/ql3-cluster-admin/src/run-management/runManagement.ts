@@ -11,6 +11,8 @@ import {
   RunCancellationDispatchManagementNotFoundError,
   RunCancellationDispatchManagementUnavailableError,
   type BlockingCancellationDispatchResult,
+  type RunCancellationDispatchBlockedCursor,
+  type RunCancellationDispatchBlockedPage,
   type RunCancellationDispatchDiagnostic,
   type RunCancellationDispatchRearmReceipt,
   type RunCancellationDispatchSummary,
@@ -84,6 +86,11 @@ export interface ClusterRunManagementCancellationSummaryRequest {
   readonly principal: Readonly<SecurityPrincipal>;
 }
 
+export interface ClusterRunManagementCancellationBlockedListRequest
+  extends ClusterRunManagementCancellationSummaryRequest {
+  readonly after?: Readonly<RunCancellationDispatchBlockedCursor>;
+}
+
 export interface ClusterRunManagementCancellationRearmRequest
   extends ClusterRunManagementCancellationInspectRequest {
   readonly mutationId: string;
@@ -102,6 +109,9 @@ export interface ClusterRunManagementService {
   summarizeCancellation(
     request: Readonly<ClusterRunManagementCancellationSummaryRequest>,
   ): Promise<Readonly<RunCancellationDispatchSummary>>;
+  listBlockedCancellations(
+    request: Readonly<ClusterRunManagementCancellationBlockedListRequest>,
+  ): Promise<Readonly<RunCancellationDispatchBlockedPage>>;
   inspectCancellation(
     request: Readonly<ClusterRunManagementCancellationInspectRequest>,
   ): Promise<Readonly<RunCancellationDispatchDiagnostic>>;
@@ -259,6 +269,34 @@ function exactCancellationSummaryRequest(
         'principal',
         'projectId',
         'requestId',
+      ]
+        .sort()
+        .join('\0')
+  ) {
+    throw new ClusterRunManagementRequestError();
+  }
+}
+
+function exactCancellationBlockedListRequest(
+  value: unknown,
+): asserts value is Readonly<ClusterRunManagementCancellationBlockedListRequest> {
+  const hasAfter =
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.hasOwn(value, 'after');
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join('\0') !==
+      [
+        'auditEventId',
+        'failureAuditEventId',
+        'principal',
+        'projectId',
+        'requestId',
+        ...(hasAfter ? ['after'] : []),
       ]
         .sort()
         .join('\0')
@@ -590,6 +628,99 @@ export function createClusterRunManagementService(
               eventId: requestValue.failureAuditEventId,
               requestId: requestValue.requestId,
               operationId: 'run.cancellation.summary',
+              projectId: requestValue.projectId,
+              subject: principal.subject,
+              authenticationId: principal.authenticationId,
+              outcome: 'denied',
+              reasons: [failureReason(error)],
+              fence,
+              occurredAtMs: observedAtMs,
+            }),
+          );
+        } catch (auditError) {
+          throw new ClusterRunManagementUnavailableError({ cause: auditError });
+        }
+        if (error instanceof ClusterRunManagementAuthorizationError) throw error;
+        if (error instanceof InvalidRunCancellationDispatchManagementError) {
+          throw new ClusterRunManagementRequestError();
+        }
+        if (error instanceof RunCancellationDispatchManagementConflictError) {
+          throw new ClusterRunManagementConflictError();
+        }
+        if (error instanceof RunCancellationDispatchManagementUnavailableError) {
+          throw new ClusterRunManagementUnavailableError({ cause: error });
+        }
+        throw new ClusterRunManagementUnavailableError({ cause: error });
+      }
+    },
+    async listBlockedCancellations(
+      requestValue: Readonly<ClusterRunManagementCancellationBlockedListRequest>,
+    ) {
+      exactCancellationBlockedListRequest(requestValue);
+      const observedAtMs = now();
+      let principal: Readonly<SecurityPrincipal>;
+      const after = requestValue.after;
+      if (
+        !Number.isSafeInteger(observedAtMs) ||
+        observedAtMs < 0 ||
+        !IDENTIFIER_PATTERN.test(requestValue.projectId) ||
+        !IDENTIFIER_PATTERN.test(requestValue.requestId) ||
+        !validUuid(requestValue.auditEventId) ||
+        !validUuid(requestValue.failureAuditEventId) ||
+        requestValue.auditEventId === requestValue.failureAuditEventId ||
+        (after !== undefined &&
+          (!after ||
+            typeof after !== 'object' ||
+            Array.isArray(after) ||
+            Object.keys(after).sort().join('\0') !==
+              ['blockedAtMs', 'runId', 'snapshotAtMs'].join('\0') ||
+            !Number.isSafeInteger(after.snapshotAtMs) ||
+            after.snapshotAtMs < 0 ||
+            !Number.isSafeInteger(after.blockedAtMs) ||
+            after.blockedAtMs < 0 ||
+            after.blockedAtMs > after.snapshotAtMs ||
+            !IDENTIFIER_PATTERN.test(after.runId)))
+      ) {
+        throw new ClusterRunManagementRequestError();
+      }
+      try {
+        principal = normalizeSecurityPrincipal(
+          requestValue.principal,
+          observedAtMs,
+        );
+      } catch {
+        throw new ClusterRunManagementRequestError();
+      }
+      let fence: Readonly<SecurityPolicyFence> | null = null;
+      try {
+        const decision = await policy.authorize(
+          principal,
+          requestValue.projectId,
+          'run.read',
+        );
+        fence = decision.fence;
+        if (
+          decision.effect !== 'allow' ||
+          !fence ||
+          fence.bindingVersion === null
+        ) {
+          throw new ClusterRunManagementAuthorizationError();
+        }
+        return await cancellationDispatches.listBlocked({
+          projectId: requestValue.projectId,
+          requestId: requestValue.requestId,
+          auditEventId: requestValue.auditEventId,
+          principal,
+          policyFence: fence,
+          ...(after === undefined ? {} : { after }),
+        });
+      } catch (error) {
+        try {
+          await audit.record(
+            normalizeSecurityAuditRecord({
+              eventId: requestValue.failureAuditEventId,
+              requestId: requestValue.requestId,
+              operationId: 'run.cancellation.blocked.list',
               projectId: requestValue.projectId,
               subject: principal.subject,
               authenticationId: principal.authenticationId,

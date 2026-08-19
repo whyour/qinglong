@@ -59,4 +59,4 @@ QingLong 的部署跨度很大。Cluster operator 需要可读状态卡和可供
 
 ## 后续
 
-D-368 可设计 Project-scoped blocked drill-down：固定小页、稳定数据库 cursor、只返回继续 inspect 所需的最低 identity，并证明索引、事务一致性、Policy/audit 和多副本 HA。Copilot Console 状态卡应复用本 ADR 的 projection 和显式 Run management authority，但不得默认持有该 authority 或建立轮询。
+ADR-0461/D-368 已完成 Project-scoped blocked drill-down：固定 16 项、数据库快照键集、最低 Run identity、Project partial index、Policy/audit 与一次性 `ql3 run blocked`。Copilot Console 状态卡和 drill-down 应复用这些 projection 与显式 Run management authority，但不得默认持有该 authority、建立轮询或自动翻页。

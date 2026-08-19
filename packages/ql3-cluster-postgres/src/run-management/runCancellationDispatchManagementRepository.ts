@@ -7,6 +7,7 @@ import {
 } from '@qinglong/runtime-core';
 import {
   CANCELLATION_DISPATCH_BLOCKING_RESULTS,
+  CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT,
   CANCELLATION_DISPATCH_RESULTS,
   CANCELLATION_DISPATCH_STATUSES,
   MAX_CANCELLATION_DISPATCH_RETRY_DELAY_MS,
@@ -83,6 +84,27 @@ export type RunCancellationDispatchSummary = Readonly<{
   oldestBlockedAtMs?: number;
 }>;
 
+export const RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT =
+  CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT;
+
+export type RunCancellationDispatchBlockedCursor = Readonly<{
+  snapshotAtMs: number;
+  blockedAtMs: number;
+  runId: string;
+}>;
+
+export type RunCancellationDispatchBlockedPage = Readonly<{
+  projectId: string;
+  snapshotAtMs: number;
+  observedAtMs: number;
+  items: readonly Readonly<{
+    runId: string;
+    blockedAtMs: number;
+  }>[];
+  truncated: boolean;
+  nextCursor?: Readonly<RunCancellationDispatchBlockedCursor>;
+}>;
+
 interface ProjectManagementAuthority {
   readonly projectId: string;
   readonly requestId: string;
@@ -97,6 +119,11 @@ interface ManagementAuthority extends ProjectManagementAuthority {
 
 export interface PostgresRunCancellationDispatchSummaryCommand
   extends ProjectManagementAuthority {}
+
+export interface PostgresRunCancellationDispatchBlockedListCommand
+  extends ProjectManagementAuthority {
+  readonly after?: Readonly<RunCancellationDispatchBlockedCursor>;
+}
 
 export interface PostgresRunCancellationDispatchInspectCommand
   extends ManagementAuthority {}
@@ -347,6 +374,48 @@ function normalizeSummaryCommand(
   });
 }
 
+function normalizeBlockedCursor(
+  value: unknown,
+): Readonly<RunCancellationDispatchBlockedCursor> {
+  const cursor = exact(value, ['snapshotAtMs', 'blockedAtMs', 'runId']);
+  const snapshotAtMs = boundedInteger(cursor.snapshotAtMs, 0);
+  const blockedAtMs = boundedInteger(cursor.blockedAtMs, 0, snapshotAtMs);
+  return Object.freeze({
+    snapshotAtMs,
+    blockedAtMs,
+    runId: identifier(cursor.runId),
+  });
+}
+
+function normalizeBlockedListCommand(
+  value: Readonly<PostgresRunCancellationDispatchBlockedListCommand>,
+): Readonly<PostgresRunCancellationDispatchBlockedListCommand> {
+  const hasAfter =
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.hasOwn(value, 'after');
+  const input = exact(value, [
+    'projectId',
+    'requestId',
+    'auditEventId',
+    'principal',
+    'policyFence',
+    ...(hasAfter ? ['after'] : []),
+  ]);
+  const authority = normalizeSummaryCommand({
+    projectId: input.projectId as string,
+    requestId: input.requestId as string,
+    auditEventId: input.auditEventId as string,
+    principal: input.principal as SecurityPrincipal,
+    policyFence: input.policyFence as SecurityPolicyFence,
+  });
+  return Object.freeze({
+    ...authority,
+    ...(hasAfter ? { after: normalizeBlockedCursor(input.after) } : {}),
+  });
+}
+
 function normalizeRearmCommand(
   value: Readonly<PostgresRunCancellationDispatchRearmCommand>,
 ): Readonly<PostgresRunCancellationDispatchRearmCommand> {
@@ -474,6 +543,7 @@ async function recordAllowedAudit(
   command: Readonly<ProjectManagementAuthority>,
   operationId:
     | 'run.cancellation.summary'
+    | 'run.cancellation.blocked.list'
     | 'run.cancellation.inspect'
     | 'run.cancellation.rearm',
   observedAtMs: number,
@@ -600,6 +670,76 @@ function summaryProjection(
     signals,
     blockingResults,
     ...(oldestBlockedAtMs === undefined ? {} : { oldestBlockedAtMs }),
+  });
+}
+
+function storedIdentifier(row: Row, key: string): string {
+  const value = text(row, key);
+  if (!IDENTIFIER_PATTERN.test(value)) {
+    throw new TypeError(
+      `PostgreSQL cancellation management ${key} is invalid`,
+    );
+  }
+  return value;
+}
+
+function blockedPageProjection(
+  command: Readonly<PostgresRunCancellationDispatchBlockedListCommand>,
+  observedAtMs: number,
+  snapshotAtMs: number,
+  rows: readonly Row[],
+): Readonly<RunCancellationDispatchBlockedPage> {
+  if (rows.length > RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT + 1) {
+    throw new TypeError(
+      'PostgreSQL cancellation management blocked page is invalid',
+    );
+  }
+  const projected = rows.map((row) =>
+    Object.freeze({
+      runId: storedIdentifier(row, 'runId'),
+      blockedAtMs: integer(row, 'blockedAtMs'),
+    }),
+  );
+  let previous = command.after;
+  for (const item of projected) {
+    if (
+      item.blockedAtMs > snapshotAtMs ||
+      (previous !== undefined &&
+        (item.blockedAtMs < previous.blockedAtMs ||
+          (item.blockedAtMs === previous.blockedAtMs &&
+            item.runId <= previous.runId)))
+    ) {
+      throw new TypeError(
+        'PostgreSQL cancellation management blocked cursor order is invalid',
+      );
+    }
+    previous = Object.freeze({
+      snapshotAtMs,
+      blockedAtMs: item.blockedAtMs,
+      runId: item.runId,
+    });
+  }
+  const truncated =
+    projected.length > RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT;
+  const items = Object.freeze(
+    projected.slice(0, RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT),
+  );
+  const last = items.at(-1);
+  return Object.freeze({
+    projectId: command.projectId,
+    snapshotAtMs,
+    observedAtMs,
+    items,
+    truncated,
+    ...(truncated && last
+      ? {
+          nextCursor: Object.freeze({
+            snapshotAtMs,
+            blockedAtMs: last.blockedAtMs,
+            runId: last.runId,
+          }),
+        }
+      : {}),
   });
 }
 
@@ -815,6 +955,53 @@ export class PostgresRunCancellationDispatchManagementRepository {
         observedAtMs,
       );
       return summaryProjection(command.projectId, observedAtMs, result.rows[0]!);
+    });
+  }
+
+  listBlocked(
+    value: Readonly<PostgresRunCancellationDispatchBlockedListCommand>,
+  ): Promise<Readonly<RunCancellationDispatchBlockedPage>> {
+    const command = normalizeBlockedListCommand(value);
+    return this.transaction(async (client) => {
+      const observedAtMs = await databaseNow(client);
+      const snapshotAtMs = command.after?.snapshotAtMs ?? observedAtMs;
+      if (snapshotAtMs > observedAtMs) {
+        throw new InvalidRunCancellationDispatchManagementError();
+      }
+      const authorized = Object.freeze({
+        ...command,
+        principal: strongPrincipal(command.principal, observedAtMs),
+      });
+      await confirmAuthorization(client, authorized);
+      const result = await client.query<Row>(
+        `SELECT run_id AS "runId", updated_at_ms AS "blockedAtMs"
+           FROM "ql3"."run_cancellation_dispatches"
+          WHERE project_id = $1 AND status = 'blocked'
+            AND updated_at_ms <= $2
+            AND ($3::bigint IS NULL OR
+                 (updated_at_ms, run_id) > ($3::bigint, $4::varchar))
+          ORDER BY updated_at_ms ASC, run_id ASC
+          LIMIT $5`,
+        [
+          command.projectId,
+          snapshotAtMs,
+          command.after?.blockedAtMs ?? null,
+          command.after?.runId ?? '',
+          RUN_CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT + 1,
+        ],
+      );
+      await recordAllowedAudit(
+        client,
+        authorized,
+        'run.cancellation.blocked.list',
+        observedAtMs,
+      );
+      return blockedPageProjection(
+        command,
+        observedAtMs,
+        snapshotAtMs,
+        result.rows,
+      );
     });
   }
 

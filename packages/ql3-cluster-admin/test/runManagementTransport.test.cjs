@@ -144,6 +144,16 @@ function summaryResult() {
   };
 }
 
+function blockedListResult() {
+  return {
+    projectId: 'project-1',
+    snapshotAtMs: NOW,
+    observedAtMs: NOW,
+    items: [{ runId: 'run-1', blockedAtMs: NOW - 800 }],
+    truncated: false,
+  };
+}
+
 function rearmResult() {
   return {
     status: 'rearmed',
@@ -195,6 +205,24 @@ function summaryCommand(overrides = {}) {
   };
 }
 
+function blockedListCommand(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    operation: 'run.cancellation.blocked.list',
+    request: {
+      projectId: 'project-1',
+      requestId: 'request-blocked-1',
+      auditEventId: '019f9300-0000-4000-8000-000000000061',
+      failureAuditEventId: '019f9300-0000-4000-8000-000000000062',
+      body: {
+        schema: 'qinglong/run-cancellation-dispatch-blocked-list-request@v1',
+        after: null,
+      },
+      ...overrides,
+    },
+  };
+}
+
 function rearmCommand(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -231,6 +259,9 @@ test('routes one exact strong User retry and emits the shared response', async (
       },
       async summarizeCancellation() {
         return summaryResult();
+      },
+      async listBlockedCancellations() {
+        return blockedListResult();
       },
       async inspectCancellation() {
         return diagnosticResult();
@@ -271,6 +302,9 @@ test('routes one exact strong User stop and emits the shared response', async ()
       async summarizeCancellation() {
         return summaryResult();
       },
+      async listBlockedCancellations() {
+        return blockedListResult();
+      },
       async inspectCancellation() {
         return diagnosticResult();
       },
@@ -310,6 +344,9 @@ test('rejects weak or non-User identity before service authority', async () => {
       async summarizeCancellation() {
         return summaryResult();
       },
+      async listBlockedCancellations() {
+        return blockedListResult();
+      },
       async inspectCancellation() {
         return diagnosticResult();
       },
@@ -342,6 +379,7 @@ test('routes bounded cancellation inspection without lease capability data', asy
       async retry() { return retryResult(); },
       async stop() { return stopResult(); },
       async summarizeCancellation() { return summaryResult(); },
+      async listBlockedCancellations() { return blockedListResult(); },
       async inspectCancellation(request) {
         calls.push(request);
         return diagnosticResult();
@@ -376,6 +414,7 @@ test('routes one Project-scoped cancellation summary without Run identity', asyn
         calls.push(request);
         return summaryResult();
       },
+      async listBlockedCancellations() { return blockedListResult(); },
       async inspectCancellation() { return diagnosticResult(); },
       async rearmCancellation() { return rearmResult(); },
     },
@@ -398,6 +437,47 @@ test('routes one Project-scoped cancellation summary without Run identity', asyn
   assert.equal(JSON.stringify(result).includes('leaseOwner'), false);
 });
 
+test('routes one fixed Project blocked page without dispatch internals', async () => {
+  const calls = [];
+  const transport = createClusterRunManagementTransport({
+    now: () => NOW,
+    service: {
+      async retry() { return retryResult(); },
+      async stop() { return stopResult(); },
+      async summarizeCancellation() { return summaryResult(); },
+      async listBlockedCancellations(request) {
+        calls.push(request);
+        return blockedListResult();
+      },
+      async inspectCancellation() { return diagnosticResult(); },
+      async rearmCancellation() { return rearmResult(); },
+    },
+  });
+  const result = await transport.execute(blockedListCommand(), {
+    authenticate: async () => principal(),
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].projectId, 'project-1');
+  assert.equal(Object.hasOwn(calls[0], 'after'), false);
+  assert.deepEqual(result, {
+    schemaVersion: 1,
+    operation: 'run.cancellation.blocked.list',
+    page: {
+      schema: 'qinglong/run-cancellation-dispatch-blocked-page@v1',
+      ...blockedListResult(),
+    },
+  });
+  for (const forbidden of [
+    'attemptId',
+    'dispatchVersion',
+    'lastResult',
+    'leaseOwner',
+    'leaseToken',
+  ]) {
+    assert.equal(JSON.stringify(result).includes(forbidden), false);
+  }
+});
+
 test('routes an exact blocked cancellation rearm receipt', async () => {
   const calls = [];
   const transport = createClusterRunManagementTransport({
@@ -406,6 +486,7 @@ test('routes an exact blocked cancellation rearm receipt', async () => {
       async retry() { return retryResult(); },
       async stop() { return stopResult(); },
       async summarizeCancellation() { return summaryResult(); },
+      async listBlockedCancellations() { return blockedListResult(); },
       async inspectCancellation() { return diagnosticResult(); },
       async rearmCancellation(request) {
         calls.push(request);

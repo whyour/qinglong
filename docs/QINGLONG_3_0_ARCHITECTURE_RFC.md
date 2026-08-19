@@ -11,7 +11,23 @@
 
 最新增量证据（2026-08-19）：
 
-- D-367/ADR-0460（已接受；有界 blocked drill-down 与 Console 可选接入待完成）：在现有 `ql3 run`/`ql3-run-client` 增加一次性
+- D-368/ADR-0461（已接受；Console 可选接入待完成）：在既有 Run management plane 与 `ql3 run` 增加
+  `run.cancellation.blocked.list`/`blocked` 一次性 drill-down。服务端固定 16 项、只查询 17 行，客户端不能提供 limit 或自动翻页；页面只含
+  `{runId,blockedAtMs}`，以 PostgreSQL 首屏时间和 `(blockedAtMs,runId)` 组成稳定 cursor，严格 oldest-first、快照后新增项不进入后续页。强认证 User 继续使用
+  `run.read`，Policy fence、数据库时间、键集读取与 allowed audit 在同一 5 秒 SERIALIZABLE 短事务；CLI cursor 是有版本、精确字段、大小受限的 canonical
+  base64url token，非法输入在网络前失败。`pg-0068-cancellation-dispatch-project-keyset`/capability v67 为 dispatch 增加一次性回填的 `project_id`、
+  `runs(project_id,id)` 唯一键、复合外键和仅 blocked 的 `(project_id,updated_at_ms,run_id)` partial index，避免跨租户扫描；runtime claim 从已锁定 Run
+  原子写入 Project。没有新增 package、依赖、binary、服务、端口、timer、queue、cache 或 Kubernetes 对象；代码只进入既有领域子目录，`src` 根仍只保留入口。
+  Edge/Standalone 闭包不包含 Cluster 管理能力，低配路由器维持零新增常驻开销。Cluster Admin 全量 `413 total / 410 pass / 3 conditional skip / 0 fail`，
+  Cluster PostgreSQL 全量 `347 total / 344 pass / 3 conditional skip / 0 fail`，backend 为 `1,489 total / 1,487 pass / 2 conditional skip / 0 fail`，
+  18-package clean build/顺序测试单次退出 0。package layout 聚焦审计 `10/10`，四项架构审计全部 compatible；workspace 保持 18 packages、无
+  single/shallow package，Cluster Admin 为 `124 source / 123 nested`，Cluster PostgreSQL 为 `173 source / 172 nested`。`14/14` Local artifact audit
+  全部 compatible；基础 Edge/Standalone 保持 `2,589,998 / 2,590,076` bytes，Application+AI 为 `4,493,151 / 4,493,283` bytes，MCP 为
+  `7,315,930 / 7,316,038` bytes。PostgreSQL 18.6 arm64 HA `146/146`、timeline `1→2`，真实证明 v67 migration、Project partial-index list、同事务 audit、
+  rearm、生产交付、WAL 与 promotion；报告 SHA-256 为 `1fbd58c5bb32bbf83b6c1970a594f7879c33d63057a3b9c34f13ec9917ff5c44`，独立 evidence audit
+  compatible 且零 finding。
+
+- D-367/ADR-0460（已接受；有界 blocked drill-down 由 D-368 完成，Console 可选接入待完成）：在现有 `ql3 run`/`ql3-run-client` 增加一次性
   `status --config=... --assertion=... --project=... [--format=text|json]` 产品入口。它在内存生成固定 `run.cancellation.summary` 命令，仍经同一
   exact codec、TLS 1.3、Run 专用 mTLS/OIDC、固定 management route 和响应交叉不变量校验；原 `--command` 私有文件模式保持兼容。默认 text 是无 ANSI
   的确定性 Project 状态卡，JSON 使用 `qinglong/run-cancellation-status@v1`；两者只含 D-366 低敏计数与结论。告警映射固定为

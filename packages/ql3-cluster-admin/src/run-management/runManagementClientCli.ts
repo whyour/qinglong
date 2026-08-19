@@ -6,6 +6,12 @@ import {
   executeClusterRunManagementCommand,
 } from './runManagementClient';
 import {
+  createRunCancellationBlockedListCommand,
+  decodeRunCancellationBlockedCursor,
+  formatRunCancellationBlockedListCard,
+  projectRunCancellationBlockedList,
+} from './runCancellationBlockedList';
+import {
   createRunCancellationStatusCommand,
   formatRunCancellationStatusCard,
   projectRunCancellationStatus,
@@ -14,6 +20,7 @@ import {
 const USAGE = [
   'Usage: ql3-run-client --config=/absolute/client.json --command=/absolute/command.json --assertion=/absolute/assertion.jwt',
   '       ql3-run-client status --config=/absolute/client.json --assertion=/absolute/assertion.jwt --project=PROJECT [--format=text|json]',
+  '       ql3-run-client blocked --config=/absolute/client.json --assertion=/absolute/assertion.jwt --project=PROJECT [--cursor=CURSOR] [--format=text|json]',
   '',
   'Status exit codes: 0=clear, 10=converging, 20=attention_required.',
 ].join('\n');
@@ -32,18 +39,31 @@ type RunManagementClientArguments =
       assertionFile: string;
       projectId: string;
       format: 'text' | 'json';
+    }>
+  | Readonly<{
+      kind: 'blocked';
+      configFile: string;
+      assertionFile: string;
+      projectId: string;
+      cursor?: string;
+      format: 'text' | 'json';
     }>;
 
 function argumentsFrom(
   argv: readonly string[],
 ): Readonly<RunManagementClientArguments> | null {
-  const statusCount = argv.filter((argument) => argument === 'status').length;
-  if (statusCount > 0) {
-    if (statusCount !== 1 || argv.length < 4 || argv.length > 5) return null;
+  const modes = argv.filter(
+    (argument) => argument === 'status' || argument === 'blocked',
+  );
+  if (modes.length > 0) {
+    if (modes.length !== 1 || argv.length < 4 || argv.length > 6) return null;
+    const kind = modes[0] as 'status' | 'blocked';
     const values = new Map<string, string>();
     for (const argument of argv) {
-      if (argument === 'status') continue;
-      const match = /^--(config|assertion|project|format)=(.+)$/.exec(argument);
+      if (argument === kind) continue;
+      const match = /^--(config|assertion|project|cursor|format)=(.+)$/.exec(
+        argument,
+      );
       if (!match || values.has(match[1]!)) return null;
       values.set(match[1]!, match[2]!);
     }
@@ -54,17 +74,28 @@ function argumentsFrom(
       !values.get('assertion')!.startsWith('/') ||
       !values.has('project') ||
       !PROJECT_ID.test(values.get('project')!) ||
+      (kind === 'status' && values.has('cursor')) ||
       (values.has('format') &&
         values.get('format') !== 'text' &&
         values.get('format') !== 'json')
     ) {
       return null;
     }
+    if (kind === 'blocked' && values.has('cursor')) {
+      try {
+        decodeRunCancellationBlockedCursor(values.get('cursor')!);
+      } catch {
+        return null;
+      }
+    }
     return Object.freeze({
-      kind: 'status',
+      kind,
       configFile: values.get('config')!,
       assertionFile: values.get('assertion')!,
       projectId: values.get('project')!,
+      ...(kind === 'blocked' && values.has('cursor')
+        ? { cursor: values.get('cursor')! }
+        : {}),
       format: (values.get('format') ?? 'text') as 'text' | 'json',
     });
   }
@@ -131,6 +162,23 @@ async function run(argv: readonly string[]): Promise<void> {
     return;
   }
   try {
+    if (paths.kind === 'blocked') {
+      const result = await executeClusterRunManagementCommand({
+        configFile: paths.configFile,
+        assertionFile: paths.assertionFile,
+        command: createRunCancellationBlockedListCommand(
+          paths.projectId,
+          paths.cursor,
+        ),
+      });
+      const page = projectRunCancellationBlockedList(result);
+      process.stdout.write(
+        paths.format === 'json'
+          ? `${JSON.stringify(page)}\n`
+          : `${formatRunCancellationBlockedListCard(page)}\n`,
+      );
+      return;
+    }
     if (paths.kind === 'status') {
       const result = await executeClusterRunManagementCommand({
         configFile: paths.configFile,

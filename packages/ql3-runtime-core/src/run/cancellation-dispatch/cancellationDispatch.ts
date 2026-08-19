@@ -49,6 +49,7 @@ const CANCELLATION_DISPATCH_RETRY_HISTORY_RESULTS = new Set<
 
 export const MAX_CANCELLATION_DISPATCH_LEASE_MS = 5 * 60_000;
 export const MAX_CANCELLATION_DISPATCH_RETRY_DELAY_MS = 24 * 60 * 60_000;
+export const CANCELLATION_DISPATCH_BLOCKED_PAGE_LIMIT = 16;
 
 export interface CancellationDispatchRecord {
   readonly runId: string;

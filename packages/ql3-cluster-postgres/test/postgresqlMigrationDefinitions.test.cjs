@@ -118,6 +118,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0065-approved-action-manual-recovery',
       'pg-0066-cancellation-dispatch',
       'pg-0067-cancellation-dispatch-management',
+      'pg-0068-cancellation-dispatch-project-keyset',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -590,6 +591,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0067-cancellation-dispatch-management',
       checksum:
         'e78e24a06dc4c4dbdd859685f28b4bc837a8cfb279eb3512e0a57dc6d27eaaaa',
+    },
+    {
+      id: 'pg-0068-cancellation-dispatch-project-keyset',
+      checksum:
+        '2fcac38386581189db63faacff325356f11c4529a8db9cef6be1a1ca706aaf10',
     },
   ];
   assert.deepEqual(
@@ -2372,4 +2378,46 @@ test('advances capability v66 with least-privilege cancellation diagnostics and 
   assert.match(sql, /"run_cancellation_dispatch_management":1/);
   assert.match(sql, /contract_version = 65/);
   assert.match(sql, /migration_id = 'pg-0066-cancellation-dispatch'/);
+});
+
+test('advances capability v67 with a Project-scoped blocked keyset', async () => {
+  const migration = migrationById(
+    'pg-0068-cancellation-dispatch-project-keyset',
+  );
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(
+    sql,
+    /ADD COLUMN project_id varchar\(128\)/,
+  );
+  assert.match(
+    sql,
+    /SET project_id = run\.project_id FROM "ql3"\."runs" AS run/,
+  );
+  assert.match(sql, /ALTER COLUMN project_id SET NOT NULL/);
+  assert.match(
+    sql,
+    /CREATE UNIQUE INDEX ql3_runs_project_id_uidx ON "ql3"\."runs" \(project_id, id\)/,
+  );
+  assert.match(
+    sql,
+    /FOREIGN KEY \(project_id, run_id\) REFERENCES "ql3"\."runs" \(project_id, id\)/,
+  );
+  assert.match(
+    sql,
+    /CREATE INDEX ql3_run_cancellation_dispatch_project_blocked_idx[\s\S]+\(project_id, updated_at_ms, run_id\) WHERE status = 'blocked'/,
+  );
+  assert.match(sql, /contract_version = 67/);
+  assert.match(sql, /"run_cancellation_dispatch_blocked_list":1/);
+  assert.match(sql, /contract_version = 66/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0067-cancellation-dispatch-management'/,
+  );
 });

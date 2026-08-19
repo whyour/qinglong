@@ -58,4 +58,4 @@ QingLong 同时面对小型路由设备和多副本 Cluster。Local/Edge 不应�
 
 ## 后续
 
-ADR-0460 已用现有 `ql3 run status` 完成一次性 Project 状态卡、稳定 JSON 和 `0/10/20` 告警退出码，不增加常驻组件或混合 Copilot Console authority。未知 blocked Run 的有界发现与 Console 可选接入仍需独立设计。CloudNativePG live failover、多副本容量压力、固定 Linux x64/arm64 和物理 Edge 资源证据仍是独立发布门；本 ADR 不把 Docker HA 或按需汇总冒充这些现场证据。
+ADR-0460 已用现有 `ql3 run status` 完成一次性 Project 状态卡、稳定 JSON 和 `0/10/20` 告警退出码；ADR-0461 又以固定 16 项、快照键集和 Project partial index 完成未知 blocked Run 的有界发现。两者都不增加常驻组件或混合 Copilot Console authority。Console 可选接入、CloudNativePG live failover、多副本容量压力、固定 Linux x64/arm64 和物理 Edge 资源证据仍是独立发布门；本 ADR 不把 Docker HA 或按需汇总冒充这些现场证据。
