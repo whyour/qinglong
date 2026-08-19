@@ -11,7 +11,22 @@
 
 最新增量证据（2026-08-19）：
 
-- D-366/ADR-0459（已接受；产品视觉入口待完成）：在既有 Run management plane 增加 `run.cancellation.summary`，由强认证 User 以
+- D-367/ADR-0460（已接受；有界 blocked drill-down 与 Console 可选接入待完成）：在现有 `ql3 run`/`ql3-run-client` 增加一次性
+  `status --config=... --assertion=... --project=... [--format=text|json]` 产品入口。它在内存生成固定 `run.cancellation.summary` 命令，仍经同一
+  exact codec、TLS 1.3、Run 专用 mTLS/OIDC、固定 management route 和响应交叉不变量校验；原 `--command` 私有文件模式保持兼容。默认 text 是无 ANSI
+  的确定性 Project 状态卡，JSON 使用 `qinglong/run-cancellation-status@v1`；两者只含 D-366 低敏计数与结论。告警映射固定为
+  `clear→ok/0`、`converging→warning/10`、`attention_required→critical/20`，查询失败仍为 1、用法错误仍为 64，使外部 supervisor 无需解析自然语言。
+  命令一次请求后退出，不轮询、不重试、不缓存、不保持 socket，也不改变 Cluster readiness。实现只在已有 `cluster-admin/run-management` 与
+  `management-support` 内增加真实职责，不新增 package、binary、依赖、服务、端口、timer、queue、cache、数据库权限、migration 或 Kubernetes 对象；
+  Edge/Standalone 闭包不变化。未知 blocked Run 的发现仍须后续独立的有界 cursor 契约，不能把 status 扩成无界列表或把第二组管理 authority 默认塞进
+  Copilot Console。聚焦门 `12/12`、CLI/product 真实进程门 `15/15`；Cluster Admin 全量为 `407 total / 404 pass / 3 conditional skip / 0 fail`，
+  backend 为 `1,489 total / 1,487 pass / 2 conditional skip / 0 fail`，18-package clean build/test 退出 0。四项架构审计与 `14/14` Local artifact audit
+  全部 compatible；workspace 保持 18 packages、无 single/shallow package，Cluster Admin 为 123 个 source、122 个 nested source、仅 1 个受审 binary root
+  entry。基础 Edge/Standalone 保持 `2,589,998 / 2,590,076` bytes，Application+AI 保持 `4,493,151 / 4,493,283` bytes，MCP 保持
+  `7,315,930 / 7,316,038` bytes。PostgreSQL 18.6 arm64 HA `145/145`、timeline `1→2`，报告 SHA-256 为
+  `59a568d0511cde671946ebf6df09f88868a3d591c5021c90bc27d4715411091e`，独立 evidence audit compatible 且零 finding。
+
+- D-366/ADR-0459（已接受；一次性产品 CLI 由 D-367 完成，Console 可选接入待完成）：在既有 Run management plane 增加 `run.cancellation.summary`，由强认证 User 以
   `run.read` 按需读取 Project 级 PostgreSQL 快照。响应只有五态 dispatch 计数、due/expired-lease 信号、四种 blocking-result 计数、最早 blocked
   时间和 `clear|converging|attention_required`/`none|wait|inspect` 固定结论，不返回 Run/Attempt/Worker identity 或 lease capability。blocked 触发
   `attention_required`，但不错误撤回整个 Cluster readiness；due/expired 只作为 caller-driven 收敛信号。查询与 allowed audit 位于同一 5 秒
@@ -22,7 +37,7 @@
   `145/145` 执行 blocked summary→inspect→rearm→production delivery→WAL→promotion，timeline `1→2`，报告 SHA-256 为
   `d763157b3a781e305add3c6f0c5080820b1d65b5feefe60be6fa7006c0050107`。
 
-- D-365/ADR-0458（已接受；聚合出口由 D-366 完成，产品视觉入口待完成）：在既有隔离 `cluster-admin` Run management plane 上增加
+- D-365/ADR-0458（已接受；聚合出口由 D-366、一次性产品 CLI 由 D-367 完成）：在既有隔离 `cluster-admin` Run management plane 上增加
   `run.cancellation.inspect` 与 `run.cancellation.rearm`，不新建 package、服务、端口、timer、连接池或 Kubernetes 对象。inspect 要求强认证 User
   与 `run.read`，viewer 可读取 Run/dispatch 的固定低敏投影，但永不返回 lease owner、raw token 或 token digest；rearm 要求 `run.stop`，只接受
   `blocked + expected dispatch version + expected blocking result` 的精确 CAS，retry delay 固定为 1 秒至 24 小时并由 PostgreSQL

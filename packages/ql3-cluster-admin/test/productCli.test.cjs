@@ -375,7 +375,7 @@ test('catalog exposes only reviewed product entrypoints from the same package', 
 test('help and version are bounded installation-derived product facts', () => {
   const help = qingLong3ClusterProductHelp();
   assert.match(help, /^Usage: ql3-cluster-admin <command> \[arguments\]/);
-  assert.match(help, /\n  run\s+retry or stop Runs/);
+  assert.match(help, /\n  run\s+observe, retry or stop Runs/);
   assert.match(help, /\n  copilot\s+diagnose, inspect, read or cancel Runs/);
   assert.match(help, /\n  copilot-mcp\s+serve the bounded Cluster Copilot MCP/);
   assert.match(help, /\n  copilot-console\s+open the loopback-only read-only/);

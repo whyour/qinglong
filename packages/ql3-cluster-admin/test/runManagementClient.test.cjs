@@ -15,6 +15,7 @@ const { afterEach, test } = require('node:test');
 
 const {
   executeClusterRunManagementClient,
+  executeClusterRunManagementCommand,
   validateClusterRunManagementClientResult,
 } = require('@qinglong/cluster-admin/run-management-client');
 const {
@@ -212,6 +213,32 @@ test('accepts only the exact Run route before opening one mTLS connection', asyn
         throw new Error('expected-connect-stop');
       },
     }),
+    { code: 'QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_REQUEST_FAILED' },
+  );
+  assert.equal(connects, 1);
+});
+
+test('accepts a normalized in-memory summary command without a command file', async () => {
+  const paths = clientFiles();
+  let connects = 0;
+  await assert.rejects(
+    executeClusterRunManagementCommand(
+      {
+        configFile: paths.configFile,
+        assertionFile: paths.assertionFile,
+        command: summaryCommand,
+      },
+      {
+        async connect(target) {
+          connects += 1;
+          assert.deepEqual(target, {
+            hostname: 'run.example.test',
+            port: 8448,
+          });
+          throw new Error('expected-connect-stop');
+        },
+      },
+    ),
     { code: 'QL3_PLUGIN_PACKAGE_MANAGEMENT_CLIENT_REQUEST_FAILED' },
   );
   assert.equal(connects, 1);

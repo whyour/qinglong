@@ -155,9 +155,11 @@ PID 可复用，可能终止无关进程，禁止。
 
 ADR-0459 进一步增加 Project-scoped、caller-driven summary，以固定计数和三态 assessment 提供 blocked/availability 告警出口，不改变全局 readiness，也不新增采集器。
 
+ADR-0460 已在现有 `ql3 run` 增加 one-shot status 产品入口：同一强认证 summary 被投影为低敏 text/JSON 状态卡，并以 `0/10/20` 区分 clear、converging 与 attention-required；没有新增轮询器、临时 command 文件或常驻 authority。
+
 HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入 Local Supervisor：只有 accepted 且全部 gate 通过时才启动，失败或 shutdown 时有界停止。以下工作仍未完成，因此它仍只允许显式 canary，不得扩大到默认生产流量：
 
-- 产品控制台中的 Project 状态卡、告警路由和有界 blocked drill-down；Project 聚合出口与私有 operator 处置协议已经实现。
+- Copilot Console 的可选 Project 状态卡与有界 blocked drill-down；Project 聚合出口、一次性产品状态卡、告警退出码和私有 operator 处置协议已经实现。
 - 固定 edge 设备的数据库写放大、RSS、时延和磁盘基准。
 - 固定 Project allowlist 的外部时序指标适配；数据库事实驱动的按需 availability/blocked 汇总已经实现。
 - 首次真实目标实例完整激活/回滚仪式与共享 config 多写者 authority。
@@ -180,3 +182,4 @@ HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入 Local
 14. 强认证 viewer 只能读取无 lease capability 的低敏诊断；只有 `run.stop` authority 可按 blocked/version/result 精确 rearm。
 15. rearm、RunEvent 与 allowed audit 原子提交，数据库时间决定 retry due；stale fence、授权漂移与 mutation drift 均失败关闭。
 16. Project summary 的五态与 blocking-result 计数必须交叉守恒，blocked 只产生 `attention_required` 告警而不撤回全局 readiness，且响应不包含 Run/Attempt/lease identity。
+17. `ql3 run status` 必须只发送一次固定 summary，text/JSON 事实一致，`0/10/20` 与三态严格映射；原 command-file 模式和 Edge/Standalone 闭包不得变化。

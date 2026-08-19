@@ -49,6 +49,12 @@ export interface ClusterPluginPackageManagementClientPaths {
   readonly assertionFile: string;
 }
 
+export interface ClusterAuthenticatedManagementCommandExecution<Command> {
+  readonly configFile: string;
+  readonly assertionFile: string;
+  readonly command: Command;
+}
+
 export interface ClusterPluginPackageManagementClientResult {
   readonly schemaVersion: 1;
   readonly requestId: string;
@@ -1119,11 +1125,23 @@ export async function executeClusterAuthenticatedManagementClient<
   Command,
   Result,
 >(
-  paths: ClusterPluginPackageManagementClientPaths,
+  execution:
+    | ClusterPluginPackageManagementClientPaths
+    | ClusterAuthenticatedManagementCommandExecution<Command>,
   protocol: ClusterAuthenticatedManagementClientProtocol<Command, Result>,
   connectionOptions?: ClusterPluginPackageManagementClientConnectionOptions,
 ): Promise<Readonly<ClusterAuthenticatedManagementClientResult<Result>>> {
-  exactObject(paths, ['configFile', 'commandFile', 'assertionFile']);
+  const inlineCommand =
+    execution !== null &&
+    typeof execution === 'object' &&
+    !Array.isArray(execution) &&
+    Object.hasOwn(execution, 'command');
+  exactObject(
+    execution,
+    inlineCommand
+      ? ['configFile', 'command', 'assertionFile']
+      : ['configFile', 'commandFile', 'assertionFile'],
+  );
   if (
     !protocol ||
     typeof protocol !== 'object' ||
@@ -1160,17 +1178,19 @@ export async function executeClusterAuthenticatedManagementClient<
     | undefined;
   try {
     prepared = prepareClusterAuthenticatedManagementClientConfiguration(
-      paths.configFile,
+      execution.configFile,
       protocol.managementPath,
       protocol.clientCertificate,
     );
-    commandBytes = readCanonicalFile(
-      paths.commandFile,
-      MAX_COMMAND_BYTES,
-      'private',
-    );
+    if (!inlineCommand) {
+      commandBytes = readCanonicalFile(
+        (execution as ClusterPluginPackageManagementClientPaths).commandFile,
+        MAX_COMMAND_BYTES,
+        'private',
+      );
+    }
     assertionBytes = readCanonicalFile(
-      paths.assertionFile,
+      execution.assertionFile,
       MAX_ASSERTION_BYTES,
       'private',
     );
@@ -1183,7 +1203,12 @@ export async function executeClusterAuthenticatedManagementClient<
       clientCertificateBytes,
       clientPrivateKeyBytes,
     } = prepared;
-    const command = protocol.normalizeCommand(parseJson(commandBytes));
+    const command = protocol.normalizeCommand(
+      inlineCommand
+        ? (execution as ClusterAuthenticatedManagementCommandExecution<Command>)
+            .command
+        : parseJson(commandBytes!),
+    );
     const assertion = assertionBytes.toString('ascii');
     if (
       assertionBytes.some((byte) => byte > 0x7f) ||

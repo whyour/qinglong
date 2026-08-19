@@ -14,6 +14,7 @@ import {
 import {
   ClusterPluginPackageManagementClientRequestError,
   executeClusterAuthenticatedManagementClient,
+  type ClusterAuthenticatedManagementCommandExecution,
   type ClusterAuthenticatedManagementClientResult,
   type ClusterPluginPackageManagementClientConnectionOptions,
   type ClusterPluginPackageManagementClientPaths,
@@ -35,6 +36,8 @@ export type ClusterRunManagementClientConnectionOptions =
   ClusterPluginPackageManagementClientConnectionOptions;
 export type ClusterRunManagementClientResult =
   ClusterAuthenticatedManagementClientResult<ClusterRunManagementTransportResult>;
+export type ClusterRunManagementCommandExecution =
+  ClusterAuthenticatedManagementCommandExecution<ClusterRunManagementCommand>;
 
 function invalid(): never {
   throw new ClusterPluginPackageManagementClientRequestError();
@@ -423,6 +426,17 @@ export function executeClusterRunManagementClient(
 ): Promise<Readonly<ClusterRunManagementClientResult>> {
   return executeClusterAuthenticatedManagementClient(
     paths,
+    PROTOCOL,
+    connectionOptions,
+  );
+}
+
+export function executeClusterRunManagementCommand(
+  execution: ClusterRunManagementCommandExecution,
+  connectionOptions?: ClusterRunManagementClientConnectionOptions,
+): Promise<Readonly<ClusterRunManagementClientResult>> {
+  return executeClusterAuthenticatedManagementClient(
+    execution,
     PROTOCOL,
     connectionOptions,
   );

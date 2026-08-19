@@ -87,7 +87,7 @@ export const QINGLONG3_CLUSTER_PRODUCT_COMMANDS: readonly QingLong3ClusterProduc
       name: 'run',
       binary: 'ql3-run-client',
       target: 'run-management/runManagementClientCli.js',
-      description: 'retry or stop Runs under strong authentication',
+      description: 'observe, retry or stop Runs under strong authentication',
     }),
     Object.freeze({
       name: 'automation',
