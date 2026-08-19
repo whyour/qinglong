@@ -211,6 +211,11 @@ run_extra_shell() {
   fi
 }
 
+## 查看青龙服务日志
+show_service_logs() {
+  pm2 logs qinglong "$@"
+}
+
 ## 脚本用法
 usage() {
   t "$cmd_update 命令使用方法："
@@ -221,10 +226,11 @@ usage() {
   echo -e "5.  $cmd_update rmlog <days>                                                            # 删除旧日志"
   echo -e "6.  $cmd_update bot                                                                     # 启动tg-bot"
   echo -e "7.  $cmd_update check                                                                   # 检测青龙环境并修复"
-  echo -e "8.  $cmd_update resetlet                                                                # 重置登录错误次数"
-  echo -e "9.  $cmd_update resettfa                                                                # 禁用两步登录"
-  echo -e "10. $cmd_update resetpwd                                                                # 修改登录密码"
-  echo -e "11. $cmd_update resetname                                                               # 修改登录用户名"
+  echo -e "8.  $cmd_update log [pm2-log-options]                                                    # 查看青龙服务日志"
+  echo -e "9.  $cmd_update resetlet                                                                # 重置登录错误次数"
+  echo -e "10. $cmd_update resettfa                                                                # 禁用两步登录"
+  echo -e "11. $cmd_update resetpwd                                                                # 修改登录密码"
+  echo -e "12. $cmd_update resetname                                                               # 修改登录用户名"
 }
 
 reload_qinglong() {
@@ -471,6 +477,12 @@ main() {
   local p8="${8}"
   local p9="${9}"
   local p10="${10}"
+
+  if [[ "$p1" == "log" ]]; then
+    show_service_logs "${@:2}"
+    return $?
+  fi
+
   local log_dir="${p1}"
   make_dir "$dir_log/$log_dir"
   local log_time=$(date "+%Y-%m-%d-%H-%M-%S")

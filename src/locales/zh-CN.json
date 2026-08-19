@@ -2,7 +2,7 @@
   "1. 宿主机执行 docker run --rm -v\n                  /var/run/docker.sock:/var/run/docker.sock\n                  containrrr/watchtower -cR <容器名>": "1. 宿主机执行 docker run --rm -v\n                  /var/run/docker.sock:/var/run/docker.sock\n                  containrrr/watchtower -cR <容器名>",
   "2. 容器内执行 ql check、ql update": "2. 容器内执行 ql check、ql update",
   "24小时未运行": "24小时未运行",
-  "3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果": "3. 如果无法解决，容器内执行 pm2 logs，拷贝执行结果",
+  "3. 如果无法解决，容器内执行 ql log，拷贝执行结果": "3. 如果无法解决，容器内执行 ql log，拷贝执行结果",
   "6位数字": "6位数字",
   "BARK推送图标，自定义推送图标 (需iOS15或以上才能显示)": "BARK推送图标，自定义推送图标 (需iOS15或以上才能显示)",
   "BARK推送消息的分组，默认为qinglong": "BARK推送消息的分组，默认为qinglong",
