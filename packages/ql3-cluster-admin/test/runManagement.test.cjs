@@ -164,6 +164,30 @@ function fixture(role = 'operator', options = {}) {
             return { rows: [], rowCount: 0 };
           }
           if (
+            text.includes('FROM "ql3"."run_cancellation_dispatches" AS dispatch')
+          ) {
+            return {
+              rows: [
+                {
+                  total: '5',
+                  pending: '1',
+                  leased: '1',
+                  retryWait: '1',
+                  dispatched: '1',
+                  blocked: '1',
+                  due: '1',
+                  expiredLease: '1',
+                  identityMismatch: '1',
+                  pidMismatch: '0',
+                  unsupported: '0',
+                  invalid: '0',
+                  oldestBlockedAtMs: String(NOW - 1_500),
+                },
+              ],
+              rowCount: 1,
+            };
+          }
+          if (
             text.startsWith('SELECT attempt_id AS "attemptId"') &&
             text.includes('FROM "ql3"."run_cancellation_dispatches"') &&
             !text.includes('dispatchStatus') &&
@@ -368,6 +392,37 @@ test('allows a viewer to inspect only low-sensitive cancellation state', async (
       params[2] === 'run.cancellation.inspect',
   );
   assert.equal(audit.params[0], inspectRequest.auditEventId);
+});
+
+test('allows a viewer to summarize Project cancellation availability atomically', async () => {
+  const { calls, service } = fixture('viewer');
+  const summaryRequest = {
+    projectId: 'project-1',
+    requestId: 'request-summary-1',
+    auditEventId: '019f9500-0000-4000-8000-000000000061',
+    failureAuditEventId: '019f9500-0000-4000-8000-000000000062',
+    principal: request().principal,
+  };
+  const result = await service.summarizeCancellation(summaryRequest);
+  assert.equal(result.assessment, 'attention_required');
+  assert.equal(result.operatorAction, 'inspect');
+  assert.equal(result.dispatches.blocked, 1);
+  assert.equal(result.blockingResults.identityMismatch, 1);
+  assert.equal(Object.hasOwn(result, 'runId'), false);
+  assert.equal(JSON.stringify(result).includes('attemptId'), false);
+  const aggregate = calls.find(({ sql }) =>
+    sql.includes('FROM "ql3"."run_cancellation_dispatches" AS dispatch'),
+  );
+  assert.deepEqual(aggregate.params, ['project-1', NOW]);
+  const audit = calls.find(
+    ({ sql, params }) =>
+      sql.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
+      params[2] === 'run.cancellation.summary',
+  );
+  assert.equal(audit.params[0], summaryRequest.auditEventId);
+  assert.ok(
+    calls.indexOf(audit) < calls.findIndex(({ sql }) => sql === 'COMMIT'),
+  );
 });
 
 test('authorizes exact cancellation rearm and keeps the event identity server-side', async () => {

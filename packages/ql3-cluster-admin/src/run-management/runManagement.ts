@@ -13,6 +13,7 @@ import {
   type BlockingCancellationDispatchResult,
   type RunCancellationDispatchDiagnostic,
   type RunCancellationDispatchRearmReceipt,
+  type RunCancellationDispatchSummary,
 } from '@qinglong/cluster-postgres/run-manager';
 import type { PostgresPool } from '@qinglong/runtime-core';
 import { CANCELLATION_DISPATCH_BLOCKING_RESULTS } from '@qinglong/runtime-core/cancellation-dispatch';
@@ -75,6 +76,14 @@ export interface ClusterRunManagementCancellationInspectRequest {
   readonly principal: Readonly<SecurityPrincipal>;
 }
 
+export interface ClusterRunManagementCancellationSummaryRequest {
+  readonly projectId: string;
+  readonly requestId: string;
+  readonly auditEventId: string;
+  readonly failureAuditEventId: string;
+  readonly principal: Readonly<SecurityPrincipal>;
+}
+
 export interface ClusterRunManagementCancellationRearmRequest
   extends ClusterRunManagementCancellationInspectRequest {
   readonly mutationId: string;
@@ -90,6 +99,9 @@ export interface ClusterRunManagementService {
   stop(
     request: Readonly<ClusterRunManagementStopRequest>,
   ): Promise<Readonly<ClusterRunCancellationResult>>;
+  summarizeCancellation(
+    request: Readonly<ClusterRunManagementCancellationSummaryRequest>,
+  ): Promise<Readonly<RunCancellationDispatchSummary>>;
   inspectCancellation(
     request: Readonly<ClusterRunManagementCancellationInspectRequest>,
   ): Promise<Readonly<RunCancellationDispatchDiagnostic>>;
@@ -225,6 +237,28 @@ function exactCancellationInspectRequest(
         'projectId',
         'requestId',
         'runId',
+      ]
+        .sort()
+        .join('\0')
+  ) {
+    throw new ClusterRunManagementRequestError();
+  }
+}
+
+function exactCancellationSummaryRequest(
+  value: unknown,
+): asserts value is Readonly<ClusterRunManagementCancellationSummaryRequest> {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join('\0') !==
+      [
+        'auditEventId',
+        'failureAuditEventId',
+        'principal',
+        'projectId',
+        'requestId',
       ]
         .sort()
         .join('\0')
@@ -497,6 +531,85 @@ export function createClusterRunManagementService(
           throw new ClusterRunManagementConflictError();
         }
         if (error instanceof ClusterRunCancellationUnavailableError) {
+          throw new ClusterRunManagementUnavailableError({ cause: error });
+        }
+        throw new ClusterRunManagementUnavailableError({ cause: error });
+      }
+    },
+    async summarizeCancellation(
+      requestValue: Readonly<ClusterRunManagementCancellationSummaryRequest>,
+    ) {
+      exactCancellationSummaryRequest(requestValue);
+      const observedAtMs = now();
+      let principal: Readonly<SecurityPrincipal>;
+      if (
+        !Number.isSafeInteger(observedAtMs) ||
+        observedAtMs < 0 ||
+        !IDENTIFIER_PATTERN.test(requestValue.projectId) ||
+        !IDENTIFIER_PATTERN.test(requestValue.requestId) ||
+        !validUuid(requestValue.auditEventId) ||
+        !validUuid(requestValue.failureAuditEventId) ||
+        requestValue.auditEventId === requestValue.failureAuditEventId
+      ) {
+        throw new ClusterRunManagementRequestError();
+      }
+      try {
+        principal = normalizeSecurityPrincipal(
+          requestValue.principal,
+          observedAtMs,
+        );
+      } catch {
+        throw new ClusterRunManagementRequestError();
+      }
+      let fence: Readonly<SecurityPolicyFence> | null = null;
+      try {
+        const decision = await policy.authorize(
+          principal,
+          requestValue.projectId,
+          'run.read',
+        );
+        fence = decision.fence;
+        if (
+          decision.effect !== 'allow' ||
+          !fence ||
+          fence.bindingVersion === null
+        ) {
+          throw new ClusterRunManagementAuthorizationError();
+        }
+        return await cancellationDispatches.summary({
+          projectId: requestValue.projectId,
+          requestId: requestValue.requestId,
+          auditEventId: requestValue.auditEventId,
+          principal,
+          policyFence: fence,
+        });
+      } catch (error) {
+        try {
+          await audit.record(
+            normalizeSecurityAuditRecord({
+              eventId: requestValue.failureAuditEventId,
+              requestId: requestValue.requestId,
+              operationId: 'run.cancellation.summary',
+              projectId: requestValue.projectId,
+              subject: principal.subject,
+              authenticationId: principal.authenticationId,
+              outcome: 'denied',
+              reasons: [failureReason(error)],
+              fence,
+              occurredAtMs: observedAtMs,
+            }),
+          );
+        } catch (auditError) {
+          throw new ClusterRunManagementUnavailableError({ cause: auditError });
+        }
+        if (error instanceof ClusterRunManagementAuthorizationError) throw error;
+        if (error instanceof InvalidRunCancellationDispatchManagementError) {
+          throw new ClusterRunManagementRequestError();
+        }
+        if (error instanceof RunCancellationDispatchManagementConflictError) {
+          throw new ClusterRunManagementConflictError();
+        }
+        if (error instanceof RunCancellationDispatchManagementUnavailableError) {
           throw new ClusterRunManagementUnavailableError({ cause: error });
         }
         throw new ClusterRunManagementUnavailableError({ cause: error });

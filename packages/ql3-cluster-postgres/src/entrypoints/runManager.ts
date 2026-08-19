@@ -8,8 +8,10 @@ export {
   type BlockingCancellationDispatchResult,
   type PostgresRunCancellationDispatchInspectCommand,
   type PostgresRunCancellationDispatchRearmCommand,
+  type PostgresRunCancellationDispatchSummaryCommand,
   type RunCancellationDispatchDiagnostic,
   type RunCancellationDispatchRearmReceipt,
+  type RunCancellationDispatchSummary,
 } from '../run-management/runCancellationDispatchManagementRepository';
 export {
   PostgresClusterRunCancellationRepository,

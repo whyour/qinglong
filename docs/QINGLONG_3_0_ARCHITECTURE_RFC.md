@@ -11,7 +11,18 @@
 
 最新增量证据（2026-08-19）：
 
-- D-365/ADR-0458（已接受；聚合指标与产品 UI 待完成）：在既有隔离 `cluster-admin` Run management plane 上增加
+- D-366/ADR-0459（已接受；产品视觉入口待完成）：在既有 Run management plane 增加 `run.cancellation.summary`，由强认证 User 以
+  `run.read` 按需读取 Project 级 PostgreSQL 快照。响应只有五态 dispatch 计数、due/expired-lease 信号、四种 blocking-result 计数、最早 blocked
+  时间和 `clear|converging|attention_required`/`none|wait|inspect` 固定结论，不返回 Run/Attempt/Worker identity 或 lease capability。blocked 触发
+  `attention_required`，但不错误撤回整个 Cluster readiness；due/expired 只作为 caller-driven 收敛信号。查询与 allowed audit 位于同一 5 秒
+  SERIALIZABLE 短事务，复用 v66 Run manager SELECT、既有单连接池和通用 mTLS 客户端，不新增 migration、权限、package、依赖、服务、端口、timer、
+  queue、cache 或 Kubernetes 对象。Edge/Standalone 闭包不变化；代码继续位于已有 `run-management` 子域，没有新增微包或 `src` 根目录平铺。完整
+  backend `1,487 pass / 0 fail / 2 conditional skip`，18-package clean build/test、四项架构审计与 `14/14` Local artifact audit 通过；基础
+  Edge/Standalone 保持 `2,589,998 / 2,590,076` bytes，Application+AI 保持 `4,493,151 / 4,493,283` bytes。PostgreSQL 18.6 arm64 HA
+  `145/145` 执行 blocked summary→inspect→rearm→production delivery→WAL→promotion，timeline `1→2`，报告 SHA-256 为
+  `d763157b3a781e305add3c6f0c5080820b1d65b5feefe60be6fa7006c0050107`。
+
+- D-365/ADR-0458（已接受；聚合出口由 D-366 完成，产品视觉入口待完成）：在既有隔离 `cluster-admin` Run management plane 上增加
   `run.cancellation.inspect` 与 `run.cancellation.rearm`，不新建 package、服务、端口、timer、连接池或 Kubernetes 对象。inspect 要求强认证 User
   与 `run.read`，viewer 可读取 Run/dispatch 的固定低敏投影，但永不返回 lease owner、raw token 或 token digest；rearm 要求 `run.stop`，只接受
   `blocked + expected dispatch version + expected blocking result` 的精确 CAS，retry delay 固定为 1 秒至 24 小时并由 PostgreSQL

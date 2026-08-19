@@ -132,6 +132,20 @@ const inspectCommand = normalizeClusterRunManagementCommand({
   },
 });
 
+const summaryCommand = normalizeClusterRunManagementCommand({
+  schemaVersion: 1,
+  operation: 'run.cancellation.summary',
+  request: {
+    projectId: 'project-1',
+    requestId: 'request-summary-1',
+    auditEventId: '019f9400-0000-4000-8000-000000000051',
+    failureAuditEventId: '019f9400-0000-4000-8000-000000000052',
+    body: {
+      schema: 'qinglong/run-cancellation-dispatch-summary-request@v1',
+    },
+  },
+});
+
 const rearmCommand = normalizeClusterRunManagementCommand({
   schemaVersion: 1,
   operation: 'run.cancellation.rearm',
@@ -305,6 +319,67 @@ test('validates a low-sensitive cancellation diagnostic and rejects capability l
   ]) {
     assert.throws(
       () => validateClusterRunManagementClientResult(drift, inspectCommand),
+      ClusterPluginPackageManagementClientRequestError,
+    );
+  }
+});
+
+test('validates the fixed low-sensitive Project cancellation summary', () => {
+  const value = {
+    schemaVersion: 1,
+    operation: 'run.cancellation.summary',
+    summary: {
+      schema: 'qinglong/run-cancellation-dispatch-summary@v1',
+      projectId: 'project-1',
+      observedAtMs: 1_000_000,
+      assessment: 'attention_required',
+      operatorAction: 'inspect',
+      dispatches: {
+        total: 5,
+        pending: 1,
+        leased: 1,
+        retryWait: 1,
+        dispatched: 1,
+        blocked: 1,
+      },
+      signals: { due: 1, expiredLease: 1 },
+      blockingResults: {
+        identityMismatch: 1,
+        pidMismatch: 0,
+        unsupported: 0,
+        invalid: 0,
+      },
+      oldestBlockedAtMs: 999_200,
+    },
+  };
+  assert.deepEqual(
+    validateClusterRunManagementClientResult(value, summaryCommand),
+    value,
+  );
+  for (const summary of [
+    { ...value.summary, projectId: 'project-2' },
+    { ...value.summary, assessment: 'clear' },
+    { ...value.summary, operatorAction: 'wait' },
+    {
+      ...value.summary,
+      dispatches: { ...value.summary.dispatches, total: 6 },
+    },
+    {
+      ...value.summary,
+      blockingResults: {
+        ...value.summary.blockingResults,
+        identityMismatch: 0,
+      },
+    },
+    { ...value.summary, oldestBlockedAtMs: 1_000_001 },
+    { ...value.summary, runId: 'run-1' },
+  ]) {
+    assert.throws(
+      () =>
+        validateClusterRunManagementClientResult(
+          { ...value, summary },
+          summaryCommand,
+        ),
       ClusterPluginPackageManagementClientRequestError,
     );
   }

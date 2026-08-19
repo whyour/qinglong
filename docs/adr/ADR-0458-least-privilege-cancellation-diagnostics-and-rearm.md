@@ -62,4 +62,4 @@ QingLong 同时面向低配路由器与集群。该能力只属于 Cluster opera
 
 ## 后续
 
-私有 operator 协议已经闭合，但面向产品的聚合 blocked/availability 指标、告警和 UI 仍待实现。CloudNativePG live failover、多副本容量压力、固定 Linux x64/arm64 与物理 Edge 资源证据继续作为发布最终化门，不由单机 Docker HA 结果替代。
+ADR-0459 已用既有管理面完成数据库事实驱动的 Project 级 blocked/availability 汇总和固定告警结论；产品视觉入口、告警路由和有界 drill-down 仍待实现。CloudNativePG live failover、多副本容量压力、固定 Linux x64/arm64 与物理 Edge 资源证据继续作为发布最终化门，不由单机 Docker HA 结果替代。

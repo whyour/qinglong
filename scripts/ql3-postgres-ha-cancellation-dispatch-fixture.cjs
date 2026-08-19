@@ -25,6 +25,7 @@ const FIXTURE = Object.freeze({
   terminalEventId: 'ha-cancel-terminal-event-d363',
   settledEventId: 'ha-cancel-settled-event-d363',
   blockedEventId: 'ha-cancel-blocked-event-d365',
+  summaryAuditEventId: '019f9700-0000-4000-8000-000000000005',
   inspectAuditEventId: '019f9700-0000-4000-8000-000000000001',
   rearmAuditEventId: '019f9700-0000-4000-8000-000000000002',
   rearmMutationId: '019f9700-0000-4000-8000-000000000003',
@@ -262,6 +263,22 @@ async function persistCancellationDispatchHaFixture(options) {
         principal,
         policyFence: Object.freeze({ projectVersion: 1, bindingVersion: 1 }),
       });
+      const summary = await management.summary({
+        projectId: FIXTURE.projectId,
+        requestId: 'ha-cancel-summary-d366',
+        auditEventId: FIXTURE.summaryAuditEventId,
+        principal,
+        policyFence: authority.policyFence,
+      });
+      assert.equal(summary.assessment, 'attention_required');
+      assert.equal(summary.operatorAction, 'inspect');
+      assert.equal(summary.dispatches.blocked, 1);
+      assert.equal(summary.blockingResults.identityMismatch, 1);
+      assert.equal(summary.signals.due, 0);
+      assert.equal(summary.signals.expiredLease, 0);
+      assert.equal(Object.hasOwn(summary, 'runId'), false);
+      assert.equal(JSON.stringify(summary).includes('attemptId'), false);
+      assert.equal(JSON.stringify(summary).includes('leaseOwner'), false);
       const diagnostic = await management.inspect(authority);
       assert.equal(diagnostic.operatorAction, 'rearm');
       assert.equal(diagnostic.dispatch?.status, 'blocked');
@@ -380,6 +397,7 @@ async function persistCancellationDispatchHaFixture(options) {
       staleLeaseFenced: true,
       retryDeferredUntilDue: true,
       operatorDiagnosticLowSensitive: true,
+      operatorSummaryLowSensitiveAndActionable: true,
       manualBlockedRearmExact: true,
       manualRearmDeferredUntilDue: true,
       productionDeliverySettledBeforeStop: true,

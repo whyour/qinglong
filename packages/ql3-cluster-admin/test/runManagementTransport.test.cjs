@@ -119,6 +119,31 @@ function diagnosticResult() {
   };
 }
 
+function summaryResult() {
+  return {
+    projectId: 'project-1',
+    observedAtMs: NOW,
+    assessment: 'attention_required',
+    operatorAction: 'inspect',
+    dispatches: {
+      total: 5,
+      pending: 1,
+      leased: 1,
+      retryWait: 1,
+      dispatched: 1,
+      blocked: 1,
+    },
+    signals: { due: 1, expiredLease: 1 },
+    blockingResults: {
+      identityMismatch: 1,
+      pidMismatch: 0,
+      unsupported: 0,
+      invalid: 0,
+    },
+    oldestBlockedAtMs: NOW - 800,
+  };
+}
+
 function rearmResult() {
   return {
     status: 'rearmed',
@@ -147,6 +172,23 @@ function inspectCommand(overrides = {}) {
       failureAuditEventId: '019f9300-0000-4000-8000-000000000032',
       body: {
         schema: 'qinglong/run-cancellation-dispatch-inspect@v1',
+      },
+      ...overrides,
+    },
+  };
+}
+
+function summaryCommand(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    operation: 'run.cancellation.summary',
+    request: {
+      projectId: 'project-1',
+      requestId: 'request-summary-1',
+      auditEventId: '019f9300-0000-4000-8000-000000000051',
+      failureAuditEventId: '019f9300-0000-4000-8000-000000000052',
+      body: {
+        schema: 'qinglong/run-cancellation-dispatch-summary-request@v1',
       },
       ...overrides,
     },
@@ -187,6 +229,9 @@ test('routes one exact strong User retry and emits the shared response', async (
       async stop() {
         return stopResult();
       },
+      async summarizeCancellation() {
+        return summaryResult();
+      },
       async inspectCancellation() {
         return diagnosticResult();
       },
@@ -222,6 +267,9 @@ test('routes one exact strong User stop and emits the shared response', async ()
       async stop(request) {
         calls.push(request);
         return stopResult();
+      },
+      async summarizeCancellation() {
+        return summaryResult();
       },
       async inspectCancellation() {
         return diagnosticResult();
@@ -259,6 +307,9 @@ test('rejects weak or non-User identity before service authority', async () => {
       async stop() {
         return stopResult();
       },
+      async summarizeCancellation() {
+        return summaryResult();
+      },
       async inspectCancellation() {
         return diagnosticResult();
       },
@@ -290,6 +341,7 @@ test('routes bounded cancellation inspection without lease capability data', asy
     service: {
       async retry() { return retryResult(); },
       async stop() { return stopResult(); },
+      async summarizeCancellation() { return summaryResult(); },
       async inspectCancellation(request) {
         calls.push(request);
         return diagnosticResult();
@@ -313,6 +365,39 @@ test('routes bounded cancellation inspection without lease capability data', asy
   assert.equal(JSON.stringify(result).includes('leaseToken'), false);
 });
 
+test('routes one Project-scoped cancellation summary without Run identity', async () => {
+  const calls = [];
+  const transport = createClusterRunManagementTransport({
+    now: () => NOW,
+    service: {
+      async retry() { return retryResult(); },
+      async stop() { return stopResult(); },
+      async summarizeCancellation(request) {
+        calls.push(request);
+        return summaryResult();
+      },
+      async inspectCancellation() { return diagnosticResult(); },
+      async rearmCancellation() { return rearmResult(); },
+    },
+  });
+  const result = await transport.execute(summaryCommand(), {
+    authenticate: async () => principal(),
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].projectId, 'project-1');
+  assert.equal(Object.hasOwn(calls[0], 'runId'), false);
+  assert.deepEqual(result, {
+    schemaVersion: 1,
+    operation: 'run.cancellation.summary',
+    summary: {
+      schema: 'qinglong/run-cancellation-dispatch-summary@v1',
+      ...summaryResult(),
+    },
+  });
+  assert.equal(JSON.stringify(result).includes('attemptId'), false);
+  assert.equal(JSON.stringify(result).includes('leaseOwner'), false);
+});
+
 test('routes an exact blocked cancellation rearm receipt', async () => {
   const calls = [];
   const transport = createClusterRunManagementTransport({
@@ -320,6 +405,7 @@ test('routes an exact blocked cancellation rearm receipt', async () => {
     service: {
       async retry() { return retryResult(); },
       async stop() { return stopResult(); },
+      async summarizeCancellation() { return summaryResult(); },
       async inspectCancellation() { return diagnosticResult(); },
       async rearmCancellation(request) {
         calls.push(request);

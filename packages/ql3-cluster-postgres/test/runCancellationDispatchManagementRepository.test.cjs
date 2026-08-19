@@ -42,6 +42,11 @@ function rearmCommand(overrides = {}) {
   });
 }
 
+function summaryCommand(overrides = {}) {
+  const { runId: _runId, ...authority } = command();
+  return { ...authority, ...overrides };
+}
+
 function runRow() {
   return {
     projectId: 'project-1',
@@ -103,6 +108,30 @@ function fixture(options = {}) {
         text.includes('dedupe_key = $2')
       ) {
         return { rows: options.replay ? [options.replay] : [], rowCount: 0 };
+      }
+      if (
+        text.includes('FROM "ql3"."run_cancellation_dispatches" AS dispatch')
+      ) {
+        return {
+          rows: [
+            options.summary ?? {
+              total: '5',
+              pending: '1',
+              leased: '1',
+              retryWait: '1',
+              dispatched: '1',
+              blocked: '1',
+              due: '1',
+              expiredLease: '1',
+              identityMismatch: '1',
+              pidMismatch: '0',
+              unsupported: '0',
+              invalid: '0',
+              oldestBlockedAtMs: String(NOW - 1_500),
+            },
+          ],
+          rowCount: 1,
+        };
       }
       if (
         text.startsWith('SELECT attempt_id AS "attemptId"') &&
@@ -177,6 +206,94 @@ test('inspects one low-sensitive blocked dispatch under run.read authority', asy
     ),
     true,
   );
+});
+
+test('summarizes one Project without exposing Run, Attempt or lease identity', async () => {
+  const { calls, repository } = fixture();
+  const result = await repository.summary(summaryCommand());
+  assert.deepEqual(result, {
+    projectId: 'project-1',
+    observedAtMs: NOW,
+    assessment: 'attention_required',
+    operatorAction: 'inspect',
+    dispatches: {
+      total: 5,
+      pending: 1,
+      leased: 1,
+      retryWait: 1,
+      dispatched: 1,
+      blocked: 1,
+    },
+    signals: { due: 1, expiredLease: 1 },
+    blockingResults: {
+      identityMismatch: 1,
+      pidMismatch: 0,
+      unsupported: 0,
+      invalid: 0,
+    },
+    oldestBlockedAtMs: NOW - 1_500,
+  });
+  const read = calls.find(({ sql }) =>
+    sql.includes('FROM "ql3"."run_cancellation_dispatches" AS dispatch'),
+  );
+  assert.deepEqual(read.params, ['project-1', NOW]);
+  for (const forbidden of [
+    'attempt_id AS',
+    'run.id AS',
+    'lease_owner',
+    'lease_token',
+    'lease_token_digest',
+  ]) {
+    assert.equal(read.sql.includes(forbidden), false);
+  }
+  const audit = calls.find(
+    ({ sql, params }) =>
+      sql.startsWith('INSERT INTO "ql3"."security_audit_events"') &&
+      params[2] === 'run.cancellation.summary',
+  );
+  assert.equal(audit.params[0], summaryCommand().auditEventId);
+});
+
+test('derives clear and converging assessments from fixed status counts', async () => {
+  const clear = fixture({
+    summary: {
+      total: '1',
+      pending: '0',
+      leased: '0',
+      retryWait: '0',
+      dispatched: '1',
+      blocked: '0',
+      due: '0',
+      expiredLease: '0',
+      identityMismatch: '0',
+      pidMismatch: '0',
+      unsupported: '0',
+      invalid: '0',
+      oldestBlockedAtMs: null,
+    },
+  });
+  assert.equal((await clear.repository.summary(summaryCommand())).assessment, 'clear');
+
+  const converging = fixture({
+    summary: {
+      total: '1',
+      pending: '0',
+      leased: '0',
+      retryWait: '1',
+      dispatched: '0',
+      blocked: '0',
+      due: '1',
+      expiredLease: '0',
+      identityMismatch: '0',
+      pidMismatch: '0',
+      unsupported: '0',
+      invalid: '0',
+      oldestBlockedAtMs: null,
+    },
+  });
+  const result = await converging.repository.summary(summaryCommand());
+  assert.equal(result.assessment, 'converging');
+  assert.equal(result.operatorAction, 'wait');
 });
 
 test('rearms an exact blocked dispatch with one event and allowed audit', async () => {

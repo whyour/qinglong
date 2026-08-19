@@ -13985,6 +13985,8 @@ async function main(argv = process.argv.slice(2)) {
           cancellationDispatch.expiredLeaseTakenOver &&
           cancellationDispatch.staleLeaseFenced &&
           cancellationDispatch.retryDeferredUntilDue,
+        cancellationDispatchSummaryIsLowSensitiveAndActionable:
+          cancellationDispatch.operatorSummaryLowSensitiveAndActionable,
         cancellationDispatchReplicatesAndSurvivesPromotion:
           cancellationDispatch.replicatedBeforePromotion &&
           cancellationDispatch.survivedPromotion,

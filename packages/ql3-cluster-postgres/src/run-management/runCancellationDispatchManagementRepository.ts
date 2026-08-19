@@ -57,14 +57,46 @@ export type RunCancellationDispatchRearmReceipt = Readonly<{
   eventSequence: number;
 }>;
 
-interface ManagementAuthority {
+export type RunCancellationDispatchSummary = Readonly<{
+  projectId: string;
+  observedAtMs: number;
+  assessment: 'clear' | 'converging' | 'attention_required';
+  operatorAction: 'none' | 'wait' | 'inspect';
+  dispatches: Readonly<{
+    total: number;
+    pending: number;
+    leased: number;
+    retryWait: number;
+    dispatched: number;
+    blocked: number;
+  }>;
+  signals: Readonly<{
+    due: number;
+    expiredLease: number;
+  }>;
+  blockingResults: Readonly<{
+    identityMismatch: number;
+    pidMismatch: number;
+    unsupported: number;
+    invalid: number;
+  }>;
+  oldestBlockedAtMs?: number;
+}>;
+
+interface ProjectManagementAuthority {
   readonly projectId: string;
-  readonly runId: string;
   readonly requestId: string;
   readonly auditEventId: string;
   readonly principal: Readonly<SecurityPrincipal>;
   readonly policyFence: Readonly<SecurityPolicyFence>;
 }
+
+interface ManagementAuthority extends ProjectManagementAuthority {
+  readonly runId: string;
+}
+
+export interface PostgresRunCancellationDispatchSummaryCommand
+  extends ProjectManagementAuthority {}
 
 export interface PostgresRunCancellationDispatchInspectCommand
   extends ManagementAuthority {}
@@ -282,6 +314,39 @@ function normalizeInspectCommand(
   return normalizeAuthority(value, []);
 }
 
+function normalizeSummaryCommand(
+  value: Readonly<PostgresRunCancellationDispatchSummaryCommand>,
+): Readonly<PostgresRunCancellationDispatchSummaryCommand> {
+  const input = exact(value, [
+    'projectId',
+    'requestId',
+    'auditEventId',
+    'principal',
+    'policyFence',
+  ]);
+  const principal = exact(input.principal, [
+    'subject',
+    'authenticationId',
+    'authenticatedAtMs',
+    'expiresAtMs',
+    'assurance',
+  ]) as unknown as SecurityPrincipal;
+  const fence = exact(input.policyFence, [
+    'projectVersion',
+    'bindingVersion',
+  ]);
+  return Object.freeze({
+    projectId: identifier(input.projectId),
+    requestId: identifier(input.requestId),
+    auditEventId: uuid(input.auditEventId),
+    principal,
+    policyFence: Object.freeze({
+      projectVersion: boundedInteger(fence.projectVersion, 1, 2_147_483_647),
+      bindingVersion: boundedInteger(fence.bindingVersion, 1, 2_147_483_647),
+    }),
+  });
+}
+
 function normalizeRearmCommand(
   value: Readonly<PostgresRunCancellationDispatchRearmCommand>,
 ): Readonly<PostgresRunCancellationDispatchRearmCommand> {
@@ -383,7 +448,7 @@ function strongPrincipal(
 
 async function confirmAuthorization(
   client: PostgresClient,
-  command: Readonly<ManagementAuthority>,
+  command: Readonly<ProjectManagementAuthority>,
 ): Promise<void> {
   const result = await client.query<Row>(
     `SELECT "ql3"."lock_run_management_policy_fence"(
@@ -406,8 +471,11 @@ async function confirmAuthorization(
 
 async function recordAllowedAudit(
   client: PostgresClient,
-  command: Readonly<ManagementAuthority>,
-  operationId: 'run.cancellation.inspect' | 'run.cancellation.rearm',
+  command: Readonly<ProjectManagementAuthority>,
+  operationId:
+    | 'run.cancellation.summary'
+    | 'run.cancellation.inspect'
+    | 'run.cancellation.rearm',
   observedAtMs: number,
 ): Promise<void> {
   const inserted = await client.query<Row>(
@@ -461,6 +529,78 @@ async function recordAllowedAudit(
       'mutation_conflict',
     );
   }
+}
+
+function summaryProjection(
+  projectId: string,
+  observedAtMs: number,
+  row: Row,
+): Readonly<RunCancellationDispatchSummary> {
+  const dispatches = Object.freeze({
+    total: integer(row, 'total'),
+    pending: integer(row, 'pending'),
+    leased: integer(row, 'leased'),
+    retryWait: integer(row, 'retryWait'),
+    dispatched: integer(row, 'dispatched'),
+    blocked: integer(row, 'blocked'),
+  });
+  const signals = Object.freeze({
+    due: integer(row, 'due'),
+    expiredLease: integer(row, 'expiredLease'),
+  });
+  const blockingResults = Object.freeze({
+    identityMismatch: integer(row, 'identityMismatch'),
+    pidMismatch: integer(row, 'pidMismatch'),
+    unsupported: integer(row, 'unsupported'),
+    invalid: integer(row, 'invalid'),
+  });
+  if (
+    dispatches.total !==
+      dispatches.pending +
+        dispatches.leased +
+        dispatches.retryWait +
+        dispatches.dispatched +
+        dispatches.blocked ||
+    dispatches.blocked !==
+      blockingResults.identityMismatch +
+        blockingResults.pidMismatch +
+        blockingResults.unsupported +
+        blockingResults.invalid ||
+    signals.due > dispatches.pending + dispatches.retryWait ||
+    signals.expiredLease > dispatches.leased
+  ) {
+    throw new TypeError('PostgreSQL cancellation management summary is invalid');
+  }
+  const oldestBlockedAtMs = optionalInteger(row, 'oldestBlockedAtMs');
+  if (
+    (dispatches.blocked === 0) !== (oldestBlockedAtMs === undefined) ||
+    (oldestBlockedAtMs !== undefined && oldestBlockedAtMs > observedAtMs)
+  ) {
+    throw new TypeError(
+      'PostgreSQL cancellation management blocked summary is invalid',
+    );
+  }
+  const active =
+    dispatches.pending +
+    dispatches.leased +
+    dispatches.retryWait +
+    dispatches.blocked;
+  return Object.freeze({
+    projectId,
+    observedAtMs,
+    assessment:
+      dispatches.blocked > 0
+        ? 'attention_required'
+        : active > 0
+          ? 'converging'
+          : 'clear',
+    operatorAction:
+      dispatches.blocked > 0 ? 'inspect' : active > 0 ? 'wait' : 'none',
+    dispatches,
+    signals,
+    blockingResults,
+    ...(oldestBlockedAtMs === undefined ? {} : { oldestBlockedAtMs }),
+  });
 }
 
 function runStatus(row: Row): RunStatus {
@@ -606,6 +746,76 @@ export class PostgresRunCancellationDispatchManagementRepository {
     if (!pool || typeof pool.connect !== 'function') {
       throw new InvalidRunCancellationDispatchManagementError();
     }
+  }
+
+  summary(
+    value: Readonly<PostgresRunCancellationDispatchSummaryCommand>,
+  ): Promise<Readonly<RunCancellationDispatchSummary>> {
+    const command = normalizeSummaryCommand(value);
+    return this.transaction(async (client) => {
+      const observedAtMs = await databaseNow(client);
+      const authorized = Object.freeze({
+        ...command,
+        principal: strongPrincipal(command.principal, observedAtMs),
+      });
+      await confirmAuthorization(client, authorized);
+      const result = await client.query<Row>(
+        `SELECT count(*)::bigint AS total,
+                count(*) FILTER (WHERE dispatch.status = 'pending')::bigint
+                  AS pending,
+                count(*) FILTER (WHERE dispatch.status = 'leased')::bigint
+                  AS leased,
+                count(*) FILTER (WHERE dispatch.status = 'retry_wait')::bigint
+                  AS "retryWait",
+                count(*) FILTER (WHERE dispatch.status = 'dispatched')::bigint
+                  AS dispatched,
+                count(*) FILTER (WHERE dispatch.status = 'blocked')::bigint
+                  AS blocked,
+                count(*) FILTER (
+                  WHERE dispatch.status IN ('pending', 'retry_wait')
+                    AND dispatch.next_attempt_at_ms <= $2
+                )::bigint AS due,
+                count(*) FILTER (
+                  WHERE dispatch.status = 'leased'
+                    AND dispatch.lease_expires_at_ms <= $2
+                )::bigint AS "expiredLease",
+                count(*) FILTER (
+                  WHERE dispatch.status = 'blocked'
+                    AND dispatch.last_result = 'identity_mismatch'
+                )::bigint AS "identityMismatch",
+                count(*) FILTER (
+                  WHERE dispatch.status = 'blocked'
+                    AND dispatch.last_result = 'pid_mismatch'
+                )::bigint AS "pidMismatch",
+                count(*) FILTER (
+                  WHERE dispatch.status = 'blocked'
+                    AND dispatch.last_result = 'unsupported'
+                )::bigint AS unsupported,
+                count(*) FILTER (
+                  WHERE dispatch.status = 'blocked'
+                    AND dispatch.last_result = 'invalid'
+                )::bigint AS invalid,
+                min(dispatch.updated_at_ms) FILTER (
+                  WHERE dispatch.status = 'blocked'
+                ) AS "oldestBlockedAtMs"
+           FROM "ql3"."run_cancellation_dispatches" AS dispatch
+           JOIN "ql3"."runs" AS run ON run.id = dispatch.run_id
+          WHERE run.project_id = $1`,
+        [command.projectId, observedAtMs],
+      );
+      if (result.rows.length !== 1) {
+        throw new TypeError(
+          'PostgreSQL cancellation management summary row is invalid',
+        );
+      }
+      await recordAllowedAudit(
+        client,
+        authorized,
+        'run.cancellation.summary',
+        observedAtMs,
+      );
+      return summaryProjection(command.projectId, observedAtMs, result.rows[0]!);
+    });
   }
 
   inspect(

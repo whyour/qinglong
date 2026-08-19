@@ -153,11 +153,13 @@ PID 可复用，可能终止无关进程，禁止。
 
 `next` 已实现 profile-neutral canonical contract、`0005-run-cancellation-dispatch`、legacy Sequelize/SQLite adapter、PostgreSQL `pg-0066-cancellation-dispatch`/capability v65 adapter、lease expiry 接管、fencing、退避、结果事件、Dispatcher、有界 Supervisor 和默认惰性的 lifecycle runner。PostgreSQL 结果事务按 Run→Attempt→dispatch 锁序完成 dispatch 更新、Run version CAS 与 RunEvent 追加；runtime 角色只取得新表的 SELECT/INSERT/UPDATE。Cluster 生产交付已由 ADR-0457 接入既有 caller-driven Worker lease-control：Run-level stop 必须先结算 durable dispatch 再返回，Workflow Task timeout 则保持 `untracked`，不伪造父 Run 取消。ADR-0458 又在既有隔离 Run management plane 上增加低敏 inspect 与 exact-CAS rearm：viewer 只有 `run.read` 诊断权，rearm 继续要求 `run.stop`；任何接口都不暴露 lease owner、raw token 或 token digest。
 
+ADR-0459 进一步增加 Project-scoped、caller-driven summary，以固定计数和三态 assessment 提供 blocked/availability 告警出口，不改变全局 readiness，也不新增采集器。
+
 HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入 Local Supervisor：只有 accepted 且全部 gate 通过时才启动，失败或 shutdown 时有界停止。以下工作仍未完成，因此它仍只允许显式 canary，不得扩大到默认生产流量：
 
-- 用户可见的聚合运行指标、告警与产品 UI；私有 operator 诊断和处置协议已经实现。
+- 产品控制台中的 Project 状态卡、告警路由和有界 blocked drill-down；Project 聚合出口与私有 operator 处置协议已经实现。
 - 固定 edge 设备的数据库写放大、RSS、时延和磁盘基准。
-- cluster-control 对 PostgreSQL CancellationDispatch 的聚合 availability/blocked 指标与告警出口。
+- 固定 Project allowlist 的外部时序指标适配；数据库事实驱动的按需 availability/blocked 汇总已经实现。
 - 首次真实目标实例完整激活/回滚仪式与共享 config 多写者 authority。
 
 ## 6. 验证门禁
@@ -177,3 +179,4 @@ HTTP worker 已通过默认关闭的 manual-only manifest bootstrap 接入 Local
 13. Cluster Worker lease-control 只在 durable dispatch 已结算或已重放时释放 Run-level stop；Workflow Task timeout 不写父 Run 取消事实。
 14. 强认证 viewer 只能读取无 lease capability 的低敏诊断；只有 `run.stop` authority 可按 blocked/version/result 精确 rearm。
 15. rearm、RunEvent 与 allowed audit 原子提交，数据库时间决定 retry due；stale fence、授权漂移与 mutation drift 均失败关闭。
+16. Project summary 的五态与 blocking-result 计数必须交叉守恒，blocked 只产生 `attention_required` 告警而不撤回全局 readiness，且响应不包含 Run/Attempt/lease identity。

@@ -21,6 +21,7 @@ import {
 import {
   RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA,
   RUN_CANCELLATION_DISPATCH_REARM_RECEIPT_SCHEMA,
+  RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA,
   normalizeClusterRunManagementCommand,
   type ClusterRunManagementCommand,
   type ClusterRunManagementTransportResult,
@@ -109,6 +110,118 @@ export function validateClusterRunManagementClientResult(
         invalid();
       }
     } catch {
+      invalid();
+    }
+    return Object.freeze(
+      envelope as unknown as ClusterRunManagementTransportResult,
+    );
+  }
+  if (command.operation === 'run.cancellation.summary') {
+    const envelope = exact(value, ['schemaVersion', 'operation', 'summary']);
+    if (
+      envelope.schemaVersion !== 1 ||
+      envelope.operation !== command.operation
+    ) {
+      invalid();
+    }
+    const summary = exact(envelope.summary, [
+      'schema',
+      'projectId',
+      'observedAtMs',
+      'assessment',
+      'operatorAction',
+      'dispatches',
+      'signals',
+      'blockingResults',
+      ...(Object.hasOwn(envelope.summary as object, 'oldestBlockedAtMs')
+        ? ['oldestBlockedAtMs']
+        : []),
+    ]);
+    const dispatches = exact(summary.dispatches, [
+      'total',
+      'pending',
+      'leased',
+      'retryWait',
+      'dispatched',
+      'blocked',
+    ]);
+    const signals = exact(summary.signals, ['due', 'expiredLease']);
+    const blockingResults = exact(summary.blockingResults, [
+      'identityMismatch',
+      'pidMismatch',
+      'unsupported',
+      'invalid',
+    ]);
+    const dispatchCounts = [
+      dispatches.total,
+      dispatches.pending,
+      dispatches.leased,
+      dispatches.retryWait,
+      dispatches.dispatched,
+      dispatches.blocked,
+    ];
+    const blockingCounts = [
+      blockingResults.identityMismatch,
+      blockingResults.pidMismatch,
+      blockingResults.unsupported,
+      blockingResults.invalid,
+    ];
+    if (
+      summary.schema !== RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA ||
+      summary.projectId !== command.request.projectId ||
+      !safeInteger(summary.observedAtMs) ||
+      !['clear', 'converging', 'attention_required'].includes(
+        summary.assessment as string,
+      ) ||
+      !['none', 'wait', 'inspect'].includes(summary.operatorAction as string) ||
+      dispatchCounts.some((count) => !safeInteger(count)) ||
+      !safeInteger(signals.due) ||
+      !safeInteger(signals.expiredLease) ||
+      blockingCounts.some((count) => !safeInteger(count)) ||
+      dispatches.total !==
+        (dispatches.pending as number) +
+          (dispatches.leased as number) +
+          (dispatches.retryWait as number) +
+          (dispatches.dispatched as number) +
+          (dispatches.blocked as number) ||
+      dispatches.blocked !==
+        (blockingResults.identityMismatch as number) +
+          (blockingResults.pidMismatch as number) +
+          (blockingResults.unsupported as number) +
+          (blockingResults.invalid as number) ||
+      (signals.due as number) >
+        (dispatches.pending as number) + (dispatches.retryWait as number) ||
+      (signals.expiredLease as number) > (dispatches.leased as number) ||
+      (Object.hasOwn(summary, 'oldestBlockedAtMs') &&
+        (!safeInteger(summary.oldestBlockedAtMs) ||
+          (summary.oldestBlockedAtMs as number) >
+            (summary.observedAtMs as number))) ||
+      ((dispatches.blocked as number) === 0) !==
+        !Object.hasOwn(summary, 'oldestBlockedAtMs')
+    ) {
+      invalid();
+    }
+    const active =
+      (dispatches.pending as number) +
+      (dispatches.leased as number) +
+      (dispatches.retryWait as number) +
+      (dispatches.blocked as number);
+    const expectedAssessment =
+      (dispatches.blocked as number) > 0
+        ? 'attention_required'
+        : active > 0
+          ? 'converging'
+          : 'clear';
+    const expectedOperatorAction =
+      (dispatches.blocked as number) > 0
+        ? 'inspect'
+        : active > 0
+          ? 'wait'
+          : 'none';
+    if (
+      summary.assessment !== expectedAssessment ||
+      summary.operatorAction !== expectedOperatorAction
+    ) {
       invalid();
     }
     return Object.freeze(

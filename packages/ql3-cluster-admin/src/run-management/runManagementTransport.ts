@@ -22,6 +22,10 @@ const STRONG_ASSURANCES = new Set(['multi_factor', 'hardware']);
 
 export const RUN_CANCELLATION_DISPATCH_INSPECT_REQUEST_SCHEMA =
   'qinglong/run-cancellation-dispatch-inspect@v1';
+export const RUN_CANCELLATION_DISPATCH_SUMMARY_REQUEST_SCHEMA =
+  'qinglong/run-cancellation-dispatch-summary-request@v1';
+export const RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA =
+  'qinglong/run-cancellation-dispatch-summary@v1';
 export const RUN_CANCELLATION_DISPATCH_DIAGNOSTIC_SCHEMA =
   'qinglong/run-cancellation-dispatch-diagnostic@v1';
 export const RUN_CANCELLATION_DISPATCH_REARM_REQUEST_SCHEMA =
@@ -78,6 +82,20 @@ export type ClusterRunManagementCancellationInspectCommand = Readonly<{
   }>;
 }>;
 
+export type ClusterRunManagementCancellationSummaryCommand = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.cancellation.summary';
+  request: Readonly<{
+    projectId: string;
+    requestId: string;
+    auditEventId: string;
+    failureAuditEventId: string;
+    body: Readonly<{
+      schema: typeof RUN_CANCELLATION_DISPATCH_SUMMARY_REQUEST_SCHEMA;
+    }>;
+  }>;
+}>;
+
 export type ClusterRunManagementCancellationRearmCommand = Readonly<{
   schemaVersion: 1;
   operation: 'run.cancellation.rearm';
@@ -104,6 +122,7 @@ export type ClusterRunManagementCancellationRearmCommand = Readonly<{
 export type ClusterRunManagementCommand =
   | ClusterRunManagementRetryCommand
   | ClusterRunManagementStopCommand
+  | ClusterRunManagementCancellationSummaryCommand
   | ClusterRunManagementCancellationInspectCommand
   | ClusterRunManagementCancellationRearmCommand;
 
@@ -129,6 +148,16 @@ export type ClusterRunManagementCancellationInspectTransportResult = Readonly<{
   >;
 }>;
 
+export type ClusterRunManagementCancellationSummaryTransportResult = Readonly<{
+  schemaVersion: 1;
+  operation: 'run.cancellation.summary';
+  summary: Readonly<
+    Awaited<ReturnType<ClusterRunManagementService['summarizeCancellation']>> & {
+      schema: typeof RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA;
+    }
+  >;
+}>;
+
 export type ClusterRunManagementCancellationRearmTransportResult = Readonly<{
   schemaVersion: 1;
   operation: 'run.cancellation.rearm';
@@ -142,6 +171,7 @@ export type ClusterRunManagementCancellationRearmTransportResult = Readonly<{
 export type ClusterRunManagementTransportResult =
   | ClusterRunManagementRetryTransportResult
   | ClusterRunManagementStopTransportResult
+  | ClusterRunManagementCancellationSummaryTransportResult
   | ClusterRunManagementCancellationInspectTransportResult
   | ClusterRunManagementCancellationRearmTransportResult;
 
@@ -227,6 +257,7 @@ export function normalizeClusterRunManagementCommand(
   if (
     operation !== 'run.retry' &&
     operation !== 'run.stop' &&
+    operation !== 'run.cancellation.summary' &&
     operation !== 'run.cancellation.inspect' &&
     operation !== 'run.cancellation.rearm'
   ) {
@@ -243,7 +274,15 @@ export function normalizeClusterRunManagementCommand(
           'failureAuditEventId',
           'body',
         ]
-      : [
+      : operation === 'run.cancellation.summary'
+        ? [
+            'projectId',
+            'requestId',
+            'auditEventId',
+            'failureAuditEventId',
+            'body',
+          ]
+        : [
           'projectId',
           'runId',
           'requestId',
@@ -272,6 +311,25 @@ export function normalizeClusterRunManagementCommand(
         auditEventId,
         failureAuditEventId,
         body,
+      }),
+    });
+  }
+  if (operation === 'run.cancellation.summary') {
+    const body = exact(request.body, ['schema']);
+    if (body.schema !== RUN_CANCELLATION_DISPATCH_SUMMARY_REQUEST_SCHEMA) {
+      invalid();
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      operation,
+      request: Object.freeze({
+        projectId: identifier(request.projectId),
+        requestId: identifier(request.requestId),
+        auditEventId,
+        failureAuditEventId,
+        body: Object.freeze({
+          schema: RUN_CANCELLATION_DISPATCH_SUMMARY_REQUEST_SCHEMA,
+        }),
       }),
     });
   }
@@ -374,6 +432,7 @@ export function createClusterRunManagementTransport(
     !options.service ||
     typeof options.service.retry !== 'function' ||
     typeof options.service.stop !== 'function' ||
+    typeof options.service.summarizeCancellation !== 'function' ||
     typeof options.service.inspectCancellation !== 'function' ||
     typeof options.service.rearmCancellation !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function')
@@ -433,6 +492,23 @@ export function createClusterRunManagementTransport(
           schemaVersion: 1,
           operation: command.operation,
           retry: createRunManualRetryResponseBody(result),
+        });
+      }
+      if (command.operation === 'run.cancellation.summary') {
+        const result = await options.service.summarizeCancellation({
+          projectId: command.request.projectId,
+          requestId: command.request.requestId,
+          auditEventId: command.request.auditEventId,
+          failureAuditEventId: command.request.failureAuditEventId,
+          principal,
+        });
+        return Object.freeze({
+          schemaVersion: 1,
+          operation: command.operation,
+          summary: Object.freeze({
+            schema: RUN_CANCELLATION_DISPATCH_SUMMARY_SCHEMA,
+            ...result,
+          }),
         });
       }
       if (command.operation === 'run.cancellation.inspect') {
