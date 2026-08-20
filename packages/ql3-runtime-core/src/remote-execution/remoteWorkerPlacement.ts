@@ -2,6 +2,20 @@ import { createHash } from 'node:crypto';
 import type { WorkerSessionRecord } from '../worker/workerSession';
 import { assertWorkerSessionRecord } from '../worker/workerSession';
 import { semver } from '../versioning/pinnedSemver';
+import {
+  REMOTE_WORKER_PROTOCOL_RANGE,
+  REMOTE_WORKER_SUPPORT_TIERS,
+  normalizeRemoteWorkerArchitecture,
+  normalizeRemoteWorkerProtocolVersion,
+  normalizeRemoteWorkerProtocolVersionRange,
+  normalizeRemoteWorkerSupportTier,
+  remoteWorkerProtocolIsCompatible,
+  remoteWorkerSupportTierForArchitecture,
+  type RemoteWorkerArchitecture,
+  type RemoteWorkerSupportTier,
+} from './remoteWorkerCompatibility';
+
+export * from './remoteWorkerCompatibility';
 
 export const REMOTE_WORKER_EXECUTOR_CAPABILITY = 'remote-worker';
 export const MAX_REMOTE_PLACEMENT_VALUES = 16;
@@ -20,8 +34,10 @@ export interface RemoteWorkerRuntimeCapability {
 }
 
 export interface RemoteWorkerCapabilities {
-  readonly architecture: string;
+  readonly architecture: RemoteWorkerArchitecture;
   readonly executors: readonly string[];
+  readonly protocolVersion: string;
+  readonly supportTier: RemoteWorkerSupportTier;
   readonly operatingSystem?: string;
   readonly runtimes?: readonly RemoteWorkerRuntimeCapability[];
   readonly labels?: Readonly<Record<string, string>>;
@@ -45,10 +61,12 @@ export interface RemoteWorkerRuntimeRequirement {
 
 export interface RemoteWorkerPlacementSpec {
   readonly required?: Readonly<{
-    readonly architectures?: readonly string[];
+    readonly architectures?: readonly RemoteWorkerArchitecture[];
     readonly operatingSystems?: readonly string[];
     readonly executors?: readonly string[];
+    readonly protocolVersionRange?: string;
     readonly runtimes?: readonly RemoteWorkerRuntimeRequirement[];
+    readonly supportTiers?: readonly RemoteWorkerSupportTier[];
     readonly labels?: Readonly<Record<string, string>>;
     readonly minMemoryBytes?: number;
     readonly minDiskBytes?: number;
@@ -63,6 +81,8 @@ export interface RemoteWorkerPlacementSpec {
 
 export type RemoteWorkerPlacementMismatch =
   | 'worker_unavailable'
+  | 'support_tier'
+  | 'protocol_version'
   | 'architecture'
   | 'operating_system'
   | 'executor'
@@ -186,17 +206,19 @@ export function normalizeRemoteWorkerCapabilities(
   const source = object(value, 'capabilities');
   exactKeys(
     source,
-    ['architecture', 'executors'],
+    ['architecture', 'executors', 'protocolVersion', 'supportTier'],
     ['capacity', 'features', 'labels', 'operatingSystem', 'runtimes'],
     'capabilities',
   );
-  const architecture = boundedString(
-    source.architecture,
-    'architecture',
-    32,
-    CAPABILITY_NAME,
-  );
+  const architecture = normalizeRemoteWorkerArchitecture(source.architecture);
   const executors = sortedStrings(source.executors, 'executors', 16, false);
+  const protocolVersion = normalizeRemoteWorkerProtocolVersion(
+    source.protocolVersion,
+  );
+  const supportTier = normalizeRemoteWorkerSupportTier(source.supportTier);
+  if (remoteWorkerSupportTierForArchitecture(architecture) !== supportTier) {
+    invalid('architecture does not belong to supportTier');
+  }
   const operatingSystem =
     source.operatingSystem === undefined
       ? undefined
@@ -330,6 +352,8 @@ export function normalizeRemoteWorkerCapabilities(
   return Object.freeze({
     architecture,
     executors,
+    protocolVersion,
+    supportTier,
     ...(operatingSystem === undefined ? {} : { operatingSystem }),
     ...(runtimes === undefined ? {} : { runtimes }),
     ...(labels === undefined ? {} : { labels }),
@@ -377,6 +401,21 @@ function optionalStringList(
     : sortedStrings(value, label, MAX_REMOTE_PLACEMENT_VALUES);
 }
 
+function optionalArchitectureList(
+  value: unknown,
+  label: string,
+): readonly RemoteWorkerArchitecture[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > MAX_REMOTE_PLACEMENT_VALUES) {
+    invalid(`${label} is invalid`);
+  }
+  const result = value.map((item) => normalizeRemoteWorkerArchitecture(item));
+  if (new Set(result).size !== result.length) {
+    invalid(`${label} contains duplicates`);
+  }
+  return Object.freeze([...result].sort());
+}
+
 export function normalizeRemoteWorkerPlacement(
   value: unknown,
 ): RemoteWorkerPlacementSpec {
@@ -397,11 +436,13 @@ export function normalizeRemoteWorkerPlacement(
         'minDiskBytes',
         'minMemoryBytes',
         'operatingSystems',
+        'protocolVersionRange',
         'runtimes',
+        'supportTiers',
       ],
       'placement.required',
     );
-    const architectures = optionalStringList(
+    const architectures = optionalArchitectureList(
       candidate.architectures,
       'placement.required.architectures',
     );
@@ -413,6 +454,23 @@ export function normalizeRemoteWorkerPlacement(
       candidate.executors,
       'placement.required.executors',
     );
+    const protocolVersionRange = candidate.protocolVersionRange === undefined
+      ? undefined
+      : normalizeRemoteWorkerProtocolVersionRange(
+          candidate.protocolVersionRange,
+        );
+    let supportTiers: readonly RemoteWorkerSupportTier[] | undefined;
+    if (candidate.supportTiers !== undefined) {
+      if (
+        !Array.isArray(candidate.supportTiers) ||
+        candidate.supportTiers.length > REMOTE_WORKER_SUPPORT_TIERS.length
+      ) invalid('placement.required.supportTiers is invalid');
+      const mapped = candidate.supportTiers.map((value) =>
+        normalizeRemoteWorkerSupportTier(value));
+      if (new Set(mapped).size !== mapped.length)
+        invalid('placement.required.supportTiers contains duplicates');
+      supportTiers = Object.freeze([...mapped].sort());
+    }
     const features = optionalStringList(
       candidate.features,
       'placement.required.features',
@@ -468,7 +526,9 @@ export function normalizeRemoteWorkerPlacement(
       ...(architectures === undefined ? {} : { architectures }),
       ...(operatingSystems === undefined ? {} : { operatingSystems }),
       ...(executors === undefined ? {} : { executors }),
+      ...(protocolVersionRange === undefined ? {} : { protocolVersionRange }),
       ...(runtimes === undefined ? {} : { runtimes }),
+      ...(supportTiers === undefined ? {} : { supportTiers }),
       ...(candidate.labels === undefined
         ? {}
         : {
@@ -594,6 +654,20 @@ export function evaluateRemoteWorkerPlacement(
     worker.leaseExpiresAtMs <= observedAtMs
   )
     mismatches.push('worker_unavailable');
+  const requiredSupportTiers = required.supportTiers ?? ['tier1'];
+  if (!requiredSupportTiers.includes(capabilities.supportTier))
+    mismatches.push('support_tier');
+  if (
+    !remoteWorkerProtocolIsCompatible(
+      capabilities.protocolVersion,
+      REMOTE_WORKER_PROTOCOL_RANGE,
+    ) ||
+    (required.protocolVersionRange !== undefined &&
+      !remoteWorkerProtocolIsCompatible(
+        capabilities.protocolVersion,
+        required.protocolVersionRange,
+      ))
+  ) mismatches.push('protocol_version');
   if (
     required.architectures?.length &&
     !required.architectures.includes(capabilities.architecture)

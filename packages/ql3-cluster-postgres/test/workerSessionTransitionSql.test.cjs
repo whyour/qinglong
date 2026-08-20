@@ -6,7 +6,9 @@ const {
 
 const SESSION_ID = '019f7094-a853-72f3-82ab-dfa08e6bd1c1';
 const CAPABILITIES_HASH =
-  '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a';
+  'b3d79017d91c477ffdf4a4dcc4ce9135ca053c921922ce0221920f905d8a2aa4';
+const CAPABILITIES_JSON =
+  '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
 
 test('pins the shared transition status parameter to PostgreSQL varchar', async () => {
   const events = [];
@@ -16,7 +18,7 @@ test('pins the shared transition status parameter to PostgreSQL varchar', async 
     generation: 2,
     status: 'online',
     version: 3,
-    capabilitiesJson: '{}',
+    capabilitiesJson: CAPABILITIES_JSON,
     capabilitiesHash: CAPABILITIES_HASH,
     maxConcurrentRuns: 2,
     availableSlots: 1,

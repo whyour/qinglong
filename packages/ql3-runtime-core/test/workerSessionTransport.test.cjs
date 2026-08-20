@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { test } = require('node:test');
 const {
   createWorkerSessionHeartbeatRequestBody,
@@ -21,9 +22,10 @@ const authority = Object.freeze({
   workerId: 'edge-1',
   sessionId: '018f5c64-9b9d-7f1a-8c2d-1234567890ac',
 });
-const capabilitiesJson = '{}';
-const capabilitiesHash =
-  '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a';
+const capabilitiesJson =
+  '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
+const capabilitiesHash = createHash('sha256')
+  .update(capabilitiesJson).digest('hex');
 
 function record(overrides = {}) {
   return {

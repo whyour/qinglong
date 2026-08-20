@@ -62,6 +62,10 @@ const {
 const {
   createCertificateAuthority,
 } = require('../packages/ql3-worker-runtime/test/helpers/certificateAuthority.cjs');
+const {
+  remoteWorkerArchitectureForNodeRuntime,
+  remoteWorkerSupportTierForArchitecture,
+} = require('../packages/ql3-runtime-core/dist/remote-execution/remoteWorkerCompatibility.js');
 
 const IMAGE = process.env.QL3_WORKER_POSTGRES_IMAGE ?? 'postgres:18';
 const LINUX_NODE_IMAGE =
@@ -80,6 +84,8 @@ const AUTOMATION_MANAGER_USER = 'ql3_automation_manager';
 const AUTOMATION_MANAGER_PASSWORD = 'ql3_automation_manager_live';
 const APPROVAL_MANAGER_USER = 'ql3_approval_manager';
 const APPROVAL_MANAGER_PASSWORD = 'ql3_approval_manager_live';
+const RUN_MANAGER_USER = 'ql3_run_manager';
+const RUN_MANAGER_PASSWORD = 'ql3_run_manager_live';
 const PACKAGE_MANAGER_USER = 'ql3_package_manager';
 const PACKAGE_MANAGER_PASSWORD = 'ql3_package_manager_live';
 const PACKAGE_EXECUTOR_USER = 'ql3_package_executor';
@@ -655,13 +661,18 @@ async function prepareWorkerFiles(root) {
   const certificateFile = path.join(authority, 'tls.crt');
   const privateKeyFile = path.join(authority, 'tls.key');
   const tokenFile = path.join(authority, 'credential-token');
+  const architecture = remoteWorkerArchitectureForNodeRuntime(
+    process.arch, process.config.variables.arm_version,
+  );
   await Promise.all([
     writePrivate(
       capabilitiesFile,
       `${JSON.stringify({
-        architecture: process.arch,
+        architecture,
         operatingSystem: process.platform,
         executors: ['remote-worker'],
+        protocolVersion: '1.0.0',
+        supportTier: remoteWorkerSupportTierForArchitecture(architecture),
         runtimes: [{ name: 'node', version: process.versions.node }],
         labels: { contract: 'postgres-live' },
         capacity: {
@@ -863,6 +874,9 @@ async function main() {
       `CREATE ROLE ${APPROVAL_MANAGER_USER} LOGIN PASSWORD '${APPROVAL_MANAGER_PASSWORD}'`,
     );
     await superuserDatabase.pool.query(
+      `CREATE ROLE ${RUN_MANAGER_USER} LOGIN PASSWORD '${RUN_MANAGER_PASSWORD}'`,
+    );
+    await superuserDatabase.pool.query(
       `CREATE ROLE ${PACKAGE_MANAGER_USER} LOGIN PASSWORD '${PACKAGE_MANAGER_PASSWORD}'`,
     );
     await superuserDatabase.pool.query(
@@ -962,9 +976,11 @@ async function main() {
       QL3_WORKER_INGRESS_TLS_CLIENT_CA_FILE: files.ingressClientCaFile,
     });
     assert.equal(ingressConfig.enabled, true);
-    const runtimePort = createClusterWorkerRuntimePort(runtimeDatabase.pool, {
-      artifactStore,
-    });
+    const runtimePort = createClusterWorkerRuntimePort(
+      runtimeDatabase.pool,
+      { artifactStore },
+      { cancellationDispatchOwnerId: 'ql3-worker-postgres-live' },
+    );
     const runtime = Object.freeze({
       ...runtimePort,
       activation: Object.freeze({

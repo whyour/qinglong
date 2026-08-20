@@ -8,7 +8,7 @@ const {
 } = require('../dist');
 
 function capabilities() {
-  const json = '{"architecture":"arm64","executors":["remote-worker"]}';
+  const json = '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
   return {
     json,
     hash: createHash('sha256').update(json).digest('hex'),
@@ -42,6 +42,10 @@ test('rejects forged capabilities, partial status capacity and invalid time', ()
     () => assertWorkerCapabilitiesSnapshot(snapshot.json, '0'.repeat(64)),
     InvalidWorkerSessionValueError,
   );
+  const unversioned = '{"architecture":"arm64","executors":["remote-worker"]}';
+  assert.throws(() => assertWorkerCapabilitiesSnapshot(
+    unversioned, createHash('sha256').update(unversioned).digest('hex'),
+  ), /compatibility contract is invalid/);
   assert.throws(
     () =>
       assertWorkerSessionRecord({

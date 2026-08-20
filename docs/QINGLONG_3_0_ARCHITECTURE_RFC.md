@@ -11,6 +11,25 @@
 
 最新增量证据（2026-08-20）：
 
+- D-372/ADR-0465（已接受）：把 D-371 的发布架构分层推进到 Remote Worker 的实际注册与调度边界。Worker canonical
+  capability 现在必须声明 `protocolVersion` 与 `supportTier`，架构/Tier 必须与根 release identity v2 一致，Node
+  `x64/ppc64/ia32/arm` 会归一化到发布词汇并与实际 Worker 进程复验。普通 Task 即使未声明 Placement 也只匹配 Tier 1
+  与控制面 `>=1.0.0 <2.0.0`；candidate、experimental、legacy-only 必须由新 immutable revision 显式选择，且任务不能
+  放宽控制面协议范围。新默认只在调度判定时应用，不写回历史 execution revision，因而不改既有 digest。Session register
+  在 Repository 前拒绝未版本化、非 canonical 或 Tier 漂移快照；生产 Worker 同时必须声明 `remote-worker`，关闭此前
+  `local_process` 节点可注册却永远无法领取任务的假健康状态。本切片没有新增 package、dependency、数据库对象、服务、
+  端口、timer 或 Edge/Standalone 常驻闭包；legacy-only 只建立未来受限 adapter 的准入槽位，不表示 2.x adapter、
+  Plugin/Tool/DB 权限或实机支持已经完成。runtime-core 全量 `574/574`、Worker Runtime 全量 `134/134`；完整 backend
+  工作区为 `1,503 total / 1,501 pass / 2 conditional skip / 0 fail`（含一条不会提交的既有用户测试），18-package clean
+  build/逐包测试退出 0。PostgreSQL 18.6 arm64 HA 为 `146/146`、timeline `1→2`，报告 SHA-256 为
+  `e94d48f0bbe5d5af6f6fd18f94572ead40d7155c38d194dce958712d968efeed`；真实 Linux Worker + PostgreSQL 门同时通过
+  TLS 1.3 mTLS、证书/credential rotation、同 Session、remote execution、Artifact completion 与数据库最小权限。
+  本机 arm64 Worker edge/node active RSS 为 `72,073,216 / 71,991,296` bytes、max RSS 为
+  `72,466,432 / 72,417,280` bytes，仅作为回归基线，不构成 ARM32 路由器实机证明。七项架构/部署审计与 14 档
+  Local artifact audit 全部 compatible；基础 Edge/Standalone 为 `2,598,669 / 2,598,747` bytes，Application+AI 为
+  `4,501,822 / 4,501,954` bytes，MCP 为 `7,324,601 / 7,324,709` bytes，workspace 仍为 18 packages、无
+  single/shallow package，也没有新增外部 dependency。
+
 - D-371/ADR-0464（已接受并机器化）：接受 ADR-0006 的 Node 24 与多架构分层，并把根 `ql3-release.json` 升级为
   `qinglong/release-identity@v2` 唯一事实源。3.0 Tier 1 精确为 `amd64`、`arm64`；`ppc64le`、`s390x` 是通过固定
   Node 24 与同等级原生门禁前不可发布的候选；`arm/v7` 在缺少 owner、可重复 toolchain 与设备报告时为 experimental blocked；
@@ -6430,7 +6449,11 @@ D-371/ADR-0464 已接受 D-14 与 D-16 的一致解，当前分层为：
 | legacy-only | ARMv6、386 | 继续使用显式 2.x legacy line；不能把 Node 20/22 镜像标为满足 D-16 的完整 3.0 |
 
 这个分层不等于放弃小设备。2.x legacy line 继续承担约定兼容窗口，旧设备参与 3.0 集群的受限 Worker 协议仍是
-独立后续决策；但不能因此把没有受支持 Node 24、数据库恢复与原生资源证据的设备标成完整 3.0 ql-core。若
+独立后续决策；D-372/ADR-0465 已先把 support Tier 与 Worker protocol v1 变成 Session register 和 Scheduler 的
+机器准入边界。默认任务只匹配 Tier 1；candidate、experimental 和 legacy-only 需要新的 immutable Placement 显式
+选择，且 capability architecture/Tier 必须与本表一致。该能力只为未来 legacy adapter 保留受限调度槽位，不表示
+ARMv6/386 的 2.x 进程已经能直接连接 3.0，也不授予 Plugin Host、任意 Tool 或控制面数据库权力。但不能因此把没有
+受支持 Node 24、数据库恢复与原生资源证据的设备标成完整 3.0 ql-core。若
 Maintainers 要求 ARMv6、ARMv7 或 386 成为 3.0 正式支持项，必须先修改 D-16 或长期维护对应 Node 24 构建链，
 升级 release identity schema，并通过与现有 Tier 1 同等级的发布门禁。
 

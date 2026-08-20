@@ -36,6 +36,8 @@ test('uses pinned SemVer for remote runtime range admission', () => {
   const candidate = worker({
     architecture: 'arm64',
     executors: ['remote-worker'],
+    protocolVersion: '1.0.0',
+    supportTier: 'tier1',
     runtimes: [{ name: 'node', version: '24.18.0' }],
   });
 
@@ -53,4 +55,52 @@ test('uses pinned SemVer for remote runtime range admission', () => {
       }),
     /versionRange is not semver/,
   );
+});
+
+test('defaults to Tier 1 protocol v1 and requires explicit legacy placement', () => {
+  const legacy = worker({
+    architecture: 'arm/v6', executors: ['remote-worker'],
+    protocolVersion: '1.0.0', supportTier: 'legacy-only',
+  });
+  assert.deepEqual(evaluateRemoteWorkerPlacement(legacy, {}, 500), {
+    matches: false, score: 0, mismatches: ['support_tier'],
+  });
+  assert.deepEqual(evaluateRemoteWorkerPlacement(
+    legacy, { required: { supportTiers: ['legacy-only'] } }, 500,
+  ), { matches: true, score: 0, mismatches: [] });
+  const incompatible = worker({
+    architecture: 'arm64', executors: ['remote-worker'],
+    protocolVersion: '2.0.0', supportTier: 'tier1',
+  });
+  assert.deepEqual(evaluateRemoteWorkerPlacement(incompatible, {}, 500), {
+    matches: false, score: 0, mismatches: ['protocol_version'],
+  });
+});
+
+test('rejects unversioned capabilities and unknown support policy', () => {
+  assert.throws(() => canonicalRemoteWorkerCapabilities({
+    architecture: 'arm64', executors: ['remote-worker'],
+  }), /shape is invalid/);
+  assert.throws(() => normalizeRemoteWorkerPlacement({
+    required: { supportTiers: ['unsupported'] },
+  }), /supportTier is unknown/);
+  assert.throws(() => normalizeRemoteWorkerPlacement({
+    required: { protocolVersionRange: 'not-a-range' },
+  }), /protocolVersionRange is not semver/);
+  assert.throws(() => canonicalRemoteWorkerCapabilities({
+    architecture: 'arm/v7', executors: ['remote-worker'],
+    protocolVersion: '1.0.0', supportTier: 'tier1',
+  }), /does not belong to supportTier/);
+});
+
+test('keeps Worker architecture tiers aligned with the release identity', () => {
+  const { REMOTE_WORKER_ARCHITECTURES_BY_SUPPORT_TIER } =
+    require('../dist/remote-execution/remoteWorkerCompatibility');
+  const release = require('../../../ql3-release.json');
+  assert.deepEqual(REMOTE_WORKER_ARCHITECTURES_BY_SUPPORT_TIER, {
+    tier1: release.architectureSupport.tier1,
+    candidate: release.architectureSupport.candidates,
+    experimental: release.architectureSupport.experimentalBlocked,
+    'legacy-only': release.architectureSupport.legacyOnly,
+  });
 });

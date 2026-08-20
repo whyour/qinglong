@@ -465,6 +465,10 @@
 | [ADR-0459](./ADR-0459-project-scoped-cancellation-availability-summary.md)                                       | Project-scoped Cancellation 可用性汇总                                                                                                                                               | Accepted |
 | [ADR-0460](./ADR-0460-one-shot-cancellation-status-product-entry.md)                                             | 一次性 Cancellation 状态产品入口                                                                                                                                                     | Accepted |
 | [ADR-0461](./ADR-0461-project-scoped-blocked-cancellation-keyset.md)                                             | Project-scoped Blocked Cancellation 固定键集分页                                                                                                                                     | Accepted |
+| [ADR-0462](./ADR-0462-optional-console-run-management-drilldown.md)                                              | 可选 Console Run Management Drill-down                                                                                                                                               | Accepted |
+| [ADR-0463](./ADR-0463-native-console-capacity-and-assertion-lifecycle-evidence.md)                               | 原生双架构 Console 容量与 Assertion 生命周期证据                                                                                                                                       | Accepted（首份原生 CI 双架构报告待实际运行） |
+| [ADR-0464](./ADR-0464-machine-enforced-node24-architecture-support-tiers.md)                                     | 机器化 Node 24 架构支持分层                                                                                                                                                            | Accepted |
+| [ADR-0465](./ADR-0465-versioned-worker-support-tier-admission.md)                                                | 版本化 Worker 支持等级准入                                                                                                                                                              | Accepted |
 
 ## 规则
 

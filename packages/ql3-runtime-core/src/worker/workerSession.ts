@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { assertRemoteWorkerCompatibilityCapability } from '../remote-execution/remoteWorkerCompatibility';
 
 export const WORKER_SESSION_STATUSES = ['online', 'draining', 'offline'] as const;
 export type WorkerSessionStatus = (typeof WORKER_SESSION_STATUSES)[number];
@@ -140,6 +141,11 @@ export function assertWorkerCapabilitiesSnapshot(
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     invalid('Worker capabilities snapshot must be an object');
+  }
+  try {
+    assertRemoteWorkerCompatibilityCapability(parsed);
+  } catch {
+    invalid('Worker capabilities compatibility contract is invalid');
   }
   if (
     createHash('sha256').update(capabilitiesJson, 'utf8').digest('hex') !==

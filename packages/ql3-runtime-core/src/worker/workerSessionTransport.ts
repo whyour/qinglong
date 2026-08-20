@@ -13,6 +13,7 @@ import {
   type WorkerSessionRecord,
   type WorkerSessionStatus,
 } from './workerSession';
+import { canonicalRemoteWorkerCapabilities } from '../remote-execution/remoteWorkerPlacement';
 
 export const WORKER_SESSION_REGISTER_SCHEMA =
   'qinglong/worker-session-register@v1';
@@ -153,6 +154,13 @@ function validateRegister(
       command?.capabilitiesJson,
       command?.capabilitiesHash,
     );
+    const canonical = canonicalRemoteWorkerCapabilities(
+      JSON.parse(command.capabilitiesJson) as unknown,
+    );
+    if (
+      canonical.json !== command.capabilitiesJson ||
+      canonical.hash !== command.capabilitiesHash
+    ) throw new TypeError('capabilities snapshot is not canonical');
     assertWorkerConcurrency(
       command?.maxConcurrentRuns,
       command?.availableSlots,

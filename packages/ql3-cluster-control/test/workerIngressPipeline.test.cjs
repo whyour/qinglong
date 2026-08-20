@@ -36,6 +36,10 @@ const {
 } = require('@qinglong/runtime-core/remote-worker-lease-control');
 
 const SESSION_ID = '018f5c64-9b9d-7f1a-8c2d-1234567890ac';
+const CAPABILITIES_JSON =
+  '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
+const CAPABILITIES_HASH =
+  'b3d79017d91c477ffdf4a4dcc4ce9135ca053c921922ce0221920f905d8a2aa4';
 
 function metadata(operation, workerId = 'edge-1') {
   return {
@@ -80,9 +84,8 @@ function fixture(overrides = {}) {
           generation: command.generation,
           version: command.expectedVersion + 1,
           status: 'online',
-          capabilitiesJson: '{}',
-          capabilitiesHash:
-            '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+          capabilitiesJson: CAPABILITIES_JSON,
+          capabilitiesHash: CAPABILITIES_HASH,
           maxConcurrentRuns: 1,
           availableSlots: command.availableSlots,
           registeredAtMs: 1,
@@ -150,9 +153,8 @@ test('uses exact versioned register and transition contracts', async () => {
     generation: 1,
     version: 0,
     status: 'online',
-    capabilitiesJson: '{}',
-    capabilitiesHash:
-      '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+    capabilitiesJson: CAPABILITIES_JSON,
+    capabilitiesHash: CAPABILITIES_HASH,
     maxConcurrentRuns: 1,
     availableSlots: 1,
     registeredAtMs: 1,
@@ -188,7 +190,7 @@ test('uses exact versioned register and transition contracts', async () => {
     await context.pipeline.prepare(metadata('register'))
   ).handle({
     schema: WORKER_SESSION_REGISTER_SCHEMA,
-    capabilitiesJson: '{}',
+    capabilitiesJson: CAPABILITIES_JSON,
     capabilitiesHash: baseRecord.capabilitiesHash,
     maxConcurrentRuns: 1,
     availableSlots: 1,
@@ -206,6 +208,31 @@ test('uses exact versioned register and transition contracts', async () => {
   });
   assert.equal(transition.body.schema, WORKER_SESSION_TRANSITION_SCHEMA);
   assert.equal(transition.body.status, 'draining');
+});
+
+test('rejects unversioned Worker capabilities before repository registration', async () => {
+  let registered = false;
+  const context = fixture({
+    workers: {
+      async register() { registered = true; throw new Error('must not register'); },
+      async heartbeatAuthenticated() { throw new Error('not used'); },
+      async transitionAuthenticated() { throw new Error('not used'); },
+      async findById() { return null; },
+      async listAvailable() { throw new Error('not used'); },
+    },
+  });
+  const prepared = await context.pipeline.prepare(metadata('register'));
+  await assert.rejects(prepared.handle({
+    schema: WORKER_SESSION_REGISTER_SCHEMA,
+    capabilitiesJson: '{}',
+    capabilitiesHash:
+      '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+    maxConcurrentRuns: 1,
+    availableSlots: 1,
+    leaseDurationMs: 30_000,
+  }), (error) =>
+    error.statusCode === 400 && error.code === 'invalid_worker_request');
+  assert.equal(registered, false);
 });
 
 test('binds the credential Worker to the path and rejects before body access', async () => {

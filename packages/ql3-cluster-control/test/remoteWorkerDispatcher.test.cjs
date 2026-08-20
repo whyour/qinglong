@@ -43,6 +43,7 @@ function revision() {
 function worker() {
   const capabilities = canonicalRemoteWorkerCapabilities({
     architecture: 'arm64', executors: ['remote-worker'],
+    protocolVersion: '1.0.0', supportTier: 'tier1',
   });
   return {
     workerId: 'edge-1', sessionId: SESSION, generation: 2,

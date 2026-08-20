@@ -5501,7 +5501,7 @@ async function runCredentialDeliveryCommitResponseLossMatrix(options) {
 
     const sessions = new PostgresWorkerSessionRepository(ingressDatabase.pool);
     const capabilitiesJson =
-      '{"architecture":"arm64","executors":["remote-worker"]}';
+      '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
     const capabilitiesHash = createHash('sha256')
       .update(capabilitiesJson)
       .digest('hex');

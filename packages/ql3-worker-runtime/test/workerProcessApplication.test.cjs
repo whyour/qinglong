@@ -16,15 +16,24 @@ const {
   WorkerProcessError,
   runProductionWorkerProcess,
 } = require('@qinglong/worker-runtime/process');
+const {
+  remoteWorkerArchitectureForNodeRuntime,
+  remoteWorkerSupportTierForArchitecture,
+} = require('@qinglong/runtime-core/remote-dispatch');
 
 async function environment(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'ql3-worker-process-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const capabilities = path.join(root, 'capabilities.json');
+  const architecture = remoteWorkerArchitectureForNodeRuntime(
+    process.arch, process.config.variables.arm_version,
+  );
   await writeFile(capabilities, JSON.stringify({
-    architecture: 'x64',
+    architecture,
     operatingSystem: 'linux',
-    executors: ['local_process'],
+    executors: ['remote-worker'],
+    protocolVersion: '1.0.0',
+    supportTier: remoteWorkerSupportTierForArchitecture(architecture),
   }));
   await chmod(capabilities, 0o444);
   return {

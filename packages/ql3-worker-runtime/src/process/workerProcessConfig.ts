@@ -8,6 +8,8 @@ import {
 } from 'node:path';
 import {
   canonicalRemoteWorkerCapabilities,
+  REMOTE_WORKER_EXECUTOR_CAPABILITY,
+  remoteWorkerArchitectureForNodeRuntime,
   type RemoteWorkerCapabilities,
 } from '@qinglong/runtime-core/remote-dispatch';
 
@@ -206,7 +208,18 @@ async function capabilities(path: string): Promise<RemoteWorkerCapabilities> {
     const parsed = JSON.parse(
       new TextDecoder('utf-8', { fatal: true }).decode(bytes),
     ) as unknown;
-    return canonicalRemoteWorkerCapabilities(parsed).capabilities;
+    const normalized = canonicalRemoteWorkerCapabilities(parsed).capabilities;
+    if (!normalized.executors.includes(REMOTE_WORKER_EXECUTOR_CAPABILITY))
+      throw new Error('remote-worker executor capability is required');
+    const runtimeArchitecture = remoteWorkerArchitectureForNodeRuntime(
+      process.arch,
+      (process.config.variables as Readonly<Record<string, unknown>>)[
+        'arm_version'
+      ],
+    );
+    if (normalized.architecture !== runtimeArchitecture)
+      throw new Error('capability architecture does not match the Node runtime');
+    return normalized;
   } catch (error) {
     throw new WorkerProcessConfigError(
       'QL3_WORKER_CAPABILITIES_FILE is unavailable or invalid',

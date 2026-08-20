@@ -5851,7 +5851,7 @@ if (!migrationConnectionString) {
       assert.equal(published.state, 'published');
 
       const capabilitiesJson =
-        '{"architecture":"arm64","executors":["remote-worker"]}';
+        '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
       const capabilitiesHash = createHash('sha256')
         .update(capabilitiesJson)
         .digest('hex');
@@ -6168,7 +6168,7 @@ if (!migrationConnectionString) {
         runtimeDatabase.pool,
       );
       const capabilitiesJson =
-        '{"architecture":"arm64","executors":["remote-worker"]}';
+        '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
       const capabilitiesHash = createHash('sha256')
         .update(capabilitiesJson)
         .digest('hex');
@@ -6371,7 +6371,7 @@ if (!migrationConnectionString) {
           'worker-ingress-a',
         );
         const capabilitiesJson =
-          '{"architecture":"arm64","executors":["remote-worker"]}';
+          '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
         const workers = new PostgresWorkerSessionRepository(
           ingressDatabase.pool,
         );

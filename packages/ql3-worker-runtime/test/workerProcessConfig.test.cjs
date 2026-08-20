@@ -14,6 +14,16 @@ const {
   WorkerProcessConfigError,
   loadWorkerProcessConfig,
 } = require('@qinglong/worker-runtime/process-config');
+const {
+  remoteWorkerArchitectureForNodeRuntime,
+  remoteWorkerSupportTierForArchitecture,
+} = require('@qinglong/runtime-core/remote-dispatch');
+
+const RUNTIME_ARCHITECTURE = remoteWorkerArchitectureForNodeRuntime(
+  process.arch, process.config.variables.arm_version,
+);
+const RUNTIME_SUPPORT_TIER =
+  remoteWorkerSupportTierForArchitecture(RUNTIME_ARCHITECTURE);
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'ql3-worker-config-'));
@@ -22,9 +32,11 @@ async function fixture(t) {
   await writeFile(
     capabilitiesFile,
     JSON.stringify({
-      architecture: 'arm64',
+      architecture: RUNTIME_ARCHITECTURE,
       operatingSystem: 'linux',
-      executors: ['local_process'],
+      executors: ['remote-worker'],
+      protocolVersion: '1.0.0',
+      supportTier: RUNTIME_SUPPORT_TIER,
       runtimes: [{ name: 'node', version: '24.18.0' }],
       labels: { site: 'edge-a' },
       capacity: {
@@ -97,8 +109,10 @@ test('loads canonical edge defaults and bounded node overrides', async (t) => {
   assert.equal(edge.workerId, 'router-worker-1');
   assert.equal(edge.origin, 'https://control.example.internal:5801');
   assert.deepEqual(edge.capabilities, {
-    architecture: 'arm64',
-    executors: ['local_process'],
+    architecture: RUNTIME_ARCHITECTURE,
+    executors: ['remote-worker'],
+    protocolVersion: '1.0.0',
+    supportTier: RUNTIME_SUPPORT_TIER,
     operatingSystem: 'linux',
     runtimes: [{ name: 'node', version: '24.18.0' }],
     labels: { site: 'edge-a' },
@@ -177,6 +191,22 @@ test('rejects widened profiles, origins, heartbeat and filesystem configuration'
   }
 
   await chmod(current.capabilitiesFile, 0o666);
+  await assert.rejects(
+    loadWorkerProcessConfig(current.environment),
+    WorkerProcessConfigError,
+  );
+});
+
+test('rejects a Worker capability file that cannot satisfy remote placement', async (t) => {
+  const current = await fixture(t);
+  await chmod(current.capabilitiesFile, 0o644);
+  await writeFile(current.capabilitiesFile, JSON.stringify({
+    architecture: RUNTIME_ARCHITECTURE,
+    executors: ['local_process'],
+    protocolVersion: '1.0.0',
+    supportTier: RUNTIME_SUPPORT_TIER,
+  }));
+  await chmod(current.capabilitiesFile, 0o444);
   await assert.rejects(
     loadWorkerProcessConfig(current.environment),
     WorkerProcessConfigError,

@@ -14,6 +14,10 @@ const fixtures = path.resolve(
   __dirname,
   '../packages/ql3-cluster-control/test/fixtures/mtls',
 );
+const {
+  remoteWorkerArchitectureForNodeRuntime,
+  remoteWorkerSupportTierForArchitecture,
+} = require('../packages/ql3-runtime-core/dist/remote-execution/remoteWorkerCompatibility.js');
 
 function argumentsMap() {
   return new Map(
@@ -69,13 +73,18 @@ async function child() {
   const certificateFile = path.join(authority, 'tls.crt');
   const privateKeyFile = path.join(authority, 'tls.key');
   const tokenFile = path.join(authority, 'credential-token');
+  const architecture = remoteWorkerArchitectureForNodeRuntime(
+    process.arch, process.config.variables.arm_version,
+  );
   await Promise.all([
     writePrivate(
       capabilitiesFile,
       `${JSON.stringify({
-        architecture: process.arch,
+        architecture,
         operatingSystem: process.platform,
-        executors: ['local_process'],
+        executors: ['remote-worker'],
+        protocolVersion: '1.0.0',
+        supportTier: remoteWorkerSupportTierForArchitecture(architecture),
         runtimes: [{ name: 'node', version: process.versions.node }],
         labels: {},
         capacity: {

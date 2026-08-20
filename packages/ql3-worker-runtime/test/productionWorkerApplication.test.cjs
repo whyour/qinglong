@@ -40,9 +40,11 @@ async function temporaryStorage() {
 
 function capabilities() {
   return {
-    architecture: 'x64',
+    architecture: 'amd64',
     operatingSystem: 'linux',
-    executors: ['local_process'],
+    executors: ['remote-worker'],
+    protocolVersion: '1.0.0',
+    supportTier: 'tier1',
     runtimes: [{ name: 'node', version: '24.14.0' }],
     labels: {},
     capacity: { cpuCores: 1, memoryBytes: 256 * 1024 * 1024 },

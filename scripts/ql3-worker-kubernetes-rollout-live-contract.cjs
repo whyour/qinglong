@@ -15,6 +15,10 @@ const { createMutualTlsPki } = require('./lib/ql3-live-pki.cjs');
 const {
   validateWorkerKubernetesRolloutLiveReport,
 } = require('./ql3-worker-kubernetes-rollout-live-audit.cjs');
+const {
+  remoteWorkerArchitectureForNodeRuntime,
+  remoteWorkerSupportTierForArchitecture,
+} = require('../packages/ql3-runtime-core/dist/remote-execution/remoteWorkerCompatibility.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const K3S_IMAGE = 'rancher/k3s:v1.34.3-k3s1';
@@ -1613,6 +1617,9 @@ async function main(argv = process.argv.slice(2)) {
         'tls.crt': pkiMaterial.oldClientCertificate,
       },
     });
+    const workerArchitecture = remoteWorkerArchitectureForNodeRuntime(
+      process.arch, process.config.variables.arm_version,
+    );
     apply({
       apiVersion: 'v1',
       kind: 'ConfigMap',
@@ -1621,9 +1628,12 @@ async function main(argv = process.argv.slice(2)) {
         'worker-id': WORKER_ID,
         'control-origin': `https://${ingressServername}:5801`,
         'capabilities.json': `${JSON.stringify({
-          architecture: process.arch,
+          architecture: workerArchitecture,
           operatingSystem: 'linux',
-          executors: ['local_process'],
+          executors: ['remote-worker'],
+          protocolVersion: '1.0.0',
+          supportTier:
+            remoteWorkerSupportTierForArchitecture(workerArchitecture),
           runtimes: [{ name: 'node', version: '24.18.0' }],
           labels: { contract: 'kubernetes-product-live' },
           capacity: { cpuCores: 1, memoryBytes: 256 * 1024 * 1024 },

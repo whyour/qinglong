@@ -17,9 +17,11 @@ const SESSION_ID = '018f5c64-9b9d-7f1a-8c2d-1234567890ac';
 
 function capabilities() {
   return {
-    architecture: 'x64',
+    architecture: 'amd64',
     operatingSystem: 'linux',
-    executors: ['local_process'],
+    executors: ['remote-worker'],
+    protocolVersion: '1.0.0',
+    supportTier: 'tier1',
     runtimes: [{ name: 'node', version: '24.14.0' }],
     labels: {},
     capacity: { cpuCores: 1, memoryBytes: 256 * 1024 * 1024 },

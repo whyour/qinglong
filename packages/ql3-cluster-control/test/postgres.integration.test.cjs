@@ -527,6 +527,8 @@ if (!migrationConnectionString || !runtimeConnectionString) {
       const capabilities = canonicalRemoteWorkerCapabilities({
         architecture: 'arm64',
         executors: ['remote-worker'],
+        protocolVersion: '1.0.0',
+        supportTier: 'tier1',
         labels: { region: 'cn-east' },
         capacity: { memoryBytes: 536870912 },
       });
@@ -1227,7 +1229,7 @@ if (!migrationConnectionString || !runtimeConnectionString) {
         );
         const sessionId = '018f0000-0000-7000-8000-000000000021';
         const capabilitiesJson =
-          '{"architecture":"arm64","executors":["remote-worker"]}';
+          '{"architecture":"arm64","executors":["remote-worker"],"protocolVersion":"1.0.0","supportTier":"tier1"}';
         const response = await workerRequest(
           application.address,
           `/api/v3/worker-ingress/workers/worker-http-a/sessions/${sessionId}/register`,

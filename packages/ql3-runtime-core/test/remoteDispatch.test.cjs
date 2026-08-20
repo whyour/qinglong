@@ -20,6 +20,8 @@ function worker() {
   const snapshot = canonicalRemoteWorkerCapabilities({
     architecture: 'arm64',
     executors: ['remote-worker'],
+    protocolVersion: '1.0.0',
+    supportTier: 'tier1',
     operatingSystem: 'linux',
     runtimes: [{ name: 'node', version: '24.18.0' }],
     labels: { region: 'cn-east', tier: 'edge' },
@@ -90,7 +92,10 @@ test('rejects non-canonical snapshots and reports bounded mismatch classes', () 
   const value = worker();
   const reordered = {
     ...value,
-    capabilitiesJson: JSON.stringify({ executors: ['remote-worker'], architecture: 'arm64' }),
+    capabilitiesJson: JSON.stringify({
+      executors: ['remote-worker'], architecture: 'arm64',
+      protocolVersion: '1.0.0', supportTier: 'tier1',
+    }),
   };
   reordered.capabilitiesHash = require('node:crypto')
     .createHash('sha256')
@@ -102,7 +107,7 @@ test('rejects non-canonical snapshots and reports bounded mismatch classes', () 
   );
   const decision = evaluateRemoteWorkerPlacement(
     value,
-    { required: { architectures: ['x64'], labels: { region: 'eu' } } },
+    { required: { architectures: ['amd64'], labels: { region: 'eu' } } },
     20_000,
   );
   assert.deepEqual(decision.mismatches, ['architecture', 'label']);
