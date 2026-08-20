@@ -1,6 +1,7 @@
 /** TLS 1.3 Worker credential management HTTP adapter boundary. */
 import {
   CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH,
+  CLUSTER_WORKER_MANAGEMENT_PATH,
   startClusterPluginPackageManagementHttp,
   type ClusterPluginPackageManagementHttpApplication,
   type ClusterPluginPackageManagementHttpLimits,
@@ -32,15 +33,17 @@ export interface StartClusterWorkerCredentialManagementHttpOptions {
 }
 
 /**
- * Starts the Worker credential management endpoint on the shared Cluster Admin
- * TLS 1.3/OIDC boundary. The public manager process never receives credential
- * delivery or Kubernetes execution capabilities.
+ * Starts the Worker management endpoint on the shared Cluster Admin TLS
+ * 1.3/OIDC boundary. The former credential-scoped path remains an exact
+ * compatibility alias on this listener. The public manager process never
+ * receives credential delivery or Kubernetes execution capabilities.
  */
 export async function startClusterWorkerCredentialManagementHttp(
   options: StartClusterWorkerCredentialManagementHttpOptions,
 ): Promise<Readonly<ClusterWorkerCredentialManagementHttpApplication>> {
   return startClusterPluginPackageManagementHttp({
     ...options,
-    managementPath: CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH,
+    managementPath: CLUSTER_WORKER_MANAGEMENT_PATH,
+    compatibleManagementPaths: [CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH],
   });
 }

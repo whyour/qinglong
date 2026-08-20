@@ -475,6 +475,8 @@ function assertExactExternalClosure(readFile, root, findings) {
       'dist/worker-credential/management-server/workerCredentialManagementCli.js' ||
     adminManifest.bin?.['ql3-worker-credential-client'] !==
       'dist/worker-credential/workerCredentialManagementClientCli.js' ||
+    adminManifest.bin?.['ql3-worker-client'] !==
+      'dist/worker-management/workerManagementClientCli.js' ||
     adminManifest.bin?.['ql3-worker-credential-execute'] !==
       'dist/worker-credential/workerCredentialExecutorCli.js' ||
     adminManifest.exports?.['./plugin-package-recovery-process']?.require !==
@@ -498,13 +500,17 @@ function assertExactExternalClosure(readFile, root, findings) {
     adminManifest.exports?.['./worker-credential-management-client']
       ?.require !==
       './dist/worker-credential/workerCredentialManagementClient.js' ||
+    adminManifest.exports?.['./worker-management-client']?.require !==
+      './dist/worker-management/workerManagementClient.js' ||
+    adminManifest.exports?.['./worker-management-product']?.require !==
+      './dist/worker-management/workerManagementProduct.js' ||
     adminManifest.exports?.['./worker-credential-executor-process']?.require !==
       './dist/worker-credential/workerCredentialExecutorProcess.js'
   ) {
     findings.push(
       finding(
         'QL3_CLUSTER_PLUGIN_RECOVERY_ENTRYPOINT_MISSING',
-        'cluster-admin must publish the reviewed product facade, Package and Worker management and executor entrypoints',
+        'cluster-admin must publish the reviewed product facade, Package and credential-compatible/read-only Worker management and executor entrypoints',
       ),
     );
   }

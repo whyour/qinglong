@@ -284,6 +284,13 @@ function validContextFixture(t) {
     copilot: { configFile: copilotConfig },
     package: { configFile: packageConfig },
     'package-kubernetes': { configFile: packageConfig, kubernetesFile },
+    worker: {
+      configFile: config(
+        'worker-observation-client',
+        '/api/v3/workers/management',
+        'required',
+      ),
+    },
     'worker-credential': {
       configFile: config(
         'worker-client',
@@ -329,7 +336,7 @@ function validContextFixture(t) {
 
 test('catalog exposes only reviewed product entrypoints from the same package', () => {
   assert.equal(manifest.bin['ql3-cluster-admin'], 'dist/product-cli/cli.js');
-  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 11);
+  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 12);
   assert.equal(
     new Set(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.map(({ name }) => name)).size,
     QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length,
@@ -617,7 +624,7 @@ test('validates the complete operator context offline without operational author
     schemaVersion: 1,
     component: 'qinglong3-cluster-product-cli',
     event: 'context_valid',
-    commandCount: 8,
+    commandCount: 9,
     commands: [
       { name: 'copilot', transport: 'https', clientCertificate: 'forbidden' },
       { name: 'package', transport: 'https', clientCertificate: 'forbidden' },
@@ -626,6 +633,11 @@ test('validates the complete operator context offline without operational author
         transport: 'kubernetes-port-forward',
         clientCertificate: 'forbidden',
         kubernetesAuthentication: 'token',
+      },
+      {
+        name: 'worker',
+        transport: 'https',
+        clientCertificate: 'required',
       },
       {
         name: 'worker-credential',

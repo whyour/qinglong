@@ -11,6 +11,25 @@
 
 最新增量证据（2026-08-20）：
 
+- D-374/ADR-0467（已接受）：完成 D-373 留下的 Worker 产品命名债务，同时保持零新增常驻服务。通用 canonical path 为
+  `/api/v3/workers/management`；旧 `/api/v3/worker-credentials/management` 作为精确兼容 alias 继续由同一个 TLS 1.3/mTLS/
+  OIDC listener、transport、quota、rate limiter 和连接集合处理。共享 host 只允许这一对 alias，任意跨 Run/Automation/
+  Approval/Package 管理面的路径组合在监听前失败。新增 `ql3-worker-client` 与 `ql3-cluster-admin worker inspect|list`，只接受
+  caller-driven point inspect 或固定 16 项 keyset page，不接受 command file、credential mutation、caller limit、filter、自动
+  翻页、重试、轮询或 cache；输出固定为 `qinglong/worker-session-inspection@v1` 或
+  `qinglong/worker-session-list@v1`，不投影 transport request/inspection identity。旧 `worker-credential` binary、export、配置和
+  Kubernetes ceremony 保持兼容。实现仍在现有 `@qinglong/cluster-admin` 的内聚 `worker-management/` 目录，不新增 workspace
+  package、dependency、端口、Deployment、数据库对象或权限。聚焦实现门 `87/87`；Cluster Admin 全量为
+  `427 total / 424 pass / 3 conditional skip / 0 fail`，完整 backend 为
+  `1,503 total / 1,501 pass / 2 conditional skip / 0 fail`（包含一条不进入本阶段提交的既有用户测试），18-package clean
+  build/逐包测试单次退出 0。package boundary、Cluster dependency、Edge import、Cluster deployment 与 Worker deployment
+  审计全部 compatible；workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Cluster Admin 为
+  `128 source / 127 nested`。14 档 Local artifact audit 全部 compatible；基础 Edge/Standalone 为
+  `2,598,669 / 2,598,747` bytes、57 loaded modules，Application+AI 为 `4,501,822 / 4,501,954` bytes，MCP 为
+  `7,324,601 / 7,324,709` bytes、227 loaded modules。本切片不改变 PostgreSQL schema、ACL、repository、role、Pool、连接或
+  failover 语义，因此不重跑和不重新占有物理 HA 证明；D-373 的 PostgreSQL 18.6 arm64 HA `146/146`、timeline `1→2`
+  仅作为相邻既有基线，后续任何数据库语义变化必须重新执行 HA 门。
+
 - D-373/ADR-0466（已接受）：完成 D-372 的首个 caller-driven Worker 管理只读面。在既有 Worker management
   service/transport/client 内增加 `worker-session.inspect|list`，继续复用同一个 TLS 1.3/mTLS/OIDC listener、强 User
   `worker.manage` 与耐久 `worker-session.observe` quota，不新增 package、服务、端口、连接池、timer、watcher、queue、
@@ -6480,8 +6499,9 @@ Maintainers 要求 ARMv6、ARMv7 或 386 成为 3.0 正式支持项，必须先�
 D-373/ADR-0466 已把该分层投影到 caller-driven Worker 管理只读面：operator 可以 point inspect 或显式读取固定 16 项
 keyset page，区分 Session lifecycle 与 Placement compatibility，并查看有界 runtime/capacity；不能请求任意 filter、
 limit、自动翻页或轮询。该能力复用现有 Worker manager 进程和 `worker.manage`/耐久 quota，PostgreSQL role 只新增
-`SELECT worker_sessions`，所以不会进入 Edge/Standalone 常驻闭包。alpha 的 credential-named URI/CLI 是待 Beta 迁移的
-命名债务，不得用新建第二套 listener、Deployment 或 package 的方式修复。
+`SELECT worker_sessions`，所以不会进入 Edge/Standalone 常驻闭包。D-374/ADR-0467 已用 canonical
+`/api/v3/workers/management`、只读 `ql3-worker-client` 和同 listener 的精确 legacy alias 清偿 credential-named URI/CLI
+债务；旧 credential ceremony 继续兼容，且没有新建第二套 listener、Deployment 或 package。
 
 ### 7.10 资源基准与发布门禁
 

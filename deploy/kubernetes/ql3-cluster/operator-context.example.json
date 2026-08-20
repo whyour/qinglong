@@ -11,6 +11,9 @@
       "configFile": "/secure/qinglong3/plugin-package-client.json",
       "kubernetesFile": "/secure/qinglong3/plugin-package-kubernetes.json"
     },
+    "worker": {
+      "configFile": "/secure/qinglong3/worker-client.json"
+    },
     "worker-credential": {
       "configFile": "/secure/qinglong3/worker-credential-client.json"
     },

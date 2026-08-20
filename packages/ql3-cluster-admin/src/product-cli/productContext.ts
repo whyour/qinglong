@@ -14,9 +14,7 @@ import {
   probeClusterCopilotClientReadiness,
   validateClusterCopilotClientConfiguration,
 } from '../copilot-client/client';
-import {
-  validateClusterAuthenticatedManagementClientConfiguration,
-} from '../management-support/pluginPackageManagementClient';
+import { validateClusterAuthenticatedManagementClientConfiguration } from '../management-support/pluginPackageManagementClient';
 import type { ClusterAuthenticatedManagementClientKind } from '../management-support/pluginPackageManagementClient';
 import { probeClusterAuthenticatedManagementClientReadiness } from '../management-support/managementReadinessProbe';
 import {
@@ -31,6 +29,7 @@ const CONTEXT_COMMANDS = Object.freeze([
   'copilot',
   'package',
   'package-kubernetes',
+  'worker',
   'worker-credential',
   'approval',
   'run',
@@ -92,6 +91,7 @@ const CONTEXT_COMMAND_CLIENT_KINDS: Readonly<
 > = Object.freeze({
   package: 'package',
   'package-kubernetes': 'package',
+  worker: 'worker',
   'worker-credential': 'worker-credential',
   approval: 'approval',
   run: 'run',
@@ -337,11 +337,10 @@ export async function validateQingLong3ClusterProductContext(
           }),
         );
       } else if (name === 'package-kubernetes') {
-        const https =
-          validateClusterAuthenticatedManagementClientConfiguration(
-            command.configFile,
-            CONTEXT_COMMAND_CLIENT_KINDS[name],
-          );
+        const https = validateClusterAuthenticatedManagementClientConfiguration(
+          command.configFile,
+          CONTEXT_COMMAND_CLIENT_KINDS[name],
+        );
         const kubernetes =
           await validateClusterPluginPackageManagementKubernetesConfiguration(
             command.kubernetesFile!,
@@ -355,11 +354,10 @@ export async function validateQingLong3ClusterProductContext(
           }),
         );
       } else {
-        const https =
-          validateClusterAuthenticatedManagementClientConfiguration(
-            command.configFile,
-            CONTEXT_COMMAND_CLIENT_KINDS[name],
-          );
+        const https = validateClusterAuthenticatedManagementClientConfiguration(
+          command.configFile,
+          CONTEXT_COMMAND_CLIENT_KINDS[name],
+        );
         commands.push(
           Object.freeze({
             name,
@@ -403,7 +401,7 @@ export async function probeQingLong3ClusterProductContext(
               command.kubernetesFile!,
             )
           : name === 'copilot'
-            ? await probeClusterCopilotClientReadiness(command.configFile)
+          ? await probeClusterCopilotClientReadiness(command.configFile)
           : await probeClusterAuthenticatedManagementClientReadiness(
               command.configFile,
               CONTEXT_COMMAND_CLIENT_KINDS[name],

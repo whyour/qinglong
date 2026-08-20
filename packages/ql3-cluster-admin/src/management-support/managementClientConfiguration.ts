@@ -15,6 +15,7 @@ import { TextDecoder } from 'node:util';
 
 export type ClusterAuthenticatedManagementClientKind =
   | 'package'
+  | 'worker'
   | 'worker-credential'
   | 'automation'
   | 'approval'
@@ -33,6 +34,10 @@ const MANAGEMENT_CLIENT_POLICIES: Readonly<
   package: Object.freeze({
     managementPath: '/api/v3/plugin-packages/management',
     clientCertificate: 'forbidden',
+  }),
+  worker: Object.freeze({
+    managementPath: '/api/v3/workers/management',
+    clientCertificate: 'required',
   }),
   'worker-credential': Object.freeze({
     managementPath: '/api/v3/worker-credentials/management',
@@ -147,7 +152,9 @@ export function readCanonicalFile(
       throw configurationFailure();
     }
   } catch (error) {
-    if (error instanceof ClusterPluginPackageManagementClientConfigurationError) {
+    if (
+      error instanceof ClusterPluginPackageManagementClientConfigurationError
+    ) {
       throw error;
     }
     throw configurationFailure();
@@ -209,7 +216,9 @@ export function readCanonicalFile(
     return bytes;
   } catch (error) {
     bytes?.fill(0);
-    if (error instanceof ClusterPluginPackageManagementClientConfigurationError) {
+    if (
+      error instanceof ClusterPluginPackageManagementClientConfigurationError
+    ) {
       throw error;
     }
     throw configurationFailure();
@@ -349,7 +358,10 @@ export function prepareClusterAuthenticatedManagementClientConfiguration(
           throw configurationFailure();
         }
       } catch (error) {
-        if (error instanceof ClusterPluginPackageManagementClientConfigurationError) {
+        if (
+          error instanceof
+          ClusterPluginPackageManagementClientConfigurationError
+        ) {
           throw error;
         }
         throw configurationFailure();
@@ -380,7 +392,9 @@ export function prepareClusterAuthenticatedManagementClientConfiguration(
     caBytes?.fill(0);
     clientCertificateBytes?.fill(0);
     clientPrivateKeyBytes?.fill(0);
-    if (error instanceof ClusterPluginPackageManagementClientConfigurationError) {
+    if (
+      error instanceof ClusterPluginPackageManagementClientConfigurationError
+    ) {
       throw error;
     }
     throw configurationFailure();
@@ -408,11 +422,10 @@ export function validateClusterAuthenticatedManagementClientConfiguration(
 ): Readonly<ClusterAuthenticatedManagementClientConfigurationSummary> {
   const policy = MANAGEMENT_CLIENT_POLICIES[kind];
   if (policy === undefined) throw configurationFailure();
-  const prepared =
-    prepareClusterAuthenticatedManagementClientKindConfiguration(
-      configFile,
-      kind,
-    );
+  const prepared = prepareClusterAuthenticatedManagementClientKindConfiguration(
+    configFile,
+    kind,
+  );
   try {
     return Object.freeze({
       schemaVersion: 1,

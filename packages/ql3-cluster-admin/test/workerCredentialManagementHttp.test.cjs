@@ -56,6 +56,7 @@ const NEXT_CLIENT_KEY = resolve(
   'fixtures/management-service-key.pem',
 );
 const WORKER_PATH = '/api/v3/worker-credentials/management';
+const CANONICAL_WORKER_PATH = '/api/v3/workers/management';
 
 function command() {
   return {
@@ -223,7 +224,7 @@ async function requestWithClientIdentity(application, certificate, key) {
   });
 }
 
-test('serves only the fixed Worker credential management route', async () => {
+test('serves the canonical Worker route and exact credential compatibility alias', async () => {
   const calls = [];
   const application = await start(async (value, authentication) => {
     calls.push({ value, principal: await authentication.authenticate() });
@@ -245,12 +246,15 @@ test('serves only the fixed Worker credential management route', async () => {
       type: 'user',
       id: 'cluster-reviewer',
     });
+    const canonical = await request(application, CANONICAL_WORKER_PATH);
+    assert.equal(canonical.statusCode, 200);
+    assert.equal(canonical.body.result.operation, 'worker-credential.inspect');
     assert.equal(
       (await request(application, '/api/v3/plugin-packages/management'))
         .statusCode,
       404,
     );
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 2);
   } finally {
     await application.close();
   }
@@ -312,10 +316,18 @@ test('rejects a CRL-revoked client certificate before OIDC', async () => {
 
 test('maps Worker credential management failures to stable HTTP errors', async () => {
   for (const [failure, statusCode, code] of [
-    [new WorkerCredentialManagementRequestError('invalid'), 400, 'request_invalid'],
+    [
+      new WorkerCredentialManagementRequestError('invalid'),
+      400,
+      'request_invalid',
+    ],
     [new WorkerCredentialManagementAuthorizationError(), 403, 'forbidden'],
     [new WorkerCredentialManagementConflictError('conflict'), 409, 'conflict'],
-    [new WorkerCredentialManagementQuotaExceededError(1_250), 429, 'quota_exceeded'],
+    [
+      new WorkerCredentialManagementQuotaExceededError(1_250),
+      429,
+      'quota_exceeded',
+    ],
     [new WorkerCredentialManagementUnavailableError(), 503, 'unavailable'],
   ]) {
     const application = await start(async () => {
@@ -350,6 +362,34 @@ test('rejects arbitrary management paths at configuration time', async () => {
     );
   } finally {
     privateKey.fill(0);
+  }
+});
+
+test('rejects arbitrary or cross-plane compatible route aliases', async () => {
+  for (const compatibleManagementPaths of [
+    ['/api/v3/automations/management'],
+    ['/api/v3/worker-credentials/management', '/api/v3/runs/management'],
+  ]) {
+    const privateKey = Buffer.from(readFileSync(SERVER_KEY));
+    try {
+      await assert.rejects(
+        startClusterPluginPackageManagementHttp({
+          host: '127.0.0.1',
+          port: 0,
+          tls: {
+            privateKey,
+            certificate: Buffer.from(readFileSync(SERVER_CERT)),
+          },
+          identities: identities(),
+          transport: { async execute() {} },
+          managementPath: CANONICAL_WORKER_PATH,
+          compatibleManagementPaths,
+        }),
+        ClusterPluginPackageManagementHttpConfigurationError,
+      );
+    } finally {
+      privateKey.fill(0);
+    }
   }
 });
 

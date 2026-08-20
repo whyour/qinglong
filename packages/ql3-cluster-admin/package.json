@@ -180,6 +180,16 @@
       "require": "./dist/worker-credential/workerCredentialManagementClient.js",
       "default": "./dist/worker-credential/workerCredentialManagementClient.js"
     },
+    "./worker-management-client": {
+      "types": "./dist/worker-management/workerManagementClient.d.ts",
+      "require": "./dist/worker-management/workerManagementClient.js",
+      "default": "./dist/worker-management/workerManagementClient.js"
+    },
+    "./worker-management-product": {
+      "types": "./dist/worker-management/workerManagementProduct.d.ts",
+      "require": "./dist/worker-management/workerManagementProduct.js",
+      "default": "./dist/worker-management/workerManagementProduct.js"
+    },
     "./worker-credential-management-executor": {
       "types": "./dist/worker-credential/workerCredentialManagementExecutor.d.ts",
       "require": "./dist/worker-credential/workerCredentialManagementExecutor.js",
@@ -420,6 +430,7 @@
     "ql3-worker-credential-manage": "dist/worker-credential/management-server/workerCredentialManagementCli.js",
     "ql3-worker-credential-execute": "dist/worker-credential/workerCredentialExecutorCli.js",
     "ql3-worker-credential-client": "dist/worker-credential/workerCredentialManagementClientCli.js",
+    "ql3-worker-client": "dist/worker-management/workerManagementClientCli.js",
     "ql3-approval-manage": "dist/approval-management/approvalManagementCli.js",
     "ql3-approval-client": "dist/approval-management/approvalManagementClientCli.js",
     "ql3-run-manage": "dist/run-management/runManagementCli.js",

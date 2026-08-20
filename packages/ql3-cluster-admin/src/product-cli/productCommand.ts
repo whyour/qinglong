@@ -72,6 +72,12 @@ export const QINGLONG3_CLUSTER_PRODUCT_COMMANDS: readonly QingLong3ClusterProduc
       description: 'manage Plugin Packages through a bounded Kubernetes tunnel',
     }),
     Object.freeze({
+      name: 'worker',
+      binary: 'ql3-worker-client',
+      target: 'worker-management/workerManagementClientCli.js',
+      description: 'inspect bounded Worker session state',
+    }),
+    Object.freeze({
       name: 'worker-credential',
       binary: 'ql3-worker-credential-client',
       target: 'worker-credential/workerCredentialManagementClientCli.js',

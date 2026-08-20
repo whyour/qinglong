@@ -85,6 +85,7 @@ export const CLUSTER_PLUGIN_PACKAGE_MANAGEMENT_PATH =
   '/api/v3/plugin-packages/management';
 export const CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH =
   '/api/v3/worker-credentials/management';
+export const CLUSTER_WORKER_MANAGEMENT_PATH = '/api/v3/workers/management';
 export const CLUSTER_AUTOMATION_MANAGEMENT_PATH =
   '/api/v3/automations/management';
 export const CLUSTER_APPROVAL_MANAGEMENT_PATH = '/api/v3/approvals/management';
@@ -94,6 +95,7 @@ export const CLUSTER_RUN_MANAGEMENT_PATH = '/api/v3/runs/management';
 export type ClusterAuthenticatedManagementPath =
   | typeof CLUSTER_PLUGIN_PACKAGE_MANAGEMENT_PATH
   | typeof CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH
+  | typeof CLUSTER_WORKER_MANAGEMENT_PATH
   | typeof CLUSTER_AUTOMATION_MANAGEMENT_PATH
   | typeof CLUSTER_APPROVAL_MANAGEMENT_PATH
   | typeof CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_PATH
@@ -101,6 +103,7 @@ export type ClusterAuthenticatedManagementPath =
 const MANAGEMENT_PATHS = new Set<ClusterAuthenticatedManagementPath>([
   CLUSTER_PLUGIN_PACKAGE_MANAGEMENT_PATH,
   CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH,
+  CLUSTER_WORKER_MANAGEMENT_PATH,
   CLUSTER_AUTOMATION_MANAGEMENT_PATH,
   CLUSTER_APPROVAL_MANAGEMENT_PATH,
   CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_PATH,
@@ -143,6 +146,7 @@ export interface StartClusterPluginPackageManagementHttpOptions {
   readonly transport: ClusterAuthenticatedManagementTransport;
   readonly identities: ClusterPluginPackageIdentityKeysetFile;
   readonly managementPath?: ClusterAuthenticatedManagementPath;
+  readonly compatibleManagementPaths?: readonly ClusterAuthenticatedManagementPath[];
   readonly limits?: ClusterPluginPackageManagementHttpLimits;
   readonly now?: () => number;
   readonly createRequestId?: () => string;
@@ -547,7 +551,8 @@ function responseError(error: unknown): HttpRequestError {
     error instanceof ClusterApprovalManagementTransportAuthenticationError ||
     error instanceof
       ClusterModelProviderCredentialManagementTransportAuthenticationError ||
-    error instanceof ClusterModelProviderCredentialManagementAuthenticationError ||
+    error instanceof
+      ClusterModelProviderCredentialManagementAuthenticationError ||
     error instanceof ClusterRunManagementTransportAuthenticationError
   ) {
     return new HttpRequestError(401, 'authentication_required');
@@ -573,7 +578,8 @@ function responseError(error: unknown): HttpRequestError {
     error instanceof WorkerCredentialManagementAuthorizationError ||
     error instanceof ClusterAutomationManagementAuthorizationError ||
     error instanceof ClusterApprovalManagementTransportAuthorizationError ||
-    error instanceof ClusterModelProviderCredentialManagementAuthorizationError ||
+    error instanceof
+      ClusterModelProviderCredentialManagementAuthorizationError ||
     error instanceof ClusterRunManagementAuthorizationError
   ) {
     return new HttpRequestError(403, 'forbidden');
@@ -665,6 +671,7 @@ export async function startClusterPluginPackageManagementHttp(
           'transport',
           'identities',
           'managementPath',
+          'compatibleManagementPaths',
           'limits',
           'now',
           'createRequestId',
@@ -711,6 +718,12 @@ export async function startClusterPluginPackageManagementHttp(
     typeof options.identities.reload !== 'function' ||
     (options.managementPath !== undefined &&
       !MANAGEMENT_PATHS.has(options.managementPath)) ||
+    (options.compatibleManagementPaths !== undefined &&
+      (!Array.isArray(options.compatibleManagementPaths) ||
+        options.managementPath !== CLUSTER_WORKER_MANAGEMENT_PATH ||
+        options.compatibleManagementPaths.length !== 1 ||
+        options.compatibleManagementPaths[0] !==
+          CLUSTER_WORKER_CREDENTIAL_MANAGEMENT_PATH)) ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.createRequestId !== undefined &&
       typeof options.createRequestId !== 'function') ||
@@ -721,6 +734,10 @@ export async function startClusterPluginPackageManagementHttp(
   const limits = reviewedLimits(options.limits);
   const managementPath =
     options.managementPath ?? CLUSTER_PLUGIN_PACKAGE_MANAGEMENT_PATH;
+  const managementPaths = new Set<ClusterAuthenticatedManagementPath>([
+    managementPath,
+    ...(options.compatibleManagementPaths ?? []),
+  ]);
   const now = options.now ?? Date.now;
   const createRequestId = options.createRequestId ?? randomUUID;
   const clientCertificateRequired =
@@ -824,7 +841,10 @@ export async function startClusterPluginPackageManagementHttp(
       ) {
         throw new HttpRequestError(401, 'client_certificate_required');
       }
-      if (request.method !== 'POST' || url !== managementPath) {
+      if (
+        request.method !== 'POST' ||
+        !managementPaths.has(url as ClusterAuthenticatedManagementPath)
+      ) {
         throw new HttpRequestError(404, 'not_found');
       }
       if (availability !== 'ready') {

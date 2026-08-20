@@ -211,6 +211,7 @@ test('ships a path-only Cluster operator context example without durable authori
     'package',
     'package-kubernetes',
     'run',
+    'worker',
     'worker-credential',
   ]);
   for (const [name, command] of Object.entries(example.commands)) {
@@ -753,13 +754,16 @@ test('rejects widened authority or lifecycle in the Worker management client', (
   }
 });
 
-test('requires the production Worker credential management client export and binary', () => {
+test('requires both read-only Worker and credential-compatible client entrypoints', () => {
   const report = auditClusterDeployment({
     root: ROOT,
     readFile: intercept('packages/ql3-cluster-admin/package.json', (source) => {
       const manifest = JSON.parse(source);
       delete manifest.bin['ql3-worker-credential-client'];
+      delete manifest.bin['ql3-worker-client'];
       delete manifest.exports['./worker-credential-management-client'];
+      delete manifest.exports['./worker-management-client'];
+      delete manifest.exports['./worker-management-product'];
       return JSON.stringify(manifest);
     }),
   });

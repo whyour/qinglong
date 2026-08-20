@@ -470,6 +470,7 @@
 | [ADR-0464](./ADR-0464-machine-enforced-node24-architecture-support-tiers.md)                                     | 机器化 Node 24 架构支持分层                                                                                                                                                            | Accepted |
 | [ADR-0465](./ADR-0465-versioned-worker-support-tier-admission.md)                                                | 版本化 Worker 支持等级准入                                                                                                                                                              | Accepted |
 | [ADR-0466](./ADR-0466-bounded-worker-session-compatibility-observation.md)                                       | 有界 Worker Session 兼容性观察                                                                                                                                                           | Accepted |
+| [ADR-0467](./ADR-0467-generic-worker-management-product-entry.md)                                                | 通用 Worker Management 产品入口与兼容路径                                                                                                                                                | Accepted |
 
 ## 规则
 
