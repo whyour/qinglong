@@ -24,16 +24,19 @@ function main() {
       'ql3-service-bridge binary entry drifted',
     );
   }
-  const entry = path.join(
-    packageRoot,
+  const entries = [
     'dist/deployment/service-manager/serviceBridge.js',
-  );
-  if (!fs.existsSync(entry)) {
-    throw new QingLong3ServiceBridgeImportAuditError(
-      'service bridge must be built before import audit',
-    );
+    'dist/deployment/service-manager/legacy-rollback/bridge.js',
+  ];
+  for (const relativeEntry of entries) {
+    const entry = path.join(packageRoot, relativeEntry);
+    if (!fs.existsSync(entry)) {
+      throw new QingLong3ServiceBridgeImportAuditError(
+        `${relativeEntry} must be built before import audit`,
+      );
+    }
+    require(entry);
   }
-  require(entry);
   const loaded = Object.keys(require.cache)
     .map((filePath) => path.resolve(filePath))
     .filter(
@@ -69,8 +72,14 @@ function main() {
       file: 'packages/ql3-local-owner-cli/src/deployment/service-manager/serviceBridgeCli.ts',
     });
   }
+  if (!source.includes("from './legacy-rollback/bridge'")) {
+    findings.push({
+      code: 'LEGACY_ROLLBACK_BRIDGE_CLI_ENTRY_DRIFT',
+      file: 'packages/ql3-local-owner-cli/src/deployment/service-manager/serviceBridgeCli.ts',
+    });
+  }
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     compatible: findings.length === 0,
     binary: expectedBin,
     loaded,

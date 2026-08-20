@@ -476,6 +476,7 @@
 | [ADR-0470](./ADR-0470-session-scoped-console-capability-discovery.md)                                            | Console 会话级能力发现与服务端操作围栏                                                                                                                                                     | Accepted |
 | [ADR-0471](./ADR-0471-legacy-core-api-compatibility-baseline.md)                                                 | Legacy 核心执行 API 兼容基线                                                                                                                                                                | Accepted |
 | [ADR-0472](./ADR-0472-service-manager-legacy-rollback-preparation.md)                                           | Service Manager Legacy Rollback Preparation                                                                                                                                                 | Accepted |
+| [ADR-0473](./ADR-0473-service-manager-legacy-rollback-commit.md)                                                | Service Manager Legacy Rollback Commit                                                                                                                                                      | Accepted（OpenRC live actor 待补） |
 
 ## 规则
 

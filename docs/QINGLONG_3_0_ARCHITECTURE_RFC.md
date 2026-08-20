@@ -11,6 +11,26 @@
 
 最新增量证据（2026-08-20）：
 
+- D-380/ADR-0473（已接受；OpenRC live actor 待镜像基础设施恢复后补跑）：完成 systemd/OpenRC service-manager rollback 的
+  安全 commit 协议。`rollback_prepared` 不再被误当作 root 授权；Owner 重新绑定当前 head、preparation、Application 与
+  legacy-silence commitment 原始摘要、descriptor 摘要后，才 no-replace 发布 `legacy_restart_requested`。短生命周期 root bridge
+  只允许固定 `qinglong`/`qinglong3`、固定 descriptor 与固定 systemd/OpenRC argv，启动前证明双服务 inactive，并在任何 start 前写
+  durable barrier；barrier 后所有重放只能 inspect，响应丢失可按 legacy active/target inactive 与进程身份收敛，无法证明则由 Owner
+  消费为 `manual_required`，永不盲目二次 start。Owner 是 instance head 的唯一终态写者，成功 CAS 到 `legacy_running` 并支持
+  exact replay；该状态只证明 init/process running 与 target stopped，不宣称 2.x 业务健康。实现仍在现有 Local Owner package，且将
+  回滚四模块内聚到 `service-manager/legacy-rollback/`，没有新 package、production dependency、binary、daemon、watcher、timer、
+  socket、数据库连接或部署对象。聚焦门 `16/16`；Local Owner 全量
+  `181 total / 176 pass / 5 conditional skip / 0 fail`；backend 全量
+  `1,523 total / 1,521 pass / 2 conditional skip / 0 fail`；18-package clean build/逐包测试单次退出 0。package boundary、
+  Service Bridge import、Edge import、Cluster dependency、Cluster/Worker deployment、Console 与 Console distribution 八项审计
+  全部 compatible/passed；workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
+  `111 source / 110 nested / 1 root binary entry`。14 档 Local artifact audit 全部 compatible；基础 Edge/Standalone 保持
+  `2,598,669 / 2,598,747` bytes、316 files、57 loaded modules，Adopted 为 `2,817,964 / 2,818,087` bytes、58 loaded modules，
+  Application+AI 为 `4,501,822 / 4,501,954` bytes，MCP 为 `7,324,601 / 7,324,709` bytes。systemd live actor 已覆盖
+  root/non-root success、真实 manager start、response-loss inspect convergence、Owner consume/replay；root barrier-crash 证明没有
+  第二次 start，双服务均 inactive 并收敛为 manual。OpenRC 因本机缺少基础镜像且 `node:24-alpine` credential helper 挂起未执行，
+  不能宣称全组合门已闭合；临时容器/镜像/tag 已清理。本切片不改变 PostgreSQL schema、ACL、repository、role、Pool、连接或
+  failover 语义，因此不重跑且不重新占有 HA 证明。D-381 应补 OpenRC 证据与 `legacy_running` 后的有界 2.x readiness/health proof。
 - D-379/ADR-0472（已接受；OpenRC live actor 待镜像基础设施恢复后补跑）：为 systemd/OpenRC adopted cutover 增加 Owner-side
   `service-legacy-rollback-prepare`。命令绑定 exact `target_stopped` record 与 instance head，重读 stop intent、Application v3、
   activation 和 legacy-silence commitment，并复用 Docker 路径相同的 stable-fd SHA-256/inode/sidecar reconciliation。

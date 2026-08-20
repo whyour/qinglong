@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
-import { runLocalServiceBridgeCommandFile } from './serviceBridge';
+import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
+
+import { runLocalServiceBridge } from './serviceBridge';
+import { runLocalServiceManagerLegacyRollbackBridge } from './legacy-rollback/bridge';
 
 const USAGE =
   'Usage: ql3-service-bridge run --command-file /absolute/root-owned-command.json';
@@ -21,7 +24,15 @@ function main(argv: readonly string[]): void {
     return;
   }
   try {
-    const result = runLocalServiceBridgeCommandFile(argv[2]!);
+    const command = readPrivateLocalCommandFile(argv[2]!);
+    const operation =
+      command && typeof command === 'object' && !Array.isArray(command)
+        ? (command as Record<string, unknown>).operation
+        : undefined;
+    const result =
+      operation === 'local.deployment.service-manager.legacy-rollback.execute'
+        ? runLocalServiceManagerLegacyRollbackBridge(command)
+        : runLocalServiceBridge(command);
     process.stdout.write(`${JSON.stringify(result)}\n`);
     if (result.state === 'manual_required') process.exitCode = 2;
   } catch (error) {

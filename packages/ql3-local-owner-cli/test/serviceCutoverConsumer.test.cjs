@@ -11,7 +11,16 @@ const {
 const {
   localServiceManagerLegacyRollbackPreparationPath,
   prepareLocalServiceManagerLegacyRollback,
-} = require('../dist/deployment/service-manager/serviceLegacyRollback.js');
+} = require('../dist/deployment/service-manager/legacy-rollback/preparation.js');
+const {
+  authorizeLocalServiceManagerLegacyRollback,
+  consumeLocalServiceManagerLegacyRollback,
+} = require('../dist/deployment/service-manager/legacy-rollback/consumer.js');
+const {
+  localServiceManagerLegacyStartOutcomeDigest,
+  localServiceManagerLegacyStartOutcomePath,
+  localServiceManagerRollbackObservationDigest,
+} = require('../dist/deployment/service-manager/legacy-rollback/contract.js');
 const {
   prepareLocalServiceManagerIntent,
 } = require('../dist/deployment/service-manager/serviceManagerIntent.js');
@@ -384,6 +393,126 @@ function rollbackPrepareCommand(state, stoppedResult, head) {
   };
 }
 
+function rollbackAuthorizeCommand(state, prepared) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.authorize',
+    options: {
+      deploymentRoot: state.root,
+      allowRootService: process.getuid() === 0,
+    },
+    request: {
+      cutoverId: state.cutoverId,
+      profile: 'edge',
+      instanceId: 'edge-router-1',
+      generation: 1,
+      expectedActivationDigest: state.activationDigest,
+      expectedPreparationDigest: prepared.preparationDigest,
+      expectedInstanceHeadDigest: prepared.instanceHeadDigest,
+      requestedAtMs: 1786416000500,
+    },
+  };
+}
+
+function rollbackObservation(serviceName, active, observedAtMs) {
+  const payload = {
+    managerKind: 'systemd',
+    serviceName,
+    fragmentPath: `/etc/systemd/system/${serviceName}.service`,
+    loadState: 'loaded',
+    activeState: active ? 'active' : 'inactive',
+    subState: active ? 'running' : 'dead',
+    enabledState: 'enabled',
+    mainPid: active ? 5723 : 0,
+    observedAtMs,
+  };
+  return {
+    ...payload,
+    observationDigest: localServiceManagerRollbackObservationDigest(payload),
+  };
+}
+
+function publishLegacyStartOutcome(
+  state,
+  prepared,
+  authorized,
+  outcomeState = 'legacy_running',
+) {
+  const preparation = JSON.parse(
+    fs.readFileSync(
+      localServiceManagerLegacyRollbackPreparationPath(
+        state.root,
+        state.cutoverId,
+        1,
+      ),
+      'utf8',
+    ),
+  );
+  const legacyObservation = rollbackObservation(
+    'qinglong',
+    outcomeState === 'legacy_running',
+    1786416000600,
+  );
+  const targetObservation = rollbackObservation(
+    'qinglong3',
+    false,
+    1786416000601,
+  );
+  const payload = {
+    schema: 'qinglong3-local-service-manager-legacy-start-outcome',
+    schemaVersion: 1,
+    state: outcomeState,
+    cutoverId: state.cutoverId,
+    profile: 'edge',
+    instanceId: 'edge-router-1',
+    generation: 1,
+    activationDigest: state.activationDigest,
+    managerKind: 'systemd',
+    preparationDigest: prepared.preparationDigest,
+    authorizationDigest: authorized.authorizationDigest,
+    barrierDigest: '9'.repeat(64),
+    legacyDescriptorDigest: 'a'.repeat(64),
+    targetDescriptorDigest: preparation.targetDescriptorDigest,
+    mutationDisposition: 'executed',
+    manualReason:
+      outcomeState === 'legacy_running' ? null : 'manager_state_unproved',
+    legacyObservation,
+    targetObservation,
+    completedAtMs: 1786416000610,
+  };
+  const outcome = {
+    ...payload,
+    outcomeDigest: localServiceManagerLegacyStartOutcomeDigest(payload),
+  };
+  writePrivate(
+    localServiceManagerLegacyStartOutcomePath(state.root, state.cutoverId, 1),
+    outcome,
+  );
+  return outcome;
+}
+
+function rollbackConsumeCommand(state, prepared, authorized) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.consume',
+    options: {
+      deploymentRoot: state.root,
+      allowRootService: process.getuid() === 0,
+    },
+    request: {
+      cutoverId: state.cutoverId,
+      profile: 'edge',
+      instanceId: 'edge-router-1',
+      generation: 1,
+      expectedActivationDigest: state.activationDigest,
+      expectedPreparationDigest: prepared.preparationDigest,
+      expectedAuthorizationDigest: authorized.authorizationDigest,
+      expectedAuthorizationHeadDigest: authorized.instanceHeadDigest,
+      requestedAtMs: 1786416000700,
+    },
+  };
+}
+
 test('commits adopted service active evidence and replays from the instance head', async (t) => {
   const state = fixture(t);
   const prepared = prepare(
@@ -572,6 +701,92 @@ test('prepares and exactly replays lossless service-manager legacy rollback evid
   assert.equal(replay.status, 'existing');
   assert.equal(replay.preparationDigest, prepared.preparationDigest);
   assert.equal(replay.instanceHeadDigest, prepared.instanceHeadDigest);
+});
+
+test('authorizes, consumes and exactly replays service-manager legacy running evidence', async (t) => {
+  const state = fixture(t);
+  const { stoppedResult, head } = await stopAdoptedTarget(state, '039');
+  const prepared = prepareLocalServiceManagerLegacyRollback(
+    rollbackPrepareCommand(state, stoppedResult, head),
+  );
+  const authorizeCommand = rollbackAuthorizeCommand(state, prepared);
+  const authorized =
+    authorizeLocalServiceManagerLegacyRollback(authorizeCommand);
+  assert.equal(authorized.status, 'prepared');
+  assert.equal(authorized.state, 'legacy_restart_requested');
+  assert.equal(
+    authorizeLocalServiceManagerLegacyRollback(authorizeCommand).status,
+    'existing',
+  );
+  const requestedHead = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(requestedHead.state, 'legacy_restart_requested');
+  assert.equal(
+    requestedHead.sourceRecordDigest,
+    authorized.authorizationDigest,
+  );
+  const outcome = publishLegacyStartOutcome(state, prepared, authorized);
+  const consumeCommand = rollbackConsumeCommand(state, prepared, authorized);
+  const consumed = consumeLocalServiceManagerLegacyRollback(consumeCommand);
+  assert.equal(consumed.status, 'prepared');
+  assert.equal(consumed.state, 'legacy_running');
+  assert.equal(consumed.outcomeDigest, outcome.outcomeDigest);
+  assert.match(consumed.completionDigest, /^[0-9a-f]{64}$/);
+  const replay = consumeLocalServiceManagerLegacyRollback(consumeCommand);
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.completionDigest, consumed.completionDigest);
+  assert.equal(replay.instanceHeadDigest, consumed.instanceHeadDigest);
+});
+
+test('requires current rollback evidence before publishing legacy start authorization', async (t) => {
+  const state = fixture(t);
+  const { stoppedResult, head } = await stopAdoptedTarget(state, '041');
+  const prepared = prepareLocalServiceManagerLegacyRollback(
+    rollbackPrepareCommand(state, stoppedResult, head),
+  );
+  fs.writeFileSync(state.targetPath, 'target-drift-before-authorization\n', {
+    mode: 0o600,
+  });
+  assert.throws(
+    () =>
+      authorizeLocalServiceManagerLegacyRollback(
+        rollbackAuthorizeCommand(state, prepared),
+      ),
+    /prepared rollback data drifted after authorization/,
+  );
+  const unchanged = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(unchanged.state, 'rollback_prepared');
+  assert.equal(unchanged.headDigest, prepared.instanceHeadDigest);
+});
+
+test('terminalizes an unproved root legacy start outcome', async (t) => {
+  const state = fixture(t);
+  const { stoppedResult, head } = await stopAdoptedTarget(state, '043');
+  const prepared = prepareLocalServiceManagerLegacyRollback(
+    rollbackPrepareCommand(state, stoppedResult, head),
+  );
+  const authorized = authorizeLocalServiceManagerLegacyRollback(
+    rollbackAuthorizeCommand(state, prepared),
+  );
+  publishLegacyStartOutcome(state, prepared, authorized, 'manual_required');
+  const consumed = consumeLocalServiceManagerLegacyRollback(
+    rollbackConsumeCommand(state, prepared, authorized),
+  );
+  assert.equal(consumed.state, 'manual_required');
+  const terminal = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(terminal.state, 'manual_required');
+  assert.equal(terminal.sourceRecordDigest, consumed.completionDigest);
 });
 
 test('keeps target_stopped when service-manager rollback would discard target writes', async (t) => {

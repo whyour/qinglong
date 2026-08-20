@@ -82,7 +82,13 @@ import {
 import {
   prepareLocalServiceManagerLegacyRollback,
   prepareLocalServiceManagerLegacyRollbackCommandFile,
-} from './service-manager/serviceLegacyRollback';
+} from './service-manager/legacy-rollback/preparation';
+import {
+  authorizeLocalServiceManagerLegacyRollback,
+  authorizeLocalServiceManagerLegacyRollbackCommandFile,
+  consumeLocalServiceManagerLegacyRollback,
+  consumeLocalServiceManagerLegacyRollbackCommandFile,
+} from './service-manager/legacy-rollback/consumer';
 
 export {
   LocalDeploymentConfigurationError,
@@ -187,6 +193,10 @@ export {
   prepareLocalServiceManagerIntentCommandFile,
   prepareLocalServiceManagerLegacyRollback,
   prepareLocalServiceManagerLegacyRollbackCommandFile,
+  authorizeLocalServiceManagerLegacyRollback,
+  authorizeLocalServiceManagerLegacyRollbackCommandFile,
+  consumeLocalServiceManagerLegacyRollback,
+  consumeLocalServiceManagerLegacyRollbackCommandFile,
 };
 export {
   localServiceManagerIntentDigest,
@@ -221,7 +231,29 @@ export {
   type LocalServiceManagerLegacyRollbackPreparation,
   type LocalServiceManagerLegacyRollbackPrepareCommand,
   type LocalServiceManagerLegacyRollbackPrepareResult,
-} from './service-manager/serviceLegacyRollback';
+} from './service-manager/legacy-rollback/preparation';
+export {
+  normalizeLocalServiceManagerLegacyRollbackCompletion,
+  type LocalServiceManagerLegacyRollbackAuthorizeCommand,
+  type LocalServiceManagerLegacyRollbackAuthorizeResult,
+  type LocalServiceManagerLegacyRollbackCompletion,
+  type LocalServiceManagerLegacyRollbackConsumeCommand,
+  type LocalServiceManagerLegacyRollbackConsumeResult,
+} from './service-manager/legacy-rollback/consumer';
+export {
+  localServiceManagerLegacyCompletionPath,
+  localServiceManagerLegacyDescriptorPath,
+  localServiceManagerLegacyStartAuthorizationPath,
+  localServiceManagerLegacyStartOutcomePath,
+  localServiceManagerTargetDescriptorPath,
+  normalizeLocalServiceManagerLegacyRollbackBridgeCommand,
+  normalizeLocalServiceManagerLegacyStartAuthorization,
+  normalizeLocalServiceManagerLegacyStartOutcome,
+  type LocalServiceManagerLegacyRollbackBridgeCommand,
+  type LocalServiceManagerLegacyRollbackBridgeResult,
+  type LocalServiceManagerLegacyStartAuthorization,
+  type LocalServiceManagerLegacyStartOutcome,
+} from './service-manager/legacy-rollback/contract';
 
 export async function prepareLocalDeployment(
   input: unknown,

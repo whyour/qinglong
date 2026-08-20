@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -11,21 +10,26 @@ import {
 import {
   advanceLocalCutoverInstanceHead,
   readLocalCutoverInstanceHead,
-} from '../cutover/instanceLineage';
+} from '../../cutover/instanceLineage';
 import {
   readTargetDataReconciliationEvidenceForPaths,
   verifyTargetDataReconciliationEvidence,
   type TargetDataReconciliationEvidence,
-} from '../cutover/targetDataEvidence';
-import { cutoverDigest } from '../cutover/targetEvidence';
-import { currentIdentity } from '../foundation/contract';
-import { LocalDeploymentConfigurationError } from '../foundation/error';
-import { preflightPublishedFile, publishExactFile } from '../foundation/files';
+} from '../../cutover/targetDataEvidence';
+import { cutoverDigest } from '../../cutover/targetEvidence';
+import { currentIdentity } from '../../foundation/contract';
+import { LocalDeploymentConfigurationError } from '../../foundation/error';
+import {
+  preflightPublishedFile,
+  publishExactFile,
+} from '../../foundation/files';
 import {
   localServiceManagerIntentPath,
   normalizeLocalServiceManagerIntent,
-} from './serviceBridgeContract';
-import { normalizeLocalServiceManagerCutoverRecord } from './serviceCutoverJournal';
+  type LocalServiceManagerKind,
+} from '../serviceBridgeContract';
+import { readServiceBridgeFile } from '../serviceBridgeFiles';
+import { normalizeLocalServiceManagerCutoverRecord } from '../serviceCutoverJournal';
 
 const SCHEMA = 'qinglong3-local-service-manager-rollback-preparation';
 const ZERO_DIGEST = '0'.repeat(64);
@@ -78,11 +82,14 @@ export interface LocalServiceManagerLegacyRollbackPreparation {
   readonly instanceId: string;
   readonly generation: number;
   readonly activationDigest: string;
+  readonly managerKind: LocalServiceManagerKind;
   readonly expectedInstanceHeadDigest: string;
   readonly stoppedRecordDigest: string;
   readonly stoppedManagerOutcomeDigest: string;
   readonly applicationConfigDigest: string;
   readonly commitmentDigest: string;
+  readonly commitmentFileDigest: string;
+  readonly targetDescriptorDigest: string;
   readonly shutdownReceiptDigest: string;
   readonly reconciliation: Readonly<TargetDataReconciliationEvidence>;
   readonly requestedAtMs: number;
@@ -95,6 +102,7 @@ interface AdoptedPaths {
   readonly targetDatabasePath: string;
   readonly expectedActivationDigest: string;
   readonly commitmentDigest: string;
+  readonly commitmentFileDigest: string;
 }
 
 function configurationError(message: string, cause?: unknown): never {
@@ -253,17 +261,20 @@ export function localServiceManagerLegacyRollbackPreparationPath(
   );
 }
 
-function applicationSha256(filePath: string): string {
+function privateFileSha256(
+  filePath: string,
+  uid: number,
+  gid: number,
+  label: string,
+): string {
+  let bytes: Buffer | undefined;
   try {
-    return crypto
-      .createHash('sha256')
-      .update(fs.readFileSync(filePath))
-      .digest('hex');
+    bytes = readServiceBridgeFile(filePath, { uid, gid, mode: 0o600 }, label);
+    return crypto.createHash('sha256').update(bytes).digest('hex');
   } catch (error) {
-    return configurationError(
-      'application configuration cannot be hashed',
-      error,
-    );
+    return configurationError(`${label} cannot be hashed`, error);
+  } finally {
+    bytes?.fill(0);
   }
 }
 
@@ -272,8 +283,17 @@ function adoptedPaths(
   command: Readonly<LocalServiceManagerLegacyRollbackPrepareCommand>,
   expectedApplicationDigest: string,
   expectedCommitmentDigest: string,
+  uid: number,
+  gid: number,
 ): Readonly<AdoptedPaths> {
-  if (applicationSha256(applicationPath) !== expectedApplicationDigest) {
+  if (
+    privateFileSha256(
+      applicationPath,
+      uid,
+      gid,
+      'application configuration',
+    ) !== expectedApplicationDigest
+  ) {
     configurationError('adopted application configuration digest drifted');
   }
   const application = object(
@@ -329,6 +349,12 @@ function adoptedPaths(
     ),
     expectedActivationDigest: command.request.expectedActivationDigest,
     commitmentDigest: expectedCommitmentDigest,
+    commitmentFileDigest: privateFileSha256(
+      commitmentPath,
+      uid,
+      gid,
+      'legacy silence commitment',
+    ),
   });
 }
 
@@ -336,6 +362,9 @@ function preparationRecord(
   command: Readonly<LocalServiceManagerLegacyRollbackPrepareCommand>,
   stopped: ReturnType<typeof normalizeLocalServiceManagerCutoverRecord>,
   reconciliation: Readonly<TargetDataReconciliationEvidence>,
+  managerKind: LocalServiceManagerKind,
+  commitmentFileDigest: string,
+  targetDescriptorDigest: string,
 ): Readonly<LocalServiceManagerLegacyRollbackPreparation> {
   if (
     stopped.evidence.shutdownReceiptDigest === null ||
@@ -352,11 +381,14 @@ function preparationRecord(
     instanceId: command.request.instanceId,
     generation: command.request.generation,
     activationDigest: command.request.expectedActivationDigest,
+    managerKind,
     expectedInstanceHeadDigest: command.request.expectedInstanceHeadDigest,
     stoppedRecordDigest: stopped.recordDigest,
     stoppedManagerOutcomeDigest: stopped.evidence.managerOutcomeDigest,
     applicationConfigDigest: stopped.evidence.applicationConfigDigest,
     commitmentDigest: stopped.evidence.commitmentDigest,
+    commitmentFileDigest,
+    targetDescriptorDigest,
     shutdownReceiptDigest: stopped.evidence.shutdownReceiptDigest,
     reconciliation,
     requestedAtMs: command.request.requestedAtMs,
@@ -377,10 +409,12 @@ export function normalizeLocalServiceManagerLegacyRollbackPreparation(
       'activationDigest',
       'applicationConfigDigest',
       'commitmentDigest',
+      'commitmentFileDigest',
       'cutoverId',
       'expectedInstanceHeadDigest',
       'generation',
       'instanceId',
+      'managerKind',
       'preparationDigest',
       'profile',
       'reconciliation',
@@ -391,6 +425,7 @@ export function normalizeLocalServiceManagerLegacyRollbackPreparation(
       'state',
       'stoppedManagerOutcomeDigest',
       'stoppedRecordDigest',
+      'targetDescriptorDigest',
     ],
     'service manager rollback preparation',
   );
@@ -413,6 +448,7 @@ export function normalizeLocalServiceManagerLegacyRollbackPreparation(
     (record.generation as number) > MAX_GENERATION ||
     typeof record.activationDigest !== 'string' ||
     !DIGEST_PATTERN.test(record.activationDigest) ||
+    (record.managerKind !== 'systemd' && record.managerKind !== 'openrc') ||
     typeof record.expectedInstanceHeadDigest !== 'string' ||
     !DIGEST_PATTERN.test(record.expectedInstanceHeadDigest) ||
     typeof record.stoppedRecordDigest !== 'string' ||
@@ -423,6 +459,10 @@ export function normalizeLocalServiceManagerLegacyRollbackPreparation(
     !DIGEST_PATTERN.test(record.applicationConfigDigest) ||
     typeof record.commitmentDigest !== 'string' ||
     !DIGEST_PATTERN.test(record.commitmentDigest) ||
+    typeof record.commitmentFileDigest !== 'string' ||
+    !DIGEST_PATTERN.test(record.commitmentFileDigest) ||
+    typeof record.targetDescriptorDigest !== 'string' ||
+    !DIGEST_PATTERN.test(record.targetDescriptorDigest) ||
     typeof record.shutdownReceiptDigest !== 'string' ||
     !DIGEST_PATTERN.test(record.shutdownReceiptDigest) ||
     reconciliation.disposition !== 'rollback_candidate' ||
@@ -531,6 +571,8 @@ export function prepareLocalServiceManagerLegacyRollback(
     command,
     stopped.evidence.applicationConfigDigest,
     stopped.evidence.commitmentDigest,
+    identity.uid,
+    identity.gid,
   );
   const reconciliation = readTargetDataReconciliationEvidenceForPaths(
     {
@@ -555,7 +597,14 @@ export function prepareLocalServiceManagerLegacyRollback(
       head.headDigest,
     );
   }
-  const preparation = preparationRecord(command, stopped, reconciliation);
+  const preparation = preparationRecord(
+    command,
+    stopped,
+    reconciliation,
+    intent.service.kind,
+    paths.commitmentFileDigest,
+    intent.descriptor.sha256,
+  );
   const filePath = localServiceManagerLegacyRollbackPreparationPath(
     command.options.deploymentRoot,
     command.request.cutoverId,

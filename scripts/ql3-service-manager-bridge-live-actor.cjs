@@ -20,6 +20,12 @@ const {
 const {
   runLocalServiceBridgeCommandFile,
 } = require('../packages/ql3-local-owner-cli/dist/deployment/service-manager/serviceBridge.js');
+const {
+  runLocalServiceManagerLegacyRollbackBridgeCommandFile,
+} = require('../packages/ql3-local-owner-cli/dist/deployment/service-manager/legacy-rollback/bridge.js');
+const {
+  localServiceManagerLegacyStartOutcomePath,
+} = require('../packages/ql3-local-owner-cli/dist/deployment/service-manager/legacy-rollback/contract.js');
 
 const OWNER_DEPLOYMENT_CLI = path.resolve(
   __dirname,
@@ -56,6 +62,30 @@ function run(executable, args, accepted = [0]) {
     );
   }
   return String(result.stdout ?? '');
+}
+
+function responseLossManager(request) {
+  const result = spawnSync(request.executable, [...request.args], {
+    encoding: 'utf8',
+    env: {
+      PATH: '/usr/sbin:/usr/bin:/sbin:/bin',
+      LANG: 'C',
+      LC_ALL: 'C',
+    },
+    timeout: request.timeoutMs,
+    maxBuffer: 64 * 1024,
+  });
+  const legacyStart =
+    (request.args[0] === 'start' && request.args[1] === 'qinglong.service') ||
+    (request.args[0] === 'qinglong' && request.args[1] === 'start');
+  return {
+    status: legacyStart ? null : result.status,
+    signal: result.signal,
+    stdout: String(result.stdout ?? ''),
+    stderr: String(result.stderr ?? ''),
+    responseLost:
+      legacyStart || result.error !== undefined || result.status === null,
+  };
 }
 
 function executable(candidates, label) {
@@ -99,6 +129,37 @@ function descriptor(kind, uid, gid, root, adopted = false) {
     'description="QingLong 3 bridge live gate"',
     `command="${command}"`,
     `command_args="${commandArgs}"`,
+    `command_user="${uid}:${gid}"`,
+    'supervisor="supervise-daemon"',
+    'retry="TERM/5/KILL/2"',
+    '',
+  ].join('\n');
+}
+
+function legacyDescriptor(kind, uid, gid) {
+  if (kind === 'systemd') {
+    return [
+      '[Unit]',
+      'Description=QingLong 2 legacy rollback live gate',
+      '',
+      '[Service]',
+      'Type=simple',
+      `User=${uid}`,
+      `Group=${gid}`,
+      'ExecStart=/bin/sleep 300',
+      'Restart=no',
+      '',
+      '[Install]',
+      'WantedBy=multi-user.target',
+      '',
+    ].join('\n');
+  }
+  return [
+    '#!/sbin/openrc-run',
+    'name="qinglong"',
+    'description="QingLong 2 legacy rollback live gate"',
+    'command="/bin/sleep"',
+    'command_args="300"',
     `command_user="${uid}:${gid}"`,
     'supervisor="supervise-daemon"',
     'retry="TERM/5/KILL/2"',
@@ -436,6 +497,222 @@ function prepareAdoptedRollback(root, adopted, stopped, uid, gid) {
   };
 }
 
+function authorizeAdoptedRollback(root, adopted, prepared, uid, gid) {
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.authorize',
+    options: { deploymentRoot: root, allowRootService: uid === 0 },
+    request: {
+      cutoverId: adopted.cutoverId,
+      profile: 'edge',
+      instanceId: adopted.instanceId,
+      generation: 1,
+      expectedActivationDigest: adopted.activationDigest,
+      expectedPreparationDigest: prepared.preparationDigest,
+      expectedInstanceHeadDigest: prepared.instanceHeadDigest,
+      requestedAtMs: Date.now(),
+    },
+  };
+  const commandPath = path.join(root, 'owner-legacy-rollback-authorize.json');
+  writePrivate(
+    commandPath,
+    `${JSON.stringify(command, null, 2)}\n`,
+    0o600,
+    uid,
+    gid,
+  );
+  return {
+    commandPath,
+    result: ownerCli(
+      uid,
+      gid,
+      'service-legacy-rollback-authorize',
+      commandPath,
+    ),
+  };
+}
+
+function installLegacyService(kind, managerOptions, uid, gid) {
+  const descriptorPath =
+    kind === 'systemd'
+      ? '/etc/systemd/system/qinglong.service'
+      : '/etc/init.d/qinglong';
+  fs.rmSync(descriptorPath, { force: true });
+  writePrivate(
+    descriptorPath,
+    legacyDescriptor(kind, uid, gid),
+    kind === 'systemd' ? 0o644 : 0o755,
+    0,
+    0,
+  );
+  if (kind === 'systemd') {
+    run(managerOptions.executable, ['daemon-reload']);
+  }
+}
+
+function executeLegacyRollback(
+  root,
+  controllerRoot,
+  managerOptions,
+  adopted,
+  prepared,
+  authorized,
+  uid,
+  gid,
+) {
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.execute',
+    options: {
+      deploymentRoot: root,
+      controllerRoot,
+      allowRootController: true,
+      manager: managerOptions,
+    },
+    request: {
+      cutoverId: adopted.cutoverId,
+      generation: 1,
+      expectedAuthorizationDigest: authorized.authorizationDigest,
+    },
+  };
+  const commandPath = path.join(root, 'root-legacy-rollback-command.json');
+  writePrivate(commandPath, `${JSON.stringify(command, null, 2)}\n`);
+  const result = runLocalServiceManagerLegacyRollbackBridgeCommandFile(
+    commandPath,
+    { runManager: responseLossManager },
+  );
+  const replay =
+    runLocalServiceManagerLegacyRollbackBridgeCommandFile(commandPath);
+  const consumeCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.consume',
+    options: { deploymentRoot: root, allowRootService: uid === 0 },
+    request: {
+      cutoverId: adopted.cutoverId,
+      profile: 'edge',
+      instanceId: adopted.instanceId,
+      generation: 1,
+      expectedActivationDigest: adopted.activationDigest,
+      expectedPreparationDigest: prepared.preparationDigest,
+      expectedAuthorizationDigest: authorized.authorizationDigest,
+      expectedAuthorizationHeadDigest: authorized.instanceHeadDigest,
+      requestedAtMs: Date.now(),
+    },
+  };
+  const consumePath = path.join(root, 'owner-legacy-rollback-consume.json');
+  writePrivate(
+    consumePath,
+    `${JSON.stringify(consumeCommand, null, 2)}\n`,
+    0o600,
+    uid,
+    gid,
+  );
+  const consumed = ownerCli(
+    uid,
+    gid,
+    'service-legacy-rollback-consume',
+    consumePath,
+  );
+  const outcome = JSON.parse(
+    fs.readFileSync(
+      localServiceManagerLegacyStartOutcomePath(root, adopted.cutoverId, 1),
+      'utf8',
+    ),
+  );
+  return { commandPath, result, replay, consumed, outcome };
+}
+
+function executeLegacyRollbackBarrierCrash(
+  root,
+  controllerRoot,
+  managerOptions,
+  adopted,
+  prepared,
+  authorized,
+  uid,
+  gid,
+) {
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.execute',
+    options: {
+      deploymentRoot: root,
+      controllerRoot,
+      allowRootController: true,
+      manager: managerOptions,
+    },
+    request: {
+      cutoverId: adopted.cutoverId,
+      generation: 1,
+      expectedAuthorizationDigest: authorized.authorizationDigest,
+    },
+  };
+  const commandPath = path.join(
+    root,
+    'root-legacy-rollback-barrier-crash-command.json',
+  );
+  writePrivate(commandPath, `${JSON.stringify(command, null, 2)}\n`);
+  let interrupted = false;
+  try {
+    runLocalServiceManagerLegacyRollbackBridgeCommandFile(commandPath, {
+      afterBarrier() {
+        throw new QingLong3ServiceManagerBridgeLiveActorError(
+          'simulated crash after legacy start barrier',
+        );
+      },
+    });
+  } catch (error) {
+    interrupted =
+      error instanceof QingLong3ServiceManagerBridgeLiveActorError &&
+      error.message === 'simulated crash after legacy start barrier';
+  }
+  if (!interrupted) fail('legacy start barrier crash was not observed');
+  const result =
+    runLocalServiceManagerLegacyRollbackBridgeCommandFile(commandPath);
+  const replay =
+    runLocalServiceManagerLegacyRollbackBridgeCommandFile(commandPath);
+  const consumeCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.consume',
+    options: { deploymentRoot: root, allowRootService: uid === 0 },
+    request: {
+      cutoverId: adopted.cutoverId,
+      profile: 'edge',
+      instanceId: adopted.instanceId,
+      generation: 1,
+      expectedActivationDigest: adopted.activationDigest,
+      expectedPreparationDigest: prepared.preparationDigest,
+      expectedAuthorizationDigest: authorized.authorizationDigest,
+      expectedAuthorizationHeadDigest: authorized.instanceHeadDigest,
+      requestedAtMs: Date.now(),
+    },
+  };
+  const consumePath = path.join(
+    root,
+    'owner-legacy-rollback-barrier-crash-consume.json',
+  );
+  writePrivate(
+    consumePath,
+    `${JSON.stringify(consumeCommand, null, 2)}\n`,
+    0o600,
+    uid,
+    gid,
+  );
+  const consumed = ownerCli(
+    uid,
+    gid,
+    'service-legacy-rollback-consume',
+    consumePath,
+  );
+  const outcome = JSON.parse(
+    fs.readFileSync(
+      localServiceManagerLegacyStartOutcomePath(root, adopted.cutoverId, 1),
+      'utf8',
+    ),
+  );
+  return { commandPath, result, replay, consumed, outcome };
+}
+
 function execute(root, controllerRoot, managerOptions, prepared, uid, gid) {
   const command = {
     schemaVersion: 1,
@@ -509,24 +786,30 @@ function serviceProcessUid(kind, outcome) {
 
 function cleanup(kind, managerOptions) {
   if (kind === 'systemd') {
-    spawnSync(
-      managerOptions.executable,
-      ['disable', '--now', 'qinglong3.service'],
-      { timeout: 10_000 },
-    );
-    fs.rmSync('/etc/systemd/system/qinglong3.service', { force: true });
+    for (const serviceName of ['qinglong', 'qinglong3']) {
+      spawnSync(
+        managerOptions.executable,
+        ['disable', '--now', `${serviceName}.service`],
+        { timeout: 10_000 },
+      );
+      fs.rmSync(`/etc/systemd/system/${serviceName}.service`, { force: true });
+    }
     spawnSync(managerOptions.executable, ['daemon-reload'], {
       timeout: 10_000,
     });
     return;
   }
-  spawnSync(managerOptions.serviceExecutable, ['qinglong3', 'stop'], {
-    timeout: 10_000,
-  });
-  spawnSync(managerOptions.updateExecutable, ['del', 'qinglong3', 'default'], {
-    timeout: 10_000,
-  });
-  fs.rmSync('/etc/init.d/qinglong3', { force: true });
+  for (const serviceName of ['qinglong', 'qinglong3']) {
+    spawnSync(managerOptions.serviceExecutable, [serviceName, 'stop'], {
+      timeout: 10_000,
+    });
+    spawnSync(
+      managerOptions.updateExecutable,
+      ['del', serviceName, 'default'],
+      { timeout: 10_000 },
+    );
+    fs.rmSync(`/etc/init.d/${serviceName}`, { force: true });
+  }
 }
 
 async function main(argv) {
@@ -535,12 +818,14 @@ async function main(argv) {
   }
   const kind = argv[0];
   const identityMode = argv[1];
+  const scenario = argv[2] ?? 'success';
   if (
     (kind !== 'systemd' && kind !== 'openrc') ||
-    (identityMode !== 'root' && identityMode !== 'nonroot')
+    (identityMode !== 'root' && identityMode !== 'nonroot') ||
+    (scenario !== 'success' && scenario !== 'barrier-crash')
   ) {
     fail(
-      'usage: ql3-service-manager-bridge-live-actor.cjs <systemd|openrc> <root|nonroot>',
+      'usage: ql3-service-manager-bridge-live-actor.cjs <systemd|openrc> <root|nonroot> [success|barrier-crash]',
     );
   }
   const uid = identityMode === 'root' ? 0 : NON_ROOT_SERVICE_UID;
@@ -728,11 +1013,91 @@ async function main(argv) {
     ) {
       fail('adopted rollback preparation did not converge exactly');
     }
+    const adoptedAuthorization = authorizeAdoptedRollback(
+      root,
+      adopted,
+      adoptedRollback.result,
+      uid,
+      gid,
+    );
+    const adoptedAuthorizationReplay = ownerCli(
+      uid,
+      gid,
+      'service-legacy-rollback-authorize',
+      adoptedAuthorization.commandPath,
+    );
+    if (
+      adoptedAuthorization.result.status !== 'prepared' ||
+      adoptedAuthorization.result.state !== 'legacy_restart_requested' ||
+      adoptedAuthorizationReplay.status !== 'existing' ||
+      adoptedAuthorizationReplay.authorizationDigest !==
+        adoptedAuthorization.result.authorizationDigest
+    ) {
+      fail('adopted rollback authorization did not converge exactly');
+    }
+    installLegacyService(kind, managerOptions, uid, gid);
+    const adoptedLegacyStarted =
+      scenario === 'success'
+        ? executeLegacyRollback(
+            root,
+            controllerRoot,
+            managerOptions,
+            adopted,
+            adoptedRollback.result,
+            adoptedAuthorization.result,
+            uid,
+            gid,
+          )
+        : executeLegacyRollbackBarrierCrash(
+            root,
+            controllerRoot,
+            managerOptions,
+            adopted,
+            adoptedRollback.result,
+            adoptedAuthorization.result,
+            uid,
+            gid,
+          );
+    if (scenario === 'success') {
+      if (
+        adoptedLegacyStarted.result.state !== 'legacy_running' ||
+        adoptedLegacyStarted.replay.status !== 'existing' ||
+        adoptedLegacyStarted.replay.state !== 'legacy_running' ||
+        adoptedLegacyStarted.consumed.state !== 'legacy_running' ||
+        adoptedLegacyStarted.outcome.mutationDisposition !==
+          'response-loss-inspected' ||
+        adoptedLegacyStarted.outcome.targetObservation.activeState !==
+          'inactive' ||
+        adoptedLegacyStarted.outcome.legacyObservation.activeState !== 'active'
+      ) {
+        fail('adopted legacy rollback did not converge to legacy_running');
+      }
+      const legacyUid = serviceProcessUid(kind, {
+        observation: adoptedLegacyStarted.outcome.legacyObservation,
+      });
+      if (legacyUid !== uid) {
+        fail(`legacy service process UID drifted: ${legacyUid} != ${uid}`);
+      }
+    } else if (
+      adoptedLegacyStarted.result.state !== 'manual_required' ||
+      adoptedLegacyStarted.result.status !== 'prepared' ||
+      adoptedLegacyStarted.replay.status !== 'existing' ||
+      adoptedLegacyStarted.replay.state !== 'manual_required' ||
+      adoptedLegacyStarted.consumed.state !== 'manual_required' ||
+      adoptedLegacyStarted.outcome.mutationDisposition !== 'replay-inspected' ||
+      adoptedLegacyStarted.outcome.manualReason !== 'manager_state_unproved' ||
+      adoptedLegacyStarted.outcome.targetObservation.activeState !==
+        'inactive' ||
+      adoptedLegacyStarted.outcome.legacyObservation.activeState !== 'inactive'
+    ) {
+      fail('legacy barrier replay did not fail closed without a second start');
+    }
     const payload = {
       schemaVersion: 1,
       evidenceClass: 'qinglong3_service_manager_bridge_live_actor',
       managerKind: kind,
       identityMode,
+      scenario,
       serviceUid: uid,
       manager: managerOptions,
       actions: [
@@ -746,6 +1111,11 @@ async function main(argv) {
         stopped: adoptedStopped,
         rollbackPrepared: adoptedRollback.result,
         rollbackReplay: adoptedRollbackReplay,
+        rollbackAuthorized: adoptedAuthorization.result,
+        rollbackAuthorizationReplay: adoptedAuthorizationReplay,
+        legacyStarted: adoptedLegacyStarted.result,
+        legacyStartReplay: adoptedLegacyStarted.replay,
+        legacyConsumed: adoptedLegacyStarted.consumed,
       },
       gates: {
         rootCommandFile: true,
@@ -762,6 +1132,18 @@ async function main(argv) {
         adoptedRollbackPrepared: true,
         adoptedRollbackReplay: true,
         adoptedRollbackCandidate: true,
+        adoptedRollbackAuthorized: true,
+        adoptedRollbackAuthorizationReplay: true,
+        adoptedLegacyStarted: scenario === 'success',
+        adoptedLegacyStartReplay: true,
+        adoptedLegacyConsumed: true,
+        adoptedTargetRemainedStopped: true,
+        adoptedLegacyProcessIdentity: scenario === 'success',
+        adoptedLegacyResponseLossInspected: scenario === 'success',
+        adoptedLegacyBarrierCrash: scenario === 'barrier-crash',
+        adoptedLegacyInspectOnlyConvergence: scenario === 'barrier-crash',
+        adoptedLegacyRemainedStopped: scenario === 'barrier-crash',
+        adoptedLegacyManualConsumed: scenario === 'barrier-crash',
       },
     };
     process.stdout.write(

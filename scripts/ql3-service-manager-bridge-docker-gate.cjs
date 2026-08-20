@@ -61,7 +61,7 @@ function waitReady(name, kind) {
   fail(`${kind} container did not become ready`);
 }
 
-function actorReport(name, kind, identityMode) {
+function actorReport(name, kind, identityMode, scenario = 'success') {
   const stdout = run([
     'exec',
     name,
@@ -69,6 +69,7 @@ function actorReport(name, kind, identityMode) {
     '/workspace/scripts/ql3-service-manager-bridge-live-actor.cjs',
     kind,
     identityMode,
+    scenario,
   ]);
   const report = JSON.parse(stdout);
   const requiredGates = [
@@ -84,10 +85,28 @@ function actorReport(name, kind, identityMode) {
     'adoptedRollbackPrepared',
     'adoptedRollbackReplay',
     'adoptedRollbackCandidate',
+    'adoptedRollbackAuthorized',
+    'adoptedRollbackAuthorizationReplay',
+    'adoptedLegacyStartReplay',
+    'adoptedLegacyConsumed',
+    'adoptedTargetRemainedStopped',
+    ...(scenario === 'success'
+      ? [
+          'adoptedLegacyStarted',
+          'adoptedLegacyProcessIdentity',
+          'adoptedLegacyResponseLossInspected',
+        ]
+      : [
+          'adoptedLegacyBarrierCrash',
+          'adoptedLegacyInspectOnlyConvergence',
+          'adoptedLegacyRemainedStopped',
+          'adoptedLegacyManualConsumed',
+        ]),
   ];
   if (
     report.managerKind !== kind ||
     report.identityMode !== identityMode ||
+    report.scenario !== scenario ||
     report.serviceUid !== (identityMode === 'root' ? 0 : 10001) ||
     !requiredGates.every((gate) => report.gates?.[gate] === true) ||
     (report.gates?.restartRequired === true &&
@@ -152,10 +171,21 @@ function main() {
         );
         waitReady(name, target.kind);
         reports.push(actorReport(name, target.kind, identityMode));
+        if (identityMode === 'root') {
+          reports.push(
+            actorReport(name, target.kind, identityMode, 'barrier-crash'),
+          );
+        }
         run(['rm', '--force', name]);
         containers.splice(containers.indexOf(name), 1);
       }
     }
+    const successReports = reports.filter(
+      (report) => report.scenario === 'success',
+    );
+    const crashReports = reports.filter(
+      (report) => report.scenario === 'barrier-crash',
+    );
     const payload = {
       schemaVersion: 1,
       evidenceClass: 'qinglong3_service_manager_bridge_docker_gate',
@@ -179,30 +209,64 @@ function main() {
             report.managerKind === 'openrc' &&
             report.identityMode === 'nonroot',
         ),
-        rootCommandFile: reports.every(
+        rootCommandFile: successReports.every(
           (report) => report.gates.rootCommandFile,
         ),
-        exactReplay: reports.every((report) => report.gates.exactReplay),
-        ownerOutcomeVerified: reports.every(
+        exactReplay: successReports.every((report) => report.gates.exactReplay),
+        ownerOutcomeVerified: successReports.every(
           (report) => report.gates.ownerOutcomeVerified,
         ),
-        serviceProcessIdentity: reports.every(
+        serviceProcessIdentity: successReports.every(
           (report) => report.gates.serviceProcessIdentity,
         ),
-        adoptedCutoverActive: reports.every(
+        adoptedCutoverActive: successReports.every(
           (report) => report.gates.adoptedCutoverActive,
         ),
-        adoptedCutoverStopped: reports.every(
+        adoptedCutoverStopped: successReports.every(
           (report) => report.gates.adoptedCutoverStopped,
         ),
-        adoptedRollbackPrepared: reports.every(
+        adoptedRollbackPrepared: successReports.every(
           (report) => report.gates.adoptedRollbackPrepared,
         ),
-        adoptedRollbackReplay: reports.every(
+        adoptedRollbackReplay: successReports.every(
           (report) => report.gates.adoptedRollbackReplay,
         ),
-        adoptedRollbackCandidate: reports.every(
+        adoptedRollbackCandidate: successReports.every(
           (report) => report.gates.adoptedRollbackCandidate,
+        ),
+        adoptedRollbackAuthorized: successReports.every(
+          (report) => report.gates.adoptedRollbackAuthorized,
+        ),
+        adoptedRollbackAuthorizationReplay: successReports.every(
+          (report) => report.gates.adoptedRollbackAuthorizationReplay,
+        ),
+        adoptedLegacyStarted: successReports.every(
+          (report) => report.gates.adoptedLegacyStarted,
+        ),
+        adoptedLegacyStartReplay: successReports.every(
+          (report) => report.gates.adoptedLegacyStartReplay,
+        ),
+        adoptedLegacyConsumed: successReports.every(
+          (report) => report.gates.adoptedLegacyConsumed,
+        ),
+        adoptedTargetRemainedStopped: successReports.every(
+          (report) => report.gates.adoptedTargetRemainedStopped,
+        ),
+        adoptedLegacyProcessIdentity: successReports.every(
+          (report) => report.gates.adoptedLegacyProcessIdentity,
+        ),
+        adoptedLegacyResponseLossInspected: successReports.every(
+          (report) => report.gates.adoptedLegacyResponseLossInspected,
+        ),
+        adoptedLegacyBarrierCrash: crashReports.length === 2,
+        adoptedLegacyInspectOnlyConvergence: crashReports.every(
+          (report) => report.gates.adoptedLegacyInspectOnlyConvergence,
+        ),
+        adoptedLegacyRemainedStopped: crashReports.every(
+          (report) => report.gates.adoptedLegacyRemainedStopped,
+        ),
+        adoptedLegacyManualConsumed: crashReports.every(
+          (report) => report.gates.adoptedLegacyManualConsumed,
         ),
         systemdRestart: reports.some(
           (report) =>
