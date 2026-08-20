@@ -1759,6 +1759,11 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/lifecycle/sqlite-adoption/command.ts' &&
+          specifier === '@qinglong/local-admin'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/plugin-package/pluginPackageCommand.ts' &&
           [
             '@qinglong/local-admin/package-lifecycle',

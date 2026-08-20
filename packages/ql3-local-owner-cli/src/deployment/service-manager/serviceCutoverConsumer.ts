@@ -404,6 +404,8 @@ function verifyAdoptedEvidence(
     activation.profile !== intent.profile ||
     activation.sourcePathDigest !== textDigest(binding.sourcePath) ||
     activation.targetPathDigest !== textDigest(binding.targetPath) ||
+    typeof activation.sourceSha256 !== 'string' ||
+    !DIGEST_PATTERN.test(activation.sourceSha256) ||
     typeof activation.recoverySha256 !== 'string' ||
     !DIGEST_PATTERN.test(activation.recoverySha256) ||
     typeof activation.adoptionManifestDigest !== 'string' ||
@@ -451,7 +453,7 @@ function verifyAdoptedEvidence(
   if (
     activation.targetDevice !== target.device ||
     activation.targetInode !== target.inode ||
-    sourceSha256 !== activation.recoverySha256 ||
+    sourceSha256 !== activation.sourceSha256 ||
     recoverySha256 !== activation.recoverySha256
   ) {
     configurationError('adopted data evidence drifted');

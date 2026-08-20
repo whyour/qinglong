@@ -6,11 +6,32 @@
 - 目标版本：QingLong 3.x
 - 作者：QingLong Maintainers
 - 创建日期：2026-07-17
-- 最后更新：2026-08-20
+- 最后更新：2026-08-21
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-20）：
+最新增量证据（2026-08-21）：
 
+- D-383/ADR-0476（已接受）：把单个 2.x SQLite 主库接管从分散 API/合成 fixture 推进为产品级真实双态演练。既有一次性
+  `ql3-adoption` 新增 exact、私有 command-file 的 `inspect → stage → verify → activation`，从生产形态 Sequelize schema
+  （Cron、Dependency、App、Auth、Env、Subscription、View、Stats、RunningInstance 与未知 Plugin-owned table）生成独立 recovery
+  和 target，只迁移 target，并由 adopted runtime 持有 source write fence。真实演练证明 recovery 不含 3.0 表、target 同时保留
+  legacy/plugin 数据与新增 3.0 表；clean target stop 得到 `rollback_candidate` 且 fence 释放后 legacy 写恢复；正式 Run repository
+  写 target 后得到 `reconciliation_required`，source 字节和 schema 不变；扩权 command 在 inspect 前失败。演练发现 SQLite Online
+  Backup 与 source 逻辑等价却不保证物理 SHA 相同，旧 classifier 因比较 recovery SHA 会误拒合法回滚；activation 因此分别绑定
+  `sourceSha256`、`recoverySha256`、`targetSha256`，数据证据字段同步纠正为 `sourceMatchesActivation`。GitNexus 对修改点最高为
+  MEDIUM（activation payload 7 direct/27 total），无 HIGH/CRITICAL。没有新增 package、dependency、binary、daemon、listener、timer
+  或部署对象；Local Owner 新代码内聚在 `lifecycle/sqlite-adoption/`，workspace 保持 18 packages、
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`、`116 source / 115 nested / 1 root binary entry`。真实 rehearsal `3/3`、
+  D-383 focused `102/102`、Local Admin `91/91`、Local Owner `190 total / 185 pass / 5 conditional skip / 0 fail`；backend 全量
+  `1,535 total / 1,533 pass / 2 conditional skip / 0 fail`，`pnpm build:back` 与 18-package clean build/逐包测试通过；package
+  boundary、Cluster dependency、Edge import、Service Bridge import、Cluster/Worker deployment、Console 与 distribution 八项审计
+  全 compatible/passed。14 档 artifact audit 全 compatible：基础 Edge/Standalone
+  `2,598,669 / 2,598,747` bytes、316 files、57 modules；Adopted `2,818,404 / 2,818,527` bytes、336 files、58 modules；
+  Application+AI `4,502,262 / 4,502,394` bytes、511 files、141 modules；MCP `7,324,601 / 7,324,709` bytes、802 files、
+  227 modules。四阶段均是 one-shot，schema 最多 4096 项、manifest 最大 256 KiB，基础 Edge 不携带 adopted authority；operator
+  仍须为 recovery + target 与 SQLite 临时文件预留磁盘，制品 import RSS 不冒充真实路由设备迁移峰值。本阶段不触及 PostgreSQL
+  schema/ACL/repository/role/Pool/连接/failover，故不重跑且不重新占有 HA 证明。D-384 应从单 SQLite 主库扩展到完整 2.x data
+  directory 资产盘点/恢复合同与固定物理 Edge 升级演练；target 写后数据 reconciliation 和 OpenRC live actor 仍未完成。
 - D-382/ADR-0475（已接受）：扩展 3.0 首发前的 2.x HTTP 兼容基线，使用真实 loopback HTTP、生产 Express middleware、System/
   Script/Open Router 与 Celebrate validator，锁定 System config/四类 mutation/reload/notify、Script list/detail/create/rename/run、
   Open app CRUD/reset-secret/token issuance，以及面板/Open token、scope、expiration、路径大小写、400/401/500 envelope。测试以

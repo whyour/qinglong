@@ -168,6 +168,10 @@ function legacyStopCommand(state, cutoverId = 'cutover-edge-1') {
       .createHash('sha256')
       .update(path.resolve(legacySourcePath), 'utf8')
       .digest('hex'),
+    sourceSha256: crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(legacySourcePath))
+      .digest('hex'),
     recoverySha256: '4'.repeat(64),
     targetSha256: '5'.repeat(64),
     targetPathDigest: '6'.repeat(64),

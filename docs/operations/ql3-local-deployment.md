@@ -157,6 +157,11 @@ receipt。
 
 ### 2.2 adopted 2.x 的 Docker legacy silence gate
 
+已有 2.x SQLite 部署必须先完成
+[`inspect → stage → verify → activation`](./ql3-local-sqlite-adoption.md)，取得真实、未手写的 manifest、activation 与 digest。
+下列 silence/cutover 命令只消费该证据，不负责隐式迁移数据库。source、target 和 recovery 必须一直保留到回退或 reconciliation
+正式闭合。
+
 adopted target 不得直接使用旧 v1 配置启动。当前第一条可达的 cutover 产品路径只接管由
 Docker 精确容器 ID 标识的 2.x owner；systemd/OpenRC legacy、Kubernetes 和远端 cluster
 不允许伪装成 Docker evidence。先确保 deployment root 与其 `service/` 都是当前 UID 的
@@ -399,11 +404,12 @@ reconciliation_required
 manual_review
 ```
 
-- `rollback_candidate`：target 主文件仍等于 activation 初始 SHA-256、source 仍等于 recovery SHA-256，
+- `rollback_candidate`：target 主文件仍等于 activation 的 `targetSha256`、source 仍等于 activation 的
+  `sourceSha256`，
   且两者均没有 `-wal`、`-shm`、`-journal` sidecar。
 - `reconciliation_required`：target 主文件已经变化，或发现 target SQLite sidecar；必须保留 target 并进入
   后续数据域 reconciliation，不能启动 2.x。
-- `manual_review`：activation/文件稳定身份不能证明，或 target 未写但 source 已偏离 recovery；不得猜测。
+- `manual_review`：activation/文件稳定身份不能证明，或 target 未写但 source 已偏离 activation 时原始 source；不得猜测。
 
 `rollback_candidate` 本身不是 legacy restart 授权。实例 head 成功后进入 `target_stopped`，旧 restart
 command 会在 Docker authority 前失败；只有下一节的双阶段 ceremony 可以请求启动 2.x。

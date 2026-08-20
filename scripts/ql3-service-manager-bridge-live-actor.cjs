@@ -138,8 +138,7 @@ function descriptor(kind, uid, gid, root, adopted = false) {
 
 function legacyDescriptor(kind, uid, gid, port) {
   const nodeExecutable = fs.realpathSync(process.execPath);
-  const commandArgs =
-    `/workspace/scripts/ql3-service-manager-legacy-live-service.cjs ${port}`;
+  const commandArgs = `/workspace/scripts/ql3-service-manager-legacy-live-service.cjs ${port}`;
   if (kind === 'systemd') {
     return [
       '[Unit]',
@@ -297,6 +296,10 @@ function adoptedFixture(root, kind, uid, gid) {
     sourcePathDigest: crypto
       .createHash('sha256')
       .update(sourcePath)
+      .digest('hex'),
+    sourceSha256: crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(sourcePath))
       .digest('hex'),
     recoverySha256: crypto
       .createHash('sha256')

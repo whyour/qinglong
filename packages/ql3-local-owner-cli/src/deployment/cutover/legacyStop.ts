@@ -107,6 +107,7 @@ function verifyActivation(
     'recoverySha256',
     'schemaVersion',
     'sourcePathDigest',
+    'sourceSha256',
     'state',
     'targetDevice',
     'targetInode',
@@ -129,6 +130,8 @@ function verifyActivation(
   if (
     typeof activationDigest !== 'string' ||
     !DIGEST_PATTERN.test(activationDigest) ||
+    typeof activation.sourceSha256 !== 'string' ||
+    !DIGEST_PATTERN.test(activation.sourceSha256) ||
     digest(payload) !== activationDigest
   ) {
     configurationError('activation digest does not match');

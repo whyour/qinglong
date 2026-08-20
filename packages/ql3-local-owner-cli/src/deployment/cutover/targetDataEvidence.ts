@@ -14,7 +14,7 @@ const HASH_BUFFER_BYTES = 64 * 1024;
 export interface TargetDataReconciliationEvidence {
   readonly disposition: LocalDeploymentTargetReconciliationDisposition;
   readonly targetMatchesActivation: boolean | null;
-  readonly sourceMatchesRecovery: boolean | null;
+  readonly sourceMatchesActivation: boolean | null;
   readonly targetSidecarsClear: boolean | null;
   readonly sourceSidecarsClear: boolean | null;
   readonly targetFileIdentityDigest: string;
@@ -194,6 +194,8 @@ export function readTargetDataReconciliationEvidenceForPaths(
       !DIGEST_PATTERN.test(activation.targetSha256) ||
       typeof activation.recoverySha256 !== 'string' ||
       !DIGEST_PATTERN.test(activation.recoverySha256) ||
+      typeof activation.sourceSha256 !== 'string' ||
+      !DIGEST_PATTERN.test(activation.sourceSha256) ||
       typeof activation.targetDevice !== 'string' ||
       typeof activation.targetInode !== 'string' ||
       cutoverDigest(payload) !== activationDigest
@@ -218,17 +220,17 @@ export function readTargetDataReconciliationEvidenceForPaths(
       throw new Error('target database stable identity drifted');
     }
     const targetMatchesActivation = target.sha256 === activation.targetSha256;
-    const sourceMatchesRecovery = source.sha256 === activation.recoverySha256;
+    const sourceMatchesActivation = source.sha256 === activation.sourceSha256;
     const disposition =
       !targetMatchesActivation || !target.sidecarsClear
         ? ('reconciliation_required' as const)
-        : sourceMatchesRecovery && source.sidecarsClear
+        : sourceMatchesActivation && source.sidecarsClear
         ? ('rollback_candidate' as const)
         : ('manual_review' as const);
     return evidence({
       disposition,
       targetMatchesActivation,
-      sourceMatchesRecovery,
+      sourceMatchesActivation,
       targetSidecarsClear: target.sidecarsClear,
       sourceSidecarsClear: source.sidecarsClear,
       targetFileIdentityDigest: target.identityDigest,
@@ -238,7 +240,7 @@ export function readTargetDataReconciliationEvidenceForPaths(
     return evidence({
       disposition: 'manual_review',
       targetMatchesActivation: null,
-      sourceMatchesRecovery: null,
+      sourceMatchesActivation: null,
       targetSidecarsClear: null,
       sourceSidecarsClear: null,
       targetFileIdentityDigest: UNKNOWN_DIGEST,
@@ -256,7 +258,7 @@ export function verifyTargetDataReconciliationEvidence(
     'disposition',
     'evidenceDigest',
     'sourceFileIdentityDigest',
-    'sourceMatchesRecovery',
+    'sourceMatchesActivation',
     'sourceSidecarsClear',
     'targetFileIdentityDigest',
     'targetMatchesActivation',
@@ -270,8 +272,8 @@ export function verifyTargetDataReconciliationEvidence(
       candidate.disposition !== 'manual_review') ||
     (candidate.targetMatchesActivation !== null &&
       typeof candidate.targetMatchesActivation !== 'boolean') ||
-    (candidate.sourceMatchesRecovery !== null &&
-      typeof candidate.sourceMatchesRecovery !== 'boolean') ||
+    (candidate.sourceMatchesActivation !== null &&
+      typeof candidate.sourceMatchesActivation !== 'boolean') ||
     (candidate.targetSidecarsClear !== null &&
       typeof candidate.targetSidecarsClear !== 'boolean') ||
     (candidate.sourceSidecarsClear !== null &&

@@ -22,6 +22,7 @@ import {
   assertRealParent,
   assertRegularFile,
   fileIdentity,
+  sha256File,
   sha256Text,
   writeManifestAtomically,
 } from './filesystem';
@@ -48,6 +49,7 @@ function parseActivation(value: unknown): LocalSqliteActivation {
     'recoverySha256',
     'schemaVersion',
     'sourcePathDigest',
+    'sourceSha256',
     'state',
     'targetDevice',
     'targetInode',
@@ -65,6 +67,7 @@ function parseActivation(value: unknown): LocalSqliteActivation {
     !DIGEST_PATTERN.test(activation.adoptionManifestDigest ?? '') ||
     !DIGEST_PATTERN.test(activation.planDigest ?? '') ||
     !DIGEST_PATTERN.test(activation.sourcePathDigest ?? '') ||
+    !DIGEST_PATTERN.test(activation.sourceSha256 ?? '') ||
     !DIGEST_PATTERN.test(activation.recoverySha256 ?? '') ||
     !DIGEST_PATTERN.test(activation.targetSha256 ?? '') ||
     !DIGEST_PATTERN.test(activation.targetPathDigest ?? '') ||
@@ -198,6 +201,7 @@ export async function prepareLocalSqliteActivation(
       options.recoveryPath,
       adoption,
     );
+    const sourceSha256 = await sha256File(options.sourcePath);
     const activationVerified = await verifyLocalSqliteAdoptionInternal(
       options,
       true,
@@ -218,6 +222,7 @@ export async function prepareLocalSqliteActivation(
       adoptionManifestDigest: adoption.manifestDigest,
       planDigest: adoption.planDigest,
       sourcePathDigest: adoption.source.pathDigest,
+      sourceSha256,
       recoverySha256: adoption.recovery.sha256,
       targetSha256: adoption.target.sha256,
       targetPathDigest: activationVerified.targetIdentity.pathDigest,
@@ -286,6 +291,11 @@ export async function acquireLocalSqliteActivation(
       options.recoveryPath,
       adoption,
     );
+    if ((await sha256File(options.sourcePath)) !== activation.sourceSha256) {
+      throw new LocalSqliteAdoptionError(
+        'legacy source bytes changed after activation preparation',
+      );
+    }
   } catch (error) {
     releaseSourceWriteFence(fence);
     if (error instanceof LocalSqliteAdoptionError) throw error;

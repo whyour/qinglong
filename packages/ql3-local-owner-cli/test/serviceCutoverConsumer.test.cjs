@@ -90,6 +90,7 @@ function fixture(t) {
     adoptionManifestDigest: manifestDigest,
     planDigest: '2'.repeat(64),
     sourcePathDigest: sha256(sourcePath),
+    sourceSha256: sha256(fs.readFileSync(sourcePath)),
     recoverySha256: sha256(fs.readFileSync(recoveryPath)),
     targetSha256: sha256(fs.readFileSync(targetPath)),
     targetPathDigest: sha256(targetPath),
@@ -694,7 +695,7 @@ test('prepares and exactly replays lossless service-manager legacy rollback evid
   );
   assert.equal(record.stoppedRecordDigest, stoppedResult.recordDigest);
   assert.equal(record.reconciliation.targetMatchesActivation, true);
-  assert.equal(record.reconciliation.sourceMatchesRecovery, true);
+  assert.equal(record.reconciliation.sourceMatchesActivation, true);
   assert.equal(record.reconciliation.targetSidecarsClear, true);
   assert.equal(record.reconciliation.sourceSidecarsClear, true);
   const replay = prepareLocalServiceManagerLegacyRollback(command);

@@ -179,6 +179,7 @@ export interface LocalSqliteActivationPayload {
   readonly adoptionManifestDigest: string;
   readonly planDigest: string;
   readonly sourcePathDigest: string;
+  readonly sourceSha256: string;
   readonly recoverySha256: string;
   readonly targetSha256: string;
   readonly targetPathDigest: string;

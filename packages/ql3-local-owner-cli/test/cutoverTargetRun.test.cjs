@@ -154,6 +154,10 @@ function fixture(t) {
       .createHash('sha256')
       .update(legacySourcePath, 'utf8')
       .digest('hex'),
+    sourceSha256: crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(legacySourcePath))
+      .digest('hex'),
     recoverySha256: crypto
       .createHash('sha256')
       .update(fs.readFileSync(recoveryPath))
@@ -917,7 +921,7 @@ test('stops an active target and proves an unchanged rollback candidate', async 
   assert.equal(request.state, 'target_stop_requested');
   assert.equal(outcome.state, 'target_stopped');
   assert.equal(outcome.evidence.reconciliation.targetMatchesActivation, true);
-  assert.equal(outcome.evidence.reconciliation.sourceMatchesRecovery, true);
+  assert.equal(outcome.evidence.reconciliation.sourceMatchesActivation, true);
 
   const replay = stopLocalDeploymentDockerTarget(stopCommand(state), {
     validateSocket() {
@@ -1304,7 +1308,7 @@ test('treats target SQLite sidecars as reconciliation-required', async (t) => {
   assert.equal(outcome.evidence.reconciliation.targetSidecarsClear, false);
 });
 
-test('requires manual review when legacy source no longer matches recovery', async (t) => {
+test('requires manual review when legacy source no longer matches activation', async (t) => {
   const state = fixture(t);
   await runLocalDeploymentDockerTarget(command(state), harness(state));
   fs.appendFileSync(state.legacySourcePath, 'offline-legacy-drift\n');
@@ -1320,7 +1324,7 @@ test('requires manual review when legacy source no longer matches recovery', asy
     ),
   );
   assert.equal(outcome.evidence.reconciliation.targetMatchesActivation, true);
-  assert.equal(outcome.evidence.reconciliation.sourceMatchesRecovery, false);
+  assert.equal(outcome.evidence.reconciliation.sourceMatchesActivation, false);
 });
 
 test('recovers a crash after the stop barrier by converging stop-and-inspect', async (t) => {

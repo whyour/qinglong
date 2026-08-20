@@ -147,6 +147,7 @@ export function verifyTargetRunActivation(
       'recoverySha256',
       'schemaVersion',
       'sourcePathDigest',
+      'sourceSha256',
       'state',
       'targetDevice',
       'targetInode',
@@ -166,6 +167,8 @@ export function verifyTargetRunActivation(
     activationDigest !== command.request.expectedActivationDigest ||
     typeof activationDigest !== 'string' ||
     !DIGEST_PATTERN.test(activationDigest) ||
+    typeof activation.sourceSha256 !== 'string' ||
+    !DIGEST_PATTERN.test(activation.sourceSha256) ||
     cutoverDigest(payload) !== activationDigest
   ) {
     configurationError('activation does not match the target run request');

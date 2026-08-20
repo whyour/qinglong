@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Keep the one-shot adoption binary beside its lifecycle command.
-import { runLegacyCrontabAdoptionCommandFile } from './adoption';
+import { runLocalAdoptionProductCommandFile } from './adoptionCommand';
 
 const USAGE =
   'Usage: ql3-adoption run --command-file /absolute/private-command.json';
@@ -40,7 +40,7 @@ async function main(argv: readonly string[]): Promise<void> {
     return;
   }
   try {
-    const result = await runLegacyCrontabAdoptionCommandFile(argv[2]!);
+    const result = await runLocalAdoptionProductCommandFile(argv[2]!);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     const candidate = error as {
