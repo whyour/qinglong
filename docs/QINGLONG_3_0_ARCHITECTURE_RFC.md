@@ -11,6 +11,23 @@
 
 最新增量证据（2026-08-20）：
 
+- D-370/ADR-0463（实现与本地协议门已接受；首份原生 CI 双架构报告待实际 workflow 产生）：为显式按需的 Cluster Admin
+  Copilot Console 增加固定 Linux x64/arm64 容量与 assertion 生命周期发布证据。两个原生 Admin image matrix job 分别在
+  `192 MiB / swap 0 / 0.25 CPU / 32 PIDs`、只读 root、非 root、cap-drop ALL、no-new-privileges、默认 seccomp、8 MiB tmpfs 与
+  loopback-only publication 下执行四次用户驱动读取，并从 Console 自身 cgroup v2 采集 memory max/peak/events、swap、CPU 与 PID；要求至少
+  32 MiB headroom 且 `max/oom/oom_kill/oom_group_kill` 不增加。隔离 synthetic TLS 1.3/mTLS management verifier 验证
+  `initial accepted → atomic rotated accepted → expired rejected → rotated recovered`，Console 全程不重启、不轮询、不重试、不缓存、不 mutation，过期
+  assertion 只投影为 502/`assertion_expired` 低敏事实。每架构报告绑定 repository/revision/workflow/run ID/attempt 和独立 image ID，使用 nofollow
+  bounded input、`wx/0600` output 与 domain-separated canonical SHA-256；独立只读 job 以 commit-pinned artifact actions 精确下载、合并并离线重审。
+  实现保持在单一 CI 脚本和既有 image release audit 中，没有新增 package、dependency、binary、服务、端口、数据库对象或部署 workload，避免制造单文件微包；
+  Edge/Standalone closure 不含 Console。D-370 聚焦证据与发布审计为 `108/108`，连同 image SBOM 的原生 job 聚焦集合为 `120/120`；18-package
+  clean build/逐包测试退出 0，完整 backend 工作区门为 `1,503 total / 1,501 pass / 2 conditional skip / 0 fail`（含一条不会提交的既有用户测试；D-370
+  提交范围为 `1,502 total / 1,500 pass / 2 skip`），六项架构审计和 14 档 Local artifact
+  audit 全部 compatible。基础 Edge/Standalone 仍为 `2,589,998 / 2,590,076` bytes，Application+AI 为 `4,493,151 / 4,493,283` bytes，MCP 为
+  `7,315,930 / 7,316,038` bytes。本机只能验证协议、Docker inspect 契约和 workflow 装配，尚无本提交的原生
+  GitHub x64/arm64 memory peak、artifact digest 或 run URL，因此不能把实现状态写成最终现场证据。192 MiB 只回答 workstation Console 的有界空载读取，
+  不是物理路由器最低配置，也不是 Cluster 节点吞吐、故障恢复或容量规划。
+
 - D-369/ADR-0462（已接受）：在既有 operator-workstation Copilot Console 内完成显式可选、默认关闭的 Run management 只读纵切，新增固定
   `run_cancellation_status`、`run_cancellation_blocked_list`、`run_cancellation_inspect` 三种 browser/BFF operation。只有同时提供独立
   `--run-management-config` 与 owner-private `--run-management-assertion` 才启用，Project API credential、浏览器 session 与 Run 专用 TLS 1.3/mTLS/OIDC

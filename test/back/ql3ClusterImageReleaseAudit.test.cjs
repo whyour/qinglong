@@ -30,6 +30,14 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       clusterAdminOperatorContext: true,
       clusterAdminContextPreflight: true,
       clusterAdminContextReadiness: true,
+      clusterCopilotConsoleCapacityEvidence: {
+        nativeArchitectures: ['x64', 'arm64'],
+        memoryLimitMiB: 192,
+        minimumHeadroomMiB: 32,
+        assertionRotation: true,
+        assertionExpiryRejected: true,
+        sourceBound: true,
+      },
       releaseVersionAudit: true,
       deploymentLockMaterialization: true,
       ociAttestations: true,
@@ -312,6 +320,50 @@ test('rejects removal of the native Cluster Admin product facade gate', () => {
   assert.throws(
     () => auditClusterImageCiWorkflow(mutated),
     /bounded product facade contract/,
+  );
+});
+
+test('rejects a Console capacity capture without the exact native live opt-in', () => {
+  const mutated = ciSource.replace(
+    "QL3_CLUSTER_COPILOT_CONSOLE_CAPACITY_LIVE: '1'",
+    "QL3_CLUSTER_COPILOT_CONSOLE_CAPACITY_LIVE: '0'",
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /exact source-bound Console capacity envelope/,
+  );
+});
+
+test('rejects removal of the Console capacity evidence protocol tests', () => {
+  const mutated = ciSource.replace(
+    'test/back/ql3ClusterCopilotConsoleCapacityEvidence.test.cjs',
+    'test/back/ql3ClusterCopilotConsoleCapacityEvidence.removed.cjs',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /Console capacity evidence protocol tests/,
+  );
+});
+
+test('rejects Console capacity evidence that is not gated by the native image matrix', () => {
+  const mutated = ciSource.replace(
+    'cluster-console-capacity-release-evidence:\n    name: Cross-architecture Cluster Copilot Console capacity evidence\n    needs: cluster-image',
+    'cluster-console-capacity-release-evidence:\n    name: Cross-architecture Cluster Copilot Console capacity evidence\n    needs: image-oci',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /exact native x64 and arm64 reports/,
+  );
+});
+
+test('rejects removal of the offline Console capacity release audit', () => {
+  const mutated = ciSource.replace(
+    '            --mode=audit \\\n',
+    '            --mode=merge \\\n',
+  );
+  assert.throws(
+    () => auditClusterImageCiWorkflow(mutated),
+    /exact native x64 and arm64 reports/,
   );
 });
 

@@ -51,6 +51,8 @@ function auditClusterImageCiWorkflow(
   const workflow = yaml.load(source);
   const clusterImageJob = workflow?.jobs?.['cluster-image'];
   const localImageJob = workflow?.jobs?.['local-image'];
+  const consoleCapacityJob =
+    workflow?.jobs?.['cluster-console-capacity-release-evidence'];
   const expectedNativeMatrix = [
     {
       runner: 'ubuntu-24.04',
@@ -284,6 +286,11 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
+    /test\/back\/ql3ClusterCopilotConsoleCapacityEvidence\.test\.cjs/,
+    'native image CI must run the Console capacity evidence protocol tests',
+  );
+  requirePattern(
+    source,
     /pnpm audit:deployment-lock-surfaces:ql3/,
     'supply-chain CI must freeze the reviewed deployment image surfaces',
   );
@@ -341,6 +348,135 @@ function auditClusterImageCiWorkflow(
     /name: Run the bounded Cluster Admin product facade\s+if: matrix\.image == 'admin'\s+env:\s+IMAGE: qinglong3-cluster-admin:ci-\$\{\{ matrix\.image_arch \}\}\s+QL3_CLUSTER_ADMIN_PRODUCT_LIVE: '1'\s+run: node scripts\/ql3-cluster-admin-product-live-contract\.cjs --image="\$\{IMAGE\}"/,
     'native admin image CI must run the bounded product facade contract',
   );
+  const capacityCapture = clusterImageJob?.steps?.find(
+    ({ name }) =>
+      name === 'Capture the fixed Cluster Copilot Console capacity envelope',
+  );
+  const nativeCapacityUpload = clusterImageJob?.steps?.find(
+    ({ name }) =>
+      name === 'Upload native Cluster Copilot Console capacity evidence',
+  );
+  const expectedSourceEnvironment = {
+    SOURCE_REPOSITORY: '${{ github.repository }}',
+    SOURCE_REVISION: '${{ github.sha }}',
+    SOURCE_WORKFLOW: '${{ github.workflow }}',
+    SOURCE_RUN_ID: '${{ github.run_id }}',
+    SOURCE_RUN_ATTEMPT: '${{ github.run_attempt }}',
+  };
+  if (
+    capacityCapture?.if !== "matrix.image == 'admin'" ||
+    capacityCapture?.['timeout-minutes'] !== 10 ||
+    JSON.stringify(capacityCapture?.env) !==
+      JSON.stringify({
+        IMAGE: 'qinglong3-cluster-admin:ci-${{ matrix.image_arch }}',
+        QL3_CLUSTER_COPILOT_CONSOLE_CAPACITY_LIVE: '1',
+        ...expectedSourceEnvironment,
+      }) ||
+    typeof capacityCapture?.run !== 'string' ||
+    !capacityCapture.run.includes(
+      'node scripts/ql3-cluster-copilot-console-capacity-evidence.cjs',
+    ) ||
+    !capacityCapture.run.includes('--mode=capture') ||
+    !capacityCapture.run.includes('--architecture="${{ matrix.node_arch }}"') ||
+    !capacityCapture.run.includes('--image="${IMAGE}"') ||
+    !capacityCapture.run.includes(
+      '--output="${RUNNER_TEMP}/ql3-cluster-console-capacity/${{ matrix.node_arch }}.json"',
+    ) ||
+    nativeCapacityUpload?.if !== "matrix.image == 'admin'" ||
+    nativeCapacityUpload?.uses !==
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
+    JSON.stringify(nativeCapacityUpload?.with) !==
+      JSON.stringify({
+        name: 'ql3-cluster-console-capacity-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.node_arch }}',
+        path: '${{ runner.temp }}/ql3-cluster-console-capacity/${{ matrix.node_arch }}.json',
+        'if-no-files-found': 'error',
+        'retention-days': 14,
+        'compression-level': 0,
+        overwrite: false,
+        'include-hidden-files': false,
+      })
+  ) {
+    throw new Error(
+      'native admin image CI must capture and retain the exact source-bound Console capacity envelope',
+    );
+  }
+  const capacitySteps = consoleCapacityJob?.steps;
+  const x64Download = capacitySteps?.find(
+    ({ name }) => name === 'Download native x64 Console capacity evidence',
+  );
+  const arm64Download = capacitySteps?.find(
+    ({ name }) => name === 'Download native arm64 Console capacity evidence',
+  );
+  const capacityMerge = capacitySteps?.find(
+    ({ name }) =>
+      name === 'Merge and audit the source-bound Console capacity evidence',
+  );
+  const capacityUpload = capacitySteps?.find(
+    ({ name }) =>
+      name === 'Upload cross-architecture Console capacity evidence',
+  );
+  const downloadAction =
+    'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c';
+  if (
+    consoleCapacityJob?.needs !== 'cluster-image' ||
+    consoleCapacityJob?.['runs-on'] !== 'ubuntu-24.04' ||
+    consoleCapacityJob?.['timeout-minutes'] !== 5 ||
+    JSON.stringify(consoleCapacityJob?.permissions) !==
+      JSON.stringify({ contents: 'read' }) ||
+    !Array.isArray(capacitySteps) ||
+    capacitySteps.length !== 6 ||
+    capacitySteps[0]?.uses !== 'actions/checkout@v6' ||
+    capacitySteps[1]?.uses !== 'actions/setup-node@v6' ||
+    JSON.stringify(capacitySteps[1]?.with) !==
+      JSON.stringify({ 'node-version': '24.18.0' }) ||
+    x64Download?.uses !== downloadAction ||
+    JSON.stringify(x64Download?.with) !==
+      JSON.stringify({
+        name: 'ql3-cluster-console-capacity-${{ github.run_id }}-${{ github.run_attempt }}-x64',
+        path: '${{ runner.temp }}/ql3-cluster-console-capacity/x64',
+      }) ||
+    arm64Download?.uses !== downloadAction ||
+    JSON.stringify(arm64Download?.with) !==
+      JSON.stringify({
+        name: 'ql3-cluster-console-capacity-${{ github.run_id }}-${{ github.run_attempt }}-arm64',
+        path: '${{ runner.temp }}/ql3-cluster-console-capacity/arm64',
+      }) ||
+    JSON.stringify(capacityMerge?.env) !==
+      JSON.stringify(expectedSourceEnvironment) ||
+    typeof capacityMerge?.run !== 'string' ||
+    (
+      capacityMerge.run.match(
+        /node scripts\/ql3-cluster-copilot-console-capacity-evidence\.cjs/g,
+      ) || []
+    ).length !== 2 ||
+    !capacityMerge.run.includes('--mode=merge') ||
+    !capacityMerge.run.includes('--mode=audit') ||
+    !capacityMerge.run.includes(
+      '--x64="${RUNNER_TEMP}/ql3-cluster-console-capacity/x64/x64.json"',
+    ) ||
+    !capacityMerge.run.includes(
+      '--arm64="${RUNNER_TEMP}/ql3-cluster-console-capacity/arm64/arm64.json"',
+    ) ||
+    !capacityMerge.run.includes(
+      '--report="${RUNNER_TEMP}/ql3-cluster-console-capacity/cross-architecture.json"',
+    ) ||
+    capacityUpload?.uses !==
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' ||
+    JSON.stringify(capacityUpload?.with) !==
+      JSON.stringify({
+        name: 'ql3-cluster-console-capacity-release-${{ github.run_id }}-${{ github.run_attempt }}',
+        path: '${{ runner.temp }}/ql3-cluster-console-capacity/cross-architecture.json',
+        'if-no-files-found': 'error',
+        'retention-days': 14,
+        'compression-level': 0,
+        overwrite: false,
+        'include-hidden-files': false,
+      })
+  ) {
+    throw new Error(
+      'Console capacity release evidence must merge and audit exact native x64 and arm64 reports with read-only authority',
+    );
+  }
   requirePattern(
     adminProductLiveContract,
     /runOperatorContextContract\(image\);[\s\S]*operatorContext: true,[\s\S]*contextPreflight: true,[\s\S]*contextReadiness: true/,
@@ -390,6 +526,14 @@ function auditClusterImageCiWorkflow(
     clusterAdminOperatorContext: true,
     clusterAdminContextPreflight: true,
     clusterAdminContextReadiness: true,
+    clusterCopilotConsoleCapacityEvidence: {
+      nativeArchitectures: ['x64', 'arm64'],
+      memoryLimitMiB: 192,
+      minimumHeadroomMiB: 32,
+      assertionRotation: true,
+      assertionExpiryRejected: true,
+      sourceBound: true,
+    },
     releaseVersionAudit: true,
     deploymentLockMaterialization: true,
     ociAttestations: true,

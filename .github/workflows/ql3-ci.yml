@@ -542,7 +542,7 @@ jobs:
       - name: Verify native runner architecture
         run: node -e "if (process.arch !== '${{ matrix.node_arch }}') throw new Error('unexpected architecture ' + process.arch)"
       - name: Test exact SBOM and release contract failures
-        run: node --test test/back/ql3ClusterImageSbom.test.cjs test/back/ql3ClusterImageReleaseAudit.test.cjs
+        run: node --test test/back/ql3ClusterImageSbom.test.cjs test/back/ql3ClusterImageReleaseAudit.test.cjs test/back/ql3ClusterCopilotConsoleCapacityEvidence.test.cjs
       - name: Audit deployment and image release contracts
         run: |
           pnpm audit:cluster-deployment:ql3
@@ -594,6 +594,40 @@ jobs:
           IMAGE: qinglong3-cluster-admin:ci-${{ matrix.image_arch }}
           QL3_CLUSTER_ADMIN_PRODUCT_LIVE: '1'
         run: node scripts/ql3-cluster-admin-product-live-contract.cjs --image="${IMAGE}"
+      - name: Capture the fixed Cluster Copilot Console capacity envelope
+        if: matrix.image == 'admin'
+        timeout-minutes: 10
+        env:
+          IMAGE: qinglong3-cluster-admin:ci-${{ matrix.image_arch }}
+          QL3_CLUSTER_COPILOT_CONSOLE_CAPACITY_LIVE: '1'
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_REVISION: ${{ github.sha }}
+          SOURCE_WORKFLOW: ${{ github.workflow }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/ql3-cluster-console-capacity"
+          node scripts/ql3-cluster-copilot-console-capacity-evidence.cjs \
+            --mode=capture \
+            --repository="${SOURCE_REPOSITORY}" \
+            --revision="${SOURCE_REVISION}" \
+            --workflow="${SOURCE_WORKFLOW}" \
+            --run-id="${SOURCE_RUN_ID}" \
+            --run-attempt="${SOURCE_RUN_ATTEMPT}" \
+            --architecture="${{ matrix.node_arch }}" \
+            --image="${IMAGE}" \
+            --output="${RUNNER_TEMP}/ql3-cluster-console-capacity/${{ matrix.node_arch }}.json"
+      - name: Upload native Cluster Copilot Console capacity evidence
+        if: matrix.image == 'admin'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-cluster-console-capacity-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.node_arch }}
+          path: ${{ runner.temp }}/ql3-cluster-console-capacity/${{ matrix.node_arch }}.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
       - name: Generate the reviewed application SBOM
         run: >-
           node scripts/ql3-cluster-image-sbom.cjs
@@ -613,6 +647,65 @@ jobs:
           scripts/ql3-cluster-image-sbom.cjs
           --image=${{ matrix.image }}
           --inventory-root=/opt/qinglong/node_modules
+
+  cluster-console-capacity-release-evidence:
+    name: Cross-architecture Cluster Copilot Console capacity evidence
+    needs: cluster-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - name: Download native x64 Console capacity evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-cluster-console-capacity-${{ github.run_id }}-${{ github.run_attempt }}-x64
+          path: ${{ runner.temp }}/ql3-cluster-console-capacity/x64
+      - name: Download native arm64 Console capacity evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-cluster-console-capacity-${{ github.run_id }}-${{ github.run_attempt }}-arm64
+          path: ${{ runner.temp }}/ql3-cluster-console-capacity/arm64
+      - name: Merge and audit the source-bound Console capacity evidence
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_REVISION: ${{ github.sha }}
+          SOURCE_WORKFLOW: ${{ github.workflow }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          node scripts/ql3-cluster-copilot-console-capacity-evidence.cjs \
+            --mode=merge \
+            --repository="${SOURCE_REPOSITORY}" \
+            --revision="${SOURCE_REVISION}" \
+            --workflow="${SOURCE_WORKFLOW}" \
+            --run-id="${SOURCE_RUN_ID}" \
+            --run-attempt="${SOURCE_RUN_ATTEMPT}" \
+            --x64="${RUNNER_TEMP}/ql3-cluster-console-capacity/x64/x64.json" \
+            --arm64="${RUNNER_TEMP}/ql3-cluster-console-capacity/arm64/arm64.json" \
+            --output="${RUNNER_TEMP}/ql3-cluster-console-capacity/cross-architecture.json"
+          node scripts/ql3-cluster-copilot-console-capacity-evidence.cjs \
+            --mode=audit \
+            --repository="${SOURCE_REPOSITORY}" \
+            --revision="${SOURCE_REVISION}" \
+            --workflow="${SOURCE_WORKFLOW}" \
+            --run-id="${SOURCE_RUN_ID}" \
+            --run-attempt="${SOURCE_RUN_ATTEMPT}" \
+            --report="${RUNNER_TEMP}/ql3-cluster-console-capacity/cross-architecture.json"
+      - name: Upload cross-architecture Console capacity evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-cluster-console-capacity-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-cluster-console-capacity/cross-architecture.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
 
   image-oci:
     name: ${{ matrix.image }} multi-architecture OCI evidence
