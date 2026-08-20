@@ -11,6 +11,20 @@
 
 最新增量证据（2026-08-20）：
 
+- D-371/ADR-0464（已接受并机器化）：接受 ADR-0006 的 Node 24 与多架构分层，并把根 `ql3-release.json` 升级为
+  `qinglong/release-identity@v2` 唯一事实源。3.0 Tier 1 精确为 `amd64`、`arm64`；`ppc64le`、`s390x` 是通过固定
+  Node 24 与同等级原生门禁前不可发布的候选；`arm/v7` 在缺少 owner、可重复 toolchain 与设备报告时为 experimental blocked；
+  `arm/v6`、`386` 明确留在 `2.x` legacy line。release candidate 的 OCI platforms、原生 OS runner matrix、release set digest 与
+  version audit 均从该身份派生，新增 Tier 1 却无原生 runner 会失败关闭；发布必需门新增 `architecture-support-tier`。这不新增
+  workspace package、dependency、服务、timer、数据库对象或 Edge 常驻成本，也不把旧设备排除出后续受限 Worker 兼容路径。
+  聚焦 release/version/downstream closure 门为 `55/55`；完整 backend 工作区为
+  `1,503 total / 1,501 pass / 2 conditional skip / 0 fail`（含一条不会提交的既有用户测试；D-371 提交范围为
+  `1,502 total / 1,500 pass / 2 skip`），18-package clean build/逐包测试退出 0。release version、package boundary、
+  cluster dependency、Edge import、cluster deployment 与 image release 六项审计全部 compatible，workspace 仍为 18 packages、
+  无 single/shallow package。14 档 Local artifact audit 串行复核全部 compatible；基础 Edge/Standalone 仍为
+  `2,589,998 / 2,590,076` bytes，Application+AI 为 `4,493,151 / 4,493,283` bytes，MCP 为
+  `7,315,930 / 7,316,038` bytes，证明发布政策未进入低资源部署闭包。
+
 - D-370/ADR-0463（实现与本地协议门已接受；首份原生 CI 双架构报告待实际 workflow 产生）：为显式按需的 Cluster Admin
   Copilot Console 增加固定 Linux x64/arm64 容量与 assertion 生命周期发布证据。两个原生 Admin image matrix job 分别在
   `192 MiB / swap 0 / 0.25 CPU / 32 PIDs`、只读 root、非 root、cap-drop ALL、no-new-privileges、默认 seccomp、8 MiB tmpfs 与
@@ -4959,9 +4973,9 @@
 | D-11 | 新领域 API 使用 `/api/v3`，旧 API 通过兼容层继续服务 | Proposed | 允许渐进迁移而非一次性切换 |
 | D-12 | Workflow 首版只支持有界、可恢复的步骤模型 | Proposed | 避免无界 DAG 和 Agent 循环扩大可靠性风险 |
 | D-13 | Prompt、模型结果和 Tool 内容采集默认关闭 | Proposed | 降低 Secret 和业务数据泄漏风险 |
-| D-14 | ql-core 按 Tier 发布明确的架构支持矩阵，不把“现有镜像可构建”等同于“Node 24 可支持” | Proposed | 路由、NAS 和异构 Worker 是核心用户场景，但 Node 24 官方产物当前不能覆盖 ARMv6、ARMv7 和 386 |
+| D-14 | ql-core 按 Tier 发布明确的架构支持矩阵，不把“现有镜像可构建”等同于“Node 24 可支持” | Accepted（ADR-0006/0464：release identity v2 已机器化当前支持矩阵） | 路由、NAS 和异构 Worker 是核心用户场景，但 Node 24 官方产物当前不能覆盖 ARMv6、ARMv7 和 386 |
 | D-15 | UI Extension 不进入 3.0 首个稳定版本 | Deferred | 先稳定 Package、Tool 和 Runtime Extension 契约 |
-| D-16 | 3.0 ql-core 以固定 Node.js 24 LTS 为运行时基线 | Proposed | 使用稳定 Web/SQLite 能力并消除不同发行版浮动 Node 版本造成的行为漂移 |
+| D-16 | 3.0 ql-core 以固定 Node.js 24 LTS 为运行时基线 | Accepted（ADR-0006/0464：当前精确固定 24.18.0，变更必须升级发布身份并重跑完整矩阵） | 使用稳定 Web/SQLite 能力并消除不同发行版浮动 Node 版本造成的行为漂移 |
 | D-17 | 3.0 新领域持久化通过 typed schema 与 Repository 端口访问；SQLite 目标为 Drizzle + node:sqlite | Proposed | 避免新 Runtime 继续耦合 Sequelize，同时保留 PostgreSQL adapter 边界和可审查 migration |
 | D-18 | 取消先持久化为 Run 意图事件，再调用 Executor；实际终态由完成事实或 Reconciler 收敛 | Proposed | 使取消可跨重启恢复，并消除“已发信号但无审计事实”和迟到成功覆盖取消的竞态 |
 | D-19 | 跨进程取消派发使用独立的 durable lease/fencing 状态，不以 RunEvent 或内存锁代替并发控制 | Proposed | 在 edge SQLite 与 cluster PostgreSQL 上共享一致语义，限制多 Worker 重复 signal 和崩溃重试风暴 |
@@ -6392,7 +6406,8 @@ ql-observability
 
 ### 7.9 多架构发布
 
-QingLong 当前容器发布覆盖 `amd64`、`arm/v6`、`arm/v7`、`arm64`、`ppc64le` 和 `386`。3.0 应维护明确的架构支持矩阵：
+QingLong 2.x 容器发布曾覆盖 `amd64`、`arm/v6`、`arm/v7`、`arm64`、`ppc64le`、`s390x` 和 `386`。
+3.0 由 release identity v2 维护明确的架构支持矩阵：
 
 - `ql-core` 和 edge 镜像优先保持现有多架构覆盖，但每个架构必须标记 `supported`、`experimental` 或 `legacy-only`，不能只凭构建成功宣称支持。
 - Alpine 与 Debian 发布物必须固定同一 Node.js 24 小版本，不能依赖发行版仓库的浮动 `nodejs`；升级 Node 小版本需要通过完整多架构门禁。
@@ -6405,15 +6420,19 @@ QingLong 当前容器发布覆盖 `amd64`、`arm/v6`、`arm/v7`、`arm64`、`ppc
 
 截至 2026-07-18 的上游产物审计显示，Node.js 24 官方 release binary 提供 x64、arm64、ppc64le 和 s390x，没有 ARMv6、ARMv7 或 386；官方 `node:24` Docker manifest 的 Debian/Alpine 覆盖也小于 QingLong 当前矩阵。Node.js BUILDING 文档把 ARMv7 降为实验支持，不能把自定义构建当作官方维护基线。参考：[Node.js 24 release](https://nodejs.org/en/blog/release/v24.18.0)、[Node.js official image manifest](https://github.com/docker-library/official-images/blob/master/library/node)、[Node.js BUILDING](https://github.com/nodejs/node/blob/main/BUILDING.md)。
 
-因此 D-14 与 D-16 之间存在必须在首个 Beta 前解决的发布决策，当前建议的候选分层为：
+D-371/ADR-0464 已接受 D-14 与 D-16 的一致解，当前分层为：
 
 | Tier | 3.0 候选架构 | 约束 |
 | --- | --- | --- |
-| Tier 1 supported | amd64、arm64；ppc64le、s390x 在对应 libc 镜像通过后纳入 | 固定官方 Node 24 patch，完整 migration、任务与恢复门禁 |
-| Tier 2 experimental | ARMv7 自定义 Node 24 构建 | 必须有可重复 toolchain、设备测试和明确无官方 binary 的提示，不进入默认 `latest` |
-| legacy-only | ARMv6、386；以及未通过 Node 24 门禁的架构 | 继续使用受维护的 2.x 镜像；不能把 Node 20/22 镜像标为满足 D-16 的完整 3.0 |
+| Tier 1 supported | amd64、arm64 | 固定 Node 24.18.0；完整原生 OS、OCI、migration、任务、恢复与资源门禁；只进入默认 3.0 manifest |
+| candidate | ppc64le、s390x | 在固定 Node 24 镜像、原生 runner/设备和同等级门禁全部具备前不得进入 3.0 manifest |
+| experimental blocked | ARMv7 | 当前没有已接受的 owner、可重复 toolchain 与设备证据；未来若补齐只能进入独立 experimental tag |
+| legacy-only | ARMv6、386 | 继续使用显式 2.x legacy line；不能把 Node 20/22 镜像标为满足 D-16 的完整 3.0 |
 
-这个分层是待评审候选，不等于已经决定放弃小设备。若 Maintainers 要求 ARMv6、ARMv7、386 在 3.0 与 Node 24 同时成为正式支持项，则必须先拥有并长期维护对应 Node 24 构建链；否则应明确修改 D-16 或维持 2.x legacy support line，不能发布互相矛盾的承诺。
+这个分层不等于放弃小设备。2.x legacy line 继续承担约定兼容窗口，旧设备参与 3.0 集群的受限 Worker 协议仍是
+独立后续决策；但不能因此把没有受支持 Node 24、数据库恢复与原生资源证据的设备标成完整 3.0 ql-core。若
+Maintainers 要求 ARMv6、ARMv7 或 386 成为 3.0 正式支持项，必须先修改 D-16 或长期维护对应 Node 24 构建链，
+升级 release identity schema，并通过与现有 Tier 1 同等级的发布门禁。
 
 ### 7.10 资源基准与发布门禁
 

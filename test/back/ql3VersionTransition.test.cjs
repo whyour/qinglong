@@ -86,11 +86,18 @@ function replaceVersion(
 
 test('audits one source-derived QingLong 3 release identity', () => {
   assert.deepEqual(auditReleaseVersionContract(root), {
-    schemaVersion: 1,
-    schema: 'qinglong/release-identity@v1',
+    schemaVersion: 2,
+    schema: 'qinglong/release-identity@v2',
     version: SOURCE_VERSION,
     nodeVersion: '24.18.0',
     nodeEngine: '>=24.18.0 <25',
+    architectureSupport: {
+      tier1: ['amd64', 'arm64'],
+      candidates: ['ppc64le', 's390x'],
+      experimentalBlocked: ['arm/v7'],
+      legacyOnly: ['arm/v6', '386'],
+      legacyLine: '2.x',
+    },
     legacyRootPackageVersion: LEGACY_VERSION,
     legacyRootExcluded: true,
     workspacePackageCount: 18,
@@ -220,6 +227,19 @@ test('rejects invalid SemVer, downgrade, plan mutation and a symbolic-link ident
   fs.writeFileSync(
     invalidIdentityPath,
     `${JSON.stringify(invalidIdentity, null, 2)}\n`,
+  );
+  assert.throws(
+    () => auditReleaseVersionContract(fixture),
+    /identity shape or value is incompatible/,
+  );
+  copyFile(root, fixture, 'ql3-release.json');
+  const architectureDrift = JSON.parse(
+    fs.readFileSync(invalidIdentityPath, 'utf8'),
+  );
+  architectureDrift.architectureSupport.tier1.push('ppc64le');
+  fs.writeFileSync(
+    invalidIdentityPath,
+    `${JSON.stringify(architectureDrift, null, 2)}\n`,
   );
   assert.throws(
     () => auditReleaseVersionContract(fixture),

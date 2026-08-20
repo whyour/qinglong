@@ -1,11 +1,29 @@
 {
-  "schemaVersion": 1,
-  "schema": "qinglong/release-identity@v1",
+  "schemaVersion": 2,
+  "schema": "qinglong/release-identity@v2",
   "product": "qinglong3",
   "version": "3.0.0-alpha.0",
   "node": {
     "version": "24.18.0",
     "engine": ">=24.18.0 <25"
+  },
+  "architectureSupport": {
+    "tier1": [
+      "amd64",
+      "arm64"
+    ],
+    "candidates": [
+      "ppc64le",
+      "s390x"
+    ],
+    "experimentalBlocked": [
+      "arm/v7"
+    ],
+    "legacyOnly": [
+      "arm/v6",
+      "386"
+    ],
+    "legacyLine": "2.x"
   },
   "workspacePackageCount": 18,
   "legacyRootPackageExcluded": true

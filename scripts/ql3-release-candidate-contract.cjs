@@ -17,6 +17,18 @@ const PREDICATE_TYPE =
   'https://qinglong.dev/attestations/release-candidate-contract/v1';
 const MAX_REPORT_BYTES = 1024 * 1024;
 const RELEASE_SCOPES = Object.freeze(['all', 'cluster', 'local']);
+const NATIVE_ARCHITECTURES = Object.freeze({
+  amd64: Object.freeze({
+    runner: 'ubuntu-24.04',
+    node_arch: 'x64',
+    image_arch: 'amd64',
+  }),
+  arm64: Object.freeze({
+    runner: 'ubuntu-24.04-arm',
+    node_arch: 'arm64',
+    image_arch: 'arm64',
+  }),
+});
 const LOCAL_IMAGES = Object.freeze([
   Object.freeze({
     image: 'local',
@@ -92,6 +104,18 @@ function selectedImages(scope) {
   return [...CLUSTER_IMAGES, ...LOCAL_IMAGES];
 }
 
+function nativeArchitectureMatrix(architectureSupport) {
+  return architectureSupport.tier1.map((architecture) => {
+    const native = NATIVE_ARCHITECTURES[architecture];
+    if (!native) {
+      fail(
+        `Tier 1 architecture lacks a native release runner: ${architecture}`,
+      );
+    }
+    return native;
+  });
+}
+
 function validateIdentity(options) {
   if (
     typeof options.version !== 'string' ||
@@ -147,6 +171,9 @@ function createReleaseCandidateContract(options) {
     })
     .sort((left, right) => left.name.localeCompare(right.name, 'en'));
   const images = selectedImages(options.releaseScope);
+  const nativeArchitectures = nativeArchitectureMatrix(
+    releaseIdentity.architectureSupport,
+  );
   const imageManifests = images.map((image) => {
     const manifest = readJson(
       path.join(root, image.runtime_root, 'package.json'),
@@ -182,24 +209,14 @@ function createReleaseCandidateContract(options) {
     });
   });
   const publishMatrix = images.map(({ dockerfile, target, ...image }) => image);
-  const osMatrix = images.flatMap((image) => [
-    {
+  const osMatrix = images.flatMap((image) =>
+    nativeArchitectures.map((architecture) => ({
       image: image.image,
-      runner: 'ubuntu-24.04',
-      node_arch: 'x64',
-      image_arch: 'amd64',
+      ...architecture,
       dockerfile: image.dockerfile,
       target: image.target,
-    },
-    {
-      image: image.image,
-      runner: 'ubuntu-24.04-arm',
-      node_arch: 'arm64',
-      image_arch: 'arm64',
-      dockerfile: image.dockerfile,
-      target: image.target,
-    },
-  ]);
+    })),
+  );
   const unsigned = {
     schemaVersion: 1,
     schema: SCHEMA,
@@ -220,7 +237,18 @@ function createReleaseCandidateContract(options) {
       ),
       nodeVersion: releaseIdentity.node.version,
       nodeEngine: releaseIdentity.node.engine,
-      platforms: ['linux/amd64', 'linux/arm64'],
+      architectureSupport: {
+        tier1: [...releaseIdentity.architectureSupport.tier1],
+        candidates: [...releaseIdentity.architectureSupport.candidates],
+        experimentalBlocked: [
+          ...releaseIdentity.architectureSupport.experimentalBlocked,
+        ],
+        legacyOnly: [...releaseIdentity.architectureSupport.legacyOnly],
+        legacyLine: releaseIdentity.architectureSupport.legacyLine,
+      },
+      platforms: releaseIdentity.architectureSupport.tier1.map(
+        (architecture) => `linux/${architecture}`,
+      ),
     },
     workspace: {
       packageCount: workspacePackages.length,
@@ -248,6 +276,7 @@ function createReleaseCandidateContract(options) {
     requiredGates: [
       'package-boundary',
       'source-tag-version-identity',
+      'architecture-support-tier',
       'native-os-vulnerability',
       'multiarch-oci-layout',
       'production-dependency-audit',

@@ -284,11 +284,20 @@ function auditReleaseVersionContract(rootInput = DEFAULT_ROOT) {
   }
 
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: identity.schemaVersion,
     schema: RELEASE_IDENTITY_SCHEMA,
     version: identity.version,
     nodeVersion: identity.node.version,
     nodeEngine: identity.node.engine,
+    architectureSupport: Object.freeze({
+      tier1: Object.freeze([...identity.architectureSupport.tier1]),
+      candidates: Object.freeze([...identity.architectureSupport.candidates]),
+      experimentalBlocked: Object.freeze([
+        ...identity.architectureSupport.experimentalBlocked,
+      ]),
+      legacyOnly: Object.freeze([...identity.architectureSupport.legacyOnly]),
+      legacyLine: identity.architectureSupport.legacyLine,
+    }),
     legacyRootPackageVersion: legacyRoot.version,
     legacyRootExcluded: true,
     workspacePackageCount: workspacePaths.length,

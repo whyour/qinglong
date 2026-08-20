@@ -41,13 +41,28 @@ test('freezes an independent low-resource local release family', () => {
   assert.equal(contract.workspace.packageCount, 18);
   assert.equal(
     contract.compatibility.releaseIdentitySchema,
-    'qinglong/release-identity@v1',
+    'qinglong/release-identity@v2',
   );
+  assert.deepEqual(contract.compatibility.architectureSupport, {
+    tier1: ['amd64', 'arm64'],
+    candidates: ['ppc64le', 's390x'],
+    experimentalBlocked: ['arm/v7'],
+    legacyOnly: ['arm/v6', '386'],
+    legacyLine: '2.x',
+  });
+  assert.deepEqual(contract.compatibility.platforms, [
+    'linux/amd64',
+    'linux/arm64',
+  ]);
   assert.match(
     contract.compatibility.releaseIdentityDigest,
     /^sha256:[a-f0-9]{64}$/u,
   );
   assert.match(contract.contractDigest, /^sha256:[a-f0-9]{64}$/u);
+  assert.equal(
+    contract.requiredGates.includes('architecture-support-tier'),
+    true,
+  );
   assert.equal(
     contract.requiredGates.includes('offline-deployment-lock-materialization'),
     true,
@@ -81,6 +96,33 @@ test('closes the cluster release family with the Worker image', () => {
   );
   assert.equal(contract.releasePlan.clusterEvidenceRequired, true);
   assert.equal(contract.releasePlan.osMatrix.length, 8);
+  assert.deepEqual(
+    [
+      ...new Set(
+        contract.releasePlan.osMatrix.map((entry) => entry.image_arch),
+      ),
+    ],
+    ['amd64', 'arm64'],
+  );
+  assert.deepEqual(
+    contract.releasePlan.osMatrix.slice(0, 2).map((entry) => ({
+      runner: entry.runner,
+      node_arch: entry.node_arch,
+      image_arch: entry.image_arch,
+    })),
+    [
+      {
+        runner: 'ubuntu-24.04',
+        node_arch: 'x64',
+        image_arch: 'amd64',
+      },
+      {
+        runner: 'ubuntu-24.04-arm',
+        node_arch: 'arm64',
+        image_arch: 'arm64',
+      },
+    ],
+  );
   assert.equal(
     contract.requiredGates.includes('edge-and-standalone-rollout'),
     false,

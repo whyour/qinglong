@@ -1,10 +1,11 @@
 # ADR-0006：Node.js 24 与多架构支持分层
 
-- 状态：Proposed
+- 状态：Accepted（由 ADR-0464 机器化；新增架构必须先满足对应原生门禁）
 - 日期：2026-07-18
 - 决策者：QingLong Maintainers
 - 关联 RFC：[QL-RFC-0001](../QINGLONG_3_0_ARCHITECTURE_RFC.md)
 - 关联决策：D-05、D-14、D-16、D-17
+- Operationalized by：ADR-0464
 
 官方参考：
 
@@ -166,3 +167,15 @@ Node 22 能覆盖更多 32-bit ARM 镜像，但把同一个 3.0 tag 在不同架
 - 接受 ARMv6、386 默认进入有 EOL 的 2.x legacy line，而不是伪装成 Node 24 3.0。
 - 接受旧设备可通过受限 Worker 兼容路径参与 3.0，但不拥有完整 ql-core 权限。
 - 接受任何 Node 22 的 3.0 compatibility runtime 都必须先显式修订 RFC。
+
+## 9. 2026-08-20 实施状态
+
+ADR-0464 已把本 ADR 从候选分层转为唯一发布身份中的机器契约。当前 3.0 Tier 1 精确为 `amd64`、`arm64`；
+`ppc64le`、`s390x` 保持候选，必须在进入默认 manifest 前取得固定 Node 24 镜像与同等级原生门禁；`arm/v7`
+因没有受维护 toolchain、owner 与设备证据而保持 experimental blocked；`arm/v6`、`386` 留在显式 `2.x`
+legacy line。该状态不是删除小设备支持：2.x 兼容窗口和未来受限 Worker 路径仍需单独关闭，但不能冒充完整 3.0
+ql-core 支持。
+
+根 `ql3-release.json` 的 `qinglong/release-identity@v2` 是唯一事实源；release candidate、原生 OS matrix、OCI
+platform 列表、release set 和 version audit 都从它派生。任何新增 Tier 1 架构若没有对应原生 runner mapping，
+发布候选会失败关闭。实现未新增 workspace package、运行时依赖、服务、timer、数据库对象或 Edge 常驻成本。

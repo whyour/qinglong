@@ -5,7 +5,14 @@ const path = require('node:path');
 const semver = require('semver');
 
 const RELEASE_IDENTITY_PATH = 'ql3-release.json';
-const RELEASE_IDENTITY_SCHEMA = 'qinglong/release-identity@v1';
+const RELEASE_IDENTITY_SCHEMA = 'qinglong/release-identity@v2';
+const ARCHITECTURE_SUPPORT = Object.freeze({
+  tier1: Object.freeze(['amd64', 'arm64']),
+  candidates: Object.freeze(['ppc64le', 's390x']),
+  experimentalBlocked: Object.freeze(['arm/v7']),
+  legacyOnly: Object.freeze(['arm/v6', '386']),
+  legacyLine: '2.x',
+});
 const MAX_RELEASE_IDENTITY_BYTES = 4096;
 const VERSION_PATTERN =
   /^3\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$/u;
@@ -38,10 +45,11 @@ function normalizeReleaseIdentity(value) {
       'product',
       'version',
       'node',
+      'architectureSupport',
       'workspacePackageCount',
       'legacyRootPackageExcluded',
     ]) ||
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== 2 ||
     value.schema !== RELEASE_IDENTITY_SCHEMA ||
     value.product !== 'qinglong3' ||
     typeof value.version !== 'string' ||
@@ -50,6 +58,15 @@ function normalizeReleaseIdentity(value) {
     !exactKeys(value.node, ['version', 'engine']) ||
     value.node.version !== '24.18.0' ||
     value.node.engine !== '>=24.18.0 <25' ||
+    !exactKeys(value.architectureSupport, [
+      'tier1',
+      'candidates',
+      'experimentalBlocked',
+      'legacyOnly',
+      'legacyLine',
+    ]) ||
+    JSON.stringify(value.architectureSupport) !==
+      JSON.stringify(ARCHITECTURE_SUPPORT) ||
     value.workspacePackageCount !== 18 ||
     value.legacyRootPackageExcluded !== true
   ) {
@@ -58,6 +75,15 @@ function normalizeReleaseIdentity(value) {
   return Object.freeze({
     ...value,
     node: Object.freeze({ ...value.node }),
+    architectureSupport: Object.freeze({
+      ...value.architectureSupport,
+      tier1: Object.freeze([...value.architectureSupport.tier1]),
+      candidates: Object.freeze([...value.architectureSupport.candidates]),
+      experimentalBlocked: Object.freeze([
+        ...value.architectureSupport.experimentalBlocked,
+      ]),
+      legacyOnly: Object.freeze([...value.architectureSupport.legacyOnly]),
+    }),
   });
 }
 
@@ -89,6 +115,7 @@ function readReleaseIdentity(root) {
 }
 
 module.exports = Object.freeze({
+  ARCHITECTURE_SUPPORT,
   MAX_RELEASE_IDENTITY_BYTES,
   RELEASE_IDENTITY_PATH,
   RELEASE_IDENTITY_SCHEMA,
