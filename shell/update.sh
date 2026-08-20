@@ -213,7 +213,56 @@ run_extra_shell() {
 
 ## 查看青龙服务日志
 show_service_logs() {
-  pm2 logs qinglong "$@"
+  local lines="15"
+  local no_stream="false"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --lines)
+      if [[ ! "${2:-}" =~ ^[0-9]+$ ]]; then
+        echo "ql log: --lines requires a non-negative integer" >&2
+        return 2
+      fi
+      lines="$2"
+      shift 2
+      ;;
+    --lines=*)
+      lines="${1#--lines=}"
+      if [[ ! "$lines" =~ ^[0-9]+$ ]]; then
+        echo "ql log: --lines requires a non-negative integer" >&2
+        return 2
+      fi
+      shift
+      ;;
+    --nostream)
+      no_stream="true"
+      shift
+      ;;
+    *)
+      echo "ql log: unknown option: $1" >&2
+      return 2
+      ;;
+    esac
+  done
+
+  local system_log_dir="$dir_data/syslog"
+  local latest_system_log
+  latest_system_log=$(ls -1t "$system_log_dir"/*.log* 2>/dev/null | head -n 1)
+  if [[ "$lines" != "0" ]] && [[ -f "$latest_system_log" ]]; then
+    tail -n "$lines" "$latest_system_log"
+  fi
+
+  if [[ "$no_stream" == "true" ]]; then
+    if [[ -z "$latest_system_log" ]]; then
+      echo "ql log: no system log found in $system_log_dir" >&2
+      return 1
+    fi
+    return 0
+  fi
+
+  # Winston writes the active runtime log by date. Follow the filename so
+  # size-based rotations are handled without involving the PM2 log files.
+  local current_system_log="$system_log_dir/$(date +%F).log"
+  tail -n 0 --retry -F "$current_system_log"
 }
 
 ## 脚本用法
@@ -226,7 +275,7 @@ usage() {
   echo -e "5.  $cmd_update rmlog <days>                                                            # 删除旧日志"
   echo -e "6.  $cmd_update bot                                                                     # 启动tg-bot"
   echo -e "7.  $cmd_update check                                                                   # 检测青龙环境并修复"
-  echo -e "8.  $cmd_update log [pm2-log-options]                                                    # 查看青龙服务日志"
+  echo -e "8.  $cmd_update log [--lines <n>] [--nostream]                                         # 查看青龙运行日志"
   echo -e "9.  $cmd_update resetlet                                                                # 重置登录错误次数"
   echo -e "10. $cmd_update resettfa                                                                # 禁用两步登录"
   echo -e "11. $cmd_update resetpwd                                                                # 修改登录密码"
