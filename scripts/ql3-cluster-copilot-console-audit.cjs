@@ -145,6 +145,10 @@ function auditClusterCopilotConsole(options = {}) {
     "'/api/v1/run-management/cancellation-status': 'run_cancellation_status'",
     "'/api/v1/worker-management/workers': 'worker_list'",
     "'/api/v1/package-management/installations': 'package_list'",
+    "const CAPABILITIES_PATH = '/api/v1/session/capabilities'",
+    'validatedAllowedOperations(record.allowedOperations)',
+    'if (!capabilitiesRequest && !allowedOperations.has(operation!))',
+    'upstreamReads: 0',
     "'/api/v1/observe/run-list': 'run_list'",
     "'/api/v1/observe/task-list': 'task_list'",
     "'/api/v1/observe/workflow-list': 'workflow_list'",
@@ -181,6 +185,7 @@ function auditClusterCopilotConsole(options = {}) {
     'runManagementAuthority: runManagementAuthority',
     'workerManagementAuthority: workerManagementAuthority',
     'packageManagementAuthority: packageManagementAuthority',
+    'allowedOperations: operations',
     'mutation: false',
   ]);
   rejectFragments(CONSOLE_ROOT + '/cli.ts', [
@@ -246,6 +251,8 @@ function auditClusterCopilotConsole(options = {}) {
     '该只读面没有 rearm',
     '模型文本是不可信内容',
     '导出脱敏包',
+    'id="authority-summary"',
+    'QingLong 3.0 incubation / D-377',
     '/evidence-bundle.js',
   ]);
   expectFragments(ASSET_ROOT + '/app.js', [
@@ -256,6 +263,9 @@ function auditClusterCopilotConsole(options = {}) {
     'measureClusterConsoleEvidenceRecord(record)',
     'createClusterConsoleEvidenceBundle',
     'URL.revokeObjectURL(objectUrl)',
+    "fetch('/api/v1/session/capabilities'",
+    'applyCapabilities(capabilities)',
+    'allowedOperations.has(operation)',
     "sessionToken = ''",
   ]);
   rejectFragments(ASSET_ROOT + '/app.js', [
@@ -312,6 +322,9 @@ function auditClusterCopilotConsole(options = {}) {
     'thirteen exact operations',
     'available vocabulary to sixteen',
     'maximum vocabulary of twenty operations',
+    'POST /api/v1/session/capabilities',
+    '`upstreamReads: 0`',
+    'BFF independently checks the same immutable operation set',
     'QL3_COPILOT_CONSOLE_RUN_MANAGEMENT=enabled',
     'QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT=enabled',
     'QL3_COPILOT_CONSOLE_PACKAGE_MANAGEMENT=enabled',

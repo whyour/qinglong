@@ -214,6 +214,16 @@ then enter the session key from the private file. The browser keeps it only in
 page memory; reloading locks the page. Stop the process with `SIGINT` or
 `SIGTERM`, then remove or rotate the session file.
 
+Unlock performs one authenticated same-origin
+`POST /api/v1/session/capabilities` with one fixed schema-only body. This is a local configuration read with
+`upstreamReads: 0`: it neither contacts the Cluster nor creates evidence. The
+page hides optional operation groups that the process did not enable, while the
+BFF independently checks the same immutable operation set before invoking any
+executor. A disabled operation is masked as `404` even if a caller constructs
+the fixed route manually. The thirteen base reads are mandatory; each optional
+Run, Worker or Package authority group must be enabled completely or remains
+disabled.
+
 The BFF accepts at most two concurrent reads and sixteen connections, rejects
 a third request without queueing, caps request bodies at 4 KiB and responses at
 approximately 2 MiB, disables cache/cookies/frames/workers, and never polls.

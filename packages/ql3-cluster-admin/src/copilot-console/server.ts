@@ -17,6 +17,7 @@ import {
 } from '../management-support/pluginPackageManagementClient';
 import { type ClusterCopilotConsoleAssets } from './assets';
 import {
+  CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
   CLUSTER_COPILOT_CONSOLE_READ_RESPONSE_SCHEMA,
   InvalidClusterCopilotConsoleReadRequestError,
   normalizeClusterCopilotConsoleReadRequest,
@@ -43,6 +44,7 @@ export interface ClusterCopilotConsoleExecutor {
 }
 
 export interface ClusterCopilotConsoleServerOptions {
+  readonly allowedOperations: readonly ClusterCopilotConsoleReadOperation[];
   readonly assets: Readonly<ClusterCopilotConsoleAssets>;
   readonly executor: ClusterCopilotConsoleExecutor;
   readonly networkBoundary?: ClusterCopilotConsoleNetworkBoundary;
@@ -69,6 +71,31 @@ export class ClusterCopilotConsoleConfigurationError extends TypeError {
 }
 
 const SESSION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+const CAPABILITIES_PATH = '/api/v1/session/capabilities';
+const CAPABILITIES_REQUEST_SCHEMA =
+  'qinglong/cluster-copilot-console-capabilities-request@v1';
+const CAPABILITIES_SCHEMA = 'qinglong/cluster-copilot-console-capabilities@v1';
+const RUN_MANAGEMENT_OPERATIONS = Object.freeze([
+  'run_cancellation_status',
+  'run_cancellation_blocked_list',
+  'run_cancellation_inspect',
+] as const satisfies readonly ClusterCopilotConsoleReadOperation[]);
+const WORKER_MANAGEMENT_OPERATIONS = Object.freeze([
+  'worker_list',
+  'worker_inspect',
+] as const satisfies readonly ClusterCopilotConsoleReadOperation[]);
+const PACKAGE_MANAGEMENT_OPERATIONS = Object.freeze([
+  'package_list',
+  'package_inspect',
+] as const satisfies readonly ClusterCopilotConsoleReadOperation[]);
+const OPTIONAL_OPERATION_GROUPS = Object.freeze([
+  RUN_MANAGEMENT_OPERATIONS,
+  WORKER_MANAGEMENT_OPERATIONS,
+  PACKAGE_MANAGEMENT_OPERATIONS,
+]);
+const OPTIONAL_OPERATIONS = new Set<ClusterCopilotConsoleReadOperation>(
+  OPTIONAL_OPERATION_GROUPS.flat(),
+);
 const SESSION_DIGEST_DOMAIN = Buffer.from(
   'qinglong-cluster-copilot-console-session-v1\0',
   'utf8',
@@ -219,6 +246,57 @@ function targetPath(
   return request.url === undefined ? null : READ_ROUTES[request.url] ?? null;
 }
 
+function validatedAllowedOperations(
+  value: unknown,
+): readonly ClusterCopilotConsoleReadOperation[] {
+  if (!Array.isArray(value)) return invalid();
+  const canonical = new Set<ClusterCopilotConsoleReadOperation>(
+    CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
+  );
+  const operations = value as ClusterCopilotConsoleReadOperation[];
+  const selected = new Set(operations);
+  if (
+    selected.size !== operations.length ||
+    operations.some((operation) => !canonical.has(operation)) ||
+    CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS.some(
+      (operation) =>
+        !OPTIONAL_OPERATIONS.has(operation) && !selected.has(operation),
+    ) ||
+    OPTIONAL_OPERATION_GROUPS.some((group) => {
+      const selectedCount = group.filter((operation) =>
+        selected.has(operation),
+      ).length;
+      return selectedCount !== 0 && selectedCount !== group.length;
+    })
+  ) {
+    return invalid();
+  }
+  return Object.freeze(
+    CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS.filter((operation) =>
+      selected.has(operation),
+    ),
+  );
+}
+
+function operationGroupEnabled(
+  allowedOperations: ReadonlySet<ClusterCopilotConsoleReadOperation>,
+  operations: readonly ClusterCopilotConsoleReadOperation[],
+): boolean {
+  return operations.every((operation) => allowedOperations.has(operation));
+}
+
+function validateCapabilitiesRequest(value: unknown): void {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).length !== 1 ||
+    (value as Record<string, unknown>).schema !== CAPABILITIES_REQUEST_SCHEMA
+  ) {
+    throw new InvalidClusterCopilotConsoleReadRequestError();
+  }
+}
+
 function authorize(
   request: IncomingMessage,
   expectedOrigin: string,
@@ -331,7 +409,13 @@ function remoteFailure(
 export async function startClusterCopilotConsoleServer(
   options: ClusterCopilotConsoleServerOptions,
 ): Promise<Readonly<ClusterCopilotConsoleServer>> {
-  const optionKeys = ['assets', 'executor', 'port', 'sessionDigest'];
+  const optionKeys = [
+    'allowedOperations',
+    'assets',
+    'executor',
+    'port',
+    'sessionDigest',
+  ];
   if (Object.hasOwn(options, 'networkBoundary')) {
     optionKeys.push('networkBoundary');
   }
@@ -342,6 +426,8 @@ export async function startClusterCopilotConsoleServer(
     'html',
     'javascript',
   ]);
+  const operations = validatedAllowedOperations(record.allowedOperations);
+  const allowedOperations = new Set(operations);
   const networkBoundary =
     record.networkBoundary === undefined
       ? 'host-loopback'
@@ -412,12 +498,19 @@ export async function startClusterCopilotConsoleServer(
       }
     }
 
+    const capabilitiesRequest =
+      request.method === 'POST' && request.url === CAPABILITIES_PATH;
     const operation = targetPath(request);
     if (
       !hostMatches ||
-      operation === null ||
+      (!capabilitiesRequest && operation === null) ||
       !authorize(request, expectedOrigin, sessionDigest)
     ) {
+      sendJson(response, 404, Object.freeze({ code: 'not_found' }));
+      request.resume();
+      return;
+    }
+    if (!capabilitiesRequest && !allowedOperations.has(operation!)) {
       sendJson(response, 404, Object.freeze({ code: 'not_found' }));
       request.resume();
       return;
@@ -439,6 +532,41 @@ export async function startClusterCopilotConsoleServer(
     inFlight += 1;
     try {
       const body = await readJsonBody(request);
+      if (capabilitiesRequest) {
+        validateCapabilitiesRequest(body);
+        sendJson(
+          response,
+          200,
+          Object.freeze({
+            schema: CAPABILITIES_SCHEMA,
+            operations,
+            authorities: Object.freeze({
+              projectObservation: 'server_only',
+              runManagement: operationGroupEnabled(
+                allowedOperations,
+                RUN_MANAGEMENT_OPERATIONS,
+              )
+                ? 'server_only'
+                : 'disabled',
+              workerManagement: operationGroupEnabled(
+                allowedOperations,
+                WORKER_MANAGEMENT_OPERATIONS,
+              )
+                ? 'server_only'
+                : 'disabled',
+              packageManagement: operationGroupEnabled(
+                allowedOperations,
+                PACKAGE_MANAGEMENT_OPERATIONS,
+              )
+                ? 'server_only'
+                : 'disabled',
+            }),
+            mutation: false,
+            upstreamReads: 0,
+          }),
+        );
+        return;
+      }
       const normalized = normalizeClusterCopilotConsoleReadRequest(body);
       if (normalized.operation !== operation) {
         throw new InvalidClusterCopilotConsoleReadRequestError();

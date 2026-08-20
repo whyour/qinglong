@@ -24,7 +24,7 @@ const ASSETS = Object.freeze([
     name: 'index.html',
     field: 'html',
     maximumBytes: 32 * 1024,
-    digest: '429d7b3dd2da4989865be6ac07180cc9c3ebdcbbac5028054cddaac870ad520c',
+    digest: '7e024103aaf03553995b09bfb9d6da5ba058ce77f7fff65c56b564017c79f28a',
   }),
   Object.freeze({
     name: 'app.css',
@@ -42,7 +42,7 @@ const ASSETS = Object.freeze([
     name: 'app.js',
     field: 'javascript',
     maximumBytes: 32 * 1024,
-    digest: '365ccd43ae2aa4b11a0ab3d142cd04e89ec0b96711bef253f63584e8182589ee',
+    digest: '224895776a1df1b4571a8cdb9ce8126861d0284e1fef801e6de3ef31ca96c931',
   }),
 ] as const);
 

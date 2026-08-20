@@ -14,6 +14,7 @@ const {
   loadClusterCopilotConsoleAssets,
 } = require('../dist/copilot-console/assets.js');
 const {
+  CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
   CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
   clusterCopilotConsoleClientCommand,
   clusterCopilotConsoleProjectReadPath,
@@ -26,6 +27,18 @@ const {
 } = require('../dist/copilot-console/server.js');
 
 const moduleDirectory = resolve(__dirname, '../dist/copilot-console');
+const optionalOperations = new Set([
+  'run_cancellation_status',
+  'run_cancellation_blocked_list',
+  'run_cancellation_inspect',
+  'worker_list',
+  'worker_inspect',
+  'package_list',
+  'package_inspect',
+]);
+const baseOperations = CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS.filter(
+  (operation) => !optionalOperations.has(operation),
+);
 
 function target(operation = 'inspect') {
   return {
@@ -151,9 +164,13 @@ function request(origin, options = {}) {
   });
 }
 
-async function fixture(execute = async () => inspection()) {
+async function fixture(
+  execute = async () => inspection(),
+  allowedOperations = CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
+) {
   const token = randomBytes(32).toString('base64url');
   const server = await startClusterCopilotConsoleServer({
+    allowedOperations,
     assets: loadClusterCopilotConsoleAssets(moduleDirectory),
     executor: { execute },
     port: 0,
@@ -501,6 +518,7 @@ test('allows only an explicit fixed-port container listener behind host loopback
   const token = randomBytes(32).toString('base64url');
   await assert.rejects(
     startClusterCopilotConsoleServer({
+      allowedOperations: CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
       assets: loadClusterCopilotConsoleAssets(moduleDirectory),
       executor: { execute: async () => inspection() },
       networkBoundary: 'container-published-loopback',
@@ -510,6 +528,7 @@ test('allows only an explicit fixed-port container listener behind host loopback
     ClusterCopilotConsoleConfigurationError,
   );
   const server = await startClusterCopilotConsoleServer({
+    allowedOperations: CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
     assets: loadClusterCopilotConsoleAssets(moduleDirectory),
     executor: { execute: async () => inspection() },
     networkBoundary: 'container-published-loopback',
@@ -519,6 +538,89 @@ test('allows only an explicit fixed-port container listener behind host loopback
   t.after(() => server.close());
   assert.match(server.origin, /^http:\/\/127\.0\.0\.1:[0-9]+$/);
   assert.equal((await request(server.origin)).statusCode, 200);
+});
+
+test('discovers session capabilities locally and fences disabled operations before execution', async (t) => {
+  const reads = [];
+  const { server, headers } = await fixture(async (read) => {
+    reads.push(read);
+    return inspection();
+  }, baseOperations);
+  t.after(() => server.close());
+
+  const unauthenticated = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/session/capabilities',
+  });
+  assert.equal(unauthenticated.statusCode, 404);
+
+  const invalidCapabilities = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/session/capabilities',
+    headers,
+    body: {},
+  });
+  assert.equal(invalidCapabilities.statusCode, 400);
+
+  const capabilities = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/session/capabilities',
+    headers,
+    body: {
+      schema: 'qinglong/cluster-copilot-console-capabilities-request@v1',
+    },
+  });
+  assert.equal(capabilities.statusCode, 200);
+  assert.deepEqual(capabilities.body, {
+    schema: 'qinglong/cluster-copilot-console-capabilities@v1',
+    operations: baseOperations,
+    authorities: {
+      projectObservation: 'server_only',
+      runManagement: 'disabled',
+      workerManagement: 'disabled',
+      packageManagement: 'disabled',
+    },
+    mutation: false,
+    upstreamReads: 0,
+  });
+
+  const disabled = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/package-management/installations',
+    headers,
+    body: {
+      schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+      operation: 'package_list',
+      projectId: 'project-main',
+      requestId: 'console-package-list-1',
+      afterPackageName: null,
+    },
+  });
+  assert.equal(disabled.statusCode, 404);
+  assert.deepEqual(reads, []);
+});
+
+test('rejects duplicate, incomplete base and partial optional operation sets', async () => {
+  const token = randomBytes(32).toString('base64url');
+  const common = {
+    assets: loadClusterCopilotConsoleAssets(moduleDirectory),
+    executor: { execute: async () => inspection() },
+    port: 0,
+    sessionDigest: clusterCopilotConsoleSessionDigest(token),
+  };
+  for (const allowedOperations of [
+    [...CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS, 'inspect'],
+    baseOperations.filter((operation) => operation !== 'inspect'),
+    [...baseOperations, 'run_cancellation_status'],
+  ]) {
+    await assert.rejects(
+      startClusterCopilotConsoleServer({
+        allowedOperations,
+        ...common,
+      }),
+      ClusterCopilotConsoleConfigurationError,
+    );
+  }
 });
 
 test('keeps the Cluster credential server-side and forwards one exact inspect', async (t) => {

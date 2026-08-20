@@ -2,6 +2,9 @@
 
 (function () {
   const schema = 'qinglong/cluster-copilot-console-read-request@v1';
+  const capabilityRequestSchema =
+    'qinglong/cluster-copilot-console-capabilities-request@v1';
+  const capabilitySchema = 'qinglong/cluster-copilot-console-capabilities@v1';
   const routes = Object.freeze({
     inspect: '/api/v1/copilot/inspect',
     output: '/api/v1/copilot/output',
@@ -55,11 +58,13 @@
   const emptyState = document.getElementById('empty-state');
   const message = document.getElementById('message');
   const statusChip = document.getElementById('status-chip');
+  const authoritySummary = document.getElementById('authority-summary');
   const ledgerMeta = document.getElementById('ledger-meta');
   const exportButton = document.getElementById('export-evidence');
   const clearButton = document.getElementById('clear-evidence');
   const evidenceRecords = [];
   let sessionToken = '';
+  let allowedOperations = new Set();
   let busy = false;
   let exporting = false;
   let evidenceBytes = 0;
@@ -95,7 +100,7 @@
   const setBusy = function (next) {
     busy = next;
     document.querySelectorAll('[data-read]').forEach(function (button) {
-      button.disabled = next;
+      button.disabled = next || !allowedOperations.has(button.dataset.read);
     });
     if (next) {
       statusChip.textContent = '读取中';
@@ -105,6 +110,72 @@
       statusChip.dataset.tone = 'success';
     }
     updateLedgerState();
+  };
+
+  const applyCapabilities = function (capabilities) {
+    allowedOperations = new Set(capabilities.operations);
+    document.querySelectorAll('[data-read]').forEach(function (button) {
+      const available = allowedOperations.has(button.dataset.read);
+      button.hidden = !available;
+      button.disabled = !available;
+    });
+    document.querySelectorAll('.mode-tab').forEach(function (tab) {
+      const panel = document.getElementById(tab.dataset.panel);
+      const available = Array.from(panel.querySelectorAll('[data-read]')).some(
+        function (button) {
+          return allowedOperations.has(button.dataset.read);
+        },
+      );
+      tab.hidden = !available;
+      tab.classList.toggle('active', tab.dataset.panel === 'runtime-panel');
+      tab.setAttribute(
+        'aria-pressed',
+        String(tab.dataset.panel === 'runtime-panel'),
+      );
+      panel.hidden = tab.dataset.panel !== 'runtime-panel';
+    });
+    const enabled = ['Run', 'Task', 'Workflow', 'Copilot'];
+    if (allowedOperations.has('run_cancellation_status')) {
+      enabled.push('取消诊断');
+    }
+    if (allowedOperations.has('worker_list')) enabled.push('Worker');
+    if (allowedOperations.has('package_list')) enabled.push('Package');
+    authoritySummary.textContent = enabled.join(' · ');
+  };
+
+  const discoverCapabilities = async function () {
+    const response = await fetch('/api/v1/session/capabilities', {
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+        Authorization: 'QL3-Console ' + sessionToken,
+      },
+      body: JSON.stringify({ schema: capabilityRequestSchema }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(
+        typeof body.code === 'string' ? body.code : 'capability_read_failed',
+      );
+    }
+    if (
+      body.schema !== capabilitySchema ||
+      !Array.isArray(body.operations) ||
+      body.operations.length !== new Set(body.operations).size ||
+      body.operations.some(function (operation) {
+        return (
+          typeof operation !== 'string' || !Object.hasOwn(routes, operation)
+        );
+      })
+    ) {
+      throw new Error('capability_response_invalid');
+    }
+    return body;
   };
 
   const base = function (operation) {
@@ -363,7 +434,7 @@
   };
 
   const execute = async function (operation, prepared) {
-    if (busy) return;
+    if (busy || !allowedOperations.has(operation)) return;
     setBusy(true);
     setMessage('正在读取 ' + labels[operation] + '…');
     try {
@@ -477,21 +548,42 @@
     }
   };
 
-  sessionForm.addEventListener('submit', function (event) {
+  sessionForm.addEventListener('submit', async function (event) {
     event.preventDefault();
     const candidate = sessionInput.value.trim();
     if (!/^[A-Za-z0-9_-]{43}$/.test(candidate)) {
       setMessage('浏览器访问密钥格式无效。', 'error');
       return;
     }
+    const submitButton = sessionForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
     sessionToken = candidate;
-    sessionInput.value = '';
-    sessionForm.hidden = true;
-    controls.hidden = false;
-    statusChip.textContent = '只读就绪';
-    statusChip.dataset.tone = 'success';
-    setMessage('本页已解锁；Cluster credential 仍只存在于服务端。', 'success');
-    document.getElementById('project-id').focus();
+    setMessage('正在核验会话并读取本机能力边界…');
+    try {
+      const capabilities = await discoverCapabilities();
+      applyCapabilities(capabilities);
+      sessionInput.value = '';
+      sessionForm.hidden = true;
+      controls.hidden = false;
+      statusChip.textContent = '只读就绪';
+      statusChip.dataset.tone = 'success';
+      setMessage(
+        '本页已解锁并仅显示服务端启用的 ' +
+          String(capabilities.operations.length) +
+          ' 个只读操作；Cluster credential 仍只存在于服务端。',
+        'success',
+      );
+      document.getElementById('project-id').focus();
+    } catch (error) {
+      sessionToken = '';
+      setMessage(
+        '无法解锁：' +
+          (error instanceof Error ? error.message : 'capability_read_failed'),
+        'error',
+      );
+    } finally {
+      submitButton.disabled = false;
+    }
   });
 
   document.querySelectorAll('.mode-tab').forEach(function (tab) {
@@ -521,6 +613,7 @@
 
   window.addEventListener('pagehide', function () {
     sessionToken = '';
+    allowedOperations.clear();
     evidenceRecords.length = 0;
     evidenceBytes = 0;
     ledger.textContent = '';

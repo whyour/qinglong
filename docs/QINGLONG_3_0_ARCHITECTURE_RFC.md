@@ -11,6 +11,22 @@
 
 最新增量证据（2026-08-20）：
 
+- D-377/ADR-0470（已接受）：修复可选 Console authority 已默认关闭、浏览器却仍展示全部二十个操作的产品与授权边界漂移。Console CLI 现在把
+  完成私有文件校验后的唯一 `allowedOperations` 集合注入 server；十三个 Project/Copilot 基础只读操作必须完整存在，Run、Worker 与 Package
+  三组可选操作只能整组启用或整组关闭，未知、重复、缺失基础操作或半组配置均在监听前失败。认证后的同源
+  `POST /api/v1/session/capabilities` 只接受固定 schema-only body、读取进程内存配置，返回低敏 authority 状态、`mutation=false` 与
+  `upstreamReads=0`，不调用 Cluster、
+  manager、executor、repository 或数据库，也不进入证据账本。浏览器只有能力响应通过 fixed-route allowlist 校验后才解锁，隐藏未启用 tab，
+  session/allowed set 只保留在页内存；服务端同时在 body 解析和 executor 前对禁用 route 掩码 `404`，因此 UI 隐藏不是唯一安全边界。本切片不新增
+  package、dependency、binary、端口、服务、数据库对象、Kubernetes workload、timer、poller、retry、queue 或 cache。聚焦 Console 门
+  `38/38`；Cluster Admin 全量 `440 total / 437 pass / 3 conditional skip / 0 fail`；完整 backend
+  `1,505 total / 1,503 pass / 2 conditional skip / 0 fail`，并修正 D-376 后陈旧的包边界测试期望为 RFC 已声明的 Cluster Admin
+  `129 source / 128 nested`。18-package clean build/逐包测试单次退出 0；package boundary、Cluster dependency、Edge import、Cluster/Worker
+  deployment、Console 与 distribution 七项审计全部 compatible/passed，仍为 18 packages、`singleSourcePackages=[]`、
+  `shallowSourcePackages=[]`。14 档 Local artifact audit 全部 compatible；基础 Edge/Standalone 保持
+  `2,598,669 / 2,598,747` bytes、57 loaded modules，Application+AI 为 `4,501,822 / 4,501,954`，MCP 为
+  `7,324,601 / 7,324,709`，证明能力发现未进入低配路由设备闭包。本切片不改变 PostgreSQL schema、ACL、repository、role、Pool、连接或
+  failover 语义，因此不重跑且不重新占有 HA 证明；D-373/D-374 PostgreSQL 18.6 arm64 HA `146/146`、timeline `1→2` 仅作为相邻既有基线。
 - D-376/ADR-0469（已接受）：在既有 operator-workstation、loopback-only Copilot Console 内增加可选 Plugin Package installation
   观察，而不新增 workspace package、服务、端口或集群工作负载。Browser/BFF 只增加固定 `package_list|package_inspect` 与
   `/api/v1/package-management/installations|installation`；上游复用 canonical `/api/v3/plugin-packages/management` client，独立

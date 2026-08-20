@@ -340,10 +340,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterAdmin.rootSourceFileRoles,
     },
     {
-      sourceFiles: 128,
+      sourceFiles: 129,
       rootSourceFiles: 1,
       rootSourceLines: 61,
-      nestedSourceFiles: 127,
+      nestedSourceFiles: 128,
       rootSourceFileRoles: {
         'modelInvocationMigrationCli.ts': 'binary_entry',
       },

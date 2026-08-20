@@ -577,6 +577,7 @@ async function main(): Promise<void> {
   }
 
   const server = await startClusterCopilotConsoleServer({
+    allowedOperations: operations,
     assets,
     executor: Object.freeze({
       execute(request: Readonly<ClusterCopilotConsoleReadRequest>) {
