@@ -175,6 +175,64 @@ test('resets the undisclosed alias table for every bundle', async () => {
   );
 });
 
+test('redacts optional Run management observations while preserving fixed availability facts', async () => {
+  const bundle = await createClusterConsoleEvidenceBundle(
+    [
+      {
+        operation: 'run_cancellation_status',
+        observedAtMs: 1_700_000_003_000,
+        request: {
+          schema: requestSchema,
+          operation: 'run_cancellation_status',
+          projectId: 'project-sensitive',
+          requestId: 'console-request-sensitive',
+        },
+        fact: {
+          schemaVersion: 1,
+          schema: 'qinglong/run-cancellation-status@v1',
+          component: 'qinglong3-run-management-client',
+          event: 'cancellation_status_observed',
+          requestId: 'console-request-sensitive',
+          projectId: 'project-sensitive',
+          observedAtMs: 1_700_000_003_000,
+          assessment: 'attention_required',
+          operatorAction: 'inspect',
+          severity: 'critical',
+          exitCode: 20,
+          dispatches: {
+            total: 1,
+            pending: 0,
+            leased: 0,
+            retryWait: 0,
+            dispatched: 0,
+            blocked: 1,
+          },
+          signals: { due: 0, expiredLease: 0 },
+          blockingResults: {
+            identityMismatch: 1,
+            pidMismatch: 0,
+            unsupported: 0,
+            invalid: 0,
+          },
+          oldestBlockedAtMs: 1_700_000_002_000,
+        },
+      },
+    ],
+    1_700_000_004_000,
+    webcrypto,
+  );
+  const entry = bundle.entries[0];
+  assert.equal(entry.operation, 'run_cancellation_status');
+  assert.equal(entry.target.projectId, 'project-001');
+  assert.equal(entry.fact.projectId, 'project-001');
+  assert.equal(entry.fact.assessment, 'attention_required');
+  assert.equal(entry.fact.operatorAction, 'inspect');
+  assert.equal(entry.fact.dispatches.blocked, 1);
+  assert.equal(entry.fact.blockingResults.identityMismatch, 1);
+  assert.equal(entry.fact.component, undefined);
+  assert.doesNotMatch(JSON.stringify(bundle), /project-sensitive/);
+});
+
 test('fails closed on widened records, unsafe JSON and every capacity ceiling', async () => {
   const error = { code: 'QL3_CLUSTER_CONSOLE_EVIDENCE_BUNDLE_INVALID' };
   assert.throws(() => measureClusterConsoleEvidenceRecord(null), error);

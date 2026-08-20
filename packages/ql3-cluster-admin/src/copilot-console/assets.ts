@@ -24,25 +24,25 @@ const ASSETS = Object.freeze([
     name: 'index.html',
     field: 'html',
     maximumBytes: 32 * 1024,
-    digest: '5d452c947a9f1266e4920cf48e7d5116b3f5ef8f9120f681124ed61f0217f5ff',
+    digest: 'a5a3d46a8493a27b53bd4a253ef38ebaf00d204a1454f4b47a1f1ceff668855f',
   }),
   Object.freeze({
     name: 'app.css',
     field: 'css',
     maximumBytes: 64 * 1024,
-    digest: '5cf82b0a88920d106530603a7d407f852312138e5b7af5c422b3bccee785f144',
+    digest: 'ddfe85971df0b8acfaed8b4bb5f5bcdf679347106294987d928bbb82dc6610ec',
   }),
   Object.freeze({
     name: 'evidence-bundle.js',
     field: 'evidenceBundle',
     maximumBytes: 32 * 1024,
-    digest: '6ecb14d2f59d872b889bb42c22bf0c0d2c150c90ea708fb1662d47f17f2e2095',
+    digest: '739ff786b651de23876fc5f4df5073e211085dfdfa1d2ecb79f53d5c871c6c1d',
   }),
   Object.freeze({
     name: 'app.js',
     field: 'javascript',
     maximumBytes: 32 * 1024,
-    digest: 'f109c5b0491ba9a473e3129e35773edf38ac745b403e1f547f8252aa2932cdff',
+    digest: '7ed994d8f2f5b151a247c5dec1d2841d45d30ff05b14dd1f41c12c5582acf9e6',
   }),
 ] as const);
 

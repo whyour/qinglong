@@ -85,6 +85,8 @@ COPY --chmod=0444 deploy/console/ql3-cluster-copilot/README.md \
   share/ql3-copilot-console/README.md
 COPY --chmod=0444 deploy/console/ql3-cluster-copilot/client-config.example.json \
   share/ql3-copilot-console/client-config.example.json
+COPY --chmod=0444 deploy/console/ql3-cluster-copilot/run-management-client-config.example.json \
+  share/ql3-copilot-console/run-management-client-config.example.json
 COPY --chmod=0444 deploy/console/ql3-cluster-copilot/host-environment.example.json \
   share/ql3-copilot-console/host-environment.example.json
 

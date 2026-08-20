@@ -123,6 +123,20 @@ test('cross-verifies every fixed Console read operation', async (t) => {
   const requests = {
     inspect: { projectId: 'p-1', requestId: 'q-1', sourceRunId: 'r-1' },
     output: { projectId: 'p-2', requestId: 'q-2', sourceRunId: 'r-2' },
+    run_cancellation_status: {
+      projectId: 'p-management',
+      requestId: 'q-management-status',
+    },
+    run_cancellation_blocked_list: {
+      cursor: null,
+      projectId: 'p-management',
+      requestId: 'q-management-blocked',
+    },
+    run_cancellation_inspect: {
+      projectId: 'p-management',
+      requestId: 'q-management-inspect',
+      runId: 'r-management',
+    },
     run_list: {
       afterCreatedAtMs: null,
       afterRunId: null,
@@ -218,7 +232,7 @@ test('cross-verifies every fixed Console read operation', async (t) => {
   );
   const result = verifyClusterConsoleEvidenceBundleFile(filePath);
   assert.equal(result.status, 'verified');
-  assert.equal(result.bundle.entryCount, 13);
+  assert.equal(result.bundle.entryCount, 16);
 });
 
 test('CLI is secret-free on success, invalid input and usage errors', async (t) => {

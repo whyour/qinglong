@@ -234,7 +234,7 @@ h3 {
 }
 .mode-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   margin: 1.8rem 0 1.2rem;
   border-bottom: 1px solid var(--line);
 }

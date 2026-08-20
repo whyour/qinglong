@@ -34,6 +34,11 @@ const consoleOperations = [
   'workflow_event_list',
   'workflow_step_list',
 ];
+const runManagementOperations = [
+  'run_cancellation_status',
+  'run_cancellation_blocked_list',
+  'run_cancellation_inspect',
+];
 
 function privateFile(directory, name, contents) {
   const filePath = path.join(directory, name);
@@ -106,6 +111,41 @@ function get(origin) {
   });
 }
 
+function post(origin, token, path, body) {
+  const url = new URL(origin);
+  const bytes = Buffer.from(JSON.stringify(body), 'utf8');
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(
+      {
+        hostname: '127.0.0.1',
+        port: Number(url.port),
+        method: 'POST',
+        path,
+        agent: false,
+        headers: {
+          authorization: `QL3-Console ${token}`,
+          origin,
+          'content-type': 'application/json; charset=utf-8',
+          'content-length': String(bytes.byteLength),
+        },
+      },
+      (response) => {
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          resolve({
+            statusCode: response.statusCode,
+            body: JSON.parse(text),
+          });
+        });
+      },
+    );
+    request.once('error', reject);
+    request.end(bytes);
+  });
+}
+
 async function fixture(t) {
   const directory = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-copilot-console-cli-')),
@@ -120,18 +160,61 @@ async function fixture(t) {
       maxVersion: 'TLSv1.3',
     },
     (request, response) => {
-      requests.push({
-        method: request.method,
-        path: request.url,
-        authorization: request.headers.authorization,
-        tls: request.socket.getProtocol(),
+      const chunks = [];
+      request.on('data', (chunk) => chunks.push(chunk));
+      request.on('end', () => {
+        const command =
+          chunks.length === 0
+            ? null
+            : JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        requests.push({
+          method: request.method,
+          path: request.url,
+          authorization: request.headers.authorization,
+          tls: request.socket.getProtocol(),
+          command,
+        });
+        const body =
+          command?.operation === 'run.cancellation.summary'
+            ? {
+                schemaVersion: 1,
+                requestId: command.request.requestId,
+                result: {
+                  schemaVersion: 1,
+                  operation: 'run.cancellation.summary',
+                  summary: {
+                    schema: 'qinglong/run-cancellation-dispatch-summary@v1',
+                    projectId: command.request.projectId,
+                    observedAtMs: 1_700_000_000_000,
+                    assessment: 'attention_required',
+                    operatorAction: 'inspect',
+                    dispatches: {
+                      total: 1,
+                      pending: 0,
+                      leased: 0,
+                      retryWait: 0,
+                      dispatched: 0,
+                      blocked: 1,
+                    },
+                    signals: { due: 0, expiredLease: 0 },
+                    blockingResults: {
+                      identityMismatch: 1,
+                      pidMismatch: 0,
+                      unsupported: 0,
+                      invalid: 0,
+                    },
+                    oldestBlockedAtMs: 1_699_999_999_000,
+                  },
+                },
+              }
+            : { status: 'ready' };
+        const bytes = Buffer.from(JSON.stringify(body), 'utf8');
+        response.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'content-length': String(bytes.byteLength),
+        });
+        response.end(bytes);
       });
-      const bytes = Buffer.from('{"status":"ready"}', 'utf8');
-      response.writeHead(200, {
-        'content-type': 'application/json; charset=utf-8',
-        'content-length': String(bytes.byteLength),
-      });
-      response.end(bytes);
     },
   );
   await new Promise((resolve, reject) => {
@@ -160,14 +243,43 @@ async function fixture(t) {
       requestTimeoutMs: 2_000,
     }),
   );
+  const clientCertificateFile = privateFile(
+    directory,
+    'run-client.crt',
+    fs.readFileSync(path.join(tlsFixture, 'client-cert.pem')),
+  );
+  const clientPrivateKeyFile = privateFile(
+    directory,
+    'run-client.key',
+    fs.readFileSync(path.join(tlsFixture, 'client-key.pem')),
+  );
+  const runManagementConfigFile = privateFile(
+    directory,
+    'run-client.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      endpoint: `https://localhost:${
+        server.address().port
+      }/api/v3/runs/management`,
+      servername: 'localhost',
+      caFile,
+      clientCertificateFile,
+      clientPrivateKeyFile,
+      requestTimeoutMs: 2_000,
+    }),
+  );
+  const sessionToken = randomBytes(32).toString('base64url');
   return {
     requests,
     configFile,
     credentialFile: privateFile(directory, 'credential', credential),
-    sessionFile: privateFile(
+    sessionFile: privateFile(directory, 'session', sessionToken),
+    sessionToken,
+    runManagementConfigFile,
+    runManagementAssertionFile: privateFile(
       directory,
-      'session',
-      randomBytes(32).toString('base64url'),
+      'run-assertion.jwt',
+      'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJvcGVyYXRvci0xIn0.c2lnbmF0dXJl',
     ),
   };
 }
@@ -178,6 +290,7 @@ test('CLI exposes deterministic help and a low-sensitive failure surface', async
     '  ql3-copilot-console --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--port=0..65535]',
     '  ql3-copilot-console --check --config /absolute/client.json --credential /absolute/credential --session /absolute/session',
     '  ql3-copilot-console --container-published-loopback --port=1024..65535 --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--check]',
+    '  Optional Run reads: --run-management-config /absolute/run-client.json --run-management-assertion /absolute/assertion.jwt',
     '',
     'Native mode binds 127.0.0.1. Container mode requires host-loopback port publication.',
     'The browser session key remains in a separate owner-private 0600 file.',
@@ -231,6 +344,7 @@ test('preflight proves private authority and unauthenticated TLS 1.3 readiness',
     publishedHostAddress: '127.0.0.1',
     browserCredential: 'forbidden',
     clusterCredential: 'server_only',
+    runManagementAuthority: 'disabled',
     operations: consoleOperations,
     mutation: false,
   });
@@ -240,8 +354,50 @@ test('preflight proves private authority and unauthenticated TLS 1.3 readiness',
       path: '/readyz',
       authorization: undefined,
       tls: 'TLSv1.3',
+      command: null,
     },
   ]);
+});
+
+test('preflight enables exactly three optional Run management reads only when both private files are explicit', async (t) => {
+  const value = await fixture(t);
+  const result = await runCli([
+    '--check',
+    '--config',
+    value.configFile,
+    '--credential',
+    value.credentialFile,
+    '--session',
+    value.sessionFile,
+    '--run-management-config',
+    value.runManagementConfigFile,
+    '--run-management-assertion',
+    value.runManagementAssertionFile,
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const fact = JSON.parse(result.stdout);
+  assert.equal(fact.runManagementAuthority, 'server_only');
+  assert.deepEqual(fact.operations, [
+    'inspect',
+    'output',
+    ...runManagementOperations,
+    ...consoleOperations.slice(2),
+  ]);
+  assert.equal(fact.mutation, false);
+  assert.equal(value.requests.length, 1);
+
+  const incomplete = await runCli([
+    '--config',
+    value.configFile,
+    '--credential',
+    value.credentialFile,
+    '--session',
+    value.sessionFile,
+    '--run-management-config',
+    value.runManagementConfigFile,
+  ]);
+  assert.equal(incomplete.status, 64);
+  assert.doesNotMatch(incomplete.stderr, /ql3-copilot-console-cli-/);
 });
 
 test('serve mode starts an ephemeral loopback origin and shuts down cleanly', async (t) => {
@@ -269,6 +425,7 @@ test('serve mode starts an ephemeral loopback origin and shuts down cleanly', as
   assert.match(started.origin, /^http:\/\/127\.0\.0\.1:[0-9]+$/);
   assert.deepEqual(started.operations, consoleOperations);
   assert.equal(started.mutation, false);
+  assert.equal(started.runManagementAuthority, 'disabled');
   assert.equal(started.networkBoundary, 'host-loopback');
   assert.equal(started.publishedHostAddress, '127.0.0.1');
   const shell = await get(started.origin);
@@ -280,6 +437,66 @@ test('serve mode starts an ephemeral loopback origin and shuts down cleanly', as
     child.once('close', (status, signal) => resolve({ status, signal }));
   });
   assert.deepEqual(result, { status: 0, signal: null });
+});
+
+test('serve mode forwards one explicit status click through the optional mTLS Run authority', async (t) => {
+  const value = await fixture(t);
+  const child = spawn(
+    process.execPath,
+    [
+      cliPath,
+      '--config',
+      value.configFile,
+      '--credential',
+      value.credentialFile,
+      '--session',
+      value.sessionFile,
+      '--run-management-config',
+      value.runManagementConfigFile,
+      '--run-management-assertion',
+      value.runManagementAssertionFile,
+      '--port=0',
+    ],
+    { cwd: packageRoot, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill('SIGKILL');
+  });
+  const started = JSON.parse(await firstLine(child.stdout));
+  assert.equal(started.runManagementAuthority, 'server_only');
+  const response = await post(
+    started.origin,
+    value.sessionToken,
+    '/api/v1/run-management/cancellation-status',
+    {
+      schema: 'qinglong/cluster-copilot-console-read-request@v1',
+      operation: 'run_cancellation_status',
+      projectId: 'project-main',
+      requestId: 'console-status-1',
+    },
+  );
+  assert.equal(response.statusCode, 200);
+  assert.equal(
+    response.body.result.result.schema,
+    'qinglong/run-cancellation-status@v1',
+  );
+  assert.equal(response.body.result.result.assessment, 'attention_required');
+  assert.equal(response.body.result.result.operatorAction, 'inspect');
+  assert.equal(response.body.result.result.dispatches.blocked, 1);
+  const management = value.requests.find(
+    (request) => request.path === '/api/v3/runs/management',
+  );
+  assert.equal(management.method, 'POST');
+  assert.equal(management.command.operation, 'run.cancellation.summary');
+  assert.equal(management.command.request.requestId, 'console-status-1');
+  assert.match(management.authorization, /^Bearer [A-Za-z0-9_-]+\./);
+  child.kill('SIGTERM');
+  const exit = await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (status, signal) => resolve({ status, signal }));
+  });
+  assert.deepEqual(exit, { status: 0, signal: null });
 });
 
 test('container mode requires an explicit publish port before any authority read', async () => {

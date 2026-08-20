@@ -28,6 +28,9 @@
   const operations = Object.freeze([
     'inspect',
     'output',
+    'run_cancellation_status',
+    'run_cancellation_blocked_list',
+    'run_cancellation_inspect',
     'run_list',
     'run_read',
     'run_event_list',
@@ -44,6 +47,9 @@
   const requestFields = Object.freeze({
     inspect: ['projectId', 'requestId', 'sourceRunId'],
     output: ['projectId', 'requestId', 'sourceRunId'],
+    run_cancellation_status: ['projectId', 'requestId'],
+    run_cancellation_blocked_list: ['cursor', 'projectId', 'requestId'],
+    run_cancellation_inspect: ['projectId', 'requestId', 'runId'],
     run_list: [
       'afterCreatedAtMs',
       'afterRunId',
@@ -112,7 +118,9 @@
     afterStepRunId: 'step',
     afterTaskId: 'task',
     artifactId: 'artifact',
+    attemptId: 'attempt',
     contentDigest: 'digest',
+    cursor: 'cursor',
     diagnosisRunId: 'run',
     executionId: 'execution',
     id: 'identifier',
@@ -133,7 +141,10 @@
   });
   const safeContainers = new Set([
     'attempts',
+    'blockingResults',
     'counts',
+    'dispatch',
+    'dispatches',
     'events',
     'items',
     'metadata',
@@ -142,6 +153,7 @@
     'run',
     'runs',
     'source',
+    'signals',
     'step',
     'steps',
     'summary',
@@ -168,9 +180,15 @@
   ]);
   const safeEnumKeys = new Set([
     'finishReason',
+    'assessment',
+    'cancelReason',
     'kind',
+    'lastResult',
     'operation',
+    'operatorAction',
     'outcome',
+    'runStatus',
+    'severity',
     'stage',
     'status',
   ]);
@@ -178,11 +196,15 @@
     'accepted',
     'active',
     'admission',
+    'attention_required',
     'available',
     'blocked',
     'cancelled',
     'completed',
     'completion',
+    'converging',
+    'critical',
+    'clear',
     'dispatch',
     'dispatching',
     'disabled',
@@ -191,12 +213,18 @@
     'failed',
     'finalization',
     'installed',
+    'inspect',
+    'invalid',
+    'identity_mismatch',
     'local',
     'lost',
     'missing',
     'model',
+    'none',
     'not_found',
     'pending',
+    'pid_mismatch',
+    'policy',
     'post_model',
     'pre_model',
     'prompt',
@@ -204,6 +232,8 @@
     'queued',
     'ready',
     'recovery',
+    'rearm',
+    'reconcile',
     'rejected',
     'remote',
     'retained',
@@ -217,13 +247,20 @@
     'step',
     'stop',
     'succeeded',
+    'shutdown',
     'system',
     'task',
     'terminal',
     'timed_out',
+    'timeout',
     'tool',
     'trigger',
     'unknown',
+    'unsupported',
+    'user',
+    'wait',
+    'warning',
+    'ok',
     'unavailable',
     'workflow',
   ]);
@@ -232,7 +269,7 @@
   const freeTextKey =
     /text|content|stdout|stderr|command|input|output|environment|reason|error|message|description|name|path|url|uri|host|endpoint/iu;
   const numericKey =
-    /^(?:schemaVersion|version|revision|sequence|attempt|priority|limit|offset|size|total|count|[A-Za-z0-9_]*(?:AtMs|TimeMs|DurationMs|Bytes|Tokens|Micros|Sequence|Version|Count|Limit|Offset|Size|Total))$/u;
+    /^(?:schemaVersion|version|revision|sequence|attempt|priority|limit|offset|size|total|count|exitCode|pending|leased|retryWait|dispatched|blocked|due|expiredLease|identityMismatch|pidMismatch|unsupported|invalid|[A-Za-z0-9_]*(?:AtMs|TimeMs|DurationMs|Bytes|Tokens|Micros|Sequence|Version|Count|Limit|Offset|Size|Total))$/u;
   const schemaValue = /^[a-z0-9][a-z0-9./_-]{0,126}@[a-z0-9._-]{1,16}$/u;
 
   class ClusterConsoleEvidenceBundleError extends TypeError {

@@ -24,6 +24,7 @@ private_root=${QL3_COPILOT_CONSOLE_PRIVATE_ROOT-}
 network=${QL3_COPILOT_CONSOLE_NETWORK-}
 port=${QL3_COPILOT_CONSOLE_PORT-}
 resource_class=${QL3_COPILOT_CONSOLE_RESOURCE_CLASS-compact}
+run_management=${QL3_COPILOT_CONSOLE_RUN_MANAGEMENT-disabled}
 
 printf '%s' "$image" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}@sha256:[0-9a-f]{64}$' || fail
 printf '%s' "$network" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$' || fail
@@ -57,6 +58,10 @@ case "$resource_class" in
     ;;
   *) fail ;;
 esac
+case "$run_management" in
+  disabled|enabled) ;;
+  *) fail ;;
+esac
 
 set -- docker run --rm --pull never --init --read-only \
   --network "$network" \
@@ -80,6 +85,12 @@ set -- "$@" "$image" copilot-console \
   --config /var/run/secrets/qinglong3/copilot-console/client.json \
   --credential /var/run/secrets/qinglong3/copilot-console/credential \
   --session /var/run/secrets/qinglong3/copilot-console/session
+
+if [ "$run_management" = enabled ]; then
+  set -- "$@" \
+    --run-management-config /var/run/secrets/qinglong3/copilot-console/run-management-client.json \
+    --run-management-assertion /var/run/secrets/qinglong3/copilot-console/run-management-assertion.jwt
+fi
 
 if [ "$mode" = check ]; then
   set -- "$@" --check

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { randomUUID } from 'node:crypto';
+
 import {
   executeClusterCopilotCommand,
   executeClusterProjectApiRead,
@@ -8,6 +10,20 @@ import {
   validateClusterCopilotClientCredentialFile,
 } from '../copilot-client/client';
 import { readCanonicalFile } from '../management-support/managementClientConfiguration';
+import { validateClusterAuthenticatedManagementClientConfiguration } from '../management-support/pluginPackageManagementClient';
+import {
+  createRunCancellationBlockedListCommand,
+  projectRunCancellationBlockedList,
+} from '../run-management/runCancellationBlockedList';
+import {
+  createRunCancellationInspectionCommand,
+  projectRunCancellationInspection,
+} from '../run-management/runCancellationInspection';
+import {
+  createRunCancellationStatusCommand,
+  projectRunCancellationStatus,
+} from '../run-management/runCancellationStatus';
+import { executeClusterRunManagementCommand } from '../run-management/runManagementClient';
 import { loadClusterCopilotConsoleAssets } from './assets';
 import {
   CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
@@ -25,6 +41,7 @@ const USAGE = [
   '  ql3-copilot-console --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--port=0..65535]',
   '  ql3-copilot-console --check --config /absolute/client.json --credential /absolute/credential --session /absolute/session',
   '  ql3-copilot-console --container-published-loopback --port=1024..65535 --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--check]',
+  '  Optional Run reads: --run-management-config /absolute/run-client.json --run-management-assertion /absolute/assertion.jwt',
   '',
   'Native mode binds 127.0.0.1. Container mode requires host-loopback port publication.',
   'The browser session key remains in a separate owner-private 0600 file.',
@@ -35,12 +52,21 @@ interface ClusterCopilotConsoleCliArguments {
   readonly configFile: string;
   readonly credentialFile: string;
   readonly networkBoundary: 'host-loopback' | 'container-published-loopback';
+  readonly runManagementAssertionFile?: string;
+  readonly runManagementConfigFile?: string;
   readonly sessionFile: string;
   readonly port: number;
 }
 
 const SESSION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+const MANAGEMENT_ASSERTION = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const MAXIMUM_SESSION_BYTES = 128;
+const MAXIMUM_MANAGEMENT_ASSERTION_BYTES = 16 * 1024;
+const RUN_MANAGEMENT_OPERATIONS = new Set([
+  'run_cancellation_status',
+  'run_cancellation_blocked_list',
+  'run_cancellation_inspect',
+]);
 
 function usageFailure(): never {
   process.stderr.write(USAGE + '\n');
@@ -77,6 +103,8 @@ export function parseClusterCopilotConsoleCliArguments(
   let configFile: string | undefined;
   let credentialFile: string | undefined;
   let sessionFile: string | undefined;
+  let runManagementConfigFile: string | undefined;
+  let runManagementAssertionFile: string | undefined;
   let port = 0;
   let portSeen = false;
   let containerPublishedLoopback = false;
@@ -116,6 +144,28 @@ export function parseClusterCopilotConsoleCliArguments(
       index += session.consumed;
       continue;
     }
+    const runManagementConfig = argumentValue(
+      argv,
+      index,
+      '--run-management-config',
+    );
+    if (runManagementConfig) {
+      if (runManagementConfigFile !== undefined) return usageFailure();
+      runManagementConfigFile = runManagementConfig.value;
+      index += runManagementConfig.consumed;
+      continue;
+    }
+    const runManagementAssertion = argumentValue(
+      argv,
+      index,
+      '--run-management-assertion',
+    );
+    if (runManagementAssertion) {
+      if (runManagementAssertionFile !== undefined) return usageFailure();
+      runManagementAssertionFile = runManagementAssertion.value;
+      index += runManagementAssertion.consumed;
+      continue;
+    }
     const portArgument = argumentValue(argv, index, '--port');
     if (portArgument) {
       if (portSeen || !/^(?:0|[1-9][0-9]{0,4})$/.test(portArgument.value)) {
@@ -138,6 +188,8 @@ export function parseClusterCopilotConsoleCliArguments(
     configFile === undefined ||
     credentialFile === undefined ||
     sessionFile === undefined ||
+    (runManagementConfigFile === undefined) !==
+      (runManagementAssertionFile === undefined) ||
     (containerPublishedLoopback && port === 0) ||
     (!containerPublishedLoopback && check && port !== 0)
   ) {
@@ -150,8 +202,125 @@ export function parseClusterCopilotConsoleCliArguments(
     networkBoundary: containerPublishedLoopback
       ? 'container-published-loopback'
       : 'host-loopback',
+    ...(runManagementConfigFile !== undefined &&
+    runManagementAssertionFile !== undefined
+      ? { runManagementConfigFile, runManagementAssertionFile }
+      : {}),
     sessionFile,
     port,
+  });
+}
+
+function validateRunManagementAuthority(
+  parsed: Readonly<ClusterCopilotConsoleCliArguments>,
+): boolean {
+  if (
+    parsed.runManagementConfigFile === undefined ||
+    parsed.runManagementAssertionFile === undefined
+  ) {
+    return false;
+  }
+  validateClusterAuthenticatedManagementClientConfiguration(
+    parsed.runManagementConfigFile,
+    'run',
+  );
+  let bytes: Buffer | undefined;
+  try {
+    bytes = readCanonicalFile(
+      parsed.runManagementAssertionFile,
+      MAXIMUM_MANAGEMENT_ASSERTION_BYTES,
+      'private',
+    );
+    if (
+      bytes.some((byte) => byte > 0x7f) ||
+      !MANAGEMENT_ASSERTION.test(bytes.toString('ascii'))
+    ) {
+      throw new Error('invalid Run management assertion');
+    }
+    return true;
+  } finally {
+    bytes?.fill(0);
+  }
+}
+
+function availableOperations(runManagementAuthority: boolean) {
+  return runManagementAuthority
+    ? CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS
+    : CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS.filter(
+        (operation) => !RUN_MANAGEMENT_OPERATIONS.has(operation),
+      );
+}
+
+function commandIdSource(requestId: string): () => string {
+  let first = true;
+  return () => {
+    if (first) {
+      first = false;
+      return requestId;
+    }
+    return randomUUID();
+  };
+}
+
+async function executeConsoleRead(
+  request: Readonly<ClusterCopilotConsoleReadRequest>,
+  parsed: Readonly<ClusterCopilotConsoleCliArguments>,
+) {
+  if (request.operation === 'inspect' || request.operation === 'output') {
+    return executeClusterCopilotCommand({
+      configFile: parsed.configFile,
+      credentialFile: parsed.credentialFile,
+      command: clusterCopilotConsoleClientCommand(request),
+    });
+  }
+  if (
+    request.operation === 'run_cancellation_status' ||
+    request.operation === 'run_cancellation_blocked_list' ||
+    request.operation === 'run_cancellation_inspect'
+  ) {
+    if (
+      parsed.runManagementConfigFile === undefined ||
+      parsed.runManagementAssertionFile === undefined
+    ) {
+      throw new Error('Run management authority is disabled');
+    }
+    const createUuid = commandIdSource(request.requestId);
+    const command =
+      request.operation === 'run_cancellation_status'
+        ? createRunCancellationStatusCommand(request.projectId, createUuid)
+        : request.operation === 'run_cancellation_blocked_list'
+        ? createRunCancellationBlockedListCommand(
+            request.projectId,
+            request.cursor ?? undefined,
+            createUuid,
+          )
+        : createRunCancellationInspectionCommand(
+            request.projectId,
+            request.runId,
+            createUuid,
+          );
+    const result = await executeClusterRunManagementCommand({
+      configFile: parsed.runManagementConfigFile,
+      assertionFile: parsed.runManagementAssertionFile,
+      command,
+    });
+    const projected =
+      request.operation === 'run_cancellation_status'
+        ? projectRunCancellationStatus(result)
+        : request.operation === 'run_cancellation_blocked_list'
+        ? projectRunCancellationBlockedList(result)
+        : projectRunCancellationInspection(result);
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      requestId: result.requestId,
+      result: projected as unknown as Readonly<Record<string, unknown>>,
+    });
+  }
+  return executeClusterProjectApiRead({
+    configFile: parsed.configFile,
+    credentialFile: parsed.credentialFile,
+    path: clusterCopilotConsoleProjectReadPath(request),
+    requestId: request.requestId,
   });
 }
 
@@ -183,6 +352,8 @@ async function main(): Promise<void> {
   const assets = loadClusterCopilotConsoleAssets(__dirname);
   validateClusterCopilotClientConfiguration(parsed.configFile);
   validateClusterCopilotClientCredentialFile(parsed.credentialFile);
+  const runManagementAuthority = validateRunManagementAuthority(parsed);
+  const operations = availableOperations(runManagementAuthority);
   const sessionDigest = readSessionDigest(parsed.sessionFile);
   if (parsed.check) {
     try {
@@ -199,7 +370,10 @@ async function main(): Promise<void> {
           publishedHostAddress: '127.0.0.1',
           browserCredential: 'forbidden',
           clusterCredential: 'server_only',
-          operations: CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
+          runManagementAuthority: runManagementAuthority
+            ? 'server_only'
+            : 'disabled',
+          operations,
           mutation: false,
         }) + '\n',
       );
@@ -214,19 +388,7 @@ async function main(): Promise<void> {
     assets,
     executor: Object.freeze({
       execute(request: Readonly<ClusterCopilotConsoleReadRequest>) {
-        if (request.operation === 'inspect' || request.operation === 'output') {
-          return executeClusterCopilotCommand({
-            configFile: parsed.configFile,
-            credentialFile: parsed.credentialFile,
-            command: clusterCopilotConsoleClientCommand(request),
-          });
-        }
-        return executeClusterProjectApiRead({
-          configFile: parsed.configFile,
-          credentialFile: parsed.credentialFile,
-          path: clusterCopilotConsoleProjectReadPath(request),
-          requestId: request.requestId,
-        });
+        return executeConsoleRead(request, parsed);
       },
     }),
     networkBoundary: parsed.networkBoundary,
@@ -244,7 +406,10 @@ async function main(): Promise<void> {
       publishedHostAddress: '127.0.0.1',
       browserCredential: 'forbidden',
       clusterCredential: 'server_only',
-      operations: CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS,
+      runManagementAuthority: runManagementAuthority
+        ? 'server_only'
+        : 'disabled',
+      operations,
       mutation: false,
     }) + '\n',
   );

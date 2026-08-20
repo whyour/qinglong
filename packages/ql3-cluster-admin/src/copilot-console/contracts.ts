@@ -11,6 +11,9 @@ export const CLUSTER_COPILOT_CONSOLE_READ_RESPONSE_SCHEMA =
 export const CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS = Object.freeze([
   'inspect',
   'output',
+  'run_cancellation_status',
+  'run_cancellation_blocked_list',
+  'run_cancellation_inspect',
   'run_list',
   'run_read',
   'run_event_list',
@@ -39,6 +42,10 @@ interface BaseReadRequest<
 export type ClusterCopilotConsoleReadRequest =
   | (BaseReadRequest<'inspect'> & Readonly<{ sourceRunId: string }>)
   | (BaseReadRequest<'output'> & Readonly<{ sourceRunId: string }>)
+  | BaseReadRequest<'run_cancellation_status'>
+  | (BaseReadRequest<'run_cancellation_blocked_list'> &
+      Readonly<{ cursor: string | null }>)
+  | (BaseReadRequest<'run_cancellation_inspect'> & Readonly<{ runId: string }>)
   | (BaseReadRequest<'run_list'> &
       Readonly<{
         afterCreatedAtMs: number | null;
@@ -98,6 +105,7 @@ export class InvalidClusterCopilotConsoleReadRequestError extends TypeError {
 
 const IDENTITY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const COPILOT_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,35}$/;
+const RUN_CANCELLATION_CURSOR = /^v1\.[A-Za-z0-9_-]{1,512}$/;
 const PACKAGE_NAME = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const WORKFLOW_ID = /^[a-z][a-z0-9-]{0,62}$/;
 const UUID_V4 =
@@ -203,6 +211,36 @@ export function normalizeClusterCopilotConsoleReadRequest(
       ...common(record),
       operation: op,
       sourceRunId: record.sourceRunId,
+    });
+  }
+  if (op === 'run_cancellation_status') {
+    exact(record, op, []);
+    return Object.freeze({
+      ...common(record),
+      operation: op,
+    });
+  }
+  if (op === 'run_cancellation_blocked_list') {
+    exact(record, op, ['cursor']);
+    if (
+      record.cursor !== null &&
+      (typeof record.cursor !== 'string' ||
+        !RUN_CANCELLATION_CURSOR.test(record.cursor))
+    )
+      invalid();
+    return Object.freeze({
+      ...common(record),
+      operation: op,
+      cursor: record.cursor as string | null,
+    });
+  }
+  if (op === 'run_cancellation_inspect') {
+    exact(record, op, ['runId']);
+    if (!identifier(record.runId)) invalid();
+    return Object.freeze({
+      ...common(record),
+      operation: op,
+      runId: record.runId,
     });
   }
   if (op === 'run_list') {
@@ -433,7 +471,13 @@ export function clusterCopilotConsoleProjectReadPath(
   request: Readonly<ClusterCopilotConsoleReadRequest>,
 ): string {
   const normalized = normalizeClusterCopilotConsoleReadRequest(request);
-  if (normalized.operation === 'inspect' || normalized.operation === 'output')
+  if (
+    normalized.operation === 'inspect' ||
+    normalized.operation === 'output' ||
+    normalized.operation === 'run_cancellation_status' ||
+    normalized.operation === 'run_cancellation_blocked_list' ||
+    normalized.operation === 'run_cancellation_inspect'
+  )
     invalid();
   const project = '/api/v3/projects/' + encoded(normalized.projectId);
   if (normalized.operation === 'run_list') {

@@ -224,6 +224,30 @@ test('normalizes Copilot and fixed Project observation operations without arbitr
       }),
     { code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID' },
   );
+  assert.deepEqual(
+    normalizeClusterCopilotConsoleReadRequest({
+      schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+      operation: 'run_cancellation_status',
+      projectId: 'project-main',
+      requestId: 'console-read-status',
+    }),
+    {
+      schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+      operation: 'run_cancellation_status',
+      projectId: 'project-main',
+      requestId: 'console-read-status',
+    },
+  );
+  assert.throws(
+    () =>
+      clusterCopilotConsoleProjectReadPath({
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'run_cancellation_status',
+        projectId: 'project-main',
+        requestId: 'console-read-status',
+      }),
+    { code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID' },
+  );
   assert.throws(
     () =>
       normalizeClusterCopilotConsoleReadRequest({
@@ -525,6 +549,72 @@ test('forwards one exact bounded Run list read and exposes no path field', async
   assert.deepEqual(response.body.result.result, { runs: [], hasMore: false });
   assert.equal(Object.hasOwn(requests[0], 'path'), false);
   assert.equal(Object.hasOwn(requests[0], 'url'), false);
+});
+
+test('routes only the three fixed Run management reads and validates their cursors', async (t) => {
+  const reads = [];
+  const { server, headers } = await fixture(async (read) => {
+    reads.push(read);
+    return {
+      schemaVersion: 1,
+      requestId: read.requestId,
+      result: { operation: read.operation },
+    };
+  });
+  t.after(() => server.close());
+  const cases = [
+    [
+      '/api/v1/run-management/cancellation-status',
+      {
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'run_cancellation_status',
+        projectId: 'project-main',
+        requestId: 'console-status-1',
+      },
+    ],
+    [
+      '/api/v1/run-management/blocked-cancellations',
+      {
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'run_cancellation_blocked_list',
+        projectId: 'project-main',
+        requestId: 'console-blocked-1',
+        cursor: null,
+      },
+    ],
+    [
+      '/api/v1/run-management/cancellation-inspect',
+      {
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'run_cancellation_inspect',
+        projectId: 'project-main',
+        requestId: 'console-inspect-1',
+        runId: 'run-1',
+      },
+    ],
+  ];
+  for (const [path, body] of cases) {
+    const response = await request(server.origin, {
+      method: 'POST',
+      path,
+      headers,
+      body,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  assert.deepEqual(
+    reads,
+    cases.map(([, body]) => body),
+  );
+
+  const invalidCursor = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/run-management/blocked-cancellations',
+    headers,
+    body: { ...cases[1][1], cursor: 'opaque-unversioned' },
+  });
+  assert.equal(invalidCursor.statusCode, 400);
+  assert.equal(reads.length, 3);
 });
 
 test('returns model text as JSON data only after an explicit output read', async (t) => {

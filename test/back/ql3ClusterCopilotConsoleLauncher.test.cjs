@@ -10,7 +10,9 @@ const launcher = path.join(
   ROOT,
   'deploy/console/ql3-cluster-copilot/docker-loopback.sh',
 );
-const image = `ghcr.io/example/qinglong3-cluster-admin@sha256:${'a'.repeat(64)}`;
+const image = `ghcr.io/example/qinglong3-cluster-admin@sha256:${'a'.repeat(
+  64,
+)}`;
 
 function fixture(t) {
   const directory = fs.realpathSync(
@@ -114,9 +116,24 @@ test('publishes standard serve only on host loopback', (t) => {
   assert.equal(args[args.indexOf('--memory') + 1], '512m');
   assert.equal(args[args.indexOf('--cpus') + 1], '1');
   assert.equal(args[args.indexOf('--pids-limit') + 1], '64');
+  assert.equal(args[args.indexOf('--publish') + 1], '127.0.0.1:5701:5701/tcp');
+});
+
+test('adds optional Run management files only after an explicit enabled switch', (t) => {
+  const value = fixture(t);
+  const result = invoke('check', {
+    ...value.env,
+    QL3_COPILOT_CONSOLE_RUN_MANAGEMENT: 'enabled',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const args = fs.readFileSync(value.capture, 'utf8').trimEnd().split('\n');
   assert.equal(
-    args[args.indexOf('--publish') + 1],
-    '127.0.0.1:5701:5701/tcp',
+    args[args.indexOf('--run-management-config') + 1],
+    '/var/run/secrets/qinglong3/copilot-console/run-management-client.json',
+  );
+  assert.equal(
+    args[args.indexOf('--run-management-assertion') + 1],
+    '/var/run/secrets/qinglong3/copilot-console/run-management-assertion.jwt',
   );
 });
 
@@ -126,8 +143,12 @@ test('rejects mutable, ambient and malformed host inputs before Docker', (t) => 
     { ...value.env, QL3_COPILOT_CONSOLE_IMAGE: 'ghcr.io/example/admin:latest' },
     { ...value.env, QL3_COPILOT_CONSOLE_NETWORK: 'host' },
     { ...value.env, QL3_COPILOT_CONSOLE_PORT: '80' },
-    { ...value.env, QL3_COPILOT_CONSOLE_PRIVATE_ROOT: `${value.privateRoot}:rw` },
+    {
+      ...value.env,
+      QL3_COPILOT_CONSOLE_PRIVATE_ROOT: `${value.privateRoot}:rw`,
+    },
     { ...value.env, QL3_COPILOT_CONSOLE_RESOURCE_CLASS: 'unbounded' },
+    { ...value.env, QL3_COPILOT_CONSOLE_RUN_MANAGEMENT: 'ambient' },
   ]) {
     const rejected = invoke('serve', environment);
     assert.equal(rejected.status, 78);

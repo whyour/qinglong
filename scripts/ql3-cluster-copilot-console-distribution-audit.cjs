@@ -11,6 +11,8 @@ const FILES = Object.freeze({
     'scripts/ql3-cluster-admin-release-workstation-ceremony-audit.cjs',
   environment:
     'deploy/console/ql3-cluster-copilot/host-environment.example.json',
+  runManagementExample:
+    'deploy/console/ql3-cluster-copilot/run-management-client-config.example.json',
   image: 'deploy/containers/ql3-cluster-admin/Dockerfile',
   workflow: '.github/workflows/ql3-image-release.yml',
   candidate: 'scripts/ql3-release-candidate-contract.cjs',
@@ -82,6 +84,9 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       'memory=192m',
       'standard)',
       'memory=512m',
+      'QL3_COPILOT_CONSOLE_RUN_MANAGEMENT-disabled',
+      '--run-management-config /var/run/secrets/qinglong3/copilot-console/run-management-client.json',
+      '--run-management-assertion /var/run/secrets/qinglong3/copilot-console/run-management-assertion.jwt',
     ],
     'QL3_COPILOT_CONSOLE_LAUNCHER_CONTRACT_DRIFT',
   );
@@ -200,6 +205,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
     QL3_COPILOT_CONSOLE_NETWORK: 'qinglong3-copilot-console-egress',
     QL3_COPILOT_CONSOLE_PORT: '5701',
     QL3_COPILOT_CONSOLE_RESOURCE_CLASS: 'compact',
+    QL3_COPILOT_CONSOLE_RUN_MANAGEMENT: 'disabled',
   };
   if (
     environment &&
@@ -223,6 +229,8 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       'share/ql3-copilot-console/verify-release.sh',
       'COPY --chmod=0444 deploy/console/ql3-cluster-copilot/host-environment.example.json',
       'share/ql3-copilot-console/host-environment.example.json',
+      'COPY --chmod=0444 deploy/console/ql3-cluster-copilot/run-management-client-config.example.json',
+      'share/ql3-copilot-console/run-management-client-config.example.json',
     ],
     'QL3_COPILOT_CONSOLE_IMAGE_DISTRIBUTION_DRIFT',
   );
@@ -315,6 +323,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
     hostPublication: '127.0.0.1',
     kubernetesResident: false,
     additionalWorkspacePackages: 0,
+    runManagementAuthorityDefault: 'disabled',
     externalWorkstationCeremony: 'source-tag-private-report',
     ceremonyStatus: 'implementation-ready-public-release-pending',
     findings: Object.freeze(findings),

@@ -10,6 +10,11 @@ import {
   ClusterCopilotClientRemoteError,
   ClusterCopilotClientRequestError,
 } from '../copilot-client/client';
+import {
+  ClusterPluginPackageManagementClientConfigurationError,
+  ClusterPluginPackageManagementClientRemoteError,
+  ClusterPluginPackageManagementClientRequestError,
+} from '../management-support/pluginPackageManagementClient';
 import { type ClusterCopilotConsoleAssets } from './assets';
 import {
   CLUSTER_COPILOT_CONSOLE_READ_RESPONSE_SCHEMA,
@@ -186,6 +191,10 @@ const READ_ROUTES: Readonly<
 > = Object.freeze({
   '/api/v1/copilot/inspect': 'inspect',
   '/api/v1/copilot/output': 'output',
+  '/api/v1/run-management/cancellation-status': 'run_cancellation_status',
+  '/api/v1/run-management/blocked-cancellations':
+    'run_cancellation_blocked_list',
+  '/api/v1/run-management/cancellation-inspect': 'run_cancellation_inspect',
   '/api/v1/observe/run-list': 'run_list',
   '/api/v1/observe/run': 'run_read',
   '/api/v1/observe/run-events': 'run_event_list',
@@ -294,7 +303,9 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 
 function remoteFailure(
   response: ServerResponse,
-  error: ClusterCopilotClientRemoteError,
+  error:
+    | ClusterCopilotClientRemoteError
+    | ClusterPluginPackageManagementClientRemoteError,
 ): void {
   const statusCode =
     error.statusCode === 404 ? 404 : error.statusCode === 429 ? 429 : 502;
@@ -457,11 +468,17 @@ export async function startClusterCopilotConsoleServer(
             code: 'invalid_cluster_copilot_console_read_request',
           }),
         );
-      } else if (error instanceof ClusterCopilotClientRemoteError) {
+      } else if (
+        error instanceof ClusterCopilotClientRemoteError ||
+        error instanceof ClusterPluginPackageManagementClientRemoteError
+      ) {
         remoteFailure(response, error);
       } else if (
         error instanceof ClusterCopilotClientConfigurationError ||
-        error instanceof ClusterCopilotClientRequestError
+        error instanceof ClusterCopilotClientRequestError ||
+        error instanceof
+          ClusterPluginPackageManagementClientConfigurationError ||
+        error instanceof ClusterPluginPackageManagementClientRequestError
       ) {
         sendJson(
           response,

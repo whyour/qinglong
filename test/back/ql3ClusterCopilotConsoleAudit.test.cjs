@@ -28,6 +28,9 @@ test('keeps the QingLong 3.0 Copilot Console independent and read-only', () => {
     operations: [
       'inspect',
       'output',
+      'run_cancellation_status',
+      'run_cancellation_blocked_list',
+      'run_cancellation_inspect',
       'run_list',
       'run_read',
       'run_event_list',
@@ -61,7 +64,7 @@ test('keeps the QingLong 3.0 Copilot Console independent and read-only', () => {
       networkAccess: false,
       fileWrites: false,
     },
-    sourceFileCount: 6,
+    sourceFileCount: 7,
     findings: [],
     compatible: true,
   });

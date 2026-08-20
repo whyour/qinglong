@@ -425,7 +425,7 @@ const { statSync, writeFileSync } = require('node:fs');
 const { rootCertificates } = require('node:tls');
 const facade = '/opt/qinglong/node_modules/@qinglong/cluster-admin/dist/product-cli/cli.js';
 const share = '/opt/qinglong/share/ql3-copilot-console';
-for (const [file, mode] of [['docker-loopback.sh', 0o555], ['verify-release.sh', 0o555], ['README.md', 0o444], ['client-config.example.json', 0o444], ['host-environment.example.json', 0o444]]) {
+for (const [file, mode] of [['docker-loopback.sh', 0o555], ['verify-release.sh', 0o555], ['README.md', 0o444], ['client-config.example.json', 0o444], ['run-management-client-config.example.json', 0o444], ['host-environment.example.json', 0o444]]) {
   if ((statSync(share + '/' + file).mode & 0o777) !== mode) process.exit(51);
 }
 writeFileSync('/tmp/ca.pem', rootCertificates[0], { mode: 0o600 });

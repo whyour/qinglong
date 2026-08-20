@@ -7,6 +7,11 @@ and Copilot reads to existing Cluster APIs. It never accepts a browser-provided
 URL or method. Do not deploy it as a Kubernetes workload, Ingress, shared LAN
 listener, Edge component or legacy 2.x Web route.
 
+Run cancellation availability is a second, explicit authority. It is disabled
+by default. Supplying a separate Run management mTLS config and short-lived
+User assertion adds only status, blocked-list and inspect reads to the same
+loopback process; rearm, stop and retry remain absent.
+
 Use `ql3-cluster-admin` from the same independently verified Admin release as
 the Cluster deployment. D-328 also supports the image-carried
 `docker-loopback.sh`: it uses an explicit container-only listener but publishes
@@ -97,6 +102,15 @@ and `artifact.read`; `run.read` covers Run and Workflow observations, while
 requested Copilot output. The Console has no route for Run/Workflow start,
 diagnosis creation or cancellation even if a wider credential is supplied.
 
+To enable the optional cancellation drill-down, copy
+`run-management-client-config.example.json` to `run-management-client.json`,
+install its CA, client certificate and private key, and issue a short-lived
+strong User assertion with only `run.read` into
+`run-management-assertion.jwt`. These files are independent of the Project API
+credential. Supplying only one of config/assertion is rejected before a
+listener or Cluster request is created. The assertion is reread for every
+explicit click so it can be rotated or removed while the Console is running.
+
 Create an independent 256-bit browser session key without placing its value in
 argv or an environment variable:
 
@@ -106,6 +120,11 @@ umask 077
 node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))' > /absolute/private/ql3-copilot-console/session
 chmod 0600 /absolute/private/ql3-copilot-console/client.json /absolute/private/ql3-copilot-console/ca.pem /absolute/private/ql3-copilot-console/credential /absolute/private/ql3-copilot-console/session
 ```
+
+If optional Run management reads are enabled, apply the same owner-private,
+canonical, non-symlink `0600` rule to `run-management-client.json`,
+`run-management-ca.pem`, `run-management-client.crt`,
+`run-management-client.key` and `run-management-assertion.jwt`.
 
 Every file must be a current-owner, non-symlink, canonical regular file. The
 session file contains exactly 43 base64url characters and no newline. It is a
@@ -122,6 +141,14 @@ ql3-cluster-admin copilot-console --check \
   --config /absolute/private/ql3-copilot-console/client.json \
   --credential /absolute/private/ql3-copilot-console/credential \
   --session /absolute/private/ql3-copilot-console/session
+```
+
+Append both flags to preflight and serve when the optional authority is
+intended:
+
+```sh
+--run-management-config /absolute/private/ql3-copilot-console/run-management-client.json \
+--run-management-assertion /absolute/private/ql3-copilot-console/run-management-assertion.jwt
 ```
 
 It validates all three private authorities and performs one unauthenticated
@@ -150,12 +177,19 @@ Model text is rendered as plain text and remains untrusted advice. These limits
 keep the workstation surface bounded, but this Cluster-only product is still
 excluded from small router Edge/Standalone artifacts.
 
-The page exposes thirteen exact operations: Copilot `inspect|output`; Run
+The default page exposes thirteen exact operations: Copilot `inspect|output`; Run
 list/detail/events/steps; Task list/detail; and Workflow list plus Workflow Run
 list/detail/events/steps. List responses use 32-row pages and offer an explicit
 next-page read only when the upstream cursor says more data exists. There is no
 automatic cascade from a list to details, steps or events, so each authority
 read remains visible and intentional.
+
+Explicit Run management authority raises the available vocabulary to sixteen:
+one Project cancellation status, one fixed 16-item blocked snapshot page and
+one low-sensitive Run cancellation inspection. An `attention_required` status
+offers a user-clicked blocked-list step; each returned Run offers a user-clicked
+inspect step. Pagination is also click-only. There is no polling, automatic
+page traversal, bulk inspection or mutation route.
 
 ## Export a redacted evidence bundle
 
@@ -203,6 +237,12 @@ firewall to DNS and the exact Cluster API destination. Copy
 the image with the verified digest and selecting one unused host port. The
 launcher rejects `bridge|default|host|none`, mutable tags, noncanonical private
 roots, ports outside `1024..65535` and unknown resource classes.
+
+The image launcher keeps Run management disabled unless
+`QL3_COPILOT_CONSOLE_RUN_MANAGEMENT=enabled` is set. Enabled mode reads
+`run-management-client.json` and `run-management-assertion.jwt` from the same
+read-only private mount; all certificate paths in the config must point into
+that mount. `disabled` is the only default and unknown values fail closed.
 
 | Resource class | Memory | CPU | PIDs | Console reads |
 | --- | ---: | ---: | ---: | ---: |

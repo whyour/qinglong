@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "endpoint": "https://replace-cluster-api.example.com:8448/api/v3/runs/management",
+  "servername": "replace-cluster-api.example.com",
+  "caFile": "/absolute/private/ql3-copilot-console/run-management-ca.pem",
+  "clientCertificateFile": "/absolute/private/ql3-copilot-console/run-management-client.crt",
+  "clientPrivateKeyFile": "/absolute/private/ql3-copilot-console/run-management-client.key",
+  "requestTimeoutMs": 5000
+}

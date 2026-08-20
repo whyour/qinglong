@@ -5,6 +5,11 @@
   const routes = Object.freeze({
     inspect: '/api/v1/copilot/inspect',
     output: '/api/v1/copilot/output',
+    run_cancellation_status: '/api/v1/run-management/cancellation-status',
+    run_cancellation_blocked_list:
+      '/api/v1/run-management/blocked-cancellations',
+    run_cancellation_inspect:
+      '/api/v1/run-management/cancellation-inspect',
     run_list: '/api/v1/observe/run-list',
     run_read: '/api/v1/observe/run',
     run_event_list: '/api/v1/observe/run-events',
@@ -20,6 +25,9 @@
   const labels = Object.freeze({
     inspect: 'Copilot 诊断状态',
     output: 'Copilot 诊断内容',
+    run_cancellation_status: '取消可用性',
+    run_cancellation_blocked_list: 'Blocked Cancellations',
+    run_cancellation_inspect: '取消诊断',
     run_list: 'Run 目录',
     run_read: 'Run 详情',
     run_event_list: 'Run Events',
@@ -110,6 +118,12 @@
     if (operation === 'inspect' || operation === 'output') {
       result.sourceRunId = value('source-run-id');
       result.requestId = value('diagnosis-request-id');
+    } else if (operation === 'run_cancellation_status') {
+      return result;
+    } else if (operation === 'run_cancellation_blocked_list') {
+      result.cursor = null;
+    } else if (operation === 'run_cancellation_inspect') {
+      result.runId = value('cancellation-run-id');
     } else if (operation === 'run_list') {
       result.afterCreatedAtMs = null;
       result.afterRunId = null;
@@ -156,7 +170,13 @@
 
   const nextPage = function (operation, prior, fact) {
     const next = Object.assign({}, prior, { requestId: requestId() });
-    if (operation === 'run_list' && fact.hasMore === true && fact.next) {
+    if (
+      operation === 'run_cancellation_blocked_list' &&
+      fact.truncated === true &&
+      typeof fact.nextCursor === 'string'
+    ) {
+      next.cursor = fact.nextCursor;
+    } else if (operation === 'run_list' && fact.hasMore === true && fact.next) {
       next.afterCreatedAtMs = fact.next.createdAtMs;
       next.afterRunId = fact.next.runId;
     } else if (
@@ -200,6 +220,39 @@
     return next;
   };
 
+  const appendDrilldownControls = function (entry, operation, fact) {
+    if (
+      operation === 'run_cancellation_status' &&
+      fact.operatorAction === 'inspect'
+    ) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = '显式读取 Blocked Runs';
+      button.addEventListener('click', function () {
+        void execute('run_cancellation_blocked_list');
+      });
+      entry.append(button);
+      return;
+    }
+    if (
+      operation !== 'run_cancellation_blocked_list' ||
+      !Array.isArray(fact.items)
+    ) {
+      return;
+    }
+    fact.items.forEach(function (item) {
+      if (!item || typeof item.runId !== 'string') return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = '显式检查 ' + item.runId;
+      button.addEventListener('click', function () {
+        document.getElementById('cancellation-run-id').value = item.runId;
+        void execute('run_cancellation_inspect');
+      });
+      entry.append(button);
+    });
+  };
+
   const appendEvidence = function (operation, request, response) {
     const fact = response.result.result;
     const observedAtMs = Date.now();
@@ -235,6 +288,7 @@
       });
       entry.append(button);
     }
+    appendDrilldownControls(entry, operation, fact);
     ledger.prepend(entry);
     evidenceRecords.push({ record: record, bytes: recordBytes, entry: entry });
     evidenceBytes += recordBytes;

@@ -24,7 +24,7 @@
         <div class="boundary" aria-label="当前权限边界">
           <span class="boundary-dot" aria-hidden="true"></span>
           <span>本机只读 BFF</span>
-          <strong>Run · Task · Workflow · Copilot</strong>
+          <strong>Run · Task · Workflow · Copilot · Optional management</strong>
         </div>
       </header>
 
@@ -51,6 +51,7 @@
 
             <nav class="mode-tabs" aria-label="观察面">
               <button type="button" class="mode-tab active" data-panel="runtime-panel" aria-pressed="true">运行态</button>
+              <button type="button" class="mode-tab" data-panel="management-panel" aria-pressed="false">取消可用性</button>
               <button type="button" class="mode-tab" data-panel="workflow-panel" aria-pressed="false">工作流</button>
               <button type="button" class="mode-tab" data-panel="copilot-panel" aria-pressed="false">Copilot</button>
             </nav>
@@ -76,6 +77,25 @@
                   <button type="button" data-read="run_step_list">读取 Steps</button>
                   <button type="button" data-read="run_event_list">读取 Events</button>
                 </div>
+              </div>
+            </section>
+
+            <section id="management-panel" class="mode-panel" hidden>
+              <div class="control-group">
+                <div class="control-title"><span>01</span><strong>Project 状态</strong></div>
+                <button type="button" class="primary" data-read="run_cancellation_status">读取取消可用性</button>
+                <p class="field-note">只有启动进程显式提供独立 Run management 配置与短期 assertion 时可用；页面不会自动刷新。</p>
+              </div>
+              <div class="control-group">
+                <div class="control-title"><span>02</span><strong>Blocked Runs</strong></div>
+                <button type="button" data-read="run_cancellation_blocked_list">读取首屏 Blocked Runs</button>
+                <p class="field-note">固定 16 项快照页。下一页必须在证据条目中再次显式点击。</p>
+              </div>
+              <div class="control-group">
+                <div class="control-title"><span>03</span><strong>单 Run 诊断</strong></div>
+                <input id="cancellation-run-id" type="text" maxlength="128" autocomplete="off" spellcheck="false" placeholder="run-id" />
+                <button type="button" data-read="run_cancellation_inspect">读取取消诊断</button>
+                <p class="field-note">该只读面没有 rearm、stop、retry 或其他 mutation 入口。</p>
               </div>
             </section>
 
@@ -110,7 +130,7 @@
 
           <aside class="trust-note">
             <span>Authority boundary</span>
-            <p>Cluster credential 只由本机进程从私有文件读取。浏览器无法提交任意路径，也没有 start、cancel 或 diagnose 权限入口。脱敏导出只处理本页已读事实，不补读或上传。</p>
+            <p>Project credential 与可选 Run management authority 只由本机进程从彼此独立的私有文件读取。浏览器无法提交任意路径，也没有 start、stop、retry、rearm 或 diagnose 权限入口。脱敏导出只处理本页已读事实，不补读或上传。</p>
           </aside>
         </aside>
 
@@ -141,7 +161,7 @@
 
       <footer>
         <span>Loopback only · explicit reads · zero polling</span>
-        <span>QingLong 3.0 incubation / D-330</span>
+        <span>QingLong 3.0 incubation / D-369</span>
       </footer>
     </div>
   </body>
