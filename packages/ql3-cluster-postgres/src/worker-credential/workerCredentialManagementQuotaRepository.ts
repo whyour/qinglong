@@ -10,6 +10,7 @@ const OPERATIONS = [
   'worker-credential.propose',
   'worker-credential.decide',
   'worker-credential.inspect',
+  'worker-session.observe',
 ] as const;
 type Operation = (typeof OPERATIONS)[number];
 type Row = Record<string, unknown>;
@@ -31,6 +32,7 @@ const DEFAULT_LIMITS: Readonly<Record<Operation, number>> = Object.freeze({
   'worker-credential.propose': 30,
   'worker-credential.decide': 60,
   'worker-credential.inspect': 600,
+  'worker-session.observe': 600,
 });
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}$/;
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;

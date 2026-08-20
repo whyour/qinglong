@@ -1509,7 +1509,8 @@ const REQUIRED_WORKER_CREDENTIAL_MANAGER_PRIVILEGES: RequiredPrivileges =
           name === 'schema_migrations' ||
             name === 'schema_capabilities' ||
             name === 'projects' ||
-            name === 'project_role_bindings'
+            name === 'project_role_bindings' ||
+            name === 'worker_sessions'
             ? { ...NO_TABLE_PRIVILEGES, select: true }
             : name === 'worker_credential_management_plans' ||
               name === 'security_audit_events'

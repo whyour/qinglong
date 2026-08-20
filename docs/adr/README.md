@@ -469,6 +469,7 @@
 | [ADR-0463](./ADR-0463-native-console-capacity-and-assertion-lifecycle-evidence.md)                               | 原生双架构 Console 容量与 Assertion 生命周期证据                                                                                                                                       | Accepted（首份原生 CI 双架构报告待实际运行） |
 | [ADR-0464](./ADR-0464-machine-enforced-node24-architecture-support-tiers.md)                                     | 机器化 Node 24 架构支持分层                                                                                                                                                            | Accepted |
 | [ADR-0465](./ADR-0465-versioned-worker-support-tier-admission.md)                                                | 版本化 Worker 支持等级准入                                                                                                                                                              | Accepted |
+| [ADR-0466](./ADR-0466-bounded-worker-session-compatibility-observation.md)                                       | 有界 Worker Session 兼容性观察                                                                                                                                                           | Accepted |
 
 ## 规则
 

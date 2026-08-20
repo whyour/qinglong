@@ -11,6 +11,26 @@
 
 最新增量证据（2026-08-20）：
 
+- D-373/ADR-0466（已接受）：完成 D-372 的首个 caller-driven Worker 管理只读面。在既有 Worker management
+  service/transport/client 内增加 `worker-session.inspect|list`，继续复用同一个 TLS 1.3/mTLS/OIDC listener、强 User
+  `worker.manage` 与耐久 `worker-session.observe` quota，不新增 package、服务、端口、连接池、timer、watcher、queue、
+  cache 或 Deployment。`pg-0069-worker-session-management-observation` 把 `control-core` 升至 v68，只给
+  `ql3_worker_credential_manager` 增加 `SELECT worker_sessions`；point 只读一个 canonical Worker，list 固定查询 17 行并
+  最多返回 16 行 `workerId` keyset。响应只投影 Session/generation/version、`online|draining|offline|lease_expired`、
+  `default_placement|explicit_placement_required|protocol_incompatible`、architecture/Tier/protocol、OS、并发与有界
+  runtime/capacity，不返回 raw capability、label、GPU model、credential、Secret 或 lease capability。alpha 继续复用历史
+  `/api/v3/worker-credentials/management` 是明确的命名债务，Beta 前须决定通用 Worker management alias/CLI 迁移，不能
+  复制第二个 listener。PostgreSQL 聚焦 migration/readiness `76/76`，Cluster PostgreSQL 全量
+  `351 total / 348 pass / 3 conditional skip / 0 fail`，Cluster Admin 全量
+  `421 total / 418 pass / 3 conditional skip / 0 fail`；package boundary、Cluster dependency、Edge import、Cluster
+  deployment 与 Worker deployment 全部 compatible，18 packages 仍无 single/shallow package且没有新增外部 dependency。
+  完整 backend 为 `1,503 total / 1,501 pass / 2 conditional skip / 0 fail`（包含一条不进入本阶段提交的既有用户测试）。
+  14 档 Local artifact audit 全部 compatible；基础 Edge/Standalone 为 `2,598,669 / 2,598,747` bytes、57 loaded modules，
+  Application+AI 为 `4,501,822 / 4,501,954` bytes，MCP 为 `7,324,601 / 7,324,709` bytes。
+  PostgreSQL 18.6 arm64 HA `146/146`、timeline `1→2`，报告 SHA-256 为
+  `c4cf0189b68d7af18169cd8f8de726e26a970af703f28d4ffe0ad3ace96fa596`，真实 Worker manager role readiness、promotion、
+  fencing、`pg_rewind` 与只读 rejoin 全绿。Edge/Standalone 和禁用 Worker manager 的 Cluster 路径保持零新增常驻成本。
+
 - D-372/ADR-0465（已接受）：把 D-371 的发布架构分层推进到 Remote Worker 的实际注册与调度边界。Worker canonical
   capability 现在必须声明 `protocolVersion` 与 `supportTier`，架构/Tier 必须与根 release identity v2 一致，Node
   `x64/ppc64/ia32/arm` 会归一化到发布词汇并与实际 Worker 进程复验。普通 Task 即使未声明 Placement 也只匹配 Tier 1
@@ -6456,6 +6476,12 @@ ARMv6/386 的 2.x 进程已经能直接连接 3.0，也不授予 Plugin Host、�
 受支持 Node 24、数据库恢复与原生资源证据的设备标成完整 3.0 ql-core。若
 Maintainers 要求 ARMv6、ARMv7 或 386 成为 3.0 正式支持项，必须先修改 D-16 或长期维护对应 Node 24 构建链，
 升级 release identity schema，并通过与现有 Tier 1 同等级的发布门禁。
+
+D-373/ADR-0466 已把该分层投影到 caller-driven Worker 管理只读面：operator 可以 point inspect 或显式读取固定 16 项
+keyset page，区分 Session lifecycle 与 Placement compatibility，并查看有界 runtime/capacity；不能请求任意 filter、
+limit、自动翻页或轮询。该能力复用现有 Worker manager 进程和 `worker.manage`/耐久 quota，PostgreSQL role 只新增
+`SELECT worker_sessions`，所以不会进入 Edge/Standalone 常驻闭包。alpha 的 credential-named URI/CLI 是待 Beta 迁移的
+命名债务，不得用新建第二套 listener、Deployment 或 package 的方式修复。
 
 ### 7.10 资源基准与发布门禁
 

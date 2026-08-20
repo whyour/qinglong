@@ -69,6 +69,41 @@ function approval(planValue) {
   });
 }
 
+const SESSION_OBSERVATION = Object.freeze({
+  workerId: 'worker-a',
+  sessionId: '018f0f5d-7b6a-7a11-8f4d-2f7b4f477001',
+  generation: 2,
+  sessionVersion: 5,
+  lifecycle: 'online',
+  compatibility: 'default_placement',
+  architecture: 'arm64',
+  supportTier: 'tier1',
+  protocolVersion: '1.0.0',
+  operatingSystem: 'linux',
+  maxConcurrentRuns: 2,
+  availableSlots: 1,
+  registeredAtMs: 900,
+  lastHeartbeatAtMs: 1_050,
+  leaseExpiresAtMs: 2_000,
+  updatedAtMs: 1_050,
+  observedAtMs: 1_100,
+  runtimes: Object.freeze([{ name: 'node', version: '24.18.0' }]),
+  declaredCapacity: Object.freeze({
+    cpuCores: 1,
+    memoryBytes: 268_435_456,
+    diskBytes: 1_073_741_824,
+    gpuCount: 0,
+  }),
+});
+
+const SESSION_SUMMARY = Object.freeze(
+  Object.fromEntries(
+    Object.entries(SESSION_OBSERVATION).filter(
+      ([key]) => key !== 'runtimes' && key !== 'declaredCapacity',
+    ),
+  ),
+);
+
 function commands() {
   return [
     {
@@ -122,10 +157,28 @@ function commands() {
         inspectionId: 'inspection-worker-a-generation-2',
       },
     },
+    {
+      schemaVersion: 1,
+      operation: 'worker-session.inspect',
+      request: {
+        authorityProjectId: 'cluster-authority',
+        workerId: 'worker-a',
+        inspectionId: 'inspection-worker-session-a',
+      },
+    },
+    {
+      schemaVersion: 1,
+      operation: 'worker-session.list',
+      request: {
+        authorityProjectId: 'cluster-authority',
+        afterWorkerId: null,
+        inspectionId: 'inspection-worker-session-list-a',
+      },
+    },
   ];
 }
 
-test('routes the four public commands with strong User authority and low-sensitive results', async () => {
+test('routes six public commands with strong User authority and low-sensitive results', async () => {
   const planValue = plan();
   const approvalValue = approval(planValue);
   const calls = [];
@@ -154,6 +207,18 @@ test('routes the four public commands with strong User authority and low-sensiti
         stale: false,
       };
     },
+    async inspectSession(request) {
+      calls.push(['inspectSession', request]);
+      return { observedAtMs: 1_100, worker: SESSION_OBSERVATION };
+    },
+    async listSessions(request) {
+      calls.push(['listSessions', request]);
+      return {
+        observedAtMs: 1_100,
+        workers: [SESSION_SUMMARY],
+        nextCursor: null,
+      };
+    },
   };
   const transport = createClusterWorkerCredentialManagementTransport({
     service,
@@ -170,7 +235,7 @@ test('routes the four public commands with strong User authority and low-sensiti
   }
   assert.deepEqual(
     calls.map(([kind]) => kind),
-    ['plan', 'propose', 'decide', 'inspect'],
+    ['plan', 'propose', 'decide', 'inspect', 'inspectSession', 'listSessions'],
   );
   for (const [, request] of calls) {
     assert.deepEqual(request.principal, principal());
@@ -182,11 +247,15 @@ test('routes the four public commands with strong User authority and low-sensiti
       'worker-credential.propose',
       'worker-credential.decide',
       'worker-credential.inspect',
+      'worker-session.inspect',
+      'worker-session.list',
     ],
   );
   assert.equal(results[0].plan.planDigest, planValue.planDigest);
   assert.equal(results[1].approval.actionDigest, planValue.planDigest);
   assert.equal(results[3].stale, false);
+  assert.equal(results[4].worker.compatibility, 'default_placement');
+  assert.equal(results[5].workers[0].workerId, 'worker-a');
   const serialized = JSON.stringify(results);
   assert.doesNotMatch(serialized, /authenticationId|credential-token|secret/i);
 });
@@ -194,7 +263,14 @@ test('routes the four public commands with strong User authority and low-sensiti
 test('rejects weak or unavailable identity before management authority', async () => {
   let calls = 0;
   const service = Object.fromEntries(
-    ['plan', 'propose', 'decide', 'inspectAuthorized'].map((name) => [
+    [
+      'plan',
+      'propose',
+      'decide',
+      'inspectAuthorized',
+      'inspectSession',
+      'listSessions',
+    ].map((name) => [
       name,
       async () => {
         calls += 1;
@@ -232,6 +308,8 @@ test('rejects widened and internal commands before authentication', async () => 
       async propose() {},
       async decide() {},
       async inspectAuthorized() {},
+      async inspectSession() {},
+      async listSessions() {},
     },
   });
   let authentications = 0;

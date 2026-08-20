@@ -44,6 +44,7 @@ export { postgresqlMainMigrationManifest } from '../migration/migrationManifest'
 export { PostgresApprovalRequestRepository } from '../approved-action/approvalRequestRepository';
 export { PostgresProjectPolicyRepository } from '../security/projectPolicyRepository';
 export { PostgresWorkerCredentialManagementPlanRepository } from './workerCredentialManagementPlanRepository';
+export { PostgresWorkerSessionObservationRepository } from '../remote-execution/workerSessionObservationRepository';
 export {
   PostgresPluginPackageIdentityKeysetLedgerRepository as PostgresWorkerCredentialManagementIdentityKeysetLedgerRepository,
   type ClusterManagementIdentityAuthority,

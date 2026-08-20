@@ -3,6 +3,7 @@ import {
   PostgresApprovalRequestRepository,
   PostgresProjectPolicyRepository,
   PostgresWorkerCredentialManagementPlanRepository,
+  PostgresWorkerSessionObservationRepository,
 } from '@qinglong/cluster-postgres/worker-credential-manager';
 import type { PostgresPool } from '@qinglong/runtime-core';
 import {
@@ -20,6 +21,10 @@ import {
   type SecuritySubject,
 } from '@qinglong/runtime-core/security';
 import type { SecurityAuditRecord } from '@qinglong/runtime-core/security-audit';
+import type {
+  WorkerSessionInspection,
+  WorkerSessionObservationPage,
+} from '@qinglong/runtime-core/worker-session-observation';
 import {
   InvalidWorkerCredentialManagementPlanError,
   MAX_WORKER_CREDENTIAL_MANAGEMENT_PLAN_LIFETIME_MS,
@@ -93,7 +98,8 @@ export type WorkerCredentialManagementQuotaOperation =
   | 'worker-credential.plan'
   | 'worker-credential.propose'
   | 'worker-credential.decide'
-  | 'worker-credential.inspect';
+  | 'worker-credential.inspect'
+  | 'worker-session.observe';
 
 export interface WorkerCredentialManagementQuotaPort {
   consume(
@@ -166,6 +172,20 @@ export interface InspectClusterWorkerCredentialResult {
   readonly stale: boolean;
 }
 
+export interface InspectClusterWorkerSessionRequest {
+  readonly authorityProjectId: string;
+  readonly workerId: string;
+  readonly inspectionId: string;
+  readonly principal: SecurityPrincipal;
+}
+
+export interface ListClusterWorkerSessionsRequest {
+  readonly authorityProjectId: string;
+  readonly afterWorkerId: string | null;
+  readonly inspectionId: string;
+  readonly principal: SecurityPrincipal;
+}
+
 export interface ClusterWorkerCredentialManagementService {
   plan(
     request: PlanClusterWorkerCredentialRequest,
@@ -179,6 +199,12 @@ export interface ClusterWorkerCredentialManagementService {
   inspectAuthorized(
     request: InspectClusterWorkerCredentialRequest,
   ): Promise<Readonly<InspectClusterWorkerCredentialResult>>;
+  inspectSession(
+    request: InspectClusterWorkerSessionRequest,
+  ): Promise<Readonly<WorkerSessionInspection>>;
+  listSessions(
+    request: ListClusterWorkerSessionsRequest,
+  ): Promise<Readonly<WorkerSessionObservationPage>>;
 }
 
 export interface ClusterWorkerCredentialManagementOptions {
@@ -324,6 +350,7 @@ export function createClusterWorkerCredentialManagementService(
   const plans = new PostgresWorkerCredentialManagementPlanRepository(
     options.pool,
   );
+  const sessions = new PostgresWorkerSessionObservationRepository(options.pool);
   const approvals = new PostgresApprovalRequestRepository(options.pool);
   const policy = new ProjectPolicyEngine(
     new PostgresProjectPolicyRepository(options.pool),
@@ -795,6 +822,75 @@ export function createClusterWorkerCredentialManagementService(
           !same(approval.action, binding(plan)) ||
           observedAtMs > plan.expiresAtMs,
       });
+    },
+
+    async inspectSession(request: InspectClusterWorkerSessionRequest) {
+      exact(
+        request,
+        ['authorityProjectId', 'inspectionId', 'principal', 'workerId'],
+        'Session inspection request',
+      );
+      const projectId = identifier(
+        request.authorityProjectId,
+        'authorityProjectId',
+      );
+      const inspectionId = identifier(request.inspectionId, 'inspectionId');
+      const workerId = identifier(request.workerId, 'workerId');
+      const authorization = await authorize(
+        request.principal,
+        projectId,
+        'worker.manage',
+        currentTime(now),
+      );
+      await consumeQuota(
+        projectId,
+        authorization.principal,
+        'worker-session.observe',
+        `session-inspect:${inspectionId}`,
+      );
+      try {
+        return await sessions.inspect(workerId);
+      } catch (error) {
+        throw new WorkerCredentialManagementUnavailableError({
+          cause: error instanceof Error ? error : undefined,
+        });
+      }
+    },
+
+    async listSessions(request: ListClusterWorkerSessionsRequest) {
+      exact(
+        request,
+        ['afterWorkerId', 'authorityProjectId', 'inspectionId', 'principal'],
+        'Session list request',
+      );
+      const projectId = identifier(
+        request.authorityProjectId,
+        'authorityProjectId',
+      );
+      const inspectionId = identifier(request.inspectionId, 'inspectionId');
+      const afterWorkerId =
+        request.afterWorkerId === null
+          ? null
+          : identifier(request.afterWorkerId, 'afterWorkerId');
+      const authorization = await authorize(
+        request.principal,
+        projectId,
+        'worker.manage',
+        currentTime(now),
+      );
+      await consumeQuota(
+        projectId,
+        authorization.principal,
+        'worker-session.observe',
+        `session-list:${inspectionId}`,
+      );
+      try {
+        return await sessions.list(afterWorkerId);
+      } catch (error) {
+        throw new WorkerCredentialManagementUnavailableError({
+          cause: error instanceof Error ? error : undefined,
+        });
+      }
     },
   });
 }

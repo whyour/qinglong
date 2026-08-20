@@ -71,6 +71,7 @@ import { pg0065ApprovedActionManualRecoveryMigration } from '../approved-action/
 import { pg0066CancellationDispatchMigration } from '../run/migrations/pg-0066-cancellation-dispatch';
 import { pg0067CancellationDispatchManagementMigration } from '../run-management/pg-0067-cancellation-dispatch-management';
 import { pg0068CancellationDispatchProjectKeysetMigration } from '../run-management/pg-0068-cancellation-dispatch-project-keyset';
+import { pg0069WorkerSessionManagementObservationMigration } from '../remote-execution/pg-0069-worker-session-management-observation';
 
 export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMigrationContext> =
   Object.freeze({
@@ -147,5 +148,6 @@ export const postgresqlMainMigrationStream: MigrationStreamDefinition<PostgresMi
       pg0066CancellationDispatchMigration,
       pg0067CancellationDispatchManagementMigration,
       pg0068CancellationDispatchProjectKeysetMigration,
+      pg0069WorkerSessionManagementObservationMigration,
     ]),
   });

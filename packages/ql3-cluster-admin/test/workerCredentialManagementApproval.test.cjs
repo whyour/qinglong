@@ -4,6 +4,9 @@ const { test } = require('node:test');
 const {
   createClusterWorkerCredentialManagementService,
 } = require('@qinglong/cluster-admin/worker-credential-management');
+const {
+  canonicalRemoteWorkerCapabilities,
+} = require('@qinglong/runtime-core/remote-dispatch');
 
 const REQUESTER = Object.freeze({
   subject: Object.freeze({ type: 'user', id: 'operator-a' }),
@@ -19,6 +22,32 @@ const REVIEWER = Object.freeze({
   expiresAtMs: 20_000,
   assurance: 'hardware',
 });
+
+function sessionRow() {
+  const capabilities = canonicalRemoteWorkerCapabilities({
+    architecture: 'arm64',
+    executors: ['remote-worker'],
+    protocolVersion: '1.0.0',
+    supportTier: 'tier1',
+    runtimes: [{ name: 'node', version: '24.18.0' }],
+  });
+  return {
+    observedAtMs: 2_000,
+    workerId: 'worker-a',
+    sessionId: '018f0f5d-7b6a-7a11-8f4d-2f7b4f477001',
+    generation: 2,
+    status: 'online',
+    version: 5,
+    capabilitiesJson: capabilities.json,
+    capabilitiesHash: capabilities.hash,
+    maxConcurrentRuns: 2,
+    availableSlots: 1,
+    registeredAtMs: 1_000,
+    lastHeartbeatAtMs: 1_900,
+    leaseExpiresAtMs: 3_000,
+    updatedAtMs: 1_900,
+  };
+}
 
 function approvalFixture() {
   const plans = new Map();
@@ -75,6 +104,9 @@ function approvalFixture() {
     if (text.includes('FROM "ql3"."security_audit_events"')) {
       const stored = audits.get(values[0]);
       return { rows: stored ? [stored] : [], rowCount: stored ? 1 : 0 };
+    }
+    if (text.includes('FROM "ql3"."worker_sessions"')) {
+      return { rows: [sessionRow()], rowCount: 1 };
     }
     if (text.includes('"ql3"."lock_approval_policy_fence"')) {
       return { rows: [{ matches: true }], rowCount: 1 };
@@ -276,4 +308,51 @@ test('authorizes and consumes durable quota before reading management state', as
   assert.equal(quotaCalls.length, 2);
   assert.equal(quotaCalls[1].operation, 'worker-credential.propose');
   assert.equal(quotaCalls[1].planReads, readsBefore);
+});
+
+test('observes one Session and one bounded page only after worker.manage quota', async () => {
+  const state = approvalFixture();
+  const quotaCalls = [];
+  const service = createClusterWorkerCredentialManagementService({
+    pool: state.pool,
+    now: () => 2_000,
+    quota: {
+      async consume(command) {
+        quotaCalls.push(command);
+        return { admitted: true, retryAfterMs: null };
+      },
+    },
+  });
+  const inspection = await service.inspectSession({
+    authorityProjectId: 'cluster-authority',
+    workerId: 'worker-a',
+    inspectionId: 'worker-session-inspection-a',
+    principal: REQUESTER,
+  });
+  const page = await service.listSessions({
+    authorityProjectId: 'cluster-authority',
+    afterWorkerId: null,
+    inspectionId: 'worker-session-list-a',
+    principal: REQUESTER,
+  });
+  assert.equal(inspection.worker.workerId, 'worker-a');
+  assert.equal(inspection.worker.compatibility, 'default_placement');
+  assert.equal(page.workers.length, 1);
+  assert.equal(page.workers[0].workerId, 'worker-a');
+  assert.deepEqual(
+    quotaCalls.map(({ operation, idempotencyKey }) => ({
+      operation,
+      idempotencyKey,
+    })),
+    [
+      {
+        operation: 'worker-session.observe',
+        idempotencyKey: 'session-inspect:worker-session-inspection-a',
+      },
+      {
+        operation: 'worker-session.observe',
+        idempotencyKey: 'session-list:worker-session-list-a',
+      },
+    ],
+  );
 });

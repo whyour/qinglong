@@ -74,11 +74,33 @@ export interface InspectClusterWorkerCredentialCommand {
   };
 }
 
+export interface InspectClusterWorkerSessionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'worker-session.inspect';
+  readonly request: {
+    readonly authorityProjectId: string;
+    readonly workerId: string;
+    readonly inspectionId: string;
+  };
+}
+
+export interface ListClusterWorkerSessionsCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'worker-session.list';
+  readonly request: {
+    readonly authorityProjectId: string;
+    readonly afterWorkerId: string | null;
+    readonly inspectionId: string;
+  };
+}
+
 export type ClusterWorkerCredentialManagementCommand =
   | PlanClusterWorkerCredentialCommand
   | ProposeClusterWorkerCredentialCommand
   | DecideClusterWorkerCredentialCommand
-  | InspectClusterWorkerCredentialCommand;
+  | InspectClusterWorkerCredentialCommand
+  | InspectClusterWorkerSessionCommand
+  | ListClusterWorkerSessionsCommand;
 
 type PlanSummary = ReturnType<typeof planSummary>;
 type ApprovalSummary = ReturnType<typeof approvalSummary>;
@@ -109,6 +131,23 @@ export type ClusterWorkerCredentialManagementTransportResult =
       plan: PlanSummary | null;
       approval: ApprovalSummary | null;
       stale: boolean;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'worker-session.inspect';
+      observedAtMs: number;
+      worker: Awaited<
+        ReturnType<ClusterWorkerCredentialManagementService['inspectSession']>
+      >['worker'];
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'worker-session.list';
+      observedAtMs: number;
+      workers: Awaited<
+        ReturnType<ClusterWorkerCredentialManagementService['listSessions']>
+      >['workers'];
+      nextCursor: string | null;
     }>;
 
 export interface ClusterWorkerCredentialManagementTransport {
@@ -254,6 +293,20 @@ export function normalizeClusterWorkerCredentialManagementCommand(
         'inspection request',
       );
       break;
+    case 'worker-session.inspect':
+      exactObject(
+        value.request,
+        ['authorityProjectId', 'inspectionId', 'workerId'],
+        'Session inspection request',
+      );
+      break;
+    case 'worker-session.list':
+      exactObject(
+        value.request,
+        ['afterWorkerId', 'authorityProjectId', 'inspectionId'],
+        'Session list request',
+      );
+      break;
     default:
       throw new ClusterWorkerCredentialManagementTransportRequestError(
         'operation is not publicly available',
@@ -317,6 +370,8 @@ export function createClusterWorkerCredentialManagementTransport(
     typeof options.service.propose !== 'function' ||
     typeof options.service.decide !== 'function' ||
     typeof options.service.inspectAuthorized !== 'function' ||
+    typeof options.service.inspectSession !== 'function' ||
+    typeof options.service.listSessions !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function')
   ) {
     throw new ClusterWorkerCredentialManagementTransportConfigurationError(
@@ -418,6 +473,31 @@ export function createClusterWorkerCredentialManagementTransport(
               ? approvalSummary(result.approvalRequest)
               : null,
             stale: result.stale,
+          });
+        }
+        case 'worker-session.inspect': {
+          const result = await options.service.inspectSession({
+            ...command.request,
+            principal,
+          });
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            observedAtMs: result.observedAtMs,
+            worker: result.worker,
+          });
+        }
+        case 'worker-session.list': {
+          const result = await options.service.listSessions({
+            ...command.request,
+            principal,
+          });
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            observedAtMs: result.observedAtMs,
+            workers: result.workers,
+            nextCursor: result.nextCursor,
           });
         }
       }

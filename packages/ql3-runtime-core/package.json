@@ -56,6 +56,9 @@
       "worker-session": [
         "dist/worker/workerSession.d.ts"
       ],
+      "worker-session-observation": [
+        "dist/worker/workerSessionObservation.d.ts"
+      ],
       "worker-session-transport": [
         "dist/worker/workerSessionTransport.d.ts"
       ],
@@ -803,6 +806,11 @@
       "types": "./dist/worker/workerSession.d.ts",
       "require": "./dist/worker/workerSession.js",
       "default": "./dist/worker/workerSession.js"
+    },
+    "./worker-session-observation": {
+      "types": "./dist/worker/workerSessionObservation.d.ts",
+      "require": "./dist/worker/workerSessionObservation.js",
+      "default": "./dist/worker/workerSessionObservation.js"
     },
     "./worker-session-transport": {
       "types": "./dist/worker/workerSessionTransport.d.ts",

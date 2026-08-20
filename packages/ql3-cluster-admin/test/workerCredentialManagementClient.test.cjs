@@ -82,6 +82,39 @@ const approval = Object.freeze({
   actionDigest: 'd'.repeat(64),
   previewDigest: plan.previewDigest,
 });
+const session = Object.freeze({
+  workerId: 'worker-1',
+  sessionId: '018f0f5d-7b6a-7a11-8f4d-2f7b4f477001',
+  generation: 2,
+  sessionVersion: 5,
+  lifecycle: 'online',
+  compatibility: 'default_placement',
+  architecture: 'arm64',
+  supportTier: 'tier1',
+  protocolVersion: '1.0.0',
+  operatingSystem: 'linux',
+  maxConcurrentRuns: 2,
+  availableSlots: 1,
+  registeredAtMs: 900,
+  lastHeartbeatAtMs: 1_050,
+  leaseExpiresAtMs: 2_000,
+  updatedAtMs: 1_050,
+  observedAtMs: 1_100,
+  runtimes: Object.freeze([{ name: 'node', version: '24.18.0' }]),
+  declaredCapacity: Object.freeze({
+    cpuCores: 1,
+    memoryBytes: 268_435_456,
+    diskBytes: 1_073_741_824,
+    gpuCount: 0,
+  }),
+});
+const sessionSummary = Object.freeze(
+  Object.fromEntries(
+    Object.entries(session).filter(
+      ([key]) => key !== 'runtimes' && key !== 'declaredCapacity',
+    ),
+  ),
+);
 
 function command(operation) {
   return {
@@ -152,7 +185,7 @@ afterEach(() => {
   }
 });
 
-test('validates all four low-sensitive Worker management results', () => {
+test('validates all six low-sensitive Worker management results', () => {
   const fixtures = [
     [
       'worker-credential.plan',
@@ -185,6 +218,25 @@ test('validates all four low-sensitive Worker management results', () => {
         plan,
         approval,
         stale: false,
+      },
+    ],
+    [
+      'worker-session.inspect',
+      {
+        schemaVersion: 1,
+        operation: 'worker-session.inspect',
+        observedAtMs: 1_100,
+        worker: session,
+      },
+    ],
+    [
+      'worker-session.list',
+      {
+        schemaVersion: 1,
+        operation: 'worker-session.list',
+        observedAtMs: 1_100,
+        workers: [sessionSummary],
+        nextCursor: null,
       },
     ],
   ];
@@ -223,6 +275,51 @@ test('rejects widened and secret-bearing response shapes', () => {
       command('worker-credential.inspect'),
     ),
   );
+  assert.throws(() =>
+    validateClusterWorkerCredentialManagementClientResult(
+      {
+        schemaVersion: 1,
+        operation: 'worker-session.inspect',
+        observedAtMs: 1_100,
+        worker: { ...session, labels: { secret: 'value' } },
+      },
+      command('worker-session.inspect'),
+    ),
+  );
+  assert.throws(() =>
+    validateClusterWorkerCredentialManagementClientResult(
+      {
+        schemaVersion: 1,
+        operation: 'worker-session.list',
+        observedAtMs: 1_100,
+        workers: [
+          { ...sessionSummary, workerId: 'worker-b' },
+          { ...sessionSummary, workerId: 'worker-a' },
+        ],
+        nextCursor: null,
+      },
+      command('worker-session.list'),
+    ),
+  );
+  for (const worker of [
+    { ...session, workerId: null },
+    { ...session, generation: -1 },
+    { ...session, availableSlots: 3 },
+    { ...session, observedAtMs: 1_000 },
+    { ...session, declaredCapacity: { ...session.declaredCapacity, gpuCount: -1 } },
+  ]) {
+    assert.throws(() =>
+      validateClusterWorkerCredentialManagementClientResult(
+        {
+          schemaVersion: 1,
+          operation: 'worker-session.inspect',
+          observedAtMs: worker.observedAtMs,
+          worker,
+        },
+        command('worker-session.inspect'),
+      ),
+    );
+  }
 });
 
 test('requires one matching private client certificate identity before connect', async () => {

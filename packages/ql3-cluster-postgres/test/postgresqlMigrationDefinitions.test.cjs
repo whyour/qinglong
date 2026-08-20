@@ -119,6 +119,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0066-cancellation-dispatch',
       'pg-0067-cancellation-dispatch-management',
       'pg-0068-cancellation-dispatch-project-keyset',
+      'pg-0069-worker-session-management-observation',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -596,6 +597,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0068-cancellation-dispatch-project-keyset',
       checksum:
         '2fcac38386581189db63faacff325356f11c4529a8db9cef6be1a1ca706aaf10',
+    },
+    {
+      id: 'pg-0069-worker-session-management-observation',
+      checksum:
+        '1191255575589abc2686b391827607abddb4edb78007245dbaaf45dc1c4e5e8b',
     },
   ];
   assert.deepEqual(
@@ -2419,5 +2425,38 @@ test('advances capability v67 with a Project-scoped blocked keyset', async () =>
   assert.match(
     sql,
     /migration_id = 'pg-0067-cancellation-dispatch-management'/,
+  );
+});
+
+test('advances capability v68 with read-only Worker session observation', async () => {
+  const migration = migrationById(
+    'pg-0069-worker-session-management-observation',
+  );
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(
+    sql,
+    /REVOKE ALL ON "ql3"\."worker_sessions" FROM ql3_worker_credential_manager/,
+  );
+  assert.match(
+    sql,
+    /GRANT SELECT ON "ql3"\."worker_sessions" TO ql3_worker_credential_manager/,
+  );
+  assert.doesNotMatch(
+    sql,
+    /GRANT (?:INSERT|UPDATE|DELETE|TRUNCATE)[^;]+worker_sessions[^;]+ql3_worker_credential_manager/,
+  );
+  assert.match(sql, /contract_version = 68/);
+  assert.match(sql, /"worker_session_observation":1/);
+  assert.match(sql, /contract_version = 67/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0068-cancellation-dispatch-project-keyset'/,
   );
 });

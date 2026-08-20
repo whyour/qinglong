@@ -348,5 +348,10 @@ export const postgresqlMainMigrationManifest: MigrationStreamManifest =
         checksum:
           '2fcac38386581189db63faacff325356f11c4529a8db9cef6be1a1ca706aaf10',
       }),
+      Object.freeze({
+        id: 'pg-0069-worker-session-management-observation',
+        checksum:
+          '1191255575589abc2686b391827607abddb4edb78007245dbaaf45dc1c4e5e8b',
+      }),
     ]),
   });

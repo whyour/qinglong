@@ -21,8 +21,8 @@ export interface PostgresSchemaContractTrigger {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 67;
-  readonly migrationId: 'pg-0068-cancellation-dispatch-project-keyset';
+  readonly contractVersion: 68;
+  readonly migrationId: 'pg-0069-worker-session-management-observation';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -92,6 +92,7 @@ export interface PostgresSchemaContract {
     tool_invocation_artifact: 1;
     trigger_definition: 1;
     worker_session: 1;
+    worker_session_observation: 1;
     worker_credential: 1;
     worker_credential_delivery: 1;
     worker_credential_execution_receipt: 1;
@@ -121,8 +122,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 67,
-    migrationId: 'pg-0068-cancellation-dispatch-project-keyset',
+    contractVersion: 68,
+    migrationId: 'pg-0069-worker-session-management-observation',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -192,6 +193,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       tool_invocation_artifact: 1,
       trigger_definition: 1,
       worker_session: 1,
+      worker_session_observation: 1,
       worker_credential: 1,
       worker_credential_delivery: 1,
       worker_credential_execution_receipt: 1,
