@@ -11,6 +11,25 @@
 
 最新增量证据（2026-08-20）：
 
+- D-382/ADR-0475（已接受）：扩展 3.0 首发前的 2.x HTTP 兼容基线，使用真实 loopback HTTP、生产 Express middleware、System/
+  Script/Open Router 与 Celebrate validator，锁定 System config/四类 mutation/reload/notify、Script list/detail/create/rename/run、
+  Open app CRUD/reset-secret/token issuance，以及面板/Open token、scope、expiration、路径大小写、400/401/500 envelope。测试以
+  确定性 service/store 替代副作用边界，不启动 master、scheduler、gRPC、Keyv SQLite 或数据库。兼容不冻结安全缺陷：新增
+  separator-aware `isPathInside`，Script API/service 不再用字符串前缀接受 `scripts-sibling`；`readDir` 再以 realpath containment
+  和 target `lstat` 拒绝直接目录 symlink 越界，同时保持既有拒绝 envelope。该收紧不宣称 legacy API 已成为完整 filesystem
+  capability sandbox，也不把 2.x Open scope 提升为 3.0 Policy authority。GitNexus 对三个被改 symbol 均为 LOW；Express loader
+  为 HIGH（29 个累计影响、22 个直接调用者），本切片明确不修改。D-382 聚焦 `10/10`，与 D-378 `18/18`、D-381 `2/2`
+  合并为 legacy HTTP 兼容门 `30/30`；backend 全量 `1,535 total / 1,533 pass / 2 conditional skip / 0 fail`，`pnpm build:back`
+  通过，18-package clean build/逐包测试单次退出 0。package boundary、Cluster dependency、Edge import、Service Bridge import、
+  Cluster/Worker deployment、Console 与 Console distribution 八项审计全部 compatible/passed；workspace 仍为 18 packages、
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为 `113 source / 112 nested / 1 root binary entry`。14 档 Local
+  artifact audit 全部 compatible；基础 Edge/Standalone 保持 `2,598,669 / 2,598,747` bytes、316 files、57 loaded modules，
+  Adopted 为 `2,817,964 / 2,818,087` bytes、336 files、58 loaded modules，Application+AI 为
+  `4,501,822 / 4,501,954` bytes、511 files、141 loaded modules，MCP 为 `7,324,601 / 7,324,709` bytes、802 files、
+  227 loaded modules。生产修复仍在 legacy backend，测试 harness 不进入制品，没有新增 package、production dependency、binary、
+  daemon、listener、timer、数据库连接或部署对象。本阶段不改变 PostgreSQL schema、ACL、repository、role、Pool、连接或 failover
+  语义，因此不重跑且不重新占有 HA 证明。D-383 应执行真实 2.x SQLite 数据目录升级、Primary 双态和目标实例 rollback rehearsal；
+  OpenRC live actor 仍待镜像基础设施恢复后补跑。
 - D-381/ADR-0474（已接受；OpenRC live actor 待镜像基础设施恢复后补跑）：把 service-manager adopted rollback 从仅证明
   init/process 的 `legacy_running` 推进到有界、可重放的 2.x core readiness。新增显式 Owner 私有命令
   `cutover-legacy-readiness-probe`，绑定 exact cutover/profile/instance/generation、activation、当前 head、legacy-running source

@@ -1,4 +1,11 @@
-import { fileExist, readDirs, readDir, rmPath, IFile } from '../config/util';
+import {
+  fileExist,
+  isPathInside,
+  readDirs,
+  readDir,
+  rmPath,
+  IFile,
+} from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
@@ -14,7 +21,9 @@ const route = Router();
 
 function isPathAllowed(targetPath: string): boolean {
   const resolved = path.resolve(targetPath);
-  return config.writePathList.some((x) => resolved.startsWith(x));
+  return config.writePathList.some((rootPath) =>
+    isPathInside(rootPath, resolved),
+  );
 }
 
 const storage = multer.diskStorage({
@@ -158,7 +167,11 @@ export default (app: Router) => {
         if (!path.startsWith('/')) {
           path = join(config.scriptPath, path);
         }
-        if (config.writePathList.every((x) => !path.startsWith(x))) {
+        if (
+          config.writePathList.every(
+            (rootPath) => !isPathInside(rootPath, path),
+          )
+        ) {
           return res.send({
             code: 403,
             message: t('暂无权限'),

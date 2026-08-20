@@ -6,7 +6,13 @@ import CronService from './cron';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import config from '../config';
 import { TASK_COMMAND } from '../config/const';
-import { getFileContentByName, getPid, killTask, rmPath } from '../config/util';
+import {
+  getFileContentByName,
+  getPid,
+  isPathInside,
+  killTask,
+  rmPath,
+} from '../config/util';
 import taskLimit from '../shared/pLimit';
 
 @Service()
@@ -66,7 +72,7 @@ export default class ScriptService {
 
   public checkFilePath(filePath: string, fileName: string) {
     const finalPath = path.resolve(config.scriptPath, filePath, fileName);
-    return finalPath.startsWith(config.scriptPath) ? finalPath : '';
+    return isPathInside(config.scriptPath, finalPath) ? finalPath : '';
   }
 
   public async getFile(filePath: string, fileName: string) {

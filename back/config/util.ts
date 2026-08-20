@@ -263,13 +263,26 @@ export async function readDir(
   baseDir: string = '',
   blacklist: string[] = [],
 ): Promise<IFile[]> {
+  const absoluteBaseDir = path.resolve(baseDir);
   const absoluteDir = path.resolve(baseDir, dir);
-  if (!absoluteDir.startsWith(path.resolve(baseDir))) {
+  if (!isPathInside(absoluteBaseDir, absoluteDir)) {
     return [];
   }
-  const relativePath = path.relative(baseDir, absoluteDir);
 
   try {
+    const [realBaseDir, realDirectory] = await Promise.all([
+      fs.realpath(absoluteBaseDir),
+      fs.realpath(absoluteDir),
+    ]);
+    const directoryStat = await fs.lstat(absoluteDir);
+    if (
+      !isPathInside(realBaseDir, realDirectory) ||
+      !directoryStat.isDirectory() ||
+      directoryStat.isSymbolicLink()
+    ) {
+      return [];
+    }
+    const relativePath = path.relative(absoluteBaseDir, absoluteDir);
     const files = await fs.readdir(absoluteDir);
     const result: IFile[] = [];
 
@@ -310,6 +323,19 @@ export async function readDir(
     }
     throw error;
   }
+}
+
+export function isPathInside(rootPath: string, targetPath: string): boolean {
+  const relative = path.relative(
+    path.resolve(rootPath),
+    path.resolve(targetPath),
+  );
+  return (
+    relative === '' ||
+    (relative !== '..' &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative))
+  );
 }
 
 export async function promiseExec(command: string): Promise<string> {
