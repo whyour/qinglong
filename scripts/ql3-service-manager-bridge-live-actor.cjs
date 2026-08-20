@@ -136,7 +136,10 @@ function descriptor(kind, uid, gid, root, adopted = false) {
   ].join('\n');
 }
 
-function legacyDescriptor(kind, uid, gid) {
+function legacyDescriptor(kind, uid, gid, port) {
+  const nodeExecutable = fs.realpathSync(process.execPath);
+  const commandArgs =
+    `/workspace/scripts/ql3-service-manager-legacy-live-service.cjs ${port}`;
   if (kind === 'systemd') {
     return [
       '[Unit]',
@@ -146,7 +149,7 @@ function legacyDescriptor(kind, uid, gid) {
       'Type=simple',
       `User=${uid}`,
       `Group=${gid}`,
-      'ExecStart=/bin/sleep 300',
+      `ExecStart=${nodeExecutable} ${commandArgs}`,
       'Restart=no',
       '',
       '[Install]',
@@ -158,8 +161,8 @@ function legacyDescriptor(kind, uid, gid) {
     '#!/sbin/openrc-run',
     'name="qinglong"',
     'description="QingLong 2 legacy rollback live gate"',
-    'command="/bin/sleep"',
-    'command_args="300"',
+    `command="${nodeExecutable}"`,
+    `command_args="${commandArgs}"`,
     `command_user="${uid}:${gid}"`,
     'supervisor="supervise-daemon"',
     'retry="TERM/5/KILL/2"',
@@ -532,7 +535,7 @@ function authorizeAdoptedRollback(root, adopted, prepared, uid, gid) {
   };
 }
 
-function installLegacyService(kind, managerOptions, uid, gid) {
+function installLegacyService(kind, managerOptions, uid, gid, port) {
   const descriptorPath =
     kind === 'systemd'
       ? '/etc/systemd/system/qinglong.service'
@@ -540,7 +543,7 @@ function installLegacyService(kind, managerOptions, uid, gid) {
   fs.rmSync(descriptorPath, { force: true });
   writePrivate(
     descriptorPath,
-    legacyDescriptor(kind, uid, gid),
+    legacyDescriptor(kind, uid, gid, port),
     kind === 'systemd' ? 0o644 : 0o755,
     0,
     0,
@@ -620,6 +623,54 @@ function executeLegacyRollback(
     ),
   );
   return { commandPath, result, replay, consumed, outcome };
+}
+
+function proveLegacyReadiness(
+  root,
+  adopted,
+  consumed,
+  uid,
+  gid,
+  legacyHttpPort,
+) {
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.cutover.legacy-readiness-probe',
+    options: { deploymentRoot: root, allowRootService: uid === 0 },
+    request: {
+      cutoverId: adopted.cutoverId,
+      profile: 'edge',
+      instanceId: adopted.instanceId,
+      generation: 1,
+      expectedActivationDigest: adopted.activationDigest,
+      expectedInstanceHeadDigest: consumed.instanceHeadDigest,
+      expectedLegacyRunningRecordDigest: consumed.completionDigest,
+      legacyHttpPort,
+      expectedLegacyVersion: '2.21.0',
+      requestedAtMs: Date.now(),
+    },
+  };
+  const commandPath = path.join(root, 'owner-legacy-readiness-probe.json');
+  writePrivate(
+    commandPath,
+    `${JSON.stringify(command, null, 2)}\n`,
+    0o600,
+    uid,
+    gid,
+  );
+  const result = ownerCli(
+    uid,
+    gid,
+    'cutover-legacy-readiness-probe',
+    commandPath,
+  );
+  const replay = ownerCli(
+    uid,
+    gid,
+    'cutover-legacy-readiness-probe',
+    commandPath,
+  );
+  return { commandPath, result, replay };
 }
 
 function executeLegacyRollbackBarrierCrash(
@@ -830,6 +881,7 @@ async function main(argv) {
   }
   const uid = identityMode === 'root' ? 0 : NON_ROOT_SERVICE_UID;
   const gid = uid;
+  const legacyHttpPort = 15_700;
   const root = `/var/lib/ql3-service-manager-${kind}-${identityMode}`;
   const controllerRoot = `/var/lib/ql3-service-bridge-${kind}-${identityMode}`;
   fs.rmSync(root, { force: true, recursive: true });
@@ -1035,7 +1087,7 @@ async function main(argv) {
     ) {
       fail('adopted rollback authorization did not converge exactly');
     }
-    installLegacyService(kind, managerOptions, uid, gid);
+    installLegacyService(kind, managerOptions, uid, gid, legacyHttpPort);
     const adoptedLegacyStarted =
       scenario === 'success'
         ? executeLegacyRollback(
@@ -1058,6 +1110,7 @@ async function main(argv) {
             uid,
             gid,
           );
+    let adoptedLegacyReadiness;
     if (scenario === 'success') {
       if (
         adoptedLegacyStarted.result.state !== 'legacy_running' ||
@@ -1077,6 +1130,26 @@ async function main(argv) {
       });
       if (legacyUid !== uid) {
         fail(`legacy service process UID drifted: ${legacyUid} != ${uid}`);
+      }
+      adoptedLegacyReadiness = proveLegacyReadiness(
+        root,
+        adopted,
+        adoptedLegacyStarted.consumed,
+        uid,
+        gid,
+        legacyHttpPort,
+      );
+      if (
+        adoptedLegacyReadiness.result.status !== 'prepared' ||
+        adoptedLegacyReadiness.result.state !== 'legacy_ready' ||
+        adoptedLegacyReadiness.replay.status !== 'existing' ||
+        adoptedLegacyReadiness.replay.state !== 'legacy_ready' ||
+        adoptedLegacyReadiness.replay.receiptDigest !==
+          adoptedLegacyReadiness.result.receiptDigest ||
+        adoptedLegacyReadiness.replay.instanceHeadDigest !==
+          adoptedLegacyReadiness.result.instanceHeadDigest
+      ) {
+        fail('legacy readiness proof did not converge exactly');
       }
     } else if (
       adoptedLegacyStarted.result.state !== 'manual_required' ||
@@ -1116,6 +1189,8 @@ async function main(argv) {
         legacyStarted: adoptedLegacyStarted.result,
         legacyStartReplay: adoptedLegacyStarted.replay,
         legacyConsumed: adoptedLegacyStarted.consumed,
+        legacyReadiness: adoptedLegacyReadiness?.result ?? null,
+        legacyReadinessReplay: adoptedLegacyReadiness?.replay ?? null,
       },
       gates: {
         rootCommandFile: true,
@@ -1140,6 +1215,8 @@ async function main(argv) {
         adoptedTargetRemainedStopped: true,
         adoptedLegacyProcessIdentity: scenario === 'success',
         adoptedLegacyResponseLossInspected: scenario === 'success',
+        adoptedLegacyReady: scenario === 'success',
+        adoptedLegacyReadinessReplay: scenario === 'success',
         adoptedLegacyBarrierCrash: scenario === 'barrier-crash',
         adoptedLegacyInspectOnlyConvergence: scenario === 'barrier-crash',
         adoptedLegacyRemainedStopped: scenario === 'barrier-crash',

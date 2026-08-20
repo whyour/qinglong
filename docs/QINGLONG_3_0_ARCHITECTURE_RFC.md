@@ -11,6 +11,27 @@
 
 最新增量证据（2026-08-20）：
 
+- D-381/ADR-0474（已接受；OpenRC live actor 待镜像基础设施恢复后补跑）：把 service-manager adopted rollback 从仅证明
+  init/process 的 `legacy_running` 推进到有界、可重放的 2.x core readiness。新增显式 Owner 私有命令
+  `cutover-legacy-readiness-probe`，绑定 exact cutover/profile/instance/generation、activation、当前 head、legacy-running source
+  record、port 与精确 2.x version；只允许 `GET 127.0.0.1:<port>/api/system`，没有 caller URL/header/credential、redirect、proxy
+  或 keep-alive agent。每次请求最多 2 秒/32 KiB，Edge 总预算 30 秒/最多 60 次，Standalone 60 秒/最多 120 次；只有 HTTP/envelope
+  成功、`isInitialized=true` 且 version 精确相等才 no-replace 发布 `0600` 收据并 CAS 到 `legacy_ready`，exact replay 发起零次网络
+  请求，所有 not-ready reason 保持 `legacy_running`。该状态只证明正确 2.x 版本的本机 HTTP core 与初始化，不宣称任务、订阅、
+  provider、通知、Worker 或全部 API 健康。实现内聚在现有 Local Owner 的 `cutover/legacy-readiness/`，不新增 package、production
+  dependency、binary、daemon、listener、watcher、timer、数据库连接或部署对象。readiness 聚焦 `6/6`，生产 `/api/system` Router
+  兼容门 `2/2`；Local Owner 全量 `187 total / 182 pass / 5 conditional skip / 0 fail`；backend 全量
+  `1,525 total / 1,523 pass / 2 conditional skip / 0 fail`；18-package clean build/逐包测试单次退出 0。package boundary、Service
+  Bridge import、Edge import、Cluster dependency、Cluster/Worker deployment、Console 与 Console distribution 八项审计全部
+  compatible/passed；workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
+  `113 source / 112 nested / 1 root binary entry`。14 档 Local artifact audit 全部 compatible；基础 Edge/Standalone 保持
+  `2,598,669 / 2,598,747` bytes、316 files、57 loaded modules，Adopted 为 `2,817,964 / 2,818,087` bytes、58 loaded modules，
+  Application+AI 为 `4,501,822 / 4,501,954` bytes，MCP 为 `7,324,601 / 7,324,709` bytes、227 loaded modules，证明 ceremony
+  未进入低配运行闭包。systemd Docker live gate 已覆盖 root/non-root success，真实 `/api/system` 推进到 `legacy_ready` 并验证收据/head
+  exact replay；barrier-crash 保持 `manual_required` 且不执行 readiness。OpenRC 因 `node:24-alpine` 拉取卡在 Docker credential
+  helper 而未执行，不能宣称全组合门闭合；挂起拉取已终止。本切片不改变 PostgreSQL schema、ACL、repository、role、Pool、连接或
+  failover 语义，因此不重跑且不重新占有 HA 证明。D-382 应扩展 System/Script/Open API/鉴权错误 envelope 兼容矩阵与真实升级/回滚
+  rehearsal；OpenRC 门在镜像基础设施恢复后补跑。
 - D-380/ADR-0473（已接受；OpenRC live actor 待镜像基础设施恢复后补跑）：完成 systemd/OpenRC service-manager rollback 的
   安全 commit 协议。`rollback_prepared` 不再被误当作 root 授权；Owner 重新绑定当前 head、preparation、Application 与
   legacy-silence commitment 原始摘要、descriptor 摘要后，才 no-replace 发布 `legacy_restart_requested`。短生命周期 root bridge

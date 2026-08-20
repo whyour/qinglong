@@ -95,6 +95,8 @@ function actorReport(name, kind, identityMode, scenario = 'success') {
           'adoptedLegacyStarted',
           'adoptedLegacyProcessIdentity',
           'adoptedLegacyResponseLossInspected',
+          'adoptedLegacyReady',
+          'adoptedLegacyReadinessReplay',
         ]
       : [
           'adoptedLegacyBarrierCrash',
@@ -257,6 +259,12 @@ function main() {
         ),
         adoptedLegacyResponseLossInspected: successReports.every(
           (report) => report.gates.adoptedLegacyResponseLossInspected,
+        ),
+        adoptedLegacyReady: successReports.every(
+          (report) => report.gates.adoptedLegacyReady,
+        ),
+        adoptedLegacyReadinessReplay: successReports.every(
+          (report) => report.gates.adoptedLegacyReadinessReplay,
         ),
         adoptedLegacyBarrierCrash: crashReports.length === 2,
         adoptedLegacyInspectOnlyConvergence: crashReports.every(

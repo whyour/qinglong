@@ -70,6 +70,10 @@ import {
   runLocalDeploymentLegacyRollbackCommandFile,
 } from './cutover/legacyRollback';
 import {
+  proveLocalDeploymentLegacyReadiness,
+  proveLocalDeploymentLegacyReadinessCommandFile,
+} from './cutover/legacy-readiness/probe';
+import {
   consumeLocalServiceManagerOutcome,
   consumeLocalServiceManagerOutcomeCommandFile,
   prepareLocalServiceManagerIntent,
@@ -149,6 +153,17 @@ export {
 } from './cutover/legacyRollbackContract';
 export { type LocalDeploymentLegacyRollbackDependencies } from './cutover/legacyRollback';
 export {
+  normalizeLocalDeploymentLegacyReadinessCommand,
+  type LocalDeploymentLegacyReadinessCommand,
+} from './cutover/legacy-readiness/contract';
+export {
+  type LocalDeploymentLegacyReadinessDependencies,
+  type LocalDeploymentLegacyReadinessResult,
+  type LocalLegacyReadinessObservation,
+  type LocalLegacyReadinessProbeInput,
+  type LocalLegacyReadinessReason,
+} from './cutover/legacy-readiness/probe';
+export {
   EMPTY_RESOLUTION_DIGEST,
   normalizeLocalDeploymentCutoverManualCommand,
   type LocalDeploymentCutoverManualCommand,
@@ -177,6 +192,8 @@ export {
   runLocalDeploymentCutoverManualCommandFile,
   runLocalDeploymentLegacyRollback,
   runLocalDeploymentLegacyRollbackCommandFile,
+  proveLocalDeploymentLegacyReadiness,
+  proveLocalDeploymentLegacyReadinessCommandFile,
   runLocalDeploymentDockerTarget,
   runLocalDeploymentDockerTargetCommandFile,
   switchLocalDeploymentComposeRevision,

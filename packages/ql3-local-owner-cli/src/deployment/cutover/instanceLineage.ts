@@ -26,6 +26,7 @@ export type LocalCutoverInstanceHeadState =
   | 'rollback_prepared'
   | 'legacy_restart_requested'
   | 'legacy_running'
+  | 'legacy_ready'
   | 'manual_required'
   | 'resolution_authorized';
 
@@ -156,6 +157,7 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
       head.state !== 'legacy_running' &&
+      head.state !== 'legacy_ready' &&
       head.state !== 'manual_required' &&
       head.state !== 'resolution_authorized') ||
     !Number.isSafeInteger(head.generation) ||
@@ -321,6 +323,7 @@ export function advanceLocalCutoverInstanceHead(
     | 'rollback_prepared'
     | 'legacy_restart_requested'
     | 'legacy_running'
+    | 'legacy_ready'
     | 'manual_required',
   generation: number,
   sourceRecordDigest: string,
@@ -356,7 +359,8 @@ export function advanceLocalCutoverInstanceHead(
     current.generation === generation &&
     (current.state === 'rollback_prepared' ||
       current.state === 'legacy_restart_requested' ||
-      current.state === 'legacy_running')
+      current.state === 'legacy_running' ||
+      current.state === 'legacy_ready')
   ) {
     return current;
   }
@@ -374,6 +378,7 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'rollback_prepared') ||
     (state === 'legacy_running' &&
       current.state === 'legacy_restart_requested') ||
+    (state === 'legacy_ready' && current.state === 'legacy_running') ||
     (state === 'manual_required' &&
       (current.state === 'legacy_stopped' ||
         current.state === 'target_active' ||

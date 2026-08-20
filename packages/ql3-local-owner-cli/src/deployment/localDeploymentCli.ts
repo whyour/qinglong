@@ -14,6 +14,7 @@ import {
   prepareLocalServiceManagerIntentCommandFile,
   prepareLocalServiceManagerLegacyRollbackCommandFile,
   prepareLocalDeploymentCommandFile,
+  proveLocalDeploymentLegacyReadinessCommandFile,
   restoreLocalDeploymentComposeCommitCommandFile,
   restoreLocalDeploymentComposePrepareCommandFile,
   runLocalDeploymentCutoverManualCommandFile,
@@ -25,7 +26,7 @@ import {
 } from './localDeployment';
 
 const USAGE =
-  'Usage: ql3-local-deploy <prepare|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
+  'Usage: ql3-local-deploy <prepare|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
 
 async function main(argv: readonly string[]): Promise<void> {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) {
@@ -48,6 +49,7 @@ async function main(argv: readonly string[]): Promise<void> {
       argv[0] !== 'cutover-target-stop' &&
       argv[0] !== 'cutover-legacy-rollback-prepare' &&
       argv[0] !== 'cutover-legacy-rollback-commit' &&
+      argv[0] !== 'cutover-legacy-readiness-probe' &&
       argv[0] !== 'cutover-manual-diagnose' &&
       argv[0] !== 'cutover-manual-resolution-prepare' &&
       argv[0] !== 'cutover-manual-resolution-commit' &&
@@ -101,6 +103,8 @@ async function main(argv: readonly string[]): Promise<void> {
             ? 'local.deployment.cutover.legacy-rollback-prepare'
             : 'local.deployment.cutover.legacy-rollback-commit',
         )
+      : argv[0] === 'cutover-legacy-readiness-probe'
+      ? proveLocalDeploymentLegacyReadinessCommandFile(argv[2]!)
       : argv[0] === 'cutover-manual-diagnose' ||
         argv[0] === 'cutover-manual-resolution-prepare' ||
         argv[0] === 'cutover-manual-resolution-commit'

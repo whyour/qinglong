@@ -454,6 +454,52 @@ barrier 后崩溃时原样重放 commit。重放只 inspect，绝不盲目重复
 补写 exact outcome；若无法证明，则安全收敛为 `manual_required`。整个流程不删除/覆盖 target，不把 target
 数据库写回 source。`reconciliation_required` 或 `manual_review` 必须停止在 2.5，等待独立数据恢复流程。
 
+### 2.7 Legacy core readiness proof
+
+`legacy_running` 只证明 legacy init/process running 与 target stopped。要把回滚实例推进为 core ready，必须创建独立的私有
+`0600` command file；不要把探针塞进 root bridge，也不要手工用可变 URL 的 `curl` 结果替代：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "local.deployment.cutover.legacy-readiness-probe",
+  "options": {
+    "deploymentRoot": "/opt/qinglong3",
+    "allowRootService": false
+  },
+  "request": {
+    "cutoverId": "cutover-20260820-01",
+    "profile": "edge",
+    "instanceId": "local-default",
+    "generation": 1,
+    "expectedActivationDigest": "REPLACE_WITH_64_HEX_ACTIVATION_DIGEST",
+    "expectedInstanceHeadDigest": "REPLACE_WITH_LEGACY_RUNNING_HEAD_DIGEST",
+    "expectedLegacyRunningRecordDigest": "REPLACE_WITH_LEGACY_RUNNING_SOURCE_RECORD_DIGEST",
+    "legacyHttpPort": 5700,
+    "expectedLegacyVersion": "2.21.0",
+    "requestedAtMs": 1787236200000
+  }
+}
+```
+
+```sh
+ql3-local-deploy cutover-legacy-readiness-probe \
+  --command-file /secure/operator/qinglong3-legacy-readiness.json
+```
+
+`expectedInstanceHeadDigest` 取 2.6 Owner consume 返回的 `legacy_running` head；
+`expectedLegacyRunningRecordDigest` 取该 head 绑定的 source record digest。Docker 与 systemd/OpenRC 使用相同命令，因为它只操作
+共同的 Owner instance lineage。
+
+探针固定请求 `GET http://127.0.0.1:<legacyHttpPort>/api/system`，不接受其他 host/path/header/credential，不跟随重定向；
+每次请求最多 2 秒、响应最多 32 KiB。Edge 总预算 30 秒/最多 60 次，Standalone 总预算 60 秒/最多 120 次。
+只有 HTTP/envelope 成功、`isInitialized=true` 且 version 精确等于命令中的 2.x version 才会发布
+`legacy-readiness-gN.json` 并 CAS 到 `legacy_ready`。
+
+`not_ready` 会给出 `unavailable|http_rejected|response_too_large|response_invalid|not_initialized|version_mismatch`，保持
+`legacy_running` 不变；处理原因后必须原样重放，不要换 cutover/generation 绕过证据链。成功命令的 exact replay 只读取既有收据，
+不会再次发网络请求。`legacy_ready` 是 2.x HTTP core 与初始化证明，不代表任务、订阅、外部 provider、通知或 Cluster Worker 全健康。
+
 ## 3. systemd
 
 命令中使用 `"kind": "systemd"`。成功后检查：
