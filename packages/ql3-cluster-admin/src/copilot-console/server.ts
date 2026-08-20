@@ -195,6 +195,8 @@ const READ_ROUTES: Readonly<
   '/api/v1/run-management/blocked-cancellations':
     'run_cancellation_blocked_list',
   '/api/v1/run-management/cancellation-inspect': 'run_cancellation_inspect',
+  '/api/v1/worker-management/workers': 'worker_list',
+  '/api/v1/worker-management/worker': 'worker_inspect',
   '/api/v1/observe/run-list': 'run_list',
   '/api/v1/observe/run': 'run_read',
   '/api/v1/observe/run-events': 'run_event_list',

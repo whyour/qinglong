@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "endpoint": "https://replace-cluster-api.example.com:8448/api/v3/workers/management",
+  "servername": "replace-cluster-api.example.com",
+  "caFile": "/absolute/private/ql3-copilot-console/worker-management-ca.pem",
+  "clientCertificateFile": "/absolute/private/ql3-copilot-console/worker-management-client.crt",
+  "clientPrivateKeyFile": "/absolute/private/ql3-copilot-console/worker-management-client.key",
+  "requestTimeoutMs": 5000
+}

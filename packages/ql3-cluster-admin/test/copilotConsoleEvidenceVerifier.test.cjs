@@ -137,6 +137,16 @@ test('cross-verifies every fixed Console read operation', async (t) => {
       requestId: 'q-management-inspect',
       runId: 'r-management',
     },
+    worker_list: {
+      afterWorkerId: null,
+      projectId: 'p-worker',
+      requestId: 'q-worker-list',
+    },
+    worker_inspect: {
+      projectId: 'p-worker',
+      requestId: 'q-worker-inspect',
+      workerId: 'worker-1',
+    },
     run_list: {
       afterCreatedAtMs: null,
       afterRunId: null,
@@ -221,18 +231,23 @@ test('cross-verifies every fixed Console read operation', async (t) => {
       },
     }),
   );
-  const bundle = await createClusterConsoleEvidenceBundle(
-    records,
-    1_700_000_001_000,
-    webcrypto,
-  );
-  const { filePath } = fixture(
-    t,
-    serializeClusterConsoleEvidenceBundle(bundle),
-  );
-  const result = verifyClusterConsoleEvidenceBundleFile(filePath);
-  assert.equal(result.status, 'verified');
-  assert.equal(result.bundle.entryCount, 16);
+  let verified = 0;
+  for (let index = 0; index < records.length; index += 16) {
+    const bundle = await createClusterConsoleEvidenceBundle(
+      records.slice(index, index + 16),
+      1_700_000_001_000 + index,
+      webcrypto,
+    );
+    const { filePath } = fixture(
+      t,
+      serializeClusterConsoleEvidenceBundle(bundle),
+      `operations-${index}.json`,
+    );
+    const result = verifyClusterConsoleEvidenceBundleFile(filePath);
+    assert.equal(result.status, 'verified');
+    verified += result.bundle.entryCount;
+  }
+  assert.equal(verified, 18);
 });
 
 test('CLI is secret-free on success, invalid input and usage errors', async (t) => {

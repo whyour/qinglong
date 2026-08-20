@@ -248,6 +248,23 @@ test('normalizes Copilot and fixed Project observation operations without arbitr
       }),
     { code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID' },
   );
+  const workerList = normalizeClusterCopilotConsoleReadRequest({
+    schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+    operation: 'worker_list',
+    projectId: 'project-main',
+    requestId: 'console-worker-list',
+    afterWorkerId: 'worker-16',
+  });
+  assert.deepEqual(workerList, {
+    schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+    operation: 'worker_list',
+    projectId: 'project-main',
+    requestId: 'console-worker-list',
+    afterWorkerId: 'worker-16',
+  });
+  assert.throws(() => clusterCopilotConsoleProjectReadPath(workerList), {
+    code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID',
+  });
   assert.throws(
     () =>
       normalizeClusterCopilotConsoleReadRequest({
@@ -615,6 +632,62 @@ test('routes only the three fixed Run management reads and validates their curso
   });
   assert.equal(invalidCursor.statusCode, 400);
   assert.equal(reads.length, 3);
+});
+
+test('routes only fixed Worker list and inspect reads with a bounded cursor', async (t) => {
+  const reads = [];
+  const { server, headers } = await fixture(async (read) => {
+    reads.push(read);
+    return {
+      schemaVersion: 1,
+      requestId: read.requestId,
+      result: { operation: read.operation },
+    };
+  });
+  t.after(() => server.close());
+  const cases = [
+    [
+      '/api/v1/worker-management/workers',
+      {
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'worker_list',
+        projectId: 'project-main',
+        requestId: 'console-worker-list-1',
+        afterWorkerId: null,
+      },
+    ],
+    [
+      '/api/v1/worker-management/worker',
+      {
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'worker_inspect',
+        projectId: 'project-main',
+        requestId: 'console-worker-inspect-1',
+        workerId: 'worker-a',
+      },
+    ],
+  ];
+  for (const [path, body] of cases) {
+    const response = await request(server.origin, {
+      method: 'POST',
+      path,
+      headers,
+      body,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  assert.deepEqual(
+    reads,
+    cases.map(([, body]) => body),
+  );
+  const invalidCursor = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/worker-management/workers',
+    headers,
+    body: { ...cases[0][1], afterWorkerId: 'contains space' },
+  });
+  assert.equal(invalidCursor.statusCode, 400);
+  assert.equal(reads.length, 2);
 });
 
 test('returns model text as JSON data only after an explicit output read', async (t) => {

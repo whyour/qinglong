@@ -14,6 +14,8 @@ export const CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS = Object.freeze([
   'run_cancellation_status',
   'run_cancellation_blocked_list',
   'run_cancellation_inspect',
+  'worker_list',
+  'worker_inspect',
   'run_list',
   'run_read',
   'run_event_list',
@@ -46,6 +48,9 @@ export type ClusterCopilotConsoleReadRequest =
   | (BaseReadRequest<'run_cancellation_blocked_list'> &
       Readonly<{ cursor: string | null }>)
   | (BaseReadRequest<'run_cancellation_inspect'> & Readonly<{ runId: string }>)
+  | (BaseReadRequest<'worker_list'> &
+      Readonly<{ afterWorkerId: string | null }>)
+  | (BaseReadRequest<'worker_inspect'> & Readonly<{ workerId: string }>)
   | (BaseReadRequest<'run_list'> &
       Readonly<{
         afterCreatedAtMs: number | null;
@@ -241,6 +246,25 @@ export function normalizeClusterCopilotConsoleReadRequest(
       ...common(record),
       operation: op,
       runId: record.runId,
+    });
+  }
+  if (op === 'worker_list') {
+    exact(record, op, ['afterWorkerId']);
+    if (record.afterWorkerId !== null && !identifier(record.afterWorkerId))
+      invalid();
+    return Object.freeze({
+      ...common(record),
+      operation: op,
+      afterWorkerId: record.afterWorkerId as string | null,
+    });
+  }
+  if (op === 'worker_inspect') {
+    exact(record, op, ['workerId']);
+    if (!identifier(record.workerId)) invalid();
+    return Object.freeze({
+      ...common(record),
+      operation: op,
+      workerId: record.workerId,
     });
   }
   if (op === 'run_list') {
@@ -476,7 +500,9 @@ export function clusterCopilotConsoleProjectReadPath(
     normalized.operation === 'output' ||
     normalized.operation === 'run_cancellation_status' ||
     normalized.operation === 'run_cancellation_blocked_list' ||
-    normalized.operation === 'run_cancellation_inspect'
+    normalized.operation === 'run_cancellation_inspect' ||
+    normalized.operation === 'worker_list' ||
+    normalized.operation === 'worker_inspect'
   )
     invalid();
   const project = '/api/v3/projects/' + encoded(normalized.projectId);

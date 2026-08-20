@@ -13,6 +13,8 @@ const FILES = Object.freeze({
     'deploy/console/ql3-cluster-copilot/host-environment.example.json',
   runManagementExample:
     'deploy/console/ql3-cluster-copilot/run-management-client-config.example.json',
+  workerManagementExample:
+    'deploy/console/ql3-cluster-copilot/worker-management-client-config.example.json',
   image: 'deploy/containers/ql3-cluster-admin/Dockerfile',
   workflow: '.github/workflows/ql3-image-release.yml',
   candidate: 'scripts/ql3-release-candidate-contract.cjs',
@@ -87,8 +89,21 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       'QL3_COPILOT_CONSOLE_RUN_MANAGEMENT-disabled',
       '--run-management-config /var/run/secrets/qinglong3/copilot-console/run-management-client.json',
       '--run-management-assertion /var/run/secrets/qinglong3/copilot-console/run-management-assertion.jwt',
+      'QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT-disabled',
+      '--worker-management-config /var/run/secrets/qinglong3/copilot-console/worker-management-client.json',
+      '--worker-management-assertion /var/run/secrets/qinglong3/copilot-console/worker-management-assertion.jwt',
     ],
     'QL3_COPILOT_CONSOLE_LAUNCHER_CONTRACT_DRIFT',
+  );
+  requireFragments(
+    'workerManagementExample',
+    [
+      '"schemaVersion": 1',
+      '/api/v3/workers/management',
+      'worker-management-client.crt',
+      'worker-management-client.key',
+    ],
+    'QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT_EXAMPLE_DRIFT',
   );
   rejectFragments(
     'launcher',
@@ -206,6 +221,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
     QL3_COPILOT_CONSOLE_PORT: '5701',
     QL3_COPILOT_CONSOLE_RESOURCE_CLASS: 'compact',
     QL3_COPILOT_CONSOLE_RUN_MANAGEMENT: 'disabled',
+    QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT: 'disabled',
   };
   if (
     environment &&
@@ -231,6 +247,8 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
       'share/ql3-copilot-console/host-environment.example.json',
       'COPY --chmod=0444 deploy/console/ql3-cluster-copilot/run-management-client-config.example.json',
       'share/ql3-copilot-console/run-management-client-config.example.json',
+      'COPY --chmod=0444 deploy/console/ql3-cluster-copilot/worker-management-client-config.example.json',
+      'share/ql3-copilot-console/worker-management-client-config.example.json',
     ],
     'QL3_COPILOT_CONSOLE_IMAGE_DISTRIBUTION_DRIFT',
   );
@@ -324,6 +342,7 @@ function auditClusterCopilotConsoleDistribution(options = {}) {
     kubernetesResident: false,
     additionalWorkspacePackages: 0,
     runManagementAuthorityDefault: 'disabled',
+    workerManagementAuthorityDefault: 'disabled',
     externalWorkstationCeremony: 'source-tag-private-report',
     ceremonyStatus: 'implementation-ready-public-release-pending',
     findings: Object.freeze(findings),

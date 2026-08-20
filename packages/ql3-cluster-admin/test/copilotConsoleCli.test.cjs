@@ -39,6 +39,29 @@ const runManagementOperations = [
   'run_cancellation_blocked_list',
   'run_cancellation_inspect',
 ];
+const workerManagementOperations = ['worker_list', 'worker_inspect'];
+
+function workerSummary(workerId = 'worker-a') {
+  return {
+    workerId,
+    sessionId: 'session-a',
+    generation: 2,
+    sessionVersion: 5,
+    lifecycle: 'online',
+    compatibility: 'default_placement',
+    architecture: 'arm64',
+    supportTier: 'tier1',
+    protocolVersion: '1.0.0',
+    operatingSystem: 'linux',
+    maxConcurrentRuns: 2,
+    availableSlots: 1,
+    registeredAtMs: 900,
+    lastHeartbeatAtMs: 1_050,
+    leaseExpiresAtMs: 2_000,
+    updatedAtMs: 1_050,
+    observedAtMs: 1_100,
+  };
+}
 
 function privateFile(directory, name, contents) {
   const filePath = path.join(directory, name);
@@ -156,6 +179,9 @@ async function fixture(t) {
     {
       key: fs.readFileSync(path.join(tlsFixture, 'server-key.pem')),
       cert: fs.readFileSync(path.join(tlsFixture, 'server-cert.pem')),
+      ca: fs.readFileSync(path.join(tlsFixture, 'ca-cert.pem')),
+      requestCert: true,
+      rejectUnauthorized: false,
       minVersion: 'TLSv1.3',
       maxVersion: 'TLSv1.3',
     },
@@ -175,7 +201,39 @@ async function fixture(t) {
           command,
         });
         const body =
-          command?.operation === 'run.cancellation.summary'
+          command?.operation === 'worker-session.list'
+            ? {
+                schemaVersion: 1,
+                requestId: 'worker-transport-hidden',
+                result: {
+                  schemaVersion: 1,
+                  operation: 'worker-session.list',
+                  observedAtMs: 1_100,
+                  workers: [workerSummary()],
+                  nextCursor: 'worker-a',
+                },
+              }
+            : command?.operation === 'worker-session.inspect'
+            ? {
+                schemaVersion: 1,
+                requestId: 'worker-transport-hidden',
+                result: {
+                  schemaVersion: 1,
+                  operation: 'worker-session.inspect',
+                  observedAtMs: 1_100,
+                  worker: {
+                    ...workerSummary(),
+                    runtimes: [{ name: 'node', version: '24.18.0' }],
+                    declaredCapacity: {
+                      cpuCores: 1,
+                      memoryBytes: 268_435_456,
+                      diskBytes: 1_073_741_824,
+                      gpuCount: 0,
+                    },
+                  },
+                },
+              }
+            : command?.operation === 'run.cancellation.summary'
             ? {
                 schemaVersion: 1,
                 requestId: command.request.requestId,
@@ -268,6 +326,21 @@ async function fixture(t) {
       requestTimeoutMs: 2_000,
     }),
   );
+  const workerManagementConfigFile = privateFile(
+    directory,
+    'worker-client.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      endpoint: `https://localhost:${
+        server.address().port
+      }/api/v3/workers/management`,
+      servername: 'localhost',
+      caFile,
+      clientCertificateFile,
+      clientPrivateKeyFile,
+      requestTimeoutMs: 2_000,
+    }),
+  );
   const sessionToken = randomBytes(32).toString('base64url');
   return {
     requests,
@@ -281,6 +354,12 @@ async function fixture(t) {
       'run-assertion.jwt',
       'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJvcGVyYXRvci0xIn0.c2lnbmF0dXJl',
     ),
+    workerManagementConfigFile,
+    workerManagementAssertionFile: privateFile(
+      directory,
+      'worker-assertion.jwt',
+      'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJvcGVyYXRvci0xIn0.c2lnbmF0dXJl',
+    ),
   };
 }
 
@@ -291,6 +370,7 @@ test('CLI exposes deterministic help and a low-sensitive failure surface', async
     '  ql3-copilot-console --check --config /absolute/client.json --credential /absolute/credential --session /absolute/session',
     '  ql3-copilot-console --container-published-loopback --port=1024..65535 --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--check]',
     '  Optional Run reads: --run-management-config /absolute/run-client.json --run-management-assertion /absolute/assertion.jwt',
+    '  Optional Worker reads: --worker-management-config /absolute/worker-client.json --worker-management-assertion /absolute/assertion.jwt',
     '',
     'Native mode binds 127.0.0.1. Container mode requires host-loopback port publication.',
     'The browser session key remains in a separate owner-private 0600 file.',
@@ -345,6 +425,7 @@ test('preflight proves private authority and unauthenticated TLS 1.3 readiness',
     browserCredential: 'forbidden',
     clusterCredential: 'server_only',
     runManagementAuthority: 'disabled',
+    workerManagementAuthority: 'disabled',
     operations: consoleOperations,
     mutation: false,
   });
@@ -400,6 +481,46 @@ test('preflight enables exactly three optional Run management reads only when bo
   assert.doesNotMatch(incomplete.stderr, /ql3-copilot-console-cli-/);
 });
 
+test('preflight enables exactly two Worker reads only with canonical config and assertion', async (t) => {
+  const value = await fixture(t);
+  const result = await runCli([
+    '--check',
+    '--config',
+    value.configFile,
+    '--credential',
+    value.credentialFile,
+    '--session',
+    value.sessionFile,
+    '--worker-management-config',
+    value.workerManagementConfigFile,
+    '--worker-management-assertion',
+    value.workerManagementAssertionFile,
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const fact = JSON.parse(result.stdout);
+  assert.equal(fact.runManagementAuthority, 'disabled');
+  assert.equal(fact.workerManagementAuthority, 'server_only');
+  assert.deepEqual(fact.operations, [
+    'inspect',
+    'output',
+    ...workerManagementOperations,
+    ...consoleOperations.slice(2),
+  ]);
+  assert.equal(value.requests.length, 1);
+
+  const incomplete = await runCli([
+    '--config',
+    value.configFile,
+    '--credential',
+    value.credentialFile,
+    '--session',
+    value.sessionFile,
+    '--worker-management-config',
+    value.workerManagementConfigFile,
+  ]);
+  assert.equal(incomplete.status, 64);
+});
+
 test('serve mode starts an ephemeral loopback origin and shuts down cleanly', async (t) => {
   const value = await fixture(t);
   const child = spawn(
@@ -426,6 +547,7 @@ test('serve mode starts an ephemeral loopback origin and shuts down cleanly', as
   assert.deepEqual(started.operations, consoleOperations);
   assert.equal(started.mutation, false);
   assert.equal(started.runManagementAuthority, 'disabled');
+  assert.equal(started.workerManagementAuthority, 'disabled');
   assert.equal(started.networkBoundary, 'host-loopback');
   assert.equal(started.publishedHostAddress, '127.0.0.1');
   const shell = await get(started.origin);
@@ -491,6 +613,72 @@ test('serve mode forwards one explicit status click through the optional mTLS Ru
   assert.equal(management.command.operation, 'run.cancellation.summary');
   assert.equal(management.command.request.requestId, 'console-status-1');
   assert.match(management.authorization, /^Bearer [A-Za-z0-9_-]+\./);
+  child.kill('SIGTERM');
+  const exit = await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (status, signal) => resolve({ status, signal }));
+  });
+  assert.deepEqual(exit, { status: 0, signal: null });
+});
+
+test('serve mode performs one canonical Worker page read without exposing transport identity', async (t) => {
+  const value = await fixture(t);
+  const child = spawn(
+    process.execPath,
+    [
+      cliPath,
+      '--config',
+      value.configFile,
+      '--credential',
+      value.credentialFile,
+      '--session',
+      value.sessionFile,
+      '--worker-management-config',
+      value.workerManagementConfigFile,
+      '--worker-management-assertion',
+      value.workerManagementAssertionFile,
+      '--port=0',
+    ],
+    { cwd: packageRoot, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill('SIGKILL');
+  });
+  const started = JSON.parse(await firstLine(child.stdout));
+  assert.equal(started.workerManagementAuthority, 'server_only');
+  const response = await post(
+    started.origin,
+    value.sessionToken,
+    '/api/v1/worker-management/workers',
+    {
+      schema: 'qinglong/cluster-copilot-console-read-request@v1',
+      operation: 'worker_list',
+      projectId: 'project-main',
+      requestId: 'console-worker-list-1',
+      afterWorkerId: null,
+    },
+  );
+  assert.equal(response.statusCode, 200);
+  assert.equal(
+    response.body.result.result.schema,
+    'qinglong/worker-session-list@v1',
+  );
+  assert.equal(response.body.result.result.count, 1);
+  assert.equal(response.body.result.result.nextAfterWorkerId, 'worker-a');
+  assert.equal(
+    JSON.stringify(response.body).includes('worker-transport-hidden'),
+    false,
+  );
+  const management = value.requests.find(
+    (request) => request.path === '/api/v3/workers/management',
+  );
+  assert.equal(management.method, 'POST');
+  assert.equal(management.command.operation, 'worker-session.list');
+  assert.equal(
+    management.command.request.inspectionId,
+    'console-worker-list-1',
+  );
   child.kill('SIGTERM');
   const exit = await new Promise((resolve, reject) => {
     child.once('error', reject);

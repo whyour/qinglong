@@ -8,8 +8,9 @@
     run_cancellation_status: '/api/v1/run-management/cancellation-status',
     run_cancellation_blocked_list:
       '/api/v1/run-management/blocked-cancellations',
-    run_cancellation_inspect:
-      '/api/v1/run-management/cancellation-inspect',
+    run_cancellation_inspect: '/api/v1/run-management/cancellation-inspect',
+    worker_list: '/api/v1/worker-management/workers',
+    worker_inspect: '/api/v1/worker-management/worker',
     run_list: '/api/v1/observe/run-list',
     run_read: '/api/v1/observe/run',
     run_event_list: '/api/v1/observe/run-events',
@@ -28,6 +29,8 @@
     run_cancellation_status: '取消可用性',
     run_cancellation_blocked_list: 'Blocked Cancellations',
     run_cancellation_inspect: '取消诊断',
+    worker_list: 'Worker 目录',
+    worker_inspect: 'Worker 详情',
     run_list: 'Run 目录',
     run_read: 'Run 详情',
     run_event_list: 'Run Events',
@@ -124,6 +127,10 @@
       result.cursor = null;
     } else if (operation === 'run_cancellation_inspect') {
       result.runId = value('cancellation-run-id');
+    } else if (operation === 'worker_list') {
+      result.afterWorkerId = null;
+    } else if (operation === 'worker_inspect') {
+      result.workerId = value('worker-id');
     } else if (operation === 'run_list') {
       result.afterCreatedAtMs = null;
       result.afterRunId = null;
@@ -176,6 +183,11 @@
       typeof fact.nextCursor === 'string'
     ) {
       next.cursor = fact.nextCursor;
+    } else if (
+      operation === 'worker_list' &&
+      typeof fact.nextAfterWorkerId === 'string'
+    ) {
+      next.afterWorkerId = fact.nextAfterWorkerId;
     } else if (operation === 'run_list' && fact.hasMore === true && fact.next) {
       next.afterCreatedAtMs = fact.next.createdAtMs;
       next.afterRunId = fact.next.runId;
@@ -232,6 +244,20 @@
         void execute('run_cancellation_blocked_list');
       });
       entry.append(button);
+      return;
+    }
+    if (operation === 'worker_list' && Array.isArray(fact.workers)) {
+      fact.workers.forEach(function (worker) {
+        if (!worker || typeof worker.workerId !== 'string') return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = '显式检查 ' + worker.workerId;
+        button.addEventListener('click', function () {
+          document.getElementById('worker-id').value = worker.workerId;
+          void execute('worker_inspect');
+        });
+        entry.append(button);
+      });
       return;
     }
     if (

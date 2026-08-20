@@ -25,6 +25,7 @@ network=${QL3_COPILOT_CONSOLE_NETWORK-}
 port=${QL3_COPILOT_CONSOLE_PORT-}
 resource_class=${QL3_COPILOT_CONSOLE_RESOURCE_CLASS-compact}
 run_management=${QL3_COPILOT_CONSOLE_RUN_MANAGEMENT-disabled}
+worker_management=${QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT-disabled}
 
 printf '%s' "$image" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}@sha256:[0-9a-f]{64}$' || fail
 printf '%s' "$network" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$' || fail
@@ -62,6 +63,10 @@ case "$run_management" in
   disabled|enabled) ;;
   *) fail ;;
 esac
+case "$worker_management" in
+  disabled|enabled) ;;
+  *) fail ;;
+esac
 
 set -- docker run --rm --pull never --init --read-only \
   --network "$network" \
@@ -90,6 +95,12 @@ if [ "$run_management" = enabled ]; then
   set -- "$@" \
     --run-management-config /var/run/secrets/qinglong3/copilot-console/run-management-client.json \
     --run-management-assertion /var/run/secrets/qinglong3/copilot-console/run-management-assertion.jwt
+fi
+
+if [ "$worker_management" = enabled ]; then
+  set -- "$@" \
+    --worker-management-config /var/run/secrets/qinglong3/copilot-console/worker-management-client.json \
+    --worker-management-assertion /var/run/secrets/qinglong3/copilot-console/worker-management-assertion.jwt
 fi
 
 if [ "$mode" = check ]; then

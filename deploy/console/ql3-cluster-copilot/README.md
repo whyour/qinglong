@@ -12,6 +12,12 @@ by default. Supplying a separate Run management mTLS config and short-lived
 User assertion adds only status, blocked-list and inspect reads to the same
 loopback process; rearm, stop and retry remain absent.
 
+Worker observation is a third, independent authority and is also disabled by
+default. Supplying its generic Worker management mTLS config and short-lived
+User assertion adds only a fixed 16-item list and point inspect to the same
+loopback process. Credential mutation, drain, revoke, background polling and
+automatic pagination remain absent.
+
 Use `ql3-cluster-admin` from the same independently verified Admin release as
 the Cluster deployment. D-328 also supports the image-carried
 `docker-loopback.sh`: it uses an explicit container-only listener but publishes
@@ -111,6 +117,14 @@ credential. Supplying only one of config/assertion is rejected before a
 listener or Cluster request is created. The assertion is reread for every
 explicit click so it can be rotated or removed while the Console is running.
 
+To enable Worker observation, copy
+`worker-management-client-config.example.json` to
+`worker-management-client.json`, install its separate CA, client certificate
+and private key, and issue a short-lived strong User assertion with only
+`worker.manage` into `worker-management-assertion.jwt`. Its endpoint must be
+the D-374 canonical `/api/v3/workers/management`; the Console cannot accept the
+legacy credential-management path or a credential mutation command file.
+
 Create an independent 256-bit browser session key without placing its value in
 argv or an environment variable:
 
@@ -125,6 +139,10 @@ If optional Run management reads are enabled, apply the same owner-private,
 canonical, non-symlink `0600` rule to `run-management-client.json`,
 `run-management-ca.pem`, `run-management-client.crt`,
 `run-management-client.key` and `run-management-assertion.jwt`.
+Apply the same rule to `worker-management-client.json`,
+`worker-management-ca.pem`, `worker-management-client.crt`,
+`worker-management-client.key` and `worker-management-assertion.jwt` when
+Worker observation is enabled.
 
 Every file must be a current-owner, non-symlink, canonical regular file. The
 session file contains exactly 43 base64url characters and no newline. It is a
@@ -151,7 +169,14 @@ intended:
 --run-management-assertion /absolute/private/ql3-copilot-console/run-management-assertion.jwt
 ```
 
-It validates all three private authorities and performs one unauthenticated
+Worker observation uses its own pair:
+
+```sh
+--worker-management-config /absolute/private/ql3-copilot-console/worker-management-client.json \
+--worker-management-assertion /absolute/private/ql3-copilot-console/worker-management-assertion.jwt
+```
+
+It validates every configured private authority and performs one unauthenticated
 TLS 1.3 `GET /readyz`. It does not open the Console listener or reveal paths,
 endpoint, credential, Project or Cluster identity.
 
@@ -190,6 +215,12 @@ one low-sensitive Run cancellation inspection. An `attention_required` status
 offers a user-clicked blocked-list step; each returned Run offers a user-clicked
 inspect step. Pagination is also click-only. There is no polling, automatic
 page traversal, bulk inspection or mutation route.
+
+Explicit Worker management authority adds `worker_list|worker_inspect`. The
+list is fixed at 16 items and exposes a next cursor only as a new user-clicked
+read; each listed Worker can be inspected only by another explicit click. The
+projection contains bounded lifecycle, compatibility, architecture, protocol
+and capacity facts, but no credential, raw capability, label or Secret.
 
 ## Export a redacted evidence bundle
 
@@ -243,6 +274,10 @@ The image launcher keeps Run management disabled unless
 `run-management-client.json` and `run-management-assertion.jwt` from the same
 read-only private mount; all certificate paths in the config must point into
 that mount. `disabled` is the only default and unknown values fail closed.
+Worker observation follows the independent
+`QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT=enabled` switch and reads only its
+Worker config/assertion pair. Enabling one management authority does not enable
+the other.
 
 | Resource class | Memory | CPU | PIDs | Console reads |
 | --- | ---: | ---: | ---: | ---: |

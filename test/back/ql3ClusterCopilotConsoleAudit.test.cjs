@@ -31,6 +31,8 @@ test('keeps the QingLong 3.0 Copilot Console independent and read-only', () => {
       'run_cancellation_status',
       'run_cancellation_blocked_list',
       'run_cancellation_inspect',
+      'worker_list',
+      'worker_inspect',
       'run_list',
       'run_read',
       'run_event_list',

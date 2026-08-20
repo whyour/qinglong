@@ -11,6 +11,27 @@
 
 最新增量证据（2026-08-20）：
 
+- D-375/ADR-0468（已接受）：在既有 operator-workstation、loopback-only Copilot Console 内接入 D-374 通用 Worker
+  management 的两个只读产品操作，而不是新增包、服务或集群工作负载。Browser/BFF 只新增固定
+  `worker_list|worker_inspect` 与 `/api/v1/worker-management/workers|worker`，上游只走 canonical
+  `/api/v3/workers/management`；Worker config/assertion 必须成对显式提供，宿主启动器也只在
+  `QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT=enabled` 时只读挂载，默认输出 `workerManagementAuthority=disabled`。
+  list 固定 16 项并只在用户点击时携带 `afterWorkerId`，inspect 只由用户选定一个 Worker；没有 credential mutation、drain、
+  revoke、caller limit/filter、自动翻页、poller、retry、queue、cache、watcher 或后台 timer。浏览器不接触 mTLS key/assertion，
+  Console 返回 caller request ID 并丢弃 management transport request ID；证据 bundle 对 Worker/Project/request identity 使用域内
+  alias，只保留有界 lifecycle、compatibility、support tier、architecture、OS、runtime 和 capacity 事实。实现继续内聚在现有
+  `@qinglong/cluster-admin/copilot-console`，复用 `worker-management/` client/product；workspace 保持 18 packages，没有新增依赖、
+  binary、端口、数据库对象、Deployment、Ingress 或常驻连接。专项门 `48/48`；Cluster Admin 全量为
+  `431 total / 428 pass / 3 conditional skip / 0 fail`，backend 为
+  `1,504 total / 1,502 pass / 2 conditional skip / 0 fail`，18-package clean build/逐包测试单次退出 0。package boundary、Cluster
+  dependency、Edge import、Cluster/Worker deployment、Console 与 Console distribution 审计全部 compatible；仍为
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`，Cluster Admin `128 source / 127 nested`。14 档 Local artifact audit 全部
+  compatible；基础 Edge/Standalone 为 `2,598,669 / 2,598,747` bytes、57 loaded modules、RSS 增量
+  `11,272,192 / 11,223,040` bytes，Application+AI 为 `4,501,822 / 4,501,954` bytes，MCP 为
+  `7,324,601 / 7,324,709` bytes，证明 Cluster Console/Worker authority 没有进入低配路由设备闭包。本切片不改变 schema、ACL、
+  repository、role、Pool、连接或 failover 语义，不重跑并不重新占有 PostgreSQL HA 证明；D-373/D-374 的 PostgreSQL 18.6
+  arm64 HA `146/146`、timeline `1→2` 仅作为相邻既有基线，任何后续数据库语义变化必须重新执行 HA 门。
+
 - D-374/ADR-0467（已接受）：完成 D-373 留下的 Worker 产品命名债务，同时保持零新增常驻服务。通用 canonical path 为
   `/api/v3/workers/management`；旧 `/api/v3/worker-credentials/management` 作为精确兼容 alias 继续由同一个 TLS 1.3/mTLS/
   OIDC listener、transport、quota、rate limiter 和连接集合处理。共享 host 只允许这一对 alias，任意跨 Run/Automation/

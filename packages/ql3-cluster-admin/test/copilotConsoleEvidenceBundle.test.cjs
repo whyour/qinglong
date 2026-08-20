@@ -233,6 +233,67 @@ test('redacts optional Run management observations while preserving fixed availa
   assert.doesNotMatch(JSON.stringify(bundle), /project-sensitive/);
 });
 
+test('redacts Worker identity and preserves only bounded placement and capacity facts', async () => {
+  const bundle = await createClusterConsoleEvidenceBundle(
+    [
+      {
+        operation: 'worker_list',
+        observedAtMs: 1_700_000_003_000,
+        request: {
+          schema: requestSchema,
+          operation: 'worker_list',
+          afterWorkerId: null,
+          projectId: 'project-sensitive',
+          requestId: 'worker-request-sensitive',
+        },
+        fact: {
+          schema: 'qinglong/worker-session-list@v1',
+          projectId: 'project-sensitive',
+          observedAtMs: 1_700_000_003_000,
+          count: 1,
+          workers: [
+            {
+              workerId: 'worker-sensitive',
+              sessionId: 'session-must-not-export',
+              generation: 2,
+              sessionVersion: 5,
+              lifecycle: 'online',
+              compatibility: 'default_placement',
+              architecture: 'arm64',
+              supportTier: 'tier1',
+              protocolVersion: '1.0.0',
+              operatingSystem: 'linux',
+              maxConcurrentRuns: 2,
+              availableSlots: 1,
+              lastHeartbeatAtMs: 1_700_000_002_000,
+              leaseExpiresAtMs: 1_700_000_004_000,
+            },
+          ],
+          nextAfterWorkerId: 'worker-sensitive',
+        },
+      },
+    ],
+    1_700_000_004_000,
+    webcrypto,
+  );
+  const entry = bundle.entries[0];
+  assert.equal(entry.operation, 'worker_list');
+  assert.equal(entry.target.afterWorkerId, null);
+  assert.equal(entry.fact.workers[0].workerId, 'worker-001');
+  assert.equal(entry.fact.nextAfterWorkerId, 'worker-001');
+  assert.equal(entry.fact.workers[0].lifecycle, 'online');
+  assert.equal(entry.fact.workers[0].compatibility, 'default_placement');
+  assert.equal(entry.fact.workers[0].architecture, 'arm64');
+  assert.equal(entry.fact.workers[0].supportTier, 'tier1');
+  assert.equal(entry.fact.workers[0].availableSlots, 1);
+  assert.equal(entry.fact.workers[0].sessionId, undefined);
+  assert.equal(entry.fact.workers[0].protocolVersion, undefined);
+  assert.doesNotMatch(
+    JSON.stringify(bundle),
+    /worker-sensitive|session-must-not-export|project-sensitive/,
+  );
+});
+
 test('fails closed on widened records, unsafe JSON and every capacity ceiling', async () => {
   const error = { code: 'QL3_CLUSTER_CONSOLE_EVIDENCE_BUNDLE_INVALID' };
   assert.throws(() => measureClusterConsoleEvidenceRecord(null), error);
