@@ -89,6 +89,8 @@ COPY --chmod=0444 deploy/console/ql3-cluster-copilot/run-management-client-confi
   share/ql3-copilot-console/run-management-client-config.example.json
 COPY --chmod=0444 deploy/console/ql3-cluster-copilot/worker-management-client-config.example.json \
   share/ql3-copilot-console/worker-management-client-config.example.json
+COPY --chmod=0444 deploy/console/ql3-cluster-copilot/package-management-client-config.example.json \
+  share/ql3-copilot-console/package-management-client-config.example.json
 COPY --chmod=0444 deploy/console/ql3-cluster-copilot/host-environment.example.json \
   share/ql3-copilot-console/host-environment.example.json
 

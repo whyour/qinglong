@@ -265,6 +265,23 @@ test('normalizes Copilot and fixed Project observation operations without arbitr
   assert.throws(() => clusterCopilotConsoleProjectReadPath(workerList), {
     code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID',
   });
+  const packageList = normalizeClusterCopilotConsoleReadRequest({
+    schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+    operation: 'package_list',
+    projectId: 'project-main',
+    requestId: 'console-package-list',
+    afterPackageName: 'ops-package',
+  });
+  assert.deepEqual(packageList, {
+    schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+    operation: 'package_list',
+    projectId: 'project-main',
+    requestId: 'console-package-list',
+    afterPackageName: 'ops-package',
+  });
+  assert.throws(() => clusterCopilotConsoleProjectReadPath(packageList), {
+    code: 'QL3_CLUSTER_COPILOT_CONSOLE_READ_REQUEST_INVALID',
+  });
   assert.throws(
     () =>
       normalizeClusterCopilotConsoleReadRequest({
@@ -685,6 +702,62 @@ test('routes only fixed Worker list and inspect reads with a bounded cursor', as
     path: '/api/v1/worker-management/workers',
     headers,
     body: { ...cases[0][1], afterWorkerId: 'contains space' },
+  });
+  assert.equal(invalidCursor.statusCode, 400);
+  assert.equal(reads.length, 2);
+});
+
+test('routes only fixed Package installation list and inspect reads', async (t) => {
+  const reads = [];
+  const { server, headers } = await fixture(async (read) => {
+    reads.push(read);
+    return {
+      schemaVersion: 1,
+      requestId: read.requestId,
+      result: { operation: read.operation },
+    };
+  });
+  t.after(() => server.close());
+  const cases = [
+    [
+      '/api/v1/package-management/installations',
+      {
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'package_list',
+        projectId: 'project-main',
+        requestId: 'console-package-list-1',
+        afterPackageName: null,
+      },
+    ],
+    [
+      '/api/v1/package-management/installation',
+      {
+        schema: CLUSTER_COPILOT_CONSOLE_READ_REQUEST_SCHEMA,
+        operation: 'package_inspect',
+        projectId: 'project-main',
+        requestId: 'console-package-inspect-1',
+        packageName: 'ops-package',
+      },
+    ],
+  ];
+  for (const [path, body] of cases) {
+    const response = await request(server.origin, {
+      method: 'POST',
+      path,
+      headers,
+      body,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  assert.deepEqual(
+    reads,
+    cases.map(([, body]) => body),
+  );
+  const invalidCursor = await request(server.origin, {
+    method: 'POST',
+    path: '/api/v1/package-management/installations',
+    headers,
+    body: { ...cases[0][1], afterPackageName: 'Contains_underscore' },
   });
   assert.equal(invalidCursor.statusCode, 400);
   assert.equal(reads.length, 2);

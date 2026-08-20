@@ -33,6 +33,8 @@
     'run_cancellation_inspect',
     'worker_list',
     'worker_inspect',
+    'package_list',
+    'package_inspect',
     'run_list',
     'run_read',
     'run_event_list',
@@ -54,6 +56,8 @@
     run_cancellation_inspect: ['projectId', 'requestId', 'runId'],
     worker_list: ['afterWorkerId', 'projectId', 'requestId'],
     worker_inspect: ['projectId', 'requestId', 'workerId'],
+    package_list: ['afterPackageName', 'projectId', 'requestId'],
+    package_inspect: ['packageName', 'projectId', 'requestId'],
     run_list: [
       'afterCreatedAtMs',
       'afterRunId',
@@ -122,6 +126,7 @@
     afterStepRunId: 'step',
     afterTaskId: 'task',
     afterWorkerId: 'worker',
+    afterPackageName: 'package',
     artifactId: 'artifact',
     attemptId: 'attempt',
     contentDigest: 'digest',
@@ -131,6 +136,7 @@
     id: 'identifier',
     modelId: 'model',
     nextAfterWorkerId: 'worker',
+    nextAfterPackageName: 'package',
     outputRef: 'artifact',
     packageName: 'package',
     projectId: 'project',
@@ -170,6 +176,8 @@
     'runtimes',
     'worker',
     'workers',
+    'installation',
+    'installations',
     'usage',
     'workflow',
     'workflows',
@@ -207,6 +215,12 @@
     'status',
     'supportTier',
     'operatingSystem',
+    'availability',
+    'failureReason',
+    'installOperation',
+    'quarantineReason',
+    'recoveryAction',
+    'state',
   ]);
   const safeEnumValues = new Set([
     'accepted',
@@ -302,13 +316,31 @@
     'ok',
     'unavailable',
     'workflow',
+    'not_active',
+    'install',
+    'reinstall',
+    'upgrade',
+    'rollback',
+    'resume_stage',
+    'resume_activation',
+    'inspect_activation',
+    'source_unavailable',
+    'source_mismatch',
+    'stage_failed',
+    'activation_failed',
+    'activation_fact_conflict',
+    'approval_expired',
+    'policy_fence_changed',
+    'resource_exhausted',
+    'suspected_key_compromise',
+    'confirmed_key_compromise',
   ]);
   const sensitiveKey =
     /credential|token|authorization|secret|session|password|cookie|private|keyring/iu;
   const freeTextKey =
     /text|content|stdout|stderr|command|input|output|environment|reason|error|message|description|name|path|url|uri|host|endpoint/iu;
   const numericKey =
-    /^(?:schemaVersion|version|revision|sequence|attempt|priority|limit|offset|size|total|count|exitCode|pending|leased|retryWait|dispatched|blocked|due|expiredLease|identityMismatch|pidMismatch|unsupported|invalid|availableSlots|maxConcurrentRuns|cpuCores|[A-Za-z0-9_]*(?:AtMs|TimeMs|DurationMs|Bytes|Tokens|Micros|Sequence|Version|Count|Limit|Offset|Size|Total))$/u;
+    /^(?:schemaVersion|version|revision|sequence|attempt|priority|limit|offset|size|total|count|exitCode|pending|leased|retryWait|dispatched|blocked|due|expiredLease|identityMismatch|pidMismatch|unsupported|invalid|availableSlots|maxConcurrentRuns|cpuCores|targetGeneration|[A-Za-z0-9_]*(?:AtMs|TimeMs|DurationMs|Bytes|Tokens|Micros|Sequence|Version|Count|Limit|Offset|Size|Total))$/u;
   const schemaValue = /^[a-z0-9][a-z0-9./_-]{0,126}@[a-z0-9._-]{1,16}$/u;
 
   class ClusterConsoleEvidenceBundleError extends TypeError {

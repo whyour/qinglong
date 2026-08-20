@@ -156,6 +156,26 @@ test('adds optional Worker management files only after its independent enabled s
   assert.equal(args.includes('--run-management-config'), false);
 });
 
+test('adds optional Package management files only after its independent enabled switch', (t) => {
+  const value = fixture(t);
+  const result = invoke('check', {
+    ...value.env,
+    QL3_COPILOT_CONSOLE_PACKAGE_MANAGEMENT: 'enabled',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const args = fs.readFileSync(value.capture, 'utf8').trimEnd().split('\n');
+  assert.equal(
+    args[args.indexOf('--package-management-config') + 1],
+    '/var/run/secrets/qinglong3/copilot-console/package-management-client.json',
+  );
+  assert.equal(
+    args[args.indexOf('--package-management-assertion') + 1],
+    '/var/run/secrets/qinglong3/copilot-console/package-management-assertion.jwt',
+  );
+  assert.equal(args.includes('--run-management-config'), false);
+  assert.equal(args.includes('--worker-management-config'), false);
+});
+
 test('rejects mutable, ambient and malformed host inputs before Docker', (t) => {
   const value = fixture(t);
   for (const environment of [
@@ -169,6 +189,7 @@ test('rejects mutable, ambient and malformed host inputs before Docker', (t) => 
     { ...value.env, QL3_COPILOT_CONSOLE_RESOURCE_CLASS: 'unbounded' },
     { ...value.env, QL3_COPILOT_CONSOLE_RUN_MANAGEMENT: 'ambient' },
     { ...value.env, QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT: 'ambient' },
+    { ...value.env, QL3_COPILOT_CONSOLE_PACKAGE_MANAGEMENT: 'ambient' },
   ]) {
     const rejected = invoke('serve', environment);
     assert.equal(rejected.status, 78);

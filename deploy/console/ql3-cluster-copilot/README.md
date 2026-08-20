@@ -125,6 +125,15 @@ and private key, and issue a short-lived strong User assertion with only
 the D-374 canonical `/api/v3/workers/management`; the Console cannot accept the
 legacy credential-management path or a credential mutation command file.
 
+To enable Plugin Package installation observation, copy
+`package-management-client-config.example.json` to
+`package-management-client.json`, install its CA, and issue a short-lived
+strong User assertion with only `package.manage` into
+`package-management-assertion.jwt`. Its endpoint is fixed to the canonical
+`/api/v3/plugin-packages/management`. This authority is independent of the
+Project, Run and Worker files; the Console exposes no Package command file or
+lifecycle mutation.
+
 Create an independent 256-bit browser session key without placing its value in
 argv or an environment variable:
 
@@ -143,6 +152,9 @@ Apply the same rule to `worker-management-client.json`,
 `worker-management-ca.pem`, `worker-management-client.crt`,
 `worker-management-client.key` and `worker-management-assertion.jwt` when
 Worker observation is enabled.
+Apply the same rule to `package-management-client.json`,
+`package-management-ca.pem` and `package-management-assertion.jwt` when Package
+observation is enabled.
 
 Every file must be a current-owner, non-symlink, canonical regular file. The
 session file contains exactly 43 base64url characters and no newline. It is a
@@ -174,6 +186,13 @@ Worker observation uses its own pair:
 ```sh
 --worker-management-config /absolute/private/ql3-copilot-console/worker-management-client.json \
 --worker-management-assertion /absolute/private/ql3-copilot-console/worker-management-assertion.jwt
+```
+
+Package observation also uses an independent pair:
+
+```sh
+--package-management-config /absolute/private/ql3-copilot-console/package-management-client.json \
+--package-management-assertion /absolute/private/ql3-copilot-console/package-management-assertion.jwt
 ```
 
 It validates every configured private authority and performs one unauthenticated
@@ -221,6 +240,14 @@ list is fixed at 16 items and exposes a next cursor only as a new user-clicked
 read; each listed Worker can be inspected only by another explicit click. The
 projection contains bounded lifecycle, compatibility, architecture, protocol
 and capacity facts, but no credential, raw capability, label or Secret.
+
+Explicit Package management authority adds `package_list|package_inspect`, for
+a maximum vocabulary of twenty operations when every optional authority is
+enabled. The list is fixed at 16 installations with click-only pagination and
+click-only inspection. The product projection includes Package version,
+installation state, availability and bounded recovery codes, but omits
+installation IDs, locks, record digests, transport identity and every Package
+mutation. Package authority remains disabled by default.
 
 ## Export a redacted evidence bundle
 
@@ -276,8 +303,10 @@ read-only private mount; all certificate paths in the config must point into
 that mount. `disabled` is the only default and unknown values fail closed.
 Worker observation follows the independent
 `QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT=enabled` switch and reads only its
-Worker config/assertion pair. Enabling one management authority does not enable
-the other.
+Worker config/assertion pair. Package observation follows
+`QL3_COPILOT_CONSOLE_PACKAGE_MANAGEMENT=enabled` and reads only its Package
+config/assertion pair. Enabling one management authority does not enable either
+of the others.
 
 | Resource class | Memory | CPU | PIDs | Console reads |
 | --- | ---: | ---: | ---: | ---: |

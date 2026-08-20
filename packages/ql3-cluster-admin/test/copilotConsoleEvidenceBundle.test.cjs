@@ -294,6 +294,65 @@ test('redacts Worker identity and preserves only bounded placement and capacity 
   );
 });
 
+test('redacts Package transport identity and keeps bounded installation state', async () => {
+  const bundle = await createClusterConsoleEvidenceBundle(
+    [
+      {
+        operation: 'package_list',
+        observedAtMs: 1_700_000_005_000,
+        request: {
+          schema: requestSchema,
+          operation: 'package_list',
+          afterPackageName: null,
+          projectId: 'project-sensitive',
+          requestId: 'package-request-sensitive',
+        },
+        fact: {
+          schema: 'qinglong/plugin-package-installation-list@v1',
+          projectId: 'project-sensitive',
+          count: 1,
+          installations: [
+            {
+              packageName: 'ops-package-sensitive',
+              packageVersion: '3.1.0',
+              installOperation: 'upgrade',
+              state: 'active',
+              targetGeneration: 4,
+              recoveryAction: 'none',
+              availability: 'active',
+              quarantineReason: null,
+              failureReason: null,
+              version: 7,
+              createdAtMs: 1_700_000_001_000,
+              updatedAtMs: 1_700_000_004_000,
+              installationId: 'must-not-export',
+              recordDigest: 'a'.repeat(64),
+            },
+          ],
+          truncated: true,
+          nextAfterPackageName: 'ops-package-sensitive',
+        },
+      },
+    ],
+    1_700_000_006_000,
+    webcrypto,
+  );
+  const entry = bundle.entries[0];
+  assert.equal(entry.operation, 'package_list');
+  assert.equal(entry.fact.installations[0].packageName, 'package-001');
+  assert.equal(entry.fact.nextAfterPackageName, 'package-001');
+  assert.equal(entry.fact.installations[0].installOperation, 'upgrade');
+  assert.equal(entry.fact.installations[0].state, 'active');
+  assert.equal(entry.fact.installations[0].targetGeneration, 4);
+  assert.equal(entry.fact.installations[0].installationId, undefined);
+  assert.equal(entry.fact.installations[0].recordDigest, 'digest-001');
+  assert.equal(entry.fact.installations[0].packageVersion, undefined);
+  assert.doesNotMatch(
+    JSON.stringify(bundle),
+    /ops-package-sensitive|package-request-sensitive|project-sensitive|must-not-export/,
+  );
+});
+
 test('fails closed on widened records, unsafe JSON and every capacity ceiling', async () => {
   const error = { code: 'QL3_CLUSTER_CONSOLE_EVIDENCE_BUNDLE_INVALID' };
   assert.throws(() => measureClusterConsoleEvidenceRecord(null), error);

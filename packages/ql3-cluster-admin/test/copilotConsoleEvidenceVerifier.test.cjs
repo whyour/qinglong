@@ -147,6 +147,16 @@ test('cross-verifies every fixed Console read operation', async (t) => {
       requestId: 'q-worker-inspect',
       workerId: 'worker-1',
     },
+    package_list: {
+      afterPackageName: null,
+      projectId: 'p-package',
+      requestId: 'q-package-list',
+    },
+    package_inspect: {
+      packageName: 'ops-package',
+      projectId: 'p-package',
+      requestId: 'q-package-inspect',
+    },
     run_list: {
       afterCreatedAtMs: null,
       afterRunId: null,
@@ -247,7 +257,7 @@ test('cross-verifies every fixed Console read operation', async (t) => {
     assert.equal(result.status, 'verified');
     verified += result.bundle.entryCount;
   }
-  assert.equal(verified, 18);
+  assert.equal(verified, 20);
 });
 
 test('CLI is secret-free on success, invalid input and usage errors', async (t) => {

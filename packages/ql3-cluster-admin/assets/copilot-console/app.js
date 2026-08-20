@@ -11,6 +11,8 @@
     run_cancellation_inspect: '/api/v1/run-management/cancellation-inspect',
     worker_list: '/api/v1/worker-management/workers',
     worker_inspect: '/api/v1/worker-management/worker',
+    package_list: '/api/v1/package-management/installations',
+    package_inspect: '/api/v1/package-management/installation',
     run_list: '/api/v1/observe/run-list',
     run_read: '/api/v1/observe/run',
     run_event_list: '/api/v1/observe/run-events',
@@ -31,6 +33,8 @@
     run_cancellation_inspect: '取消诊断',
     worker_list: 'Worker 目录',
     worker_inspect: 'Worker 详情',
+    package_list: 'Package 安装目录',
+    package_inspect: 'Package 安装详情',
     run_list: 'Run 目录',
     run_read: 'Run 详情',
     run_event_list: 'Run Events',
@@ -131,6 +135,10 @@
       result.afterWorkerId = null;
     } else if (operation === 'worker_inspect') {
       result.workerId = value('worker-id');
+    } else if (operation === 'package_list') {
+      result.afterPackageName = null;
+    } else if (operation === 'package_inspect') {
+      result.packageName = value('installation-package-name');
     } else if (operation === 'run_list') {
       result.afterCreatedAtMs = null;
       result.afterRunId = null;
@@ -188,6 +196,11 @@
       typeof fact.nextAfterWorkerId === 'string'
     ) {
       next.afterWorkerId = fact.nextAfterWorkerId;
+    } else if (
+      operation === 'package_list' &&
+      typeof fact.nextAfterPackageName === 'string'
+    ) {
+      next.afterPackageName = fact.nextAfterPackageName;
     } else if (operation === 'run_list' && fact.hasMore === true && fact.next) {
       next.afterCreatedAtMs = fact.next.createdAtMs;
       next.afterRunId = fact.next.runId;
@@ -255,6 +268,23 @@
         button.addEventListener('click', function () {
           document.getElementById('worker-id').value = worker.workerId;
           void execute('worker_inspect');
+        });
+        entry.append(button);
+      });
+      return;
+    }
+    if (operation === 'package_list' && Array.isArray(fact.installations)) {
+      fact.installations.forEach(function (installation) {
+        if (!installation || typeof installation.packageName !== 'string') {
+          return;
+        }
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = '显式检查 ' + installation.packageName;
+        button.addEventListener('click', function () {
+          document.getElementById('installation-package-name').value =
+            installation.packageName;
+          void execute('package_inspect');
         });
         entry.append(button);
       });

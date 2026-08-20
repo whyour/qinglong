@@ -40,6 +40,7 @@ const runManagementOperations = [
   'run_cancellation_inspect',
 ];
 const workerManagementOperations = ['worker_list', 'worker_inspect'];
+const packageManagementOperations = ['package_list', 'package_inspect'];
 
 function workerSummary(workerId = 'worker-a') {
   return {
@@ -60,6 +61,36 @@ function workerSummary(workerId = 'worker-a') {
     leaseExpiresAtMs: 2_000,
     updatedAtMs: 1_050,
     observedAtMs: 1_100,
+  };
+}
+
+function packageInstallationSummary(packageName = 'ops-package') {
+  return {
+    installationId: 'installation-transport-hidden',
+    projectId: 'project-main',
+    packageName,
+    packageVersion: '3.1.0',
+    operation: 'upgrade',
+    state: 'active',
+    targetGeneration: 4,
+    activeLockDigest: 'a'.repeat(64),
+    previousActiveLockDigest: 'b'.repeat(64),
+    recoveryAction: 'none',
+    availability: 'active',
+    quarantineReason: null,
+    quarantineAuthorizationMode: null,
+    quarantineEventDigest: null,
+    quarantinedAtMs: null,
+    withdrawalStatus: null,
+    withdrawalReceiptDigest: null,
+    withdrawalCommittedAtMs: null,
+    failureReason: null,
+    failedFrom: null,
+    failedAtMs: null,
+    version: 7,
+    createdAtMs: 1_000,
+    updatedAtMs: 1_100,
+    recordDigest: 'c'.repeat(64),
   };
 }
 
@@ -201,7 +232,29 @@ async function fixture(t) {
           command,
         });
         const body =
-          command?.operation === 'worker-session.list'
+          command?.operation === 'plugin-package.installation.list'
+            ? {
+                schemaVersion: 1,
+                requestId: 'package-transport-hidden',
+                result: {
+                  schemaVersion: 1,
+                  operation: 'plugin-package.installation.list',
+                  installations: [packageInstallationSummary()],
+                  truncated: true,
+                  next: { packageName: 'ops-package' },
+                },
+              }
+            : command?.operation === 'plugin-package.installation.inspect'
+            ? {
+                schemaVersion: 1,
+                requestId: 'package-transport-hidden',
+                result: {
+                  schemaVersion: 1,
+                  operation: 'plugin-package.installation.inspect',
+                  installation: packageInstallationSummary(),
+                },
+              }
+            : command?.operation === 'worker-session.list'
             ? {
                 schemaVersion: 1,
                 requestId: 'worker-transport-hidden',
@@ -341,6 +394,19 @@ async function fixture(t) {
       requestTimeoutMs: 2_000,
     }),
   );
+  const packageManagementConfigFile = privateFile(
+    directory,
+    'package-client.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      endpoint: `https://localhost:${
+        server.address().port
+      }/api/v3/plugin-packages/management`,
+      servername: 'localhost',
+      caFile,
+      requestTimeoutMs: 2_000,
+    }),
+  );
   const sessionToken = randomBytes(32).toString('base64url');
   return {
     requests,
@@ -360,6 +426,12 @@ async function fixture(t) {
       'worker-assertion.jwt',
       'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJvcGVyYXRvci0xIn0.c2lnbmF0dXJl',
     ),
+    packageManagementConfigFile,
+    packageManagementAssertionFile: privateFile(
+      directory,
+      'package-assertion.jwt',
+      'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJvcGVyYXRvci0xIn0.c2lnbmF0dXJl',
+    ),
   };
 }
 
@@ -371,6 +443,7 @@ test('CLI exposes deterministic help and a low-sensitive failure surface', async
     '  ql3-copilot-console --container-published-loopback --port=1024..65535 --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--check]',
     '  Optional Run reads: --run-management-config /absolute/run-client.json --run-management-assertion /absolute/assertion.jwt',
     '  Optional Worker reads: --worker-management-config /absolute/worker-client.json --worker-management-assertion /absolute/assertion.jwt',
+    '  Optional Package reads: --package-management-config /absolute/package-client.json --package-management-assertion /absolute/assertion.jwt',
     '',
     'Native mode binds 127.0.0.1. Container mode requires host-loopback port publication.',
     'The browser session key remains in a separate owner-private 0600 file.',
@@ -426,6 +499,7 @@ test('preflight proves private authority and unauthenticated TLS 1.3 readiness',
     clusterCredential: 'server_only',
     runManagementAuthority: 'disabled',
     workerManagementAuthority: 'disabled',
+    packageManagementAuthority: 'disabled',
     operations: consoleOperations,
     mutation: false,
   });
@@ -521,6 +595,47 @@ test('preflight enables exactly two Worker reads only with canonical config and 
   assert.equal(incomplete.status, 64);
 });
 
+test('preflight enables exactly two Package reads only with canonical config and assertion', async (t) => {
+  const value = await fixture(t);
+  const result = await runCli([
+    '--check',
+    '--config',
+    value.configFile,
+    '--credential',
+    value.credentialFile,
+    '--session',
+    value.sessionFile,
+    '--package-management-config',
+    value.packageManagementConfigFile,
+    '--package-management-assertion',
+    value.packageManagementAssertionFile,
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const fact = JSON.parse(result.stdout);
+  assert.equal(fact.runManagementAuthority, 'disabled');
+  assert.equal(fact.workerManagementAuthority, 'disabled');
+  assert.equal(fact.packageManagementAuthority, 'server_only');
+  assert.deepEqual(fact.operations, [
+    'inspect',
+    'output',
+    ...packageManagementOperations,
+    ...consoleOperations.slice(2),
+  ]);
+  assert.equal(value.requests.length, 1);
+
+  const incomplete = await runCli([
+    '--config',
+    value.configFile,
+    '--credential',
+    value.credentialFile,
+    '--session',
+    value.sessionFile,
+    '--package-management-config',
+    value.packageManagementConfigFile,
+  ]);
+  assert.equal(incomplete.status, 64);
+});
+
 test('serve mode starts an ephemeral loopback origin and shuts down cleanly', async (t) => {
   const value = await fixture(t);
   const child = spawn(
@@ -548,6 +663,7 @@ test('serve mode starts an ephemeral loopback origin and shuts down cleanly', as
   assert.equal(started.mutation, false);
   assert.equal(started.runManagementAuthority, 'disabled');
   assert.equal(started.workerManagementAuthority, 'disabled');
+  assert.equal(started.packageManagementAuthority, 'disabled');
   assert.equal(started.networkBoundary, 'host-loopback');
   assert.equal(started.publishedHostAddress, '127.0.0.1');
   const shell = await get(started.origin);
@@ -679,6 +795,76 @@ test('serve mode performs one canonical Worker page read without exposing transp
     management.command.request.inspectionId,
     'console-worker-list-1',
   );
+  child.kill('SIGTERM');
+  const exit = await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (status, signal) => resolve({ status, signal }));
+  });
+  assert.deepEqual(exit, { status: 0, signal: null });
+});
+
+test('serve mode performs one canonical Package page read without exposing durable identity', async (t) => {
+  const value = await fixture(t);
+  const child = spawn(
+    process.execPath,
+    [
+      cliPath,
+      '--config',
+      value.configFile,
+      '--credential',
+      value.credentialFile,
+      '--session',
+      value.sessionFile,
+      '--package-management-config',
+      value.packageManagementConfigFile,
+      '--package-management-assertion',
+      value.packageManagementAssertionFile,
+      '--port=0',
+    ],
+    { cwd: packageRoot, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill('SIGKILL');
+  });
+  const started = JSON.parse(await firstLine(child.stdout));
+  assert.equal(started.packageManagementAuthority, 'server_only');
+  const response = await post(
+    started.origin,
+    value.sessionToken,
+    '/api/v1/package-management/installations',
+    {
+      schema: 'qinglong/cluster-copilot-console-read-request@v1',
+      operation: 'package_list',
+      projectId: 'project-main',
+      requestId: 'console-package-list-1',
+      afterPackageName: null,
+    },
+  );
+  assert.equal(response.statusCode, 200);
+  assert.equal(
+    response.body.result.result.schema,
+    'qinglong/plugin-package-installation-list@v1',
+  );
+  assert.equal(response.body.result.result.count, 1);
+  assert.equal(response.body.result.result.nextAfterPackageName, 'ops-package');
+  const encoded = JSON.stringify(response.body);
+  assert.equal(encoded.includes('package-transport-hidden'), false);
+  assert.equal(encoded.includes('installation-transport-hidden'), false);
+  assert.equal(encoded.includes('recordDigest'), false);
+  const management = value.requests.find(
+    (request) => request.path === '/api/v3/plugin-packages/management',
+  );
+  assert.equal(management.method, 'POST');
+  assert.equal(
+    management.command.operation,
+    'plugin-package.installation.list',
+  );
+  assert.equal(
+    management.command.request.inspectionId,
+    'console-package-list-1',
+  );
+  assert.equal(management.command.request.limit, 16);
   child.kill('SIGTERM');
   const exit = await new Promise((resolve, reject) => {
     child.once('error', reject);

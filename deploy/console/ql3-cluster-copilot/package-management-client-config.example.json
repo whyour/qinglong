@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "endpoint": "https://replace-cluster-api.example.com:8443/api/v3/plugin-packages/management",
+  "servername": "replace-cluster-api.example.com",
+  "caFile": "/absolute/private/ql3-copilot-console/package-management-ca.pem",
+  "requestTimeoutMs": 5000
+}

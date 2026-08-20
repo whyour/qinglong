@@ -598,16 +598,18 @@ function validateSecretBindingPlanSummary(
   }
   if (
     summary.actionRef !== command.request.actionRef ||
-    command.operation === 'plugin-package.secret-binding.plan' &&
-    (summary.projectId !== command.request.projectId ||
-      summary.packageName !== command.request.packageName ||
-      summary.entries.length !== command.request.assignments.length ||
-      command.request.assignments.some((assignment) => {
-        const responseEntry = (summary.entries as JsonObject[]).find(
-          (entry) => entry.name === assignment.name,
-        );
-        return !responseEntry || responseEntry.secretRef !== assignment.secretRef;
-      }))
+    (command.operation === 'plugin-package.secret-binding.plan' &&
+      (summary.projectId !== command.request.projectId ||
+        summary.packageName !== command.request.packageName ||
+        summary.entries.length !== command.request.assignments.length ||
+        command.request.assignments.some((assignment) => {
+          const responseEntry = (summary.entries as JsonObject[]).find(
+            (entry) => entry.name === assignment.name,
+          );
+          return (
+            !responseEntry || responseEntry.secretRef !== assignment.secretRef
+          );
+        })))
   ) {
     throw new ClusterPluginPackageManagementClientRequestError();
   }
@@ -707,7 +709,9 @@ function validateSecretBindingTransitionPlanSummary(
             throw new ClusterPluginPackageManagementClientRequestError();
           }
         } catch (error) {
-          if (error instanceof ClusterPluginPackageManagementClientRequestError) {
+          if (
+            error instanceof ClusterPluginPackageManagementClientRequestError
+          ) {
             throw error;
           }
           throw new ClusterPluginPackageManagementClientRequestError();
@@ -758,7 +762,9 @@ function validateResult(
       result as unknown as ClusterPluginPackageManagementTransportResult,
     );
   }
-  if (command.operation === 'plugin-package.secret-binding.transition.propose') {
+  if (
+    command.operation === 'plugin-package.secret-binding.transition.propose'
+  ) {
     const result = exactResponseObject(value, [
       'schemaVersion',
       'operation',
@@ -789,7 +795,9 @@ function validateResult(
       result as unknown as ClusterPluginPackageManagementTransportResult,
     );
   }
-  if (command.operation === 'plugin-package.secret-binding.transition.inspect') {
+  if (
+    command.operation === 'plugin-package.secret-binding.transition.inspect'
+  ) {
     const result = exactResponseObject(value, [
       'schemaVersion',
       'operation',
@@ -893,7 +901,7 @@ function validateResult(
       result.schemaVersion !== 1 ||
       result.operation !== command.operation ||
       typeof result.stale !== 'boolean' ||
-      result.plan === null && result.approval === null
+      (result.plan === null && result.approval === null)
     ) {
       throw new ClusterPluginPackageManagementClientRequestError();
     }
@@ -903,8 +911,7 @@ function validateResult(
     if (result.approval !== null) {
       validateScalarSummary(result.approval, APPROVAL_KEYS);
       if (
-        (result.approval as JsonObject).id !==
-        command.request.approvalRequestId
+        (result.approval as JsonObject).id !== command.request.approvalRequestId
       ) {
         throw new ClusterPluginPackageManagementClientRequestError();
       }
@@ -1482,6 +1489,17 @@ export async function executeClusterPluginPackageManagementClient(
 ): Promise<Readonly<ClusterPluginPackageManagementClientResult>> {
   return executeClusterAuthenticatedManagementClient(
     paths,
+    PLUGIN_PACKAGE_MANAGEMENT_CLIENT_PROTOCOL,
+    connectionOptions,
+  );
+}
+
+export async function executeClusterPluginPackageManagementCommand(
+  execution: ClusterAuthenticatedManagementCommandExecution<ClusterPluginPackageManagementCommand>,
+  connectionOptions?: ClusterPluginPackageManagementClientConnectionOptions,
+): Promise<Readonly<ClusterPluginPackageManagementClientResult>> {
+  return executeClusterAuthenticatedManagementClient(
+    execution,
     PLUGIN_PACKAGE_MANAGEMENT_CLIENT_PROTOCOL,
     connectionOptions,
   );

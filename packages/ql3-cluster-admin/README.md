@@ -8,8 +8,10 @@ Console is a loopback-only read BFF serving digest-bound static assets. Neither
 opens database or Kubernetes authority, enters the legacy 2.x Web application,
 or resides in `cluster-control`.
 
-The Console accepts thirteen exact Run, Task, Workflow and Copilot reads. The
-browser cannot provide an upstream path or HTTP method, and every list page and
+The Console accepts thirteen default Run, Task, Workflow and Copilot reads,
+plus independently enabled Run cancellation, Worker and Plugin Package
+installation observations, for at most twenty exact operations. The browser
+cannot provide an upstream path or HTTP method, and every list page and
 detail/evidence read requires an explicit click. Its Cluster API credential
 stays in a canonical owner-private file and is reread for each upstream
 request; browser JavaScript receives only a separate session token which cannot

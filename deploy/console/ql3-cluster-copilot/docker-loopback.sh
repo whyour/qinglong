@@ -26,6 +26,7 @@ port=${QL3_COPILOT_CONSOLE_PORT-}
 resource_class=${QL3_COPILOT_CONSOLE_RESOURCE_CLASS-compact}
 run_management=${QL3_COPILOT_CONSOLE_RUN_MANAGEMENT-disabled}
 worker_management=${QL3_COPILOT_CONSOLE_WORKER_MANAGEMENT-disabled}
+package_management=${QL3_COPILOT_CONSOLE_PACKAGE_MANAGEMENT-disabled}
 
 printf '%s' "$image" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]{0,191}@sha256:[0-9a-f]{64}$' || fail
 printf '%s' "$network" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$' || fail
@@ -67,6 +68,10 @@ case "$worker_management" in
   disabled|enabled) ;;
   *) fail ;;
 esac
+case "$package_management" in
+  disabled|enabled) ;;
+  *) fail ;;
+esac
 
 set -- docker run --rm --pull never --init --read-only \
   --network "$network" \
@@ -101,6 +106,12 @@ if [ "$worker_management" = enabled ]; then
   set -- "$@" \
     --worker-management-config /var/run/secrets/qinglong3/copilot-console/worker-management-client.json \
     --worker-management-assertion /var/run/secrets/qinglong3/copilot-console/worker-management-assertion.jwt
+fi
+
+if [ "$package_management" = enabled ]; then
+  set -- "$@" \
+    --package-management-config /var/run/secrets/qinglong3/copilot-console/package-management-client.json \
+    --package-management-assertion /var/run/secrets/qinglong3/copilot-console/package-management-assertion.jwt
 fi
 
 if [ "$mode" = check ]; then

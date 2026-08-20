@@ -10,7 +10,16 @@ import {
   validateClusterCopilotClientCredentialFile,
 } from '../copilot-client/client';
 import { readCanonicalFile } from '../management-support/managementClientConfiguration';
-import { validateClusterAuthenticatedManagementClientConfiguration } from '../management-support/pluginPackageManagementClient';
+import {
+  executeClusterPluginPackageManagementCommand,
+  validateClusterAuthenticatedManagementClientConfiguration,
+} from '../management-support/pluginPackageManagementClient';
+import {
+  createPluginPackageInstallationInspectionCommand,
+  createPluginPackageInstallationListCommand,
+  projectPluginPackageInstallationInspection,
+  projectPluginPackageInstallationList,
+} from '../plugin-package/management/pluginPackageInstallationProduct';
 import {
   createRunCancellationBlockedListCommand,
   projectRunCancellationBlockedList,
@@ -50,6 +59,7 @@ const USAGE = [
   '  ql3-copilot-console --container-published-loopback --port=1024..65535 --config /absolute/client.json --credential /absolute/credential --session /absolute/session [--check]',
   '  Optional Run reads: --run-management-config /absolute/run-client.json --run-management-assertion /absolute/assertion.jwt',
   '  Optional Worker reads: --worker-management-config /absolute/worker-client.json --worker-management-assertion /absolute/assertion.jwt',
+  '  Optional Package reads: --package-management-config /absolute/package-client.json --package-management-assertion /absolute/assertion.jwt',
   '',
   'Native mode binds 127.0.0.1. Container mode requires host-loopback port publication.',
   'The browser session key remains in a separate owner-private 0600 file.',
@@ -60,6 +70,8 @@ interface ClusterCopilotConsoleCliArguments {
   readonly configFile: string;
   readonly credentialFile: string;
   readonly networkBoundary: 'host-loopback' | 'container-published-loopback';
+  readonly packageManagementAssertionFile?: string;
+  readonly packageManagementConfigFile?: string;
   readonly runManagementAssertionFile?: string;
   readonly runManagementConfigFile?: string;
   readonly workerManagementAssertionFile?: string;
@@ -78,6 +90,10 @@ const RUN_MANAGEMENT_OPERATIONS = new Set([
   'run_cancellation_inspect',
 ]);
 const WORKER_MANAGEMENT_OPERATIONS = new Set(['worker_list', 'worker_inspect']);
+const PACKAGE_MANAGEMENT_OPERATIONS = new Set([
+  'package_list',
+  'package_inspect',
+]);
 
 function usageFailure(): never {
   process.stderr.write(USAGE + '\n');
@@ -118,6 +134,8 @@ export function parseClusterCopilotConsoleCliArguments(
   let runManagementAssertionFile: string | undefined;
   let workerManagementConfigFile: string | undefined;
   let workerManagementAssertionFile: string | undefined;
+  let packageManagementConfigFile: string | undefined;
+  let packageManagementAssertionFile: string | undefined;
   let port = 0;
   let portSeen = false;
   let containerPublishedLoopback = false;
@@ -201,6 +219,28 @@ export function parseClusterCopilotConsoleCliArguments(
       index += workerManagementAssertion.consumed;
       continue;
     }
+    const packageManagementConfig = argumentValue(
+      argv,
+      index,
+      '--package-management-config',
+    );
+    if (packageManagementConfig) {
+      if (packageManagementConfigFile !== undefined) return usageFailure();
+      packageManagementConfigFile = packageManagementConfig.value;
+      index += packageManagementConfig.consumed;
+      continue;
+    }
+    const packageManagementAssertion = argumentValue(
+      argv,
+      index,
+      '--package-management-assertion',
+    );
+    if (packageManagementAssertion) {
+      if (packageManagementAssertionFile !== undefined) return usageFailure();
+      packageManagementAssertionFile = packageManagementAssertion.value;
+      index += packageManagementAssertion.consumed;
+      continue;
+    }
     const portArgument = argumentValue(argv, index, '--port');
     if (portArgument) {
       if (portSeen || !/^(?:0|[1-9][0-9]{0,4})$/.test(portArgument.value)) {
@@ -227,6 +267,8 @@ export function parseClusterCopilotConsoleCliArguments(
       (runManagementAssertionFile === undefined) ||
     (workerManagementConfigFile === undefined) !==
       (workerManagementAssertionFile === undefined) ||
+    (packageManagementConfigFile === undefined) !==
+      (packageManagementAssertionFile === undefined) ||
     (containerPublishedLoopback && port === 0) ||
     (!containerPublishedLoopback && check && port !== 0)
   ) {
@@ -247,6 +289,10 @@ export function parseClusterCopilotConsoleCliArguments(
     workerManagementAssertionFile !== undefined
       ? { workerManagementConfigFile, workerManagementAssertionFile }
       : {}),
+    ...(packageManagementConfigFile !== undefined &&
+    packageManagementAssertionFile !== undefined
+      ? { packageManagementConfigFile, packageManagementAssertionFile }
+      : {}),
     sessionFile,
     port,
   });
@@ -255,7 +301,7 @@ export function parseClusterCopilotConsoleCliArguments(
 function validateManagementAuthority(
   configFile: string | undefined,
   assertionFile: string | undefined,
-  kind: 'run' | 'worker',
+  kind: 'package' | 'run' | 'worker',
 ): boolean {
   if (configFile === undefined || assertionFile === undefined) return false;
   validateClusterAuthenticatedManagementClientConfiguration(configFile, kind);
@@ -281,12 +327,15 @@ function validateManagementAuthority(
 function availableOperations(
   runManagementAuthority: boolean,
   workerManagementAuthority: boolean,
+  packageManagementAuthority: boolean,
 ) {
   return CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS.filter(
     (operation) =>
       (runManagementAuthority || !RUN_MANAGEMENT_OPERATIONS.has(operation)) &&
       (workerManagementAuthority ||
-        !WORKER_MANAGEMENT_OPERATIONS.has(operation)),
+        !WORKER_MANAGEMENT_OPERATIONS.has(operation)) &&
+      (packageManagementAuthority ||
+        !PACKAGE_MANAGEMENT_OPERATIONS.has(operation)),
   );
 }
 
@@ -393,6 +442,48 @@ async function executeConsoleRead(
       result: projected as unknown as Readonly<Record<string, unknown>>,
     });
   }
+  if (
+    request.operation === 'package_list' ||
+    request.operation === 'package_inspect'
+  ) {
+    if (
+      parsed.packageManagementConfigFile === undefined ||
+      parsed.packageManagementAssertionFile === undefined
+    ) {
+      throw new Error('Package management authority is disabled');
+    }
+    const createUuid = commandIdSource(request.requestId);
+    const command =
+      request.operation === 'package_list'
+        ? createPluginPackageInstallationListCommand(
+            request.projectId,
+            request.afterPackageName ?? undefined,
+            createUuid,
+          )
+        : createPluginPackageInstallationInspectionCommand(
+            request.projectId,
+            request.packageName,
+            createUuid,
+          );
+    const result = await executeClusterPluginPackageManagementCommand({
+      configFile: parsed.packageManagementConfigFile,
+      assertionFile: parsed.packageManagementAssertionFile,
+      command,
+    });
+    const projected =
+      request.operation === 'package_list'
+        ? projectPluginPackageInstallationList(request.projectId, result)
+        : projectPluginPackageInstallationInspection(
+            request.projectId,
+            request.packageName,
+            result,
+          );
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      requestId: request.requestId,
+      result: projected as unknown as Readonly<Record<string, unknown>>,
+    });
+  }
   return executeClusterProjectApiRead({
     configFile: parsed.configFile,
     credentialFile: parsed.credentialFile,
@@ -439,9 +530,15 @@ async function main(): Promise<void> {
     parsed.workerManagementAssertionFile,
     'worker',
   );
+  const packageManagementAuthority = validateManagementAuthority(
+    parsed.packageManagementConfigFile,
+    parsed.packageManagementAssertionFile,
+    'package',
+  );
   const operations = availableOperations(
     runManagementAuthority,
     workerManagementAuthority,
+    packageManagementAuthority,
   );
   const sessionDigest = readSessionDigest(parsed.sessionFile);
   if (parsed.check) {
@@ -463,6 +560,9 @@ async function main(): Promise<void> {
             ? 'server_only'
             : 'disabled',
           workerManagementAuthority: workerManagementAuthority
+            ? 'server_only'
+            : 'disabled',
+          packageManagementAuthority: packageManagementAuthority
             ? 'server_only'
             : 'disabled',
           operations,
@@ -502,6 +602,9 @@ async function main(): Promise<void> {
         ? 'server_only'
         : 'disabled',
       workerManagementAuthority: workerManagementAuthority
+        ? 'server_only'
+        : 'disabled',
+      packageManagementAuthority: packageManagementAuthority
         ? 'server_only'
         : 'disabled',
       operations,

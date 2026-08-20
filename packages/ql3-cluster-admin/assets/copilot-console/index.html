@@ -24,7 +24,7 @@
         <div class="boundary" aria-label="当前权限边界">
           <span class="boundary-dot" aria-hidden="true"></span>
           <span>本机只读 BFF</span>
-          <strong>Run · Task · Workflow · Worker · Copilot</strong>
+          <strong>Run · Task · Workflow · Worker · Package · Copilot</strong>
         </div>
       </header>
 
@@ -33,7 +33,7 @@
           <div class="section-heading">
             <p class="eyebrow">Observation coordinates</p>
             <h2 id="control-title">选择要读取的事实</h2>
-            <p>每次按钮点击只发起一次有界 GET。页面不创建、取消、重试、轮询或缓存任何任务。</p>
+            <p>每次按钮点击只发起一次有界读取。页面不创建、安装、升级、回滚、取消、重试、轮询或缓存任何任务。</p>
           </div>
 
           <form id="session-form" class="session-gate" autocomplete="off">
@@ -53,6 +53,7 @@
               <button type="button" class="mode-tab active" data-panel="runtime-panel" aria-pressed="true">运行态</button>
               <button type="button" class="mode-tab" data-panel="management-panel" aria-pressed="false">取消可用性</button>
               <button type="button" class="mode-tab" data-panel="worker-panel" aria-pressed="false">Worker</button>
+              <button type="button" class="mode-tab" data-panel="package-panel" aria-pressed="false">Package</button>
               <button type="button" class="mode-tab" data-panel="workflow-panel" aria-pressed="false">工作流</button>
               <button type="button" class="mode-tab" data-panel="copilot-panel" aria-pressed="false">Copilot</button>
             </nav>
@@ -78,6 +79,20 @@
                   <button type="button" data-read="run_step_list">读取 Steps</button>
                   <button type="button" data-read="run_event_list">读取 Events</button>
                 </div>
+              </div>
+            </section>
+
+            <section id="package-panel" class="mode-panel" hidden>
+              <div class="control-group">
+                <div class="control-title"><span>01</span><strong>Package 安装目录</strong></div>
+                <button type="button" class="primary" data-read="package_list">读取首屏 Installations</button>
+                <p class="field-note">只有启动进程显式提供独立 Package management 配置与短期 assertion 时可用；固定 16 项，下一页必须再次点击。</p>
+              </div>
+              <div class="control-group">
+                <div class="control-title"><span>02</span><strong>单 Package 安装状态</strong></div>
+                <input id="installation-package-name" type="text" maxlength="63" autocomplete="off" spellcheck="false" placeholder="ops-package" />
+                <button type="button" data-read="package_inspect">读取 Package 安装详情</button>
+                <p class="field-note">只投影版本、安装状态、可用性与恢复提示；没有 propose、decide、install、upgrade、rollback、disable 或 uninstall mutation。</p>
               </div>
             </section>
 
@@ -145,7 +160,7 @@
 
           <aside class="trust-note">
             <span>Authority boundary</span>
-            <p>Project credential、可选 Run authority 与可选 Worker authority 只由本机进程从彼此独立的私有文件读取。浏览器无法提交任意路径，也没有 start、stop、retry、rearm、drain、revoke 或 diagnose 权限入口。脱敏导出只处理本页已读事实，不补读或上传。</p>
+            <p>Project credential、可选 Run、Worker 与 Package authority 只由本机进程从彼此独立的私有文件读取。浏览器无法提交任意路径，也没有 start、stop、retry、rearm、drain、revoke、propose、decide、install、upgrade、rollback、disable、uninstall 或 diagnose 权限入口。脱敏导出只处理本页已读事实，不补读或上传。</p>
           </aside>
         </aside>
 
@@ -176,7 +191,7 @@
 
       <footer>
         <span>Loopback only · explicit reads · zero polling</span>
-        <span>QingLong 3.0 incubation / D-375</span>
+        <span>QingLong 3.0 incubation / D-376</span>
       </footer>
     </div>
   </body>

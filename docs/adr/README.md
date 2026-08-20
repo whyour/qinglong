@@ -472,6 +472,7 @@
 | [ADR-0466](./ADR-0466-bounded-worker-session-compatibility-observation.md)                                       | 有界 Worker Session 兼容性观察                                                                                                                                                           | Accepted |
 | [ADR-0467](./ADR-0467-generic-worker-management-product-entry.md)                                                | 通用 Worker Management 产品入口与兼容路径                                                                                                                                                | Accepted |
 | [ADR-0468](./ADR-0468-optional-console-worker-observation.md)                                                    | 可选 Console Worker 只读观察                                                                                                                                                              | Accepted |
+| [ADR-0469](./ADR-0469-optional-console-package-installation-observation.md)                                      | 可选 Console Package Installation 只读观察                                                                                                                                                 | Accepted |
 
 ## 规则
 

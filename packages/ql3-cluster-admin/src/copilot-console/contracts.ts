@@ -16,6 +16,8 @@ export const CLUSTER_COPILOT_CONSOLE_READ_OPERATIONS = Object.freeze([
   'run_cancellation_inspect',
   'worker_list',
   'worker_inspect',
+  'package_list',
+  'package_inspect',
   'run_list',
   'run_read',
   'run_event_list',
@@ -51,6 +53,9 @@ export type ClusterCopilotConsoleReadRequest =
   | (BaseReadRequest<'worker_list'> &
       Readonly<{ afterWorkerId: string | null }>)
   | (BaseReadRequest<'worker_inspect'> & Readonly<{ workerId: string }>)
+  | (BaseReadRequest<'package_list'> &
+      Readonly<{ afterPackageName: string | null }>)
+  | (BaseReadRequest<'package_inspect'> & Readonly<{ packageName: string }>)
   | (BaseReadRequest<'run_list'> &
       Readonly<{
         afterCreatedAtMs: number | null;
@@ -265,6 +270,33 @@ export function normalizeClusterCopilotConsoleReadRequest(
       ...common(record),
       operation: op,
       workerId: record.workerId,
+    });
+  }
+  if (op === 'package_list') {
+    exact(record, op, ['afterPackageName']);
+    if (
+      record.afterPackageName !== null &&
+      (typeof record.afterPackageName !== 'string' ||
+        !PACKAGE_NAME.test(record.afterPackageName))
+    )
+      invalid();
+    return Object.freeze({
+      ...common(record),
+      operation: op,
+      afterPackageName: record.afterPackageName as string | null,
+    });
+  }
+  if (op === 'package_inspect') {
+    exact(record, op, ['packageName']);
+    if (
+      typeof record.packageName !== 'string' ||
+      !PACKAGE_NAME.test(record.packageName)
+    )
+      invalid();
+    return Object.freeze({
+      ...common(record),
+      operation: op,
+      packageName: record.packageName,
     });
   }
   if (op === 'run_list') {
@@ -502,7 +534,9 @@ export function clusterCopilotConsoleProjectReadPath(
     normalized.operation === 'run_cancellation_blocked_list' ||
     normalized.operation === 'run_cancellation_inspect' ||
     normalized.operation === 'worker_list' ||
-    normalized.operation === 'worker_inspect'
+    normalized.operation === 'worker_inspect' ||
+    normalized.operation === 'package_list' ||
+    normalized.operation === 'package_inspect'
   )
     invalid();
   const project = '/api/v3/projects/' + encoded(normalized.projectId);

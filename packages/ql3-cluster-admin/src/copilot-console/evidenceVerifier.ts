@@ -35,6 +35,8 @@ const OPERATIONS = Object.freeze([
   'run_cancellation_inspect',
   'worker_list',
   'worker_inspect',
+  'package_list',
+  'package_inspect',
   'run_list',
   'run_read',
   'run_event_list',
@@ -66,6 +68,8 @@ const REQUEST_FIELDS: Readonly<Record<EvidenceOperation, readonly string[]>> =
     ]),
     worker_list: Object.freeze(['afterWorkerId', 'projectId', 'requestId']),
     worker_inspect: Object.freeze(['projectId', 'requestId', 'workerId']),
+    package_list: Object.freeze(['afterPackageName', 'projectId', 'requestId']),
+    package_inspect: Object.freeze(['packageName', 'projectId', 'requestId']),
     run_list: Object.freeze([
       'afterCreatedAtMs',
       'afterRunId',
@@ -139,6 +143,7 @@ const IDENTIFIER_DOMAINS: Readonly<Record<string, string>> = Object.freeze({
   afterStepRunId: 'step',
   afterTaskId: 'task',
   afterWorkerId: 'worker',
+  afterPackageName: 'package',
   artifactId: 'artifact',
   attemptId: 'attempt',
   contentDigest: 'digest',
@@ -148,6 +153,7 @@ const IDENTIFIER_DOMAINS: Readonly<Record<string, string>> = Object.freeze({
   id: 'identifier',
   modelId: 'model',
   nextAfterWorkerId: 'worker',
+  nextAfterPackageName: 'package',
   outputRef: 'artifact',
   packageName: 'package',
   projectId: 'project',
@@ -187,6 +193,8 @@ const SAFE_CONTAINERS = new Set([
   'runtimes',
   'worker',
   'workers',
+  'installation',
+  'installations',
   'usage',
   'workflow',
   'workflows',
@@ -224,6 +232,12 @@ const SAFE_ENUM_KEYS = new Set([
   'status',
   'supportTier',
   'operatingSystem',
+  'availability',
+  'failureReason',
+  'installOperation',
+  'quarantineReason',
+  'recoveryAction',
+  'state',
 ]);
 const SAFE_ENUM_VALUES = new Set([
   'accepted',
@@ -319,9 +333,27 @@ const SAFE_ENUM_VALUES = new Set([
   'ok',
   'unavailable',
   'workflow',
+  'not_active',
+  'install',
+  'reinstall',
+  'upgrade',
+  'rollback',
+  'resume_stage',
+  'resume_activation',
+  'inspect_activation',
+  'source_unavailable',
+  'source_mismatch',
+  'stage_failed',
+  'activation_failed',
+  'activation_fact_conflict',
+  'approval_expired',
+  'policy_fence_changed',
+  'resource_exhausted',
+  'suspected_key_compromise',
+  'confirmed_key_compromise',
 ]);
 const NUMERIC_KEY =
-  /^(?:schemaVersion|version|revision|sequence|attempt|priority|limit|offset|size|total|count|exitCode|pending|leased|retryWait|dispatched|blocked|due|expiredLease|identityMismatch|pidMismatch|unsupported|invalid|availableSlots|maxConcurrentRuns|cpuCores|[A-Za-z0-9_]*(?:AtMs|TimeMs|DurationMs|Bytes|Tokens|Micros|Sequence|Version|Count|Limit|Offset|Size|Total))$/u;
+  /^(?:schemaVersion|version|revision|sequence|attempt|priority|limit|offset|size|total|count|exitCode|pending|leased|retryWait|dispatched|blocked|due|expiredLease|identityMismatch|pidMismatch|unsupported|invalid|availableSlots|maxConcurrentRuns|cpuCores|targetGeneration|[A-Za-z0-9_]*(?:AtMs|TimeMs|DurationMs|Bytes|Tokens|Micros|Sequence|Version|Count|Limit|Offset|Size|Total))$/u;
 const SCHEMA_VALUE = /^[a-z0-9][a-z0-9./_-]{0,126}@[a-z0-9._-]{1,16}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const CONTROL = /[\0-\x1f\x7f]/u;
